@@ -32,37 +32,54 @@ export default function Dashboard() {
   }
 
 async function createInvoice() {
-  // Защита от двойного нажатия — 3 минуты
   if (lastCreated && Date.now() - lastCreated < 180000) {
-    const seconds = Math.round((180000 - (Date.now() - lastCreated)) / 1000)
-    if (!confirm(`Вы уже создали счёт ${Math.round((Date.now() - lastCreated)/1000)} сек. назад. Создать ещё один?`)) return
+    if (!confirm(`Вы уже создали счёт недавно. Создать ещё один?`)) return
   }
+
+  if (!clientName) { alert('Введите название клиента'); return }
+  if (services.some(s => !s.name || s.price === 0)) { alert('Заполните все услуги'); return }
 
   setLoading(true)
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) { alert('Войдите в систему'); setLoading(false); return }
 
+  // Получаем настройки профиля для номера счёта
+  const { data: profile } = await supabase.from('profiles').select('invoice_prefix, invoice_next_number').eq('id', user.id).single()
+  
+  const prefix = profile?.invoice_prefix || 'INV-'
+  const nextNum = profile?.invoice_next_number || '0001'
+  const invoiceNumber = prefix + nextNum
+
+  // Увеличиваем номер
+  const newNum = String(parseInt(nextNum) + 1).padStart(nextNum.length, '0')
+  await supabase.from('profiles').update({ invoice_next_number: newNum }).eq('id', user.id)
+
   const { data, error } = await supabase.from('invoices').insert({
     user_id: user.id,
-    number: 'INV-' + Date.now(),
+    number: invoiceNumber,
     amount: total,
     status: 'draft',
+    client_name: clientName,
+    client_bin: clientBin,
+    client_email: clientEmail,
+    services: services,
   }).select().single()
 
   if (error) { alert('Ошибка: ' + error.message); setLoading(false); return }
 
   setLastCreated(Date.now())
   setLoading(false)
+
   generateInvoicePDF({
-  number: data.number,
-  date: new Date().toLocaleDateString('ru-KZ'),
-  clientName,
-  clientBin,
-  clientEmail,
-  services,
-  total,
-})
-alert('Счёт создан и скачан! №' + data.number)
+    number: data.number,
+    date: new Date().toLocaleDateString('ru-KZ'),
+    clientName,
+    clientBin,
+    clientEmail,
+    services,
+    total,
+  })
+  alert('Счёт создан и скачан! №' + data.number)
 }
   return (
     <main className="min-h-screen bg-gray-50">

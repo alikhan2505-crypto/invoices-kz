@@ -120,7 +120,7 @@ export default function History() {
                 <div>
                   <div className="text-xs text-gray-400 mb-1">{inv.number}</div>
                   <div className="text-sm font-medium text-[#1C2056]">
-                    {inv.clients?.name || 'Без клиента'}
+                    {inv.client_name || inv.clients?.name || 'Без клиента'}
                   </div>
                   <div className="text-xs text-gray-400 mt-1">
                     {new Date(inv.created_at).toLocaleDateString('ru-KZ', { day: 'numeric', month: 'short', year: 'numeric' })}
