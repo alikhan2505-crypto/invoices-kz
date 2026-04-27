@@ -6,43 +6,19 @@ import BottomNav from '@/components/BottomNav'
 
 export default function Profile() {
   const router = useRouter()
+  const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [profile, setProfile] = useState({
-    company_name: '',
-    bin_iin: '',
-    address: '',
-    phone: '',
-    email: '',
-    bank_name: '',
-    bik: '',
-    iik: '',
-    kbe: '19',
-    knp: '',
-    director_name: '',
-    accountant_name: '',
-  })
 
   useEffect(() => {
-    async function loadProfile() {
+    async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
       const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
-      if (data) setProfile({ ...profile, ...data })
+      setProfile(data)
       setLoading(false)
     }
-    loadProfile()
+    load()
   }, [])
-
-  async function saveProfile() {
-    setSaving(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    const { error } = await supabase.from('profiles').upsert({ id: user.id, ...profile })
-    if (error) alert('Ошибка: ' + error.message)
-    else alert('Профиль сохранён!')
-    setSaving(false)
-  }
 
   async function signOut() {
     await supabase.auth.signOut()
@@ -55,67 +31,97 @@ export default function Profile() {
     </main>
   )
 
-  const fields = [
-    { section: 'Компания', items: [
-      { key: 'company_name', label: 'Название компании / ИП', placeholder: 'ИП First Project' },
-      { key: 'bin_iin', label: 'БИН / ИИН', placeholder: '890525350143' },
-      { key: 'address', label: 'Адрес', placeholder: 'г. Астана, ул. ...' },
-      { key: 'phone', label: 'Телефон', placeholder: '+7 776 355 51 77' },
-      { key: 'email', label: 'Email', placeholder: 'info@company.kz' },
-      { key: 'director_name', label: 'Руководитель (ФИО)', placeholder: 'Абилбаев А.А.' },
-      { key: 'accountant_name', label: 'Бухгалтер (ФИО)', placeholder: 'Абилбаев А.А.' },
-    ]},
-    { section: 'Банковские реквизиты', items: [
-      { key: 'bank_name', label: 'Банк', placeholder: 'АО «Kaspi Bank»' },
-      { key: 'iik', label: 'ИИК (номер счёта)', placeholder: 'KZ...' },
-      { key: 'bik', label: 'БИК', placeholder: 'CASPKZKA' },
-      { key: 'kbe', label: 'КБе', placeholder: '19' },
-      { key: 'knp', label: 'КНП', placeholder: '119' },
-    ]},
-  ]
+  const initials = profile?.company_name ? profile.company_name.slice(0, 2).toUpperCase() : 'FP'
 
   return (
     <main className="min-h-screen bg-gray-50 pb-24">
-      <div className="bg-[#1C2056] px-4 pt-6 pb-8 max-w-lg mx-auto rounded-b-3xl">
-        <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center text-white font-bold text-lg mb-3">
-          {profile.company_name ? profile.company_name[0] : 'F'}
+      {/* Header */}
+      <div className="bg-white px-4 pt-6 pb-4 border-b">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-full bg-[#1C2056] flex items-center justify-center text-white font-bold text-sm">
+            {initials}
+          </div>
+          <div>
+            <div className="font-semibold text-[#1C2056] text-base">{profile?.company_name || 'Заполните профиль'}</div>
+            <div className="text-xs text-gray-400">{profile?.bin_iin ? 'ИИН: ' + profile.bin_iin : 'Нет данных'}</div>
+          </div>
         </div>
-        <div className="text-white font-medium text-lg">{profile.company_name || 'Заполните профиль'}</div>
-        <div className="text-white/60 text-sm mt-1">{profile.bin_iin ? 'ИИН: ' + profile.bin_iin : ''}</div>
+
+        {/* Income card */}
+        <div className="bg-gray-50 rounded-2xl p-4">
+          <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">Доход за месяц</div>
+          <div className="text-2xl font-semibold text-[#1C2056]">0 ₸</div>
+          <div className="text-xs text-[#2DC48D] mt-1">Нет данных за прошлый период</div>
+        </div>
       </div>
 
-      <div className="max-w-lg mx-auto p-4">
-        {fields.map(section => (
-          <div key={section.section} className="bg-white rounded-2xl shadow-sm mb-4 overflow-hidden">
-            <div className="px-4 pt-4 pb-2 text-xs text-gray-400 uppercase tracking-wide font-medium">
-              {section.section}
-            </div>
-            {section.items.map(field => (
-              <div key={field.key} className="px-4 pb-3">
-                <label className="text-xs text-gray-500 mb-1 block">{field.label}</label>
-                <input
-                  className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                  placeholder={field.placeholder}
-                  value={(profile as any)[field.key] || ''}
-                  onChange={e => setProfile({ ...profile, [field.key]: e.target.value })}
-                />
+      <div className="max-w-lg mx-auto p-4 space-y-3">
+        {/* Компания */}
+        <div>
+          <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">Компания</div>
+          <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
+            {[
+              { icon: '🏢', label: 'Реквизиты', href: '/profile/requisites' },
+              { icon: '💳', label: 'Банковские счета', href: '/profile/banks' },
+              { icon: '🔒', label: 'ЭЦП и безопасность', href: '/profile/security' },
+            ].map((item, i, arr) => (
+              <div key={item.href}
+                onClick={() => router.push(item.href)}
+                className={`flex items-center justify-between px-4 py-3.5 cursor-pointer hover:bg-gray-50 ${i < arr.length - 1 ? 'border-b border-gray-100' : ''}`}>
+                <div className="flex items-center gap-3">
+                  <span className="text-lg">{item.icon}</span>
+                  <span className="text-sm text-gray-800">{item.label}</span>
+                </div>
+                <span className="text-gray-300 text-lg">›</span>
               </div>
             ))}
           </div>
-        ))}
+        </div>
 
-        <button
-          onClick={saveProfile}
-          disabled={saving}
-          className="w-full bg-[#1C2056] text-white rounded-xl py-4 font-medium text-sm mb-3"
-        >
-          {saving ? 'Сохраняем...' : 'Сохранить'}
-        </button>
+        {/* Справочники */}
+        <div>
+          <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">Справочники</div>
+          <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
+            {[
+              { icon: '👥', label: 'Мои клиенты', href: '/profile/clients', badge: '' },
+              { icon: '📋', label: 'Услуги и товары', href: '/profile/services', badge: '' },
+            ].map((item, i, arr) => (
+              <div key={item.href}
+                onClick={() => router.push(item.href)}
+                className={`flex items-center justify-between px-4 py-3.5 cursor-pointer hover:bg-gray-50 ${i < arr.length - 1 ? 'border-b border-gray-100' : ''}`}>
+                <div className="flex items-center gap-3">
+                  <span className="text-lg">{item.icon}</span>
+                  <span className="text-sm text-gray-800">{item.label}</span>
+                </div>
+                <span className="text-gray-300 text-lg">›</span>
+              </div>
+            ))}
+          </div>
+        </div>
 
-        <button
-          onClick={signOut}
-          className="w-full bg-red-50 text-red-500 rounded-xl py-3 text-sm font-medium"
-        >
+        {/* Настройки */}
+        <div>
+          <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">Настройки</div>
+          <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
+            {[
+              { icon: '⚙️', label: 'Настройки счетов', href: '/profile/settings' },
+              { icon: '🔔', label: 'Уведомления', href: '/profile/notifications' },
+              { icon: '💬', label: 'Поддержка', href: '/profile/support' },
+            ].map((item, i, arr) => (
+              <div key={item.href}
+                onClick={() => router.push(item.href)}
+                className={`flex items-center justify-between px-4 py-3.5 cursor-pointer hover:bg-gray-50 ${i < arr.length - 1 ? 'border-b border-gray-100' : ''}`}>
+                <div className="flex items-center gap-3">
+                  <span className="text-lg">{item.icon}</span>
+                  <span className="text-sm text-gray-800">{item.label}</span>
+                </div>
+                <span className="text-gray-300 text-lg">›</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <button onClick={signOut} className="w-full bg-red-50 text-red-500 rounded-xl py-3 text-sm font-medium">
           Выйти из аккаунта
         </button>
       </div>
