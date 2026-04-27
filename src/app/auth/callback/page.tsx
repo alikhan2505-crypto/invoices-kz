@@ -8,41 +8,58 @@ export default function AuthCallback() {
 
   useEffect(() => {
     async function handleCallback() {
-      // Ждём пока Supabase обработает токен из URL
-      const { data: { session } } = await supabase.auth.getSession()
+      try {
+        // Для Google OAuth — обменяем code на сессию
+        const params = new URLSearchParams(window.location.search)
+        const hashParams = new URLSearchParams(window.location.hash.replace('#', ''))
+        
+        const code = params.get('code')
+        const accessToken = hashParams.get('access_token')
+        const error = params.get('error') || hashParams.get('error')
 
-      if (session) {
-        const { data } = await supabase
+        if (error) {
+          console.error('Auth error:', error)
+          router.push('/login')
+          return
+        }
+
+        if (code) {
+          // Google OAuth flow
+          const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
+          if (exchangeError) {
+            console.error('Exchange error:', exchangeError)
+            router.push('/login')
+            return
+          }
+        } else if (accessToken) {
+          // Magic link flow — уже в сессии
+        }
+
+        // Проверяем сессию
+        await new Promise(resolve => setTimeout(resolve, 500))
+        const { data: { session } } = await supabase.auth.getSession()
+
+        if (!session) {
+          router.push('/login')
+          return
+        }
+
+        // Проверяем профиль
+        const { data: profile } = await supabase
           .from('profiles')
           .select('company_name')
           .eq('id', session.user.id)
           .single()
 
-        if (!data?.company_name) {
+        if (!profile?.company_name) {
           router.push('/onboarding')
         } else {
           router.push('/dashboard')
         }
-      } else {
-        // Подождём немного и попробуем снова
-        setTimeout(async () => {
-          const { data: { session: session2 } } = await supabase.auth.getSession()
-          if (session2) {
-            const { data } = await supabase
-              .from('profiles')
-              .select('company_name')
-              .eq('id', session2.user.id)
-              .single()
 
-            if (!data?.company_name) {
-              router.push('/onboarding')
-            } else {
-              router.push('/dashboard')
-            }
-          } else {
-            router.push('/login')
-          }
-        }, 2000)
+      } catch (err) {
+        console.error('Callback error:', err)
+        router.push('/login')
       }
     }
 
@@ -52,7 +69,7 @@ export default function AuthCallback() {
   return (
     <main className="min-h-screen bg-gray-50 flex items-center justify-center">
       <div className="text-center">
-        <div className="text-4xl mb-4 animate-spin">⏳</div>
+        <div className="text-4xl mb-4">⏳</div>
         <p className="text-gray-500">Входим в систему...</p>
       </div>
     </main>
