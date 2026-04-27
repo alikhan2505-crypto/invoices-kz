@@ -11,7 +11,6 @@ export default function Dashboard() {
   const [lastCreated, setLastCreated] = useState<number | null>(null)
   const [clients, setClients] = useState<any[]>([])
   const [savedServices, setSavedServices] = useState<any[]>([])
-  const [showClientPicker, setShowClientPicker] = useState(false)
   const [showServicePicker, setShowServicePicker] = useState(false)
   const [profile, setProfile] = useState<any>(null)
 
@@ -44,7 +43,13 @@ export default function Dashboard() {
     setClientBin(client.bin_iin || '')
     setClientEmail(client.email || '')
     setClientAddress(client.address || '')
-    setShowClientPicker(false)
+  }
+
+  function clearClient() {
+    setClientName('')
+    setClientBin('')
+    setClientEmail('')
+    setClientAddress('')
   }
 
   function selectService(svc: any) {
@@ -63,28 +68,27 @@ export default function Dashboard() {
     setServices(updated)
   }
 
+  const filteredClients = clientName && !clientBin
+    ? clients.filter(c =>
+        c.name.toLowerCase().includes(clientName.toLowerCase()) ||
+        (c.bin_iin || '').includes(clientName)
+      )
+    : []
+
   async function createInvoice() {
-    // Валидация профиля
     if (!profile?.company_name || !profile?.bin_iin) {
       alert('Сначала заполните реквизиты компании в Профиле')
       router.push('/profile/requisites')
       return
     }
-
-    // Валидация клиента
     if (!clientName) { alert('Введите название клиента'); return }
     if (!clientBin) { alert('Введите БИН/ИИН клиента'); return }
-
-    // Валидация услуг
     if (services.length === 0 || services.some(s => !s.name)) {
-      alert('Добавьте хотя бы одну услугу')
-      return
+      alert('Добавьте хотя бы одну услугу'); return
     }
     if (services.some(s => s.price === 0)) {
-      alert('Укажите цену для всех услуг')
-      return
+      alert('Укажите цену для всех услуг'); return
     }
-
     if (lastCreated && Date.now() - lastCreated < 180000) {
       if (!confirm('Вы уже создали счёт недавно. Создать ещё один?')) return
     }
@@ -121,7 +125,6 @@ export default function Dashboard() {
       clientName, clientBin, clientEmail, services, total,
     })
 
-    // Сброс формы
     setClientName(''); setClientBin(''); setClientEmail(''); setClientAddress('')
     setServices([{ name: '', qty: 1, price: 0 }])
   }
@@ -130,7 +133,7 @@ export default function Dashboard() {
     <main className="min-h-screen bg-gray-50 pb-24">
       <div className="bg-white border-b px-4 py-3 flex items-center justify-between">
         <span className="font-bold text-[#1C2056]">INVOICES.KZ</span>
-        <span className="text-sm text-gray-500">{profile?.company_name || 'Профиль'}</span>
+        <span className="text-sm text-gray-500">{profile?.company_name || ''}</span>
       </div>
 
       <div className="max-w-lg mx-auto p-4">
@@ -139,43 +142,78 @@ export default function Dashboard() {
 
         {/* Client section */}
         <div className="bg-white rounded-2xl p-5 mb-4 shadow-sm">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-medium text-[#1C2056]">Данные клиента</h3>
-            {clients.length > 0 && (
-              <button onClick={() => setShowClientPicker(true)}
-                className="text-xs text-[#1C2056] border border-[#1C2056] rounded-lg px-3 py-1">
-                Из справочника
-              </button>
-            )}
-          </div>
-          <div className="space-y-3">
-            <div>
-              <label className="text-xs text-gray-500 mb-1 block">Название компании / ИП *</label>
-              <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                placeholder="ТОО «Пример»"
-                value={clientName} onChange={e => setClientName(e.target.value)} />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
+          <h3 className="font-medium text-[#1C2056] mb-3">Данные клиента</h3>
+
+          {/* Selected client card */}
+          {clientBin ? (
+            <div className="bg-gray-50 rounded-xl p-3 mb-3 flex items-center justify-between">
               <div>
-                <label className="text-xs text-gray-500 mb-1 block">БИН/ИИН *</label>
-                <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                  placeholder="123456789012"
-                  value={clientBin} onChange={e => setClientBin(e.target.value)} />
+                <div className="text-sm font-medium text-[#1C2056]">{clientName}</div>
+                <div className="text-xs text-gray-400 mt-0.5">БИН: {clientBin}</div>
+                {clientEmail && <div className="text-xs text-gray-400">{clientEmail}</div>}
               </div>
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">Email</label>
-                <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                  placeholder="client@mail.kz"
-                  value={clientEmail} onChange={e => setClientEmail(e.target.value)} />
+              <button onClick={clearClient} className="text-gray-300 hover:text-red-400 text-xl">✕</button>
+            </div>
+          ) : (
+            <>
+              {/* Search input */}
+              <div className="relative mb-3">
+                <input
+                  className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                  placeholder="Поиск клиента по БИН/ИИН или названию"
+                  value={clientName}
+                  onChange={e => setClientName(e.target.value)}
+                />
+                {filteredClients.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 bg-white border rounded-xl shadow-lg z-10 mt-1 max-h-44 overflow-y-auto">
+                    {filteredClients.map(c => (
+                      <div key={c.id} onClick={() => selectClient(c)}
+                        className="px-3 py-2.5 hover:bg-gray-50 cursor-pointer border-b border-gray-50 last:border-0">
+                        <div className="text-sm font-medium text-[#1C2056]">{c.name}</div>
+                        {c.bin_iin && <div className="text-xs text-gray-400">БИН: {c.bin_iin}</div>}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-            </div>
-            <div>
-              <label className="text-xs text-gray-500 mb-1 block">Адрес (необязательно)</label>
-              <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                placeholder="г. Алматы, ул. Абая 1"
-                value={clientAddress} onChange={e => setClientAddress(e.target.value)} />
-            </div>
-          </div>
+
+              {/* Recent clients chips */}
+              {clients.length > 0 && (
+                <div className="flex gap-2 overflow-x-auto pb-1 mb-3">
+                  {clients.slice(0, 5).map(c => (
+                    <button key={c.id} onClick={() => selectClient(c)}
+                      className="whitespace-nowrap text-xs bg-gray-100 text-[#1C2056] px-3 py-1.5 rounded-full hover:bg-[#1C2056] hover:text-white transition flex-shrink-0">
+                      {c.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Manual fields */}
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">БИН/ИИН *</label>
+                    <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                      placeholder="123456789012"
+                      value={clientBin} onChange={e => setClientBin(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">Email</label>
+                    <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                      placeholder="client@mail.kz"
+                      value={clientEmail} onChange={e => setClientEmail(e.target.value)} />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Адрес (необязательно)</label>
+                  <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                    placeholder="г. Алматы, ул. Абая 1"
+                    value={clientAddress} onChange={e => setClientAddress(e.target.value)} />
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Services section */}
@@ -238,27 +276,6 @@ export default function Dashboard() {
           {loading ? 'Создаём...' : '✈ Создать и скачать PDF'}
         </button>
       </div>
-
-      {/* Client picker modal */}
-      {showClientPicker && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-end">
-          <div className="bg-white w-full max-w-lg mx-auto rounded-t-3xl p-5 max-h-[70vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <span className="font-semibold text-[#1C2056]">Выберите клиента</span>
-              <button onClick={() => setShowClientPicker(false)} className="text-gray-400 text-xl">✕</button>
-            </div>
-            <div className="space-y-2">
-              {clients.map(c => (
-                <div key={c.id} onClick={() => selectClient(c)}
-                  className="p-3 rounded-xl border border-gray-100 cursor-pointer hover:border-[#1C2056]">
-                  <div className="font-medium text-sm text-[#1C2056]">{c.name}</div>
-                  {c.bin_iin && <div className="text-xs text-gray-400">БИН: {c.bin_iin}</div>}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Service picker modal */}
       {showServicePicker && (
