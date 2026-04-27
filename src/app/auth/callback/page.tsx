@@ -7,9 +7,19 @@ export default function AuthCallback() {
   const router = useRouter()
 
   useEffect(() => {
-    supabase.auth.onAuthStateChange((event, session) => {
+    supabase.auth.onAuthStateChange(async (event, session) => {
       if (session) {
-        router.push('/dashboard')
+        const { data } = await supabase
+          .from('profiles')
+          .select('company_name')
+          .eq('id', session.user.id)
+          .single()
+
+        if (!data?.company_name) {
+          router.push('/onboarding')
+        } else {
+          router.push('/dashboard')
+        }
       } else {
         router.push('/login')
       }
