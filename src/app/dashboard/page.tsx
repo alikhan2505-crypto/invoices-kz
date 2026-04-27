@@ -123,6 +123,17 @@ export default function Dashboard() {
       number: data.number,
       date: new Date().toLocaleDateString('ru-KZ'),
       clientName, clientBin, clientEmail, services, total,
+      profile: {
+        company_name: profile?.company_name || '',
+        bin_iin: profile?.bin_iin || '',
+        address: profile?.address || '',
+        phone: profile?.phone || '',
+        bank_name: profile?.bank_name || '',
+        iik: profile?.iik || '',
+        bik: profile?.bik || '',
+        kbe: profile?.kbe || '19',
+        director_name: profile?.director_name || '',
+      }
     })
 
     setClientName(''); setClientBin(''); setClientEmail(''); setClientAddress('')

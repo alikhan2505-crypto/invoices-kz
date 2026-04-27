@@ -4,6 +4,18 @@ interface Service {
   price: number
 }
 
+interface ProfileData {
+  company_name: string
+  bin_iin: string
+  address: string
+  phone: string
+  bank_name: string
+  iik: string
+  bik: string
+  kbe: string
+  director_name: string
+}
+
 interface InvoiceData {
   number: string
   date: string
@@ -12,6 +24,7 @@ interface InvoiceData {
   clientEmail: string
   services: Service[]
   total: number
+  profile?: ProfileData
 }
 
 function numberToWords(n: number): string {
@@ -20,8 +33,6 @@ function numberToWords(n: number): string {
     'шестнадцать','семнадцать','восемнадцать','девятнадцать']
   const tens = ['','','двадцать','тридцать','сорок','пятьдесят','шестьдесят','семьдесят','восемьдесят','девяносто']
   const hundreds = ['','сто','двести','триста','четыреста','пятьсот','шестьсот','семьсот','восемьсот','девятьсот']
-  const thousands = ['','одна тысяча','две тысячи','три тысячи','четыре тысячи','пять тысяч',
-    'шесть тысяч','семь тысяч','восемь тысяч','девять тысяч']
 
   if (n === 0) return 'ноль'
   if (n < 0) return 'минус ' + numberToWords(-n)
@@ -30,8 +41,12 @@ function numberToWords(n: number): string {
   const th = Math.floor(n / 1000)
   const rest = n % 1000
 
-  if (th > 0 && th < 10) result += thousands[th] + ' '
-  else if (th >= 10) result += numberToWords(th) + ' тысяч '
+  if (th > 0 && th < 10) {
+    const tWords = ['','одна тысяча','две тысячи','три тысячи','четыре тысячи','пять тысяч','шесть тысяч','семь тысяч','восемь тысяч','девять тысяч']
+    result += tWords[th] + ' '
+  } else if (th >= 10) {
+    result += numberToWords(th) + ' тысяч '
+  }
 
   const h = Math.floor(rest / 100)
   const t = Math.floor((rest % 100) / 10)
@@ -48,7 +63,18 @@ function numberToWords(n: number): string {
 }
 
 export function generateInvoicePDF(data: InvoiceData) {
-  const totalWords = numberToWords(data.total) + ' тенге 00 тиын'
+  const p = data.profile
+  const companyName = p?.company_name || 'ИП First Project'
+  const binIin = p?.bin_iin || '890525350143'
+  const address = p?.address || 'г. Астана, ул. Ш.Косшыгулулы 25-153'
+  const phone = p?.phone || '+7 776 355 51 77'
+  const bankName = p?.bank_name || '—'
+  const iik = p?.iik || 'KZ__________________________'
+  const bik = p?.bik || '—'
+  const kbe = p?.kbe || '19'
+  const director = p?.director_name || ''
+
+  const totalWords = numberToWords(Math.floor(data.total)) + ' тенге 00 тиын'
 
   const html = `
     <!DOCTYPE html>
@@ -69,44 +95,15 @@ export function generateInvoicePDF(data: InvoiceData) {
           padding: 25mm 15mm 20mm;
           box-shadow: 0 0 20px rgba(0,0,0,0.3);
         }
-        .notice {
-          font-size: 9px;
-          text-align: center;
-          margin-bottom: 16px;
-          line-height: 1.5;
-        }
-        .bank-label {
-          font-weight: bold;
-          font-size: 10px;
-          margin-bottom: 4px;
-        }
-        .bank-table {
-          width: 100%;
-          border-collapse: collapse;
-          margin-bottom: 16px;
-        }
-        .bank-table td {
-          border: 1px solid #000;
-          padding: 5px 8px;
-          vertical-align: top;
-        }
-        .title {
-          font-size: 14px;
-          font-weight: bold;
-          margin: 16px 0 10px;
-        }
+        .notice { font-size: 9px; text-align: center; margin-bottom: 16px; line-height: 1.5; }
+        .bank-label { font-weight: bold; font-size: 10px; margin-bottom: 4px; }
+        .bank-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+        .bank-table td { border: 1px solid #000; padding: 5px 8px; vertical-align: top; }
+        .title { font-size: 14px; font-weight: bold; margin: 16px 0 10px; }
         .info-row { margin-bottom: 6px; }
         .info-row b { margin-right: 6px; }
-        .items-table {
-          width: 100%;
-          border-collapse: collapse;
-          margin: 12px 0;
-        }
-        .items-table th, .items-table td {
-          border: 1px solid #000;
-          padding: 4px 6px;
-          text-align: center;
-        }
+        .items-table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+        .items-table th, .items-table td { border: 1px solid #000; padding: 4px 6px; text-align: center; }
         .items-table th { background: #f0f0f0; font-weight: bold; }
         .items-table td.left { text-align: left; }
         .totals { text-align: right; margin: 4px 0; line-height: 1.8; }
@@ -129,26 +126,26 @@ export function generateInvoicePDF(data: InvoiceData) {
       </div>
 
       <div class="bank-label">Образец платежного поручения</div>
-        <table class="bank-table">
+      <table class="bank-table">
         <tr>
-            <td style="width:45%">
+          <td style="width:45%">
             <b>Бенефициар:</b><br>
-            ИП First Project<br>
-            БИН: 890525350143
-            </td>
-            <td style="width:35%;text-align:center"><b>ИИК</b><br><br>KZ__________________________</td>
-            <td style="width:20%;text-align:center"><b>КБе</b><br><br>19</td>
+            ${companyName}<br>
+            БИН: ${binIin}
+          </td>
+          <td style="width:35%;text-align:center"><b>ИИК</b><br><br>${iik}</td>
+          <td style="width:20%;text-align:center"><b>КБе</b><br><br>${kbe}</td>
         </tr>
         <tr>
-            <td><b>Банк бенефициара:</b><br>—</td>
-            <td style="text-align:center"><b>БИК</b><br>—</td>
-            <td style="text-align:center"><b>Код назначения платежа</b><br>—</td>
+          <td><b>Банк бенефициара:</b><br>${bankName}</td>
+          <td style="text-align:center"><b>БИК</b><br>${bik}</td>
+          <td style="text-align:center"><b>Код назначения платежа</b><br>—</td>
         </tr>
-        </table>
+      </table>
 
       <div class="title">Счет на оплату №${data.number} от ${data.date}</div>
 
-      <div class="info-row"><b>Поставщик:</b> ИП First Project, г. Астана, ул. Ш.Косшыгулулы 25-153, тел: +7 776 355 51 77</div>
+      <div class="info-row"><b>Поставщик:</b> ${companyName}, ${address}${phone ? ', тел: ' + phone : ''}</div>
       <div class="info-row"><b>Покупатель:</b> ${data.clientBin ? 'ИИН/БИН: ' + data.clientBin + ', ' : ''}${data.clientName}</div>
       <div class="info-row"><b>Договор:</b> —</div>
 
@@ -172,7 +169,7 @@ export function generateInvoicePDF(data: InvoiceData) {
               <td class="left">${s.name}</td>
               <td>${s.qty}</td>
               <td>шт</td>
-              <td>${s.price.toLocaleString('ru-KZ')}</td>
+              <td>${Number(s.price).toLocaleString('ru-KZ')}</td>
               <td>${(s.qty * s.price).toLocaleString('ru-KZ')}</td>
             </tr>
           `).join('')}
@@ -191,7 +188,7 @@ export function generateInvoicePDF(data: InvoiceData) {
 
       <hr>
       <div class="signature">
-        Исполнитель <span class="sig-line"></span> //
+        Руководитель <span class="sig-line"></span> ${director ? '/ ' + director : '//'}
       </div>
 
       <script>window.onload = () => window.print()</script>
