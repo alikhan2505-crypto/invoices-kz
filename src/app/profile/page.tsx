@@ -62,6 +62,7 @@ export default function Profile() {
           <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
             {[
               { icon: '🏢', label: 'Реквизиты', href: '/profile/requisites' },
+              { icon: '✍️', label: 'Подпись и печать', href: '/profile/signature' },
               { icon: '💳', label: 'Банковские счета', href: '/profile/banks' },
               { icon: '🔒', label: 'ЭЦП и безопасность', href: '/profile/security' },
             ].map((item, i, arr) => (
