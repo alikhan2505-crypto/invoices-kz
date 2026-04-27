@@ -11,7 +11,7 @@ async function sendLink() {
   setLoading(true)
   const { error } = await supabase.auth.signInWithOtp({ 
     email,
-    options: { emailRedirectTo: 'https://invoices.kz/dashboard' }
+    options: { emailRedirectTo: 'https://invoices.kz/auth/callback' }
   })
   if (error) {
     alert('Ошибка: ' + error.message)
