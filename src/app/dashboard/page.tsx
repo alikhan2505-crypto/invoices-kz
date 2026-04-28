@@ -12,7 +12,6 @@ export default function Dashboard() {
   const [clients, setClients] = useState<any[]>([])
   const [savedServices, setSavedServices] = useState<any[]>([])
   const [showServicePicker, setShowServicePicker] = useState(false)
-  const [showDropdown, setShowDropdown] = useState(false)
   const [clientSelected, setClientSelected] = useState(false)
   const [profile, setProfile] = useState<any>(null)
 
@@ -46,7 +45,6 @@ export default function Dashboard() {
     setClientEmail(client.email || '')
     setClientAddress(client.address || '')
     setClientSelected(true)
-    setShowDropdown(false)
   }
 
   function clearClient() {
@@ -72,13 +70,6 @@ export default function Dashboard() {
     updated[idx] = { ...updated[idx], [field]: value }
     setServices(updated)
   }
-
-  const filteredClients = showDropdown && clientName && !clientSelected
-    ? clients.filter(c =>
-        c.name.toLowerCase().includes(clientName.toLowerCase()) ||
-        (c.bin_iin || '').includes(clientName)
-      )
-    : []
 
   async function createInvoice() {
     if (!profile?.company_name || !profile?.bin_iin) {
@@ -158,12 +149,27 @@ export default function Dashboard() {
         <h2 className="text-xl font-bold text-[#1C2056] mb-1">Новый счёт</h2>
         <p className="text-sm text-gray-500 mb-4">Создайте счёт за 1 минуту</p>
 
+        {/* Recent clients chips */}
+        {clients.length > 0 && !clientSelected && (
+          <div className="mb-3">
+            <p className="text-xs text-gray-400 mb-2">Быстрый выбор клиента</p>
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {clients.slice(0, 6).map(c => (
+                <button key={c.id} onClick={() => selectClient(c)}
+                  className="whitespace-nowrap text-xs bg-white border border-gray-200 text-[#1C2056] px-3 py-2 rounded-full hover:bg-[#1C2056] hover:text-white hover:border-[#1C2056] transition flex-shrink-0 shadow-sm">
+                  {c.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Client section */}
         <div className="bg-white rounded-2xl p-5 mb-4 shadow-sm">
           <h3 className="font-medium text-[#1C2056] mb-3">Данные клиента</h3>
 
           {clientSelected ? (
-            <div className="bg-gray-50 rounded-xl p-3 mb-3 flex items-center justify-between">
+            <div className="bg-gray-50 rounded-xl p-3 flex items-center justify-between">
               <div>
                 <div className="text-sm font-medium text-[#1C2056]">{clientName}</div>
                 <div className="text-xs text-gray-400 mt-0.5">БИН: {clientBin}</div>
@@ -172,73 +178,46 @@ export default function Dashboard() {
               <button onClick={clearClient} className="text-gray-300 hover:text-red-400 text-xl">✕</button>
             </div>
           ) : (
-            <>
-              {/* Search input */}
-              <div className="relative mb-3">
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">Название компании / ИП *</label>
                 <input
                   className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                  placeholder="Поиск клиента по БИН/ИИН или названию"
+                  placeholder="ТОО «Пример»"
                   value={clientName}
-                  onFocus={() => setShowDropdown(true)}
-                  onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
                   onChange={e => setClientName(e.target.value)}
                 />
-                {filteredClients.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 bg-white border rounded-xl shadow-lg z-10 mt-1 max-h-44 overflow-y-auto">
-                    {filteredClients.map(c => (
-                      <div key={c.id} onClick={() => selectClient(c)}
-                        className="px-3 py-2.5 hover:bg-gray-50 cursor-pointer border-b border-gray-50 last:border-0">
-                        <div className="text-sm font-medium text-[#1C2056]">{c.name}</div>
-                        {c.bin_iin && <div className="text-xs text-gray-400">БИН: {c.bin_iin}</div>}
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
-
-              {/* Recent clients chips */}
-              {clients.length > 0 && (
-                <div className="flex gap-2 overflow-x-auto pb-1 mb-3">
-                  {clients.slice(0, 5).map(c => (
-                    <button key={c.id} onClick={() => selectClient(c)}
-                      className="whitespace-nowrap text-xs bg-gray-100 text-[#1C2056] px-3 py-1.5 rounded-full hover:bg-[#1C2056] hover:text-white transition flex-shrink-0">
-                      {c.name}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* Manual fields */}
-              <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs text-gray-500 mb-1 block">Название компании / ИП *</label>
-                  <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                    placeholder="ТОО «Пример»"
-                    value={clientName}
-                    onChange={e => setClientName(e.target.value)} />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs text-gray-500 mb-1 block">БИН/ИИН *</label>
-                    <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                      placeholder="123456789012"
-                      value={clientBin} onChange={e => setClientBin(e.target.value)} />
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Email</label>
-                    <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                      placeholder="client@mail.kz"
-                      value={clientEmail} onChange={e => setClientEmail(e.target.value)} />
-                  </div>
+                  <label className="text-xs text-gray-500 mb-1 block">БИН/ИИН *</label>
+                  <input
+                    className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                    placeholder="123456789012"
+                    value={clientBin}
+                    onChange={e => setClientBin(e.target.value)}
+                  />
                 </div>
                 <div>
-                  <label className="text-xs text-gray-500 mb-1 block">Адрес (необязательно)</label>
-                  <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                    placeholder="г. Алматы, ул. Абая 1"
-                    value={clientAddress} onChange={e => setClientAddress(e.target.value)} />
+                  <label className="text-xs text-gray-500 mb-1 block">Email</label>
+                  <input
+                    className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                    placeholder="client@mail.kz"
+                    value={clientEmail}
+                    onChange={e => setClientEmail(e.target.value)}
+                  />
                 </div>
               </div>
-            </>
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">Адрес (необязательно)</label>
+                <input
+                  className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                  placeholder="г. Алматы, ул. Абая 1"
+                  value={clientAddress}
+                  onChange={e => setClientAddress(e.target.value)}
+                />
+              </div>
+            </div>
           )}
         </div>
 
@@ -263,16 +242,25 @@ export default function Dashboard() {
             {services.map((svc, idx) => (
               <div key={idx} className="flex gap-2 items-start">
                 <div className="flex-1 space-y-2">
-                  <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                  <input
+                    className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
                     placeholder="Название услуги"
-                    value={svc.name} onChange={e => updateService(idx, 'name', e.target.value)} />
+                    value={svc.name}
+                    onChange={e => updateService(idx, 'name', e.target.value)}
+                  />
                   <div className="grid grid-cols-2 gap-2">
-                    <input className="border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                    <input
+                      className="border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
                       type="number" placeholder="Кол-во"
-                      value={svc.qty} onChange={e => updateService(idx, 'qty', Number(e.target.value))} />
-                    <input className="border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                      value={svc.qty}
+                      onChange={e => updateService(idx, 'qty', Number(e.target.value))}
+                    />
+                    <input
+                      className="border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
                       type="number" placeholder="Цена ₸"
-                      value={svc.price || ''} onChange={e => updateService(idx, 'price', Number(e.target.value))} />
+                      value={svc.price || ''}
+                      onChange={e => updateService(idx, 'price', Number(e.target.value))}
+                    />
                   </div>
                 </div>
                 {services.length > 1 && (
