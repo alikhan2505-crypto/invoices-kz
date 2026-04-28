@@ -14,6 +14,8 @@ interface ProfileData {
   bik: string
   kbe: string
   director_name: string
+  signature_url?: string
+  stamp_url?: string
 }
 
 interface InvoiceData {
@@ -73,6 +75,8 @@ export function generateInvoicePDF(data: InvoiceData) {
   const bik = p?.bik || '—'
   const kbe = p?.kbe || '19'
   const director = p?.director_name || ''
+  const signatureUrl = p?.signature_url || ''
+  const stampUrl = p?.stamp_url || ''
 
   const totalWords = numberToWords(Math.floor(data.total)) + ' тенге 00 тиын'
 
@@ -109,8 +113,27 @@ export function generateInvoicePDF(data: InvoiceData) {
         .totals { text-align: right; margin: 4px 0; line-height: 1.8; }
         .total-words { margin: 10px 0; font-weight: bold; line-height: 1.6; }
         hr { border: none; border-top: 1px solid #000; margin: 16px 0; }
-        .signature { margin-top: 20px; }
-        .sig-line { display: inline-block; border-bottom: 1px solid #000; width: 220px; margin: 0 8px; }
+        .signature-row {
+          display: flex;
+          align-items: flex-end;
+          justify-content: space-between;
+          margin-top: 20px;
+        }
+        .sig-block { flex: 1; }
+        .sig-line { 
+          display: inline-block; 
+          border-bottom: 1px solid #000; 
+          width: 180px; 
+          margin: 0 8px; 
+          vertical-align: bottom;
+        }
+        .stamp-block {
+          width: 100px;
+          height: 100px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
         @page { size: A4; margin: 0; }
         @media print {
           html { background: white; }
@@ -187,11 +210,55 @@ export function generateInvoicePDF(data: InvoiceData) {
       </div>
 
       <hr>
-      <div class="signature">
-        Руководитель <span class="sig-line"></span> ${director ? '/ ' + director : '//'}
+
+      <div class="signature-row">
+        <div class="sig-block">
+          <div style="margin-bottom: 8px;">
+            Руководитель
+            ${director ? `<span class="sig-line"></span> ${director}` : '<span class="sig-line"></span> //'}
+          </div>
+          ${signatureUrl ? `
+            <img src="${signatureUrl}" 
+              style="height:55px; max-width:200px; object-fit:contain; display:block; margin-top:4px;"
+            />
+          ` : '<div style="height:55px;"></div>'}
+        </div>
+
+        <div class="stamp-block">
+          ${stampUrl ? `
+            <img src="${stampUrl}" 
+              style="height:90px; width:90px; object-fit:contain; opacity:0.9;"
+            />
+          ` : ''}
+        </div>
       </div>
 
-      <script>window.onload = () => window.print()</script>
+      <script>
+        window.onload = function() {
+          // Ждём загрузки картинок
+          const images = document.querySelectorAll('img')
+          if (images.length === 0) {
+            window.print()
+            return
+          }
+          let loaded = 0
+          images.forEach(img => {
+            if (img.complete) {
+              loaded++
+              if (loaded === images.length) window.print()
+            } else {
+              img.onload = () => {
+                loaded++
+                if (loaded === images.length) window.print()
+              }
+              img.onerror = () => {
+                loaded++
+                if (loaded === images.length) window.print()
+              }
+            }
+          })
+        }
+      </script>
     </body>
     </html>
   `
