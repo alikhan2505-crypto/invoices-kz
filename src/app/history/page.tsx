@@ -123,7 +123,10 @@ export default function History() {
                     {inv.client_name || inv.clients?.name || 'Без клиента'}
                   </div>
                   <div className="text-xs text-gray-400 mt-1">
-                    {new Date(inv.created_at).toLocaleDateString('ru-KZ', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    {new Date(inv.created_at).toLocaleDateString('ru-KZ', { 
+                      day: 'numeric', month: 'short', year: 'numeric',
+                      hour: '2-digit', minute: '2-digit'
+                    })}
                   </div>
                 </div>
                 <div className="text-right">

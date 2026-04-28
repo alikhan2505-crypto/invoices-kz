@@ -40,34 +40,42 @@ export default function InvoicePage() {
   }
 
   async function duplicateInvoice() {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
 
-    const { data: profile } = await supabase.from('profiles')
-      .select('invoice_prefix, invoice_next_number')
-      .eq('id', user.id).single()
+  // Загружаем свежие данные профиля
+  const { data: freshProfile } = await supabase.from('profiles')
+    .select('invoice_prefix, invoice_next_number')
+    .eq('id', user.id).single()
 
-    const prefix = profile?.invoice_prefix || 'INV-'
-    const nextNum = profile?.invoice_next_number || '0001'
-    const invoiceNumber = prefix + nextNum
-    const newNum = String(parseInt(nextNum) + 1).padStart(nextNum.length, '0')
-    await supabase.from('profiles').update({ invoice_next_number: newNum }).eq('id', user.id)
+  const prefix = freshProfile?.invoice_prefix || 'INV-'
+  const nextNum = freshProfile?.invoice_next_number || '0001'
+  const invoiceNumber = prefix + nextNum
+  const newNum = String(parseInt(nextNum) + 1).padStart(nextNum.length, '0')
 
-    const { data, error } = await supabase.from('invoices').insert({
-      user_id: user.id,
-      number: invoiceNumber,
-      amount: invoice.amount,
-      status: 'draft',
-      client_name: invoice.client_name,
-      client_bin: invoice.client_bin,
-      client_email: invoice.client_email,
-      services: invoice.services,
-    }).select().single()
+  // Сначала обновляем номер
+  const { error: updateError } = await supabase.from('profiles')
+    .update({ invoice_next_number: newNum })
+    .eq('id', user.id)
 
-    if (error) { alert('Ошибка: ' + error.message); return }
-    alert('Счёт продублирован: ' + data.number)
-    router.push('/invoice/' + data.id)
-  }
+  if (updateError) { alert('Ошибка: ' + updateError.message); return }
+
+  // Потом создаём счёт с новой датой
+  const { data, error } = await supabase.from('invoices').insert({
+    user_id: user.id,
+    number: invoiceNumber,
+    amount: invoice.amount,
+    status: 'draft',
+    client_name: invoice.client_name,
+    client_bin: invoice.client_bin,
+    client_email: invoice.client_email,
+    services: invoice.services,
+    created_at: new Date().toISOString(),
+  }).select().single()
+
+  if (error) { alert('Ошибка: ' + error.message); return }
+  router.push('/invoice/' + data.id)
+}
 
   function openPDF() {
     if (!invoice) return
