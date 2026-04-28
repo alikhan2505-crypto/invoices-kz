@@ -124,6 +124,26 @@ export default function Dashboard() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { alert('Войдите в систему'); setLoading(false); return }
 
+    // Проверка лимита — 3 счёта в месяц для free
+    if ((profile?.plan || 'free') === 'free') {
+      const monthStart = new Date()
+      monthStart.setDate(1)
+      monthStart.setHours(0, 0, 0, 0)
+      
+      const { count } = await supabase
+        .from('invoices')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .gte('created_at', monthStart.toISOString())
+
+      if ((count || 0) >= 3) {
+        router.push('/upgrade')
+        setLoading(false)
+        return
+      }
+    }
+
+
     const prefix = profile?.invoice_prefix || 'INV-'
     const nextNum = profile?.invoice_next_number || '0001'
     const invoiceNumber = prefix + nextNum
