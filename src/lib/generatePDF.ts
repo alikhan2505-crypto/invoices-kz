@@ -210,10 +210,10 @@ export function generateInvoicePDF(data: InvoiceData) {
       </div>
 
       <hr>
-      <div style="position:relative; margin-top:20px; min-height:100px;">
-        <div style="display:flex; align-items:flex-end; gap:8px;">
+      <div style="position:relative; margin-top:20px; min-height:110px;">
+        <div style="display:flex; align-items:flex-end; gap:8px; width:50%;">
           <span>Руководитель</span>
-          <div style="position:relative; width:220px;">
+          <div style="position:relative; flex:1;">
             ${signatureUrl ? `
               <img src="${signatureUrl}" 
                 style="position:absolute; bottom:4px; left:10px; height:45px; max-width:180px; object-fit:contain;"
@@ -225,7 +225,7 @@ export function generateInvoicePDF(data: InvoiceData) {
         </div>
         ${stampUrl ? `
           <img src="${stampUrl}" 
-            style="position:absolute; right:0; bottom:-20px; height:110px; width:110px; object-fit:contain; opacity:0.85;"
+            style="position:absolute; left:30%; bottom:-15px; height:110px; width:110px; object-fit:contain; opacity:0.85;"
           />
         ` : ''}
       </div>

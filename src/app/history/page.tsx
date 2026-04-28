@@ -32,6 +32,13 @@ export default function History() {
     setLoading(false)
   }
 
+  async function deleteInvoice(e: React.MouseEvent, id: string, number: string) {
+    e.stopPropagation()
+    if (!confirm('Аннулировать счёт ' + number + '?')) return
+    await supabase.from('invoices').delete().eq('id', id)
+    setInvoices(prev => prev.filter(inv => inv.id !== id))
+  }
+
   const counts = {
     all: invoices.length,
     paid: invoices.filter(i => i.status === 'paid').length,
@@ -41,14 +48,12 @@ export default function History() {
 
   const filtered = invoices.filter(inv => {
     const matchFilter = filter === 'all' || inv.status === filter
-    const clientName = inv.clients?.name || ''
+    const clientName = inv.client_name || inv.clients?.name || ''
     const matchSearch = clientName.toLowerCase().includes(search.toLowerCase()) ||
       inv.number.toLowerCase().includes(search.toLowerCase()) ||
       String(inv.amount).includes(search)
     return matchFilter && matchSearch
   })
-
-  const totalIncome = invoices.filter(i => i.status === 'paid').reduce((s, i) => s + Number(i.amount), 0)
 
   return (
     <main className="min-h-screen bg-gray-50 pb-24">
@@ -115,27 +120,37 @@ export default function History() {
           <div className="bg-white rounded-2xl shadow-sm overflow-hidden mb-4">
             {filtered.map((inv, i) => (
               <div key={inv.id}
-                onClick={() => router.push('/invoice/' + inv.id)}
-                className={`flex items-start justify-between p-4 cursor-pointer hover:bg-gray-50 ${i < filtered.length - 1 ? 'border-b border-gray-100' : ''}`}>
-                <div>
-                  <div className="text-xs text-gray-400 mb-1">{inv.number}</div>
-                  <div className="text-sm font-medium text-[#1C2056]">
-                    {inv.client_name || inv.clients?.name || 'Без клиента'}
+                className={`flex items-center p-4 cursor-pointer hover:bg-gray-50 ${i < filtered.length - 1 ? 'border-b border-gray-100' : ''}`}>
+                
+                {/* Clickable area */}
+                <div className="flex-1 flex items-start justify-between"
+                  onClick={() => router.push('/invoice/' + inv.id)}>
+                  <div>
+                    <div className="text-xs text-gray-400 mb-1">{inv.number}</div>
+                    <div className="text-sm font-medium text-[#1C2056]">
+                      {inv.client_name || inv.clients?.name || 'Без клиента'}
+                    </div>
+                    <div className="text-xs text-gray-400 mt-1">
+                      {new Date(inv.created_at).toLocaleString('ru-KZ', {
+                        day: 'numeric', month: 'short', year: 'numeric',
+                        hour: '2-digit', minute: '2-digit'
+                      })}
+                    </div>
                   </div>
-                  <div className="text-xs text-gray-400 mt-1">
-                    {new Date(inv.created_at).toLocaleString('ru-KZ', { 
-                      timeZone: 'Asia/Almaty',
-                      day: 'numeric', month: 'short', year: 'numeric',
-                      hour: '2-digit', minute: '2-digit'
-                    })}
+                  <div className="text-right mr-3">
+                    <div className="text-sm font-medium mb-1.5">{Number(inv.amount).toLocaleString('ru-KZ')} ₸</div>
+                    <span className={`text-xs px-2 py-1 rounded-full ${(statusLabel[inv.status] || statusLabel.draft).color}`}>
+                      {(statusLabel[inv.status] || statusLabel.draft).text}
+                    </span>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-sm font-medium mb-1.5">{Number(inv.amount).toLocaleString('ru-KZ')} ₸</div>
-                  <span className={`text-xs px-2 py-1 rounded-full ${(statusLabel[inv.status] || statusLabel.draft).color}`}>
-                    {(statusLabel[inv.status] || statusLabel.draft).text}
-                  </span>
-                </div>
+
+                {/* Delete button */}
+                <button
+                  onClick={(e) => deleteInvoice(e, inv.id, inv.number)}
+                  className="text-gray-300 hover:text-red-400 text-lg p-1 flex-shrink-0">
+                  ✕
+                </button>
               </div>
             ))}
           </div>
