@@ -42,22 +42,18 @@ export default function Dashboard() {
       setProfile(p)
       setSavedServices(s || [])
 
-      // Объединяем клиентов из справочника и из истории
       const fromHistory = (inv || []).reduce((acc: any[], inv: any) => {
-        if (inv.client_name && !acc.find(c => c.name === inv.client_name)) {
+        if (inv.client_name && !acc.find((c: any) => c.name === inv.client_name)) {
           acc.push({ name: inv.client_name, bin_iin: inv.client_bin, email: inv.client_email, id: inv.client_name })
         }
         return acc
       }, [])
 
       const fromDirectory = (c || []).map((cl: any) => ({ ...cl, id: cl.id }))
-      
-      // Сначала из справочника, потом из истории (без дублей)
       const merged = [...fromDirectory]
-      fromHistory.forEach(h => {
-        if (!merged.find(m => m.name === h.name)) merged.push(h)
+      fromHistory.forEach((h: any) => {
+        if (!merged.find((m: any) => m.name === h.name)) merged.push(h)
       })
-      
       setClients(merged)
     }
     load()
@@ -93,6 +89,17 @@ export default function Dashboard() {
     const updated = [...services]
     updated[idx] = { ...updated[idx], [field]: value }
     setServices(updated)
+  }
+
+  // Сохранить клиента в справочник — вынесено на уровень компонента
+  async function saveClientToDirectory() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user || !lastInvoiceClient) return
+    const { error } = await supabase.from('clients').insert({ ...lastInvoiceClient, user_id: user.id })
+    if (!error) {
+      setClients(prev => [...prev, { ...lastInvoiceClient, id: lastInvoiceClient.bin_iin }])
+    }
+    setShowSaveClient(false)
   }
 
   async function createInvoice() {
@@ -157,20 +164,15 @@ export default function Dashboard() {
         stamp_url: profile?.stamp_url || '',
       }
     })
+
     // Предлагаем сохранить клиента если его нет в справочнике
     const alreadyExists = clients.find(c => c.bin_iin === clientBin)
     if (!alreadyExists && clientBin) {
       setLastInvoiceClient({ name: clientName, bin_iin: clientBin, email: clientEmail, address: clientAddress })
       setShowSaveClient(true)
     }
+
     clearClient()
-    async function saveClientToDirectory() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user || !lastInvoiceClient) return
-      await supabase.from('clients').insert({ ...lastInvoiceClient, user_id: user.id })
-      setClients([...clients, { ...lastInvoiceClient, id: lastInvoiceClient.bin_iin }])
-      setShowSaveClient(false)
-    }
     setServices([{ name: '', qty: 1, price: 0 }])
   }
 
@@ -350,31 +352,34 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      {/* Save client modal */}
       {showSaveClient && (
-  <div className="fixed inset-0 bg-black/40 z-50 flex items-end">
-    <div className="bg-white w-full max-w-lg mx-auto rounded-t-3xl p-6">
-      <div className="text-center mb-5">
-        <div className="text-3xl mb-2">👥</div>
-        <div className="font-semibold text-[#1C2056] mb-1">Сохранить клиента?</div>
-        <div className="text-sm text-gray-400">
-          {lastInvoiceClient?.name} будет добавлен в справочник
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-end">
+          <div className="bg-white w-full max-w-lg mx-auto rounded-t-3xl p-6">
+            <div className="text-center mb-5">
+              <div className="text-3xl mb-2">👥</div>
+              <div className="font-semibold text-[#1C2056] mb-1">Сохранить клиента?</div>
+              <div className="text-sm text-gray-400">
+                {lastInvoiceClient?.name} будет добавлен в справочник
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowSaveClient(false)}
+                className="flex-1 border border-gray-200 rounded-xl py-3 text-sm text-gray-500">
+                Пропустить
+              </button>
+              <button
+                onClick={saveClientToDirectory}
+                className="flex-1 bg-[#1C2056] text-white rounded-xl py-3 text-sm font-medium">
+                Сохранить
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
-      <div className="flex gap-3">
-        <button
-          onClick={() => setShowSaveClient(false)}
-          className="flex-1 border border-gray-200 rounded-xl py-3 text-sm text-gray-500">
-          Пропустить
-        </button>
-        <button
-          onClick={saveClientToDirectory}
-          className="flex-1 bg-[#1C2056] text-white rounded-xl py-3 text-sm font-medium">
-          Сохранить
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+      )}
+
       <BottomNav />
     </main>
   )
