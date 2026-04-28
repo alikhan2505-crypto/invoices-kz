@@ -11,12 +11,14 @@ export default function Signature() {
   const [isDrawing, setIsDrawing] = useState(false)
   const [showCanvas, setShowCanvas] = useState(false)
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [userId, setUserId] = useState<string>('')
 
   useEffect(() => { loadData() }, [])
 
   async function loadData() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
+    setUserId(user.id)
     const { data } = await supabase.from('profiles').select('signature_url, stamp_url').eq('id', user.id).single()
     if (data) {
       setSignatureUrl(data.signature_url)
@@ -24,37 +26,54 @@ export default function Signature() {
     }
   }
 
-  // Canvas drawing
+  function getPos(e: React.MouseEvent | React.TouchEvent, canvas: HTMLCanvasElement) {
+    const rect = canvas.getBoundingClientRect()
+    const scaleX = canvas.width / rect.width
+    const scaleY = canvas.height / rect.height
+    if ('touches' in e) {
+      return {
+        x: (e.touches[0].clientX - rect.left) * scaleX,
+        y: (e.touches[0].clientY - rect.top) * scaleY
+      }
+    }
+    return {
+      x: (e.clientX - rect.left) * scaleX,
+      y: (e.clientY - rect.top) * scaleY
+    }
+  }
+
   function startDraw(e: React.MouseEvent | React.TouchEvent) {
+    e.preventDefault()
     setIsDrawing(true)
     const canvas = canvasRef.current
     if (!canvas) return
     const ctx = canvas.getContext('2d')
     if (!ctx) return
-    const rect = canvas.getBoundingClientRect()
-    const x = 'touches' in e ? e.touches[0].clientX - rect.left : e.clientX - rect.left
-    const y = 'touches' in e ? e.touches[0].clientY - rect.top : e.clientY - rect.top
+    const { x, y } = getPos(e, canvas)
     ctx.beginPath()
     ctx.moveTo(x, y)
   }
 
   function draw(e: React.MouseEvent | React.TouchEvent) {
+    e.preventDefault()
     if (!isDrawing) return
     const canvas = canvasRef.current
     if (!canvas) return
     const ctx = canvas.getContext('2d')
     if (!ctx) return
-    const rect = canvas.getBoundingClientRect()
-    const x = 'touches' in e ? e.touches[0].clientX - rect.left : e.clientX - rect.left
-    const y = 'touches' in e ? e.touches[0].clientY - rect.top : e.clientY - rect.top
+    const { x, y } = getPos(e, canvas)
     ctx.lineWidth = 2
     ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
     ctx.strokeStyle = '#1C2056'
     ctx.lineTo(x, y)
     ctx.stroke()
   }
 
-  function stopDraw() { setIsDrawing(false) }
+  function stopDraw(e: React.MouseEvent | React.TouchEvent) {
+    e.preventDefault()
+    setIsDrawing(false)
+  }
 
   function clearCanvas() {
     const canvas = canvasRef.current
@@ -68,20 +87,31 @@ export default function Signature() {
     const canvas = canvasRef.current
     if (!canvas) return
     setSaving(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
 
     canvas.toBlob(async (blob) => {
-      if (!blob) return
+      if (!blob) { setSaving(false); return }
       const file = new File([blob], 'signature.png', { type: 'image/png' })
-      const path = `${user.id}/signature.png`
+      const path = `${userId}/signature.png`
+
+      // Сначала удаляем старый файл
       await supabase.storage.from('signatures').remove([path])
-      const { error } = await supabase.storage.from('signatures').upload(path, file)
-      if (error) { alert('Ошибка: ' + error.message); setSaving(false); return }
+
+      // Загружаем новый
+      const { error } = await supabase.storage.from('signatures').upload(path, file, {
+        upsert: true
+      })
+
+      if (error) {
+        alert('Ошибка: ' + error.message)
+        setSaving(false)
+        return
+      }
 
       const { data: urlData } = supabase.storage.from('signatures').getPublicUrl(path)
-      await supabase.from('profiles').update({ signature_url: urlData.publicUrl }).eq('id', user.id)
-      setSignatureUrl(urlData.publicUrl)
+      // Добавляем timestamp чтобы обойти кэш
+      const url = urlData.publicUrl + '?t=' + Date.now()
+      await supabase.from('profiles').update({ signature_url: url }).eq('id', userId)
+      setSignatureUrl(url)
       setShowCanvas(false)
       setSaving(false)
     }, 'image/png')
@@ -91,49 +121,49 @@ export default function Signature() {
     const file = e.target.files?.[0]
     if (!file) return
     setSaving(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
 
-    const path = `${user.id}/stamp.png`
+    const path = `${userId}/stamp.png`
     await supabase.storage.from('stamps').remove([path])
-    const { error } = await supabase.storage.from('stamps').upload(path, file)
+
+    const { error } = await supabase.storage.from('stamps').upload(path, file, {
+      upsert: true
+    })
+
     if (error) { alert('Ошибка: ' + error.message); setSaving(false); return }
 
     const { data: urlData } = supabase.storage.from('stamps').getPublicUrl(path)
-    await supabase.from('profiles').update({ stamp_url: urlData.publicUrl }).eq('id', user.id)
-    setStampUrl(urlData.publicUrl)
+    const url = urlData.publicUrl + '?t=' + Date.now()
+    await supabase.from('profiles').update({ stamp_url: url }).eq('id', userId)
+    setStampUrl(url)
     setSaving(false)
   }
 
   async function removeSignature() {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    await supabase.storage.from('signatures').remove([`${user.id}/signature.png`])
-    await supabase.from('profiles').update({ signature_url: null }).eq('id', user.id)
+    await supabase.storage.from('signatures').remove([`${userId}/signature.png`])
+    await supabase.from('profiles').update({ signature_url: null }).eq('id', userId)
     setSignatureUrl(null)
   }
 
   async function removeStamp() {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    await supabase.storage.from('stamps').remove([`${user.id}/stamp.png`])
-    await supabase.from('profiles').update({ stamp_url: null }).eq('id', user.id)
+    await supabase.storage.from('stamps').remove([`${userId}/stamp.png`])
+    await supabase.from('profiles').update({ stamp_url: null }).eq('id', userId)
     setStampUrl(null)
   }
 
   return (
-    <main className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b px-4 py-4 flex items-center gap-3">
+    <main className="min-h-screen bg-gray-50 flex flex-col">
+      {/* Sticky header */}
+      <div className="sticky top-0 z-10 bg-white border-b px-4 py-4 flex items-center gap-3">
         <button onClick={() => router.push('/profile')} className="text-gray-400 text-xl">‹</button>
         <span className="font-semibold text-[#1C2056]">Подпись и печать</span>
       </div>
 
-      <div className="max-w-lg mx-auto p-4 space-y-4">
+      <div className="max-w-lg mx-auto p-4 space-y-4 w-full">
         {/* Signature */}
         <div>
           <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">Подпись руководителя</div>
           <div className="bg-white rounded-2xl shadow-sm p-4">
-            {signatureUrl ? (
+            {signatureUrl && !showCanvas ? (
               <div>
                 <div className="border rounded-xl p-3 mb-3 bg-gray-50">
                   <img src={signatureUrl} alt="Подпись" className="h-20 object-contain" />
@@ -154,10 +184,17 @@ export default function Signature() {
                 <p className="text-xs text-gray-400 mb-2">Нарисуйте подпись в поле ниже:</p>
                 <canvas
                   ref={canvasRef}
-                  width={340} height={120}
-                  className="border-2 border-dashed border-gray-200 rounded-xl w-full touch-none cursor-crosshair"
-                  onMouseDown={startDraw} onMouseMove={draw} onMouseUp={stopDraw} onMouseLeave={stopDraw}
-                  onTouchStart={startDraw} onTouchMove={draw} onTouchEnd={stopDraw}
+                  width={600}
+                  height={200}
+                  className="border-2 border-dashed border-gray-200 rounded-xl w-full touch-none cursor-crosshair bg-white"
+                  style={{ touchAction: 'none' }}
+                  onMouseDown={startDraw}
+                  onMouseMove={draw}
+                  onMouseUp={stopDraw}
+                  onMouseLeave={stopDraw}
+                  onTouchStart={startDraw}
+                  onTouchMove={draw}
+                  onTouchEnd={stopDraw}
                 />
                 <div className="flex gap-2 mt-3">
                   <button onClick={clearCanvas}
@@ -170,7 +207,7 @@ export default function Signature() {
                   </button>
                   <button onClick={saveSignature} disabled={saving}
                     className="flex-1 bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium">
-                    {saving ? '...' : 'Сохранить'}
+                    {saving ? 'Сохраняем...' : 'Сохранить'}
                   </button>
                 </div>
               </div>
@@ -212,7 +249,7 @@ export default function Signature() {
                 <div className="text-4xl mb-3">🔵</div>
                 <p className="text-sm text-gray-400 mb-4">Загрузите фото печати (PNG с прозрачным фоном)</p>
                 <label className="bg-[#1C2056] text-white px-6 py-2.5 rounded-xl text-sm font-medium cursor-pointer">
-                  Загрузить фото
+                  {saving ? 'Загружаем...' : 'Загрузить фото'}
                   <input type="file" accept="image/*" className="hidden" onChange={uploadStamp} />
                 </label>
               </div>
@@ -220,11 +257,10 @@ export default function Signature() {
           </div>
         </div>
 
-        {/* Info */}
         <div className="bg-[#1C2056]/5 rounded-2xl p-4">
           <div className="text-xs text-[#1C2056] font-medium mb-1">💡 Совет</div>
           <div className="text-xs text-gray-500 leading-relaxed">
-            Для печати лучше всего подходит фото на белом фоне или PNG с прозрачным фоном. 
+            Для печати лучше всего подходит фото на белом фоне или PNG с прозрачным фоном.
             Подпись и печать автоматически добавятся на все создаваемые PDF счёта.
           </div>
         </div>

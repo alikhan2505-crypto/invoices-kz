@@ -68,12 +68,14 @@ export default function Dashboard() {
     setServices(updated)
   }
 
-  const filteredClients = clientName && !clientBin
-    ? clients.filter(c =>
-        c.name.toLowerCase().includes(clientName.toLowerCase()) ||
-        (c.bin_iin || '').includes(clientName)
-      )
-    : []
+    const [showDropdown, setShowDropdown] = useState(false)
+
+    const filteredClients = showDropdown && clientName && !clientBin
+      ? clients.filter(c =>
+          c.name.toLowerCase().includes(clientName.toLowerCase()) ||
+          (c.bin_iin || '').includes(clientName)
+        )
+      : []
 
   async function createInvoice() {
     if (!profile?.company_name || !profile?.bin_iin) {
@@ -173,7 +175,9 @@ export default function Dashboard() {
                   className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
                   placeholder="Поиск клиента по БИН/ИИН или названию"
                   value={clientName}
-                  onChange={e => setClientName(e.target.value)}
+                    onFocus={() => setShowDropdown(true)}
+                    onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+                    onChange={e => setClientName(e.target.value)}
                 />
                 {filteredClients.length > 0 && (
                   <div className="absolute top-full left-0 right-0 bg-white border rounded-xl shadow-lg z-10 mt-1 max-h-44 overflow-y-auto">
