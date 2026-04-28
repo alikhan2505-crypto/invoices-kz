@@ -156,7 +156,51 @@ export default function Profile() {
             ))}
           </div>
         </div>
-
+        {/* Plan */}
+        <div>
+          <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">Подписка</div>
+          <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
+            {profile?.plan === 'pro' ? (
+              <div className="px-4 py-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="text-lg">⭐</span>
+                  <div>
+                    <div className="text-sm font-medium text-[#1C2056]">Про тариф</div>
+                    <div className="text-xs text-[#2DC48D]">Безлимитные счета · ЭЦП · Шаблоны</div>
+                  </div>
+                </div>
+                <span className="text-xs bg-[#2DC48D]/10 text-[#2DC48D] px-2 py-1 rounded-full font-medium">Активен</span>
+              </div>
+            ) : profile?.plan === 'basic' ? (
+              <div className="px-4 py-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="text-lg">💼</span>
+                  <div>
+                    <div className="text-sm font-medium text-[#1C2056]">Базовый тариф</div>
+                    <div className="text-xs text-gray-400">30 счетов в месяц</div>
+                  </div>
+                </div>
+                <span className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded-full font-medium">Активен</span>
+              </div>
+            ) : (
+              <div className="px-4 py-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <span className="text-lg">🆓</span>
+                    <div>
+                      <div className="text-sm font-medium text-[#1C2056]">Бесплатный</div>
+                      <div className="text-xs text-gray-400">{stats.invoices} счетов · лимит 3/мес</div>
+                    </div>
+                  </div>
+                </div>
+                <button onClick={() => router.push('/upgrade')}
+                  className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium">
+                  Перейти на платный тариф →
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
         <button onClick={signOut} className="w-full bg-red-50 text-red-500 rounded-xl py-3 text-sm font-medium">
           Выйти из аккаунта
         </button>
