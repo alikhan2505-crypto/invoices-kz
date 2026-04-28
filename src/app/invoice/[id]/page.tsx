@@ -39,6 +39,36 @@ export default function InvoicePage() {
     router.push('/history')
   }
 
+  async function duplicateInvoice() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    const { data: profile } = await supabase.from('profiles')
+      .select('invoice_prefix, invoice_next_number')
+      .eq('id', user.id).single()
+
+    const prefix = profile?.invoice_prefix || 'INV-'
+    const nextNum = profile?.invoice_next_number || '0001'
+    const invoiceNumber = prefix + nextNum
+    const newNum = String(parseInt(nextNum) + 1).padStart(nextNum.length, '0')
+    await supabase.from('profiles').update({ invoice_next_number: newNum }).eq('id', user.id)
+
+    const { data, error } = await supabase.from('invoices').insert({
+      user_id: user.id,
+      number: invoiceNumber,
+      amount: invoice.amount,
+      status: 'draft',
+      client_name: invoice.client_name,
+      client_bin: invoice.client_bin,
+      client_email: invoice.client_email,
+      services: invoice.services,
+    }).select().single()
+
+    if (error) { alert('Ошибка: ' + error.message); return }
+    alert('Счёт продублирован: ' + data.number)
+    router.push('/invoice/' + data.id)
+  }
+
   function openPDF() {
     if (!invoice) return
     const services = invoice.services || [{ name: 'Услуга', qty: 1, price: invoice.amount }]
@@ -86,11 +116,6 @@ export default function InvoicePage() {
             <span className={`w-2 h-2 rounded-full ${status.dot}`}></span>
             {status.text}
           </span>
-          {invoice.status === 'paid' && (
-            <div className="text-xs text-gray-400 mt-1">
-              {new Date(invoice.created_at).toLocaleDateString('ru-KZ', { day: 'numeric', month: 'long' })}
-            </div>
-          )}
         </div>
 
         {/* Actions */}
@@ -183,19 +208,20 @@ export default function InvoicePage() {
           ))}
         </div>
 
-        {/* Danger zone */}
+        {/* Actions bottom */}
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-          {[
-            { label: '📋 Дублировать', action: () => alert('Скоро!') },
-            { label: '✈️ Отправить повторно', action: () => alert('Скоро!') },
-            { label: '← Отозвать / Аннулировать', action: deleteInvoice, red: true },
-          ].map((item, i, arr) => (
-            <button key={item.label}
-              onClick={item.action}
-              className={`w-full flex items-center px-4 py-3.5 text-sm hover:bg-gray-50 ${item.red ? 'text-red-500' : 'text-[#1C2056]'} ${i < arr.length - 1 ? 'border-b border-gray-100' : ''}`}>
-              {item.label}
-            </button>
-          ))}
+          <button onClick={duplicateInvoice}
+            className="w-full flex items-center px-4 py-3.5 text-sm hover:bg-gray-50 text-[#1C2056] border-b border-gray-100">
+            📋 Дублировать
+          </button>
+          <button onClick={() => alert('Скоро!')}
+            className="w-full flex items-center px-4 py-3.5 text-sm hover:bg-gray-50 text-[#1C2056] border-b border-gray-100">
+            ✈️ Отправить повторно
+          </button>
+          <button onClick={deleteInvoice}
+            className="w-full flex items-center px-4 py-3.5 text-sm hover:bg-gray-50 text-red-500">
+            ← Отозвать / Аннулировать
+          </button>
         </div>
       </div>
     </main>
