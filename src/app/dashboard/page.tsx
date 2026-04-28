@@ -217,8 +217,6 @@ export default function Dashboard() {
       <div className="max-w-lg mx-auto p-4">
         <h2 className="text-xl font-bold text-[#1C2056] mb-1">Новый счёт</h2>
         <p className="text-sm text-gray-500 mb-4">Создайте счёт за 1 минуту</p>
-        <h2 className="text-xl font-bold text-[#1C2056] mb-1">Новый счёт</h2>
-        <p className="text-sm text-gray-500 mb-4">Создайте счёт за 1 минуту</p>
 
         {(profile?.plan || 'free') === 'free' && (
           <div className={`flex items-center justify-between rounded-xl px-4 py-3 mb-4 ${monthCount >= 3 ? 'bg-red-50 border border-red-100' : 'bg-blue-50 border border-blue-100'}`}>
