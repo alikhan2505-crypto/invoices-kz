@@ -13,6 +13,8 @@ export default function Dashboard() {
   const [savedServices, setSavedServices] = useState<any[]>([])
   const [showServicePicker, setShowServicePicker] = useState(false)
   const [clientSelected, setClientSelected] = useState(false)
+  const [showSaveClient, setShowSaveClient] = useState(false)
+  const [lastInvoiceClient, setLastInvoiceClient] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
 
   const [clientName, setClientName] = useState('')
@@ -155,8 +157,20 @@ export default function Dashboard() {
         stamp_url: profile?.stamp_url || '',
       }
     })
-
+    // Предлагаем сохранить клиента если его нет в справочнике
+    const alreadyExists = clients.find(c => c.bin_iin === clientBin)
+    if (!alreadyExists && clientBin) {
+      setLastInvoiceClient({ name: clientName, bin_iin: clientBin, email: clientEmail, address: clientAddress })
+      setShowSaveClient(true)
+    }
     clearClient()
+    async function saveClientToDirectory() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user || !lastInvoiceClient) return
+      await supabase.from('clients').insert({ ...lastInvoiceClient, user_id: user.id })
+      setClients([...clients, { ...lastInvoiceClient, id: lastInvoiceClient.bin_iin }])
+      setShowSaveClient(false)
+    }
     setServices([{ name: '', qty: 1, price: 0 }])
   }
 
@@ -336,7 +350,31 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-
+      {showSaveClient && (
+  <div className="fixed inset-0 bg-black/40 z-50 flex items-end">
+    <div className="bg-white w-full max-w-lg mx-auto rounded-t-3xl p-6">
+      <div className="text-center mb-5">
+        <div className="text-3xl mb-2">👥</div>
+        <div className="font-semibold text-[#1C2056] mb-1">Сохранить клиента?</div>
+        <div className="text-sm text-gray-400">
+          {lastInvoiceClient?.name} будет добавлен в справочник
+        </div>
+      </div>
+      <div className="flex gap-3">
+        <button
+          onClick={() => setShowSaveClient(false)}
+          className="flex-1 border border-gray-200 rounded-xl py-3 text-sm text-gray-500">
+          Пропустить
+        </button>
+        <button
+          onClick={saveClientToDirectory}
+          className="flex-1 bg-[#1C2056] text-white rounded-xl py-3 text-sm font-medium">
+          Сохранить
+        </button>
+      </div>
+    </div>
+  </div>
+)}
       <BottomNav />
     </main>
   )
