@@ -12,6 +12,8 @@ export default function Dashboard() {
   const [clients, setClients] = useState<any[]>([])
   const [savedServices, setSavedServices] = useState<any[]>([])
   const [showServicePicker, setShowServicePicker] = useState(false)
+  const [showDropdown, setShowDropdown] = useState(false)
+  const [clientSelected, setClientSelected] = useState(false)
   const [profile, setProfile] = useState<any>(null)
 
   const [clientName, setClientName] = useState('')
@@ -43,6 +45,8 @@ export default function Dashboard() {
     setClientBin(client.bin_iin || '')
     setClientEmail(client.email || '')
     setClientAddress(client.address || '')
+    setClientSelected(true)
+    setShowDropdown(false)
   }
 
   function clearClient() {
@@ -50,6 +54,7 @@ export default function Dashboard() {
     setClientBin('')
     setClientEmail('')
     setClientAddress('')
+    setClientSelected(false)
   }
 
   function selectService(svc: any) {
@@ -68,14 +73,12 @@ export default function Dashboard() {
     setServices(updated)
   }
 
-    const [showDropdown, setShowDropdown] = useState(false)
-
-    const filteredClients = showDropdown && clientName && !clientBin
-      ? clients.filter(c =>
-          c.name.toLowerCase().includes(clientName.toLowerCase()) ||
-          (c.bin_iin || '').includes(clientName)
-        )
-      : []
+  const filteredClients = showDropdown && clientName && !clientSelected
+    ? clients.filter(c =>
+        c.name.toLowerCase().includes(clientName.toLowerCase()) ||
+        (c.bin_iin || '').includes(clientName)
+      )
+    : []
 
   async function createInvoice() {
     if (!profile?.company_name || !profile?.bin_iin) {
@@ -135,10 +138,12 @@ export default function Dashboard() {
         bik: profile?.bik || '',
         kbe: profile?.kbe || '19',
         director_name: profile?.director_name || '',
+        signature_url: profile?.signature_url || '',
+        stamp_url: profile?.stamp_url || '',
       }
     })
 
-    setClientName(''); setClientBin(''); setClientEmail(''); setClientAddress('')
+    clearClient()
     setServices([{ name: '', qty: 1, price: 0 }])
   }
 
@@ -157,8 +162,7 @@ export default function Dashboard() {
         <div className="bg-white rounded-2xl p-5 mb-4 shadow-sm">
           <h3 className="font-medium text-[#1C2056] mb-3">Данные клиента</h3>
 
-          {/* Selected client card */}
-          {clientBin ? (
+          {clientSelected ? (
             <div className="bg-gray-50 rounded-xl p-3 mb-3 flex items-center justify-between">
               <div>
                 <div className="text-sm font-medium text-[#1C2056]">{clientName}</div>
@@ -175,9 +179,9 @@ export default function Dashboard() {
                   className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
                   placeholder="Поиск клиента по БИН/ИИН или названию"
                   value={clientName}
-                    onFocus={() => setShowDropdown(true)}
-                    onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
-                    onChange={e => setClientName(e.target.value)}
+                  onFocus={() => setShowDropdown(true)}
+                  onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+                  onChange={e => setClientName(e.target.value)}
                 />
                 {filteredClients.length > 0 && (
                   <div className="absolute top-full left-0 right-0 bg-white border rounded-xl shadow-lg z-10 mt-1 max-h-44 overflow-y-auto">
@@ -206,6 +210,13 @@ export default function Dashboard() {
 
               {/* Manual fields */}
               <div className="space-y-3">
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Название компании / ИП *</label>
+                  <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                    placeholder="ТОО «Пример»"
+                    value={clientName}
+                    onChange={e => setClientName(e.target.value)} />
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs text-gray-500 mb-1 block">БИН/ИИН *</label>
