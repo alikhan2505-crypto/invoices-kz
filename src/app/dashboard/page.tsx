@@ -27,14 +27,36 @@ export default function Dashboard() {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
-      const [{ data: p }, { data: c }, { data: s }] = await Promise.all([
+      const [{ data: p }, { data: c }, { data: s }, { data: inv }] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', user.id).single(),
         supabase.from('clients').select('*').eq('user_id', user.id).order('name'),
         supabase.from('services').select('*').eq('user_id', user.id).order('name'),
+        supabase.from('invoices').select('client_name, client_bin, client_email')
+          .eq('user_id', user.id)
+          .not('client_name', 'is', null)
+          .order('created_at', { ascending: false })
+          .limit(20),
       ])
       setProfile(p)
-      setClients(c || [])
       setSavedServices(s || [])
+
+      // Объединяем клиентов из справочника и из истории
+      const fromHistory = (inv || []).reduce((acc: any[], inv: any) => {
+        if (inv.client_name && !acc.find(c => c.name === inv.client_name)) {
+          acc.push({ name: inv.client_name, bin_iin: inv.client_bin, email: inv.client_email, id: inv.client_name })
+        }
+        return acc
+      }, [])
+
+      const fromDirectory = (c || []).map((cl: any) => ({ ...cl, id: cl.id }))
+      
+      // Сначала из справочника, потом из истории (без дублей)
+      const merged = [...fromDirectory]
+      fromHistory.forEach(h => {
+        if (!merged.find(m => m.name === h.name)) merged.push(h)
+      })
+      
+      setClients(merged)
     }
     load()
   }, [])
