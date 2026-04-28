@@ -82,7 +82,7 @@ export default function InvoicePage() {
     const services = invoice.services || [{ name: 'Услуга', qty: 1, price: invoice.amount }]
     generateInvoicePDF({
       number: invoice.number,
-      date: new Date(invoice.created_at).toLocaleDateString('ru-KZ'),
+      date: new Date(invoice.created_at).toLocaleDateString('ru-KZ',{ timeZone: 'Asia/Almaty' }),
       clientName: invoice.client_name || '',
       clientBin: invoice.client_bin || '',
       clientEmail: invoice.client_email || '',
@@ -174,7 +174,7 @@ export default function InvoicePage() {
                 <span className="w-2 h-2 rounded-full bg-green-500"></span>
                 <div>
                   <div className="text-sm text-[#1C2056]">Оплачен</div>
-                  <div className="text-xs text-gray-400">{new Date(invoice.created_at).toLocaleDateString('ru-KZ')}</div>
+                  <div className="text-xs text-gray-400">{new Date(invoice.created_at).toLocaleDateString('ru-KZ', { timeZone: 'Asia/Almaty' })}</div>
                 </div>
               </div>
             )}
@@ -183,7 +183,7 @@ export default function InvoicePage() {
                 <span className="w-2 h-2 rounded-full bg-blue-400"></span>
                 <div>
                   <div className="text-sm text-[#1C2056]">Отправлен</div>
-                  <div className="text-xs text-gray-400">{new Date(invoice.created_at).toLocaleDateString('ru-KZ')}</div>
+                  <div className="text-xs text-gray-400">{new Date(invoice.created_at).toLocaleDateString('ru-KZ', { timeZone: 'Asia/Almaty' })}</div>
                 </div>
               </div>
             )}
@@ -191,7 +191,7 @@ export default function InvoicePage() {
               <span className="w-2 h-2 rounded-full bg-gray-300"></span>
               <div>
                 <div className="text-sm text-[#1C2056]">Создан</div>
-                <div className="text-xs text-gray-400">{new Date(invoice.created_at).toLocaleDateString('ru-KZ', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+                <div className="text-xs text-gray-400">{new Date(invoice.created_at).toLocaleDateString('ru-KZ', { timeZone: 'Asia/Almaty', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
               </div>
             </div>
           </div>
