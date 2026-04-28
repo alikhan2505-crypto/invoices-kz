@@ -47,12 +47,12 @@ export default function Profile() {
         d.setMonth(d.getMonth() - i)
         const start = new Date(d.getFullYear(), d.getMonth(), 1).toISOString()
         const end = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59).toISOString()
-        const income = (inv || [])
-          .filter((inv: any) => inv.status === 'paid' && inv.created_at >= start && inv.created_at <= end)
+        const monthTotal = (inv || [])
+          .filter((inv: any) => inv.created_at >= start && inv.created_at <= end)
           .reduce((sum: number, inv: any) => sum + Number(inv.amount), 0)
         months.push({
           month: d.toLocaleString('ru-KZ', { month: 'short' }),
-          income
+          income: monthTotal
         })
       }
       setChartData(months)
@@ -109,7 +109,7 @@ export default function Profile() {
             <div className="text-xs text-[#2DC48D] mt-0.5">Всего счетов: {stats.invoices}</div>
 
             {/* Chart */}
-            {chartData.length > 0 && (
+            {chartData.some(d => d.income > 0) && (
               <>
                 <div className="mt-3 h-16">
                   <ResponsiveContainer width="100%" height="100%">
