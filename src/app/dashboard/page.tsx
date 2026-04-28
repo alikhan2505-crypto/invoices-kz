@@ -16,6 +16,7 @@ export default function Dashboard() {
   const [showSaveClient, setShowSaveClient] = useState(false)
   const [lastInvoiceClient, setLastInvoiceClient] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
+  const [monthCount, setMonthCount] = useState(0)
 
   const [clientName, setClientName] = useState('')
   const [clientBin, setClientBin] = useState('')
@@ -40,6 +41,16 @@ export default function Dashboard() {
           .limit(20),
       ])
       setProfile(p)
+      // Считаем счета за текущий месяц
+      const monthStart = new Date()
+      monthStart.setDate(1)
+      monthStart.setHours(0, 0, 0, 0)
+      const { count } = await supabase
+        .from('invoices')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .gte('created_at', monthStart.toISOString())
+      setMonthCount(count || 0)
       setSavedServices(s || [])
 
       const fromHistory = (inv || []).reduce((acc: any[], inv: any) => {
@@ -206,6 +217,25 @@ export default function Dashboard() {
       <div className="max-w-lg mx-auto p-4">
         <h2 className="text-xl font-bold text-[#1C2056] mb-1">Новый счёт</h2>
         <p className="text-sm text-gray-500 mb-4">Создайте счёт за 1 минуту</p>
+        <h2 className="text-xl font-bold text-[#1C2056] mb-1">Новый счёт</h2>
+        <p className="text-sm text-gray-500 mb-4">Создайте счёт за 1 минуту</p>
+
+        {(profile?.plan || 'free') === 'free' && (
+          <div className={`flex items-center justify-between rounded-xl px-4 py-3 mb-4 ${monthCount >= 3 ? 'bg-red-50 border border-red-100' : 'bg-blue-50 border border-blue-100'}`}>
+            <div>
+              <div className={`text-sm font-medium ${monthCount >= 3 ? 'text-red-600' : 'text-[#1C2056]'}`}>
+                {monthCount >= 3 ? 'Лимит исчерпан!' : `Использовано ${monthCount} из 3 бесплатных`}
+              </div>
+              <div className="text-xs text-gray-400 mt-0.5">
+                {monthCount >= 3 ? 'Перейдите на платный тариф' : `Осталось ${3 - monthCount} счёта в этом месяце`}
+              </div>
+            </div>
+            <button onClick={() => router.push('/upgrade')}
+              className="text-xs bg-[#1C2056] text-white px-3 py-1.5 rounded-lg">
+              Тарифы
+            </button>
+          </div>
+        )}
 
         {/* Recent clients chips */}
         {clients.length > 0 && !clientSelected && (
