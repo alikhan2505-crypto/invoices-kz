@@ -210,27 +210,23 @@ export function generateInvoicePDF(data: InvoiceData) {
       </div>
 
       <hr>
-      <div style="display:flex; align-items:flex-end; justify-content:space-between; margin-top:20px; position:relative;">
-        <div style="flex:1;">
-          <div style="display:flex; align-items:flex-end; gap:8px;">
-            <span>Руководитель</span>
-            <div style="position:relative; flex:1; max-width:220px;">
-              <div style="border-bottom:1px solid #000; width:100%;"></div>
-              ${signatureUrl ? `
-                <img src="${signatureUrl}" 
-                  style="position:absolute; bottom:0; left:10px; height:45px; max-width:180px; object-fit:contain;"
-                />
-              ` : ''}
-            </div>
-            <span>${director ? '/ ' + director : '//'}</span>
+      <div style="position:relative; margin-top:20px; min-height:100px;">
+        <div style="display:flex; align-items:flex-end; gap:8px;">
+          <span>Руководитель</span>
+          <div style="position:relative; width:220px;">
+            ${signatureUrl ? `
+              <img src="${signatureUrl}" 
+                style="position:absolute; bottom:4px; left:10px; height:45px; max-width:180px; object-fit:contain;"
+              />
+            ` : ''}
+            <div style="border-bottom:1px solid #000; width:100%; margin-top:50px;"></div>
           </div>
+          <span>${director ? '/ ' + director : '//'}</span>
         </div>
         ${stampUrl ? `
-          <div style="position:absolute; right:0; bottom:-10px;">
-            <img src="${stampUrl}" 
-              style="height:90px; width:90px; object-fit:contain; opacity:0.85;"
-            />
-          </div>
+          <img src="${stampUrl}" 
+            style="position:absolute; right:0; bottom:-20px; height:110px; width:110px; object-fit:contain; opacity:0.85;"
+          />
         ` : ''}
       </div>
 
