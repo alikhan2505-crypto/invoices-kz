@@ -41,6 +41,7 @@ export default function Dashboard() {
           .limit(20),
       ])
       setProfile(p)
+
       // Считаем счета за текущий месяц
       const monthStart = new Date()
       monthStart.setDate(1)
@@ -51,6 +52,7 @@ export default function Dashboard() {
         .eq('user_id', user.id)
         .gte('created_at', monthStart.toISOString())
       setMonthCount(count || 0)
+
       setSavedServices(s || [])
 
       const fromHistory = (inv || []).reduce((acc: any[], inv: any) => {
@@ -66,6 +68,20 @@ export default function Dashboard() {
         if (!merged.find((m: any) => m.name === h.name)) merged.push(h)
       })
       setClients(merged)
+
+      // Загрузка шаблона если передан параметр
+      const params = new URLSearchParams(window.location.search)
+      const templateId = params.get('template')
+      if (templateId) {
+        const { data: tmpl } = await supabase.from('templates').select('*').eq('id', templateId).single()
+        if (tmpl) {
+          setClientName(tmpl.client_name || '')
+          setClientBin(tmpl.client_bin || '')
+          setClientEmail(tmpl.client_email || '')
+          if (tmpl.services && tmpl.services.length > 0) setServices(tmpl.services)
+          if (tmpl.client_name) setClientSelected(true)
+        }
+      }
     }
     load()
   }, [])

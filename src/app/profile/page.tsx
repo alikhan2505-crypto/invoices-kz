@@ -115,6 +115,7 @@ export default function Profile() {
             {[
               { icon: '👥', label: 'Мои клиенты', href: '/profile/clients', badge: stats.clients },
               { icon: '📋', label: 'Услуги и товары', href: '/profile/services', badge: stats.services },
+              { icon: '📋', label: 'Шаблоны счетов', href: '/profile/templates', badge: 0 },
             ].map((item, i, arr) => (
               <div key={item.href}
                 onClick={() => router.push(item.href)}

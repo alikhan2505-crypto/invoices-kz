@@ -226,6 +226,30 @@ export default function InvoicePage() {
             className="w-full flex items-center px-4 py-3.5 text-sm hover:bg-gray-50 text-[#1C2056] border-b border-gray-100">
             ✈️ Отправить повторно
           </button>
+          <button onClick={async () => {
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) return
+            const { data: p } = await supabase.from('profiles').select('plan').eq('id', user.id).single()
+            if (p?.plan !== 'pro') { router.push('/upgrade'); return }
+
+            const name = prompt('Название шаблона:', invoice.client_name + ' — ' + invoice.number)
+            if (!name) return
+
+            const { error } = await supabase.from('templates').insert({
+              user_id: user.id,
+              name,
+              client_name: invoice.client_name,
+              client_bin: invoice.client_bin,
+              client_email: invoice.client_email,
+              services: invoice.services,
+              amount: invoice.amount,
+            })
+            if (error) { alert('Ошибка: ' + error.message); return }
+            alert('Шаблон сохранён!')
+          }}
+            className="w-full flex items-center px-4 py-3.5 text-sm hover:bg-gray-50 text-[#1C2056] border-b border-gray-100">
+            ⭐ Сохранить как шаблон
+          </button>
           <button onClick={deleteInvoice}
             className="w-full flex items-center px-4 py-3.5 text-sm hover:bg-gray-50 text-red-500">
             ← Отозвать / Аннулировать
