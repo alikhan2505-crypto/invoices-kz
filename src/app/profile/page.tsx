@@ -203,6 +203,7 @@ export default function Profile() {
               { icon: '⚙️', label: 'Настройки счетов', href: '/profile/settings' },
               { icon: '🔔', label: 'Уведомления', href: '/profile/notifications' },
               { icon: '💬', label: 'Поддержка', href: '/profile/support' },
+              { icon: 'ℹ️', label: 'О приложении', href: '/profile/about' },
             ].map((item, i, arr) => (
               <div key={item.href}
                 onClick={() => router.push(item.href)}
