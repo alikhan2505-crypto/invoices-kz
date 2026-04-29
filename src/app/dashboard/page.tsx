@@ -380,17 +380,14 @@ export default function Dashboard() {
                     onChange={async e => {
                       const bin = e.target.value
                       setClientBin(bin)
-                      
-                      // Автопоиск по БИН когда введено 12 цифр
+
                       if (bin.length === 12) {
-                        try {
-                          const res = await fetch(`https://pk.uchet.kz/api/company/?bin=${bin}`)
-                          const data = await res.json()
-                          if (data?.obj?.name) {
-                            setClientName(data.obj.name)
-                          }
-                        } catch {
-                          // Если API не ответил — просто игнорируем
+                        // Ищем в нашей базе клиентов
+                        const found = clients.find(c => c.bin_iin === bin)
+                        if (found) {
+                          setClientName(found.name)
+                          setClientEmail(found.email || '')
+                          setClientAddress(found.address || '')
                         }
                       }
                     }}
