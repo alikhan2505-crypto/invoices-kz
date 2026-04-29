@@ -4,9 +4,11 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import BottomNav from '@/components/BottomNav'
 import { AreaChart, Area, ResponsiveContainer, Tooltip } from 'recharts'
+import { useTheme } from '@/components/ThemeProvider'
 
 export default function Profile() {
   const router = useRouter()
+  const { theme, toggle } = useTheme()
   const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({ clients: 0, services: 0, income: 0, invoices: 0 })
@@ -260,6 +262,22 @@ export default function Profile() {
                 </button>
               </div>
             )}
+          </div>
+        </div>
+
+        {/* Theme toggle */}
+        <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
+          <div className="flex items-center justify-between px-4 py-3.5">
+            <div className="flex items-center gap-3">
+              <span className="text-lg">{theme === 'dark' ? '🌙' : '☀️'}</span>
+              <span className="text-sm text-gray-800">
+                {theme === 'dark' ? 'Тёмная тема' : 'Светлая тема'}
+              </span>
+            </div>
+            <button onClick={toggle}
+              className={`w-12 h-6 rounded-full transition-colors relative ${theme === 'dark' ? 'bg-[#1C2056]' : 'bg-gray-200'}`}>
+              <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${theme === 'dark' ? 'left-7' : 'left-1'}`}></span>
+            </button>
           </div>
         </div>
 

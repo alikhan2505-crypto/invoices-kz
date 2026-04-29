@@ -24,3 +24,23 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+[data-theme="dark"] {
+  --bg: #0f1117;
+  --bg-card: #1a1d27;
+  --bg-hover: #222536;
+  --text-primary: #ffffff;
+  --text-secondary: #a0aec0;
+  --border: #2d3148;
+  --accent: #1C2056;
+}
+
+[data-theme="light"] {
+  --bg: #f9fafb;
+  --bg-card: #ffffff;
+  --bg-hover: #f3f4f6;
+  --text-primary: #1C2056;
+  --text-secondary: #6b7280;
+  --border: #e5e7eb;
+  --accent: #1C2056;
+}
