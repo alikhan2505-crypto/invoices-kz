@@ -45,6 +45,24 @@ export default function Dashboard() {
 
     setProfile(p)
 
+    // Загружаем основной банковский счёт
+    const { data: bankData } = await supabase
+      .from('bank_accounts')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('is_primary', true)
+      .single()
+
+    if (bankData) {
+      setProfile((prev: any) => ({
+        ...prev,
+        bank_name: bankData.bank_name,
+        iik: bankData.iik,
+        bik: bankData.bik,
+        kbe: bankData.kbe,
+      }))
+    }
+
     const monthStart = new Date()
     monthStart.setDate(1)
     monthStart.setHours(0, 0, 0, 0)
