@@ -40,24 +40,24 @@ export default function Referral() {
 
       <div className="max-w-lg mx-auto p-4 space-y-4">
         {/* Header */}
-        <div className="bg-[#1C2056] rounded-2xl p-6 text-center">
-          <div className="text-4xl mb-3">🎁</div>
-          <div className="text-xl font-bold text-white mb-2">Приглашай — получай бонусы</div>
-          <div className="text-white/60 text-sm">
-            За каждого приглашённого друга вы оба получаете 1 месяц Базового тарифа бесплатно
-          </div>
+            <div className="bg-[#1C2056] rounded-2xl p-6 text-center">
+            <div className="text-4xl mb-3">🎁</div>
+            <div className="text-xl font-bold text-white mb-2">Приглашай — получай бонусы</div>
+            <div className="text-white/60 text-sm">
+                За каждого приглашённого друга вы оба получаете <span className="text-[#2DC48D] font-bold">+7 дней</span> Базового тарифа бесплатно
+            </div>
         </div>
 
         {/* Stats */}
         <div className="grid grid-cols-2 gap-3">
-          <div className="bg-white rounded-2xl p-4 text-center shadow-sm">
+        <div className="bg-white rounded-2xl p-4 text-center shadow-sm">
             <div className="text-2xl font-bold text-[#1C2056]">{profile?.referral_count || 0}</div>
             <div className="text-xs text-gray-400 mt-1">Приглашено друзей</div>
-          </div>
-          <div className="bg-white rounded-2xl p-4 text-center shadow-sm">
-            <div className="text-2xl font-bold text-[#2DC48D]">{profile?.referral_count || 0}</div>
-            <div className="text-xs text-gray-400 mt-1">Месяцев бонуса</div>
-          </div>
+        </div>
+        <div className="bg-white rounded-2xl p-4 text-center shadow-sm">
+            <div className="text-2xl font-bold text-[#2DC48D]">{(profile?.referral_count || 0) * 7}</div>
+            <div className="text-xs text-gray-400 mt-1">Бонусных дней</div>
+        </div>
         </div>
 
         {/* Referral link */}
@@ -86,7 +86,7 @@ export default function Referral() {
               { step: '1', text: 'Поделитесь своей ссылкой с другом' },
               { step: '2', text: 'Друг регистрируется по вашей ссылке' },
               { step: '3', text: 'Друг создаёт первый счёт' },
-              { step: '4', text: 'Вы оба получаете 1 месяц Базового тарифа' },
+              { step: '4', text: 'Вы оба получаете +7 дней Базового тарифа' },
             ].map(item => (
               <div key={item.step} className="flex items-center gap-3">
                 <div className="w-7 h-7 rounded-full bg-[#1C2056] text-white text-sm font-bold flex items-center justify-center flex-shrink-0">

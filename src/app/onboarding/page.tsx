@@ -30,6 +30,18 @@ export default function Onboarding() {
     })
 
     if (error) { alert('Ошибка: ' + error.message); setSaving(false); return }
+
+    // Применяем реферальный код если есть
+    const params = new URLSearchParams(window.location.search)
+    const ref = params.get('ref')
+    if (ref) {
+      await fetch('/api/referral', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, referralCode: ref })
+      })
+    }
+
     router.push('/dashboard')
   }
 
