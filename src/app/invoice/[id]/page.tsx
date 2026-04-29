@@ -9,6 +9,7 @@ const statusLabel: Record<string, { text: string; color: string; dot: string }> 
   sent:    { text: 'Отправлен', color: 'text-blue-600',  dot: 'bg-blue-400' },
   overdue: { text: 'Просрочен', color: 'text-red-600',   dot: 'bg-red-500' },
   draft:   { text: 'Черновик',  color: 'text-gray-500',  dot: 'bg-gray-300' },
+  viewed: { text: 'Просмотрен', color: 'text-purple-600', dot: 'bg-purple-400' },
 }
 
 export default function InvoicePage() {
@@ -233,6 +234,7 @@ export default function InvoicePage() {
             { status: 'paid', label: 'Оплачен' },
             { status: 'overdue', label: 'Просрочен' },
             { status: 'draft', label: 'Черновик' },
+            { status: 'viewed', label: 'Просмотрен клиентом' },
           ].filter(s => s.status !== invoice.status).map((s, i, arr) => (
             <button key={s.status}
               onClick={() => updateStatus(s.status)}

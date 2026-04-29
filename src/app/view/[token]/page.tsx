@@ -22,6 +22,16 @@ export default function PublicInvoice() {
       if (!inv) { setLoading(false); return }
       setInvoice(inv)
 
+      // Отмечаем что клиент просмотрел счёт
+      if (inv && inv.status === 'sent') {
+        await supabase.from('invoices')
+          .update({ 
+            status: 'viewed',
+            viewed_at: new Date().toISOString()
+          })
+          .eq('id', inv.id)
+      }
+
       const { data: p } = await supabase
         .from('profiles')
         .select('company_name, bin_iin, address, phone, email, bank_name, iik, bik, kbe')

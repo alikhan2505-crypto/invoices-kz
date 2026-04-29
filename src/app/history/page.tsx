@@ -10,6 +10,7 @@ const statusLabel: Record<string, { text: string; color: string }> = {
   sent:    { text: 'Отправлен', color: 'bg-blue-100 text-blue-700' },
   overdue: { text: 'Просрочен', color: 'bg-red-100 text-red-700' },
   draft:   { text: 'Черновик',  color: 'bg-gray-100 text-gray-600' },
+  viewed: { text: 'Просмотрен', color: 'bg-purple-100 text-purple-700' },
 }
 
 export default function History() {
