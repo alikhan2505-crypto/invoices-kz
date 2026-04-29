@@ -95,6 +95,18 @@ export default function InvoicePage() {
     await updateStatus('sent')
   }
 
+  async function sendReminder() {
+    const { data } = await supabase
+      .from('invoices')
+      .select('public_token')
+      .eq('id', id)
+      .single()
+    if (!data?.public_token) { alert('Ошибка'); return }
+    const link = `https://invoices.kz/view/${data.public_token}`
+    const text = `Здравствуйте, ${invoice.client_name}!\n\nНапоминаем о неоплаченном счёте:\n\n📄 Счёт: ${invoice.number}\n💰 Сумма: ${Number(invoice.amount).toLocaleString('ru-KZ')} ₸\n🔗 Открыть счёт: ${link}\n\nПожалуйста, произведите оплату. Спасибо!`
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
+  }
+
   function openPDF() {
     if (!invoice) return
     const services = invoice.services || [{ name: 'Услуга', qty: 1, price: invoice.amount }]
@@ -264,9 +276,9 @@ export default function InvoicePage() {
             className="w-full flex items-center px-4 py-3.5 text-sm hover:bg-gray-50 text-[#1C2056] border-b border-gray-100">
             ⭐ Сохранить как шаблон
           </button>
-          <button onClick={shareWhatsApp}
+          <button onClick={sendReminder}
             className="w-full flex items-center px-4 py-3.5 text-sm hover:bg-gray-50 text-[#1C2056] border-b border-gray-100">
-            💬 Отправить в WhatsApp
+            🔔 Напомнить об оплате
           </button>
           <button onClick={deleteInvoice}
             className="w-full flex items-center px-4 py-3.5 text-sm hover:bg-gray-50 text-red-500">
