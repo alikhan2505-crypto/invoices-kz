@@ -32,6 +32,7 @@ export default function Dashboard() {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
+
       const [{ data: p }, { data: c }, { data: s }, { data: inv }] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', user.id).single(),
         supabase.from('clients').select('*').eq('user_id', user.id).order('name'),
@@ -42,12 +43,14 @@ export default function Dashboard() {
           .order('created_at', { ascending: false })
           .limit(20),
       ])
+
       setProfile(p)
 
       // Считаем счета за текущий месяц
       const monthStart = new Date()
       monthStart.setDate(1)
       monthStart.setHours(0, 0, 0, 0)
+
       const { count } = await supabase
         .from('invoices')
         .select('*', { count: 'exact', head: true })
@@ -66,6 +69,11 @@ export default function Dashboard() {
         .filter((i: any) => i.status === 'paid')
         .reduce((sum: number, i: any) => sum + Number(i.amount), 0)
       setMonthStats({ paid, total: monthInvoices?.length || 0, amount })
+
+      // Показываем онбординг если нет счетов и не заполнен профиль
+      if ((count || 0) === 0 && !p?.company_name) {
+        setShowOnboarding(true)
+      }
 
       setSavedServices(s || [])
 
@@ -98,12 +106,6 @@ export default function Dashboard() {
       }
     }
     load()
-
-    // Показываем онбординг если нет счетов
-    if ((count || 0) === 0 && !p?.company_name) {
-      setShowOnboarding(true)
-    }
-
   }, [])
 
   function selectClient(client: any) {
@@ -138,7 +140,6 @@ export default function Dashboard() {
     setServices(updated)
   }
 
-  // Сохранить клиента в справочник — вынесено на уровень компонента
   async function saveClientToDirectory() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user || !lastInvoiceClient) return
@@ -171,25 +172,21 @@ export default function Dashboard() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { alert('Войдите в систему'); setLoading(false); return }
 
-    // Проверка лимита — 3 счёта в месяц для free
     if ((profile?.plan || 'free') === 'free') {
       const monthStart = new Date()
       monthStart.setDate(1)
       monthStart.setHours(0, 0, 0, 0)
-      
       const { count } = await supabase
         .from('invoices')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id)
         .gte('created_at', monthStart.toISOString())
-
       if ((count || 0) >= 3) {
         router.push('/upgrade')
         setLoading(false)
         return
       }
     }
-
 
     const prefix = profile?.invoice_prefix || 'INV-'
     const nextNum = profile?.invoice_next_number || '0001'
@@ -232,7 +229,6 @@ export default function Dashboard() {
       }
     })
 
-    // Предлагаем сохранить клиента если его нет в справочнике
     const alreadyExists = clients.find(c => c.bin_iin === clientBin)
     if (!alreadyExists && clientBin) {
       setLastInvoiceClient({ name: clientName, bin_iin: clientBin, email: clientEmail, address: clientAddress })
@@ -253,6 +249,7 @@ export default function Dashboard() {
       <div className="max-w-lg mx-auto p-4">
         <h2 className="text-xl font-bold text-[#1C2056] mb-1">Новый счёт</h2>
         <p className="text-sm text-gray-500 mb-4">Создайте счёт за 1 минуту</p>
+
         {/* Month stats */}
         {monthStats.total > 0 && (
           <div className="grid grid-cols-3 gap-1 mb-4">
@@ -273,6 +270,7 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* Free plan banner */}
         {(profile?.plan || 'free') === 'free' && (
           <div className={`flex items-center justify-between rounded-xl px-4 py-3 mb-4 ${monthCount >= 3 ? 'bg-red-50 border border-red-100' : 'bg-blue-50 border border-blue-100'}`}>
             <div>
@@ -290,6 +288,20 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* Profile incomplete banner */}
+        {profile && (!profile.company_name || !profile.bin_iin) && (
+          <div className="bg-yellow-50 border border-yellow-100 rounded-xl px-4 py-3 mb-4 flex items-center justify-between">
+            <div>
+              <div className="text-sm font-medium text-yellow-800">⚠️ Заполните профиль</div>
+              <div className="text-xs text-yellow-600 mt-0.5">Без реквизитов нельзя создать счёт</div>
+            </div>
+            <button onClick={() => router.push('/profile/requisites')}
+              className="text-xs bg-yellow-800 text-white px-3 py-1.5 rounded-lg">
+              Заполнить
+            </button>
+          </div>
+        )}
+
         {/* Onboarding */}
         {showOnboarding && (
           <div className="bg-white rounded-2xl shadow-sm p-5 mb-4">
@@ -300,52 +312,21 @@ export default function Dashboard() {
             </div>
             <div className="space-y-3">
               {[
-                {
-                  step: 1,
-                  title: 'Заполните реквизиты',
-                  desc: 'Название компании, БИН, адрес — они появятся в счёте',
-                  done: !!(profile?.company_name && profile?.bin_iin),
-                  action: () => router.push('/profile/requisites'),
-                  btn: 'Заполнить'
-                },
-                {
-                  step: 2,
-                  title: 'Добавьте банковский счёт',
-                  desc: 'ИИК, БИК — для реквизитов оплаты в счёте',
-                  done: !!(profile?.iik),
-                  action: () => router.push('/profile/banks'),
-                  btn: 'Добавить'
-                },
-                {
-                  step: 3,
-                  title: 'Загрузите подпись',
-                  desc: 'Нарисуйте подпись — она появится на PDF',
-                  done: !!(profile?.signature_url),
-                  action: () => router.push('/profile/signature'),
-                  btn: 'Загрузить'
-                },
-                {
-                  step: 4,
-                  title: 'Создайте первый счёт',
-                  desc: 'Заполните данные клиента и нажмите создать',
-                  done: monthStats.total > 0,
-                  action: () => {},
-                  btn: ''
-                },
+                { step: 1, title: 'Заполните реквизиты', desc: 'Название компании, БИН, адрес', done: !!(profile?.company_name && profile?.bin_iin), action: () => router.push('/profile/requisites'), btn: 'Заполнить' },
+                { step: 2, title: 'Добавьте банковский счёт', desc: 'ИИК, БИК — для реквизитов оплаты', done: !!(profile?.iik), action: () => router.push('/profile/banks'), btn: 'Добавить' },
+                { step: 3, title: 'Загрузите подпись', desc: 'Нарисуйте подпись для PDF', done: !!(profile?.signature_url), action: () => router.push('/profile/signature'), btn: 'Загрузить' },
+                { step: 4, title: 'Создайте первый счёт', desc: 'Заполните данные клиента', done: monthStats.total > 0, action: () => {}, btn: '' },
               ].map((item, i) => (
                 <div key={i} className={`flex items-center gap-3 p-3 rounded-xl ${item.done ? 'bg-green-50' : 'bg-gray-50'}`}>
                   <div className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${item.done ? 'bg-[#2DC48D] text-white' : 'bg-gray-200 text-gray-500'}`}>
                     {item.done ? '✓' : item.step}
                   </div>
                   <div className="flex-1">
-                    <div className={`text-sm font-medium ${item.done ? 'text-green-700 line-through' : 'text-[#1C2056]'}`}>
-                      {item.title}
-                    </div>
+                    <div className={`text-sm font-medium ${item.done ? 'text-green-700 line-through' : 'text-[#1C2056]'}`}>{item.title}</div>
                     <div className="text-xs text-gray-400">{item.desc}</div>
                   </div>
                   {!item.done && item.btn && (
-                    <button onClick={item.action}
-                      className="text-xs bg-[#1C2056] text-white px-3 py-1.5 rounded-lg flex-shrink-0">
+                    <button onClick={item.action} className="text-xs bg-[#1C2056] text-white px-3 py-1.5 rounded-lg flex-shrink-0">
                       {item.btn}
                     </button>
                   )}
@@ -373,7 +354,6 @@ export default function Dashboard() {
         {/* Client section */}
         <div className="bg-white rounded-2xl p-5 mb-4 shadow-sm">
           <h3 className="font-medium text-[#1C2056] mb-3">Данные клиента</h3>
-
           {clientSelected ? (
             <div className="bg-gray-50 rounded-xl p-3 flex items-center justify-between">
               <div>
@@ -387,41 +367,25 @@ export default function Dashboard() {
             <div className="space-y-3">
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">Название компании / ИП *</label>
-                <input
-                  className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                  placeholder="ТОО «Пример»"
-                  value={clientName}
-                  onChange={e => setClientName(e.target.value)}
-                />
+                <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                  placeholder="ТОО «Пример»" value={clientName} onChange={e => setClientName(e.target.value)} />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs text-gray-500 mb-1 block">БИН/ИИН *</label>
-                  <input
-                    className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                    placeholder="123456789012"
-                    value={clientBin}
-                    onChange={e => setClientBin(e.target.value)}
-                  />
+                  <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                    placeholder="123456789012" value={clientBin} onChange={e => setClientBin(e.target.value)} />
                 </div>
                 <div>
                   <label className="text-xs text-gray-500 mb-1 block">Email</label>
-                  <input
-                    className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                    placeholder="client@mail.kz"
-                    value={clientEmail}
-                    onChange={e => setClientEmail(e.target.value)}
-                  />
+                  <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                    placeholder="client@mail.kz" value={clientEmail} onChange={e => setClientEmail(e.target.value)} />
                 </div>
               </div>
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">Адрес (необязательно)</label>
-                <input
-                  className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                  placeholder="г. Алматы, ул. Абая 1"
-                  value={clientAddress}
-                  onChange={e => setClientAddress(e.target.value)}
-                />
+                <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                  placeholder="г. Алматы, ул. Абая 1" value={clientAddress} onChange={e => setClientAddress(e.target.value)} />
               </div>
             </div>
           )}
@@ -438,8 +402,7 @@ export default function Dashboard() {
                   Из справочника
                 </button>
               )}
-              <button onClick={addService}
-                className="text-xs bg-[#1C2056] text-white rounded-lg px-3 py-1">
+              <button onClick={addService} className="text-xs bg-[#1C2056] text-white rounded-lg px-3 py-1">
                 + Добавить
               </button>
             </div>
@@ -448,25 +411,13 @@ export default function Dashboard() {
             {services.map((svc, idx) => (
               <div key={idx} className="flex gap-2 items-start">
                 <div className="flex-1 space-y-2">
-                  <input
-                    className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                    placeholder="Название услуги"
-                    value={svc.name}
-                    onChange={e => updateService(idx, 'name', e.target.value)}
-                  />
+                  <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                    placeholder="Название услуги" value={svc.name} onChange={e => updateService(idx, 'name', e.target.value)} />
                   <div className="grid grid-cols-2 gap-2">
-                    <input
-                      className="border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                      type="number" placeholder="Кол-во"
-                      value={svc.qty}
-                      onChange={e => updateService(idx, 'qty', Number(e.target.value))}
-                    />
-                    <input
-                      className="border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                      type="number" placeholder="Цена ₸"
-                      value={svc.price || ''}
-                      onChange={e => updateService(idx, 'price', Number(e.target.value))}
-                    />
+                    <input className="border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                      type="number" placeholder="Кол-во" value={svc.qty} onChange={e => updateService(idx, 'qty', Number(e.target.value))} />
+                    <input className="border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                      type="number" placeholder="Цена ₸" value={svc.price || ''} onChange={e => updateService(idx, 'price', Number(e.target.value))} />
                   </div>
                 </div>
                 {services.length > 1 && (
@@ -528,18 +479,14 @@ export default function Dashboard() {
             <div className="text-center mb-5">
               <div className="text-3xl mb-2">👥</div>
               <div className="font-semibold text-[#1C2056] mb-1">Сохранить клиента?</div>
-              <div className="text-sm text-gray-400">
-                {lastInvoiceClient?.name} будет добавлен в справочник
-              </div>
+              <div className="text-sm text-gray-400">{lastInvoiceClient?.name} будет добавлен в справочник</div>
             </div>
             <div className="flex gap-3">
-              <button
-                onClick={() => setShowSaveClient(false)}
+              <button onClick={() => setShowSaveClient(false)}
                 className="flex-1 border border-gray-200 rounded-xl py-3 text-sm text-gray-500">
                 Пропустить
               </button>
-              <button
-                onClick={saveClientToDirectory}
+              <button onClick={saveClientToDirectory}
                 className="flex-1 bg-[#1C2056] text-white rounded-xl py-3 text-sm font-medium">
                 Сохранить
               </button>
