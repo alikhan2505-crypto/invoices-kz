@@ -210,6 +210,14 @@ export default function Dashboard() {
     setLastCreated(Date.now())
     setLoading(false)
 
+    // Не генерируем PDF если не заполнены банковские реквизиты
+    if (!profile?.iik || !profile?.bank_name) {
+      alert('Заполните банковские реквизиты в Профиле для генерации PDF')
+      router.push('/profile/banks')
+      setLoading(false)
+      return
+    }
+
     generateInvoicePDF({
       number: data.number,
       date: new Date().toLocaleDateString('ru-KZ'),
