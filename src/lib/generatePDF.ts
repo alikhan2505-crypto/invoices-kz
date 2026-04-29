@@ -216,7 +216,7 @@ export function generateInvoicePDF(data: InvoiceData) {
           <div style="position:relative; flex:1;">
             ${signatureUrl ? `
               <img src="${signatureUrl}" 
-                style="position:absolute; bottom:4px; left:0px; height:45px; max-width:160px; object-fit:contain;"
+                style="position:absolute; bottom:4px; left:25%; height:45px; max-width:160px; object-fit:contain;"
               />
             ` : ''}
             <div style="border-bottom:1px solid #000; width:100%; margin-top:50px;"></div>
