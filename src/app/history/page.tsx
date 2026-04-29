@@ -10,7 +10,7 @@ const statusLabel: Record<string, { text: string; color: string }> = {
   sent:    { text: 'Отправлен', color: 'bg-blue-100 text-blue-700' },
   overdue: { text: 'Просрочен', color: 'bg-red-100 text-red-700' },
   draft:   { text: 'Черновик',  color: 'bg-gray-100 text-gray-600' },
-  viewed: { text: 'Просмотрен', color: 'bg-purple-100 text-purple-700' },
+  viewed:  { text: 'Просмотрен', color: 'bg-purple-100 text-purple-700' },
 }
 
 export default function History() {
@@ -21,10 +21,8 @@ export default function History() {
   const [search, setSearch] = useState('')
   const [dateFilter, setDateFilter] = useState('month')
 
-  useEffect(() => { 
-    loadInvoices() 
-    window.addEventListener('focus', loadInvoices)
-    return () => window.removeEventListener('focus', loadInvoices)
+  useEffect(() => {
+    loadInvoices()
   }, [])
 
   async function loadInvoices() {
@@ -50,10 +48,8 @@ export default function History() {
   async function markOverdue() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-
     const sevenDaysAgo = new Date()
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-
     const { data, error } = await supabase
       .from('invoices')
       .update({ status: 'overdue' })
@@ -61,9 +57,7 @@ export default function History() {
       .in('status', ['sent', 'viewed'])
       .lt('created_at', sevenDaysAgo.toISOString())
       .select()
-
     if (error) { alert('Ошибка: ' + error.message); return }
-
     if (data && data.length > 0) {
       alert(`Отмечено просроченных: ${data.length}`)
       loadInvoices()
@@ -81,21 +75,13 @@ export default function History() {
       'Статус': (statusLabel[inv.status] || statusLabel.draft).text,
       'Дата': new Date(inv.created_at).toLocaleDateString('ru-KZ'),
     }))
-
     const ws = XLSX.utils.json_to_sheet(data)
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Счета')
-
-    // Ширина колонок
     ws['!cols'] = [
-      { wch: 12 },
-      { wch: 30 },
-      { wch: 15 },
-      { wch: 15 },
-      { wch: 12 },
-      { wch: 15 },
+      { wch: 12 }, { wch: 30 }, { wch: 15 },
+      { wch: 15 }, { wch: 12 }, { wch: 15 },
     ]
-
     const date = new Date().toLocaleDateString('ru-KZ').replace(/\./g, '-')
     XLSX.writeFile(wb, `Счета_${date}.xlsx`)
   }
@@ -117,11 +103,13 @@ export default function History() {
       weekAgo.setDate(now.getDate() - 7)
       matchDate = invDate >= weekAgo
     } else if (dateFilter === 'month') {
-      matchDate = invDate.getMonth() === now.getMonth() && invDate.getFullYear() === now.getFullYear()
+      matchDate = invDate.getMonth() === now.getMonth() &&
+        invDate.getFullYear() === now.getFullYear()
     } else if (dateFilter === 'last_month') {
       const lastMonth = new Date(now)
       lastMonth.setMonth(now.getMonth() - 1)
-      matchDate = invDate.getMonth() === lastMonth.getMonth() && invDate.getFullYear() === lastMonth.getFullYear()
+      matchDate = invDate.getMonth() === lastMonth.getMonth() &&
+        invDate.getFullYear() === lastMonth.getFullYear()
     }
 
     return matchFilter && matchSearch && matchDate
@@ -155,7 +143,6 @@ export default function History() {
       </div>
 
       <div className="max-w-lg mx-auto p-4">
-
         {/* Search */}
         <div className="bg-white rounded-xl px-3 py-2.5 flex items-center gap-2 shadow-sm mb-3">
           <span className="text-gray-400">🔍</span>
@@ -257,7 +244,9 @@ export default function History() {
                     </div>
                   </div>
                   <div className="text-right mr-3">
-                    <div className="text-sm font-medium mb-1.5">{Number(inv.amount).toLocaleString('ru-KZ')} ₸</div>
+                    <div className="text-sm font-medium mb-1.5">
+                      {Number(inv.amount).toLocaleString('ru-KZ')} ₸
+                    </div>
                     <span className={`text-xs px-2 py-1 rounded-full ${(statusLabel[inv.status] || statusLabel.draft).color}`}>
                       {(statusLabel[inv.status] || statusLabel.draft).text}
                     </span>
