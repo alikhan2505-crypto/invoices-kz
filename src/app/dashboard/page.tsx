@@ -384,7 +384,7 @@ export default function Dashboard() {
                       // Автопоиск по БИН когда введено 12 цифр
                       if (bin.length === 12) {
                         try {
-                          const res = await fetch(`https://stat.gov.kz/api/juridical/counter/api/?bin=${bin}&lang=ru`)
+                          const res = await fetch(`https://pk.uchet.kz/api/company/?bin=${bin}`)
                           const data = await res.json()
                           if (data?.obj?.name) {
                             setClientName(data.obj.name)
