@@ -17,6 +17,7 @@ export default function History() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
+  const [dateFilter, setDateFilter] = useState('month')
 
   useEffect(() => { loadInvoices() }, [])
 
@@ -39,31 +40,55 @@ export default function History() {
     setInvoices(prev => prev.filter(inv => inv.id !== id))
   }
 
-  const counts = {
-    all: invoices.length,
-    paid: invoices.filter(i => i.status === 'paid').length,
-    sent: invoices.filter(i => i.status === 'sent').length,
-    overdue: invoices.filter(i => i.status === 'overdue').length,
-  }
-
   const filtered = invoices.filter(inv => {
     const matchFilter = filter === 'all' || inv.status === filter
     const clientName = inv.client_name || inv.clients?.name || ''
     const matchSearch = clientName.toLowerCase().includes(search.toLowerCase()) ||
       inv.number.toLowerCase().includes(search.toLowerCase()) ||
       String(inv.amount).includes(search)
-    return matchFilter && matchSearch
+
+    const invDate = new Date(inv.created_at)
+    const now = new Date()
+    let matchDate = true
+    if (dateFilter === 'today') {
+      matchDate = invDate.toDateString() === now.toDateString()
+    } else if (dateFilter === 'week') {
+      const weekAgo = new Date(now)
+      weekAgo.setDate(now.getDate() - 7)
+      matchDate = invDate >= weekAgo
+    } else if (dateFilter === 'month') {
+      matchDate = invDate.getMonth() === now.getMonth() && invDate.getFullYear() === now.getFullYear()
+    } else if (dateFilter === 'last_month') {
+      const lastMonth = new Date(now)
+      lastMonth.setMonth(now.getMonth() - 1)
+      matchDate = invDate.getMonth() === lastMonth.getMonth() && invDate.getFullYear() === lastMonth.getFullYear()
+    }
+
+    return matchFilter && matchSearch && matchDate
   })
+
+  const counts = {
+    all: filtered.length,
+    paid: filtered.filter(i => i.status === 'paid').length,
+    sent: filtered.filter(i => i.status === 'sent').length,
+    overdue: filtered.filter(i => i.status === 'overdue').length,
+  }
+
+  const totalAmount = filtered
+    .filter(i => i.status === 'paid')
+    .reduce((sum, i) => sum + Number(i.amount), 0)
 
   return (
     <main className="min-h-screen bg-gray-50 pb-24">
-      <div className="bg-white border-b px-4 py-4">
-        <h1 className="text-xl font-bold text-[#1C2056]">История счетов</h1>
+      <div className="bg-white border-b px-4 py-3 flex items-center justify-between">
+        <span className="font-bold text-[#1C2056]">INVOICES.KZ</span>
+        <span className="text-sm text-gray-500">История</span>
       </div>
 
       <div className="max-w-lg mx-auto p-4">
+
         {/* Search */}
-        <div className="bg-white rounded-xl px-3 py-2.5 flex items-center gap-2 shadow-sm mb-4">
+        <div className="bg-white rounded-xl px-3 py-2.5 flex items-center gap-2 shadow-sm mb-3">
           <span className="text-gray-400">🔍</span>
           <input
             className="flex-1 text-sm outline-none"
@@ -73,8 +98,25 @@ export default function History() {
           />
         </div>
 
-        {/* Filter tabs */}
-        <div className="flex gap-2 mb-4 overflow-x-auto">
+        {/* Date filter */}
+        <div className="flex gap-2 mb-3 overflow-x-auto pb-1">
+          {[
+            { key: 'all_time', label: 'Всё время' },
+            { key: 'today', label: 'Сегодня' },
+            { key: 'week', label: 'Неделя' },
+            { key: 'month', label: 'Месяц' },
+            { key: 'last_month', label: 'Прошлый месяц' },
+          ].map(d => (
+            <button key={d.key}
+              onClick={() => setDateFilter(d.key)}
+              className={`px-3 py-1.5 rounded-full text-xs whitespace-nowrap transition flex-shrink-0 ${dateFilter === d.key ? 'bg-[#2DC48D] text-white' : 'bg-white text-gray-500 shadow-sm'}`}>
+              {d.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Status filter */}
+        <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
           {[
             { key: 'all', label: 'Все' },
             { key: 'paid', label: 'Оплачены' },
@@ -83,7 +125,7 @@ export default function History() {
           ].map(f => (
             <button key={f.key}
               onClick={() => setFilter(f.key)}
-              className={`px-4 py-1.5 rounded-full text-xs whitespace-nowrap transition ${filter === f.key ? 'bg-[#1C2056] text-white' : 'bg-white text-gray-500 shadow-sm'}`}>
+              className={`px-4 py-1.5 rounded-full text-xs whitespace-nowrap transition flex-shrink-0 ${filter === f.key ? 'bg-[#1C2056] text-white' : 'bg-white text-gray-500 shadow-sm'}`}>
               {f.label}
             </button>
           ))}
@@ -92,17 +134,27 @@ export default function History() {
         {/* Stats */}
         <div className="grid grid-cols-4 gap-2 mb-4">
           {[
-            { label: 'Отправлено', value: counts.all },
+            { label: 'Всего', value: counts.all },
             { label: 'Оплачено', value: counts.paid },
             { label: 'Неоплач.', value: counts.sent },
             { label: 'Просроч.', value: counts.overdue, red: true },
           ].map(s => (
             <div key={s.label} className="bg-white rounded-xl p-3 text-center shadow-sm">
-              <div className={`text-lg font-semibold ${s.red && s.value > 0 ? 'text-red-500' : 'text-[#1C2056]'}`}>{s.value}</div>
+              <div className={`text-lg font-semibold ${s.red && s.value > 0 ? 'text-red-500' : 'text-[#1C2056]'}`}>
+                {s.value}
+              </div>
               <div className="text-xs text-gray-400 mt-0.5 leading-tight">{s.label}</div>
             </div>
           ))}
         </div>
+
+        {/* Total income for period */}
+        {totalAmount > 0 && (
+          <div className="bg-[#1C2056] rounded-xl px-4 py-3 mb-4 flex items-center justify-between">
+            <span className="text-white/70 text-sm">Доход за период</span>
+            <span className="text-white font-bold">{totalAmount.toLocaleString('ru-KZ')} ₸</span>
+          </div>
+        )}
 
         {/* List */}
         {loading ? (
@@ -120,10 +172,8 @@ export default function History() {
           <div className="bg-white rounded-2xl shadow-sm overflow-hidden mb-4">
             {filtered.map((inv, i) => (
               <div key={inv.id}
-                className={`flex items-center p-4 cursor-pointer hover:bg-gray-50 ${i < filtered.length - 1 ? 'border-b border-gray-100' : ''}`}>
-                
-                {/* Clickable area */}
-                <div className="flex-1 flex items-start justify-between"
+                className={`flex items-center p-4 hover:bg-gray-50 ${i < filtered.length - 1 ? 'border-b border-gray-100' : ''}`}>
+                <div className="flex-1 flex items-start justify-between cursor-pointer"
                   onClick={() => router.push('/invoice/' + inv.id)}>
                   <div>
                     <div className="text-xs text-gray-400 mb-1">{inv.number}</div>
@@ -144,8 +194,6 @@ export default function History() {
                     </span>
                   </div>
                 </div>
-
-                {/* Delete button */}
                 <button
                   onClick={(e) => deleteInvoice(e, inv.id, inv.number)}
                   className="text-gray-300 hover:text-red-400 text-lg p-1 flex-shrink-0">
