@@ -50,7 +50,7 @@ export default function Dashboard() {
       .from('bank_accounts')
       .select('*')
       .eq('user_id', user.id)
-      .eq('is_primary', true)
+      .eq('is_main', true)
       .single()
 
     if (bankData) {
