@@ -248,7 +248,7 @@ export default function Dashboard() {
         <p className="text-sm text-gray-500 mb-4">Создайте счёт за 1 минуту</p>
         {/* Month stats */}
         {monthStats.total > 0 && (
-          <div className="grid grid-cols-3 gap-2 mb-4">
+          <div className="grid grid-cols-3 gap-1 mb-4">
             <div className="bg-white rounded-xl p-3 text-center shadow-sm">
               <div className="text-lg font-bold text-[#1C2056]">{monthStats.total}</div>
               <div className="text-xs text-gray-400 mt-0.5">Счетов</div>
@@ -258,8 +258,8 @@ export default function Dashboard() {
               <div className="text-xs text-gray-400 mt-0.5">Оплачено</div>
             </div>
             <div className="bg-white rounded-xl p-3 text-center shadow-sm">
-              <div className="text-sm font-bold text-[#1C2056]">
-                {monthStats.amount > 0 ? (monthStats.amount / 1000).toFixed(0) + 'K' : '0'} ₸
+              <div className="text-sm font-bold text-[#1C2056] leading-tight">
+                {monthStats.amount > 0 ? (monthStats.amount / 1000).toFixed(0) + 'K ₸' : '0 ₸'}
               </div>
               <div className="text-xs text-gray-400 mt-0.5">Доход</div>
             </div>
