@@ -160,7 +160,13 @@ export default function Dashboard() {
     }
 
     // Проверка банковских реквизитов ДО создания счёта
-    if (!profile?.iik || !profile?.bank_name) {
+    const { data: bankAccounts } = await supabase
+      .from('bank_accounts')
+      .select('id')
+      .eq('user_id', (await supabase.auth.getUser()).data.user?.id)
+      .limit(1)
+
+    if (!bankAccounts || bankAccounts.length === 0) {
       if (confirm('Не заполнены банковские реквизиты — они нужны для PDF. Заполнить сейчас?')) {
         router.push('/profile/banks')
       }
