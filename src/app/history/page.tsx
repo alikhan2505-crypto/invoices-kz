@@ -42,6 +42,31 @@ export default function History() {
     setInvoices(prev => prev.filter(inv => inv.id !== id))
   }
 
+  async function markOverdue() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    const sevenDaysAgo = new Date()
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+
+    const { data, error } = await supabase
+      .from('invoices')
+      .update({ status: 'overdue' })
+      .eq('user_id', user.id)
+      .in('status', ['sent', 'viewed'])
+      .lt('created_at', sevenDaysAgo.toISOString())
+      .select()
+
+    if (error) { alert('Ошибка: ' + error.message); return }
+
+    if (data && data.length > 0) {
+      alert(`Отмечено просроченных: ${data.length}`)
+      loadInvoices()
+    } else {
+      alert('Просроченных счетов нет')
+    }
+  }
+
   function exportToExcel() {
     const data = filtered.map(inv => ({
       'Номер': inv.number,
@@ -112,10 +137,16 @@ export default function History() {
     <main className="min-h-screen bg-gray-50 pb-24">
       <div className="bg-white border-b px-4 py-3 flex items-center justify-between">
         <span className="font-bold text-[#1C2056]">INVOICES.KZ</span>
-        <button onClick={exportToExcel}
-          className="text-xs bg-[#1C2056] text-white px-3 py-1.5 rounded-lg">
-          📊 Экспорт
-        </button>
+        <div className="flex gap-2">
+          <button onClick={markOverdue}
+            className="text-xs bg-red-50 text-red-500 border border-red-100 px-3 py-1.5 rounded-lg">
+            ⏰ Просрочка
+          </button>
+          <button onClick={exportToExcel}
+            className="text-xs bg-[#1C2056] text-white px-3 py-1.5 rounded-lg">
+            📊 Экспорт
+          </button>
+        </div>
       </div>
 
       <div className="max-w-lg mx-auto p-4">
