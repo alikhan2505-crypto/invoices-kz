@@ -121,7 +121,7 @@ export default function Profile() {
                         </linearGradient>
                       </defs>
                       <Tooltip
-                        formatter={(value: number) => [value.toLocaleString('ru-KZ') + ' ₸', 'Доход']}
+                        formatter={(value: any) => [value.toLocaleString('ru-KZ') + ' ₸', 'Доход']}
                         contentStyle={{ fontSize: '11px', borderRadius: '8px', border: '1px solid #e5e7eb' }}
                       />
                       <Area
