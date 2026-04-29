@@ -373,8 +373,28 @@ export default function Dashboard() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs text-gray-500 mb-1 block">БИН/ИИН *</label>
-                  <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                    placeholder="123456789012" value={clientBin} onChange={e => setClientBin(e.target.value)} />
+                  <input
+                    className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                    placeholder="123456789012"
+                    value={clientBin}
+                    onChange={async e => {
+                      const bin = e.target.value
+                      setClientBin(bin)
+                      
+                      // Автопоиск по БИН когда введено 12 цифр
+                      if (bin.length === 12) {
+                        try {
+                          const res = await fetch(`https://stat.gov.kz/api/juridical/counter/api/?bin=${bin}&lang=ru`)
+                          const data = await res.json()
+                          if (data?.obj?.name) {
+                            setClientName(data.obj.name)
+                          }
+                        } catch {
+                          // Если API не ответил — просто игнорируем
+                        }
+                      }
+                    }}
+                  />
                 </div>
                 <div>
                   <label className="text-xs text-gray-500 mb-1 block">Email</label>
