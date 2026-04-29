@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { generateInvoicePDF } from '@/lib/generatePDF'
@@ -28,85 +28,86 @@ export default function Dashboard() {
 
   const total = services.reduce((s, i) => s + i.qty * i.price, 0)
 
-  useEffect(() => {
-    async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/login'); return }
+  const load = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { router.push('/login'); return }
 
-      const [{ data: p }, { data: c }, { data: s }, { data: inv }] = await Promise.all([
-        supabase.from('profiles').select('*').eq('id', user.id).single(),
-        supabase.from('clients').select('*').eq('user_id', user.id).order('name'),
-        supabase.from('services').select('*').eq('user_id', user.id).order('name'),
-        supabase.from('invoices').select('client_name, client_bin, client_email')
-          .eq('user_id', user.id)
-          .not('client_name', 'is', null)
-          .order('created_at', { ascending: false })
-          .limit(20),
-      ])
-
-      setProfile(p)
-
-      // Считаем счета за текущий месяц
-      const monthStart = new Date()
-      monthStart.setDate(1)
-      monthStart.setHours(0, 0, 0, 0)
-
-      const { count } = await supabase
-        .from('invoices')
-        .select('*', { count: 'exact', head: true })
+    const [{ data: p }, { data: c }, { data: s }, { data: inv }] = await Promise.all([
+      supabase.from('profiles').select('*').eq('id', user.id).single(),
+      supabase.from('clients').select('*').eq('user_id', user.id).order('name'),
+      supabase.from('services').select('*').eq('user_id', user.id).order('name'),
+      supabase.from('invoices').select('client_name, client_bin, client_email')
         .eq('user_id', user.id)
-        .gte('created_at', monthStart.toISOString())
-      setMonthCount(count || 0)
+        .not('client_name', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(20),
+    ])
 
-      // Статистика за месяц
-      const { data: monthInvoices } = await supabase
-        .from('invoices')
-        .select('amount, status')
-        .eq('user_id', user.id)
-        .gte('created_at', monthStart.toISOString())
-      const paid = (monthInvoices || []).filter((i: any) => i.status === 'paid').length
-      const amount = (monthInvoices || [])
-        .filter((i: any) => i.status === 'paid')
-        .reduce((sum: number, i: any) => sum + Number(i.amount), 0)
-      setMonthStats({ paid, total: monthInvoices?.length || 0, amount })
+    setProfile(p)
 
-      // Показываем онбординг если нет счетов и не заполнен профиль
-      if ((count || 0) === 0 && !p?.company_name) {
-        setShowOnboarding(true)
+    const monthStart = new Date()
+    monthStart.setDate(1)
+    monthStart.setHours(0, 0, 0, 0)
+
+    const { count } = await supabase
+      .from('invoices')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .gte('created_at', monthStart.toISOString())
+    setMonthCount(count || 0)
+
+    const { data: monthInvoices } = await supabase
+      .from('invoices')
+      .select('amount, status')
+      .eq('user_id', user.id)
+      .gte('created_at', monthStart.toISOString())
+    const paid = (monthInvoices || []).filter((i: any) => i.status === 'paid').length
+    const amount = (monthInvoices || [])
+      .filter((i: any) => i.status === 'paid')
+      .reduce((sum: number, i: any) => sum + Number(i.amount), 0)
+    setMonthStats({ paid, total: monthInvoices?.length || 0, amount })
+
+    if ((count || 0) === 0 && !p?.company_name) {
+      setShowOnboarding(true)
+    }
+
+    setSavedServices(s || [])
+
+    const fromHistory = (inv || []).reduce((acc: any[], inv: any) => {
+      if (inv.client_name && !acc.find((c: any) => c.name === inv.client_name)) {
+        acc.push({ name: inv.client_name, bin_iin: inv.client_bin, email: inv.client_email, id: inv.client_name })
       }
+      return acc
+    }, [])
 
-      setSavedServices(s || [])
+    const fromDirectory = (c || []).map((cl: any) => ({ ...cl, id: cl.id }))
+    const merged = [...fromDirectory]
+    fromHistory.forEach((h: any) => {
+      if (!merged.find((m: any) => m.name === h.name)) merged.push(h)
+    })
+    setClients(merged)
 
-      const fromHistory = (inv || []).reduce((acc: any[], inv: any) => {
-        if (inv.client_name && !acc.find((c: any) => c.name === inv.client_name)) {
-          acc.push({ name: inv.client_name, bin_iin: inv.client_bin, email: inv.client_email, id: inv.client_name })
-        }
-        return acc
-      }, [])
-
-      const fromDirectory = (c || []).map((cl: any) => ({ ...cl, id: cl.id }))
-      const merged = [...fromDirectory]
-      fromHistory.forEach((h: any) => {
-        if (!merged.find((m: any) => m.name === h.name)) merged.push(h)
-      })
-      setClients(merged)
-
-      // Загрузка шаблона если передан параметр
-      const params = new URLSearchParams(window.location.search)
-      const templateId = params.get('template')
-      if (templateId) {
-        const { data: tmpl } = await supabase.from('templates').select('*').eq('id', templateId).single()
-        if (tmpl) {
-          setClientName(tmpl.client_name || '')
-          setClientBin(tmpl.client_bin || '')
-          setClientEmail(tmpl.client_email || '')
-          if (tmpl.services && tmpl.services.length > 0) setServices(tmpl.services)
-          if (tmpl.client_name) setClientSelected(true)
-        }
+    const params = new URLSearchParams(window.location.search)
+    const templateId = params.get('template')
+    if (templateId) {
+      const { data: tmpl } = await supabase.from('templates').select('*').eq('id', templateId).single()
+      if (tmpl) {
+        setClientName(tmpl.client_name || '')
+        setClientBin(tmpl.client_bin || '')
+        setClientEmail(tmpl.client_email || '')
+        if (tmpl.services && tmpl.services.length > 0) setServices(tmpl.services)
+        if (tmpl.client_name) setClientSelected(true)
       }
     }
+  }, [router])
+
+  useEffect(() => {
     load()
-  }, [])
+    // Перезагружаем профиль когда возвращаемся на страницу
+    const handleFocus = () => load()
+    window.addEventListener('focus', handleFocus)
+    return () => window.removeEventListener('focus', handleFocus)
+  }, [load])
 
   function selectClient(client: any) {
     setClientName(client.name)
@@ -151,11 +152,21 @@ export default function Dashboard() {
   }
 
   async function createInvoice() {
+    // Проверка реквизитов компании
     if (!profile?.company_name || !profile?.bin_iin) {
       alert('Сначала заполните реквизиты компании в Профиле')
       router.push('/profile/requisites')
       return
     }
+
+    // Проверка банковских реквизитов ДО создания счёта
+    if (!profile?.iik || !profile?.bank_name) {
+      if (confirm('Не заполнены банковские реквизиты — они нужны для PDF. Заполнить сейчас?')) {
+        router.push('/profile/banks')
+      }
+      return
+    }
+
     if (!clientName) { alert('Введите название клиента'); return }
     if (!clientBin) { alert('Введите БИН/ИИН клиента'); return }
     if (services.length === 0 || services.some(s => !s.name)) {
@@ -209,14 +220,6 @@ export default function Dashboard() {
 
     setLastCreated(Date.now())
     setLoading(false)
-
-    // Не генерируем PDF если не заполнены банковские реквизиты
-    if (!profile?.iik || !profile?.bank_name) {
-      alert('Заполните банковские реквизиты в Профиле для генерации PDF')
-      router.push('/profile/banks')
-      setLoading(false)
-      return
-    }
 
     generateInvoicePDF({
       number: data.number,
@@ -388,9 +391,7 @@ export default function Dashboard() {
                     onChange={async e => {
                       const bin = e.target.value
                       setClientBin(bin)
-
                       if (bin.length === 12) {
-                        // Ищем в нашей базе клиентов
                         const found = clients.find(c => c.bin_iin === bin)
                         if (found) {
                           setClientName(found.name)
