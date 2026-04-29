@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import BottomNav from '@/components/BottomNav'
+import * as XLSX from 'xlsx'
 
 const statusLabel: Record<string, { text: string; color: string }> = {
   paid:    { text: 'Оплачен',   color: 'bg-green-100 text-green-700' },
@@ -38,6 +39,34 @@ export default function History() {
     if (!confirm('Аннулировать счёт ' + number + '?')) return
     await supabase.from('invoices').delete().eq('id', id)
     setInvoices(prev => prev.filter(inv => inv.id !== id))
+  }
+
+  function exportToExcel() {
+    const data = filtered.map(inv => ({
+      'Номер': inv.number,
+      'Клиент': inv.client_name || 'Без клиента',
+      'БИН/ИИН': inv.client_bin || '',
+      'Сумма': Number(inv.amount),
+      'Статус': (statusLabel[inv.status] || statusLabel.draft).text,
+      'Дата': new Date(inv.created_at).toLocaleDateString('ru-KZ'),
+    }))
+
+    const ws = XLSX.utils.json_to_sheet(data)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Счета')
+
+    // Ширина колонок
+    ws['!cols'] = [
+      { wch: 12 },
+      { wch: 30 },
+      { wch: 15 },
+      { wch: 15 },
+      { wch: 12 },
+      { wch: 15 },
+    ]
+
+    const date = new Date().toLocaleDateString('ru-KZ').replace(/\./g, '-')
+    XLSX.writeFile(wb, `Счета_${date}.xlsx`)
   }
 
   const filtered = invoices.filter(inv => {
@@ -82,7 +111,10 @@ export default function History() {
     <main className="min-h-screen bg-gray-50 pb-24">
       <div className="bg-white border-b px-4 py-3 flex items-center justify-between">
         <span className="font-bold text-[#1C2056]">INVOICES.KZ</span>
-        <span className="text-sm text-gray-500">История</span>
+        <button onClick={exportToExcel}
+          className="text-xs bg-[#1C2056] text-white px-3 py-1.5 rounded-lg">
+          📊 Экспорт
+        </button>
       </div>
 
       <div className="max-w-lg mx-auto p-4">
