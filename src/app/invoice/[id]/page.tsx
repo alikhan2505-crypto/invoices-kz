@@ -40,49 +40,54 @@ export default function InvoicePage() {
   }
 
   async function duplicateInvoice() {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data: freshProfile } = await supabase.from('profiles')
+      .select('invoice_prefix, invoice_next_number')
+      .eq('id', user.id).single()
+    const prefix = freshProfile?.invoice_prefix || 'INV-'
+    const nextNum = freshProfile?.invoice_next_number || '0001'
+    const invoiceNumber = prefix + nextNum
+    const newNum = String(parseInt(nextNum) + 1).padStart(nextNum.length, '0')
+    const { error: updateError } = await supabase.from('profiles')
+      .update({ invoice_next_number: newNum }).eq('id', user.id)
+    if (updateError) { alert('Ошибка: ' + updateError.message); return }
+    const { data, error } = await supabase.from('invoices').insert({
+      user_id: user.id,
+      number: invoiceNumber,
+      amount: invoice.amount,
+      status: 'draft',
+      client_name: invoice.client_name,
+      client_bin: invoice.client_bin,
+      client_email: invoice.client_email,
+      services: invoice.services,
+      created_at: new Date().toISOString(),
+    }).select().single()
+    if (error) { alert('Ошибка: ' + error.message); return }
+    router.push('/invoice/' + data.id)
+  }
 
-  // Загружаем свежие данные профиля
-  const { data: freshProfile } = await supabase.from('profiles')
-    .select('invoice_prefix, invoice_next_number')
-    .eq('id', user.id).single()
-
-  const prefix = freshProfile?.invoice_prefix || 'INV-'
-  const nextNum = freshProfile?.invoice_next_number || '0001'
-  const invoiceNumber = prefix + nextNum
-  const newNum = String(parseInt(nextNum) + 1).padStart(nextNum.length, '0')
-
-  // Сначала обновляем номер
-  const { error: updateError } = await supabase.from('profiles')
-    .update({ invoice_next_number: newNum })
-    .eq('id', user.id)
-
-  if (updateError) { alert('Ошибка: ' + updateError.message); return }
-
-  // Потом создаём счёт с новой датой
-  const { data, error } = await supabase.from('invoices').insert({
-    user_id: user.id,
-    number: invoiceNumber,
-    amount: invoice.amount,
-    status: 'draft',
-    client_name: invoice.client_name,
-    client_bin: invoice.client_bin,
-    client_email: invoice.client_email,
-    services: invoice.services,
-    created_at: new Date().toISOString(),
-  }).select().single()
-
-  if (error) { alert('Ошибка: ' + error.message); return }
-  router.push('/invoice/' + data.id)
-}
+  async function copyPublicLink() {
+    const { data } = await supabase
+      .from('invoices')
+      .select('public_token')
+      .eq('id', id)
+      .single()
+    if (data?.public_token) {
+      const link = `https://invoices.kz/view/${data.public_token}`
+      await navigator.clipboard.writeText(link)
+      alert('Ссылка скопирована:\n' + link)
+    } else {
+      alert('Ошибка: токен не найден')
+    }
+  }
 
   function openPDF() {
     if (!invoice) return
     const services = invoice.services || [{ name: 'Услуга', qty: 1, price: invoice.amount }]
     generateInvoicePDF({
       number: invoice.number,
-      date: new Date(invoice.created_at).toLocaleDateString('ru-KZ',{ timeZone: 'Asia/Almaty' }),
+      date: new Date(invoice.created_at).toLocaleDateString('ru-KZ', { timeZone: 'Asia/Almaty' }),
       clientName: invoice.client_name || '',
       clientBin: invoice.client_bin || '',
       clientEmail: invoice.client_email || '',
@@ -130,20 +135,7 @@ export default function InvoicePage() {
         <div className="grid grid-cols-4 gap-2">
           {[
             { icon: '✈️', label: 'Отправить', action: () => alert('Скоро!') },
-            { icon: '🔗', label: 'Ссылка', action: async () => {
-              const { data } = await supabase
-                .from('invoices')
-                .select('public_token')
-                .eq('id', id)
-                .single()
-              if (data?.public_token) {
-                const link = `https://invoices.kz/view/${data.public_token}`
-                await navigator.clipboard.writeText(link)
-                alert('Ссылка скопирована:\n' + link)
-              } else {
-                alert('Ошибка: токен не найден')
-              }
-            }},
+            { icon: '🔗', label: 'Ссылка', action: copyPublicLink },
             { icon: '📄', label: 'PDF', action: openPDF },
             { icon: '🖨️', label: 'Печать', action: openPDF },
           ].map(a => (
@@ -226,47 +218,47 @@ export default function InvoicePage() {
           ))}
         </div>
 
-{/* Actions bottom */}
-      <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-        <button onClick={() => router.push('/invoice/' + id + '/edit')}
-          className="w-full flex items-center px-4 py-3.5 text-sm hover:bg-gray-50 text-[#1C2056] border-b border-gray-100">
-          📝 Редактировать
-        </button>
-        <button onClick={duplicateInvoice}
-          className="w-full flex items-center px-4 py-3.5 text-sm hover:bg-gray-50 text-[#1C2056] border-b border-gray-100">
-          📋 Дублировать
-        </button>
-        <button onClick={async () => {
-          const { data: { user } } = await supabase.auth.getUser()
-          if (!user) return
-          const { data: p } = await supabase.from('profiles').select('plan').eq('id', user.id).single()
-          if (p?.plan !== 'pro') { router.push('/upgrade'); return }
-          const name = prompt('Название шаблона:', invoice.client_name + ' — ' + invoice.number)
-          if (!name) return
-          const { error } = await supabase.from('templates').insert({
-            user_id: user.id,
-            name,
-            client_name: invoice.client_name,
-            client_bin: invoice.client_bin,
-            client_email: invoice.client_email,
-            services: invoice.services,
-            amount: invoice.amount,
-          })
-          if (error) { alert('Ошибка: ' + error.message); return }
-          alert('Шаблон сохранён!')
-        }}
-          className="w-full flex items-center px-4 py-3.5 text-sm hover:bg-gray-50 text-[#1C2056] border-b border-gray-100">
-          ⭐ Сохранить как шаблон
-        </button>
-        <button onClick={() => alert('Скоро!')}
-          className="w-full flex items-center px-4 py-3.5 text-sm hover:bg-gray-50 text-[#1C2056] border-b border-gray-100">
-          ✈️ Отправить повторно
-        </button>
-        <button onClick={deleteInvoice}
-          className="w-full flex items-center px-4 py-3.5 text-sm hover:bg-gray-50 text-red-500">
-          ← Отозвать / Аннулировать
-        </button>
-      </div>
+        {/* Actions bottom */}
+        <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+          <button onClick={() => router.push('/invoice/' + id + '/edit')}
+            className="w-full flex items-center px-4 py-3.5 text-sm hover:bg-gray-50 text-[#1C2056] border-b border-gray-100">
+            📝 Редактировать
+          </button>
+          <button onClick={duplicateInvoice}
+            className="w-full flex items-center px-4 py-3.5 text-sm hover:bg-gray-50 text-[#1C2056] border-b border-gray-100">
+            📋 Дублировать
+          </button>
+          <button onClick={async () => {
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) return
+            const { data: p } = await supabase.from('profiles').select('plan').eq('id', user.id).single()
+            if (p?.plan !== 'pro') { router.push('/upgrade'); return }
+            const name = prompt('Название шаблона:', invoice.client_name + ' — ' + invoice.number)
+            if (!name) return
+            const { error } = await supabase.from('templates').insert({
+              user_id: user.id,
+              name,
+              client_name: invoice.client_name,
+              client_bin: invoice.client_bin,
+              client_email: invoice.client_email,
+              services: invoice.services,
+              amount: invoice.amount,
+            })
+            if (error) { alert('Ошибка: ' + error.message); return }
+            alert('Шаблон сохранён!')
+          }}
+            className="w-full flex items-center px-4 py-3.5 text-sm hover:bg-gray-50 text-[#1C2056] border-b border-gray-100">
+            ⭐ Сохранить как шаблон
+          </button>
+          <button onClick={() => alert('Скоро!')}
+            className="w-full flex items-center px-4 py-3.5 text-sm hover:bg-gray-50 text-[#1C2056] border-b border-gray-100">
+            ✈️ Отправить повторно
+          </button>
+          <button onClick={deleteInvoice}
+            className="w-full flex items-center px-4 py-3.5 text-sm hover:bg-gray-50 text-red-500">
+            ← Отозвать / Аннулировать
+          </button>
+        </div>
       </div>
     </main>
   )
