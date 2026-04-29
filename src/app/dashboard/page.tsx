@@ -18,6 +18,7 @@ export default function Dashboard() {
   const [profile, setProfile] = useState<any>(null)
   const [monthCount, setMonthCount] = useState(0)
   const [monthStats, setMonthStats] = useState({ paid: 0, total: 0, amount: 0 })
+  const [showOnboarding, setShowOnboarding] = useState(false)
 
   const [clientName, setClientName] = useState('')
   const [clientBin, setClientBin] = useState('')
@@ -97,6 +98,12 @@ export default function Dashboard() {
       }
     }
     load()
+
+    // Показываем онбординг если нет счетов
+    if ((monthInvoices?.length || 0) === 0 && !p?.company_name) {
+      setShowOnboarding(true)
+    }
+
   }, [])
 
   function selectClient(client: any) {
@@ -280,6 +287,71 @@ export default function Dashboard() {
               className="text-xs bg-[#1C2056] text-white px-3 py-1.5 rounded-lg">
               Тарифы
             </button>
+          </div>
+        )}
+
+        {/* Onboarding */}
+        {showOnboarding && (
+          <div className="bg-white rounded-2xl shadow-sm p-5 mb-4">
+            <div className="flex items-center justify-between mb-4">
+              <div className="font-medium text-[#1C2056]">🚀 Начало работы</div>
+              <button onClick={() => setShowOnboarding(false)}
+                className="text-gray-300 hover:text-gray-500 text-lg">✕</button>
+            </div>
+            <div className="space-y-3">
+              {[
+                {
+                  step: 1,
+                  title: 'Заполните реквизиты',
+                  desc: 'Название компании, БИН, адрес — они появятся в счёте',
+                  done: !!(profile?.company_name && profile?.bin_iin),
+                  action: () => router.push('/profile/requisites'),
+                  btn: 'Заполнить'
+                },
+                {
+                  step: 2,
+                  title: 'Добавьте банковский счёт',
+                  desc: 'ИИК, БИК — для реквизитов оплаты в счёте',
+                  done: !!(profile?.iik),
+                  action: () => router.push('/profile/banks'),
+                  btn: 'Добавить'
+                },
+                {
+                  step: 3,
+                  title: 'Загрузите подпись',
+                  desc: 'Нарисуйте подпись — она появится на PDF',
+                  done: !!(profile?.signature_url),
+                  action: () => router.push('/profile/signature'),
+                  btn: 'Загрузить'
+                },
+                {
+                  step: 4,
+                  title: 'Создайте первый счёт',
+                  desc: 'Заполните данные клиента и нажмите создать',
+                  done: monthStats.total > 0,
+                  action: () => {},
+                  btn: ''
+                },
+              ].map((item, i) => (
+                <div key={i} className={`flex items-center gap-3 p-3 rounded-xl ${item.done ? 'bg-green-50' : 'bg-gray-50'}`}>
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${item.done ? 'bg-[#2DC48D] text-white' : 'bg-gray-200 text-gray-500'}`}>
+                    {item.done ? '✓' : item.step}
+                  </div>
+                  <div className="flex-1">
+                    <div className={`text-sm font-medium ${item.done ? 'text-green-700 line-through' : 'text-[#1C2056]'}`}>
+                      {item.title}
+                    </div>
+                    <div className="text-xs text-gray-400">{item.desc}</div>
+                  </div>
+                  {!item.done && item.btn && (
+                    <button onClick={item.action}
+                      className="text-xs bg-[#1C2056] text-white px-3 py-1.5 rounded-lg flex-shrink-0">
+                      {item.btn}
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
