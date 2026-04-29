@@ -100,7 +100,7 @@ export default function Dashboard() {
     load()
 
     // Показываем онбординг если нет счетов
-    if ((monthInvoices?.length || 0) === 0 && !p?.company_name) {
+    if ((count || 0) === 0 && !p?.company_name) {
       setShowOnboarding(true)
     }
 
