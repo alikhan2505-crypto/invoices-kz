@@ -1,9 +1,26 @@
 'use client'
 import { useRouter, usePathname } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { supabase } from '@/lib/supabase'
 
 export default function BottomNav() {
   const router = useRouter()
   const path = usePathname()
+  const [unpaid, setUnpaid] = useState(0)
+
+  useEffect(() => {
+    async function loadUnpaid() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { count } = await supabase
+        .from('invoices')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .in('status', ['sent', 'overdue'])
+      setUnpaid(count || 0)
+    }
+    loadUnpaid()
+  }, [path])
 
   const items = [
     {
@@ -22,6 +39,7 @@ export default function BottomNav() {
     {
       label: 'История',
       href: '/history',
+      badge: unpaid,
       icon: (active: boolean) => (
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
           <circle cx="12" cy="12" r="9"
@@ -52,8 +70,15 @@ export default function BottomNav() {
         return (
           <button key={item.href}
             onClick={() => router.push(item.href)}
-            className="flex-1 flex flex-col items-center py-3 gap-1">
-            {item.icon(active)}
+            className="flex-1 flex flex-col items-center py-3 gap-1 relative">
+            <div className="relative">
+              {item.icon(active)}
+              {item.badge && item.badge > 0 ? (
+                <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-medium">
+                  {item.badge > 9 ? '9+' : item.badge}
+                </div>
+              ) : null}
+            </div>
             <span className={`text-xs transition ${active ? 'text-[#1C2056] font-medium' : 'text-gray-400'}`}>
               {item.label}
             </span>
