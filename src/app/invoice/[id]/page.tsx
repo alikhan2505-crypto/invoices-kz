@@ -82,6 +82,19 @@ export default function InvoicePage() {
     }
   }
 
+  async function shareWhatsApp() {
+    const { data } = await supabase
+      .from('invoices')
+      .select('public_token')
+      .eq('id', id)
+      .single()
+    if (!data?.public_token) { alert('Ошибка'); return }
+    const link = `https://invoices.kz/view/${data.public_token}`
+    const text = `Здравствуйте! Направляю вам счёт на оплату ${invoice.number} на сумму ${Number(invoice.amount).toLocaleString('ru-KZ')} ₸.\n\nОткрыть счёт: ${link}`
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
+    await updateStatus('sent')
+  }
+
   function openPDF() {
     if (!invoice) return
     const services = invoice.services || [{ name: 'Услуга', qty: 1, price: invoice.amount }]
@@ -119,6 +132,7 @@ export default function InvoicePage() {
       </div>
 
       <div className="max-w-lg mx-auto p-4 space-y-4">
+
         {/* Status card */}
         <div className="bg-white rounded-2xl shadow-sm p-5 text-center">
           <div className="text-3xl font-bold text-[#1C2056] mb-1">
@@ -134,7 +148,7 @@ export default function InvoicePage() {
         {/* Actions */}
         <div className="grid grid-cols-4 gap-2">
           {[
-            { icon: '✈️', label: 'Отправить', action: () => alert('Скоро!') },
+            { icon: '💬', label: 'WhatsApp', action: shareWhatsApp },
             { icon: '🔗', label: 'Ссылка', action: copyPublicLink },
             { icon: '📄', label: 'PDF', action: openPDF },
             { icon: '🖨️', label: 'Печать', action: openPDF },
@@ -250,9 +264,9 @@ export default function InvoicePage() {
             className="w-full flex items-center px-4 py-3.5 text-sm hover:bg-gray-50 text-[#1C2056] border-b border-gray-100">
             ⭐ Сохранить как шаблон
           </button>
-          <button onClick={() => alert('Скоро!')}
+          <button onClick={shareWhatsApp}
             className="w-full flex items-center px-4 py-3.5 text-sm hover:bg-gray-50 text-[#1C2056] border-b border-gray-100">
-            ✈️ Отправить повторно
+            💬 Отправить в WhatsApp
           </button>
           <button onClick={deleteInvoice}
             className="w-full flex items-center px-4 py-3.5 text-sm hover:bg-gray-50 text-red-500">
