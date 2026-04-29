@@ -17,6 +17,7 @@ export default function Dashboard() {
   const [lastInvoiceClient, setLastInvoiceClient] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
   const [monthCount, setMonthCount] = useState(0)
+  const [monthStats, setMonthStats] = useState({ paid: 0, total: 0, amount: 0 })
 
   const [clientName, setClientName] = useState('')
   const [clientBin, setClientBin] = useState('')
@@ -52,6 +53,18 @@ export default function Dashboard() {
         .eq('user_id', user.id)
         .gte('created_at', monthStart.toISOString())
       setMonthCount(count || 0)
+
+      // Статистика за месяц
+      const { data: monthInvoices } = await supabase
+        .from('invoices')
+        .select('amount, status')
+        .eq('user_id', user.id)
+        .gte('created_at', monthStart.toISOString())
+      const paid = (monthInvoices || []).filter((i: any) => i.status === 'paid').length
+      const amount = (monthInvoices || [])
+        .filter((i: any) => i.status === 'paid')
+        .reduce((sum: number, i: any) => sum + Number(i.amount), 0)
+      setMonthStats({ paid, total: monthInvoices?.length || 0, amount })
 
       setSavedServices(s || [])
 
@@ -233,6 +246,25 @@ export default function Dashboard() {
       <div className="max-w-lg mx-auto p-4">
         <h2 className="text-xl font-bold text-[#1C2056] mb-1">Новый счёт</h2>
         <p className="text-sm text-gray-500 mb-4">Создайте счёт за 1 минуту</p>
+        {/* Month stats */}
+        {monthStats.total > 0 && (
+          <div className="grid grid-cols-3 gap-2 mb-4">
+            <div className="bg-white rounded-xl p-3 text-center shadow-sm">
+              <div className="text-lg font-bold text-[#1C2056]">{monthStats.total}</div>
+              <div className="text-xs text-gray-400 mt-0.5">Счетов</div>
+            </div>
+            <div className="bg-white rounded-xl p-3 text-center shadow-sm">
+              <div className="text-lg font-bold text-[#2DC48D]">{monthStats.paid}</div>
+              <div className="text-xs text-gray-400 mt-0.5">Оплачено</div>
+            </div>
+            <div className="bg-white rounded-xl p-3 text-center shadow-sm">
+              <div className="text-sm font-bold text-[#1C2056]">
+                {monthStats.amount > 0 ? (monthStats.amount / 1000).toFixed(0) + 'K' : '0'} ₸
+              </div>
+              <div className="text-xs text-gray-400 mt-0.5">Доход</div>
+            </div>
+          </div>
+        )}
 
         {(profile?.plan || 'free') === 'free' && (
           <div className={`flex items-center justify-between rounded-xl px-4 py-3 mb-4 ${monthCount >= 3 ? 'bg-red-50 border border-red-100' : 'bg-blue-50 border border-blue-100'}`}>
