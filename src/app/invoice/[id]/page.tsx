@@ -136,9 +136,13 @@ export default function InvoicePage() {
                 .select('public_token')
                 .eq('id', id)
                 .single()
-              const link = `https://invoices.kz/view/${data?.public_token}`
-              navigator.clipboard.writeText(link)
-              alert('Ссылка скопирована!\n' + link)
+              if (data?.public_token) {
+                const link = `https://invoices.kz/view/${data.public_token}`
+                await navigator.clipboard.writeText(link)
+                alert('Ссылка скопирована:\n' + link)
+              } else {
+                alert('Ошибка: токен не найден')
+              }
             }},
             { icon: '📄', label: 'PDF', action: openPDF },
             { icon: '🖨️', label: 'Печать', action: openPDF },
