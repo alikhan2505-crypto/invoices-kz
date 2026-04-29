@@ -130,9 +130,15 @@ export default function InvoicePage() {
         <div className="grid grid-cols-4 gap-2">
           {[
             { icon: '✈️', label: 'Отправить', action: () => alert('Скоро!') },
-            { icon: '🔗', label: 'Ссылка', action: () => {
-              navigator.clipboard.writeText(window.location.href)
-              alert('Ссылка скопирована!')
+            { icon: '🔗', label: 'Ссылка', action: async () => {
+              const { data } = await supabase
+                .from('invoices')
+                .select('public_token')
+                .eq('id', id)
+                .single()
+              const link = `https://invoices.kz/view/${data?.public_token}`
+              navigator.clipboard.writeText(link)
+              alert('Ссылка скопирована!\n' + link)
             }},
             { icon: '📄', label: 'PDF', action: openPDF },
             { icon: '🖨️', label: 'Печать', action: openPDF },
