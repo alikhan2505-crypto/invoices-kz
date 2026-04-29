@@ -21,7 +21,11 @@ export default function History() {
   const [search, setSearch] = useState('')
   const [dateFilter, setDateFilter] = useState('month')
 
-  useEffect(() => { loadInvoices() }, [])
+  useEffect(() => { 
+    loadInvoices() 
+    window.addEventListener('focus', loadInvoices)
+    return () => window.removeEventListener('focus', loadInvoices)
+  }, [])
 
   async function loadInvoices() {
     const { data: { user } } = await supabase.auth.getUser()
@@ -38,7 +42,8 @@ export default function History() {
   async function deleteInvoice(e: React.MouseEvent, id: string, number: string) {
     e.stopPropagation()
     if (!confirm('Аннулировать счёт ' + number + '?')) return
-    await supabase.from('invoices').delete().eq('id', id)
+    const { error } = await supabase.from('invoices').delete().eq('id', id)
+    if (error) { alert('Ошибка: ' + error.message); return }
     setInvoices(prev => prev.filter(inv => inv.id !== id))
   }
 
