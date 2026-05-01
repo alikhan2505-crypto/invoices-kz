@@ -27,6 +27,7 @@ export default function Dashboard() {
   const [clientBin, setClientBin] = useState('')
   const [clientEmail, setClientEmail] = useState('')
   const [clientAddress, setClientAddress] = useState('')
+  const [note, setNote] = useState('')
   const [services, setServices] = useState([{ name: '', qty: 1, price: 0 }])
 
   const total = services.reduce((s, i) => s + i.qty * i.price, 0)
@@ -48,7 +49,6 @@ export default function Dashboard() {
 
     setProfile(p)
 
-    // Загружаем банковские счета
     const { data: banks } = await supabase
       .from('bank_accounts')
       .select('*')
@@ -133,6 +133,7 @@ export default function Dashboard() {
     setClientEmail('')
     setClientAddress('')
     setClientSelected(false)
+    setNote('')
   }
 
   function selectService(svc: any) {
@@ -163,7 +164,7 @@ export default function Dashboard() {
 
   function generateWithBank(bank: any) {
     if (!pendingInvoiceData) return
-    const { invoiceNumber, invoiceDate, cn, cb, ce, svcs, tot } = pendingInvoiceData
+    const { invoiceNumber, invoiceDate, cn, cb, ce, svcs, tot, nt } = pendingInvoiceData
     generateInvoicePDF({
       number: invoiceNumber,
       date: invoiceDate,
@@ -172,6 +173,7 @@ export default function Dashboard() {
       clientEmail: ce,
       services: svcs,
       total: tot,
+      note: nt || '',
       profile: {
         company_name: profile?.company_name || '',
         bin_iin: profile?.bin_iin || '',
@@ -189,7 +191,6 @@ export default function Dashboard() {
     setShowBankPicker(false)
     setPendingInvoiceData(null)
 
-    // Предлагаем сохранить клиента
     const alreadyExists = clients.find(c => c.bin_iin === cb)
     if (!alreadyExists && cb) {
       setLastInvoiceClient({ name: cn, bin_iin: cb, email: ce, address: clientAddress })
@@ -207,7 +208,6 @@ export default function Dashboard() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { alert('Войдите в систему'); return }
 
-    // Проверка банковских реквизитов
     const { data: banks } = await supabase
       .from('bank_accounts')
       .select('*')
@@ -266,6 +266,7 @@ export default function Dashboard() {
       client_bin: clientBin,
       client_email: clientEmail,
       services,
+      note: note || null,
     }).select().single()
 
     if (error) { alert('Ошибка: ' + error.message); setLoading(false); return }
@@ -275,7 +276,6 @@ export default function Dashboard() {
 
     const invoiceDate = new Date().toLocaleDateString('ru-KZ')
 
-    // Если банков больше одного — показываем выбор
     if (banks.length > 1) {
       setBankAccounts(banks)
       setPendingInvoiceData({
@@ -286,6 +286,7 @@ export default function Dashboard() {
         ce: clientEmail,
         svcs: services,
         tot: total,
+        nt: note,
       })
       setShowBankPicker(true)
       clearClient()
@@ -293,12 +294,12 @@ export default function Dashboard() {
       return
     }
 
-    // Если банк один — генерируем сразу
     const bank = banks[0]
     generateInvoicePDF({
       number: data.number,
       date: invoiceDate,
       clientName, clientBin, clientEmail, services, total,
+      note: note || '',
       profile: {
         company_name: profile?.company_name || '',
         bin_iin: profile?.bin_iin || '',
@@ -526,6 +527,18 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
+        </div>
+
+        {/* Note */}
+        <div className="bg-white rounded-2xl p-5 mb-4 shadow-sm">
+          <h3 className="font-medium text-[#1C2056] mb-3">Примечание</h3>
+          <textarea
+            className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056] resize-none"
+            placeholder="Например: Оплата в течение 5 рабочих дней. Без НДС."
+            rows={3}
+            value={note}
+            onChange={e => setNote(e.target.value)}
+          />
         </div>
 
         {/* Total */}

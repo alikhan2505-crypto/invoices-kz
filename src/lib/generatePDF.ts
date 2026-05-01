@@ -26,6 +26,7 @@ interface InvoiceData {
   clientEmail: string
   services: Service[]
   total: number
+  note?: string
   profile?: ProfileData
 }
 
@@ -108,36 +109,14 @@ export function generateInvoicePDF(data: InvoiceData) {
         .bank-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
         .bank-table td { border: 1px solid #000; padding: 5px 8px; vertical-align: top; }
         .title { font-size: 14px; font-weight: bold; margin: 16px 0 10px; }
-        .info-row { margin-bottom: 6px; }
-        .info-row b { margin-right: 6px; }
         .items-table { width: 100%; border-collapse: collapse; margin: 12px 0; }
         .items-table th, .items-table td { border: 1px solid #000; padding: 4px 6px; text-align: center; }
         .items-table th { background: #f0f0f0; font-weight: bold; }
         .items-table td.left { text-align: left; }
         .totals { text-align: right; margin: 4px 0; line-height: 1.8; }
         .total-words { margin: 10px 0; font-weight: bold; line-height: 1.6; }
+        .note { margin: 10px 0; font-size: 11px; color: #333; }
         hr { border: none; border-top: 1px solid #000; margin: 16px 0; }
-        .signature-row {
-          display: flex;
-          align-items: flex-end;
-          justify-content: space-between;
-          margin-top: 20px;
-        }
-        .sig-block { flex: 1; }
-        .sig-line { 
-          display: inline-block; 
-          border-bottom: 1px solid #000; 
-          width: 180px; 
-          margin: 0 8px; 
-          vertical-align: bottom;
-        }
-        .stamp-block {
-          width: 100px;
-          height: 100px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
         @page { size: A4; margin: 0; }
         @media print {
           html { background: white; }
@@ -228,6 +207,8 @@ export function generateInvoicePDF(data: InvoiceData) {
         Всего к оплате: ${totalWords}
       </div>
 
+      ${data.note ? `<div class="note"><b>Примечание:</b> ${data.note}</div>` : ''}
+
       <hr>
       <div style="position:relative; margin-top:20px; min-height:110px;">
         <div style="display:flex; align-items:flex-end; gap:8px; width:50%;">
@@ -251,26 +232,16 @@ export function generateInvoicePDF(data: InvoiceData) {
 
       <script>
         window.onload = function() {
-          // Ждём загрузки картинок
           const images = document.querySelectorAll('img')
-          if (images.length === 0) {
-            window.print()
-            return
-          }
+          if (images.length === 0) { window.print(); return }
           let loaded = 0
           images.forEach(img => {
             if (img.complete) {
               loaded++
               if (loaded === images.length) window.print()
             } else {
-              img.onload = () => {
-                loaded++
-                if (loaded === images.length) window.print()
-              }
-              img.onerror = () => {
-                loaded++
-                if (loaded === images.length) window.print()
-              }
+              img.onload = () => { loaded++; if (loaded === images.length) window.print() }
+              img.onerror = () => { loaded++; if (loaded === images.length) window.print() }
             }
           })
         }
