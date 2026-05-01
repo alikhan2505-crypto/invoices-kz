@@ -160,14 +160,14 @@ export function generateInvoicePDF(data: InvoiceData) {
             ${companyName}<br>
             БИН: ${binIin}
           </td>
-          <td style="width:35%">
+          <td style="width:35%;text-align:center">
             <b>ИИК</b><br><br>${iik}
           </td>
           <td style="width:20%;text-align:center"><b>КБе</b><br><br>${kbe}</td>
         </tr>
         <tr>
           <td><b>Банк бенефициара:</b><br>${bankName}</td>
-          <td>
+          <td style="text-align:center">
             <b>БИК</b><br><br>${bik}
           </td>
           <td style="text-align:center"><b>Код назначения платежа</b><br>—</td>
@@ -211,8 +211,8 @@ export function generateInvoicePDF(data: InvoiceData) {
               <td class="left">${s.name}</td>
               <td>${s.qty}</td>
               <td>шт</td>
-              <td>${formatMoney(Number(s.price))}</td>
-              <td>${formatMoney(s.qty * s.price)}</td>
+              <td style="text-align:right">${formatMoney(Number(s.price))}</td>
+              <td style="text-align:right">${formatMoney(s.qty * s.price)}</td>
             </tr>
           `).join('')}
         </tbody>
