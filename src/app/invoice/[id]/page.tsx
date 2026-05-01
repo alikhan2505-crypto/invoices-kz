@@ -194,6 +194,14 @@ export default function InvoicePage() {
           </div>
         )}
 
+        {/* Note */}
+        {invoice.note && (
+          <div className="bg-white rounded-2xl shadow-sm p-4">
+            <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">Примечание</div>
+            <div className="text-sm text-gray-600">{invoice.note}</div>
+          </div>
+        )}
+
         {/* Status history */}
         <div className="bg-white rounded-2xl shadow-sm p-4">
           <div className="text-xs text-gray-400 uppercase tracking-wide mb-3">История статусов</div>
