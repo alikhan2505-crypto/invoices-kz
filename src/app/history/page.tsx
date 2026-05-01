@@ -73,6 +73,7 @@ export default function History() {
       'БИН/ИИН': inv.client_bin || '',
       'Сумма': Number(inv.amount),
       'Статус': (statusLabel[inv.status] || statusLabel.draft).text,
+      'Примечание': inv.note || '',
       'Дата': new Date(inv.created_at).toLocaleDateString('ru-KZ'),
     }))
     const ws = XLSX.utils.json_to_sheet(data)
@@ -80,7 +81,7 @@ export default function History() {
     XLSX.utils.book_append_sheet(wb, ws, 'Счета')
     ws['!cols'] = [
       { wch: 12 }, { wch: 30 }, { wch: 15 },
-      { wch: 15 }, { wch: 12 }, { wch: 15 },
+      { wch: 15 }, { wch: 12 }, { wch: 30 }, { wch: 15 },
     ]
     const date = new Date().toLocaleDateString('ru-KZ').replace(/\./g, '-')
     XLSX.writeFile(wb, `Счета_${date}.xlsx`)
@@ -91,7 +92,8 @@ export default function History() {
     const clientName = inv.client_name || inv.clients?.name || ''
     const matchSearch = clientName.toLowerCase().includes(search.toLowerCase()) ||
       inv.number.toLowerCase().includes(search.toLowerCase()) ||
-      String(inv.amount).includes(search)
+      String(inv.amount).includes(search) ||
+      (inv.note || '').toLowerCase().includes(search.toLowerCase())
 
     const invDate = new Date(inv.created_at)
     const now = new Date()
@@ -148,10 +150,13 @@ export default function History() {
           <span className="text-gray-400">🔍</span>
           <input
             className="flex-1 text-sm outline-none"
-            placeholder="Поиск по клиенту или сумме"
+            placeholder="Поиск по клиенту, сумме, примечанию..."
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
+          {search && (
+            <button onClick={() => setSearch('')} className="text-gray-300 hover:text-gray-500">✕</button>
+          )}
         </div>
 
         {/* Date filter */}
@@ -236,6 +241,11 @@ export default function History() {
                     <div className="text-sm font-medium text-[#1C2056]">
                       {inv.client_name || inv.clients?.name || 'Без клиента'}
                     </div>
+                    {inv.note && (
+                      <div className="text-xs text-gray-400 mt-0.5 italic truncate max-w-[180px]">
+                        {inv.note}
+                      </div>
+                    )}
                     <div className="text-xs text-gray-400 mt-1">
                       {new Date(inv.created_at).toLocaleString('ru-KZ', {
                         day: 'numeric', month: 'short', year: 'numeric',
