@@ -245,6 +245,14 @@ export default function Dashboard() {
     setLastCreated(Date.now())
     setLoading(false)
 
+    // Загружаем свежие данные банка перед генерацией PDF
+    const { data: bankData } = await supabase
+      .from('bank_accounts')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('is_main', true)
+      .single()
+
     generateInvoicePDF({
       number: data.number,
       date: new Date().toLocaleDateString('ru-KZ'),
@@ -254,10 +262,10 @@ export default function Dashboard() {
         bin_iin: profile?.bin_iin || '',
         address: profile?.address || '',
         phone: profile?.phone || '',
-        bank_name: profile?.bank_name || '',
-        iik: profile?.iik || '',
-        bik: profile?.bik || '',
-        kbe: profile?.kbe || '19',
+        bank_name: bankData?.bank_name || profile?.bank_name || '',
+        iik: bankData?.iik || profile?.iik || '',
+        bik: bankData?.bik || profile?.bik || '',
+        kbe: bankData?.kbe || profile?.kbe || '19',
         director_name: profile?.director_name || '',
         signature_url: profile?.signature_url || '',
         stamp_url: profile?.stamp_url || '',
