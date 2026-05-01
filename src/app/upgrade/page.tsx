@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
@@ -9,6 +9,17 @@ export default function Upgrade() {
   const [promoLoading, setPromoLoading] = useState(false)
   const [promoSuccess, setPromoSuccess] = useState('')
   const [promoError, setPromoError] = useState('')
+  const [plan, setPlan] = useState('free')
+
+  useEffect(() => {
+    async function loadPlan() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data } = await supabase.from('profiles').select('plan').eq('id', user.id).single()
+      setPlan(data?.plan || 'free')
+    }
+    loadPlan()
+  }, [promoSuccess])
 
   async function applyPromo() {
     if (!promoCode.trim()) { setPromoError('Введите промокод'); return }
@@ -19,7 +30,6 @@ export default function Upgrade() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
 
-    // Ищем промокод
     const { data: promo } = await supabase
       .from('promo_codes')
       .select('*')
@@ -39,7 +49,6 @@ export default function Upgrade() {
       return
     }
 
-    // Активируем тариф
     const expiresAt = new Date()
     expiresAt.setDate(expiresAt.getDate() + promo.days)
 
@@ -48,7 +57,6 @@ export default function Upgrade() {
       plan_expires_at: expiresAt.toISOString(),
     }).eq('id', user.id)
 
-    // Увеличиваем счётчик использований
     await supabase.from('promo_codes').update({
       used_count: promo.used_count + 1
     }).eq('id', promo.id)
@@ -60,8 +68,8 @@ export default function Upgrade() {
 
   return (
     <main className="min-h-screen bg-gray-50 flex flex-col">
-      <div className="bg-white border-b px-4 py-4 flex items-center gap-3">
-        <button onClick={() => router.push('/dashboard')} className="text-gray-400 text-xl">‹</button>
+      <div className="bg-white border-b px-4 py-3 flex items-center gap-3">
+        <button onClick={() => router.back()} className="text-gray-400 text-xl">‹</button>
         <span className="font-semibold text-[#1C2056]">Тарифы</span>
       </div>
 
@@ -94,10 +102,12 @@ export default function Upgrade() {
         </div>
 
         {/* Free */}
-        <div className="bg-white rounded-2xl p-5 mb-4 shadow-sm border-2 border-gray-100">
+        <div className={`bg-white rounded-2xl p-5 mb-4 shadow-sm border-2 ${plan === 'free' ? 'border-[#1C2056]' : 'border-gray-100'}`}>
           <div className="flex items-center justify-between mb-3">
             <div className="font-bold text-[#1C2056]">Бесплатно</div>
-            <span className="text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded-full">Текущий</span>
+            {plan === 'free' && (
+              <span className="text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded-full">Текущий</span>
+            )}
           </div>
           <div className="text-2xl font-bold text-[#1C2056] mb-3">0 ₸</div>
           <ul className="space-y-2">
@@ -110,10 +120,14 @@ export default function Upgrade() {
         </div>
 
         {/* Basic */}
-        <div className="bg-white rounded-2xl p-5 mb-4 shadow-sm border-2 border-[#1C2056]/20">
+        <div className={`bg-white rounded-2xl p-5 mb-4 shadow-sm border-2 ${plan === 'basic' ? 'border-[#1C2056]' : 'border-[#1C2056]/20'}`}>
           <div className="flex items-center justify-between mb-3">
             <div className="font-bold text-[#1C2056]">Базовый</div>
-            <span className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded-full">Популярный</span>
+            {plan === 'basic' ? (
+              <span className="text-xs bg-[#1C2056] text-white px-2 py-1 rounded-full">Текущий</span>
+            ) : (
+              <span className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded-full">Популярный</span>
+            )}
           </div>
           <div className="text-2xl font-bold text-[#1C2056] mb-3">
             2 990 ₸<span className="text-sm font-normal text-gray-400">/мес</span>
@@ -132,18 +146,30 @@ export default function Upgrade() {
               </li>
             ))}
           </ul>
-          <button
-            onClick={() => window.open('https://wa.me/77763555177?text=Хочу подключить Базовый тариф INVOICES.KZ', '_blank')}
-            className="w-full border-2 border-[#1C2056] text-[#1C2056] rounded-xl py-3.5 font-medium text-sm">
-            Подключить за 2 990 ₸/мес
-          </button>
+          {plan !== 'basic' && plan !== 'pro' && (
+            <button
+              onClick={() => window.open('https://wa.me/77763555177?text=Хочу подключить Базовый тариф INVOICES.KZ', '_blank')}
+              className="w-full border-2 border-[#1C2056] text-[#1C2056] rounded-xl py-3.5 font-medium text-sm">
+              Подключить за 2 990 ₸/мес
+            </button>
+          )}
+          {plan === 'basic' && (
+            <div className="w-full text-center text-sm text-gray-400 py-2">✓ Активен</div>
+          )}
+          {plan === 'pro' && (
+            <div className="w-full text-center text-sm text-gray-400 py-2">У вас более высокий тариф</div>
+          )}
         </div>
 
         {/* Pro */}
-        <div className="bg-[#1C2056] rounded-2xl p-5 mb-6">
+        <div className={`rounded-2xl p-5 mb-6 ${plan === 'pro' ? 'bg-[#1C2056] ring-2 ring-[#2DC48D]' : 'bg-[#1C2056]'}`}>
           <div className="flex items-center justify-between mb-3">
             <div className="font-bold text-white text-lg">Про</div>
-            <span className="text-xs bg-[#2DC48D] text-white px-2 py-1 rounded-full">Максимум</span>
+            {plan === 'pro' ? (
+              <span className="text-xs bg-[#2DC48D] text-white px-2 py-1 rounded-full">Текущий</span>
+            ) : (
+              <span className="text-xs bg-[#2DC48D] text-white px-2 py-1 rounded-full">Максимум</span>
+            )}
           </div>
           <div className="text-2xl font-bold text-white mb-3">
             5 990 ₸<span className="text-sm font-normal text-white/60">/мес</span>
@@ -163,11 +189,15 @@ export default function Upgrade() {
               </li>
             ))}
           </ul>
-          <button
-            onClick={() => window.open('https://wa.me/77763555177?text=Хочу подключить Про тариф INVOICES.KZ', '_blank')}
-            className="w-full bg-[#2DC48D] text-white rounded-xl py-3.5 font-medium text-sm">
-            Подключить за 5 990 ₸/мес
-          </button>
+          {plan !== 'pro' ? (
+            <button
+              onClick={() => window.open('https://wa.me/77763555177?text=Хочу подключить Про тариф INVOICES.KZ', '_blank')}
+              className="w-full bg-[#2DC48D] text-white rounded-xl py-3.5 font-medium text-sm">
+              Подключить за 5 990 ₸/мес
+            </button>
+          ) : (
+            <div className="w-full text-center text-sm text-white/60 py-2">✓ Активен</div>
+          )}
         </div>
 
         <p className="text-center text-xs text-gray-400">
