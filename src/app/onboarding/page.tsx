@@ -48,7 +48,7 @@ export default function Onboarding() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: `🆕 <b>Новый пользователь!</b>\n👤 ${formData.company_name}\n🔢 БИН: ${formData.bin_iin}\n📧 ${user?.email}`
+          message: `🆕 <b>Новый пользователь!</b>\n👤 ${form.company_name}\n🔢 БИН: ${form.bin_iin}\n📧 ${user?.email}`
         })
       })
     } catch {}
