@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { AreaChart, Area, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
 
 export default function Admin() {
   const router = useRouter()
@@ -10,9 +11,11 @@ export default function Admin() {
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({ users: 0, invoices: 0, paid: 0 })
   const [search, setSearch] = useState('')
-  const [tab, setTab] = useState<'users' | 'promos'>('users')
+  const [tab, setTab] = useState<'users' | 'promos' | 'stats'>('users')
   const [newPromo, setNewPromo] = useState({ code: '', plan: 'basic', days: 30, max_uses: 100 })
   const [savingPromo, setSavingPromo] = useState(false)
+  const [regChart, setRegChart] = useState<{ day: string; count: number }[]>([])
+  const [planStats, setPlanStats] = useState({ free: 0, basic: 0, pro: 0 })
 
   useEffect(() => { load() }, [])
 
@@ -41,6 +44,29 @@ export default function Admin() {
       invoices: (allInvoices || []).length,
       paid: (allInvoices || []).filter(i => i.status === 'paid').length,
     })
+
+    // График регистраций за последние 14 дней
+    const days: { day: string; count: number }[] = []
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date()
+      d.setDate(d.getDate() - i)
+      const dayStr = d.toISOString().split('T')[0]
+      const count = (allUsers || []).filter(u =>
+        u.created_at && u.created_at.startsWith(dayStr)
+      ).length
+      days.push({
+        day: d.toLocaleDateString('ru-KZ', { day: 'numeric', month: 'short' }),
+        count
+      })
+    }
+    setRegChart(days)
+
+    // Статистика по тарифам
+    const free = (allUsers || []).filter(u => !u.plan || u.plan === 'free').length
+    const basic = (allUsers || []).filter(u => u.plan === 'basic').length
+    const pro = (allUsers || []).filter(u => u.plan === 'pro').length
+    setPlanStats({ free, basic, pro })
+
     setLoading(false)
   }
 
@@ -127,11 +153,14 @@ export default function Admin() {
             className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === 'promos' ? 'bg-[#1C2056] text-white' : 'bg-gray-800 text-gray-400'}`}>
             🎟️ Промокоды
           </button>
+          <button onClick={() => setTab('stats')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === 'stats' ? 'bg-[#1C2056] text-white' : 'bg-gray-800 text-gray-400'}`}>
+            📊 Статистика
+          </button>
         </div>
 
         {tab === 'users' && (
           <>
-            {/* Search */}
             <div className="bg-gray-800 rounded-xl px-4 py-2.5 flex items-center gap-2 border border-gray-700 mb-4">
               <span className="text-gray-400">🔍</span>
               <input
@@ -142,7 +171,6 @@ export default function Admin() {
               />
             </div>
 
-            {/* Users table */}
             <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
               <div className="grid grid-cols-5 gap-4 px-4 py-3 border-b border-gray-700 text-xs text-gray-400 uppercase">
                 <div className="col-span-2">Пользователь</div>
@@ -156,6 +184,9 @@ export default function Admin() {
                   <div className="col-span-2">
                     <div className="text-sm font-medium">{user.company_name || '—'}</div>
                     <div className="text-xs text-gray-400">{user.email || '—'}</div>
+                    <div className="text-xs text-gray-600">
+                      {user.created_at ? new Date(user.created_at).toLocaleDateString('ru-KZ') : '—'}
+                    </div>
                   </div>
                   <div className="text-xs text-gray-400">{user.bin_iin || '—'}</div>
                   <div>
@@ -185,7 +216,6 @@ export default function Admin() {
 
         {tab === 'promos' && (
           <>
-            {/* Create promo */}
             <div className="bg-gray-800 rounded-xl border border-gray-700 p-4 mb-4">
               <div className="font-medium text-sm mb-3">Создать промокод</div>
               <div className="grid grid-cols-2 gap-3 mb-3">
@@ -233,7 +263,6 @@ export default function Admin() {
               </button>
             </div>
 
-            {/* Promo list */}
             <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
               <div className="grid grid-cols-5 gap-4 px-4 py-3 border-b border-gray-700 text-xs text-gray-400 uppercase">
                 <div>Код</div>
@@ -269,6 +298,97 @@ export default function Admin() {
               ))}
             </div>
           </>
+        )}
+
+        {tab === 'stats' && (
+          <div className="space-y-4">
+            {/* Тарифы */}
+            <div className="bg-gray-800 rounded-xl border border-gray-700 p-4">
+              <div className="font-medium text-sm mb-4">Распределение по тарифам</div>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-gray-700 rounded-xl p-3 text-center">
+                  <div className="text-2xl font-bold text-gray-300">{planStats.free}</div>
+                  <div className="text-xs text-gray-400 mt-1">Free</div>
+                  <div className="text-xs text-gray-500 mt-0.5">
+                    {stats.users > 0 ? Math.round(planStats.free / stats.users * 100) : 0}%
+                  </div>
+                </div>
+                <div className="bg-blue-500/10 rounded-xl p-3 text-center">
+                  <div className="text-2xl font-bold text-blue-400">{planStats.basic}</div>
+                  <div className="text-xs text-gray-400 mt-1">Basic</div>
+                  <div className="text-xs text-gray-500 mt-0.5">
+                    {stats.users > 0 ? Math.round(planStats.basic / stats.users * 100) : 0}%
+                  </div>
+                </div>
+                <div className="bg-yellow-500/10 rounded-xl p-3 text-center">
+                  <div className="text-2xl font-bold text-yellow-400">{planStats.pro}</div>
+                  <div className="text-xs text-gray-400 mt-1">Pro</div>
+                  <div className="text-xs text-gray-500 mt-0.5">
+                    {stats.users > 0 ? Math.round(planStats.pro / stats.users * 100) : 0}%
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* График регистраций */}
+            <div className="bg-gray-800 rounded-xl border border-gray-700 p-4">
+              <div className="font-medium text-sm mb-1">Регистрации за 14 дней</div>
+              <div className="text-xs text-gray-400 mb-4">
+                Всего за период: {regChart.reduce((s, d) => s + d.count, 0)} пользователей
+              </div>
+              <div className="h-40">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={regChart}>
+                    <defs>
+                      <linearGradient id="regGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#2DC48D" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#2DC48D" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <XAxis
+                      dataKey="day"
+                      tick={{ fill: '#6b7280', fontSize: 10 }}
+                      axisLine={false}
+                      tickLine={false}
+                      interval={2}
+                    />
+                    <Tooltip
+                      formatter={(value: any) => [value, 'Регистраций']}
+                      contentStyle={{ background: '#1f2937', border: '1px solid #374151', borderRadius: '8px', fontSize: '11px' }}
+                      labelStyle={{ color: '#9ca3af' }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="count"
+                      stroke="#2DC48D"
+                      strokeWidth={2}
+                      fill="url(#regGrad)"
+                      dot={{ fill: '#2DC48D', r: 3 }}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Доход */}
+            <div className="bg-gray-800 rounded-xl border border-gray-700 p-4">
+              <div className="font-medium text-sm mb-3">Потенциальный доход</div>
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">Basic ({planStats.basic} польз.)</span>
+                  <span className="text-blue-400 font-medium">{(planStats.basic * 2990).toLocaleString('ru-KZ')} ₸/мес</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">Pro ({planStats.pro} польз.)</span>
+                  <span className="text-yellow-400 font-medium">{(planStats.pro * 5990).toLocaleString('ru-KZ')} ₸/мес</span>
+                </div>
+                <div className="border-t border-gray-700 pt-2 flex justify-between text-sm font-bold">
+                  <span className="text-gray-300">Итого</span>
+                  <span className="text-[#2DC48D]">{(planStats.basic * 2990 + planStats.pro * 5990).toLocaleString('ru-KZ')} ₸/мес</span>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </main>
