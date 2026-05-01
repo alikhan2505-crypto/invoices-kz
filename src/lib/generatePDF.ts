@@ -78,6 +78,10 @@ export function generateInvoicePDF(data: InvoiceData) {
   const signatureUrl = p?.signature_url || ''
   const stampUrl = p?.stamp_url || ''
 
+  function formatMoney(n: number): string {
+    return n.toLocaleString('ru-KZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace('.', ',')
+  }
+
   const totalWords = numberToWords(Math.floor(data.total)) + ' тенге 00 тиын'
 
   const html = `
@@ -156,21 +160,36 @@ export function generateInvoicePDF(data: InvoiceData) {
             ${companyName}<br>
             БИН: ${binIin}
           </td>
-          <td style="width:35%;text-align:center"><b>ИИК</b><br><br>${iik}</td>
+          <td style="width:35%">
+            <b>ИИК</b><br><br>${iik}
+          </td>
           <td style="width:20%;text-align:center"><b>КБе</b><br><br>${kbe}</td>
         </tr>
         <tr>
           <td><b>Банк бенефициара:</b><br>${bankName}</td>
-          <td style="text-align:center"><b>БИК</b><br>${bik}</td>
+          <td>
+            <b>БИК</b><br><br>${bik}
+          </td>
           <td style="text-align:center"><b>Код назначения платежа</b><br>—</td>
         </tr>
       </table>
 
       <div class="title">Счет на оплату №${data.number} от ${data.date}</div>
 
-      <div class="info-row"><b>Поставщик:</b> ${companyName}, ${address}${phone ? ', тел: ' + phone : ''}</div>
-      <div class="info-row"><b>Покупатель:</b> ${data.clientBin ? 'ИИН/БИН: ' + data.clientBin + ', ' : ''}${data.clientName}</div>
-      <div class="info-row"><b>Договор:</b> —</div>
+      <table style="width:100%; border-collapse:collapse; margin-bottom:10px;">
+        <tr>
+          <td style="font-weight:bold; width:90px; vertical-align:top; padding:3px 0;">Поставщик:</td>
+          <td style="padding:3px 0;">${companyName}, ${address}${phone ? ', тел: ' + phone : ''}</td>
+        </tr>
+        <tr>
+          <td style="font-weight:bold; vertical-align:top; padding:3px 0;">Покупатель:</td>
+          <td style="padding:3px 0;">${data.clientBin ? 'ИИН/БИН: ' + data.clientBin + ', ' : ''}${data.clientName}</td>
+        </tr>
+        <tr>
+          <td style="font-weight:bold; vertical-align:top; padding:3px 0;">Договор:</td>
+          <td style="padding:3px 0;">—</td>
+        </tr>
+      </table>
 
       <table class="items-table">
         <thead>
@@ -192,20 +211,20 @@ export function generateInvoicePDF(data: InvoiceData) {
               <td class="left">${s.name}</td>
               <td>${s.qty}</td>
               <td>шт</td>
-              <td>${Number(s.price).toLocaleString('ru-KZ')}</td>
-              <td>${(s.qty * s.price).toLocaleString('ru-KZ')}</td>
+              <td>${formatMoney(Number(s.price))}</td>
+              <td>${formatMoney(s.qty * s.price)}</td>
             </tr>
           `).join('')}
         </tbody>
       </table>
 
       <div class="totals">
-        Итого: ${data.total.toLocaleString('ru-KZ')}<br>
+        Итого: ${formatMoney(data.total)}<br>
         В том числе НДС: 0.00
       </div>
 
       <div class="total-words">
-        Всего наименований ${data.services.length}, на сумму ${data.total.toLocaleString('ru-KZ')} KZT<br>
+        Всего наименований ${data.services.length}, на сумму ${formatMoney(data.total)} KZT<br>
         Всего к оплате: ${totalWords}
       </div>
 

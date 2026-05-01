@@ -19,6 +19,9 @@ export default function Dashboard() {
   const [monthCount, setMonthCount] = useState(0)
   const [monthStats, setMonthStats] = useState({ paid: 0, total: 0, amount: 0 })
   const [showOnboarding, setShowOnboarding] = useState(false)
+  const [bankAccounts, setBankAccounts] = useState<any[]>([])
+  const [showBankPicker, setShowBankPicker] = useState(false)
+  const [pendingInvoiceData, setPendingInvoiceData] = useState<any>(null)
 
   const [clientName, setClientName] = useState('')
   const [clientBin, setClientBin] = useState('')
@@ -45,23 +48,13 @@ export default function Dashboard() {
 
     setProfile(p)
 
-    // Загружаем основной банковский счёт
-    const { data: bankData } = await supabase
+    // Загружаем банковские счета
+    const { data: banks } = await supabase
       .from('bank_accounts')
       .select('*')
       .eq('user_id', user.id)
-      .eq('is_main', true)
-      .single()
-
-    if (bankData) {
-      setProfile((prev: any) => ({
-        ...prev,
-        bank_name: bankData.bank_name,
-        iik: bankData.iik,
-        bik: bankData.bik,
-        kbe: bankData.kbe,
-      }))
-    }
+      .order('is_main', { ascending: false })
+    setBankAccounts(banks || [])
 
     const monthStart = new Date()
     monthStart.setDate(1)
@@ -121,7 +114,6 @@ export default function Dashboard() {
 
   useEffect(() => {
     load()
-    // Перезагружаем профиль когда возвращаемся на страницу
     const handleFocus = () => load()
     window.addEventListener('focus', handleFocus)
     return () => window.removeEventListener('focus', handleFocus)
@@ -169,22 +161,60 @@ export default function Dashboard() {
     setShowSaveClient(false)
   }
 
+  function generateWithBank(bank: any) {
+    if (!pendingInvoiceData) return
+    const { invoiceNumber, invoiceDate, cn, cb, ce, svcs, tot } = pendingInvoiceData
+    generateInvoicePDF({
+      number: invoiceNumber,
+      date: invoiceDate,
+      clientName: cn,
+      clientBin: cb,
+      clientEmail: ce,
+      services: svcs,
+      total: tot,
+      profile: {
+        company_name: profile?.company_name || '',
+        bin_iin: profile?.bin_iin || '',
+        address: profile?.address || '',
+        phone: profile?.phone || '',
+        bank_name: bank.bank_name || '',
+        iik: bank.iik || '',
+        bik: bank.bik || '',
+        kbe: bank.kbe || '19',
+        director_name: profile?.director_name || '',
+        signature_url: profile?.signature_url || '',
+        stamp_url: profile?.stamp_url || '',
+      }
+    })
+    setShowBankPicker(false)
+    setPendingInvoiceData(null)
+
+    // Предлагаем сохранить клиента
+    const alreadyExists = clients.find(c => c.bin_iin === cb)
+    if (!alreadyExists && cb) {
+      setLastInvoiceClient({ name: cn, bin_iin: cb, email: ce, address: clientAddress })
+      setShowSaveClient(true)
+    }
+  }
+
   async function createInvoice() {
-    // Проверка реквизитов компании
     if (!profile?.company_name || !profile?.bin_iin) {
       alert('Сначала заполните реквизиты компании в Профиле')
       router.push('/profile/requisites')
       return
     }
 
-    // Проверка банковских реквизитов ДО создания счёта
-    const { data: bankAccounts } = await supabase
-      .from('bank_accounts')
-      .select('id')
-      .eq('user_id', (await supabase.auth.getUser()).data.user?.id)
-      .limit(1)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { alert('Войдите в систему'); return }
 
-    if (!bankAccounts || bankAccounts.length === 0) {
+    // Проверка банковских реквизитов
+    const { data: banks } = await supabase
+      .from('bank_accounts')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('is_main', { ascending: false })
+
+    if (!banks || banks.length === 0) {
       if (confirm('Не заполнены банковские реквизиты — они нужны для PDF. Заполнить сейчас?')) {
         router.push('/profile/banks')
       }
@@ -204,8 +234,6 @@ export default function Dashboard() {
     }
 
     setLoading(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { alert('Войдите в систему'); setLoading(false); return }
 
     if ((profile?.plan || 'free') === 'free') {
       const monthStart = new Date()
@@ -245,27 +273,41 @@ export default function Dashboard() {
     setLastCreated(Date.now())
     setLoading(false)
 
-    // Загружаем свежие данные банка перед генерацией PDF
-    const { data: bankData } = await supabase
-      .from('bank_accounts')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('is_main', true)
-      .single()
+    const invoiceDate = new Date().toLocaleDateString('ru-KZ')
 
+    // Если банков больше одного — показываем выбор
+    if (banks.length > 1) {
+      setBankAccounts(banks)
+      setPendingInvoiceData({
+        invoiceNumber: data.number,
+        invoiceDate,
+        cn: clientName,
+        cb: clientBin,
+        ce: clientEmail,
+        svcs: services,
+        tot: total,
+      })
+      setShowBankPicker(true)
+      clearClient()
+      setServices([{ name: '', qty: 1, price: 0 }])
+      return
+    }
+
+    // Если банк один — генерируем сразу
+    const bank = banks[0]
     generateInvoicePDF({
       number: data.number,
-      date: new Date().toLocaleDateString('ru-KZ'),
+      date: invoiceDate,
       clientName, clientBin, clientEmail, services, total,
       profile: {
         company_name: profile?.company_name || '',
         bin_iin: profile?.bin_iin || '',
         address: profile?.address || '',
         phone: profile?.phone || '',
-        bank_name: bankData?.bank_name || profile?.bank_name || '',
-        iik: bankData?.iik || profile?.iik || '',
-        bik: bankData?.bik || profile?.bik || '',
-        kbe: bankData?.kbe || profile?.kbe || '19',
+        bank_name: bank.bank_name || '',
+        iik: bank.iik || '',
+        bik: bank.bik || '',
+        kbe: bank.kbe || '19',
         director_name: profile?.director_name || '',
         signature_url: profile?.signature_url || '',
         stamp_url: profile?.stamp_url || '',
@@ -356,7 +398,7 @@ export default function Dashboard() {
             <div className="space-y-3">
               {[
                 { step: 1, title: 'Заполните реквизиты', desc: 'Название компании, БИН, адрес', done: !!(profile?.company_name && profile?.bin_iin), action: () => router.push('/profile/requisites'), btn: 'Заполнить' },
-                { step: 2, title: 'Добавьте банковский счёт', desc: 'ИИК, БИК — для реквизитов оплаты', done: !!(profile?.iik), action: () => router.push('/profile/banks'), btn: 'Добавить' },
+                { step: 2, title: 'Добавьте банковский счёт', desc: 'ИИК, БИК — для реквизитов оплаты', done: bankAccounts.length > 0, action: () => router.push('/profile/banks'), btn: 'Добавить' },
                 { step: 3, title: 'Загрузите подпись', desc: 'Нарисуйте подпись для PDF', done: !!(profile?.signature_url), action: () => router.push('/profile/signature'), btn: 'Загрузить' },
                 { step: 4, title: 'Создайте первый счёт', desc: 'Заполните данные клиента', done: monthStats.total > 0, action: () => {}, btn: '' },
               ].map((item, i) => (
@@ -548,6 +590,38 @@ export default function Dashboard() {
                 className="flex-1 bg-[#1C2056] text-white rounded-xl py-3 text-sm font-medium">
                 Сохранить
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bank picker modal */}
+      {showBankPicker && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-end">
+          <div className="bg-white w-full max-w-lg mx-auto rounded-t-3xl p-5">
+            <div className="flex items-center justify-between mb-4">
+              <span className="font-semibold text-[#1C2056]">Выберите счёт для PDF</span>
+              <button onClick={() => { setShowBankPicker(false); setPendingInvoiceData(null) }}
+                className="text-gray-400 text-xl">✕</button>
+            </div>
+            <div className="space-y-2">
+              {bankAccounts.map(bank => (
+                <div key={bank.id}
+                  onClick={() => generateWithBank(bank)}
+                  className="flex items-center justify-between p-4 rounded-xl border border-gray-100 cursor-pointer hover:border-[#1C2056] hover:bg-gray-50">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-sm text-[#1C2056]">{bank.bank_name}</span>
+                      {bank.is_main && (
+                        <span className="text-xs bg-[#2DC48D]/10 text-[#2DC48D] px-2 py-0.5 rounded-full">★ Основной</span>
+                      )}
+                    </div>
+                    <div className="text-xs text-gray-400 mt-0.5">{bank.iik}</div>
+                    {bank.bik && <div className="text-xs text-gray-400">БИК: {bank.bik}</div>}
+                  </div>
+                  <span className="text-gray-300 text-lg">›</span>
+                </div>
+              ))}
             </div>
           </div>
         </div>
