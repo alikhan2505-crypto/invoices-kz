@@ -1,8 +1,62 @@
 'use client'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { supabase } from '@/lib/supabase'
 
 export default function Upgrade() {
   const router = useRouter()
+  const [promoCode, setPromoCode] = useState('')
+  const [promoLoading, setPromoLoading] = useState(false)
+  const [promoSuccess, setPromoSuccess] = useState('')
+  const [promoError, setPromoError] = useState('')
+
+  async function applyPromo() {
+    if (!promoCode.trim()) { setPromoError('Введите промокод'); return }
+    setPromoLoading(true)
+    setPromoError('')
+    setPromoSuccess('')
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { router.push('/login'); return }
+
+    // Ищем промокод
+    const { data: promo } = await supabase
+      .from('promo_codes')
+      .select('*')
+      .eq('code', promoCode.toUpperCase())
+      .eq('is_active', true)
+      .single()
+
+    if (!promo) {
+      setPromoError('Промокод не найден или недействителен')
+      setPromoLoading(false)
+      return
+    }
+
+    if (promo.used_count >= promo.max_uses) {
+      setPromoError('Промокод уже использован максимальное количество раз')
+      setPromoLoading(false)
+      return
+    }
+
+    // Активируем тариф
+    const expiresAt = new Date()
+    expiresAt.setDate(expiresAt.getDate() + promo.days)
+
+    await supabase.from('profiles').update({
+      plan: promo.plan,
+      plan_expires_at: expiresAt.toISOString(),
+    }).eq('id', user.id)
+
+    // Увеличиваем счётчик использований
+    await supabase.from('promo_codes').update({
+      used_count: promo.used_count + 1
+    }).eq('id', promo.id)
+
+    setPromoSuccess(`🎉 Промокод активирован! ${promo.plan === 'pro' ? 'Про' : 'Базовый'} тариф на ${promo.days} дней`)
+    setPromoCode('')
+    setPromoLoading(false)
+  }
 
   return (
     <main className="min-h-screen bg-gray-50 flex flex-col">
@@ -16,6 +70,27 @@ export default function Upgrade() {
           <div className="text-5xl mb-4">🚀</div>
           <h1 className="text-2xl font-bold text-[#1C2056] mb-2">Выберите тариф</h1>
           <p className="text-gray-400 text-sm">Бесплатно — 3 счёта в месяц</p>
+        </div>
+
+        {/* Promo code */}
+        <div className="bg-white rounded-2xl p-4 mb-6 shadow-sm">
+          <div className="text-sm font-medium text-[#1C2056] mb-3">🎟️ Есть промокод?</div>
+          <div className="flex gap-2">
+            <input
+              className="flex-1 border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056] uppercase"
+              placeholder="Введите промокод"
+              value={promoCode}
+              onChange={e => { setPromoCode(e.target.value.toUpperCase()); setPromoError(''); setPromoSuccess('') }}
+            />
+            <button
+              onClick={applyPromo}
+              disabled={promoLoading}
+              className="bg-[#1C2056] text-white px-4 py-2.5 rounded-lg text-sm font-medium">
+              {promoLoading ? '...' : 'Применить'}
+            </button>
+          </div>
+          {promoError && <p className="text-xs text-red-500 mt-2">{promoError}</p>}
+          {promoSuccess && <p className="text-xs text-[#2DC48D] mt-2 font-medium">{promoSuccess}</p>}
         </div>
 
         {/* Free */}
