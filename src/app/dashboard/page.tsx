@@ -49,6 +49,9 @@ export default function Dashboard() {
 
     setProfile(p)
 
+    // Подставляем стандартное примечание из настроек
+    if (p?.default_note) setNote(p.default_note)
+
     const { data: banks } = await supabase
       .from('bank_accounts')
       .select('*')
@@ -173,7 +176,7 @@ export default function Dashboard() {
       clientEmail: ce,
       services: svcs,
       total: tot,
-      note: nt || '',
+      note: note || '',
       profile: {
         company_name: profile?.company_name || '',
         bin_iin: profile?.bin_iin || '',
@@ -527,18 +530,6 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
-        </div>
-
-        {/* Note */}
-        <div className="bg-white rounded-2xl p-5 mb-4 shadow-sm">
-          <h3 className="font-medium text-[#1C2056] mb-3">Примечание</h3>
-          <textarea
-            className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056] resize-none"
-            placeholder="Например: Оплата в течение 5 рабочих дней. Без НДС."
-            rows={3}
-            value={note}
-            onChange={e => setNote(e.target.value)}
-          />
         </div>
 
         {/* Total */}
