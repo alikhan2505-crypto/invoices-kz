@@ -224,7 +224,8 @@ export default function Profile() {
         {/* Подписка */}
         <div>
           <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">Подписка</div>
-          <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
+          <div className="bg-white rounded-2xl overflow-hidden shadow-sm cursor-pointer"
+            onClick={() => router.push('/upgrade')}>
             {profile?.plan === 'pro' ? (
               <div className="px-4 py-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -234,7 +235,7 @@ export default function Profile() {
                     <div className="text-xs text-[#2DC48D]">Безлимит · ЭЦП · Шаблоны</div>
                   </div>
                 </div>
-                <span className="text-xs bg-[#2DC48D]/10 text-[#2DC48D] px-2 py-1 rounded-full font-medium">Активен</span>
+                <span className="text-gray-300 text-lg">›</span>
               </div>
             ) : profile?.plan === 'basic' ? (
               <div className="px-4 py-4 flex items-center justify-between">
@@ -245,21 +246,18 @@ export default function Profile() {
                     <div className="text-xs text-gray-400">30 счетов в месяц</div>
                   </div>
                 </div>
-                <span className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded-full font-medium">Активен</span>
+                <span className="text-gray-300 text-lg">›</span>
               </div>
             ) : (
-              <div className="px-4 py-4">
-                <div className="flex items-center gap-3 mb-3">
+              <div className="px-4 py-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
                   <span className="text-lg">🆓</span>
                   <div>
                     <div className="text-sm font-medium text-[#1C2056]">Бесплатный</div>
                     <div className="text-xs text-gray-400">Лимит 3 счёта в месяц</div>
                   </div>
                 </div>
-                <button onClick={() => router.push('/upgrade')}
-                  className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium">
-                  Перейти на платный тариф →
-                </button>
+                <span className="text-gray-300 text-lg">›</span>
               </div>
             )}
           </div>
