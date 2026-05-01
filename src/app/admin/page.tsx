@@ -8,10 +8,11 @@ export default function Admin() {
   const router = useRouter()
   const [users, setUsers] = useState<any[]>([])
   const [promos, setPromos] = useState<any[]>([])
+  const [payments, setPayments] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({ users: 0, invoices: 0, paid: 0 })
   const [search, setSearch] = useState('')
-  const [tab, setTab] = useState<'users' | 'promos' | 'stats'>('users')
+  const [tab, setTab] = useState<'users' | 'promos' | 'stats' | 'payments'>('payments')
   const [newPromo, setNewPromo] = useState({ code: '', plan: 'basic', days: 30, max_uses: 100 })
   const [savingPromo, setSavingPromo] = useState(false)
   const [regChart, setRegChart] = useState<{ day: string; count: number }[]>([])
@@ -31,21 +32,22 @@ export default function Admin() {
 
     if (!profile?.is_admin) { router.push('/dashboard'); return }
 
-    const [{ data: allUsers }, { data: allInvoices }, { data: allPromos }] = await Promise.all([
+    const [{ data: allUsers }, { data: allInvoices }, { data: allPromos }, { data: allPayments }] = await Promise.all([
       supabase.from('profiles').select('*').order('created_at', { ascending: false }),
       supabase.from('invoices').select('status, amount'),
       supabase.from('promo_codes').select('*').order('created_at', { ascending: false }),
+      supabase.from('payment_requests').select('*').order('created_at', { ascending: false }),
     ])
 
     setUsers(allUsers || [])
     setPromos(allPromos || [])
+    setPayments(allPayments || [])
     setStats({
       users: (allUsers || []).length,
       invoices: (allInvoices || []).length,
       paid: (allInvoices || []).filter(i => i.status === 'paid').length,
     })
 
-    // График регистраций за последние 14 дней
     const days: { day: string; count: number }[] = []
     for (let i = 13; i >= 0; i--) {
       const d = new Date()
@@ -61,7 +63,6 @@ export default function Admin() {
     }
     setRegChart(days)
 
-    // Статистика по тарифам
     const free = (allUsers || []).filter(u => !u.plan || u.plan === 'free').length
     const basic = (allUsers || []).filter(u => u.plan === 'basic').length
     const pro = (allUsers || []).filter(u => u.plan === 'pro').length
@@ -74,6 +75,42 @@ export default function Admin() {
     const { error } = await supabase.from('profiles').update({ plan }).eq('id', userId)
     if (error) { alert('Ошибка: ' + error.message); return }
     setUsers(prev => prev.map(u => u.id === userId ? { ...u, plan } : u))
+  }
+
+  async function activatePayment(payment: any) {
+    // Активируем тариф
+    const { error } = await supabase.from('profiles').update({
+      plan: payment.plan,
+      plan_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    }).eq('id', payment.user_id)
+
+    if (error) { alert('Ошибка: ' + error.message); return }
+
+    // Обновляем статус заявки
+    await supabase.from('payment_requests').update({
+      status: 'activated',
+      activated_at: new Date().toISOString(),
+    }).eq('id', payment.id)
+
+    // Telegram уведомление пользователю — через нашу систему
+    try {
+      await fetch('/api/telegram', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: `✅ <b>Тариф активирован!</b>\n📧 ${payment.email}\n📦 ${payment.plan === 'pro' ? 'Про' : 'Базовый'} тариф активирован`
+        })
+      })
+    } catch {}
+
+    alert(`✅ Тариф ${payment.plan} активирован для ${payment.email}`)
+    load()
+  }
+
+  async function rejectPayment(id: string) {
+    if (!confirm('Отклонить заявку?')) return
+    await supabase.from('payment_requests').update({ status: 'rejected' }).eq('id', id)
+    load()
   }
 
   async function createPromo() {
@@ -108,6 +145,8 @@ export default function Admin() {
     (u.bin_iin || '').includes(search)
   )
 
+  const pendingPayments = payments.filter(p => p.status === 'pending').length
+
   if (loading) return (
     <main className="min-h-screen bg-gray-900 flex items-center justify-center">
       <p className="text-gray-400">Загрузка...</p>
@@ -116,7 +155,6 @@ export default function Admin() {
 
   return (
     <main className="min-h-screen bg-gray-900 text-white">
-      {/* Header */}
       <div className="bg-gray-800 border-b border-gray-700 px-6 py-4 flex items-center justify-between">
         <div>
           <div className="font-bold text-lg">INVOICES.KZ Admin</div>
@@ -130,11 +168,12 @@ export default function Admin() {
 
       <div className="max-w-4xl mx-auto p-6">
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-4 gap-4 mb-6">
           {[
             { label: 'Пользователей', value: stats.users, color: 'text-blue-400' },
             { label: 'Всего счетов', value: stats.invoices, color: 'text-green-400' },
             { label: 'Оплачено', value: stats.paid, color: 'text-yellow-400' },
+            { label: 'Новых заявок', value: pendingPayments, color: pendingPayments > 0 ? 'text-red-400' : 'text-gray-400' },
           ].map(s => (
             <div key={s.label} className="bg-gray-800 rounded-xl p-4 border border-gray-700">
               <div className={`text-2xl font-bold ${s.color}`}>{s.value}</div>
@@ -144,20 +183,84 @@ export default function Admin() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2 mb-6">
+        <div className="flex gap-2 mb-6 overflow-x-auto">
+          <button onClick={() => setTab('payments')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap relative ${tab === 'payments' ? 'bg-[#1C2056] text-white' : 'bg-gray-800 text-gray-400'}`}>
+            💳 Заявки на оплату
+            {pendingPayments > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                {pendingPayments}
+              </span>
+            )}
+          </button>
           <button onClick={() => setTab('users')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === 'users' ? 'bg-[#1C2056] text-white' : 'bg-gray-800 text-gray-400'}`}>
+            className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap ${tab === 'users' ? 'bg-[#1C2056] text-white' : 'bg-gray-800 text-gray-400'}`}>
             👥 Пользователи
           </button>
           <button onClick={() => setTab('promos')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === 'promos' ? 'bg-[#1C2056] text-white' : 'bg-gray-800 text-gray-400'}`}>
+            className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap ${tab === 'promos' ? 'bg-[#1C2056] text-white' : 'bg-gray-800 text-gray-400'}`}>
             🎟️ Промокоды
           </button>
           <button onClick={() => setTab('stats')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === 'stats' ? 'bg-[#1C2056] text-white' : 'bg-gray-800 text-gray-400'}`}>
+            className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap ${tab === 'stats' ? 'bg-[#1C2056] text-white' : 'bg-gray-800 text-gray-400'}`}>
             📊 Статистика
           </button>
         </div>
+
+        {tab === 'payments' && (
+          <div className="space-y-3">
+            {payments.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">
+                <div className="text-4xl mb-3">💳</div>
+                <div>Заявок пока нет</div>
+              </div>
+            ) : payments.map(payment => (
+              <div key={payment.id}
+                className={`bg-gray-800 rounded-xl border p-4 ${payment.status === 'pending' ? 'border-yellow-500/50' : payment.status === 'activated' ? 'border-green-500/30' : 'border-gray-700'}`}>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${
+                        payment.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
+                        payment.status === 'activated' ? 'bg-green-500/20 text-green-400' :
+                        'bg-gray-600 text-gray-400'
+                      }`}>
+                        {payment.status === 'pending' ? '⏳ Ожидает' : payment.status === 'activated' ? '✅ Активирован' : '❌ Отклонён'}
+                      </span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${payment.plan === 'pro' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-blue-500/20 text-blue-400'}`}>
+                        {payment.plan === 'pro' ? 'Pro' : 'Basic'}
+                      </span>
+                    </div>
+                    <div className="text-sm font-medium">{payment.email}</div>
+                    <div className="text-xs text-gray-400 mt-0.5">
+                      Сумма: {payment.amount?.toLocaleString('ru-KZ')} ₸
+                    </div>
+                    <div className="text-xs text-gray-500 mt-0.5">
+                      {new Date(payment.created_at).toLocaleString('ru-KZ')}
+                    </div>
+                    {payment.activated_at && (
+                      <div className="text-xs text-green-400 mt-0.5">
+                        Активирован: {new Date(payment.activated_at).toLocaleString('ru-KZ')}
+                      </div>
+                    )}
+                  </div>
+                  {payment.status === 'pending' && (
+                    <div className="flex gap-2">
+                      <button onClick={() => activatePayment(payment)}
+                        className="bg-green-500/20 text-green-400 border border-green-500/30 text-xs px-3 py-1.5 rounded-lg hover:bg-green-500/30">
+                        ✅ Активировать
+                      </button>
+                      <button onClick={() => rejectPayment(payment.id)}
+                        className="bg-red-500/10 text-red-400 text-xs px-3 py-1.5 rounded-lg hover:bg-red-500/20">
+                        ✕
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {tab === 'users' && (
           <>
@@ -170,7 +273,6 @@ export default function Admin() {
                 onChange={e => setSearch(e.target.value)}
               />
             </div>
-
             <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
               <div className="grid grid-cols-5 gap-4 px-4 py-3 border-b border-gray-700 text-xs text-gray-400 uppercase">
                 <div className="col-span-2">Пользователь</div>
@@ -262,7 +364,6 @@ export default function Admin() {
                 {savingPromo ? 'Создаём...' : '+ Создать промокод'}
               </button>
             </div>
-
             <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
               <div className="grid grid-cols-5 gap-4 px-4 py-3 border-b border-gray-700 text-xs text-gray-400 uppercase">
                 <div>Код</div>
@@ -278,9 +379,7 @@ export default function Admin() {
                   className={`grid grid-cols-5 gap-4 px-4 py-3 items-center ${i < promos.length - 1 ? 'border-b border-gray-700' : ''}`}>
                   <div className="font-mono font-bold text-yellow-400">{promo.code}</div>
                   <div>
-                    <span className={`text-xs px-2 py-1 rounded-full ${
-                      promo.plan === 'pro' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-blue-500/20 text-blue-400'
-                    }`}>
+                    <span className={`text-xs px-2 py-1 rounded-full ${promo.plan === 'pro' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-blue-500/20 text-blue-400'}`}>
                       {promo.plan}
                     </span>
                   </div>
@@ -302,35 +401,27 @@ export default function Admin() {
 
         {tab === 'stats' && (
           <div className="space-y-4">
-            {/* Тарифы */}
             <div className="bg-gray-800 rounded-xl border border-gray-700 p-4">
               <div className="font-medium text-sm mb-4">Распределение по тарифам</div>
               <div className="grid grid-cols-3 gap-3">
                 <div className="bg-gray-700 rounded-xl p-3 text-center">
                   <div className="text-2xl font-bold text-gray-300">{planStats.free}</div>
                   <div className="text-xs text-gray-400 mt-1">Free</div>
-                  <div className="text-xs text-gray-500 mt-0.5">
-                    {stats.users > 0 ? Math.round(planStats.free / stats.users * 100) : 0}%
-                  </div>
+                  <div className="text-xs text-gray-500 mt-0.5">{stats.users > 0 ? Math.round(planStats.free / stats.users * 100) : 0}%</div>
                 </div>
                 <div className="bg-blue-500/10 rounded-xl p-3 text-center">
                   <div className="text-2xl font-bold text-blue-400">{planStats.basic}</div>
                   <div className="text-xs text-gray-400 mt-1">Basic</div>
-                  <div className="text-xs text-gray-500 mt-0.5">
-                    {stats.users > 0 ? Math.round(planStats.basic / stats.users * 100) : 0}%
-                  </div>
+                  <div className="text-xs text-gray-500 mt-0.5">{stats.users > 0 ? Math.round(planStats.basic / stats.users * 100) : 0}%</div>
                 </div>
                 <div className="bg-yellow-500/10 rounded-xl p-3 text-center">
                   <div className="text-2xl font-bold text-yellow-400">{planStats.pro}</div>
                   <div className="text-xs text-gray-400 mt-1">Pro</div>
-                  <div className="text-xs text-gray-500 mt-0.5">
-                    {stats.users > 0 ? Math.round(planStats.pro / stats.users * 100) : 0}%
-                  </div>
+                  <div className="text-xs text-gray-500 mt-0.5">{stats.users > 0 ? Math.round(planStats.pro / stats.users * 100) : 0}%</div>
                 </div>
               </div>
             </div>
 
-            {/* График регистраций */}
             <div className="bg-gray-800 rounded-xl border border-gray-700 p-4">
               <div className="font-medium text-sm mb-1">Регистрации за 14 дней</div>
               <div className="text-xs text-gray-400 mb-4">
@@ -345,54 +436,38 @@ export default function Admin() {
                         <stop offset="95%" stopColor="#2DC48D" stopOpacity={0}/>
                       </linearGradient>
                     </defs>
-                    <XAxis
-                      dataKey="day"
-                      tick={{ fill: '#6b7280', fontSize: 10 }}
-                      axisLine={false}
-                      tickLine={false}
-                      interval={2}
-                    />
+                    <XAxis dataKey="day" tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} interval={2} />
                     <Tooltip
                       formatter={(value: any) => [value, 'Регистраций']}
                       contentStyle={{ background: '#1f2937', border: '1px solid #374151', borderRadius: '8px', fontSize: '11px' }}
                       labelStyle={{ color: '#9ca3af' }}
                     />
-                    <Area
-                      type="monotone"
-                      dataKey="count"
-                      stroke="#2DC48D"
-                      strokeWidth={2}
-                      fill="url(#regGrad)"
-                      dot={{ fill: '#2DC48D', r: 3 }}
-                    />
+                    <Area type="monotone" dataKey="count" stroke="#2DC48D" strokeWidth={2} fill="url(#regGrad)" dot={{ fill: '#2DC48D', r: 3 }} />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
             </div>
 
-           {/* Доход */}
-                <div className="bg-gray-800 rounded-xl border border-gray-700 p-4">
-                <div className="font-medium text-sm mb-3">Доход от подписок</div>
-                <div className="text-xs text-gray-400 mb-3">
-                    Только реальные платящие пользователи (не промокоды)
+            <div className="bg-gray-800 rounded-xl border border-gray-700 p-4">
+              <div className="font-medium text-sm mb-3">Доход от подписок</div>
+              <div className="text-xs text-gray-400 mb-3">Только реальные платящие пользователи</div>
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">Basic ({planStats.basic} польз.)</span>
+                  <span className="text-blue-400 font-medium">0 ₸/мес</span>
                 </div>
-                <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                    <span className="text-gray-400">Basic ({planStats.basic} польз.)</span>
-                    <span className="text-blue-400 font-medium">0 ₸/мес</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                    <span className="text-gray-400">Pro ({planStats.pro} польз.)</span>
-                    <span className="text-yellow-400 font-medium">0 ₸/мес</span>
-                    </div>
-                    <div className="border-t border-gray-700 pt-2 flex justify-between text-sm font-bold">
-                    <span className="text-gray-300">Итого</span>
-                    <span className="text-[#2DC48D]">0 ₸/мес</span>
-                    </div>
-                    <div className="text-xs text-gray-500 mt-2">
-                    * Оплата принимается вручную через WhatsApp. После подключения Kaspi Pay доход будет считаться автоматически.
-                    </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">Pro ({planStats.pro} польз.)</span>
+                  <span className="text-yellow-400 font-medium">0 ₸/мес</span>
                 </div>
+                <div className="border-t border-gray-700 pt-2 flex justify-between text-sm font-bold">
+                  <span className="text-gray-300">Итого</span>
+                  <span className="text-[#2DC48D]">0 ₸/мес</span>
+                </div>
+                <div className="text-xs text-gray-500 mt-2">
+                  * После подключения Kaspi Pay доход будет считаться автоматически.
+                </div>
+              </div>
             </div>
           </div>
         )}

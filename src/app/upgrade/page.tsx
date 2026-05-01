@@ -10,13 +10,21 @@ export default function Upgrade() {
   const [promoSuccess, setPromoSuccess] = useState('')
   const [promoError, setPromoError] = useState('')
   const [plan, setPlan] = useState('free')
+  const [userEmail, setUserEmail] = useState('')
+  const [showPayModal, setShowPayModal] = useState(false)
+  const [selectedPlan, setSelectedPlan] = useState<{ name: string; amount: number; plan: string } | null>(null)
+  const [payEmail, setPayEmail] = useState('')
+  const [payLoading, setPayLoading] = useState(false)
+  const [paySuccess, setPaySuccess] = useState(false)
 
   useEffect(() => {
     async function loadPlan() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
-      const { data } = await supabase.from('profiles').select('plan').eq('id', user.id).single()
+      const { data } = await supabase.from('profiles').select('plan, email').eq('id', user.id).single()
       setPlan(data?.plan || 'free')
+      setUserEmail(data?.email || user.email || '')
+      setPayEmail(data?.email || user.email || '')
     }
     loadPlan()
   }, [promoSuccess])
@@ -66,6 +74,48 @@ export default function Upgrade() {
     setPromoLoading(false)
   }
 
+  function openPayModal(planName: string, amount: number, planKey: string) {
+    setSelectedPlan({ name: planName, amount, plan: planKey })
+    setPaySuccess(false)
+    setShowPayModal(true)
+  }
+
+  async function submitPayRequest() {
+    if (!payEmail) { alert('Введите email'); return }
+    setPayLoading(true)
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { router.push('/login'); return }
+
+    // Сохраняем заявку
+    const { error } = await supabase.from('payment_requests').insert({
+      user_id: user.id,
+      email: payEmail,
+      plan: selectedPlan?.plan,
+      amount: selectedPlan?.amount,
+      status: 'pending',
+    })
+
+    if (error) { alert('Ошибка: ' + error.message); setPayLoading(false); return }
+
+    // Telegram уведомление
+    try {
+      await fetch('/api/telegram', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: `💳 <b>Новая заявка на оплату!</b>\n📧 Email: ${payEmail}\n📦 Тариф: ${selectedPlan?.name}\n💰 Сумма: ${selectedPlan?.amount.toLocaleString('ru-KZ')} ₸\n⏳ Ожидает активации`
+        })
+      })
+    } catch {}
+
+    setPayLoading(false)
+    setPaySuccess(true)
+
+    // Открываем Kaspi Pay
+    window.open('https://pay.kaspi.kz/pay/q3p5cvsl', '_blank')
+  }
+
   return (
     <main className="min-h-screen bg-gray-50 flex flex-col">
       <div className="bg-white border-b px-4 py-3 flex items-center gap-3">
@@ -77,7 +127,7 @@ export default function Upgrade() {
         <div className="text-center mb-8">
           <div className="text-5xl mb-4">🚀</div>
           <h1 className="text-2xl font-bold text-[#1C2056] mb-2">Выберите тариф</h1>
-          <p className="text-gray-400 text-sm">Бесплатно — 3 счёта в месяц</p>
+          <p className="text-gray-400 text-sm">Без скрытых платежей · Активация до 20 минут</p>
         </div>
 
         {/* Promo code */}
@@ -90,9 +140,7 @@ export default function Upgrade() {
               value={promoCode}
               onChange={e => { setPromoCode(e.target.value.toUpperCase()); setPromoError(''); setPromoSuccess('') }}
             />
-            <button
-              onClick={applyPromo}
-              disabled={promoLoading}
+            <button onClick={applyPromo} disabled={promoLoading}
               className="bg-[#1C2056] text-white px-4 py-2.5 rounded-lg text-sm font-medium">
               {promoLoading ? '...' : 'Применить'}
             </button>
@@ -102,17 +150,15 @@ export default function Upgrade() {
         </div>
 
         {/* Free */}
-        <div className={`bg-white rounded-2xl p-5 mb-4 shadow-sm border-2 ${plan === 'free' ? 'border-[#1C2056]' : 'border-gray-100'}`}>
+        <div className={`bg-white border-2 rounded-2xl p-6 mb-4 ${plan === 'free' ? 'border-[#1C2056]' : 'border-gray-100'}`}>
           <div className="flex items-center justify-between mb-3">
-            <div className="font-bold text-[#1C2056]">Бесплатно</div>
-            {plan === 'free' && (
-              <span className="text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded-full">Текущий</span>
-            )}
+            <div className="font-bold text-[#1C2056] text-lg">Бесплатно</div>
+            {plan === 'free' && <span className="text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded-full">Текущий</span>}
           </div>
-          <div className="text-2xl font-bold text-[#1C2056] mb-3">0 ₸</div>
+          <div className="text-3xl font-bold text-[#1C2056] mb-4">0 ₸</div>
           <ul className="space-y-2">
-            {['3 счёта в месяц', 'PDF генерация', 'История счетов', 'Профиль компании'].map(f => (
-              <li key={f} className="flex items-center gap-2 text-sm text-gray-500">
+            {['3 счёта в месяц', 'PDF генерация', 'История счетов', 'Публичная ссылка'].map(f => (
+              <li key={f} className="flex items-center gap-2 text-sm text-gray-600">
                 <span className="text-[#2DC48D]">✓</span> {f}
               </li>
             ))}
@@ -120,93 +166,158 @@ export default function Upgrade() {
         </div>
 
         {/* Basic */}
-        <div className={`bg-white rounded-2xl p-5 mb-4 shadow-sm border-2 ${plan === 'basic' ? 'border-[#1C2056]' : 'border-[#1C2056]/20'}`}>
+        <div className={`bg-white border-2 rounded-2xl p-6 mb-4 ${plan === 'basic' ? 'border-[#1C2056]' : 'border-[#1C2056]/20'}`}>
           <div className="flex items-center justify-between mb-3">
-            <div className="font-bold text-[#1C2056]">Базовый</div>
-            {plan === 'basic' ? (
-              <span className="text-xs bg-[#1C2056] text-white px-2 py-1 rounded-full">Текущий</span>
-            ) : (
-              <span className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded-full">Популярный</span>
-            )}
+            <div className="font-bold text-[#1C2056] text-lg">Базовый</div>
+            {plan === 'basic'
+              ? <span className="text-xs bg-[#1C2056] text-white px-2 py-1 rounded-full">Текущий</span>
+              : <span className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded-full">Популярный</span>
+            }
           </div>
-          <div className="text-2xl font-bold text-[#1C2056] mb-3">
+          <div className="text-3xl font-bold text-[#1C2056] mb-4">
             2 990 ₸<span className="text-sm font-normal text-gray-400">/мес</span>
           </div>
           <ul className="space-y-2 mb-5">
-            {[
-              '30 счетов в месяц',
-              'PDF с подписью и печатью',
-              'Справочник клиентов',
-              'Услуги и товары',
-              'Отправка на Email',
-              'Поддержка в WhatsApp',
-            ].map(f => (
+            {['30 счетов в месяц', 'PDF с подписью и печатью', 'Справочник клиентов', 'Услуги и товары', 'Отправка через WhatsApp', 'Поддержка в WhatsApp'].map(f => (
               <li key={f} className="flex items-center gap-2 text-sm text-gray-600">
                 <span className="text-[#2DC48D]">✓</span> {f}
               </li>
             ))}
           </ul>
           {plan !== 'basic' && plan !== 'pro' && (
-            <button
-              onClick={() => window.open('https://wa.me/77763555177?text=Хочу подключить Базовый тариф INVOICES.KZ', '_blank')}
+            <button onClick={() => openPayModal('Базовый', 2990, 'basic')}
               className="w-full border-2 border-[#1C2056] text-[#1C2056] rounded-xl py-3.5 font-medium text-sm">
               Подключить за 2 990 ₸/мес
             </button>
           )}
-          {plan === 'basic' && (
-            <div className="w-full text-center text-sm text-gray-400 py-2">✓ Активен</div>
-          )}
-          {plan === 'pro' && (
-            <div className="w-full text-center text-sm text-gray-400 py-2">У вас более высокий тариф</div>
-          )}
+          {plan === 'basic' && <div className="text-center text-sm text-gray-400 py-2">✓ Активен</div>}
+          {plan === 'pro' && <div className="text-center text-sm text-gray-400 py-2">У вас более высокий тариф</div>}
         </div>
 
         {/* Pro */}
-        <div className={`rounded-2xl p-5 mb-6 ${plan === 'pro' ? 'bg-[#1C2056] ring-2 ring-[#2DC48D]' : 'bg-[#1C2056]'}`}>
+        <div className={`rounded-2xl p-6 mb-6 bg-[#1C2056] ${plan === 'pro' ? 'ring-2 ring-[#2DC48D]' : ''}`}>
           <div className="flex items-center justify-between mb-3">
             <div className="font-bold text-white text-lg">Про</div>
-            {plan === 'pro' ? (
-              <span className="text-xs bg-[#2DC48D] text-white px-2 py-1 rounded-full">Текущий</span>
-            ) : (
-              <span className="text-xs bg-[#2DC48D] text-white px-2 py-1 rounded-full">Максимум</span>
-            )}
+            {plan === 'pro'
+              ? <span className="text-xs bg-[#2DC48D] text-white px-2 py-1 rounded-full">Текущий</span>
+              : <span className="text-xs bg-[#2DC48D] text-white px-2 py-1 rounded-full">Максимум</span>
+            }
           </div>
-          <div className="text-2xl font-bold text-white mb-3">
+          <div className="text-3xl font-bold text-white mb-4">
             5 990 ₸<span className="text-sm font-normal text-white/60">/мес</span>
           </div>
           <ul className="space-y-2 mb-5">
-            {[
-              'Безлимитные счета',
-              'ЭЦП НУЦ РК подпись',
-              'Шаблоны счетов',
-              'PDF с подписью и печатью',
-              'Отправка на Email и WhatsApp',
-              'Аналитика и отчёты',
-              'Приоритетная поддержка 24/7',
-            ].map(f => (
+            {['Безлимитные счета', 'ЭЦП НУЦ РК (скоро)', 'Шаблоны счетов', 'PDF с подписью и печатью', 'Отправка на Email и WhatsApp', 'Аналитика и отчёты', 'Приоритетная поддержка 24/7'].map(f => (
               <li key={f} className="flex items-center gap-2 text-sm text-white/80">
                 <span className="text-[#2DC48D]">✓</span> {f}
               </li>
             ))}
           </ul>
-          {plan !== 'pro' ? (
-            <button
-              onClick={() => window.open('https://wa.me/77763555177?text=Хочу подключить Про тариф INVOICES.KZ', '_blank')}
+          {plan !== 'pro' && (
+            <button onClick={() => openPayModal('Про', 5990, 'pro')}
               className="w-full bg-[#2DC48D] text-white rounded-xl py-3.5 font-medium text-sm">
               Подключить за 5 990 ₸/мес
             </button>
-          ) : (
-            <div className="w-full text-center text-sm text-white/60 py-2">✓ Активен</div>
           )}
+          {plan === 'pro' && <div className="text-center text-sm text-white/60 py-2">✓ Активен</div>}
         </div>
 
         <p className="text-center text-xs text-gray-400">
-          Оплата через Kaspi или перевод.{' '}
+          Вопросы?{' '}
           <a href="https://wa.me/77763555177" target="_blank" className="text-[#1C2056] underline">
-            Написать нам
+            Написать в WhatsApp
           </a>
         </p>
       </div>
+
+      {/* Payment Modal */}
+      {showPayModal && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-end">
+          <div className="bg-white w-full max-w-lg mx-auto rounded-t-3xl p-6">
+            {!paySuccess ? (
+              <>
+                <div className="flex items-center justify-between mb-5">
+                  <div className="font-semibold text-[#1C2056]">
+                    Подключить тариф {selectedPlan?.name}
+                  </div>
+                  <button onClick={() => setShowPayModal(false)} className="text-gray-400 text-xl">✕</button>
+                </div>
+
+                {/* Instructions */}
+                <div className="bg-blue-50 rounded-2xl p-4 mb-5">
+                  <div className="text-sm font-medium text-[#1C2056] mb-3">📋 Инструкция по оплате</div>
+                  <div className="space-y-2">
+                    {[
+                      { step: '1', text: `Нажмите кнопку "Перейти к оплате" ниже` },
+                      { step: '2', text: `Оплатите ${selectedPlan?.amount.toLocaleString('ru-KZ')} ₸ через Kaspi Pay` },
+                      { step: '3', text: 'Вернитесь сюда и нажмите "Я оплатил"' },
+                      { step: '4', text: 'Тариф будет активирован в течение 20 минут' },
+                    ].map(item => (
+                      <div key={item.step} className="flex gap-3 items-start">
+                        <div className="w-6 h-6 rounded-full bg-[#1C2056] text-white text-xs flex items-center justify-center flex-shrink-0 mt-0.5">
+                          {item.step}
+                        </div>
+                        <span className="text-sm text-gray-600">{item.text}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Email */}
+                <div className="mb-5">
+                  <label className="text-xs text-gray-500 mb-1 block">Ваш email для уведомления об активации</label>
+                  <input
+                    className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                    placeholder="your@email.kz"
+                    value={payEmail}
+                    onChange={e => setPayEmail(e.target.value)}
+                  />
+                </div>
+
+                {/* Amount */}
+                <div className="bg-gray-50 rounded-xl px-4 py-3 mb-5 flex items-center justify-between">
+                  <span className="text-sm text-gray-500">К оплате</span>
+                  <span className="text-lg font-bold text-[#1C2056]">{selectedPlan?.amount.toLocaleString('ru-KZ')} ₸/мес</span>
+                </div>
+
+                <button onClick={submitPayRequest} disabled={payLoading}
+                  className="w-full bg-[#2DC48D] text-white rounded-xl py-4 font-medium text-sm mb-3">
+                  {payLoading ? 'Сохраняем заявку...' : '💳 Перейти к оплате в Kaspi →'}
+                </button>
+
+                <p className="text-center text-xs text-gray-400">
+                  После оплаты нажмите "Я оплатил" для быстрой активации
+                </p>
+              </>
+            ) : (
+              <div className="text-center py-4">
+                <div className="text-5xl mb-4">✅</div>
+                <div className="font-bold text-[#1C2056] text-lg mb-2">Заявка принята!</div>
+                <div className="text-sm text-gray-500 mb-2">
+                  Тариф <b>{selectedPlan?.name}</b> будет активирован в течение <b>20 минут</b>
+                </div>
+                <div className="text-sm text-gray-500 mb-6">
+                  Уведомление придёт на <b>{payEmail}</b>
+                </div>
+                <div className="bg-yellow-50 rounded-xl p-4 mb-5 text-left">
+                  <div className="text-sm font-medium text-yellow-800 mb-1">⚠️ Важно!</div>
+                  <div className="text-xs text-yellow-700">
+                    Если вы ещё не оплатили — нажмите кнопку ниже чтобы перейти к оплате в Kaspi
+                  </div>
+                </div>
+                <button onClick={() => window.open('https://pay.kaspi.kz/pay/q3p5cvsl', '_blank')}
+                  className="w-full border-2 border-[#1C2056] text-[#1C2056] rounded-xl py-3 text-sm font-medium mb-3">
+                  💳 Открыть Kaspi Pay
+                </button>
+                <button onClick={() => setShowPayModal(false)}
+                  className="w-full bg-gray-100 text-gray-500 rounded-xl py-3 text-sm">
+                  Закрыть
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </main>
   )
 }
