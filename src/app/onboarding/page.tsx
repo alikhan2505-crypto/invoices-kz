@@ -42,6 +42,17 @@ export default function Onboarding() {
       })
     }
 
+    // Уведомление в Telegram
+    try {
+      await fetch('/api/telegram', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: `🆕 <b>Новый пользователь!</b>\n👤 ${formData.company_name}\n🔢 БИН: ${formData.bin_iin}\n📧 ${user?.email}`
+        })
+      })
+    } catch {}
+
     router.push('/dashboard')
   }
 
