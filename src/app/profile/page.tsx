@@ -12,6 +12,7 @@ export default function Profile() {
   const { theme, toggle } = useTheme()
   const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [isAdmin, setIsAdmin] = useState(false)
   const [stats, setStats] = useState({ clients: 0, services: 0, income: 0, invoices: 0 })
   const [chartData, setChartData] = useState<{ month: string; income: number }[]>([])
 
@@ -34,7 +35,9 @@ export default function Profile() {
       setProfile(p)
       if (p) cacheSet('profile_' + user.id, p)
 
-      // Доход за текущий месяц
+      // Проверяем админа только после загрузки
+      if (p?.is_admin) setIsAdmin(true)
+
       const now = new Date()
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
       const monthIncome = (inv || [])
@@ -48,7 +51,6 @@ export default function Profile() {
         invoices: (inv || []).length,
       })
 
-      // График — последние 6 месяцев
       const months: { month: string; income: number }[] = []
       for (let i = 5; i >= 0; i--) {
         const d = new Date()
@@ -86,6 +88,15 @@ export default function Profile() {
     ? profile.company_name.slice(0, 2).toUpperCase()
     : 'FP'
 
+  const settingsItems = [
+    { icon: '⚙️', label: 'Настройки счетов', href: '/profile/settings' },
+    { icon: '🔔', label: 'Уведомления', href: '/profile/notifications' },
+    { icon: '💬', label: 'Поддержка', href: '/profile/support' },
+    { icon: 'ℹ️', label: 'О приложении', href: '/profile/about' },
+    { icon: '🎁', label: 'Пригласить друзей', href: '/profile/referral' },
+    ...(isAdmin ? [{ icon: '🔐', label: 'Админ панель', href: '/admin' }] : []),
+  ]
+
   return (
     <main className="min-h-screen bg-gray-50 pb-24">
 
@@ -117,7 +128,6 @@ export default function Profile() {
             </div>
             <div className="text-xs text-[#2DC48D] mt-0.5">Всего счетов: {stats.invoices}</div>
 
-            {/* Chart */}
             {chartData.some(d => d.income > 0) && (
               <>
                 <div className="mt-3 h-16">
@@ -208,13 +218,7 @@ export default function Profile() {
         <div>
           <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">Настройки</div>
           <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
-            {[
-              { icon: '⚙️', label: 'Настройки счетов', href: '/profile/settings' },
-              { icon: '🔔', label: 'Уведомления', href: '/profile/notifications' },
-              { icon: '💬', label: 'Поддержка', href: '/profile/support' },
-              { icon: 'ℹ️', label: 'О приложении', href: '/profile/about' },
-              { icon: '🎁', label: 'Пригласить друзей', href: '/profile/referral' },
-            ].map((item, i, arr) => (
+            {settingsItems.map((item, i, arr) => (
               <div key={item.href}
                 onClick={() => router.push(item.href)}
                 className={`flex items-center justify-between px-4 py-3.5 cursor-pointer hover:bg-gray-50 ${i < arr.length - 1 ? 'border-b border-gray-100' : ''}`}>

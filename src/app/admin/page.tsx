@@ -370,23 +370,29 @@ export default function Admin() {
               </div>
             </div>
 
-            {/* Доход */}
-            <div className="bg-gray-800 rounded-xl border border-gray-700 p-4">
-              <div className="font-medium text-sm mb-3">Потенциальный доход</div>
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-400">Basic ({planStats.basic} польз.)</span>
-                  <span className="text-blue-400 font-medium">{(planStats.basic * 2990).toLocaleString('ru-KZ')} ₸/мес</span>
+           {/* Доход */}
+                <div className="bg-gray-800 rounded-xl border border-gray-700 p-4">
+                <div className="font-medium text-sm mb-3">Доход от подписок</div>
+                <div className="text-xs text-gray-400 mb-3">
+                    Только реальные платящие пользователи (не промокоды)
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-400">Pro ({planStats.pro} польз.)</span>
-                  <span className="text-yellow-400 font-medium">{(planStats.pro * 5990).toLocaleString('ru-KZ')} ₸/мес</span>
+                <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Basic ({planStats.basic} польз.)</span>
+                    <span className="text-blue-400 font-medium">0 ₸/мес</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Pro ({planStats.pro} польз.)</span>
+                    <span className="text-yellow-400 font-medium">0 ₸/мес</span>
+                    </div>
+                    <div className="border-t border-gray-700 pt-2 flex justify-between text-sm font-bold">
+                    <span className="text-gray-300">Итого</span>
+                    <span className="text-[#2DC48D]">0 ₸/мес</span>
+                    </div>
+                    <div className="text-xs text-gray-500 mt-2">
+                    * Оплата принимается вручную через WhatsApp. После подключения Kaspi Pay доход будет считаться автоматически.
+                    </div>
                 </div>
-                <div className="border-t border-gray-700 pt-2 flex justify-between text-sm font-bold">
-                  <span className="text-gray-300">Итого</span>
-                  <span className="text-[#2DC48D]">{(planStats.basic * 2990 + planStats.pro * 5990).toLocaleString('ru-KZ')} ₸/мес</span>
-                </div>
-              </div>
             </div>
           </div>
         )}
