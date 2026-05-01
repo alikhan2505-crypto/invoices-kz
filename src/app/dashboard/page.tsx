@@ -176,7 +176,7 @@ export default function Dashboard() {
       clientEmail: ce,
       services: svcs,
       total: tot,
-      note: note || '',
+      note: note || profile?.default_note || '',
       profile: {
         company_name: profile?.company_name || '',
         bin_iin: profile?.bin_iin || '',
@@ -269,7 +269,7 @@ export default function Dashboard() {
       client_bin: clientBin,
       client_email: clientEmail,
       services,
-      note: note || null,
+      note: note || profile?.default_note || null,
     }).select().single()
 
     if (error) { alert('Ошибка: ' + error.message); setLoading(false); return }
@@ -538,7 +538,7 @@ export default function Dashboard() {
             <span>Сумма</span><span>{total.toLocaleString('ru-KZ')} ₸</span>
           </div>
           <div className="flex justify-between text-sm text-white/70 mb-3">
-            <span>НДС (12%)</span><span>0 ₸</span>
+            <span>НДС (16%)</span><span>0 ₸</span>
           </div>
           <div className="flex justify-between font-medium text-white border-t border-white/20 pt-3">
             <span>К оплате</span>
