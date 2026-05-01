@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { generateInvoicePDF } from '@/lib/generatePDF'
 import BottomNav from '@/components/BottomNav'
+import { cacheGet, cacheSet } from '@/lib/cache'
 
 export default function Dashboard() {
   const router = useRouter()
@@ -36,6 +37,10 @@ export default function Dashboard() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
 
+    // Сначала показываем кэш
+    const cachedProfile = cacheGet('profile_' + user.id)
+    if (cachedProfile) setProfile(cachedProfile)
+
     const [{ data: p }, { data: c }, { data: s }, { data: inv }] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', user.id).single(),
       supabase.from('clients').select('*').eq('user_id', user.id).order('name'),
@@ -48,6 +53,7 @@ export default function Dashboard() {
     ])
 
     setProfile(p)
+    if (p) cacheSet('profile_' + user.id, p)
 
     // Подставляем стандартное примечание из настроек
     if (p?.default_note) setNote(p.default_note)

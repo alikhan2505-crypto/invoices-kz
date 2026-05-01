@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import BottomNav from '@/components/BottomNav'
 import { AreaChart, Area, ResponsiveContainer, Tooltip } from 'recharts'
 import { useTheme } from '@/components/ThemeProvider'
+import { cacheGet, cacheSet, cacheClear } from '@/lib/cache'
 
 export default function Profile() {
   const router = useRouter()
@@ -19,6 +20,10 @@ export default function Profile() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
 
+      // Сначала показываем кэш
+      const cachedProfile = cacheGet('profile_' + user.id)
+      if (cachedProfile) setProfile(cachedProfile)
+
       const [{ data: p }, { data: c }, { data: s }, { data: inv }] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', user.id).single(),
         supabase.from('clients').select('id').eq('user_id', user.id),
@@ -27,6 +32,7 @@ export default function Profile() {
       ])
 
       setProfile(p)
+      if (p) cacheSet('profile_' + user.id, p)
 
       // Доход за текущий месяц
       const now = new Date()
@@ -58,18 +64,19 @@ export default function Profile() {
         })
       }
       setChartData(months)
-
       setLoading(false)
     }
     load()
   }, [])
 
   async function signOut() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) cacheClear('profile_' + user.id)
     await supabase.auth.signOut()
     router.push('/login')
   }
 
-  if (loading) return (
+  if (loading && !profile) return (
     <main className="min-h-screen bg-gray-50 flex items-center justify-center">
       <p className="text-gray-400">Загрузка...</p>
     </main>
@@ -82,7 +89,7 @@ export default function Profile() {
   return (
     <main className="min-h-screen bg-gray-50 pb-24">
 
-      {/* Header — единый стиль как на других страницах */}
+      {/* Header */}
       <div className="bg-white border-b px-4 py-3 flex items-center justify-between">
         <span className="font-bold text-[#1C2056]">INVOICES.KZ</span>
         <span className="text-sm text-gray-500">{profile?.company_name || ''}</span>
