@@ -13,6 +13,7 @@ export default function Upgrade() {
   const [payPhone, setPayPhone] = useState('')
   const [userId, setUserId] = useState('')
   const [existingRequest, setExistingRequest] = useState<any>(null)
+  const [hasRequest, setHasRequest] = useState(false)
   const [countdown, setCountdown] = useState(0)
   const [showModal, setShowModal] = useState(false)
   const [selectedPlan, setSelectedPlan] = useState<{ name: string; amount: number; plan: string } | null>(null)
@@ -42,9 +43,8 @@ export default function Upgrade() {
       phoneLoaded.current = true
     }
 
-    // Ищем любую pending заявку за последние 20 минут
     const twentyMinutesAgo = new Date(Date.now() - 20 * 60 * 1000).toISOString()
-    const { data: reqs, error } = await supabase
+    const { data: reqs } = await supabase
       .from('payment_requests')
       .select('*')
       .eq('user_id', user.id)
@@ -53,13 +53,13 @@ export default function Upgrade() {
       .order('created_at', { ascending: false })
       .limit(1)
 
-    console.log('payment_requests result:', reqs, 'error:', error)
-
     if (reqs && reqs.length > 0) {
       setExistingRequest(reqs[0])
+      setHasRequest(true)
       setStep('pending')
     } else {
       setExistingRequest(null)
+      setHasRequest(false)
       setStep('instruction')
     }
 
@@ -82,6 +82,7 @@ export default function Upgrade() {
       setCountdown(remaining)
       if (remaining === 0) {
         setExistingRequest(null)
+        setHasRequest(false)
         setStep('instruction')
         clearInterval(interval)
       }
@@ -108,7 +109,7 @@ export default function Upgrade() {
 
   function openModal(planName: string, amount: number, planKey: string) {
     setSelectedPlan({ name: planName, amount, plan: planKey })
-    setStep(existingRequest ? 'pending' : 'instruction')
+    setStep(hasRequest ? 'pending' : 'instruction')
     setShowModal(true)
   }
 
@@ -144,6 +145,7 @@ export default function Upgrade() {
     } catch {}
 
     setExistingRequest(newReq)
+    setHasRequest(true)
     setStep('pending')
     setSubmitting(false)
     window.open('https://pay.kaspi.kz/pay/q3p5cvsl', '_blank')
@@ -253,7 +255,7 @@ export default function Upgrade() {
           {plan !== 'basic' && plan !== 'pro' && (
             <button onClick={() => openModal('Базовый', 2990, 'basic')}
               className="w-full border-2 border-[#1C2056] text-[#1C2056] rounded-xl py-3.5 font-medium text-sm">
-              {existingRequest ? '📋 Посмотреть заявку' : 'Подключить за 2 990 ₸/мес'}
+              {hasRequest ? '📋 Посмотреть заявку' : 'Подключить за 2 990 ₸/мес'}
             </button>
           )}
           {plan === 'basic' && <div className="text-center text-sm text-gray-400 py-2">✓ Активен</div>}
@@ -281,7 +283,7 @@ export default function Upgrade() {
           {plan !== 'pro' && (
             <button onClick={() => openModal('Про', 5990, 'pro')}
               className="w-full bg-[#2DC48D] text-white rounded-xl py-3.5 font-medium text-sm">
-              {existingRequest ? '📋 Посмотреть заявку' : 'Подключить за 5 990 ₸/мес'}
+              {hasRequest ? '📋 Посмотреть заявку' : 'Подключить за 5 990 ₸/мес'}
             </button>
           )}
           {plan === 'pro' && <div className="text-center text-sm text-white/60 py-2">✓ Активен</div>}
