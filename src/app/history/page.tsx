@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import BottomNav from '@/components/BottomNav'
 import * as XLSX from 'xlsx'
+import { formatDateTime, formatDate } from '@/lib/date'
 
 const statusLabel: Record<string, { text: string; color: string }> = {
   paid:    { text: 'Оплачен',   color: 'bg-green-100 text-green-700' },
@@ -21,9 +22,7 @@ export default function History() {
   const [search, setSearch] = useState('')
   const [dateFilter, setDateFilter] = useState('month')
 
-  useEffect(() => {
-    loadInvoices()
-  }, [])
+  useEffect(() => { loadInvoices() }, [])
 
   async function loadInvoices() {
     const { data: { user } } = await supabase.auth.getUser()
@@ -74,7 +73,7 @@ export default function History() {
       'Сумма': Number(inv.amount),
       'Статус': (statusLabel[inv.status] || statusLabel.draft).text,
       'Примечание': inv.note || '',
-      'Дата': new Date(inv.created_at).toLocaleDateString('ru-KZ'),
+      'Дата': formatDate(inv.created_at),
     }))
     const ws = XLSX.utils.json_to_sheet(data)
     const wb = XLSX.utils.book_new()
@@ -83,8 +82,7 @@ export default function History() {
       { wch: 12 }, { wch: 30 }, { wch: 15 },
       { wch: 15 }, { wch: 12 }, { wch: 30 }, { wch: 15 },
     ]
-    const date = new Date().toLocaleDateString('ru-KZ').replace(/\./g, '-')
-    XLSX.writeFile(wb, `Счета_${date}.xlsx`)
+    XLSX.writeFile(wb, `Счета_${formatDate(new Date().toISOString())}.xlsx`)
   }
 
   const filtered = invoices.filter(inv => {
@@ -209,7 +207,6 @@ export default function History() {
           ))}
         </div>
 
-        {/* Total income for period */}
         {totalAmount > 0 && (
           <div className="bg-[#1C2056] rounded-xl px-4 py-3 mb-4 flex items-center justify-between">
             <span className="text-white/70 text-sm">Доход за период</span>
@@ -217,7 +214,6 @@ export default function History() {
           </div>
         )}
 
-        {/* List */}
         {loading ? (
           <p className="text-center text-gray-400 py-8">Загрузка...</p>
         ) : filtered.length === 0 ? (
@@ -247,10 +243,7 @@ export default function History() {
                       </div>
                     )}
                     <div className="text-xs text-gray-400 mt-1">
-                      {new Date(inv.created_at).toLocaleString('ru-KZ', {
-                        day: 'numeric', month: 'short', year: 'numeric',
-                        hour: '2-digit', minute: '2-digit'
-                      })}
+                      {formatDateTime(inv.created_at)}
                     </div>
                   </div>
                   <div className="text-right mr-3">
