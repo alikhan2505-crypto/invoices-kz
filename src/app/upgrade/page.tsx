@@ -13,9 +13,7 @@ export default function Upgrade() {
   const [payPhone, setPayPhone] = useState('')
   const [userId, setUserId] = useState('')
   const [existingRequest, setExistingRequest] = useState<any>(null)
-  // null = ещё не загружено, true = есть заявка, false = нет заявки
   const [hasRequest, setHasRequest] = useState<boolean | null>(null)
-  const [countdown, setCountdown] = useState(0)
   const [showModal, setShowModal] = useState(false)
   const [selectedPlan, setSelectedPlan] = useState<{ name: string; amount: number; plan: string } | null>(null)
   const [step, setStep] = useState<'instruction' | 'pending'>('instruction')
@@ -52,21 +50,9 @@ export default function Upgrade() {
       .limit(1)
 
     if (reqs && reqs.length > 0) {
-      const req = reqs[0]
-      const created = new Date(req.created_at).getTime()
-      const expires = created + 24 * 60 * 60 * 1000
-      const remaining = Math.floor((expires - Date.now()) / 1000)
-
-      if (remaining > 0) {
-        setExistingRequest(req)
-        setHasRequest(true)
-        setStep('pending')
-        setCountdown(remaining)
-      } else {
-        setExistingRequest(null)
-        setHasRequest(false)
-        setStep('instruction')
-      }
+      setExistingRequest(reqs[0])
+      setHasRequest(true)
+      setStep('pending')
     } else {
       setExistingRequest(null)
       setHasRequest(false)
@@ -79,29 +65,6 @@ export default function Upgrade() {
     if (!user) return
     const { data: p } = await supabase.from('profiles').select('plan').eq('id', user.id).single()
     setPlan(p?.plan || 'free')
-  }
-
-  useEffect(() => {
-    if (!existingRequest) return
-    const interval = setInterval(() => {
-      const created = new Date(existingRequest.created_at).getTime()
-      const expires = created + 20 * 60 * 1000
-      const remaining = Math.max(0, Math.floor((expires - Date.now()) / 1000))
-      setCountdown(remaining)
-      if (remaining === 0) {
-        setExistingRequest(null)
-        setHasRequest(false)
-        setStep('instruction')
-        clearInterval(interval)
-      }
-    }, 1000)
-    return () => clearInterval(interval)
-  }, [existingRequest])
-
-  const formatCountdown = (s: number) => {
-    const m = Math.floor(s / 60)
-    const sec = s % 60
-    return `${m}:${sec.toString().padStart(2, '0')}`
   }
 
   function formatPhone(value: string) {
@@ -187,12 +150,12 @@ export default function Upgrade() {
     await reloadPlan()
   }
 
-  // Кнопка подключения — показываем только когда hasRequest НЕ null
-  function ConnectButton({ planName, amount, planKey, dark }: { planName: string; amount: number; planKey: string; dark?: boolean }) {
+  function ConnectButton({ planName, amount, planKey, dark }: {
+    planName: string; amount: number; planKey: string; dark?: boolean
+  }) {
     if (hasRequest === null) {
-      // Ещё загружается — показываем заглушку
       return (
-        <div className={`w-full rounded-xl py-3.5 text-sm text-center ${dark ? 'bg-white/10 text-white/40' : 'bg-gray-100 text-gray-300'}`}>
+        <div className={`w-full rounded-xl py-3.5 text-sm text-center ${dark ? 'bg-white/10 text-white/30' : 'bg-gray-100 text-gray-300'}`}>
           Загрузка...
         </div>
       )
@@ -200,14 +163,17 @@ export default function Upgrade() {
     if (hasRequest) {
       return (
         <button onClick={() => openModal(planName, amount, planKey)}
-          className={`w-full rounded-xl py-3.5 font-medium text-sm ${dark ? 'bg-yellow-400 text-[#1C2056]' : 'bg-yellow-400 text-[#1C2056]'}`}>
+          className="w-full bg-yellow-400 text-[#1C2056] rounded-xl py-3.5 font-medium text-sm">
           📋 Посмотреть заявку
         </button>
       )
     }
     return (
       <button onClick={() => openModal(planName, amount, planKey)}
-        className={`w-full rounded-xl py-3.5 font-medium text-sm ${dark ? 'bg-[#2DC48D] text-white' : 'border-2 border-[#1C2056] text-[#1C2056]'}`}>
+        className={`w-full rounded-xl py-3.5 font-medium text-sm ${dark
+          ? 'bg-[#2DC48D] text-white'
+          : 'border-2 border-[#1C2056] text-[#1C2056]'
+        }`}>
         Подключить за {amount.toLocaleString('ru-KZ')} ₸/мес
       </button>
     )
@@ -397,13 +363,6 @@ export default function Upgrade() {
                     После оплаты мы свяжемся с вами и активируем тариф в течение 20 минут
                   </div>
                 </div>
-
-                {countdown > 0 && (
-                  <div className="bg-gray-50 rounded-xl px-4 py-3 mb-4 flex items-center justify-between">
-                    <span className="text-xs text-gray-500">Новую заявку можно подать через</span>
-                    <span className="text-lg font-bold text-[#1C2056]">{formatCountdown(countdown)}</span>
-                  </div>
-                )}
 
                 <button onClick={() => window.open('https://pay.kaspi.kz/pay/q3p5cvsl', '_blank')}
                   className="w-full bg-[#2DC48D] text-white rounded-xl py-4 font-medium text-sm mb-3">
