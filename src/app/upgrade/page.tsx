@@ -356,7 +356,7 @@ export default function Upgrade() {
                     <div className="text-sm text-yellow-700">Сумма: <b>{existingRequest?.amount?.toLocaleString('ru-KZ')} ₸</b></div>
                     <div className="text-sm text-yellow-700">Телефон: <b>{existingRequest?.email}</b></div>
                     <div className="text-sm text-yellow-700">
-                      Подана: <b>{existingRequest ? new Date(existingRequest.created_at).toLocaleTimeString('ru-KZ') : ''}</b>
+                      Подана: <b>{existingRequest ? new Date(existingRequest.created_at).toLocaleTimeString('ru-KZ', { timeZone: 'Asia/Almaty' }) : ''}</b>
                     </div>
                   </div>
                   <div className="bg-yellow-100 rounded-xl px-4 py-2 text-xs text-yellow-700">
