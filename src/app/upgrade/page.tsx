@@ -54,7 +54,7 @@ export default function Upgrade() {
     if (reqs && reqs.length > 0) {
       const req = reqs[0]
       const created = new Date(req.created_at).getTime()
-      const expires = created + 20 * 60 * 1000
+      const expires = created + 24 * 60 * 60 * 1000
       const remaining = Math.floor((expires - Date.now()) / 1000)
 
       if (remaining > 0) {
