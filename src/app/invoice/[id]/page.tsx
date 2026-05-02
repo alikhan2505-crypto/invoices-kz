@@ -3,27 +3,44 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { generateInvoicePDF } from '@/lib/generatePDF'
+import { formatDateTime, formatDate } from '@/lib/date'
 
 const statusLabel: Record<string, { text: string; color: string; dot: string }> = {
   paid:    { text: 'Оплачен',   color: 'text-green-600', dot: 'bg-green-500' },
   sent:    { text: 'Отправлен', color: 'text-blue-600',  dot: 'bg-blue-400' },
   overdue: { text: 'Просрочен', color: 'text-red-600',   dot: 'bg-red-500' },
   draft:   { text: 'Черновик',  color: 'text-gray-500',  dot: 'bg-gray-300' },
-  viewed: { text: 'Просмотрен', color: 'text-purple-600', dot: 'bg-purple-400' },
+  viewed:  { text: 'Просмотрен', color: 'text-purple-600', dot: 'bg-purple-400' },
 }
 
 export default function InvoicePage() {
   const router = useRouter()
   const { id } = useParams()
   const [invoice, setInvoice] = useState<any>(null)
+  const [profile, setProfile] = useState<any>(null)
+  const [bank, setBank] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState(false)
 
   useEffect(() => { loadInvoice() }, [])
 
   async function loadInvoice() {
-    const { data } = await supabase.from('invoices').select('*').eq('id', id).single()
-    setInvoice(data)
+    const { data: inv } = await supabase.from('invoices').select('*').eq('id', id).single()
+    setInvoice(inv)
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      const { data: p } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+      setProfile(p)
+
+      if (inv?.bank_id) {
+        const { data: b } = await supabase.from('bank_accounts').select('*').eq('id', inv.bank_id).single()
+        setBank(b)
+      } else {
+        const { data: b } = await supabase.from('bank_accounts').select('*').eq('user_id', user.id).eq('is_main', true).single()
+        setBank(b)
+      }
+    }
     setLoading(false)
   }
 
@@ -50,9 +67,7 @@ export default function InvoicePage() {
     const nextNum = freshProfile?.invoice_next_number || '0001'
     const invoiceNumber = prefix + nextNum
     const newNum = String(parseInt(nextNum) + 1).padStart(nextNum.length, '0')
-    const { error: updateError } = await supabase.from('profiles')
-      .update({ invoice_next_number: newNum }).eq('id', user.id)
-    if (updateError) { alert('Ошибка: ' + updateError.message); return }
+    await supabase.from('profiles').update({ invoice_next_number: newNum }).eq('id', user.id)
     const { data, error } = await supabase.from('invoices').insert({
       user_id: user.id,
       number: invoiceNumber,
@@ -62,6 +77,7 @@ export default function InvoicePage() {
       client_bin: invoice.client_bin,
       client_email: invoice.client_email,
       services: invoice.services,
+      note: invoice.note,
       created_at: new Date().toISOString(),
     }).select().single()
     if (error) { alert('Ошибка: ' + error.message); return }
@@ -69,11 +85,7 @@ export default function InvoicePage() {
   }
 
   async function copyPublicLink() {
-    const { data } = await supabase
-      .from('invoices')
-      .select('public_token')
-      .eq('id', id)
-      .single()
+    const { data } = await supabase.from('invoices').select('public_token').eq('id', id).single()
     if (data?.public_token) {
       const link = `https://invoices.kz/view/${data.public_token}`
       await navigator.clipboard.writeText(link)
@@ -84,11 +96,7 @@ export default function InvoicePage() {
   }
 
   async function shareWhatsApp() {
-    const { data } = await supabase
-      .from('invoices')
-      .select('public_token')
-      .eq('id', id)
-      .single()
+    const { data } = await supabase.from('invoices').select('public_token').eq('id', id).single()
     if (!data?.public_token) { alert('Ошибка'); return }
     const link = `https://invoices.kz/view/${data.public_token}`
     const text = `Здравствуйте! Направляю вам счёт на оплату ${invoice.number} на сумму ${Number(invoice.amount).toLocaleString('ru-KZ')} ₸.\n\nОткрыть счёт: ${link}`
@@ -97,11 +105,7 @@ export default function InvoicePage() {
   }
 
   async function sendReminder() {
-    const { data } = await supabase
-      .from('invoices')
-      .select('public_token')
-      .eq('id', id)
-      .single()
+    const { data } = await supabase.from('invoices').select('public_token').eq('id', id).single()
     if (!data?.public_token) { alert('Ошибка'); return }
     const link = `https://invoices.kz/view/${data.public_token}`
     const text = `Здравствуйте, ${invoice.client_name}!\n\nНапоминаем о неоплаченном счёте:\n\n📄 Счёт: ${invoice.number}\n💰 Сумма: ${Number(invoice.amount).toLocaleString('ru-KZ')} ₸\n🔗 Открыть счёт: ${link}\n\nПожалуйста, произведите оплату. Спасибо!`
@@ -109,16 +113,33 @@ export default function InvoicePage() {
   }
 
   function openPDF() {
-    if (!invoice) return
+    if (!invoice || !profile) { alert('Данные ещё загружаются'); return }
     const services = invoice.services || [{ name: 'Услуга', qty: 1, price: invoice.amount }]
     generateInvoicePDF({
       number: invoice.number,
-      date: new Date(invoice.created_at).toLocaleDateString('ru-KZ', { timeZone: 'Asia/Almaty' }),
+      date: formatDate(invoice.created_at),
       clientName: invoice.client_name || '',
       clientBin: invoice.client_bin || '',
       clientEmail: invoice.client_email || '',
+      clientAddress: invoice.client_address || '',
       services,
       total: Number(invoice.amount),
+      note: invoice.note || profile?.default_note || '',
+      profile: {
+        company_name: profile.company_name || '',
+        bin_iin: profile.bin_iin || '',
+        address: profile.address || '',
+        director_name: profile.director_name || '',
+        signature_url: profile.signature_url || '',
+        stamp_url: profile.stamp_url || '',
+        account_type: profile.account_type || 'ИП',
+      },
+      bank: bank ? {
+        bank_name: bank.bank_name,
+        iik: bank.iik,
+        bik: bank.bik,
+        kbe: bank.kbe,
+      } : undefined,
     })
   }
 
@@ -202,16 +223,43 @@ export default function InvoicePage() {
           </div>
         )}
 
+        {/* Bank info */}
+        {bank && (
+          <div className="bg-white rounded-2xl shadow-sm p-4">
+            <div className="text-xs text-gray-400 uppercase tracking-wide mb-3">Банковские реквизиты</div>
+            <div className="space-y-1.5">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-400">Банк</span>
+                <span className="text-[#1C2056] font-medium">{bank.bank_name}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-400">ИИК</span>
+                <span className="text-[#1C2056] font-mono text-xs">{bank.iik}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-400">БИК</span>
+                <span className="text-[#1C2056] font-mono text-xs">{bank.bik}</span>
+              </div>
+              {bank.kbe && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">КБе</span>
+                  <span className="text-[#1C2056]">{bank.kbe}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Status history */}
         <div className="bg-white rounded-2xl shadow-sm p-4">
-          <div className="text-xs text-gray-400 uppercase tracking-wide mb-3">История статусов</div>
+          <div className="text-xs text-gray-400 uppercase tracking-wide mb-3">История</div>
           <div className="space-y-3">
             {invoice.status === 'paid' && (
               <div className="flex items-center gap-3">
                 <span className="w-2 h-2 rounded-full bg-green-500"></span>
                 <div>
                   <div className="text-sm text-[#1C2056]">Оплачен</div>
-                  <div className="text-xs text-gray-400">{new Date(invoice.created_at).toLocaleDateString('ru-KZ', { timeZone: 'Asia/Almaty' })}</div>
+                  <div className="text-xs text-gray-400">{formatDate(invoice.created_at)}</div>
                 </div>
               </div>
             )}
@@ -220,7 +268,7 @@ export default function InvoicePage() {
                 <span className="w-2 h-2 rounded-full bg-blue-400"></span>
                 <div>
                   <div className="text-sm text-[#1C2056]">Отправлен</div>
-                  <div className="text-xs text-gray-400">{new Date(invoice.created_at).toLocaleDateString('ru-KZ', { timeZone: 'Asia/Almaty' })}</div>
+                  <div className="text-xs text-gray-400">{formatDate(invoice.created_at)}</div>
                 </div>
               </div>
             )}
@@ -228,7 +276,7 @@ export default function InvoicePage() {
               <span className="w-2 h-2 rounded-full bg-gray-300"></span>
               <div>
                 <div className="text-sm text-[#1C2056]">Создан</div>
-                <div className="text-xs text-gray-400">{new Date(invoice.created_at).toLocaleDateString('ru-KZ', { timeZone: 'Asia/Almaty', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+                <div className="text-xs text-gray-400">{formatDateTime(invoice.created_at)}</div>
               </div>
             </div>
           </div>
