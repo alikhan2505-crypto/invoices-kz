@@ -10,56 +10,112 @@ export default function Upgrade() {
   const [promoSuccess, setPromoSuccess] = useState('')
   const [promoError, setPromoError] = useState('')
   const [plan, setPlan] = useState('free')
-  const [showPayModal, setShowPayModal] = useState(false)
-  const [selectedPlan, setSelectedPlan] = useState<{ name: string; amount: number; plan: string } | null>(null)
   const [payEmail, setPayEmail] = useState('')
-  const [payLoading, setPayLoading] = useState(false)
-  const [paySuccess, setPaySuccess] = useState(false)
+  const [userId, setUserId] = useState('')
   const [existingRequest, setExistingRequest] = useState<any>(null)
   const [countdown, setCountdown] = useState(0)
-  const [userId, setUserId] = useState('')
+  const [showModal, setShowModal] = useState(false)
+  const [selectedPlan, setSelectedPlan] = useState<{ name: string; amount: number; plan: string } | null>(null)
+  const [step, setStep] = useState<'instruction' | 'pending'>('instruction')
+  const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
-    async function loadData() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      setUserId(user.id)
-      const { data: p } = await supabase.from('profiles').select('plan, email').eq('id', user.id).single()
-      setPlan(p?.plan || 'free')
-      setPayEmail(p?.email || user.email || '')
-
-      // Проверяем есть ли активная заявка
-      const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString()
-      const { data: req } = await supabase
-        .from('payment_requests')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('status', 'pending')
-        .gte('created_at', tenMinutesAgo)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single()
-
-      if (req) setExistingRequest(req)
-    }
     loadData()
   }, [promoSuccess])
+
+  async function loadData() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    setUserId(user.id)
+
+    const { data: p } = await supabase.from('profiles').select('plan, email').eq('id', user.id).single()
+    setPlan(p?.plan || 'free')
+    setPayEmail(p?.email || user.email || '')
+
+    // Проверяем заявку за последние 20 минут
+    const twentyMinutesAgo = new Date(Date.now() - 20 * 60 * 1000).toISOString()
+    const { data: req } = await supabase
+      .from('payment_requests')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('status', 'pending')
+      .gte('created_at', twentyMinutesAgo)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+
+    if (req) {
+      setExistingRequest(req)
+      setStep('pending')
+    }
+  }
 
   // Обратный отсчёт
   useEffect(() => {
     if (!existingRequest) return
     const interval = setInterval(() => {
       const created = new Date(existingRequest.created_at).getTime()
-      const expires = created + 10 * 60 * 1000
+      const expires = created + 20 * 60 * 1000
       const remaining = Math.max(0, Math.floor((expires - Date.now()) / 1000))
       setCountdown(remaining)
       if (remaining === 0) {
         setExistingRequest(null)
+        setStep('instruction')
         clearInterval(interval)
       }
     }, 1000)
     return () => clearInterval(interval)
   }, [existingRequest])
+
+  const formatCountdown = (s: number) => {
+    const m = Math.floor(s / 60)
+    const sec = s % 60
+    return `${m}:${sec.toString().padStart(2, '0')}`
+  }
+
+  function openModal(planName: string, amount: number, planKey: string) {
+    setSelectedPlan({ name: planName, amount, plan: planKey })
+
+    // Если уже есть заявка — показываем pending
+    if (existingRequest) {
+      setStep('pending')
+    } else {
+      setStep('instruction')
+    }
+    setShowModal(true)
+  }
+
+  async function submitRequest() {
+    if (!payEmail) { alert('Введите email'); return }
+    setSubmitting(true)
+
+    const { data: newReq, error } = await supabase.from('payment_requests').insert({
+      user_id: userId,
+      email: payEmail,
+      plan: selectedPlan?.plan,
+      amount: selectedPlan?.amount,
+      status: 'pending',
+    }).select().single()
+
+    if (error) { alert('Ошибка: ' + error.message); setSubmitting(false); return }
+
+    try {
+      await fetch('/api/telegram', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: `💳 <b>Новая заявка на оплату!</b>\n📧 ${payEmail}\n📦 ${selectedPlan?.name}\n💰 ${selectedPlan?.amount.toLocaleString('ru-KZ')} ₸`
+        })
+      })
+    } catch {}
+
+    setExistingRequest(newReq)
+    setStep('pending')
+    setSubmitting(false)
+
+    // Открываем Kaspi Pay
+    window.open('https://pay.kaspi.kz/pay/q3p5cvsl', '_blank')
+  }
 
   async function applyPromo() {
     if (!promoCode.trim()) { setPromoError('Введите промокод'); return }
@@ -71,11 +127,9 @@ export default function Upgrade() {
     if (!user) { router.push('/login'); return }
 
     const { data: promo } = await supabase
-      .from('promo_codes')
-      .select('*')
+      .from('promo_codes').select('*')
       .eq('code', promoCode.toUpperCase())
-      .eq('is_active', true)
-      .single()
+      .eq('is_active', true).single()
 
     if (!promo) { setPromoError('Промокод не найден или недействителен'); setPromoLoading(false); return }
     if (promo.used_count >= promo.max_uses) { setPromoError('Промокод уже использован максимальное количество раз'); setPromoLoading(false); return }
@@ -83,59 +137,12 @@ export default function Upgrade() {
     const expiresAt = new Date()
     expiresAt.setDate(expiresAt.getDate() + promo.days)
 
-    await supabase.from('profiles').update({
-      plan: promo.plan,
-      plan_expires_at: expiresAt.toISOString(),
-    }).eq('id', user.id)
-
+    await supabase.from('profiles').update({ plan: promo.plan, plan_expires_at: expiresAt.toISOString() }).eq('id', user.id)
     await supabase.from('promo_codes').update({ used_count: promo.used_count + 1 }).eq('id', promo.id)
 
     setPromoSuccess(`🎉 Промокод активирован! ${promo.plan === 'pro' ? 'Про' : 'Базовый'} тариф на ${promo.days} дней`)
     setPromoCode('')
     setPromoLoading(false)
-  }
-
-  function openPayModal(planName: string, amount: number, planKey: string) {
-    setSelectedPlan({ name: planName, amount, plan: planKey })
-    setPaySuccess(false)
-    setShowPayModal(true)
-  }
-
-  async function submitPayRequest() {
-    if (!payEmail) { alert('Введите email'); return }
-    setPayLoading(true)
-
-    const { error } = await supabase.from('payment_requests').insert({
-      user_id: userId,
-      email: payEmail,
-      plan: selectedPlan?.plan,
-      amount: selectedPlan?.amount,
-      status: 'pending',
-    })
-
-    if (error) { alert('Ошибка: ' + error.message); setPayLoading(false); return }
-
-    try {
-      await fetch('/api/telegram', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: `💳 <b>Новая заявка на оплату!</b>\n📧 Email: ${payEmail}\n📦 Тариф: ${selectedPlan?.name}\n💰 Сумма: ${selectedPlan?.amount.toLocaleString('ru-KZ')} ₸`
-        })
-      })
-    } catch {}
-
-    setPayLoading(false)
-    setPaySuccess(true)
-
-    // Открываем Kaspi Pay
-    window.open('https://pay.kaspi.kz/pay/q3p5cvsl', '_blank')
-  }
-
-  const formatCountdown = (s: number) => {
-    const m = Math.floor(s / 60)
-    const sec = s % 60
-    return `${m}:${sec.toString().padStart(2, '0')}`
   }
 
   return (
@@ -152,32 +159,7 @@ export default function Upgrade() {
           <p className="text-gray-400 text-sm">Без скрытых платежей · Активация до 20 минут</p>
         </div>
 
-        {/* Активная заявка */}
-        {existingRequest && countdown > 0 && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 mb-6">
-            <div className="font-medium text-yellow-800 mb-1">⏳ Заявка уже подана</div>
-            <div className="text-sm text-yellow-700 mb-2">
-              Тариф: <b>{existingRequest.plan === 'pro' ? 'Про' : 'Базовый'}</b> · {existingRequest.amount?.toLocaleString('ru-KZ')} ₸
-            </div>
-            <div className="text-sm text-yellow-700 mb-3">
-              Подана: {new Date(existingRequest.created_at).toLocaleTimeString('ru-KZ')}
-            </div>
-            <div className="bg-yellow-100 rounded-xl px-4 py-2 flex items-center justify-between mb-3">
-              <span className="text-xs text-yellow-700">Новую заявку можно подать через</span>
-              <span className="text-lg font-bold text-yellow-800">{formatCountdown(countdown)}</span>
-            </div>
-            <div className="text-xs text-yellow-600">
-              Если передумали — просто не проводите оплату. Заявка аннулируется автоматически.
-            </div>
-            <button
-              onClick={() => window.open('https://pay.kaspi.kz/pay/q3p5cvsl', '_blank')}
-              className="w-full mt-3 bg-[#2DC48D] text-white rounded-xl py-3 text-sm font-medium">
-              💳 Перейти к оплате в Kaspi
-            </button>
-          </div>
-        )}
-
-        {/* Promo code */}
+        {/* Promo */}
         <div className="bg-white rounded-2xl p-4 mb-6 shadow-sm">
           <div className="text-sm font-medium text-[#1C2056] mb-3">🎟️ Есть промокод?</div>
           <div className="flex gap-2">
@@ -218,8 +200,7 @@ export default function Upgrade() {
             <div className="font-bold text-[#1C2056] text-lg">Базовый</div>
             {plan === 'basic'
               ? <span className="text-xs bg-[#1C2056] text-white px-2 py-1 rounded-full">Текущий</span>
-              : <span className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded-full">Популярный</span>
-            }
+              : <span className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded-full">Популярный</span>}
           </div>
           <div className="text-3xl font-bold text-[#1C2056] mb-4">
             2 990 ₸<span className="text-sm font-normal text-gray-400">/мес</span>
@@ -231,17 +212,14 @@ export default function Upgrade() {
               </li>
             ))}
           </ul>
-          {plan !== 'basic' && plan !== 'pro' && !existingRequest && (
-            <button onClick={() => openPayModal('Базовый', 2990, 'basic')}
+          {plan !== 'basic' && plan !== 'pro' && (
+            <button onClick={() => openModal('Базовый', 2990, 'basic')}
               className="w-full border-2 border-[#1C2056] text-[#1C2056] rounded-xl py-3.5 font-medium text-sm">
-              Подключить за 2 990 ₸/мес
+              {existingRequest ? '📋 Посмотреть заявку' : 'Подключить за 2 990 ₸/мес'}
             </button>
           )}
           {plan === 'basic' && <div className="text-center text-sm text-gray-400 py-2">✓ Активен</div>}
           {plan === 'pro' && <div className="text-center text-sm text-gray-400 py-2">У вас более высокий тариф</div>}
-          {existingRequest && plan !== 'basic' && plan !== 'pro' && (
-            <div className="text-center text-xs text-gray-400 py-2">Дождитесь обработки текущей заявки</div>
-          )}
         </div>
 
         {/* Pro */}
@@ -250,8 +228,7 @@ export default function Upgrade() {
             <div className="font-bold text-white text-lg">Про</div>
             {plan === 'pro'
               ? <span className="text-xs bg-[#2DC48D] text-white px-2 py-1 rounded-full">Текущий</span>
-              : <span className="text-xs bg-[#2DC48D] text-white px-2 py-1 rounded-full">Максимум</span>
-            }
+              : <span className="text-xs bg-[#2DC48D] text-white px-2 py-1 rounded-full">Максимум</span>}
           </div>
           <div className="text-3xl font-bold text-white mb-4">
             5 990 ₸<span className="text-sm font-normal text-white/60">/мес</span>
@@ -263,16 +240,13 @@ export default function Upgrade() {
               </li>
             ))}
           </ul>
-          {plan !== 'pro' && !existingRequest && (
-            <button onClick={() => openPayModal('Про', 5990, 'pro')}
+          {plan !== 'pro' && (
+            <button onClick={() => openModal('Про', 5990, 'pro')}
               className="w-full bg-[#2DC48D] text-white rounded-xl py-3.5 font-medium text-sm">
-              Подключить за 5 990 ₸/мес
+              {existingRequest ? '📋 Посмотреть заявку' : 'Подключить за 5 990 ₸/мес'}
             </button>
           )}
           {plan === 'pro' && <div className="text-center text-sm text-white/60 py-2">✓ Активен</div>}
-          {existingRequest && plan !== 'pro' && (
-            <div className="text-center text-xs text-white/40 py-2">Дождитесь обработки текущей заявки</div>
-          )}
         </div>
 
         <p className="text-center text-xs text-gray-400">
@@ -283,31 +257,31 @@ export default function Upgrade() {
         </p>
       </div>
 
-      {/* Payment Modal */}
-      {showPayModal && (
+      {/* Modal */}
+      {showModal && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-end">
           <div className="bg-white w-full max-w-lg mx-auto rounded-t-3xl p-6">
-            {!paySuccess ? (
+
+            {step === 'instruction' && (
               <>
                 <div className="flex items-center justify-between mb-5">
                   <div className="font-semibold text-[#1C2056]">
                     Подключить тариф {selectedPlan?.name}
                   </div>
-                  <button onClick={() => setShowPayModal(false)} className="text-gray-400 text-xl">✕</button>
+                  <button onClick={() => setShowModal(false)} className="text-gray-400 text-xl">✕</button>
                 </div>
 
-                {/* Instructions */}
                 <div className="bg-blue-50 rounded-2xl p-4 mb-5">
                   <div className="text-sm font-medium text-[#1C2056] mb-3">📋 Инструкция по оплате</div>
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {[
-                      { step: '1', text: 'Нажмите кнопку "Перейти к оплате" ниже' },
-                      { step: '2', text: `Оплатите ${selectedPlan?.amount.toLocaleString('ru-KZ')} ₸ через Kaspi Pay` },
-                      { step: '3', text: 'Вернитесь на эту страницу' },
+                      { step: '1', text: 'Нажмите кнопку "Перейти к оплате" — откроется Kaspi Pay' },
+                      { step: '2', text: `Оплатите ${selectedPlan?.amount.toLocaleString('ru-KZ')} ₸` },
+                      { step: '3', text: 'Вернитесь сюда и нажмите "Я оплатил"' },
                       { step: '4', text: 'Тариф будет активирован в течение 20 минут' },
                     ].map(item => (
                       <div key={item.step} className="flex gap-3 items-start">
-                        <div className="w-6 h-6 rounded-full bg-[#1C2056] text-white text-xs flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <div className="w-6 h-6 rounded-full bg-[#1C2056] text-white text-xs flex items-center justify-center flex-shrink-0">
                           {item.step}
                         </div>
                         <span className="text-sm text-gray-600">{item.text}</span>
@@ -316,7 +290,6 @@ export default function Upgrade() {
                   </div>
                 </div>
 
-                {/* Email */}
                 <div className="mb-5">
                   <label className="text-xs text-gray-500 mb-1 block">Email для уведомления об активации</label>
                   <input
@@ -327,46 +300,68 @@ export default function Upgrade() {
                   />
                 </div>
 
-                {/* Amount */}
                 <div className="bg-gray-50 rounded-xl px-4 py-3 mb-5 flex items-center justify-between">
                   <span className="text-sm text-gray-500">К оплате</span>
                   <span className="text-lg font-bold text-[#1C2056]">{selectedPlan?.amount.toLocaleString('ru-KZ')} ₸/мес</span>
                 </div>
 
-                <button onClick={submitPayRequest} disabled={payLoading}
+                <button onClick={submitRequest} disabled={submitting}
                   className="w-full bg-[#2DC48D] text-white rounded-xl py-4 font-medium text-sm mb-3">
-                  {payLoading ? 'Сохраняем заявку...' : '💳 Перейти к оплате в Kaspi →'}
+                  {submitting ? 'Оформляем...' : '💳 Перейти к оплате в Kaspi →'}
                 </button>
 
                 <p className="text-center text-xs text-gray-400">
-                  Если передумали — просто закройте это окно и не проводите оплату
+                  Передумали? Просто закройте окно и не проводите оплату
                 </p>
               </>
-            ) : (
-              <div className="text-center py-4">
-                <div className="text-5xl mb-4">✅</div>
-                <div className="font-bold text-[#1C2056] text-lg mb-2">Заявка принята!</div>
-                <div className="text-sm text-gray-500 mb-2">
-                  Тариф <b>{selectedPlan?.name}</b> будет активирован в течение <b>20 минут</b>
+            )}
+
+            {step === 'pending' && (
+              <>
+                <div className="flex items-center justify-between mb-5">
+                  <div className="font-semibold text-[#1C2056]">Статус заявки</div>
+                  <button onClick={() => setShowModal(false)} className="text-gray-400 text-xl">✕</button>
                 </div>
-                <div className="text-sm text-gray-500 mb-6">
-                  Уведомление придёт на <b>{payEmail}</b>
-                </div>
-                <div className="bg-yellow-50 rounded-xl p-4 mb-5 text-left">
-                  <div className="text-sm font-medium text-yellow-800 mb-1">⚠️ Не забудьте оплатить!</div>
-                  <div className="text-xs text-yellow-700">
-                    Если вы ещё не оплатили — нажмите кнопку ниже. Если передумали — просто не платите, заявка аннулируется через 10 минут.
+
+                <div className="bg-yellow-50 rounded-2xl p-4 mb-5">
+                  <div className="text-sm font-medium text-yellow-800 mb-2">⏳ Заявка на обработке</div>
+                  <div className="text-sm text-yellow-700 mb-1">
+                    Тариф: <b>{existingRequest?.plan === 'pro' ? 'Про' : 'Базовый'}</b>
+                  </div>
+                  <div className="text-sm text-yellow-700 mb-1">
+                    Сумма: <b>{existingRequest?.amount?.toLocaleString('ru-KZ')} ₸</b>
+                  </div>
+                  <div className="text-sm text-yellow-700 mb-3">
+                    Подана: <b>{existingRequest ? new Date(existingRequest.created_at).toLocaleTimeString('ru-KZ') : ''}</b>
+                  </div>
+                  <div className="bg-yellow-100 rounded-xl px-4 py-2 flex items-center justify-between">
+                    <span className="text-xs text-yellow-700">Тариф будет активирован в течение 20 минут с момента оплаты</span>
                   </div>
                 </div>
-                <button onClick={() => window.open('https://pay.kaspi.kz/pay/q3p5cvsl', '_blank')}
-                  className="w-full bg-[#2DC48D] text-white rounded-xl py-3.5 text-sm font-medium mb-3">
-                  💳 Открыть Kaspi Pay
+
+                {countdown > 0 && (
+                  <div className="bg-gray-50 rounded-xl px-4 py-3 mb-4 flex items-center justify-between">
+                    <span className="text-xs text-gray-500">Новую заявку можно подать через</span>
+                    <span className="text-lg font-bold text-[#1C2056]">{formatCountdown(countdown)}</span>
+                  </div>
+                )}
+
+                <button
+                  onClick={() => window.open('https://pay.kaspi.kz/pay/q3p5cvsl', '_blank')}
+                  className="w-full bg-[#2DC48D] text-white rounded-xl py-4 font-medium text-sm mb-3">
+                  💳 Перейти к оплате в Kaspi
                 </button>
-                <button onClick={() => { setShowPayModal(false); window.location.reload() }}
-                  className="w-full bg-gray-100 text-gray-500 rounded-xl py-3 text-sm">
-                  Закрыть
+
+                <button
+                  onClick={() => setShowModal(false)}
+                  className="w-full bg-gray-100 text-gray-500 rounded-xl py-3 text-sm mb-3">
+                  ✅ Я уже оплатил — жду активации
                 </button>
-              </div>
+
+                <p className="text-center text-xs text-gray-400">
+                  Если передумали — просто не проводите оплату. Заявка аннулируется автоматически.
+                </p>
+              </>
             )}
           </div>
         </div>
