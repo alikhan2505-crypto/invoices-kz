@@ -132,7 +132,6 @@ export default function InvoicePage() {
         director_name: profile.director_name || '',
         signature_url: profile.signature_url || '',
         stamp_url: profile.stamp_url || '',
-        account_type: profile.account_type || 'ИП',
       },
       bank: bank ? {
         bank_name: bank.bank_name,
