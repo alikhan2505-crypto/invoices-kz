@@ -369,8 +369,24 @@ export default function Upgrade() {
                   💳 Перейти к оплате в Kaspi
                 </button>
 
-                <button onClick={() => setShowModal(false)}
-                  className="w-full bg-gray-100 text-gray-500 rounded-xl py-3 text-sm mb-3">
+                <button onClick={async () => {
+                  if (existingRequest) {
+                    await supabase.from('payment_requests')
+                      .update({ status: 'confirmed' })
+                      .eq('id', existingRequest.id)
+                    await fetch('/api/telegram', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        message: `✅ <b>Клиент подтвердил оплату!</b>\n📱 Телефон: ${existingRequest.email}\n📦 ${existingRequest.plan === 'pro' ? 'Про' : 'Базовый'} тариф\n💰 ${existingRequest.amount?.toLocaleString('ru-KZ')} ₸`
+                      })
+                    })
+                  }
+                  setShowModal(false)
+                  setHasRequest(false)
+                  setExistingRequest(null)
+                }}
+                  className="w-full bg-[#2DC48D] text-white rounded-xl py-3 text-sm mb-3 font-medium">
                   ✅ Я уже оплатил — жду активации
                 </button>
 

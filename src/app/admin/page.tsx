@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { AreaChart, Area, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
+import { formatDateTime, formatDate } from '@/lib/date'
 
 export default function Admin() {
   const router = useRouter()
@@ -25,10 +26,7 @@ export default function Admin() {
     if (!user) { router.push('/login'); return }
 
     const { data: profile } = await supabase
-      .from('profiles')
-      .select('is_admin')
-      .eq('id', user.id)
-      .single()
+      .from('profiles').select('is_admin').eq('id', user.id).single()
 
     if (!profile?.is_admin) { router.push('/dashboard'); return }
 
@@ -67,7 +65,6 @@ export default function Admin() {
     const basic = (allUsers || []).filter(u => u.plan === 'basic').length
     const pro = (allUsers || []).filter(u => u.plan === 'pro').length
     setPlanStats({ free, basic, pro })
-
     setLoading(false)
   }
 
@@ -78,7 +75,6 @@ export default function Admin() {
   }
 
   async function activatePayment(payment: any) {
-    // Активируем тариф
     const { error } = await supabase.from('profiles').update({
       plan: payment.plan,
       plan_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
@@ -86,19 +82,17 @@ export default function Admin() {
 
     if (error) { alert('Ошибка: ' + error.message); return }
 
-    // Обновляем статус заявки
     await supabase.from('payment_requests').update({
       status: 'activated',
       activated_at: new Date().toISOString(),
     }).eq('id', payment.id)
 
-    // Telegram уведомление пользователю — через нашу систему
     try {
       await fetch('/api/telegram', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: `✅ <b>Тариф активирован!</b>\n📧 ${payment.email}\n📦 ${payment.plan === 'pro' ? 'Про' : 'Базовый'} тариф активирован`
+          message: `🎉 <b>Тариф активирован!</b>\n📱 ${payment.email}\n📦 ${payment.plan === 'pro' ? 'Про' : 'Базовый'} тариф активирован`
         })
       })
     } catch {}
@@ -145,7 +139,17 @@ export default function Admin() {
     (u.bin_iin || '').includes(search)
   )
 
-  const pendingPayments = payments.filter(p => p.status === 'pending').length
+  const pendingPayments = payments.filter(p => p.status === 'pending' || p.status === 'confirmed').length
+
+  const statusBadge = (status: string) => {
+    switch (status) {
+      case 'pending': return { label: '⏳ Ожидает', color: 'bg-yellow-500/20 text-yellow-400' }
+      case 'confirmed': return { label: '💰 Оплата подтверждена', color: 'bg-blue-500/20 text-blue-400' }
+      case 'activated': return { label: '✅ Активирован', color: 'bg-green-500/20 text-green-400' }
+      case 'rejected': return { label: '❌ Отклонён', color: 'bg-gray-600 text-gray-400' }
+      default: return { label: status, color: 'bg-gray-600 text-gray-400' }
+    }
+  }
 
   if (loading) return (
     <main className="min-h-screen bg-gray-900 flex items-center justify-center">
@@ -167,7 +171,6 @@ export default function Admin() {
       </div>
 
       <div className="max-w-4xl mx-auto p-6">
-        {/* Stats */}
         <div className="grid grid-cols-4 gap-4 mb-6">
           {[
             { label: 'Пользователей', value: stats.users, color: 'text-blue-400' },
@@ -182,7 +185,6 @@ export default function Admin() {
           ))}
         </div>
 
-        {/* Tabs */}
         <div className="flex gap-2 mb-6 overflow-x-auto">
           <button onClick={() => setTab('payments')}
             className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap relative ${tab === 'payments' ? 'bg-[#1C2056] text-white' : 'bg-gray-800 text-gray-400'}`}>
@@ -214,51 +216,55 @@ export default function Admin() {
                 <div className="text-4xl mb-3">💳</div>
                 <div>Заявок пока нет</div>
               </div>
-            ) : payments.map(payment => (
-              <div key={payment.id}
-                className={`bg-gray-800 rounded-xl border p-4 ${payment.status === 'pending' ? 'border-yellow-500/50' : payment.status === 'activated' ? 'border-green-500/30' : 'border-gray-700'}`}>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${
-                        payment.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
-                        payment.status === 'activated' ? 'bg-green-500/20 text-green-400' :
-                        'bg-gray-600 text-gray-400'
-                      }`}>
-                        {payment.status === 'pending' ? '⏳ Ожидает' : payment.status === 'activated' ? '✅ Активирован' : '❌ Отклонён'}
-                      </span>
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${payment.plan === 'pro' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-blue-500/20 text-blue-400'}`}>
-                        {payment.plan === 'pro' ? 'Pro' : 'Basic'}
-                      </span>
+            ) : payments.map(payment => {
+              const badge = statusBadge(payment.status)
+              return (
+                <div key={payment.id}
+                  className={`bg-gray-800 rounded-xl border p-4 ${
+                    payment.status === 'confirmed' ? 'border-blue-500/50' :
+                    payment.status === 'pending' ? 'border-yellow-500/50' :
+                    payment.status === 'activated' ? 'border-green-500/30' :
+                    'border-gray-700'
+                  }`}>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${badge.color}`}>
+                          {badge.label}
+                        </span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${payment.plan === 'pro' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-blue-500/20 text-blue-400'}`}>
+                          {payment.plan === 'pro' ? 'Pro' : 'Basic'}
+                        </span>
+                      </div>
+                      <div className="text-sm font-medium mt-1">📱 {payment.email}</div>
+                      <div className="text-xs text-gray-400 mt-0.5">
+                        Сумма: <b>{payment.amount?.toLocaleString('ru-KZ')} ₸</b>
+                      </div>
+                      <div className="text-xs text-gray-500 mt-0.5">
+                        Подана: {formatDateTime(payment.created_at)}
+                      </div>
+                      {payment.activated_at && (
+                        <div className="text-xs text-green-400 mt-0.5">
+                          Активирован: {formatDateTime(payment.activated_at)}
+                        </div>
+                      )}
                     </div>
-                    <div className="text-sm font-medium">{payment.email}</div>
-                    <div className="text-xs text-gray-400 mt-0.5">
-                      Сумма: {payment.amount?.toLocaleString('ru-KZ')} ₸
-                    </div>
-                    <div className="text-xs text-gray-500 mt-0.5">
-                      {new Date(payment.created_at).toLocaleString('ru-KZ')}
-                    </div>
-                    {payment.activated_at && (
-                      <div className="text-xs text-green-400 mt-0.5">
-                        Активирован: {new Date(payment.activated_at).toLocaleString('ru-KZ')}
+                    {(payment.status === 'pending' || payment.status === 'confirmed') && (
+                      <div className="flex flex-col gap-2">
+                        <button onClick={() => activatePayment(payment)}
+                          className="bg-green-500/20 text-green-400 border border-green-500/30 text-xs px-3 py-1.5 rounded-lg hover:bg-green-500/30 whitespace-nowrap">
+                          ✅ Активировать
+                        </button>
+                        <button onClick={() => rejectPayment(payment.id)}
+                          className="bg-red-500/10 text-red-400 text-xs px-3 py-1.5 rounded-lg hover:bg-red-500/20">
+                          ✕ Отклонить
+                        </button>
                       </div>
                     )}
                   </div>
-                  {payment.status === 'pending' && (
-                    <div className="flex gap-2">
-                      <button onClick={() => activatePayment(payment)}
-                        className="bg-green-500/20 text-green-400 border border-green-500/30 text-xs px-3 py-1.5 rounded-lg hover:bg-green-500/30">
-                        ✅ Активировать
-                      </button>
-                      <button onClick={() => rejectPayment(payment.id)}
-                        className="bg-red-500/10 text-red-400 text-xs px-3 py-1.5 rounded-lg hover:bg-red-500/20">
-                        ✕
-                      </button>
-                    </div>
-                  )}
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
 
@@ -287,7 +293,7 @@ export default function Admin() {
                     <div className="text-sm font-medium">{user.company_name || '—'}</div>
                     <div className="text-xs text-gray-400">{user.email || '—'}</div>
                     <div className="text-xs text-gray-600">
-                      {user.created_at ? new Date(user.created_at).toLocaleDateString('ru-KZ') : '—'}
+                      {user.created_at ? formatDate(user.created_at) : '—'}
                     </div>
                   </div>
                   <div className="text-xs text-gray-400">{user.bin_iin || '—'}</div>
