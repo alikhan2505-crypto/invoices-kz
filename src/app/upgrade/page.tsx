@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
@@ -18,10 +18,12 @@ export default function Upgrade() {
   const [selectedPlan, setSelectedPlan] = useState<{ name: string; amount: number; plan: string } | null>(null)
   const [step, setStep] = useState<'instruction' | 'pending'>('instruction')
   const [submitting, setSubmitting] = useState(false)
+  const [dataLoaded, setDataLoaded] = useState(false)
+  const loadedRef = useRef(false)
 
   useEffect(() => {
     loadData()
-  }, [promoSuccess])
+  }, [])
 
   async function loadData() {
     const { data: { user } } = await supabase.auth.getUser()
@@ -30,7 +32,7 @@ export default function Upgrade() {
 
     const { data: p } = await supabase.from('profiles').select('plan, phone').eq('id', user.id).single()
     setPlan(p?.plan || 'free')
-    setPayPhone(p?.phone || '')
+    if (p?.phone && !loadedRef.current) setPayPhone(p.phone)
 
     const twentyMinutesAgo = new Date(Date.now() - 20 * 60 * 1000).toISOString()
     const { data: reqs } = await supabase
@@ -49,6 +51,15 @@ export default function Upgrade() {
       setExistingRequest(null)
       setStep('instruction')
     }
+    setDataLoaded(true)
+    loadedRef.current = true
+  }
+
+  async function reloadPlan() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data: p } = await supabase.from('profiles').select('plan').eq('id', user.id).single()
+    setPlan(p?.plan || 'free')
   }
 
   useEffect(() => {
@@ -71,6 +82,22 @@ export default function Upgrade() {
     const m = Math.floor(s / 60)
     const sec = s % 60
     return `${m}:${sec.toString().padStart(2, '0')}`
+  }
+
+  function formatPhone(value: string) {
+    const digits = value.replace(/\D/g, '')
+    let result = ''
+    if (digits.length === 0) return ''
+    if (digits[0] === '7' || digits[0] === '8') {
+      result = '+7'
+      if (digits.length > 1) result += ' ' + digits.slice(1, 4)
+      if (digits.length > 4) result += ' ' + digits.slice(4, 7)
+      if (digits.length > 7) result += ' ' + digits.slice(7, 9)
+      if (digits.length > 9) result += ' ' + digits.slice(9, 11)
+    } else {
+      result = '+' + digits.slice(0, 11)
+    }
+    return result
   }
 
   function openModal(planName: string, amount: number, planKey: string) {
@@ -135,7 +162,16 @@ export default function Upgrade() {
     setPromoSuccess(`🎉 Промокод активирован! ${promo.plan === 'pro' ? 'Про' : 'Базовый'} тариф на ${promo.days} дней`)
     setPromoCode('')
     setPromoLoading(false)
+
+    // Только обновляем план — не перезагружаем всё
+    await reloadPlan()
   }
+
+  if (!dataLoaded) return (
+    <main className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <p className="text-gray-400">Загрузка...</p>
+    </main>
+  )
 
   return (
     <main className="min-h-screen bg-gray-50 flex flex-col">
@@ -288,8 +324,9 @@ export default function Upgrade() {
                     className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
                     placeholder="+7 777 123 45 67"
                     value={payPhone}
-                    onChange={e => setPayPhone(e.target.value)}
+                    onChange={e => setPayPhone(formatPhone(e.target.value))}
                     type="tel"
+                    maxLength={16}
                   />
                 </div>
 
@@ -344,8 +381,7 @@ export default function Upgrade() {
                   </div>
                 )}
 
-                <button
-                  onClick={() => window.open('https://pay.kaspi.kz/pay/q3p5cvsl', '_blank')}
+                <button onClick={() => window.open('https://pay.kaspi.kz/pay/q3p5cvsl', '_blank')}
                   className="w-full bg-[#2DC48D] text-white rounded-xl py-4 font-medium text-sm mb-3">
                   💳 Перейти к оплате в Kaspi
                 </button>
