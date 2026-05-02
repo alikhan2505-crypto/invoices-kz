@@ -19,7 +19,7 @@ export default function Upgrade() {
   const [step, setStep] = useState<'instruction' | 'pending'>('instruction')
   const [submitting, setSubmitting] = useState(false)
   const [dataLoaded, setDataLoaded] = useState(false)
-  const loadedRef = useRef(false)
+  const phoneLoaded = useRef(false)
 
   useEffect(() => {
     loadData()
@@ -30,12 +30,21 @@ export default function Upgrade() {
     if (!user) return
     setUserId(user.id)
 
-    const { data: p } = await supabase.from('profiles').select('plan, phone').eq('id', user.id).single()
-    setPlan(p?.plan || 'free')
-    if (p?.phone && !loadedRef.current) setPayPhone(p.phone)
+    const { data: p } = await supabase
+      .from('profiles')
+      .select('plan, phone')
+      .eq('id', user.id)
+      .single()
 
+    setPlan(p?.plan || 'free')
+    if (p?.phone && !phoneLoaded.current) {
+      setPayPhone(p.phone)
+      phoneLoaded.current = true
+    }
+
+    // Ищем любую pending заявку за последние 20 минут
     const twentyMinutesAgo = new Date(Date.now() - 20 * 60 * 1000).toISOString()
-    const { data: reqs } = await supabase
+    const { data: reqs, error } = await supabase
       .from('payment_requests')
       .select('*')
       .eq('user_id', user.id)
@@ -44,6 +53,8 @@ export default function Upgrade() {
       .order('created_at', { ascending: false })
       .limit(1)
 
+    console.log('payment_requests result:', reqs, 'error:', error)
+
     if (reqs && reqs.length > 0) {
       setExistingRequest(reqs[0])
       setStep('pending')
@@ -51,8 +62,8 @@ export default function Upgrade() {
       setExistingRequest(null)
       setStep('instruction')
     }
+
     setDataLoaded(true)
-    loadedRef.current = true
   }
 
   async function reloadPlan() {
@@ -86,17 +97,12 @@ export default function Upgrade() {
 
   function formatPhone(value: string) {
     const digits = value.replace(/\D/g, '')
-    let result = ''
     if (digits.length === 0) return ''
-    if (digits[0] === '7' || digits[0] === '8') {
-      result = '+7'
-      if (digits.length > 1) result += ' ' + digits.slice(1, 4)
-      if (digits.length > 4) result += ' ' + digits.slice(4, 7)
-      if (digits.length > 7) result += ' ' + digits.slice(7, 9)
-      if (digits.length > 9) result += ' ' + digits.slice(9, 11)
-    } else {
-      result = '+' + digits.slice(0, 11)
-    }
+    let result = '+7'
+    if (digits.length > 1) result += ' ' + digits.slice(1, 4)
+    if (digits.length > 4) result += ' ' + digits.slice(4, 7)
+    if (digits.length > 7) result += ' ' + digits.slice(7, 9)
+    if (digits.length > 9) result += ' ' + digits.slice(9, 11)
     return result
   }
 
@@ -110,13 +116,20 @@ export default function Upgrade() {
     if (!payPhone) { alert('Введите номер телефона'); return }
     setSubmitting(true)
 
-    const { data: newReq, error } = await supabase.from('payment_requests').insert({
-      user_id: userId,
-      email: payPhone,
-      plan: selectedPlan?.plan,
-      amount: selectedPlan?.amount,
-      status: 'pending',
-    }).select().single()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    const { data: newReq, error } = await supabase
+      .from('payment_requests')
+      .insert({
+        user_id: user.id,
+        email: payPhone,
+        plan: selectedPlan?.plan,
+        amount: selectedPlan?.amount,
+        status: 'pending',
+      })
+      .select()
+      .single()
 
     if (error) { alert('Ошибка: ' + error.message); setSubmitting(false); return }
 
@@ -155,15 +168,12 @@ export default function Upgrade() {
 
     const expiresAt = new Date()
     expiresAt.setDate(expiresAt.getDate() + promo.days)
-
     await supabase.from('profiles').update({ plan: promo.plan, plan_expires_at: expiresAt.toISOString() }).eq('id', user.id)
     await supabase.from('promo_codes').update({ used_count: promo.used_count + 1 }).eq('id', promo.id)
 
     setPromoSuccess(`🎉 Промокод активирован! ${promo.plan === 'pro' ? 'Про' : 'Базовый'} тариф на ${promo.days} дней`)
     setPromoCode('')
     setPromoLoading(false)
-
-    // Только обновляем план — не перезагружаем всё
     await reloadPlan()
   }
 
@@ -356,15 +366,9 @@ export default function Upgrade() {
                 <div className="bg-yellow-50 rounded-2xl p-4 mb-5">
                   <div className="text-sm font-medium text-yellow-800 mb-2">⏳ Заявка на обработке</div>
                   <div className="space-y-1 mb-3">
-                    <div className="text-sm text-yellow-700">
-                      Тариф: <b>{existingRequest?.plan === 'pro' ? 'Про' : 'Базовый'}</b>
-                    </div>
-                    <div className="text-sm text-yellow-700">
-                      Сумма: <b>{existingRequest?.amount?.toLocaleString('ru-KZ')} ₸</b>
-                    </div>
-                    <div className="text-sm text-yellow-700">
-                      Телефон: <b>{existingRequest?.email}</b>
-                    </div>
+                    <div className="text-sm text-yellow-700">Тариф: <b>{existingRequest?.plan === 'pro' ? 'Про' : 'Базовый'}</b></div>
+                    <div className="text-sm text-yellow-700">Сумма: <b>{existingRequest?.amount?.toLocaleString('ru-KZ')} ₸</b></div>
+                    <div className="text-sm text-yellow-700">Телефон: <b>{existingRequest?.email}</b></div>
                     <div className="text-sm text-yellow-700">
                       Подана: <b>{existingRequest ? new Date(existingRequest.created_at).toLocaleTimeString('ru-KZ') : ''}</b>
                     </div>
