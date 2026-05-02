@@ -2,20 +2,29 @@ interface Service {
   name: string
   qty: number
   price: number
+  code?: string
+  unit?: string
 }
 
 interface ProfileData {
   company_name: string
   bin_iin: string
   address: string
-  phone: string
+  director_name: string
+  phone?: string
+  bank_name?: string
+  iik?: string
+  bik?: string
+  kbe?: string
+  signature_url?: string
+  stamp_url?: string
+}
+
+interface BankData {
   bank_name: string
   iik: string
   bik: string
-  kbe: string
-  director_name: string
-  signature_url?: string
-  stamp_url?: string
+  kbe?: string
 }
 
 interface InvoiceData {
@@ -24,10 +33,12 @@ interface InvoiceData {
   clientName: string
   clientBin: string
   clientEmail: string
+  clientAddress?: string
   services: Service[]
   total: number
   note?: string
   profile?: ProfileData
+  bank?: BankData
 }
 
 function numberToWords(n: number): string {
@@ -67,17 +78,21 @@ function numberToWords(n: number): string {
 
 export function generateInvoicePDF(data: InvoiceData) {
   const p = data.profile
+  const b = data.bank
+
   const companyName = p?.company_name || 'ИП First Project'
   const binIin = p?.bin_iin || '890525350143'
-  const address = p?.address || 'г. Астана, ул. Ш.Косшыгулулы 25-153'
-  const phone = p?.phone || '+7 776 355 51 77'
-  const bankName = p?.bank_name || '—'
-  const iik = p?.iik || 'KZ__________________________'
-  const bik = p?.bik || '—'
-  const kbe = p?.kbe || '19'
+  const address = p?.address || 'г. Астана'
+  const phone = p?.phone || ''
   const director = p?.director_name || ''
   const signatureUrl = p?.signature_url || ''
   const stampUrl = p?.stamp_url || ''
+
+  // Банк: сначала из отдельного объекта bank, потом из profile
+  const bankName = b?.bank_name || p?.bank_name || '—'
+  const iik = b?.iik || p?.iik || '—'
+  const bik = b?.bik || p?.bik || '—'
+  const kbe = b?.kbe || p?.kbe || '19'
 
   function formatMoney(n: number): string {
     return n.toLocaleString('ru-KZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace('.', ',')
@@ -162,7 +177,7 @@ export function generateInvoicePDF(data: InvoiceData) {
         </tr>
         <tr>
           <td style="font-weight:bold; vertical-align:top; padding:3px 0;">Покупатель:</td>
-          <td style="padding:3px 0;">${data.clientBin ? 'ИИН/БИН: ' + data.clientBin + ', ' : ''}${data.clientName}</td>
+          <td style="padding:3px 0;">${data.clientBin ? 'ИИН/БИН: ' + data.clientBin + ', ' : ''}${data.clientName}${data.clientAddress ? ', ' + data.clientAddress : ''}</td>
         </tr>
         <tr>
           <td style="font-weight:bold; vertical-align:top; padding:3px 0;">Договор:</td>
@@ -186,10 +201,10 @@ export function generateInvoicePDF(data: InvoiceData) {
           ${data.services.map((s, i) => `
             <tr>
               <td>${i + 1}</td>
-              <td>${i + 1}</td>
+              <td>${s.code || (i + 1)}</td>
               <td class="left">${s.name}</td>
               <td>${s.qty}</td>
-              <td>шт</td>
+              <td>${s.unit || 'шт'}</td>
               <td style="text-align:right">${formatMoney(Number(s.price))}</td>
               <td style="text-align:right">${formatMoney(s.qty * s.price)}</td>
             </tr>
@@ -215,7 +230,7 @@ export function generateInvoicePDF(data: InvoiceData) {
           <span>Руководитель</span>
           <div style="position:relative; flex:1;">
             ${signatureUrl ? `
-              <img src="${signatureUrl}" 
+              <img src="${signatureUrl}"
                 style="position:absolute; bottom:4px; left:25%; height:45px; max-width:160px; object-fit:contain;"
               />
             ` : ''}
@@ -224,7 +239,7 @@ export function generateInvoicePDF(data: InvoiceData) {
           <span>${director ? '/ ' + director : '//'}</span>
         </div>
         ${stampUrl ? `
-          <img src="${stampUrl}" 
+          <img src="${stampUrl}"
             style="position:absolute; left:30%; bottom:-15px; height:110px; width:110px; object-fit:contain; opacity:0.85;"
           />
         ` : ''}
