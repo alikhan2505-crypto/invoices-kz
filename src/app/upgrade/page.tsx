@@ -13,13 +13,13 @@ export default function Upgrade() {
   const [payPhone, setPayPhone] = useState('')
   const [userId, setUserId] = useState('')
   const [existingRequest, setExistingRequest] = useState<any>(null)
-  const [hasRequest, setHasRequest] = useState(false)
+  // null = ещё не загружено, true = есть заявка, false = нет заявки
+  const [hasRequest, setHasRequest] = useState<boolean | null>(null)
   const [countdown, setCountdown] = useState(0)
   const [showModal, setShowModal] = useState(false)
   const [selectedPlan, setSelectedPlan] = useState<{ name: string; amount: number; plan: string } | null>(null)
   const [step, setStep] = useState<'instruction' | 'pending'>('instruction')
   const [submitting, setSubmitting] = useState(false)
-  const [dataLoaded, setDataLoaded] = useState(false)
   const phoneLoaded = useRef(false)
 
   useEffect(() => {
@@ -43,27 +43,35 @@ export default function Upgrade() {
       phoneLoaded.current = true
     }
 
-    const twentyMinutesAgo = new Date(Date.now() - 20 * 60 * 1000).toISOString()
     const { data: reqs } = await supabase
       .from('payment_requests')
       .select('*')
       .eq('user_id', user.id)
       .eq('status', 'pending')
-      .gte('created_at', twentyMinutesAgo)
       .order('created_at', { ascending: false })
       .limit(1)
 
     if (reqs && reqs.length > 0) {
-      setExistingRequest(reqs[0])
-      setHasRequest(true)
-      setStep('pending')
+      const req = reqs[0]
+      const created = new Date(req.created_at).getTime()
+      const expires = created + 20 * 60 * 1000
+      const remaining = Math.floor((expires - Date.now()) / 1000)
+
+      if (remaining > 0) {
+        setExistingRequest(req)
+        setHasRequest(true)
+        setStep('pending')
+        setCountdown(remaining)
+      } else {
+        setExistingRequest(null)
+        setHasRequest(false)
+        setStep('instruction')
+      }
     } else {
       setExistingRequest(null)
       setHasRequest(false)
       setStep('instruction')
     }
-
-    setDataLoaded(true)
   }
 
   async function reloadPlan() {
@@ -166,7 +174,7 @@ export default function Upgrade() {
       .eq('is_active', true).single()
 
     if (!promo) { setPromoError('Промокод не найден или недействителен'); setPromoLoading(false); return }
-    if (promo.used_count >= promo.max_uses) { setPromoError('Промокод уже использован максимальное количество раз'); setPromoLoading(false); return }
+    if (promo.used_count >= promo.max_uses) { setPromoError('Промокод уже использован'); setPromoLoading(false); return }
 
     const expiresAt = new Date()
     expiresAt.setDate(expiresAt.getDate() + promo.days)
@@ -179,11 +187,31 @@ export default function Upgrade() {
     await reloadPlan()
   }
 
-  if (!dataLoaded) return (
-    <main className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <p className="text-gray-400">Загрузка...</p>
-    </main>
-  )
+  // Кнопка подключения — показываем только когда hasRequest НЕ null
+  function ConnectButton({ planName, amount, planKey, dark }: { planName: string; amount: number; planKey: string; dark?: boolean }) {
+    if (hasRequest === null) {
+      // Ещё загружается — показываем заглушку
+      return (
+        <div className={`w-full rounded-xl py-3.5 text-sm text-center ${dark ? 'bg-white/10 text-white/40' : 'bg-gray-100 text-gray-300'}`}>
+          Загрузка...
+        </div>
+      )
+    }
+    if (hasRequest) {
+      return (
+        <button onClick={() => openModal(planName, amount, planKey)}
+          className={`w-full rounded-xl py-3.5 font-medium text-sm ${dark ? 'bg-yellow-400 text-[#1C2056]' : 'bg-yellow-400 text-[#1C2056]'}`}>
+          📋 Посмотреть заявку
+        </button>
+      )
+    }
+    return (
+      <button onClick={() => openModal(planName, amount, planKey)}
+        className={`w-full rounded-xl py-3.5 font-medium text-sm ${dark ? 'bg-[#2DC48D] text-white' : 'border-2 border-[#1C2056] text-[#1C2056]'}`}>
+        Подключить за {amount.toLocaleString('ru-KZ')} ₸/мес
+      </button>
+    )
+  }
 
   return (
     <main className="min-h-screen bg-gray-50 flex flex-col">
@@ -252,12 +280,7 @@ export default function Upgrade() {
               </li>
             ))}
           </ul>
-          {plan !== 'basic' && plan !== 'pro' && (
-            <button onClick={() => openModal('Базовый', 2990, 'basic')}
-              className="w-full border-2 border-[#1C2056] text-[#1C2056] rounded-xl py-3.5 font-medium text-sm">
-              {hasRequest ? '📋 Посмотреть заявку' : 'Подключить за 2 990 ₸/мес'}
-            </button>
-          )}
+          {plan !== 'basic' && plan !== 'pro' && <ConnectButton planName="Базовый" amount={2990} planKey="basic" />}
           {plan === 'basic' && <div className="text-center text-sm text-gray-400 py-2">✓ Активен</div>}
           {plan === 'pro' && <div className="text-center text-sm text-gray-400 py-2">У вас более высокий тариф</div>}
         </div>
@@ -280,12 +303,7 @@ export default function Upgrade() {
               </li>
             ))}
           </ul>
-          {plan !== 'pro' && (
-            <button onClick={() => openModal('Про', 5990, 'pro')}
-              className="w-full bg-[#2DC48D] text-white rounded-xl py-3.5 font-medium text-sm">
-              {hasRequest ? '📋 Посмотреть заявку' : 'Подключить за 5 990 ₸/мес'}
-            </button>
-          )}
+          {plan !== 'pro' && <ConnectButton planName="Про" amount={5990} planKey="pro" dark />}
           {plan === 'pro' && <div className="text-center text-sm text-white/60 py-2">✓ Активен</div>}
         </div>
 
