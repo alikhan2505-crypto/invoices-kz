@@ -72,3 +72,43 @@ select {
   color: #111827;
   -webkit-text-fill-color: #111827;
 }
+
+/* Page transitions */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+main {
+  animation: fadeIn 0.25s ease-out;
+}
+
+/* Card hover effects */
+.bg-white.rounded-2xl {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* Button press effect */
+button {
+  transition: transform 0.1s ease, opacity 0.1s ease;
+}
+
+button:active {
+  transform: scale(0.97);
+  opacity: 0.85;
+}
+
+/* Smooth list items */
+.border-b {
+  transition: background-color 0.15s ease;
+}
