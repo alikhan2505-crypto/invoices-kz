@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
@@ -7,11 +7,21 @@ export default function Onboarding() {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
   const [accountType, setAccountType] = useState<'ИП' | 'ТОО' | 'Физлицо'>('ИП')
+  const [refCode, setRefCode] = useState('')
   const [form, setForm] = useState({
     company_name: '',
     bin_iin: '',
     email: '',
   })
+
+  useEffect(() => {
+    // Берём реф код из URL или localStorage
+    const params = new URLSearchParams(window.location.search)
+    const refFromUrl = params.get('ref')
+    const refFromStorage = localStorage.getItem('referral_code')
+    const ref = refFromUrl || refFromStorage || ''
+    setRefCode(ref)
+  }, [])
 
   async function save() {
     if (!form.company_name) { alert('Введите название'); return }
@@ -31,18 +41,17 @@ export default function Onboarding() {
 
     if (error) { alert('Ошибка: ' + error.message); setSaving(false); return }
 
-    // Применяем реферальный код если есть
-    const params = new URLSearchParams(window.location.search)
-    const ref = params.get('ref')
-    if (ref) {
-      await fetch('/api/referral', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id, referralCode: ref })
-      })
+    // Применяем реферальный код
+    if (refCode) {
+      try {
+        await fetch('/api/referral', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: user.id, referralCode: refCode })
+        })
+      } catch {}
+      localStorage.removeItem('referral_code')
     }
-
-    localStorage.removeItem('referral_code')
 
     // Уведомление в Telegram
     try {
@@ -50,7 +59,7 @@ export default function Onboarding() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: `🆕 <b>Новый пользователь!</b>\n👤 ${form.company_name}\n🔢 БИН: ${form.bin_iin}\n📧 ${user?.email}`
+          message: `🆕 <b>Новый пользователь!</b>\n👤 ${form.company_name}\n🔢 БИН: ${form.bin_iin}\n📧 ${user?.email}${refCode ? '\n🎁 Реферал: ' + refCode : ''}`
         })
       })
     } catch {}
@@ -68,6 +77,12 @@ export default function Onboarding() {
           <h1 className="text-2xl font-bold text-[#1C2056] mb-2">Настройка профиля</h1>
           <p className="text-sm text-gray-400">Заполните данные для выставления счетов</p>
         </div>
+
+        {refCode && (
+          <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-2.5 mb-4 text-center">
+            <span className="text-xs text-green-700">🎁 Реферальный бонус будет начислен после регистрации</span>
+          </div>
+        )}
 
         {/* Account type */}
         <div className="mb-5">
