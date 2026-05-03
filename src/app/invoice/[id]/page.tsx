@@ -315,10 +315,23 @@ export default function InvoicePage() {
 
           <button onClick={async () => {
             if (!profile) { alert('Данные загружаются'); return }
+
+            // Запрашиваем номер КП
+            const kpNumber = prompt('Номер КП:', invoice.number)
+            if (!kpNumber) return
+
+            // Запрашиваем срок действия
+            const today = new Date()
+            today.setDate(today.getDate() + 30)
+            const defaultDate = today.toLocaleDateString('ru-KZ')
+            const validUntil = prompt('Действителен до:', defaultDate)
+            if (!validUntil) return
+
             const { generateKP } = await import('@/lib/generateKP')
             generateKP({
-              number: invoice.number,
+              number: kpNumber,
               date: formatDate(invoice.created_at),
+              validUntil,
               clientName: invoice.client_name || '',
               clientBin: invoice.client_bin || '',
               services: invoice.services || [],
