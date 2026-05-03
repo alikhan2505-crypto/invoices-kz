@@ -312,6 +312,40 @@ export default function InvoicePage() {
             className="w-full flex items-center px-4 py-3.5 text-sm hover:bg-gray-50 text-[#1C2056] border-b border-gray-100">
             📋 Дублировать
           </button>
+
+          <button onClick={async () => {
+            if (!profile) { alert('Данные загружаются'); return }
+            const { generateKP } = await import('@/lib/generateKP')
+            generateKP({
+              number: invoice.number,
+              date: formatDate(invoice.created_at),
+              clientName: invoice.client_name || '',
+              clientBin: invoice.client_bin || '',
+              services: invoice.services || [],
+              total: Number(invoice.amount),
+              note: invoice.note || '',
+              profile: {
+                company_name: profile.company_name || '',
+                bin_iin: profile.bin_iin || '',
+                address: profile.address || '',
+                phone: profile.phone || '',
+                email: profile.email || '',
+                director_name: profile.director_name || '',
+                signature_url: profile.signature_url || '',
+                stamp_url: profile.stamp_url || '',
+              },
+              bank: bank ? {
+                bank_name: bank.bank_name,
+                iik: bank.iik,
+                bik: bank.bik,
+                kbe: bank.kbe,
+              } : undefined,
+            })
+          }}
+            className="w-full flex items-center px-4 py-3.5 text-sm hover:bg-gray-50 text-[#1C2056] border-b border-gray-100">
+            📋 Коммерческое предложение
+          </button>
+
           <button onClick={async () => {
             const { data: { user } } = await supabase.auth.getUser()
             if (!user) return
