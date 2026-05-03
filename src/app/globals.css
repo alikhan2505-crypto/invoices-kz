@@ -44,3 +44,23 @@ body {
   --border: #e5e7eb;
   --accent: #1C2056;
 }
+
+/* Placeholder visible on all devices */
+input::placeholder,
+textarea::placeholder {
+  color: #9ca3af;
+  opacity: 1;
+}
+
+/* Fix for iOS/PWA */
+input::-webkit-input-placeholder,
+textarea::-webkit-input-placeholder {
+  color: #9ca3af;
+  opacity: 1;
+}
+
+input::-moz-placeholder,
+textarea::-moz-placeholder {
+  color: #9ca3af;
+  opacity: 1;
+}
