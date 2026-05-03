@@ -126,7 +126,7 @@ export default function InvoicePage() {
       total: Number(invoice.amount),
       note: invoice.note || profile?.default_note || '',
       autoPrint,
-      vatType: profile?.vat_type
+      vatType: profile?.vat_type,
       profile: {
         company_name: profile.company_name || '',
         bin_iin: profile.bin_iin || '',
