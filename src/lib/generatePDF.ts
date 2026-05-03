@@ -107,8 +107,9 @@ export function generateInvoicePDF(data: InvoiceData) {
     <html>
     <head>
       <meta charset="utf-8">
+      <meta name="viewport" content="width=794, initial-scale=1.0, maximum-scale=1.0">
       <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
         html { background: #888; }
         body {
           font-family: Arial, sans-serif;
@@ -120,6 +121,8 @@ export function generateInvoicePDF(data: InvoiceData) {
           background: white;
           padding: 25mm 15mm 20mm;
           box-shadow: 0 0 20px rgba(0,0,0,0.3);
+          -webkit-text-size-adjust: 100%;
+          text-size-adjust: 100%;
         }
         .notice { font-size: 9px; text-align: center; margin-bottom: 16px; line-height: 1.5; }
         .bank-label { font-weight: bold; font-size: 10px; margin-bottom: 4px; }
