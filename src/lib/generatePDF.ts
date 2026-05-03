@@ -102,6 +102,20 @@ export function generateInvoicePDF(data: InvoiceData) {
 
   const totalWords = numberToWords(Math.floor(data.total)) + ' тенге 00 тиын'
 
+  // НДС расчёт
+  const vatType = data.vatType || 'no_vat'
+  const totalWithoutVat = vatType === 'vat_16' ? Math.round(data.total / 1.16) : data.total
+  const vatAmount = vatType === 'vat_16' ? Math.round(data.total - data.total / 1.16) : 0
+
+  let vatLine = ''
+  if (vatType === 'vat_16') {
+    vatLine = `Итого без НДС: ${formatMoney(totalWithoutVat)}<br>НДС 16%: ${formatMoney(vatAmount)}<br>Итого с НДС: ${formatMoney(data.total)}`
+  } else if (vatType === 'vat_0') {
+    vatLine = `Итого: ${formatMoney(data.total)}<br>НДС 0%: 0,00`
+  } else {
+    vatLine = `Итого: ${formatMoney(data.total)}<br>Без НДС`
+  }
+
   const html = `
     <!DOCTYPE html>
     <html>
@@ -218,18 +232,8 @@ export function generateInvoicePDF(data: InvoiceData) {
         </tbody>
       </table>
 
-      <<div class="totals">
-        ${data.vatType === 'vat_16' ? `
-          Итого без НДС: ${formatMoney(Math.round(data.total / 1.16))}<br>
-          НДС 16%: ${formatMoney(Math.round(data.total - data.total / 1.16))}<br>
-          Итого с НДС: ${formatMoney(data.total)}
-        ` : data.vatType === 'vat_0' ? `
-          Итого: ${formatMoney(data.total)}<br>
-          НДС 0%: 0,00
-        ` : `
-          Итого: ${formatMoney(data.total)}<br>
-          Без НДС
-        `}
+      <div class="totals">
+        ${vatLine}
       </div>
 
       <div class="total-words">
