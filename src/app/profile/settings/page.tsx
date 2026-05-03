@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 export default function InvoiceSettings() {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
+  const [loaded, setLoaded] = useState(false)
   const [settings, setSettings] = useState({
     invoice_prefix: 'INV-',
     invoice_next_number: '0001',
@@ -30,6 +31,7 @@ export default function InvoiceSettings() {
           vat_type: data.vat_type || 'no_vat',
         })
       }
+      setLoaded(true)
     }
     load()
   }, [])
@@ -49,6 +51,12 @@ export default function InvoiceSettings() {
     vat_0: { label: 'НДС 0%', desc: 'Плательщик НДС, ставка 0% (экспорт)', color: 'border-blue-400 text-blue-600' },
     vat_16: { label: 'НДС 16%', desc: 'Стандартная ставка НДС', color: 'border-[#1C2056] text-[#1C2056]' },
   }
+
+  if (!loaded) return (
+    <main className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <p className="text-gray-400">Загрузка...</p>
+    </main>
+  )
 
   return (
     <main className="min-h-screen bg-gray-50">
