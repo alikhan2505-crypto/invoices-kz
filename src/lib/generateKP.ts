@@ -16,6 +16,7 @@ interface KPData {
   services: KPService[]
   total: number
   note?: string
+  vatType?: 'no_vat' | 'vat_0' | 'vat_16'
   profile?: {
     company_name: string
     bin_iin: string
@@ -57,6 +58,59 @@ export function generateKP(data: KPData) {
     return d.toLocaleDateString('ru-KZ')
   })()
 
+  // НДС расчёт
+  const vatType = data.vatType || 'no_vat'
+  const totalWithoutVat = vatType === 'vat_16' ? Math.round(data.total / 1.16) : data.total
+  const vatAmount = vatType === 'vat_16' ? Math.round(data.total - data.total / 1.16) : 0
+
+  let totalsHTML = ''
+  if (vatType === 'vat_16') {
+    totalsHTML = `
+      <div class="totals-row">
+        <label>Итого без НДС:</label>
+        <span>${formatMoney(totalWithoutVat)} ₸</span>
+      </div>
+      <div class="totals-row">
+        <label>НДС 16%:</label>
+        <span>${formatMoney(vatAmount)} ₸</span>
+      </div>
+      <div class="totals-row total-final">
+        <label>ИТОГО К ОПЛАТЕ:</label>
+        <span>${formatMoney(data.total)} ₸</span>
+      </div>
+    `
+  } else if (vatType === 'vat_0') {
+    totalsHTML = `
+      <div class="totals-row">
+        <label>Итого:</label>
+        <span>${formatMoney(data.total)} ₸</span>
+      </div>
+      <div class="totals-row">
+        <label>НДС 0%:</label>
+        <span>0,00 ₸</span>
+      </div>
+      <div class="totals-row total-final">
+        <label>ИТОГО К ОПЛАТЕ:</label>
+        <span>${formatMoney(data.total)} ₸</span>
+      </div>
+    `
+  } else {
+    totalsHTML = `
+      <div class="totals-row">
+        <label>Итого:</label>
+        <span>${formatMoney(data.total)} ₸</span>
+      </div>
+      <div class="totals-row">
+        <label>НДС:</label>
+        <span>Без НДС</span>
+      </div>
+      <div class="totals-row total-final">
+        <label>ИТОГО К ОПЛАТЕ:</label>
+        <span>${formatMoney(data.total)} ₸</span>
+      </div>
+    `
+  }
+
   const html = `
     <!DOCTYPE html>
     <html>
@@ -92,11 +146,7 @@ export function generateKP(data: KPData) {
         .header-right .kp-date { font-size: 10px; color: rgba(255,255,255,0.6); margin-top: 4px; }
         .accent-bar { background: #2DC48D; height: 6px; }
         .content { padding: 30px 40px; }
-        .title-block {
-          margin-bottom: 24px;
-          padding-bottom: 20px;
-          border-bottom: 2px solid #f0f0f0;
-        }
+        .title-block { margin-bottom: 24px; padding-bottom: 20px; border-bottom: 2px solid #f0f0f0; }
         .title-block h1 { font-size: 18px; color: #1C2056; margin-bottom: 6px; }
         .title-block .subtitle { font-size: 11px; color: #666; }
         .parties { display: flex; gap: 20px; margin-bottom: 24px; }
@@ -281,18 +331,7 @@ export function generateKP(data: KPData) {
         <!-- Totals -->
         <div class="totals-block">
           <div class="totals-inner">
-            <div class="totals-row">
-              <label>Итого без НДС:</label>
-              <span>${formatMoney(data.total)} ₸</span>
-            </div>
-            <div class="totals-row">
-              <label>НДС:</label>
-              <span>0,00 ₸</span>
-            </div>
-            <div class="totals-row total-final">
-              <label>ИТОГО К ОПЛАТЕ:</label>
-              <span>${formatMoney(data.total)} ₸</span>
-            </div>
+            ${totalsHTML}
           </div>
         </div>
 

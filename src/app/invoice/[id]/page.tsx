@@ -338,6 +338,7 @@ export default function InvoicePage() {
               services: invoice.services || [],
               total: Number(invoice.amount),
               note: invoice.note || '',
+              vatType: profile?.vat_type || 'no_vat',
               profile: {
                 company_name: profile.company_name || '',
                 bin_iin: profile.bin_iin || '',
