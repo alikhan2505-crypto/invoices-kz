@@ -51,7 +51,6 @@ export function generateKP(data: KPData) {
     return n.toLocaleString('ru-KZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   }
 
-  // Дата действия КП — 30 дней
   const validDate = data.validUntil || (() => {
     const d = new Date()
     d.setDate(d.getDate() + 30)
@@ -78,8 +77,6 @@ export function generateKP(data: KPData) {
           background: white;
           box-shadow: 0 0 20px rgba(0,0,0,0.3);
         }
-
-        /* Header */
         .header {
           background: #1C2056;
           padding: 30px 40px;
@@ -93,48 +90,16 @@ export function generateKP(data: KPData) {
         .header-right .kp-label { font-size: 11px; color: rgba(255,255,255,0.6); margin-bottom: 4px; }
         .header-right .kp-number { font-size: 22px; font-weight: bold; color: white; }
         .header-right .kp-date { font-size: 10px; color: rgba(255,255,255,0.6); margin-top: 4px; }
-
-        /* Green accent bar */
-        .accent-bar {
-          background: #2DC48D;
-          height: 6px;
-        }
-
-        /* Content */
+        .accent-bar { background: #2DC48D; height: 6px; }
         .content { padding: 30px 40px; }
-
-        /* Title block */
         .title-block {
           margin-bottom: 24px;
           padding-bottom: 20px;
           border-bottom: 2px solid #f0f0f0;
         }
-        .title-block h1 {
-          font-size: 18px;
-          color: #1C2056;
-          margin-bottom: 6px;
-        }
-        .title-block .subtitle {
-          font-size: 11px;
-          color: #666;
-        }
-        .valid-until {
-          display: inline-block;
-          background: #fff8e1;
-          border: 1px solid #ffc107;
-          color: #856404;
-          font-size: 10px;
-          padding: 3px 10px;
-          border-radius: 4px;
-          margin-top: 8px;
-        }
-
-        /* Parties */
-        .parties {
-          display: flex;
-          gap: 20px;
-          margin-bottom: 24px;
-        }
+        .title-block h1 { font-size: 18px; color: #1C2056; margin-bottom: 6px; }
+        .title-block .subtitle { font-size: 11px; color: #666; }
+        .parties { display: flex; gap: 20px; margin-bottom: 24px; }
         .party {
           flex: 1;
           background: #f8f9fa;
@@ -143,17 +108,9 @@ export function generateKP(data: KPData) {
           border-radius: 0 6px 6px 0;
         }
         .party.client { border-left-color: #2DC48D; }
-        .party-label {
-          font-size: 9px;
-          color: #888;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-          margin-bottom: 6px;
-        }
+        .party-label { font-size: 9px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
         .party-name { font-size: 12px; font-weight: bold; color: #1C2056; margin-bottom: 3px; }
         .party-detail { font-size: 10px; color: #555; line-height: 1.6; }
-
-        /* Services table */
         .section-title {
           font-size: 13px;
           font-weight: bold;
@@ -162,22 +119,9 @@ export function generateKP(data: KPData) {
           padding-left: 10px;
           border-left: 3px solid #2DC48D;
         }
-        .services-table {
-          width: 100%;
-          border-collapse: collapse;
-          margin-bottom: 16px;
-          font-size: 10px;
-        }
-        .services-table thead tr {
-          background: #1C2056;
-          color: white;
-        }
-        .services-table thead th {
-          padding: 8px 10px;
-          text-align: center;
-          font-weight: bold;
-          font-size: 10px;
-        }
+        .services-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 10px; }
+        .services-table thead tr { background: #1C2056; color: white; }
+        .services-table thead th { padding: 8px 10px; text-align: center; font-weight: bold; font-size: 10px; }
         .services-table thead th:nth-child(3) { text-align: left; }
         .services-table tbody tr:nth-child(even) { background: #f8f9fa; }
         .services-table tbody tr:nth-child(odd) { background: white; }
@@ -189,19 +133,8 @@ export function generateKP(data: KPData) {
         }
         .services-table tbody td.name { text-align: left; }
         .services-table tbody td.right { text-align: right; }
-
-        /* Totals */
-        .totals-block {
-          display: flex;
-          justify-content: flex-end;
-          margin-bottom: 24px;
-        }
-        .totals-inner {
-          width: 280px;
-          border: 1px solid #e0e0e0;
-          border-radius: 6px;
-          overflow: hidden;
-        }
+        .totals-block { display: flex; justify-content: flex-end; margin-bottom: 24px; }
+        .totals-inner { width: 280px; border: 1px solid #e0e0e0; border-radius: 6px; overflow: hidden; }
         .totals-row {
           display: flex;
           justify-content: space-between;
@@ -218,8 +151,6 @@ export function generateKP(data: KPData) {
         }
         .totals-row label { color: #666; }
         .totals-row.total-final label { color: rgba(255,255,255,0.8); }
-
-        /* Bank */
         .bank-block {
           background: #f8f9fa;
           border: 1px solid #e0e0e0;
@@ -227,28 +158,9 @@ export function generateKP(data: KPData) {
           padding: 14px;
           margin-bottom: 24px;
         }
-        .bank-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 8px;
-          margin-top: 10px;
-        }
+        .bank-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
         .bank-item label { font-size: 9px; color: #888; display: block; margin-bottom: 2px; }
         .bank-item span { font-size: 10px; color: #1C2056; font-weight: 500; }
-
-        /* Note */
-        .note-block {
-          background: #e8f5e9;
-          border-left: 3px solid #2DC48D;
-          padding: 10px 14px;
-          border-radius: 0 6px 6px 0;
-          margin-bottom: 24px;
-          font-size: 10px;
-          color: #333;
-          line-height: 1.6;
-        }
-
-        /* Signature */
         .signature-block {
           display: flex;
           justify-content: space-between;
@@ -259,16 +171,8 @@ export function generateKP(data: KPData) {
         }
         .sig-left { width: 45%; }
         .sig-label { font-size: 10px; color: #888; margin-bottom: 40px; }
-        .sig-line {
-          border-bottom: 1px solid #333;
-          position: relative;
-          min-height: 50px;
-          display: flex;
-          align-items: flex-end;
-        }
-        .sig-name { font-size: 10px; color: #333; padding-bottom: 4px; }
-
-        /* Footer */
+        .sig-line { position: relative; min-height: 60px; border-bottom: 1px solid #333; }
+        .sig-name { font-size: 10px; color: #333; padding-top: 4px; }
         .footer {
           background: #1C2056;
           padding: 12px 40px;
@@ -277,11 +181,8 @@ export function generateKP(data: KPData) {
           align-items: center;
           margin-top: 30px;
         }
-        .footer-left { font-size: 10px; color: rgba(255,255,255,0.6); }
-        .footer-right { font-size: 10px; color: rgba(255,255,255,0.6); }
         .footer-brand { font-size: 11px; font-weight: bold; color: white; }
-
-        /* Toolbar */
+        .footer-sub { font-size: 10px; color: rgba(255,255,255,0.6); }
         @media print {
           .toolbar { display: none !important; }
           html { background: white; }
@@ -326,7 +227,6 @@ export function generateKP(data: KPData) {
         <div class="title-block">
           <h1>Коммерческое предложение</h1>
           <div class="subtitle">Уважаемые партнёры, предлагаем вашему вниманию следующие товары и услуги:</div>
-          <div class="valid-until">⏳ Предложение действительно до: ${validDate}</div>
         </div>
 
         <!-- Parties -->
@@ -421,18 +321,11 @@ export function generateKP(data: KPData) {
         </div>
         ` : ''}
 
-        ${data.note ? `
-        <!-- Note -->
-        <div class="note-block">
-          <b>Примечание:</b> ${data.note}
-        </div>
-        ` : ''}
-
         <!-- Signature -->
         <div class="signature-block">
           <div class="sig-left">
             <div class="sig-label">Руководитель / Представитель</div>
-            <div class="sig-line" style="position:relative; min-height:60px;">
+            <div class="sig-line">
               ${signatureUrl ? `<img src="${signatureUrl}" style="position:absolute; bottom:8px; left:10px; height:45px; max-width:150px; object-fit:contain;">` : ''}
               ${stampUrl ? `<img src="${stampUrl}" style="position:absolute; bottom:-10px; left:60px; height:90px; width:90px; object-fit:contain; opacity:0.85;">` : ''}
             </div>
@@ -441,7 +334,7 @@ export function generateKP(data: KPData) {
           <div style="width:45%; text-align:right;">
             <div style="font-size:10px; color:#888; margin-bottom:8px;">Дата составления</div>
             <div style="font-size:12px; font-weight:bold; color:#1C2056;">${data.date}</div>
-            <div style="font-size:10px; color:#888; margin-top:12px;">Действительно до</div>
+            <div style="font-size:10px; color:#888; margin-top:12px;">Действителен до</div>
             <div style="font-size:12px; font-weight:bold; color:#2DC48D;">${validDate}</div>
           </div>
         </div>
@@ -452,9 +345,9 @@ export function generateKP(data: KPData) {
       <div class="footer">
         <div>
           <div class="footer-brand">INVOICES.KZ</div>
-          <div class="footer-left">Профессиональные счета для казахстанского бизнеса</div>
+          <div class="footer-sub">Профессиональные счета для казахстанского бизнеса</div>
         </div>
-        <div class="footer-right">invoices.kz</div>
+        <div class="footer-sub">invoices.kz</div>
       </div>
 
       <script>
@@ -463,8 +356,8 @@ export function generateKP(data: KPData) {
           btn.textContent = '⏳ Загрузка...'
           btn.disabled = true
           const toolbar = document.querySelector('.toolbar')
-          if (toolbar) toolbar.style.display = 'none'
           const spacer = toolbar?.nextElementSibling
+          if (toolbar) toolbar.style.display = 'none'
           if (spacer) spacer.style.display = 'none'
           html2pdf().set({
             margin: 0,
