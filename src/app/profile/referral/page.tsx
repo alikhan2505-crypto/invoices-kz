@@ -19,14 +19,14 @@ export default function Referral() {
   }, [])
 
   async function copyLink() {
-    const link = `https://invoices.kz/register?ref=${profile?.referral_code}`
+    const link = `https://invoices.kz/login?ref=${profile?.referral_code}`
     await navigator.clipboard.writeText(link)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
 
   async function shareWhatsApp() {
-    const link = `https://invoices.kz/register?ref=${profile?.referral_code}`
+    const link = `https://invoices.kz/login?ref=${profile?.referral_code}`
     const text = `Привет! Попробуй INVOICES.KZ — создавай счета за 1 минуту. Регистрируйся по моей ссылке и получи бонус: ${link}`
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
   }
@@ -65,7 +65,7 @@ export default function Referral() {
           <div className="text-sm font-medium text-[#1C2056] mb-3">Ваша реферальная ссылка</div>
           <div className="bg-gray-50 rounded-xl px-3 py-2.5 flex items-center justify-between mb-3">
             <span className="text-xs text-gray-500 truncate">
-              invoices.kz/register?ref={profile?.referral_code}
+              invoices.kz/login?ref={profile?.referral_code}
             </span>
             <button onClick={copyLink}
               className={`text-xs px-3 py-1.5 rounded-lg ml-2 flex-shrink-0 transition ${copied ? 'bg-[#2DC48D] text-white' : 'bg-[#1C2056] text-white'}`}>

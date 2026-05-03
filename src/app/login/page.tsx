@@ -1,11 +1,18 @@
 'use client'
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { useState, useEffect } from 'react'
 
 export default function Login() {
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const ref = params.get('ref')
+    if (ref) localStorage.setItem('referral_code', ref)
+  }, [])
 
   async function sendLink() {
     setLoading(true)

@@ -42,6 +42,8 @@ export default function Onboarding() {
       })
     }
 
+    localStorage.removeItem('referral_code')
+
     // Уведомление в Telegram
     try {
       await fetch('/api/telegram', {
