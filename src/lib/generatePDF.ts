@@ -90,7 +90,6 @@ export function generateInvoicePDF(data: InvoiceData) {
   const signatureUrl = p?.signature_url || ''
   const stampUrl = p?.stamp_url || ''
 
-  // Банк: сначала из отдельного объекта bank, потом из profile
   const bankName = b?.bank_name || p?.bank_name || '—'
   const iik = b?.iik || p?.iik || '—'
   const bik = b?.bik || p?.bik || '—'
@@ -108,6 +107,7 @@ export function generateInvoicePDF(data: InvoiceData) {
     <head>
       <meta charset="utf-8">
       <meta name="viewport" content="width=794, initial-scale=1.0, maximum-scale=1.0">
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"><\/script>
       <style>
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
         html { background: #888; }
@@ -137,10 +137,12 @@ export function generateInvoicePDF(data: InvoiceData) {
         .total-words { margin: 10px 0; font-weight: bold; line-height: 1.6; }
         .note { margin: 10px 0; font-size: 11px; color: #333; }
         hr { border: none; border-top: 1px solid #000; margin: 16px 0; }
+        .toolbar { display: none; }
         @page { size: A4; margin: 0; }
         @media print {
           html { background: white; }
           body { margin: 0; box-shadow: none; padding: 15mm; }
+          .toolbar { display: none !important; }
         }
       </style>
     </head>
@@ -166,9 +168,7 @@ export function generateInvoicePDF(data: InvoiceData) {
         </tr>
         <tr>
           <td><b>Банк бенефициара:</b><br>${bankName}</td>
-          <td style="text-align:center">
-            <b>БИК</b><br><br>${bik}
-          </td>
+          <td style="text-align:center"><b>БИК</b><br><br>${bik}</td>
           <td style="text-align:center"><b>Код назначения платежа</b><br>${data.knp || '849'}</td>
         </tr>
       </table>
@@ -251,30 +251,54 @@ export function generateInvoicePDF(data: InvoiceData) {
       </div>
 
       ${data.autoPrint !== false ? `
-      <div style="position:fixed; top:10px; right:10px; z-index:999; display:flex; gap:8px;">
-        <button onclick="window.print()" style="background:#1C2056; color:white; border:none; padding:8px 16px; border-radius:8px; cursor:pointer; font-size:13px;">🖨️ Печать</button>
-      </div>
-      <script>
-        window.onload = function() {
-          const images = document.querySelectorAll('img')
-          if (images.length === 0) { window.print(); return }
-          let loaded = 0
-          images.forEach(img => {
-            if (img.complete) { loaded++; if (loaded === images.length) window.print() }
-            else {
-              img.onload = () => { loaded++; if (loaded === images.length) window.print() }
-              img.onerror = () => { loaded++; if (loaded === images.length) window.print() }
-            }
-          })
-        }
-      <\/script>
+        <div class="toolbar" style="position:fixed; top:10px; right:10px; z-index:999; display:flex; gap:8px;">
+          <button onclick="window.print()" style="background:#1C2056; color:white; border:none; padding:8px 16px; border-radius:8px; cursor:pointer; font-size:13px;">🖨️ Печать</button>
+        </div>
+        <script>
+          window.onload = function() {
+            const images = document.querySelectorAll('img')
+            if (images.length === 0) { window.print(); return }
+            let loaded = 0
+            images.forEach(img => {
+              if (img.complete) { loaded++; if (loaded === images.length) window.print() }
+              else {
+                img.onload = () => { loaded++; if (loaded === images.length) window.print() }
+                img.onerror = () => { loaded++; if (loaded === images.length) window.print() }
+              }
+            })
+          }
+        <\/script>
       ` : `
-      <div style="position:fixed; top:0; left:0; right:0; background:white; border-bottom:1px solid #e5e7eb; padding:10px 16px; z-index:999; display:flex; align-items:center; justify-content:space-between;">
-        <button onclick="window.close()" style="background:#f3f4f6; color:#374151; border:none; padding:8px 16px; border-radius:8px; cursor:pointer; font-size:13px;">← Назад</button>
-        <span style="font-size:13px; color:#6b7280;">Счёт ${data.number}</span>
-        <button onclick="window.print()" style="background:#1C2056; color:white; border:none; padding:8px 16px; border-radius:8px; cursor:pointer; font-size:13px;">🖨️ Печать</button>
-      </div>
-      <div style="height:50px;"></div>
+        <div style="position:fixed; top:0; left:0; right:0; background:white; border-bottom:1px solid #e5e7eb; padding:10px 16px; z-index:999; display:flex; align-items:center; justify-content:space-between; gap:8px;">
+          <button onclick="window.close()" style="background:#f3f4f6; color:#374151; border:none; padding:8px 14px; border-radius:8px; cursor:pointer; font-size:13px; white-space:nowrap;">← Назад</button>
+          <span style="font-size:12px; color:#6b7280; font-weight:600; flex:1; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Счёт №${data.number}</span>
+          <div style="display:flex; gap:6px; flex-shrink:0;">
+            <button onclick="window.print()" style="background:#1C2056; color:white; border:none; padding:8px 14px; border-radius:8px; cursor:pointer; font-size:13px; white-space:nowrap;">🖨️ Печать</button>
+            <button id="downloadBtn" onclick="downloadPDF()" style="background:#2DC48D; color:white; border:none; padding:8px 14px; border-radius:8px; cursor:pointer; font-size:13px; white-space:nowrap;">💾 Скачать PDF</button>
+          </div>
+        </div>
+        <div style="height:55px;"></div>
+        <script>
+          function downloadPDF() {
+            const btn = document.getElementById('downloadBtn')
+            btn.textContent = '⏳ Загрузка...'
+            btn.disabled = true
+            const toolbar = btn.closest('div[style*="position:fixed"]')
+            if (toolbar) toolbar.style.display = 'none'
+            const opt = {
+              margin: 0,
+              filename: 'Счёт-${data.number}.pdf',
+              image: { type: 'jpeg', quality: 0.98 },
+              html2canvas: { scale: 2, useCORS: true, logging: false },
+              jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            }
+            html2pdf().set(opt).from(document.body).save().then(() => {
+              if (toolbar) toolbar.style.display = 'flex'
+              btn.textContent = '💾 Скачать PDF'
+              btn.disabled = false
+            })
+          }
+        <\/script>
       `}
     </body>
     </html>
