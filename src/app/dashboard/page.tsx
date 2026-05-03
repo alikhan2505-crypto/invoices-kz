@@ -41,6 +41,9 @@ export default function Dashboard() {
   const [services, setServices] = useState([{ name: '', qty: 1, price: 0, unit: 'шт', code: '' }])
 
   const total = services.reduce((s, i) => s + i.qty * i.price, 0)
+  const vatType = profile?.vat_type || 'no_vat'
+  const vatAmount = vatType === 'vat_16' ? Math.round(total - total / 1.16) : 0
+  const totalWithoutVat = vatType === 'vat_16' ? Math.round(total / 1.16) : total
 
   const load = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -174,6 +177,17 @@ export default function Dashboard() {
     setShowSaveClient(false)
   }
 
+  function buildPDFProfile() {
+    return {
+      company_name: profile?.company_name || '',
+      bin_iin: profile?.bin_iin || '',
+      address: profile?.address || '',
+      director_name: profile?.director_name || '',
+      signature_url: profile?.signature_url || '',
+      stamp_url: profile?.stamp_url || '',
+    }
+  }
+
   function generateWithBank(bank: any) {
     if (!pendingInvoiceData) return
     const { invoiceNumber, invoiceDate, cn, cb, ce, ca, svcs, tot, nt, knp } = pendingInvoiceData
@@ -189,20 +203,14 @@ export default function Dashboard() {
       total: tot,
       note: nt || profile?.default_note || '',
       autoPrint: false,
-      profile: {
-        company_name: profile?.company_name || '',
-        bin_iin: profile?.bin_iin || '',
-        address: profile?.address || '',
-        director_name: profile?.director_name || '',
-        signature_url: profile?.signature_url || '',
-        stamp_url: profile?.stamp_url || '',
-      },
+      vatType: profile?.vat_type || 'no_vat',
+      profile: buildPDFProfile(),
       bank: {
         bank_name: bank.bank_name || '',
         iik: bank.iik || '',
         bik: bank.bik || '',
         kbe: bank.kbe || '19',
-      }
+      },
     })
     setShowBankPicker(false)
     setPendingInvoiceData(null)
@@ -325,21 +333,14 @@ export default function Dashboard() {
       total,
       note: note || '',
       autoPrint: false,
-      console.log('vatType:', profile?.vat_type),
-      profile: {
-        company_name: profile?.company_name || '',
-        bin_iin: profile?.bin_iin || '',
-        address: profile?.address || '',
-        director_name: profile?.director_name || '',
-        signature_url: profile?.signature_url || '',
-        stamp_url: profile?.stamp_url || '',
-      },
+      vatType: profile?.vat_type || 'no_vat',
+      profile: buildPDFProfile(),
       bank: {
         bank_name: bank.bank_name || '',
         iik: bank.iik || '',
         bik: bank.bik || '',
         kbe: bank.kbe || '19',
-      }
+      },
     })
 
     const alreadyExists = clients.find(c => c.bin_iin === clientBin)
@@ -626,12 +627,28 @@ export default function Dashboard() {
 
         {/* Total */}
         <div className="bg-[#1C2056] rounded-2xl p-5 mb-4">
-          <div className="flex justify-between text-sm text-white/70 mb-2">
-            <span>Сумма</span><span>{total.toLocaleString('ru-KZ')} ₸</span>
-          </div>
-          <div className="flex justify-between text-sm text-white/70 mb-3">
-            <span>НДС (16%)</span><span>0 ₸</span>
-          </div>
+          {vatType === 'vat_16' ? (
+            <>
+              <div className="flex justify-between text-sm text-white/70 mb-2">
+                <span>Сумма без НДС</span>
+                <span>{totalWithoutVat.toLocaleString('ru-KZ')} ₸</span>
+              </div>
+              <div className="flex justify-between text-sm text-white/70 mb-3">
+                <span>НДС 16%</span>
+                <span>{vatAmount.toLocaleString('ru-KZ')} ₸</span>
+              </div>
+            </>
+          ) : vatType === 'vat_0' ? (
+            <div className="flex justify-between text-sm text-white/70 mb-3">
+              <span>НДС 0%</span>
+              <span>0 ₸</span>
+            </div>
+          ) : (
+            <div className="flex justify-between text-sm text-white/70 mb-3">
+              <span>Без НДС</span>
+              <span>—</span>
+            </div>
+          )}
           <div className="flex justify-between font-medium text-white border-t border-white/20 pt-3">
             <span>К оплате</span>
             <span className="text-lg">{total.toLocaleString('ru-KZ')} ₸</span>
