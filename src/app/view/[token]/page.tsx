@@ -2,11 +2,13 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { formatDate } from '@/lib/date'
 
 export default function PublicInvoice() {
   const { token } = useParams()
   const [invoice, setInvoice] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
+  const [bank, setBank] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [marking, setMarking] = useState(false)
   const [marked, setMarked] = useState(false)
@@ -22,23 +24,32 @@ export default function PublicInvoice() {
       if (!inv) { setLoading(false); return }
       setInvoice(inv)
 
-      // Отмечаем что клиент просмотрел счёт
-      if (inv && inv.status === 'sent') {
+      if (inv.status === 'sent') {
         await supabase.from('invoices')
-          .update({ 
-            status: 'viewed',
-            viewed_at: new Date().toISOString()
-          })
+          .update({ status: 'viewed', viewed_at: new Date().toISOString() })
           .eq('id', inv.id)
       }
 
       const { data: p } = await supabase
         .from('profiles')
-        .select('company_name, bin_iin, address, phone, email, bank_name, iik, bik, kbe')
+        .select('company_name, bin_iin, address, phone, email')
         .eq('id', inv.user_id)
         .single()
-
       setProfile(p)
+
+      // Берём банк из счёта если есть, иначе основной
+      if (inv.bank_id) {
+        const { data: b } = await supabase
+          .from('bank_accounts').select('*').eq('id', inv.bank_id).single()
+        setBank(b)
+      } else {
+        const { data: b } = await supabase
+          .from('bank_accounts').select('*')
+          .eq('user_id', inv.user_id)
+          .eq('is_main', true).single()
+        setBank(b)
+      }
+
       setLoading(false)
     }
     load()
@@ -74,14 +85,15 @@ export default function PublicInvoice() {
     sent: 'bg-blue-100 text-blue-700',
     overdue: 'bg-red-100 text-red-700',
     draft: 'bg-gray-100 text-gray-600',
+    viewed: 'bg-purple-100 text-purple-700',
   }
   const statusLabels: Record<string, string> = {
-    paid: 'Оплачен', sent: 'Отправлен', overdue: 'Просрочен', draft: 'Черновик'
+    paid: 'Оплачен', sent: 'Отправлен', overdue: 'Просрочен',
+    draft: 'Черновик', viewed: 'Просмотрен'
   }
 
   return (
     <main className="min-h-screen bg-gray-50">
-      {/* Header */}
       <div className="bg-[#1C2056] px-4 py-4 flex items-center justify-between">
         <span className="font-bold text-white text-lg">INVOICES.KZ</span>
         <span className={`text-xs px-2 py-1 rounded-full ${statusColors[invoice.status] || statusColors.draft}`}>
@@ -98,9 +110,7 @@ export default function PublicInvoice() {
               <div className="text-xs text-gray-400 mb-1">Счёт на оплату</div>
               <div className="text-xl font-bold text-[#1C2056]">{invoice.number}</div>
               <div className="text-xs text-gray-400 mt-1">
-                {new Date(invoice.created_at).toLocaleDateString('ru-KZ', {
-                  day: 'numeric', month: 'long', year: 'numeric'
-                })}
+                {formatDate(invoice.created_at)}
               </div>
             </div>
             <div className="text-right">
@@ -136,7 +146,9 @@ export default function PublicInvoice() {
               <div key={i} className={`flex justify-between px-4 py-3 ${i < services.length - 1 ? 'border-b border-gray-100' : ''}`}>
                 <div>
                   <div className="text-sm text-[#1C2056]">{s.name}</div>
-                  <div className="text-xs text-gray-400">{s.qty} шт × {Number(s.price).toLocaleString('ru-KZ')} ₸</div>
+                  <div className="text-xs text-gray-400">
+                    {s.qty} {s.unit || 'шт'} × {Number(s.price).toLocaleString('ru-KZ')} ₸
+                  </div>
                 </div>
                 <div className="text-sm font-medium text-[#1C2056]">
                   {(s.qty * s.price).toLocaleString('ru-KZ')} ₸
@@ -150,33 +162,37 @@ export default function PublicInvoice() {
           </div>
         )}
 
+        {/* Note */}
+        {invoice.note && (
+          <div className="bg-white rounded-2xl shadow-sm p-4">
+            <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">Примечание</div>
+            <div className="text-sm text-gray-600">{invoice.note}</div>
+          </div>
+        )}
+
         {/* Bank details */}
-        {(profile?.iik || profile?.bank_name) && (
+        {bank && (
           <div className="bg-white rounded-2xl shadow-sm p-5">
             <div className="text-xs text-gray-400 uppercase tracking-wide mb-3">Реквизиты для оплаты</div>
             <div className="space-y-2">
-              {profile?.bank_name && (
-                <div className="flex justify-between">
-                  <span className="text-xs text-gray-400">Банк</span>
-                  <span className="text-xs font-medium text-[#1C2056]">{profile.bank_name}</span>
-                </div>
-              )}
-              {profile?.iik && (
-                <div className="flex justify-between">
-                  <span className="text-xs text-gray-400">ИИК</span>
-                  <span className="text-xs font-medium text-[#1C2056]">{profile.iik}</span>
-                </div>
-              )}
-              {profile?.bik && (
+              <div className="flex justify-between">
+                <span className="text-xs text-gray-400">Банк</span>
+                <span className="text-xs font-medium text-[#1C2056]">{bank.bank_name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-xs text-gray-400">ИИК</span>
+                <span className="text-xs font-medium text-[#1C2056] font-mono">{bank.iik}</span>
+              </div>
+              {bank.bik && (
                 <div className="flex justify-between">
                   <span className="text-xs text-gray-400">БИК</span>
-                  <span className="text-xs font-medium text-[#1C2056]">{profile.bik}</span>
+                  <span className="text-xs font-medium text-[#1C2056] font-mono">{bank.bik}</span>
                 </div>
               )}
-              {profile?.kbe && (
+              {bank.kbe && (
                 <div className="flex justify-between">
                   <span className="text-xs text-gray-400">КБе</span>
-                  <span className="text-xs font-medium text-[#1C2056]">{profile.kbe}</span>
+                  <span className="text-xs font-medium text-[#1C2056]">{bank.kbe}</span>
                 </div>
               )}
             </div>
@@ -219,7 +235,6 @@ export default function PublicInvoice() {
           </div>
         )}
 
-        {/* Footer */}
         <div className="text-center py-4">
           <p className="text-xs text-gray-400">Счёт создан через</p>
           <a href="https://invoices.kz" className="text-xs font-medium text-[#1C2056]">INVOICES.KZ</a>
