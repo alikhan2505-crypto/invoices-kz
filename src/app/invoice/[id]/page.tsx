@@ -112,7 +112,7 @@ export default function InvoicePage() {
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
   }
 
-  function openPDF() {
+  function openPDF(autoPrint = false) {
     if (!invoice || !profile) { alert('Данные ещё загружаются'); return }
     const services = invoice.services || [{ name: 'Услуга', qty: 1, price: invoice.amount }]
     generateInvoicePDF({
@@ -125,6 +125,7 @@ export default function InvoicePage() {
       services,
       total: Number(invoice.amount),
       note: invoice.note || profile?.default_note || '',
+      autoPrint,
       profile: {
         company_name: profile.company_name || '',
         bin_iin: profile.bin_iin || '',
@@ -184,7 +185,7 @@ export default function InvoicePage() {
             { icon: '💬', label: 'WhatsApp', action: shareWhatsApp },
             { icon: '🔗', label: 'Ссылка', action: copyPublicLink },
             { icon: '📄', label: 'PDF', action: () => openPDF(false) },
-          { icon: '🖨️', label: 'Печать', action: () => openPDF(true) },
+            { icon: '🖨️', label: 'Печать', action: () => openPDF(true) },
           ].map(a => (
             <button key={a.label} onClick={a.action}
               className="bg-white rounded-xl p-3 text-center shadow-sm hover:bg-gray-50">
