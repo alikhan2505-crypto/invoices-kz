@@ -188,6 +188,7 @@ export default function Dashboard() {
       services: svcs,
       total: tot,
       note: nt || profile?.default_note || '',
+      autoPrint: false,
       profile: {
         company_name: profile?.company_name || '',
         bin_iin: profile?.bin_iin || '',
@@ -323,6 +324,7 @@ export default function Dashboard() {
       services,
       total,
       note: note || '',
+      autoPrint: false,
       profile: {
         company_name: profile?.company_name || '',
         bin_iin: profile?.bin_iin || '',
