@@ -183,8 +183,8 @@ export default function InvoicePage() {
           {[
             { icon: '💬', label: 'WhatsApp', action: shareWhatsApp },
             { icon: '🔗', label: 'Ссылка', action: copyPublicLink },
-            { icon: '📄', label: 'PDF', action: openPDF },
-            { icon: '🖨️', label: 'Печать', action: openPDF },
+            { icon: '📄', label: 'PDF', action: () => openPDF(false) },
+          { icon: '🖨️', label: 'Печать', action: () => openPDF(true) },
           ].map(a => (
             <button key={a.label} onClick={a.action}
               className="bg-white rounded-xl p-3 text-center shadow-sm hover:bg-gray-50">

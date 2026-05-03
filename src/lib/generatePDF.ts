@@ -40,6 +40,7 @@ interface InvoiceData {
   profile?: ProfileData
   bank?: BankData
   knp?: string
+  autoPrint?: boolean
 }
 
 function numberToWords(n: number): string {
@@ -246,22 +247,32 @@ export function generateInvoicePDF(data: InvoiceData) {
         ` : ''}
       </div>
 
+      ${data.autoPrint !== false ? `
+      <div style="position:fixed; top:10px; right:10px; z-index:999; display:flex; gap:8px;">
+        <button onclick="window.print()" style="background:#1C2056; color:white; border:none; padding:8px 16px; border-radius:8px; cursor:pointer; font-size:13px;">🖨️ Печать</button>
+      </div>
       <script>
         window.onload = function() {
           const images = document.querySelectorAll('img')
           if (images.length === 0) { window.print(); return }
           let loaded = 0
           images.forEach(img => {
-            if (img.complete) {
-              loaded++
-              if (loaded === images.length) window.print()
-            } else {
+            if (img.complete) { loaded++; if (loaded === images.length) window.print() }
+            else {
               img.onload = () => { loaded++; if (loaded === images.length) window.print() }
               img.onerror = () => { loaded++; if (loaded === images.length) window.print() }
             }
           })
         }
-      </script>
+      <\/script>
+      ` : `
+      <div style="position:fixed; top:0; left:0; right:0; background:white; border-bottom:1px solid #e5e7eb; padding:10px 16px; z-index:999; display:flex; align-items:center; justify-content:space-between;">
+        <button onclick="window.close()" style="background:#f3f4f6; color:#374151; border:none; padding:8px 16px; border-radius:8px; cursor:pointer; font-size:13px;">← Назад</button>
+        <span style="font-size:13px; color:#6b7280;">Счёт ${data.number}</span>
+        <button onclick="window.print()" style="background:#1C2056; color:white; border:none; padding:8px 16px; border-radius:8px; cursor:pointer; font-size:13px;">🖨️ Печать</button>
+      </div>
+      <div style="height:50px;"></div>
+      `}
     </body>
     </html>
   `

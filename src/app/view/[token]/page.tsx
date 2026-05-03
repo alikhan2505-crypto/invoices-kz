@@ -93,6 +93,7 @@ export default function PublicInvoice() {
         bik: bank.bik,
         kbe: bank.kbe,
       } : undefined,
+      autoPrint: false,
     })
   }
 
