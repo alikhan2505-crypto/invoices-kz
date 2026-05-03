@@ -325,6 +325,7 @@ export default function Dashboard() {
       total,
       note: note || '',
       autoPrint: false,
+      vatType: profile?.vat_type
       profile: {
         company_name: profile?.company_name || '',
         bin_iin: profile?.bin_iin || '',

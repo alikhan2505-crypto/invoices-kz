@@ -12,6 +12,7 @@ export default function InvoiceSettings() {
     default_currency: 'KZT',
     default_due_days: '3',
     default_note: '',
+    vat_type: 'no_vat',
   })
 
   useEffect(() => {
@@ -26,6 +27,7 @@ export default function InvoiceSettings() {
           default_currency: data.default_currency || 'KZT',
           default_due_days: data.default_due_days || '3',
           default_note: data.default_note || '',
+          vat_type: data.vat_type || 'no_vat',
         })
       }
     }
@@ -42,6 +44,12 @@ export default function InvoiceSettings() {
     setSaving(false)
   }
 
+  const vatLabels: Record<string, { label: string; desc: string; color: string }> = {
+    no_vat: { label: 'Без НДС', desc: 'Не являюсь плательщиком НДС', color: 'border-gray-300 text-gray-600' },
+    vat_0: { label: 'НДС 0%', desc: 'Плательщик НДС, ставка 0% (экспорт)', color: 'border-blue-400 text-blue-600' },
+    vat_16: { label: 'НДС 16%', desc: 'Стандартная ставка НДС', color: 'border-[#1C2056] text-[#1C2056]' },
+  }
+
   return (
     <main className="min-h-screen bg-gray-50">
       <div className="bg-white border-b px-4 py-4 flex items-center gap-3">
@@ -49,8 +57,11 @@ export default function InvoiceSettings() {
         <span className="font-semibold text-[#1C2056]">Настройки счетов</span>
       </div>
 
-      <div className="max-w-lg mx-auto p-4">
+      <div className="max-w-lg mx-auto p-4 space-y-4">
+
+        {/* Основные настройки */}
         <div className="bg-white rounded-2xl shadow-sm p-4 space-y-4">
+          <div className="text-xs text-gray-400 uppercase tracking-wide">Нумерация счетов</div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-gray-500 mb-1 block">Префикс</label>
@@ -77,8 +88,7 @@ export default function InvoiceSettings() {
             <select
               className="w-full border-b border-gray-200 py-2 text-sm outline-none"
               value={settings.default_currency}
-              onChange={e => setSettings({ ...settings, default_currency: e.target.value })}
-            >
+              onChange={e => setSettings({ ...settings, default_currency: e.target.value })}>
               <option>KZT</option>
               <option>USD</option>
               <option>EUR</option>
@@ -109,11 +119,57 @@ export default function InvoiceSettings() {
           </div>
         </div>
 
+        {/* НДС */}
+        <div className="bg-white rounded-2xl shadow-sm p-4">
+          <div className="text-xs text-gray-400 uppercase tracking-wide mb-3">Статус НДС</div>
+          <div className="space-y-2">
+            {Object.entries(vatLabels).map(([key, val]) => (
+              <div
+                key={key}
+                onClick={() => setSettings({ ...settings, vat_type: key })}
+                className={`flex items-center justify-between p-3 rounded-xl border-2 cursor-pointer transition ${
+                  settings.vat_type === key
+                    ? 'bg-gray-50 ' + val.color
+                    : 'border-gray-100 text-gray-400'
+                }`}>
+                <div>
+                  <div className={`text-sm font-medium ${settings.vat_type === key ? '' : 'text-gray-600'}`}>
+                    {val.label}
+                  </div>
+                  <div className="text-xs text-gray-400 mt-0.5">{val.desc}</div>
+                </div>
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                  settings.vat_type === key ? 'border-[#1C2056] bg-[#1C2056]' : 'border-gray-300'
+                }`}>
+                  {settings.vat_type === key && (
+                    <div className="w-2 h-2 rounded-full bg-white"></div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {settings.vat_type === 'vat_16' && (
+            <div className="mt-3 bg-blue-50 rounded-xl p-3 text-xs text-blue-700">
+              💡 В счетах будет автоматически рассчитываться НДС 16% и показываться отдельной строкой
+            </div>
+          )}
+          {settings.vat_type === 'vat_0' && (
+            <div className="mt-3 bg-blue-50 rounded-xl p-3 text-xs text-blue-700">
+              💡 В счетах будет показываться НДС 0% — для экспортных операций
+            </div>
+          )}
+          {settings.vat_type === 'no_vat' && (
+            <div className="mt-3 bg-gray-50 rounded-xl p-3 text-xs text-gray-500">
+              💡 В счетах будет написано "Без НДС" — для неплательщиков НДС
+            </div>
+          )}
+        </div>
+
         <button
           onClick={save}
           disabled={saving}
-          className="w-full bg-[#1C2056] text-white rounded-xl py-4 font-medium text-sm mt-4"
-        >
+          className="w-full bg-[#1C2056] text-white rounded-xl py-4 font-medium text-sm">
           {saving ? 'Сохраняем...' : 'Сохранить настройки'}
         </button>
       </div>

@@ -41,6 +41,7 @@ interface InvoiceData {
   bank?: BankData
   knp?: string
   autoPrint?: boolean
+  vatType?: 'no_vat' | 'vat_0' | 'vat_16'
 }
 
 function numberToWords(n: number): string {
@@ -217,9 +218,18 @@ export function generateInvoicePDF(data: InvoiceData) {
         </tbody>
       </table>
 
-      <div class="totals">
-        Итого: ${formatMoney(data.total)}<br>
-        В том числе НДС: 0.00
+      <<div class="totals">
+        ${data.vatType === 'vat_16' ? `
+          Итого без НДС: ${formatMoney(Math.round(data.total / 1.16))}<br>
+          НДС 16%: ${formatMoney(Math.round(data.total - data.total / 1.16))}<br>
+          Итого с НДС: ${formatMoney(data.total)}
+        ` : data.vatType === 'vat_0' ? `
+          Итого: ${formatMoney(data.total)}<br>
+          НДС 0%: 0,00
+        ` : `
+          Итого: ${formatMoney(data.total)}<br>
+          Без НДС
+        `}
       </div>
 
       <div class="total-words">

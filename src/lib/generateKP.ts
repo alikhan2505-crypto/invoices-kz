@@ -329,7 +329,7 @@ export function generateKP(data: KPData) {
               ${signatureUrl ? `<img src="${signatureUrl}" style="position:absolute; bottom:8px; left:10px; height:45px; max-width:150px; object-fit:contain;">` : ''}
               ${stampUrl ? `<img src="${stampUrl}" style="position:absolute; bottom:-10px; left:60px; height:90px; width:90px; object-fit:contain; opacity:0.85;">` : ''}
             </div>
-            <div class="sig-name">${director ? director : '____________________'}</div>
+            <div class="sig-name">${director ? director : ''}</div>
           </div>
           <div style="width:45%; text-align:right;">
             <div style="font-size:10px; color:#888; margin-bottom:8px;">Дата составления</div>
