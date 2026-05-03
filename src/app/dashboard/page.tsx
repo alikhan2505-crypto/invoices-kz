@@ -6,6 +6,14 @@ import { generateInvoicePDF } from '@/lib/generatePDF'
 import BottomNav from '@/components/BottomNav'
 import { cacheGet, cacheSet } from '@/lib/cache'
 
+const KNP_OPTIONS = [
+  { value: '710', label: '710 — Оплата за товар' },
+  { value: '849', label: '849 — Оплата за услуги' },
+  { value: '119', label: '119 — Прочие услуги' },
+]
+
+const UNIT_OPTIONS = ['шт', 'кг', 'л', 'м', 'м²', 'м³', 'час', 'день', 'месяц', 'услуга', 'работа']
+
 export default function Dashboard() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
@@ -28,8 +36,9 @@ export default function Dashboard() {
   const [clientBin, setClientBin] = useState('')
   const [clientEmail, setClientEmail] = useState('')
   const [clientAddress, setClientAddress] = useState('')
+  const [clientKnp, setClientKnp] = useState('849')
   const [note, setNote] = useState('')
-  const [services, setServices] = useState([{ name: '', qty: 1, price: 0 }])
+  const [services, setServices] = useState([{ name: '', qty: 1, price: 0, unit: 'шт', code: '' }])
 
   const total = services.reduce((s, i) => s + i.qty * i.price, 0)
 
@@ -37,7 +46,6 @@ export default function Dashboard() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
 
-    // Сначала показываем кэш
     const cachedProfile = cacheGet('profile_' + user.id)
     if (cachedProfile) setProfile(cachedProfile)
 
@@ -54,8 +62,6 @@ export default function Dashboard() {
 
     setProfile(p)
     if (p) cacheSet('profile_' + user.id, p)
-
-    // Подставляем стандартное примечание из настроек
     if (p?.default_note) setNote(p.default_note)
 
     const { data: banks } = await supabase
@@ -87,9 +93,7 @@ export default function Dashboard() {
       .reduce((sum: number, i: any) => sum + Number(i.amount), 0)
     setMonthStats({ paid, total: monthInvoices?.length || 0, amount })
 
-    if ((count || 0) === 0 && !p?.company_name) {
-      setShowOnboarding(true)
-    }
+    if ((count || 0) === 0 && !p?.company_name) setShowOnboarding(true)
 
     setSavedServices(s || [])
 
@@ -141,6 +145,7 @@ export default function Dashboard() {
     setClientBin('')
     setClientEmail('')
     setClientAddress('')
+    setClientKnp('849')
     setClientSelected(false)
     setNote('')
   }
@@ -149,11 +154,11 @@ export default function Dashboard() {
     const exists = services.find(s => s.name === svc.name)
     if (exists) { setShowServicePicker(false); return }
     const updated = services[0].name === '' ? [] : [...services]
-    setServices([...updated, { name: svc.name, qty: 1, price: svc.price }])
+    setServices([...updated, { name: svc.name, qty: 1, price: svc.price, unit: svc.unit || 'шт', code: svc.code || '' }])
     setShowServicePicker(false)
   }
 
-  function addService() { setServices([...services, { name: '', qty: 1, price: 0 }]) }
+  function addService() { setServices([...services, { name: '', qty: 1, price: 0, unit: 'шт', code: '' }]) }
   function removeService(idx: number) { setServices(services.filter((_, i) => i !== idx)) }
   function updateService(idx: number, field: string, value: string | number) {
     const updated = [...services]
@@ -165,36 +170,37 @@ export default function Dashboard() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user || !lastInvoiceClient) return
     const { error } = await supabase.from('clients').insert({ ...lastInvoiceClient, user_id: user.id })
-    if (!error) {
-      setClients(prev => [...prev, { ...lastInvoiceClient, id: lastInvoiceClient.bin_iin }])
-    }
+    if (!error) setClients(prev => [...prev, { ...lastInvoiceClient, id: lastInvoiceClient.bin_iin }])
     setShowSaveClient(false)
   }
 
   function generateWithBank(bank: any) {
     if (!pendingInvoiceData) return
-    const { invoiceNumber, invoiceDate, cn, cb, ce, svcs, tot, nt } = pendingInvoiceData
+    const { invoiceNumber, invoiceDate, cn, cb, ce, ca, svcs, tot, nt, knp } = pendingInvoiceData
     generateInvoicePDF({
       number: invoiceNumber,
       date: invoiceDate,
       clientName: cn,
       clientBin: cb,
       clientEmail: ce,
+      clientAddress: ca,
+      knp,
       services: svcs,
       total: tot,
-      note: note || profile?.default_note || '',
+      note: nt || profile?.default_note || '',
       profile: {
         company_name: profile?.company_name || '',
         bin_iin: profile?.bin_iin || '',
         address: profile?.address || '',
-        phone: profile?.phone || '',
+        director_name: profile?.director_name || '',
+        signature_url: profile?.signature_url || '',
+        stamp_url: profile?.stamp_url || '',
+      },
+      bank: {
         bank_name: bank.bank_name || '',
         iik: bank.iik || '',
         bik: bank.bik || '',
         kbe: bank.kbe || '19',
-        director_name: profile?.director_name || '',
-        signature_url: profile?.signature_url || '',
-        stamp_url: profile?.stamp_url || '',
       }
     })
     setShowBankPicker(false)
@@ -202,7 +208,7 @@ export default function Dashboard() {
 
     const alreadyExists = clients.find(c => c.bin_iin === cb)
     if (!alreadyExists && cb) {
-      setLastInvoiceClient({ name: cn, bin_iin: cb, email: ce, address: clientAddress })
+      setLastInvoiceClient({ name: cn, bin_iin: cb, email: ce, address: ca })
       setShowSaveClient(true)
     }
   }
@@ -293,13 +299,15 @@ export default function Dashboard() {
         cn: clientName,
         cb: clientBin,
         ce: clientEmail,
+        ca: clientAddress,
+        knp: clientKnp,
         svcs: services,
         tot: total,
         nt: note,
       })
       setShowBankPicker(true)
       clearClient()
-      setServices([{ name: '', qty: 1, price: 0 }])
+      setServices([{ name: '', qty: 1, price: 0, unit: 'шт', code: '' }])
       return
     }
 
@@ -307,20 +315,27 @@ export default function Dashboard() {
     generateInvoicePDF({
       number: data.number,
       date: invoiceDate,
-      clientName, clientBin, clientEmail, services, total,
+      clientName,
+      clientBin,
+      clientEmail,
+      clientAddress,
+      knp: clientKnp,
+      services,
+      total,
       note: note || '',
       profile: {
         company_name: profile?.company_name || '',
         bin_iin: profile?.bin_iin || '',
         address: profile?.address || '',
-        phone: profile?.phone || '',
+        director_name: profile?.director_name || '',
+        signature_url: profile?.signature_url || '',
+        stamp_url: profile?.stamp_url || '',
+      },
+      bank: {
         bank_name: bank.bank_name || '',
         iik: bank.iik || '',
         bik: bank.bik || '',
         kbe: bank.kbe || '19',
-        director_name: profile?.director_name || '',
-        signature_url: profile?.signature_url || '',
-        stamp_url: profile?.stamp_url || '',
       }
     })
 
@@ -331,7 +346,7 @@ export default function Dashboard() {
     }
 
     clearClient()
-    setServices([{ name: '', qty: 1, price: 0 }])
+    setServices([{ name: '', qty: 1, price: 0, unit: 'шт', code: '' }])
   }
 
   return (
@@ -402,8 +417,7 @@ export default function Dashboard() {
           <div className="bg-white rounded-2xl shadow-sm p-5 mb-4">
             <div className="flex items-center justify-between mb-4">
               <div className="font-medium text-[#1C2056]">🚀 Начало работы</div>
-              <button onClick={() => setShowOnboarding(false)}
-                className="text-gray-300 hover:text-gray-500 text-lg">✕</button>
+              <button onClick={() => setShowOnboarding(false)} className="text-gray-300 hover:text-gray-500 text-lg">✕</button>
             </div>
             <div className="space-y-3">
               {[
@@ -438,7 +452,7 @@ export default function Dashboard() {
             <div className="flex gap-2 overflow-x-auto pb-1">
               {clients.slice(0, 6).map(c => (
                 <button key={c.id} onClick={() => selectClient(c)}
-                  className="whitespace-nowrap text-xs bg-white border border-gray-200 text-[#1C2056] px-3 py-2 rounded-full hover:bg-[#1C2056] hover:text-white hover:border-[#1C2056] transition flex-shrink-0 shadow-sm">
+                  className="whitespace-nowrap text-xs bg-white border border-gray-200 text-[#1C2056] px-3 py-2 rounded-full hover:bg-[#1C2056] hover:text-white transition flex-shrink-0 shadow-sm">
                   {c.name}
                 </button>
               ))}
@@ -450,13 +464,26 @@ export default function Dashboard() {
         <div className="bg-white rounded-2xl p-5 mb-4 shadow-sm">
           <h3 className="font-medium text-[#1C2056] mb-3">Данные клиента</h3>
           {clientSelected ? (
-            <div className="bg-gray-50 rounded-xl p-3 flex items-center justify-between">
-              <div>
-                <div className="text-sm font-medium text-[#1C2056]">{clientName}</div>
-                <div className="text-xs text-gray-400 mt-0.5">БИН: {clientBin}</div>
-                {clientEmail && <div className="text-xs text-gray-400">{clientEmail}</div>}
+            <div>
+              <div className="bg-gray-50 rounded-xl p-3 flex items-center justify-between mb-3">
+                <div>
+                  <div className="text-sm font-medium text-[#1C2056]">{clientName}</div>
+                  <div className="text-xs text-gray-400 mt-0.5">БИН: {clientBin}</div>
+                  {clientEmail && <div className="text-xs text-gray-400">{clientEmail}</div>}
+                </div>
+                <button onClick={clearClient} className="text-gray-300 hover:text-red-400 text-xl">✕</button>
               </div>
-              <button onClick={clearClient} className="text-gray-300 hover:text-red-400 text-xl">✕</button>
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">КНП (Код назначения платежа)</label>
+                <select
+                  className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056] bg-white"
+                  value={clientKnp}
+                  onChange={e => setClientKnp(e.target.value)}>
+                  {KNP_OPTIONS.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
             </div>
           ) : (
             <div className="space-y-3">
@@ -497,6 +524,17 @@ export default function Dashboard() {
                 <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
                   placeholder="г. Алматы, ул. Абая 1" value={clientAddress} onChange={e => setClientAddress(e.target.value)} />
               </div>
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">КНП (Код назначения платежа)</label>
+                <select
+                  className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056] bg-white"
+                  value={clientKnp}
+                  onChange={e => setClientKnp(e.target.value)}>
+                  {KNP_OPTIONS.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
             </div>
           )}
         </div>
@@ -517,21 +555,66 @@ export default function Dashboard() {
               </button>
             </div>
           </div>
-          <div className="space-y-3">
+          <div className="space-y-4">
             {services.map((svc, idx) => (
-              <div key={idx} className="flex gap-2 items-start">
-                <div className="flex-1 space-y-2">
-                  <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                    placeholder="Название услуги" value={svc.name} onChange={e => updateService(idx, 'name', e.target.value)} />
-                  <div className="grid grid-cols-2 gap-2">
-                    <input className="border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                      type="number" placeholder="Кол-во" value={svc.qty} onChange={e => updateService(idx, 'qty', Number(e.target.value))} />
-                    <input className="border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                      type="number" placeholder="Цена ₸" value={svc.price || ''} onChange={e => updateService(idx, 'price', Number(e.target.value))} />
+              <div key={idx} className="border border-gray-100 rounded-xl p-3 space-y-2">
+                <div className="flex gap-2 items-start">
+                  <input
+                    className="flex-1 border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                    placeholder="Название услуги / товара"
+                    value={svc.name}
+                    onChange={e => updateService(idx, 'name', e.target.value)}
+                  />
+                  {services.length > 1 && (
+                    <button onClick={() => removeService(idx)} className="text-gray-300 hover:text-red-400 text-xl mt-1">×</button>
+                  )}
+                </div>
+                <div className="grid grid-cols-4 gap-2">
+                  <div>
+                    <label className="text-xs text-gray-400 mb-1 block">Код</label>
+                    <input
+                      className="w-full border rounded-lg px-2 py-2 text-sm outline-none focus:border-[#1C2056]"
+                      placeholder="001"
+                      value={svc.code || ''}
+                      onChange={e => updateService(idx, 'code', e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 mb-1 block">Кол-во</label>
+                    <input
+                      className="w-full border rounded-lg px-2 py-2 text-sm outline-none focus:border-[#1C2056]"
+                      type="number"
+                      placeholder="1"
+                      value={svc.qty}
+                      onChange={e => updateService(idx, 'qty', Number(e.target.value))}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 mb-1 block">Ед.</label>
+                    <select
+                      className="w-full border rounded-lg px-2 py-2 text-sm outline-none focus:border-[#1C2056] bg-white"
+                      value={svc.unit || 'шт'}
+                      onChange={e => updateService(idx, 'unit', e.target.value)}>
+                      {UNIT_OPTIONS.map(u => (
+                        <option key={u} value={u}>{u}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 mb-1 block">Цена ₸</label>
+                    <input
+                      className="w-full border rounded-lg px-2 py-2 text-sm outline-none focus:border-[#1C2056]"
+                      type="number"
+                      placeholder="0"
+                      value={svc.price || ''}
+                      onChange={e => updateService(idx, 'price', Number(e.target.value))}
+                    />
                   </div>
                 </div>
-                {services.length > 1 && (
-                  <button onClick={() => removeService(idx)} className="text-gray-300 hover:text-red-400 mt-2 text-xl">×</button>
+                {svc.name && svc.price > 0 && (
+                  <div className="text-xs text-gray-400 text-right">
+                    Итого: {(svc.qty * svc.price).toLocaleString('ru-KZ')} ₸
+                  </div>
                 )}
               </div>
             ))}
@@ -572,7 +655,7 @@ export default function Dashboard() {
                   className="flex items-center justify-between p-3 rounded-xl border border-gray-100 cursor-pointer hover:border-[#1C2056]">
                   <div>
                     <div className="font-medium text-sm text-[#1C2056]">{s.name}</div>
-                    <div className="text-xs text-gray-400">{s.unit}</div>
+                    <div className="text-xs text-gray-400">{s.unit || 'шт'}</div>
                   </div>
                   <div className="text-sm font-medium text-[#1C2056]">{Number(s.price).toLocaleString('ru-KZ')} ₸</div>
                 </div>
@@ -627,7 +710,6 @@ export default function Dashboard() {
                       )}
                     </div>
                     <div className="text-xs text-gray-400 mt-0.5">{bank.iik}</div>
-                    {bank.bik && <div className="text-xs text-gray-400">БИК: {bank.bik}</div>}
                   </div>
                   <span className="text-gray-300 text-lg">›</span>
                 </div>

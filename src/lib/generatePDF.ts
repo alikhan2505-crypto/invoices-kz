@@ -39,6 +39,7 @@ interface InvoiceData {
   note?: string
   profile?: ProfileData
   bank?: BankData
+  knp?: string
 }
 
 function numberToWords(n: number): string {
@@ -164,7 +165,7 @@ export function generateInvoicePDF(data: InvoiceData) {
           <td style="text-align:center">
             <b>БИК</b><br><br>${bik}
           </td>
-          <td style="text-align:center"><b>Код назначения платежа</b><br>—</td>
+          <td style="text-align:center"><b>Код назначения платежа</b><br>${data.knp || '849'}</td>
         </tr>
       </table>
 
