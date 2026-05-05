@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /history
+Disallow: /profile
+Disallow: /invoice
+Disallow: /admin
+Disallow: /onboarding
+
+Sitemap: https://invoices.kz/sitemap.xml
