@@ -157,7 +157,7 @@ export default function Dashboard() {
     const exists = services.find(s => s.name === svc.name)
     if (exists) { setShowServicePicker(false); return }
     const updated = services[0].name === '' ? [] : [...services]
-    setServices([...updated, { name: svc.name, qty: 1, price: svc.price, unit: svc.unit || 'шт', code: svc.code || '' }])
+    setServices([...updated, { name: svc.name, qty: 1, price: svc.price, unit: svc.unit || 'шт', code: svc.code || '', type: 'service' }])
     setShowServicePicker(false)
   }
 
