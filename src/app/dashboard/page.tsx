@@ -122,7 +122,13 @@ export default function Dashboard() {
         setClientName(tmpl.client_name || '')
         setClientBin(tmpl.client_bin || '')
         setClientEmail(tmpl.client_email || '')
-        if (tmpl.services && tmpl.services.length > 0) setServices(tmpl.services)
+        if (tmpl.services && tmpl.services.length > 0) {
+          const servicesWithType = tmpl.services.map((s: any) => ({
+            ...s,
+            type: s.type || 'service'
+          }))
+          setServices(servicesWithType)
+        }
         if (tmpl.client_name) setClientSelected(true)
       }
     }
@@ -161,8 +167,14 @@ export default function Dashboard() {
     setShowServicePicker(false)
   }
 
-  function addService() { setServices([...services, { name: '', qty: 1, price: 0, unit: 'шт', code: '', type: 'service' }]) }
-  function removeService(idx: number) { setServices(services.filter((_, i) => i !== idx)) }
+  function addService() { 
+    setServices([...services, { name: '', qty: 1, price: 0, unit: 'шт', code: '', type: 'service' }]) 
+  }
+  
+  function removeService(idx: number) { 
+    setServices(services.filter((_, i) => i !== idx)) 
+  }
+  
   function updateService(idx: number, field: string, value: string | number) {
     const updated = [...services]
     updated[idx] = { ...updated[idx], [field]: value }
