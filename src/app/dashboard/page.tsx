@@ -316,7 +316,7 @@ export default function Dashboard() {
       })
       setShowBankPicker(true)
       clearClient()
-      setServices([{ name: '', qty: 1, price: 0, unit: 'шт', code: '' }])
+      setServices([{ name: '', qty: 1, price: 0, unit: 'шт', code: '', type: 'service' }])
       return
     }
 
@@ -350,7 +350,7 @@ export default function Dashboard() {
     }
 
     clearClient()
-    setServices([{ name: '', qty: 1, price: 0, unit: 'шт', code: '' }])
+    setServices([{ name: '', qty: 1, price: 0, unit: 'шт', code: '', type: 'service' }])
   }
 
   return (
