@@ -104,6 +104,28 @@ export default function InvoicePage() {
     await updateStatus('sent')
   }
 
+  async function sendEmail() {
+    if (!invoice.client_email) {
+      alert('У клиента нет email! Укажите email при создании счёта.')
+      return
+    }
+    if (!confirm(`Отправить счёт на ${invoice.client_email}?`)) return
+    
+    const res = await fetch('/api/send-invoice', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ invoiceId: id })
+    })
+    
+    const data = await res.json()
+    if (data.success) {
+      alert(`✅ Счёт отправлен на ${invoice.client_email}`)
+      await loadInvoice()
+    } else {
+      alert('Ошибка: ' + data.error)
+    }
+  }
+
   async function sendReminder() {
     const { data } = await supabase.from('invoices').select('public_token').eq('id', id).single()
     if (!data?.public_token) { alert('Ошибка'); return }
@@ -181,12 +203,13 @@ export default function InvoicePage() {
         </div>
 
         {/* Actions */}
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-5 gap-2">
           {[
             { icon: '💬', label: 'WhatsApp', action: shareWhatsApp },
             { icon: '🔗', label: 'Ссылка', action: copyPublicLink },
             { icon: '📄', label: 'PDF', action: () => openPDF(false) },
             { icon: '🖨️', label: 'Печать', action: () => openPDF(true) },
+            { icon: '📧', label: 'Email', action: sendEmail },
           ].map(a => (
             <button key={a.label} onClick={a.action}
               className="bg-white rounded-xl p-3 text-center shadow-sm hover:bg-gray-50">
