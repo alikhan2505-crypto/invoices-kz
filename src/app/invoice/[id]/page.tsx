@@ -455,6 +455,39 @@ export default function InvoicePage() {
             className="w-full flex items-center px-4 py-3.5 text-sm hover:bg-gray-50 text-[#1C2056] border-b border-gray-100">
             🔔 Напомнить об оплате
           </button>
+
+          <button onClick={async () => {
+            if (invoice.recurring_active) {
+              // Отключаем повторение
+              await supabase.from('invoices').update({ recurring_active: false }).eq('id', id)
+              await loadInvoice()
+              alert('Повторение отключено')
+            } else {
+              // Включаем повторение
+              const until = prompt('Повторять до (дата в формате ДД.ММ.ГГГГ):', '01.12.2026')
+              if (!until) return
+              const parts = until.split('.')
+              if (parts.length !== 3) { alert('Неверный формат даты'); return }
+              const isoDate = `${parts[2]}-${parts[1]}-${parts[0]}`
+              if (!invoice.client_email) {
+                alert('У клиента нет email! Добавьте email клиента чтобы он получал счета.')
+                return
+              }
+              await supabase.from('invoices').update({ 
+                recurring_active: true,
+                recurring_until: isoDate
+              }).eq('id', id)
+              await loadInvoice()
+              alert(`Повторение включено до ${until}. Счёт будет отправляться 1-го числа каждого месяца на ${invoice.client_email}`)
+            }
+          }}
+            className={`w-full flex items-center justify-between px-4 py-3.5 text-sm hover:bg-gray-50 border-b border-gray-100 ${invoice.recurring_active ? 'text-green-600' : 'text-[#1C2056]'}`}>
+            <span>{invoice.recurring_active ? '🔄 Повторение включено' : '🔄 Повторять ежемесячно'}</span>
+            {invoice.recurring_active && (
+              <span className="text-xs text-gray-400">до {new Date(invoice.recurring_until).toLocaleDateString('ru-KZ')}</span>
+            )}
+          </button>
+
           <button onClick={deleteInvoice}
             className="w-full flex items-center px-4 py-3.5 text-sm hover:bg-gray-50 text-red-500">
             ← Отозвать / Аннулировать
