@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { generateInvoicePDF } from '@/lib/generatePDF'
 import BottomNav from '@/components/BottomNav'
 import { cacheGet, cacheSet } from '@/lib/cache'
+import { getActivePlan } from '@/lib/plan'
 
 const KNP_OPTIONS = [
   { value: '710', label: '710 — Оплата за товар' },
@@ -259,20 +260,11 @@ export default function Dashboard() {
 
     setLoading(true)
 
-    if ((profile?.plan || 'free') === 'free') {
-      const monthStart = new Date()
-      monthStart.setDate(1)
-      monthStart.setHours(0, 0, 0, 0)
-      const { count } = await supabase
-        .from('invoices')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .gte('created_at', monthStart.toISOString())
-      if ((count || 0) >= 3) {
-        router.push('/upgrade')
-        setLoading(false)
-        return
-      }
+    const activePlan = getActivePlan(profile)
+    if (activePlan.plan === 'free') {
+      router.push('/upgrade')
+      setLoading(false)
+      return
     }
 
     const prefix = profile?.invoice_prefix || 'INV-'
@@ -384,37 +376,53 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Free plan banner */}
-        {(profile?.plan || 'free') === 'free' && (
-          <div className={`flex items-center justify-between rounded-xl px-4 py-3 mb-4 ${monthCount >= 3 ? 'bg-red-50 border border-red-100' : 'bg-blue-50 border border-blue-100'}`}>
-            <div>
-              <div className={`text-sm font-medium ${monthCount >= 3 ? 'text-red-600' : 'text-[#1C2056]'}`}>
-                {monthCount >= 3 ? 'Лимит исчерпан!' : `Использовано ${monthCount} из 3 бесплатных`}
+        {/* Plan banner */}
+        {(() => {
+          const activePlan = getActivePlan(profile)
+          if (activePlan.plan === 'free') {
+            return (
+              <div className="flex items-center justify-between rounded-xl px-4 py-3 mb-4 bg-blue-50 border border-blue-100">
+                <div>
+                  <div className="text-sm font-medium text-[#1C2056]">Бесплатный тариф</div>
+                  <div className="text-xs text-gray-400 mt-0.5">Перейдите на платный для безлимитных счетов</div>
+                </div>
+                <button onClick={() => router.push('/upgrade')}
+                  className="text-xs bg-[#1C2056] text-white px-3 py-1.5 rounded-lg">
+                  Тарифы
+                </button>
               </div>
-              <div className="text-xs text-gray-400 mt-0.5">
-                {monthCount >= 3 ? 'Перейдите на платный тариф' : `Осталось ${3 - monthCount} счёта в этом месяце`}
+            )
+          }
+          if (activePlan.isTrial) {
+            return (
+              <div className="flex items-center justify-between rounded-xl px-4 py-3 mb-4 bg-green-50 border border-green-100">
+                <div>
+                  <div className="text-sm font-medium text-green-700">🎉 Пробный период</div>
+                  <div className="text-xs text-gray-400 mt-0.5">Осталось {activePlan.daysLeft} дней — все функции открыты</div>
+                </div>
+                <button onClick={() => router.push('/upgrade')}
+                  className="text-xs bg-[#2DC48D] text-white px-3 py-1.5 rounded-lg">
+                  Купить
+                </button>
               </div>
-            </div>
-            <button onClick={() => router.push('/upgrade')}
-              className="text-xs bg-[#1C2056] text-white px-3 py-1.5 rounded-lg">
-              Тарифы
-            </button>
-          </div>
-        )}
-
-        {/* Profile incomplete banner */}
-        {profile && (!profile.company_name || !profile.bin_iin) && (
-          <div className="bg-yellow-50 border border-yellow-100 rounded-xl px-4 py-3 mb-4 flex items-center justify-between">
-            <div>
-              <div className="text-sm font-medium text-yellow-800">⚠️ Заполните профиль</div>
-              <div className="text-xs text-yellow-600 mt-0.5">Без реквизитов нельзя создать счёт</div>
-            </div>
-            <button onClick={() => router.push('/profile/requisites')}
-              className="text-xs bg-yellow-800 text-white px-3 py-1.5 rounded-lg">
-              Заполнить
-            </button>
-          </div>
-        )}
+            )
+          }
+          if (activePlan.daysLeft !== null && activePlan.daysLeft <= 3) {
+            return (
+              <div className="flex items-center justify-between rounded-xl px-4 py-3 mb-4 bg-red-50 border border-red-100">
+                <div>
+                  <div className="text-sm font-medium text-red-600">⚠️ Тариф истекает</div>
+                  <div className="text-xs text-gray-400 mt-0.5">Осталось {activePlan.daysLeft} дней — {activePlan.label}</div>
+                </div>
+                <button onClick={() => router.push('/upgrade')}
+                  className="text-xs bg-red-500 text-white px-3 py-1.5 rounded-lg">
+                  Продлить
+                </button>
+              </div>
+            )
+          }
+          return null
+        })()}
 
         {/* Onboarding */}
         {showOnboarding && (

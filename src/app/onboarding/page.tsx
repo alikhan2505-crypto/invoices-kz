@@ -31,12 +31,16 @@ export default function Onboarding() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
 
+    const trialExpires = new Date()
+    trialExpires.setDate(trialExpires.getDate() + 7)
+
     const { error } = await supabase.from('profiles').upsert({
       id: user.id,
       company_name: form.company_name,
       bin_iin: form.bin_iin,
       email: form.email || user.email,
       account_type: accountType,
+      trial_expires_at: trialExpires.toISOString(),
     })
 
     if (error) { alert('Ошибка: ' + error.message); setSaving(false); return }
