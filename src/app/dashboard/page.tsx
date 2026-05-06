@@ -38,7 +38,7 @@ export default function Dashboard() {
   const [clientAddress, setClientAddress] = useState('')
   const [clientKnp, setClientKnp] = useState('849')
   const [note, setNote] = useState('')
-  const [services, setServices] = useState<any[]>([{ name: '', qty: 1, price: 0, unit: 'шт', code: '' }])
+  const [services, setServices] = useState<any[]>([{ name: '', qty: 1, price: 0, unit: 'шт', code: '', type: 'service' }])
 
   const total = services.reduce((s, i) => s + i.qty * i.price, 0)
   const vatType = profile?.vat_type || 'no_vat'
