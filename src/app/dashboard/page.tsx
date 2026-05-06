@@ -38,7 +38,7 @@ export default function Dashboard() {
   const [clientAddress, setClientAddress] = useState('')
   const [clientKnp, setClientKnp] = useState('849')
   const [note, setNote] = useState('')
-  const [services, setServices] = useState<{ name: string; qty: number; price: number; unit: string; code: string; type?: 'service' | 'product' }[]>([{ name: '', qty: 1, price: 0, unit: 'шт', code: '', type: 'service' }])
+  const [services, setServices] = useState<any[]>([{ name: '', qty: 1, price: 0, unit: 'шт', code: '' }])
 
   const total = services.reduce((s, i) => s + i.qty * i.price, 0)
   const vatType = profile?.vat_type || 'no_vat'
@@ -122,13 +122,7 @@ export default function Dashboard() {
         setClientName(tmpl.client_name || '')
         setClientBin(tmpl.client_bin || '')
         setClientEmail(tmpl.client_email || '')
-        if (tmpl.services && tmpl.services.length > 0) {
-          const servicesWithType = tmpl.services.map((s: any) => ({
-            ...s,
-            type: s.type || 'service'
-          }))
-          setServices(servicesWithType)
-        }
+        if (tmpl.services && tmpl.services.length > 0) setServices(tmpl.services)
         if (tmpl.client_name) setClientSelected(true)
       }
     }
@@ -163,18 +157,12 @@ export default function Dashboard() {
     const exists = services.find(s => s.name === svc.name)
     if (exists) { setShowServicePicker(false); return }
     const updated = services[0].name === '' ? [] : [...services]
-    setServices([...updated, { name: svc.name, qty: 1, price: svc.price, unit: svc.unit || 'шт', code: svc.code || '', type: 'service' }])
+    setServices([...updated, { name: svc.name, qty: 1, price: svc.price, unit: svc.unit || 'шт', code: svc.code || '' }])
     setShowServicePicker(false)
   }
 
-  function addService() { 
-    setServices([...services, { name: '', qty: 1, price: 0, unit: 'шт', code: '', type: 'service' }]) 
-  }
-  
-  function removeService(idx: number) { 
-    setServices(services.filter((_, i) => i !== idx)) 
-  }
-  
+  function addService() { setServices([...services, { name: '', qty: 1, price: 0, unit: 'шт', code: '' }]) }
+  function removeService(idx: number) { setServices(services.filter((_, i) => i !== idx)) }
   function updateService(idx: number, field: string, value: string | number) {
     const updated = [...services]
     updated[idx] = { ...updated[idx], [field]: value }
@@ -328,7 +316,7 @@ export default function Dashboard() {
       })
       setShowBankPicker(true)
       clearClient()
-      setServices([{ name: '', qty: 1, price: 0, unit: 'шт', code: '', type: 'service' }])
+      setServices([{ name: '', qty: 1, price: 0, unit: 'шт', code: '' }])
       return
     }
 
@@ -362,7 +350,7 @@ export default function Dashboard() {
     }
 
     clearClient()
-    setServices([{ name: '', qty: 1, price: 0, unit: 'шт', code: '', type: 'service' }])
+    setServices([{ name: '', qty: 1, price: 0, unit: 'шт', code: '' }])
   }
 
   return (
@@ -574,29 +562,6 @@ export default function Dashboard() {
           <div className="space-y-4">
             {services.map((svc, idx) => (
               <div key={idx} className="border border-gray-100 rounded-xl p-3 space-y-2">
-                {/* Переключатель Товар / Услуга */}
-                <div className="flex gap-2 mb-2">
-                  <button
-                    type="button"
-                    onClick={() => updateService(idx, 'type', 'service')}
-                    className={`flex-1 px-3 py-1.5 text-xs rounded-lg font-medium transition ${
-                      svc.type === 'service'
-                        ? 'bg-[#1C2056] text-white'
-                        : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                    }`}>
-                    📋 Услуга
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => updateService(idx, 'type', 'product')}
-                    className={`flex-1 px-3 py-1.5 text-xs rounded-lg font-medium transition ${
-                      svc.type === 'product'
-                        ? 'bg-[#2DC48D] text-white'
-                        : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                    }`}>
-                    📦 Товар
-                  </button>
-                </div>
                 <div className="flex gap-2 items-start">
                   <input
                     className="flex-1 border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
