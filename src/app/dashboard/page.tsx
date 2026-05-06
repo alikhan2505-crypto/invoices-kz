@@ -161,7 +161,7 @@ export default function Dashboard() {
     setShowServicePicker(false)
   }
 
-  function addService() { setServices([...services, { name: '', qty: 1, price: 0, unit: 'шт', code: '' }]) }
+  function addService() { setServices([...services, { name: '', qty: 1, price: 0, unit: 'шт', code: '', type: 'service' }]) }
   function removeService(idx: number) { setServices(services.filter((_, i) => i !== idx)) }
   function updateService(idx: number, field: string, value: string | number) {
     const updated = [...services]
@@ -316,7 +316,7 @@ export default function Dashboard() {
       })
       setShowBankPicker(true)
       clearClient()
-      setServices([{ name: '', qty: 1, price: 0, unit: 'шт', code: '' }])
+      setServices([{ name: '', qty: 1, price: 0, unit: 'шт', code: '', type: 'service' }])
       return
     }
 
@@ -350,7 +350,7 @@ export default function Dashboard() {
     }
 
     clearClient()
-    setServices([{ name: '', qty: 1, price: 0, unit: 'шт', code: '' }])
+    setServices([{ name: '', qty: 1, price: 0, unit: 'шт', code: '', type: 'service' }])
   }
 
   return (
@@ -562,18 +562,17 @@ export default function Dashboard() {
           <div className="space-y-4">
             {services.map((svc, idx) => (
               <div key={idx} className="border border-gray-100 rounded-xl p-3 space-y-2">
-                <div className="flex gap-2 items-start">
-                  <input
-                    className="flex-1 border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                    placeholder="Название услуги / товара"
-                    value={svc.name}
-                    onChange={e => updateService(idx, 'name', e.target.value)}
-                  />
-                  {services.length > 1 && (
-                    <button onClick={() => removeService(idx)} className="text-gray-300 hover:text-red-400 text-xl mt-1">×</button>
-                  )}
+                <div className="flex gap-2 mb-2">
+                  <button type="button" onClick={() => updateService(idx, 'type', 'service')}
+                    className={`flex-1 px-3 py-1.5 text-xs rounded-lg font-medium transition ${(svc.type || 'service') === 'service' ? 'bg-[#1C2056] text-white' : 'bg-gray-100 text-gray-500'}`}>
+                    📋 Услуга
+                  </button>
+                  <button type="button" onClick={() => updateService(idx, 'type', 'product')}
+                    className={`flex-1 px-3 py-1.5 text-xs rounded-lg font-medium transition ${svc.type === 'product' ? 'bg-[#2DC48D] text-white' : 'bg-gray-100 text-gray-500'}`}>
+                    📦 Товар
+                  </button>
                 </div>
-                <div className="grid grid-cols-4 gap-2">
+                <div className="flex gap-2 items-start">
                   <div>
                     <label className="text-xs text-gray-400 mb-1 block">Код</label>
                     <input
