@@ -573,6 +573,17 @@ export default function Dashboard() {
                   </button>
                 </div>
                 <div className="flex gap-2 items-start">
+                  <input
+                    className="flex-1 border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                    placeholder="Название услуги / товара"
+                    value={svc.name}
+                    onChange={e => updateService(idx, 'name', e.target.value)}
+                  />
+                  {services.length > 1 && (
+                    <button onClick={() => removeService(idx)} className="text-gray-300 hover:text-red-400 text-xl mt-1">×</button>
+                  )}
+                </div>
+                <div className="grid grid-cols-4 gap-2">
                   <div>
                     <label className="text-xs text-gray-400 mb-1 block">Код</label>
                     <input
