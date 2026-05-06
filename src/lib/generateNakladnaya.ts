@@ -63,7 +63,7 @@ export function generateNakladnaya(data: NakladnayaData) {
     <html>
     <head>
       <meta charset="utf-8">
-      <meta name="viewport" content="width=794, initial-scale=1.0, maximum-scale=1.0">
+      <meta name="viewport" content="width=1123, initial-scale=1.0, maximum-scale=1.0">
       <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"><\/script>
       <style>
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-text-size-adjust: 100%; }
@@ -72,8 +72,8 @@ export function generateNakladnaya(data: NakladnayaData) {
           font-family: Arial, sans-serif;
           font-size: 11px;
           color: #1a1a1a;
-          width: 794px;
-          min-height: 1123px;
+          width: 1123px;
+          min-height: 794px;
           margin: 20px auto;
           background: white;
           box-shadow: 0 0 20px rgba(0,0,0,0.3);
@@ -344,7 +344,7 @@ export function generateNakladnaya(data: NakladnayaData) {
             filename: 'Накладная-${data.number}.pdf',
             image: { type: 'jpeg', quality: 0.98 },
             html2canvas: { scale: 2, useCORS: true, logging: false },
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
           }).from(document.body).save().then(() => {
             if (toolbar) toolbar.style.display = 'flex'
             if (spacer) spacer.style.display = 'block'
