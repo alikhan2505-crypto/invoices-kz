@@ -1,0 +1,6 @@
+<svg width="192" height="192" viewBox="0 0 192 192" xmlns="http://www.w3.org/2000/svg">
+  <rect width="192" height="192" rx="42" fill="#1C2056"/>
+  <text x="96" y="105" text-anchor="middle" font-family="Arial, sans-serif" font-weight="800" font-size="64" fill="white">INV</text>
+  <rect x="56" y="118" width="80" height="4" rx="2" fill="#2DC48D"/>
+  <text x="96" y="152" text-anchor="middle" font-family="Arial, sans-serif" font-weight="700" font-size="18" fill="#2DC48D">.KZ</text>
+</svg>
