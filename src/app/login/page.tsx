@@ -34,6 +34,13 @@ export default function Login() {
     })
   }
 
+  async function signInWithYandex() {
+    await supabase.auth.signInWithOAuth({
+      provider: 'yandex',
+      options: { redirectTo: 'https://invoices.kz/auth/callback' }
+    })
+  }
+
   return (
     <main className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl p-8 w-full max-w-sm shadow-sm">
@@ -73,6 +80,17 @@ export default function Login() {
               </svg>
               Войти через Google
             </button>
+
+            <button
+              onClick={signInWithYandex}
+              className="w-full border border-gray-200 rounded-lg py-3 text-sm font-medium flex items-center justify-center gap-3 hover:bg-gray-50 transition">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z" fill="#FC3F1D"/>
+                <path d="M13.32 7.219h-.929c-1.607 0-2.45.843-2.45 2.09 0 1.411.607 2.126 1.857 2.968l1.036.707-2.95 4.797H8.429l2.733-4.44C9.615 12.294 8.75 11.22 8.75 9.38c0-2.19 1.5-3.661 4.036-3.661h2.393v9.972H13.32V7.219z" fill="white"/>
+              </svg>
+              Войти через Яндекс
+</button>
+
           </>
         ) : (
           <div className="text-center">
