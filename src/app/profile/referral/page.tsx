@@ -55,7 +55,11 @@ export default function Referral() {
             <div className="text-xs text-gray-400 mt-1">Приглашено друзей</div>
         </div>
         <div className="bg-white rounded-2xl p-4 text-center shadow-sm">
-            <div className="text-2xl font-bold text-[#2DC48D]">{(profile?.referral_count || 0) * 7}</div>
+            <div className="text-2xl font-bold text-[#2DC48D]">
+              {profile?.bonus_expires_at && new Date(profile.bonus_expires_at) > new Date()
+                ? Math.ceil((new Date(profile.bonus_expires_at).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+                : (profile?.referral_count || 0) * 7}
+            </div>
             <div className="text-xs text-gray-400 mt-1">Бонусных дней</div>
         </div>
         </div>

@@ -236,8 +236,18 @@ export default function Profile() {
               <div className="border-t border-gray-100 px-4 py-3 space-y-2">
                 {profile?.trial_expires_at && new Date(profile.trial_expires_at) > new Date() && (
                   <div className="flex justify-between text-xs">
-                    <span className="text-gray-400">Пробный период до</span>
-                    <span className="text-green-600 font-medium">{new Date(profile.trial_expires_at).toLocaleDateString('ru-KZ')}</span>
+                    <span className="text-gray-400">Пробный период</span>
+                    <span className="text-green-600 font-medium">
+                      до {new Date(profile.trial_expires_at).toLocaleDateString('ru-KZ')}
+                    </span>
+                  </div>
+                )}
+                {profile?.bonus_expires_at && new Date(profile.bonus_expires_at) > new Date() && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-400">Реферальный бонус</span>
+                    <span className="text-[#2DC48D] font-medium">
+                      {Math.ceil((new Date(profile.bonus_expires_at).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} дней осталось · до {new Date(profile.bonus_expires_at).toLocaleDateString('ru-KZ')}
+                    </span>
                   </div>
                 )}
                 {profile?.plan_expires_at && profile?.plan !== 'free' && (
