@@ -141,6 +141,16 @@ export default function Dashboard() {
     setClientSelected(true)
   }
 
+  function formatPhone(value: string) {
+    const digits = value.replace(/\D/g, '')
+    if (digits.length === 0) return ''
+    let result = '+7'
+    if (digits.length > 1) result += ' ' + digits.slice(1, 4)
+    if (digits.length > 4) result += ' ' + digits.slice(4, 7)
+    if (digits.length > 7) result += ' ' + digits.slice(7, 11)
+    return result
+  }
+
   function clearClient() {
     setClientName('')
     setClientBin('')
@@ -228,7 +238,7 @@ export default function Dashboard() {
 
     const alreadyExists = clients.find(c => c.bin_iin === cb)
     if (!alreadyExists && cb) {
-      setLastInvoiceClient({ name: cn, bin_iin: cb, email: ce, address: ca })
+      setLastInvoiceClient({ name: cn, bin_iin: cb, email: ce, address: ca, phone: cp })
       setShowSaveClient(true)
     }
   }
@@ -354,7 +364,7 @@ export default function Dashboard() {
 
     const alreadyExists = clients.find(c => c.bin_iin === clientBin)
     if (!alreadyExists && clientBin) {
-      setLastInvoiceClient({ name: clientName, bin_iin: clientBin, email: clientEmail, address: clientAddress })
+      setLastInvoiceClient({ name: clientName, bin_iin: clientBin, email: clientEmail, address: clientAddress, phone: clientPhone })
       setShowSaveClient(true)
     }
 
@@ -491,7 +501,9 @@ export default function Dashboard() {
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">Телефон покупателя</label>
                 <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                  placeholder="+7 701 123 45 67" value={clientPhone} onChange={e => setClientPhone(e.target.value)} />
+                  placeholder="+7 776 355 5177" value={clientPhone}
+                  type="tel" maxLength={16}
+                  onChange={e => setClientPhone(formatPhone(e.target.value))} />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -546,7 +558,9 @@ export default function Dashboard() {
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">Телефон покупателя</label>
                 <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                  placeholder="+7 701 123 45 67" value={clientPhone} onChange={e => setClientPhone(e.target.value)} />
+                  placeholder="+7 776 355 5177" value={clientPhone}
+                  type="tel" maxLength={16}
+                  onChange={e => setClientPhone(formatPhone(e.target.value))} />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
