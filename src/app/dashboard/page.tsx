@@ -163,9 +163,10 @@ export default function Dashboard() {
   }
 
   function addService() {
-    setServices([...services, { name: '', qty: 1, price: 0, unit: 'шт', code: '', type: 'service' }])
+    setServices([{ name: '', qty: 1, price: 0, unit: 'шт', code: '', type: 'service' }, ...services])
     setTimeout(() => {
-      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })
+      const el = document.getElementById('services-list')
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }, 100)
   }
   function removeService(idx: number) { setServices(services.filter((_, i) => i !== idx)) }
@@ -572,7 +573,7 @@ export default function Dashboard() {
               </button>
             </div>
           </div>
-          <div className="space-y-4">
+          <div className="space-y-4" id="services-list">
             {services.map((svc, idx) => (
               <div key={idx} className="border border-gray-100 rounded-xl p-3 space-y-2">
                 <div className="flex gap-2 mb-2">
