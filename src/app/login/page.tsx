@@ -35,8 +35,9 @@ export default function Login() {
   }
 
   async function signInWithYandex() {
+    // @ts-ignore
     await supabase.auth.signInWithOAuth({
-      provider: 'yandex',
+      provider: 'custom:yandex',
       options: { redirectTo: 'https://invoices.kz/auth/callback' }
     })
   }
