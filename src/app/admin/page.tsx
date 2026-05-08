@@ -69,9 +69,19 @@ export default function Admin() {
   }
 
   async function updatePlan(userId: string, plan: string) {
-    const { error } = await supabase.from('profiles').update({ plan }).eq('id', userId)
+    const updates: any = { plan }
+    
+    // Если ставим платный план — добавляем дату +30 дней
+    if (plan === 'pro' || plan === 'basic') {
+      updates.plan_expires_at = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+    } else {
+      // Free — убираем дату
+      updates.plan_expires_at = null
+    }
+
+    const { error } = await supabase.from('profiles').update(updates).eq('id', userId)
     if (error) { alert('Ошибка: ' + error.message); return }
-    setUsers(prev => prev.map(u => u.id === userId ? { ...u, plan } : u))
+    setUsers(prev => prev.map(u => u.id === userId ? { ...u, ...updates } : u))
   }
 
   async function activatePayment(payment: any) {
