@@ -51,6 +51,10 @@ export default function AuthCallback() {
           .eq('id', session.user.id)
           .single()
 
+        console.log('Profile check:', profile)
+        console.log('company_name:', profile?.company_name)
+        console.log('Ref code:', localStorage.getItem('referral_code'))
+
         if (!profile?.company_name) {
           const ref = localStorage.getItem('referral_code')
           router.push(ref ? `/onboarding?ref=${ref}` : '/onboarding')
