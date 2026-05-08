@@ -15,12 +15,20 @@ export default function Onboarding() {
   })
 
   useEffect(() => {
-    // Берём реф код из URL или localStorage
     const params = new URLSearchParams(window.location.search)
     const refFromUrl = params.get('ref')
+
+    // Сохраняем реф код
+    if (refFromUrl) localStorage.setItem('referral_code', refFromUrl)
+
     const refFromStorage = localStorage.getItem('referral_code')
     const ref = refFromUrl || refFromStorage || ''
     setRefCode(ref)
+
+    // Если не авторизован — на логин (код уже сохранён в localStorage)
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) router.push('/login')
+    })
   }, [])
 
   async function save() {
