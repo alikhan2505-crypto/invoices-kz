@@ -6,6 +6,7 @@ import BottomNav from '@/components/BottomNav'
 import { AreaChart, Area, ResponsiveContainer, Tooltip } from 'recharts'
 import { useTheme } from '@/components/ThemeProvider'
 import { cacheGet, cacheSet, cacheClear } from '@/lib/cache'
+import { getActivePlan } from '@/lib/plan'
 
 export default function Profile() {
   const router = useRouter()
@@ -233,68 +234,88 @@ export default function Profile() {
         </div>
 
         {/* Подписка */}
-        <div>
-          <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">Подписка</div>
-          <div className="bg-white rounded-2xl overflow-hidden shadow-sm cursor-pointer"
-            onClick={() => router.push('/upgrade')}>
-            {profile?.plan === 'pro' ? (
-              <div className="px-4 py-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="text-lg">⭐</span>
-                  <div>
-                    <div className="text-sm font-medium text-[#1C2056]">Про тариф</div>
-                    <div className="text-xs text-[#2DC48D]">Безлимит · ЭЦП · Шаблоны</div>
+        {(() => {
+          const activePlan = getActivePlan(profile)
+          return (
+            <div>
+              <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">Подписка</div>
+              <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
+                <div className="px-4 py-4 flex items-center justify-between cursor-pointer"
+                  onClick={() => router.push('/upgrade')}>
+                  <div className="flex items-center gap-3">
+                    <span className="text-lg">
+                      {activePlan.isTrial ? '🎉' : activePlan.plan === 'pro' ? '⭐' : activePlan.plan === 'basic' ? '💼' : '🆓'}
+                    </span>
+                    <div>
+                      <div className="text-sm font-medium text-[#1C2056]">{activePlan.label}</div>
+                      <div className="text-xs text-gray-400">
+                        {activePlan.plan === 'pro' && !activePlan.isTrial && 'Безлимит · ЭЦП · Шаблоны'}
+                        {activePlan.plan === 'basic' && !activePlan.isTrial && '30 счетов в месяц'}
+                        {activePlan.plan === 'free' && 'Перейдите на платный тариф'}
+                        {activePlan.isTrial && 'Все функции Pro открыты'}
+                      </div>
+                    </div>
                   </div>
+                  <span className="text-gray-300 text-lg">›</span>
                 </div>
-                <span className="text-gray-300 text-lg">›</span>
-              </div>
-            ) : profile?.plan === 'basic' ? (
-              <div className="px-4 py-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="text-lg">💼</span>
-                  <div>
-                    <div className="text-sm font-medium text-[#1C2056]">Базовый тариф</div>
-                    <div className="text-xs text-gray-400">30 счетов в месяц</div>
-                  </div>
-                </div>
-                <span className="text-gray-300 text-lg">›</span>
-              </div>
-            ) : (
-              <div className="px-4 py-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="text-lg">🆓</span>
-                  <div>
-                    <div className="text-sm font-medium text-[#1C2056]">Бесплатный</div>
-                    <div className="text-xs text-gray-400">Лимит 3 счёта в месяц</div>
-                  </div>
-                </div>
-                <span className="text-gray-300 text-lg">›</span>
-              </div>
-            )}
-          </div>
-        </div>
 
-        {/* Theme toggle */}
-        <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
-          <div className="flex items-center justify-between px-4 py-3.5">
-            <div className="flex items-center gap-3">
-              <span className="text-lg">{theme === 'dark' ? '🌙' : '☀️'}</span>
-              <span className="text-sm text-gray-800">
-                {theme === 'dark' ? 'Тёмная тема' : 'Светлая тема'}
-              </span>
+                {/* Даты */}
+                {(profile?.trial_expires_at || profile?.plan_expires_at || profile?.bonus_expires_at) && (
+                  <div className="border-t border-gray-100 px-4 py-3 space-y-2">
+                    {profile?.trial_expires_at && new Date(profile.trial_expires_at) > new Date() && (
+                      <div className="flex justify-between text-xs">
+                        <span className="text-gray-400">Пробный период до</span>
+                        <span className="text-green-600 font-medium">
+                          {new Date(profile.trial_expires_at).toLocaleDateString('ru-KZ')}
+                        </span>
+                      </div>
+                    )}
+                    {profile?.plan_expires_at && profile?.plan !== 'free' && (
+                      <div className="flex justify-between text-xs">
+                        <span className="text-gray-400">Тариф действует до</span>
+                        <span className={`font-medium ${new Date(profile.plan_expires_at) > new Date() ? 'text-[#1C2056]' : 'text-red-500'}`}>
+                          {new Date(profile.plan_expires_at).toLocaleDateString('ru-KZ')}
+                        </span>
+                      </div>
+                    )}
+                    {profile?.bonus_expires_at && (
+                      <div className="flex justify-between text-xs">
+                        <span className="text-gray-400">Бонусные дни до</span>
+                        <span className={`font-medium ${new Date(profile.bonus_expires_at) > new Date() ? 'text-[#2DC48D]' : 'text-gray-400'}`}>
+                          {new Date(profile.bonus_expires_at).toLocaleDateString('ru-KZ')}
+                          {new Date(profile.bonus_expires_at) < new Date() && ' (истёк)'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Реферальный код */}
+                {profile?.referral_code && (
+                  <div className="border-t border-gray-100 px-4 py-3">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <div className="text-xs text-gray-400">Ваш реферальный код</div>
+                        <div className="text-sm font-bold text-[#1C2056] mt-0.5">{profile.referral_code}</div>
+                      </div>
+                      <button onClick={async () => {
+                        await navigator.clipboard.writeText(`https://invoices.kz/onboarding?ref=${profile.referral_code}`)
+                        alert('Ссылка скопирована!')
+                      }} className="text-xs bg-[#1C2056] text-white px-3 py-1.5 rounded-lg">
+                        Скопировать
+                      </button>
+                    </div>
+                    {profile?.referral_count > 0 && (
+                      <div className="text-xs text-[#2DC48D] mt-1">
+                        Приглашено друзей: {profile.referral_count}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
-            <button onClick={toggle}
-              className={`w-12 h-6 rounded-full transition-colors relative ${theme === 'dark' ? 'bg-[#1C2056]' : 'bg-gray-200'}`}>
-              <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${theme === 'dark' ? 'left-7' : 'left-1'}`}></span>
-            </button>
-          </div>
-        </div>
-
-        <button onClick={signOut}
-          className="w-full bg-red-50 text-red-500 rounded-xl py-3 text-sm font-medium">
-          Выйти из аккаунта
-        </button>
-      </div>
+          )
+        })()}
 
       <BottomNav />
     </main>
