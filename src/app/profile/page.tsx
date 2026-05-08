@@ -22,7 +22,6 @@ export default function Profile() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
 
-      // Сначала показываем кэш
       const cachedProfile = cacheGet('profile_' + user.id)
       if (cachedProfile) setProfile(cachedProfile)
 
@@ -35,8 +34,6 @@ export default function Profile() {
 
       setProfile(p)
       if (p) cacheSet('profile_' + user.id, p)
-
-      // Проверяем админа только после загрузки
       if (p?.is_admin) setIsAdmin(true)
 
       const now = new Date()
@@ -61,10 +58,7 @@ export default function Profile() {
         const monthTotal = (inv || [])
           .filter((inv: any) => inv.created_at >= start && inv.created_at <= end)
           .reduce((sum: number, inv: any) => sum + Number(inv.amount), 0)
-        months.push({
-          month: d.toLocaleString('ru-KZ', { month: 'short' }),
-          income: monthTotal
-        })
+        months.push({ month: d.toLocaleString('ru-KZ', { month: 'short' }), income: monthTotal })
       }
       setChartData(months)
       setLoading(false)
@@ -79,15 +73,19 @@ export default function Profile() {
     router.push('/login')
   }
 
+  async function copyReferralLink() {
+    await navigator.clipboard.writeText('https://invoices.kz/onboarding?ref=' + profile.referral_code)
+    alert('Ссылка скопирована!')
+  }
+
   if (loading && !profile) return (
     <main className="min-h-screen bg-gray-50 flex items-center justify-center">
       <p className="text-gray-400">Загрузка...</p>
     </main>
   )
 
-  const initials = profile?.company_name
-    ? profile.company_name.slice(0, 2).toUpperCase()
-    : 'FP'
+  const initials = profile?.company_name ? profile.company_name.slice(0, 2).toUpperCase() : 'FP'
+  const activePlan = getActivePlan(profile)
 
   const settingsItems = [
     { icon: '⚙️', label: 'Настройки счетов', href: '/profile/settings' },
@@ -101,7 +99,6 @@ export default function Profile() {
   return (
     <main className="min-h-screen bg-gray-50 pb-24">
 
-      {/* Header */}
       <div className="bg-white border-b px-4 py-3 flex items-center justify-between">
         <span className="font-bold text-[#1C2056]">INVOICES.KZ</span>
         <span className="text-sm text-gray-500">{profile?.company_name || ''}</span>
@@ -120,15 +117,10 @@ export default function Profile() {
               <div className="text-xs text-gray-400 mt-0.5">{profile?.bin_iin ? 'ИИН: ' + profile.bin_iin : 'Нет данных'}</div>
             </div>
           </div>
-
-          {/* Income */}
           <div className="bg-gray-50 rounded-xl p-4">
             <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">Доход за месяц</div>
-            <div className="text-2xl font-bold text-[#1C2056]">
-              {stats.income.toLocaleString('ru-KZ')} ₸
-            </div>
+            <div className="text-2xl font-bold text-[#1C2056]">{stats.income.toLocaleString('ru-KZ')} ₸</div>
             <div className="text-xs text-[#2DC48D] mt-0.5">Всего счетов: {stats.invoices}</div>
-
             {chartData.some(d => d.income > 0) && (
               <>
                 <div className="mt-3 h-16">
@@ -144,14 +136,7 @@ export default function Profile() {
                         formatter={(value: any) => [value.toLocaleString('ru-KZ') + ' ₸', 'Доход']}
                         contentStyle={{ fontSize: '11px', borderRadius: '8px', border: '1px solid #e5e7eb' }}
                       />
-                      <Area
-                        type="monotone"
-                        dataKey="income"
-                        stroke="#1C2056"
-                        strokeWidth={2}
-                        fill="url(#incomeGrad)"
-                        dot={false}
-                      />
+                      <Area type="monotone" dataKey="income" stroke="#1C2056" strokeWidth={2} fill="url(#incomeGrad)" dot={false} />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
@@ -175,8 +160,7 @@ export default function Profile() {
               { icon: '💳', label: 'Банковские счета', href: '/profile/banks' },
               { icon: '🔒', label: 'ЭЦП и безопасность', href: '/profile/security' },
             ].map((item, i, arr) => (
-              <div key={item.href}
-                onClick={() => router.push(item.href)}
+              <div key={item.href} onClick={() => router.push(item.href)}
                 className={`flex items-center justify-between px-4 py-3.5 cursor-pointer hover:bg-gray-50 ${i < arr.length - 1 ? 'border-b border-gray-100' : ''}`}>
                 <div className="flex items-center gap-3">
                   <span className="text-lg">{item.icon}</span>
@@ -197,17 +181,14 @@ export default function Profile() {
               { icon: '📋', label: 'Услуги и товары', href: '/profile/services', badge: stats.services },
               { icon: '⭐', label: 'Шаблоны счетов', href: '/profile/templates', badge: 0 },
             ].map((item, i, arr) => (
-              <div key={item.href}
-                onClick={() => router.push(item.href)}
+              <div key={item.href} onClick={() => router.push(item.href)}
                 className={`flex items-center justify-between px-4 py-3.5 cursor-pointer hover:bg-gray-50 ${i < arr.length - 1 ? 'border-b border-gray-100' : ''}`}>
                 <div className="flex items-center gap-3">
                   <span className="text-lg">{item.icon}</span>
                   <span className="text-sm text-gray-800">{item.label}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  {item.badge > 0 && (
-                    <span className="text-xs text-gray-400 font-medium">{item.badge}</span>
-                  )}
+                  {item.badge > 0 && <span className="text-xs text-gray-400 font-medium">{item.badge}</span>}
                   <span className="text-gray-300 text-lg">›</span>
                 </div>
               </div>
@@ -220,8 +201,7 @@ export default function Profile() {
           <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">Настройки</div>
           <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
             {settingsItems.map((item, i, arr) => (
-              <div key={item.href}
-                onClick={() => router.push(item.href)}
+              <div key={item.href} onClick={() => router.push(item.href)}
                 className={`flex items-center justify-between px-4 py-3.5 cursor-pointer hover:bg-gray-50 ${i < arr.length - 1 ? 'border-b border-gray-100' : ''}`}>
                 <div className="flex items-center gap-3">
                   <span className="text-lg">{item.icon}</span>
@@ -234,88 +214,93 @@ export default function Profile() {
         </div>
 
         {/* Подписка */}
-        {(() => {
-          const activePlan = getActivePlan(profile)
-          return (
-            <div>
-              <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">Подписка</div>
-              <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
-                <div className="px-4 py-4 flex items-center justify-between cursor-pointer"
-                  onClick={() => router.push('/upgrade')}>
-                  <div className="flex items-center gap-3">
-                    <span className="text-lg">
-                      {activePlan.isTrial ? '🎉' : activePlan.plan === 'pro' ? '⭐' : activePlan.plan === 'basic' ? '💼' : '🆓'}
-                    </span>
-                    <div>
-                      <div className="text-sm font-medium text-[#1C2056]">{activePlan.label}</div>
-                      <div className="text-xs text-gray-400">
-                        {activePlan.plan === 'pro' && !activePlan.isTrial && 'Безлимит · ЭЦП · Шаблоны'}
-                        {activePlan.plan === 'basic' && !activePlan.isTrial && '30 счетов в месяц'}
-                        {activePlan.plan === 'free' && 'Перейдите на платный тариф'}
-                        {activePlan.isTrial && 'Все функции Pro открыты'}
-                      </div>
-                    </div>
+        <div>
+          <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">Подписка</div>
+          <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
+            <div className="px-4 py-4 flex items-center justify-between cursor-pointer" onClick={() => router.push('/upgrade')}>
+              <div className="flex items-center gap-3">
+                <span className="text-lg">
+                  {activePlan.isTrial ? '🎉' : activePlan.plan === 'pro' ? '⭐' : activePlan.plan === 'basic' ? '💼' : '🆓'}
+                </span>
+                <div>
+                  <div className="text-sm font-medium text-[#1C2056]">{activePlan.label}</div>
+                  <div className="text-xs text-gray-400">
+                    {activePlan.plan === 'pro' && !activePlan.isTrial && 'Безлимит · ЭЦП · Шаблоны'}
+                    {activePlan.plan === 'basic' && !activePlan.isTrial && '30 счетов в месяц'}
+                    {activePlan.plan === 'free' && 'Перейдите на платный тариф'}
+                    {activePlan.isTrial && 'Все функции Pro открыты'}
                   </div>
-                  <span className="text-gray-300 text-lg">›</span>
                 </div>
+              </div>
+              <span className="text-gray-300 text-lg">›</span>
+            </div>
 
-                {/* Даты */}
-                {(profile?.trial_expires_at || profile?.plan_expires_at || profile?.bonus_expires_at) && (
-                  <div className="border-t border-gray-100 px-4 py-3 space-y-2">
-                    {profile?.trial_expires_at && new Date(profile.trial_expires_at) > new Date() && (
-                      <div className="flex justify-between text-xs">
-                        <span className="text-gray-400">Пробный период до</span>
-                        <span className="text-green-600 font-medium">
-                          {new Date(profile.trial_expires_at).toLocaleDateString('ru-KZ')}
-                        </span>
-                      </div>
-                    )}
-                    {profile?.plan_expires_at && profile?.plan !== 'free' && (
-                      <div className="flex justify-between text-xs">
-                        <span className="text-gray-400">Тариф действует до</span>
-                        <span className={`font-medium ${new Date(profile.plan_expires_at) > new Date() ? 'text-[#1C2056]' : 'text-red-500'}`}>
-                          {new Date(profile.plan_expires_at).toLocaleDateString('ru-KZ')}
-                        </span>
-                      </div>
-                    )}
-                    {profile?.bonus_expires_at && (
-                      <div className="flex justify-between text-xs">
-                        <span className="text-gray-400">Бонусные дни до</span>
-                        <span className={`font-medium ${new Date(profile.bonus_expires_at) > new Date() ? 'text-[#2DC48D]' : 'text-gray-400'}`}>
-                          {new Date(profile.bonus_expires_at).toLocaleDateString('ru-KZ')}
-                          {new Date(profile.bonus_expires_at) < new Date() && ' (истёк)'}
-                        </span>
-                      </div>
-                    )}
+            {(profile?.trial_expires_at || profile?.plan_expires_at || profile?.bonus_expires_at) && (
+              <div className="border-t border-gray-100 px-4 py-3 space-y-2">
+                {profile?.trial_expires_at && new Date(profile.trial_expires_at) > new Date() && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-400">Пробный период до</span>
+                    <span className="text-green-600 font-medium">{new Date(profile.trial_expires_at).toLocaleDateString('ru-KZ')}</span>
                   </div>
                 )}
-
-                {/* Реферальный код */}
-                {profile?.referral_code && (
-                  <div className="border-t border-gray-100 px-4 py-3">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <div className="text-xs text-gray-400">Ваш реферальный код</div>
-                        <div className="text-sm font-bold text-[#1C2056] mt-0.5">{profile.referral_code}</div>
-                      </div>
-                      <button onClick={async () => {
-                        await navigator.clipboard.writeText(`https://invoices.kz/onboarding?ref=${profile.referral_code}`)
-                        alert('Ссылка скопирована!')
-                      }} className="text-xs bg-[#1C2056] text-white px-3 py-1.5 rounded-lg">
-                        Скопировать
-                      </button>
-                    </div>
-                    {profile?.referral_count > 0 && (
-                      <div className="text-xs text-[#2DC48D] mt-1">
-                        Приглашено друзей: {profile.referral_count}
-                      </div>
-                    )}
+                {profile?.plan_expires_at && profile?.plan !== 'free' && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-400">Тариф действует до</span>
+                    <span className={`font-medium ${new Date(profile.plan_expires_at) > new Date() ? 'text-[#1C2056]' : 'text-red-500'}`}>
+                      {new Date(profile.plan_expires_at).toLocaleDateString('ru-KZ')}
+                    </span>
+                  </div>
+                )}
+                {profile?.bonus_expires_at && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-400">Бонусные дни до</span>
+                    <span className={`font-medium ${new Date(profile.bonus_expires_at) > new Date() ? 'text-[#2DC48D]' : 'text-gray-400'}`}>
+                      {new Date(profile.bonus_expires_at).toLocaleDateString('ru-KZ')}
+                      {new Date(profile.bonus_expires_at) < new Date() && ' (истёк)'}
+                    </span>
                   </div>
                 )}
               </div>
+            )}
+
+            {profile?.referral_code && (
+              <div className="border-t border-gray-100 px-4 py-3">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <div className="text-xs text-gray-400">Ваш реферальный код</div>
+                    <div className="text-sm font-bold text-[#1C2056] mt-0.5">{profile.referral_code}</div>
+                  </div>
+                  <button onClick={copyReferralLink} className="text-xs bg-[#1C2056] text-white px-3 py-1.5 rounded-lg">
+                    Скопировать
+                  </button>
+                </div>
+                {profile?.referral_count > 0 && (
+                  <div className="text-xs text-[#2DC48D] mt-1">Приглашено друзей: {profile.referral_count}</div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Theme toggle */}
+        <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
+          <div className="flex items-center justify-between px-4 py-3.5">
+            <div className="flex items-center gap-3">
+              <span className="text-lg">{theme === 'dark' ? '🌙' : '☀️'}</span>
+              <span className="text-sm text-gray-800">{theme === 'dark' ? 'Тёмная тема' : 'Светлая тема'}</span>
             </div>
-          )
-        })()}
+            <button onClick={toggle}
+              className={`w-12 h-6 rounded-full transition-colors relative ${theme === 'dark' ? 'bg-[#1C2056]' : 'bg-gray-200'}`}>
+              <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${theme === 'dark' ? 'left-7' : 'left-1'}`}></span>
+            </button>
+          </div>
+        </div>
+
+        <button onClick={signOut} className="w-full bg-red-50 text-red-500 rounded-xl py-3 text-sm font-medium">
+          Выйти из аккаунта
+        </button>
+
+      </div>
 
       <BottomNav />
     </main>
