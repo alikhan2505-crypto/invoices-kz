@@ -162,7 +162,12 @@ export default function Dashboard() {
     setShowServicePicker(false)
   }
 
-  function addService() { setServices([...services, { name: '', qty: 1, price: 0, unit: 'шт', code: '', type: 'service' }]) }
+  function addService() {
+    setServices([...services, { name: '', qty: 1, price: 0, unit: 'шт', code: '', type: 'service' }])
+    setTimeout(() => {
+      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })
+    }, 100)
+  }
   function removeService(idx: number) { setServices(services.filter((_, i) => i !== idx)) }
   function updateService(idx: number, field: string, value: string | number) {
     const updated = [...services]

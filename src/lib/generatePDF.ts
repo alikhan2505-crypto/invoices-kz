@@ -278,7 +278,7 @@ export function generateInvoicePDF(data: InvoiceData) {
       <hr>
 
       <div style="margin-top:16px; min-height:120px; position:relative;">
-        <div style="display:flex; align-items:flex-end; gap:8px; width:55%;">
+        <div style="display:flex; align-items:flex-end; gap:4px; width:90%;">
           <span style="white-space:nowrap;">Руководитель</span>
           <div style="position:relative; flex:1; min-width:120px;">
             ${signatureUrl ? `
@@ -286,7 +286,7 @@ export function generateInvoicePDF(data: InvoiceData) {
                 style="position:absolute; bottom:4px; left:10px; height:45px; max-width:160px; object-fit:contain;"
               />
             ` : ''}
-            <div style="border-bottom:1px solid #000; width:100%; margin-top:50px;"></div>
+            <div style="border-bottom:1px solid #000; width:100%; margin-top:50px; min-width:200px;"></div>
           </div>
           <span style="white-space:nowrap; padding-bottom:2px;">${director ? '/ ' + director : '/'}</span>
         </div>
