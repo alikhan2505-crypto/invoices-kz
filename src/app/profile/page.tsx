@@ -232,34 +232,48 @@ export default function Profile() {
               <span className="text-gray-300 text-lg">›</span>
             </div>
 
-            {(profile?.trial_expires_at || profile?.plan_expires_at || profile?.bonus_expires_at) && (
+            {(profile?.plan_expires_at || profile?.bonus_expires_at || profile?.trial_expires_at) && (
               <div className="border-t border-gray-100 px-4 py-3 space-y-2">
-                {profile?.trial_expires_at && new Date(profile.trial_expires_at) > new Date() && (
+
+                {/* 1. Тарифный план */}
+                {profile?.plan_expires_at && profile?.plan !== 'free' && (
                   <div className="flex justify-between text-xs">
-                    <span className="text-gray-400">Пробный период</span>
-                    <span className="text-green-600 font-medium">
-                      до {new Date(profile.trial_expires_at).toLocaleDateString('ru-KZ')}
+                    <span className="text-gray-400">
+                      {activePlan.plan === 'pro' ? 'Про тариф' : 'Базовый тариф'} действует до
+                    </span>
+                    <span className={`font-medium ${new Date(profile.plan_expires_at) > new Date() ? 'text-[#1C2056]' : 'text-red-500'}`}>
+                      {new Date(profile.plan_expires_at).toLocaleDateString('ru-KZ')}
                     </span>
                   </div>
                 )}
+
+                {/* 2. Реферальный бонус */}
                 {profile?.bonus_expires_at && new Date(profile.bonus_expires_at) > new Date() && (
                   <div className="flex justify-between text-xs">
-                    <span className="text-gray-400">Реферальный бонус</span>
+                    <span className="text-gray-400">Реферальный бонус Basic</span>
                     <span className="text-[#2DC48D] font-medium">
-                      {Math.ceil((new Date(profile.bonus_expires_at).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} дней осталось · до {new Date(profile.bonus_expires_at).toLocaleDateString('ru-KZ')}
+                      {Math.ceil((new Date(profile.bonus_expires_at).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} дней
                     </span>
                   </div>
                 )}
-                
-                {profile?.bonus_expires_at && (
+
+                {/* 3. Пробный период */}
+                {profile?.trial_expires_at && new Date(profile.trial_expires_at) > new Date() && (
                   <div className="flex justify-between text-xs">
-                    <span className="text-gray-400">Бонусные дни до</span>
-                    <span className={`font-medium ${new Date(profile.bonus_expires_at) > new Date() ? 'text-[#2DC48D]' : 'text-gray-400'}`}>
-                      {new Date(profile.bonus_expires_at).toLocaleDateString('ru-KZ')}
-                      {new Date(profile.bonus_expires_at) < new Date() && ' (истёк)'}
+                    <span className="text-gray-400">Пробный период до</span>
+                    <span className="text-green-600 font-medium">
+                      {profile?.plan_expires_at && new Date(profile.plan_expires_at) > new Date()
+                        ? (() => {
+                            const trialEnd = new Date(profile.plan_expires_at)
+                            trialEnd.setDate(trialEnd.getDate() + 7)
+                            return trialEnd.toLocaleDateString('ru-KZ')
+                          })()
+                        : new Date(profile.trial_expires_at).toLocaleDateString('ru-KZ')
+                      }
                     </span>
                   </div>
                 )}
+
               </div>
             )}
 
