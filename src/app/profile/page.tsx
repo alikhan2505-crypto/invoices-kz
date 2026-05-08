@@ -73,10 +73,7 @@ export default function Profile() {
     router.push('/login')
   }
 
-  async function copyReferralLink() {
-    await navigator.clipboard.writeText('https://invoices.kz/onboarding?ref=' + profile.referral_code)
-    alert('Ссылка скопирована!')
-  }
+
 
   if (loading && !profile) return (
     <main className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -263,22 +260,6 @@ export default function Profile() {
               </div>
             )}
 
-            {profile?.referral_code && (
-              <div className="border-t border-gray-100 px-4 py-3">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <div className="text-xs text-gray-400">Ваш реферальный код</div>
-                    <div className="text-sm font-bold text-[#1C2056] mt-0.5">{profile.referral_code}</div>
-                  </div>
-                  <button onClick={copyReferralLink} className="text-xs bg-[#1C2056] text-white px-3 py-1.5 rounded-lg">
-                    Скопировать
-                  </button>
-                </div>
-                {profile?.referral_count > 0 && (
-                  <div className="text-xs text-[#2DC48D] mt-1">Приглашено друзей: {profile.referral_count}</div>
-                )}
-              </div>
-            )}
           </div>
         </div>
 

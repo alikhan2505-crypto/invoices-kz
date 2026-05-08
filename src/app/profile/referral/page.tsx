@@ -19,14 +19,14 @@ export default function Referral() {
   }, [])
 
   async function copyLink() {
-    const link = `https://invoices.kz/login?ref=${profile?.referral_code}`
+    const link = `https://invoices.kz/onboarding?ref=${profile?.referral_code}`
     await navigator.clipboard.writeText(link)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
 
   async function shareWhatsApp() {
-    const link = `https://invoices.kz/login?ref=${profile?.referral_code}`
+    const link = `https://invoices.kz/onboarding?ref=${profile?.referral_code}`
     const text = `Привет! Попробуй INVOICES.KZ — создавай счета за 1 минуту. Регистрируйся по моей ссылке и получи бонус: ${link}`
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
   }
