@@ -82,3 +82,95 @@ main {
   from { opacity: 0; }
   to { opacity: 1; }
 }
+
+/* Dark theme overrides */
+[data-theme="dark"] body {
+  background: var(--bg);
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .bg-white {
+  background-color: var(--bg-card) !important;
+}
+
+[data-theme="dark"] .bg-gray-50 {
+  background-color: var(--bg) !important;
+}
+
+[data-theme="dark"] .bg-gray-100 {
+  background-color: var(--bg-hover) !important;
+}
+
+[data-theme="dark"] .border-gray-100,
+[data-theme="dark"] .border-gray-200 {
+  border-color: var(--border) !important;
+}
+
+[data-theme="dark"] .text-gray-400,
+[data-theme="dark"] .text-gray-500,
+[data-theme="dark"] .text-gray-600 {
+  color: var(--text-secondary) !important;
+}
+
+[data-theme="dark"] .text-gray-800,
+[data-theme="dark"] .text-gray-900 {
+  color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .shadow-sm {
+  box-shadow: 0 1px 3px rgba(0,0,0,0.4) !important;
+}
+
+[data-theme="dark"] input,
+[data-theme="dark"] textarea,
+[data-theme="dark"] select {
+  background-color: var(--bg-hover) !important;
+  color: var(--text-primary) !important;
+  -webkit-text-fill-color: var(--text-primary) !important;
+  border-color: var(--border) !important;
+}
+
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder {
+  color: var(--text-secondary) !important;
+}
+
+[data-theme="dark"] .border-b {
+  border-color: var(--border) !important;
+}
+
+[data-theme="dark"] .hover\:bg-gray-50:hover {
+  background-color: var(--bg-hover) !important;
+}
+
+[data-theme="dark"] .bg-blue-50 {
+  background-color: rgba(28, 32, 86, 0.3) !important;
+}
+
+[data-theme="dark"] .bg-green-50 {
+  background-color: rgba(45, 196, 141, 0.1) !important;
+}
+
+[data-theme="dark"] .bg-red-50 {
+  background-color: rgba(239, 68, 68, 0.1) !important;
+}
+
+[data-theme="dark"] .bg-yellow-50 {
+  background-color: rgba(234, 179, 8, 0.1) !important;
+}
+
+[data-theme="dark"] .border-blue-100 {
+  border-color: rgba(28, 32, 86, 0.5) !important;
+}
+
+[data-theme="dark"] .border-green-100 {
+  border-color: rgba(45, 196, 141, 0.3) !important;
+}
+
+[data-theme="dark"] .border-red-100 {
+  border-color: rgba(239, 68, 68, 0.3) !important;
+}
+
+[data-theme="dark"] .border-yellow-100 {
+  border-color: rgba(234, 179, 8, 0.3) !important;
+}
