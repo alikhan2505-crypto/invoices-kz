@@ -11,7 +11,7 @@ export default function Clients() {
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [form, setForm] = useState({ name: '', bin_iin: '', email: '', address: '' })
+  const [form, setForm] = useState({ name: '', bin_iin: '', email: '', address: '', phone: '' })
 
   useEffect(() => { loadClients() }, [])
 
@@ -25,13 +25,13 @@ export default function Clients() {
 
   function startEdit(client: any) {
     setEditingId(client.id)
-    setForm({ name: client.name, bin_iin: client.bin_iin || '', email: client.email || '', address: client.address || '' })
+    setForm({ name: client.name, bin_iin: client.bin_iin || '', email: client.email || '', address: client.address || '', phone: client.phone || '' })
     setShowForm(true)
   }
 
   function resetForm() {
     setEditingId(null)
-    setForm({ name: '', bin_iin: '', email: '', address: '' })
+    setForm({ name: '', bin_iin: '', email: '', address: '', phone: '' })
     setShowForm(false)
   }
 
@@ -64,7 +64,8 @@ export default function Clients() {
     c.name.toLowerCase().includes(search.toLowerCase()) ||
     (c.bin_iin || '').includes(search) ||
     (c.email || '').toLowerCase().includes(search.toLowerCase()) ||
-    (c.address || '').toLowerCase().includes(search.toLowerCase())
+    (c.address || '').toLowerCase().includes(search.toLowerCase()) ||
+    (c.phone || '').includes(search)
   )
 
   return (
@@ -121,6 +122,7 @@ export default function Clients() {
               { key: 'bin_iin', label: 'БИН / ИИН', placeholder: '123456789012' },
               { key: 'email', label: 'Email', placeholder: 'client@mail.kz' },
               { key: 'address', label: 'Адрес', placeholder: 'г. Алматы, ул. Абая 1' },
+              { key: 'phone', label: 'Телефон', placeholder: '+7 701 123 45 67' },
             ].map(f => (
               <div key={f.key}>
                 <label className="text-xs text-gray-500 mb-1 block">{f.label}</label>
@@ -171,6 +173,7 @@ export default function Clients() {
                   {client.bin_iin && <div className="text-xs text-gray-400 mt-0.5">БИН: {client.bin_iin}</div>}
                   {client.email && <div className="text-xs text-gray-400">{client.email}</div>}
                   {client.address && <div className="text-xs text-gray-400">{client.address}</div>}
+                  {client.phone && <div className="text-xs text-gray-400">{client.phone}</div>}
                 </div>
                 <div className="flex items-center gap-2 ml-3">
                   <button onClick={() => startEdit(client)}

@@ -497,7 +497,7 @@ export default function Dashboard() {
                 <div>
                   <label className="text-xs text-gray-500 mb-1 block">№ договора</label>
                   <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                    placeholder="№123" value={contractNumber} onChange={e => setContractNumber(e.target.value)} />
+                    placeholder="123" value={contractNumber} onChange={e => setContractNumber(e.target.value)} />
                 </div>
                 <div>
                   <label className="text-xs text-gray-500 mb-1 block">Дата договора</label>

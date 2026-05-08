@@ -291,9 +291,10 @@ export function generateInvoicePDF(data: InvoiceData) {
           <span style="white-space:nowrap; padding-bottom:2px;">${director ? '/ ' + director : '/'}</span>
         </div>
         <div style="margin-top:8px; font-size:9px; color:#666; width:55%; display:flex; justify-content:space-between; padding:0 4px;">
-          <span>М.П.</span>
+          <span>должность</span>
           <span>подпись</span>
-          <span>расшифровка подписи</span>
+          <span>М.П.</span>
+           <span>расшифровка подписи</span>
         </div>
         ${stampUrl ? `
           <img src="${stampUrl}"
