@@ -50,29 +50,10 @@ export default function Login() {
 
         {!sent ? (
           <>
-            <label className="text-xs text-gray-500 mb-2 block">Email</label>
-            <input
-              className="w-full border rounded-lg px-3 py-3 text-sm outline-none focus:border-[#1C2056] mb-4"
-              placeholder="your@email.com"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-            />
-            <button
-              onClick={sendLink}
-              disabled={loading}
-              className="w-full bg-[#2DC48D] text-white rounded-lg py-3 font-medium text-sm mb-4">
-              {loading ? 'Отправка...' : 'Получить ссылку для входа'}
-            </button>
-
-            <div className="flex items-center gap-3 my-3">
-              <div className="flex-1 h-px bg-gray-200"></div>
-              <span className="text-xs text-gray-400">или</span>
-              <div className="flex-1 h-px bg-gray-200"></div>
-            </div>
-
+            {/* Google */}
             <button
               onClick={signInWithGoogle}
-              className="w-full border border-gray-200 rounded-lg py-3 text-sm font-medium flex items-center justify-center gap-3 hover:bg-gray-50 transition">
+              className="w-full border border-gray-200 rounded-lg py-3 text-sm font-medium flex items-center justify-center gap-3 hover:bg-gray-50 transition mb-3">
               <svg width="18" height="18" viewBox="0 0 48 48">
                 <path fill="#FFC107" d="M43.6 20H24v8h11.3C33.7 32.8 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l5.7-5.7C34.1 6.5 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20c11 0 20-9 20-20 0-1.3-.1-2.7-.4-4z"/>
                 <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.5 16 18.9 13 24 13c3 0 5.8 1.1 7.9 3l5.7-5.7C34.1 6.5 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/>
@@ -82,16 +63,39 @@ export default function Login() {
               Войти через Google
             </button>
 
+            {/* Yandex */}
             <button
               onClick={signInWithYandex}
-              className="w-full border border-gray-200 rounded-lg py-3 text-sm font-medium flex items-center justify-center gap-3 hover:bg-gray-50 transition">
+              className="w-full border border-gray-200 rounded-lg py-3 text-sm font-medium flex items-center justify-center gap-3 hover:bg-gray-50 transition mb-4">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                 <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z" fill="#FC3F1D"/>
                 <path d="M13.32 7.219h-.929c-1.607 0-2.45.843-2.45 2.09 0 1.411.607 2.126 1.857 2.968l1.036.707-2.95 4.797H8.429l2.733-4.44C9.615 12.294 8.75 11.22 8.75 9.38c0-2.19 1.5-3.661 4.036-3.661h2.393v9.972H13.32V7.219z" fill="white"/>
               </svg>
               Войти через Яндекс
-</button>
+            </button>
 
+            {/* Divider */}
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex-1 h-px bg-gray-200"></div>
+              <span className="text-xs text-gray-400">или через email</span>
+              <div className="flex-1 h-px bg-gray-200"></div>
+            </div>
+
+            {/* Email */}
+            <label className="text-xs text-gray-500 mb-2 block">Email</label>
+            <input
+              className="w-full border rounded-lg px-3 py-3 text-sm outline-none focus:border-[#1C2056] mb-3"
+              placeholder="your@email.com"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && sendLink()}
+            />
+            <button
+              onClick={sendLink}
+              disabled={loading}
+              className="w-full bg-[#2DC48D] text-white rounded-lg py-3 font-medium text-sm">
+              {loading ? 'Отправка...' : 'Получить ссылку для входа'}
+            </button>
           </>
         ) : (
           <div className="text-center">
