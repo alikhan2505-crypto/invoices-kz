@@ -20,7 +20,7 @@ export default function History() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
-  const [dateFilter, setDateFilter] = useState('month')
+  const [dateFilter, setDateFilter] = useState('all_time')
 
   useEffect(() => { loadInvoices() }, [])
 
@@ -96,7 +96,9 @@ export default function History() {
     const invDate = new Date(inv.created_at)
     const now = new Date()
     let matchDate = true
-    if (dateFilter === 'today') {
+    if (dateFilter === 'all_time') {
+      matchDate = true
+    } else if (dateFilter === 'today') {
       matchDate = invDate.toDateString() === now.toDateString()
     } else if (dateFilter === 'week') {
       const weekAgo = new Date(now)
