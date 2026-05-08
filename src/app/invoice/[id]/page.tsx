@@ -24,18 +24,18 @@ export default function InvoicePage() {
   const [bank, setBank] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState(false)
+  const [showSignModal, setShowSignModal] = useState(false)
+  const [pendingDocAction, setPendingDocAction] = useState<((withSign: boolean) => void) | null>(null)
 
   useEffect(() => { loadInvoice() }, [])
 
   async function loadInvoice() {
     const { data: inv } = await supabase.from('invoices').select('*').eq('id', id).single()
     setInvoice(inv)
-
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
       const { data: p } = await supabase.from('profiles').select('*').eq('id', user.id).single()
       setProfile(p)
-
       if (inv?.bank_id) {
         const { data: b } = await supabase.from('bank_accounts').select('*').eq('id', inv.bank_id).single()
         setBank(b)
@@ -45,6 +45,24 @@ export default function InvoicePage() {
       }
     }
     setLoading(false)
+  }
+
+  function askSignature(action: (withSign: boolean) => void) {
+    setPendingDocAction(() => action)
+    setShowSignModal(true)
+  }
+
+  function buildProfile(withSign: boolean) {
+    return {
+      company_name: profile.company_name || '',
+      bin_iin: profile.bin_iin || '',
+      address: profile.address || '',
+      director_name: profile.director_name || '',
+      phone: profile.phone || '',
+      email: profile.email || '',
+      signature_url: withSign ? (profile.signature_url || '') : '',
+      stamp_url: withSign ? (profile.stamp_url || '') : '',
+    }
   }
 
   async function updateStatus(status: string) {
@@ -113,13 +131,11 @@ export default function InvoicePage() {
       return
     }
     if (!confirm(`Отправить счёт на ${invoice.client_email}?`)) return
-    
     const res = await fetch('/api/send-invoice', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ invoiceId: id })
     })
-    
     const data = await res.json()
     if (data.success) {
       alert(`✅ Счёт отправлен на ${invoice.client_email}`)
@@ -137,7 +153,7 @@ export default function InvoicePage() {
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
   }
 
-  function openPDF(autoPrint = false) {
+  function openPDF(autoPrint = false, withSignature = true) {
     if (!invoice || !profile) { alert('Данные ещё загружаются'); return }
     const services = invoice.services || [{ name: 'Услуга', qty: 1, price: invoice.amount }]
     generateInvoicePDF({
@@ -152,20 +168,8 @@ export default function InvoicePage() {
       note: invoice.note || profile?.default_note || '',
       autoPrint,
       vatType: profile?.vat_type,
-      profile: {
-        company_name: profile.company_name || '',
-        bin_iin: profile.bin_iin || '',
-        address: profile.address || '',
-        director_name: profile.director_name || '',
-        signature_url: profile.signature_url || '',
-        stamp_url: profile.stamp_url || '',
-      },
-      bank: bank ? {
-        bank_name: bank.bank_name,
-        iik: bank.iik,
-        bik: bank.bik,
-        kbe: bank.kbe,
-      } : undefined,
+      profile: buildProfile(withSignature),
+      bank: bank ? { bank_name: bank.bank_name, iik: bank.iik, bik: bank.bik, kbe: bank.kbe } : undefined,
     })
   }
 
@@ -193,7 +197,6 @@ export default function InvoicePage() {
 
       <div className="max-w-lg mx-auto p-4 space-y-4">
 
-        {/* Status card */}
         <div className="bg-white rounded-2xl shadow-sm p-5 text-center">
           <div className="text-3xl font-bold text-[#1C2056] mb-1">
             {Number(invoice.amount).toLocaleString('ru-KZ')} ₸
@@ -205,13 +208,12 @@ export default function InvoicePage() {
           </span>
         </div>
 
-        {/* Actions */}
         <div className="grid grid-cols-5 gap-2">
           {[
             { icon: '💬', label: 'WhatsApp', action: shareWhatsApp },
             { icon: '🔗', label: 'Ссылка', action: copyPublicLink },
-            { icon: '📄', label: 'PDF', action: () => openPDF(false) },
-            { icon: '🖨️', label: 'Печать', action: () => openPDF(true) },
+            { icon: '📄', label: 'PDF', action: () => askSignature((w) => openPDF(false, w)) },
+            { icon: '🖨️', label: 'Печать', action: () => askSignature((w) => openPDF(true, w)) },
             { icon: '📧', label: 'Email', action: sendEmail },
           ].map(a => (
             <button key={a.label} onClick={a.action}
@@ -222,7 +224,6 @@ export default function InvoicePage() {
           ))}
         </div>
 
-        {/* Services */}
         {services.length > 0 && (
           <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
             <div className="px-4 pt-4 pb-2 text-xs text-gray-400 uppercase tracking-wide">Услуги</div>
@@ -242,7 +243,6 @@ export default function InvoicePage() {
           </div>
         )}
 
-        {/* Note */}
         {invoice.note && (
           <div className="bg-white rounded-2xl shadow-sm p-4">
             <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">Примечание</div>
@@ -250,7 +250,6 @@ export default function InvoicePage() {
           </div>
         )}
 
-        {/* Bank info */}
         {bank && (
           <div className="bg-white rounded-2xl shadow-sm p-4">
             <div className="text-xs text-gray-400 uppercase tracking-wide mb-3">Банковские реквизиты</div>
@@ -277,7 +276,6 @@ export default function InvoicePage() {
           </div>
         )}
 
-        {/* Status history */}
         <div className="bg-white rounded-2xl shadow-sm p-4">
           <div className="text-xs text-gray-400 uppercase tracking-wide mb-3">История</div>
           <div className="space-y-3">
@@ -309,7 +307,6 @@ export default function InvoicePage() {
           </div>
         </div>
 
-        {/* Change status */}
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
           <div className="px-4 pt-4 pb-2 text-xs text-gray-400 uppercase tracking-wide">Изменить статус</div>
           {[
@@ -329,7 +326,6 @@ export default function InvoicePage() {
           ))}
         </div>
 
-        {/* Actions bottom */}
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
           <button onClick={() => router.push('/invoice/' + id + '/edit')}
             className="w-full flex items-center px-4 py-3.5 text-sm hover:bg-gray-50 text-[#1C2056] border-b border-gray-100">
@@ -339,119 +335,78 @@ export default function InvoicePage() {
             className="w-full flex items-center px-4 py-3.5 text-sm hover:bg-gray-50 text-[#1C2056] border-b border-gray-100">
             📋 Дублировать
           </button>
-
           <button onClick={async () => {
             if (!profile) { alert('Данные загружаются'); return }
-
-            // Запрашиваем номер КП
             const kpNumber = prompt('Номер КП:', invoice.number)
             if (!kpNumber) return
-
-            // Запрашиваем срок действия
             const today = new Date()
             today.setDate(today.getDate() + 30)
-            const defaultDate = today.toLocaleDateString('ru-KZ')
-            const validUntil = prompt('Действителен до:', defaultDate)
+            const validUntil = prompt('Действителен до:', today.toLocaleDateString('ru-KZ'))
             if (!validUntil) return
-
-            generateKP({
-              number: kpNumber,
-              date: formatDate(invoice.created_at),
-              validUntil,
-              clientName: invoice.client_name || '',
-              clientBin: invoice.client_bin || '',
-              services: invoice.services || [],
-              total: Number(invoice.amount),
-              note: invoice.note || '',
-              vatType: profile?.vat_type || 'no_vat',
-              profile: {
-                company_name: profile.company_name || '',
-                bin_iin: profile.bin_iin || '',
-                address: profile.address || '',
-                phone: profile.phone || '',
-                email: profile.email || '',
-                director_name: profile.director_name || '',
-                signature_url: profile.signature_url || '',
-                stamp_url: profile.stamp_url || '',
-              },
-              bank: bank ? {
-                bank_name: bank.bank_name,
-                iik: bank.iik,
-                bik: bank.bik,
-                kbe: bank.kbe,
-              } : undefined,
+            askSignature((withSign) => {
+              generateKP({
+                number: kpNumber,
+                date: formatDate(invoice.created_at),
+                validUntil,
+                clientName: invoice.client_name || '',
+                clientBin: invoice.client_bin || '',
+                services: invoice.services || [],
+                total: Number(invoice.amount),
+                note: invoice.note || '',
+                vatType: profile?.vat_type || 'no_vat',
+                profile: buildProfile(withSign),
+                bank: bank ? { bank_name: bank.bank_name, iik: bank.iik, bik: bank.bik, kbe: bank.kbe } : undefined,
+              })
             })
           }}
             className="w-full flex items-center px-4 py-3.5 text-sm hover:bg-gray-50 text-[#1C2056] border-b border-gray-100">
             📋 Коммерческое предложение
           </button>
-
           <button onClick={async () => {
             if (!profile) { alert('Данные загружаются'); return }
-
             const avrNumber = prompt('Номер АВР:', invoice.number)
             if (!avrNumber) return
-
             const contractNumber = prompt('Номер договора (необязательно):', invoice.number)
             const contractDate = prompt('Дата договора:', formatDate(invoice.created_at))
-
-            generateAVR({
-              number: avrNumber,
-              date: formatDate(invoice.created_at),
-              contractNumber: contractNumber || undefined,
-              contractDate: contractDate || undefined,
-              clientName: invoice.client_name || '',
-              clientBin: invoice.client_bin || '',
-              clientAddress: invoice.client_address || '',
-              services: invoice.services || [],
-              total: Number(invoice.amount),
-              vatType: profile?.vat_type || 'no_vat',
-              profile: {
-                company_name: profile.company_name || '',
-                bin_iin: profile.bin_iin || '',
-                address: profile.address || '',
-                phone: profile.phone || '',
-                email: profile.email || '',
-                director_name: profile.director_name || '',
-                signature_url: profile.signature_url || '',
-                stamp_url: profile.stamp_url || '',
-              },
+            askSignature((withSign) => {
+              generateAVR({
+                number: avrNumber,
+                date: formatDate(invoice.created_at),
+                contractNumber: contractNumber || undefined,
+                contractDate: contractDate || undefined,
+                clientName: invoice.client_name || '',
+                clientBin: invoice.client_bin || '',
+                clientAddress: invoice.client_address || '',
+                services: invoice.services || [],
+                total: Number(invoice.amount),
+                vatType: profile?.vat_type || 'no_vat',
+                profile: buildProfile(withSign),
+              })
             })
           }}
             className="w-full flex items-center px-4 py-3.5 text-sm hover:bg-gray-50 text-[#1C2056] border-b border-gray-100">
             📋 Акт выполненных работ
           </button>
-
           <button onClick={async () => {
             if (!profile) { alert('Данные загружаются'); return }
-
             const naklNumber = prompt('Номер накладной:', invoice.number)
             if (!naklNumber) return
-
-            generateNakladnaya({
-              number: naklNumber,
-              date: formatDate(invoice.created_at),
-              clientName: invoice.client_name || '',
-              clientBin: invoice.client_bin || '',
-              services: invoice.services || [],
-              total: Number(invoice.amount),
-              vatType: profile?.vat_type || 'no_vat',
-              profile: {
-                company_name: profile.company_name || '',
-                bin_iin: profile.bin_iin || '',
-                address: profile.address || '',
-                phone: profile.phone || '',
-                email: profile.email || '',
-                director_name: profile.director_name || '',
-                signature_url: profile.signature_url || '',
-                stamp_url: profile.stamp_url || '',
-              },
+            askSignature((withSign) => {
+              generateNakladnaya({
+                number: naklNumber,
+                date: formatDate(invoice.created_at),
+                clientName: invoice.client_name || '',
+                clientBin: invoice.client_bin || '',
+                services: invoice.services || [],
+                total: Number(invoice.amount),
+                vatType: profile?.vat_type || 'no_vat',
+                profile: buildProfile(withSign),
+              })
             })
           }}
             className="w-full flex items-center px-4 py-3.5 text-sm hover:bg-gray-50 text-[#1C2056] border-b border-gray-100">
             📋 Накладная на отпуск товара
           </button>
-
           <button onClick={async () => {
             const { data: { user } } = await supabase.auth.getUser()
             if (!user) return
@@ -478,15 +433,12 @@ export default function InvoicePage() {
             className="w-full flex items-center px-4 py-3.5 text-sm hover:bg-gray-50 text-[#1C2056] border-b border-gray-100">
             🔔 Напомнить об оплате
           </button>
-
           <button onClick={async () => {
             if (invoice.recurring_active) {
-              // Отключаем повторение
               await supabase.from('invoices').update({ recurring_active: false }).eq('id', id)
               await loadInvoice()
               alert('Повторение отключено')
             } else {
-              // Включаем повторение
               const until = prompt('Повторять до (дата в формате ДД.ММ.ГГГГ):', '01.12.2026')
               if (!until) return
               const parts = until.split('.')
@@ -496,7 +448,7 @@ export default function InvoicePage() {
                 alert('У клиента нет email! Добавьте email клиента чтобы он получал счета.')
                 return
               }
-              await supabase.from('invoices').update({ 
+              await supabase.from('invoices').update({
                 recurring_active: true,
                 recurring_until: isoDate
               }).eq('id', id)
@@ -510,13 +462,45 @@ export default function InvoicePage() {
               <span className="text-xs text-gray-400">до {new Date(invoice.recurring_until).toLocaleDateString('ru-KZ')}</span>
             )}
           </button>
-
           <button onClick={deleteInvoice}
             className="w-full flex items-center px-4 py-3.5 text-sm hover:bg-gray-50 text-red-500">
             ← Отозвать / Аннулировать
           </button>
         </div>
       </div>
+
+      {/* Модал выбора подписи */}
+      {showSignModal && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-end">
+          <div className="bg-white w-full max-w-lg mx-auto rounded-t-3xl p-6">
+            <div className="text-center mb-5">
+              <div className="text-3xl mb-2">✍️</div>
+              <div className="font-semibold text-[#1C2056] mb-1">Формат документа</div>
+              <div className="text-sm text-gray-400">Выберите вариант для скачивания</div>
+            </div>
+            <div className="space-y-3 mb-4">
+              <button onClick={() => {
+                setShowSignModal(false)
+                if (pendingDocAction) pendingDocAction(true)
+              }}
+                className="w-full bg-[#1C2056] text-white rounded-xl py-4 text-sm font-medium">
+                ✍️ С подписью и печатью
+              </button>
+              <button onClick={() => {
+                setShowSignModal(false)
+                if (pendingDocAction) pendingDocAction(false)
+              }}
+                className="w-full border-2 border-gray-200 text-[#1C2056] rounded-xl py-4 text-sm font-medium">
+                📄 Без подписи и печати
+              </button>
+            </div>
+            <button onClick={() => setShowSignModal(false)}
+              className="w-full text-gray-400 text-sm py-2">
+              Отмена
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   )
 }
