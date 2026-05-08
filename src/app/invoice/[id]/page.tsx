@@ -4,6 +4,9 @@ import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { generateInvoicePDF } from '@/lib/generatePDF'
 import { formatDateTime, formatDate } from '@/lib/date'
+import { generateKP } from '@/lib/generateKP'
+import { generateAVR } from '@/lib/generateAVR'
+import { generateNakladnaya } from '@/lib/generateNakladnaya'
 
 const statusLabel: Record<string, { text: string; color: string; dot: string }> = {
   paid:    { text: 'Оплачен',   color: 'text-green-600', dot: 'bg-green-500' },
@@ -351,7 +354,6 @@ export default function InvoicePage() {
             const validUntil = prompt('Действителен до:', defaultDate)
             if (!validUntil) return
 
-            const { generateKP } = await import('@/lib/generateKP')
             generateKP({
               number: kpNumber,
               date: formatDate(invoice.created_at),
@@ -393,7 +395,6 @@ export default function InvoicePage() {
             const contractNumber = prompt('Номер договора (необязательно):', invoice.number)
             const contractDate = prompt('Дата договора:', formatDate(invoice.created_at))
 
-            const { generateAVR } = await import('@/lib/generateAVR')
             generateAVR({
               number: avrNumber,
               date: formatDate(invoice.created_at),
@@ -427,7 +428,6 @@ export default function InvoicePage() {
             const naklNumber = prompt('Номер накладной:', invoice.number)
             if (!naklNumber) return
 
-            const { generateNakladnaya } = await import('@/lib/generateNakladnaya')
             generateNakladnaya({
               number: naklNumber,
               date: formatDate(invoice.created_at),
