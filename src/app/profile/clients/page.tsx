@@ -15,6 +15,16 @@ export default function Clients() {
 
   useEffect(() => { loadClients() }, [])
 
+  function formatPhone(value: string) {
+    const digits = value.replace(/\D/g, '')
+    if (digits.length === 0) return ''
+    let result = '+7'
+    if (digits.length > 1) result += ' ' + digits.slice(1, 4)
+    if (digits.length > 4) result += ' ' + digits.slice(4, 7)
+    if (digits.length > 7) result += ' ' + digits.slice(7, 11)
+    return result
+  }
+
   async function loadClients() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
@@ -25,7 +35,13 @@ export default function Clients() {
 
   function startEdit(client: any) {
     setEditingId(client.id)
-    setForm({ name: client.name, bin_iin: client.bin_iin || '', email: client.email || '', address: client.address || '', phone: client.phone || '' })
+    setForm({
+      name: client.name,
+      bin_iin: client.bin_iin || '',
+      email: client.email || '',
+      address: client.address || '',
+      phone: client.phone || ''
+    })
     setShowForm(true)
   }
 
@@ -85,7 +101,6 @@ export default function Clients() {
 
       <div className="max-w-lg mx-auto p-4">
 
-        {/* Search */}
         <div className="bg-white rounded-xl px-3 py-2.5 flex items-center gap-2 shadow-sm mb-4">
           <span className="text-gray-400">🔍</span>
           <input
@@ -99,7 +114,6 @@ export default function Clients() {
           )}
         </div>
 
-        {/* Stats */}
         {!search && clients.length > 0 && (
           <div className="text-xs text-gray-400 px-1 mb-3">
             Всего клиентов: <span className="font-medium text-[#1C2056]">{clients.length}</span>
@@ -111,29 +125,64 @@ export default function Clients() {
           </div>
         )}
 
-        {/* Form */}
         {showForm && (
           <div className="bg-white rounded-2xl shadow-sm p-5 mb-4 space-y-3">
             <div className="font-medium text-[#1C2056] mb-2">
               {editingId ? 'Редактировать клиента' : 'Новый клиент'}
             </div>
-            {[
-              { key: 'name', label: 'Название компании / ИП *', placeholder: 'ТОО «Пример»' },
-              { key: 'bin_iin', label: 'БИН / ИИН', placeholder: '123456789012' },
-              { key: 'email', label: 'Email', placeholder: 'client@mail.kz' },
-              { key: 'address', label: 'Адрес', placeholder: 'г. Алматы, ул. Абая 1' },
-              { key: 'phone', label: 'Телефон', placeholder: '+7 701 123 45 67' },
-            ].map(f => (
-              <div key={f.key}>
-                <label className="text-xs text-gray-500 mb-1 block">{f.label}</label>
-                <input
-                  className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-[#1C2056]"
-                  placeholder={f.placeholder}
-                  value={(form as any)[f.key]}
-                  onChange={e => setForm({ ...form, [f.key]: e.target.value })}
-                />
-              </div>
-            ))}
+
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Название компании / ИП *</label>
+              <input
+                className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-[#1C2056]"
+                placeholder="ТОО «Пример»"
+                value={form.name}
+                onChange={e => setForm({ ...form, name: e.target.value })}
+              />
+            </div>
+
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">БИН / ИИН</label>
+              <input
+                className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-[#1C2056]"
+                placeholder="123456789012"
+                value={form.bin_iin}
+                onChange={e => setForm({ ...form, bin_iin: e.target.value })}
+              />
+            </div>
+
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Email</label>
+              <input
+                className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-[#1C2056]"
+                placeholder="client@mail.kz"
+                value={form.email}
+                onChange={e => setForm({ ...form, email: e.target.value })}
+              />
+            </div>
+
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Адрес</label>
+              <input
+                className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-[#1C2056]"
+                placeholder="г. Алматы, ул. Абая 1"
+                value={form.address}
+                onChange={e => setForm({ ...form, address: e.target.value })}
+              />
+            </div>
+
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Телефон</label>
+              <input
+                className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-[#1C2056]"
+                placeholder="+7 776 355 5177"
+                value={form.phone}
+                type="tel"
+                maxLength={16}
+                onChange={e => setForm({ ...form, phone: formatPhone(e.target.value) })}
+              />
+            </div>
+
             <div className="flex gap-2 pt-2">
               <button onClick={resetForm}
                 className="flex-1 border border-gray-200 rounded-xl py-3 text-sm text-gray-500">
@@ -147,7 +196,6 @@ export default function Clients() {
           </div>
         )}
 
-        {/* List */}
         {loading ? (
           <p className="text-center text-gray-400 py-8">Загрузка...</p>
         ) : filtered.length === 0 ? (
@@ -172,8 +220,8 @@ export default function Clients() {
                   <div className="font-medium text-sm text-[#1C2056]">{client.name}</div>
                   {client.bin_iin && <div className="text-xs text-gray-400 mt-0.5">БИН: {client.bin_iin}</div>}
                   {client.email && <div className="text-xs text-gray-400">{client.email}</div>}
-                  {client.address && <div className="text-xs text-gray-400">{client.address}</div>}
                   {client.phone && <div className="text-xs text-gray-400">{client.phone}</div>}
+                  {client.address && <div className="text-xs text-gray-400">{client.address}</div>}
                 </div>
                 <div className="flex items-center gap-2 ml-3">
                   <button onClick={() => startEdit(client)}
