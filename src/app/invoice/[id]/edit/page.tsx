@@ -241,7 +241,7 @@ export default function EditInvoice() {
                   <div>
                     <label className="text-xs text-gray-400 mb-1 block">Кол-во</label>
                     <input className="w-full border rounded-lg px-2 py-2 text-sm outline-none focus:border-[#1C2056]"
-                      type="number" placeholder="1" value={svc.qty}
+                      type="number" placeholder="1" value={svc.qty || ''}
                       onChange={e => updateService(idx, 'qty', Number(e.target.value))} />
                   </div>
                   <div>

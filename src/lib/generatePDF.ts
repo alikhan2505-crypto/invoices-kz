@@ -290,7 +290,7 @@ export function generateInvoicePDF(data: InvoiceData) {
           </div>
           <span style="white-space:nowrap; padding-bottom:2px;">${director ? '/ ' + director : '/'}</span>
         </div>
-        <div style="margin-top:8px; font-size:9px; color:#666; width:55%; display:flex; justify-content:space-between; padding:0 4px;">
+        <div style="margin-top:8px; font-size:9px; color:#666; width:85%; display:flex; justify-content:space-between; padding:0 4px;">
           <span>должность</span>
           <span>подпись</span>
           <span>М.П.</span>
