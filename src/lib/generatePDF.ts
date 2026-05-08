@@ -34,6 +34,7 @@ interface InvoiceData {
   clientBin: string
   clientEmail: string
   clientAddress?: string
+  clientPhone?: string
   services: Service[]
   total: number
   note?: string
@@ -42,6 +43,8 @@ interface InvoiceData {
   knp?: string
   autoPrint?: boolean
   vatType?: 'no_vat' | 'vat_0' | 'vat_16'
+  contractNumber?: string
+  contractDate?: string
 }
 
 function numberToWords(n: number): string {
@@ -102,18 +105,45 @@ export function generateInvoicePDF(data: InvoiceData) {
 
   const totalWords = numberToWords(Math.floor(data.total)) + ' тенге 00 тиын'
 
-  // НДС расчёт
   const vatType = data.vatType || 'no_vat'
   const totalWithoutVat = vatType === 'vat_16' ? Math.round(data.total / 1.16) : data.total
   const vatAmount = vatType === 'vat_16' ? Math.round(data.total - data.total / 1.16) : 0
 
+  // Итого строка — новый формат
   let vatLine = ''
   if (vatType === 'vat_16') {
-    vatLine = `Итого без НДС: ${formatMoney(totalWithoutVat)}<br>НДС 16%: ${formatMoney(vatAmount)}<br>Итого с НДС: ${formatMoney(data.total)}`
+    vatLine = `
+      <div style="display:flex; justify-content:flex-end; gap:40px; line-height:2;">
+        <div style="text-align:right; color:#333;">
+          Итого:<br>
+          В том числе НДС 16%:
+        </div>
+        <div style="text-align:right; font-weight:bold; min-width:120px;">
+          ${formatMoney(data.total)}<br>
+          ${formatMoney(vatAmount)}
+        </div>
+      </div>
+    `
   } else if (vatType === 'vat_0') {
-    vatLine = `Итого: ${formatMoney(data.total)}<br>НДС 0%: 0,00`
+    vatLine = `
+      <div style="display:flex; justify-content:flex-end; gap:40px; line-height:2;">
+        <div style="text-align:right; color:#333;">
+          Итого:<br>
+          НДС 0%:
+        </div>
+        <div style="text-align:right; font-weight:bold; min-width:120px;">
+          ${formatMoney(data.total)}<br>
+          0,00
+        </div>
+      </div>
+    `
   } else {
-    vatLine = `Итого: ${formatMoney(data.total)}<br>Без НДС`
+    vatLine = `
+      <div style="display:flex; justify-content:flex-end; gap:40px; line-height:2;">
+        <div style="text-align:right; color:#333;">Итого:</div>
+        <div style="text-align:right; font-weight:bold; min-width:120px;">${formatMoney(data.total)}</div>
+      </div>
+    `
   }
 
   const html = `
@@ -136,23 +166,20 @@ export function generateInvoicePDF(data: InvoiceData) {
           background: white;
           padding: 25mm 15mm 20mm;
           box-shadow: 0 0 20px rgba(0,0,0,0.3);
-          -webkit-text-size-adjust: 100%;
-          text-size-adjust: 100%;
         }
         .notice { font-size: 9px; text-align: center; margin-bottom: 16px; line-height: 1.5; }
         .bank-label { font-weight: bold; font-size: 10px; margin-bottom: 4px; }
         .bank-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
         .bank-table td { border: 1px solid #000; padding: 5px 8px; vertical-align: top; }
-        .title { font-size: 14px; font-weight: bold; margin: 16px 0 10px; }
+        .title { font-size: 15px; font-weight: bold; margin: 16px 0 10px; }
         .items-table { width: 100%; border-collapse: collapse; margin: 12px 0; }
         .items-table th, .items-table td { border: 1px solid #000; padding: 4px 6px; text-align: center; }
         .items-table th { background: #f0f0f0; font-weight: bold; }
         .items-table td.left { text-align: left; }
-        .totals { text-align: right; margin: 4px 0; line-height: 1.8; }
+        .totals { margin: 4px 0; }
         .total-words { margin: 10px 0; font-weight: bold; line-height: 1.6; }
         .note { margin: 10px 0; font-size: 11px; color: #333; }
         hr { border: none; border-top: 1px solid #000; margin: 16px 0; }
-        .toolbar { display: none; }
         @page { size: A4; margin: 0; }
         @media print {
           html { background: white; }
@@ -162,6 +189,7 @@ export function generateInvoicePDF(data: InvoiceData) {
       </style>
     </head>
     <body>
+
       <div class="notice">
         Внимание! Оплата данного счета означает согласие с условиями поставки товара.<br>
         Уведомление об оплате обязательно, в противном случае не гарантируется наличие товара на складе.<br>
@@ -193,15 +221,19 @@ export function generateInvoicePDF(data: InvoiceData) {
       <table style="width:100%; border-collapse:collapse; margin-bottom:10px;">
         <tr>
           <td style="font-weight:bold; width:90px; vertical-align:top; padding:3px 0;">Поставщик:</td>
-          <td style="padding:3px 0;">${companyName}, ${address}${phone ? ', тел: ' + phone : ''}</td>
+          <td style="padding:3px 0;">
+            ИИН/БИН: ${binIin}, ${companyName}, ${address}${phone ? ', тел: ' + phone : ''}
+          </td>
         </tr>
         <tr>
           <td style="font-weight:bold; vertical-align:top; padding:3px 0;">Покупатель:</td>
-          <td style="padding:3px 0;">${data.clientBin ? 'ИИН/БИН: ' + data.clientBin + ', ' : ''}${data.clientName}${data.clientAddress ? ', ' + data.clientAddress : ''}</td>
+          <td style="padding:3px 0;">
+            ${data.clientBin ? 'ИИН/БИН: ' + data.clientBin + ', ' : ''}${data.clientName}${data.clientAddress ? ', ' + data.clientAddress : ''}${data.clientPhone ? ', тел: ' + data.clientPhone : ''}
+          </td>
         </tr>
         <tr>
           <td style="font-weight:bold; vertical-align:top; padding:3px 0;">Договор:</td>
-          <td style="padding:3px 0;">—</td>
+          <td style="padding:3px 0;">${data.contractNumber ? '№' + data.contractNumber + (data.contractDate ? ' от ' + data.contractDate : '') : '—'}</td>
         </tr>
       </table>
 
@@ -244,30 +276,33 @@ export function generateInvoicePDF(data: InvoiceData) {
       ${data.note ? `<div class="note"><b>Примечание:</b> ${data.note}</div>` : ''}
 
       <hr>
-      <div style="position:relative; margin-top:20px; min-height:110px;">
-        <div style="display:flex; align-items:flex-end; gap:8px; width:50%;">
-          <span>Руководитель</span>
-          <div style="position:relative; flex:1;">
+
+      <div style="margin-top:16px; min-height:120px; position:relative;">
+        <div style="display:flex; align-items:flex-end; gap:8px; width:55%;">
+          <span style="white-space:nowrap;">Руководитель</span>
+          <div style="position:relative; flex:1; min-width:120px;">
             ${signatureUrl ? `
               <img src="${signatureUrl}"
-                style="position:absolute; bottom:4px; left:25%; height:45px; max-width:160px; object-fit:contain;"
+                style="position:absolute; bottom:4px; left:10px; height:45px; max-width:160px; object-fit:contain;"
               />
             ` : ''}
             <div style="border-bottom:1px solid #000; width:100%; margin-top:50px;"></div>
           </div>
-          <span>${director ? '/ ' + director : '//'}</span>
+          <span style="white-space:nowrap; padding-bottom:2px;">${director ? '/ ' + director : '/'}</span>
+        </div>
+        <div style="margin-top:8px; font-size:9px; color:#666; width:55%; display:flex; justify-content:space-between; padding:0 4px;">
+          <span>М.П.</span>
+          <span>подпись</span>
+          <span>расшифровка подписи</span>
         </div>
         ${stampUrl ? `
           <img src="${stampUrl}"
-            style="position:absolute; left:30%; bottom:-15px; height:110px; width:110px; object-fit:contain; opacity:0.85;"
+            style="position:absolute; left:28%; bottom:-10px; height:110px; width:110px; object-fit:contain; opacity:0.85;"
           />
         ` : ''}
       </div>
 
       ${data.autoPrint !== false ? `
-        <div class="toolbar" style="position:fixed; top:10px; right:10px; z-index:999; display:flex; gap:8px;">
-          <button onclick="window.print()" style="background:#1C2056; color:white; border:none; padding:8px 16px; border-radius:8px; cursor:pointer; font-size:13px;">🖨️ Печать</button>
-        </div>
         <script>
           window.onload = function() {
             const images = document.querySelectorAll('img')
@@ -299,14 +334,13 @@ export function generateInvoicePDF(data: InvoiceData) {
             btn.disabled = true
             const toolbar = btn.closest('div[style*="position:fixed"]')
             if (toolbar) toolbar.style.display = 'none'
-            const opt = {
+            html2pdf().set({
               margin: 0,
               filename: 'Счёт-${data.number}.pdf',
               image: { type: 'jpeg', quality: 0.98 },
               html2canvas: { scale: 2, useCORS: true, logging: false },
               jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-            }
-            html2pdf().set(opt).from(document.body).save().then(() => {
+            }).from(document.body).save().then(() => {
               if (toolbar) toolbar.style.display = 'flex'
               btn.textContent = '💾 Скачать PDF'
               btn.disabled = false
