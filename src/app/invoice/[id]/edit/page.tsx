@@ -2,7 +2,8 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { generateInvoicePDF } from '@/lib/generatePDF'
+
+const UNIT_OPTIONS = ['шт', 'кг', 'л', 'м', 'м²', 'м³', 'час', 'день', 'месяц', 'услуга', 'работа']
 
 export default function EditInvoice() {
   const router = useRouter()
@@ -10,22 +11,35 @@ export default function EditInvoice() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [profile, setProfile] = useState<any>(null)
+  const [bank, setBank] = useState<any>(null)
+  const [clients, setClients] = useState<any[]>([])
 
   const [clientName, setClientName] = useState('')
   const [clientBin, setClientBin] = useState('')
   const [clientEmail, setClientEmail] = useState('')
-  const [services, setServices] = useState([{ name: '', qty: 1, price: 0 }])
+  const [clientAddress, setClientAddress] = useState('')
+  const [clientPhone, setClientPhone] = useState('')
+  const [contractNumber, setContractNumber] = useState('')
+  const [contractDate, setContractDate] = useState('')
+  const [note, setNote] = useState('')
+  const [services, setServices] = useState<any[]>([{ name: '', qty: 1, price: 0, unit: 'шт', code: '', type: 'service' }])
+  const [invoiceNumber, setInvoiceNumber] = useState('')
+  const [invoiceDate, setInvoiceDate] = useState('')
 
   const total = services.reduce((s, i) => s + i.qty * i.price, 0)
+  const vatType = profile?.vat_type || 'no_vat'
+  const vatAmount = vatType === 'vat_16' ? Math.round(total - total / 1.16) : 0
+  const totalWithoutVat = vatType === 'vat_16' ? Math.round(total / 1.16) : total
 
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
 
-      const [{ data: inv }, { data: p }] = await Promise.all([
+      const [{ data: inv }, { data: p }, { data: c }] = await Promise.all([
         supabase.from('invoices').select('*').eq('id', id).single(),
         supabase.from('profiles').select('*').eq('id', user.id).single(),
+        supabase.from('clients').select('*').eq('user_id', user.id).order('name'),
       ])
 
       if (!inv) { router.push('/history'); return }
@@ -33,19 +47,55 @@ export default function EditInvoice() {
       setClientName(inv.client_name || '')
       setClientBin(inv.client_bin || '')
       setClientEmail(inv.client_email || '')
-      if (inv.services && inv.services.length > 0) setServices(inv.services)
+      setClientAddress(inv.client_address || '')
+      setClientPhone(inv.client_phone || '')
+      setContractNumber(inv.contract_number || '')
+      setContractDate(inv.contract_date || '')
+      setNote(inv.note || '')
+      setInvoiceNumber(inv.number || '')
+      setInvoiceDate(inv.created_at ? new Date(inv.created_at).toLocaleDateString('ru-KZ') : '')
+
+      if (inv.services && inv.services.length > 0) {
+        setServices(inv.services.map((s: any) => ({ ...s, type: s.type || 'service' })))
+      }
+
       setProfile(p)
+      setClients(c || [])
+
+      if (inv.bank_id) {
+        const { data: b } = await supabase.from('bank_accounts').select('*').eq('id', inv.bank_id).single()
+        setBank(b)
+      } else {
+        const { data: b } = await supabase.from('bank_accounts').select('*').eq('user_id', user.id).eq('is_main', true).single()
+        setBank(b)
+      }
+
       setLoading(false)
     }
     load()
   }, [])
 
-  function addService() { setServices([...services, { name: '', qty: 1, price: 0 }]) }
+  function addService() {
+    setServices([{ name: '', qty: 1, price: 0, unit: 'шт', code: '', type: 'service' }, ...services])
+  }
   function removeService(idx: number) { setServices(services.filter((_, i) => i !== idx)) }
-  function updateService(idx: number, field: string, value: string | number) {
+  function updateService(idx: number, field: string, value: any) {
     const updated = [...services]
     updated[idx] = { ...updated[idx], [field]: value }
     setServices(updated)
+  }
+
+  // Автозаполнение из справочника клиентов
+  function handleBinChange(bin: string) {
+    setClientBin(bin)
+    if (bin.length === 12) {
+      const found = clients.find(c => c.bin_iin === bin)
+      if (found) {
+        setClientName(found.name)
+        setClientEmail(found.email || '')
+        setClientAddress(found.address || '')
+      }
+    }
   }
 
   async function save() {
@@ -60,32 +110,16 @@ export default function EditInvoice() {
       client_name: clientName,
       client_bin: clientBin,
       client_email: clientEmail,
+      client_address: clientAddress,
+      client_phone: clientPhone,
+      contract_number: contractNumber || null,
+      contract_date: contractDate || null,
       services,
       amount: total,
+      note: note || null,
     }).eq('id', id)
 
     if (error) { alert('Ошибка: ' + error.message); setSaving(false); return }
-
-    // Генерируем обновлённый PDF
-    generateInvoicePDF({
-      number: '',
-      date: new Date().toLocaleDateString('ru-KZ'),
-      clientName, clientBin, clientEmail, services, total,
-      profile: {
-        company_name: profile?.company_name || '',
-        bin_iin: profile?.bin_iin || '',
-        address: profile?.address || '',
-        phone: profile?.phone || '',
-        bank_name: profile?.bank_name || '',
-        iik: profile?.iik || '',
-        bik: profile?.bik || '',
-        kbe: profile?.kbe || '19',
-        director_name: profile?.director_name || '',
-        signature_url: profile?.signature_url || '',
-        stamp_url: profile?.stamp_url || '',
-      }
-    })
-
     setSaving(false)
     router.push('/invoice/' + id)
   }
@@ -104,38 +138,61 @@ export default function EditInvoice() {
       </div>
 
       <div className="max-w-lg mx-auto p-4 space-y-4">
+
         {/* Client */}
         <div className="bg-white rounded-2xl p-5 shadow-sm">
           <h3 className="font-medium text-[#1C2056] mb-3">Данные клиента</h3>
           <div className="space-y-3">
             <div>
               <label className="text-xs text-gray-500 mb-1 block">Название компании / ИП *</label>
-              <input
-                className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                placeholder="ТОО «Пример»"
-                value={clientName}
-                onChange={e => setClientName(e.target.value)}
-              />
+              <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                placeholder="ТОО «Пример»" value={clientName}
+                onChange={e => setClientName(e.target.value)} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">БИН/ИИН *</label>
-                <input
-                  className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                  placeholder="123456789012"
-                  value={clientBin}
-                  onChange={e => setClientBin(e.target.value)}
-                />
+                <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                  placeholder="123456789012" value={clientBin}
+                  onChange={e => handleBinChange(e.target.value)} />
               </div>
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">Email</label>
-                <input
-                  className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                  placeholder="client@mail.kz"
-                  value={clientEmail}
-                  onChange={e => setClientEmail(e.target.value)}
-                />
+                <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                  placeholder="client@mail.kz" value={clientEmail}
+                  onChange={e => setClientEmail(e.target.value)} />
               </div>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Адрес</label>
+              <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                placeholder="г. Алматы, ул. Абая 1" value={clientAddress}
+                onChange={e => setClientAddress(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Телефон покупателя</label>
+              <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                placeholder="+7 701 123 45 67" value={clientPhone}
+                onChange={e => setClientPhone(e.target.value)} />
+            </div>
+          </div>
+        </div>
+
+        {/* Contract */}
+        <div className="bg-white rounded-2xl p-5 shadow-sm">
+          <h3 className="font-medium text-[#1C2056] mb-3">Договор</h3>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Номер договора</label>
+              <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                placeholder="№123" value={contractNumber}
+                onChange={e => setContractNumber(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Дата договора</label>
+              <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                placeholder="01.01.2026" value={contractDate}
+                onChange={e => setContractDate(e.target.value)} />
             </div>
           </div>
         </div>
@@ -149,44 +206,93 @@ export default function EditInvoice() {
               + Добавить
             </button>
           </div>
-          <div className="space-y-3">
+          <div className="space-y-4" id="services-list">
             {services.map((svc, idx) => (
-              <div key={idx} className="flex gap-2 items-start">
-                <div className="flex-1 space-y-2">
+              <div key={idx} className="border border-gray-100 rounded-xl p-3 space-y-2">
+                {/* Переключатель */}
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => updateService(idx, 'type', 'service')}
+                    className={`flex-1 px-3 py-1.5 text-xs rounded-lg font-medium transition ${(svc.type || 'service') === 'service' ? 'bg-[#1C2056] text-white' : 'bg-gray-100 text-gray-500'}`}>
+                    📋 Услуга
+                  </button>
+                  <button type="button" onClick={() => updateService(idx, 'type', 'product')}
+                    className={`flex-1 px-3 py-1.5 text-xs rounded-lg font-medium transition ${svc.type === 'product' ? 'bg-[#2DC48D] text-white' : 'bg-gray-100 text-gray-500'}`}>
+                    📦 Товар
+                  </button>
+                </div>
+                <div className="flex gap-2 items-start">
                   <input
-                    className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                    placeholder="Название услуги"
+                    className="flex-1 border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                    placeholder="Название услуги / товара"
                     value={svc.name}
                     onChange={e => updateService(idx, 'name', e.target.value)}
                   />
-                  <div className="grid grid-cols-2 gap-2">
-                    <input
-                      className="border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                      type="number" placeholder="Кол-во"
-                      value={svc.qty}
-                      onChange={e => updateService(idx, 'qty', Number(e.target.value))}
-                    />
-                    <input
-                      className="border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                      type="number" placeholder="Цена ₸"
-                      value={svc.price || ''}
-                      onChange={e => updateService(idx, 'price', Number(e.target.value))}
-                    />
+                  {services.length > 1 && (
+                    <button onClick={() => removeService(idx)} className="text-gray-300 hover:text-red-400 text-xl mt-1">×</button>
+                  )}
+                </div>
+                <div className="grid grid-cols-4 gap-2">
+                  <div>
+                    <label className="text-xs text-gray-400 mb-1 block">Код</label>
+                    <input className="w-full border rounded-lg px-2 py-2 text-sm outline-none focus:border-[#1C2056]"
+                      placeholder="001" value={svc.code || ''}
+                      onChange={e => updateService(idx, 'code', e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 mb-1 block">Кол-во</label>
+                    <input className="w-full border rounded-lg px-2 py-2 text-sm outline-none focus:border-[#1C2056]"
+                      type="number" placeholder="1" value={svc.qty}
+                      onChange={e => updateService(idx, 'qty', Number(e.target.value))} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 mb-1 block">Ед.</label>
+                    <select className="w-full border rounded-lg px-2 py-2 text-sm outline-none focus:border-[#1C2056] bg-white"
+                      value={svc.unit || 'шт'}
+                      onChange={e => updateService(idx, 'unit', e.target.value)}>
+                      {UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 mb-1 block">Цена ₸</label>
+                    <input className="w-full border rounded-lg px-2 py-2 text-sm outline-none focus:border-[#1C2056]"
+                      type="number" placeholder="0" value={svc.price || ''}
+                      onChange={e => updateService(idx, 'price', Number(e.target.value))} />
                   </div>
                 </div>
-                {services.length > 1 && (
-                  <button onClick={() => removeService(idx)} className="text-gray-300 hover:text-red-400 mt-2 text-xl">×</button>
+                {svc.name && svc.price > 0 && (
+                  <div className="text-xs text-gray-400 text-right">
+                    Итого: {(svc.qty * svc.price).toLocaleString('ru-KZ')} ₸
+                  </div>
                 )}
               </div>
             ))}
           </div>
         </div>
 
+        {/* Note */}
+        <div className="bg-white rounded-2xl p-5 shadow-sm">
+          <h3 className="font-medium text-[#1C2056] mb-3">Примечание</h3>
+          <textarea
+            className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056] resize-none"
+            placeholder="Оплата в течение 3х дней..."
+            rows={3}
+            value={note}
+            onChange={e => setNote(e.target.value)}
+          />
+        </div>
+
         {/* Total */}
         <div className="bg-[#1C2056] rounded-2xl p-5">
-          <div className="flex justify-between text-sm text-white/70 mb-2">
-            <span>Сумма</span><span>{total.toLocaleString('ru-KZ')} ₸</span>
-          </div>
+          {vatType === 'vat_16' ? (
+            <>
+              <div className="flex justify-between text-sm text-white/70 mb-2">
+                <span>Сумма без НДС</span><span>{totalWithoutVat.toLocaleString('ru-KZ')} ₸</span>
+              </div>
+              <div className="flex justify-between text-sm text-white/70 mb-3">
+                <span>НДС 16%</span><span>{vatAmount.toLocaleString('ru-KZ')} ₸</span>
+              </div>
+            </>
+          ) : null}
           <div className="flex justify-between font-medium text-white border-t border-white/20 pt-3">
             <span>К оплате</span>
             <span className="text-lg">{total.toLocaleString('ru-KZ')} ₸</span>
