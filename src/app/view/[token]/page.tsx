@@ -16,13 +16,17 @@ export default function PublicInvoice() {
 
   useEffect(() => {
     async function load() {
-      const { data: inv } = await supabase
+      const { data: inv, error: invError } = await supabase
         .from('invoices')
         .select('*')
         .eq('public_token', token)
         .single()
 
-      if (!inv) { setLoading(false); return }
+      console.log('Token:', token)
+      console.log('Invoice:', inv)
+      console.log('Error:', invError)
+
+      if (!inv) { setLoading(false); return }   
       setInvoice(inv)
 
       if (inv.status === 'sent') {
