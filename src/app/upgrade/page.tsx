@@ -220,7 +220,7 @@ export default function Upgrade() {
           </div>
           <div className="text-3xl font-bold text-[#1C2056] mb-4">0 ₸</div>
           <ul className="space-y-2">
-            {['3 счёта в месяц', 'PDF генерация', 'История счетов', 'Публичная ссылка'].map(f => (
+            {['7 дней бесплатного периода', 'PDF генерация', 'История счетов', 'Публичная ссылка'].map(f => (
               <li key={f} className="flex items-center gap-2 text-sm text-gray-600">
                 <span className="text-[#2DC48D]">✓</span> {f}
               </li>

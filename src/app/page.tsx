@@ -36,7 +36,7 @@ export default function Home() {
           className="bg-[#1C2056] text-white px-8 py-4 rounded-2xl text-base font-medium hover:bg-[#252A6B] transition mb-3 w-full max-w-xs">
           Начать бесплатно →
         </button>
-        <p className="text-xs text-gray-400">3 счёта бесплатно, без карты</p>
+        <p className="text-xs text-gray-400">7 дней бесплатно</p>
       </section>
 
       {/* Features */}
@@ -119,7 +119,7 @@ export default function Home() {
               <div className="text-3xl font-bold text-[#1C2056] mb-4">0 ₸</div>
               <ul className="space-y-2 mb-6">
                 {[
-                  '3 счёта в месяц',
+                  '7 дней бесплатного периода',
                   'PDF генерация',
                   'История счетов',
                   'Профиль компании',
@@ -225,7 +225,7 @@ export default function Home() {
           className="bg-[#2DC48D] text-white px-8 py-4 rounded-2xl text-base font-medium">
           Создать первый счёт →
         </button>
-        <p className="text-white/40 text-xs mt-3">3 счёта бесплатно · Без карты · Отмена в любое время</p>
+        <p className="text-white/40 text-xs mt-3">7 дней бесплатно · Отмена в любое время</p>
       </section>
 
       {/* Footer */}
