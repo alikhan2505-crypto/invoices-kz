@@ -1,0 +1,17 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="630" fill="#1C2056"/>
+  <rect x="0" y="0" width="400" height="630" fill="#162048"/>
+  <rect x="0" y="580" width="1200" height="8" fill="#2DC48D"/>
+  <rect x="80" y="100" width="8" height="160" fill="#2DC48D"/>
+  <text x="120" y="185" font-family="Arial, sans-serif" font-weight="800" font-size="80" fill="#ffffff">INVOICES.KZ</text>
+  <text x="122" y="255" font-family="Arial, sans-serif" font-weight="400" font-size="36" fill="rgba(255,255,255,0.65)">Счета на оплату за 1 минуту</text>
+  <text x="122" y="310" font-family="Arial, sans-serif" font-weight="400" font-size="28" fill="rgba(255,255,255,0.4)">Для казахстанского бизнеса</text>
+  <rect x="122" y="370" width="280" height="60" rx="30" fill="#2DC48D"/>
+  <text x="262" y="408" text-anchor="middle" font-family="Arial, sans-serif" font-weight="700" font-size="22" fill="#ffffff">7 дней бесплатно</text>
+  <circle cx="900" cy="220" r="180" fill="rgba(45,196,141,0.06)"/>
+  <circle cx="900" cy="220" r="130" fill="rgba(45,196,141,0.08)"/>
+  <circle cx="900" cy="220" r="80" fill="rgba(45,196,141,0.12)"/>
+  <text x="900" y="195" text-anchor="middle" font-family="Arial, sans-serif" font-weight="800" font-size="56" fill="#2DC48D">PDF</text>
+  <text x="900" y="250" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" fill="rgba(255,255,255,0.4)">за 1 минуту</text>
+  <text x="122" y="545" font-family="Arial, sans-serif" font-size="18" fill="rgba(255,255,255,0.3)">invoices.kz</text>
+</svg>
