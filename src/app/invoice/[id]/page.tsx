@@ -26,12 +26,16 @@ export default function InvoicePage() {
   const [updating, setUpdating] = useState(false)
   const [showSignModal, setShowSignModal] = useState(false)
   const [pendingDocAction, setPendingDocAction] = useState<((withSign: boolean) => void) | null>(null)
+  const [showEmailModal, setShowEmailModal] = useState(false)
+  const [emailTo, setEmailTo] = useState('')
+  const [sendingEmail, setSendingEmail] = useState(false)
 
   useEffect(() => { loadInvoice() }, [])
 
   async function loadInvoice() {
     const { data: inv } = await supabase.from('invoices').select('*').eq('id', id).single()
     setInvoice(inv)
+    if (inv?.client_email) setEmailTo(inv.client_email)
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
       const { data: p } = await supabase.from('profiles').select('*').eq('id', user.id).single()
@@ -109,8 +113,20 @@ export default function InvoicePage() {
     const { data } = await supabase.from('invoices').select('public_token').eq('id', id).single()
     if (data?.public_token) {
       const link = `https://invoices.kz/view/${data.public_token}`
-      await navigator.clipboard.writeText(link)
-      alert('Ссылка скопирована:\n' + link)
+      // Используем fallback для мобильных
+      try {
+        await navigator.clipboard.writeText(link)
+        alert('Ссылка скопирована: ' + link)
+      } catch {
+        // Fallback для мобильных
+        const el = document.createElement('textarea')
+        el.value = link
+        document.body.appendChild(el)
+        el.select()
+        document.execCommand('copy')
+        document.body.removeChild(el)
+        alert('Ссылка скопирована: ' + link)
+      }
     } else {
       alert('Ошибка: токен не найден')
     }
@@ -121,24 +137,24 @@ export default function InvoicePage() {
     if (!data?.public_token) { alert('Ошибка'); return }
     const link = `https://invoices.kz/view/${data.public_token}`
     const text = `Здравствуйте! Направляю вам счёт на оплату ${invoice.number} на сумму ${Number(invoice.amount).toLocaleString('ru-KZ')} ₸.\n\nОткрыть счёт: ${link}`
-    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
+    // Используем location.href для мобильных вместо window.open
+    window.location.href = `https://wa.me/?text=${encodeURIComponent(text)}`
     await updateStatus('sent')
   }
 
-  async function sendEmail() {
-    if (!invoice.client_email) {
-      alert('У клиента нет email! Укажите email при создании счёта.')
-      return
-    }
-    if (!confirm(`Отправить счёт на ${invoice.client_email}?`)) return
+  async function sendEmailConfirm() {
+    if (!emailTo) { alert('Введите email адрес'); return }
+    setSendingEmail(true)
     const res = await fetch('/api/send-invoice', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ invoiceId: id })
+      body: JSON.stringify({ invoiceId: id, overrideEmail: emailTo })
     })
     const data = await res.json()
+    setSendingEmail(false)
     if (data.success) {
-      alert(`✅ Счёт отправлен на ${invoice.client_email}`)
+      alert(`✅ Счёт отправлен на ${emailTo}`)
+      setShowEmailModal(false)
       await loadInvoice()
     } else {
       alert('Ошибка: ' + data.error)
@@ -150,10 +166,10 @@ export default function InvoicePage() {
     if (!data?.public_token) { alert('Ошибка'); return }
     const link = `https://invoices.kz/view/${data.public_token}`
     const text = `Здравствуйте, ${invoice.client_name}!\n\nНапоминаем о неоплаченном счёте:\n\n📄 Счёт: ${invoice.number}\n💰 Сумма: ${Number(invoice.amount).toLocaleString('ru-KZ')} ₸\n🔗 Открыть счёт: ${link}\n\nПожалуйста, произведите оплату. Спасибо!`
-    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
+    window.location.href = `https://wa.me/?text=${encodeURIComponent(text)}`
   }
 
-  function openPDF(autoPrint = false, withSignature = true) {
+  function openPDF(withSignature = true) {
     if (!invoice || !profile) { alert('Данные ещё загружаются'); return }
     const services = invoice.services || [{ name: 'Услуга', qty: 1, price: invoice.amount }]
     generateInvoicePDF({
@@ -166,7 +182,7 @@ export default function InvoicePage() {
       services,
       total: Number(invoice.amount),
       note: invoice.note || profile?.default_note || '',
-      autoPrint,
+      autoPrint: false,
       vatType: profile?.vat_type,
       profile: buildProfile(withSignature),
       bank: bank ? { bank_name: bank.bank_name, iik: bank.iik, bik: bank.bik, kbe: bank.kbe } : undefined,
@@ -175,7 +191,10 @@ export default function InvoicePage() {
 
   if (loading) return (
     <main className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <p className="text-gray-400">Загрузка...</p>
+      <div className="text-center">
+        <div className="w-8 h-8 border-2 border-[#1C2056] border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+        <p className="text-gray-400 text-sm">Загрузка...</p>
+      </div>
     </main>
   )
 
@@ -208,13 +227,13 @@ export default function InvoicePage() {
           </span>
         </div>
 
-        <div className="grid grid-cols-5 gap-2">
+        {/* Actions — убрали Печать, оставили PDF */}
+        <div className="grid grid-cols-4 gap-2">
           {[
             { icon: '💬', label: 'WhatsApp', action: shareWhatsApp },
             { icon: '🔗', label: 'Ссылка', action: copyPublicLink },
-            { icon: '📄', label: 'PDF', action: () => askSignature((w) => openPDF(false, w)) },
-            { icon: '🖨️', label: 'Печать', action: () => askSignature((w) => openPDF(true, w)) },
-            { icon: '📧', label: 'Email', action: sendEmail },
+            { icon: '📄', label: 'PDF', action: () => askSignature((w) => openPDF(w)) },
+            { icon: '📧', label: 'Email', action: () => setShowEmailModal(true) },
           ].map(a => (
             <button key={a.label} onClick={a.action}
               className="bg-white rounded-xl p-3 text-center shadow-sm hover:bg-gray-50">
@@ -231,7 +250,7 @@ export default function InvoicePage() {
               <div key={i} className={`flex justify-between px-4 py-3 ${i < services.length - 1 ? 'border-b border-gray-100' : ''}`}>
                 <div>
                   <div className="text-sm text-[#1C2056]">{s.name}</div>
-                  <div className="text-xs text-gray-400">{s.qty} шт × {Number(s.price).toLocaleString('ru-KZ')} ₸</div>
+                  <div className="text-xs text-gray-400">{s.qty} {s.unit || 'шт'} × {Number(s.price).toLocaleString('ru-KZ')} ₸</div>
                 </div>
                 <div className="text-sm font-medium">{(s.qty * s.price).toLocaleString('ru-KZ')} ₸</div>
               </div>
@@ -276,29 +295,30 @@ export default function InvoicePage() {
           </div>
         )}
 
+        {/* История */}
         <div className="bg-white rounded-2xl shadow-sm p-4">
           <div className="text-xs text-gray-400 uppercase tracking-wide mb-3">История</div>
           <div className="space-y-3">
             {invoice.status === 'paid' && (
               <div className="flex items-center gap-3">
-                <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0"></span>
                 <div>
                   <div className="text-sm text-[#1C2056]">Оплачен</div>
-                  <div className="text-xs text-gray-400">{formatDate(invoice.created_at)}</div>
+                  <div className="text-xs text-gray-400">{formatDateTime(invoice.updated_at || invoice.created_at)}</div>
                 </div>
               </div>
             )}
-            {(invoice.status === 'sent' || invoice.status === 'paid') && (
+            {(invoice.status === 'sent' || invoice.status === 'paid' || invoice.status === 'viewed') && (
               <div className="flex items-center gap-3">
-                <span className="w-2 h-2 rounded-full bg-blue-400"></span>
+                <span className="w-2 h-2 rounded-full bg-blue-400 flex-shrink-0"></span>
                 <div>
                   <div className="text-sm text-[#1C2056]">Отправлен</div>
-                  <div className="text-xs text-gray-400">{formatDate(invoice.created_at)}</div>
+                  <div className="text-xs text-gray-400">{formatDateTime(invoice.created_at)}</div>
                 </div>
               </div>
             )}
             <div className="flex items-center gap-3">
-              <span className="w-2 h-2 rounded-full bg-gray-300"></span>
+              <span className="w-2 h-2 rounded-full bg-gray-300 flex-shrink-0"></span>
               <div>
                 <div className="text-sm text-[#1C2056]">Создан</div>
                 <div className="text-xs text-gray-400">{formatDateTime(invoice.created_at)}</div>
@@ -307,14 +327,15 @@ export default function InvoicePage() {
           </div>
         </div>
 
+        {/* Изменить статус */}
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
           <div className="px-4 pt-4 pb-2 text-xs text-gray-400 uppercase tracking-wide">Изменить статус</div>
           {[
-            { status: 'sent', label: 'Отправлен' },
-            { status: 'paid', label: 'Оплачен' },
-            { status: 'overdue', label: 'Просрочен' },
-            { status: 'draft', label: 'Черновик' },
-            { status: 'viewed', label: 'Просмотрен клиентом' },
+            { status: 'draft', label: '📝 Черновик' },
+            { status: 'sent', label: '📤 Отправлен' },
+            { status: 'viewed', label: '👁 Просмотрен клиентом' },
+            { status: 'paid', label: '✅ Оплачен' },
+            { status: 'overdue', label: '⏰ Просрочен' },
           ].filter(s => s.status !== invoice.status).map((s, i, arr) => (
             <button key={s.status}
               onClick={() => updateStatus(s.status)}
@@ -366,7 +387,7 @@ export default function InvoicePage() {
             if (!profile) { alert('Данные загружаются'); return }
             const avrNumber = prompt('Номер АВР:', invoice.number)
             if (!avrNumber) return
-            const contractNumber = prompt('Номер договора (необязательно):', invoice.number)
+            const contractNumber = prompt('Номер договора (необязательно):', '')
             const contractDate = prompt('Дата договора:', formatDate(invoice.created_at))
             askSignature((withSign) => {
               generateAVR({
@@ -468,6 +489,37 @@ export default function InvoicePage() {
           </button>
         </div>
       </div>
+
+      {/* Модал Email */}
+      {showEmailModal && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-end">
+          <div className="bg-white w-full max-w-lg mx-auto rounded-t-3xl p-6">
+            <div className="text-center mb-5">
+              <div className="text-3xl mb-2">📧</div>
+              <div className="font-semibold text-[#1C2056] mb-1">Отправить счёт на email</div>
+              <div className="text-sm text-gray-400 mb-4">Измените адрес если нужно</div>
+            </div>
+            <label className="text-xs text-gray-500 mb-1 block">Email получателя</label>
+            <input
+              className="w-full border rounded-lg px-3 py-3 text-sm outline-none focus:border-[#1C2056] mb-4"
+              placeholder="client@mail.kz"
+              type="email"
+              value={emailTo}
+              onChange={e => setEmailTo(e.target.value)}
+            />
+            <div className="space-y-2">
+              <button onClick={sendEmailConfirm} disabled={sendingEmail}
+                className="w-full bg-[#1C2056] text-white rounded-xl py-4 text-sm font-medium">
+                {sendingEmail ? 'Отправляем...' : '📧 Отправить'}
+              </button>
+              <button onClick={() => setShowEmailModal(false)}
+                className="w-full text-gray-400 text-sm py-2">
+                Отмена
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Модал выбора подписи */}
       {showSignModal && (
