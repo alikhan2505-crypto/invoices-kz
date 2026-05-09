@@ -169,9 +169,7 @@ export function generateInvoicePDF(data: InvoiceData) {
           html { background: white; }
           body { margin: 0; box-shadow: none; padding: 15mm; }
           .toolbar { display: none !important; }
-          img { max-width: 100% !important; }
-        }
-          .toolbar { display: none !important; }
+          img { max-width: 110px !important; }
         }
       </style>
     </head>
