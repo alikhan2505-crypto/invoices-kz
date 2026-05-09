@@ -307,15 +307,22 @@ export function generateInvoicePDF(data: InvoiceData) {
             btn.disabled = true
             if (toolbar) toolbar.style.display = 'none'
             if (spacer) spacer.style.display = 'none'
+            document.documentElement.style.background = 'white'
+            document.body.style.margin = '0'
+            document.body.style.boxShadow = 'none'
+            document.body.style.width = '794px'
             html2pdf().set({
-              margin: 0,
+              margin: [10, 15, 10, 15],
               filename: 'Счёт-${data.number}.pdf',
               image: { type: 'jpeg', quality: 0.98 },
-              html2canvas: { scale: 2, useCORS: true, logging: false },
+              html2canvas: { scale: 2, useCORS: true, logging: false, windowWidth: 824 },
               jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
             }).from(document.body).save().then(() => {
               if (toolbar) toolbar.style.display = 'flex'
               if (spacer) spacer.style.display = 'block'
+              document.documentElement.style.background = '#888'
+              document.body.style.margin = '20px auto'
+              document.body.style.boxShadow = '0 0 20px rgba(0,0,0,0.3)'
               btn.textContent = '💾 Скачать PDF'
               btn.disabled = false
             })
