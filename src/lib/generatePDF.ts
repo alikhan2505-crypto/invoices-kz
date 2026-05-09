@@ -167,13 +167,10 @@ export function generateInvoicePDF(data: InvoiceData) {
         @page { size: A4; margin: 10mm; }
         @media print {
           html { background: white; }
-          body {
-            margin: 0 auto;
-            box-shadow: none;
-            padding: 5mm 10mm;
-            width: 100%;
-            max-width: 100%;
-          }
+          body { margin: 0; box-shadow: none; padding: 15mm; }
+          .toolbar { display: none !important; }
+          img { max-width: 100% !important; }
+        }
           .toolbar { display: none !important; }
         }
       </style>
@@ -270,7 +267,7 @@ export function generateInvoicePDF(data: InvoiceData) {
           <span>М.П.</span>
           <span>расшифровка подписи</span>
         </div>
-        ${stampUrl ? `<img src="${stampUrl}" style="position:absolute; left:28%; bottom:-10px; height:110px; width:110px; object-fit:contain; opacity:0.85;" />` : ''}
+        ${stampUrl ? `<img src="${stampUrl}" style="position:absolute; left:28%; bottom:-10px; height:110px; width:110px; max-width:110px; object-fit:contain; opacity:0.85; display:block;" />` : ''}
       </div>
 
       ${data.autoPrint !== false ? `
@@ -301,28 +298,19 @@ export function generateInvoicePDF(data: InvoiceData) {
         <script>
           function downloadPDF() {
             const btn = document.getElementById('downloadBtn')
-            const toolbar = document.querySelector('.toolbar')
-            const spacer = toolbar?.nextElementSibling
             btn.textContent = '⏳ Загрузка...'
             btn.disabled = true
+            const toolbar = btn.closest('div[style*="position:fixed"]')
             if (toolbar) toolbar.style.display = 'none'
-            if (spacer) spacer.style.display = 'none'
-            document.documentElement.style.background = 'white'
-            document.body.style.margin = '0'
-            document.body.style.boxShadow = 'none'
-            document.body.style.width = '794px'
-            html2pdf().set({
-              margin: [10, 15, 10, 15],
+            const opt = {
+              margin: 0,
               filename: 'Счёт-${data.number}.pdf',
               image: { type: 'jpeg', quality: 0.98 },
-              html2canvas: { scale: 2, useCORS: true, logging: false, windowWidth: 824 },
+              html2canvas: { scale: 2, useCORS: true, logging: false },
               jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-            }).from(document.body).save().then(() => {
+            }
+            html2pdf().set(opt).from(document.body).save().then(() => {
               if (toolbar) toolbar.style.display = 'flex'
-              if (spacer) spacer.style.display = 'block'
-              document.documentElement.style.background = '#888'
-              document.body.style.margin = '20px auto'
-              document.body.style.boxShadow = '0 0 20px rgba(0,0,0,0.3)'
               btn.textContent = '💾 Скачать PDF'
               btn.disabled = false
             })
