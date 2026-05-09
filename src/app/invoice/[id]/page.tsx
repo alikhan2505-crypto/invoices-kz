@@ -309,7 +309,7 @@ export default function InvoicePage() {
           </div>
         )}
 
-        {/* История — реальные логи */}
+        {/* История */}
         <div className="bg-white rounded-2xl shadow-sm p-4">
           <div className="text-xs text-gray-400 uppercase tracking-wide mb-3">История</div>
           {logs.length === 0 ? (
@@ -328,12 +328,8 @@ export default function InvoicePage() {
                       )}
                     </div>
                     <div className="flex-1 pb-3">
-                      <div className={`text-sm font-medium ${s.color}`}>
-                        {icon} {s.text}
-                      </div>
-                      <div className="text-xs text-gray-400 mt-0.5">
-                        {formatDateTime(log.created_at)}
-                      </div>
+                      <div className={`text-sm font-medium ${s.color}`}>{icon} {s.text}</div>
+                      <div className="text-xs text-gray-400 mt-0.5">{formatDateTime(log.created_at)}</div>
                     </div>
                   </div>
                 )
@@ -371,6 +367,8 @@ export default function InvoicePage() {
             className="w-full flex items-center px-4 py-3.5 text-sm hover:bg-gray-50 text-[#1C2056] border-b border-gray-100">
             📋 Дублировать
           </button>
+
+          {/* КП */}
           <button onClick={async () => {
             if (!profile) { alert('Данные загружаются'); return }
             const kpNumber = prompt('Номер КП:', invoice.number)
@@ -379,6 +377,24 @@ export default function InvoicePage() {
             today.setDate(today.getDate() + 30)
             const validUntil = prompt('Действителен до:', today.toLocaleDateString('ru-KZ'))
             if (!validUntil) return
+
+            const { data: { user } } = await supabase.auth.getUser()
+            if (user) {
+              await supabase.from('kp_documents').insert({
+                user_id: user.id,
+                invoice_id: id,
+                number: kpNumber,
+                date: formatDate(invoice.created_at),
+                valid_until: validUntil,
+                client_name: invoice.client_name,
+                client_bin: invoice.client_bin,
+                total: Number(invoice.amount),
+                services: invoice.services,
+                note: invoice.note,
+                vat_type: profile?.vat_type || 'no_vat',
+              })
+            }
+
             askSignature((withSign) => {
               generateKP({
                 number: kpNumber,
@@ -398,12 +414,33 @@ export default function InvoicePage() {
             className="w-full flex items-center px-4 py-3.5 text-sm hover:bg-gray-50 text-[#1C2056] border-b border-gray-100">
             📋 Коммерческое предложение
           </button>
+
+          {/* АВР */}
           <button onClick={async () => {
             if (!profile) { alert('Данные загружаются'); return }
             const avrNumber = prompt('Номер АВР:', invoice.number)
             if (!avrNumber) return
             const contractNumber = prompt('Номер договора (необязательно):', '')
             const contractDate = prompt('Дата договора:', formatDate(invoice.created_at))
+
+            const { data: { user } } = await supabase.auth.getUser()
+            if (user) {
+              await supabase.from('avr_documents').insert({
+                user_id: user.id,
+                invoice_id: id,
+                number: avrNumber,
+                date: formatDate(invoice.created_at),
+                contract_number: contractNumber || null,
+                contract_date: contractDate || null,
+                client_name: invoice.client_name,
+                client_bin: invoice.client_bin,
+                client_address: invoice.client_address,
+                total: Number(invoice.amount),
+                services: invoice.services,
+                vat_type: profile?.vat_type || 'no_vat',
+              })
+            }
+
             askSignature((withSign) => {
               generateAVR({
                 number: avrNumber,
@@ -423,10 +460,28 @@ export default function InvoicePage() {
             className="w-full flex items-center px-4 py-3.5 text-sm hover:bg-gray-50 text-[#1C2056] border-b border-gray-100">
             📋 Акт выполненных работ
           </button>
+
+          {/* Накладная */}
           <button onClick={async () => {
             if (!profile) { alert('Данные загружаются'); return }
             const naklNumber = prompt('Номер накладной:', invoice.number)
             if (!naklNumber) return
+
+            const { data: { user } } = await supabase.auth.getUser()
+            if (user) {
+              await supabase.from('nakladnaya_documents').insert({
+                user_id: user.id,
+                invoice_id: id,
+                number: naklNumber,
+                date: formatDate(invoice.created_at),
+                client_name: invoice.client_name,
+                client_bin: invoice.client_bin,
+                total: Number(invoice.amount),
+                services: invoice.services,
+                vat_type: profile?.vat_type || 'no_vat',
+              })
+            }
+
             askSignature((withSign) => {
               generateNakladnaya({
                 number: naklNumber,
@@ -443,6 +498,7 @@ export default function InvoicePage() {
             className="w-full flex items-center px-4 py-3.5 text-sm hover:bg-gray-50 text-[#1C2056] border-b border-gray-100">
             📋 Накладная на отпуск товара
           </button>
+
           <button onClick={async () => {
             const { data: { user } } = await supabase.auth.getUser()
             if (!user) return

@@ -177,6 +177,7 @@ export default function Profile() {
               { icon: '👥', label: 'Мои клиенты', href: '/profile/clients', badge: stats.clients },
               { icon: '📋', label: 'Услуги и товары', href: '/profile/services', badge: stats.services },
               { icon: '⭐', label: 'Шаблоны счетов', href: '/profile/templates', badge: 0 },
+              { icon: '🗂️', label: 'Документы для налоговой', href: '/profile/documents', badge: 0 },
             ].map((item, i, arr) => (
               <div key={item.href} onClick={() => router.push(item.href)}
                 className={`flex items-center justify-between px-4 py-3.5 cursor-pointer hover:bg-gray-50 ${i < arr.length - 1 ? 'border-b border-gray-100' : ''}`}>
