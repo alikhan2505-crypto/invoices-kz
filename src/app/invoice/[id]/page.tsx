@@ -9,11 +9,15 @@ import { generateAVR } from '@/lib/generateAVR'
 import { generateNakladnaya } from '@/lib/generateNakladnaya'
 
 const statusLabel: Record<string, { text: string; color: string; dot: string }> = {
-  paid:    { text: 'Оплачен',   color: 'text-green-600', dot: 'bg-green-500' },
-  sent:    { text: 'Отправлен', color: 'text-blue-600',  dot: 'bg-blue-400' },
-  overdue: { text: 'Просрочен', color: 'text-red-600',   dot: 'bg-red-500' },
-  draft:   { text: 'Черновик',  color: 'text-gray-500',  dot: 'bg-gray-300' },
+  paid:    { text: 'Оплачен',    color: 'text-green-600',  dot: 'bg-green-500' },
+  sent:    { text: 'Отправлен',  color: 'text-blue-600',   dot: 'bg-blue-400' },
+  overdue: { text: 'Просрочен',  color: 'text-red-600',    dot: 'bg-red-500' },
+  draft:   { text: 'Черновик',   color: 'text-gray-500',   dot: 'bg-gray-300' },
   viewed:  { text: 'Просмотрен', color: 'text-purple-600', dot: 'bg-purple-400' },
+}
+
+const statusIcon: Record<string, string> = {
+  paid: '✅', sent: '📤', overdue: '⏰', draft: '📝', viewed: '👁'
 }
 
 export default function InvoicePage() {
@@ -24,6 +28,7 @@ export default function InvoicePage() {
   const [bank, setBank] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState(false)
+  const [logs, setLogs] = useState<any[]>([])
   const [showSignModal, setShowSignModal] = useState(false)
   const [pendingDocAction, setPendingDocAction] = useState<((withSign: boolean) => void) | null>(null)
   const [showEmailModal, setShowEmailModal] = useState(false)
@@ -36,6 +41,14 @@ export default function InvoicePage() {
     const { data: inv } = await supabase.from('invoices').select('*').eq('id', id).single()
     setInvoice(inv)
     if (inv?.client_email) setEmailTo(inv.client_email)
+
+    const { data: logsData } = await supabase
+      .from('invoice_logs')
+      .select('*')
+      .eq('invoice_id', id)
+      .order('created_at', { ascending: false })
+    setLogs(logsData || [])
+
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
       const { data: p } = await supabase.from('profiles').select('*').eq('id', user.id).single()
@@ -72,6 +85,7 @@ export default function InvoicePage() {
   async function updateStatus(status: string) {
     setUpdating(true)
     await supabase.from('invoices').update({ status }).eq('id', id)
+    await supabase.from('invoice_logs').insert({ invoice_id: id, status })
     await loadInvoice()
     setUpdating(false)
   }
@@ -106,6 +120,7 @@ export default function InvoicePage() {
       created_at: new Date().toISOString(),
     }).select().single()
     if (error) { alert('Ошибка: ' + error.message); return }
+    await supabase.from('invoice_logs').insert({ invoice_id: data.id, status: 'draft' })
     router.push('/invoice/' + data.id)
   }
 
@@ -113,12 +128,10 @@ export default function InvoicePage() {
     const { data } = await supabase.from('invoices').select('public_token').eq('id', id).single()
     if (data?.public_token) {
       const link = `https://invoices.kz/view/${data.public_token}`
-      // Используем fallback для мобильных
       try {
         await navigator.clipboard.writeText(link)
         alert('Ссылка скопирована: ' + link)
       } catch {
-        // Fallback для мобильных
         const el = document.createElement('textarea')
         el.value = link
         document.body.appendChild(el)
@@ -137,7 +150,6 @@ export default function InvoicePage() {
     if (!data?.public_token) { alert('Ошибка'); return }
     const link = `https://invoices.kz/view/${data.public_token}`
     const text = `Здравствуйте! Направляю вам счёт на оплату ${invoice.number} на сумму ${Number(invoice.amount).toLocaleString('ru-KZ')} ₸.\n\nОткрыть счёт: ${link}`
-    // Используем location.href для мобильных вместо window.open
     window.location.href = `https://wa.me/?text=${encodeURIComponent(text)}`
     await updateStatus('sent')
   }
@@ -179,6 +191,9 @@ export default function InvoicePage() {
       clientBin: invoice.client_bin || '',
       clientEmail: invoice.client_email || '',
       clientAddress: invoice.client_address || '',
+      clientPhone: invoice.client_phone || '',
+      contractNumber: invoice.contract_number || '',
+      contractDate: invoice.contract_date || '',
       services,
       total: Number(invoice.amount),
       note: invoice.note || profile?.default_note || '',
@@ -227,7 +242,6 @@ export default function InvoicePage() {
           </span>
         </div>
 
-        {/* Actions — убрали Печать, оставили PDF */}
         <div className="grid grid-cols-4 gap-2">
           {[
             { icon: '💬', label: 'WhatsApp', action: shareWhatsApp },
@@ -295,46 +309,47 @@ export default function InvoicePage() {
           </div>
         )}
 
-        {/* История */}
+        {/* История — реальные логи */}
         <div className="bg-white rounded-2xl shadow-sm p-4">
           <div className="text-xs text-gray-400 uppercase tracking-wide mb-3">История</div>
-          <div className="space-y-3">
-            {invoice.status === 'paid' && (
-              <div className="flex items-center gap-3">
-                <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0"></span>
-                <div>
-                  <div className="text-sm text-[#1C2056]">Оплачен</div>
-                  <div className="text-xs text-gray-400">{formatDateTime(invoice.updated_at || invoice.created_at)}</div>
-                </div>
-              </div>
-            )}
-            {(invoice.status === 'sent' || invoice.status === 'paid' || invoice.status === 'viewed') && (
-              <div className="flex items-center gap-3">
-                <span className="w-2 h-2 rounded-full bg-blue-400 flex-shrink-0"></span>
-                <div>
-                  <div className="text-sm text-[#1C2056]">Отправлен</div>
-                  <div className="text-xs text-gray-400">{formatDateTime(invoice.created_at)}</div>
-                </div>
-              </div>
-            )}
-            <div className="flex items-center gap-3">
-              <span className="w-2 h-2 rounded-full bg-gray-300 flex-shrink-0"></span>
-              <div>
-                <div className="text-sm text-[#1C2056]">Создан</div>
-                <div className="text-xs text-gray-400">{formatDateTime(invoice.created_at)}</div>
-              </div>
+          {logs.length === 0 ? (
+            <div className="text-xs text-gray-400 text-center py-2">Нет записей</div>
+          ) : (
+            <div className="space-y-0">
+              {logs.map((log, i) => {
+                const s = statusLabel[log.status] || statusLabel.draft
+                const icon = statusIcon[log.status] || '📝'
+                return (
+                  <div key={log.id} className="flex items-start gap-3">
+                    <div className="flex flex-col items-center flex-shrink-0">
+                      <span className={`w-2.5 h-2.5 rounded-full mt-1.5 ${s.dot}`}></span>
+                      {i < logs.length - 1 && (
+                        <div className="w-px flex-1 min-h-[24px] bg-gray-100 my-1"></div>
+                      )}
+                    </div>
+                    <div className="flex-1 pb-3">
+                      <div className={`text-sm font-medium ${s.color}`}>
+                        {icon} {s.text}
+                      </div>
+                      <div className="text-xs text-gray-400 mt-0.5">
+                        {formatDateTime(log.created_at)}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
-          </div>
+          )}
         </div>
 
         {/* Изменить статус */}
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
           <div className="px-4 pt-4 pb-2 text-xs text-gray-400 uppercase tracking-wide">Изменить статус</div>
           {[
-            { status: 'draft', label: '📝 Черновик' },
-            { status: 'sent', label: '📤 Отправлен' },
-            { status: 'viewed', label: '👁 Просмотрен клиентом' },
-            { status: 'paid', label: '✅ Оплачен' },
+            { status: 'draft',   label: '📝 Черновик' },
+            { status: 'sent',    label: '📤 Отправлен' },
+            { status: 'viewed',  label: '👁 Просмотрен клиентом' },
+            { status: 'paid',    label: '✅ Оплачен' },
             { status: 'overdue', label: '⏰ Просрочен' },
           ].filter(s => s.status !== invoice.status).map((s, i, arr) => (
             <button key={s.status}

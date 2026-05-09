@@ -308,6 +308,12 @@ export default function Dashboard() {
 
     if (error) { alert('Ошибка: ' + error.message); setLoading(false); return }
 
+    // Записываем лог создания
+    await supabase.from('invoice_logs').insert({
+      invoice_id: data.id,
+      status: 'draft',
+    })
+
     setLastCreated(Date.now())
     setLoading(false)
 
