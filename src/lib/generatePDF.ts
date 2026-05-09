@@ -109,42 +109,121 @@ export function generateInvoicePDF(data: InvoiceData) {
   const totalWithoutVat = vatType === 'vat_16' ? Math.round(data.total / 1.16) : data.total
   const vatAmount = vatType === 'vat_16' ? Math.round(data.total - data.total / 1.16) : 0
 
-  // Итого строка — новый формат
   let vatLine = ''
   if (vatType === 'vat_16') {
     vatLine = `
       <div style="display:flex; justify-content:flex-end; gap:40px; line-height:2;">
-        <div style="text-align:right; color:#333;">
-          Итого:<br>
-          В том числе НДС 16%:
-        </div>
-        <div style="text-align:right; font-weight:bold; min-width:120px;">
-          ${formatMoney(data.total)}<br>
-          ${formatMoney(vatAmount)}
-        </div>
-      </div>
-    `
+        <div style="text-align:right; color:#333;">Итого:<br>В том числе НДС 16%:</div>
+        <div style="text-align:right; font-weight:bold; min-width:120px;">${formatMoney(data.total)}<br>${formatMoney(vatAmount)}</div>
+      </div>`
   } else if (vatType === 'vat_0') {
     vatLine = `
       <div style="display:flex; justify-content:flex-end; gap:40px; line-height:2;">
-        <div style="text-align:right; color:#333;">
-          Итого:<br>
-          НДС 0%:
-        </div>
-        <div style="text-align:right; font-weight:bold; min-width:120px;">
-          ${formatMoney(data.total)}<br>
-          0,00
-        </div>
-      </div>
-    `
+        <div style="text-align:right; color:#333;">Итого:<br>НДС 0%:</div>
+        <div style="text-align:right; font-weight:bold; min-width:120px;">${formatMoney(data.total)}<br>0,00</div>
+      </div>`
   } else {
     vatLine = `
       <div style="display:flex; justify-content:flex-end; gap:40px; line-height:2;">
         <div style="text-align:right; color:#333;">Итого:</div>
         <div style="text-align:right; font-weight:bold; min-width:120px;">${formatMoney(data.total)}</div>
-      </div>
-    `
+      </div>`
   }
+
+  const invoiceHTML = `
+    <div class="notice">
+      Внимание! Оплата данного счета означает согласие с условиями поставки товара.<br>
+      Уведомление об оплате обязательно, в противном случае не гарантируется наличие товара на складе.<br>
+      Товар отпускается по факту прихода денег на р/с Поставщика, самовывозом, при наличии доверенности и документов удостоверяющих личность.
+    </div>
+
+    <div class="bank-label">Образец платежного поручения</div>
+    <table class="bank-table">
+      <tr>
+        <td style="width:45%"><b>Бенефициар:</b><br>${companyName}<br>БИН: ${binIin}</td>
+        <td style="width:35%;text-align:center"><b>ИИК</b><br><br>${iik}</td>
+        <td style="width:20%;text-align:center"><b>КБе</b><br><br>${kbe}</td>
+      </tr>
+      <tr>
+        <td><b>Банк бенефициара:</b><br>${bankName}</td>
+        <td style="text-align:center"><b>БИК</b><br><br>${bik}</td>
+        <td style="text-align:center"><b>Код назначения платежа</b><br>${data.knp || '849'}</td>
+      </tr>
+    </table>
+
+    <div class="title">Счет на оплату №${data.number} от ${data.date}</div>
+
+    <table style="width:100%; border-collapse:collapse; margin-bottom:10px;">
+      <tr>
+        <td style="font-weight:bold; width:90px; vertical-align:top; padding:3px 0;">Поставщик:</td>
+        <td style="padding:3px 0;">ИИН/БИН: ${binIin}, ${companyName}, ${address}${phone ? ', тел: ' + phone : ''}</td>
+      </tr>
+      <tr>
+        <td style="font-weight:bold; vertical-align:top; padding:3px 0;">Покупатель:</td>
+        <td style="padding:3px 0;">${data.clientBin ? 'ИИН/БИН: ' + data.clientBin + ', ' : ''}${data.clientName}${data.clientAddress ? ', ' + data.clientAddress : ''}${data.clientPhone ? ', тел: ' + data.clientPhone : ''}</td>
+      </tr>
+      <tr>
+        <td style="font-weight:bold; vertical-align:top; padding:3px 0;">Договор:</td>
+        <td style="padding:3px 0;">${data.contractNumber ? '№' + data.contractNumber + (data.contractDate ? ' от ' + data.contractDate : '') : '—'}</td>
+      </tr>
+    </table>
+
+    <table class="items-table">
+      <thead>
+        <tr>
+          <th style="width:5%">№</th>
+          <th style="width:8%">Код</th>
+          <th style="width:37%">Наименование</th>
+          <th style="width:10%">Кол-во</th>
+          <th style="width:8%">Ед.</th>
+          <th style="width:16%">Цена</th>
+          <th style="width:16%">Сумма</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${data.services.map((s, i) => `
+          <tr>
+            <td>${i + 1}</td>
+            <td>${s.code || (i + 1)}</td>
+            <td class="left">${s.name}</td>
+            <td>${s.qty}</td>
+            <td>${s.unit || 'шт'}</td>
+            <td style="text-align:right">${formatMoney(Number(s.price))}</td>
+            <td style="text-align:right">${formatMoney(s.qty * s.price)}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+
+    <div class="totals">${vatLine}</div>
+
+    <div class="total-words">
+      Всего наименований ${data.services.length}, на сумму ${formatMoney(data.total)} KZT<br>
+      Всего к оплате: ${totalWords}
+    </div>
+
+    ${data.note ? `<div class="note"><b>Примечание:</b> ${data.note}</div>` : ''}
+
+    <hr>
+
+    <div style="margin-top:16px; min-height:120px; position:relative;">
+      <div style="display:flex; align-items:flex-end; gap:4px; width:90%;">
+        <span style="white-space:nowrap;">Руководитель</span>
+        <div style="position:relative; flex:1; min-width:120px;">
+          ${signatureUrl ? `<img src="${signatureUrl}" style="position:absolute; bottom:4px; left:10px; height:45px; max-width:160px; object-fit:contain;" />` : ''}
+          <div style="border-bottom:1px solid #000; width:100%; margin-top:50px; min-width:200px;"></div>
+        </div>
+        <span style="white-space:nowrap; padding-bottom:2px;">${director ? '/ ' + director : '/'}</span>
+      </div>
+      <div style="margin-top:8px; font-size:9px; color:#666; width:85%; display:flex; justify-content:space-between; padding:0 4px;">
+        <span>должность</span>
+        <span>подпись</span>
+        <span>М.П.</span>
+        <span>расшифровка подписи</span>
+      </div>
+      ${stampUrl ? `<img src="${stampUrl}" style="position:absolute; left:28%; bottom:-10px; height:110px; width:110px; object-fit:contain; opacity:0.85;" />` : ''}
+    </div>
+  `
 
   const html = `
     <!DOCTYPE html>
@@ -156,10 +235,8 @@ export function generateInvoicePDF(data: InvoiceData) {
       <style>
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
         html { background: #888; }
-        body {
-          font-family: Arial, sans-serif;
-          font-size: 11px;
-          color: #000;
+        body { font-family: Arial, sans-serif; font-size: 11px; color: #000; background: #888; margin: 0; padding: 0; }
+        #invoice-content {
           width: 794px;
           min-height: 1123px;
           margin: 20px auto;
@@ -182,133 +259,20 @@ export function generateInvoicePDF(data: InvoiceData) {
         hr { border: none; border-top: 1px solid #000; margin: 16px 0; }
         @page { size: A4; margin: 0; }
         @media print {
-          html { background: white; }
-          body {
+          html, body { background: white; }
+          #invoice-content {
             margin: 0;
             box-shadow: none;
-            padding: 10mm 15mm;
             width: 100% !important;
+            padding: 10mm 15mm;
           }
           .toolbar { display: none !important; }
         }
       </style>
     </head>
     <body>
-
-      <div class="notice">
-        Внимание! Оплата данного счета означает согласие с условиями поставки товара.<br>
-        Уведомление об оплате обязательно, в противном случае не гарантируется наличие товара на складе.<br>
-        Товар отпускается по факту прихода денег на р/с Поставщика, самовывозом, при наличии доверенности и документов удостоверяющих личность.
-      </div>
-
-      <div class="bank-label">Образец платежного поручения</div>
-      <table class="bank-table">
-        <tr>
-          <td style="width:45%">
-            <b>Бенефициар:</b><br>
-            ${companyName}<br>
-            БИН: ${binIin}
-          </td>
-          <td style="width:35%;text-align:center">
-            <b>ИИК</b><br><br>${iik}
-          </td>
-          <td style="width:20%;text-align:center"><b>КБе</b><br><br>${kbe}</td>
-        </tr>
-        <tr>
-          <td><b>Банк бенефициара:</b><br>${bankName}</td>
-          <td style="text-align:center"><b>БИК</b><br><br>${bik}</td>
-          <td style="text-align:center"><b>Код назначения платежа</b><br>${data.knp || '849'}</td>
-        </tr>
-      </table>
-
-      <div class="title">Счет на оплату №${data.number} от ${data.date}</div>
-
-      <table style="width:100%; border-collapse:collapse; margin-bottom:10px;">
-        <tr>
-          <td style="font-weight:bold; width:90px; vertical-align:top; padding:3px 0;">Поставщик:</td>
-          <td style="padding:3px 0;">
-            ИИН/БИН: ${binIin}, ${companyName}, ${address}${phone ? ', тел: ' + phone : ''}
-          </td>
-        </tr>
-        <tr>
-          <td style="font-weight:bold; vertical-align:top; padding:3px 0;">Покупатель:</td>
-          <td style="padding:3px 0;">
-            ${data.clientBin ? 'ИИН/БИН: ' + data.clientBin + ', ' : ''}${data.clientName}${data.clientAddress ? ', ' + data.clientAddress : ''}${data.clientPhone ? ', тел: ' + data.clientPhone : ''}
-          </td>
-        </tr>
-        <tr>
-          <td style="font-weight:bold; vertical-align:top; padding:3px 0;">Договор:</td>
-          <td style="padding:3px 0;">${data.contractNumber ? '№' + data.contractNumber + (data.contractDate ? ' от ' + data.contractDate : '') : '—'}</td>
-        </tr>
-      </table>
-
-      <table class="items-table">
-        <thead>
-          <tr>
-            <th style="width:5%">№</th>
-            <th style="width:8%">Код</th>
-            <th style="width:37%">Наименование</th>
-            <th style="width:10%">Кол-во</th>
-            <th style="width:8%">Ед.</th>
-            <th style="width:16%">Цена</th>
-            <th style="width:16%">Сумма</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${data.services.map((s, i) => `
-            <tr>
-              <td>${i + 1}</td>
-              <td>${s.code || (i + 1)}</td>
-              <td class="left">${s.name}</td>
-              <td>${s.qty}</td>
-              <td>${s.unit || 'шт'}</td>
-              <td style="text-align:right">${formatMoney(Number(s.price))}</td>
-              <td style="text-align:right">${formatMoney(s.qty * s.price)}</td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-
-      <div class="totals">
-        ${vatLine}
-      </div>
-
-      <div class="total-words">
-        Всего наименований ${data.services.length}, на сумму ${formatMoney(data.total)} KZT<br>
-        Всего к оплате: ${totalWords}
-      </div>
-
-      ${data.note ? `<div class="note"><b>Примечание:</b> ${data.note}</div>` : ''}
-
-      <hr>
-
-      <div style="margin-top:16px; min-height:120px; position:relative;">
-        <div style="display:flex; align-items:flex-end; gap:4px; width:90%;">
-          <span style="white-space:nowrap;">Руководитель</span>
-          <div style="position:relative; flex:1; min-width:120px;">
-            ${signatureUrl ? `
-              <img src="${signatureUrl}"
-                style="position:absolute; bottom:4px; left:10px; height:45px; max-width:160px; object-fit:contain;"
-              />
-            ` : ''}
-            <div style="border-bottom:1px solid #000; width:100%; margin-top:50px; min-width:200px;"></div>
-          </div>
-          <span style="white-space:nowrap; padding-bottom:2px;">${director ? '/ ' + director : '/'}</span>
-        </div>
-        <div style="margin-top:8px; font-size:9px; color:#666; width:85%; display:flex; justify-content:space-between; padding:0 4px;">
-          <span>должность</span>
-          <span>подпись</span>
-          <span>М.П.</span>
-           <span>расшифровка подписи</span>
-        </div>
-        ${stampUrl ? `
-          <img src="${stampUrl}"
-            style="position:absolute; left:28%; bottom:-10px; height:110px; width:110px; object-fit:contain; opacity:0.85;"
-          />
-        ` : ''}
-      </div>
-
       ${data.autoPrint !== false ? `
+        <div id="invoice-content">${invoiceHTML}</div>
         <script>
           window.onload = function() {
             const images = document.querySelectorAll('img')
@@ -324,7 +288,7 @@ export function generateInvoicePDF(data: InvoiceData) {
           }
         <\/script>
       ` : `
-        <div style="position:fixed; top:0; left:0; right:0; background:white; border-bottom:1px solid #e5e7eb; padding:10px 16px; z-index:999; display:flex; align-items:center; justify-content:space-between; gap:8px;">
+        <div class="toolbar" style="position:fixed; top:0; left:0; right:0; background:white; border-bottom:1px solid #e5e7eb; padding:10px 16px; z-index:999; display:flex; align-items:center; justify-content:space-between; gap:8px;">
           <button onclick="window.close()" style="background:#f3f4f6; color:#374151; border:none; padding:8px 14px; border-radius:8px; cursor:pointer; font-size:13px; white-space:nowrap;">← Назад</button>
           <span style="font-size:12px; color:#6b7280; font-weight:600; flex:1; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Счёт №${data.number}</span>
           <div style="display:flex; gap:6px; flex-shrink:0;">
@@ -333,23 +297,24 @@ export function generateInvoicePDF(data: InvoiceData) {
           </div>
         </div>
         <div style="height:55px;"></div>
-        <div id="invoice-content">
+        <div id="invoice-content">${invoiceHTML}</div>
         <script>
           function downloadPDF() {
             const btn = document.getElementById('downloadBtn')
+            const toolbar = document.querySelector('.toolbar')
+            const spacer = toolbar?.nextElementSibling
             btn.textContent = '⏳ Загрузка...'
             btn.disabled = true
-            const toolbar = btn.closest('div[style*="position:fixed"]')
             if (toolbar) toolbar.style.display = 'none'
-            const spacer = toolbar?.nextElementSibling
             if (spacer) spacer.style.display = 'none'
+            const element = document.getElementById('invoice-content')
             html2pdf().set({
-              margin: [10, 15, 10, 15],
+              margin: 0,
               filename: 'Счёт-${data.number}.pdf',
               image: { type: 'jpeg', quality: 0.98 },
-              html2canvas: { scale: 2, useCORS: true, logging: false },
+              html2canvas: { scale: 2, useCORS: true, logging: false, windowWidth: 794 },
               jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-            }).from(document.body).save().then(() => {
+            }).from(element).save().then(() => {
               if (toolbar) toolbar.style.display = 'flex'
               if (spacer) spacer.style.display = 'block'
               btn.textContent = '💾 Скачать PDF'
@@ -358,7 +323,6 @@ export function generateInvoicePDF(data: InvoiceData) {
           }
         <\/script>
       `}
-      </div>
     </body>
     </html>
   `
