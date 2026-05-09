@@ -182,10 +182,14 @@ export function generateInvoicePDF(data: InvoiceData) {
         hr { border: none; border-top: 1px solid #000; margin: 16px 0; }
         @page { size: A4; margin: 0; }
         @media print {
-          html, body { background: white; margin: 0; padding: 0; }
-          body { box-shadow: none; width: 100% !important; }
+          html { background: white; }
+          body {
+            margin: 0;
+            box-shadow: none;
+            padding: 10mm 15mm;
+            width: 100% !important;
+          }
           .toolbar { display: none !important; }
-          #invoice-content { padding: 10mm 15mm; }
         }
       </style>
     </head>
@@ -337,14 +341,17 @@ export function generateInvoicePDF(data: InvoiceData) {
             btn.disabled = true
             const toolbar = btn.closest('div[style*="position:fixed"]')
             if (toolbar) toolbar.style.display = 'none'
+            const spacer = toolbar?.nextElementSibling
+            if (spacer) spacer.style.display = 'none'
             html2pdf().set({
               margin: [10, 15, 10, 15],
               filename: 'Счёт-${data.number}.pdf',
               image: { type: 'jpeg', quality: 0.98 },
-              html2canvas: { scale: 2, useCORS: true, logging: false, width: 794 },
+              html2canvas: { scale: 2, useCORS: true, logging: false },
               jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-            }).from(document.getElementById('invoice-content')).save().then(() => {
+            }).from(document.body).save().then(() => {
               if (toolbar) toolbar.style.display = 'flex'
+              if (spacer) spacer.style.display = 'block'
               btn.textContent = '💾 Скачать PDF'
               btn.disabled = false
             })
