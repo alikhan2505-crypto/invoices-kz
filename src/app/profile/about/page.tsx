@@ -1,6 +1,10 @@
 'use client'
 import { useRouter } from 'next/navigation'
 
+const BUILD_DATE = new Date().toLocaleDateString('ru-KZ', {
+  day: 'numeric', month: 'long', year: 'numeric'
+})
+
 export default function About() {
   const router = useRouter()
 
@@ -12,21 +16,24 @@ export default function About() {
       </div>
 
       <div className="max-w-lg mx-auto p-4 space-y-4">
-        {/* Logo */}
         <div className="bg-[#1C2056] rounded-2xl p-8 text-center">
           <div className="text-3xl font-bold text-white mb-1">INVOICES.KZ</div>
           <div className="text-white/60 text-sm mb-4">Счета на оплату за 1 минуту</div>
-          <div className="inline-block bg-white/10 text-white/80 text-xs px-3 py-1.5 rounded-full">
-            Версия 1.0.0
+          <div className="flex items-center justify-center gap-2">
+            <div className="inline-block bg-white/10 text-white/80 text-xs px-3 py-1.5 rounded-full">
+              Версия 1.0.0
+            </div>
+            <div className="inline-block bg-[#2DC48D]/20 text-[#2DC48D] text-xs px-3 py-1.5 rounded-full">
+              Обновлено {BUILD_DATE}
+            </div>
           </div>
         </div>
 
-        {/* Info */}
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
           {[
             { label: 'Сайт', value: 'invoices.kz', action: () => window.open('https://invoices.kz', '_blank') },
-            { label: 'Поддержка', value: 'support@invoices.kz', action: () => window.open('mailto:support@invoices.kz') },
-            { label: 'WhatsApp', value: '+7 776 355 51 77', action: () => window.open('https://wa.me/77763555177', '_blank') },
+            { label: 'Поддержка', value: 'Telegram', action: () => window.open('https://t.me/invoiceskz_support_bot', '_blank') },
+            { label: 'Email', value: 'support@invoices.kz', action: () => window.open('mailto:support@invoices.kz') },
           ].map((item, i, arr) => (
             <div key={item.label}
               onClick={item.action}
@@ -37,7 +44,6 @@ export default function About() {
           ))}
         </div>
 
-        {/* Legal */}
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
           <div className="px-4 pt-4 pb-2 text-xs text-gray-400 uppercase tracking-wide">Документы</div>
           {[
@@ -53,7 +59,6 @@ export default function About() {
           ))}
         </div>
 
-        {/* Made in KZ */}
         <div className="text-center py-4">
           <div className="text-2xl mb-2">🇰🇿</div>
           <div className="text-xs text-gray-400">Сделано в Казахстане с ❤️</div>

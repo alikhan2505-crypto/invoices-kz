@@ -183,7 +183,13 @@ export function generateInvoicePDF(data: InvoiceData) {
         @page { size: A4; margin: 0; }
         @media print {
           html { background: white; }
-          body { margin: 0; box-shadow: none; padding: 15mm; }
+          body {
+            margin: 0;
+            box-shadow: none;
+            padding: 10mm;
+            width: 210mm !important;
+            max-width: 210mm !important;
+          }
           .toolbar { display: none !important; }
         }
       </style>
