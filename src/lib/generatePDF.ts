@@ -241,7 +241,7 @@ export function generateInvoicePDF(data: InvoiceData) {
           min-height: 1123px;
           margin: 20px auto;
           background: white;
-          padding: 25mm 15mm 20mm;
+          padding: 20mm 15mm 20mm;
           box-shadow: 0 0 20px rgba(0,0,0,0.3);
         }
         .notice { font-size: 9px; text-align: center; margin-bottom: 16px; line-height: 1.5; }
@@ -257,16 +257,17 @@ export function generateInvoicePDF(data: InvoiceData) {
         .total-words { margin: 10px 0; font-weight: bold; line-height: 1.6; }
         .note { margin: 10px 0; font-size: 11px; color: #333; }
         hr { border: none; border-top: 1px solid #000; margin: 16px 0; }
-        @page { size: A4; margin: 0; }
+        @page { size: A4 portrait; margin: 15mm; }
         @media print {
-          html, body { background: white; }
-          #invoice-content {
-            margin: 0;
-            box-shadow: none;
-            width: 100% !important;
-            padding: 10mm 15mm;
-          }
+          html, body { background: white !important; margin: 0 !important; padding: 0 !important; }
           .toolbar { display: none !important; }
+          #invoice-content {
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            box-shadow: none !important;
+            min-height: unset !important;
+          }
         }
       </style>
     </head>
