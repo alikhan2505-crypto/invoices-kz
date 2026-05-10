@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 export async function POST(req: NextRequest) {
   try {
     const { userId, plan, phone } = await req.json()
-    if (!userId || !plan || !phone) {
+    if (!userId || !plan) {
       return NextResponse.json({ error: 'Missing params' }, { status: 400 })
     }
 
@@ -13,22 +13,18 @@ export async function POST(req: NextRequest) {
     }
 
     const amount = plan === 'pro' ? 5990 : 2990
-    const comment = plan === 'pro' ? 'INVOICES.KZ Pro тариф' : 'INVOICES.KZ Basic тариф'
+    const orderId = `${userId}-${plan}-${Date.now()}`
 
-    const res = await fetch('https://api.xpayment.kz/v1/payments', {
+    const res = await fetch('https://api.xpayment.kz/v1/payments/link', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
-        'X-Idempotency-Key': `${userId}-${plan}-${Date.now()}`,
       },
       body: JSON.stringify({
         amount,
-        comment,
-        currency: 'KZT',
-        payer_phone: phone,
-        merchant_order_id: `${userId}-${plan}-${Date.now()}`,
-        metadata: { user_id: userId, plan },
+        device_interface: 'Pos',
+        merchant_order_id: orderId,
       }),
     })
 
@@ -36,12 +32,29 @@ export async function POST(req: NextRequest) {
 
     if (!res.ok) {
       console.error('xpayment error:', JSON.stringify(data))
-      console.error('phone sent:', phone)
-      console.error('amount:', amount)
       return NextResponse.json({ error: data.message || data.error || 'xpayment error', details: data }, { status: 400 })
     }
 
-    return NextResponse.json({ payment_id: data.payment_id, status: data.status })
+    // Сохраняем userId и plan в Supabase чтобы webhook знал кому активировать
+    const { createClient } = await import('@supabase/supabase-js')
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+    await supabase.from('payment_requests').insert({
+      user_id: userId,
+      plan,
+      amount,
+      status: 'pending',
+      order_id: orderId,
+      qr_operation_id: String(data.qr_operation_id),
+    })
+
+    return NextResponse.json({
+      qr_token: data.qr_token,
+      qr_operation_id: data.qr_operation_id,
+      expire_date: data.expire_date,
+    })
 
   } catch (e: any) {
     console.error('Payment create error:', e)

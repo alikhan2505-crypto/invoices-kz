@@ -10,19 +10,19 @@ export default function Upgrade() {
   const [promoSuccess, setPromoSuccess] = useState('')
   const [promoError, setPromoError] = useState('')
   const [plan, setPlan] = useState('free')
-  const [payPhone, setPayPhone] = useState('')
   const [userId, setUserId] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [selectedPlan, setSelectedPlan] = useState<{ name: string; amount: number; plan: string } | null>(null)
-  const [step, setStep] = useState<'phone' | 'pending' | 'success'>('phone')
+  const [step, setStep] = useState<'pending' | 'success'>('pending')
   const [submitting, setSubmitting] = useState(false)
-  const [paymentId, setPaymentId] = useState('')
+  const [qrToken, setQrToken] = useState('')
   const [checkingStatus, setCheckingStatus] = useState(false)
-  const phoneLoaded = useRef(false)
+  const [isMobile, setIsMobile] = useState(false)
   const statusInterval = useRef<any>(null)
 
   useEffect(() => {
     loadData()
+    setIsMobile(/iPhone|iPad|iPod|Android/i.test(navigator.userAgent))
     return () => { if (statusInterval.current) clearInterval(statusInterval.current) }
   }, [])
 
@@ -30,18 +30,8 @@ export default function Upgrade() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     setUserId(user.id)
-
-    const { data: p } = await supabase
-      .from('profiles')
-      .select('plan, phone')
-      .eq('id', user.id)
-      .single()
-
+    const { data: p } = await supabase.from('profiles').select('plan').eq('id', user.id).single()
     setPlan(p?.plan || 'free')
-    if (p?.phone && !phoneLoaded.current) {
-      setPayPhone(p.phone)
-      phoneLoaded.current = true
-    }
   }
 
   async function reloadPlan() {
@@ -51,64 +41,47 @@ export default function Upgrade() {
     setPlan(p?.plan || 'free')
   }
 
-  function formatPhone(value: string) {
-    const digits = value.replace(/\D/g, '')
-    if (digits.length === 0) return ''
-    let result = '+7'
-    if (digits.length > 1) result += ' ' + digits.slice(1, 4)
-    if (digits.length > 4) result += ' ' + digits.slice(4, 7)
-    if (digits.length > 7) result += ' ' + digits.slice(7, 9)
-    if (digits.length > 9) result += ' ' + digits.slice(9, 11)
-    return result
-  }
-
-  function openModal(planName: string, amount: number, planKey: string) {
+  async function openModal(planName: string, amount: number, planKey: string) {
     setSelectedPlan({ name: planName, amount, plan: planKey })
-    setStep('phone')
-    setPaymentId('')
+    setQrToken('')
+    setStep('pending')
     setShowModal(true)
-  }
-
-  async function createPayment() {
-    if (!payPhone || payPhone.length < 16) {
-      alert('Введите полный номер телефона Kaspi')
-      return
-    }
     setSubmitting(true)
 
     try {
       const res = await fetch('/api/payment/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId,
-          plan: selectedPlan?.plan,
-          phone: payPhone.replace(/\s/g, ''),
-        })
+        body: JSON.stringify({ userId, plan: planKey })
       })
 
       const data = await res.json()
 
       if (!res.ok || data.error) {
-        alert('Ошибка: ' + (data.error || 'Попробуйте снова') + (data.details ? '\n' + JSON.stringify(data.details) : ''))
+        alert('Ошибка: ' + (data.error || 'Попробуйте снова'))
+        setShowModal(false)
         setSubmitting(false)
         return
       }
 
-      setPaymentId(data.payment_id)
-      setStep('pending')
+      setQrToken(data.qr_token)
+
+      // На мобильном сразу открываем Kaspi
+      if (isMobile) {
+        window.location.href = data.qr_token
+      }
 
       // Автопроверка статуса каждые 5 секунд
-      statusInterval.current = setInterval(() => checkPaymentStatus(data.payment_id), 5000)
+      statusInterval.current = setInterval(() => checkPaymentStatus(planKey), 5000)
 
     } catch (e: any) {
       alert('Ошибка: ' + (e.message || 'Попробуйте снова'))
+      setShowModal(false)
     }
     setSubmitting(false)
   }
 
-  async function checkPaymentStatus(pid: string) {
-    if (!pid) return
+  async function checkPaymentStatus(planKey: string) {
     setCheckingStatus(true)
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -116,10 +89,9 @@ export default function Upgrade() {
 
       const { data: p } = await supabase.from('profiles').select('plan, plan_expires_at').eq('id', user.id).single()
 
-      if (p?.plan === selectedPlan?.plan && p?.plan_expires_at) {
+      if (p?.plan === planKey && p?.plan_expires_at) {
         const expiresAt = new Date(p.plan_expires_at)
-        const now = new Date()
-        if (expiresAt > now) {
+        if (expiresAt > new Date()) {
           clearInterval(statusInterval.current)
           setPlan(p.plan)
           setStep('success')
@@ -278,133 +250,96 @@ export default function Upgrade() {
         <div className="fixed inset-0 bg-black/40 z-50 flex items-end">
           <div className="bg-white w-full max-w-lg mx-auto rounded-t-3xl p-6">
 
-            {/* Шаг 1 — ввод телефона */}
-            {step === 'phone' && (
-              <>
-                <div className="flex items-center justify-between mb-5">
-                  <div className="font-semibold text-[#1C2056]">
-                    Подключить тариф {selectedPlan?.name}
-                  </div>
-                  <button onClick={() => setShowModal(false)} className="text-gray-400 text-xl">✕</button>
-                </div>
-
-                <div className="bg-blue-50 rounded-2xl p-4 mb-5">
-                  <div className="text-sm font-medium text-[#1C2056] mb-2">💳 Оплата через Kaspi Pay</div>
-                  <div className="text-xs text-gray-500 leading-relaxed">
-                    Введите номер телефона привязанный к Kaspi. На него придёт запрос на оплату через приложение Kaspi.
-                  </div>
-                </div>
-
-                <div className="mb-5">
-                  <label className="text-xs text-gray-500 mb-1 block">Номер телефона Kaspi</label>
-                  <input
-                    className="w-full border rounded-lg px-3 py-3 text-sm outline-none focus:border-[#1C2056]"
-                    placeholder="+7 777 123 45 67"
-                    value={payPhone}
-                    onChange={e => setPayPhone(formatPhone(e.target.value))}
-                    type="tel"
-                    maxLength={16}
-                  />
-                </div>
-
-                <div className="bg-gray-50 rounded-xl px-4 py-3 mb-5 flex items-center justify-between">
-                  <span className="text-sm text-gray-500">К оплате</span>
-                  <span className="text-lg font-bold text-[#1C2056]">{selectedPlan?.amount.toLocaleString('ru-KZ')} ₸/мес</span>
-                </div>
-
-                <button onClick={createPayment} disabled={submitting}
-                  className="w-full bg-[#2DC48D] text-white rounded-xl py-4 font-medium text-sm mb-3">
-                  {submitting ? 'Создаём запрос...' : '💳 Оплатить через Kaspi'}
-                </button>
-
-                <p className="text-center text-xs text-gray-400">
-                  После нажатия придёт уведомление в приложение Kaspi
-                </p>
-              </>
+            {/* Загрузка */}
+            {submitting && (
+              <div className="text-center py-8">
+                <div className="w-10 h-10 border-2 border-[#1C2056] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                <div className="font-semibold text-[#1C2056] mb-1">Создаём платёж...</div>
+                <div className="text-xs text-gray-400">Подождите несколько секунд</div>
+              </div>
             )}
 
-            {/* Шаг 2 — ожидание оплаты */}
-            {step === 'pending' && (
+            {/* Ожидание оплаты */}
+            {!submitting && step === 'pending' && (
               <>
                 <div className="flex items-center justify-between mb-5">
-                  <div className="font-semibold text-[#1C2056]">Ожидание оплаты</div>
+                  <div className="font-semibold text-[#1C2056]">Оплата {selectedPlan?.name}</div>
                   <button onClick={() => {
                     clearInterval(statusInterval.current)
                     setShowModal(false)
                   }} className="text-gray-400 text-xl">✕</button>
                 </div>
 
-                <div className="text-center py-6">
-                  <div className="text-5xl mb-4">📱</div>
-                  <div className="font-semibold text-[#1C2056] mb-2">Откройте приложение Kaspi</div>
-                  <div className="text-sm text-gray-400 mb-6">
-                    Запрос на оплату отправлен на<br/>
-                    <strong className="text-[#1C2056]">{payPhone}</strong>
-                  </div>
-
-                  <div className="bg-yellow-50 rounded-2xl p-4 mb-5 text-left">
-                    <div className="text-sm font-medium text-yellow-800 mb-2">📋 Как оплатить:</div>
-                    <div className="space-y-2">
-                      {[
-                        'Откройте Kaspi на телефоне',
-                        'Найдите уведомление о платеже',
-                        'Подтвердите оплату',
-                        'Подписка активируется автоматически',
-                      ].map((t, i) => (
-                        <div key={i} className="flex gap-2 items-start text-xs text-yellow-700">
-                          <span className="w-4 h-4 rounded-full bg-yellow-200 flex items-center justify-center flex-shrink-0 font-bold text-yellow-800">{i + 1}</span>
-                          {t}
-                        </div>
-                      ))}
+                {isMobile ? (
+                  <div className="text-center py-4">
+                    <div className="text-5xl mb-4">📱</div>
+                    <div className="font-semibold text-[#1C2056] mb-2">Переходим в Kaspi...</div>
+                    <div className="text-sm text-gray-400 mb-6">
+                      Если приложение не открылось — нажмите кнопку ниже
                     </div>
+                    <a href={qrToken} target="_blank"
+                      className="block w-full bg-[#2DC48D] text-white rounded-xl py-4 font-medium text-sm mb-4">
+                      💳 Открыть Kaspi
+                    </a>
                   </div>
-
-                  <div className="flex items-center justify-center gap-2 text-xs text-gray-400 mb-4">
-                    <div className="w-3 h-3 border-2 border-[#1C2056] border-t-transparent rounded-full animate-spin"></div>
-                    {checkingStatus ? 'Проверяем оплату...' : 'Ожидаем подтверждение от Kaspi...'}
+                ) : (
+                  <div className="text-center py-4">
+                    <div className="font-semibold text-[#1C2056] mb-2">Отсканируйте QR в приложении Kaspi</div>
+                    <div className="text-xs text-gray-400 mb-4">Или откройте ссылку на телефоне</div>
+                    {qrToken && (
+                      <div className="flex justify-center mb-4">
+                        <img
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrToken)}`}
+                          alt="QR код"
+                          className="rounded-xl border border-gray-100"
+                          width={200}
+                          height={200}
+                        />
+                      </div>
+                    )}
+                    <a href={qrToken} target="_blank"
+                      className="text-xs text-[#1C2056] underline">
+                      Открыть ссылку напрямую
+                    </a>
                   </div>
-                </div>
+                )}
 
                 <div className="bg-gray-50 rounded-xl px-4 py-3 mb-4 flex items-center justify-between">
-                  <span className="text-sm text-gray-500">Тариф {selectedPlan?.name}</span>
+                  <span className="text-sm text-gray-500">К оплате</span>
                   <span className="text-sm font-bold text-[#1C2056]">{selectedPlan?.amount.toLocaleString('ru-KZ')} ₸/мес</span>
                 </div>
 
-                <button onClick={() => checkPaymentStatus(paymentId)}
-                  className="w-full border border-gray-200 text-gray-500 rounded-xl py-3 text-sm mb-2">
+                <div className="flex items-center justify-center gap-2 text-xs text-gray-400 mb-3">
+                  <div className="w-3 h-3 border-2 border-[#1C2056] border-t-transparent rounded-full animate-spin"></div>
+                  {checkingStatus ? 'Проверяем оплату...' : 'Ожидаем подтверждение...'}
+                </div>
+
+                <button onClick={() => checkPaymentStatus(selectedPlan?.plan || '')}
+                  className="w-full border border-gray-200 text-gray-500 rounded-xl py-3 text-sm">
                   🔄 Проверить вручную
                 </button>
-
-                <p className="text-center text-xs text-gray-400">
-                  Уведомление не пришло?{' '}
-                  <a href="https://t.me/invoiceskz_support_bot" target="_blank" className="text-[#1C2056] underline">
-                    Написать в поддержку
-                  </a>
-                </p>
               </>
             )}
 
-            {/* Шаг 3 — успешная оплата */}
+            {/* Успех */}
             {step === 'success' && (
-              <>
-                <div className="text-center py-6">
-                  <div className="text-5xl mb-4">🎉</div>
-                  <div className="font-bold text-[#1C2056] text-xl mb-2">Оплата прошла!</div>
-                  <div className="text-sm text-gray-400 mb-6">
-                    Тариф <strong>{selectedPlan?.name}</strong> активирован
-                  </div>
-                  <div className="bg-green-50 rounded-2xl p-4 mb-6">
-                    <div className="text-sm text-green-700">✅ Подписка активна на 30 дней</div>
-                  </div>
-                  <button onClick={() => {
-                    setShowModal(false)
-                    router.push('/dashboard')
-                  }}
-                    className="w-full bg-[#1C2056] text-white rounded-xl py-4 font-medium text-sm">
-                    Перейти к работе →
-                  </button>
+              <div className="text-center py-6">
+                <div className="text-5xl mb-4">🎉</div>
+                <div className="font-bold text-[#1C2056] text-xl mb-2">Оплата прошла!</div>
+                <div className="text-sm text-gray-400 mb-6">
+                  Тариф <strong>{selectedPlan?.name}</strong> активирован
                 </div>
-              </>
+                <div className="bg-green-50 rounded-2xl p-4 mb-6">
+                  <div className="text-sm text-green-700">✅ Подписка активна на 30 дней</div>
+                </div>
+                <button onClick={() => {
+                  setShowModal(false)
+                  router.push('/dashboard')
+                }}
+                  className="w-full bg-[#1C2056] text-white rounded-xl py-4 font-medium text-sm">
+                  Перейти к работе →
+                </button>
+              </div>
             )}
 
           </div>
