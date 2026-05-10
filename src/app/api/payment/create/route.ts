@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 
 export async function POST(req: NextRequest) {
   try {
-    const { userId, plan, phone } = await req.json()
+    const { userId, plan } = await req.json()
     if (!userId || !plan) {
       return NextResponse.json({ error: 'Missing params' }, { status: 400 })
     }
@@ -13,7 +14,8 @@ export async function POST(req: NextRequest) {
     }
 
     const amount = plan === 'pro' ? 5990 : 2990
-    const orderId = `${userId}-${plan}-${Date.now()}`
+    // Кодируем userId и plan прямо в orderId через разделитель __|__
+    const orderId = `${userId}__|__${plan}__|__${Date.now()}`
 
     const res = await fetch('https://api.xpayment.kz/v1/payments/link', {
       method: 'POST',
@@ -35,20 +37,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: data.message || data.error || 'xpayment error', details: data }, { status: 400 })
     }
 
-    // Сохраняем userId и plan в Supabase чтобы webhook знал кому активировать
-    const { createClient } = await import('@supabase/supabase-js')
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-    await supabase.from('payment_requests').insert({
-      user_id: userId,
-      plan,
-      amount,
-      status: 'pending',
-      order_id: orderId,
-      qr_operation_id: String(data.qr_operation_id),
-    })
+    console.log('Payment link created:', data.qr_token, 'orderId:', orderId)
 
     return NextResponse.json({
       qr_token: data.qr_token,
