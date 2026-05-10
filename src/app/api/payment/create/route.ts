@@ -14,8 +14,6 @@ export async function POST(req: NextRequest) {
     }
 
     const amount = plan === 'pro' ? 5990 : 2990
-    // Кодируем userId и plan прямо в orderId через разделитель __|__
-    const orderId = `${userId}__|__${plan}__|__${Date.now()}`
 
     const res = await fetch('https://api.xpayment.kz/v1/payments/link', {
       method: 'POST',
@@ -23,25 +21,34 @@ export async function POST(req: NextRequest) {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        amount,
-        device_interface: 'Pos',
-        merchant_order_id: orderId,
-      }),
+      body: JSON.stringify({ amount }),
     })
 
     const data = await res.json()
+    console.log('xpayment response:', JSON.stringify(data))
 
     if (!res.ok) {
       console.error('xpayment error:', JSON.stringify(data))
-      return NextResponse.json({ error: data.message || data.error || 'xpayment error', details: data }, { status: 400 })
+      return NextResponse.json({ error: data.message || data.error || 'xpayment error' }, { status: 400 })
     }
 
-    console.log('Payment link created:', data.qr_token, 'orderId:', orderId)
+    // Сохраняем userId и plan в Supabase — свяжем с платежом через ext_tran_id
+    const { createClient: create } = await import('@supabase/supabase-js')
+    const supabase = create(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+    await supabase.from('payment_requests').insert({
+      user_id: userId,
+      plan,
+      amount,
+      status: 'pending',
+      order_id: data.ext_tran_id,
+    })
 
     return NextResponse.json({
-      qr_token: data.qr_token,
-      qr_operation_id: data.qr_operation_id,
+      qr_token: data.payment_link,  // теперь правильное поле
+      ext_tran_id: data.ext_tran_id,
       expire_date: data.expire_date,
     })
 
