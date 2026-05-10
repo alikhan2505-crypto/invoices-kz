@@ -9,10 +9,9 @@ export default function AuthCallback() {
   useEffect(() => {
     async function handleCallback() {
       try {
-        // Для Google OAuth — обменяем code на сессию
         const params = new URLSearchParams(window.location.search)
         const hashParams = new URLSearchParams(window.location.hash.replace('#', ''))
-        
+
         const code = params.get('code')
         const accessToken = hashParams.get('access_token')
         const error = params.get('error') || hashParams.get('error')
@@ -24,7 +23,6 @@ export default function AuthCallback() {
         }
 
         if (code) {
-          // Google OAuth flow
           const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
           if (exchangeError) {
             console.error('Exchange error:', exchangeError)
@@ -32,26 +30,37 @@ export default function AuthCallback() {
             return
           }
         } else if (accessToken) {
-          // Magic link flow — уже в сессии
+          // Magic link — сессия уже есть
         }
 
-        // Проверяем сессию
-        await new Promise(resolve => setTimeout(resolve, 500))
-        const { data: { session } } = await supabase.auth.getSession()
+        // Ждём дольше чтобы сессия успела установиться
+        await new Promise(resolve => setTimeout(resolve, 1000))
+
+        // Пробуем получить сессию несколько раз
+        let session = null
+        for (let i = 0; i < 5; i++) {
+          const { data } = await supabase.auth.getSession()
+          if (data.session) {
+            session = data.session
+            break
+          }
+          await new Promise(resolve => setTimeout(resolve, 500))
+        }
 
         if (!session) {
+          console.error('No session after retries')
           router.push('/login')
           return
         }
 
-        // Проверяем профиль
+        // Проверяем профиль по bin_iin (надёжнее чем company_name)
         const { data: profile } = await supabase
           .from('profiles')
-          .select('company_name')
+          .select('bin_iin, company_name')
           .eq('id', session.user.id)
           .single()
 
-        if (!profile?.company_name) {
+        if (!profile?.bin_iin) {
           const ref = localStorage.getItem('referral_code')
           router.push(ref ? `/onboarding?ref=${ref}` : '/onboarding')
         } else {

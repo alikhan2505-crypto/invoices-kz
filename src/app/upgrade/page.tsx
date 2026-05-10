@@ -90,7 +90,7 @@ export default function Upgrade() {
       const data = await res.json()
 
       if (!res.ok || data.error) {
-        alert('Ошибка: ' + (data.error || 'Попробуйте снова'))
+        alert('Ошибка: ' + (data.error || 'Попробуйте снова') + (data.details ? '\n' + JSON.stringify(data.details) : ''))
         setSubmitting(false)
         return
       }

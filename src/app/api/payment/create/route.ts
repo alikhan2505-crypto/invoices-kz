@@ -35,8 +35,10 @@ export async function POST(req: NextRequest) {
     const data = await res.json()
 
     if (!res.ok) {
-      console.error('xpayment error:', data)
-      return NextResponse.json({ error: data.message || 'xpayment error', details: data }, { status: 400 })
+      console.error('xpayment error:', JSON.stringify(data))
+      console.error('phone sent:', phone)
+      console.error('amount:', amount)
+      return NextResponse.json({ error: data.message || data.error || 'xpayment error', details: data }, { status: 400 })
     }
 
     return NextResponse.json({ payment_id: data.payment_id, status: data.status })
