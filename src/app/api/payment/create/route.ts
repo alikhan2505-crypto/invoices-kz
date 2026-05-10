@@ -46,9 +46,12 @@ export async function POST(req: NextRequest) {
       order_id: data.ext_tran_id,
     })
 
+    const paymentUrl = data.payment_link || data.qr_token
+    console.log('payment url:', paymentUrl, 'full response keys:', Object.keys(data))
+
     return NextResponse.json({
-      qr_token: data.payment_link,  // теперь правильное поле
-      ext_tran_id: data.ext_tran_id,
+      qr_token: paymentUrl,
+      ext_tran_id: data.ext_tran_id || data.qr_operation_id,
       expire_date: data.expire_date,
     })
 
