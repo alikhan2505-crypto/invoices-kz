@@ -10,50 +10,27 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     await supabase.from('webhook_logs').insert({ body })
-    console.log('Webhook v4:', JSON.stringify(body))
+    console.log('Webhook v3:', JSON.stringify(body))
 
     const event = body?.event
+    const merchant_order_id = body?.merchant_order_id
+
+    console.log('event:', event, 'order_id:', merchant_order_id)
+
     if (event !== 'payment.completed') {
-      console.log('Skipping event:', event)
       return NextResponse.json({ ok: true })
     }
 
-    // Для /payments/link webhook содержит ext_tran_id
-    const extTranId = body?.ext_tran_id || body?.payment?.ext_tran_id
-    const merchantOrderId = body?.merchant_order_id || body?.payment?.merchant_order_id
-
-    console.log('ext_tran_id:', extTranId, 'merchant_order_id:', merchantOrderId)
-
-    let userId: string | null = null
-    let plan: string | null = null
-
-    // Вариант 1 — ищем по merchant_order_id с __|__ (старый способ через /payments)
-    if (merchantOrderId && merchantOrderId.includes('__|__')) {
-      const parts = merchantOrderId.split('__|__')
-      userId = parts[0]
-      plan = parts[1]
-      console.log('Found via merchant_order_id:', userId, plan)
-    }
-
-    // Вариант 2 — ищем по ext_tran_id в payment_requests
-    if (!userId && extTranId) {
-      const { data: request } = await supabase
-        .from('payment_requests')
-        .select('*')
-        .eq('order_id', extTranId)
-        .maybeSingle()
-
-      if (request) {
-        userId = request.user_id
-        plan = request.plan
-        console.log('Found via ext_tran_id:', userId, plan)
-      }
-    }
-
-    if (!userId || !plan) {
-      console.log('Cannot identify user, skipping')
+    if (!merchant_order_id || !merchant_order_id.includes('__|__')) {
+      console.log('Skipping - no valid order_id:', merchant_order_id)
       return NextResponse.json({ ok: true })
     }
+
+    const parts = merchant_order_id.split('__|__')
+    const userId = parts[0]
+    const plan = parts[1]
+
+    console.log('Activating:', plan, 'for:', userId)
 
     const expiresAt = new Date()
     expiresAt.setDate(expiresAt.getDate() + 30)
@@ -84,14 +61,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    // Обновляем статус заявки
-    if (extTranId) {
-      await supabase.from('payment_requests')
-        .update({ status: 'completed' })
-        .eq('order_id', extTranId)
-    }
-
-    console.log('SUCCESS for', userId, 'until', expiresAt)
+    console.log('SUCCESS for', userId)
 
     try {
       const { data: prof } = await supabase

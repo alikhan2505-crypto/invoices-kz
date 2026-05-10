@@ -21,7 +21,10 @@ export async function POST(req: NextRequest) {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ amount }),
+      body: JSON.stringify({
+        amount,
+        merchant_order_id: `${userId}__|__${plan}__|__${Date.now()}`,
+      }),
     })
 
     const data = await res.json()
