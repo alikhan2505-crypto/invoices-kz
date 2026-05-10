@@ -101,8 +101,8 @@ export default function Upgrade() {
       // Автопроверка статуса каждые 5 секунд
       statusInterval.current = setInterval(() => checkPaymentStatus(data.payment_id), 5000)
 
-    } catch (e) {
-      alert('Ошибка соединения')
+    } catch (e: any) {
+      alert('Ошибка: ' + (e.message || 'Попробуйте снова'))
     }
     setSubmitting(false)
   }
