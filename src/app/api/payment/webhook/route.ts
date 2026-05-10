@@ -10,25 +10,21 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
 
-    // Сохраняем ВСЁ что пришло — для отладки
     await supabase.from('webhook_logs').insert({ body })
+    console.log('Webhook received:', JSON.stringify(body))
 
-    console.log('Webhook full body:', JSON.stringify(body))
+    const event = body?.event
+    const merchant_order_id = body?.merchant_order_id  // прямо в корне!
 
-    const { event, payment } = body
+    console.log('event:', event, 'merchant_order_id:', merchant_order_id)
 
     if (event !== 'payment.completed') {
       console.log('Skipping event:', event)
       return NextResponse.json({ ok: true })
     }
 
-    const merchant_order_id = payment?.merchant_order_id
-    const amount = payment?.amount
-    console.log('merchant_order_id:', merchant_order_id)
-    console.log('Full payment object:', JSON.stringify(payment))
-
     if (!merchant_order_id || !merchant_order_id.includes('__|__')) {
-      console.log('No valid order_id, skipping. merchant_order_id was:', merchant_order_id)
+      console.log('No valid order_id:', merchant_order_id)
       return NextResponse.json({ ok: true })
     }
 
@@ -47,7 +43,7 @@ export async function POST(req: NextRequest) {
       .eq('id', userId)
 
     if (updateError) {
-      console.error('Profile update error:', JSON.stringify(updateError))
+      console.error('Update error:', JSON.stringify(updateError))
       return NextResponse.json({ error: updateError.message }, { status: 500 })
     }
 
