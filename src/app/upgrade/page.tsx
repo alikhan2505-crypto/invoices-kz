@@ -18,6 +18,9 @@ export default function Upgrade() {
   const [qrToken, setQrToken] = useState('')
   const [checkingStatus, setCheckingStatus] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
+  const [showPhoneModal, setShowPhoneModal] = useState(false)
+  const [payPhone, setPayPhone] = useState('')
+  const [phoneSubmitting, setPhoneSubmitting] = useState(false)
   const statusInterval = useRef<any>(null)
 
   useEffect(() => {
@@ -39,6 +42,17 @@ export default function Upgrade() {
     if (!user) return
     const { data: p } = await supabase.from('profiles').select('plan').eq('id', user.id).single()
     setPlan(p?.plan || 'free')
+  }
+
+  function formatPhone(value: string) {
+    const digits = value.replace(/\D/g, '')
+    if (digits.length === 0) return ''
+    let result = '+7'
+    if (digits.length > 1) result += ' ' + digits.slice(1, 4)
+    if (digits.length > 4) result += ' ' + digits.slice(4, 7)
+    if (digits.length > 7) result += ' ' + digits.slice(7, 9)
+    if (digits.length > 9) result += ' ' + digits.slice(9, 11)
+    return result
   }
 
   async function openModal(planName: string, amount: number, planKey: string) {
@@ -66,12 +80,10 @@ export default function Upgrade() {
 
       setQrToken(data.qr_token)
 
-      // На мобильном сразу открываем Kaspi
       if (isMobile) {
         window.location.href = data.qr_token
       }
 
-      // Автопроверка статуса каждые 5 секунд
       statusInterval.current = setInterval(() => checkPaymentStatus(planKey), 5000)
 
     } catch (e: any) {
@@ -86,9 +98,7 @@ export default function Upgrade() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
-
       const { data: p } = await supabase.from('profiles').select('plan, plan_expires_at').eq('id', user.id).single()
-
       if (p?.plan === planKey && p?.plan_expires_at) {
         const expiresAt = new Date(p.plan_expires_at)
         if (expiresAt > new Date()) {
@@ -99,6 +109,36 @@ export default function Upgrade() {
       }
     } catch {}
     setCheckingStatus(false)
+  }
+
+  async function createPhonePayment() {
+    if (!payPhone || payPhone.length < 16) {
+      alert('Введите полный номер телефона')
+      return
+    }
+    setPhoneSubmitting(true)
+    try {
+      const res = await fetch('/api/payment/create-phone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          plan: selectedPlan?.plan,
+          phone: payPhone.replace(/\s/g, ''),
+        })
+      })
+      const data = await res.json()
+      if (!res.ok || data.error) {
+        alert('Ошибка: ' + (data.error || 'Попробуйте снова'))
+        setPhoneSubmitting(false)
+        return
+      }
+      setShowPhoneModal(false)
+      alert('✅ Запрос отправлен! Откройте Kaspi и подтвердите оплату.')
+    } catch (e: any) {
+      alert('Ошибка: ' + e.message)
+    }
+    setPhoneSubmitting(false)
   }
 
   async function applyPromo() {
@@ -245,12 +285,11 @@ export default function Upgrade() {
         </p>
       </div>
 
-      {/* Modal */}
+      {/* Modal QR */}
       {showModal && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-end">
           <div className="bg-white w-full max-w-lg mx-auto rounded-t-3xl p-6">
 
-            {/* Загрузка */}
             {submitting && (
               <div className="text-center py-8">
                 <div className="w-10 h-10 border-2 border-[#1C2056] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
@@ -259,7 +298,6 @@ export default function Upgrade() {
               </div>
             )}
 
-            {/* Ожидание оплаты */}
             {!submitting && step === 'pending' && (
               <>
                 <div className="flex items-center justify-between mb-5">
@@ -274,18 +312,27 @@ export default function Upgrade() {
                   <div className="text-center py-4">
                     <div className="text-5xl mb-4">📱</div>
                     <div className="font-semibold text-[#1C2056] mb-2">Переходим в Kaspi...</div>
-                    <div className="text-sm text-gray-400 mb-6">
+                    <div className="text-sm text-gray-400 mb-4">
                       Если приложение не открылось — нажмите кнопку ниже
                     </div>
                     <a href={qrToken} target="_blank"
-                      className="block w-full bg-[#2DC48D] text-white rounded-xl py-4 font-medium text-sm mb-4">
+                      className="block w-full bg-[#2DC48D] text-white rounded-xl py-4 font-medium text-sm mb-3">
                       💳 Открыть Kaspi
                     </a>
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="flex-1 h-px bg-gray-100"></div>
+                      <span className="text-xs text-gray-400">или</span>
+                      <div className="flex-1 h-px bg-gray-100"></div>
+                    </div>
+                    <button onClick={() => setShowPhoneModal(true)}
+                      className="w-full border border-[#1C2056] text-[#1C2056] rounded-xl py-3 text-sm font-medium">
+                      📲 Отправить запрос на телефон
+                    </button>
                   </div>
                 ) : (
-                  <div className="text-center py-4">
-                    <div className="font-semibold text-[#1C2056] mb-2">Отсканируйте QR в приложении Kaspi</div>
-                    <div className="text-xs text-gray-400 mb-4">Или откройте ссылку на телефоне</div>
+                  <div className="text-center py-2">
+                    <div className="font-semibold text-[#1C2056] mb-1">Отсканируйте QR в приложении Kaspi</div>
+                    <div className="text-xs text-gray-400 mb-4">Или воспользуйтесь другим способом ниже</div>
                     {qrToken && (
                       <div className="flex justify-center mb-4">
                         <img
@@ -297,14 +344,25 @@ export default function Upgrade() {
                         />
                       </div>
                     )}
-                    <a href={qrToken} target="_blank"
-                      className="text-xs text-[#1C2056] underline">
-                      Открыть ссылку напрямую
-                    </a>
+                    <div className="flex flex-col gap-2">
+                      <a href={qrToken} target="_blank"
+                        className="text-xs text-gray-400 underline">
+                        Открыть ссылку напрямую
+                      </a>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-px bg-gray-100"></div>
+                        <span className="text-xs text-gray-400">или</span>
+                        <div className="flex-1 h-px bg-gray-100"></div>
+                      </div>
+                      <button onClick={() => setShowPhoneModal(true)}
+                        className="w-full border border-[#1C2056] text-[#1C2056] rounded-xl py-3 text-sm font-medium">
+                        📲 Отправить запрос на телефон
+                      </button>
+                    </div>
                   </div>
                 )}
 
-                <div className="bg-gray-50 rounded-xl px-4 py-3 mb-4 flex items-center justify-between">
+                <div className="bg-gray-50 rounded-xl px-4 py-3 mt-4 mb-3 flex items-center justify-between">
                   <span className="text-sm text-gray-500">К оплате</span>
                   <span className="text-sm font-bold text-[#1C2056]">{selectedPlan?.amount.toLocaleString('ru-KZ')} ₸/мес</span>
                 </div>
@@ -321,7 +379,6 @@ export default function Upgrade() {
               </>
             )}
 
-            {/* Успех */}
             {step === 'success' && (
               <div className="text-center py-6">
                 <div className="text-5xl mb-4">🎉</div>
@@ -345,6 +402,49 @@ export default function Upgrade() {
           </div>
         </div>
       )}
+
+      {/* Модал ввода телефона */}
+      {showPhoneModal && (
+        <div className="fixed inset-0 bg-black/40 z-[60] flex items-end">
+          <div className="bg-white w-full max-w-lg mx-auto rounded-t-3xl p-6">
+            <div className="flex items-center justify-between mb-5">
+              <div className="font-semibold text-[#1C2056]">Оплата по номеру телефона</div>
+              <button onClick={() => setShowPhoneModal(false)} className="text-gray-400 text-xl">✕</button>
+            </div>
+
+            <div className="bg-blue-50 rounded-2xl p-4 mb-5">
+              <div className="text-xs text-gray-500 leading-relaxed">
+                Введите номер телефона привязанный к Kaspi. На него придёт уведомление с запросом на оплату.
+              </div>
+            </div>
+
+            <label className="text-xs text-gray-500 mb-1 block">Номер телефона Kaspi</label>
+            <input
+              className="w-full border rounded-lg px-3 py-3 text-sm outline-none focus:border-[#1C2056] mb-3"
+              placeholder="+7 777 123 45 67"
+              value={payPhone}
+              onChange={e => setPayPhone(formatPhone(e.target.value))}
+              type="tel"
+              maxLength={16}
+            />
+
+            <div className="bg-gray-50 rounded-xl px-4 py-3 mb-4 flex items-center justify-between">
+              <span className="text-sm text-gray-500">К оплате</span>
+              <span className="text-sm font-bold text-[#1C2056]">{selectedPlan?.amount.toLocaleString('ru-KZ')} ₸/мес</span>
+            </div>
+
+            <button onClick={createPhonePayment} disabled={phoneSubmitting}
+              className="w-full bg-[#2DC48D] text-white rounded-xl py-4 font-medium text-sm mb-2">
+              {phoneSubmitting ? 'Отправляем...' : '📲 Отправить запрос в Kaspi'}
+            </button>
+            <button onClick={() => setShowPhoneModal(false)}
+              className="w-full text-gray-400 text-sm py-2">
+              Отмена
+            </button>
+          </div>
+        </div>
+      )}
+
     </main>
   )
 }
