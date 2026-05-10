@@ -237,40 +237,47 @@ export default function Profile() {
               <div className="border-t border-gray-100 px-4 py-3 space-y-2">
 
                 {/* 1. Тарифный план */}
-                {profile?.plan_expires_at && profile?.plan !== 'free' && (
+                {profile?.plan_expires_at && profile?.plan !== 'free' && new Date(profile.plan_expires_at) > new Date() && (
                   <div className="flex justify-between text-xs">
                     <span className="text-gray-400">
-                      {activePlan.plan === 'pro' ? 'Про тариф' : 'Базовый тариф'} действует до
+                      {profile.plan === 'pro' ? 'Про тариф' : 'Базовый тариф'} действует до
                     </span>
-                    <span className={`font-medium ${new Date(profile.plan_expires_at) > new Date() ? 'text-[#1C2056]' : 'text-red-500'}`}>
+                    <span className="text-[#1C2056] font-medium">
                       {new Date(profile.plan_expires_at).toLocaleDateString('ru-KZ')}
                     </span>
                   </div>
                 )}
 
-                {/* 2. Реферальный бонус */}
-                {profile?.bonus_expires_at && new Date(profile.bonus_expires_at) > new Date() && (
-                  <div className="flex justify-between text-xs">
-                    <span className="text-gray-400">Реферальный бонус Basic</span>
-                    <span className="text-[#2DC48D] font-medium">
-                      {Math.ceil((new Date(profile.bonus_expires_at).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} дней
-                    </span>
-                  </div>
-                )}
+                {/* 2. Реферальный бонус — показываем дату когда закончится */}
+                {profile?.bonus_expires_at && new Date(profile.bonus_expires_at) > new Date() && (() => {
+                  const bonusDays = Math.ceil((new Date(profile.bonus_expires_at).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+                  // Если есть активный платный план — бонус добавляется к его дате
+                  let bonusEndDate: Date
+                  if (profile?.plan_expires_at && new Date(profile.plan_expires_at) > new Date()) {
+                    bonusEndDate = new Date(profile.plan_expires_at)
+                    bonusEndDate.setDate(bonusEndDate.getDate() + bonusDays)
+                  } else {
+                    bonusEndDate = new Date(profile.bonus_expires_at)
+                  }
+                  return (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-400">Реферальный бонус Basic (+{bonusDays} дн.)</span>
+                      <span className="text-[#2DC48D] font-medium">
+                        до {bonusEndDate.toLocaleDateString('ru-KZ')}
+                      </span>
+                    </div>
+                  )
+                })()}
 
-                {/* 3. Пробный период */}
-                {profile?.trial_expires_at && new Date(profile.trial_expires_at) > new Date() && (
+                {/* 3. Пробный период — только если нет платного плана И нет бонуса И не истёк */}
+                {profile?.trial_expires_at &&
+                new Date(profile.trial_expires_at) > new Date() &&
+                !(profile?.plan && profile.plan !== 'free' && profile?.plan_expires_at && new Date(profile.plan_expires_at) > new Date()) &&
+                !(profile?.bonus_expires_at && new Date(profile.bonus_expires_at) > new Date()) && (
                   <div className="flex justify-between text-xs">
                     <span className="text-gray-400">Пробный период до</span>
                     <span className="text-green-600 font-medium">
-                      {profile?.plan_expires_at && new Date(profile.plan_expires_at) > new Date()
-                        ? (() => {
-                            const trialEnd = new Date(profile.plan_expires_at)
-                            trialEnd.setDate(trialEnd.getDate() + 7)
-                            return trialEnd.toLocaleDateString('ru-KZ')
-                          })()
-                        : new Date(profile.trial_expires_at).toLocaleDateString('ru-KZ')
-                      }
+                      {new Date(profile.trial_expires_at).toLocaleDateString('ru-KZ')}
                     </span>
                   </div>
                 )}
