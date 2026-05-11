@@ -17,7 +17,7 @@ export default function Support() {
         </p>
 
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden mb-4">
-          <a href="https://t.me/invoiceskz_support_bot"
+          <a href="https://t.me/invoiceskz_support"
             target="_blank"
             className="flex items-center justify-between px-4 py-4 border-b border-gray-100 hover:bg-gray-50">
             <div className="flex items-center gap-3">

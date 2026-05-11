@@ -279,7 +279,7 @@ export default function Upgrade() {
 
         <p className="text-center text-xs text-gray-400">
           Вопросы?{' '}
-          <a href="https://t.me/invoiceskz_support_bot" target="_blank" className="text-[#1C2056] underline">
+          <a href="https://t.me/invoiceskz_support" target="_blank" className="text-[#1C2056] underline">
             Написать в Telegram
           </a>
         </p>

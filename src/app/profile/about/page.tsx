@@ -32,7 +32,7 @@ export default function About() {
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
           {[
             { label: 'Сайт', value: 'invoices.kz', action: () => window.open('https://invoices.kz', '_blank') },
-            { label: 'Поддержка', value: 'Telegram', action: () => window.open('https://t.me/invoiceskz_support_bot', '_blank') },
+            { label: 'Поддержка', value: 'Telegram', action: () => window.open('https://t.me/invoiceskz_support', '_blank') },
             { label: 'Email', value: 'support@invoices.kz', action: () => window.open('mailto:support@invoices.kz') },
           ].map((item, i, arr) => (
             <div key={item.label}

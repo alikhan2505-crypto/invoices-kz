@@ -278,7 +278,24 @@ export default function Dashboard() {
     setLoading(true)
 
     const activePlan = getActivePlan(profile)
-    if (activePlan.plan === 'free') {
+
+    // Проверка лимита счетов
+    if (activePlan.invoiceLimit !== null && monthCount >= activePlan.invoiceLimit) {
+      setLoading(false)
+      if (activePlan.plan === 'free') {
+        alert(`На бесплатном тарифе максимум ${activePlan.invoiceLimit} счета в месяц. Перейдите на платный тариф.`)
+        router.push('/upgrade')
+      } else if (activePlan.isTrial) {
+        alert(`На пробном периоде максимум ${activePlan.invoiceLimit} счетов. Купите подписку для продолжения.`)
+        router.push('/upgrade')
+      } else {
+        alert(`На тарифе Базовый максимум ${activePlan.invoiceLimit} счетов в месяц. Перейдите на Про.`)
+        router.push('/upgrade')
+      }
+      return
+    }
+
+    if (!activePlan.isActive && activePlan.plan === 'free') {
       router.push('/upgrade')
       setLoading(false)
       return
@@ -423,7 +440,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between rounded-xl px-4 py-3 mb-4 bg-green-50 border border-green-100">
               <div>
                 <div className="text-sm font-medium text-green-700">🎉 Пробный период</div>
-                <div className="text-xs text-gray-400 mt-0.5">Осталось {activePlan.daysLeft} дней — все функции открыты</div>
+                <div className="text-xs text-gray-400 mt-0.5">Осталось {activePlan.daysLeft} дней · осталось {activePlan.invoiceLimit! - monthCount} счетов</div>
               </div>
               <button onClick={() => router.push('/upgrade')} className="text-xs bg-[#2DC48D] text-white px-3 py-1.5 rounded-lg">Купить</button>
             </div>
