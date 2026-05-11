@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import LoadingSpinner from '@/components/LoadingSpinner'
 import { formatDate } from '@/lib/date'
+import { getActivePlan } from '@/lib/plan'
 
 export default function Documents() {
   const router = useRouter()
@@ -12,12 +13,22 @@ export default function Documents() {
   const [kpList, setKpList] = useState<any[]>([])
   const [avrList, setAvrList] = useState<any[]>([])
   const [naklList, setNaklList] = useState<any[]>([])
+  const [profile, setProfile] = useState<any>(null)
 
   useEffect(() => { load() }, [])
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
+
+    const { data: p } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+    setProfile(p)
+
+    const ap = getActivePlan(p)
+    if (!ap.canKpAvrNakl) {
+      setLoading(false)
+      return
+    }
 
     const [{ data: kp }, { data: avr }, { data: nakl }] = await Promise.all([
       supabase.from('kp_documents').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
@@ -31,21 +42,40 @@ export default function Documents() {
     setLoading(false)
   }
 
-  async function deleteDoc(table: string, id: string) {
-    if (!confirm('Удалить документ?')) return
-    await supabase.from(table).delete().eq('id', id)
-    load()
-  }
-
   if (loading) return <LoadingSpinner />
 
+  const ap = getActivePlan(profile)
+
+  if (!ap.canKpAvrNakl) {
+    return (
+      <main className="min-h-screen bg-gray-50">
+        <div className="bg-white border-b px-4 py-4 flex items-center gap-3">
+          <button onClick={() => router.push('/profile')} className="text-gray-400 text-xl">‹</button>
+          <span className="font-semibold text-[#1C2056]">Документы для налоговой</span>
+        </div>
+        <div className="max-w-lg mx-auto p-4">
+          <div className="text-center py-16">
+            <div className="text-5xl mb-4">🔒</div>
+            <div className="font-semibold text-[#1C2056] mb-2">Доступно на тарифе Про</div>
+            <div className="text-sm text-gray-400 mb-6">
+              КП, АВР и Накладные для налоговой отчётности доступны только на тарифе Про
+            </div>
+            <button onClick={() => router.push('/upgrade')}
+              className="bg-[#1C2056] text-white rounded-xl px-6 py-3 text-sm font-medium">
+              🚀 Перейти к тарифам
+            </button>
+          </div>
+        </div>
+      </main>
+    )
+  }
+
   const tabs = [
-    { key: 'kp', label: '📋 КП', count: kpList.length, table: 'kp_documents' },
-    { key: 'avr', label: '📄 АВР', count: avrList.length, table: 'avr_documents' },
-    { key: 'nakladnaya', label: '📦 Накладные', count: naklList.length, table: 'nakladnaya_documents' },
+    { key: 'kp', label: '📋 КП', count: kpList.length },
+    { key: 'avr', label: '📄 АВР', count: avrList.length },
+    { key: 'nakladnaya', label: '📦 Накладные', count: naklList.length },
   ]
 
-  const currentTab = tabs.find(t => t.key === tab)!
   const currentList = tab === 'kp' ? kpList : tab === 'avr' ? avrList : naklList
 
   return (
@@ -57,19 +87,16 @@ export default function Documents() {
 
       <div className="max-w-lg mx-auto p-4">
 
-        {/* Инфо */}
         <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 mb-4">
           <div className="text-sm font-medium text-[#1C2056] mb-1">📊 Для отчётности 910 формы</div>
           <div className="text-xs text-gray-500 leading-relaxed">
-            Здесь хранятся все КП, АВР и Накладные которые вы создавали. Используйте для налоговой отчётности.
+            История всех КП, АВР и Накладных. Документы не удаляются — это важно для налоговой отчётности.
           </div>
         </div>
 
-        {/* Табы */}
         <div className="flex gap-2 mb-4">
           {tabs.map(t => (
-            <button key={t.key}
-              onClick={() => setTab(t.key as any)}
+            <button key={t.key} onClick={() => setTab(t.key as any)}
               className={`flex-1 py-2.5 rounded-xl text-xs font-medium transition ${tab === t.key ? 'bg-[#1C2056] text-white' : 'bg-white text-gray-500 shadow-sm'}`}>
               {t.label}
               {t.count > 0 && (
@@ -81,7 +108,6 @@ export default function Documents() {
           ))}
         </div>
 
-        {/* Список */}
         {currentList.length === 0 ? (
           <div className="text-center py-12">
             <div className="text-4xl mb-3">📋</div>
@@ -94,36 +120,35 @@ export default function Documents() {
           <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
             {currentList.map((doc, i) => (
               <div key={doc.id}
-                className={`flex items-center px-4 py-3.5 ${i < currentList.length - 1 ? 'border-b border-gray-100' : ''}`}>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-[#1C2056]">№{doc.number}</span>
-                    <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">
-                      {formatDate(doc.created_at)}
-                    </span>
+                className={`px-4 py-3.5 ${i < currentList.length - 1 ? 'border-b border-gray-100' : ''}`}>
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-[#1C2056]">№{doc.number}</span>
+                      <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">
+                        {formatDate(doc.created_at)}
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-500 mt-0.5">{doc.client_name}</div>
+                    {doc.contract_number && (
+                      <div className="text-xs text-gray-400 mt-0.5">Договор №{doc.contract_number}</div>
+                    )}
+                    {doc.valid_until && (
+                      <div className="text-xs text-gray-400 mt-0.5">Действителен до: {doc.valid_until}</div>
+                    )}
                   </div>
-                  <div className="text-xs text-gray-500 mt-0.5">{doc.client_name}</div>
-                  {doc.contract_number && (
-                    <div className="text-xs text-gray-400 mt-0.5">Договор №{doc.contract_number}</div>
-                  )}
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-bold text-[#1C2056]">
+                  <span className="text-sm font-bold text-[#1C2056] flex-shrink-0 ml-3">
                     {Number(doc.total).toLocaleString('ru-KZ')} ₸
                   </span>
-                  <button
-                    onClick={() => deleteDoc(currentTab.table, doc.id)}
-                    className="text-gray-300 hover:text-red-400 text-lg">✕</button>
                 </div>
               </div>
             ))}
           </div>
         )}
 
-        {/* Статистика */}
         {currentList.length > 0 && (
           <div className="bg-[#1C2056] rounded-xl px-4 py-3 mt-4 flex items-center justify-between">
-            <span className="text-white/70 text-sm">Итого документов: {currentList.length}</span>
+            <span className="text-white/70 text-sm">Итого: {currentList.length} документов</span>
             <span className="text-white font-bold">
               {currentList.reduce((sum, d) => sum + Number(d.total), 0).toLocaleString('ru-KZ')} ₸
             </span>

@@ -38,6 +38,9 @@ export default function InvoicePage() {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [upgradeMessage, setUpgradeMessage] = useState('')
   const [upgradePlan, setUpgradePlan] = useState<'basic' | 'pro'>('basic')
+  const [kpCount, setKpCount] = useState(0)
+  const [avrCount, setAvrCount] = useState(0)
+  const [naklCount, setNaklCount] = useState(0)
 
   useEffect(() => { loadInvoice() }, [])
 
@@ -50,6 +53,16 @@ export default function InvoicePage() {
       .from('invoice_logs').select('*').eq('invoice_id', id)
       .order('created_at', { ascending: false })
     setLogs(logsData || [])
+
+    // Загружаем счётчики документов для этого инвойса
+    const [{ count: kp }, { count: avr }, { count: nakl }] = await Promise.all([
+      supabase.from('kp_documents').select('*', { count: 'exact', head: true }).eq('invoice_id', id),
+      supabase.from('avr_documents').select('*', { count: 'exact', head: true }).eq('invoice_id', id),
+      supabase.from('nakladnaya_documents').select('*', { count: 'exact', head: true }).eq('invoice_id', id),
+    ])
+    setKpCount(kp || 0)
+    setAvrCount(avr || 0)
+    setNaklCount(nakl || 0)
 
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
@@ -70,19 +83,6 @@ export default function InvoicePage() {
     setUpgradeMessage(message)
     setUpgradePlan(plan)
     setShowUpgradeModal(true)
-  }
-
-  function requirePlan(needed: 'basic' | 'pro', action: () => void) {
-    const ap = getActivePlan(profile)
-    if (needed === 'basic' && !ap.canSign) {
-      showUpgrade('Эта функция доступна с тарифа Базовый', 'basic')
-      return
-    }
-    if (needed === 'pro' && !ap.canKpAvrNakl) {
-      showUpgrade('Эта функция доступна только на тарифе Про', 'pro')
-      return
-    }
-    action()
   }
 
   function askSignature(action: (withSign: boolean) => void) {
@@ -212,6 +212,33 @@ export default function InvoicePage() {
     })
   }
 
+  // Подсчёт сумм по типу услуг/товаров
+  function calcServiceTotal(svcs: any[]) {
+    return svcs
+      .filter(s => !s.type || s.type === 'service')
+      .reduce((sum, s) => sum + s.qty * s.price, 0)
+  }
+
+  function calcProductTotal(svcs: any[]) {
+    return svcs
+      .filter(s => s.type === 'product')
+      .reduce((sum, s) => sum + s.qty * s.price, 0)
+  }
+
+  // Генерация автономера
+  async function getNextNumber(type: 'kp' | 'avr' | 'nakladnaya', userId: string) {
+    const prefixField = `${type}_prefix`
+    const numberField = `${type}_next_number`
+    const { data: p } = await supabase.from('profiles')
+      .select(`${prefixField}, ${numberField}`)
+      .eq('id', userId).single()
+    const prefix = p?.[prefixField] || (type === 'kp' ? 'КП-' : type === 'avr' ? 'АВР-' : 'НАК-')
+    const num = p?.[numberField] || 1
+    const docNumber = `${prefix}${String(num).padStart(4, '0')}`
+    await supabase.from('profiles').update({ [numberField]: num + 1 }).eq('id', userId)
+    return docNumber
+  }
+
   if (loading) return (
     <main className="min-h-screen bg-gray-50 flex items-center justify-center">
       <div className="text-center">
@@ -231,7 +258,61 @@ export default function InvoicePage() {
   const services = invoice.services || []
   const ap = getActivePlan(profile)
 
-  // Компонент кнопки с замочком
+  // Подсчёт сумм
+  const serviceTotal = calcServiceTotal(services)
+  const productTotal = calcProductTotal(services)
+  const hasServices = serviceTotal > 0
+  const hasProducts = productTotal > 0
+
+  // Компонент кнопки с замочком и ярлыком
+  function DocButton({ label, icon, onClick, locked, lockedLabel, savedCount, disabled, disabledReason }: {
+    label: string
+    icon: string
+    onClick: () => void
+    locked: boolean
+    lockedLabel: string
+    savedCount: number
+    disabled?: boolean
+    disabledReason?: string
+  }) {
+    const isLocked = locked
+    const isDisabled = !locked && disabled
+
+    return (
+      <button
+        onClick={() => {
+          if (isLocked) showUpgrade(lockedLabel, 'pro')
+          else if (isDisabled) alert(disabledReason || 'Недоступно')
+          else onClick()
+        }}
+        className="w-full flex items-center justify-between px-4 py-3.5 text-sm hover:bg-gray-50 border-b border-gray-100">
+        <div className="flex flex-col items-start gap-0.5">
+          <span className={isLocked || isDisabled ? 'text-gray-400' : 'text-[#1C2056]'}>
+            {icon} {label}
+          </span>
+          {savedCount > 0 && (
+            <span className="text-xs text-[#2DC48D]">
+              📁 {savedCount} {savedCount === 1 ? 'документ' : 'документа'} сохранено в налоговую
+            </span>
+          )}
+          {isDisabled && disabledReason && (
+            <span className="text-xs text-gray-400">{disabledReason}</span>
+          )}
+        </div>
+        {isLocked ? (
+          <span className="text-xs bg-amber-50 text-amber-600 border border-amber-200 px-2 py-0.5 rounded-full flex-shrink-0">
+            🔒 Про
+          </span>
+        ) : isDisabled ? (
+          <span className="text-xs text-gray-300 flex-shrink-0">—</span>
+        ) : (
+          <span className="text-gray-300 flex-shrink-0">›</span>
+        )}
+      </button>
+    )
+  }
+
+  // Компонент обычной кнопки с замочком
   function LockedButton({ label, icon, onClick, locked, lockedLabel }: {
     label: string, icon: string, onClick: () => void,
     locked: boolean, lockedLabel: string
@@ -242,7 +323,7 @@ export default function InvoicePage() {
         className="w-full flex items-center justify-between px-4 py-3.5 text-sm hover:bg-gray-50 border-b border-gray-100">
         <span className={locked ? 'text-gray-400' : 'text-[#1C2056]'}>{icon} {label}</span>
         {locked ? (
-          <span className="text-xs bg-amber-50 text-amber-600 border border-amber-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+          <span className="text-xs bg-amber-50 text-amber-600 border border-amber-200 px-2 py-0.5 rounded-full">
             🔒 {lockedLabel.includes('Про') ? 'Про' : 'Базовый'}
           </span>
         ) : (
@@ -279,26 +360,23 @@ export default function InvoicePage() {
             <div className="text-xl mb-1">💬</div>
             <div className="text-xs text-gray-500">WhatsApp</div>
           </button>
-
           <button onClick={copyPublicLink}
             className="bg-white rounded-xl p-3 text-center shadow-sm hover:bg-gray-50">
             <div className="text-xl mb-1">🔗</div>
             <div className="text-xs text-gray-500">Ссылка</div>
           </button>
-
           <button onClick={() => askSignature((w) => openPDF(w))}
             className="bg-white rounded-xl p-3 text-center shadow-sm hover:bg-gray-50">
             <div className="text-xl mb-1">📄</div>
             <div className="text-xs text-gray-500">PDF</div>
           </button>
-
           <button
             onClick={() => ap.canEmail
               ? setShowEmailModal(true)
               : showUpgrade('Email отправка доступна с тарифа Базовый', 'basic')
             }
             className="bg-white rounded-xl p-3 text-center shadow-sm hover:bg-gray-50 relative">
-            <div className="text-xl mb-1">{ap.canEmail ? '📧' : '📧'}</div>
+            <div className="text-xl mb-1">📧</div>
             <div className="text-xs text-gray-500">Email</div>
             {!ap.canEmail && (
               <span className="absolute -top-1 -right-1 text-xs bg-amber-400 text-white w-4 h-4 rounded-full flex items-center justify-center">🔒</span>
@@ -308,11 +386,16 @@ export default function InvoicePage() {
 
         {services.length > 0 && (
           <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-            <div className="px-4 pt-4 pb-2 text-xs text-gray-400 uppercase tracking-wide">Услуги</div>
+            <div className="px-4 pt-4 pb-2 text-xs text-gray-400 uppercase tracking-wide">Услуги и товары</div>
             {services.map((s: any, i: number) => (
               <div key={i} className={`flex justify-between px-4 py-3 ${i < services.length - 1 ? 'border-b border-gray-100' : ''}`}>
                 <div>
-                  <div className="text-sm text-[#1C2056]">{s.name}</div>
+                  <div className="flex items-center gap-2">
+                    <div className="text-sm text-[#1C2056]">{s.name}</div>
+                    <span className={`text-xs px-1.5 py-0.5 rounded ${s.type === 'product' ? 'bg-green-50 text-green-600' : 'bg-blue-50 text-blue-600'}`}>
+                      {s.type === 'product' ? 'Товар' : 'Услуга'}
+                    </span>
+                  </div>
                   <div className="text-xs text-gray-400">{s.qty} {s.unit || 'шт'} × {Number(s.price).toLocaleString('ru-KZ')} ₸</div>
                 </div>
                 <div className="text-sm font-medium">{(s.qty * s.price).toLocaleString('ru-KZ')} ₸</div>
@@ -417,30 +500,30 @@ export default function InvoicePage() {
             <span className="text-gray-300">›</span>
           </button>
 
-          {/* КП — Про */}
-          <LockedButton
+          {/* КП — Про, всегда доступно (сумма = полная) */}
+          <DocButton
             label="Коммерческое предложение"
             icon="📋"
             locked={!ap.canKpAvrNakl}
             lockedLabel="Доступно на тарифе Про"
+            savedCount={kpCount}
             onClick={async () => {
               if (!profile) return
-              const kpNumber = prompt('Номер КП:', invoice.number)
-              if (!kpNumber) return
+              const { data: { user } } = await supabase.auth.getUser()
+              if (!user) return
+              const kpNumber = await getNextNumber('kp', user.id)
               const today = new Date()
               today.setDate(today.getDate() + 30)
               const validUntil = prompt('Действителен до:', today.toLocaleDateString('ru-KZ'))
               if (!validUntil) return
-              const { data: { user } } = await supabase.auth.getUser()
-              if (user) {
-                await supabase.from('kp_documents').insert({
-                  user_id: user.id, invoice_id: id, number: kpNumber,
-                  date: formatDate(invoice.created_at), valid_until: validUntil,
-                  client_name: invoice.client_name, client_bin: invoice.client_bin,
-                  total: Number(invoice.amount), services: invoice.services,
-                  note: invoice.note, vat_type: profile?.vat_type || 'no_vat',
-                })
-              }
+              await supabase.from('kp_documents').insert({
+                user_id: user.id, invoice_id: id, number: kpNumber,
+                date: formatDate(invoice.created_at), valid_until: validUntil,
+                client_name: invoice.client_name, client_bin: invoice.client_bin,
+                total: Number(invoice.amount), services: invoice.services,
+                note: invoice.note, vat_type: profile?.vat_type || 'no_vat',
+              })
+              setKpCount(prev => prev + 1)
               askSignature((withSign) => {
                 generateKP({
                   number: kpNumber, date: formatDate(invoice.created_at), validUntil,
@@ -454,31 +537,34 @@ export default function InvoicePage() {
             }}
           />
 
-          {/* АВР — Про */}
-          <LockedButton
+          {/* АВР — Про, только если есть услуги */}
+          <DocButton
             label="Акт выполненных работ"
             icon="📄"
             locked={!ap.canKpAvrNakl}
             lockedLabel="Доступно на тарифе Про"
+            savedCount={avrCount}
+            disabled={!hasServices}
+            disabledReason="Нет услуг в счёте"
             onClick={async () => {
               if (!profile) return
-              const avrNumber = prompt('Номер АВР:', invoice.number)
-              if (!avrNumber) return
-              const contractNumber = prompt('Номер договора (необязательно):', '')
-              const contractDate = prompt('Дата договора:', formatDate(invoice.created_at))
               const { data: { user } } = await supabase.auth.getUser()
-              if (user) {
-                await supabase.from('avr_documents').insert({
-                  user_id: user.id, invoice_id: id, number: avrNumber,
-                  date: formatDate(invoice.created_at),
-                  contract_number: contractNumber || null,
-                  contract_date: contractDate || null,
-                  client_name: invoice.client_name, client_bin: invoice.client_bin,
-                  client_address: invoice.client_address,
-                  total: Number(invoice.amount), services: invoice.services,
-                  vat_type: profile?.vat_type || 'no_vat',
-                })
-              }
+              if (!user) return
+              const avrNumber = await getNextNumber('avr', user.id)
+              const contractNumber = prompt('Номер договора (необязательно):', invoice.contract_number || '')
+              const contractDate = prompt('Дата договора:', invoice.contract_date || formatDate(invoice.created_at))
+              await supabase.from('avr_documents').insert({
+                user_id: user.id, invoice_id: id, number: avrNumber,
+                date: formatDate(invoice.created_at),
+                contract_number: contractNumber || null,
+                contract_date: contractDate || null,
+                client_name: invoice.client_name, client_bin: invoice.client_bin,
+                client_address: invoice.client_address,
+                total: serviceTotal,
+                services: invoice.services?.filter((s: any) => !s.type || s.type === 'service'),
+                vat_type: profile?.vat_type || 'no_vat',
+              })
+              setAvrCount(prev => prev + 1)
               askSignature((withSign) => {
                 generateAVR({
                   number: avrNumber, date: formatDate(invoice.created_at),
@@ -486,39 +572,46 @@ export default function InvoicePage() {
                   contractDate: contractDate || undefined,
                   clientName: invoice.client_name || '', clientBin: invoice.client_bin || '',
                   clientAddress: invoice.client_address || '',
-                  services: invoice.services || [], total: Number(invoice.amount),
-                  vatType: profile?.vat_type || 'no_vat', profile: buildProfile(withSign),
+                  services: invoice.services?.filter((s: any) => !s.type || s.type === 'service') || [],
+                  total: serviceTotal,
+                  vatType: profile?.vat_type || 'no_vat',
+                  profile: buildProfile(withSign),
                 })
               })
             }}
           />
 
-          {/* Накладная — Про */}
-          <LockedButton
+          {/* Накладная — Про, только если есть товары */}
+          <DocButton
             label="Накладная на отпуск товара"
             icon="📦"
             locked={!ap.canKpAvrNakl}
             lockedLabel="Доступно на тарифе Про"
+            savedCount={naklCount}
+            disabled={!hasProducts}
+            disabledReason="Нет товаров в счёте"
             onClick={async () => {
               if (!profile) return
-              const naklNumber = prompt('Номер накладной:', invoice.number)
-              if (!naklNumber) return
               const { data: { user } } = await supabase.auth.getUser()
-              if (user) {
-                await supabase.from('nakladnaya_documents').insert({
-                  user_id: user.id, invoice_id: id, number: naklNumber,
-                  date: formatDate(invoice.created_at),
-                  client_name: invoice.client_name, client_bin: invoice.client_bin,
-                  total: Number(invoice.amount), services: invoice.services,
-                  vat_type: profile?.vat_type || 'no_vat',
-                })
-              }
+              if (!user) return
+              const naklNumber = await getNextNumber('nakladnaya', user.id)
+              await supabase.from('nakladnaya_documents').insert({
+                user_id: user.id, invoice_id: id, number: naklNumber,
+                date: formatDate(invoice.created_at),
+                client_name: invoice.client_name, client_bin: invoice.client_bin,
+                total: productTotal,
+                services: invoice.services?.filter((s: any) => s.type === 'product'),
+                vat_type: profile?.vat_type || 'no_vat',
+              })
+              setNaklCount(prev => prev + 1)
               askSignature((withSign) => {
                 generateNakladnaya({
                   number: naklNumber, date: formatDate(invoice.created_at),
                   clientName: invoice.client_name || '', clientBin: invoice.client_bin || '',
-                  services: invoice.services || [], total: Number(invoice.amount),
-                  vatType: profile?.vat_type || 'no_vat', profile: buildProfile(withSign),
+                  services: invoice.services?.filter((s: any) => s.type === 'product') || [],
+                  total: productTotal,
+                  vatType: profile?.vat_type || 'no_vat',
+                  profile: buildProfile(withSign),
                 })
               })
             }}
@@ -599,9 +692,7 @@ export default function InvoicePage() {
                 🚀 Перейти к тарифам
               </button>
               <button onClick={() => setShowUpgradeModal(false)}
-                className="w-full text-gray-400 text-sm py-2">
-                Отмена
-              </button>
+                className="w-full text-gray-400 text-sm py-2">Отмена</button>
             </div>
           </div>
         </div>
@@ -617,11 +708,9 @@ export default function InvoicePage() {
               <div className="text-sm text-gray-400 mb-4">Измените адрес если нужно</div>
             </div>
             <label className="text-xs text-gray-500 mb-1 block">Email получателя</label>
-            <input
-              className="w-full border rounded-lg px-3 py-3 text-sm outline-none focus:border-[#1C2056] mb-4"
+            <input className="w-full border rounded-lg px-3 py-3 text-sm outline-none focus:border-[#1C2056] mb-4"
               placeholder="client@mail.kz" type="email"
-              value={emailTo} onChange={e => setEmailTo(e.target.value)}
-            />
+              value={emailTo} onChange={e => setEmailTo(e.target.value)} />
             <div className="space-y-2">
               <button onClick={sendEmailConfirm} disabled={sendingEmail}
                 className="w-full bg-[#1C2056] text-white rounded-xl py-4 text-sm font-medium">
@@ -644,16 +733,15 @@ export default function InvoicePage() {
               <div className="text-sm text-gray-400">Выберите вариант для скачивания</div>
             </div>
             <div className="space-y-3 mb-4">
-              <button
-                onClick={() => {
-                  if (!ap.canSign) {
-                    setShowSignModal(false)
-                    showUpgrade('PDF с подписью доступен с тарифа Базовый', 'basic')
-                    return
-                  }
+              <button onClick={() => {
+                if (!ap.canSign) {
                   setShowSignModal(false)
-                  if (pendingDocAction) pendingDocAction(true)
-                }}
+                  showUpgrade('PDF с подписью доступен с тарифа Базовый', 'basic')
+                  return
+                }
+                setShowSignModal(false)
+                if (pendingDocAction) pendingDocAction(true)
+              }}
                 className={`w-full rounded-xl py-4 text-sm font-medium relative ${ap.canSign ? 'bg-[#1C2056] text-white' : 'bg-gray-100 text-gray-400'}`}>
                 ✍️ С подписью и печатью
                 {!ap.canSign && <span className="absolute top-1 right-2 text-xs text-amber-500">🔒 Базовый+</span>}
