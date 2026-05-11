@@ -7,6 +7,7 @@ import { formatDateTime, formatDate } from '@/lib/date'
 import { generateKP } from '@/lib/generateKP'
 import { generateAVR } from '@/lib/generateAVR'
 import { generateNakladnaya } from '@/lib/generateNakladnaya'
+import { getActivePlan } from '@/lib/plan'
 
 const statusLabel: Record<string, { text: string; color: string; dot: string }> = {
   paid:    { text: 'Оплачен',    color: 'text-green-600',  dot: 'bg-green-500' },
@@ -34,6 +35,9 @@ export default function InvoicePage() {
   const [showEmailModal, setShowEmailModal] = useState(false)
   const [emailTo, setEmailTo] = useState('')
   const [sendingEmail, setSendingEmail] = useState(false)
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+  const [upgradeMessage, setUpgradeMessage] = useState('')
+  const [upgradePlan, setUpgradePlan] = useState<'basic' | 'pro'>('basic')
 
   useEffect(() => { loadInvoice() }, [])
 
@@ -43,9 +47,7 @@ export default function InvoicePage() {
     if (inv?.client_email) setEmailTo(inv.client_email)
 
     const { data: logsData } = await supabase
-      .from('invoice_logs')
-      .select('*')
-      .eq('invoice_id', id)
+      .from('invoice_logs').select('*').eq('invoice_id', id)
       .order('created_at', { ascending: false })
     setLogs(logsData || [])
 
@@ -64,12 +66,32 @@ export default function InvoicePage() {
     setLoading(false)
   }
 
+  function showUpgrade(message: string, plan: 'basic' | 'pro') {
+    setUpgradeMessage(message)
+    setUpgradePlan(plan)
+    setShowUpgradeModal(true)
+  }
+
+  function requirePlan(needed: 'basic' | 'pro', action: () => void) {
+    const ap = getActivePlan(profile)
+    if (needed === 'basic' && !ap.canSign) {
+      showUpgrade('Эта функция доступна с тарифа Базовый', 'basic')
+      return
+    }
+    if (needed === 'pro' && !ap.canKpAvrNakl) {
+      showUpgrade('Эта функция доступна только на тарифе Про', 'pro')
+      return
+    }
+    action()
+  }
+
   function askSignature(action: (withSign: boolean) => void) {
     setPendingDocAction(() => action)
     setShowSignModal(true)
   }
 
   function buildProfile(withSign: boolean) {
+    const ap = getActivePlan(profile)
     return {
       company_name: profile.company_name || '',
       bin_iin: profile.bin_iin || '',
@@ -77,8 +99,8 @@ export default function InvoicePage() {
       director_name: profile.director_name || '',
       phone: profile.phone || '',
       email: profile.email || '',
-      signature_url: withSign ? (profile.signature_url || '') : '',
-      stamp_url: withSign ? (profile.stamp_url || '') : '',
+      signature_url: withSign && ap.canSign ? (profile.signature_url || '') : '',
+      stamp_url: withSign && ap.canSign ? (profile.stamp_url || '') : '',
     }
   }
 
@@ -100,24 +122,17 @@ export default function InvoicePage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     const { data: freshProfile } = await supabase.from('profiles')
-      .select('invoice_prefix, invoice_next_number')
-      .eq('id', user.id).single()
+      .select('invoice_prefix, invoice_next_number').eq('id', user.id).single()
     const prefix = freshProfile?.invoice_prefix || 'INV-'
     const nextNum = freshProfile?.invoice_next_number || '0001'
     const invoiceNumber = prefix + nextNum
     const newNum = String(parseInt(nextNum) + 1).padStart(nextNum.length, '0')
     await supabase.from('profiles').update({ invoice_next_number: newNum }).eq('id', user.id)
     const { data, error } = await supabase.from('invoices').insert({
-      user_id: user.id,
-      number: invoiceNumber,
-      amount: invoice.amount,
-      status: 'draft',
-      client_name: invoice.client_name,
-      client_bin: invoice.client_bin,
-      client_email: invoice.client_email,
-      services: invoice.services,
-      note: invoice.note,
-      created_at: new Date().toISOString(),
+      user_id: user.id, number: invoiceNumber, amount: invoice.amount,
+      status: 'draft', client_name: invoice.client_name, client_bin: invoice.client_bin,
+      client_email: invoice.client_email, services: invoice.services,
+      note: invoice.note, created_at: new Date().toISOString(),
     }).select().single()
     if (error) { alert('Ошибка: ' + error.message); return }
     await supabase.from('invoice_logs').insert({ invoice_id: data.id, status: 'draft' })
@@ -185,20 +200,13 @@ export default function InvoicePage() {
     if (!invoice || !profile) { alert('Данные ещё загружаются'); return }
     const services = invoice.services || [{ name: 'Услуга', qty: 1, price: invoice.amount }]
     generateInvoicePDF({
-      number: invoice.number,
-      date: formatDate(invoice.created_at),
-      clientName: invoice.client_name || '',
-      clientBin: invoice.client_bin || '',
-      clientEmail: invoice.client_email || '',
-      clientAddress: invoice.client_address || '',
-      clientPhone: invoice.client_phone || '',
-      contractNumber: invoice.contract_number || '',
-      contractDate: invoice.contract_date || '',
-      services,
-      total: Number(invoice.amount),
-      note: invoice.note || profile?.default_note || '',
-      autoPrint: false,
-      vatType: profile?.vat_type,
+      number: invoice.number, date: formatDate(invoice.created_at),
+      clientName: invoice.client_name || '', clientBin: invoice.client_bin || '',
+      clientEmail: invoice.client_email || '', clientAddress: invoice.client_address || '',
+      clientPhone: invoice.client_phone || '', contractNumber: invoice.contract_number || '',
+      contractDate: invoice.contract_date || '', services,
+      total: Number(invoice.amount), note: invoice.note || profile?.default_note || '',
+      autoPrint: false, vatType: profile?.vat_type,
       profile: buildProfile(withSignature),
       bank: bank ? { bank_name: bank.bank_name, iik: bank.iik, bik: bank.bik, kbe: bank.kbe } : undefined,
     })
@@ -221,6 +229,28 @@ export default function InvoicePage() {
 
   const status = statusLabel[invoice.status] || statusLabel.draft
   const services = invoice.services || []
+  const ap = getActivePlan(profile)
+
+  // Компонент кнопки с замочком
+  function LockedButton({ label, icon, onClick, locked, lockedLabel }: {
+    label: string, icon: string, onClick: () => void,
+    locked: boolean, lockedLabel: string
+  }) {
+    return (
+      <button
+        onClick={locked ? () => showUpgrade(lockedLabel, lockedLabel.includes('Про') ? 'pro' : 'basic') : onClick}
+        className="w-full flex items-center justify-between px-4 py-3.5 text-sm hover:bg-gray-50 border-b border-gray-100">
+        <span className={locked ? 'text-gray-400' : 'text-[#1C2056]'}>{icon} {label}</span>
+        {locked ? (
+          <span className="text-xs bg-amber-50 text-amber-600 border border-amber-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+            🔒 {lockedLabel.includes('Про') ? 'Про' : 'Базовый'}
+          </span>
+        ) : (
+          <span className="text-gray-300">›</span>
+        )}
+      </button>
+    )
+  }
 
   return (
     <main className="min-h-screen bg-gray-50 pb-8">
@@ -242,19 +272,38 @@ export default function InvoicePage() {
           </span>
         </div>
 
+        {/* 4 кнопки действий */}
         <div className="grid grid-cols-4 gap-2">
-          {[
-            { icon: '💬', label: 'WhatsApp', action: shareWhatsApp },
-            { icon: '🔗', label: 'Ссылка', action: copyPublicLink },
-            { icon: '📄', label: 'PDF', action: () => askSignature((w) => openPDF(w)) },
-            { icon: '📧', label: 'Email', action: () => setShowEmailModal(true) },
-          ].map(a => (
-            <button key={a.label} onClick={a.action}
-              className="bg-white rounded-xl p-3 text-center shadow-sm hover:bg-gray-50">
-              <div className="text-xl mb-1">{a.icon}</div>
-              <div className="text-xs text-gray-500">{a.label}</div>
-            </button>
-          ))}
+          <button onClick={shareWhatsApp}
+            className="bg-white rounded-xl p-3 text-center shadow-sm hover:bg-gray-50">
+            <div className="text-xl mb-1">💬</div>
+            <div className="text-xs text-gray-500">WhatsApp</div>
+          </button>
+
+          <button onClick={copyPublicLink}
+            className="bg-white rounded-xl p-3 text-center shadow-sm hover:bg-gray-50">
+            <div className="text-xl mb-1">🔗</div>
+            <div className="text-xs text-gray-500">Ссылка</div>
+          </button>
+
+          <button onClick={() => askSignature((w) => openPDF(w))}
+            className="bg-white rounded-xl p-3 text-center shadow-sm hover:bg-gray-50">
+            <div className="text-xl mb-1">📄</div>
+            <div className="text-xs text-gray-500">PDF</div>
+          </button>
+
+          <button
+            onClick={() => ap.canEmail
+              ? setShowEmailModal(true)
+              : showUpgrade('Email отправка доступна с тарифа Базовый', 'basic')
+            }
+            className="bg-white rounded-xl p-3 text-center shadow-sm hover:bg-gray-50 relative">
+            <div className="text-xl mb-1">{ap.canEmail ? '📧' : '📧'}</div>
+            <div className="text-xs text-gray-500">Email</div>
+            {!ap.canEmail && (
+              <span className="absolute -top-1 -right-1 text-xs bg-amber-400 text-white w-4 h-4 rounded-full flex items-center justify-center">🔒</span>
+            )}
+          </button>
         </div>
 
         {services.length > 0 && (
@@ -323,9 +372,7 @@ export default function InvoicePage() {
                   <div key={log.id} className="flex items-start gap-3">
                     <div className="flex flex-col items-center flex-shrink-0">
                       <span className={`w-2.5 h-2.5 rounded-full mt-1.5 ${s.dot}`}></span>
-                      {i < logs.length - 1 && (
-                        <div className="w-px flex-1 min-h-[24px] bg-gray-100 my-1"></div>
-                      )}
+                      {i < logs.length - 1 && <div className="w-px flex-1 min-h-[24px] bg-gray-100 my-1"></div>}
                     </div>
                     <div className="flex-1 pb-3">
                       <div className={`text-sm font-medium ${s.color}`}>{icon} {s.text}</div>
@@ -348,9 +395,7 @@ export default function InvoicePage() {
             { status: 'paid',    label: '✅ Оплачен' },
             { status: 'overdue', label: '⏰ Просрочен' },
           ].filter(s => s.status !== invoice.status).map((s, i, arr) => (
-            <button key={s.status}
-              onClick={() => updateStatus(s.status)}
-              disabled={updating}
+            <button key={s.status} onClick={() => updateStatus(s.status)} disabled={updating}
               className={`w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50 text-sm text-left ${i < arr.length - 1 ? 'border-b border-gray-100' : ''}`}>
               <span className="text-[#1C2056]">{s.label}</span>
               <span className="text-gray-300">›</span>
@@ -358,208 +403,209 @@ export default function InvoicePage() {
           ))}
         </div>
 
+        {/* Действия */}
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
           <button onClick={() => router.push('/invoice/' + id + '/edit')}
-            className="w-full flex items-center px-4 py-3.5 text-sm hover:bg-gray-50 text-[#1C2056] border-b border-gray-100">
-            📝 Редактировать
+            className="w-full flex items-center justify-between px-4 py-3.5 text-sm hover:bg-gray-50 text-[#1C2056] border-b border-gray-100">
+            <span>📝 Редактировать</span>
+            <span className="text-gray-300">›</span>
           </button>
+
           <button onClick={duplicateInvoice}
-            className="w-full flex items-center px-4 py-3.5 text-sm hover:bg-gray-50 text-[#1C2056] border-b border-gray-100">
-            📋 Дублировать
+            className="w-full flex items-center justify-between px-4 py-3.5 text-sm hover:bg-gray-50 text-[#1C2056] border-b border-gray-100">
+            <span>📋 Дублировать</span>
+            <span className="text-gray-300">›</span>
           </button>
 
-          {/* КП */}
-          <button onClick={async () => {
-            if (!profile) { alert('Данные загружаются'); return }
-            const kpNumber = prompt('Номер КП:', invoice.number)
-            if (!kpNumber) return
-            const today = new Date()
-            today.setDate(today.getDate() + 30)
-            const validUntil = prompt('Действителен до:', today.toLocaleDateString('ru-KZ'))
-            if (!validUntil) return
-
-            const { data: { user } } = await supabase.auth.getUser()
-            if (user) {
-              await supabase.from('kp_documents').insert({
-                user_id: user.id,
-                invoice_id: id,
-                number: kpNumber,
-                date: formatDate(invoice.created_at),
-                valid_until: validUntil,
-                client_name: invoice.client_name,
-                client_bin: invoice.client_bin,
-                total: Number(invoice.amount),
-                services: invoice.services,
-                note: invoice.note,
-                vat_type: profile?.vat_type || 'no_vat',
-              })
-            }
-
-            askSignature((withSign) => {
-              generateKP({
-                number: kpNumber,
-                date: formatDate(invoice.created_at),
-                validUntil,
-                clientName: invoice.client_name || '',
-                clientBin: invoice.client_bin || '',
-                services: invoice.services || [],
-                total: Number(invoice.amount),
-                note: invoice.note || '',
-                vatType: profile?.vat_type || 'no_vat',
-                profile: buildProfile(withSign),
-                bank: bank ? { bank_name: bank.bank_name, iik: bank.iik, bik: bank.bik, kbe: bank.kbe } : undefined,
-              })
-            })
-          }}
-            className="w-full flex items-center px-4 py-3.5 text-sm hover:bg-gray-50 text-[#1C2056] border-b border-gray-100">
-            📋 Коммерческое предложение
-          </button>
-
-          {/* АВР */}
-          <button onClick={async () => {
-            if (!profile) { alert('Данные загружаются'); return }
-            const avrNumber = prompt('Номер АВР:', invoice.number)
-            if (!avrNumber) return
-            const contractNumber = prompt('Номер договора (необязательно):', '')
-            const contractDate = prompt('Дата договора:', formatDate(invoice.created_at))
-
-            const { data: { user } } = await supabase.auth.getUser()
-            if (user) {
-              await supabase.from('avr_documents').insert({
-                user_id: user.id,
-                invoice_id: id,
-                number: avrNumber,
-                date: formatDate(invoice.created_at),
-                contract_number: contractNumber || null,
-                contract_date: contractDate || null,
-                client_name: invoice.client_name,
-                client_bin: invoice.client_bin,
-                client_address: invoice.client_address,
-                total: Number(invoice.amount),
-                services: invoice.services,
-                vat_type: profile?.vat_type || 'no_vat',
-              })
-            }
-
-            askSignature((withSign) => {
-              generateAVR({
-                number: avrNumber,
-                date: formatDate(invoice.created_at),
-                contractNumber: contractNumber || undefined,
-                contractDate: contractDate || undefined,
-                clientName: invoice.client_name || '',
-                clientBin: invoice.client_bin || '',
-                clientAddress: invoice.client_address || '',
-                services: invoice.services || [],
-                total: Number(invoice.amount),
-                vatType: profile?.vat_type || 'no_vat',
-                profile: buildProfile(withSign),
-              })
-            })
-          }}
-            className="w-full flex items-center px-4 py-3.5 text-sm hover:bg-gray-50 text-[#1C2056] border-b border-gray-100">
-            📋 Акт выполненных работ
-          </button>
-
-          {/* Накладная */}
-          <button onClick={async () => {
-            if (!profile) { alert('Данные загружаются'); return }
-            const naklNumber = prompt('Номер накладной:', invoice.number)
-            if (!naklNumber) return
-
-            const { data: { user } } = await supabase.auth.getUser()
-            if (user) {
-              await supabase.from('nakladnaya_documents').insert({
-                user_id: user.id,
-                invoice_id: id,
-                number: naklNumber,
-                date: formatDate(invoice.created_at),
-                client_name: invoice.client_name,
-                client_bin: invoice.client_bin,
-                total: Number(invoice.amount),
-                services: invoice.services,
-                vat_type: profile?.vat_type || 'no_vat',
-              })
-            }
-
-            askSignature((withSign) => {
-              generateNakladnaya({
-                number: naklNumber,
-                date: formatDate(invoice.created_at),
-                clientName: invoice.client_name || '',
-                clientBin: invoice.client_bin || '',
-                services: invoice.services || [],
-                total: Number(invoice.amount),
-                vatType: profile?.vat_type || 'no_vat',
-                profile: buildProfile(withSign),
-              })
-            })
-          }}
-            className="w-full flex items-center px-4 py-3.5 text-sm hover:bg-gray-50 text-[#1C2056] border-b border-gray-100">
-            📋 Накладная на отпуск товара
-          </button>
-
-          <button onClick={async () => {
-            const { data: { user } } = await supabase.auth.getUser()
-            if (!user) return
-            const { data: p } = await supabase.from('profiles').select('plan').eq('id', user.id).single()
-            if (p?.plan !== 'pro') { router.push('/upgrade'); return }
-            const name = prompt('Название шаблона:', invoice.client_name + ' — ' + invoice.number)
-            if (!name) return
-            const { error } = await supabase.from('templates').insert({
-              user_id: user.id,
-              name,
-              client_name: invoice.client_name,
-              client_bin: invoice.client_bin,
-              client_email: invoice.client_email,
-              services: invoice.services,
-              amount: invoice.amount,
-            })
-            if (error) { alert('Ошибка: ' + error.message); return }
-            alert('Шаблон сохранён!')
-          }}
-            className="w-full flex items-center px-4 py-3.5 text-sm hover:bg-gray-50 text-[#1C2056] border-b border-gray-100">
-            ⭐ Сохранить как шаблон
-          </button>
-          <button onClick={sendReminder}
-            className="w-full flex items-center px-4 py-3.5 text-sm hover:bg-gray-50 text-[#1C2056] border-b border-gray-100">
-            🔔 Напомнить об оплате
-          </button>
-          <button onClick={async () => {
-            if (invoice.recurring_active) {
-              await supabase.from('invoices').update({ recurring_active: false }).eq('id', id)
-              await loadInvoice()
-              alert('Повторение отключено')
-            } else {
-              const until = prompt('Повторять до (дата в формате ДД.ММ.ГГГГ):', '01.12.2026')
-              if (!until) return
-              const parts = until.split('.')
-              if (parts.length !== 3) { alert('Неверный формат даты'); return }
-              const isoDate = `${parts[2]}-${parts[1]}-${parts[0]}`
-              if (!invoice.client_email) {
-                alert('У клиента нет email! Добавьте email клиента чтобы он получал счета.')
-                return
+          {/* КП — Про */}
+          <LockedButton
+            label="Коммерческое предложение"
+            icon="📋"
+            locked={!ap.canKpAvrNakl}
+            lockedLabel="Доступно на тарифе Про"
+            onClick={async () => {
+              if (!profile) return
+              const kpNumber = prompt('Номер КП:', invoice.number)
+              if (!kpNumber) return
+              const today = new Date()
+              today.setDate(today.getDate() + 30)
+              const validUntil = prompt('Действителен до:', today.toLocaleDateString('ru-KZ'))
+              if (!validUntil) return
+              const { data: { user } } = await supabase.auth.getUser()
+              if (user) {
+                await supabase.from('kp_documents').insert({
+                  user_id: user.id, invoice_id: id, number: kpNumber,
+                  date: formatDate(invoice.created_at), valid_until: validUntil,
+                  client_name: invoice.client_name, client_bin: invoice.client_bin,
+                  total: Number(invoice.amount), services: invoice.services,
+                  note: invoice.note, vat_type: profile?.vat_type || 'no_vat',
+                })
               }
-              await supabase.from('invoices').update({
-                recurring_active: true,
-                recurring_until: isoDate
-              }).eq('id', id)
-              await loadInvoice()
-              alert(`Повторение включено до ${until}. Счёт будет отправляться 1-го числа каждого месяца на ${invoice.client_email}`)
-            }
-          }}
-            className={`w-full flex items-center justify-between px-4 py-3.5 text-sm hover:bg-gray-50 border-b border-gray-100 ${invoice.recurring_active ? 'text-green-600' : 'text-[#1C2056]'}`}>
-            <span>{invoice.recurring_active ? '🔄 Повторение включено' : '🔄 Повторять ежемесячно'}</span>
-            {invoice.recurring_active && (
-              <span className="text-xs text-gray-400">до {new Date(invoice.recurring_until).toLocaleDateString('ru-KZ')}</span>
-            )}
+              askSignature((withSign) => {
+                generateKP({
+                  number: kpNumber, date: formatDate(invoice.created_at), validUntil,
+                  clientName: invoice.client_name || '', clientBin: invoice.client_bin || '',
+                  services: invoice.services || [], total: Number(invoice.amount),
+                  note: invoice.note || '', vatType: profile?.vat_type || 'no_vat',
+                  profile: buildProfile(withSign),
+                  bank: bank ? { bank_name: bank.bank_name, iik: bank.iik, bik: bank.bik, kbe: bank.kbe } : undefined,
+                })
+              })
+            }}
+          />
+
+          {/* АВР — Про */}
+          <LockedButton
+            label="Акт выполненных работ"
+            icon="📄"
+            locked={!ap.canKpAvrNakl}
+            lockedLabel="Доступно на тарифе Про"
+            onClick={async () => {
+              if (!profile) return
+              const avrNumber = prompt('Номер АВР:', invoice.number)
+              if (!avrNumber) return
+              const contractNumber = prompt('Номер договора (необязательно):', '')
+              const contractDate = prompt('Дата договора:', formatDate(invoice.created_at))
+              const { data: { user } } = await supabase.auth.getUser()
+              if (user) {
+                await supabase.from('avr_documents').insert({
+                  user_id: user.id, invoice_id: id, number: avrNumber,
+                  date: formatDate(invoice.created_at),
+                  contract_number: contractNumber || null,
+                  contract_date: contractDate || null,
+                  client_name: invoice.client_name, client_bin: invoice.client_bin,
+                  client_address: invoice.client_address,
+                  total: Number(invoice.amount), services: invoice.services,
+                  vat_type: profile?.vat_type || 'no_vat',
+                })
+              }
+              askSignature((withSign) => {
+                generateAVR({
+                  number: avrNumber, date: formatDate(invoice.created_at),
+                  contractNumber: contractNumber || undefined,
+                  contractDate: contractDate || undefined,
+                  clientName: invoice.client_name || '', clientBin: invoice.client_bin || '',
+                  clientAddress: invoice.client_address || '',
+                  services: invoice.services || [], total: Number(invoice.amount),
+                  vatType: profile?.vat_type || 'no_vat', profile: buildProfile(withSign),
+                })
+              })
+            }}
+          />
+
+          {/* Накладная — Про */}
+          <LockedButton
+            label="Накладная на отпуск товара"
+            icon="📦"
+            locked={!ap.canKpAvrNakl}
+            lockedLabel="Доступно на тарифе Про"
+            onClick={async () => {
+              if (!profile) return
+              const naklNumber = prompt('Номер накладной:', invoice.number)
+              if (!naklNumber) return
+              const { data: { user } } = await supabase.auth.getUser()
+              if (user) {
+                await supabase.from('nakladnaya_documents').insert({
+                  user_id: user.id, invoice_id: id, number: naklNumber,
+                  date: formatDate(invoice.created_at),
+                  client_name: invoice.client_name, client_bin: invoice.client_bin,
+                  total: Number(invoice.amount), services: invoice.services,
+                  vat_type: profile?.vat_type || 'no_vat',
+                })
+              }
+              askSignature((withSign) => {
+                generateNakladnaya({
+                  number: naklNumber, date: formatDate(invoice.created_at),
+                  clientName: invoice.client_name || '', clientBin: invoice.client_bin || '',
+                  services: invoice.services || [], total: Number(invoice.amount),
+                  vatType: profile?.vat_type || 'no_vat', profile: buildProfile(withSign),
+                })
+              })
+            }}
+          />
+
+          {/* Шаблон — Про */}
+          <LockedButton
+            label="Сохранить как шаблон"
+            icon="⭐"
+            locked={!ap.canTemplates}
+            lockedLabel="Доступно на тарифе Про"
+            onClick={async () => {
+              const { data: { user } } = await supabase.auth.getUser()
+              if (!user) return
+              const name = prompt('Название шаблона:', invoice.client_name + ' — ' + invoice.number)
+              if (!name) return
+              const { error } = await supabase.from('templates').insert({
+                user_id: user.id, name,
+                client_name: invoice.client_name, client_bin: invoice.client_bin,
+                client_email: invoice.client_email, services: invoice.services,
+                amount: invoice.amount,
+              })
+              if (error) { alert('Ошибка: ' + error.message); return }
+              alert('Шаблон сохранён!')
+            }}
+          />
+
+          <button onClick={sendReminder}
+            className="w-full flex items-center justify-between px-4 py-3.5 text-sm hover:bg-gray-50 text-[#1C2056] border-b border-gray-100">
+            <span>🔔 Напомнить об оплате</span>
+            <span className="text-gray-300">›</span>
           </button>
+
+          {/* Повторяющиеся — Про */}
+          <LockedButton
+            label={invoice.recurring_active ? 'Повторение включено' : 'Повторять ежемесячно'}
+            icon="🔄"
+            locked={!ap.canRecurring}
+            lockedLabel="Доступно на тарифе Про"
+            onClick={async () => {
+              if (invoice.recurring_active) {
+                await supabase.from('invoices').update({ recurring_active: false }).eq('id', id)
+                await loadInvoice()
+                alert('Повторение отключено')
+              } else {
+                const until = prompt('Повторять до (ДД.ММ.ГГГГ):', '01.12.2026')
+                if (!until) return
+                const parts = until.split('.')
+                if (parts.length !== 3) { alert('Неверный формат даты'); return }
+                if (!invoice.client_email) { alert('У клиента нет email!'); return }
+                const isoDate = `${parts[2]}-${parts[1]}-${parts[0]}`
+                await supabase.from('invoices').update({ recurring_active: true, recurring_until: isoDate }).eq('id', id)
+                await loadInvoice()
+                alert(`Повторение включено до ${until}`)
+              }
+            }}
+          />
+
           <button onClick={deleteInvoice}
             className="w-full flex items-center px-4 py-3.5 text-sm hover:bg-gray-50 text-red-500">
             ← Отозвать / Аннулировать
           </button>
         </div>
       </div>
+
+      {/* Модал апгрейда */}
+      {showUpgradeModal && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-sm rounded-2xl p-6">
+            <div className="text-center mb-5">
+              <div className="text-4xl mb-3">🔒</div>
+              <div className="font-semibold text-[#1C2056] mb-2">Необходим апгрейд</div>
+              <div className="text-sm text-gray-400">{upgradeMessage}</div>
+            </div>
+            <div className="space-y-2">
+              <button onClick={() => { setShowUpgradeModal(false); router.push('/upgrade') }}
+                className="w-full bg-[#1C2056] text-white rounded-xl py-3.5 font-medium text-sm">
+                🚀 Перейти к тарифам
+              </button>
+              <button onClick={() => setShowUpgradeModal(false)}
+                className="w-full text-gray-400 text-sm py-2">
+                Отмена
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Модал Email */}
       {showEmailModal && (
@@ -573,10 +619,8 @@ export default function InvoicePage() {
             <label className="text-xs text-gray-500 mb-1 block">Email получателя</label>
             <input
               className="w-full border rounded-lg px-3 py-3 text-sm outline-none focus:border-[#1C2056] mb-4"
-              placeholder="client@mail.kz"
-              type="email"
-              value={emailTo}
-              onChange={e => setEmailTo(e.target.value)}
+              placeholder="client@mail.kz" type="email"
+              value={emailTo} onChange={e => setEmailTo(e.target.value)}
             />
             <div className="space-y-2">
               <button onClick={sendEmailConfirm} disabled={sendingEmail}
@@ -584,15 +628,13 @@ export default function InvoicePage() {
                 {sendingEmail ? 'Отправляем...' : '📧 Отправить'}
               </button>
               <button onClick={() => setShowEmailModal(false)}
-                className="w-full text-gray-400 text-sm py-2">
-                Отмена
-              </button>
+                className="w-full text-gray-400 text-sm py-2">Отмена</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Модал выбора подписи */}
+      {/* Модал подписи */}
       {showSignModal && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-end">
           <div className="bg-white w-full max-w-lg mx-auto rounded-t-3xl p-6">
@@ -602,25 +644,27 @@ export default function InvoicePage() {
               <div className="text-sm text-gray-400">Выберите вариант для скачивания</div>
             </div>
             <div className="space-y-3 mb-4">
-              <button onClick={() => {
-                setShowSignModal(false)
-                if (pendingDocAction) pendingDocAction(true)
-              }}
-                className="w-full bg-[#1C2056] text-white rounded-xl py-4 text-sm font-medium">
+              <button
+                onClick={() => {
+                  if (!ap.canSign) {
+                    setShowSignModal(false)
+                    showUpgrade('PDF с подписью доступен с тарифа Базовый', 'basic')
+                    return
+                  }
+                  setShowSignModal(false)
+                  if (pendingDocAction) pendingDocAction(true)
+                }}
+                className={`w-full rounded-xl py-4 text-sm font-medium relative ${ap.canSign ? 'bg-[#1C2056] text-white' : 'bg-gray-100 text-gray-400'}`}>
                 ✍️ С подписью и печатью
+                {!ap.canSign && <span className="absolute top-1 right-2 text-xs text-amber-500">🔒 Базовый+</span>}
               </button>
-              <button onClick={() => {
-                setShowSignModal(false)
-                if (pendingDocAction) pendingDocAction(false)
-              }}
+              <button onClick={() => { setShowSignModal(false); if (pendingDocAction) pendingDocAction(false) }}
                 className="w-full border-2 border-gray-200 text-[#1C2056] rounded-xl py-4 text-sm font-medium">
                 📄 Без подписи и печати
               </button>
             </div>
             <button onClick={() => setShowSignModal(false)}
-              className="w-full text-gray-400 text-sm py-2">
-              Отмена
-            </button>
+              className="w-full text-gray-400 text-sm py-2">Отмена</button>
           </div>
         </div>
       )}
