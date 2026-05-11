@@ -1,45 +1,91 @@
-export function getActivePlan(profile: any): {
+export interface PlanInfo {
   plan: string
   isTrial: boolean
   daysLeft: number | null
   label: string
-} {
-  if (!profile) return { plan: 'free', isTrial: false, daysLeft: null, label: 'Бесплатный' }
+  isActive: boolean
+  canEmail: boolean
+  canSign: boolean
+  canKpAvrNakl: boolean
+  canTemplates: boolean
+  canRecurring: boolean
+  invoiceLimit: number | null
+}
+
+export function getActivePlan(profile: any): PlanInfo {
+  if (!profile) return {
+    plan: 'free', isTrial: false, daysLeft: null,
+    label: 'Бесплатный', isActive: false,
+    invoiceLimit: 3,
+    canEmail: false, canSign: false, canKpAvrNakl: false,
+    canTemplates: false, canRecurring: false,
+  }
 
   const now = new Date()
 
-  // 1. СНАЧАЛА проверяем платный план
+  // 1. Платный план
   if (profile.plan && profile.plan !== 'free') {
     if (!profile.plan_expires_at) {
-      // Бессрочный план (ручная активация) — просто возвращаем
-      return { plan: profile.plan, isTrial: false, daysLeft: null, label: profile.plan === 'pro' ? 'Про' : 'Базовый' }
+      return {
+        plan: profile.plan, isTrial: false, daysLeft: null, isActive: true,
+        label: profile.plan === 'pro' ? 'Про' : 'Базовый',
+        invoiceLimit: profile.plan === 'pro' ? null : 30,
+        canEmail: true, canSign: true,
+        canKpAvrNakl: profile.plan === 'pro',
+        canTemplates: profile.plan === 'pro',
+        canRecurring: profile.plan === 'pro',
+      }
     }
     const planEnd = new Date(profile.plan_expires_at)
     if (planEnd > now) {
       const daysLeft = Math.ceil((planEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-      return { plan: profile.plan, isTrial: false, daysLeft, label: profile.plan === 'pro' ? 'Про' : 'Базовый' }
+      return {
+        plan: profile.plan, isTrial: false, daysLeft, isActive: true,
+        label: profile.plan === 'pro' ? 'Про' : 'Базовый',
+        invoiceLimit: profile.plan === 'pro' ? null : 30,
+        canEmail: true, canSign: true,
+        canKpAvrNakl: profile.plan === 'pro',
+        canTemplates: profile.plan === 'pro',
+        canRecurring: profile.plan === 'pro',
+      }
     }
-    // Платный план закончился — идём дальше
   }
 
-  // 2. Проверяем бонусные дни (после окончания платного плана)
+  // 2. Бонусные дни = Базовый
   if (profile.bonus_expires_at) {
     const bonusEnd = new Date(profile.bonus_expires_at)
     if (bonusEnd > now) {
       const daysLeft = Math.ceil((bonusEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-      return { plan: 'basic', isTrial: false, daysLeft, label: `Бонус (${daysLeft} дн.)` }
+      return {
+        plan: 'basic', isTrial: false, daysLeft, isActive: true,
+        label: `Бонус (${daysLeft} дн.)`,
+        invoiceLimit: 30,
+        canEmail: true, canSign: true,
+        canKpAvrNakl: false, canTemplates: false, canRecurring: false,
+      }
     }
   }
 
-  // 3. Проверяем пробный период (только для новых без плана)
+  // 3. Пробный период = Базовый (10 счетов за 7 дней)
   if (profile.trial_expires_at) {
     const trialEnd = new Date(profile.trial_expires_at)
     if (trialEnd > now) {
       const daysLeft = Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-      return { plan: 'pro', isTrial: true, daysLeft, label: `Пробный период (${daysLeft} дн.)` }
+      return {
+        plan: 'basic', isTrial: true, daysLeft, isActive: true,
+        label: `Пробный (${daysLeft} дн.)`,
+        invoiceLimit: 10,
+        canEmail: true, canSign: true,
+        canKpAvrNakl: false, canTemplates: false, canRecurring: false,
+      }
     }
   }
 
-  // 4. Всё закончилось — Free
-  return { plan: 'free', isTrial: false, daysLeft: null, label: 'Бесплатный' }
+  // 4. Free
+  return {
+    plan: 'free', isTrial: false, daysLeft: null, isActive: false,
+    label: 'Бесплатный', invoiceLimit: 3,
+    canEmail: false, canSign: false, canKpAvrNakl: false,
+    canTemplates: false, canRecurring: false,
+  }
 }
