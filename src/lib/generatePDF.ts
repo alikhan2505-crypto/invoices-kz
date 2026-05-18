@@ -254,7 +254,7 @@ export function generateInvoicePDF(data: InvoiceData) {
         <div style="display:flex; align-items:flex-end; gap:4px; width:90%;">
           <span style="white-space:nowrap;">Руководитель</span>
           <div style="position:relative; flex:1; min-width:120px;">
-            ${signatureUrl ? `<img src="${signatureUrl}" style="position:absolute; bottom:4px; left:10px; height:45px; width:160px; max-width:160px; object-fit:contain;" />` : ''}
+            ${signatureUrl ? `<img src="${signatureUrl}" style="position:absolute; bottom:4px; left:10px; height:45px; width:160px; object-fit:contain;" />` : ''}
             <div style="border-bottom:1px solid #000; width:100%; margin-top:50px; min-width:200px;"></div>
           </div>
           <span style="white-space:nowrap; padding-bottom:2px;">${director ? '/ ' + director : '/'}</span>
@@ -265,7 +265,10 @@ export function generateInvoicePDF(data: InvoiceData) {
           <span>М.П.</span>
           <span>расшифровка подписи</span>
         </div>
-        ${stampUrl ? `<img src="${stampUrl}" style="position:absolute; left:28%; bottom:-10px; height:110px; width:110px; max-width:110px; min-width:0; object-fit:contain; opacity:0.85; display:block; flex-shrink:0;" />` : ''}
+        ${stampUrl ? `
+        <div style="position:absolute; left:220px; bottom:-10px; width:110px; height:110px; overflow:hidden;">
+          <img src="${stampUrl}" style="width:110px; height:110px; object-fit:contain; opacity:0.85;" />
+        </div>` : ''}
       </div>
 
       ${data.autoPrint !== false ? `
