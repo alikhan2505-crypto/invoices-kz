@@ -227,17 +227,29 @@ export default function InvoicePage() {
 
   // Генерация автономера
   async function getNextNumber(type: 'kp' | 'avr' | 'nakladnaya', userId: string) {
-    const prefixField = `${type}_prefix`
-    const numberField = `${type}_next_number`
     const { data: p } = await supabase.from('profiles')
-      .select(`${prefixField}, ${numberField}`)
+      .select('kp_prefix, kp_next_number, avr_prefix, avr_next_number, nakladnaya_prefix, nakladnaya_next_number')
       .eq('id', userId).single()
-    const prefix = p?.[prefixField] || (type === 'kp' ? 'КП-' : type === 'avr' ? 'АВР-' : 'НАК-')
-    const num = p?.[numberField] || 1
-    const docNumber = `${prefix}${String(num).padStart(4, '0')}`
-    await supabase.from('profiles').update({ [numberField]: num + 1 }).eq('id', userId)
-    return docNumber
-  }
+
+    let prefix: string
+    let num: number
+
+    if (type === 'kp') {
+      prefix = p?.kp_prefix || 'КП-'
+      num = p?.kp_next_number || 1
+      await supabase.from('profiles').update({ kp_next_number: num + 1 }).eq('id', userId)
+    } else if (type === 'avr') {
+      prefix = p?.avr_prefix || 'АВР-'
+      num = p?.avr_next_number || 1
+      await supabase.from('profiles').update({ avr_next_number: num + 1 }).eq('id', userId)
+    } else {
+      prefix = p?.nakladnaya_prefix || 'НАК-'
+      num = p?.nakladnaya_next_number || 1
+      await supabase.from('profiles').update({ nakladnaya_next_number: num + 1 }).eq('id', userId)
+    }
+
+    return `${prefix}${String(num).padStart(4, '0')}`
+  }                                                     
 
   if (loading) return (
     <main className="min-h-screen bg-gray-50 flex items-center justify-center">
