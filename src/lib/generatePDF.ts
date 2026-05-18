@@ -250,30 +250,24 @@ export function generateInvoicePDF(data: InvoiceData) {
 
       <hr>
 
-      <div style="margin-top:16px; position:relative;">
-        <table style="width:100%; border-collapse:collapse;">
-          <tr>
-            <td style="width:65%; vertical-align:bottom; padding-bottom:4px;">
-              <div style="display:flex; align-items:flex-end; gap:4px;">
-                <span style="white-space:nowrap; font-size:11px;">Руководитель</span>
-                <div style="position:relative; flex:1;">
-                  ${signatureUrl ? `<img src="${signatureUrl}" style="position:absolute; bottom:4px; left:10px; height:45px; width:160px; object-fit:contain;" />` : ''}
-                  <div style="border-bottom:1px solid #000; width:100%; margin-top:50px;"></div>
-                </div>
-                <span style="white-space:nowrap; padding-bottom:2px; font-size:11px;">${director ? '/ ' + director : '/'}</span>
-              </div>
-              <div style="margin-top:4px; font-size:9px; color:#666; display:flex; justify-content:space-between; padding:0 4px;">
-                <span>должность</span>
-                <span>подпись</span>
-                <span>М.П.</span>
-                <span>расшифровка подписи</span>
-              </div>
-            </td>
-            <td style="width:35%; vertical-align:middle; text-align:center;">
-              ${stampUrl ? `<img src="${stampUrl}" style="width:100px; height:100px; object-fit:contain; opacity:0.85;" />` : ''}
-            </td>
-          </tr>
-        </table>
+      <div style="margin-top:16px; min-height:120px; position:relative;">
+        <div style="display:flex; align-items:flex-end; gap:4px; width:90%;">
+          <span style="white-space:nowrap;">Руководитель</span>
+          <div style="position:relative; flex:1; min-width:120px;">
+            ${signatureUrl ? `<img src="${signatureUrl}" style="position:absolute; bottom:4px; left:10px; height:45px; width:160px; object-fit:contain;" />` : ''}
+            <div style="border-bottom:1px solid #000; width:100%; margin-top:50px; min-width:200px;"></div>
+          </div>
+          <span style="white-space:nowrap; padding-bottom:2px;">${director ? '/ ' + director : '/'}</span>
+        </div>
+        <div style="margin-top:8px; font-size:9px; color:#666; width:85%; display:flex; justify-content:space-between; padding:0 4px;">
+          <span>должность</span>
+          <span>подпись</span>
+          <span>М.П.</span>
+          <span>расшифровка подписи</span>
+        </div>
+        ${stampUrl ? `
+        <div style="position:absolute; left:28%; bottom:-10px; width:110px; height:110px; background-image:url('${stampUrl}'); background-size:contain; background-repeat:no-repeat; background-position:center; opacity:0.85;">
+        </div>` : ''}
       </div>
 
       ${data.autoPrint !== false ? `
