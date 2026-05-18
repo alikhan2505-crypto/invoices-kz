@@ -267,7 +267,7 @@ export function generateInvoicePDF(data: InvoiceData) {
         </div>
         ${stampUrl ? `
         <div style="position:absolute; left:28%; bottom:-10px; width:110px; height:110px; overflow:hidden;">
-          <img src="${stampUrl}" width="110" height="110" style="display:block; object-fit:contain; opacity:0.85;" />
+          <img data-stamp="true" src="${stampUrl}" style="width:110px; height:110px; display:block; object-fit:contain; opacity:0.85;" />
         </div>` : ''}
       </div>
 
@@ -307,7 +307,17 @@ export function generateInvoicePDF(data: InvoiceData) {
               margin: 0,
               filename: 'Счёт-${data.number}.pdf',
               image: { type: 'jpeg', quality: 0.98 },
-              html2canvas: { scale: 2, useCORS: true, logging: false },
+              html2canvas: { 
+                scale: 2, 
+                useCORS: true, 
+                logging: false,
+                onclone: function(clonedDoc) {
+                  const stampImg = clonedDoc.querySelector('[data-stamp]')
+                  if (stampImg) {
+                    stampImg.style.cssText = 'width:110px!important; height:110px!important; max-width:110px!important; max-height:110px!important; display:block; object-fit:contain; opacity:0.85;'
+                  }
+                }
+              },
               jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
             }
             html2pdf().set(opt).from(document.body).save().then(() => {
