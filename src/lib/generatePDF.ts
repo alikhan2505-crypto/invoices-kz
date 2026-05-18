@@ -266,7 +266,8 @@ export function generateInvoicePDF(data: InvoiceData) {
           <span>расшифровка подписи</span>
         </div>
         ${stampUrl ? `
-        <div style="position:absolute; left:28%; bottom:-10px; width:110px; height:110px; background-image:url('${stampUrl}'); background-size:contain; background-repeat:no-repeat; background-position:center; opacity:0.85;">
+        <div style="position:absolute; left:28%; bottom:-10px; width:110px; height:110px; overflow:hidden;">
+          <img src="${stampUrl}" width="110" height="110" style="display:block; object-fit:contain; opacity:0.85;" />
         </div>` : ''}
       </div>
 
