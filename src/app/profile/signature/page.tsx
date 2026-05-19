@@ -12,18 +12,22 @@ export default function Signature() {
   const [showCanvas, setShowCanvas] = useState(false)
   const [showCropModal, setShowCropModal] = useState(false)
   const [cropImageSrc, setCropImageSrc] = useState<string>('')
-  const [cropSize, setCropSize] = useState(200)
-  const [cropX, setCropX] = useState(0)
-  const [cropY, setCropY] = useState(0)
-  const [originalFile, setOriginalFile] = useState<File | null>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const cropCanvasRef = useRef<HTMLCanvasElement>(null)
-  const cropImageRef = useRef<HTMLImageElement>(null)
   const [userId, setUserId] = useState<string>('')
-  const [imgNaturalW, setImgNaturalW] = useState(0)
-  const [imgNaturalH, setImgNaturalH] = useState(0)
-  const [imgDisplayW, setImgDisplayW] = useState(0)
-  const [imgDisplayH, setImgDisplayH] = useState(0)
+
+  // Кроп состояние
+  const [cropX, setCropX] = useState(0)
+  const [cropY, setCropY] = useState(0)
+  const [cropSize, setCropSize] = useState(200)
+  const [canvasW, setCanvasW] = useState(0)
+  const [canvasH, setCanvasH] = useState(0)
+  const [naturalW, setNaturalW] = useState(0)
+  const [naturalH, setNaturalH] = useState(0)
+
+  // Touch/drag состояние
+  const dragStart = useRef<{ x: number; y: number; cx: number; cy: number } | null>(null)
+  const pinchStart = useRef<{ dist: number; size: number } | null>(null)
 
   useEffect(() => { loadData() }, [])
 
@@ -118,58 +122,213 @@ export default function Signature() {
   function openCropModal(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    setOriginalFile(file)
     const reader = new FileReader()
     reader.onload = (ev) => {
-      setCropImageSrc(ev.target?.result as string)
-      setCropX(0)
-      setCropY(0)
-      setCropSize(200)
-      setShowCropModal(true)
+      const src = ev.target?.result as string
+      setCropImageSrc(src)
+      // Загружаем изображение чтобы узнать размеры
+      const img = new Image()
+      img.onload = () => {
+        setNaturalW(img.naturalWidth)
+        setNaturalH(img.naturalHeight)
+        // Canvas кропа — фиксированная ширина 320px
+        const displayW = 320
+        const displayH = Math.round(img.naturalHeight * displayW / img.naturalWidth)
+        setCanvasW(displayW)
+        setCanvasH(displayH)
+        const initSize = Math.min(displayW, displayH) * 0.7
+        setCropSize(initSize)
+        setCropX((displayW - initSize) / 2)
+        setCropY((displayH - initSize) / 2)
+        setShowCropModal(true)
+        setTimeout(() => drawCropCanvas(src, img.naturalWidth, img.naturalHeight, displayW, displayH, (displayW - initSize) / 2, (displayH - initSize) / 2, initSize), 100)
+      }
+      img.src = src
     }
     reader.readAsDataURL(file)
     e.target.value = ''
   }
 
-  function onCropImageLoad(e: React.SyntheticEvent<HTMLImageElement>) {
-    const img = e.currentTarget
-    setImgNaturalW(img.naturalWidth)
-    setImgNaturalH(img.naturalHeight)
-    setImgDisplayW(img.width)
-    setImgDisplayH(img.height)
-    // Начальный размер кропа — меньшая из сторон
-    const initSize = Math.min(img.width, img.height)
-    setCropSize(initSize)
-    setCropX(0)
-    setCropY(0)
+  function drawCropCanvas(src: string, nw: number, nh: number, dw: number, dh: number, cx: number, cy: number, cs: number) {
+    const canvas = cropCanvasRef.current
+    if (!canvas) return
+    canvas.width = dw
+    canvas.height = dh
+    const ctx = canvas.getContext('2d')!
+    const img = new Image()
+    img.onload = () => {
+      ctx.clearRect(0, 0, dw, dh)
+      ctx.drawImage(img, 0, 0, dw, dh)
+      // Затемнение вне кропа
+      ctx.fillStyle = 'rgba(0,0,0,0.5)'
+      ctx.fillRect(0, 0, dw, dh)
+      // Вырезаем прозрачный квадрат
+      ctx.clearRect(cx, cy, cs, cs)
+      // Рисуем изображение в область кропа
+      const scaleX = nw / dw
+      const scaleY = nh / dh
+      ctx.drawImage(img, cx * scaleX, cy * scaleY, cs * scaleX, cs * scaleY, cx, cy, cs, cs)
+      // Рамка
+      ctx.strokeStyle = '#2DC48D'
+      ctx.lineWidth = 2
+      ctx.strokeRect(cx, cy, cs, cs)
+      // Угловые маркеры
+      const m = 12
+      ctx.lineWidth = 3
+      ;[[cx, cy], [cx + cs, cy], [cx, cy + cs], [cx + cs, cy + cs]].forEach(([x, y], i) => {
+        ctx.beginPath()
+        if (i === 0) { ctx.moveTo(x + m, y); ctx.lineTo(x, y); ctx.lineTo(x, y + m) }
+        if (i === 1) { ctx.moveTo(x - m, y); ctx.lineTo(x, y); ctx.lineTo(x, y + m) }
+        if (i === 2) { ctx.moveTo(x + m, y); ctx.lineTo(x, y); ctx.lineTo(x, y - m) }
+        if (i === 3) { ctx.moveTo(x - m, y); ctx.lineTo(x, y); ctx.lineTo(x, y - m) }
+        ctx.stroke()
+      })
+    }
+    img.src = src
+  }
+
+  function redraw(newCx?: number, newCy?: number, newCs?: number) {
+    const cx = newCx !== undefined ? newCx : cropX
+    const cy = newCy !== undefined ? newCy : cropY
+    const cs = newCs !== undefined ? newCs : cropSize
+    drawCropCanvas(cropImageSrc, naturalW, naturalH, canvasW, canvasH, cx, cy, cs)
+  }
+
+  function clamp(val: number, min: number, max: number) { return Math.max(min, Math.min(max, val)) }
+
+  function onCropTouchStart(e: React.TouchEvent) {
+    e.preventDefault()
+    if (e.touches.length === 1) {
+      const canvas = cropCanvasRef.current!
+      const rect = canvas.getBoundingClientRect()
+      const scaleX = canvasW / rect.width
+      const x = (e.touches[0].clientX - rect.left) * scaleX
+      const scaleY = canvasH / rect.height
+      const y = (e.touches[0].clientY - rect.top) * scaleY
+      dragStart.current = { x, y, cx: cropX, cy: cropY }
+    } else if (e.touches.length === 2) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX
+      const dy = e.touches[0].clientY - e.touches[1].clientY
+      const dist = Math.sqrt(dx * dx + dy * dy)
+      pinchStart.current = { dist, size: cropSize }
+    }
+  }
+
+  function onCropTouchMove(e: React.TouchEvent) {
+    e.preventDefault()
+    const canvas = cropCanvasRef.current!
+    const rect = canvas.getBoundingClientRect()
+    const scaleX = canvasW / rect.width
+    const scaleY = canvasH / rect.height
+
+    if (e.touches.length === 2 && pinchStart.current) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX
+      const dy = e.touches[0].clientY - e.touches[1].clientY
+      const dist = Math.sqrt(dx * dx + dy * dy)
+      const ratio = dist / pinchStart.current.dist
+      const newSize = clamp(pinchStart.current.size * ratio, 50, Math.min(canvasW, canvasH))
+      const newCx = clamp(cropX, 0, canvasW - newSize)
+      const newCy = clamp(cropY, 0, canvasH - newSize)
+      setCropSize(newSize)
+      setCropX(newCx)
+      setCropY(newCy)
+      redraw(newCx, newCy, newSize)
+    } else if (e.touches.length === 1 && dragStart.current) {
+      const x = (e.touches[0].clientX - rect.left) * scaleX
+      const y = (e.touches[0].clientY - rect.top) * scaleY
+      const dx = x - dragStart.current.x
+      const dy = y - dragStart.current.y
+      const newCx = clamp(dragStart.current.cx + dx, 0, canvasW - cropSize)
+      const newCy = clamp(dragStart.current.cy + dy, 0, canvasH - cropSize)
+      setCropX(newCx)
+      setCropY(newCy)
+      redraw(newCx, newCy)
+    }
+  }
+
+  function onCropTouchEnd() {
+    dragStart.current = null
+    pinchStart.current = null
+  }
+
+  // Mouse drag для десктопа
+  function onCropMouseDown(e: React.MouseEvent) {
+    const canvas = cropCanvasRef.current!
+    const rect = canvas.getBoundingClientRect()
+    const scaleX = canvasW / rect.width
+    const scaleY = canvasH / rect.height
+    dragStart.current = {
+      x: (e.clientX - rect.left) * scaleX,
+      y: (e.clientY - rect.top) * scaleY,
+      cx: cropX, cy: cropY
+    }
+  }
+
+  function onCropMouseMove(e: React.MouseEvent) {
+    if (!dragStart.current) return
+    const canvas = cropCanvasRef.current!
+    const rect = canvas.getBoundingClientRect()
+    const scaleX = canvasW / rect.width
+    const scaleY = canvasH / rect.height
+    const x = (e.clientX - rect.left) * scaleX
+    const y = (e.clientY - rect.top) * scaleY
+    const dx = x - dragStart.current.x
+    const dy = y - dragStart.current.y
+    const newCx = clamp(dragStart.current.cx + dx, 0, canvasW - cropSize)
+    const newCy = clamp(dragStart.current.cy + dy, 0, canvasH - cropSize)
+    setCropX(newCx)
+    setCropY(newCy)
+    redraw(newCx, newCy)
+  }
+
+  function onCropMouseUp() { dragStart.current = null }
+
+  // Скролл для изменения размера на десктопе
+  function onCropWheel(e: React.WheelEvent) {
+    e.preventDefault()
+    const delta = e.deltaY > 0 ? -10 : 10
+    const newSize = clamp(cropSize + delta, 50, Math.min(canvasW, canvasH))
+    const newCx = clamp(cropX, 0, canvasW - newSize)
+    const newCy = clamp(cropY, 0, canvasH - newSize)
+    setCropSize(newSize)
+    setCropX(newCx)
+    setCropY(newCy)
+    redraw(newCx, newCy, newSize)
   }
 
   async function applyCrop() {
-    if (!cropImageSrc || !imgNaturalW) return
     setSaving(true)
-
     const img = new Image()
     img.src = cropImageSrc
     await new Promise(r => { img.onload = r })
 
-    // Масштаб между натуральным и отображаемым размером
-    const scaleX = imgNaturalW / imgDisplayW
-    const scaleY = imgNaturalH / imgDisplayH
+    const scaleX = naturalW / canvasW
+    const scaleY = naturalH / canvasH
 
-    const canvas = document.createElement('canvas')
-    canvas.width = 300
-    canvas.height = 300
-    const ctx = canvas.getContext('2d')!
+    // Вырезаем область
+    const tempCanvas = document.createElement('canvas')
+    tempCanvas.width = 300
+    tempCanvas.height = 300
+    const ctx = tempCanvas.getContext('2d')!
+    ctx.drawImage(img, cropX * scaleX, cropY * scaleY, cropSize * scaleX, cropSize * scaleY, 0, 0, 300, 300)
 
-    // Вырезаем кроп квадрат
-    ctx.drawImage(
-      img,
-      cropX * scaleX, cropY * scaleY,
-      cropSize * scaleX, cropSize * scaleY,
-      0, 0, 300, 300
-    )
+    // Убираем белый/серый фон
+    const imageData = ctx.getImageData(0, 0, 300, 300)
+    const data = imageData.data
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i], g = data[i + 1], b = data[i + 2]
+      const brightness = (r + g + b) / 3
+      // Если пиксель светлый (>200) — делаем прозрачным
+      if (brightness > 200) {
+        data[i + 3] = 0
+      } else if (brightness > 150) {
+        // Полупрозрачный для краёв
+        data[i + 3] = Math.round((255 - brightness) * 2)
+      }
+    }
+    ctx.putImageData(imageData, 0, 0)
 
-    canvas.toBlob(async (blob) => {
+    tempCanvas.toBlob(async (blob) => {
       if (!blob) { setSaving(false); return }
       const file = new File([blob], 'stamp.png', { type: 'image/png' })
       const path = `${userId}/stamp.png`
@@ -278,7 +437,7 @@ export default function Signature() {
             {stampUrl ? (
               <div>
                 <div className="border rounded-xl p-3 mb-3 bg-gray-50 flex items-center justify-center">
-                  <img src={stampUrl} alt="Печать" className="h-24 w-24 object-contain" style={{ mixBlendMode: 'multiply' }} />
+                  <img src={stampUrl} alt="Печать" className="h-24 w-24 object-contain" />
                 </div>
                 <div className="flex gap-2">
                   <label className="flex-1 border border-[#1C2056] text-[#1C2056] rounded-xl py-2.5 text-sm font-medium text-center cursor-pointer">
@@ -307,76 +466,61 @@ export default function Signature() {
         <div className="bg-[#1C2056]/5 rounded-2xl p-4">
           <div className="text-xs text-[#1C2056] font-medium mb-1">💡 Совет</div>
           <div className="text-xs text-gray-500 leading-relaxed">
-            Сфотографируйте печать на белом листе — приложение автоматически уберёт белый фон.
-            Используйте кроп чтобы вырезать только печать без лишнего фона.
+            Сфотографируйте печать на белом листе — белый фон уберётся автоматически.
+            Перемещайте рамку пальцем, используйте щипок для изменения размера.
           </div>
         </div>
       </div>
 
       {/* Кроп модал */}
       {showCropModal && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-end">
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-end">
           <div className="bg-white w-full max-w-lg mx-auto rounded-t-3xl p-5">
-            <div className="flex items-center justify-between mb-4">
-              <div className="font-semibold text-[#1C2056]">Выберите область печати</div>
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <div className="font-semibold text-[#1C2056]">Выберите область печати</div>
+                <div className="text-xs text-gray-400 mt-0.5">Перемещайте рамку · Щипок для размера</div>
+              </div>
               <button onClick={() => setShowCropModal(false)} className="text-gray-400 text-xl">✕</button>
             </div>
 
-            <div className="text-xs text-gray-400 mb-3">
-              Передвигайте и изменяйте размер квадрата чтобы выделить печать
+            {/* Canvas кропа */}
+            <div className="rounded-xl overflow-hidden mb-4 bg-black">
+              <canvas
+                ref={cropCanvasRef}
+                style={{ width: '100%', touchAction: 'none', cursor: 'move', display: 'block' }}
+                onTouchStart={onCropTouchStart}
+                onTouchMove={onCropTouchMove}
+                onTouchEnd={onCropTouchEnd}
+                onMouseDown={onCropMouseDown}
+                onMouseMove={onCropMouseMove}
+                onMouseUp={onCropMouseUp}
+                onMouseLeave={onCropMouseUp}
+                onWheel={onCropWheel}
+              />
             </div>
 
-            {/* Превью с кропом */}
-            <div className="relative bg-gray-100 rounded-xl overflow-hidden mb-4" style={{ maxHeight: '300px' }}>
-              {cropImageSrc && (
-                <div className="relative inline-block w-full">
-                  <img
-                    ref={cropImageRef}
-                    src={cropImageSrc}
-                    alt="Кроп"
-                    className="w-full object-contain"
-                    onLoad={onCropImageLoad}
-                  />
-                  {/* Кроп рамка */}
-                  <div
-                    style={{
-                      position: 'absolute',
-                      left: cropX,
-                      top: cropY,
-                      width: cropSize,
-                      height: cropSize,
-                      border: '2px solid #2DC48D',
-                      boxShadow: '0 0 0 9999px rgba(0,0,0,0.4)',
-                      pointerEvents: 'none',
-                    }}
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* Ползунки */}
-            <div className="space-y-3 mb-4">
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">Размер: {cropSize}px</label>
-                <input type="range" min={50} max={Math.min(imgDisplayW, imgDisplayH) || 300}
-                  value={cropSize}
-                  onChange={e => setCropSize(Number(e.target.value))}
-                  className="w-full accent-[#2DC48D]" />
+            {/* Ползунок размера */}
+            <div className="mb-4">
+              <div className="flex justify-between text-xs text-gray-400 mb-1">
+                <span>Размер рамки</span>
+                <span>{Math.round(cropSize)}px</span>
               </div>
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">Позиция по горизонтали: {cropX}px</label>
-                <input type="range" min={0} max={Math.max(0, imgDisplayW - cropSize)}
-                  value={cropX}
-                  onChange={e => setCropX(Number(e.target.value))}
-                  className="w-full accent-[#1C2056]" />
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">Позиция по вертикали: {cropY}px</label>
-                <input type="range" min={0} max={Math.max(0, imgDisplayH - cropSize)}
-                  value={cropY}
-                  onChange={e => setCropY(Number(e.target.value))}
-                  className="w-full accent-[#1C2056]" />
-              </div>
+              <input type="range"
+                min={50}
+                max={Math.min(canvasW, canvasH)}
+                value={cropSize}
+                onChange={e => {
+                  const newSize = Number(e.target.value)
+                  const newCx = clamp(cropX, 0, canvasW - newSize)
+                  const newCy = clamp(cropY, 0, canvasH - newSize)
+                  setCropSize(newSize)
+                  setCropX(newCx)
+                  setCropY(newCy)
+                  redraw(newCx, newCy, newSize)
+                }}
+                className="w-full accent-[#2DC48D]"
+              />
             </div>
 
             <div className="flex gap-2">
