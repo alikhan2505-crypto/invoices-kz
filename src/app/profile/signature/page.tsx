@@ -10,8 +10,20 @@ export default function Signature() {
   const [stampUrl, setStampUrl] = useState<string | null>(null)
   const [isDrawing, setIsDrawing] = useState(false)
   const [showCanvas, setShowCanvas] = useState(false)
+  const [showCropModal, setShowCropModal] = useState(false)
+  const [cropImageSrc, setCropImageSrc] = useState<string>('')
+  const [cropSize, setCropSize] = useState(200)
+  const [cropX, setCropX] = useState(0)
+  const [cropY, setCropY] = useState(0)
+  const [originalFile, setOriginalFile] = useState<File | null>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const cropCanvasRef = useRef<HTMLCanvasElement>(null)
+  const cropImageRef = useRef<HTMLImageElement>(null)
   const [userId, setUserId] = useState<string>('')
+  const [imgNaturalW, setImgNaturalW] = useState(0)
+  const [imgNaturalH, setImgNaturalH] = useState(0)
+  const [imgDisplayW, setImgDisplayW] = useState(0)
+  const [imgDisplayH, setImgDisplayH] = useState(0)
 
   useEffect(() => { loadData() }, [])
 
@@ -87,28 +99,14 @@ export default function Signature() {
     const canvas = canvasRef.current
     if (!canvas) return
     setSaving(true)
-
     canvas.toBlob(async (blob) => {
       if (!blob) { setSaving(false); return }
       const file = new File([blob], 'signature.png', { type: 'image/png' })
       const path = `${userId}/signature.png`
-
-      // Сначала удаляем старый файл
       await supabase.storage.from('signatures').remove([path])
-
-      // Загружаем новый
-      const { error } = await supabase.storage.from('signatures').upload(path, file, {
-        upsert: true
-      })
-
-      if (error) {
-        alert('Ошибка: ' + error.message)
-        setSaving(false)
-        return
-      }
-
+      const { error } = await supabase.storage.from('signatures').upload(path, file, { upsert: true })
+      if (error) { alert('Ошибка: ' + error.message); setSaving(false); return }
       const { data: urlData } = supabase.storage.from('signatures').getPublicUrl(path)
-      // Добавляем timestamp чтобы обойти кэш
       const url = urlData.publicUrl + '?t=' + Date.now()
       await supabase.from('profiles').update({ signature_url: url }).eq('id', userId)
       setSignatureUrl(url)
@@ -117,25 +115,74 @@ export default function Signature() {
     }, 'image/png')
   }
 
-  async function uploadStamp(e: React.ChangeEvent<HTMLInputElement>) {
+  function openCropModal(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
+    setOriginalFile(file)
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      setCropImageSrc(ev.target?.result as string)
+      setCropX(0)
+      setCropY(0)
+      setCropSize(200)
+      setShowCropModal(true)
+    }
+    reader.readAsDataURL(file)
+    e.target.value = ''
+  }
+
+  function onCropImageLoad(e: React.SyntheticEvent<HTMLImageElement>) {
+    const img = e.currentTarget
+    setImgNaturalW(img.naturalWidth)
+    setImgNaturalH(img.naturalHeight)
+    setImgDisplayW(img.width)
+    setImgDisplayH(img.height)
+    // Начальный размер кропа — меньшая из сторон
+    const initSize = Math.min(img.width, img.height)
+    setCropSize(initSize)
+    setCropX(0)
+    setCropY(0)
+  }
+
+  async function applyCrop() {
+    if (!cropImageSrc || !imgNaturalW) return
     setSaving(true)
 
-    const path = `${userId}/stamp.png`
-    await supabase.storage.from('stamps').remove([path])
+    const img = new Image()
+    img.src = cropImageSrc
+    await new Promise(r => { img.onload = r })
 
-    const { error } = await supabase.storage.from('stamps').upload(path, file, {
-      upsert: true
-    })
+    // Масштаб между натуральным и отображаемым размером
+    const scaleX = imgNaturalW / imgDisplayW
+    const scaleY = imgNaturalH / imgDisplayH
 
-    if (error) { alert('Ошибка: ' + error.message); setSaving(false); return }
+    const canvas = document.createElement('canvas')
+    canvas.width = 300
+    canvas.height = 300
+    const ctx = canvas.getContext('2d')!
 
-    const { data: urlData } = supabase.storage.from('stamps').getPublicUrl(path)
-    const url = urlData.publicUrl + '?t=' + Date.now()
-    await supabase.from('profiles').update({ stamp_url: url }).eq('id', userId)
-    setStampUrl(url)
-    setSaving(false)
+    // Вырезаем кроп квадрат
+    ctx.drawImage(
+      img,
+      cropX * scaleX, cropY * scaleY,
+      cropSize * scaleX, cropSize * scaleY,
+      0, 0, 300, 300
+    )
+
+    canvas.toBlob(async (blob) => {
+      if (!blob) { setSaving(false); return }
+      const file = new File([blob], 'stamp.png', { type: 'image/png' })
+      const path = `${userId}/stamp.png`
+      await supabase.storage.from('stamps').remove([path])
+      const { error } = await supabase.storage.from('stamps').upload(path, file, { upsert: true })
+      if (error) { alert('Ошибка: ' + error.message); setSaving(false); return }
+      const { data: urlData } = supabase.storage.from('stamps').getPublicUrl(path)
+      const url = urlData.publicUrl + '?t=' + Date.now()
+      await supabase.from('profiles').update({ stamp_url: url }).eq('id', userId)
+      setStampUrl(url)
+      setShowCropModal(false)
+      setSaving(false)
+    }, 'image/png')
   }
 
   async function removeSignature() {
@@ -152,14 +199,14 @@ export default function Signature() {
 
   return (
     <main className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Sticky header */}
       <div className="sticky top-0 z-10 bg-white border-b px-4 py-4 flex items-center gap-3">
         <button onClick={() => router.push('/profile')} className="text-gray-400 text-xl">‹</button>
         <span className="font-semibold text-[#1C2056]">Подпись и печать</span>
       </div>
 
       <div className="max-w-lg mx-auto p-4 space-y-4 w-full">
-        {/* Signature */}
+
+        {/* Подпись */}
         <div>
           <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">Подпись руководителя</div>
           <div className="bg-white rounded-2xl shadow-sm p-4">
@@ -224,19 +271,19 @@ export default function Signature() {
           </div>
         </div>
 
-        {/* Stamp */}
+        {/* Печать */}
         <div>
           <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">Печать организации</div>
           <div className="bg-white rounded-2xl shadow-sm p-4">
             {stampUrl ? (
               <div>
                 <div className="border rounded-xl p-3 mb-3 bg-gray-50 flex items-center justify-center">
-                  <img src={stampUrl} alt="Печать" className="h-24 w-24 object-contain" />
+                  <img src={stampUrl} alt="Печать" className="h-24 w-24 object-contain" style={{ mixBlendMode: 'multiply' }} />
                 </div>
                 <div className="flex gap-2">
                   <label className="flex-1 border border-[#1C2056] text-[#1C2056] rounded-xl py-2.5 text-sm font-medium text-center cursor-pointer">
                     Заменить
-                    <input type="file" accept="image/*" className="hidden" onChange={uploadStamp} />
+                    <input type="file" accept="image/*" className="hidden" onChange={openCropModal} />
                   </label>
                   <button onClick={removeStamp}
                     className="flex-1 border border-red-200 text-red-400 rounded-xl py-2.5 text-sm font-medium">
@@ -247,10 +294,10 @@ export default function Signature() {
             ) : (
               <div className="text-center py-4">
                 <div className="text-4xl mb-3">🔵</div>
-                <p className="text-sm text-gray-400 mb-4">Загрузите фото печати (PNG с прозрачным фоном)</p>
+                <p className="text-sm text-gray-400 mb-4">Загрузите фото печати — белый фон уберётся автоматически</p>
                 <label className="bg-[#1C2056] text-white px-6 py-2.5 rounded-xl text-sm font-medium cursor-pointer">
                   {saving ? 'Загружаем...' : 'Загрузить фото'}
-                  <input type="file" accept="image/*" className="hidden" onChange={uploadStamp} />
+                  <input type="file" accept="image/*" className="hidden" onChange={openCropModal} />
                 </label>
               </div>
             )}
@@ -260,11 +307,91 @@ export default function Signature() {
         <div className="bg-[#1C2056]/5 rounded-2xl p-4">
           <div className="text-xs text-[#1C2056] font-medium mb-1">💡 Совет</div>
           <div className="text-xs text-gray-500 leading-relaxed">
-            Для печати лучше всего подходит фото на белом фоне или PNG с прозрачным фоном.
-            Подпись и печать автоматически добавятся на все создаваемые PDF счёта.
+            Сфотографируйте печать на белом листе — приложение автоматически уберёт белый фон.
+            Используйте кроп чтобы вырезать только печать без лишнего фона.
           </div>
         </div>
       </div>
+
+      {/* Кроп модал */}
+      {showCropModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-end">
+          <div className="bg-white w-full max-w-lg mx-auto rounded-t-3xl p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div className="font-semibold text-[#1C2056]">Выберите область печати</div>
+              <button onClick={() => setShowCropModal(false)} className="text-gray-400 text-xl">✕</button>
+            </div>
+
+            <div className="text-xs text-gray-400 mb-3">
+              Передвигайте и изменяйте размер квадрата чтобы выделить печать
+            </div>
+
+            {/* Превью с кропом */}
+            <div className="relative bg-gray-100 rounded-xl overflow-hidden mb-4" style={{ maxHeight: '300px' }}>
+              {cropImageSrc && (
+                <div className="relative inline-block w-full">
+                  <img
+                    ref={cropImageRef}
+                    src={cropImageSrc}
+                    alt="Кроп"
+                    className="w-full object-contain"
+                    onLoad={onCropImageLoad}
+                  />
+                  {/* Кроп рамка */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: cropX,
+                      top: cropY,
+                      width: cropSize,
+                      height: cropSize,
+                      border: '2px solid #2DC48D',
+                      boxShadow: '0 0 0 9999px rgba(0,0,0,0.4)',
+                      pointerEvents: 'none',
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Ползунки */}
+            <div className="space-y-3 mb-4">
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">Размер: {cropSize}px</label>
+                <input type="range" min={50} max={Math.min(imgDisplayW, imgDisplayH) || 300}
+                  value={cropSize}
+                  onChange={e => setCropSize(Number(e.target.value))}
+                  className="w-full accent-[#2DC48D]" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">Позиция по горизонтали: {cropX}px</label>
+                <input type="range" min={0} max={Math.max(0, imgDisplayW - cropSize)}
+                  value={cropX}
+                  onChange={e => setCropX(Number(e.target.value))}
+                  className="w-full accent-[#1C2056]" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">Позиция по вертикали: {cropY}px</label>
+                <input type="range" min={0} max={Math.max(0, imgDisplayH - cropSize)}
+                  value={cropY}
+                  onChange={e => setCropY(Number(e.target.value))}
+                  className="w-full accent-[#1C2056]" />
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <button onClick={() => setShowCropModal(false)}
+                className="flex-1 border border-gray-200 text-gray-500 rounded-xl py-3 text-sm">
+                Отмена
+              </button>
+              <button onClick={applyCrop} disabled={saving}
+                className="flex-1 bg-[#2DC48D] text-white rounded-xl py-3 text-sm font-medium">
+                {saving ? 'Сохраняем...' : '✅ Сохранить печать'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   )
 }

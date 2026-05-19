@@ -47,7 +47,29 @@ interface InvoiceData {
   contractDate?: string
 }
 
-async function resizeImage(url: string, size: number): Promise<string> {
+// Ресайз с сохранением пропорций
+async function resizeToFit(url: string, maxW: number, maxH: number): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => {
+      const ratio = Math.min(maxW / img.width, maxH / img.height)
+      const w = Math.round(img.width * ratio)
+      const h = Math.round(img.height * ratio)
+      const canvas = document.createElement('canvas')
+      canvas.width = w
+      canvas.height = h
+      const ctx = canvas.getContext('2d')!
+      ctx.drawImage(img, 0, 0, w, h)
+      resolve(canvas.toDataURL('image/png'))
+    }
+    img.onerror = () => resolve(url)
+    img.src = url
+  })
+}
+
+// Ресайз квадрат для печати
+async function resizeSquare(url: string, size: number): Promise<string> {
   return new Promise((resolve) => {
     const img = new Image()
     img.crossOrigin = 'anonymous'
@@ -100,20 +122,24 @@ function numberToWords(n: number): string {
 }
 
 export async function generateInvoicePDF(data: InvoiceData) {
+  // ⚡ ВАЖНО: открываем окно ДО async операций — иначе iOS блокирует!
+  const win = window.open('', '_blank')
+
   const p = data.profile
   const b = data.bank
 
-  const companyName = p?.company_name || 'ИП First Project'
-  const binIin = p?.bin_iin || '890525350143'
-  const address = p?.address || 'г. Астана'
+  const companyName = p?.company_name || ''
+  const binIin = p?.bin_iin || ''
+  const address = p?.address || ''
   const phone = p?.phone || ''
   const director = p?.director_name || ''
   const signatureUrl = p?.signature_url || ''
   const stampUrl = p?.stamp_url || ''
 
-  // Конвертируем в base64 чтобы html2pdf не терял размеры
-  const signatureBase64 = signatureUrl ? await resizeImage(signatureUrl, 400) : ''
-  const stampBase64 = stampUrl ? await resizeImage(stampUrl, 110) : ''
+  // Подпись — сохраняем пропорции, максимум 200x60
+  const signatureBase64 = signatureUrl ? await resizeToFit(signatureUrl, 200, 60) : ''
+  // Печать — квадрат 110x110
+  const stampBase64 = stampUrl ? await resizeSquare(stampUrl, 110) : ''
 
   const bankName = b?.bank_name || p?.bank_name || '—'
   const iik = b?.iik || p?.iik || '—'
@@ -125,9 +151,7 @@ export async function generateInvoicePDF(data: InvoiceData) {
   }
 
   const totalWords = numberToWords(Math.floor(data.total)) + ' тенге 00 тиын'
-
   const vatType = data.vatType || 'no_vat'
-  const totalWithoutVat = vatType === 'vat_16' ? Math.round(data.total / 1.16) : data.total
   const vatAmount = vatType === 'vat_16' ? Math.round(data.total - data.total / 1.16) : 0
 
   let vatLine = ''
@@ -190,7 +214,6 @@ export async function generateInvoicePDF(data: InvoiceData) {
           html { background: white; }
           body { margin: 0; box-shadow: none; padding: 15mm; }
           .toolbar { display: none !important; }
-          img { max-width: 110px !important; }
         }
       </style>
     </head>
@@ -271,12 +294,15 @@ export async function generateInvoicePDF(data: InvoiceData) {
 
       <hr>
 
-      <div style="margin-top:16px; min-height:120px; position:relative;">
+      <div style="margin-top:16px; min-height:130px; position:relative;">
         <div style="display:flex; align-items:flex-end; gap:4px; width:90%;">
           <span style="white-space:nowrap;">Руководитель</span>
           <div style="position:relative; flex:1; min-width:120px;">
-            ${signatureBase64 ? `<img src="${signatureBase64}" style="position:absolute; bottom:4px; left:10px; height:45px; width:160px; object-fit:contain;" />` : ''}
-            <div style="border-bottom:1px solid #000; width:100%; margin-top:50px; min-width:200px;"></div>
+            ${signatureBase64 ? `
+            <img src="${signatureBase64}"
+              style="position:absolute; bottom:6px; left:10px; max-height:50px; max-width:180px; object-fit:contain; object-position:left bottom;" />
+            ` : ''}
+            <div style="border-bottom:1px solid #000; width:100%; margin-top:60px; min-width:200px;"></div>
           </div>
           <span style="white-space:nowrap; padding-bottom:2px;">${director ? '/ ' + director : '/'}</span>
         </div>
@@ -287,11 +313,12 @@ export async function generateInvoicePDF(data: InvoiceData) {
           <span>расшифровка подписи</span>
         </div>
         ${stampBase64 ? `
-        <div style="position:absolute; left:28%; bottom:-10px; width:110px; height:110px;">
-          <img src="${stampBase64}" style="width:110px; height:110px; object-fit:contain; opacity:0.85;" />
-        </div>` : ''}
-
-
+        <img src="${stampBase64}"
+          style="position:absolute; left:calc(28% - 10px); bottom:-15px;
+                 width:110px; height:110px;
+                 object-fit:contain; opacity:0.85;
+                 mix-blend-mode:multiply;"
+        />` : ''}
       </div>
 
       ${data.autoPrint !== false ? `
@@ -330,17 +357,7 @@ export async function generateInvoicePDF(data: InvoiceData) {
               margin: 0,
               filename: 'Счёт-${data.number}.pdf',
               image: { type: 'jpeg', quality: 0.98 },
-              html2canvas: { 
-                scale: 2, 
-                useCORS: true, 
-                logging: false,
-                onclone: function(clonedDoc) {
-                  const stampImg = clonedDoc.querySelector('[data-stamp]')
-                  if (stampImg) {
-                    stampImg.style.cssText = 'width:110px!important; height:110px!important; max-width:110px!important; max-height:110px!important; display:block; object-fit:contain; opacity:0.85;'
-                  }
-                }
-              },
+              html2canvas: { scale: 2, useCORS: true, logging: false },
               jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
             }
             html2pdf().set(opt).from(document.body).save().then(() => {
@@ -355,7 +372,6 @@ export async function generateInvoicePDF(data: InvoiceData) {
     </html>
   `
 
-  const win = window.open('', '_blank')
   if (win) {
     win.document.write(html)
     win.document.close()
