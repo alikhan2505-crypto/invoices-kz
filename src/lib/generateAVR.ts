@@ -193,7 +193,7 @@ export async function generateAVR(data: AVRData) {
         <tr style="height:6px;"><td colspan="5" style="border:none;"></td></tr>
         <tr>
           <td style="border:none; font-weight:bold; vertical-align:top; line-height:1.4;">Договор<br>(контракт)</td>
-          <td style="border:none; border-bottom:1px solid #000; padding-right:20px; vertical-align:middle;">${data.contractNumber ? '№' + data.contractNumber : ''}</td>
+          <td style="border:none; border-bottom:1px solid #000; padding-right:20px; vertical-align:middle;">${data.contractNumber ? '№' + data.contractNumber + (data.contractDate ? ' от ' + data.contractDate + ' года' : '') : ''}</td>
           <td style="border:none;"></td>
           <td style="border:1px solid #000; text-align:center; font-size:9px; vertical-align:middle;">Номер<br>документа</td>
           <td style="border:1px solid #000; text-align:center; font-size:9px; vertical-align:middle;">Дата<br>составления</td>
@@ -203,7 +203,7 @@ export async function generateAVR(data: AVRData) {
           <td style="border:none;"></td>
           <td style="border:none;"></td>
           <td style="border:1px solid #000; text-align:center;">${data.number}</td>
-          <td style="border:1px solid #000; text-align:center;">${data.date}</td>
+          <td style="border:1px solid #000; text-align:center;">${new Date().toLocaleDateString('ru-KZ')}</td>
         </tr>
       </table>
 
@@ -289,15 +289,15 @@ export async function generateAVR(data: AVRData) {
             <div style="font-size:9px; margin-bottom:4px; font-weight:bold;">Сдал (Исполнитель)</div>
             <table style="width:100%; border:none;">
               <tr>
-                <td style="border:none; border-bottom:1px solid #000; width:80px; text-align:center; position:relative; height:50px;">
-                  ${signatureBase64 ? `<img src="${signatureBase64}" style="position:absolute; bottom:4px; left:5px; max-height:40px; max-width:70px; object-fit:contain;">` : ''}
+                <td style="border:none; border-bottom:1px solid #000; width:30%; height:60px; text-align:center; vertical-align:bottom; position:relative;">
+                  ${signatureBase64 ? `<img src="${signatureBase64}" style="max-height:50px; max-width:90%; object-fit:contain; display:inline-block;">` : ''}
                 </td>
-                <td style="border:none; width:10px;"></td>
-                <td style="border:none; border-bottom:1px solid #000; width:80px; text-align:center; height:50px; position:relative;">
-                  ${stampBase64 ? `<img src="${stampBase64}" style="position:absolute; bottom:-5px; left:50%; transform:translateX(-50%); height:70px; width:70px; object-fit:contain; opacity:0.85;">` : ''}
+                <td style="border:none; width:5%;"></td>
+                <td style="border:none; border-bottom:1px solid #000; width:30%; height:60px; text-align:center; vertical-align:bottom; position:relative;">
+                  ${stampBase64 ? `<img src="${stampBase64}" style="height:65px; width:65px; object-fit:contain; opacity:0.85; display:inline-block; margin-bottom:-5px;">` : ''}
                 </td>
-                <td style="border:none; width:10px;"></td>
-                <td style="border:none; border-bottom:1px solid #000; width:120px; height:50px; text-align:center;">${director}</td>
+                <td style="border:none; width:5%;"></td>
+                <td style="border:none; border-bottom:1px solid #000; width:30%; height:60px; text-align:center; vertical-align:bottom;">${director}</td>
               </tr>
               <tr>
                 <td style="border:none; text-align:center; font-size:8px; color:#666;">должность</td>
@@ -307,18 +307,18 @@ export async function generateAVR(data: AVRData) {
                 <td style="border:none; text-align:center; font-size:8px; color:#666;">расшифровка подписи</td>
               </tr>
             </table>
-            <div style="font-size:8px; margin-top:8px;">М.П.</div>
+            <div style="font-size:8px; margin-top:6px;">М.П.</div>
           </td>
           <td style="border:none; width:4%;"></td>
           <td style="border:none; width:48%; vertical-align:top;">
             <div style="font-size:9px; margin-bottom:4px; font-weight:bold;">Принял (Заказчик)</div>
             <table style="width:100%; border:none;">
               <tr>
-                <td style="border:none; border-bottom:1px solid #000; width:80px; height:50px;"></td>
-                <td style="border:none; width:10px;"></td>
-                <td style="border:none; border-bottom:1px solid #000; width:80px; height:50px;"></td>
-                <td style="border:none; width:10px;"></td>
-                <td style="border:none; border-bottom:1px solid #000; width:120px; height:50px;"></td>
+                <td style="border:none; border-bottom:1px solid #000; width:30%; height:60px;"></td>
+                <td style="border:none; width:5%;"></td>
+                <td style="border:none; border-bottom:1px solid #000; width:30%; height:60px;"></td>
+                <td style="border:none; width:5%;"></td>
+                <td style="border:none; border-bottom:1px solid #000; width:30%; height:60px;"></td>
               </tr>
               <tr>
                 <td style="border:none; text-align:center; font-size:8px; color:#666;">должность</td>
@@ -328,9 +328,11 @@ export async function generateAVR(data: AVRData) {
                 <td style="border:none; text-align:center; font-size:8px; color:#666;">расшифровка подписи</td>
               </tr>
             </table>
-            <div style="font-size:8px; margin-top:8px;">
+            <div style="font-size:8px; margin-top:6px;">
               М.П.<br>
-              <span style="margin-top:4px; display:block;">Дата подписания (принятия) работ (услуг): ${data.date}</span>
+              <span style="margin-top:4px; display:block;">
+                Дата подписания (принятия) работ (услуг): ____________________
+              </span>
             </div>
           </td>
         </tr>
