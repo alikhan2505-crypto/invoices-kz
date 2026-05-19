@@ -314,7 +314,10 @@ export function generateNakladnaya(data: NakladnayaData) {
           <div class="sig-label">Главный бухгалтер</div>
           <div class="sig-line"></div>
           <div class="sig-name"></div>
-          <div style="margin-top: 10px; font-size: 9px;">М.П.</div>
+          <div style="margin-top: 10px; font-size: 9px; display:flex; align-items:flex-start; gap:8px;">
+            <div style="font-weight:bold;">М.П.</div>
+            ${stampUrl ? `<img src="${stampUrl}" style="height:80px; width:80px; object-fit:contain; opacity:0.85;">` : ''}
+          </div>
         </div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
           <div class="sig-block">
