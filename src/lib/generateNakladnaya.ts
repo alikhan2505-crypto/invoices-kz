@@ -64,6 +64,39 @@ async function resizeSquareNakl(url: string, size: number): Promise<string> {
   })
 }
 
+function numToWordsNakl(n: number): string {
+  const ones = ['','один','два','три','четыре','пять','шесть','семь','восемь','девять',
+    'десять','одиннадцать','двенадцать','тринадцать','четырнадцать','пятнадцать',
+    'шестнадцать','семнадцать','восемнадцать','девятнадцать']
+  const tens = ['','','двадцать','тридцать','сорок','пятьдесят','шестьдесят','семьдесят','восемьдесят','девяносто']
+  const hundreds = ['','сто','двести','триста','четыреста','пятьсот','шестьсот','семьсот','восемьсот','девятьсот']
+  if (n === 0) return 'ноль'
+  if (n < 0) return 'минус ' + numToWordsNakl(-n)
+  let result = ''
+  const millions = Math.floor(n / 1000000)
+  const thousands = Math.floor((n % 1000000) / 1000)
+  const rest = n % 1000
+  if (millions > 0) result += numToWordsNakl(millions) + ' миллионов '
+  if (thousands > 0) {
+    const tWords = ['','одна тысяча','две тысячи','три тысячи','четыре тысячи','пять тысяч','шесть тысяч','семь тысяч','восемь тысяч','девять тысяч']
+    if (thousands < 10) result += tWords[thousands] + ' '
+    else result += numToWordsNakl(thousands) + ' тысяч '
+  }
+  const h = Math.floor(rest / 100)
+  const t = Math.floor((rest % 100) / 10)
+  const o = rest % 10
+  if (h > 0) result += hundreds[h] + ' '
+  if (t === 1) result += ones[10 + o] + ' '
+  else { if (t > 1) result += tens[t] + ' '; if (o > 0) result += ones[o] + ' ' }
+  return result.trim()
+}
+
+function countToWords(n: number): string {
+  const words = ['ноль','одна','две','три','четыре','пять','шесть','семь','восемь','девять','десять',
+    'одиннадцать','двенадцать','тринадцать','четырнадцать','пятнадцать','шестнадцать','семнадцать','восемнадцать','девятнадцать','двадцать']
+  return n <= 20 ? words[n] : String(n)
+}
+
 export async function generateNakladnaya(data: NakladnayaData) {
   const win = window.open('', '_blank')
 
@@ -77,7 +110,7 @@ export async function generateNakladnaya(data: NakladnayaData) {
   const stampUrl = p?.stamp_url || ''
 
   const signatureBase64 = signatureUrl ? await resizeToFitNakl(signatureUrl, 200, 55) : ''
-  const stampBase64 = stampUrl ? await resizeSquareNakl(stampUrl, 90) : ''
+  const stampBase64 = stampUrl ? await resizeSquareNakl(stampUrl, 110) : ''
 
   function formatMoney(n: number): string {
     return n.toLocaleString('ru-KZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -94,6 +127,8 @@ export async function generateNakladnaya(data: NakladnayaData) {
   const totalAmount = productsOnly.reduce((sum, s) => sum + s.qty * s.price, 0)
   const vatType = data.vatType || 'no_vat'
   const vatAmount = vatType === 'vat_16' ? Math.round(totalAmount - totalAmount / 1.16) : 0
+  const countStr = countToWords(productsOnly.length) + ' ' + (productsOnly.length === 1 ? 'позиция' : productsOnly.length < 5 ? 'позиции' : 'позиций')
+  const totalStr = numToWordsNakl(Math.floor(totalAmount)) + ' тенге 00 тиын'
 
   const html = `<!DOCTYPE html>
 <html>
@@ -114,13 +149,7 @@ body {
   box-shadow: 0 0 20px rgba(0,0,0,0.3);
 }
 table { border-collapse: collapse; width: 100%; }
-td, th {
-  border: 1px solid #000;
-  padding: 3px 4px;
-  vertical-align: middle;
-  word-wrap: break-word;
-  overflow: visible;
-}
+td, th { border: 1px solid #000; padding: 3px 4px; vertical-align: middle; word-wrap: break-word; }
 .nb { border: none !important; }
 @page { size: A4 landscape; margin: 8mm; }
 @media print {
@@ -132,6 +161,7 @@ td, th {
 </head>
 <body>
 
+<!-- Toolbar -->
 <div class="toolbar" style="position:fixed;top:0;left:0;right:0;background:white;border-bottom:1px solid #e5e7eb;padding:8px 16px;z-index:999;display:flex;align-items:center;justify-content:space-between;">
   <button onclick="window.close()" style="background:#f3f4f6;border:none;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px;">← Назад</button>
   <span style="font-size:11px;color:#6b7280;font-weight:600;">Накладная №${data.number}</span>
@@ -163,14 +193,14 @@ td, th {
   </colgroup>
   <tr>
     <td class="nb" style="font-size:9px;line-height:1.3;vertical-align:top;">Организация (индивидуальный предприниматель)</td>
-    <td class="nb" style="border-bottom:1px solid #000 !important;padding-right:15px;">${companyName}${address ? ', ' + address : ''}${phone ? ', тел: ' + phone : ''}</td>
+    <td class="nb" style="border-bottom:1px solid #000 !important;padding-right:20px;">${companyName}${address ? ', ' + address : ''}${phone ? ', тел: ' + phone : ''}</td>
     <td style="text-align:center;font-size:9px;">ИИН/БИН</td>
     <td style="text-align:center;">${binIin}</td>
   </tr>
 </table>
 
-<!-- Номер и дата -->
-<table style="margin-bottom:8px;">
+<!-- Номер и дата — отдельная таблица -->
+<table style="margin-bottom:8px;margin-top:6px;">
   <colgroup>
     <col style="width:180px;">
     <col>
@@ -199,31 +229,15 @@ td, th {
 <!-- Таблица организаций -->
 <table style="margin-bottom:6px;font-size:9px;">
   <tr>
-    <td style="text-align:center;width:20%;padding:4px;">
-      Организация (индивидуальный предприниматель) — отправитель
-    </td>
-    <td style="text-align:center;width:20%;padding:4px;">
-      Организация (индивидуальный предприниматель) — получатель
-    </td>
-    <td style="text-align:center;width:20%;padding:4px;">
-      Ответственный за поставку (Ф.И.О.)
-    </td>
-    <td style="text-align:center;width:20%;padding:4px;">
-      Транспортная организация
-    </td>
-    <td style="text-align:center;width:20%;padding:4px;">
-      Товарно-транспортная накладная (номер, дата)
-    </td>
+    <td style="text-align:center;width:20%;padding:4px;">Организация (индивидуальный предприниматель) — отправитель</td>
+    <td style="text-align:center;width:20%;padding:4px;">Организация (индивидуальный предприниматель) — получатель</td>
+    <td style="text-align:center;width:20%;padding:4px;">Ответственный за поставку (Ф.И.О.)</td>
+    <td style="text-align:center;width:20%;padding:4px;">Транспортная организация</td>
+    <td style="text-align:center;width:20%;padding:4px;">Товарно-транспортная накладная (номер, дата)</td>
   </tr>
   <tr>
-    <td style="text-align:center;padding:4px;font-size:9px;">
-      ${companyName}<br>
-      ${binIin ? 'БИН: ' + binIin : ''}
-    </td>
-    <td style="text-align:center;padding:4px;font-size:9px;">
-      ${data.clientName}<br>
-      ${data.clientBin ? 'БИН: ' + data.clientBin : ''}
-    </td>
+    <td style="text-align:center;padding:4px;">${companyName}<br>${binIin ? 'БИН: ' + binIin : ''}</td>
+    <td style="text-align:center;padding:4px;">${data.clientName}<br>${data.clientBin ? 'БИН: ' + data.clientBin : ''}</td>
     <td></td>
     <td></td>
     <td></td>
@@ -280,9 +294,9 @@ td, th {
 </table>
 
 <!-- Всего отпущено -->
-<div style="font-size:9px;margin-bottom:8px;">
-  Всего отпущено количество запасов (прописью)_______________________
-  &nbsp;&nbsp;&nbsp; на сумму (прописью), в KZT: ${formatMoney(totalAmount)}
+<div style="font-size:9px;margin-bottom:8px;line-height:1.8;">
+  Всего отпущено количество запасов (прописью): <u>${countStr}</u>
+  &nbsp;&nbsp;&nbsp;&nbsp; на сумму (прописью), в KZT: <u>${totalStr}</u>
 </div>
 
 <!-- Подписи -->
@@ -290,16 +304,17 @@ td, th {
   <tr>
     <td class="nb" style="width:48%;vertical-align:top;">
 
+      <!-- Отпуск разрешил -->
       <div style="font-size:9px;font-weight:bold;margin-bottom:3px;">Отпуск разрешил</div>
-      <table style="border:none;margin-bottom:8px;">
+      <table style="border:none;margin-bottom:10px;">
         <tr>
-          <td class="nb" style="border-bottom:1px solid #000 !important;width:30%;height:45px;text-align:center;vertical-align:bottom;">
-            ${signatureBase64 ? `<img src="${signatureBase64}" style="max-height:38px;max-width:95%;object-fit:contain;display:inline-block;">` : ''}
+          <td class="nb" style="border-bottom:1px solid #000 !important;width:28%;height:55px;text-align:center;vertical-align:bottom;"></td>
+          <td class="nb" style="width:3%;"></td>
+          <td class="nb" style="border-bottom:1px solid #000 !important;width:28%;height:55px;text-align:center;vertical-align:bottom;">
+            ${signatureBase64 ? `<img src="${signatureBase64}" style="max-height:48px;max-width:95%;object-fit:contain;display:inline-block;">` : ''}
           </td>
           <td class="nb" style="width:3%;"></td>
-          <td class="nb" style="border-bottom:1px solid #000 !important;width:30%;height:45px;"></td>
-          <td class="nb" style="width:3%;"></td>
-          <td class="nb" style="border-bottom:1px solid #000 !important;width:34%;height:45px;text-align:center;vertical-align:bottom;font-size:9px;">${director}</td>
+          <td class="nb" style="border-bottom:1px solid #000 !important;width:38%;height:55px;text-align:center;vertical-align:bottom;font-size:9px;">${director}</td>
         </tr>
         <tr>
           <td class="nb" style="text-align:center;font-size:8px;color:#666;">должность</td>
@@ -310,14 +325,15 @@ td, th {
         </tr>
       </table>
 
+      <!-- Главный бухгалтер -->
       <div style="font-size:9px;font-weight:bold;margin-bottom:3px;">Главный бухгалтер</div>
-      <table style="border:none;margin-bottom:8px;">
+      <table style="border:none;margin-bottom:10px;">
         <tr>
-          <td class="nb" style="border-bottom:1px solid #000 !important;width:30%;height:38px;"></td>
+          <td class="nb" style="border-bottom:1px solid #000 !important;width:28%;height:40px;"></td>
           <td class="nb" style="width:3%;"></td>
-          <td class="nb" style="border-bottom:1px solid #000 !important;width:30%;height:38px;"></td>
+          <td class="nb" style="border-bottom:1px solid #000 !important;width:28%;height:40px;"></td>
           <td class="nb" style="width:3%;"></td>
-          <td class="nb" style="border-bottom:1px solid #000 !important;width:34%;height:38px;"></td>
+          <td class="nb" style="border-bottom:1px solid #000 !important;width:38%;height:40px;"></td>
         </tr>
         <tr>
           <td class="nb" style="font-size:8px;color:#666;text-align:center;">подпись</td>
@@ -328,19 +344,21 @@ td, th {
         </tr>
       </table>
 
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+      <!-- М.П. + печать -->
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
         <div style="font-size:9px;font-weight:bold;">М.П.</div>
-        ${stampBase64 ? `<img src="${stampBase64}" style="height:70px;width:70px;object-fit:contain;opacity:0.85;">` : ''}
+        ${stampBase64 ? `<img src="${stampBase64}" style="height:95px;width:95px;object-fit:contain;opacity:0.85;">` : ''}
       </div>
 
+      <!-- Отпустил -->
       <div style="font-size:9px;font-weight:bold;margin-bottom:3px;">Отпустил</div>
       <table style="border:none;">
         <tr>
-          <td class="nb" style="border-bottom:1px solid #000 !important;width:30%;height:38px;"></td>
+          <td class="nb" style="border-bottom:1px solid #000 !important;width:28%;height:40px;"></td>
           <td class="nb" style="width:3%;"></td>
-          <td class="nb" style="border-bottom:1px solid #000 !important;width:30%;height:38px;"></td>
+          <td class="nb" style="border-bottom:1px solid #000 !important;width:28%;height:40px;"></td>
           <td class="nb" style="width:3%;"></td>
-          <td class="nb" style="border-bottom:1px solid #000 !important;width:34%;height:38px;"></td>
+          <td class="nb" style="border-bottom:1px solid #000 !important;width:38%;height:40px;"></td>
         </tr>
         <tr>
           <td class="nb" style="text-align:center;font-size:8px;color:#666;">должность</td>
@@ -355,24 +373,27 @@ td, th {
     <td class="nb" style="width:4%;"></td>
     <td class="nb" style="width:48%;vertical-align:top;">
 
+      <!-- По доверенности -->
       <div style="font-size:9px;margin-bottom:6px;">
         <span style="font-weight:bold;">По доверенности</span>
         <div style="border-bottom:1px solid #000;margin-top:3px;height:16px;"></div>
       </div>
 
-      <div style="font-size:9px;margin-bottom:14px;">
+      <!-- Выданной -->
+      <div style="font-size:9px;margin-bottom:16px;">
         <span style="font-weight:bold;">выданной</span>
         <div style="border-bottom:1px solid #000;margin-top:3px;height:16px;"></div>
       </div>
 
+      <!-- Запасы получил -->
       <div style="font-size:9px;font-weight:bold;margin-bottom:3px;">Запасы получил</div>
       <table style="border:none;">
         <tr>
-          <td class="nb" style="border-bottom:1px solid #000 !important;width:30%;height:38px;"></td>
+          <td class="nb" style="border-bottom:1px solid #000 !important;width:28%;height:40px;"></td>
           <td class="nb" style="width:3%;"></td>
-          <td class="nb" style="border-bottom:1px solid #000 !important;width:30%;height:38px;"></td>
+          <td class="nb" style="border-bottom:1px solid #000 !important;width:28%;height:40px;"></td>
           <td class="nb" style="width:3%;"></td>
-          <td class="nb" style="border-bottom:1px solid #000 !important;width:34%;height:38px;"></td>
+          <td class="nb" style="border-bottom:1px solid #000 !important;width:38%;height:40px;"></td>
         </tr>
         <tr>
           <td class="nb" style="text-align:center;font-size:8px;color:#666;">должность</td>
