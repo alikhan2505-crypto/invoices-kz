@@ -150,7 +150,7 @@ body {
 }
 table { border-collapse: collapse; width: 100%; }
 td, th { border: 1px solid #000; padding: 3px 4px; vertical-align: middle; word-wrap: break-word; }
-.nb { border: none !important; }
+.nb { border: none; }
 @page { size: A4 landscape; margin: 8mm; }
 @media print {
   html { background: white; }
@@ -184,18 +184,22 @@ td, th { border: 1px solid #000; padding: 3px 4px; vertical-align: middle; word-
 </div>
 
 <!-- Организация и ИИН/БИН -->
-<table style="margin-bottom:0;">
+<table style="margin-bottom:0; border-collapse:collapse;">
   <colgroup>
     <col style="width:180px;">
-    <col style="width:calc(100% - 410px);">
+    <col>
     <col style="width:70px;">
     <col style="width:130px;">
   </colgroup>
   <tr>
-    <td class="nb" style="font-size:9px;line-height:1.3;vertical-align:top;">Организация (индивидуальный предприниматель)</td>
-    <td class="nb" style="border-bottom:1px solid #000 !important;padding-right:20px;">${companyName}${address ? ', ' + address : ''}${phone ? ', тел: ' + phone : ''}</td>
-    <td style="text-align:center;font-size:9px;">ИИН/БИН</td>
-    <td style="text-align:center;">${binIin}</td>
+    <td style="border:none; font-size:9px; line-height:1.3; vertical-align:top;">
+      Организация (индивидуальный предприниматель)
+    </td>
+    <td style="border:none; border-bottom:1px solid #000; padding-right:20px;">
+      ${companyName}${address ? ', ' + address : ''}${phone ? ', тел: ' + phone : ''}
+    </td>
+    <td style="border:1px solid #000; text-align:center; font-size:9px;">ИИН/БИН</td>
+    <td style="border:1px solid #000; text-align:center;">${binIin}</td>
   </tr>
 </table>
 
@@ -239,7 +243,6 @@ td, th { border: 1px solid #000; padding: 3px 4px; vertical-align: middle; word-
     <td style="text-align:center;padding:4px;">${companyName}<br>${binIin ? 'БИН: ' + binIin : ''}</td>
     <td style="text-align:center;padding:4px;">${data.clientName}<br>${data.clientBin ? 'БИН: ' + data.clientBin : ''}</td>
     <td style="text-align:center;padding:4px;">${director}</td>
-    <td></td>
     <td></td>
     <td></td>
   </tr>
