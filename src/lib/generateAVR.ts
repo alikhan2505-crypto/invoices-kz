@@ -282,23 +282,21 @@ export async function generateAVR(data: AVRData) {
         Приложение: Перечень документации, в том числе отчёт(ы) о маркетинговых, научных исследованиях, консультационных и прочих услугах (обязательны при их наличии) на _____ страниц
       </div>
 
-      <!-- Подписи по казахстанскому стандарту -->
+      <!-- Подписи -->
       <table style="width:100%; border:none; margin-top:10px;">
         <tr>
           <td style="border:none; width:48%; vertical-align:top;">
-            <div style="font-size:9px; margin-bottom:8px; font-weight:bold;">Сдал (Исполнитель)</div>
-
-            <!-- Строка 1: Отпуск разрешил -->
-            <div style="font-size:9px; margin-bottom:6px; font-weight:bold;">Отпуск разрешил</div>
-            <table style="width:100%; border:none; margin-bottom:8px;">
+            <div style="font-size:9px; margin-bottom:4px; font-weight:bold;">Сдал (Исполнитель)</div>
+            <table style="width:100%; border:none;">
               <tr>
-                <td style="border:none; border-bottom:1px solid #000; width:25%; height:50px;"></td>
-                <td style="border:none; width:4%;"></td>
-                <td style="border:none; border-bottom:1px solid #000; width:25%; height:50px; text-align:center; vertical-align:bottom;">
-                  ${signatureBase64 ? `<img src="${signatureBase64}" style="max-height:40px; max-width:90%; object-fit:contain; display:inline-block;">` : ''}
+                <td style="border:none; border-bottom:1px solid #000; width:30%; height:60px; text-align:center; vertical-align:bottom; position:relative;">
                 </td>
-                <td style="border:none; width:4%;"></td>
-                <td style="border:none; border-bottom:1px solid #000; width:42%; height:50px;"></td>
+                <td style="border:none; width:5%;"></td>
+                <td style="border:none; border-bottom:1px solid #000; width:30%; height:60px; text-align:center; vertical-align:bottom; position:relative;">
+                  ${signatureBase64 ? `<img src="${signatureBase64}" style="max-height:50px; max-width:90%; object-fit:contain; display:inline-block;">` : ''}
+                </td>
+                <td style="border:none; width:5%;"></td>
+                <td style="border:none; border-bottom:1px solid #000; width:30%; height:60px; text-align:center; vertical-align:bottom;">${director}</td>
               </tr>
               <tr>
                 <td style="border:none; text-align:center; font-size:8px; color:#666;">должность</td>
@@ -308,78 +306,21 @@ export async function generateAVR(data: AVRData) {
                 <td style="border:none; text-align:center; font-size:8px; color:#666;">расшифровка подписи</td>
               </tr>
             </table>
-
-            <!-- Строка 2: Главный бухгалтер -->
-            <div style="font-size:9px; margin-bottom:6px; font-weight:bold;">Главный бухгалтер</div>
-            <table style="width:100%; border:none; margin-bottom:8px;">
-              <tr>
-                <td style="border:none; border-bottom:1px solid #000; width:25%; height:50px;"></td>
-                <td style="border:none; width:4%;"></td>
-                <td style="border:none; border-bottom:1px solid #000; width:25%; height:50px;"></td>
-                <td style="border:none; width:4%;"></td>
-                <td style="border:none; border-bottom:1px solid #000; width:42%; height:50px;"></td>
-              </tr>
-              <tr>
-                <td style="border:none; text-align:center; font-size:8px; color:#666;">должность</td>
-                <td style="border:none;"></td>
-                <td style="border:none; text-align:center; font-size:8px; color:#666;">подпись</td>
-                <td style="border:none;"></td>
-                <td style="border:none; text-align:center; font-size:8px; color:#666;">расшифровка подписи</td>
-              </tr>
-            </table>
-
-            <!-- Строка 3: Отпустил -->
-            <div style="font-size:9px; margin-bottom:6px; font-weight:bold;">Отпустил</div>
-            <table style="width:100%; border:none; margin-bottom:8px;">
-              <tr>
-                <td style="border:none; border-bottom:1px solid #000; width:25%; height:50px;"></td>
-                <td style="border:none; width:4%;"></td>
-                <td style="border:none; border-bottom:1px solid #000; width:25%; height:50px;"></td>
-                <td style="border:none; width:4%;"></td>
-                <td style="border:none; border-bottom:1px solid #000; width:42%; height:50px;"></td>
-              </tr>
-              <tr>
-                <td style="border:none; text-align:center; font-size:8px; color:#666;">должность</td>
-                <td style="border:none;"></td>
-                <td style="border:none; text-align:center; font-size:8px; color:#666;">подпись</td>
-                <td style="border:none;"></td>
-                <td style="border:none; text-align:center; font-size:8px; color:#666;">расшифровка подписи</td>
-              </tr>
-            </table>
-
-            <!-- М.П. -->
-            <div style="font-size:8px; margin-top:8px; display:flex; align-items:flex-start; gap:8px;">
+            <div style="font-size:8px; margin-top:6px; display:flex; align-items:flex-start; gap:8px;">
               <div style="font-weight:bold; margin-top:5px;">М.П.</div>
               ${stampBase64 ? `<img src="${stampBase64}" style="height:100px; width:100px; object-fit:contain; opacity:0.85;">` : ''}
             </div>
           </td>
-
           <td style="border:none; width:4%;"></td>
-
           <td style="border:none; width:48%; vertical-align:top;">
-            <div style="font-size:9px; margin-bottom:8px; font-weight:bold;">Принял (Заказчик)</div>
-
-            <!-- По доверенности -->
-            <div style="font-size:9px; margin-bottom:6px;">
-              <span style="font-weight:bold;">По доверенности:</span>
-              <div style="border-bottom:1px solid #000; margin-top:4px; height:20px;"></div>
-            </div>
-
-            <!-- Выданной -->
-            <div style="font-size:9px; margin-bottom:6px;">
-              <span style="font-weight:bold;">Выданной:</span>
-              <div style="border-bottom:1px solid #000; margin-top:4px; height:20px;"></div>
-            </div>
-
-            <!-- Запасы получил -->
-            <div style="font-size:9px; margin-bottom:6px; font-weight:bold;">Запасы получил</div>
-            <table style="width:100%; border:none; margin-bottom:8px;">
+            <div style="font-size:9px; margin-bottom:4px; font-weight:bold;">Принял (Заказчик)</div>
+            <table style="width:100%; border:none;">
               <tr>
-                <td style="border:none; border-bottom:1px solid #000; width:25%; height:50px;"></td>
-                <td style="border:none; width:4%;"></td>
-                <td style="border:none; border-bottom:1px solid #000; width:25%; height:50px;"></td>
-                <td style="border:none; width:4%;"></td>
-                <td style="border:none; border-bottom:1px solid #000; width:42%; height:50px;"></td>
+                <td style="border:none; border-bottom:1px solid #000; width:30%; height:60px;"></td>
+                <td style="border:none; width:5%;"></td>
+                <td style="border:none; border-bottom:1px solid #000; width:30%; height:60px;"></td>
+                <td style="border:none; width:5%;"></td>
+                <td style="border:none; border-bottom:1px solid #000; width:30%; height:60px;"></td>
               </tr>
               <tr>
                 <td style="border:none; text-align:center; font-size:8px; color:#666;">должность</td>
@@ -389,10 +330,9 @@ export async function generateAVR(data: AVRData) {
                 <td style="border:none; text-align:center; font-size:8px; color:#666;">расшифровка подписи</td>
               </tr>
             </table>
-
-            <!-- Дата подписания -->
-            <div style="font-size:9px; margin-top:8px;">
-              <span>Дата подписания (принятия) работ (услуг): ____________________</span>
+            <div style="font-size:8px; margin-top:6px;">
+              <div style="font-weight:bold;">М.П.</div>
+              <div style="margin-top:12px;">Дата подписания (принятия) работ (услуг): ____________________</div>
             </div>
           </td>
         </tr>
