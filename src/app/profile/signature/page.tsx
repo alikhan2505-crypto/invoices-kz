@@ -317,13 +317,24 @@ export default function Signature() {
     const data = imageData.data
     for (let i = 0; i < data.length; i += 4) {
       const r = data[i], g = data[i + 1], b = data[i + 2]
-      const brightness = (r + g + b) / 3
-      // Если пиксель светлый (>200) — делаем прозрачным
-      if (brightness > 200) {
+      // Проверяем насыщенность — печать обычно синяя/фиолетовая
+      const max = Math.max(r, g, b)
+      const min = Math.min(r, g, b)
+      const saturation = max === 0 ? 0 : (max - min) / max
+
+      // Убираем если: светлый И ненасыщенный (серый/белый фон)
+      if (saturation < 0.15 && r > 160) {
+        // Белый/серый фон — полностью прозрачный
         data[i + 3] = 0
-      } else if (brightness > 150) {
-        // Полупрозрачный для краёв
-        data[i + 3] = Math.round((255 - brightness) * 2)
+      } else if (saturation < 0.25 && r > 200) {
+        // Почти серый — прозрачный
+        data[i + 3] = 0
+      } else if (r > 220 && g > 220 && b > 220) {
+        // Очень светлый любого цвета — прозрачный
+        data[i + 3] = 0
+      } else if (saturation < 0.2 && r > 130) {
+        // Светло-серый — полупрозрачный для плавного перехода
+        data[i + 3] = Math.round(saturation * 255 * 5)
       }
     }
     ctx.putImageData(imageData, 0, 0)
