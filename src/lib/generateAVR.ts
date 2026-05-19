@@ -306,9 +306,9 @@ export async function generateAVR(data: AVRData) {
                 <td style="border:none; text-align:center; font-size:8px; color:#666;">расшифровка подписи</td>
               </tr>
             </table>
-            <div style="font-size:8px; margin-top:6px; display:flex; align-items:flex-start; gap:8px;">
-              ${stampBase64 ? `<img src="${stampBase64}" style="height:50px; width:50px; object-fit:contain; opacity:0.85; margin-top:2px;">` : ''}
-              <div>М.П.</div>
+            <div style="font-size:8px; margin-top:6px; position:relative; width:60px; height:60px;">
+              <div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); font-weight:bold; z-index:1;">М.П.</div>
+              ${stampBase64 ? `<img src="${stampBase64}" style="height:60px; width:60px; object-fit:contain; opacity:0.85; position:absolute; top:0; left:0; z-index:2;">` : ''}
             </div>
           </td>
           <td style="border:none; width:4%;"></td>
