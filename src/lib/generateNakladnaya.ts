@@ -188,6 +188,7 @@ td, th { border: 1px solid #000; padding: 3px 4px; vertical-align: middle; word-
   <colgroup>
     <col style="width:180px;">
     <col>
+    <col style="width:15px;">
     <col style="width:70px;">
     <col style="width:130px;">
   </colgroup>
@@ -195,9 +196,10 @@ td, th { border: 1px solid #000; padding: 3px 4px; vertical-align: middle; word-
     <td style="border:none; font-size:9px; line-height:1.3; vertical-align:top;">
       Организация (индивидуальный предприниматель)
     </td>
-    <td style="border:none; border-bottom:1px solid #000; padding-right:20px;">
+    <td style="border:none; border-bottom:1px solid #000;">
       ${companyName}${address ? ', ' + address : ''}${phone ? ', тел: ' + phone : ''}
     </td>
+    <td style="border:none;"></td>
     <td style="border:1px solid #000; text-align:center; font-size:9px;">ИИН/БИН</td>
     <td style="border:1px solid #000; text-align:center;">${binIin}</td>
   </tr>
