@@ -187,7 +187,7 @@ td, th { border: 1px solid #000; padding: 3px 4px; vertical-align: middle; word-
 <table style="margin-bottom:0;">
   <colgroup>
     <col style="width:180px;">
-    <col>
+    <col style="width:calc(100% - 410px);">
     <col style="width:70px;">
     <col style="width:130px;">
   </colgroup>
@@ -238,6 +238,7 @@ td, th { border: 1px solid #000; padding: 3px 4px; vertical-align: middle; word-
   <tr>
     <td style="text-align:center;padding:4px;">${companyName}<br>${binIin ? 'БИН: ' + binIin : ''}</td>
     <td style="text-align:center;padding:4px;">${data.clientName}<br>${data.clientBin ? 'БИН: ' + data.clientBin : ''}</td>
+    <td style="text-align:center;padding:4px;">${director}</td>
     <td></td>
     <td></td>
     <td></td>
@@ -354,11 +355,13 @@ td, th { border: 1px solid #000; padding: 3px 4px; vertical-align: middle; word-
       <div style="font-size:9px;font-weight:bold;margin-bottom:3px;">Отпустил</div>
       <table style="border:none;">
         <tr>
-          <td class="nb" style="border-bottom:1px solid #000 !important;width:28%;height:40px;"></td>
+          <td class="nb" style="border-bottom:1px solid #000 !important;width:28%;height:55px;text-align:center;vertical-align:bottom;"></td>
           <td class="nb" style="width:3%;"></td>
-          <td class="nb" style="border-bottom:1px solid #000 !important;width:28%;height:40px;"></td>
+          <td class="nb" style="border-bottom:1px solid #000 !important;width:28%;height:55px;text-align:center;vertical-align:bottom;">
+            ${signatureBase64 ? `<img src="${signatureBase64}" style="max-height:48px;max-width:95%;object-fit:contain;display:inline-block;">` : ''}
+          </td>
           <td class="nb" style="width:3%;"></td>
-          <td class="nb" style="border-bottom:1px solid #000 !important;width:38%;height:40px;"></td>
+          <td class="nb" style="border-bottom:1px solid #000 !important;width:38%;height:55px;text-align:center;vertical-align:bottom;font-size:9px;">${director}</td>
         </tr>
         <tr>
           <td class="nb" style="text-align:center;font-size:8px;color:#666;">должность</td>
