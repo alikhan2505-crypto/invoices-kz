@@ -47,6 +47,21 @@ interface InvoiceData {
   contractDate?: string
 }
 
+async function toBase64(url: string): Promise<string> {
+  try {
+    const res = await fetch(url)
+    const blob = await res.blob()
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onloadend = () => resolve(reader.result as string)
+      reader.onerror = reject
+      reader.readAsDataURL(blob)
+    })
+  } catch {
+    return url
+  }
+}
+
 function numberToWords(n: number): string {
   const ones = ['','один','два','три','четыре','пять','шесть','семь','восемь','девять',
     'десять','одиннадцать','двенадцать','тринадцать','четырнадцать','пятнадцать',
@@ -82,7 +97,7 @@ function numberToWords(n: number): string {
   return result.trim()
 }
 
-export function generateInvoicePDF(data: InvoiceData) {
+export async function generateInvoicePDF(data: InvoiceData) {
   const p = data.profile
   const b = data.bank
 
@@ -93,6 +108,10 @@ export function generateInvoicePDF(data: InvoiceData) {
   const director = p?.director_name || ''
   const signatureUrl = p?.signature_url || ''
   const stampUrl = p?.stamp_url || ''
+
+  // Конвертируем в base64 чтобы html2pdf не терял размеры
+  const signatureBase64 = signatureUrl ? await toBase64(signatureUrl) : ''
+  const stampBase64 = stampUrl ? await toBase64(stampUrl) : ''
 
   const bankName = b?.bank_name || p?.bank_name || '—'
   const iik = b?.iik || p?.iik || '—'
@@ -254,7 +273,7 @@ export function generateInvoicePDF(data: InvoiceData) {
         <div style="display:flex; align-items:flex-end; gap:4px; width:90%;">
           <span style="white-space:nowrap;">Руководитель</span>
           <div style="position:relative; flex:1; min-width:120px;">
-            ${signatureUrl ? `<img src="${signatureUrl}" style="position:absolute; bottom:4px; left:10px; height:45px; width:160px; object-fit:contain;" />` : ''}
+            ${signatureBase64 ? `<img src="${signatureBase64}" style="position:absolute; bottom:4px; left:10px; height:45px; width:160px; object-fit:contain;" />` : ''}
             <div style="border-bottom:1px solid #000; width:100%; margin-top:50px; min-width:200px;"></div>
           </div>
           <span style="white-space:nowrap; padding-bottom:2px;">${director ? '/ ' + director : '/'}</span>
@@ -265,10 +284,12 @@ export function generateInvoicePDF(data: InvoiceData) {
           <span>М.П.</span>
           <span>расшифровка подписи</span>
         </div>
-        ${stampUrl ? `
-        <div style="position:absolute; left:28%; bottom:-10px; width:110px; height:110px; overflow:hidden;">
-          <img data-stamp="true" src="${stampUrl}" style="width:110px; height:110px; display:block; object-fit:contain; opacity:0.85;" />
+        ${stampBase64 ? `
+        <div style="position:absolute; left:28%; bottom:-10px; width:110px; height:110px;">
+          <img src="${stampBase64}" style="width:110px; height:110px; object-fit:contain; opacity:0.85;" />
         </div>` : ''}
+
+
       </div>
 
       ${data.autoPrint !== false ? `
