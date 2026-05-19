@@ -300,7 +300,7 @@ export async function generateInvoicePDF(data: InvoiceData) {
           <div style="position:relative; flex:1; min-width:120px;">
             ${signatureBase64 ? `
             <img src="${signatureBase64}"
-              style="position:absolute; bottom:0px; left:25px; max-height:50px; max-width:180px; object-fit:contain; object-position:left bottom;" />
+              style="position:absolute; bottom:-5px; left:35px; max-height:50px; max-width:180px; object-fit:contain; object-position:left bottom;" />
             ` : ''}
             <div style="border-bottom:1px solid #000; width:100%; margin-top:60px; min-width:200px;"></div>
           </div>
