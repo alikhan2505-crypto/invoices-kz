@@ -157,40 +157,53 @@ export async function generateAVR(data: AVRData) {
       </div>
 
       <!-- Заказчик/Исполнитель -->
-      <table style="width:100%; margin-bottom:6px;">
+      <table style="width:100%; margin-bottom:6px; border:none;">
+        <colgroup>
+          <col style="width:100px;">
+          <col style="width:auto;">
+          <col style="width:20px;">
+          <col style="width:80px;">
+          <col style="width:130px;">
+        </colgroup>
         <tr>
-          <td style="width:100px; border:none; font-weight:bold;">Заказчик</td>
-          <td style="border:none; border-bottom:1px solid #000;">${data.clientName}${data.clientAddress ? ', ' + data.clientAddress : ''}</td>
-          <td style="width:80px; text-align:center; font-size:9px;">ИИН/БИН</td>
-          <td style="width:130px; text-align:center;">${data.clientBin || ''}</td>
+          <td style="border:none; font-weight:bold; vertical-align:middle;">Заказчик</td>
+          <td style="border:none; border-bottom:1px solid #000; padding-right:20px;">${data.clientName}${data.clientAddress ? ', ' + data.clientAddress : ''}</td>
+          <td style="border:none;"></td>
+          <td style="border:1px solid #000; text-align:center; font-size:9px;">ИИН/БИН</td>
+          <td style="border:1px solid #000; text-align:center;">${data.clientBin || ''}</td>
         </tr>
         <tr>
-          <td style="border:none; font-size:8px; color:#666; text-align:center;" colspan="2">полное наименование, адрес, данные о средствах связи</td>
-          <td colspan="2" style="border:none;"></td>
+          <td style="border:none;"></td>
+          <td style="border:none; font-size:8px; color:#666; text-align:center;">полное наименование, адрес, данные о средствах связи</td>
+          <td colspan="3" style="border:none;"></td>
         </tr>
-        <tr style="height:6px;"><td colspan="4" style="border:none;"></td></tr>
+        <tr style="height:6px;"><td colspan="5" style="border:none;"></td></tr>
         <tr>
-          <td style="border:none; font-weight:bold;">Исполнитель</td>
-          <td style="border:none; border-bottom:1px solid #000;">${companyName}, ${address}${phone ? ', тел: ' + phone : ''}</td>
-          <td style="text-align:center; font-size:9px;">ИИН/БИН</td>
-          <td style="text-align:center;">${binIin}</td>
+          <td style="border:none; font-weight:bold; vertical-align:middle;">Исполнитель</td>
+          <td style="border:none; border-bottom:1px solid #000; padding-right:20px;">${companyName}, ${address}${phone ? ', тел: ' + phone : ''}</td>
+          <td style="border:none;"></td>
+          <td style="border:1px solid #000; text-align:center; font-size:9px;">ИИН/БИН</td>
+          <td style="border:1px solid #000; text-align:center;">${binIin}</td>
         </tr>
         <tr>
-          <td style="border:none; font-size:8px; color:#666; text-align:center;" colspan="2">полное наименование, адрес, данные о средствах связи</td>
-          <td colspan="2" style="border:none;"></td>
+          <td style="border:none;"></td>
+          <td style="border:none; font-size:8px; color:#666; text-align:center;">полное наименование, адрес, данные о средствах связи</td>
+          <td colspan="3" style="border:none;"></td>
         </tr>
-        <tr style="height:6px;"><td colspan="4" style="border:none;"></td></tr>
+        <tr style="height:6px;"><td colspan="5" style="border:none;"></td></tr>
         <tr>
-          <td style="border:none; font-weight:bold;">Договор (контракт)</td>
-          <td style="border:none; border-bottom:1px solid #000;">${data.contractNumber ? '№' + data.contractNumber : ''}</td>
-          <td style="text-align:center; font-size:9px;">Номер<br>документа</td>
-          <td style="text-align:center; font-size:9px;">Дата<br>составления</td>
+          <td style="border:none; font-weight:bold; vertical-align:top; line-height:1.4;">Договор<br>(контракт)</td>
+          <td style="border:none; border-bottom:1px solid #000; padding-right:20px; vertical-align:middle;">${data.contractNumber ? '№' + data.contractNumber : ''}</td>
+          <td style="border:none;"></td>
+          <td style="border:1px solid #000; text-align:center; font-size:9px; vertical-align:middle;">Номер<br>документа</td>
+          <td style="border:1px solid #000; text-align:center; font-size:9px; vertical-align:middle;">Дата<br>составления</td>
         </tr>
         <tr>
           <td style="border:none;"></td>
           <td style="border:none;"></td>
-          <td style="text-align:center;">${data.number}</td>
-          <td style="text-align:center;">${data.date}</td>
+          <td style="border:none;"></td>
+          <td style="border:1px solid #000; text-align:center;">${data.number}</td>
+          <td style="border:1px solid #000; text-align:center;">${data.date}</td>
         </tr>
       </table>
 
