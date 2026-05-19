@@ -206,10 +206,10 @@ export default function Dashboard() {
     }
   }
 
-  function generateWithBank(bank: any) {
+  async function generateWithBank(bank: any) {
     if (!pendingInvoiceData) return
     const { invoiceNumber, invoiceDate, cn, cb, ce, ca, cp, cn2, cd, svcs, tot, nt, knp } = pendingInvoiceData
-    generateInvoicePDF({
+    await generateInvoicePDF({
       number: invoiceNumber,
       date: invoiceDate,
       clientName: cn,
@@ -360,7 +360,7 @@ export default function Dashboard() {
     }
 
     const bank = banks[0]
-    generateInvoicePDF({
+    await generateInvoicePDF({
       number: data.number,
       date: invoiceDate,
       clientName,
