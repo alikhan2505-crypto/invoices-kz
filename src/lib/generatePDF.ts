@@ -99,7 +99,7 @@ function numberToWords(n: number): string {
   return result.trim()
 }
 
-export async function await generateInvoicePDF(data: InvoiceData) {
+export async function generateInvoicePDF(data: InvoiceData) {
   const p = data.profile
   const b = data.bank
 
