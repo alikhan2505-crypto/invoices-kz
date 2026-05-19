@@ -224,7 +224,7 @@ export default function Upgrade() {
           </div>
           <div className="text-3xl font-bold text-[#1C2056] mb-4">0 ₸</div>
           <ul className="space-y-2">
-            {['7 дней бесплатного периода', 'PDF генерация', 'История счетов', 'Публичная ссылка'].map(f => (
+            {['3 счета в месяц', 'PDF без подписи', 'WhatsApp отправка', 'Публичная ссылка', 'История счетов'].map(f => (
               <li key={f} className="flex items-center gap-2 text-sm text-gray-600">
                 <span className="text-[#2DC48D]">✓</span> {f}
               </li>
@@ -244,7 +244,7 @@ export default function Upgrade() {
             2 990 ₸<span className="text-sm font-normal text-gray-400">/мес</span>
           </div>
           <ul className="space-y-2 mb-5">
-            {['30 счетов в месяц', 'PDF с подписью и печатью', 'Справочник клиентов', 'Услуги и товары', 'Отправка через WhatsApp', 'Поддержка в Telegram'].map(f => (
+            {['30 счетов в месяц', 'PDF с подписью и печатью', 'Email отправка', 'Справочник клиентов', 'Услуги и товары', 'Отправка через WhatsApp', 'Поддержка в Telegram'].map(f => (
               <li key={f} className="flex items-center gap-2 text-sm text-gray-600">
                 <span className="text-[#2DC48D]">✓</span> {f}
               </li>
@@ -267,7 +267,7 @@ export default function Upgrade() {
             5 990 ₸<span className="text-sm font-normal text-white/60">/мес</span>
           </div>
           <ul className="space-y-2 mb-5">
-            {['Безлимитные счета', 'ЭЦП НУЦ РК (скоро)', 'Шаблоны счетов', 'PDF с подписью и печатью', 'Отправка на Email и WhatsApp', 'Аналитика и отчёты', 'Приоритетная поддержка 24/7'].map(f => (
+            {['Безлимитные счета', 'КП, АВР, Накладная', 'Документы для налоговой', 'Шаблоны счетов', 'PDF с подписью и печатью', 'Email и WhatsApp отправка', 'ЭЦП НУЦ РК (скоро)', 'Приоритетная поддержка 24/7'].map(f => (
               <li key={f} className="flex items-center gap-2 text-sm text-white/80">
                 <span className="text-[#2DC48D]">✓</span> {f}
               </li>
