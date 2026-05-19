@@ -27,10 +27,48 @@ interface NakladnayaData {
   }
 }
 
-export function generateNakladnaya(data: NakladnayaData) {
-  const p = data.profile
+async function resizeToFitNakl(url: string, maxW: number, maxH: number): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => {
+      const ratio = Math.min(maxW / img.width, maxH / img.height)
+      const w = Math.round(img.width * ratio)
+      const h = Math.round(img.height * ratio)
+      const canvas = document.createElement('canvas')
+      canvas.width = w
+      canvas.height = h
+      const ctx = canvas.getContext('2d')!
+      ctx.drawImage(img, 0, 0, w, h)
+      resolve(canvas.toDataURL('image/png'))
+    }
+    img.onerror = () => resolve(url)
+    img.src = url
+  })
+}
 
-  const companyName = p?.company_name || 'ИП First Project'
+async function resizeSquareNakl(url: string, size: number): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = size
+      canvas.height = size
+      const ctx = canvas.getContext('2d')!
+      ctx.drawImage(img, 0, 0, size, size)
+      resolve(canvas.toDataURL('image/png'))
+    }
+    img.onerror = () => resolve(url)
+    img.src = url
+  })
+}
+
+export async function generateNakladnaya(data: NakladnayaData) {
+  const win = window.open('', '_blank')
+
+  const p = data.profile
+  const companyName = p?.company_name || ''
   const binIin = p?.bin_iin || ''
   const address = p?.address || ''
   const phone = p?.phone || ''
@@ -38,329 +76,343 @@ export function generateNakladnaya(data: NakladnayaData) {
   const signatureUrl = p?.signature_url || ''
   const stampUrl = p?.stamp_url || ''
 
+  const signatureBase64 = signatureUrl ? await resizeToFitNakl(signatureUrl, 200, 55) : ''
+  const stampBase64 = stampUrl ? await resizeSquareNakl(stampUrl, 90) : ''
+
   function formatMoney(n: number): string {
     return n.toLocaleString('ru-KZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   }
 
-  // Фильтруем только товары
   const productsOnly = data.services.filter(s => s.type === 'product')
 
-  // Если нет товаров - показываем предупреждение
   if (productsOnly.length === 0) {
     alert('В счёте нет товаров. Накладная формируется только для товаров.')
+    if (win) win.close()
     return
   }
 
-  const totalProductsAmount = productsOnly.reduce((sum, s) => sum + s.qty * s.price, 0)
-
-  // НДС расчёт
+  const totalAmount = productsOnly.reduce((sum, s) => sum + s.qty * s.price, 0)
   const vatType = data.vatType || 'no_vat'
-  const totalWithVat = totalProductsAmount
-  const vatAmount = vatType === 'vat_16' ? Math.round(totalProductsAmount - totalProductsAmount / 1.16) : 0
+  const vatAmount = vatType === 'vat_16' ? Math.round(totalAmount - totalAmount / 1.16) : 0
 
-  const html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8">
-      <meta name="viewport" content="width=1123, initial-scale=1.0, maximum-scale=1.0">
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"><\/script>
-      <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-text-size-adjust: 100%; }
-        html { background: #888; }
-        body {
-          font-family: Arial, sans-serif;
-          font-size: 11px;
-          color: #1a1a1a;
-          width: 1123px;
-          min-height: 794px;
-          margin: 20px auto;
-          background: white;
-          box-shadow: 0 0 20px rgba(0,0,0,0.3);
-          padding: 40px;
-        }
-        .header-right {
-          text-align: right;
-          font-size: 10px;
-          margin-bottom: 20px;
-          color: #666;
-        }
-        .doc-header {
-          display: grid;
-          grid-template-columns: 2fr 1fr 1fr;
-          gap: 10px;
-          margin-bottom: 20px;
-          font-size: 10px;
-        }
-        .doc-header-item {
-          border: 1px solid #000;
-          padding: 5px 8px;
-          text-align: center;
-        }
-        .doc-header-item strong {
-          display: block;
-          margin-top: 5px;
-        }
-        h1 {
-          text-align: center;
-          font-size: 16px;
-          font-weight: bold;
-          margin: 20px 0;
-          text-transform: uppercase;
-        }
-        .info-grid {
-          display: grid;
-          grid-template-columns: repeat(2, 1fr);
-          gap: 15px;
-          margin: 20px 0;
-          font-size: 10px;
-        }
-        .info-block {
-          line-height: 1.6;
-        }
-        .info-block strong {
-          display: block;
-          margin-bottom: 3px;
-        }
-        table {
-          width: 100%;
-          border-collapse: collapse;
-          margin: 20px 0;
-          font-size: 10px;
-        }
-        th {
-          background: #f0f0f0;
-          border: 1px solid #000;
-          padding: 6px 4px;
-          text-align: center;
-          font-weight: bold;
-          font-size: 9px;
-        }
-        td {
-          border: 1px solid #000;
-          padding: 6px 4px;
-          vertical-align: top;
-        }
-        td.center { text-align: center; }
-        td.right { text-align: right; }
-        .summary {
-          margin: 20px 0;
-          font-size: 10px;
-          line-height: 1.8;
-        }
-        .signatures {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 40px;
-          margin-top: 40px;
-        }
-        .sig-block {
-          position: relative;
-        }
-        .sig-label {
-          font-size: 10px;
-          margin-bottom: 40px;
-        }
-        .sig-line {
-          position: relative;
-          min-height: 60px;
-          border-bottom: 1px solid #333;
-          margin-bottom: 5px;
-        }
-        .sig-name {
-          font-size: 10px;
-          color: #333;
-        }
-        @media print {
-          .toolbar { display: none !important; }
-          html { background: white; }
-          body { margin: 0; box-shadow: none; }
-        }
-      </style>
-    </head>
-    <body>
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"><\/script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+html { background:#888; }
+body {
+  font-family: Arial, sans-serif;
+  font-size: 9px;
+  color: #000;
+  width: 1123px;
+  margin: 20px auto;
+  background: white;
+  padding: 15px 25px 20px;
+  box-shadow: 0 0 20px rgba(0,0,0,0.3);
+}
+table { border-collapse: collapse; width: 100%; }
+td, th {
+  border: 1px solid #000;
+  padding: 3px 4px;
+  vertical-align: middle;
+  word-wrap: break-word;
+  overflow: visible;
+}
+.nb { border: none !important; }
+@page { size: A4 landscape; margin: 8mm; }
+@media print {
+  html { background: white; }
+  body { margin:0; box-shadow:none; padding:8mm; width:100%; }
+  .toolbar { display:none !important; }
+}
+</style>
+</head>
+<body>
 
-      <!-- Toolbar -->
-      <div class="toolbar" style="position:fixed; top:0; left:0; right:0; background:white; border-bottom:1px solid #e5e7eb; padding:10px 16px; z-index:999; display:flex; align-items:center; justify-content:space-between; gap:8px;">
-        <button onclick="window.close()" style="background:#f3f4f6; color:#374151; border:none; padding:8px 14px; border-radius:8px; cursor:pointer; font-size:13px;">← Назад</button>
-        <span style="font-size:12px; color:#6b7280; font-weight:600;">Накладная №${data.number}</span>
-        <div style="display:flex; gap:6px;">
-          <button onclick="window.print()" style="background:#1C2056; color:white; border:none; padding:8px 14px; border-radius:8px; cursor:pointer; font-size:13px;">🖨️ Печать</button>
-          <button id="dlBtn" onclick="downloadPDF()" style="background:#2DC48D; color:white; border:none; padding:8px 14px; border-radius:8px; cursor:pointer; font-size:13px;">💾 Скачать PDF</button>
-        </div>
-      </div>
-      <div style="height:55px;"></div>
+<div class="toolbar" style="position:fixed;top:0;left:0;right:0;background:white;border-bottom:1px solid #e5e7eb;padding:8px 16px;z-index:999;display:flex;align-items:center;justify-content:space-between;">
+  <button onclick="window.close()" style="background:#f3f4f6;border:none;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px;">← Назад</button>
+  <span style="font-size:11px;color:#6b7280;font-weight:600;">Накладная №${data.number}</span>
+  <div style="display:flex;gap:6px;">
+    <button onclick="window.print()" style="background:#1C2056;color:white;border:none;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px;">🖨️ Печать</button>
+    <button id="dlBtn" onclick="downloadPDF()" style="background:#2DC48D;color:white;border:none;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px;">💾 Скачать PDF</button>
+  </div>
+</div>
+<div style="height:44px;"></div>
 
-      <!-- Header -->
-      <div class="header-right">
-        Приложение 26<br>
-        к приказу Министра финансов<br>
-        Республики Казахстан<br>
-        от 20 декабря 2012 года № 562<br><br>
-        <strong>Форма З-2</strong>
-      </div>
+<!-- Шапка справа -->
+<div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
+  <div style="text-align:center;font-size:9px;line-height:1.5;">
+    Приложение 26<br>
+    к приказу Министра финансов<br>
+    Республики Казахстан<br>
+    от 20 декабря 2012 года № 562<br><br>
+    <strong>Форма З-2</strong>
+  </div>
+</div>
 
-      <div class="doc-header">
-        <div class="doc-header-item">
-          Организация (индивидуальный предприниматель)<br>
-          <strong>${companyName}</strong>
-        </div>
-        <div class="doc-header-item">
-          ИИН/БИН<br>
-          <strong>${binIin}</strong>
-        </div>
-        <div class="doc-header-item"></div>
-      </div>
+<!-- Организация и ИИН/БИН -->
+<table style="margin-bottom:0;">
+  <colgroup>
+    <col style="width:180px;">
+    <col>
+    <col style="width:70px;">
+    <col style="width:130px;">
+  </colgroup>
+  <tr>
+    <td class="nb" style="font-size:9px;line-height:1.3;vertical-align:top;">Организация (индивидуальный предприниматель)</td>
+    <td class="nb" style="border-bottom:1px solid #000 !important;padding-right:15px;">${companyName}${address ? ', ' + address : ''}${phone ? ', тел: ' + phone : ''}</td>
+    <td style="text-align:center;font-size:9px;">ИИН/БИН</td>
+    <td style="text-align:center;">${binIin}</td>
+  </tr>
+</table>
 
-      <div class="doc-header">
-        <div class="doc-header-item" style="grid-column: span 2;"></div>
-        <div class="doc-header-item">
-          Номер документа<br>
-          <strong>${data.number}</strong>
-        </div>
-        <div class="doc-header-item">
-          Дата составления<br>
-          <strong>${data.date}</strong>
-        </div>
-      </div>
+<!-- Номер и дата -->
+<table style="margin-bottom:8px;">
+  <colgroup>
+    <col style="width:180px;">
+    <col>
+    <col style="width:70px;">
+    <col style="width:130px;">
+  </colgroup>
+  <tr>
+    <td class="nb"></td>
+    <td class="nb"></td>
+    <td style="text-align:center;font-size:9px;">Номер</td>
+    <td style="text-align:center;font-size:9px;">Дата</td>
+  </tr>
+  <tr>
+    <td class="nb"></td>
+    <td class="nb"></td>
+    <td style="text-align:center;">${data.number}</td>
+    <td style="text-align:center;">${new Date().toLocaleDateString('ru-KZ')}</td>
+  </tr>
+</table>
 
-      <h1>НАКЛАДНАЯ НА ОТПУСК ЗАПАСОВ НА СТОРОНУ</h1>
+<!-- Заголовок -->
+<div style="text-align:center;font-size:12px;font-weight:bold;text-transform:uppercase;margin:8px 0;">
+  НАКЛАДНАЯ НА ОТПУСК ЗАПАСОВ НА СТОРОНУ
+</div>
 
-      <div class="info-grid">
-        <div class="info-block">
-          <strong>Организация (индивидуальный предприниматель) — отправитель:</strong>
-          ${companyName}<br>
-          ${address}<br>
-          ${phone ? 'Тел: ' + phone : ''}
-        </div>
-        <div class="info-block">
-          <strong>Организация (индивидуальный предприниматель) — получатель:</strong>
-          ${data.clientName}<br>
-          ${data.clientBin ? 'БИН/ИИН: ' + data.clientBin : ''}
-        </div>
-      </div>
+<!-- Таблица организаций -->
+<table style="margin-bottom:6px;font-size:9px;">
+  <tr>
+    <td style="text-align:center;width:20%;padding:4px;">
+      Организация (индивидуальный предприниматель) — отправитель
+    </td>
+    <td style="text-align:center;width:20%;padding:4px;">
+      Организация (индивидуальный предприниматель) — получатель
+    </td>
+    <td style="text-align:center;width:20%;padding:4px;">
+      Ответственный за поставку (Ф.И.О.)
+    </td>
+    <td style="text-align:center;width:20%;padding:4px;">
+      Транспортная организация
+    </td>
+    <td style="text-align:center;width:20%;padding:4px;">
+      Товарно-транспортная накладная (номер, дата)
+    </td>
+  </tr>
+  <tr>
+    <td style="text-align:center;padding:4px;font-size:9px;">
+      ${companyName}<br>
+      ${binIin ? 'БИН: ' + binIin : ''}
+    </td>
+    <td style="text-align:center;padding:4px;font-size:9px;">
+      ${data.clientName}<br>
+      ${data.clientBin ? 'БИН: ' + data.clientBin : ''}
+    </td>
+    <td></td>
+    <td></td>
+    <td></td>
+  </tr>
+</table>
 
-      <!-- Products Table -->
-      <table>
-        <thead>
-          <tr>
-            <th style="width: 5%;">№</th>
-            <th style="width: 30%;">Наименование, характеристика</th>
-            <th style="width: 10%;">Номенкл. номер</th>
-            <th style="width: 10%;">Ед. изм.</th>
-            <th style="width: 8%;">Кол-во</th>
-            <th style="width: 15%;">Цена за ед., KZT</th>
-            <th style="width: 15%;">Сумма с НДС, KZT</th>
-            <th style="width: 12%;">Сумма НДС, KZT</th>
-          </tr>
-          <tr>
-            <th>1</th>
-            <th>2</th>
-            <th>3</th>
-            <th>4</th>
-            <th>5</th>
-            <th>6</th>
-            <th>7</th>
-            <th>8</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${productsOnly.map((s, i) => {
-            const itemTotal = s.qty * s.price
-            const itemVat = vatType === 'vat_16' ? Math.round(itemTotal - itemTotal / 1.16) : 0
-            return `
-            <tr>
-              <td class="center">${i + 1}</td>
-              <td>${s.name}</td>
-              <td class="center">${s.code || (i + 1)}</td>
-              <td class="center">${s.unit || 'шт'}</td>
-              <td class="center">${s.qty}</td>
-              <td class="right">${formatMoney(Number(s.price))}</td>
-              <td class="right">${formatMoney(itemTotal)}</td>
-              <td class="right">${formatMoney(itemVat)}</td>
-            </tr>
-          `}).join('')}
-          <tr>
-            <td colspan="6" class="right" style="font-weight: bold; background: #f0f0f0;">Итого</td>
-            <td class="right" style="font-weight: bold; background: #f0f0f0;">${formatMoney(totalWithVat)}</td>
-            <td class="right" style="font-weight: bold; background: #f0f0f0;">${formatMoney(vatAmount)}</td>
-          </tr>
-        </tbody>
+<!-- Таблица товаров -->
+<table style="margin-bottom:6px;font-size:9px;">
+  <thead>
+    <tr>
+      <th rowspan="2" style="width:4%;">Номер по порядку</th>
+      <th rowspan="2" style="width:26%;">Наименование, характеристика</th>
+      <th rowspan="2" style="width:8%;">Номенкла-турный номер</th>
+      <th rowspan="2" style="width:7%;">Единица измерения</th>
+      <th colspan="2" style="text-align:center;">Количество</th>
+      <th rowspan="2" style="width:12%;">Цена за единицу, в KZT</th>
+      <th rowspan="2" style="width:13%;">Сумма с НДС, в KZT</th>
+      <th rowspan="2" style="width:11%;">Сумма НДС, в KZT</th>
+    </tr>
+    <tr>
+      <th style="width:8%;">подлежит отпуску</th>
+      <th style="width:8%;">отпущено</th>
+    </tr>
+    <tr>
+      <th>1</th><th>2</th><th>3</th><th>4</th>
+      <th>5</th><th>6</th><th>7</th><th>8</th><th>9</th>
+    </tr>
+  </thead>
+  <tbody>
+    ${productsOnly.map((s, i) => {
+      const itemTotal = s.qty * s.price
+      const itemVat = vatType === 'vat_16' ? Math.round(itemTotal - itemTotal / 1.16) : 0
+      return `<tr>
+        <td style="text-align:center;">${i + 1}</td>
+        <td>${s.name}</td>
+        <td style="text-align:center;">${s.code || (i + 1)}</td>
+        <td style="text-align:center;">${s.unit || 'шт'}</td>
+        <td style="text-align:center;">${s.qty}</td>
+        <td style="text-align:center;">${s.qty}</td>
+        <td style="text-align:right;">${formatMoney(Number(s.price))}</td>
+        <td style="text-align:right;">${formatMoney(itemTotal)}</td>
+        <td style="text-align:right;">${formatMoney(itemVat)}</td>
+      </tr>`
+    }).join('')}
+    <tr>
+      <td colspan="4" style="text-align:right;font-weight:bold;">Итого</td>
+      <td style="text-align:center;">x</td>
+      <td style="text-align:center;">x</td>
+      <td style="text-align:center;">x</td>
+      <td style="text-align:right;font-weight:bold;">${formatMoney(totalAmount)}</td>
+      <td style="text-align:right;font-weight:bold;">${formatMoney(vatAmount)}</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- Всего отпущено -->
+<div style="font-size:9px;margin-bottom:8px;">
+  Всего отпущено количество запасов (прописью)_______________________
+  &nbsp;&nbsp;&nbsp; на сумму (прописью), в KZT: ${formatMoney(totalAmount)}
+</div>
+
+<!-- Подписи -->
+<table style="border:none;">
+  <tr>
+    <td class="nb" style="width:48%;vertical-align:top;">
+
+      <div style="font-size:9px;font-weight:bold;margin-bottom:3px;">Отпуск разрешил</div>
+      <table style="border:none;margin-bottom:8px;">
+        <tr>
+          <td class="nb" style="border-bottom:1px solid #000 !important;width:30%;height:45px;text-align:center;vertical-align:bottom;">
+            ${signatureBase64 ? `<img src="${signatureBase64}" style="max-height:38px;max-width:95%;object-fit:contain;display:inline-block;">` : ''}
+          </td>
+          <td class="nb" style="width:3%;"></td>
+          <td class="nb" style="border-bottom:1px solid #000 !important;width:30%;height:45px;"></td>
+          <td class="nb" style="width:3%;"></td>
+          <td class="nb" style="border-bottom:1px solid #000 !important;width:34%;height:45px;text-align:center;vertical-align:bottom;font-size:9px;">${director}</td>
+        </tr>
+        <tr>
+          <td class="nb" style="text-align:center;font-size:8px;color:#666;">должность</td>
+          <td class="nb"></td>
+          <td class="nb" style="text-align:center;font-size:8px;color:#666;">подпись</td>
+          <td class="nb"></td>
+          <td class="nb" style="text-align:center;font-size:8px;color:#666;">расшифровка подписи</td>
+        </tr>
       </table>
 
-      <div class="summary">
-        Всего отпущено количество запасов (прописью): ${productsOnly.length} позиций<br>
-        на сумму (прописью), в KZT: ${formatMoney(totalWithVat)} ₸
+      <div style="font-size:9px;font-weight:bold;margin-bottom:3px;">Главный бухгалтер</div>
+      <table style="border:none;margin-bottom:8px;">
+        <tr>
+          <td class="nb" style="border-bottom:1px solid #000 !important;width:30%;height:38px;"></td>
+          <td class="nb" style="width:3%;"></td>
+          <td class="nb" style="border-bottom:1px solid #000 !important;width:30%;height:38px;"></td>
+          <td class="nb" style="width:3%;"></td>
+          <td class="nb" style="border-bottom:1px solid #000 !important;width:34%;height:38px;"></td>
+        </tr>
+        <tr>
+          <td class="nb" style="font-size:8px;color:#666;text-align:center;">подпись</td>
+          <td class="nb"></td>
+          <td class="nb" style="font-size:8px;color:#666;text-align:center;">расшифровка подписи</td>
+          <td class="nb"></td>
+          <td class="nb"></td>
+        </tr>
+      </table>
+
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <div style="font-size:9px;font-weight:bold;">М.П.</div>
+        ${stampBase64 ? `<img src="${stampBase64}" style="height:70px;width:70px;object-fit:contain;opacity:0.85;">` : ''}
       </div>
 
-      <!-- Signatures -->
-      <div class="signatures">
-        <div class="sig-block">
-          <div class="sig-label">Отпуск разрешил</div>
-          <div class="sig-line">
-            ${signatureUrl ? `<img src="${signatureUrl}" style="position:absolute; bottom:8px; left:10px; height:45px; max-width:150px; object-fit:contain;">` : ''}
-          </div>
-          <div class="sig-name">${director || ''}</div>
-        </div>
-        <div class="sig-block">
-          <div class="sig-label">По доверенности выданной</div>
-          <div class="sig-line"></div>
-          <div class="sig-name"></div>
-        </div>
+      <div style="font-size:9px;font-weight:bold;margin-bottom:3px;">Отпустил</div>
+      <table style="border:none;">
+        <tr>
+          <td class="nb" style="border-bottom:1px solid #000 !important;width:30%;height:38px;"></td>
+          <td class="nb" style="width:3%;"></td>
+          <td class="nb" style="border-bottom:1px solid #000 !important;width:30%;height:38px;"></td>
+          <td class="nb" style="width:3%;"></td>
+          <td class="nb" style="border-bottom:1px solid #000 !important;width:34%;height:38px;"></td>
+        </tr>
+        <tr>
+          <td class="nb" style="text-align:center;font-size:8px;color:#666;">должность</td>
+          <td class="nb"></td>
+          <td class="nb" style="text-align:center;font-size:8px;color:#666;">подпись</td>
+          <td class="nb"></td>
+          <td class="nb" style="text-align:center;font-size:8px;color:#666;">расшифровка подписи</td>
+        </tr>
+      </table>
+
+    </td>
+    <td class="nb" style="width:4%;"></td>
+    <td class="nb" style="width:48%;vertical-align:top;">
+
+      <div style="font-size:9px;margin-bottom:6px;">
+        <span style="font-weight:bold;">По доверенности</span>
+        <div style="border-bottom:1px solid #000;margin-top:3px;height:16px;"></div>
       </div>
 
-      <div class="signatures" style="margin-top: 30px;">
-        <div class="sig-block">
-          <div class="sig-label">Главный бухгалтер</div>
-          <div class="sig-line"></div>
-          <div class="sig-name"></div>
-          <div style="margin-top: 10px; font-size: 9px; display:flex; align-items:flex-start; gap:8px;">
-            <div style="font-weight:bold;">М.П.</div>
-            ${stampUrl ? `<img src="${stampUrl}" style="height:80px; width:80px; object-fit:contain; opacity:0.85;">` : ''}
-          </div>
-        </div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-          <div class="sig-block">
-            <div class="sig-label">Отпустил</div>
-            <div class="sig-line"></div>
-            <div class="sig-name"></div>
-          </div>
-          <div class="sig-block">
-            <div class="sig-label">Запасы получил</div>
-            <div class="sig-line"></div>
-            <div class="sig-name"></div>
-          </div>
-        </div>
+      <div style="font-size:9px;margin-bottom:14px;">
+        <span style="font-weight:bold;">выданной</span>
+        <div style="border-bottom:1px solid #000;margin-top:3px;height:16px;"></div>
       </div>
 
-      <script>
-        function downloadPDF() {
-          const btn = document.getElementById('dlBtn')
-          btn.textContent = '⏳ Загрузка...'
-          btn.disabled = true
-          const toolbar = document.querySelector('.toolbar')
-          const spacer = toolbar?.nextElementSibling
-          if (toolbar) toolbar.style.display = 'none'
-          if (spacer) spacer.style.display = 'none'
-          html2pdf().set({
-            margin: [10, 10, 10, 10],
-            filename: 'Накладная-${data.number}.pdf',
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2, useCORS: true, logging: false },
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
-          }).from(document.body).save().then(() => {
-            if (toolbar) toolbar.style.display = 'flex'
-            if (spacer) spacer.style.display = 'block'
-            btn.textContent = '💾 Скачать PDF'
-            btn.disabled = false
-          })
-        }
-      <\/script>
-    </body>
-    </html>
-  `
+      <div style="font-size:9px;font-weight:bold;margin-bottom:3px;">Запасы получил</div>
+      <table style="border:none;">
+        <tr>
+          <td class="nb" style="border-bottom:1px solid #000 !important;width:30%;height:38px;"></td>
+          <td class="nb" style="width:3%;"></td>
+          <td class="nb" style="border-bottom:1px solid #000 !important;width:30%;height:38px;"></td>
+          <td class="nb" style="width:3%;"></td>
+          <td class="nb" style="border-bottom:1px solid #000 !important;width:34%;height:38px;"></td>
+        </tr>
+        <tr>
+          <td class="nb" style="text-align:center;font-size:8px;color:#666;">должность</td>
+          <td class="nb"></td>
+          <td class="nb" style="text-align:center;font-size:8px;color:#666;">подпись</td>
+          <td class="nb"></td>
+          <td class="nb" style="text-align:center;font-size:8px;color:#666;">расшифровка подписи</td>
+        </tr>
+      </table>
 
-  const win = window.open('', '_blank')
+    </td>
+  </tr>
+</table>
+
+<script>
+function downloadPDF() {
+  const btn = document.getElementById('dlBtn')
+  btn.textContent = '⏳ Загрузка...'
+  btn.disabled = true
+  const toolbar = document.querySelector('.toolbar')
+  const spacer = toolbar?.nextElementSibling
+  if (toolbar) toolbar.style.display = 'none'
+  if (spacer) spacer.style.display = 'none'
+  html2pdf().set({
+    margin: [6,6,6,6],
+    filename: 'Накладная-${data.number}.pdf',
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true, logging: false },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+  }).from(document.body).save().then(() => {
+    if (toolbar) toolbar.style.display = 'flex'
+    if (spacer) spacer.style.display = 'block'
+    btn.textContent = '💾 Скачать PDF'
+    btn.disabled = false
+  })
+}
+<\/script>
+</body>
+</html>`
+
   if (win) {
     win.document.write(html)
     win.document.close()
