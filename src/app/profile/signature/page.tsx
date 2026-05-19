@@ -339,6 +339,26 @@ export default function Signature() {
     }
     ctx.putImageData(imageData, 0, 0)
 
+    // Увеличиваем насыщенность и контраст оставшихся пикселей
+    const imageData2 = ctx.getImageData(0, 0, 300, 300)
+    const d2 = imageData2.data
+    for (let i = 0; i < d2.length; i += 4) {
+      if (d2[i + 3] === 0) continue // пропускаем прозрачные
+      // Увеличиваем насыщенность — усиливаем доминирующий цвет
+      const r = d2[i], g = d2[i + 1], b = d2[i + 2]
+      const avg = (r + g + b) / 3
+      const factor = 1.8 // насыщенность
+      d2[i]     = Math.min(255, Math.round(avg + (r - avg) * factor))
+      d2[i + 1] = Math.min(255, Math.round(avg + (g - avg) * factor))
+      d2[i + 2] = Math.min(255, Math.round(avg + (b - avg) * factor))
+      // Уменьшаем яркость чтобы казалась темнее/ярче
+      const brightness = 0.75
+      d2[i]     = Math.round(d2[i] * brightness)
+      d2[i + 1] = Math.round(d2[i + 1] * brightness)
+      d2[i + 2] = Math.round(d2[i + 2] * brightness)
+    }
+    ctx.putImageData(imageData2, 0, 0)
+
     tempCanvas.toBlob(async (blob) => {
       if (!blob) { setSaving(false); return }
       const file = new File([blob], 'stamp.png', { type: 'image/png' })
