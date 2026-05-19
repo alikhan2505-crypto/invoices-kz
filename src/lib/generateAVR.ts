@@ -290,11 +290,10 @@ export async function generateAVR(data: AVRData) {
             <table style="width:100%; border:none;">
               <tr>
                 <td style="border:none; border-bottom:1px solid #000; width:30%; height:60px; text-align:center; vertical-align:bottom; position:relative;">
-                  ${signatureBase64 ? `<img src="${signatureBase64}" style="max-height:50px; max-width:90%; object-fit:contain; display:inline-block;">` : ''}
                 </td>
                 <td style="border:none; width:5%;"></td>
                 <td style="border:none; border-bottom:1px solid #000; width:30%; height:60px; text-align:center; vertical-align:bottom; position:relative;">
-                  ${stampBase64 ? `<img src="${stampBase64}" style="height:65px; width:65px; object-fit:contain; opacity:0.85; display:inline-block; margin-bottom:-5px;">` : ''}
+                  ${signatureBase64 ? `<img src="${signatureBase64}" style="max-height:50px; max-width:90%; object-fit:contain; display:inline-block;">` : ''}
                 </td>
                 <td style="border:none; width:5%;"></td>
                 <td style="border:none; border-bottom:1px solid #000; width:30%; height:60px; text-align:center; vertical-align:bottom;">${director}</td>
@@ -307,7 +306,10 @@ export async function generateAVR(data: AVRData) {
                 <td style="border:none; text-align:center; font-size:8px; color:#666;">расшифровка подписи</td>
               </tr>
             </table>
-            <div style="font-size:8px; margin-top:6px;">М.П.</div>
+            <div style="font-size:8px; margin-top:6px; display:flex; align-items:flex-start; gap:8px;">
+              ${stampBase64 ? `<img src="${stampBase64}" style="height:50px; width:50px; object-fit:contain; opacity:0.85; margin-top:2px;">` : ''}
+              <div>М.П.</div>
+            </div>
           </td>
           <td style="border:none; width:4%;"></td>
           <td style="border:none; width:48%; vertical-align:top;">
