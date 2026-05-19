@@ -47,19 +47,21 @@ interface InvoiceData {
   contractDate?: string
 }
 
-async function toBase64(url: string): Promise<string> {
-  try {
-    const res = await fetch(url)
-    const blob = await res.blob()
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onloadend = () => resolve(reader.result as string)
-      reader.onerror = reject
-      reader.readAsDataURL(blob)
-    })
-  } catch {
-    return url
-  }
+async function resizeImage(url: string, size: number): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = size
+      canvas.height = size
+      const ctx = canvas.getContext('2d')!
+      ctx.drawImage(img, 0, 0, size, size)
+      resolve(canvas.toDataURL('image/png'))
+    }
+    img.onerror = () => resolve(url)
+    img.src = url
+  })
 }
 
 function numberToWords(n: number): string {
@@ -97,7 +99,7 @@ function numberToWords(n: number): string {
   return result.trim()
 }
 
-export async function generateInvoicePDF(data: InvoiceData) {
+export async function await generateInvoicePDF(data: InvoiceData) {
   const p = data.profile
   const b = data.bank
 
@@ -110,8 +112,8 @@ export async function generateInvoicePDF(data: InvoiceData) {
   const stampUrl = p?.stamp_url || ''
 
   // Конвертируем в base64 чтобы html2pdf не терял размеры
-  const signatureBase64 = signatureUrl ? await toBase64(signatureUrl) : ''
-  const stampBase64 = stampUrl ? await toBase64(stampUrl) : ''
+  const signatureBase64 = signatureUrl ? await resizeImage(signatureUrl, 400) : ''
+  const stampBase64 = stampUrl ? await resizeImage(stampUrl, 110) : ''
 
   const bankName = b?.bank_name || p?.bank_name || '—'
   const iik = b?.iik || p?.iik || '—'
