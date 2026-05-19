@@ -147,7 +147,7 @@ export async function generateAVR(data: AVRData) {
 
       <!-- Шапка справа -->
       <div style="display:flex; justify-content:flex-end; margin-bottom:8px;">
-        <div style="text-align:right; font-size:9px; line-height:1.5;">
+        <div style="text-align:center; font-size:9px; line-height:1.5;">
           Приложение 50<br>
           к приказу Министра финансов<br>
           Республики Казахстан<br>
