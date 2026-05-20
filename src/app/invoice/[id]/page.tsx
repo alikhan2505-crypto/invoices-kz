@@ -381,7 +381,6 @@ export default function InvoicePage() {
             <div className="text-xs text-gray-500">Ссылка</div>
           </button>
           <button onClick={() => {
-            pdfWinRef.current = window.open('', '_blank')
             askSignature((w) => openPDF(w))
           }}
             className="bg-white rounded-xl p-3 text-center shadow-sm hover:bg-gray-50">
@@ -526,7 +525,6 @@ export default function InvoicePage() {
             lockedLabel="Доступно на тарифе Про"
             savedCount={kpCount}
             onClick={async () => {
-              pdfWinRef.current = window.open('', '_blank')
               if (!profile) return
               const { data: { user } } = await supabase.auth.getUser()
               if (!user) return
@@ -568,7 +566,6 @@ export default function InvoicePage() {
             disabled={!hasServices}
             disabledReason="Нет услуг в счёте"
             onClick={async () => {
-              pdfWinRef.current = window.open('', '_blank')
               if (!profile) return
               const { data: { user } } = await supabase.auth.getUser()
               if (!user) return
@@ -615,7 +612,6 @@ export default function InvoicePage() {
             disabled={!hasProducts}
             disabledReason="Нет товаров в счёте"
             onClick={async () => {
-              pdfWinRef.current = window.open('', '_blank')
               if (!profile) return
               const { data: { user } } = await supabase.auth.getUser()
               if (!user) return
@@ -766,6 +762,7 @@ export default function InvoicePage() {
                   showUpgrade('PDF с подписью доступен с тарифа Базовый', 'basic')
                   return
                 }
+                pdfWinRef.current = window.open('', '_blank')
                 setShowSignModal(false)
                 if (pendingDocAction) pendingDocAction(true)
               }}
@@ -773,7 +770,11 @@ export default function InvoicePage() {
                 ✍️ С подписью и печатью
                 {!ap.canSign && <span className="absolute top-1 right-2 text-xs text-amber-500">🔒 Базовый+</span>}
               </button>
-              <button onClick={() => { setShowSignModal(false); if (pendingDocAction) pendingDocAction(false) }}
+              <button onClick={() => {
+                pdfWinRef.current = window.open('', '_blank')
+                setShowSignModal(false)
+                if (pendingDocAction) pendingDocAction(false)
+              }}
                 className="w-full border-2 border-gray-200 text-[#1C2056] rounded-xl py-4 text-sm font-medium">
                 📄 Без подписи и печати
               </button>
