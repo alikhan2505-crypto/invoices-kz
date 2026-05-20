@@ -1,5 +1,13 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
+import { useRouter, useParams } from 'next/navigation'
+import { supabase } from '@/lib/supabase'
+import { generateInvoicePDF } from '@/lib/generatePDF'
+import { formatDateTime, formatDate } from '@/lib/date'
+import { generateKP } from '@/lib/generateKP'
+import { generateAVR } from '@/lib/generateAVR'
+import { generateNakladnaya } from '@/lib/generateNakladnaya'
+import { getActivePlan } from '@/lib/plan'
 
 const statusLabel: Record<string, { text: string; color: string; dot: string }> = {
   paid:    { text: 'Оплачен',    color: 'text-green-600',  dot: 'bg-green-500' },
