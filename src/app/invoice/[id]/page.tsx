@@ -41,6 +41,7 @@ export default function InvoicePage() {
   const [kpCount, setKpCount] = useState(0)
   const [avrCount, setAvrCount] = useState(0)
   const [naklCount, setNaklCount] = useState(0)
+  // Ref для хранения открытого окна — открывается в модале (прямой клик пользователя)
   const pdfWinRef = useRef<Window | null>(null)
 
   useEffect(() => { loadInvoice() }, [])
@@ -55,7 +56,6 @@ export default function InvoicePage() {
       .order('created_at', { ascending: false })
     setLogs(logsData || [])
 
-    // Загружаем счётчики документов для этого инвойса
     const [{ count: kp }, { count: avr }, { count: nakl }] = await Promise.all([
       supabase.from('kp_documents').select('*', { count: 'exact', head: true }).eq('invoice_id', id),
       supabase.from('avr_documents').select('*', { count: 'exact', head: true }).eq('invoice_id', id),
@@ -197,6 +197,7 @@ export default function InvoicePage() {
     window.location.href = `https://wa.me/?text=${encodeURIComponent(text)}`
   }
 
+  // openPDF читает pdfWinRef.current внутри — окно открыто кнопкой модала (прямой клик)
   function openPDF(withSignature = true) {
     if (!invoice || !profile) { alert('Данные ещё загружаются'); return }
     const services = invoice.services || [{ name: 'Услуга', qty: 1, price: invoice.amount }]
@@ -215,20 +216,14 @@ export default function InvoicePage() {
     }, win)
   }
 
-  // Подсчёт сумм по типу услуг/товаров
   function calcServiceTotal(svcs: any[]) {
-    return svcs
-      .filter(s => !s.type || s.type === 'service')
-      .reduce((sum, s) => sum + s.qty * s.price, 0)
+    return svcs.filter(s => !s.type || s.type === 'service').reduce((sum, s) => sum + s.qty * s.price, 0)
   }
 
   function calcProductTotal(svcs: any[]) {
-    return svcs
-      .filter(s => s.type === 'product')
-      .reduce((sum, s) => sum + s.qty * s.price, 0)
+    return svcs.filter(s => s.type === 'product').reduce((sum, s) => sum + s.qty * s.price, 0)
   }
 
-  // Генерация автономера
   async function getNextNumber(type: 'kp' | 'avr' | 'nakladnaya', userId: string) {
     const { data: p } = await supabase.from('profiles')
       .select('kp_prefix, kp_next_number, avr_prefix, avr_next_number, nakladnaya_prefix, nakladnaya_next_number')
@@ -252,7 +247,7 @@ export default function InvoicePage() {
     }
 
     return `${prefix}${String(num).padStart(4, '0')}`
-  }                                                     
+  }
 
   if (loading) return (
     <main className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -273,26 +268,17 @@ export default function InvoicePage() {
   const services = invoice.services || []
   const ap = getActivePlan(profile)
 
-  // Подсчёт сумм
   const serviceTotal = calcServiceTotal(services)
   const productTotal = calcProductTotal(services)
   const hasServices = serviceTotal > 0
   const hasProducts = productTotal > 0
 
-  // Компонент кнопки с замочком и ярлыком
   function DocButton({ label, icon, onClick, locked, lockedLabel, savedCount, disabled, disabledReason }: {
-    label: string
-    icon: string
-    onClick: () => void
-    locked: boolean
-    lockedLabel: string
-    savedCount: number
-    disabled?: boolean
-    disabledReason?: string
+    label: string; icon: string; onClick: () => void; locked: boolean; lockedLabel: string
+    savedCount: number; disabled?: boolean; disabledReason?: string
   }) {
     const isLocked = locked
     const isDisabled = !locked && disabled
-
     return (
       <button
         onClick={() => {
@@ -327,10 +313,8 @@ export default function InvoicePage() {
     )
   }
 
-  // Компонент обычной кнопки с замочком
   function LockedButton({ label, icon, onClick, locked, lockedLabel }: {
-    label: string, icon: string, onClick: () => void,
-    locked: boolean, lockedLabel: string
+    label: string; icon: string; onClick: () => void; locked: boolean; lockedLabel: string
   }) {
     return (
       <button
@@ -380,9 +364,8 @@ export default function InvoicePage() {
             <div className="text-xl mb-1">🔗</div>
             <div className="text-xs text-gray-500">Ссылка</div>
           </button>
-          <button onClick={() => {
-            askSignature((w) => openPDF(w))
-          }}
+          {/* PDF — окно открывается в кнопке модала (прямой клик пользователя) */}
+          <button onClick={() => askSignature(openPDF)}
             className="bg-white rounded-xl p-3 text-center shadow-sm hover:bg-gray-50">
             <div className="text-xl mb-1">📄</div>
             <div className="text-xs text-gray-500">PDF</div>
@@ -517,7 +500,7 @@ export default function InvoicePage() {
             <span className="text-gray-300">›</span>
           </button>
 
-          {/* КП — Про, всегда доступно (сумма = полная) */}
+          {/* КП */}
           <DocButton
             label="Коммерческое предложение"
             icon="📋"
@@ -541,9 +524,10 @@ export default function InvoicePage() {
                 note: invoice.note, vat_type: profile?.vat_type || 'no_vat',
               })
               setKpCount(prev => prev + 1)
-              const win = pdfWinRef.current
-              pdfWinRef.current = null
+              // Окно открывается ВНУТРИ callback модала — прямой клик пользователя
               askSignature((withSign) => {
+                const win = pdfWinRef.current
+                pdfWinRef.current = null
                 generateKP({
                   number: kpNumber, date: formatDate(invoice.created_at), validUntil,
                   clientName: invoice.client_name || '', clientBin: invoice.client_bin || '',
@@ -556,7 +540,7 @@ export default function InvoicePage() {
             }}
           />
 
-          {/* АВР — Про, только если есть услуги */}
+          {/* АВР */}
           <DocButton
             label="Акт выполненных работ"
             icon="📄"
@@ -584,9 +568,10 @@ export default function InvoicePage() {
                 vat_type: profile?.vat_type || 'no_vat',
               })
               setAvrCount(prev => prev + 1)
-              const win = pdfWinRef.current
-              pdfWinRef.current = null
+              // Окно открывается ВНУТРИ callback модала — прямой клик пользователя
               askSignature((withSign) => {
+                const win = pdfWinRef.current
+                pdfWinRef.current = null
                 generateAVR({
                   number: avrNumber, date: formatDate(invoice.created_at),
                   contractNumber: contractNumber || undefined,
@@ -602,7 +587,7 @@ export default function InvoicePage() {
             }}
           />
 
-          {/* Накладная — Про, только если есть товары */}
+          {/* Накладная */}
           <DocButton
             label="Накладная на отпуск товара"
             icon="📦"
@@ -625,9 +610,10 @@ export default function InvoicePage() {
                 vat_type: profile?.vat_type || 'no_vat',
               })
               setNaklCount(prev => prev + 1)
-              const win = pdfWinRef.current
-              pdfWinRef.current = null
+              // Окно открывается ВНУТРИ callback модала — прямой клик пользователя
               askSignature((withSign) => {
+                const win = pdfWinRef.current
+                pdfWinRef.current = null
                 generateNakladnaya({
                   number: naklNumber, date: formatDate(invoice.created_at),
                   clientName: invoice.client_name || '', clientBin: invoice.client_bin || '',
@@ -640,7 +626,7 @@ export default function InvoicePage() {
             }}
           />
 
-          {/* Шаблон — Про */}
+          {/* Шаблон */}
           <LockedButton
             label="Сохранить как шаблон"
             icon="⭐"
@@ -668,7 +654,6 @@ export default function InvoicePage() {
             <span className="text-gray-300">›</span>
           </button>
 
-          {/* Повторяющиеся — Про */}
           <LockedButton
             label={invoice.recurring_active ? 'Повторение включено' : 'Повторять ежемесячно'}
             icon="🔄"
@@ -746,7 +731,7 @@ export default function InvoicePage() {
         </div>
       )}
 
-      {/* Модал подписи */}
+      {/* Модал подписи — здесь открываем window.open (прямой клик пользователя → iOS не блокирует) */}
       {showSignModal && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-end">
           <div className="bg-white w-full max-w-lg mx-auto rounded-t-3xl p-6">
@@ -762,6 +747,7 @@ export default function InvoicePage() {
                   showUpgrade('PDF с подписью доступен с тарифа Базовый', 'basic')
                   return
                 }
+                // Открываем окно здесь — прямой клик пользователя, iOS разрешает
                 pdfWinRef.current = window.open('', '_blank')
                 setShowSignModal(false)
                 if (pendingDocAction) pendingDocAction(true)
@@ -771,6 +757,7 @@ export default function InvoicePage() {
                 {!ap.canSign && <span className="absolute top-1 right-2 text-xs text-amber-500">🔒 Базовый+</span>}
               </button>
               <button onClick={() => {
+                // Открываем окно здесь — прямой клик пользователя, iOS разрешает
                 pdfWinRef.current = window.open('', '_blank')
                 setShowSignModal(false)
                 if (pendingDocAction) pendingDocAction(false)
