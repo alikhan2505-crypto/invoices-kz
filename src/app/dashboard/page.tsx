@@ -33,8 +33,7 @@ export default function Dashboard() {
   const [showBankPicker, setShowBankPicker] = useState(false)
   const [pendingInvoiceData, setPendingInvoiceData] = useState<any>(null)
   // Ref для хранения открытого окна PDF
-  const pdfWinRef = useRef<Window | null>(null)
-
+ 
   const [clientName, setClientName] = useState('')
   const [clientBin, setClientBin] = useState('')
   const [clientEmail, setClientEmail] = useState('')
@@ -214,8 +213,7 @@ export default function Dashboard() {
     if (!pendingInvoiceData) return
     const { invoiceNumber, invoiceDate, cn, cb, ce, ca, cp, cn2, cd, svcs, tot, nt, knp } = pendingInvoiceData
     // Берём окно из ref (было открыто при клике на банк — прямой клик пользователя)
-    const win = pdfWinRef.current
-    pdfWinRef.current = null
+    const win = window.open('', '_blank')
     await generateInvoicePDF({
       number: invoiceNumber,
       date: invoiceDate,
@@ -251,46 +249,35 @@ export default function Dashboard() {
   }
 
   async function createInvoice() {
-    // ⚡ Открываем окно ПЕРВЫМ — до любых await, iOS разрешает window.open только в прямом обработчике клика
-    const pdfWin = window.open('', '_blank')
-
     if (!profile?.company_name || !profile?.bin_iin) {
-      pdfWin?.close()
       alert('Сначала заполните реквизиты компании в Профиле')
       router.push('/profile/requisites')
       return
     }
 
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      pdfWin?.close()
-      alert('Войдите в систему')
-      return
-    }
+    if (!user) { alert('Войдите в систему'); return }
 
     const { data: banks } = await supabase
       .from('bank_accounts').select('*').eq('user_id', user.id).order('is_main', { ascending: false })
 
     if (!banks || banks.length === 0) {
-      pdfWin?.close()
       if (confirm('Не заполнены банковские реквизиты — они нужны для PDF. Заполнить сейчас?')) {
         router.push('/profile/banks')
       }
       return
     }
 
-    if (!clientName) { pdfWin?.close(); alert('Введите название клиента'); return }
-    if (!clientBin) { pdfWin?.close(); alert('Введите БИН/ИИН клиента'); return }
+    if (!clientName) { alert('Введите название клиента'); return }
+    if (!clientBin) { alert('Введите БИН/ИИН клиента'); return }
     if (services.length === 0 || services.some(s => !s.name)) {
-      pdfWin?.close(); alert('Добавьте хотя бы одну услугу'); return
+      alert('Добавьте хотя бы одну услугу'); return
     }
     if (services.some(s => s.price === 0)) {
-      pdfWin?.close(); alert('Укажите цену для всех услуг'); return
+      alert('Укажите цену для всех услуг'); return
     }
     if (lastCreated && Date.now() - lastCreated < 180000) {
-      if (!confirm('Вы уже создали счёт недавно. Создать ещё один?')) {
-        pdfWin?.close(); return
-      }
+      if (!confirm('Вы уже создали счёт недавно. Создать ещё один?')) return
     }
 
     setLoading(true)
@@ -298,7 +285,6 @@ export default function Dashboard() {
     const activePlan = getActivePlan(profile)
 
     if (activePlan.invoiceLimit !== null && monthCount >= activePlan.invoiceLimit) {
-      pdfWin?.close()
       setLoading(false)
       if (activePlan.plan === 'free') {
         alert(`На бесплатном тарифе максимум ${activePlan.invoiceLimit} счета в месяц. Перейдите на платный тариф.`)
@@ -314,7 +300,6 @@ export default function Dashboard() {
     }
 
     if (!activePlan.isActive && activePlan.plan === 'free') {
-      pdfWin?.close()
       router.push('/upgrade')
       setLoading(false)
       return
@@ -343,7 +328,6 @@ export default function Dashboard() {
     }).select().single()
 
     if (error) {
-      pdfWin?.close()
       alert('Ошибка: ' + error.message)
       setLoading(false)
       return
@@ -358,7 +342,6 @@ export default function Dashboard() {
 
     if (banks.length > 1) {
       // Несколько банков — сохраняем окно в ref, откроется при выборе банка
-      pdfWinRef.current = pdfWin
       setBankAccounts(banks)
       setPendingInvoiceData({
         invoiceNumber: data.number,
@@ -387,7 +370,7 @@ export default function Dashboard() {
         bik: bank.bik || '',
         kbe: bank.kbe || '19',
       },
-    }, pdfWin)
+    }, window.open('', '_blank'))
 
     const alreadyExists = clients.find(c => c.bin_iin === clientBin)
     if (!alreadyExists && clientBin) {
@@ -770,8 +753,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between mb-4">
               <span className="font-semibold text-[#1C2056]">Выберите счёт для PDF</span>
               <button onClick={() => {
-                pdfWinRef.current?.close()
-                pdfWinRef.current = null
+
                 setShowBankPicker(false)
                 setPendingInvoiceData(null)
               }} className="text-gray-400 text-xl">✕</button>
