@@ -97,8 +97,8 @@ function countToWords(n: number): string {
   return n <= 20 ? words[n] : String(n)
 }
 
-export async function generateNakladnaya(data: NakladnayaData) {
-  const win = window.open('', '_blank')
+export async function generateNakladnaya(data: NakladnayaData, existingWin?: Window | null) {
+  const win = existingWin || window.open('', '_blank')
 
   const p = data.profile
   const companyName = p?.company_name || ''

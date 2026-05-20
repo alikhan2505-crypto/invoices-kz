@@ -1,13 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
-import { useRouter, useParams } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
-import { generateInvoicePDF } from '@/lib/generatePDF'
-import { formatDateTime, formatDate } from '@/lib/date'
-import { generateKP } from '@/lib/generateKP'
-import { generateAVR } from '@/lib/generateAVR'
-import { generateNakladnaya } from '@/lib/generateNakladnaya'
-import { getActivePlan } from '@/lib/plan'
+import { useState, useEffect, useRef } from 'react'
 
 const statusLabel: Record<string, { text: string; color: string; dot: string }> = {
   paid:    { text: 'Оплачен',    color: 'text-green-600',  dot: 'bg-green-500' },
@@ -41,6 +33,7 @@ export default function InvoicePage() {
   const [kpCount, setKpCount] = useState(0)
   const [avrCount, setAvrCount] = useState(0)
   const [naklCount, setNaklCount] = useState(0)
+  const pdfWinRef = useRef<Window | null>(null)
 
   useEffect(() => { loadInvoice() }, [])
 
@@ -199,6 +192,8 @@ export default function InvoicePage() {
   function openPDF(withSignature = true) {
     if (!invoice || !profile) { alert('Данные ещё загружаются'); return }
     const services = invoice.services || [{ name: 'Услуга', qty: 1, price: invoice.amount }]
+    const win = pdfWinRef.current
+    pdfWinRef.current = null
     generateInvoicePDF({
       number: invoice.number, date: formatDate(invoice.created_at),
       clientName: invoice.client_name || '', clientBin: invoice.client_bin || '',
@@ -209,7 +204,7 @@ export default function InvoicePage() {
       autoPrint: false, vatType: profile?.vat_type,
       profile: buildProfile(withSignature),
       bank: bank ? { bank_name: bank.bank_name, iik: bank.iik, bik: bank.bik, kbe: bank.kbe } : undefined,
-    })
+    }, win)
   }
 
   // Подсчёт сумм по типу услуг/товаров
@@ -377,7 +372,10 @@ export default function InvoicePage() {
             <div className="text-xl mb-1">🔗</div>
             <div className="text-xs text-gray-500">Ссылка</div>
           </button>
-          <button onClick={() => askSignature((w) => openPDF(w))}
+          <button onClick={() => {
+            pdfWinRef.current = window.open('', '_blank')
+            askSignature((w) => openPDF(w))
+          }}
             className="bg-white rounded-xl p-3 text-center shadow-sm hover:bg-gray-50">
             <div className="text-xl mb-1">📄</div>
             <div className="text-xs text-gray-500">PDF</div>
@@ -520,6 +518,7 @@ export default function InvoicePage() {
             lockedLabel="Доступно на тарифе Про"
             savedCount={kpCount}
             onClick={async () => {
+              pdfWinRef.current = window.open('', '_blank')
               if (!profile) return
               const { data: { user } } = await supabase.auth.getUser()
               if (!user) return
@@ -536,6 +535,8 @@ export default function InvoicePage() {
                 note: invoice.note, vat_type: profile?.vat_type || 'no_vat',
               })
               setKpCount(prev => prev + 1)
+              const win = pdfWinRef.current
+              pdfWinRef.current = null
               askSignature((withSign) => {
                 generateKP({
                   number: kpNumber, date: formatDate(invoice.created_at), validUntil,
@@ -544,7 +545,7 @@ export default function InvoicePage() {
                   note: invoice.note || '', vatType: profile?.vat_type || 'no_vat',
                   profile: buildProfile(withSign),
                   bank: bank ? { bank_name: bank.bank_name, iik: bank.iik, bik: bank.bik, kbe: bank.kbe } : undefined,
-                })
+                }, win)
               })
             }}
           />
@@ -559,6 +560,7 @@ export default function InvoicePage() {
             disabled={!hasServices}
             disabledReason="Нет услуг в счёте"
             onClick={async () => {
+              pdfWinRef.current = window.open('', '_blank')
               if (!profile) return
               const { data: { user } } = await supabase.auth.getUser()
               if (!user) return
@@ -577,6 +579,8 @@ export default function InvoicePage() {
                 vat_type: profile?.vat_type || 'no_vat',
               })
               setAvrCount(prev => prev + 1)
+              const win = pdfWinRef.current
+              pdfWinRef.current = null
               askSignature((withSign) => {
                 generateAVR({
                   number: avrNumber, date: formatDate(invoice.created_at),
@@ -588,7 +592,7 @@ export default function InvoicePage() {
                   total: serviceTotal,
                   vatType: profile?.vat_type || 'no_vat',
                   profile: buildProfile(withSign),
-                })
+                }, win)
               })
             }}
           />
@@ -603,6 +607,7 @@ export default function InvoicePage() {
             disabled={!hasProducts}
             disabledReason="Нет товаров в счёте"
             onClick={async () => {
+              pdfWinRef.current = window.open('', '_blank')
               if (!profile) return
               const { data: { user } } = await supabase.auth.getUser()
               if (!user) return
@@ -616,6 +621,8 @@ export default function InvoicePage() {
                 vat_type: profile?.vat_type || 'no_vat',
               })
               setNaklCount(prev => prev + 1)
+              const win = pdfWinRef.current
+              pdfWinRef.current = null
               askSignature((withSign) => {
                 generateNakladnaya({
                   number: naklNumber, date: formatDate(invoice.created_at),
@@ -624,7 +631,7 @@ export default function InvoicePage() {
                   total: productTotal,
                   vatType: profile?.vat_type || 'no_vat',
                   profile: buildProfile(withSign),
-                })
+                }, win)
               })
             }}
           />

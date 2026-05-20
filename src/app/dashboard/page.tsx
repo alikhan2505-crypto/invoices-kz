@@ -206,7 +206,7 @@ export default function Dashboard() {
     }
   }
 
-  async function generateWithBank(bank: any) {
+  async function generateWithBank(bank: any, pdfWin?: Window | null) {
     if (!pendingInvoiceData) return
     const { invoiceNumber, invoiceDate, cn, cb, ce, ca, cp, cn2, cd, svcs, tot, nt, knp } = pendingInvoiceData
     await generateInvoicePDF({
@@ -232,7 +232,7 @@ export default function Dashboard() {
         bik: bank.bik || '',
         kbe: bank.kbe || '19',
       },
-    })
+    }, pdfWin)
     setShowBankPicker(false)
     setPendingInvoiceData(null)
 
@@ -360,6 +360,7 @@ export default function Dashboard() {
     }
 
     const bank = banks[0]
+    const pdfWin = window.open('', '_blank')
     await generateInvoicePDF({
       number: data.number,
       date: invoiceDate,
@@ -383,7 +384,7 @@ export default function Dashboard() {
         bik: bank.bik || '',
         kbe: bank.kbe || '19',
       },
-    })
+    }, pdfWin)
 
     const alreadyExists = clients.find(c => c.bin_iin === clientBin)
     if (!alreadyExists && clientBin) {
@@ -771,7 +772,7 @@ export default function Dashboard() {
             </div>
             <div className="space-y-2">
               {bankAccounts.map(bank => (
-                <div key={bank.id} onClick={() => generateWithBank(bank)}
+                <div key={bank.id} onClick={() => { const pdfWin = window.open('', '_blank'); generateWithBank(bank, pdfWin) }}
                   className="flex items-center justify-between p-4 rounded-xl border border-gray-100 cursor-pointer hover:border-[#1C2056] hover:bg-gray-50">
                   <div>
                     <div className="flex items-center gap-2">

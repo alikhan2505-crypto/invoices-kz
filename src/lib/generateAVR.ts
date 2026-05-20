@@ -68,9 +68,8 @@ async function resizeSquare(url: string, size: number): Promise<string> {
   })
 }
 
-export async function generateAVR(data: AVRData) {
-  // Открываем окно ДО async операций — иначе iOS блокирует
-  const win = window.open('', '_blank')
+export async function generateAVR(data: AVRData, existingWin?: Window | null) {
+  const win = existingWin || window.open('', '_blank')
 
   const p = data.profile
   const companyName = p?.company_name || ''

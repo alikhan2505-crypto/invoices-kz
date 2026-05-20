@@ -35,7 +35,7 @@ interface KPData {
   }
 }
 
-export function generateKP(data: KPData) {
+export function generateKP(data: KPData, existingWin?: Window | null) {
   const p = data.profile
   const b = data.bank
 
@@ -416,7 +416,7 @@ export function generateKP(data: KPData) {
     </html>
   `
 
-  const win = window.open('', '_blank')
+  const win = existingWin || window.open('', '_blank')
   if (win) {
     win.document.write(html)
     win.document.close()

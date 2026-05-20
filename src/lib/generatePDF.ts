@@ -121,9 +121,9 @@ function numberToWords(n: number): string {
   return result.trim()
 }
 
-export async function generateInvoicePDF(data: InvoiceData) {
+export async function generateInvoicePDF(data: InvoiceData, existingWin?: Window | null) {
   // ⚡ ВАЖНО: открываем окно ДО async операций — иначе iOS блокирует!
-  const win = window.open('', '_blank')
+  const win = existingWin || window.open('', '_blank')
 
   const p = data.profile
   const b = data.bank
