@@ -355,10 +355,10 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<string> {
             if (spacer) spacer.style.display = 'none'
             const element = document.body.cloneNode(true)
             const opt = {
-              margin: [10, 10, 10, 10],
+              margin: 0,
               filename: 'Счёт-${data.number}.pdf',
               image: { type: 'jpeg', quality: 0.98 },
-              html2canvas: { scale: 2, useCORS: true, logging: false, windowWidth: 794 },
+              html2canvas: { scale: 2, useCORS: true, logging: false, windowWidth: 794, windowHeight: 1123, scrollX: 0, scrollY: 0 },
               jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
             }
             html2pdf().set(opt).from(document.body).save().then(() => {
