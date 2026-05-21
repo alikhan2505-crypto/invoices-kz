@@ -50,6 +50,9 @@ export default function Dashboard() {
   const vatAmount = vatType === 'vat_16' ? Math.round(total - total / 1.16) : 0
   const totalWithoutVat = vatType === 'vat_16' ? Math.round(total / 1.16) : total
 
+  const [showPDFModal, setShowPDFModal] = useState(false)
+  const [pdfHTML, setPdfHTML] = useState('')
+
   const load = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
@@ -213,8 +216,7 @@ export default function Dashboard() {
     if (!pendingInvoiceData) return
     const { invoiceNumber, invoiceDate, cn, cb, ce, ca, cp, cn2, cd, svcs, tot, nt, knp } = pendingInvoiceData
     // Берём окно из ref (было открыто при клике на банк — прямой клик пользователя)
-    const win = window.open('', '_blank')
-    await generateInvoicePDF({
+    const html = await generateInvoicePDF({
       number: invoiceNumber,
       date: invoiceDate,
       clientName: cn,
@@ -238,8 +240,10 @@ export default function Dashboard() {
         kbe: bank.kbe || '19',
       },
     }, win)
+    setPdfHTML(html)
     setShowBankPicker(false)
     setPendingInvoiceData(null)
+    setShowPDFModal(true)
 
     const alreadyExists = clients.find(c => c.bin_iin === cb)
     if (!alreadyExists && cb) {
@@ -358,7 +362,7 @@ export default function Dashboard() {
     }
 
     const bank = banks[0]
-    await generateInvoicePDF({
+    const html = await generateInvoicePDF({
       number: data.number, date: invoiceDate,
       clientName, clientBin, clientEmail, clientAddress, clientPhone,
       contractNumber, contractDate, knp: clientKnp, services, total,
@@ -370,7 +374,9 @@ export default function Dashboard() {
         bik: bank.bik || '',
         kbe: bank.kbe || '19',
       },
-    }, window.open('', '_blank'))
+    })
+    setPdfHTML(html)
+    setShowPDFModal(true)
 
     const alreadyExists = clients.find(c => c.bin_iin === clientBin)
     if (!alreadyExists && clientBin) {
@@ -776,6 +782,22 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      {showPDFModal && (
+        <div className="fixed inset-0 z-50 bg-white flex flex-col">
+          <div className="flex items-center justify-between px-4 py-3 border-b bg-white">
+            <button onClick={() => setShowPDFModal(false)}
+              className="text-sm text-gray-500">← Назад</button>
+            <span className="text-sm font-semibold text-[#1C2056]">Счёт</span>
+            <button onClick={() => {
+              const iframe = document.getElementById('dash-pdf-iframe') as HTMLIFrameElement
+              iframe?.contentWindow?.print()
+            }} className="text-sm text-[#1C2056] font-medium">🖨️ Печать</button>
+          </div>
+          <iframe id="dash-pdf-iframe" srcDoc={pdfHTML} className="flex-1 w-full border-none" />
+        </div>
+      )}
+
 
       <BottomNav />
     </main>
