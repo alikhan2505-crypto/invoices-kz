@@ -349,17 +349,21 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<string> {
             const btn = document.getElementById('downloadBtn')
             btn.textContent = '⏳ Загрузка...'
             btn.disabled = true
-            const toolbar = btn.closest('div[style*="position:fixed"]')
+            const toolbar = document.querySelector('.toolbar')
+            const spacer = toolbar?.nextElementSibling
             if (toolbar) toolbar.style.display = 'none'
+            if (spacer) spacer.style.display = 'none'
+            const element = document.body.cloneNode(true)
             const opt = {
-              margin: 0,
+              margin: [10, 10, 10, 10],
               filename: 'Счёт-${data.number}.pdf',
               image: { type: 'jpeg', quality: 0.98 },
-              html2canvas: { scale: 2, useCORS: true, logging: false },
+              html2canvas: { scale: 2, useCORS: true, logging: false, windowWidth: 794 },
               jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
             }
             html2pdf().set(opt).from(document.body).save().then(() => {
               if (toolbar) toolbar.style.display = 'flex'
+              if (spacer) spacer.style.display = 'block'
               btn.textContent = '💾 Скачать PDF'
               btn.disabled = false
             })
