@@ -239,7 +239,7 @@ export default function Dashboard() {
         bik: bank.bik || '',
         kbe: bank.kbe || '19',
       },
-    }, win)
+    })
     setPdfHTML(html)
     setShowBankPicker(false)
     setPendingInvoiceData(null)
