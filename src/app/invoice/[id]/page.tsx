@@ -213,7 +213,7 @@ export default function InvoicePage() {
       autoPrint: false, vatType: profile?.vat_type,
       profile: buildProfile(withSignature),
       bank: bank ? { bank_name: bank.bank_name, iik: bank.iik, bik: bank.bik, kbe: bank.kbe } : undefined,
-    }, win)
+    })
   }
 
   function calcServiceTotal(svcs: any[]) {
