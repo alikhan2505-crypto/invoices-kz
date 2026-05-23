@@ -788,15 +788,19 @@ export default function InvoicePage() {
                 document.head.appendChild(script)
                 await new Promise(r => script.onload = r)
                 
-                // Извлекаем только содержимое body
                 const parser = new DOMParser()
                 const doc = parser.parseFromString(pdfHTML, 'text/html')
-                const bodyContent = doc.body.innerHTML
+                
+                // Берём стили
+                const styles = Array.from(doc.querySelectorAll('style'))
+                  .map(s => s.outerHTML).join('')
                 
                 const div = document.createElement('div')
-                div.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;background:white;font-family:Arial,sans-serif;font-size:11px;'
-                div.innerHTML = bodyContent
+                div.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;min-height:1123px;background:white;'
+                div.innerHTML = styles + doc.body.innerHTML
                 document.body.appendChild(div)
+                
+                await new Promise(r => setTimeout(r, 500)) // ждём рендер
                 
                 ;(window as any).html2pdf().set({
                   margin: 0,
