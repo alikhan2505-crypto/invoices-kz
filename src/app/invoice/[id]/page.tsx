@@ -789,7 +789,7 @@ export default function InvoicePage() {
                 const script = iframeDoc.createElement('script')
                 script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js'
                 script.onload = () => {
-                  iframe.contentWindow!.eval(`
+                  ;(iframe.contentWindow as any).eval(`
                     html2pdf().set({
                       margin: 0,
                       filename: 'Счёт.pdf',
