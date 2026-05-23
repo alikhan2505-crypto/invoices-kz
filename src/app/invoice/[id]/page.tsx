@@ -787,14 +787,21 @@ export default function InvoicePage() {
                 script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js'
                 document.head.appendChild(script)
                 await new Promise(r => script.onload = r)
+                
+                // Извлекаем только содержимое body
+                const parser = new DOMParser()
+                const doc = parser.parseFromString(pdfHTML, 'text/html')
+                const bodyContent = doc.body.innerHTML
+                
                 const div = document.createElement('div')
-                div.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;background:white;'
-                div.innerHTML = pdfHTML
+                div.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;background:white;font-family:Arial,sans-serif;font-size:11px;'
+                div.innerHTML = bodyContent
                 document.body.appendChild(div)
+                
                 ;(window as any).html2pdf().set({
                   margin: 0,
                   filename: `Счёт-${invoice.number}.pdf`,
-                  html2canvas: { scale: 2, useCORS: true, windowWidth: 794 },
+                  html2canvas: { scale: 2, useCORS: true, windowWidth: 794, scrollX: 0, scrollY: 0 },
                   jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
                 }).from(div).save().then(() => {
                   document.body.removeChild(div)
