@@ -285,7 +285,7 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<string> {
 
       <div class="total-words">
         Всего наименований ${data.services.length}, на сумму ${formatMoney(data.total)} KZT<br>
-        Всего к оплате: ${totalWords}
+        Всего к оплате: ${totalWords}<br>
       </div>
 
       ${data.note ? `<div class="note"><b>Примечание:</b> ${data.note}</div>` : ''}
@@ -319,12 +319,23 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<string> {
         />` : ''}
       </div>
 
-      <script>
-        window.onload = function() {
-          document.querySelectorAll('img').forEach(img => img.decode?.())
-        }
-      <\/script>
-      
+      ${data.autoPrint !== false ? `
+        <script>
+          window.onload = function() {
+            const images = document.querySelectorAll('img')
+            if (images.length === 0) { window.print(); return }
+            let loaded = 0
+            images.forEach(img => {
+              if (img.complete) { loaded++; if (loaded === images.length) window.print() }
+              else {
+                img.onload = () => { loaded++; if (loaded === images.length) window.print() }
+                img.onerror = () => { loaded++; if (loaded === images.length) window.print() }
+              }
+            })
+          }
+        <\/script>
+      ` : ''}
+
     </body>
     </html>
   `
