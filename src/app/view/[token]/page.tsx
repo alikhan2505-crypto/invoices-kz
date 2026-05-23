@@ -68,7 +68,7 @@ export default function PublicInvoice() {
 
   async function openPDF() {
     if (!invoice) return
-    const services = invoice.services || [{ name: 'Услуга', qty: 1, price: invoice.amount }]
+    const invoiceServices = invoice.services || [{ name: 'Услуга', qty: 1, price: invoice.amount }]
     const win = window.open('', '_blank')
     const html = await generateInvoicePDF({
       number: invoice.number,
@@ -78,7 +78,7 @@ export default function PublicInvoice() {
       clientEmail: invoice.client_email || '',
       clientAddress: invoice.client_address || '',
       knp: invoice.knp || '849',
-      services,
+      services: invoiceServices,
       total: Number(invoice.amount),
       note: invoice.note || '',
       profile: {
@@ -98,7 +98,7 @@ export default function PublicInvoice() {
       autoPrint: false,
     })
   if (win) { win.document.write(html); win.document.close() }
-
+}
   if (loading) return (
     <main className="min-h-screen bg-gray-50 flex items-center justify-center">
       <p className="text-gray-400">Загрузка...</p>
