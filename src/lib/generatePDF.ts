@@ -343,7 +343,13 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<string> {
               filename: 'Счёт-${data.number}.pdf',
               html2canvas: { scale: 2, useCORS: true, windowWidth: 794, scrollX: 0, scrollY: 0 },
               jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-            }).from(document.body).save()
+            const el = document.querySelector('body > div:not([style*="position:fixed"])') || document.body
+            html2pdf().set({
+              margin: 0,
+              filename: 'Счёт-${data.number}.pdf',
+              html2canvas: { scale: 2, useCORS: true, windowWidth: 794, scrollX: 0, scrollY: 0, backgroundColor: '#ffffff' },
+              jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            }).from(el).save()
           }
         <\/script>
       `}
