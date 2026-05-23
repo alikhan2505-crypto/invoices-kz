@@ -711,7 +711,7 @@ export default function Dashboard() {
           <div className="bg-white w-full max-w-lg mx-auto rounded-t-3xl p-5 max-h-[70vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <span className="font-semibold text-[#1C2056]">Выберите услугу</span>
-              <button onClick={() => setShowServicePicker(false)} className="text-gray-400 text-xl">✕</button>
+              <button onClick={() => setShowServicePicker(false)} className="back-btn text-gray-400 text-xl">✕</button>
             </div>
             <div className="space-y-2">
               {savedServices.map(s => (
@@ -762,7 +762,7 @@ export default function Dashboard() {
 
                 setShowBankPicker(false)
                 setPendingInvoiceData(null)
-              }} className="text-gray-400 text-xl">✕</button>
+              }} className="back-btn text-gray-400 text-xl">✕</button>
             </div>
             <div className="space-y-2">
               {bankAccounts.map(bank => (

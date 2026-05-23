@@ -390,7 +390,7 @@ export default function Signature() {
   return (
     <main className="min-h-screen bg-gray-50 flex flex-col">
       <div className="sticky top-0 z-10 bg-white border-b px-4 py-4 flex items-center gap-3">
-        <button onClick={() => router.push('/profile')} className="text-gray-400 text-xl">‹</button>
+        <button onClick={() => router.push('/profile')} className="back-btn text-gray-400 text-xl">‹</button>
         <span className="font-semibold text-[#1C2056]">Подпись и печать</span>
       </div>
 
@@ -512,7 +512,7 @@ export default function Signature() {
                 <div className="font-semibold text-[#1C2056]">Выберите область печати</div>
                 <div className="text-xs text-gray-400 mt-0.5">Перемещайте рамку · Щипок для размера</div>
               </div>
-              <button onClick={() => setShowCropModal(false)} className="text-gray-400 text-xl">✕</button>
+              <button onClick={() => setShowCropModal(false)} className="back-btn text-gray-400 text-xl">✕</button>
             </div>
 
             {/* Canvas кропа */}

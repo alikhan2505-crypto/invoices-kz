@@ -174,20 +174,6 @@ export default function PublicInvoice() {
           </div>
         </div>
 
-       {/* Информация о компании */}
-        {(profile?.phone || profile?.website || profile?.social_links?.length > 0) && (
-          <div className="border-t border-gray-100 pt-3">
-            <div className="text-xs text-gray-400 mb-2">Контакты</div>
-            {profile?.phone && <div className="text-xs text-gray-600">📞 {profile.phone}</div>}
-            {profile?.website && (
-              <a href={profile.website.startsWith('http') ? profile.website : 'https://' + profile.website}
-                target="_blank" className="text-xs text-[#1C2056] underline block mt-1">
-                🌐 {profile.website}
-              </a>
-            )}
-          </div>
-        )} 
-
         {/* Services */}
         {services.length > 0 && (
           <div className="bg-white rounded-2xl shadow-sm overflow-hidden">

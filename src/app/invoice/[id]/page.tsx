@@ -336,7 +336,7 @@ export default function InvoicePage() {
   return (
     <main className="min-h-screen bg-gray-50 pb-8">
       <div className="bg-white border-b px-4 py-4 flex items-center gap-3">
-        <button onClick={() => router.push('/history')} className="text-gray-400 text-xl">‹</button>
+        <button onClick={() => router.push('/history')} className="back-btn text-gray-400 text-xl">‹</button>
         <span className="font-semibold text-[#1C2056]">Счёт {invoice.number}</span>
       </div>
 

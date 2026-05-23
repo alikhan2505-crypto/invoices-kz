@@ -186,7 +186,7 @@ export default function Upgrade() {
   return (
     <main className="min-h-screen bg-gray-50 flex flex-col">
       <div className="bg-white border-b px-4 py-3 flex items-center gap-3">
-        <button onClick={() => router.back()} className="text-gray-400 text-xl">‹</button>
+        <button onClick={() => router.back()} className="back-btn text-gray-400 text-xl">‹</button>
         <span className="font-semibold text-[#1C2056]">Тарифы</span>
       </div>
 
@@ -305,7 +305,7 @@ export default function Upgrade() {
                   <button onClick={() => {
                     clearInterval(statusInterval.current)
                     setShowModal(false)
-                  }} className="text-gray-400 text-xl">✕</button>
+                  }} className="back-btn text-gray-400 text-xl">✕</button>
                 </div>
 
                 {isMobile ? (
@@ -409,7 +409,7 @@ export default function Upgrade() {
           <div className="bg-white w-full max-w-lg mx-auto rounded-t-3xl p-6">
             <div className="flex items-center justify-between mb-5">
               <div className="font-semibold text-[#1C2056]">Оплата по номеру телефона</div>
-              <button onClick={() => setShowPhoneModal(false)} className="text-gray-400 text-xl">✕</button>
+              <button onClick={() => setShowPhoneModal(false)} className="back-btn text-gray-400 text-xl">✕</button>
             </div>
 
             <div className="bg-blue-50 rounded-2xl p-4 mb-5">

@@ -133,7 +133,7 @@ export default function EditInvoice() {
   return (
     <main className="min-h-screen bg-gray-50 pb-8">
       <div className="sticky top-0 z-10 bg-white border-b px-4 py-4 flex items-center gap-3">
-        <button onClick={() => router.push('/invoice/' + id)} className="text-gray-400 text-xl">‹</button>
+        <button onClick={() => router.push('/invoice/' + id)} className="back-btn text-gray-400 text-xl">‹</button>
         <span className="font-semibold text-[#1C2056]">Редактировать счёт</span>
       </div>
 

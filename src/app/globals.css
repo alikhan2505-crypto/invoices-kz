@@ -244,15 +244,6 @@ main {
   color: #e2e8f0 !important;
 }
 
-/* 1. Splash screen — синий фон при загрузке */
-body {
-  background: #1C2056;
-}
-
-main {
-  background: #f9fafb;
-  animation: pageFade 0.25s ease-out;
-}
 
 /* 2. Анимация нажатия кнопок */
 button, a[href] {
@@ -280,4 +271,9 @@ button:active, a[href]:active {
 .back-btn:active {
   background: #e5e7eb;
   transform: scale(0.92);
+}
+
+/* Синий фон пока грузится страница = плавный переход со сплэшем */
+html {
+  background: #1C2056;
 }
