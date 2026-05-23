@@ -355,13 +355,16 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<string> {
             const spacer = toolbar?.nextElementSibling
             if (toolbar) toolbar.style.display = 'none'
             if (spacer) spacer.style.display = 'none'
+            const content = document.body.cloneNode(true)
+            content.querySelector('.toolbar')?.remove()
+            content.querySelector('[style*="height:55px"]')?.remove()
             html2pdf().set({
-              margin: 0,
+              margin: [10, 15, 15, 15],
               filename: 'Счёт-${data.number}.pdf',
               image: { type: 'jpeg', quality: 0.98 },
-              html2canvas: { scale: 2, useCORS: true, logging: false, windowWidth: 794, scrollX: 0, scrollY: 0 },
+              html2canvas: { scale: 2, useCORS: true, logging: false, windowWidth: 794 },
               jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-            }).from(document.body).save().then(() => {
+            }).from(content).save().then(() => {
               if (toolbar) toolbar.style.display = 'flex'
               if (spacer) spacer.style.display = 'block'
               btn.textContent = '💾 Скачать PDF'
