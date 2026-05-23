@@ -44,6 +44,9 @@ export default function InvoicePage() {
   // Ref для хранения открытого окна — открывается в модале (прямой клик пользователя)
   const pdfWinRef = useRef<Window | null>(null)
 
+  const [showPDFModal, setShowPDFModal] = useState(false)
+  const [pdfHTML, setPdfHTML] = useState('')
+
   useEffect(() => { loadInvoice() }, [])
 
   async function loadInvoice() {
@@ -197,23 +200,22 @@ export default function InvoicePage() {
     window.location.href = `https://wa.me/?text=${encodeURIComponent(text)}`
   }
 
-  // openPDF читает pdfWinRef.current внутри — окно открыто кнопкой модала (прямой клик)
-  function openPDF(withSignature = true) {
-    if (!invoice || !profile) { alert('Данные ещё загружаются'); return }
-    const services = invoice.services || [{ name: 'Услуга', qty: 1, price: invoice.amount }]
-    const win = pdfWinRef.current
-    pdfWinRef.current = null
-    generateInvoicePDF({
+  async function openPDF(withSignature = true) {
+    if (!invoice || !profile) return
+    const html = await generateInvoicePDF({
       number: invoice.number, date: formatDate(invoice.created_at),
       clientName: invoice.client_name || '', clientBin: invoice.client_bin || '',
       clientEmail: invoice.client_email || '', clientAddress: invoice.client_address || '',
       clientPhone: invoice.client_phone || '', contractNumber: invoice.contract_number || '',
-      contractDate: invoice.contract_date || '', services,
+      contractDate: invoice.contract_date || '',
+      services: invoice.services || [],
       total: Number(invoice.amount), note: invoice.note || profile?.default_note || '',
       autoPrint: false, vatType: profile?.vat_type,
       profile: buildProfile(withSignature),
       bank: bank ? { bank_name: bank.bank_name, iik: bank.iik, bik: bank.bik, kbe: bank.kbe } : undefined,
     })
+    setPdfHTML(html)
+    setShowPDFModal(true)
   }
 
   function calcServiceTotal(svcs: any[]) {
@@ -747,8 +749,7 @@ export default function InvoicePage() {
                   showUpgrade('PDF с подписью доступен с тарифа Базовый', 'basic')
                   return
                 }
-                // Открываем окно здесь — прямой клик пользователя, iOS разрешает
-                pdfWinRef.current = window.open('', '_blank')
+           
                 setShowSignModal(false)
                 if (pendingDocAction) pendingDocAction(true)
               }}
@@ -757,8 +758,7 @@ export default function InvoicePage() {
                 {!ap.canSign && <span className="absolute top-1 right-2 text-xs text-amber-500">🔒 Базовый+</span>}
               </button>
               <button onClick={() => {
-                // Открываем окно здесь — прямой клик пользователя, iOS разрешает
-                pdfWinRef.current = window.open('', '_blank')
+                
                 setShowSignModal(false)
                 if (pendingDocAction) pendingDocAction(false)
               }}
@@ -771,6 +771,21 @@ export default function InvoicePage() {
           </div>
         </div>
       )}
+
+      {showPDFModal && (
+        <div className="fixed inset-0 z-50 bg-white flex flex-col">
+          <div className="flex items-center justify-between px-4 py-3 border-b bg-white">
+            <button onClick={() => setShowPDFModal(false)} className="text-sm text-gray-500">← Назад</button>
+            <span className="text-sm font-semibold text-[#1C2056]">Счёт {invoice.number}</span>
+            <button onClick={() => {
+              const iframe = document.getElementById('inv-pdf-iframe') as HTMLIFrameElement
+              iframe?.contentWindow?.print()
+            }} className="text-sm text-[#1C2056] font-medium">🖨️ Печать</button>
+          </div>
+          <iframe id="inv-pdf-iframe" srcDoc={pdfHTML} className="flex-1 w-full border-none" />
+        </div>
+      )}
+
     </main>
   )
 }
