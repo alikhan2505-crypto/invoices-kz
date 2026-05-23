@@ -783,17 +783,11 @@ export default function InvoicePage() {
                 iframe?.contentWindow?.print()
               }} className="text-sm bg-[#1C2056] text-white px-3 py-1.5 rounded-lg">🖨️ Печать</button>
               <button onClick={() => {
-                const iframe = document.getElementById('inv-pdf-iframe') as HTMLIFrameElement
-                const win = iframe?.contentWindow as any
-                if (!win) return
-                const tryCall = () => {
-                  if (typeof win.downloadPDF === 'function') {
-                    win.downloadPDF()
-                  } else {
-                    setTimeout(tryCall, 200)
-                  }
+                const win = window.open('', '_blank')
+                if (win) {
+                  win.document.write(pdfHTML)
+                  win.document.close()
                 }
-                tryCall()
               }} className="text-sm bg-[#2DC48D] text-white px-3 py-1.5 rounded-lg">💾 Сохранить PDF</button>
             </div>
           </div>
