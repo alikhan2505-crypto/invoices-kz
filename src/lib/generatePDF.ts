@@ -123,6 +123,7 @@ function numberToWords(n: number): string {
 
 export async function generateInvoicePDF(data: InvoiceData): Promise<string> {
 
+
   const p = data.profile
   const b = data.bank
 
@@ -335,18 +336,36 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<string> {
           }
         <\/script>
       ` : `
+        <div class="toolbar" style="position:fixed; top:0; left:0; right:0; background:white; border-bottom:1px solid #e5e7eb; padding:10px 16px; z-index:999; display:flex; align-items:center; justify-content:space-between; gap:8px;">
+          <button onclick="window.close()" style="background:#f3f4f6; color:#374151; border:none; padding:8px 14px; border-radius:8px; cursor:pointer; font-size:13px;">← Назад</button>
+          <span style="font-size:12px; color:#6b7280; font-weight:600;">Счёт №${data.number}</span>
+          <div style="display:flex; gap:6px;">
+            <button onclick="window.print()" style="background:#1C2056; color:white; border:none; padding:8px 14px; border-radius:8px; cursor:pointer; font-size:13px;">🖨️ Печать</button>
+            <button id="dlBtn" onclick="downloadPDF()" style="background:#2DC48D; color:white; border:none; padding:8px 14px; border-radius:8px; cursor:pointer; font-size:13px;">💾 Скачать PDF</button>
+          </div>
+        </div>
+        <div style="height:55px;"></div>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"><\/script>
         <script>
           function downloadPDF() {
             const btn = document.getElementById('dlBtn')
-            if (btn) { btn.textContent = '⏳...'; btn.disabled = true }
+            btn.textContent = '⏳ Загрузка...'
+            btn.disabled = true
+            const toolbar = document.querySelector('.toolbar')
+            const spacer = toolbar?.nextElementSibling
+            if (toolbar) toolbar.style.display = 'none'
+            if (spacer) spacer.style.display = 'none'
             html2pdf().set({
               margin: 0,
               filename: 'Счёт-${data.number}.pdf',
-              html2canvas: { scale: 2, useCORS: true, windowWidth: 794, scrollX: 0, scrollY: 0 },
+              image: { type: 'jpeg', quality: 0.98 },
+              html2canvas: { scale: 2, useCORS: true, logging: false, windowWidth: 794, scrollX: 0, scrollY: 0 },
               jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
             }).from(document.body).save().then(() => {
-              if (btn) { btn.textContent = '💾 PDF'; btn.disabled = false }
+              if (toolbar) toolbar.style.display = 'flex'
+              if (spacer) spacer.style.display = 'block'
+              btn.textContent = '💾 Скачать PDF'
+              btn.disabled = false
             })
           }
         <\/script>

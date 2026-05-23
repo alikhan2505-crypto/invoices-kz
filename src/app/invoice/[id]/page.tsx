@@ -44,8 +44,6 @@ export default function InvoicePage() {
   // Ref для хранения открытого окна — открывается в модале (прямой клик пользователя)
   const pdfWinRef = useRef<Window | null>(null)
 
-  const [showPDFModal, setShowPDFModal] = useState(false)
-  const [pdfHTML, setPdfHTML] = useState('')
 
   useEffect(() => { loadInvoice() }, [])
 
@@ -202,6 +200,8 @@ export default function InvoicePage() {
 
   async function openPDF(withSignature = true) {
     if (!invoice || !profile) return
+    const win = pdfWinRef.current
+    pdfWinRef.current = null
     const html = await generateInvoicePDF({
       number: invoice.number, date: formatDate(invoice.created_at),
       clientName: invoice.client_name || '', clientBin: invoice.client_bin || '',
@@ -214,8 +214,7 @@ export default function InvoicePage() {
       profile: buildProfile(withSignature),
       bank: bank ? { bank_name: bank.bank_name, iik: bank.iik, bik: bank.bik, kbe: bank.kbe } : undefined,
     })
-    setPdfHTML(html)
-    setShowPDFModal(true)
+    if (win) { win.document.write(html); win.document.close() }
   }
 
   function calcServiceTotal(svcs: any[]) {
@@ -749,7 +748,7 @@ export default function InvoicePage() {
                   showUpgrade('PDF с подписью доступен с тарифа Базовый', 'basic')
                   return
                 }
-           
+                pdfWinRef.current = window.open('', '_blank')
                 setShowSignModal(false)
                 if (pendingDocAction) pendingDocAction(true)
               }}
@@ -758,7 +757,7 @@ export default function InvoicePage() {
                 {!ap.canSign && <span className="absolute top-1 right-2 text-xs text-amber-500">🔒 Базовый+</span>}
               </button>
               <button onClick={() => {
-                
+                pdfWinRef.current = window.open('', '_blank')
                 setShowSignModal(false)
                 if (pendingDocAction) pendingDocAction(false)
               }}
@@ -769,29 +768,6 @@ export default function InvoicePage() {
             <button onClick={() => setShowSignModal(false)}
               className="w-full text-gray-400 text-sm py-2">Отмена</button>
           </div>
-        </div>
-      )}
-
-      {showPDFModal && (
-        <div className="fixed inset-0 z-50 bg-white flex flex-col">
-          <div className="flex items-center justify-between px-4 py-3 border-b bg-white">
-            <button onClick={() => setShowPDFModal(false)} className="text-sm text-gray-500">← Назад</button>
-            <span className="text-sm font-semibold text-[#1C2056]">Счёт {invoice.number}</span>
-            <div className="flex gap-2">
-              <button onClick={() => {
-                const iframe = document.getElementById('inv-pdf-iframe') as HTMLIFrameElement
-                iframe?.contentWindow?.print()
-              }} className="text-sm bg-[#1C2056] text-white px-3 py-1.5 rounded-lg">🖨️ Печать</button>
-              <button onClick={() => {
-                const win = window.open('', '_blank')
-                if (win) {
-                  win.document.write(pdfHTML)
-                  win.document.close()
-                }
-              }} className="text-sm bg-[#2DC48D] text-white px-3 py-1.5 rounded-lg">💾 Сохранить PDF</button>
-            </div>
-          </div>
-          <iframe id="inv-pdf-iframe" srcDoc={pdfHTML} className="flex-1 w-full border-none" />
         </div>
       )}
 
