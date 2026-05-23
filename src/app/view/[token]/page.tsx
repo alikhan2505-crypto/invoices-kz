@@ -66,10 +66,11 @@ export default function PublicInvoice() {
     setMarking(false)
   }
 
-  function openPDF() {
+  async function openPDF() {
     if (!invoice) return
     const services = invoice.services || [{ name: 'Услуга', qty: 1, price: invoice.amount }]
-    generateInvoicePDF({
+    const win = window.open('', '_blank')
+    const html = await generateInvoicePDF({
       number: invoice.number,
       date: formatDate(invoice.created_at),
       clientName: invoice.client_name || '',
@@ -96,7 +97,7 @@ export default function PublicInvoice() {
       } : undefined,
       autoPrint: false,
     })
-  }
+  if (win) { win.document.write(html); win.document.close() }
 
   if (loading) return (
     <main className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -173,6 +174,20 @@ export default function PublicInvoice() {
           </div>
         </div>
 
+       {/* Информация о компании */}
+        {(profile?.phone || profile?.website || profile?.social_links?.length > 0) && (
+          <div className="border-t border-gray-100 pt-3">
+            <div className="text-xs text-gray-400 mb-2">Контакты</div>
+            {profile?.phone && <div className="text-xs text-gray-600">📞 {profile.phone}</div>}
+            {profile?.website && (
+              <a href={profile.website.startsWith('http') ? profile.website : 'https://' + profile.website}
+                target="_blank" className="text-xs text-[#1C2056] underline block mt-1">
+                🌐 {profile.website}
+              </a>
+            )}
+          </div>
+        )} 
+
         {/* Services */}
         {services.length > 0 && (
           <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
@@ -240,7 +255,7 @@ export default function PublicInvoice() {
             <div className="text-sm font-medium text-[#1C2056] mb-2">📋 Как оплатить</div>
             <div className="space-y-2">
               {[
-                { step: '1', text: 'Нажмите "Открыть счёт" — скачайте PDF' },
+                { step: '1', text: 'Нажмите "Открыть счёт" — скачайте PDF или оплатите через Kaspi/Halyk кнопкой ниже' },
                 { step: '2', text: 'Оплатите через свой банк по реквизитам из PDF' },
                 { step: '3', text: 'Вернитесь сюда и нажмите "Я оплатил"' },
               ].map(item => (
@@ -273,7 +288,7 @@ export default function PublicInvoice() {
             {(profile?.website || profile?.social_links?.length > 0) && (
               <div className="flex gap-2 flex-wrap pt-1">
                 {profile?.website && (
-                  <a href={profile.website} target="_blank" rel="noopener noreferrer"
+                   <a href={profile.website.startsWith('http') ? profile.website : 'https://' + profile.website} target="_blank"
                     className="bg-gray-100 text-gray-600 rounded-lg px-3 py-1.5 text-xs">
                     🌐 Сайт
                   </a>
