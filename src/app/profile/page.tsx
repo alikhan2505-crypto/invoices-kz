@@ -156,6 +156,7 @@ export default function Profile() {
               { icon: '✍️', label: 'Подпись и печать', href: '/profile/signature' },
               { icon: '💳', label: 'Банковские счета', href: '/profile/banks' },
               { icon: '🔒', label: 'ЭЦП и безопасность', href: '/profile/security' },
+              { icon: '🔗', label: 'Коннекторы', href: '/profile/connectors' },
             ].map((item, i, arr) => (
               <div key={item.href} onClick={() => router.push(item.href)}
                 className={`flex items-center justify-between px-4 py-3.5 cursor-pointer hover:bg-gray-50 ${i < arr.length - 1 ? 'border-b border-gray-100' : ''}`}>

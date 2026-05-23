@@ -35,7 +35,7 @@ export default function PublicInvoice() {
       // Загружаем полный профиль включая подпись и печать
       const { data: p } = await supabase
         .from('profiles')
-        .select('company_name, bin_iin, address, phone, email, director_name, signature_url, stamp_url')
+        .select('company_name, bin_iin, address, phone, email, director_name, signature_url, stamp_url, kaspi_pay_link, halyk_pay_link, website, social_links')
         .eq('id', inv.user_id)
         .single()
       setProfile(p)
@@ -252,6 +252,45 @@ export default function PublicInvoice() {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Коннекторы — оплата и соцсети */}
+        {(profile?.kaspi_pay_link || profile?.halyk_pay_link || profile?.website || profile?.social_links?.length > 0) && (
+          <div className="bg-white rounded-2xl shadow-sm p-4 space-y-3">
+            {profile?.kaspi_pay_link && (
+              <a href={profile.kaspi_pay_link} target="_blank" rel="noopener noreferrer"
+                className="w-full bg-amber-400 text-white rounded-xl py-3.5 font-medium text-sm flex items-center justify-center gap-2 block text-center">
+                🟡 Оплатить через Kaspi
+              </a>
+            )}
+            {profile?.halyk_pay_link && (
+              <a href={profile.halyk_pay_link} target="_blank" rel="noopener noreferrer"
+                className="w-full bg-green-500 text-white rounded-xl py-3.5 font-medium text-sm flex items-center justify-center gap-2 block text-center">
+                🟢 Оплатить через Halyk
+              </a>
+            )}
+            {(profile?.website || profile?.social_links?.length > 0) && (
+              <div className="flex gap-2 flex-wrap pt-1">
+                {profile?.website && (
+                  <a href={profile.website} target="_blank" rel="noopener noreferrer"
+                    className="bg-gray-100 text-gray-600 rounded-lg px-3 py-1.5 text-xs">
+                    🌐 Сайт
+                  </a>
+                )}
+                {(profile?.social_links || []).map((link: string, i: number) => {
+                  const icons: Record<string, string> = { instagram: '📸', facebook: '👤', tiktok: '🎵', youtube: '▶️', telegram: '✈️', twitter: '🐦', linkedin: '💼', '2gis': '📍', whatsapp: '💬' }
+                  const names: Record<string, string> = { instagram: 'Instagram', facebook: 'Facebook', tiktok: 'TikTok', youtube: 'YouTube', telegram: 'Telegram', twitter: 'Twitter', linkedin: 'LinkedIn', '2gis': '2GIS', whatsapp: 'WhatsApp' }
+                  const key = Object.keys(icons).find(k => link.includes(k)) || ''
+                  return (
+                    <a key={i} href={link} target="_blank" rel="noopener noreferrer"
+                      className="bg-gray-100 text-gray-600 rounded-lg px-3 py-1.5 text-xs">
+                      {icons[key] || '🔗'} {names[key] || 'Ссылка'}
+                    </a>
+                  )
+                })}
+              </div>
+            )}
           </div>
         )}
 
