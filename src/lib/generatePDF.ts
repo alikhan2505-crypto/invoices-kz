@@ -189,7 +189,7 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<string> {
           font-size: 11px;
           color: #000;
           width: 794px;
-          min-height: 1123px;
+
           margin: 20px auto;
           background: white;
           padding: 25mm 15mm 20mm;
