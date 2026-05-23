@@ -4,11 +4,12 @@ export default function Loading() {
       <div className="text-center">
         <div className="text-3xl font-bold text-white mb-2">INVOICES.KZ</div>
         <div className="text-white/60 text-sm mb-8">Счета за 1 минуту</div>
-        <div className="flex justify-center gap-1">
+        <div className="flex justify-center gap-1 mb-3">
           <div className="w-2 h-2 bg-[#2DC48D] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
           <div className="w-2 h-2 bg-[#2DC48D] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
           <div className="w-2 h-2 bg-[#2DC48D] rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
         </div>
+        <div className="text-white/40 text-xs">Загрузка...</div>
       </div>
     </main>
   )
