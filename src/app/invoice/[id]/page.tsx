@@ -782,27 +782,25 @@ export default function InvoicePage() {
                 const iframe = document.getElementById('inv-pdf-iframe') as HTMLIFrameElement
                 iframe?.contentWindow?.print()
               }} className="text-sm bg-[#1C2056] text-white px-3 py-1.5 rounded-lg">🖨️ Печать</button>
-              <button onClick={() => {
-                const iframe = document.getElementById('inv-pdf-iframe') as HTMLIFrameElement
-                if (!iframe?.contentWindow) return
-                const win = iframe.contentWindow
-                const script = win.document.createElement('script')
+              <button onClick={async () => {
+                const script = document.createElement('script')
                 script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js'
-                script.onload = () => {
-                  const fn = new Function(`
-                    html2pdf().set({
-                      margin: 0,
-                      filename: 'Счёт.pdf',
-                      html2canvas: { scale: 2, useCORS: true, windowWidth: 794 },
-                      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-                    }).from(document.body).save()
-                  `)
-                  win.document.body.appendChild(Object.assign(win.document.createElement('script'), {
-                    textContent: `html2pdf().set({margin:0,filename:'Счёт.pdf',html2canvas:{scale:2,useCORS:true,windowWidth:794},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}}).from(document.body).save()`
-                  }))
-                }
-                win.document.head.appendChild(script)
-              }} className="text-sm bg-[#2DC48D] text-white px-3 py-1.5 rounded-lg">💾 Сохранить PDF</button>
+                document.head.appendChild(script)
+                await new Promise(r => script.onload = r)
+                const div = document.createElement('div')
+                div.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;background:white;'
+                div.innerHTML = pdfHTML
+                document.body.appendChild(div)
+                ;(window as any).html2pdf().set({
+                  margin: 0,
+                  filename: `Счёт-${invoice.number}.pdf`,
+                  html2canvas: { scale: 2, useCORS: true, windowWidth: 794 },
+                  jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                }).from(div).save().then(() => {
+                  document.body.removeChild(div)
+                  document.head.removeChild(script)
+                })
+              }} className="text-sm bg-[#2DC48D] text-white px-3 py-1.5 rounded-lg">💾 PDF</button>
             </div>
           </div>
           <iframe id="inv-pdf-iframe" srcDoc={pdfHTML} className="flex-1 w-full border-none" />
