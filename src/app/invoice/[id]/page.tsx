@@ -782,35 +782,9 @@ export default function InvoicePage() {
                 const iframe = document.getElementById('inv-pdf-iframe') as HTMLIFrameElement
                 iframe?.contentWindow?.print()
               }} className="text-sm bg-[#1C2056] text-white px-3 py-1.5 rounded-lg">🖨️ Печать</button>
-              <button onClick={async () => {
-                const script = document.createElement('script')
-                script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js'
-                document.head.appendChild(script)
-                await new Promise(r => script.onload = r)
-                
-                const parser = new DOMParser()
-                const doc = parser.parseFromString(pdfHTML, 'text/html')
-                
-                // Берём стили
-                const styles = Array.from(doc.querySelectorAll('style'))
-                  .map(s => s.outerHTML).join('')
-                
-                const div = document.createElement('div')
-                div.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;min-height:1123px;background:white;'
-                div.innerHTML = styles + doc.body.innerHTML
-                document.body.appendChild(div)
-                
-                await new Promise(r => setTimeout(r, 500)) // ждём рендер
-                
-                ;(window as any).html2pdf().set({
-                  margin: 0,
-                  filename: `Счёт-${invoice.number}.pdf`,
-                  html2canvas: { scale: 2, useCORS: true, windowWidth: 794, scrollX: 0, scrollY: 0 },
-                  jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-                }).from(div).save().then(() => {
-                  document.body.removeChild(div)
-                  document.head.removeChild(script)
-                })
+              <button onClick={() => {
+                const iframe = document.getElementById('inv-pdf-iframe') as HTMLIFrameElement
+                ;(iframe?.contentWindow as any)?.downloadPDF?.()
               }} className="text-sm bg-[#2DC48D] text-white px-3 py-1.5 rounded-lg">💾 PDF</button>
             </div>
           </div>

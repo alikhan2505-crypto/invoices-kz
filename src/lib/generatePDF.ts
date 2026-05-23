@@ -334,7 +334,19 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<string> {
             })
           }
         <\/script>
-      ` : ''}
+      ` : `
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"><\/script>
+        <script>
+          function downloadPDF() {
+            html2pdf().set({
+              margin: 0,
+              filename: 'Счёт-${data.number}.pdf',
+              html2canvas: { scale: 2, useCORS: true, windowWidth: 794, scrollX: 0, scrollY: 0 },
+              jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            }).from(document.body).save()
+          }
+        <\/script>
+      `}
 
     </body>
     </html>
