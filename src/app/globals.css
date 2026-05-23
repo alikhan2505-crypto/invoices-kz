@@ -243,3 +243,41 @@ main {
 [data-theme="dark"] .font-medium.text-\[\#1C2056\] {
   color: #e2e8f0 !important;
 }
+
+/* 1. Splash screen — синий фон при загрузке */
+body {
+  background: #1C2056;
+}
+
+main {
+  background: #f9fafb;
+  animation: pageFade 0.25s ease-out;
+}
+
+/* 2. Анимация нажатия кнопок */
+button, a[href] {
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.1s ease, opacity 0.1s ease;
+  cursor: pointer;
+}
+
+button:active, a[href]:active {
+  transform: scale(0.95);
+  opacity: 0.8;
+}
+
+/* 3. Кнопка назад — больше и с анимацией */
+.back-btn {
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.back-btn:active {
+  background: #e5e7eb;
+  transform: scale(0.92);
+}
