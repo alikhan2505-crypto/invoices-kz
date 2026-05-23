@@ -777,10 +777,30 @@ export default function InvoicePage() {
           <div className="flex items-center justify-between px-4 py-3 border-b bg-white">
             <button onClick={() => setShowPDFModal(false)} className="text-sm text-gray-500">← Назад</button>
             <span className="text-sm font-semibold text-[#1C2056]">Счёт {invoice.number}</span>
-            <button onClick={() => {
-              const iframe = document.getElementById('inv-pdf-iframe') as HTMLIFrameElement
-              iframe?.contentWindow?.print()
-            }} className="text-sm text-[#1C2056] font-medium">🖨️ Печать</button>
+            <div className="flex gap-2">
+              <button onClick={() => {
+                const iframe = document.getElementById('inv-pdf-iframe') as HTMLIFrameElement
+                iframe?.contentWindow?.print()
+              }} className="text-sm bg-[#1C2056] text-white px-3 py-1.5 rounded-lg">🖨️</button>
+              <button onClick={() => {
+                const iframe = document.getElementById('inv-pdf-iframe') as HTMLIFrameElement
+                const iframeDoc = iframe?.contentWindow?.document
+                if (!iframeDoc) return
+                const script = iframeDoc.createElement('script')
+                script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js'
+                script.onload = () => {
+                  iframe.contentWindow!.eval(`
+                    html2pdf().set({
+                      margin: 0,
+                      filename: 'Счёт.pdf',
+                      html2canvas: { scale: 2, useCORS: true, windowWidth: 794 },
+                      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                    }).from(document.body).save()
+                  `)
+                }
+                iframeDoc.head.appendChild(script)
+              }} className="text-sm bg-[#2DC48D] text-white px-3 py-1.5 rounded-lg">💾 PDF</button>
+            </div>
           </div>
           <iframe id="inv-pdf-iframe" srcDoc={pdfHTML} className="flex-1 w-full border-none" />
         </div>
