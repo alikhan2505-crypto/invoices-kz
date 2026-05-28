@@ -117,7 +117,7 @@ export default function Home() {
         .who-card{transition:.3s}
         .who-card:hover{transform:translateY(-3px)}
         .price-card{transition:.3s}
-        section{padding-top:60px!important;padding-bottom:60px!important}
+        @media(max-width:768px){section{padding-top:50px!important;padding-bottom:50px!important}.orb{opacity:.1}}
       `}</style>
 
       {/* Orbs */}
@@ -138,15 +138,15 @@ export default function Home() {
         </span>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
           <button onClick={() => router.push('/login')} style={{
-            fontSize: 13, color: 'rgba(255,255,255,.6)', background: 'none', border: 'none',
-            cursor: 'pointer', padding: '8px 10px', borderRadius: 10, fontFamily: 'Inter,sans-serif',
-            display: 'block',
+            fontSize: 13, color: 'rgba(255,255,255,.7)', background: 'none', border: '1px solid rgba(255,255,255,.2)',
+            cursor: 'pointer', padding: '8px 14px', borderRadius: 10, fontFamily: 'Inter,sans-serif',
+            whiteSpace: 'nowrap' as const,
           }}>Войти</button>
           <button onClick={() => router.push('/login')} style={{
             fontSize: 13, fontWeight: 600, color: '#fff', background: 'var(--green)',
-            border: 'none', cursor: 'pointer', padding: '10px 14px', borderRadius: 12,
-            fontFamily: 'Inter,sans-serif', transition: '.2s', whiteSpace: 'nowrap' as const,
-          }}>Начать бесплатно</button>
+            border: 'none', cursor: 'pointer', padding: '8px 14px', borderRadius: 10,
+            fontFamily: 'Inter,sans-serif', whiteSpace: 'nowrap' as const,
+          }}>Начать →</button>
         </div>
       </nav>
 
@@ -154,7 +154,7 @@ export default function Home() {
       <section style={{
         position: 'relative', zIndex: 1, minHeight: '100vh',
         display: 'flex', flexDirection: 'column', alignItems: 'center',
-        justifyContent: 'center', textAlign: 'center', padding: '120px 24px 80px',
+        justifyContent: 'center', textAlign: 'center', padding: '140px 24px 60px',
       }}>
         <div className="anim-0" style={{
           display: 'inline-flex', alignItems: 'center', gap: 8,
@@ -232,23 +232,24 @@ export default function Home() {
 
       {/* STATS */}
       <div className="stats-section reveal" style={{
-        position: 'relative', zIndex: 1, padding: '60px 24px',
-        display: 'flex', justifyContent: 'center', flexWrap: 'wrap',
+        position: 'relative', zIndex: 1, padding: '40px 24px',
         borderTop: '1px solid var(--glass-border)', borderBottom: '1px solid var(--glass-border)',
       }}>
-        {[
-          { val: '1 мин', label: 'создание счёта' },
-          { val: '7+', label: 'бизнесов используют' },
-          { val: '100%', label: 'стандарты РК' },
-          { val: 'Kaspi', label: 'интеграция' },
-        ].map((s, i) => (
-          <div key={i} style={{ textAlign: 'center', padding: '24px 48px', borderRight: i < 3 ? '1px solid var(--glass-border)' : 'none', flex: 1, minWidth: 80 }}>
-            <div style={{ fontFamily: 'Syne,sans-serif', fontSize: 'clamp(20px,5vw,36px)', fontWeight: 800, color: 'var(--green)', marginBottom: 4 }}>
-              {s.val}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', maxWidth: 500, margin: '0 auto', gap: 1, background: 'var(--glass-border)' }}>
+          {[
+            { val: '1 мин', label: 'создание счёта' },
+            { val: '7+', label: 'бизнесов' },
+            { val: '100%', label: 'стандарты РК' },
+            { val: 'Kaspi', label: 'интеграция' },
+          ].map((s, i) => (
+            <div key={i} style={{ textAlign: 'center', padding: '24px 16px', background: 'var(--dark)' }}>
+              <div style={{ fontFamily: 'Syne,sans-serif', fontSize: 32, fontWeight: 800, color: 'var(--green)', marginBottom: 4 }}>
+                {s.val}
+              </div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,.4)' }}>{s.label}</div>
             </div>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,.4)', letterSpacing: .5 }}>{s.label}</div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
 
       {/* FEATURES */}
