@@ -156,7 +156,7 @@ export default function Home() {
           display: 'inline-flex', alignItems: 'center', gap: 8,
           background: 'rgba(45,196,141,.1)', border: '1px solid rgba(45,196,141,.3)',
           color: 'var(--green)', fontSize: 12, fontWeight: 600, letterSpacing: 1,
-          padding: '8px 18px', borderRadius: 100, marginBottom: 32,
+          padding: '8px 18px', borderRadius: 100, marginBottom: 32, marginTop: 20,
         }}>🇰🇿 Сделано для казахстанского бизнеса</div>
 
         <h1 className="anim-1" style={{
