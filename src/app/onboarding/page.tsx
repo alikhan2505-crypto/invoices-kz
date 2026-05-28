@@ -9,6 +9,7 @@ export default function Onboarding() {
   const [saving, setSaving] = useState(false)
   const [userId, setUserId] = useState('')
   const [refCode, setRefCode] = useState('')
+  const [promoCode, setPromoCode] = useState('')
   const [accountType, setAccountType] = useState<'ИП' | 'ТОО' | 'Физлицо'>('ИП')
   const [form, setForm] = useState({ company_name: '', bin_iin: '', email: '' })
   const [bank, setBank] = useState({ bank_name: '', iik: '', bik: '', kbe: '19' })
@@ -19,10 +20,17 @@ export default function Onboarding() {
     if (refFromUrl) localStorage.setItem('referral_code', refFromUrl)
     const ref = refFromUrl || localStorage.getItem('referral_code') || ''
     setRefCode(ref)
+
+    const promoFromUrl = params.get('promo')
+    if (promoFromUrl) localStorage.setItem('promo_code', promoFromUrl)
+    const promo = promoFromUrl || promoFromStorage || ''
+    setPromoCode(promo)
+
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) router.push('/login')
       else setUserId(user.id)
     })
+
   }, [])
 
   async function saveStep1() {
@@ -52,6 +60,27 @@ export default function Onboarding() {
       } catch {}
       localStorage.removeItem('referral_code')
     }
+
+    if (promoCode) {
+      try {
+        const { data: promo } = await supabase
+          .from('promo_codes')
+          .select('*')
+          .eq('code', promoCode.toUpperCase())
+          .eq('is_active', true)
+          .single()
+        if (promo) {
+          const bonusExpires = new Date()
+          bonusExpires.setDate(bonusExpires.getDate() + (promo.bonus_days || 14))
+          await supabase.from('profiles').update({
+            bonus_expires_at: bonusExpires.toISOString(),
+          }).eq('id', user.id)
+        }
+      } catch {}
+      localStorage.removeItem('promo_code')
+    }   
+
+
     try {
       await fetch('/api/telegram', {
         method: 'POST',
@@ -131,6 +160,12 @@ export default function Onboarding() {
             {refCode && (
               <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-2.5 mb-4 text-center">
                 <span className="text-xs text-green-700">🎁 Реферальный бонус будет начислен</span>
+              </div>
+            )}
+
+            {promoCode && (
+              <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-2.5 mb-4 text-center">
+                <span className="text-xs text-blue-700">🎁 Промокод <b>{promoCode}</b> будет применён</span>
               </div>
             )}
 
