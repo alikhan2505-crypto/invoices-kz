@@ -137,11 +137,7 @@ export default function Home() {
           INVOICES<span style={{ color: 'var(--green)' }}>.KZ</span>
         </span>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
-          <button onClick={() => router.push('/login')} style={{
-            fontSize: 13, color: 'rgba(255,255,255,.7)', background: 'none', border: '1px solid rgba(255,255,255,.2)',
-            cursor: 'pointer', padding: '8px 14px', borderRadius: 10, fontFamily: 'Inter,sans-serif',
-            whiteSpace: 'nowrap' as const,
-          }}>Войти</button>
+
           <button onClick={() => router.push('/login')} style={{
             fontSize: 13, fontWeight: 600, color: '#fff', background: 'var(--green)',
             border: 'none', cursor: 'pointer', padding: '8px 14px', borderRadius: 10,
