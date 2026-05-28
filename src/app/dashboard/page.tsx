@@ -50,9 +50,6 @@ export default function Dashboard() {
   const vatAmount = vatType === 'vat_16' ? Math.round(total - total / 1.16) : 0
   const totalWithoutVat = vatType === 'vat_16' ? Math.round(total / 1.16) : total
 
-  const [showPDFModal, setShowPDFModal] = useState(false)
-  const [pdfHTML, setPdfHTML] = useState('')
-
   const load = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
@@ -214,8 +211,10 @@ export default function Dashboard() {
 
   async function generateWithBank(bank: any) {
     if (!pendingInvoiceData) return
+    const win = window.open('', '_blank')
     const { invoiceNumber, invoiceDate, cn, cb, ce, ca, cp, cn2, cd, svcs, tot, nt, knp } = pendingInvoiceData
     // Берём окно из ref (было открыто при клике на банк — прямой клик пользователя)
+    const win = window.open('', '_blank')
     const html = await generateInvoicePDF({
       number: invoiceNumber,
       date: invoiceDate,
@@ -242,16 +241,9 @@ export default function Dashboard() {
       kaspiPayLink: profile?.kaspi_pay_link || undefined,
       showWatermark: getActivePlan(profile).plan === 'free',
     })
-    setPdfHTML(html)
     setShowBankPicker(false)
     setPendingInvoiceData(null)
-    setShowPDFModal(true)
-
-    const alreadyExists = clients.find(c => c.bin_iin === cb)
-    if (!alreadyExists && cb) {
-      setLastInvoiceClient({ name: cn, bin_iin: cb, email: ce, address: ca, phone: cp })
-      setShowSaveClient(true)
-    }
+    if (win) { win.document.write(html); win.document.close() }
   }
 
   async function createInvoice() {
@@ -363,7 +355,7 @@ export default function Dashboard() {
       return
     }
 
-    const bank = banks[0]
+    const win = window.open('', '_blank')
     const html = await generateInvoicePDF({
       number: data.number, date: invoiceDate,
       clientName, clientBin, clientEmail, clientAddress, clientPhone,
@@ -379,14 +371,7 @@ export default function Dashboard() {
       kaspiPayLink: profile?.kaspi_pay_link || undefined,
       showWatermark: getActivePlan(profile).plan === 'free',
     })
-    setPdfHTML(html)
-    setShowPDFModal(true)
-
-    const alreadyExists = clients.find(c => c.bin_iin === clientBin)
-    if (!alreadyExists && clientBin) {
-      setLastInvoiceClient({ name: clientName, bin_iin: clientBin, email: clientEmail, address: clientAddress, phone: clientPhone })
-      setShowSaveClient(true)
-    }
+    if (win) { win.document.write(html); win.document.close() }
 
     clearClient()
     setServices([{ name: '', qty: 1, price: 0, unit: 'шт', code: '', type: 'service' }])
@@ -786,22 +771,6 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-
-      {showPDFModal && (
-        <div className="fixed inset-0 z-50 bg-white flex flex-col">
-          <div className="flex items-center justify-between px-4 py-3 border-b bg-white">
-            <button onClick={() => setShowPDFModal(false)}
-              className="text-sm text-gray-500">← Назад</button>
-            <span className="text-sm font-semibold text-[#1C2056]">Счёт</span>
-            <button onClick={() => {
-              const iframe = document.getElementById('dash-pdf-iframe') as HTMLIFrameElement
-              iframe?.contentWindow?.print()
-            }} className="text-sm text-[#1C2056] font-medium">🖨️ Печать</button>
-          </div>
-          <iframe id="dash-pdf-iframe" srcDoc={pdfHTML} className="flex-1 w-full border-none" />
-        </div>
-      )}
-
 
       <BottomNav />
     </main>
