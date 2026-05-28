@@ -88,6 +88,7 @@ export default function Home() {
         *{margin:0;padding:0;box-sizing:border-box}
         html{scroll-behavior:smooth}
         body{font-family:'Inter',sans-serif;background:var(--dark);color:#fff;overflow-x:hidden}
+        html{overflow-x:hidden}
         .orb{position:fixed;border-radius:50%;filter:blur(80px);opacity:.2;pointer-events:none;z-index:0}
         .orb1{width:600px;height:600px;background:radial-gradient(circle,#2DC48D,transparent);top:-200px;left:-200px;animation:orbFloat 12s ease-in-out infinite}
         .orb2{width:500px;height:500px;background:radial-gradient(circle,#3b4fd4,transparent);top:30%;right:-150px;animation:orbFloat 12s ease-in-out infinite;animation-delay:-4s}
@@ -126,7 +127,7 @@ export default function Home() {
       {/* NAV */}
       <nav style={{
         position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100,
-        padding: '16px 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         background: navBg ? 'rgba(10,13,31,0.95)' : 'rgba(10,13,31,0.7)',
         backdropFilter: 'blur(20px)', borderBottom: '1px solid var(--glass-border)',
         transition: 'background .3s',
@@ -137,12 +138,13 @@ export default function Home() {
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
           <button onClick={() => router.push('/login')} style={{
             fontSize: 13, color: 'rgba(255,255,255,.6)', background: 'none', border: 'none',
-            cursor: 'pointer', padding: '8px 16px', borderRadius: 10, fontFamily: 'Inter,sans-serif',
+            cursor: 'pointer', padding: '8px 12px', borderRadius: 10, fontFamily: 'Inter,sans-serif',
+            display: 'block',
           }}>Войти</button>
           <button onClick={() => router.push('/login')} style={{
             fontSize: 13, fontWeight: 600, color: '#fff', background: 'var(--green)',
-            border: 'none', cursor: 'pointer', padding: '10px 20px', borderRadius: 12,
-            fontFamily: 'Inter,sans-serif', transition: '.2s',
+            border: 'none', cursor: 'pointer', padding: '10px 14px', borderRadius: 12,
+            fontFamily: 'Inter,sans-serif', transition: '.2s', whiteSpace: 'nowrap' as const,
           }}>Начать бесплатно</button>
         </div>
       </nav>
@@ -235,7 +237,7 @@ export default function Home() {
       }}>
         {[
           { val: '1 мин', label: 'создание счёта' },
-          { val: '', label: 'бизнесов используют', id: 'counter-users', init: '2000+' },
+          { val: '', label: 'бизнесов используют', id: 'counter-users', init: '8+' },
           { val: '100%', label: 'стандарты РК' },
           { val: 'Kaspi', label: 'интеграция оплаты' },
         ].map((s, i) => (
