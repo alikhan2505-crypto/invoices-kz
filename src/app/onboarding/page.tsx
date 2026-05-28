@@ -23,6 +23,7 @@ export default function Onboarding() {
 
     const promoFromUrl = params.get('promo')
     if (promoFromUrl) localStorage.setItem('promo_code', promoFromUrl)
+    const promoFromStorage = localStorage.getItem('promo_code')
     const promo = promoFromUrl || promoFromStorage || ''
     setPromoCode(promo)
 
