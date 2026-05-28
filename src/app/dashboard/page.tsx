@@ -353,7 +353,7 @@ export default function Dashboard() {
       setServices([{ name: '', qty: 1, price: 0, unit: 'шт', code: '', type: 'service' }])
       return
     }
-
+    const bank = banks[0]
     const win = window.open('', '_blank')
     const html = await generateInvoicePDF({
       number: data.number, date: invoiceDate,
