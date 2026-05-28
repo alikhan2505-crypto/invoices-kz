@@ -214,7 +214,6 @@ export default function Dashboard() {
     const win = window.open('', '_blank')
     const { invoiceNumber, invoiceDate, cn, cb, ce, ca, cp, cn2, cd, svcs, tot, nt, knp } = pendingInvoiceData
     // Берём окно из ref (было открыто при клике на банк — прямой клик пользователя)
-    const win = window.open('', '_blank')
     const html = await generateInvoicePDF({
       number: invoiceNumber,
       date: invoiceDate,
