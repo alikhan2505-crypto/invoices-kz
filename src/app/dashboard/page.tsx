@@ -238,7 +238,7 @@ export default function Dashboard() {
         kbe: bank.kbe || '19',
       },
       kaspiPayLink: profile?.kaspi_pay_link || undefined,
-      showWatermark: getActivePlan(profile).plan === 'free',
+      showWatermark: !getActivePlan(profile).isActive || getActivePlan(profile).plan === 'free',
     })
     setShowBankPicker(false)
     setPendingInvoiceData(null)
@@ -368,7 +368,7 @@ export default function Dashboard() {
         kbe: bank.kbe || '19',
       },
       kaspiPayLink: profile?.kaspi_pay_link || undefined,
-      showWatermark: getActivePlan(profile).plan === 'free',
+      showWatermark: !getActivePlan(profile).isActive || getActivePlan(profile).plan === 'free',
     })
     if (win) { win.document.write(html); win.document.close() }
 
