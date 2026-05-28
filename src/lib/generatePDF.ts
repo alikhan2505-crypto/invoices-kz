@@ -384,7 +384,7 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<string> {
         <\/script>
       `}
 
-    ${true ? `
+    ${data.showWatermark ? `
         <div style="text-align:center;margin-top:20px;padding:8px;font-size:9px;color:rgba(28,32,86,0.4);font-family:Arial;border-top:1px solid rgba(28,32,86,0.1);">
           Создано на <b>invoices.kz</b> — бесплатный тариф
         </div>
