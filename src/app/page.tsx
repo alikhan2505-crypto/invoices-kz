@@ -117,6 +117,7 @@ export default function Home() {
         .who-card{transition:.3s}
         .who-card:hover{transform:translateY(-3px)}
         .price-card{transition:.3s}
+        section{padding-top:60px!important;padding-bottom:60px!important}
       `}</style>
 
       {/* Orbs */}
@@ -135,10 +136,10 @@ export default function Home() {
         <span style={{ fontFamily: 'Syne,sans-serif', fontWeight: 800, fontSize: 18, letterSpacing: 2, color: '#fff' }}>
           INVOICES<span style={{ color: 'var(--green)' }}>.KZ</span>
         </span>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
           <button onClick={() => router.push('/login')} style={{
             fontSize: 13, color: 'rgba(255,255,255,.6)', background: 'none', border: 'none',
-            cursor: 'pointer', padding: '8px 12px', borderRadius: 10, fontFamily: 'Inter,sans-serif',
+            cursor: 'pointer', padding: '8px 10px', borderRadius: 10, fontFamily: 'Inter,sans-serif',
             display: 'block',
           }}>Войти</button>
           <button onClick={() => router.push('/login')} style={{
@@ -237,12 +238,12 @@ export default function Home() {
       }}>
         {[
           { val: '1 мин', label: 'создание счёта' },
-          { val: '', label: 'бизнесов используют', id: 'counter-users', init: '8+' },
+          { val: '7+', label: 'бизнесов используют' },
           { val: '100%', label: 'стандарты РК' },
-          { val: 'Kaspi', label: 'интеграция оплаты' },
+          { val: 'Kaspi', label: 'интеграция' },
         ].map((s, i) => (
-          <div key={i} style={{ textAlign: 'center', padding: '24px 48px', borderRight: i < 3 ? '1px solid var(--glass-border)' : 'none', flex: 1, minWidth: 160 }}>
-            <div id={s.id} style={{ fontFamily: 'Syne,sans-serif', fontSize: 36, fontWeight: 800, color: 'var(--green)', marginBottom: 4 }}>
+          <div key={i} style={{ textAlign: 'center', padding: '24px 48px', borderRight: i < 3 ? '1px solid var(--glass-border)' : 'none', flex: 1, minWidth: 80 }}>
+            <div id={s.id} style={{ fontFamily: 'Syne,sans-serif', fontSize: 'clamp(20px,5vw,36px)', fontWeight: 800, color: 'var(--green)', marginBottom: 4 }}>
               {s.val || s.init}
             </div>
             <div style={{ fontSize: 12, color: 'rgba(255,255,255,.4)', letterSpacing: .5 }}>{s.label}</div>
