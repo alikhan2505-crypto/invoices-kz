@@ -243,8 +243,8 @@ export default function Home() {
           { val: 'Kaspi', label: 'интеграция' },
         ].map((s, i) => (
           <div key={i} style={{ textAlign: 'center', padding: '24px 48px', borderRight: i < 3 ? '1px solid var(--glass-border)' : 'none', flex: 1, minWidth: 80 }}>
-            <div id={s.id} style={{ fontFamily: 'Syne,sans-serif', fontSize: 'clamp(20px,5vw,36px)', fontWeight: 800, color: 'var(--green)', marginBottom: 4 }}>
-              {s.val || s.init}
+            <div style={{ fontFamily: 'Syne,sans-serif', fontSize: 'clamp(20px,5vw,36px)', fontWeight: 800, color: 'var(--green)', marginBottom: 4 }}>
+              {s.val}
             </div>
             <div style={{ fontSize: 12, color: 'rgba(255,255,255,.4)', letterSpacing: .5 }}>{s.label}</div>
           </div>
