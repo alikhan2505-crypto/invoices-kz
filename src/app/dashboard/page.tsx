@@ -239,6 +239,7 @@ export default function Dashboard() {
         bik: bank.bik || '',
         kbe: bank.kbe || '19',
       },
+      kaspiPayLink: profile?.kaspi_pay_link || undefined,
     })
     setPdfHTML(html)
     setShowBankPicker(false)
@@ -374,6 +375,7 @@ export default function Dashboard() {
         bik: bank.bik || '',
         kbe: bank.kbe || '19',
       },
+      kaspiPayLink: profile?.kaspi_pay_link || undefined,
     })
     setPdfHTML(html)
     setShowPDFModal(true)

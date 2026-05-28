@@ -45,6 +45,7 @@ interface InvoiceData {
   vatType?: 'no_vat' | 'vat_0' | 'vat_16'
   contractNumber?: string
   contractDate?: string
+  kaspiPayLink?: string
 }
 
 // Ресайз с сохранением пропорций
@@ -290,6 +291,17 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<string> {
       </div>
 
       ${data.note ? `<div class="note"><b>Примечание:</b> ${data.note}</div>` : ''}
+
+      ${data.kaspiPayLink ? `
+        <div style="margin:16px 0;padding:12px;border:1px solid #e5e7eb;border-radius:8px;display:flex;align-items:center;gap:16px;">
+          <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(data.kaspiPayLink)}" 
+            style="width:100px;height:100px;flex-shrink:0;" />
+          <div>
+            <div style="font-weight:bold;font-size:12px;color:#1C2056;margin-bottom:4px;">Оплатить через Kaspi Pay</div>
+            <div style="font-size:10px;color:#6b7280;">Отсканируйте QR-код камерой телефона</div>
+          </div>
+        </div>
+      ` : ''}
 
       <hr>
 
