@@ -46,6 +46,7 @@ interface InvoiceData {
   contractNumber?: string
   contractDate?: string
   kaspiPayLink?: string
+  showWatermark?: boolean
 }
 
 // Ресайз с сохранением пропорций

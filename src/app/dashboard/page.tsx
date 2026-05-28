@@ -240,6 +240,7 @@ export default function Dashboard() {
         kbe: bank.kbe || '19',
       },
       kaspiPayLink: profile?.kaspi_pay_link || undefined,
+      showWatermark: getActivePlan(profile).plan === 'free',
     })
     setPdfHTML(html)
     setShowBankPicker(false)
@@ -376,6 +377,7 @@ export default function Dashboard() {
         kbe: bank.kbe || '19',
       },
       kaspiPayLink: profile?.kaspi_pay_link || undefined,
+      showWatermark: getActivePlan(profile).plan === 'free',
     })
     setPdfHTML(html)
     setShowPDFModal(true)

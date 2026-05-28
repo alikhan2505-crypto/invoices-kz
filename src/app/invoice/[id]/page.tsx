@@ -214,6 +214,7 @@ export default function InvoicePage() {
       profile: buildProfile(withSignature),
       bank: bank ? { bank_name: bank.bank_name, iik: bank.iik, bik: bank.bik, kbe: bank.kbe } : undefined,
       kaspiPayLink: profile?.kaspi_pay_link || undefined,
+      showWatermark: ap.plan === 'free',
     })
     if (win) { win.document.write(html); win.document.close() }
   }
