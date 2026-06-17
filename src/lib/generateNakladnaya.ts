@@ -426,11 +426,11 @@ function downloadPDF() {
   if (toolbar) toolbar.style.display = 'none'
   if (spacer) spacer.style.display = 'none'
   html2pdf().set({
-    margin: [6,6,6,6],
+    margin: 0,
     filename: 'Накладная-${data.number}.pdf',
     image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true, logging: false, windowWidth: 1123 },
-    jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+    html2canvas: { scale: 1.5, useCORS: true, logging: false, windowWidth: 1123, scrollX: 0, scrollY: 0 },
+    jsPDF: { unit: 'mm', format: [297, 210], orientation: 'landscape' }
   }).from(document.body).save().then(() => {
     if (toolbar) toolbar.style.display = 'flex'
     if (spacer) spacer.style.display = 'block'
