@@ -147,6 +147,8 @@ body {
   background: white;
   padding: 15px 25px 20px;
   box-shadow: 0 0 20px rgba(0,0,0,0.3);
+  padding: 15px 25px 20px 25px;
+  overflow: hidden;
 }
 table { border-collapse: collapse; width: 100%; }
 td, th { border: 1px solid #000; padding: 3px 4px; vertical-align: middle; word-wrap: break-word; }
@@ -429,8 +431,8 @@ function downloadPDF() {
     margin: 0,
     filename: 'Накладная-${data.number}.pdf',
     image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 1.5, useCORS: true, logging: false, windowWidth: 1123, scrollX: 0, scrollY: 0 },
-    jsPDF: { unit: 'mm', format: [297, 210], orientation: 'landscape' }
+    html2canvas: { scale: 2, useCORS: true, logging: false, windowWidth: 1123, scrollX: 0, scrollY: 0, x: 0, y: 0 },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
   }).from(document.body).save().then(() => {
     if (toolbar) toolbar.style.display = 'flex'
     if (spacer) spacer.style.display = 'block'
