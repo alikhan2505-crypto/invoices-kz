@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import LoadingSpinner from '@/components/LoadingSpinner'
 import { formatDate } from '@/lib/date'
 import { getActivePlan } from '@/lib/plan'
+import { generateNakladnaya } from '@/lib/generateNakladnaya'
 
 export default function Documents() {
   const router = useRouter()
@@ -46,6 +47,20 @@ export default function Documents() {
     if (!confirm('Удалить документ?')) return
     await supabase.from(table).delete().eq('id', id)
     load()
+  }
+
+  async function openNakl(doc: any) {
+    const win = window.open('', '_blank')
+    await generateNakladnaya({
+      number: doc.number,
+      date: doc.date,
+      clientName: doc.client_name,
+      clientBin: doc.client_bin,
+      services: doc.services,
+      total: doc.total,
+      vatType: doc.vat_type,
+      profile: profile,
+    }, win)
   }
 
   if (loading) return <LoadingSpinner />
@@ -147,6 +162,14 @@ export default function Documents() {
                     <span className="text-sm font-bold text-[#1C2056]">
                       {Number(doc.total).toLocaleString('ru-KZ')} ₸
                     </span>
+                    {tab === 'nakladnaya' && (
+                      <button
+                        onClick={() => openNakl(doc)}
+                        className="text-blue-400 hover:text-blue-600 text-lg leading-none"
+                        title="Открыть">
+                        👁
+                      </button>
+                    )}
                     <button
                       onClick={() => deleteDoc(doc.id, tab === 'kp' ? 'kp_documents' : tab === 'avr' ? 'avr_documents' : 'nakladnaya_documents')}
                       className="text-red-400 hover:text-red-600 text-lg leading-none"
