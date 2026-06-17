@@ -42,6 +42,12 @@ export default function Documents() {
     setLoading(false)
   }
 
+  async function deleteDoc(id: string, table: string) {
+    if (!confirm('Удалить документ?')) return
+    await supabase.from(table).delete().eq('id', id)
+    load()
+  }
+
   if (loading) return <LoadingSpinner />
 
   const ap = getActivePlan(profile)
@@ -90,7 +96,7 @@ export default function Documents() {
         <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 mb-4">
           <div className="text-sm font-medium text-[#1C2056] mb-1">📊 Для отчётности 910 формы</div>
           <div className="text-xs text-gray-500 leading-relaxed">
-            История всех КП, АВР и Накладных. Документы не удаляются — это важно для налоговой отчётности.
+            История всех КП, АВР и Накладных.
           </div>
         </div>
 
@@ -137,9 +143,17 @@ export default function Documents() {
                       <div className="text-xs text-gray-400 mt-0.5">Действителен до: {doc.valid_until}</div>
                     )}
                   </div>
-                  <span className="text-sm font-bold text-[#1C2056] flex-shrink-0 ml-3">
-                    {Number(doc.total).toLocaleString('ru-KZ')} ₸
-                  </span>
+                  <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+                    <span className="text-sm font-bold text-[#1C2056]">
+                      {Number(doc.total).toLocaleString('ru-KZ')} ₸
+                    </span>
+                    <button
+                      onClick={() => deleteDoc(doc.id, tab === 'kp' ? 'kp_documents' : tab === 'avr' ? 'avr_documents' : 'nakladnaya_documents')}
+                      className="text-red-400 hover:text-red-600 text-lg leading-none"
+                      title="Удалить">
+                      ✕
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
