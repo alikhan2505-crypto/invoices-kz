@@ -225,7 +225,7 @@ td, th { border: 1px solid #000; padding: 3px 4px; vertical-align: middle; word-
     <td class="nb"></td>
     <td class="nb"></td>
     <td style="text-align:center;">${data.number}</td>
-    <td style="text-align:center;">${data.date ? new Date(data.date).toLocaleDateString('ru-KZ') : new Date().toLocaleDateString('ru-KZ')}</td>
+    <td style="text-align:center;">${data.date || new Date().toLocaleDateString('ru-KZ')}</td>
   </tr>
 </table>
 
