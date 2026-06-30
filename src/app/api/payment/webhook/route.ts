@@ -1,14 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import crypto from 'crypto'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+function isValidSignature(rawBody: string, signature: string | null, secret: string): boolean {
+  if (!signature) return false
+  const expected = crypto.createHmac('sha256', secret).update(rawBody).digest('hex')
+  const sigBuf = Buffer.from(signature, 'hex')
+  const expBuf = Buffer.from(expected, 'hex')
+  return sigBuf.length === expBuf.length && crypto.timingSafeEqual(sigBuf, expBuf)
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json()
+    const rawBody = await req.text()
+
+    const secret = process.env.XPAYMENT_WEBHOOK_SECRET
+    if (!secret) {
+      console.error('XPAYMENT_WEBHOOK_SECRET not configured')
+      return NextResponse.json({ error: 'Webhook not configured' }, { status: 500 })
+    }
+    if (!isValidSignature(rawBody, req.headers.get('x-xpayment-signature'), secret)) {
+      console.error('Invalid webhook signature')
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
+    }
+
+    const body = JSON.parse(rawBody)
     await supabase.from('webhook_logs').insert({ body })
     console.log('Webhook v3:', JSON.stringify(body))
 
@@ -68,7 +89,10 @@ export async function POST(req: NextRequest) {
         .from('profiles').select('company_name').eq('id', userId).single()
       await fetch('https://invoices.kz/api/telegram', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-internal-secret': process.env.INTERNAL_API_SECRET!,
+        },
         body: JSON.stringify({
           message: `💳 <b>Оплата!</b>\n👤 ${prof?.company_name || userId}\n📦 ${plan === 'pro' ? 'Pro 5 990 ₸' : 'Basic 2 990 ₸'}\n📅 до ${expiresAt.toLocaleDateString('ru-KZ')}`
         })
