@@ -22,7 +22,7 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
 
 [data-theme="dark"] {
@@ -277,3 +277,4 @@ button:active, a[href]:active {
 html {
   background: #1C2056;
 }
+
