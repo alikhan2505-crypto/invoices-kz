@@ -15,6 +15,7 @@ export default function Documents() {
   const [avrList, setAvrList] = useState<any[]>([])
   const [naklList, setNaklList] = useState<any[]>([])
   const [profile, setProfile] = useState<any>(null)
+  const [busyDocId, setBusyDocId] = useState<string | null>(null)
 
   useEffect(() => { load() }, [])
 
@@ -45,12 +46,15 @@ export default function Documents() {
 
   async function deleteDoc(id: string, table: string) {
     if (!confirm('Удалить документ?')) return
+    setBusyDocId(id)
     await supabase.from(table).delete().eq('id', id)
-    load()
+    await load()
+    setBusyDocId(null)
   }
 
   async function openNakl(doc: any) {
     const win = window.open('', '_blank')
+    setBusyDocId(doc.id)
     await generateNakladnaya({
       number: doc.number,
       date: doc.date,
@@ -61,6 +65,7 @@ export default function Documents() {
       vatType: doc.vat_type,
       profile: profile,
     }, win)
+    setBusyDocId(null)
   }
 
   if (loading) return <LoadingSpinner />
@@ -158,23 +163,27 @@ export default function Documents() {
                       <div className="text-xs text-gray-400 mt-0.5">Действителен до: {doc.valid_until}</div>
                     )}
                   </div>
-                  <div className="flex items-center gap-2 flex-shrink-0 ml-3">
-                    <span className="text-sm font-bold text-[#1C2056]">
+                  <div className="flex items-center gap-1 flex-shrink-0 ml-3">
+                    <span className="text-sm font-bold text-[#1C2056] mr-1">
                       {Number(doc.total).toLocaleString('ru-KZ')} ₸
                     </span>
                     {tab === 'nakladnaya' && (
                       <button
                         onClick={() => openNakl(doc)}
-                        className="text-blue-400 hover:text-blue-600 text-lg leading-none"
-                        title="Открыть">
-                        👁
+                        disabled={busyDocId === doc.id}
+                        aria-label="Открыть накладную"
+                        title="Открыть"
+                        className="w-8 h-8 flex items-center justify-center rounded-full text-blue-400 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-40 transition-colors">
+                        <span className="text-base leading-none">👁</span>
                       </button>
                     )}
                     <button
                       onClick={() => deleteDoc(doc.id, tab === 'kp' ? 'kp_documents' : tab === 'avr' ? 'avr_documents' : 'nakladnaya_documents')}
-                      className="text-red-400 hover:text-red-600 text-lg leading-none"
-                      title="Удалить">
-                      ✕
+                      disabled={busyDocId === doc.id}
+                      aria-label="Удалить документ"
+                      title="Удалить"
+                      className="w-8 h-8 flex items-center justify-center rounded-full text-red-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-40 transition-colors">
+                      <span className="text-base leading-none">✕</span>
                     </button>
                   </div>
                 </div>
