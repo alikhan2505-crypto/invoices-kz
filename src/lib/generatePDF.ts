@@ -1,3 +1,5 @@
+import { resizeToFit } from './imageResize'
+
 interface Service {
   name: string
   qty: number
@@ -47,45 +49,6 @@ interface InvoiceData {
   contractDate?: string
   kaspiPayLink?: string
   showWatermark?: boolean
-}
-
-// Ресайз с сохранением пропорций
-async function resizeToFit(url: string, maxW: number, maxH: number): Promise<string> {
-  return new Promise((resolve) => {
-    const img = new Image()
-    img.crossOrigin = 'anonymous'
-    img.onload = () => {
-      const ratio = Math.min(maxW / img.width, maxH / img.height)
-      const w = Math.round(img.width * ratio)
-      const h = Math.round(img.height * ratio)
-      const canvas = document.createElement('canvas')
-      canvas.width = w
-      canvas.height = h
-      const ctx = canvas.getContext('2d')!
-      ctx.drawImage(img, 0, 0, w, h)
-      resolve(canvas.toDataURL('image/png'))
-    }
-    img.onerror = () => resolve(url)
-    img.src = url
-  })
-}
-
-// Ресайз квадрат для печати
-async function resizeSquare(url: string, size: number): Promise<string> {
-  return new Promise((resolve) => {
-    const img = new Image()
-    img.crossOrigin = 'anonymous'
-    img.onload = () => {
-      const canvas = document.createElement('canvas')
-      canvas.width = size
-      canvas.height = size
-      const ctx = canvas.getContext('2d')!
-      ctx.drawImage(img, 0, 0, size, size)
-      resolve(canvas.toDataURL('image/png'))
-    }
-    img.onerror = () => resolve(url)
-    img.src = url
-  })
 }
 
 function numberToWords(n: number): string {
@@ -140,7 +103,7 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<string> {
   // Подпись — сохраняем пропорции, максимум 200x60
   const signatureBase64 = signatureUrl ? await resizeToFit(signatureUrl, 200, 60) : ''
   // Печать — квадрат 110x110
-  const stampBase64 = stampUrl ? await resizeSquare(stampUrl, 110) : ''
+  const stampBase64 = stampUrl ? await resizeToFit(stampUrl, 110, 110) : ''
 
   const bankName = b?.bank_name || p?.bank_name || '—'
   const iik = b?.iik || p?.iik || '—'

@@ -27,42 +27,7 @@ interface NakladnayaData {
   }
 }
 
-async function resizeToFitNakl(url: string, maxW: number, maxH: number): Promise<string> {
-  return new Promise((resolve) => {
-    const img = new Image()
-    img.crossOrigin = 'anonymous'
-    img.onload = () => {
-      const ratio = Math.min(maxW / img.width, maxH / img.height)
-      const w = Math.round(img.width * ratio)
-      const h = Math.round(img.height * ratio)
-      const canvas = document.createElement('canvas')
-      canvas.width = w
-      canvas.height = h
-      const ctx = canvas.getContext('2d')!
-      ctx.drawImage(img, 0, 0, w, h)
-      resolve(canvas.toDataURL('image/png'))
-    }
-    img.onerror = () => resolve(url)
-    img.src = url
-  })
-}
-
-async function resizeSquareNakl(url: string, size: number): Promise<string> {
-  return new Promise((resolve) => {
-    const img = new Image()
-    img.crossOrigin = 'anonymous'
-    img.onload = () => {
-      const canvas = document.createElement('canvas')
-      canvas.width = size
-      canvas.height = size
-      const ctx = canvas.getContext('2d')!
-      ctx.drawImage(img, 0, 0, size, size)
-      resolve(canvas.toDataURL('image/png'))
-    }
-    img.onerror = () => resolve(url)
-    img.src = url
-  })
-}
+import { resizeToFit } from './imageResize'
 
 function numToWordsNakl(n: number): string {
   const ones = ['','один','два','три','четыре','пять','шесть','семь','восемь','девять',
@@ -109,8 +74,8 @@ export async function generateNakladnaya(data: NakladnayaData, existingWin?: Win
   const signatureUrl = p?.signature_url || ''
   const stampUrl = p?.stamp_url || ''
 
-  const signatureBase64 = signatureUrl ? await resizeToFitNakl(signatureUrl, 200, 55) : ''
-  const stampBase64 = stampUrl ? await resizeSquareNakl(stampUrl, 110) : ''
+  const signatureBase64 = signatureUrl ? await resizeToFit(signatureUrl, 200, 55) : ''
+  const stampBase64 = stampUrl ? await resizeToFit(stampUrl, 90, 90) : ''
 
   function formatMoney(n: number): string {
     return n.toLocaleString('ru-KZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })

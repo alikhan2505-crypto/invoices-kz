@@ -31,42 +31,7 @@ interface AVRData {
   }
 }
 
-async function resizeToFit(url: string, maxW: number, maxH: number): Promise<string> {
-  return new Promise((resolve) => {
-    const img = new Image()
-    img.crossOrigin = 'anonymous'
-    img.onload = () => {
-      const ratio = Math.min(maxW / img.width, maxH / img.height)
-      const w = Math.round(img.width * ratio)
-      const h = Math.round(img.height * ratio)
-      const canvas = document.createElement('canvas')
-      canvas.width = w
-      canvas.height = h
-      const ctx = canvas.getContext('2d')!
-      ctx.drawImage(img, 0, 0, w, h)
-      resolve(canvas.toDataURL('image/png'))
-    }
-    img.onerror = () => resolve(url)
-    img.src = url
-  })
-}
-
-async function resizeSquare(url: string, size: number): Promise<string> {
-  return new Promise((resolve) => {
-    const img = new Image()
-    img.crossOrigin = 'anonymous'
-    img.onload = () => {
-      const canvas = document.createElement('canvas')
-      canvas.width = size
-      canvas.height = size
-      const ctx = canvas.getContext('2d')!
-      ctx.drawImage(img, 0, 0, size, size)
-      resolve(canvas.toDataURL('image/png'))
-    }
-    img.onerror = () => resolve(url)
-    img.src = url
-  })
-}
+import { resizeToFit } from './imageResize'
 
 export async function generateAVR(data: AVRData, existingWin?: Window | null) {
   const win = existingWin || window.open('', '_blank')
@@ -81,7 +46,7 @@ export async function generateAVR(data: AVRData, existingWin?: Window | null) {
   const stampUrl = p?.stamp_url || ''
 
   const signatureBase64 = signatureUrl ? await resizeToFit(signatureUrl, 200, 60) : ''
-  const stampBase64 = stampUrl ? await resizeSquare(stampUrl, 100) : ''
+  const stampBase64 = stampUrl ? await resizeToFit(stampUrl, 100, 100) : ''
 
   function formatMoney(n: number): string {
     return n.toLocaleString('ru-KZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
