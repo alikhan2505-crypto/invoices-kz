@@ -1,0 +1,110 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-06-30T12:43:57.746Z",
+  "title": "Design System: invoices.kz",
+  "extensions": {
+    "colorMeta": {
+      "navy-primary": { "role": "primary", "displayName": "Карманный Navy", "canonical": "#1C2056", "tonalRamp": ["#0d0f2b", "#13163e", "#1C2056", "#2a3080", "#4a52a8", "#7b8cde", "#aab3ec", "#e2e8f0"] },
+      "mint-accent": { "role": "secondary", "displayName": "Чек Mint", "canonical": "#2DC48D", "tonalRamp": ["#0f3d2c", "#176647", "#1f8f62", "#2DC48D", "#5cd4a8", "#8be3c3", "#bdf1de", "#eafbf4"] },
+      "surface-page": { "role": "neutral", "displayName": "Бумажный фон", "canonical": "#f9fafb" },
+      "surface-card": { "role": "neutral", "displayName": "Карточный белый", "canonical": "#ffffff" },
+      "ink-secondary": { "role": "neutral", "displayName": "Вторичный текст", "canonical": "#6b7280" },
+      "danger": { "role": "functional", "displayName": "Опасность", "canonical": "#ef4444" },
+      "info-link": { "role": "functional", "displayName": "Информационная ссылка", "canonical": "#60a5fa" }
+    },
+    "typographyMeta": {
+      "body": { "displayName": "Body", "purpose": "Основной текст карточек, списков, форм." },
+      "title": { "displayName": "Title", "purpose": "Заголовки экранов в шапке." },
+      "label": { "displayName": "Label", "purpose": "Подписи, бейджи, статусы." }
+    },
+    "shadows": [
+      { "name": "card-rest", "value": "0 1px 2px rgba(0,0,0,0.05)", "purpose": "Единственная тень в системе — на всех карточках и табах." }
+    ],
+    "motion": [
+      { "name": "press-feedback", "value": "transform 0.1s ease, opacity 0.1s ease", "purpose": "Тактильный фидбэк на нажатие кнопок/ссылок (scale 0.95, opacity 0.8)." }
+    ],
+    "breakpoints": []
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Главный CTA экрана — создать счёт, сохранить, перейти к тарифам.",
+      "html": "<button class=\"ds-btn-primary\">Создать счёт</button>",
+      "css": ".ds-btn-primary { background: #1C2056; color: #fff; border: none; border-radius: 12px; padding: 12px 24px; font-weight: 600; font-size: 14px; transition: transform 0.1s ease, opacity 0.1s ease; } .ds-btn-primary:hover { opacity: 0.92; } .ds-btn-primary:active { transform: scale(0.95); opacity: 0.8; } .ds-btn-primary:focus-visible { outline: 2px solid #7b8cde; outline-offset: 2px; }"
+    },
+    {
+      "name": "Tab Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Переключатель вкладок (КП / АВР / Накладные) — активная вкладка заливается navy.",
+      "html": "<div style=\"display:flex; gap:8px;\"><button class=\"ds-tab ds-tab-active\">КП</button><button class=\"ds-tab\">АВР</button></div>",
+      "css": ".ds-tab { flex: 1; padding: 10px 16px; border-radius: 12px; font-size: 12px; font-weight: 500; background: #fff; color: #6b7280; box-shadow: 0 1px 2px rgba(0,0,0,0.05); border: none; transition: background 0.15s ease, color 0.15s ease; } .ds-tab-active { background: #1C2056; color: #fff; } .ds-tab:focus-visible { outline: 2px solid #7b8cde; outline-offset: 2px; }"
+    },
+    {
+      "name": "Icon Action — View",
+      "kind": "button",
+      "refersTo": "icon-action-view",
+      "description": "Тихая иконка-кнопка для нейтрального действия (просмотр документа).",
+      "html": "<button class=\"ds-icon-action ds-icon-view\" aria-label=\"Открыть\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\"><path d=\"M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z\" stroke=\"currentColor\" stroke-width=\"1.5\"/><circle cx=\"12\" cy=\"12\" r=\"3\" stroke=\"currentColor\" stroke-width=\"1.5\"/></svg></button>",
+      "css": ".ds-icon-action { width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border-radius: 9999px; background: transparent; border: none; transition: background 0.15s ease, color 0.15s ease; } .ds-icon-view { color: #60a5fa; } .ds-icon-view:hover { color: #2563eb; background: rgba(96,165,250,0.1); } .ds-icon-action:focus-visible { outline: 2px solid #7b8cde; outline-offset: 2px; }"
+    },
+    {
+      "name": "Icon Action — Delete",
+      "kind": "button",
+      "refersTo": "icon-action-danger",
+      "description": "Тихая иконка-кнопка для деструктивного действия (удаление документа).",
+      "html": "<button class=\"ds-icon-action ds-icon-danger\" aria-label=\"Удалить\">✕</button>",
+      "css": ".ds-icon-danger { color: #f87171; font-size: 16px; } .ds-icon-danger:hover { color: #dc2626; background: rgba(239,68,68,0.1); }"
+    },
+    {
+      "name": "Document List Item",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Сигнатурный паттерн архива: строка документа с номером, датой, клиентом, суммой и тихими действиями.",
+      "html": "<div class=\"ds-doc-row\"><div><div class=\"ds-doc-head\"><span class=\"ds-doc-number\">№142</span><span class=\"ds-doc-date\">30.06.2026</span></div><div class=\"ds-doc-client\">ТОО «Пример»</div></div><div class=\"ds-doc-actions\"><span class=\"ds-doc-sum\">45 000 ₸</span><button class=\"ds-icon-action ds-icon-view\" aria-label=\"Открыть\">👁</button><button class=\"ds-icon-action ds-icon-danger\" aria-label=\"Удалить\">✕</button></div></div>",
+      "css": ".ds-doc-row { display: flex; align-items: flex-start; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid #f3f4f6; background: #fff; } .ds-doc-head { display: flex; align-items: center; gap: 8px; } .ds-doc-number { font-size: 14px; font-weight: 500; color: #1C2056; } .ds-doc-date { font-size: 11px; color: #9ca3af; background: #f3f4f6; padding: 2px 6px; border-radius: 6px; } .ds-doc-client { font-size: 12px; color: #6b7280; margin-top: 2px; } .ds-doc-actions { display: flex; align-items: center; gap: 8px; } .ds-doc-sum { font-size: 14px; font-weight: 700; color: #1C2056; }"
+    },
+    {
+      "name": "Bottom Navigation",
+      "kind": "nav",
+      "refersTo": "card",
+      "description": "Фиксированная нижняя навигация — три пункта, активный подсвечен navy.",
+      "html": "<nav class=\"ds-bottom-nav\"><button class=\"ds-nav-item ds-nav-active\">Создать</button><button class=\"ds-nav-item\">История</button><button class=\"ds-nav-item\">Профиль</button></nav>",
+      "css": ".ds-bottom-nav { display: flex; background: #fff; border-top: 1px solid #e5e7eb; } .ds-nav-item { flex: 1; padding: 12px 0; font-size: 12px; color: #9ca3af; background: none; border: none; } .ds-nav-active { color: #1C2056; font-weight: 500; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Pocket Ledger",
+    "overview": "invoices.kz — это бухгалтерия, которая помещается в карман. ИП и ТОО Казахстана открывают её между делами, часто с телефона на ходу, чтобы выставить счёт клиенту за 30 секунд и не думать о дизайне больше, чем нужно. Каждый экран — это один понятный шаг, без лишних полей и решений. Система отвергает тяжёлую «корпоративную» бухгалтерскую эстетику: никаких таблиц в стиле 1С/Excel, никаких серых форм без иерархии. Вместо этого — плоские светлые карточки, один глубокий navy-акцент и редкий мятный для денег/успеха, в духе казахстанских финтех-приложений.",
+    "keyCharacteristics": [
+      "Светлый, почти бумажный фон с чистыми белыми карточками",
+      "Один доминирующий брендовый цвет (navy #1C2056) на хедерах и primary-кнопках",
+      "Мятный акцент (#2DC48D) зарезервирован за деньгами и успехом",
+      "Плоская элевация — только shadow-sm",
+      "Полная поддержка тёмной темы через data-theme атрибут"
+    ],
+    "rules": [
+      { "name": "The One Navy Rule", "body": "Глубокий navy — единственный «громкий» цвет интерфейса, не более одного крупного navy-блока на экране.", "section": "colors" },
+      { "name": "The Money-Only Mint Rule", "body": "Мятный появляется только там, где речь о деньгах или успехе.", "section": "colors" },
+      { "name": "The Instant-Sum Rule", "body": "Денежная сумма всегда жирнее и контрастнее окружающего текста.", "section": "typography" },
+      { "name": "The Flat-By-Default Rule", "body": "Никаких shadow-md/lg/xl — глубина передаётся контрастом фона, не тенью.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do держать на экране один доминирующий navy-блок",
+      "Do делать денежные суммы жирными и контрастными",
+      "Do использовать shadow-sm как единственную тень в системе",
+      "Do использовать rounded-xl/rounded-2xl для карточек и крупных кнопок",
+      "Do держать тач-зоны действий ≥32px с отступом друг от друга"
+    ],
+    "donts": [
+      "Don't использовать тяжёлую «корпоративную» бухгалтерскую эстетику",
+      "Don't использовать мятный декоративно — только для денег/успеха",
+      "Don't добавлять shadow-md/shadow-lg",
+      "Don't использовать border-left/border-right цветной полосой как акцент",
+      "Don't использовать градиентный текст или eyebrow-подписи",
+      "Don't переопределять body system-шрифтом поверх подключённого Geist"
+    ]
+  }
+}

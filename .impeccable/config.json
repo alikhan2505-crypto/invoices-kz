@@ -1,0 +1,11 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [
+      "src/lib/generatePDF.ts",
+      "src/lib/generateAVR.ts",
+      "src/lib/generateNakladnaya.ts"
+    ],
+    "ignoreValues": []
+  }
+}
