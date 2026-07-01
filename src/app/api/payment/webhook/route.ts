@@ -1,19 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import crypto from 'crypto'
+import { isValidSignature } from '@/lib/webhookSignature'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
-
-function isValidSignature(rawBody: string, signature: string | null, secret: string): boolean {
-  if (!signature) return false
-  const expected = crypto.createHmac('sha256', secret).update(rawBody).digest('hex')
-  const sigBuf = Buffer.from(signature, 'hex')
-  const expBuf = Buffer.from(expected, 'hex')
-  return sigBuf.length === expBuf.length && crypto.timingSafeEqual(sigBuf, expBuf)
-}
 
 export async function POST(req: NextRequest) {
   try {
@@ -30,6 +22,21 @@ export async function POST(req: NextRequest) {
     }
 
     const body = JSON.parse(rawBody)
+
+    const deliveryId = body?.delivery_id
+    if (deliveryId) {
+      const { data: existing } = await supabase
+        .from('webhook_logs')
+        .select('id')
+        .filter('body->>delivery_id', 'eq', deliveryId)
+        .limit(1)
+        .maybeSingle()
+      if (existing) {
+        console.log('Duplicate delivery, skipping:', deliveryId)
+        return NextResponse.json({ ok: true, duplicate: true })
+      }
+    }
+
     await supabase.from('webhook_logs').insert({ body })
     console.log('Webhook v3:', JSON.stringify(body))
 
