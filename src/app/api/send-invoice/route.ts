@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
 import { createClient } from '@supabase/supabase-js'
 
@@ -7,10 +7,20 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
+const supabaseAuth = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const { invoiceId } = await request.json()
+    const { invoiceId, overrideEmail } = await request.json()
+
+    const accessToken = request.headers.get('authorization')?.replace('Bearer ', '')
+    const { data: { user } } = accessToken
+      ? await supabaseAuth.auth.getUser(accessToken)
+      : { data: { user: null } }
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const { data: inv } = await supabase
       .from('invoices')
@@ -19,7 +29,10 @@ export async function POST(request: Request) {
       .single()
 
     if (!inv) return NextResponse.json({ error: 'Счёт не найден' }, { status: 404 })
-    if (!inv.client_email) return NextResponse.json({ error: 'Нет email клиента' }, { status: 400 })
+    if (inv.user_id !== user.id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+    const recipientEmail = overrideEmail || inv.client_email
+    if (!recipientEmail) return NextResponse.json({ error: 'Нет email клиента' }, { status: 400 })
 
     const publicLink = `https://invoices.kz/view/${inv.public_token}`
     const amount = Number(inv.amount).toLocaleString('ru-KZ')

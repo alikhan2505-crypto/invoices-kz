@@ -174,9 +174,13 @@ export default function InvoicePage() {
   async function sendEmailConfirm() {
     if (!emailTo) { alert('Введите email адрес'); return }
     setSendingEmail(true)
+    const { data: { session } } = await supabase.auth.getSession()
     const res = await fetch('/api/send-invoice', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session?.access_token}`,
+      },
       body: JSON.stringify({ invoiceId: id, overrideEmail: emailTo })
     })
     const data = await res.json()
