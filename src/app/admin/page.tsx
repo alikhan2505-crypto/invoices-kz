@@ -407,7 +407,7 @@ export default function Admin() {
                   <div className="text-sm text-gray-300">{promo.used_count}/{promo.max_uses}</div>
                   <div className="flex gap-2">
                     <button onClick={() => togglePromo(promo.id, promo.is_active)}
-                      className={`text-xs px-2 py-1 rounded-lg ${promo.is_active ? 'bg-green-500/20 text-green-400' : 'bg-gray-600 text-gray-400'}`}>
+                      className={`text-xs px-2 py-1 rounded-lg ${promo.is_active ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-300'}`}>
                       {promo.is_active ? 'Актив' : 'Откл'}
                     </button>
                     <button onClick={() => deletePromo(promo.id)}
