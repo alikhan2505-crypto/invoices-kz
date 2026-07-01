@@ -5,12 +5,14 @@ import { supabase } from '@/lib/supabase'
 import BottomNav from '@/components/BottomNav'
 import { AreaChart, Area, ResponsiveContainer, Tooltip } from 'recharts'
 import { useTheme } from '@/components/ThemeProvider'
+import { useLanguage } from '@/components/LanguageProvider'
 import { cacheGet, cacheSet, cacheClear } from '@/lib/cache'
 import { getActivePlan } from '@/lib/plan'
 
 export default function Profile() {
   const router = useRouter()
   const { theme, toggle } = useTheme()
+  const { lang, setLang } = useLanguage()
   const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
@@ -300,6 +302,22 @@ export default function Profile() {
               className={`w-12 h-6 rounded-full transition-colors relative ${theme === 'dark' ? 'bg-[#1C2056]' : 'bg-gray-200'}`}>
               <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${theme === 'dark' ? 'left-7' : 'left-1'}`}></span>
             </button>
+          </div>
+          <div className="flex items-center justify-between px-4 py-3.5 border-t border-gray-100">
+            <div className="flex items-center gap-3">
+              <span className="text-lg">🌐</span>
+              <span className="text-sm text-gray-800">Язык / Тіл</span>
+            </div>
+            <div className="flex bg-gray-100 rounded-full p-0.5">
+              <button onClick={() => setLang('ru')}
+                className={`px-3 py-1 text-xs rounded-full transition-colors ${lang === 'ru' ? 'bg-[#1C2056] text-white' : 'text-gray-500'}`}>
+                RU
+              </button>
+              <button onClick={() => setLang('kk')}
+                className={`px-3 py-1 text-xs rounded-full transition-colors ${lang === 'kk' ? 'bg-[#1C2056] text-white' : 'text-gray-500'}`}>
+                ҚЗ
+              </button>
+            </div>
           </div>
         </div>
 
