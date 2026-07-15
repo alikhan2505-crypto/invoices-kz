@@ -2,9 +2,13 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { useLanguage } from '@/components/LanguageProvider'
+import { authDict } from '@/lib/i18n/auth'
 
 export default function Onboarding() {
   const router = useRouter()
+  const { lang } = useLanguage()
+  const t = authDict[lang]
   const [step, setStep] = useState(1)
   const [saving, setSaving] = useState(false)
   const [userId, setUserId] = useState('')
@@ -35,8 +39,8 @@ export default function Onboarding() {
   }, [])
 
   async function saveStep1() {
-    if (!form.company_name) { alert('Введите название'); return }
-    if (!form.bin_iin) { alert('Введите БИН/ИИН'); return }
+    if (!form.company_name) { alert(t.companyNameRequiredError); return }
+    if (!form.bin_iin) { alert(t.binRequiredError); return }
     setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
@@ -50,12 +54,16 @@ export default function Onboarding() {
       account_type: accountType,
       trial_expires_at: trialExpires.toISOString(),
     })
-    if (error) { alert('Ошибка: ' + error.message); setSaving(false); return }
+    if (error) { alert(t.errorPrefix(error.message)); setSaving(false); return }
     if (refCode) {
       try {
+        const { data: { session } } = await supabase.auth.getSession()
         await fetch('/api/referral', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token}`,
+          },
           body: JSON.stringify({ userId: user.id, referralCode: refCode })
         })
       } catch {}
@@ -120,9 +128,9 @@ export default function Onboarding() {
   }
 
   const steps = [
-    { n: 1, label: 'Компания' },
-    { n: 2, label: 'Банк' },
-    { n: 3, label: 'Подпись' },
+    { n: 1, label: t.stepCompanyLabel },
+    { n: 2, label: t.stepBankLabel },
+    { n: 3, label: t.stepSignatureLabel },
   ]
 
   return (
@@ -132,7 +140,7 @@ export default function Onboarding() {
         {/* Header */}
         <div className="text-center mb-6">
           <div className="text-2xl font-bold text-[#1C2056] mb-1">INVOICES.KZ</div>
-          <p className="text-sm text-gray-400">Настройка займёт 2 минуты</p>
+          <p className="text-sm text-gray-400">{t.onboardingSubtitle}</p>
         </div>
 
         {/* Steps indicator */}
@@ -159,28 +167,28 @@ export default function Onboarding() {
         {/* Step 1 */}
         {step === 1 && (
           <div>
-            <h2 className="text-lg font-bold text-[#1C2056] mb-1">Данные компании</h2>
-            <p className="text-xs text-gray-400 mb-5">Они появятся на всех ваших счетах</p>
+            <h2 className="text-lg font-bold text-[#1C2056] mb-1">{t.step1Title}</h2>
+            <p className="text-xs text-gray-400 mb-5">{t.step1Subtitle}</p>
 
             {refCode && (
               <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-2.5 mb-4 text-center">
-                <span className="text-xs text-green-700">🎁 Реферальный бонус будет начислен</span>
+                <span className="text-xs text-green-700">{t.referralBonusNotice}</span>
               </div>
             )}
 
             {promoCode && (
               <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-2.5 mb-4 text-center">
-                <span className="text-xs text-blue-700">🎁 Промокод <b>{promoCode}</b> будет применён</span>
+                <span className="text-xs text-blue-700">{t.promoCodeNoticePrefix} <b>{promoCode}</b> {t.promoCodeNoticeSuffix}</span>
               </div>
             )}
 
             <div className="mb-4">
-              <label className="text-xs text-gray-500 mb-2 block">Тип аккаунта</label>
+              <label className="text-xs text-gray-500 mb-2 block">{t.accountTypeLabel}</label>
               <div className="grid grid-cols-3 gap-2 bg-gray-100 p-1 rounded-xl">
                 {(['ИП', 'ТОО', 'Физлицо'] as const).map(type => (
                   <button key={type} onClick={() => setAccountType(type)}
                     className={`py-2 rounded-lg text-sm font-medium transition ${accountType === type ? 'bg-white text-[#1C2056] shadow-sm' : 'text-gray-400'}`}>
-                    {type}
+                    {t.accountTypeName(type)}
                   </button>
                 ))}
               </div>
@@ -189,29 +197,29 @@ export default function Onboarding() {
             <div className="space-y-4 mb-6">
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">
-                  {accountType === 'ТОО' ? 'Название ТОО' : accountType === 'ИП' ? 'Название ИП' : 'ФИО'}
+                  {t.companyNameFieldLabel(accountType)}
                 </label>
                 <input className="w-full border-b border-gray-200 py-2.5 text-sm outline-none focus:border-[#1C2056] transition"
-                  placeholder={accountType === 'ТОО' ? 'ТОО «Пример»' : accountType === 'ИП' ? 'ИП Смагулов А.К.' : 'Смагулов Алихан'}
+                  placeholder={t.companyNamePlaceholder(accountType)}
                   value={form.company_name} onChange={e => setForm({ ...form, company_name: e.target.value })} />
               </div>
               <div>
-                <label className="text-xs text-gray-500 mb-1 block">БИН / ИИН</label>
+                <label className="text-xs text-gray-500 mb-1 block">{t.binIinLabel}</label>
                 <input className="w-full border-b border-gray-200 py-2.5 text-sm outline-none focus:border-[#1C2056] transition"
-                  placeholder="123456789012" value={form.bin_iin}
+                  placeholder={t.binIinPlaceholder} value={form.bin_iin}
                   onChange={e => setForm({ ...form, bin_iin: e.target.value })} />
               </div>
               <div>
-                <label className="text-xs text-gray-500 mb-1 block">Email для уведомлений</label>
+                <label className="text-xs text-gray-500 mb-1 block">{t.notificationEmailLabel}</label>
                 <input className="w-full border-b border-gray-200 py-2.5 text-sm outline-none focus:border-[#1C2056] transition"
-                  placeholder="email@example.kz" value={form.email}
+                  placeholder={t.notificationEmailPlaceholder} value={form.email}
                   onChange={e => setForm({ ...form, email: e.target.value })} />
               </div>
             </div>
 
             <button onClick={saveStep1} disabled={saving}
               className="w-full bg-[#1C2056] text-white rounded-xl py-4 font-medium text-sm">
-              {saving ? 'Сохраняем...' : 'Далее →'}
+              {saving ? t.savingButton : t.nextButton}
             </button>
           </div>
         )}
@@ -219,33 +227,33 @@ export default function Onboarding() {
         {/* Step 2 */}
         {step === 2 && (
           <div>
-            <h2 className="text-lg font-bold text-[#1C2056] mb-1">Банковские реквизиты</h2>
-            <p className="text-xs text-gray-400 mb-5">Нужны для PDF счетов. Можно добавить позже.</p>
+            <h2 className="text-lg font-bold text-[#1C2056] mb-1">{t.step2Title}</h2>
+            <p className="text-xs text-gray-400 mb-5">{t.step2Subtitle}</p>
 
             <div className="space-y-4 mb-6">
               <div>
-                <label className="text-xs text-gray-500 mb-1 block">Название банка</label>
+                <label className="text-xs text-gray-500 mb-1 block">{t.bankNameLabel}</label>
                 <input className="w-full border-b border-gray-200 py-2.5 text-sm outline-none focus:border-[#1C2056] transition"
-                  placeholder='АО "Kaspi Bank"' value={bank.bank_name}
+                  placeholder={t.bankNamePlaceholder} value={bank.bank_name}
                   onChange={e => setBank({ ...bank, bank_name: e.target.value })} />
               </div>
               <div>
-                <label className="text-xs text-gray-500 mb-1 block">ИИК (номер счёта)</label>
+                <label className="text-xs text-gray-500 mb-1 block">{t.iikLabel}</label>
                 <input className="w-full border-b border-gray-200 py-2.5 text-sm outline-none focus:border-[#1C2056] transition"
-                  placeholder="KZ..." value={bank.iik}
+                  placeholder={t.iikPlaceholder} value={bank.iik}
                   onChange={e => setBank({ ...bank, iik: e.target.value })} />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs text-gray-500 mb-1 block">БИК</label>
+                  <label className="text-xs text-gray-500 mb-1 block">{t.bikLabel}</label>
                   <input className="w-full border-b border-gray-200 py-2.5 text-sm outline-none focus:border-[#1C2056] transition"
-                    placeholder="CASPKZKA" value={bank.bik}
+                    placeholder={t.bikPlaceholder} value={bank.bik}
                     onChange={e => setBank({ ...bank, bik: e.target.value })} />
                 </div>
                 <div>
-                  <label className="text-xs text-gray-500 mb-1 block">КБе</label>
+                  <label className="text-xs text-gray-500 mb-1 block">{t.kbeLabel}</label>
                   <input className="w-full border-b border-gray-200 py-2.5 text-sm outline-none focus:border-[#1C2056] transition"
-                    placeholder="19" value={bank.kbe}
+                    placeholder={t.kbePlaceholder} value={bank.kbe}
                     onChange={e => setBank({ ...bank, kbe: e.target.value })} />
                 </div>
               </div>
@@ -253,11 +261,11 @@ export default function Onboarding() {
 
             <button onClick={saveStep2} disabled={saving}
               className="w-full bg-[#1C2056] text-white rounded-xl py-4 font-medium text-sm mb-3">
-              {saving ? 'Сохраняем...' : 'Далее →'}
+              {saving ? t.savingButton : t.nextButton}
             </button>
             <button onClick={() => setStep(3)}
               className="w-full text-gray-400 text-sm py-2">
-              Пропустить
+              {t.skipButton}
             </button>
           </div>
         )}
@@ -265,13 +273,13 @@ export default function Onboarding() {
         {/* Step 3 */}
         {step === 3 && (
           <div>
-            <h2 className="text-lg font-bold text-[#1C2056] mb-1">Подпись и печать</h2>
-            <p className="text-xs text-gray-400 mb-5">Появятся на всех документах автоматически</p>
+            <h2 className="text-lg font-bold text-[#1C2056] mb-1">{t.step3Title}</h2>
+            <p className="text-xs text-gray-400 mb-5">{t.step3Subtitle}</p>
 
             <div className="bg-gray-50 rounded-2xl p-5 mb-6 space-y-3">
               {[
-                { icon: '✍️', title: 'Подпись', desc: 'Нарисуйте или загрузите фото подписи' },
-                { icon: '🔵', title: 'Печать', desc: 'Загрузите фото печати компании' },
+                { icon: '✍️', title: t.signatureItemTitle, desc: t.signatureItemDesc },
+                { icon: '🔵', title: t.stampItemTitle, desc: t.stampItemDesc },
               ].map((item, i) => (
                 <div key={i} className="flex items-center gap-3">
                   <span className="text-2xl">{item.icon}</span>
@@ -285,17 +293,17 @@ export default function Onboarding() {
 
             <div className="bg-[#2DC48D]/10 rounded-xl p-4 mb-6 text-center">
               <div className="text-2xl mb-1">🎉</div>
-              <div className="text-sm font-medium text-[#1C2056]">7 дней бесплатно активированы!</div>
-              <div className="text-xs text-gray-400 mt-1">Все функции Pro открыты</div>
+              <div className="text-sm font-medium text-[#1C2056]">{t.trialActivatedMessage}</div>
+              <div className="text-xs text-gray-400 mt-1">{t.proFeaturesUnlockedMessage}</div>
             </div>
 
             <button onClick={() => router.push('/profile/signature')}
               className="w-full bg-[#1C2056] text-white rounded-xl py-4 font-medium text-sm mb-3">
-              ✍️ Добавить подпись
+              {t.addSignatureButton}
             </button>
             <button onClick={finish}
               className="w-full text-gray-400 text-sm py-2">
-              Пропустить — перейти в приложение
+              {t.skipToAppButton}
             </button>
           </div>
         )}

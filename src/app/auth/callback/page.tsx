@@ -2,9 +2,13 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { useLanguage } from '@/components/LanguageProvider'
+import { authDict } from '@/lib/i18n/auth'
 
 export default function AuthCallback() {
   const router = useRouter()
+  const { lang } = useLanguage()
+  const t = authDict[lang]
 
   useEffect(() => {
     async function handleCallback() {
@@ -80,7 +84,7 @@ export default function AuthCallback() {
     <main className="min-h-screen bg-gray-50 flex items-center justify-center">
       <div className="text-center">
         <div className="text-4xl mb-4">⏳</div>
-        <p className="text-gray-500">Входим в систему...</p>
+        <p className="text-gray-500">{t.loggingInMessage}</p>
       </div>
     </main>
   )
