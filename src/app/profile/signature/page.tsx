@@ -402,7 +402,6 @@ export default function Signature() {
       const resizedDataUrl = await resizeToFit(dataUrl, 500, 200)
       const blob = await (await fetch(resizedDataUrl)).blob()
       const path = `${userId}/logo.png`
-      await supabase.storage.from('logos').remove([path])
       const { error } = await supabase.storage.from('logos').upload(path, blob, { upsert: true, contentType: 'image/png' })
       if (error) { alert('Ошибка: ' + error.message); setSavingLogo(false); return }
       const { data: urlData } = supabase.storage.from('logos').getPublicUrl(path)
@@ -411,6 +410,7 @@ export default function Signature() {
       setLogoUrl(url)
       setSavingLogo(false)
     }
+    reader.onerror = () => { alert('Ошибка чтения файла'); setSavingLogo(false) }
     reader.readAsDataURL(file)
   }
 

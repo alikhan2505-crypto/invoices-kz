@@ -381,8 +381,8 @@ export async function generateKP(data: KPData, existingWin?: Window | null) {
           <div class="sig-left">
             <div class="sig-label">Руководитель / Представитель</div>
             <div class="sig-line">
-              ${signatureUrl ? `<img src="${signatureUrl}" style="position:absolute; bottom:8px; left:10px; height:45px; max-width:150px; object-fit:contain;">` : ''}
-              ${stampUrl ? `<img src="${stampUrl}" style="position:absolute; bottom:-10px; left:60px; height:90px; width:90px; object-fit:contain; opacity:0.85;">` : ''}
+              ${signatureBase64 ? `<img src="${signatureBase64}" style="position:absolute; bottom:8px; left:10px; height:45px; max-width:150px; object-fit:contain;">` : ''}
+              ${stampBase64 ? `<img src="${stampBase64}" style="position:absolute; bottom:-10px; left:60px; height:90px; width:90px; object-fit:contain; opacity:0.85;">` : ''}
             </div>
             <div class="sig-name">${director ? director : ''}</div>
           </div>
