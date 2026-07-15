@@ -2,10 +2,18 @@
 import { useRouter, usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { useLanguage } from './LanguageProvider'
+
+const labels: Record<'ru' | 'kk' | 'en', { create: string; history: string; profile: string }> = {
+  ru: { create: 'Создать', history: 'История', profile: 'Профиль' },
+  kk: { create: 'Жасау', history: 'Тарих', profile: 'Профиль' },
+  en: { create: 'Create', history: 'History', profile: 'Profile' },
+}
 
 export default function BottomNav() {
   const router = useRouter()
   const path = usePathname()
+  const { lang } = useLanguage()
   const [unpaid, setUnpaid] = useState(0)
 
   useEffect(() => {
@@ -24,7 +32,7 @@ export default function BottomNav() {
 
   const items = [
     {
-      label: 'Создать',
+      label: labels[lang].create,
       href: '/dashboard',
       icon: (active: boolean) => (
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -37,7 +45,7 @@ export default function BottomNav() {
       )
     },
     {
-      label: 'История',
+      label: labels[lang].history,
       href: '/history',
       badge: unpaid,
       icon: (active: boolean) => (
@@ -50,7 +58,7 @@ export default function BottomNav() {
       )
     },
     {
-      label: 'Профиль',
+      label: labels[lang].profile,
       href: '/profile',
       icon: (active: boolean) => (
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none">

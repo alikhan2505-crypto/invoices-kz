@@ -317,6 +317,10 @@ export default function Profile() {
                 className={`px-3 py-1 text-xs rounded-full transition-colors ${lang === 'kk' ? 'bg-[#1C2056] text-white' : 'text-gray-500'}`}>
                 ҚЗ
               </button>
+              <button onClick={() => setLang('en')}
+                className={`px-3 py-1 text-xs rounded-full transition-colors ${lang === 'en' ? 'bg-[#1C2056] text-white' : 'text-gray-500'}`}>
+                ENG
+              </button>
             </div>
           </div>
         </div>
