@@ -6,17 +6,16 @@ import { generateInvoicePDF } from '@/lib/generatePDF'
 import BottomNav from '@/components/BottomNav'
 import { cacheGet, cacheSet } from '@/lib/cache'
 import { getActivePlan } from '@/lib/plan'
-
-const KNP_OPTIONS = [
-  { value: '710', label: '710 — Оплата за товар' },
-  { value: '849', label: '849 — Оплата за услуги' },
-  { value: '119', label: '119 — Прочие услуги' },
-]
+import { useLanguage } from '@/components/LanguageProvider'
+import { invoiceFlowDict } from '@/lib/i18n/invoiceFlow'
 
 const UNIT_OPTIONS = ['шт', 'кг', 'л', 'м', 'м²', 'м³', 'час', 'день', 'месяц', 'услуга', 'работа']
 
 export default function Dashboard() {
   const router = useRouter()
+  const { lang } = useLanguage()
+  const t = invoiceFlowDict[lang]
+  const KNP_OPTIONS = t.knpOptions
   const [loading, setLoading] = useState(false)
   const [lastCreated, setLastCreated] = useState<number | null>(null)
   const [clients, setClients] = useState<any[]>([])
@@ -248,34 +247,34 @@ export default function Dashboard() {
 
   async function createInvoice() {
     if (!profile?.company_name || !profile?.bin_iin) {
-      alert('Сначала заполните реквизиты компании в Профиле')
+      alert(t.fillCompanyDetailsFirstAlert)
       router.push('/profile/requisites')
       return
     }
 
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { alert('Войдите в систему'); return }
+    if (!user) { alert(t.signInAlert); return }
 
     const { data: banks } = await supabase
       .from('bank_accounts').select('*').eq('user_id', user.id).order('is_main', { ascending: false })
 
     if (!banks || banks.length === 0) {
-      if (confirm('Не заполнены банковские реквизиты — они нужны для PDF. Заполнить сейчас?')) {
+      if (confirm(t.bankDetailsNeededConfirm)) {
         router.push('/profile/banks')
       }
       return
     }
 
-    if (!clientName) { alert('Введите название клиента'); return }
-    if (!clientBin) { alert('Введите БИН/ИИН клиента'); return }
+    if (!clientName) { alert(t.enterClientNameAlert); return }
+    if (!clientBin) { alert(t.enterClientBinAlert); return }
     if (services.length === 0 || services.some(s => !s.name)) {
-      alert('Добавьте хотя бы одну услугу'); return
+      alert(t.addAtLeastOneServiceAlert); return
     }
     if (services.some(s => s.price === 0)) {
-      alert('Укажите цену для всех услуг'); return
+      alert(t.specifyPriceForAllServicesAlert); return
     }
     if (lastCreated && Date.now() - lastCreated < 180000) {
-      if (!confirm('Вы уже создали счёт недавно. Создать ещё один?')) return
+      if (!confirm(t.recentInvoiceConfirm)) return
     }
 
     setLoading(true)
@@ -285,13 +284,13 @@ export default function Dashboard() {
     if (activePlan.invoiceLimit !== null && monthCount >= activePlan.invoiceLimit) {
       setLoading(false)
       if (activePlan.plan === 'free') {
-        alert(`На бесплатном тарифе максимум ${activePlan.invoiceLimit} счета в месяц. Перейдите на платный тариф.`)
+        alert(t.planLimitFreeMessage(activePlan.invoiceLimit!))
         router.push('/upgrade')
       } else if (activePlan.isTrial) {
-        alert(`На пробном периоде максимум ${activePlan.invoiceLimit} счетов. Купите подписку для продолжения.`)
+        alert(t.planLimitTrialMessage(activePlan.invoiceLimit!))
         router.push('/upgrade')
       } else {
-        alert(`На тарифе Базовый максимум ${activePlan.invoiceLimit} счетов в месяц. Перейдите на Про.`)
+        alert(t.planLimitBasicMessage(activePlan.invoiceLimit!))
         router.push('/upgrade')
       }
       return
@@ -326,13 +325,14 @@ export default function Dashboard() {
     }).select().single()
 
     if (error) {
-      alert('Ошибка: ' + error.message)
+      alert(t.errorPrefix(error.message))
       setLoading(false)
       return
     }
 
     await supabase.from('invoice_logs').insert({ invoice_id: data.id, status: 'draft' })
 
+    setMonthCount(prev => prev + 1)
     setLastCreated(Date.now())
     setLoading(false)
 
@@ -385,24 +385,24 @@ export default function Dashboard() {
       </div>
 
       <div className="max-w-lg mx-auto p-4">
-        <h2 className="text-xl font-bold text-[#1C2056] mb-1">Новый счёт</h2>
-        <p className="text-sm text-gray-500 mb-4">Создайте счёт за 1 минуту</p>
+        <h2 className="text-xl font-bold text-[#1C2056] mb-1">{t.newInvoiceTitle}</h2>
+        <p className="text-sm text-gray-500 mb-4">{t.newInvoiceSubtitle}</p>
 
         {monthStats.total > 0 && (
           <div className="grid grid-cols-3 gap-1 mb-4">
             <div className="bg-white rounded-xl p-3 text-center shadow-sm">
               <div className="text-lg font-bold text-[#1C2056]">{monthStats.total}</div>
-              <div className="text-xs text-gray-400 mt-0.5">Счетов</div>
+              <div className="text-xs text-gray-400 mt-0.5">{t.statsInvoicesLabel}</div>
             </div>
             <div className="bg-white rounded-xl p-3 text-center shadow-sm">
               <div className="text-lg font-bold text-[#2DC48D]">{monthStats.paid}</div>
-              <div className="text-xs text-gray-400 mt-0.5">Оплачено</div>
+              <div className="text-xs text-gray-400 mt-0.5">{t.statsPaidLabel}</div>
             </div>
             <div className="bg-white rounded-xl p-3 text-center shadow-sm">
               <div className="text-lg font-bold text-[#1C2056]">
                 {monthStats.amount > 0 ? (monthStats.amount / 1000).toFixed(0) + 'K' : '0'}
               </div>
-              <div className="text-xs text-gray-400 mt-0.5">Доход ₸</div>
+              <div className="text-xs text-gray-400 mt-0.5">{t.statsIncomeLabel}</div>
             </div>
           </div>
         )}
@@ -412,28 +412,28 @@ export default function Dashboard() {
           if (activePlan.plan === 'free') return (
             <div className="flex items-center justify-between rounded-xl px-4 py-3 mb-4 bg-blue-50 border border-blue-100">
               <div>
-                <div className="text-sm font-medium text-[#1C2056]">Бесплатный тариф</div>
-                <div className="text-xs text-gray-400 mt-0.5">Перейдите на платный для безлимитных счетов</div>
+                <div className="text-sm font-medium text-[#1C2056]">{t.freePlanTitle}</div>
+                <div className="text-xs text-gray-400 mt-0.5">{t.freePlanSubtitle}</div>
               </div>
-              <button onClick={() => router.push('/upgrade')} className="text-xs bg-[#1C2056] text-white px-3 py-1.5 rounded-lg">Тарифы</button>
+              <button onClick={() => router.push('/upgrade')} className="text-xs bg-[#1C2056] text-white px-3 py-1.5 rounded-lg">{t.ratesButton}</button>
             </div>
           )
           if (activePlan.isTrial) return (
             <div className="flex items-center justify-between rounded-xl px-4 py-3 mb-4 bg-green-50 border border-green-100">
               <div>
-                <div className="text-sm font-medium text-green-700">🎉 Пробный период</div>
-                <div className="text-xs text-gray-400 mt-0.5">Осталось {activePlan.daysLeft} дней · осталось {activePlan.invoiceLimit! - monthCount} счетов</div>
+                <div className="text-sm font-medium text-green-700">{t.trialPlanTitle}</div>
+                <div className="text-xs text-gray-400 mt-0.5">{t.trialDaysLeftLabel(activePlan.daysLeft!, activePlan.invoiceLimit! - monthCount)}</div>
               </div>
-              <button onClick={() => router.push('/upgrade')} className="text-xs bg-[#2DC48D] text-white px-3 py-1.5 rounded-lg">Купить</button>
+              <button onClick={() => router.push('/upgrade')} className="text-xs bg-[#2DC48D] text-white px-3 py-1.5 rounded-lg">{t.buyButton}</button>
             </div>
           )
           if (activePlan.daysLeft !== null && activePlan.daysLeft <= 3) return (
             <div className="flex items-center justify-between rounded-xl px-4 py-3 mb-4 bg-red-50 border border-red-100">
               <div>
-                <div className="text-sm font-medium text-red-600">⚠️ Тариф истекает</div>
-                <div className="text-xs text-gray-400 mt-0.5">Осталось {activePlan.daysLeft} дней</div>
+                <div className="text-sm font-medium text-red-600">{t.expiringPlanTitle}</div>
+                <div className="text-xs text-gray-400 mt-0.5">{t.daysLeftLabel(activePlan.daysLeft)}</div>
               </div>
-              <button onClick={() => router.push('/upgrade')} className="text-xs bg-red-500 text-white px-3 py-1.5 rounded-lg">Продлить</button>
+              <button onClick={() => router.push('/upgrade')} className="text-xs bg-red-500 text-white px-3 py-1.5 rounded-lg">{t.extendButton}</button>
             </div>
           )
           return null
@@ -442,15 +442,15 @@ export default function Dashboard() {
         {showOnboarding && (
           <div className="bg-white rounded-2xl shadow-sm p-5 mb-4">
             <div className="flex items-center justify-between mb-4">
-              <div className="font-medium text-[#1C2056]">🚀 Начало работы</div>
+              <div className="font-medium text-[#1C2056]">{t.onboardingTitle}</div>
               <button onClick={() => setShowOnboarding(false)} className="text-gray-300 hover:text-gray-500 text-lg">✕</button>
             </div>
             <div className="space-y-3">
               {[
-                { step: 1, title: 'Заполните реквизиты', desc: 'Название компании, БИН, адрес', done: !!(profile?.company_name && profile?.bin_iin), action: () => router.push('/profile/requisites'), btn: 'Заполнить' },
-                { step: 2, title: 'Добавьте банковский счёт', desc: 'ИИК, БИК — для реквизитов оплаты', done: bankAccounts.length > 0, action: () => router.push('/profile/banks'), btn: 'Добавить' },
-                { step: 3, title: 'Загрузите подпись', desc: 'Нарисуйте подпись для PDF', done: !!(profile?.signature_url), action: () => router.push('/profile/signature'), btn: 'Загрузить' },
-                { step: 4, title: 'Создайте первый счёт', desc: 'Заполните данные клиента', done: monthStats.total > 0, action: () => {}, btn: '' },
+                { step: 1, title: t.onboardingStep1Title, desc: t.onboardingStep1Desc, done: !!(profile?.company_name && profile?.bin_iin), action: () => router.push('/profile/requisites'), btn: t.onboardingStep1Btn },
+                { step: 2, title: t.onboardingStep2Title, desc: t.onboardingStep2Desc, done: bankAccounts.length > 0, action: () => router.push('/profile/banks'), btn: t.onboardingStep2Btn },
+                { step: 3, title: t.onboardingStep3Title, desc: t.onboardingStep3Desc, done: !!(profile?.signature_url), action: () => router.push('/profile/signature'), btn: t.onboardingStep3Btn },
+                { step: 4, title: t.onboardingStep4Title, desc: t.onboardingStep4Desc, done: monthStats.total > 0, action: () => {}, btn: '' },
               ].map((item, i) => (
                 <div key={i} className={`flex items-center gap-3 p-3 rounded-xl ${item.done ? 'bg-green-50' : 'bg-gray-50'}`}>
                   <div className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${item.done ? 'bg-[#2DC48D] text-white' : 'bg-gray-200 text-gray-500'}`}>
@@ -471,7 +471,7 @@ export default function Dashboard() {
 
         {clients.length > 0 && !clientSelected && (
           <div className="mb-3">
-            <p className="text-xs text-gray-400 mb-2">Быстрый выбор клиента</p>
+            <p className="text-xs text-gray-400 mb-2">{t.quickClientPickLabel}</p>
             <div className="flex gap-2 overflow-x-auto pb-1">
               {clients.slice(0, 6).map(c => (
                 <button key={c.id} onClick={() => selectClient(c)}
@@ -485,55 +485,55 @@ export default function Dashboard() {
 
         {/* Client section */}
         <div className="bg-white rounded-2xl p-5 mb-4 shadow-sm">
-          <h3 className="font-medium text-[#1C2056] mb-3">Данные клиента</h3>
+          <h3 className="font-medium text-[#1C2056] mb-3">{t.clientDataHeader}</h3>
           {clientSelected ? (
             <div className="space-y-3">
               <div className="bg-gray-50 rounded-xl p-3 flex items-center justify-between">
                 <div>
                   <div className="text-sm font-medium text-[#1C2056]">{clientName}</div>
-                  <div className="text-xs text-gray-400 mt-0.5">БИН: {clientBin}</div>
+                  <div className="text-xs text-gray-400 mt-0.5">{t.binLabel(clientBin)}</div>
                   {clientEmail && <div className="text-xs text-gray-400">{clientEmail}</div>}
                 </div>
                 <button onClick={clearClient} className="text-gray-300 hover:text-red-400 text-xl">✕</button>
               </div>
               <div>
-                <label className="text-xs text-gray-500 mb-1 block">КНП (Код назначения платежа)</label>
+                <label className="text-xs text-gray-500 mb-1 block">{t.knpLabel}</label>
                 <select className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056] bg-white"
                   value={clientKnp} onChange={e => setClientKnp(e.target.value)}>
                   {KNP_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                 </select>
               </div>
               <div>
-                <label className="text-xs text-gray-500 mb-1 block">Телефон покупателя</label>
+                <label className="text-xs text-gray-500 mb-1 block">{t.buyerPhoneLabel}</label>
                 <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                  placeholder="+7 776 355 5177" value={clientPhone} type="tel" maxLength={16}
+                  placeholder={t.buyerPhonePlaceholderDashboard} value={clientPhone} type="tel" maxLength={16}
                   onChange={e => setClientPhone(formatPhone(e.target.value))} />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs text-gray-500 mb-1 block">№ договора</label>
+                  <label className="text-xs text-gray-500 mb-1 block">{t.contractNumberLabelDashboard}</label>
                   <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                    placeholder="123" value={contractNumber} onChange={e => setContractNumber(e.target.value)} />
+                    placeholder={t.contractNumberPlaceholderDashboard} value={contractNumber} onChange={e => setContractNumber(e.target.value)} />
                 </div>
                 <div>
-                  <label className="text-xs text-gray-500 mb-1 block">Дата договора</label>
+                  <label className="text-xs text-gray-500 mb-1 block">{t.contractDateLabel}</label>
                   <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                    placeholder="01.01.2026" value={contractDate} onChange={e => setContractDate(e.target.value)} />
+                    placeholder={t.contractDatePlaceholder} value={contractDate} onChange={e => setContractDate(e.target.value)} />
                 </div>
               </div>
             </div>
           ) : (
             <div className="space-y-3">
               <div>
-                <label className="text-xs text-gray-500 mb-1 block">Название компании / ИП *</label>
+                <label className="text-xs text-gray-500 mb-1 block">{t.companyNameLabel}</label>
                 <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                  placeholder="ТОО «Пример»" value={clientName} onChange={e => setClientName(e.target.value)} />
+                  placeholder={t.companyNamePlaceholder} value={clientName} onChange={e => setClientName(e.target.value)} />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs text-gray-500 mb-1 block">БИН/ИИН *</label>
+                  <label className="text-xs text-gray-500 mb-1 block">{t.binIinLabel}</label>
                   <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                    placeholder="123456789012" value={clientBin}
+                    placeholder={t.binIinPlaceholder} value={clientBin}
                     onChange={async e => {
                       const bin = e.target.value
                       setClientBin(bin)
@@ -549,36 +549,36 @@ export default function Dashboard() {
                     }} />
                 </div>
                 <div>
-                  <label className="text-xs text-gray-500 mb-1 block">Email</label>
+                  <label className="text-xs text-gray-500 mb-1 block">{t.emailLabel}</label>
                   <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                    placeholder="client@mail.kz" value={clientEmail} onChange={e => setClientEmail(e.target.value)} />
+                    placeholder={t.emailPlaceholder} value={clientEmail} onChange={e => setClientEmail(e.target.value)} />
                 </div>
               </div>
               <div>
-                <label className="text-xs text-gray-500 mb-1 block">Адрес (необязательно)</label>
+                <label className="text-xs text-gray-500 mb-1 block">{t.addressLabelDashboard}</label>
                 <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                  placeholder="г. Алматы, ул. Абая 1" value={clientAddress} onChange={e => setClientAddress(e.target.value)} />
+                  placeholder={t.addressPlaceholder} value={clientAddress} onChange={e => setClientAddress(e.target.value)} />
               </div>
               <div>
-                <label className="text-xs text-gray-500 mb-1 block">Телефон покупателя</label>
+                <label className="text-xs text-gray-500 mb-1 block">{t.buyerPhoneLabel}</label>
                 <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                  placeholder="+7 776 355 5177" value={clientPhone} type="tel" maxLength={16}
+                  placeholder={t.buyerPhonePlaceholderDashboard} value={clientPhone} type="tel" maxLength={16}
                   onChange={e => setClientPhone(formatPhone(e.target.value))} />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs text-gray-500 mb-1 block">№ договора</label>
+                  <label className="text-xs text-gray-500 mb-1 block">{t.contractNumberLabelDashboard}</label>
                   <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                    placeholder="123" value={contractNumber} onChange={e => setContractNumber(e.target.value)} />
+                    placeholder={t.contractNumberPlaceholderDashboard} value={contractNumber} onChange={e => setContractNumber(e.target.value)} />
                 </div>
                 <div>
-                  <label className="text-xs text-gray-500 mb-1 block">Дата договора</label>
+                  <label className="text-xs text-gray-500 mb-1 block">{t.contractDateLabel}</label>
                   <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                    placeholder="01.01.2026" value={contractDate} onChange={e => setContractDate(e.target.value)} />
+                    placeholder={t.contractDatePlaceholder} value={contractDate} onChange={e => setContractDate(e.target.value)} />
                 </div>
               </div>
               <div>
-                <label className="text-xs text-gray-500 mb-1 block">КНП (Код назначения платежа)</label>
+                <label className="text-xs text-gray-500 mb-1 block">{t.knpLabel}</label>
                 <select className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056] bg-white"
                   value={clientKnp} onChange={e => setClientKnp(e.target.value)}>
                   {KNP_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
@@ -591,16 +591,16 @@ export default function Dashboard() {
         {/* Services section */}
         <div className="bg-white rounded-2xl p-5 mb-4 shadow-sm">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-medium text-[#1C2056]">Услуги / Товары</h3>
+            <h3 className="font-medium text-[#1C2056]">{t.servicesHeader}</h3>
             <div className="flex gap-2">
               {savedServices.length > 0 && (
                 <button onClick={() => setShowServicePicker(true)}
                   className="text-xs text-[#1C2056] border border-[#1C2056] rounded-lg px-3 py-1">
-                  Из справочника
+                  {t.fromDirectoryButton}
                 </button>
               )}
               <button onClick={addService} className="text-xs bg-[#1C2056] text-white rounded-lg px-3 py-1">
-                + Добавить
+                {t.addButton}
               </button>
             </div>
           </div>
@@ -610,16 +610,16 @@ export default function Dashboard() {
                 <div className="flex gap-2 mb-2">
                   <button type="button" onClick={() => updateService(idx, 'type', 'service')}
                     className={`flex-1 px-3 py-1.5 text-xs rounded-lg font-medium transition ${(svc.type || 'service') === 'service' ? 'bg-[#1C2056] text-white' : 'bg-gray-100 text-gray-500'}`}>
-                    📋 Услуга
+                    {t.serviceToggleLabel}
                   </button>
                   <button type="button" onClick={() => updateService(idx, 'type', 'product')}
                     className={`flex-1 px-3 py-1.5 text-xs rounded-lg font-medium transition ${svc.type === 'product' ? 'bg-[#2DC48D] text-white' : 'bg-gray-100 text-gray-500'}`}>
-                    📦 Товар
+                    {t.productToggleLabel}
                   </button>
                 </div>
                 <div className="flex gap-2 items-start">
                   <input className="flex-1 border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                    placeholder="Название услуги / товара" value={svc.name}
+                    placeholder={t.serviceNamePlaceholder} value={svc.name}
                     onChange={e => updateService(idx, 'name', e.target.value)} />
                   {services.length > 1 && (
                     <button onClick={() => removeService(idx)} className="text-gray-300 hover:text-red-400 text-xl mt-1">×</button>
@@ -627,34 +627,34 @@ export default function Dashboard() {
                 </div>
                 <div className="grid grid-cols-4 gap-2">
                   <div>
-                    <label className="text-xs text-gray-400 mb-1 block">Код</label>
+                    <label className="text-xs text-gray-400 mb-1 block">{t.codeLabel}</label>
                     <input className="w-full border rounded-lg px-2 py-2 text-sm outline-none focus:border-[#1C2056]"
-                      placeholder="001" value={svc.code || ''}
+                      placeholder={t.codePlaceholder} value={svc.code || ''}
                       onChange={e => updateService(idx, 'code', e.target.value)} />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-400 mb-1 block">Кол-во</label>
+                    <label className="text-xs text-gray-400 mb-1 block">{t.qtyLabel}</label>
                     <input className="w-full border rounded-lg px-2 py-2 text-sm outline-none focus:border-[#1C2056]"
-                      type="number" placeholder="0" value={svc.qty || ''}
+                      type="number" placeholder={t.qtyPlaceholder} value={svc.qty || ''}
                       onChange={e => updateService(idx, 'qty', Number(e.target.value))} />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-400 mb-1 block">Ед.</label>
+                    <label className="text-xs text-gray-400 mb-1 block">{t.unitLabel}</label>
                     <select className="w-full border rounded-lg px-2 py-2 text-sm outline-none focus:border-[#1C2056] bg-white"
                       value={svc.unit || 'шт'} onChange={e => updateService(idx, 'unit', e.target.value)}>
                       {UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs text-gray-400 mb-1 block">Цена ₸</label>
+                    <label className="text-xs text-gray-400 mb-1 block">{t.priceLabel}</label>
                     <input className="w-full border rounded-lg px-2 py-2 text-sm outline-none focus:border-[#1C2056]"
-                      type="number" placeholder="0" value={svc.price || ''}
+                      type="number" placeholder={t.pricePlaceholder} value={svc.price || ''}
                       onChange={e => updateService(idx, 'price', Number(e.target.value))} />
                   </div>
                 </div>
                 {svc.name && svc.price > 0 && (
                   <div className="text-xs text-gray-400 text-right">
-                    Итого: {(svc.qty * svc.price).toLocaleString('ru-KZ')} ₸
+                    {t.perLineTotal((svc.qty * svc.price).toLocaleString('ru-KZ'))}
                   </div>
                 )}
               </div>
@@ -667,30 +667,30 @@ export default function Dashboard() {
           {vatType === 'vat_16' ? (
             <>
               <div className="flex justify-between text-sm text-white/70 mb-2">
-                <span>Сумма без НДС</span><span>{totalWithoutVat.toLocaleString('ru-KZ')} ₸</span>
+                <span>{t.amountWithoutVatLabel}</span><span>{totalWithoutVat.toLocaleString('ru-KZ')} ₸</span>
               </div>
               <div className="flex justify-between text-sm text-white/70 mb-3">
-                <span>НДС 16%</span><span>{vatAmount.toLocaleString('ru-KZ')} ₸</span>
+                <span>{t.vat16Label}</span><span>{vatAmount.toLocaleString('ru-KZ')} ₸</span>
               </div>
             </>
           ) : vatType === 'vat_0' ? (
             <div className="flex justify-between text-sm text-white/70 mb-3">
-              <span>НДС 0%</span><span>0 ₸</span>
+              <span>{t.vat0Label}</span><span>{t.vat0Amount}</span>
             </div>
           ) : (
             <div className="flex justify-between text-sm text-white/70 mb-3">
-              <span>Без НДС</span><span>—</span>
+              <span>{t.noVatLabel}</span><span>{t.noVatDash}</span>
             </div>
           )}
           <div className="flex justify-between font-medium text-white border-t border-white/20 pt-3">
-            <span>К оплате</span>
+            <span>{t.amountDueLabel}</span>
             <span className="text-lg">{total.toLocaleString('ru-KZ')} ₸</span>
           </div>
         </div>
 
         <button onClick={createInvoice} disabled={loading}
           className={`w-full rounded-xl py-4 font-medium text-sm text-white transition ${loading ? 'bg-gray-400' : 'bg-[#2DC48D]'}`}>
-          {loading ? 'Создаём...' : '✈ Создать и скачать PDF'}
+          {loading ? t.creatingButton : t.createButton}
         </button>
       </div>
 
@@ -699,7 +699,7 @@ export default function Dashboard() {
         <div className="fixed inset-0 bg-black/40 z-50 flex items-end">
           <div className="bg-white w-full max-w-lg mx-auto rounded-t-3xl p-5 max-h-[70vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
-              <span className="font-semibold text-[#1C2056]">Выберите услугу</span>
+              <span className="font-semibold text-[#1C2056]">{t.servicePickerTitle}</span>
               <button onClick={() => setShowServicePicker(false)} className="back-btn text-gray-400 text-xl">✕</button>
             </div>
             <div className="space-y-2">
@@ -724,17 +724,17 @@ export default function Dashboard() {
           <div className="bg-white w-full max-w-lg mx-auto rounded-t-3xl p-6">
             <div className="text-center mb-5">
               <div className="text-3xl mb-2">👥</div>
-              <div className="font-semibold text-[#1C2056] mb-1">Сохранить клиента?</div>
-              <div className="text-sm text-gray-400">{lastInvoiceClient?.name} будет добавлен в справочник</div>
+              <div className="font-semibold text-[#1C2056] mb-1">{t.saveClientModalTitle}</div>
+              <div className="text-sm text-gray-400">{t.saveClientPrompt(lastInvoiceClient?.name)}</div>
             </div>
             <div className="flex gap-3">
               <button onClick={() => setShowSaveClient(false)}
                 className="flex-1 border border-gray-200 rounded-xl py-3 text-sm text-gray-500">
-                Пропустить
+                {t.skipButton}
               </button>
               <button onClick={saveClientToDirectory}
                 className="flex-1 bg-[#1C2056] text-white rounded-xl py-3 text-sm font-medium">
-                Сохранить
+                {t.saveButtonLabel}
               </button>
             </div>
           </div>
@@ -746,7 +746,7 @@ export default function Dashboard() {
         <div className="fixed inset-0 bg-black/40 z-50 flex items-end">
           <div className="bg-white w-full max-w-lg mx-auto rounded-t-3xl p-5">
             <div className="flex items-center justify-between mb-4">
-              <span className="font-semibold text-[#1C2056]">Выберите счёт для PDF</span>
+              <span className="font-semibold text-[#1C2056]">{t.bankPickerTitle}</span>
               <button onClick={() => {
 
                 setShowBankPicker(false)
@@ -760,7 +760,7 @@ export default function Dashboard() {
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="font-medium text-sm text-[#1C2056]">{bank.bank_name}</span>
-                      {bank.is_main && <span className="text-xs bg-[#2DC48D]/10 text-[#2DC48D] px-2 py-0.5 rounded-full">★ Основной</span>}
+                      {bank.is_main && <span className="text-xs bg-[#2DC48D]/10 text-[#2DC48D] px-2 py-0.5 rounded-full">{t.mainBankBadge}</span>}
                     </div>
                     <div className="text-xs text-gray-400 mt-0.5">{bank.iik}</div>
                   </div>

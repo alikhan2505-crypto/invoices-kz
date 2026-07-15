@@ -2,12 +2,16 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { useLanguage } from '@/components/LanguageProvider'
+import { invoiceFlowDict } from '@/lib/i18n/invoiceFlow'
 
 const UNIT_OPTIONS = ['шт', 'кг', 'л', 'м', 'м²', 'м³', 'час', 'день', 'месяц', 'услуга', 'работа']
 
 export default function EditInvoice() {
   const router = useRouter()
   const { id } = useParams()
+  const { lang } = useLanguage()
+  const t = invoiceFlowDict[lang]
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [profile, setProfile] = useState<any>(null)
@@ -99,10 +103,10 @@ export default function EditInvoice() {
   }
 
   async function save() {
-    if (!clientName) { alert('Введите название клиента'); return }
-    if (!clientBin) { alert('Введите БИН/ИИН'); return }
+    if (!clientName) { alert(t.enterClientNameAlert); return }
+    if (!clientBin) { alert(t.enterBinIinAlert); return }
     if (services.some(s => !s.name || s.price === 0)) {
-      alert('Заполните все услуги'); return
+      alert(t.fillAllServicesAlert); return
     }
 
     setSaving(true)
@@ -119,14 +123,14 @@ export default function EditInvoice() {
       note: note || null,
     }).eq('id', id)
 
-    if (error) { alert('Ошибка: ' + error.message); setSaving(false); return }
+    if (error) { alert(t.errorPrefix(error.message)); setSaving(false); return }
     setSaving(false)
     router.push('/invoice/' + id)
   }
 
   if (loading) return (
     <main className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <p className="text-gray-400">Загрузка...</p>
+      <p className="text-gray-400">{t.loadingLabel}</p>
     </main>
   )
 
@@ -134,45 +138,45 @@ export default function EditInvoice() {
     <main className="min-h-screen bg-gray-50 pb-8">
       <div className="sticky top-0 z-10 bg-white border-b px-4 py-4 flex items-center gap-3">
         <button onClick={() => router.push('/invoice/' + id)} className="back-btn text-gray-400 text-xl">‹</button>
-        <span className="font-semibold text-[#1C2056]">Редактировать счёт</span>
+        <span className="font-semibold text-[#1C2056]">{t.editInvoiceHeaderTitle}</span>
       </div>
 
       <div className="max-w-lg mx-auto p-4 space-y-4">
 
         {/* Client */}
         <div className="bg-white rounded-2xl p-5 shadow-sm">
-          <h3 className="font-medium text-[#1C2056] mb-3">Данные клиента</h3>
+          <h3 className="font-medium text-[#1C2056] mb-3">{t.clientDataHeader}</h3>
           <div className="space-y-3">
             <div>
-              <label className="text-xs text-gray-500 mb-1 block">Название компании / ИП *</label>
+              <label className="text-xs text-gray-500 mb-1 block">{t.companyNameLabel}</label>
               <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                placeholder="ТОО «Пример»" value={clientName}
+                placeholder={t.companyNamePlaceholder} value={clientName}
                 onChange={e => setClientName(e.target.value)} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-gray-500 mb-1 block">БИН/ИИН *</label>
+                <label className="text-xs text-gray-500 mb-1 block">{t.binIinLabel}</label>
                 <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                  placeholder="123456789012" value={clientBin}
+                  placeholder={t.binIinPlaceholder} value={clientBin}
                   onChange={e => handleBinChange(e.target.value)} />
               </div>
               <div>
-                <label className="text-xs text-gray-500 mb-1 block">Email</label>
+                <label className="text-xs text-gray-500 mb-1 block">{t.emailLabel}</label>
                 <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                  placeholder="client@mail.kz" value={clientEmail}
+                  placeholder={t.emailPlaceholder} value={clientEmail}
                   onChange={e => setClientEmail(e.target.value)} />
               </div>
             </div>
             <div>
-              <label className="text-xs text-gray-500 mb-1 block">Адрес</label>
+              <label className="text-xs text-gray-500 mb-1 block">{t.addressLabelEdit}</label>
               <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                placeholder="г. Алматы, ул. Абая 1" value={clientAddress}
+                placeholder={t.addressPlaceholder} value={clientAddress}
                 onChange={e => setClientAddress(e.target.value)} />
             </div>
             <div>
-              <label className="text-xs text-gray-500 mb-1 block">Телефон покупателя</label>
+              <label className="text-xs text-gray-500 mb-1 block">{t.buyerPhoneLabel}</label>
               <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                placeholder="+7 701 123 45 67" value={clientPhone}
+                placeholder={t.buyerPhonePlaceholderEdit} value={clientPhone}
                 onChange={e => setClientPhone(e.target.value)} />
             </div>
           </div>
@@ -180,18 +184,18 @@ export default function EditInvoice() {
 
         {/* Contract */}
         <div className="bg-white rounded-2xl p-5 shadow-sm">
-          <h3 className="font-medium text-[#1C2056] mb-3">Договор</h3>
+          <h3 className="font-medium text-[#1C2056] mb-3">{t.contractHeader}</h3>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-gray-500 mb-1 block">Номер договора</label>
+              <label className="text-xs text-gray-500 mb-1 block">{t.contractNumberLabelEdit}</label>
               <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                placeholder="№123" value={contractNumber}
+                placeholder={t.contractNumberPlaceholderEdit} value={contractNumber}
                 onChange={e => setContractNumber(e.target.value)} />
             </div>
             <div>
-              <label className="text-xs text-gray-500 mb-1 block">Дата договора</label>
+              <label className="text-xs text-gray-500 mb-1 block">{t.contractDateLabel}</label>
               <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                placeholder="01.01.2026" value={contractDate}
+                placeholder={t.contractDatePlaceholder} value={contractDate}
                 onChange={e => setContractDate(e.target.value)} />
             </div>
           </div>
@@ -200,10 +204,10 @@ export default function EditInvoice() {
         {/* Services */}
         <div className="bg-white rounded-2xl p-5 shadow-sm">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-medium text-[#1C2056]">Услуги / Товары</h3>
+            <h3 className="font-medium text-[#1C2056]">{t.servicesHeader}</h3>
             <button onClick={addService}
               className="text-xs bg-[#1C2056] text-white rounded-lg px-3 py-1">
-              + Добавить
+              {t.addButton}
             </button>
           </div>
           <div className="space-y-4" id="services-list">
@@ -213,17 +217,17 @@ export default function EditInvoice() {
                 <div className="flex gap-2">
                   <button type="button" onClick={() => updateService(idx, 'type', 'service')}
                     className={`flex-1 px-3 py-1.5 text-xs rounded-lg font-medium transition ${(svc.type || 'service') === 'service' ? 'bg-[#1C2056] text-white' : 'bg-gray-100 text-gray-500'}`}>
-                    📋 Услуга
+                    {t.serviceToggleLabel}
                   </button>
                   <button type="button" onClick={() => updateService(idx, 'type', 'product')}
                     className={`flex-1 px-3 py-1.5 text-xs rounded-lg font-medium transition ${svc.type === 'product' ? 'bg-[#2DC48D] text-white' : 'bg-gray-100 text-gray-500'}`}>
-                    📦 Товар
+                    {t.productToggleLabel}
                   </button>
                 </div>
                 <div className="flex gap-2 items-start">
                   <input
                     className="flex-1 border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                    placeholder="Название услуги / товара"
+                    placeholder={t.serviceNamePlaceholder}
                     value={svc.name}
                     onChange={e => updateService(idx, 'name', e.target.value)}
                   />
@@ -233,19 +237,19 @@ export default function EditInvoice() {
                 </div>
                 <div className="grid grid-cols-4 gap-2">
                   <div>
-                    <label className="text-xs text-gray-400 mb-1 block">Код</label>
+                    <label className="text-xs text-gray-400 mb-1 block">{t.codeLabel}</label>
                     <input className="w-full border rounded-lg px-2 py-2 text-sm outline-none focus:border-[#1C2056]"
-                      placeholder="001" value={svc.code || ''}
+                      placeholder={t.codePlaceholder} value={svc.code || ''}
                       onChange={e => updateService(idx, 'code', e.target.value)} />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-400 mb-1 block">Кол-во</label>
+                    <label className="text-xs text-gray-400 mb-1 block">{t.qtyLabel}</label>
                     <input className="w-full border rounded-lg px-2 py-2 text-sm outline-none focus:border-[#1C2056]"
-                      type="number" placeholder="0" value={svc.qty || ''}
+                      type="number" placeholder={t.qtyPlaceholder} value={svc.qty || ''}
                       onChange={e => updateService(idx, 'qty', Number(e.target.value))} />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-400 mb-1 block">Ед.</label>
+                    <label className="text-xs text-gray-400 mb-1 block">{t.unitLabel}</label>
                     <select className="w-full border rounded-lg px-2 py-2 text-sm outline-none focus:border-[#1C2056] bg-white"
                       value={svc.unit || 'шт'}
                       onChange={e => updateService(idx, 'unit', e.target.value)}>
@@ -253,15 +257,15 @@ export default function EditInvoice() {
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs text-gray-400 mb-1 block">Цена ₸</label>
+                    <label className="text-xs text-gray-400 mb-1 block">{t.priceLabel}</label>
                     <input className="w-full border rounded-lg px-2 py-2 text-sm outline-none focus:border-[#1C2056]"
-                      type="number" placeholder="0" value={svc.price || ''}
+                      type="number" placeholder={t.pricePlaceholder} value={svc.price || ''}
                       onChange={e => updateService(idx, 'price', Number(e.target.value))} />
                   </div>
                 </div>
                 {svc.name && svc.price > 0 && (
                   <div className="text-xs text-gray-400 text-right">
-                    Итого: {(svc.qty * svc.price).toLocaleString('ru-KZ')} ₸
+                    {t.perLineTotal((svc.qty * svc.price).toLocaleString('ru-KZ'))}
                   </div>
                 )}
               </div>
@@ -271,10 +275,10 @@ export default function EditInvoice() {
 
         {/* Note */}
         <div className="bg-white rounded-2xl p-5 shadow-sm">
-          <h3 className="font-medium text-[#1C2056] mb-3">Примечание</h3>
+          <h3 className="font-medium text-[#1C2056] mb-3">{t.noteHeader}</h3>
           <textarea
             className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056] resize-none"
-            placeholder="Оплата в течение 3х дней..."
+            placeholder={t.notePlaceholder}
             rows={3}
             value={note}
             onChange={e => setNote(e.target.value)}
@@ -286,22 +290,22 @@ export default function EditInvoice() {
           {vatType === 'vat_16' ? (
             <>
               <div className="flex justify-between text-sm text-white/70 mb-2">
-                <span>Сумма без НДС</span><span>{totalWithoutVat.toLocaleString('ru-KZ')} ₸</span>
+                <span>{t.amountWithoutVatLabel}</span><span>{totalWithoutVat.toLocaleString('ru-KZ')} ₸</span>
               </div>
               <div className="flex justify-between text-sm text-white/70 mb-3">
-                <span>НДС 16%</span><span>{vatAmount.toLocaleString('ru-KZ')} ₸</span>
+                <span>{t.vat16Label}</span><span>{vatAmount.toLocaleString('ru-KZ')} ₸</span>
               </div>
             </>
           ) : null}
           <div className="flex justify-between font-medium text-white border-t border-white/20 pt-3">
-            <span>К оплате</span>
+            <span>{t.amountDueLabel}</span>
             <span className="text-lg">{total.toLocaleString('ru-KZ')} ₸</span>
           </div>
         </div>
 
         <button onClick={save} disabled={saving}
           className={`w-full rounded-xl py-4 font-medium text-sm text-white transition ${saving ? 'bg-gray-400' : 'bg-[#2DC48D]'}`}>
-          {saving ? 'Сохраняем...' : '💾 Сохранить изменения'}
+          {saving ? t.savingButtonLabel : t.saveChangesButton}
         </button>
       </div>
     </main>

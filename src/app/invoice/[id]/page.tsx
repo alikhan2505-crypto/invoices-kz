@@ -8,14 +8,8 @@ import { generateKP } from '@/lib/generateKP'
 import { generateAVR } from '@/lib/generateAVR'
 import { generateNakladnaya } from '@/lib/generateNakladnaya'
 import { getActivePlan } from '@/lib/plan'
-
-const statusLabel: Record<string, { text: string; color: string; dot: string }> = {
-  paid:    { text: 'Оплачен',    color: 'text-green-600',  dot: 'bg-green-500' },
-  sent:    { text: 'Отправлен',  color: 'text-blue-600',   dot: 'bg-blue-400' },
-  overdue: { text: 'Просрочен',  color: 'text-red-600',    dot: 'bg-red-500' },
-  draft:   { text: 'Черновик',   color: 'text-gray-500',   dot: 'bg-gray-300' },
-  viewed:  { text: 'Просмотрен', color: 'text-purple-600', dot: 'bg-purple-400' },
-}
+import { useLanguage } from '@/components/LanguageProvider'
+import { invoiceFlowDict } from '@/lib/i18n/invoiceFlow'
 
 const statusIcon: Record<string, string> = {
   paid: '✅', sent: '📤', overdue: '⏰', draft: '📝', viewed: '👁'
@@ -24,6 +18,15 @@ const statusIcon: Record<string, string> = {
 export default function InvoicePage() {
   const router = useRouter()
   const { id } = useParams()
+  const { lang } = useLanguage()
+  const t = invoiceFlowDict[lang]
+  const statusLabel: Record<string, { text: string; color: string; dot: string }> = {
+    paid:    { text: t.statusLabelPaid,    color: 'text-green-600',  dot: 'bg-green-500' },
+    sent:    { text: t.statusLabelSent,    color: 'text-blue-600',   dot: 'bg-blue-400' },
+    overdue: { text: t.statusLabelOverdue, color: 'text-red-600',    dot: 'bg-red-500' },
+    draft:   { text: t.statusLabelDraft,   color: 'text-gray-500',   dot: 'bg-gray-300' },
+    viewed:  { text: t.statusLabelViewed,  color: 'text-purple-600', dot: 'bg-purple-400' },
+  }
   const [invoice, setInvoice] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
   const [bank, setBank] = useState<any>(null)
@@ -116,8 +119,9 @@ export default function InvoicePage() {
   }
 
   async function deleteInvoice() {
-    if (!confirm('Аннулировать счёт?')) return
-    await supabase.from('invoices').delete().eq('id', id)
+    if (!confirm(t.cancelInvoiceConfirm)) return
+    await supabase.from('invoices').update({ status: 'cancelled' }).eq('id', id)
+    await supabase.from('invoice_logs').insert({ invoice_id: id, status: 'cancelled' })
     router.push('/history')
   }
 
@@ -134,10 +138,12 @@ export default function InvoicePage() {
     const { data, error } = await supabase.from('invoices').insert({
       user_id: user.id, number: invoiceNumber, amount: invoice.amount,
       status: 'draft', client_name: invoice.client_name, client_bin: invoice.client_bin,
-      client_email: invoice.client_email, services: invoice.services,
-      note: invoice.note, created_at: new Date().toISOString(),
+      client_email: invoice.client_email, client_phone: invoice.client_phone,
+      client_address: invoice.client_address, services: invoice.services,
+      note: invoice.note, contract_number: invoice.contract_number,
+      contract_date: invoice.contract_date, created_at: new Date().toISOString(),
     }).select().single()
-    if (error) { alert('Ошибка: ' + error.message); return }
+    if (error) { alert(t.errorPrefix(error.message)); return }
     await supabase.from('invoice_logs').insert({ invoice_id: data.id, status: 'draft' })
     router.push('/invoice/' + data.id)
   }
@@ -148,7 +154,7 @@ export default function InvoicePage() {
       const link = `https://invoices.kz/view/${data.public_token}`
       try {
         await navigator.clipboard.writeText(link)
-        alert('Ссылка скопирована: ' + link)
+        alert(t.linkCopiedMessage(link))
       } catch {
         const el = document.createElement('textarea')
         el.value = link
@@ -156,24 +162,24 @@ export default function InvoicePage() {
         el.select()
         document.execCommand('copy')
         document.body.removeChild(el)
-        alert('Ссылка скопирована: ' + link)
+        alert(t.linkCopiedMessage(link))
       }
     } else {
-      alert('Ошибка: токен не найден')
+      alert(t.tokenNotFoundAlert)
     }
   }
 
   async function shareWhatsApp() {
     const { data } = await supabase.from('invoices').select('public_token').eq('id', id).single()
-    if (!data?.public_token) { alert('Ошибка'); return }
+    if (!data?.public_token) { alert(t.genericErrorLabel); return }
     const link = `https://invoices.kz/view/${data.public_token}`
-    const text = `Здравствуйте! Направляю вам счёт на оплату ${invoice.number} на сумму ${Number(invoice.amount).toLocaleString('ru-KZ')} ₸.\n\nОткрыть счёт: ${link}`
+    const text = t.whatsappShareMessage(invoice.number, Number(invoice.amount).toLocaleString('ru-KZ'), link)
     window.location.href = `https://wa.me/?text=${encodeURIComponent(text)}`
     await updateStatus('sent')
   }
 
   async function sendEmailConfirm() {
-    if (!emailTo) { alert('Введите email адрес'); return }
+    if (!emailTo) { alert(t.enterEmailAddressAlert); return }
     setSendingEmail(true)
     const { data: { session } } = await supabase.auth.getSession()
     const res = await fetch('/api/send-invoice', {
@@ -187,19 +193,19 @@ export default function InvoicePage() {
     const data = await res.json()
     setSendingEmail(false)
     if (data.success) {
-      alert(`✅ Счёт отправлен на ${emailTo}`)
+      alert(t.emailSentMessage(emailTo))
       setShowEmailModal(false)
       await loadInvoice()
     } else {
-      alert('Ошибка: ' + data.error)
+      alert(t.errorPrefix(data.error))
     }
   }
 
   async function sendReminder() {
     const { data } = await supabase.from('invoices').select('public_token').eq('id', id).single()
-    if (!data?.public_token) { alert('Ошибка'); return }
+    if (!data?.public_token) { alert(t.genericErrorLabel); return }
     const link = `https://invoices.kz/view/${data.public_token}`
-    const text = `Здравствуйте, ${invoice.client_name}!\n\nНапоминаем о неоплаченном счёте:\n\n📄 Счёт: ${invoice.number}\n💰 Сумма: ${Number(invoice.amount).toLocaleString('ru-KZ')} ₸\n🔗 Открыть счёт: ${link}\n\nПожалуйста, произведите оплату. Спасибо!`
+    const text = t.reminderMessage(invoice.client_name, invoice.number, Number(invoice.amount).toLocaleString('ru-KZ'), link)
     window.location.href = `https://wa.me/?text=${encodeURIComponent(text)}`
   }
 
@@ -261,14 +267,14 @@ export default function InvoicePage() {
     <main className="min-h-screen bg-gray-50 flex items-center justify-center">
       <div className="text-center">
         <div className="w-8 h-8 border-2 border-[#1C2056] border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-        <p className="text-gray-400 text-sm">Загрузка...</p>
+        <p className="text-gray-400 text-sm">{t.loadingLabel}</p>
       </div>
     </main>
   )
 
   if (!invoice) return (
     <main className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <p className="text-gray-400">Счёт не найден</p>
+      <p className="text-gray-400">{t.invoiceNotFoundLabel}</p>
     </main>
   )
 
@@ -291,7 +297,7 @@ export default function InvoicePage() {
       <button
         onClick={() => {
           if (isLocked) showUpgrade(lockedLabel, 'pro')
-          else if (isDisabled) alert(disabledReason || 'Недоступно')
+          else if (isDisabled) alert(disabledReason || t.unavailableLabel)
           else onClick()
         }}
         className="w-full flex items-center justify-between px-4 py-3.5 text-sm hover:bg-gray-50 border-b border-gray-100">
@@ -301,7 +307,7 @@ export default function InvoicePage() {
           </span>
           {savedCount > 0 && (
             <span className="text-xs text-[#2DC48D]">
-              📁 {savedCount} {savedCount === 1 ? 'документ' : 'документа'} сохранено в налоговую
+              📁 {t.savedToTaxLabel(savedCount)}
             </span>
           )}
           {isDisabled && disabledReason && (
@@ -310,7 +316,7 @@ export default function InvoicePage() {
         </div>
         {isLocked ? (
           <span className="text-xs bg-amber-50 text-amber-600 border border-amber-200 px-2 py-0.5 rounded-full flex-shrink-0">
-            🔒 Про
+            🔒 {t.proBadge}
           </span>
         ) : isDisabled ? (
           <span className="text-xs text-gray-300 flex-shrink-0">—</span>
@@ -326,12 +332,12 @@ export default function InvoicePage() {
   }) {
     return (
       <button
-        onClick={locked ? () => showUpgrade(lockedLabel, lockedLabel.includes('Про') ? 'pro' : 'basic') : onClick}
+        onClick={locked ? () => showUpgrade(lockedLabel, lockedLabel === t.proLockedLabel ? 'pro' : 'basic') : onClick}
         className="w-full flex items-center justify-between px-4 py-3.5 text-sm hover:bg-gray-50 border-b border-gray-100">
         <span className={locked ? 'text-gray-400' : 'text-[#1C2056]'}>{icon} {label}</span>
         {locked ? (
           <span className="text-xs bg-amber-50 text-amber-600 border border-amber-200 px-2 py-0.5 rounded-full">
-            🔒 {lockedLabel.includes('Про') ? 'Про' : 'Базовый'}
+            🔒 {lockedLabel === t.proLockedLabel ? t.proBadge : t.basicBadge}
           </span>
         ) : (
           <span className="text-gray-300">›</span>
@@ -344,7 +350,7 @@ export default function InvoicePage() {
     <main className="min-h-screen bg-gray-50 pb-8">
       <div className="bg-white border-b px-4 py-4 flex items-center gap-3">
         <button onClick={() => router.push('/history')} className="back-btn text-gray-400 text-xl">‹</button>
-        <span className="font-semibold text-[#1C2056]">Счёт {invoice.number}</span>
+        <span className="font-semibold text-[#1C2056]">{t.invoiceHeaderTitle(invoice.number)}</span>
       </div>
 
       <div className="max-w-lg mx-auto p-4 space-y-4">
@@ -353,7 +359,7 @@ export default function InvoicePage() {
           <div className="text-3xl font-bold text-[#1C2056] mb-1">
             {Number(invoice.amount).toLocaleString('ru-KZ')} ₸
           </div>
-          <div className="text-gray-500 text-sm mb-2">{invoice.client_name || 'Без клиента'}</div>
+          <div className="text-gray-500 text-sm mb-2">{invoice.client_name || t.noClientLabel}</div>
           <span className={`inline-flex items-center gap-1.5 text-sm font-medium ${status.color}`}>
             <span className={`w-2 h-2 rounded-full ${status.dot}`}></span>
             {status.text}
@@ -365,27 +371,27 @@ export default function InvoicePage() {
           <button onClick={shareWhatsApp}
             className="bg-white rounded-xl p-3 text-center shadow-sm hover:bg-gray-50">
             <div className="text-xl mb-1">💬</div>
-            <div className="text-xs text-gray-500">WhatsApp</div>
+            <div className="text-xs text-gray-500">{t.whatsappButtonLabel}</div>
           </button>
           <button onClick={copyPublicLink}
             className="bg-white rounded-xl p-3 text-center shadow-sm hover:bg-gray-50">
             <div className="text-xl mb-1">🔗</div>
-            <div className="text-xs text-gray-500">Ссылка</div>
+            <div className="text-xs text-gray-500">{t.linkButtonLabel}</div>
           </button>
           {/* PDF — окно открывается в кнопке модала (прямой клик пользователя) */}
           <button onClick={() => askSignature(openPDF)}
             className="bg-white rounded-xl p-3 text-center shadow-sm hover:bg-gray-50">
             <div className="text-xl mb-1">📄</div>
-            <div className="text-xs text-gray-500">PDF</div>
+            <div className="text-xs text-gray-500">{t.pdfButtonLabel}</div>
           </button>
           <button
             onClick={() => ap.canEmail
               ? setShowEmailModal(true)
-              : showUpgrade('Email отправка доступна с тарифа Базовый', 'basic')
+              : showUpgrade(t.emailUpgradeMessage, 'basic')
             }
             className="bg-white rounded-xl p-3 text-center shadow-sm hover:bg-gray-50 relative">
             <div className="text-xl mb-1">📧</div>
-            <div className="text-xs text-gray-500">Email</div>
+            <div className="text-xs text-gray-500">{t.emailLabel}</div>
             {!ap.canEmail && (
               <span className="absolute -top-1 -right-1 text-xs bg-amber-400 text-white w-4 h-4 rounded-full flex items-center justify-center">🔒</span>
             )}
@@ -394,14 +400,14 @@ export default function InvoicePage() {
 
         {services.length > 0 && (
           <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-            <div className="px-4 pt-4 pb-2 text-xs text-gray-400 uppercase tracking-wide">Услуги и товары</div>
+            <div className="px-4 pt-4 pb-2 text-xs text-gray-400 uppercase tracking-wide">{t.servicesAndGoodsHeader}</div>
             {services.map((s: any, i: number) => (
               <div key={i} className={`flex justify-between px-4 py-3 ${i < services.length - 1 ? 'border-b border-gray-100' : ''}`}>
                 <div>
                   <div className="flex items-center gap-2">
                     <div className="text-sm text-[#1C2056]">{s.name}</div>
                     <span className={`text-xs px-1.5 py-0.5 rounded ${s.type === 'product' ? 'bg-green-50 text-green-600' : 'bg-blue-50 text-blue-600'}`}>
-                      {s.type === 'product' ? 'Товар' : 'Услуга'}
+                      {t.serviceTypeBadge(s.type)}
                     </span>
                   </div>
                   <div className="text-xs text-gray-400">{s.qty} {s.unit || 'шт'} × {Number(s.price).toLocaleString('ru-KZ')} ₸</div>
@@ -410,7 +416,7 @@ export default function InvoicePage() {
               </div>
             ))}
             <div className="flex justify-between px-4 py-3 border-t border-gray-100 bg-gray-50">
-              <span className="text-sm font-medium text-[#1C2056]">Итого</span>
+              <span className="text-sm font-medium text-[#1C2056]">{t.totalLabel}</span>
               <span className="text-sm font-bold text-[#1C2056]">{Number(invoice.amount).toLocaleString('ru-KZ')} ₸</span>
             </div>
           </div>
@@ -418,30 +424,30 @@ export default function InvoicePage() {
 
         {invoice.note && (
           <div className="bg-white rounded-2xl shadow-sm p-4">
-            <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">Примечание</div>
+            <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">{t.noteHeader}</div>
             <div className="text-sm text-gray-600">{invoice.note}</div>
           </div>
         )}
 
         {bank && (
           <div className="bg-white rounded-2xl shadow-sm p-4">
-            <div className="text-xs text-gray-400 uppercase tracking-wide mb-3">Банковские реквизиты</div>
+            <div className="text-xs text-gray-400 uppercase tracking-wide mb-3">{t.bankDetailsHeader}</div>
             <div className="space-y-1.5">
               <div className="flex justify-between text-sm">
-                <span className="text-gray-400">Банк</span>
+                <span className="text-gray-400">{t.bankNameFieldLabel}</span>
                 <span className="text-[#1C2056] font-medium">{bank.bank_name}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-gray-400">ИИК</span>
+                <span className="text-gray-400">{t.iikFieldLabel}</span>
                 <span className="text-[#1C2056] font-mono text-xs">{bank.iik}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-gray-400">БИК</span>
+                <span className="text-gray-400">{t.bikFieldLabel}</span>
                 <span className="text-[#1C2056] font-mono text-xs">{bank.bik}</span>
               </div>
               {bank.kbe && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-400">КБе</span>
+                  <span className="text-gray-400">{t.kbeFieldLabel}</span>
                   <span className="text-[#1C2056]">{bank.kbe}</span>
                 </div>
               )}
@@ -451,9 +457,9 @@ export default function InvoicePage() {
 
         {/* История */}
         <div className="bg-white rounded-2xl shadow-sm p-4">
-          <div className="text-xs text-gray-400 uppercase tracking-wide mb-3">История</div>
+          <div className="text-xs text-gray-400 uppercase tracking-wide mb-3">{t.historyHeader}</div>
           {logs.length === 0 ? (
-            <div className="text-xs text-gray-400 text-center py-2">Нет записей</div>
+            <div className="text-xs text-gray-400 text-center py-2">{t.noEntriesLabel}</div>
           ) : (
             <div className="space-y-0">
               {logs.map((log, i) => {
@@ -478,14 +484,8 @@ export default function InvoicePage() {
 
         {/* Изменить статус */}
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-          <div className="px-4 pt-4 pb-2 text-xs text-gray-400 uppercase tracking-wide">Изменить статус</div>
-          {[
-            { status: 'draft',   label: '📝 Черновик' },
-            { status: 'sent',    label: '📤 Отправлен' },
-            { status: 'viewed',  label: '👁 Просмотрен клиентом' },
-            { status: 'paid',    label: '✅ Оплачен' },
-            { status: 'overdue', label: '⏰ Просрочен' },
-          ].filter(s => s.status !== invoice.status).map((s, i, arr) => (
+          <div className="px-4 pt-4 pb-2 text-xs text-gray-400 uppercase tracking-wide">{t.changeStatusHeader}</div>
+          {t.statusChangeOptions.filter(s => s.status !== invoice.status).map((s, i, arr) => (
             <button key={s.status} onClick={() => updateStatus(s.status)} disabled={updating}
               className={`w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50 text-sm text-left ${i < arr.length - 1 ? 'border-b border-gray-100' : ''}`}>
               <span className="text-[#1C2056]">{s.label}</span>
@@ -498,22 +498,22 @@ export default function InvoicePage() {
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
           <button onClick={() => router.push('/invoice/' + id + '/edit')}
             className="w-full flex items-center justify-between px-4 py-3.5 text-sm hover:bg-gray-50 text-[#1C2056] border-b border-gray-100">
-            <span>📝 Редактировать</span>
+            <span>{t.editButtonLabel}</span>
             <span className="text-gray-300">›</span>
           </button>
 
           <button onClick={duplicateInvoice}
             className="w-full flex items-center justify-between px-4 py-3.5 text-sm hover:bg-gray-50 text-[#1C2056] border-b border-gray-100">
-            <span>📋 Дублировать</span>
+            <span>{t.duplicateButtonLabel}</span>
             <span className="text-gray-300">›</span>
           </button>
 
           {/* КП */}
           <DocButton
-            label="Коммерческое предложение"
+            label={t.kpDocLabel}
             icon="📋"
             locked={!ap.canKpAvrNakl}
-            lockedLabel="Доступно на тарифе Про"
+            lockedLabel={t.proLockedLabel}
             savedCount={kpCount}
             onClick={async () => {
               if (!profile) return
@@ -522,7 +522,7 @@ export default function InvoicePage() {
               const kpNumber = await getNextNumber('kp', user.id)
               const today = new Date()
               today.setDate(today.getDate() + 30)
-              const validUntil = prompt('Действителен до:', today.toLocaleDateString('ru-KZ'))
+              const validUntil = prompt(t.kpValidUntilPrompt, today.toLocaleDateString('ru-KZ'))
               if (!validUntil) return
               await supabase.from('kp_documents').insert({
                 user_id: user.id, invoice_id: id, number: kpNumber,
@@ -550,20 +550,20 @@ export default function InvoicePage() {
 
           {/* АВР */}
           <DocButton
-            label="Акт выполненных работ"
+            label={t.avrDocLabel}
             icon="📄"
             locked={!ap.canKpAvrNakl}
-            lockedLabel="Доступно на тарифе Про"
+            lockedLabel={t.proLockedLabel}
             savedCount={avrCount}
             disabled={!hasServices}
-            disabledReason="Нет услуг в счёте"
+            disabledReason={t.noServicesInInvoiceLabel}
             onClick={async () => {
               if (!profile) return
               const { data: { user } } = await supabase.auth.getUser()
               if (!user) return
               const avrNumber = await getNextNumber('avr', user.id)
-              const contractNumber = prompt('Номер договора (необязательно):', invoice.contract_number || '')
-              const contractDate = prompt('Дата договора:', invoice.contract_date || formatDate(invoice.created_at))
+              const contractNumber = prompt(t.avrContractNumberPrompt, invoice.contract_number || '')
+              const contractDate = prompt(t.avrContractDatePrompt, invoice.contract_date || formatDate(invoice.created_at))
               await supabase.from('avr_documents').insert({
                 user_id: user.id, invoice_id: id, number: avrNumber,
                 date: formatDate(invoice.created_at),
@@ -597,13 +597,13 @@ export default function InvoicePage() {
 
           {/* Накладная */}
           <DocButton
-            label="Накладная на отпуск товара"
+            label={t.nakladnayaDocLabel}
             icon="📦"
             locked={!ap.canKpAvrNakl}
-            lockedLabel="Доступно на тарифе Про"
+            lockedLabel={t.proLockedLabel}
             savedCount={naklCount}
             disabled={!hasProducts}
-            disabledReason="Нет товаров в счёте"
+            disabledReason={t.noProductsInInvoiceLabel}
             onClick={async () => {
               if (!profile) return
               const { data: { user } } = await supabase.auth.getUser()
@@ -636,14 +636,14 @@ export default function InvoicePage() {
 
           {/* Шаблон */}
           <LockedButton
-            label="Сохранить как шаблон"
+            label={t.saveAsTemplateLabel}
             icon="⭐"
             locked={!ap.canTemplates}
-            lockedLabel="Доступно на тарифе Про"
+            lockedLabel={t.proLockedLabel}
             onClick={async () => {
               const { data: { user } } = await supabase.auth.getUser()
               if (!user) return
-              const name = prompt('Название шаблона:', invoice.client_name + ' — ' + invoice.number)
+              const name = prompt(t.templateNamePrompt, invoice.client_name + ' — ' + invoice.number)
               if (!name) return
               const { error } = await supabase.from('templates').insert({
                 user_id: user.id, name,
@@ -651,44 +651,44 @@ export default function InvoicePage() {
                 client_email: invoice.client_email, services: invoice.services,
                 amount: invoice.amount,
               })
-              if (error) { alert('Ошибка: ' + error.message); return }
-              alert('Шаблон сохранён!')
+              if (error) { alert(t.errorPrefix(error.message)); return }
+              alert(t.templateSavedAlert)
             }}
           />
 
           <button onClick={sendReminder}
             className="w-full flex items-center justify-between px-4 py-3.5 text-sm hover:bg-gray-50 text-[#1C2056] border-b border-gray-100">
-            <span>🔔 Напомнить об оплате</span>
+            <span>{t.remindPaymentButtonLabel}</span>
             <span className="text-gray-300">›</span>
           </button>
 
           <LockedButton
-            label={invoice.recurring_active ? 'Повторение включено' : 'Повторять ежемесячно'}
+            label={invoice.recurring_active ? t.recurringEnabledLabel : t.recurringMonthlyLabel}
             icon="🔄"
             locked={!ap.canRecurring}
-            lockedLabel="Доступно на тарифе Про"
+            lockedLabel={t.proLockedLabel}
             onClick={async () => {
               if (invoice.recurring_active) {
                 await supabase.from('invoices').update({ recurring_active: false }).eq('id', id)
                 await loadInvoice()
-                alert('Повторение отключено')
+                alert(t.recurringDisabledAlert)
               } else {
-                const until = prompt('Повторять до (ДД.ММ.ГГГГ):', '01.12.2026')
+                const until = prompt(t.recurringUntilPrompt, '01.12.2026')
                 if (!until) return
                 const parts = until.split('.')
-                if (parts.length !== 3) { alert('Неверный формат даты'); return }
-                if (!invoice.client_email) { alert('У клиента нет email!'); return }
+                if (parts.length !== 3) { alert(t.invalidDateFormatAlert); return }
+                if (!invoice.client_email) { alert(t.clientNoEmailAlert); return }
                 const isoDate = `${parts[2]}-${parts[1]}-${parts[0]}`
                 await supabase.from('invoices').update({ recurring_active: true, recurring_until: isoDate }).eq('id', id)
                 await loadInvoice()
-                alert(`Повторение включено до ${until}`)
+                alert(t.recurringEnabledUntilMessage(until))
               }
             }}
           />
 
           <button onClick={deleteInvoice}
             className="w-full flex items-center px-4 py-3.5 text-sm hover:bg-gray-50 text-red-500">
-            ← Отозвать / Аннулировать
+            {t.cancelInvoiceButtonLabel}
           </button>
         </div>
       </div>
@@ -699,16 +699,16 @@ export default function InvoicePage() {
           <div className="bg-white w-full max-w-sm rounded-2xl p-6">
             <div className="text-center mb-5">
               <div className="text-4xl mb-3">🔒</div>
-              <div className="font-semibold text-[#1C2056] mb-2">Необходим апгрейд</div>
+              <div className="font-semibold text-[#1C2056] mb-2">{t.upgradeNeededTitle}</div>
               <div className="text-sm text-gray-400">{upgradeMessage}</div>
             </div>
             <div className="space-y-2">
               <button onClick={() => { setShowUpgradeModal(false); router.push('/upgrade') }}
                 className="w-full bg-[#1C2056] text-white rounded-xl py-3.5 font-medium text-sm">
-                🚀 Перейти к тарифам
+                {t.goToPlansButton}
               </button>
               <button onClick={() => setShowUpgradeModal(false)}
-                className="w-full text-gray-400 text-sm py-2">Отмена</button>
+                className="w-full text-gray-400 text-sm py-2">{t.cancelButton}</button>
             </div>
           </div>
         </div>
@@ -720,20 +720,20 @@ export default function InvoicePage() {
           <div className="bg-white w-full max-w-lg mx-auto rounded-t-3xl p-6">
             <div className="text-center mb-5">
               <div className="text-3xl mb-2">📧</div>
-              <div className="font-semibold text-[#1C2056] mb-1">Отправить счёт на email</div>
-              <div className="text-sm text-gray-400 mb-4">Измените адрес если нужно</div>
+              <div className="font-semibold text-[#1C2056] mb-1">{t.sendInvoiceEmailModalTitle}</div>
+              <div className="text-sm text-gray-400 mb-4">{t.changeEmailIfNeededSubtitle}</div>
             </div>
-            <label className="text-xs text-gray-500 mb-1 block">Email получателя</label>
+            <label className="text-xs text-gray-500 mb-1 block">{t.recipientEmailLabel}</label>
             <input className="w-full border rounded-lg px-3 py-3 text-sm outline-none focus:border-[#1C2056] mb-4"
-              placeholder="client@mail.kz" type="email"
+              placeholder={t.emailPlaceholder} type="email"
               value={emailTo} onChange={e => setEmailTo(e.target.value)} />
             <div className="space-y-2">
               <button onClick={sendEmailConfirm} disabled={sendingEmail}
                 className="w-full bg-[#1C2056] text-white rounded-xl py-4 text-sm font-medium">
-                {sendingEmail ? 'Отправляем...' : '📧 Отправить'}
+                {sendingEmail ? t.sendingButtonLabel : t.sendButtonLabel}
               </button>
               <button onClick={() => setShowEmailModal(false)}
-                className="w-full text-gray-400 text-sm py-2">Отмена</button>
+                className="w-full text-gray-400 text-sm py-2">{t.cancelButton}</button>
             </div>
           </div>
         </div>
@@ -745,14 +745,14 @@ export default function InvoicePage() {
           <div className="bg-white w-full max-w-lg mx-auto rounded-t-3xl p-6">
             <div className="text-center mb-5">
               <div className="text-3xl mb-2">✍️</div>
-              <div className="font-semibold text-[#1C2056] mb-1">Формат документа</div>
-              <div className="text-sm text-gray-400">Выберите вариант для скачивания</div>
+              <div className="font-semibold text-[#1C2056] mb-1">{t.documentFormatModalTitle}</div>
+              <div className="text-sm text-gray-400">{t.chooseDownloadVariantSubtitle}</div>
             </div>
             <div className="space-y-3 mb-4">
               <button onClick={() => {
                 if (!ap.canSign) {
                   setShowSignModal(false)
-                  showUpgrade('PDF с подписью доступен с тарифа Базовый', 'basic')
+                  showUpgrade(t.pdfSignUpgradeMessage, 'basic')
                   return
                 }
                 pdfWinRef.current = window.open('', '_blank')
@@ -760,8 +760,8 @@ export default function InvoicePage() {
                 if (pendingDocAction) pendingDocAction(true)
               }}
                 className={`w-full rounded-xl py-4 text-sm font-medium relative ${ap.canSign ? 'bg-[#1C2056] text-white' : 'bg-gray-100 text-gray-400'}`}>
-                ✍️ С подписью и печатью
-                {!ap.canSign && <span className="absolute top-1 right-2 text-xs text-amber-500">🔒 Базовый+</span>}
+                {t.withSignatureButtonLabel}
+                {!ap.canSign && <span className="absolute top-1 right-2 text-xs text-amber-500">{t.basicPlusBadge}</span>}
               </button>
               <button onClick={() => {
                 pdfWinRef.current = window.open('', '_blank')
@@ -769,11 +769,11 @@ export default function InvoicePage() {
                 if (pendingDocAction) pendingDocAction(false)
               }}
                 className="w-full border-2 border-gray-200 text-[#1C2056] rounded-xl py-4 text-sm font-medium">
-                📄 Без подписи и печати
+                {t.withoutSignatureButtonLabel}
               </button>
             </div>
             <button onClick={() => setShowSignModal(false)}
-              className="w-full text-gray-400 text-sm py-2">Отмена</button>
+              className="w-full text-gray-400 text-sm py-2">{t.cancelButton}</button>
           </div>
         </div>
       )}
