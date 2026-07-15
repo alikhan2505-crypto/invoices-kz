@@ -2,12 +2,15 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { resizeToFit } from '@/lib/imageResize'
 
 export default function Signature() {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
   const [signatureUrl, setSignatureUrl] = useState<string | null>(null)
   const [stampUrl, setStampUrl] = useState<string | null>(null)
+  const [logoUrl, setLogoUrl] = useState<string | null>(null)
+  const [savingLogo, setSavingLogo] = useState(false)
   const [isDrawing, setIsDrawing] = useState(false)
   const [showCanvas, setShowCanvas] = useState(false)
   const [showCropModal, setShowCropModal] = useState(false)
@@ -35,10 +38,11 @@ export default function Signature() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
     setUserId(user.id)
-    const { data } = await supabase.from('profiles').select('signature_url, stamp_url').eq('id', user.id).single()
+    const { data } = await supabase.from('profiles').select('signature_url, stamp_url, logo_url').eq('id', user.id).single()
     if (data) {
       setSignatureUrl(data.signature_url)
       setStampUrl(data.stamp_url)
+      setLogoUrl(data.logo_url)
     }
   }
 
@@ -387,6 +391,35 @@ export default function Signature() {
     setStampUrl(null)
   }
 
+  async function uploadLogo(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+    setSavingLogo(true)
+    const reader = new FileReader()
+    reader.onload = async (ev) => {
+      const dataUrl = ev.target?.result as string
+      const resizedDataUrl = await resizeToFit(dataUrl, 500, 200)
+      const blob = await (await fetch(resizedDataUrl)).blob()
+      const path = `${userId}/logo.png`
+      await supabase.storage.from('logos').remove([path])
+      const { error } = await supabase.storage.from('logos').upload(path, blob, { upsert: true, contentType: 'image/png' })
+      if (error) { alert('Ошибка: ' + error.message); setSavingLogo(false); return }
+      const { data: urlData } = supabase.storage.from('logos').getPublicUrl(path)
+      const url = urlData.publicUrl + '?t=' + Date.now()
+      await supabase.from('profiles').update({ logo_url: url }).eq('id', userId)
+      setLogoUrl(url)
+      setSavingLogo(false)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  async function removeLogo() {
+    await supabase.storage.from('logos').remove([`${userId}/logo.png`])
+    await supabase.from('profiles').update({ logo_url: null }).eq('id', userId)
+    setLogoUrl(null)
+  }
+
   return (
     <main className="min-h-screen bg-gray-50 flex flex-col">
       <div className="sticky top-0 z-10 bg-white border-b px-4 py-4 flex items-center gap-3">
@@ -488,6 +521,39 @@ export default function Signature() {
                 <label className="bg-[#1C2056] text-white px-6 py-2.5 rounded-xl text-sm font-medium cursor-pointer">
                   {saving ? 'Загружаем...' : 'Загрузить фото'}
                   <input type="file" accept="image/*" className="hidden" onChange={openCropModal} />
+                </label>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Логотип */}
+        <div>
+          <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">Логотип компании</div>
+          <div className="bg-white rounded-2xl shadow-sm p-4">
+            {logoUrl ? (
+              <div>
+                <div className="border rounded-xl p-3 mb-3 bg-gray-50 flex items-center justify-center">
+                  <img src={logoUrl} alt="Логотип" className="h-16 object-contain" />
+                </div>
+                <div className="flex gap-2">
+                  <label className="flex-1 border border-[#1C2056] text-[#1C2056] rounded-xl py-2.5 text-sm font-medium text-center cursor-pointer">
+                    Заменить
+                    <input type="file" accept="image/*" className="hidden" onChange={uploadLogo} />
+                  </label>
+                  <button onClick={removeLogo}
+                    className="flex-1 border border-red-200 text-red-400 rounded-xl py-2.5 text-sm font-medium">
+                    Удалить
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-4">
+                <div className="text-4xl mb-3">🏢</div>
+                <p className="text-sm text-gray-400 mb-4">Логотип появится над шапкой на всех документах</p>
+                <label className="bg-[#1C2056] text-white px-6 py-2.5 rounded-xl text-sm font-medium cursor-pointer">
+                  {savingLogo ? 'Загружаем...' : 'Загрузить логотип'}
+                  <input type="file" accept="image/*" className="hidden" onChange={uploadLogo} />
                 </label>
               </div>
             )}
