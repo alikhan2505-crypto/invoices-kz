@@ -260,7 +260,7 @@ export const landing: Record<'ru' | 'kk' | 'en', LandingContent> = {
     stepsTitleLine1: 'Three steps',
     stepsTitleLine2: 'to get paid',
     steps: [
-      { n: '1', title: 'Enter your details', desc: 'Fill in your company details once — BIN, IIK, BIK, KBе. They will appear automatically on every document.' },
+      { n: '1', title: 'Enter your details', desc: 'Fill in your company details once — BIN, IIK, BIK, KBe. They will appear automatically on every document.' },
       { n: '2', title: 'Create a document', desc: 'Enter the client, add services, and hit "Create". A signed and stamped PDF is ready in 30 seconds.' },
       { n: '3', title: 'Send it and get paid', desc: 'Send the link via WhatsApp. Your client sees the invoice and pays instantly via Kaspi Pay.' },
     ],
@@ -300,7 +300,7 @@ export const landing: Record<'ru' | 'kk' | 'en', LandingContent> = {
     faqs: [
       { q: 'Do I need a digital signature?', a: 'No, a digital signature is not required. You can upload a handwritten signature and stamp. NCA RK digital signature integration is in development.' },
       { q: 'How does the client receive the invoice?', a: 'You send a link via WhatsApp. The client opens the invoice page without registering and pays via Kaspi Pay.' },
-      { q: 'Do banks accept these invoices?', a: 'Yes. The PDF document meets KZ standards — it includes BIN, IIK, BIK, KBе and all required details.' },
+      { q: 'Do banks accept these invoices?', a: 'Yes. The PDF document meets KZ standards — it includes BIN, IIK, BIK, KBe and all required details.' },
       { q: 'Can I work from multiple devices?', a: 'Yes. INVOICES.KZ works in the browser on phone, tablet, and computer. All data syncs automatically.' },
       { q: 'How do I cancel my subscription?', a: "Message us on WhatsApp — we'll cancel within an hour and refund any unused period." },
     ],
