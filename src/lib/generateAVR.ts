@@ -28,6 +28,7 @@ interface AVRData {
     director_name?: string
     signature_url?: string
     stamp_url?: string
+    logo_url?: string
   }
 }
 
@@ -44,9 +45,11 @@ export async function generateAVR(data: AVRData, existingWin?: Window | null) {
   const director = p?.director_name || ''
   const signatureUrl = p?.signature_url || ''
   const stampUrl = p?.stamp_url || ''
+  const logoUrl = p?.logo_url || ''
 
   const signatureBase64 = signatureUrl ? await resizeToFit(signatureUrl, 200, 60) : ''
   const stampBase64 = stampUrl ? await resizeToFit(stampUrl, 100, 100) : ''
+  const logoBase64 = logoUrl ? await resizeToFit(logoUrl, 180, 48) : ''
 
   function formatMoney(n: number): string {
     return n.toLocaleString('ru-KZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -108,6 +111,12 @@ export async function generateAVR(data: AVRData, existingWin?: Window | null) {
         </div>
       </div>
       <div style="height:50px;"></div>
+
+      ${logoBase64 ? `
+      <div style="background:white; padding:10px 16px;">
+        <img src="${logoBase64}" style="max-height:48px; max-width:180px; object-fit:contain;" />
+      </div>
+      ` : ''}
 
       <!-- Шапка справа -->
       <div style="display:flex; justify-content:flex-end; margin-bottom:8px;">

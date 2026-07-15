@@ -103,6 +103,7 @@ export default function InvoicePage() {
       email: profile.email || '',
       signature_url: withSign && ap.canSign ? (profile.signature_url || '') : '',
       stamp_url: withSign && ap.canSign ? (profile.stamp_url || '') : '',
+      logo_url: profile.logo_url || '',
     }
   }
 

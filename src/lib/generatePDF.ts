@@ -20,6 +20,7 @@ interface ProfileData {
   kbe?: string
   signature_url?: string
   stamp_url?: string
+  logo_url?: string
 }
 
 interface BankData {
@@ -99,11 +100,13 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<string> {
   const director = p?.director_name || ''
   const signatureUrl = p?.signature_url || ''
   const stampUrl = p?.stamp_url || ''
+  const logoUrl = p?.logo_url || ''
 
   // Подпись — сохраняем пропорции, максимум 200x60
   const signatureBase64 = signatureUrl ? await resizeToFit(signatureUrl, 200, 60) : ''
   // Печать — квадрат 110x110
   const stampBase64 = stampUrl ? await resizeToFit(stampUrl, 110, 110) : ''
+  const logoBase64 = logoUrl ? await resizeToFit(logoUrl, 180, 48) : ''
 
   const bankName = b?.bank_name || p?.bank_name || '—'
   const iik = b?.iik || p?.iik || '—'
@@ -182,6 +185,12 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<string> {
       </style>
     </head>
     <body>
+
+      ${logoBase64 ? `
+      <div style="background:white; padding:10px 16px;">
+        <img src="${logoBase64}" style="max-height:48px; max-width:180px; object-fit:contain;" />
+      </div>
+      ` : ''}
 
       <div class="notice">
         Внимание! Оплата данного счета означает согласие с условиями поставки товара.<br>

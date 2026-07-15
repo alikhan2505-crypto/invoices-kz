@@ -24,6 +24,7 @@ interface NakladnayaData {
     director_name?: string
     signature_url?: string
     stamp_url?: string
+    logo_url?: string
   }
 }
 
@@ -73,9 +74,11 @@ export async function generateNakladnaya(data: NakladnayaData, existingWin?: Win
   const director = p?.director_name || ''
   const signatureUrl = p?.signature_url || ''
   const stampUrl = p?.stamp_url || ''
+  const logoUrl = p?.logo_url || ''
 
   const signatureBase64 = signatureUrl ? await resizeToFit(signatureUrl, 200, 55) : ''
   const stampBase64 = stampUrl ? await resizeToFit(stampUrl, 90, 90) : ''
+  const logoBase64 = logoUrl ? await resizeToFit(logoUrl, 180, 48) : ''
 
   function formatMoney(n: number): string {
     return n.toLocaleString('ru-KZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -138,6 +141,12 @@ td, th { border: 1px solid #000; padding: 3px 4px; vertical-align: middle; word-
   </div>
 </div>
 <div style="height:44px;"></div>
+
+${logoBase64 ? `
+<div style="background:white; padding:10px 16px;">
+  <img src="${logoBase64}" style="max-height:48px; max-width:180px; object-fit:contain;" />
+</div>
+` : ''}
 
 <!-- Шапка справа -->
 <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">

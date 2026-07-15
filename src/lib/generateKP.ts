@@ -26,6 +26,7 @@ interface KPData {
     director_name?: string
     signature_url?: string
     stamp_url?: string
+    logo_url?: string
   }
   bank?: {
     bank_name: string
@@ -35,7 +36,9 @@ interface KPData {
   }
 }
 
-export function generateKP(data: KPData, existingWin?: Window | null) {
+import { resizeToFit } from './imageResize'
+
+export async function generateKP(data: KPData, existingWin?: Window | null) {
   const p = data.profile
   const b = data.bank
 
@@ -47,6 +50,13 @@ export function generateKP(data: KPData, existingWin?: Window | null) {
   const director = p?.director_name || ''
   const signatureUrl = p?.signature_url || ''
   const stampUrl = p?.stamp_url || ''
+  const logoUrl = p?.logo_url || ''
+
+  // Подпись — сохраняем пропорции, максимум 200x60
+  const signatureBase64 = signatureUrl ? await resizeToFit(signatureUrl, 200, 60) : ''
+  // Печать — квадрат 110x110
+  const stampBase64 = stampUrl ? await resizeToFit(stampUrl, 110, 110) : ''
+  const logoBase64 = logoUrl ? await resizeToFit(logoUrl, 180, 48) : ''
 
   function formatMoney(n: number): string {
     return n.toLocaleString('ru-KZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -252,6 +262,12 @@ export function generateKP(data: KPData, existingWin?: Window | null) {
         </div>
       </div>
       <div style="height:55px;"></div>
+
+      ${logoBase64 ? `
+      <div style="background:white; padding:12px 40px;">
+        <img src="${logoBase64}" style="max-height:48px; max-width:180px; object-fit:contain;" />
+      </div>
+      ` : ''}
 
       <!-- Header -->
       <div class="header">

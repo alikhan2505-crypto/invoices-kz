@@ -206,6 +206,7 @@ export default function Dashboard() {
       phone: profile?.phone || '',
       signature_url: profile?.signature_url || '',
       stamp_url: profile?.stamp_url || '',
+      logo_url: profile?.logo_url || '',
     }
   }
 
