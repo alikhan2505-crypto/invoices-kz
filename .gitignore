@@ -42,3 +42,9 @@ next-env.d.ts
 
 # impeccable design-hook cache (regenerated locally, not source of truth)
 .impeccable/hook.cache.json
+
+# claude superpowers scratch (brainstorm mockups, sdd progress ledger)
+.superpowers/
+
+# playwright mcp scratch screenshots
+.playwright-mcp/
