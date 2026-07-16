@@ -385,8 +385,8 @@ export default function Dashboard() {
 
   return (
     <DesktopShell>
-    <main className="min-h-screen bg-gray-50 pb-24 lg:pb-6 lg:rounded-[28px] lg:shadow-2xl lg:ring-1 lg:ring-black/5 lg:min-h-[calc(100vh-24px)]">
-      <div className="sticky top-0 z-30 bg-white border-b px-4 py-3 flex items-center justify-between lg:h-16 lg:rounded-t-[28px]">
+    <main className="min-h-screen bg-gray-50 pb-24 lg:pb-6 lg:min-h-full">
+      <div className="sticky top-0 z-30 bg-white border-b px-4 py-3 flex items-center justify-between lg:h-16">
         <span className="font-bold text-[#1C2056]">INVOICES.KZ</span>
         <span className="text-sm text-gray-500">{profile?.company_name || ''}</span>
       </div>
@@ -394,6 +394,9 @@ export default function Dashboard() {
       <div className="max-w-lg lg:max-w-7xl mx-auto p-4">
         <h2 className="text-xl font-bold text-[#1C2056] mb-1">{t.newInvoiceTitle}</h2>
         <p className="text-sm text-gray-500 mb-4">{t.newInvoiceSubtitle}</p>
+
+        <div className="lg:flex lg:gap-6 lg:items-start">
+        <div className="lg:flex-1 lg:min-w-0">
 
         {monthStats.total > 0 && (
           <div className="grid grid-cols-3 gap-1 mb-4">
@@ -476,8 +479,6 @@ export default function Dashboard() {
           </div>
         )}
 
-        <div className="lg:flex lg:gap-6 lg:items-start">
-        <div className="lg:flex-1 lg:min-w-0">
           {clients.length > 0 && !clientSelected && (
             <div className="mb-3">
               <p className="text-xs text-gray-400 mb-2">{t.quickClientPickLabel}</p>
@@ -598,7 +599,8 @@ export default function Dashboard() {
             )}
           </div>
 
-          {/* Services section */}
+          {/* Services section + Total, grouped so Total sits directly under Services */}
+          <div>
           <div className="bg-white rounded-2xl p-5 mb-4 shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-medium text-[#1C2056]">{t.servicesHeader}</h3>
@@ -671,7 +673,6 @@ export default function Dashboard() {
               ))}
             </div>
           </div>
-          </div>
 
           {/* Total */}
           <div className="bg-[#1C2056] rounded-2xl p-5 mb-4">
@@ -698,6 +699,8 @@ export default function Dashboard() {
               <span className="text-lg">{total.toLocaleString('ru-KZ')} ₸</span>
             </div>
           </div>
+          </div>
+          </div>
 
           <button onClick={createInvoice} disabled={loading}
             className={`w-full rounded-xl py-4 font-medium text-sm text-white transition ${loading ? 'bg-gray-400' : 'bg-[#2DC48D]'}`}>
@@ -709,7 +712,7 @@ export default function Dashboard() {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ ease: [0.16, 1, 0.3, 1], duration: 0.4 }}
-          className="hidden lg:block lg:w-[380px] lg:sticky lg:top-[88px]"
+          className="hidden lg:block lg:w-[400px] lg:flex-shrink-0 lg:sticky lg:top-[88px]"
         >
           <InvoiceLivePreview
             invoiceNumber={(profile?.invoice_prefix || 'INV-') + (profile?.invoice_next_number || '0001')}

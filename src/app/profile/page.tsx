@@ -341,9 +341,9 @@ export default function Profile() {
 
   return (
     <DesktopShell>
-    <main className="min-h-screen bg-gray-50 pb-24 lg:pb-6 lg:rounded-[28px] lg:shadow-2xl lg:ring-1 lg:ring-black/5 lg:min-h-[calc(100vh-24px)]">
+    <main className="min-h-screen bg-gray-50 pb-24 lg:pb-6 lg:min-h-full">
 
-      <div className="sticky top-0 z-30 bg-white border-b px-4 py-3 flex items-center justify-between lg:h-16 lg:rounded-t-[28px]">
+      <div className="sticky top-0 z-30 bg-white border-b px-4 py-3 flex items-center justify-between lg:h-16">
         <span className="font-bold text-[#1C2056]">INVOICES.KZ</span>
         <span className="text-sm text-gray-500">{profile?.company_name || ''}</span>
       </div>

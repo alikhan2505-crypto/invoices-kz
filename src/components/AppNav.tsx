@@ -16,6 +16,7 @@ export default function AppNav({ desktopOnly = false }: { desktopOnly?: boolean 
   const path = usePathname()
   const { lang } = useLanguage()
   const [unpaid, setUnpaid] = useState(0)
+  const [logoUrl, setLogoUrl] = useState<string | null>(null)
 
   useEffect(() => {
     async function loadUnpaid() {
@@ -30,6 +31,16 @@ export default function AppNav({ desktopOnly = false }: { desktopOnly?: boolean 
     }
     loadUnpaid()
   }, [path])
+
+  useEffect(() => {
+    async function loadLogo() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data } = await supabase.from('profiles').select('logo_url').eq('id', user.id).single()
+      setLogoUrl(data?.logo_url || null)
+    }
+    loadLogo()
+  }, [])
 
   // `invert` is only ever true for the sidebar's active pill (solid navy bg) — mobile
   // rendering always passes `active` alone (invert defaults false) so its colors are
@@ -108,9 +119,13 @@ export default function AppNav({ desktopOnly = false }: { desktopOnly?: boolean 
       {/* Desktop: left sidebar — a standalone floating rounded card, always fixed to the viewport
           (never moves on scroll), with the app mark pinned top and nav centered below it */}
       <div className="hidden lg:flex fixed left-3 top-3 bottom-3 w-[120px] bg-white rounded-[28px] shadow-2xl ring-1 ring-black/5 flex-col items-center py-6 z-40">
-        <div className="w-11 h-11 rounded-xl bg-[#1C2056] flex items-center justify-center text-white font-bold text-base flex-shrink-0">
-          IK
-        </div>
+        {logoUrl ? (
+          <img src={logoUrl} alt="" className="w-11 h-11 rounded-xl object-contain bg-white ring-1 ring-black/5 flex-shrink-0" />
+        ) : (
+          <div className="w-11 h-11 rounded-xl bg-[#1C2056] flex items-center justify-center text-white font-bold text-base flex-shrink-0">
+            IK
+          </div>
+        )}
 
         <div className="flex-1" />
 
