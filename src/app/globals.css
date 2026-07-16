@@ -278,3 +278,27 @@ html {
   background: #1C2056;
 }
 
+/* Desktop window shell: inset the scrollbar track from the rounded corners
+   (top/bottom margins matching the card's border-radius) so the browser's
+   own scrollbar never overlaps — and visually squares off — the curve. */
+.desktop-shell-scroll::-webkit-scrollbar {
+  width: 10px;
+}
+
+.desktop-shell-scroll::-webkit-scrollbar-track {
+  background: transparent;
+  margin-top: 28px;
+  margin-bottom: 28px;
+}
+
+.desktop-shell-scroll::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.15);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+
+.desktop-shell-scroll {
+  scrollbar-width: thin;
+}
+

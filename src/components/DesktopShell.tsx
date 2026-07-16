@@ -6,7 +6,7 @@ export default function DesktopShell({ children }: { children: React.ReactNode }
           corners, scrolling its own content internally (overflow-y-auto) so the frame
           stays put while the text inside moves. The sidebar is a fully separate fixed
           element, so this card needs no transform-containment trick of its own. */}
-      <div className="lg:fixed lg:top-3 lg:right-3 lg:bottom-3 lg:left-[144px] lg:rounded-[28px] lg:overflow-y-auto lg:shadow-2xl lg:ring-1 lg:ring-black/5 lg:bg-white">
+      <div className="desktop-shell-scroll lg:fixed lg:top-3 lg:right-3 lg:bottom-3 lg:left-[144px] lg:rounded-[28px] lg:overflow-y-auto lg:shadow-2xl lg:ring-1 lg:ring-black/5 lg:bg-white">
         {children}
       </div>
     </>

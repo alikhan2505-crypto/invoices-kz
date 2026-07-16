@@ -493,7 +493,7 @@ export default function Dashboard() {
             </div>
           )}
 
-          <div className="lg:grid lg:grid-cols-2 lg:gap-4 lg:items-start">
+          <div className="lg:grid lg:grid-cols-2 lg:gap-4 lg:items-start lg:mb-4">
           {/* Client section */}
           <div className="bg-white rounded-2xl p-5 mb-4 shadow-sm lg:mb-0">
             <h3 className="font-medium text-[#1C2056] mb-3">{t.clientDataHeader}</h3>

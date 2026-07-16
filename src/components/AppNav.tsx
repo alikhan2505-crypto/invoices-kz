@@ -120,9 +120,9 @@ export default function AppNav({ desktopOnly = false }: { desktopOnly?: boolean 
           (never moves on scroll), with the app mark pinned top and nav centered below it */}
       <div className="hidden lg:flex fixed left-3 top-3 bottom-3 w-[120px] bg-white rounded-[28px] shadow-2xl ring-1 ring-black/5 flex-col items-center py-6 z-40">
         {logoUrl ? (
-          <img src={logoUrl} alt="" className="w-11 h-11 rounded-xl object-contain bg-white ring-1 ring-black/5 flex-shrink-0" />
+          <img src={logoUrl} alt="" className="w-[88px] h-[88px] rounded-2xl object-contain bg-white ring-1 ring-black/5 flex-shrink-0" />
         ) : (
-          <div className="w-11 h-11 rounded-xl bg-[#1C2056] flex items-center justify-center text-white font-bold text-base flex-shrink-0">
+          <div className="w-[88px] h-[88px] rounded-2xl bg-[#1C2056] flex items-center justify-center text-white font-bold text-2xl flex-shrink-0">
             IK
           </div>
         )}
