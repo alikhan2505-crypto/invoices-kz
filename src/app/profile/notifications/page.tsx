@@ -3,9 +3,13 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import LoadingSpinner from '@/components/LoadingSpinner'
+import { useLanguage } from '@/components/LanguageProvider'
+import { profileAccountsDict } from '@/lib/i18n/profileAccounts'
 
 export default function Notifications() {
   const router = useRouter()
+  const { lang } = useLanguage()
+  const t = profileAccountsDict[lang]
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [settings, setSettings] = useState({
@@ -60,42 +64,42 @@ export default function Notifications() {
 
   const groups = [
     {
-      title: 'Каналы уведомлений',
+      title: t.channelsGroupTitle,
       items: [
         {
           key: 'notify_email',
-          label: 'Email уведомления',
-          desc: 'Получать уведомления на почту'
+          label: t.emailNotifyLabel,
+          desc: t.emailNotifyDesc
         },
         {
           key: 'notify_telegram',
-          label: 'Telegram уведомления',
-          desc: 'Получать уведомления в Telegram бот'
+          label: t.telegramNotifyLabel,
+          desc: t.telegramNotifyDesc
         },
       ]
     },
     {
-      title: 'События',
+      title: t.eventsGroupTitle,
       items: [
         {
           key: 'notify_client_viewed',
-          label: 'Клиент просмотрел счёт',
-          desc: 'Когда клиент открыл вашу ссылку на счёт'
+          label: t.clientViewedLabel,
+          desc: t.clientViewedDesc
         },
         {
           key: 'notify_payment_reminder',
-          label: 'Напоминания об оплате',
-          desc: 'Автоматические напоминания клиентам'
+          label: t.paymentReminderLabel,
+          desc: t.paymentReminderDesc
         },
         {
           key: 'notify_overdue',
-          label: 'Счёт просрочен',
-          desc: 'Если счёт не оплачен более 7 дней'
+          label: t.overdueLabel,
+          desc: t.overdueDesc
         },
         {
           key: 'notify_weekly_report',
-          label: 'Еженедельный отчёт',
-          desc: 'Сводка по счетам каждый понедельник'
+          label: t.weeklyReportLabel,
+          desc: t.weeklyReportDesc
         },
       ]
     }
@@ -106,18 +110,18 @@ export default function Notifications() {
       <div className="bg-white border-b px-4 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button onClick={() => router.push('/profile')} className="back-btn text-gray-400 text-xl">‹</button>
-          <span className="font-semibold text-[#1C2056]">Уведомления</span>
+          <span className="font-semibold text-[#1C2056]">{t.notificationsHeaderLabel}</span>
         </div>
-        {saving && <span className="text-xs text-gray-400">Сохранение...</span>}
+        {saving && <span className="text-xs text-gray-400">{t.savingLabel}</span>}
       </div>
 
       <div className="max-w-lg mx-auto p-4 space-y-4">
 
         {/* Инфо баннер */}
         <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4">
-          <div className="text-sm font-medium text-[#1C2056] mb-1">ℹ️ Как работают уведомления</div>
+          <div className="text-sm font-medium text-[#1C2056] mb-1">{t.notificationsInfoTitle}</div>
           <div className="text-xs text-gray-500 leading-relaxed">
-            Уведомления отправляются на email указанный при регистрации. Изменения сохраняются автоматически.
+            {t.notificationsInfoBody}
           </div>
         </div>
 
@@ -145,14 +149,14 @@ export default function Notifications() {
         {/* Telegram подключение */}
         {settings.notify_telegram && (
           <div className="bg-white rounded-2xl shadow-sm p-4">
-            <div className="text-sm font-medium text-[#1C2056] mb-2">Подключить Telegram</div>
+            <div className="text-sm font-medium text-[#1C2056] mb-2">{t.connectTelegramTitle}</div>
             <div className="text-xs text-gray-500 mb-3">
-              Напишите боту команду <span className="font-mono bg-gray-100 px-1 rounded">/start</span> чтобы получать уведомления
+              {t.connectTelegramBodyBefore} <span className="font-mono bg-gray-100 px-1 rounded">/start</span> {t.connectTelegramBodyAfter}
             </div>
             <a href="https://t.me/invoiceskz_support_bot"
               target="_blank"
               className="flex items-center justify-center gap-2 w-full bg-[#1C2056] text-white rounded-xl py-3 text-sm font-medium">
-              ✈️ Открыть Telegram бот
+              {t.connectTelegramBotButton}
             </a>
           </div>
         )}

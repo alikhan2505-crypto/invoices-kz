@@ -2,6 +2,8 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { useLanguage } from '@/components/LanguageProvider'
+import { profileAccountsDict, ProfileAccountsContent } from '@/lib/i18n/profileAccounts'
 
 function getSocialIcon(url: string): string {
   if (!url) return '🔗'
@@ -17,8 +19,8 @@ function getSocialIcon(url: string): string {
   return '🔗'
 }
 
-function getSocialName(url: string): string {
-  if (!url) return 'Ссылка'
+function getSocialName(url: string, t: ProfileAccountsContent): string {
+  if (!url) return t.emptyLinkLabel
   if (url.includes('instagram')) return 'Instagram'
   if (url.includes('facebook')) return 'Facebook'
   if (url.includes('tiktok')) return 'TikTok'
@@ -28,11 +30,13 @@ function getSocialName(url: string): string {
   if (url.includes('linkedin')) return 'LinkedIn'
   if (url.includes('2gis')) return '2GIS'
   if (url.includes('whatsapp')) return 'WhatsApp'
-  return 'Сайт'
+  return t.genericLinkLabel
 }
 
 export default function ConnectorsPage() {
   const router = useRouter()
+  const { lang } = useLanguage()
+  const t = profileAccountsDict[lang]
   const [saving, setSaving] = useState(false)
   const [kaspiLink, setKaspiLink] = useState('')
   const [halykLink, setHalykLink] = useState('')
@@ -68,36 +72,36 @@ export default function ConnectorsPage() {
       social_links: filtered,
     }).eq('id', userId)
     setSaving(false)
-    alert('Сохранено!')
+    alert(t.savedAlert)
   }
 
   return (
     <main className="min-h-screen bg-gray-50 pb-8">
       <div className="bg-white border-b px-4 py-4 flex items-center gap-3">
         <button onClick={() => router.push('/profile')} className="back-btn text-gray-400 text-xl">‹</button>
-        <span className="font-semibold text-[#1C2056]">Коннекторы</span>
+        <span className="font-semibold text-[#1C2056]">{t.connectorsHeaderLabel}</span>
       </div>
 
       <div className="max-w-lg mx-auto p-4 space-y-4">
 
         {/* Оплата */}
         <div>
-          <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">Кнопки оплаты</div>
+          <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">{t.paymentButtonsSectionLabel}</div>
           <div className="bg-white rounded-2xl p-4 shadow-sm space-y-4">
             <div className="bg-amber-50 rounded-xl p-3 text-xs text-amber-700">
-              💡 Клиент увидит кнопку оплаты прямо на странице счёта — не нужно искать реквизиты
+              {t.paymentButtonsHint}
             </div>
             <div>
-              <label className="text-xs text-gray-500 mb-1 block">🟡 Kaspi Pay ссылка</label>
+              <label className="text-xs text-gray-500 mb-1 block">{t.kaspiPayLinkLabel}</label>
               <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                placeholder="https://kaspi.kz/pay/..."
+                placeholder={t.kaspiPayPlaceholder}
                 value={kaspiLink} onChange={e => setKaspiLink(e.target.value)} />
-              <p className="text-xs text-gray-400 mt-1">Найдите в Kaspi.kz → Мой бизнес → Ссылка на оплату</p>
+              <p className="text-xs text-gray-400 mt-1">{t.kaspiPayHint}</p>
             </div>
             <div>
-              <label className="text-xs text-gray-500 mb-1 block">🟢 Halyk Pay ссылка</label>
+              <label className="text-xs text-gray-500 mb-1 block">{t.halykPayLinkLabel}</label>
               <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                placeholder="https://halykbank.kz/pay/..."
+                placeholder={t.halykPayPlaceholder}
                 value={halykLink} onChange={e => setHalykLink(e.target.value)} />
             </div>
           </div>
@@ -105,23 +109,23 @@ export default function ConnectorsPage() {
 
         {/* Сайт */}
         <div>
-          <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">Сайт компании</div>
+          <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">{t.websiteSectionLabel}</div>
           <div className="bg-white rounded-2xl p-4 shadow-sm">
             <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-              placeholder="https://yoursite.kz"
+              placeholder={t.websitePlaceholder}
               value={website} onChange={e => setWebsite(e.target.value)} />
           </div>
         </div>
 
         {/* Соцсети */}
         <div>
-          <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">Социальные сети</div>
+          <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">{t.socialMediaSectionLabel}</div>
           <div className="bg-white rounded-2xl p-4 shadow-sm space-y-3">
             {socialLinks.map((link, i) => (
               <div key={i} className="flex items-center gap-2">
                 <span className="text-xl w-8">{getSocialIcon(link)}</span>
                 <input className="flex-1 border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                  placeholder="https://instagram.com/yourpage"
+                  placeholder={t.socialMediaPlaceholder}
                   value={link}
                   onChange={e => {
                     const updated = [...socialLinks]
@@ -136,7 +140,7 @@ export default function ConnectorsPage() {
             ))}
             <button onClick={() => setSocialLinks([...socialLinks, ''])}
               className="text-xs text-[#1C2056] border border-[#1C2056] rounded-lg px-3 py-2 w-full">
-              + Добавить соцсеть
+              {t.addSocialButton}
             </button>
           </div>
         </div>
@@ -144,25 +148,25 @@ export default function ConnectorsPage() {
         {/* Preview */}
         {(kaspiLink || halykLink || website || socialLinks.some(l => l)) && (
           <div>
-            <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">Превью на счёте</div>
+            <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">{t.previewSectionLabel}</div>
             <div className="bg-white rounded-2xl p-4 shadow-sm space-y-2">
               {kaspiLink && (
                 <div className="w-full bg-amber-400 text-white rounded-xl py-3 text-sm font-medium text-center">
-                  🟡 Оплатить через Kaspi
+                  {t.payViaKaspiLabel}
                 </div>
               )}
               {halykLink && (
                 <div className="w-full bg-green-500 text-white rounded-xl py-3 text-sm font-medium text-center">
-                  🟢 Оплатить через Halyk
+                  {t.payViaHalykLabel}
                 </div>
               )}
               <div className="flex gap-2 flex-wrap">
                 {website && (
-                  <span className="bg-gray-100 text-gray-600 rounded-lg px-3 py-1.5 text-xs">🌐 Сайт</span>
+                  <span className="bg-gray-100 text-gray-600 rounded-lg px-3 py-1.5 text-xs">{t.websiteBadgeLabel}</span>
                 )}
                 {socialLinks.filter(l => l).map((l, i) => (
                   <span key={i} className="bg-gray-100 text-gray-600 rounded-lg px-3 py-1.5 text-xs">
-                    {getSocialIcon(l)} {getSocialName(l)}
+                    {getSocialIcon(l)} {getSocialName(l, t)}
                   </span>
                 ))}
               </div>
@@ -172,7 +176,7 @@ export default function ConnectorsPage() {
 
         <button onClick={save} disabled={saving}
           className="w-full bg-[#1C2056] text-white rounded-xl py-4 font-medium text-sm">
-          {saving ? 'Сохраняем...' : '💾 Сохранить'}
+          {saving ? t.savingEllipsis : t.saveConnectorsButton}
         </button>
       </div>
     </main>
