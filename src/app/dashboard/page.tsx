@@ -385,8 +385,8 @@ export default function Dashboard() {
 
   return (
     <DesktopShell>
-    <main className="min-h-screen bg-gray-50 pb-24 lg:pl-20">
-      <div className="sticky top-0 z-30 bg-white border-b px-4 py-3 flex items-center justify-between lg:h-16">
+    <main className="min-h-screen bg-gray-50 pb-24 lg:rounded-[28px] lg:shadow-2xl lg:ring-1 lg:ring-black/5 lg:min-h-[calc(100vh-24px)]">
+      <div className="sticky top-0 z-30 bg-white border-b px-4 py-3 flex items-center justify-between lg:h-16 lg:rounded-t-[28px]">
         <span className="font-bold text-[#1C2056]">INVOICES.KZ</span>
         <span className="text-sm text-gray-500">{profile?.company_name || ''}</span>
       </div>
@@ -492,8 +492,9 @@ export default function Dashboard() {
             </div>
           )}
 
+          <div className="lg:grid lg:grid-cols-2 lg:gap-4 lg:items-start">
           {/* Client section */}
-          <div className="bg-white rounded-2xl p-5 mb-4 shadow-sm">
+          <div className="bg-white rounded-2xl p-5 mb-4 shadow-sm lg:mb-0">
             <h3 className="font-medium text-[#1C2056] mb-3">{t.clientDataHeader}</h3>
             {clientSelected ? (
               <div className="space-y-3">
@@ -669,6 +670,7 @@ export default function Dashboard() {
                 </div>
               ))}
             </div>
+          </div>
           </div>
 
           {/* Total */}

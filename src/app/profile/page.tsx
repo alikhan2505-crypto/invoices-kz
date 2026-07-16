@@ -11,12 +11,14 @@ import { useLanguage } from '@/components/LanguageProvider'
 import { cacheGet, cacheSet, cacheClear } from '@/lib/cache'
 import { getActivePlan } from '@/lib/plan'
 import { profileCoreDict } from '@/lib/i18n/profileCore'
+import { useMediaQuery } from '@/lib/useMediaQuery'
 
 export default function Profile() {
   const router = useRouter()
   const { theme, toggle } = useTheme()
   const { lang, setLang } = useLanguage()
   const t = profileCoreDict[lang]
+  const isDesktop = useMediaQuery('(min-width: 1024px)')
   const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
@@ -105,19 +107,8 @@ export default function Profile() {
     transition: { delay: i * 0.05, duration: 0.4, ease: [0.16, 1, 0.3, 1] as const },
   })
 
-  return (
-    <DesktopShell>
-    <main className="min-h-screen bg-gray-50 pb-24 lg:pl-20">
-
-      <div className="sticky top-0 z-30 bg-white border-b px-4 py-3 flex items-center justify-between lg:h-16">
-        <span className="font-bold text-[#1C2056]">INVOICES.KZ</span>
-        <span className="text-sm text-gray-500">{profile?.company_name || ''}</span>
-      </div>
-
-      <div className="max-w-lg lg:max-w-5xl mx-auto p-4 space-y-4 lg:space-y-0 lg:grid lg:grid-cols-[360px_1fr] lg:gap-6 lg:items-start">
-
-        {/* Profile card */}
-        <motion.div {...fadeIn(0)} className="bg-white rounded-2xl shadow-sm p-5 lg:col-start-1 lg:row-start-1">
+  const profileCardEl = (
+    <motion.div {...fadeIn(0)} className="bg-white rounded-2xl shadow-sm p-5">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-12 h-12 rounded-full bg-[#1C2056] flex items-center justify-center text-white font-bold text-base flex-shrink-0">
               {initials}
@@ -158,10 +149,11 @@ export default function Profile() {
               </>
             )}
           </div>
-        </motion.div>
+    </motion.div>
+  )
 
-        {/* Компания */}
-        <motion.div {...fadeIn(1)} className="lg:col-start-2 lg:row-start-1">
+  const companyEl = (
+    <motion.div {...fadeIn(1)}>
           <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">{t.companySectionLabel}</div>
           <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
             {[
@@ -181,10 +173,11 @@ export default function Profile() {
               </div>
             ))}
           </div>
-        </motion.div>
+    </motion.div>
+  )
 
-        {/* Справочники */}
-        <motion.div {...fadeIn(2)} className="lg:col-start-2 lg:row-start-2">
+  const directoriesEl = (
+    <motion.div {...fadeIn(2)}>
           <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">{t.directoriesSectionLabel}</div>
           <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
             {[
@@ -206,10 +199,11 @@ export default function Profile() {
               </div>
             ))}
           </div>
-        </motion.div>
+    </motion.div>
+  )
 
-        {/* Настройки */}
-        <motion.div {...fadeIn(3)} className="lg:col-start-2 lg:row-start-3">
+  const settingsEl = (
+    <motion.div {...fadeIn(3)}>
           <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">{t.settingsSectionLabel}</div>
           <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
             {settingsItems.map((item, i, arr) => (
@@ -223,10 +217,11 @@ export default function Profile() {
               </div>
             ))}
           </div>
-        </motion.div>
+    </motion.div>
+  )
 
-        {/* Подписка */}
-        <motion.div {...fadeIn(4)} className="lg:col-start-1 lg:row-start-2">
+  const subscriptionEl = (
+    <motion.div {...fadeIn(4)}>
           <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">{t.subscriptionSectionLabel}</div>
           <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
             <div className="px-4 py-4 flex items-center justify-between cursor-pointer" onClick={() => router.push('/upgrade')}>
@@ -300,10 +295,11 @@ export default function Profile() {
             )}
 
           </div>
-        </motion.div>
+    </motion.div>
+  )
 
-        {/* Theme toggle */}
-        <motion.div {...fadeIn(5)} className="bg-white rounded-2xl overflow-hidden shadow-sm lg:col-start-1 lg:row-start-3">
+  const themeEl = (
+    <motion.div {...fadeIn(5)} className="bg-white rounded-2xl overflow-hidden shadow-sm">
           <div className="flex items-center justify-between px-4 py-3.5">
             <div className="flex items-center gap-3">
               <span className="text-lg">{theme === 'dark' ? '🌙' : '☀️'}</span>
@@ -334,12 +330,50 @@ export default function Profile() {
               </button>
             </div>
           </div>
-        </motion.div>
+    </motion.div>
+  )
 
-        <motion.button {...fadeIn(6)} onClick={signOut} className="w-full bg-red-50 text-red-500 rounded-xl py-3 text-sm font-medium lg:col-start-1 lg:row-start-4">
-          {t.signOutButton}
-        </motion.button>
+  const signOutEl = (
+    <motion.button {...fadeIn(6)} onClick={signOut} className="w-full bg-red-50 text-red-500 rounded-xl py-3 text-sm font-medium">
+      {t.signOutButton}
+    </motion.button>
+  )
 
+  return (
+    <DesktopShell>
+    <main className="min-h-screen bg-gray-50 pb-24 lg:rounded-[28px] lg:shadow-2xl lg:ring-1 lg:ring-black/5 lg:min-h-[calc(100vh-24px)]">
+
+      <div className="sticky top-0 z-30 bg-white border-b px-4 py-3 flex items-center justify-between lg:h-16 lg:rounded-t-[28px]">
+        <span className="font-bold text-[#1C2056]">INVOICES.KZ</span>
+        <span className="text-sm text-gray-500">{profile?.company_name || ''}</span>
+      </div>
+
+      <div className="max-w-lg lg:max-w-5xl mx-auto p-4">
+        {isDesktop ? (
+          <div className="flex gap-6 items-start">
+            <div className="flex flex-col gap-4 w-[360px] flex-shrink-0">
+              {profileCardEl}
+              {subscriptionEl}
+              {themeEl}
+              {signOutEl}
+            </div>
+            <div className="flex flex-col gap-4 flex-1 min-w-0">
+              {companyEl}
+              {directoriesEl}
+              {settingsEl}
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {profileCardEl}
+            {companyEl}
+            {directoriesEl}
+            {settingsEl}
+            {subscriptionEl}
+            {themeEl}
+            {signOutEl}
+          </div>
+        )}
       </div>
 
       <AppNav />

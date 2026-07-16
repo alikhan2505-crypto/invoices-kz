@@ -138,8 +138,8 @@ export default function EditInvoice() {
 
   return (
     <DesktopShell>
-    <main className="min-h-screen bg-gray-50 pb-8 lg:pl-20">
-      <div className="sticky top-0 z-10 bg-white border-b px-4 py-4 flex items-center gap-3 lg:h-16">
+    <main className="min-h-screen bg-gray-50 pb-8 lg:rounded-[28px] lg:shadow-2xl lg:ring-1 lg:ring-black/5 lg:min-h-[calc(100vh-24px)]">
+      <div className="sticky top-0 z-10 bg-white border-b px-4 py-4 flex items-center gap-3 lg:h-16 lg:rounded-t-[28px]">
         <button onClick={() => router.push('/invoice/' + id)} className="back-btn text-gray-400 text-xl">‹</button>
         <span className="font-semibold text-[#1C2056]">{t.editInvoiceHeaderTitle}</span>
       </div>

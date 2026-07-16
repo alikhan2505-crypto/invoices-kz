@@ -105,25 +105,35 @@ export default function AppNav({ desktopOnly = false }: { desktopOnly?: boolean 
         </div>
       )}
 
-      {/* Desktop: left sidebar with an animated sliding active-indicator */}
-      <div className="hidden lg:flex fixed left-0 top-0 bottom-0 w-20 bg-white border-r flex-col items-center py-6 gap-2 z-40">
-        <div className="relative w-full flex flex-col items-center gap-2">
+      {/* Desktop: left sidebar — a standalone floating rounded card, always fixed to the viewport
+          (never moves on scroll), with the app mark pinned top and nav centered below it */}
+      <div className="hidden lg:flex fixed left-3 top-3 bottom-3 w-20 bg-white rounded-[28px] shadow-2xl ring-1 ring-black/5 flex-col items-center py-6 z-40">
+        <div className="w-10 h-10 rounded-xl bg-[#1C2056] flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+          IK
+        </div>
+
+        <div className="flex-1" />
+
+        <div className="relative w-full flex flex-col items-center gap-4">
           {activeIndex >= 0 && (
             <motion.div
-              className="absolute w-12 h-12 rounded-2xl bg-[#1C2056]"
+              className="absolute w-14 h-16 rounded-2xl bg-[#1C2056]"
               layoutId="appnav-active-indicator"
               transition={{ ease: [0.16, 1, 0.3, 1], duration: 0.35 }}
-              style={{ top: activeIndex * 56 }}
+              style={{ top: activeIndex * 80 }}
             />
           )}
           {items.map(item => {
             const active = path === item.href
             return (
               <button key={item.href} onClick={() => router.push(item.href)}
-                className="relative w-12 h-12 rounded-2xl flex items-center justify-center z-10">
+                className="relative w-14 h-16 rounded-2xl flex flex-col items-center justify-center gap-1 z-10">
                 {item.icon(active, true)}
+                <span className={`text-[10px] leading-none ${active ? 'text-white font-medium' : 'text-gray-400'}`}>
+                  {item.label}
+                </span>
                 {item.badge && item.badge > 0 ? (
-                  <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-medium">
+                  <div className="absolute top-1 right-2 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-medium">
                     {item.badge > 9 ? '9+' : item.badge}
                   </div>
                 ) : null}
@@ -131,6 +141,8 @@ export default function AppNav({ desktopOnly = false }: { desktopOnly?: boolean 
             )
           })}
         </div>
+
+        <div className="flex-1" />
       </div>
     </>
   )
