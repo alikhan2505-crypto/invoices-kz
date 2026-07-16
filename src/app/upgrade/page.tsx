@@ -349,7 +349,7 @@ export default function Upgrade() {
                       <div className="flex justify-center mb-4">
                         <img
                           src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrToken)}`}
-                          alt="QR"
+                          alt={t.qrCodeAltText}
                           className="rounded-xl border border-gray-100"
                           width={200}
                           height={200}

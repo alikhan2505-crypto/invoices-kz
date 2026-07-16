@@ -48,6 +48,7 @@ export interface MiscContent {
   orLabel: string
   sendPhoneRequestButton: string
   scanQrTitle: string
+  qrCodeAltText: string
   otherMethodHint: string
   openLinkDirectlyLabel: string
   toPayLabel: string
@@ -171,6 +172,7 @@ export const miscDict: Record<'ru' | 'kk' | 'en', MiscContent> = {
     orLabel: 'или',
     sendPhoneRequestButton: '📲 Отправить запрос на телефон',
     scanQrTitle: 'Отсканируйте QR в приложении Kaspi',
+    qrCodeAltText: 'QR код',
     otherMethodHint: 'Или воспользуйтесь другим способом ниже',
     openLinkDirectlyLabel: 'Открыть ссылку напрямую',
     toPayLabel: 'К оплате',
@@ -291,6 +293,7 @@ export const miscDict: Record<'ru' | 'kk' | 'en', MiscContent> = {
     orLabel: 'немесе',
     sendPhoneRequestButton: '📲 Телефонға сұрау жіберу',
     scanQrTitle: 'Kaspi қосымшасында QR-кодты сканерлеңіз',
+    qrCodeAltText: 'QR код',
     otherMethodHint: 'Немесе төмендегі басқа әдісті пайдаланыңыз',
     openLinkDirectlyLabel: 'Сілтемені тікелей ашу',
     toPayLabel: 'Төлеуге',
@@ -411,6 +414,7 @@ export const miscDict: Record<'ru' | 'kk' | 'en', MiscContent> = {
     orLabel: 'or',
     sendPhoneRequestButton: '📲 Send request to phone',
     scanQrTitle: 'Scan the QR code in the Kaspi app',
+    qrCodeAltText: 'QR code',
     otherMethodHint: 'Or use another method below',
     openLinkDirectlyLabel: 'Open the link directly',
     toPayLabel: 'Amount due',
