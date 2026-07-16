@@ -472,12 +472,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ ease: [0.16, 1, 0.3, 1], duration: 0.4 }}
-          className="lg:flex lg:gap-6 lg:items-start"
-        >
+        <div className="lg:flex lg:gap-6 lg:items-start">
         <div className="lg:flex-1 lg:min-w-0">
           {clients.length > 0 && !clientSelected && (
             <div className="mb-3">
@@ -704,7 +699,12 @@ export default function Dashboard() {
           </button>
         </div>
 
-        <div className="hidden lg:block lg:w-[380px] lg:sticky lg:top-6">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ ease: [0.16, 1, 0.3, 1], duration: 0.4 }}
+          className="hidden lg:block lg:w-[380px] lg:sticky lg:top-6"
+        >
           <InvoiceLivePreview
             invoiceNumber={(profile?.invoice_prefix || 'INV-') + (profile?.invoice_next_number || '0001')}
             date={formatDate(new Date().toISOString())}
@@ -717,8 +717,8 @@ export default function Dashboard() {
             vatType={vatType}
             total={total}
           />
-        </div>
         </motion.div>
+        </div>
       </div>
 
       {/* Service picker modal */}
