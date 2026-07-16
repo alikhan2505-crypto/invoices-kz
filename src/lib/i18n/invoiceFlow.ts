@@ -40,6 +40,8 @@ export interface InvoiceFlowContent {
   amountDueLabel: string
   noteHeader: string
   enterClientNameAlert: string
+  previewFromLabel: string
+  previewToLabel: string
 
   // dashboard
   newInvoiceTitle: string
@@ -223,6 +225,8 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     amountDueLabel: 'К оплате',
     noteHeader: 'Примечание',
     enterClientNameAlert: 'Введите название клиента',
+    previewFromLabel: 'От кого',
+    previewToLabel: 'Кому',
 
     newInvoiceTitle: 'Новый счёт',
     newInvoiceSubtitle: 'Создайте счёт за 1 минуту',
@@ -413,6 +417,8 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     amountDueLabel: 'Төленуге тиіс',
     noteHeader: 'Ескертпе',
     enterClientNameAlert: 'Клиент атауын енгізіңіз',
+    previewFromLabel: 'Кімнен',
+    previewToLabel: 'Кімге',
 
     newInvoiceTitle: 'Жаңа шот',
     newInvoiceSubtitle: 'Шотты 1 минутта жасаңыз',
@@ -603,6 +609,8 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     amountDueLabel: 'Amount due',
     noteHeader: 'Note',
     enterClientNameAlert: 'Enter the client name',
+    previewFromLabel: 'From',
+    previewToLabel: 'To',
 
     newInvoiceTitle: 'New invoice',
     newInvoiceSubtitle: 'Create an invoice in 1 minute',

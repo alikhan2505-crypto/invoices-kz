@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
+import { useLanguage } from './LanguageProvider'
+import { invoiceFlowDict } from '@/lib/i18n/invoiceFlow'
 
 export interface InvoiceLivePreviewProps {
   invoiceNumber: string
@@ -69,6 +71,8 @@ export default function InvoiceLivePreview({
   vatType,
   total,
 }: InvoiceLivePreviewProps) {
+  const { lang } = useLanguage()
+  const t = invoiceFlowDict[lang]
   const [displayTotal, setDisplayTotal] = useState(total)
   const prevTotalRef = useRef(total)
 
@@ -115,23 +119,23 @@ export default function InvoiceLivePreview({
       {/* From */}
       {(companyName || companyBin) && (
         <div className="border-t border-gray-100 pt-3 mb-3">
-          <div className="text-xs text-gray-400 mb-1">От кого</div>
+          <div className="text-xs text-gray-400 mb-1">{t.previewFromLabel}</div>
           {companyName && <div className="text-sm font-medium text-[#1C2056]">{companyName}</div>}
-          {companyBin && <div className="text-xs text-gray-400">{`БИН: ${companyBin}`}</div>}
+          {companyBin && <div className="text-xs text-gray-400">{t.binLabel(companyBin)}</div>}
         </div>
       )}
 
       {/* To */}
       <div className="border-t border-gray-100 pt-3 mb-4">
-        <div className="text-xs text-gray-400 mb-1">Кому</div>
+        <div className="text-xs text-gray-400 mb-1">{t.previewToLabel}</div>
         {clientName && <div className="text-sm font-medium text-[#1C2056]">{clientName}</div>}
-        {clientBin && <div className="text-xs text-gray-400">{`БИН: ${clientBin}`}</div>}
+        {clientBin && <div className="text-xs text-gray-400">{t.binLabel(clientBin)}</div>}
       </div>
 
       {/* Services */}
       <div className="border-t border-gray-100 pt-3 mb-4">
         <AnimatePresence initial={false}>
-          {services.map((svc, idx) => (
+          {services.filter(svc => svc.name).map((svc, idx) => (
             <motion.div
               key={idx}
               layout
@@ -162,18 +166,18 @@ export default function InvoiceLivePreview({
       <div className="border-t border-gray-100 pt-3">
         {vatType === 'vat_16' && (
           <div className="flex justify-between text-xs text-gray-400 mb-2">
-            <span>В том числе НДС 16%:</span>
+            <span>{t.vat16Label}</span>
             <span>{formatMoney(vatAmount)}</span>
           </div>
         )}
         {vatType === 'vat_0' && (
           <div className="flex justify-between text-xs text-gray-400 mb-2">
-            <span>НДС 0%:</span>
-            <span>0 ₸</span>
+            <span>{t.vat0Label}</span>
+            <span>{t.vat0Amount}</span>
           </div>
         )}
         <div className="flex items-center justify-between">
-          <span className="text-sm font-semibold text-[#1C2056]">Итого:</span>
+          <span className="text-sm font-semibold text-[#1C2056]">{t.amountDueLabel}</span>
           <span className="text-lg font-bold text-[#2DC48D]">{formatMoney(displayTotal)}</span>
         </div>
       </div>
