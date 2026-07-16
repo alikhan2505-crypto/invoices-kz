@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import BottomNav from '@/components/BottomNav'
+import AppNav from '@/components/AppNav'
 import * as XLSX from 'xlsx'
 import { formatDateTime, formatDate } from '@/lib/date'
 import { useLanguage } from '@/components/LanguageProvider'
@@ -144,7 +144,7 @@ export default function History() {
     .reduce((sum, i) => sum + Number(i.amount), 0)
 
   return (
-    <main className="min-h-screen bg-gray-50 pb-24">
+    <main className="min-h-screen bg-gray-50 pb-24 lg:pl-20">
       <div className="bg-white border-b px-4 py-3 flex items-center justify-between">
         <span className="font-bold text-[#1C2056]">INVOICES.KZ</span>
         <div className="flex gap-2">
@@ -276,7 +276,7 @@ export default function History() {
           {t.createNewInvoiceButton}
         </button>
       </div>
-      <BottomNav />
+      <AppNav />
     </main>
   )
 }

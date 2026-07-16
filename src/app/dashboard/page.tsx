@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { generateInvoicePDF } from '@/lib/generatePDF'
-import BottomNav from '@/components/BottomNav'
+import AppNav from '@/components/AppNav'
 import { cacheGet, cacheSet } from '@/lib/cache'
 import { getActivePlan } from '@/lib/plan'
 import { useLanguage } from '@/components/LanguageProvider'
@@ -378,7 +378,7 @@ export default function Dashboard() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 pb-24">
+    <main className="min-h-screen bg-gray-50 pb-24 lg:pl-20">
       <div className="bg-white border-b px-4 py-3 flex items-center justify-between">
         <span className="font-bold text-[#1C2056]">INVOICES.KZ</span>
         <span className="text-sm text-gray-500">{profile?.company_name || ''}</span>
@@ -772,7 +772,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      <BottomNav />
+      <AppNav />
     </main>
   )
 }
