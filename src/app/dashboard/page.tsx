@@ -74,6 +74,8 @@ export default function Dashboard() {
     if (p) cacheSet('profile_' + user.id, p)
     if (p?.default_note) setNote(p.default_note)
 
+    supabase.from('profiles').update({ last_active_at: new Date().toISOString() }).eq('id', user.id).then(() => {})
+
     const { data: banks } = await supabase
       .from('bank_accounts').select('*').eq('user_id', user.id).order('is_main', { ascending: false })
     setBankAccounts(banks || [])

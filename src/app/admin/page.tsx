@@ -23,6 +23,7 @@ export default function Admin() {
   const [savingPromo, setSavingPromo] = useState(false)
   const [regChart, setRegChart] = useState<{ day: string; count: number }[]>([])
   const [planStats, setPlanStats] = useState({ free: 0, basic: 0, pro: 0 })
+  const [docCounts, setDocCounts] = useState<Record<string, { invoices: number; kp: number; avr: number; nakladnaya: number }>>({})
 
   useEffect(() => { load() }, [])
 
@@ -35,11 +36,14 @@ export default function Admin() {
 
     if (!profile?.is_admin) { router.push('/dashboard'); return }
 
-    const [{ data: allUsers }, { data: allInvoices }, { data: allPromos }, { data: allPayments }] = await Promise.all([
+    const [{ data: allUsers }, { data: allInvoices }, { data: allPromos }, { data: allPayments }, { data: allKp }, { data: allAvr }, { data: allNakladnaya }] = await Promise.all([
       supabase.from('profiles').select('*').order('created_at', { ascending: false }),
-      supabase.from('invoices').select('status, amount'),
+      supabase.from('invoices').select('id, user_id, status, amount'),
       supabase.from('promo_codes').select('*').order('created_at', { ascending: false }),
       supabase.from('payment_requests').select('*').order('created_at', { ascending: false }),
+      supabase.from('kp_documents').select('invoice_id'),
+      supabase.from('avr_documents').select('invoice_id'),
+      supabase.from('nakladnaya_documents').select('invoice_id'),
     ])
 
     setUsers(allUsers || [])
@@ -50,6 +54,19 @@ export default function Admin() {
       invoices: (allInvoices || []).length,
       paid: (allInvoices || []).filter(i => i.status === 'paid').length,
     })
+
+    const invoiceUserMap = new Map((allInvoices || []).map(inv => [inv.id, inv.user_id]))
+    const counts: Record<string, { invoices: number; kp: number; avr: number; nakladnaya: number }> = {}
+    const bump = (uid: string | null | undefined, key: 'invoices' | 'kp' | 'avr' | 'nakladnaya') => {
+      if (!uid) return
+      if (!counts[uid]) counts[uid] = { invoices: 0, kp: 0, avr: 0, nakladnaya: 0 }
+      counts[uid][key]++
+    }
+    ;(allInvoices || []).forEach(inv => bump(inv.user_id, 'invoices'))
+    ;(allKp || []).forEach(d => bump(invoiceUserMap.get(d.invoice_id), 'kp'))
+    ;(allAvr || []).forEach(d => bump(invoiceUserMap.get(d.invoice_id), 'avr'))
+    ;(allNakladnaya || []).forEach(d => bump(invoiceUserMap.get(d.invoice_id), 'nakladnaya'))
+    setDocCounts(counts)
 
     const days: { day: string; count: number }[] = []
     for (let i = 13; i >= 0; i--) {
@@ -299,16 +316,18 @@ export default function Admin() {
                 onChange={e => setSearch(e.target.value)}
               />
             </div>
-            <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
-              <div className="grid grid-cols-5 gap-4 px-4 py-3 border-b border-gray-700 text-xs text-gray-400 uppercase">
+            <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-x-auto">
+              <div className="grid grid-cols-8 gap-4 px-4 py-3 border-b border-gray-700 text-xs text-gray-400 uppercase min-w-[900px]">
                 <div className="col-span-2">{t.userColumnLabel}</div>
                 <div>{t.binColumnLabel}</div>
                 <div>{t.planColumnLabel}</div>
+                <div>Активность</div>
+                <div>Документы</div>
                 <div>{t.actionColumnLabel}</div>
               </div>
               {filtered.map((user, i) => (
                 <div key={user.id}
-                  className={`grid grid-cols-5 gap-4 px-4 py-3 items-center ${i < filtered.length - 1 ? 'border-b border-gray-700' : ''}`}>
+                  className={`grid grid-cols-8 gap-4 px-4 py-3 items-center min-w-[900px] ${i < filtered.length - 1 ? 'border-b border-gray-700' : ''}`}>
                   <div className="col-span-2">
                     <div className="text-sm font-medium">{user.company_name || '—'}</div>
                     <div className="text-xs text-gray-400">{user.email || '—'}</div>
@@ -336,6 +355,13 @@ export default function Admin() {
                         </>
                       )
                     })()}
+                  </div>
+                  <div className="text-xs text-gray-400">
+                    {user.last_active_at ? formatDateTime(user.last_active_at) : '—'}
+                  </div>
+                  <div className="text-xs text-gray-400 space-y-0.5">
+                    <div>Счета: {docCounts[user.id]?.invoices ?? 0}</div>
+                    <div>КП: {docCounts[user.id]?.kp ?? 0} · АВР: {docCounts[user.id]?.avr ?? 0} · Накл.: {docCounts[user.id]?.nakladnaya ?? 0}</div>
                   </div>
                   <div>
                     <select
