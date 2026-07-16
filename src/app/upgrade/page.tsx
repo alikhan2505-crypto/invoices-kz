@@ -2,9 +2,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { useLanguage } from '@/components/LanguageProvider'
+import { miscDict } from '@/lib/i18n/misc'
 
 export default function Upgrade() {
   const router = useRouter()
+  const { lang } = useLanguage()
+  const t = miscDict[lang]
   const [promoCode, setPromoCode] = useState('')
   const [promoLoading, setPromoLoading] = useState(false)
   const [promoSuccess, setPromoSuccess] = useState('')
@@ -76,7 +80,7 @@ export default function Upgrade() {
       const data = await res.json()
 
       if (!res.ok || data.error) {
-        alert('Ошибка: ' + (data.error || 'Попробуйте снова'))
+        alert(t.errorPrefix(data.error || t.tryAgainDefault))
         setShowModal(false)
         setSubmitting(false)
         return
@@ -91,7 +95,7 @@ export default function Upgrade() {
       statusInterval.current = setInterval(() => checkPaymentStatus(planKey), 5000)
 
     } catch (e: any) {
-      alert('Ошибка: ' + (e.message || 'Попробуйте снова'))
+      alert(t.errorPrefix(e.message || t.tryAgainDefault))
       setShowModal(false)
     }
     setSubmitting(false)
@@ -117,7 +121,7 @@ export default function Upgrade() {
 
   async function createPhonePayment() {
     if (!payPhone || payPhone.length < 16) {
-      alert('Введите полный номер телефона')
+      alert(t.enterFullPhoneAlert)
       return
     }
     setPhoneSubmitting(true)
@@ -137,20 +141,20 @@ export default function Upgrade() {
       })
       const data = await res.json()
       if (!res.ok || data.error) {
-        alert('Ошибка: ' + (data.error || 'Попробуйте снова'))
+        alert(t.errorPrefix(data.error || t.tryAgainDefault))
         setPhoneSubmitting(false)
         return
       }
       setShowPhoneModal(false)
-      alert('✅ Запрос отправлен! Откройте Kaspi и подтвердите оплату.')
+      alert(t.phoneRequestSentAlert)
     } catch (e: any) {
-      alert('Ошибка: ' + e.message)
+      alert(t.errorPrefix(e.message))
     }
     setPhoneSubmitting(false)
   }
 
   async function applyPromo() {
-    if (!promoCode.trim()) { setPromoError('Введите промокод'); return }
+    if (!promoCode.trim()) { setPromoError(t.enterPromoCodeError); return }
     setPromoLoading(true)
     setPromoError('')
     setPromoSuccess('')
@@ -163,15 +167,15 @@ export default function Upgrade() {
       .eq('code', promoCode.toUpperCase())
       .eq('is_active', true).single()
 
-    if (!promo) { setPromoError('Промокод не найден или недействителен'); setPromoLoading(false); return }
-    if (promo.used_count >= promo.max_uses) { setPromoError('Промокод уже использован'); setPromoLoading(false); return }
+    if (!promo) { setPromoError(t.promoNotFoundError); setPromoLoading(false); return }
+    if (promo.used_count >= promo.max_uses) { setPromoError(t.promoAlreadyUsedError); setPromoLoading(false); return }
 
     const expiresAt = new Date()
     expiresAt.setDate(expiresAt.getDate() + promo.days)
     await supabase.from('profiles').update({ plan: promo.plan, plan_expires_at: expiresAt.toISOString() }).eq('id', user.id)
     await supabase.from('promo_codes').update({ used_count: promo.used_count + 1 }).eq('id', promo.id)
 
-    setPromoSuccess(`🎉 Промокод активирован! ${promo.plan === 'pro' ? 'Про' : 'Базовый'} тариф на ${promo.days} дней`)
+    setPromoSuccess(t.promoActivatedMessage(promo.plan === 'pro' ? t.proPlanName : t.basicPlanName, promo.days))
     setPromoCode('')
     setPromoLoading(false)
     await reloadPlan()
@@ -186,7 +190,7 @@ export default function Upgrade() {
           ? 'bg-[#2DC48D] text-white'
           : 'border-2 border-[#1C2056] text-[#1C2056]'
         }`}>
-        Подключить за {amount.toLocaleString('ru-KZ')} ₸/мес
+        {t.connectButtonLabel(amount.toLocaleString('ru-KZ'))}
       </button>
     )
   }
@@ -195,29 +199,29 @@ export default function Upgrade() {
     <main className="min-h-screen bg-gray-50 flex flex-col">
       <div className="bg-white border-b px-4 py-3 flex items-center gap-3">
         <button onClick={() => router.back()} className="back-btn text-gray-400 text-xl">‹</button>
-        <span className="font-semibold text-[#1C2056]">Тарифы</span>
+        <span className="font-semibold text-[#1C2056]">{t.pageTitle}</span>
       </div>
 
       <div className="max-w-lg mx-auto p-6 flex-1">
         <div className="text-center mb-8">
           <div className="text-5xl mb-4">🚀</div>
-          <h1 className="text-2xl font-bold text-[#1C2056] mb-2">Выберите тариф</h1>
-          <p className="text-gray-400 text-sm">Оплата через Kaspi Pay · Активация моментально</p>
+          <h1 className="text-2xl font-bold text-[#1C2056] mb-2">{t.heroTitle}</h1>
+          <p className="text-gray-400 text-sm">{t.heroSubtitle}</p>
         </div>
 
         {/* Promo */}
         <div className="bg-white rounded-2xl p-4 mb-6 shadow-sm">
-          <div className="text-sm font-medium text-[#1C2056] mb-3">🎟️ Есть промокод?</div>
+          <div className="text-sm font-medium text-[#1C2056] mb-3">{t.promoSectionLabel}</div>
           <div className="flex gap-2">
             <input
               className="flex-1 border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056] uppercase"
-              placeholder="Введите промокод"
+              placeholder={t.promoPlaceholder}
               value={promoCode}
               onChange={e => { setPromoCode(e.target.value.toUpperCase()); setPromoError(''); setPromoSuccess('') }}
             />
             <button onClick={applyPromo} disabled={promoLoading}
               className="bg-[#1C2056] text-white px-4 py-2.5 rounded-lg text-sm font-medium">
-              {promoLoading ? '...' : 'Применить'}
+              {promoLoading ? t.applyingButtonLabel : t.applyButtonLabel}
             </button>
           </div>
           {promoError && <p className="text-xs text-red-500 mt-2">{promoError}</p>}
@@ -227,12 +231,12 @@ export default function Upgrade() {
         {/* Free */}
         <div className={`bg-white border-2 rounded-2xl p-6 mb-4 ${plan === 'free' ? 'border-[#1C2056]' : 'border-gray-100'}`}>
           <div className="flex items-center justify-between mb-3">
-            <div className="font-bold text-[#1C2056] text-lg">Бесплатно</div>
-            {plan === 'free' && <span className="text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded-full">Текущий</span>}
+            <div className="font-bold text-[#1C2056] text-lg">{t.freePlanName}</div>
+            {plan === 'free' && <span className="text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded-full">{t.currentBadge}</span>}
           </div>
           <div className="text-3xl font-bold text-[#1C2056] mb-4">0 ₸</div>
           <ul className="space-y-2">
-            {['3 счета в месяц', 'PDF без подписи', 'WhatsApp отправка', 'Публичная ссылка', 'История счетов'].map(f => (
+            {t.freeFeatures.map(f => (
               <li key={f} className="flex items-center gap-2 text-sm text-gray-600">
                 <span className="text-[#2DC48D]">✓</span> {f}
               </li>
@@ -243,52 +247,52 @@ export default function Upgrade() {
         {/* Basic */}
         <div className={`bg-white border-2 rounded-2xl p-6 mb-4 ${plan === 'basic' ? 'border-[#1C2056]' : 'border-[#1C2056]/20'}`}>
           <div className="flex items-center justify-between mb-3">
-            <div className="font-bold text-[#1C2056] text-lg">Базовый</div>
+            <div className="font-bold text-[#1C2056] text-lg">{t.basicPlanName}</div>
             {plan === 'basic'
-              ? <span className="text-xs bg-[#1C2056] text-white px-2 py-1 rounded-full">Текущий</span>
-              : <span className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded-full">Популярный</span>}
+              ? <span className="text-xs bg-[#1C2056] text-white px-2 py-1 rounded-full">{t.currentBadge}</span>
+              : <span className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded-full">{t.popularBadge}</span>}
           </div>
           <div className="text-3xl font-bold text-[#1C2056] mb-4">
-            2 990 ₸<span className="text-sm font-normal text-gray-400">/мес</span>
+            2 990 ₸<span className="text-sm font-normal text-gray-400">{t.perMonthSuffix}</span>
           </div>
           <ul className="space-y-2 mb-5">
-            {['30 счетов в месяц', 'PDF с подписью и печатью', 'Email отправка', 'Справочник клиентов', 'Услуги и товары', 'Отправка через WhatsApp', 'Поддержка в Telegram'].map(f => (
+            {t.basicFeatures.map(f => (
               <li key={f} className="flex items-center gap-2 text-sm text-gray-600">
                 <span className="text-[#2DC48D]">✓</span> {f}
               </li>
             ))}
           </ul>
-          {plan !== 'basic' && plan !== 'pro' && <ConnectButton planName="Базовый" amount={2990} planKey="basic" />}
-          {plan === 'basic' && <div className="text-center text-sm text-gray-400 py-2">✓ Активен</div>}
-          {plan === 'pro' && <div className="text-center text-sm text-gray-400 py-2">У вас более высокий тариф</div>}
+          {plan !== 'basic' && plan !== 'pro' && <ConnectButton planName={t.basicPlanName} amount={2990} planKey="basic" />}
+          {plan === 'basic' && <div className="text-center text-sm text-gray-400 py-2">{t.activeLabel}</div>}
+          {plan === 'pro' && <div className="text-center text-sm text-gray-400 py-2">{t.higherPlanNotice}</div>}
         </div>
 
         {/* Pro */}
         <div className={`rounded-2xl p-6 mb-6 bg-[#1C2056] ${plan === 'pro' ? 'ring-2 ring-[#2DC48D]' : ''}`}>
           <div className="flex items-center justify-between mb-3">
-            <div className="font-bold text-white text-lg">Про</div>
+            <div className="font-bold text-white text-lg">{t.proPlanName}</div>
             {plan === 'pro'
-              ? <span className="text-xs bg-[#2DC48D] text-white px-2 py-1 rounded-full">Текущий</span>
-              : <span className="text-xs bg-[#2DC48D] text-white px-2 py-1 rounded-full">Максимум</span>}
+              ? <span className="text-xs bg-[#2DC48D] text-white px-2 py-1 rounded-full">{t.currentBadge}</span>
+              : <span className="text-xs bg-[#2DC48D] text-white px-2 py-1 rounded-full">{t.maxBadge}</span>}
           </div>
           <div className="text-3xl font-bold text-white mb-4">
-            5 990 ₸<span className="text-sm font-normal text-white/60">/мес</span>
+            5 990 ₸<span className="text-sm font-normal text-white/60">{t.perMonthSuffix}</span>
           </div>
           <ul className="space-y-2 mb-5">
-            {['Безлимитные счета', 'КП, АВР, Накладная', 'Документы для налоговой', 'Шаблоны счетов', 'PDF с подписью и печатью', 'Email и WhatsApp отправка', 'ЭЦП НУЦ РК (скоро)', 'Приоритетная поддержка 24/7'].map(f => (
+            {t.proFeatures.map(f => (
               <li key={f} className="flex items-center gap-2 text-sm text-white/80">
                 <span className="text-[#2DC48D]">✓</span> {f}
               </li>
             ))}
           </ul>
-          {plan !== 'pro' && <ConnectButton planName="Про" amount={5990} planKey="pro" dark />}
-          {plan === 'pro' && <div className="text-center text-sm text-white/60 py-2">✓ Активен</div>}
+          {plan !== 'pro' && <ConnectButton planName={t.proPlanName} amount={5990} planKey="pro" dark />}
+          {plan === 'pro' && <div className="text-center text-sm text-white/60 py-2">{t.activeLabel}</div>}
         </div>
 
         <p className="text-center text-xs text-gray-400">
-          Вопросы?{' '}
+          {t.questionsText}{' '}
           <a href="https://t.me/invoiceskz_support" target="_blank" className="text-[#1C2056] underline">
-            Написать в Telegram
+            {t.telegramLinkLabel}
           </a>
         </p>
       </div>
@@ -301,15 +305,15 @@ export default function Upgrade() {
             {submitting && (
               <div className="text-center py-8">
                 <div className="w-10 h-10 border-2 border-[#1C2056] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                <div className="font-semibold text-[#1C2056] mb-1">Создаём платёж...</div>
-                <div className="text-xs text-gray-400">Подождите несколько секунд</div>
+                <div className="font-semibold text-[#1C2056] mb-1">{t.creatingPaymentLabel}</div>
+                <div className="text-xs text-gray-400">{t.pleaseWaitLabel}</div>
               </div>
             )}
 
             {!submitting && step === 'pending' && (
               <>
                 <div className="flex items-center justify-between mb-5">
-                  <div className="font-semibold text-[#1C2056]">Оплата {selectedPlan?.name}</div>
+                  <div className="font-semibold text-[#1C2056]">{t.paymentForLabel(selectedPlan?.name || '')}</div>
                   <button onClick={() => {
                     clearInterval(statusInterval.current)
                     setShowModal(false)
@@ -319,33 +323,33 @@ export default function Upgrade() {
                 {isMobile ? (
                   <div className="text-center py-4">
                     <div className="text-5xl mb-4">📱</div>
-                    <div className="font-semibold text-[#1C2056] mb-2">Переходим в Kaspi...</div>
+                    <div className="font-semibold text-[#1C2056] mb-2">{t.redirectingKaspiLabel}</div>
                     <div className="text-sm text-gray-400 mb-4">
-                      Если приложение не открылось — нажмите кнопку ниже
+                      {t.appNotOpenedHint}
                     </div>
                     <a href={qrToken} target="_blank"
                       className="block w-full bg-[#2DC48D] text-white rounded-xl py-4 font-medium text-sm mb-3">
-                      💳 Открыть Kaspi
+                      {t.openKaspiButton}
                     </a>
                     <div className="flex items-center gap-2 mb-3">
                       <div className="flex-1 h-px bg-gray-100"></div>
-                      <span className="text-xs text-gray-400">или</span>
+                      <span className="text-xs text-gray-400">{t.orLabel}</span>
                       <div className="flex-1 h-px bg-gray-100"></div>
                     </div>
                     <button onClick={() => setShowPhoneModal(true)}
                       className="w-full border border-[#1C2056] text-[#1C2056] rounded-xl py-3 text-sm font-medium">
-                      📲 Отправить запрос на телефон
+                      {t.sendPhoneRequestButton}
                     </button>
                   </div>
                 ) : (
                   <div className="text-center py-2">
-                    <div className="font-semibold text-[#1C2056] mb-1">Отсканируйте QR в приложении Kaspi</div>
-                    <div className="text-xs text-gray-400 mb-4">Или воспользуйтесь другим способом ниже</div>
+                    <div className="font-semibold text-[#1C2056] mb-1">{t.scanQrTitle}</div>
+                    <div className="text-xs text-gray-400 mb-4">{t.otherMethodHint}</div>
                     {qrToken && (
                       <div className="flex justify-center mb-4">
                         <img
                           src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrToken)}`}
-                          alt="QR код"
+                          alt="QR"
                           className="rounded-xl border border-gray-100"
                           width={200}
                           height={200}
@@ -355,34 +359,34 @@ export default function Upgrade() {
                     <div className="flex flex-col gap-2">
                       <a href={qrToken} target="_blank"
                         className="text-xs text-gray-400 underline">
-                        Открыть ссылку напрямую
+                        {t.openLinkDirectlyLabel}
                       </a>
                       <div className="flex items-center gap-2">
                         <div className="flex-1 h-px bg-gray-100"></div>
-                        <span className="text-xs text-gray-400">или</span>
+                        <span className="text-xs text-gray-400">{t.orLabel}</span>
                         <div className="flex-1 h-px bg-gray-100"></div>
                       </div>
                       <button onClick={() => setShowPhoneModal(true)}
                         className="w-full border border-[#1C2056] text-[#1C2056] rounded-xl py-3 text-sm font-medium">
-                        📲 Отправить запрос на телефон
+                        {t.sendPhoneRequestButton}
                       </button>
                     </div>
                   </div>
                 )}
 
                 <div className="bg-gray-50 rounded-xl px-4 py-3 mt-4 mb-3 flex items-center justify-between">
-                  <span className="text-sm text-gray-500">К оплате</span>
-                  <span className="text-sm font-bold text-[#1C2056]">{selectedPlan?.amount.toLocaleString('ru-KZ')} ₸/мес</span>
+                  <span className="text-sm text-gray-500">{t.toPayLabel}</span>
+                  <span className="text-sm font-bold text-[#1C2056]">{selectedPlan?.amount.toLocaleString('ru-KZ')} ₸{t.perMonthSuffix}</span>
                 </div>
 
                 <div className="flex items-center justify-center gap-2 text-xs text-gray-400 mb-3">
                   <div className="w-3 h-3 border-2 border-[#1C2056] border-t-transparent rounded-full animate-spin"></div>
-                  {checkingStatus ? 'Проверяем оплату...' : 'Ожидаем подтверждение...'}
+                  {checkingStatus ? t.checkingPaymentLabel : t.awaitingConfirmationLabel}
                 </div>
 
                 <button onClick={() => checkPaymentStatus(selectedPlan?.plan || '')}
                   className="w-full border border-gray-200 text-gray-500 rounded-xl py-3 text-sm">
-                  🔄 Проверить вручную
+                  {t.checkManuallyButton}
                 </button>
               </>
             )}
@@ -390,19 +394,19 @@ export default function Upgrade() {
             {step === 'success' && (
               <div className="text-center py-6">
                 <div className="text-5xl mb-4">🎉</div>
-                <div className="font-bold text-[#1C2056] text-xl mb-2">Оплата прошла!</div>
+                <div className="font-bold text-[#1C2056] text-xl mb-2">{t.paymentSuccessTitle}</div>
                 <div className="text-sm text-gray-400 mb-6">
-                  Тариф <strong>{selectedPlan?.name}</strong> активирован
+                  {t.planActivatedPrefixLabel}<strong>{selectedPlan?.name}</strong>{t.planActivatedSuffixLabel}
                 </div>
                 <div className="bg-green-50 rounded-2xl p-4 mb-6">
-                  <div className="text-sm text-green-700">✅ Подписка активна на 30 дней</div>
+                  <div className="text-sm text-green-700">{t.subscriptionActiveLabel}</div>
                 </div>
                 <button onClick={() => {
                   setShowModal(false)
                   router.push('/dashboard')
                 }}
                   className="w-full bg-[#1C2056] text-white rounded-xl py-4 font-medium text-sm">
-                  Перейти к работе →
+                  {t.goToWorkButton}
                 </button>
               </div>
             )}
@@ -416,17 +420,17 @@ export default function Upgrade() {
         <div className="fixed inset-0 bg-black/40 z-[60] flex items-end">
           <div className="bg-white w-full max-w-lg mx-auto rounded-t-3xl p-6">
             <div className="flex items-center justify-between mb-5">
-              <div className="font-semibold text-[#1C2056]">Оплата по номеру телефона</div>
+              <div className="font-semibold text-[#1C2056]">{t.phonePaymentTitle}</div>
               <button onClick={() => setShowPhoneModal(false)} className="back-btn text-gray-400 text-xl">✕</button>
             </div>
 
             <div className="bg-blue-50 rounded-2xl p-4 mb-5">
               <div className="text-xs text-gray-500 leading-relaxed">
-                Введите номер телефона привязанный к Kaspi. На него придёт уведомление с запросом на оплату.
+                {t.phoneInstructionText}
               </div>
             </div>
 
-            <label className="text-xs text-gray-500 mb-1 block">Номер телефона Kaspi</label>
+            <label className="text-xs text-gray-500 mb-1 block">{t.phoneNumberLabel}</label>
             <input
               className="w-full border rounded-lg px-3 py-3 text-sm outline-none focus:border-[#1C2056] mb-3"
               placeholder="+7 777 123 45 67"
@@ -437,17 +441,17 @@ export default function Upgrade() {
             />
 
             <div className="bg-gray-50 rounded-xl px-4 py-3 mb-4 flex items-center justify-between">
-              <span className="text-sm text-gray-500">К оплате</span>
-              <span className="text-sm font-bold text-[#1C2056]">{selectedPlan?.amount.toLocaleString('ru-KZ')} ₸/мес</span>
+              <span className="text-sm text-gray-500">{t.toPayLabel}</span>
+              <span className="text-sm font-bold text-[#1C2056]">{selectedPlan?.amount.toLocaleString('ru-KZ')} ₸{t.perMonthSuffix}</span>
             </div>
 
             <button onClick={createPhonePayment} disabled={phoneSubmitting}
               className="w-full bg-[#2DC48D] text-white rounded-xl py-4 font-medium text-sm mb-2">
-              {phoneSubmitting ? 'Отправляем...' : '📲 Отправить запрос в Kaspi'}
+              {t.sendKaspiRequestButton(phoneSubmitting)}
             </button>
             <button onClick={() => setShowPhoneModal(false)}
               className="w-full text-gray-400 text-sm py-2">
-              Отмена
+              {t.cancelButton}
             </button>
           </div>
         </div>
