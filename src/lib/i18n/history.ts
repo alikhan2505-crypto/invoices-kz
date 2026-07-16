@@ -163,7 +163,7 @@ export const historyDict: Record<'ru' | 'kk' | 'en', HistoryContent> = {
       overdue: 'Мерзімі өтті',
       draft: 'Жоба',
       viewed: 'Қаралды',
-      cancelled: 'Аннулирленген',
+      cancelled: 'Жойылған',
     },
 
     markOverdueButtonLabel: '⏰ Мерзімі өткен',
@@ -190,7 +190,7 @@ export const historyDict: Record<'ru' | 'kk' | 'en', HistoryContent> = {
     noInvoicesLabel: 'Шоттар жоқ',
     createFirstInvoiceButton: 'Алғашқы шотты жасау',
     createNewInvoiceButton: '+ Жаңа шот жасау',
-    confirmCancelInvoice: (number: string) => `${number} шотын аннуляциялайсыз ба?`,
+    confirmCancelInvoice: (number: string) => `${number} шотын жоясыз ба?`,
     markedOverdueMessage: (count: number) => `Мерзімі өткен деп белгіленді: ${count}`,
     noOverdueInvoicesAlert: 'Мерзімі өткен шоттар жоқ',
     excelColumnNumber: 'Нөмірі',
