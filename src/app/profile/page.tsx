@@ -8,11 +8,13 @@ import { useTheme } from '@/components/ThemeProvider'
 import { useLanguage } from '@/components/LanguageProvider'
 import { cacheGet, cacheSet, cacheClear } from '@/lib/cache'
 import { getActivePlan } from '@/lib/plan'
+import { profileCoreDict } from '@/lib/i18n/profileCore'
 
 export default function Profile() {
   const router = useRouter()
   const { theme, toggle } = useTheme()
   const { lang, setLang } = useLanguage()
+  const t = profileCoreDict[lang]
   const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
@@ -79,7 +81,7 @@ export default function Profile() {
 
   if (loading && !profile) return (
     <main className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <p className="text-gray-400">Загрузка...</p>
+      <p className="text-gray-400">{t.loadingLabel}</p>
     </main>
   )
 
@@ -87,12 +89,12 @@ export default function Profile() {
   const activePlan = getActivePlan(profile)
 
   const settingsItems = [
-    { icon: '⚙️', label: 'Настройки счетов', href: '/profile/settings' },
-    { icon: '🔔', label: 'Уведомления', href: '/profile/notifications' },
-    { icon: '💬', label: 'Поддержка', href: '/profile/support' },
-    { icon: 'ℹ️', label: 'О приложении', href: '/profile/about' },
-    { icon: '🎁', label: 'Пригласить друзей', href: '/profile/referral' },
-    ...(isAdmin ? [{ icon: '🔐', label: 'Админ панель', href: '/admin' }] : []),
+    { icon: '⚙️', label: t.invoiceSettingsLabel, href: '/profile/settings' },
+    { icon: '🔔', label: t.notificationsMenuLabel, href: '/profile/notifications' },
+    { icon: '💬', label: t.supportMenuLabel, href: '/profile/support' },
+    { icon: 'ℹ️', label: t.aboutMenuLabel, href: '/profile/about' },
+    { icon: '🎁', label: t.referralMenuLabel, href: '/profile/referral' },
+    ...(isAdmin ? [{ icon: '🔐', label: t.adminPanelMenuLabel, href: '/admin' }] : []),
   ]
 
   return (
@@ -112,14 +114,14 @@ export default function Profile() {
               {initials}
             </div>
             <div>
-              <div className="font-semibold text-[#1C2056] text-base">{profile?.company_name || 'Заполните профиль'}</div>
-              <div className="text-xs text-gray-400 mt-0.5">{profile?.bin_iin ? 'ИИН: ' + profile.bin_iin : 'Нет данных'}</div>
+              <div className="font-semibold text-[#1C2056] text-base">{profile?.company_name || t.fillProfileLabel}</div>
+              <div className="text-xs text-gray-400 mt-0.5">{profile?.bin_iin ? t.binIinPrefixLabel(profile.bin_iin) : t.noDataLabel}</div>
             </div>
           </div>
           <div className="bg-gray-50 rounded-xl p-4">
-            <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">Доход за месяц</div>
+            <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">{t.incomeThisMonthLabel}</div>
             <div className="text-2xl font-bold text-[#1C2056]">{stats.income.toLocaleString('ru-KZ')} ₸</div>
-            <div className="text-xs text-[#2DC48D] mt-0.5">Всего счетов: {stats.invoices}</div>
+            <div className="text-xs text-[#2DC48D] mt-0.5">{t.totalInvoicesLabel(stats.invoices)}</div>
             {chartData.some(d => d.income > 0) && (
               <>
                 <div className="mt-3 h-16">
@@ -132,7 +134,7 @@ export default function Profile() {
                         </linearGradient>
                       </defs>
                       <Tooltip
-                        formatter={(value: any) => [value.toLocaleString('ru-KZ') + ' ₸', 'Доход']}
+                        formatter={(value: any) => [value.toLocaleString('ru-KZ') + ' ₸', t.chartIncomeLabel]}
                         contentStyle={{ fontSize: '11px', borderRadius: '8px', border: '1px solid #e5e7eb' }}
                       />
                       <Area type="monotone" dataKey="income" stroke="#1C2056" strokeWidth={2} fill="url(#incomeGrad)" dot={false} />
@@ -151,14 +153,14 @@ export default function Profile() {
 
         {/* Компания */}
         <div>
-          <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">Компания</div>
+          <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">{t.companySectionLabel}</div>
           <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
             {[
-              { icon: '🏢', label: 'Реквизиты', href: '/profile/requisites' },
-              { icon: '✍️', label: 'Подпись и печать', href: '/profile/signature' },
-              { icon: '💳', label: 'Банковские счета', href: '/profile/banks' },
-              { icon: '🔒', label: 'ЭЦП и безопасность', href: '/profile/security' },
-              { icon: '🔗', label: 'Коннекторы', href: '/profile/connectors' },
+              { icon: '🏢', label: t.requisitesMenuLabel, href: '/profile/requisites' },
+              { icon: '✍️', label: t.signatureMenuLabel, href: '/profile/signature' },
+              { icon: '💳', label: t.banksMenuLabel, href: '/profile/banks' },
+              { icon: '🔒', label: t.securityMenuLabel, href: '/profile/security' },
+              { icon: '🔗', label: t.connectorsMenuLabel, href: '/profile/connectors' },
             ].map((item, i, arr) => (
               <div key={item.href} onClick={() => router.push(item.href)}
                 className={`flex items-center justify-between px-4 py-3.5 cursor-pointer hover:bg-gray-50 ${i < arr.length - 1 ? 'border-b border-gray-100' : ''}`}>
@@ -174,13 +176,13 @@ export default function Profile() {
 
         {/* Справочники */}
         <div>
-          <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">Справочники</div>
+          <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">{t.directoriesSectionLabel}</div>
           <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
             {[
-              { icon: '👥', label: 'Мои клиенты', href: '/profile/clients', badge: stats.clients },
-              { icon: '📋', label: 'Услуги и товары', href: '/profile/services', badge: stats.services },
-              { icon: '⭐', label: 'Шаблоны счетов', href: '/profile/templates', badge: 0 },
-              { icon: '🗂️', label: 'Документы для налоговой', href: '/profile/documents', badge: 0 },
+              { icon: '👥', label: t.clientsMenuLabel, href: '/profile/clients', badge: stats.clients },
+              { icon: '📋', label: t.servicesMenuLabel, href: '/profile/services', badge: stats.services },
+              { icon: '⭐', label: t.templatesMenuLabel, href: '/profile/templates', badge: 0 },
+              { icon: '🗂️', label: t.documentsMenuLabel, href: '/profile/documents', badge: 0 },
             ].map((item, i, arr) => (
               <div key={item.href} onClick={() => router.push(item.href)}
                 className={`flex items-center justify-between px-4 py-3.5 cursor-pointer hover:bg-gray-50 ${i < arr.length - 1 ? 'border-b border-gray-100' : ''}`}>
@@ -199,7 +201,7 @@ export default function Profile() {
 
         {/* Настройки */}
         <div>
-          <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">Настройки</div>
+          <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">{t.settingsSectionLabel}</div>
           <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
             {settingsItems.map((item, i, arr) => (
               <div key={item.href} onClick={() => router.push(item.href)}
@@ -216,7 +218,7 @@ export default function Profile() {
 
         {/* Подписка */}
         <div>
-          <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">Подписка</div>
+          <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">{t.subscriptionSectionLabel}</div>
           <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
             <div className="px-4 py-4 flex items-center justify-between cursor-pointer" onClick={() => router.push('/upgrade')}>
               <div className="flex items-center gap-3">
@@ -226,10 +228,10 @@ export default function Profile() {
                 <div>
                   <div className="text-sm font-medium text-[#1C2056]">{activePlan.label}</div>
                   <div className="text-xs text-gray-400">
-                    {activePlan.plan === 'pro' && !activePlan.isTrial && 'Безлимит · ЭЦП · Шаблоны'}
-                    {activePlan.plan === 'basic' && !activePlan.isTrial && '30 счетов в месяц'}
-                    {activePlan.plan === 'free' && 'Перейдите на платный тариф'}
-                    {activePlan.isTrial && 'Все функции Pro открыты'}
+                    {activePlan.plan === 'pro' && !activePlan.isTrial && t.proFeaturesLabel}
+                    {activePlan.plan === 'basic' && !activePlan.isTrial && t.basicFeaturesLabel}
+                    {activePlan.plan === 'free' && t.freeFeaturesLabel}
+                    {activePlan.isTrial && t.trialFeaturesLabel}
                   </div>
                 </div>
               </div>
@@ -243,7 +245,7 @@ export default function Profile() {
                 {profile?.plan_expires_at && profile?.plan !== 'free' && new Date(profile.plan_expires_at) > new Date() && (
                   <div className="flex justify-between text-xs">
                     <span className="text-gray-400">
-                      {profile.plan === 'pro' ? 'Про тариф' : 'Базовый тариф'} действует до
+                      {t.planActiveUntilLabel(profile.plan === 'pro' ? t.proTariffLabel : t.basicTariffLabel)}
                     </span>
                     <span className="text-[#1C2056] font-medium">
                       {new Date(profile.plan_expires_at).toLocaleDateString('ru-KZ')}
@@ -264,9 +266,9 @@ export default function Profile() {
                   }
                   return (
                     <div className="flex justify-between text-xs">
-                      <span className="text-gray-400">Реферальный бонус Basic (+{bonusDays} дн.)</span>
+                      <span className="text-gray-400">{t.referralBonusLabel(bonusDays)}</span>
                       <span className="text-[#2DC48D] font-medium">
-                        до {bonusEndDate.toLocaleDateString('ru-KZ')}
+                        {t.untilDateLabel(bonusEndDate.toLocaleDateString('ru-KZ'))}
                       </span>
                     </div>
                   )
@@ -278,7 +280,7 @@ export default function Profile() {
                 !(profile?.plan && profile.plan !== 'free' && profile?.plan_expires_at && new Date(profile.plan_expires_at) > new Date()) &&
                 !(profile?.bonus_expires_at && new Date(profile.bonus_expires_at) > new Date()) && (
                   <div className="flex justify-between text-xs">
-                    <span className="text-gray-400">Пробный период до</span>
+                    <span className="text-gray-400">{t.trialUntilLabel}</span>
                     <span className="text-green-600 font-medium">
                       {new Date(profile.trial_expires_at).toLocaleDateString('ru-KZ')}
                     </span>
@@ -296,7 +298,7 @@ export default function Profile() {
           <div className="flex items-center justify-between px-4 py-3.5">
             <div className="flex items-center gap-3">
               <span className="text-lg">{theme === 'dark' ? '🌙' : '☀️'}</span>
-              <span className="text-sm text-gray-800">{theme === 'dark' ? 'Тёмная тема' : 'Светлая тема'}</span>
+              <span className="text-sm text-gray-800">{theme === 'dark' ? t.darkThemeLabel : t.lightThemeLabel}</span>
             </div>
             <button onClick={toggle}
               className={`w-12 h-6 rounded-full transition-colors relative ${theme === 'dark' ? 'bg-[#1C2056]' : 'bg-gray-200'}`}>
@@ -306,7 +308,7 @@ export default function Profile() {
           <div className="flex items-center justify-between px-4 py-3.5 border-t border-gray-100">
             <div className="flex items-center gap-3">
               <span className="text-lg">🌐</span>
-              <span className="text-sm text-gray-800">Язык / Тіл</span>
+              <span className="text-sm text-gray-800">{t.languageSectionLabel}</span>
             </div>
             <div className="flex bg-gray-100 rounded-full p-0.5">
               <button onClick={() => setLang('ru')}
@@ -326,7 +328,7 @@ export default function Profile() {
         </div>
 
         <button onClick={signOut} className="w-full bg-red-50 text-red-500 rounded-xl py-3 text-sm font-medium">
-          Выйти из аккаунта
+          {t.signOutButton}
         </button>
 
       </div>

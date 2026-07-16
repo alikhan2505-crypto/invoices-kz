@@ -3,9 +3,13 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { resizeToFit } from '@/lib/imageResize'
+import { useLanguage } from '@/components/LanguageProvider'
+import { profileCoreDict } from '@/lib/i18n/profileCore'
 
 export default function Signature() {
   const router = useRouter()
+  const { lang } = useLanguage()
+  const t = profileCoreDict[lang]
   const [saving, setSaving] = useState(false)
   const [signatureUrl, setSignatureUrl] = useState<string | null>(null)
   const [stampUrl, setStampUrl] = useState<string | null>(null)
@@ -113,7 +117,7 @@ export default function Signature() {
       const path = `${userId}/signature.png`
       await supabase.storage.from('signatures').remove([path])
       const { error } = await supabase.storage.from('signatures').upload(path, file, { upsert: true })
-      if (error) { alert('Ошибка: ' + error.message); setSaving(false); return }
+      if (error) { alert(t.errorPrefix(error.message)); setSaving(false); return }
       const { data: urlData } = supabase.storage.from('signatures').getPublicUrl(path)
       const url = urlData.publicUrl + '?t=' + Date.now()
       await supabase.from('profiles').update({ signature_url: url }).eq('id', userId)
@@ -369,7 +373,7 @@ export default function Signature() {
       const path = `${userId}/stamp.png`
       await supabase.storage.from('stamps').remove([path])
       const { error } = await supabase.storage.from('stamps').upload(path, file, { upsert: true })
-      if (error) { alert('Ошибка: ' + error.message); setSaving(false); return }
+      if (error) { alert(t.errorPrefix(error.message)); setSaving(false); return }
       const { data: urlData } = supabase.storage.from('stamps').getPublicUrl(path)
       const url = urlData.publicUrl + '?t=' + Date.now()
       await supabase.from('profiles').update({ stamp_url: url }).eq('id', userId)
@@ -403,14 +407,14 @@ export default function Signature() {
       const blob = await (await fetch(resizedDataUrl)).blob()
       const path = `${userId}/logo.png`
       const { error } = await supabase.storage.from('logos').upload(path, blob, { upsert: true, contentType: 'image/png' })
-      if (error) { alert('Ошибка: ' + error.message); setSavingLogo(false); return }
+      if (error) { alert(t.errorPrefix(error.message)); setSavingLogo(false); return }
       const { data: urlData } = supabase.storage.from('logos').getPublicUrl(path)
       const url = urlData.publicUrl + '?t=' + Date.now()
       await supabase.from('profiles').update({ logo_url: url }).eq('id', userId)
       setLogoUrl(url)
       setSavingLogo(false)
     }
-    reader.onerror = () => { alert('Ошибка чтения файла'); setSavingLogo(false) }
+    reader.onerror = () => { alert(t.fileReadErrorAlert); setSavingLogo(false) }
     reader.readAsDataURL(file)
   }
 
@@ -424,34 +428,34 @@ export default function Signature() {
     <main className="min-h-screen bg-gray-50 flex flex-col">
       <div className="sticky top-0 z-10 bg-white border-b px-4 py-4 flex items-center gap-3">
         <button onClick={() => router.push('/profile')} className="back-btn text-gray-400 text-xl">‹</button>
-        <span className="font-semibold text-[#1C2056]">Подпись и печать</span>
+        <span className="font-semibold text-[#1C2056]">{t.signatureHeaderLabel}</span>
       </div>
 
       <div className="max-w-lg mx-auto p-4 space-y-4 w-full">
 
         {/* Подпись */}
         <div>
-          <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">Подпись руководителя</div>
+          <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">{t.signatureSectionLabel}</div>
           <div className="bg-white rounded-2xl shadow-sm p-4">
             {signatureUrl && !showCanvas ? (
               <div>
                 <div className="border rounded-xl p-3 mb-3 bg-gray-50">
-                  <img src={signatureUrl} alt="Подпись" className="h-20 object-contain" />
+                  <img src={signatureUrl} alt={t.signatureAltText} className="h-20 object-contain" />
                 </div>
                 <div className="flex gap-2">
                   <button onClick={() => setShowCanvas(true)}
                     className="flex-1 border border-[#1C2056] text-[#1C2056] rounded-xl py-2.5 text-sm font-medium">
-                    Перерисовать
+                    {t.redrawButton}
                   </button>
                   <button onClick={removeSignature}
                     className="flex-1 border border-red-200 text-red-400 rounded-xl py-2.5 text-sm font-medium">
-                    Удалить
+                    {t.removeButton}
                   </button>
                 </div>
               </div>
             ) : showCanvas ? (
               <div>
-                <p className="text-xs text-gray-400 mb-2">Нарисуйте подпись в поле ниже:</p>
+                <p className="text-xs text-gray-400 mb-2">{t.drawSignatureHint}</p>
                 <canvas
                   ref={canvasRef}
                   width={600}
@@ -469,25 +473,25 @@ export default function Signature() {
                 <div className="flex gap-2 mt-3">
                   <button onClick={clearCanvas}
                     className="flex-1 border border-gray-200 text-gray-500 rounded-xl py-2.5 text-sm">
-                    Очистить
+                    {t.clearButton}
                   </button>
                   <button onClick={() => setShowCanvas(false)}
                     className="flex-1 border border-gray-200 text-gray-500 rounded-xl py-2.5 text-sm">
-                    Отмена
+                    {t.cancelButton}
                   </button>
                   <button onClick={saveSignature} disabled={saving}
                     className="flex-1 bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium">
-                    {saving ? 'Сохраняем...' : 'Сохранить'}
+                    {saving ? t.savingEllipsis : t.saveButton}
                   </button>
                 </div>
               </div>
             ) : (
               <div className="text-center py-4">
                 <div className="text-4xl mb-3">✍️</div>
-                <p className="text-sm text-gray-400 mb-4">Подпись будет добавлена на PDF счёт</p>
+                <p className="text-sm text-gray-400 mb-4">{t.noSignatureHint}</p>
                 <button onClick={() => setShowCanvas(true)}
                   className="bg-[#1C2056] text-white px-6 py-2.5 rounded-xl text-sm font-medium">
-                  Нарисовать подпись
+                  {t.drawSignatureButton}
                 </button>
               </div>
             )}
@@ -496,30 +500,30 @@ export default function Signature() {
 
         {/* Печать */}
         <div>
-          <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">Печать организации</div>
+          <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">{t.stampSectionLabel}</div>
           <div className="bg-white rounded-2xl shadow-sm p-4">
             {stampUrl ? (
               <div>
                 <div className="border rounded-xl p-3 mb-3 bg-gray-50 flex items-center justify-center">
-                  <img src={stampUrl} alt="Печать" className="h-24 w-24 object-contain" />
+                  <img src={stampUrl} alt={t.stampAltText} className="h-24 w-24 object-contain" />
                 </div>
                 <div className="flex gap-2">
                   <label className="flex-1 border border-[#1C2056] text-[#1C2056] rounded-xl py-2.5 text-sm font-medium text-center cursor-pointer">
-                    Заменить
+                    {t.replaceButton}
                     <input type="file" accept="image/*" className="hidden" onChange={openCropModal} />
                   </label>
                   <button onClick={removeStamp}
                     className="flex-1 border border-red-200 text-red-400 rounded-xl py-2.5 text-sm font-medium">
-                    Удалить
+                    {t.removeButton}
                   </button>
                 </div>
               </div>
             ) : (
               <div className="text-center py-4">
                 <div className="text-4xl mb-3">🔵</div>
-                <p className="text-sm text-gray-400 mb-4">Загрузите фото печати — белый фон уберётся автоматически</p>
+                <p className="text-sm text-gray-400 mb-4">{t.noStampHint}</p>
                 <label className="bg-[#1C2056] text-white px-6 py-2.5 rounded-xl text-sm font-medium cursor-pointer">
-                  {saving ? 'Загружаем...' : 'Загрузить фото'}
+                  {saving ? t.uploadingLabel : t.uploadPhotoButton}
                   <input type="file" accept="image/*" className="hidden" onChange={openCropModal} />
                 </label>
               </div>
@@ -529,30 +533,30 @@ export default function Signature() {
 
         {/* Логотип */}
         <div>
-          <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">Логотип компании</div>
+          <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">{t.logoSectionLabel}</div>
           <div className="bg-white rounded-2xl shadow-sm p-4">
             {logoUrl ? (
               <div>
                 <div className="border rounded-xl p-3 mb-3 bg-gray-50 flex items-center justify-center">
-                  <img src={logoUrl} alt="Логотип" className="h-16 object-contain" />
+                  <img src={logoUrl} alt={t.logoAltText} className="h-16 object-contain" />
                 </div>
                 <div className="flex gap-2">
                   <label className="flex-1 border border-[#1C2056] text-[#1C2056] rounded-xl py-2.5 text-sm font-medium text-center cursor-pointer">
-                    Заменить
+                    {t.replaceButton}
                     <input type="file" accept="image/*" className="hidden" onChange={uploadLogo} />
                   </label>
                   <button onClick={removeLogo}
                     className="flex-1 border border-red-200 text-red-400 rounded-xl py-2.5 text-sm font-medium">
-                    Удалить
+                    {t.removeButton}
                   </button>
                 </div>
               </div>
             ) : (
               <div className="text-center py-4">
                 <div className="text-4xl mb-3">🏢</div>
-                <p className="text-sm text-gray-400 mb-4">Логотип появится над шапкой на всех документах</p>
+                <p className="text-sm text-gray-400 mb-4">{t.noLogoHint}</p>
                 <label className="bg-[#1C2056] text-white px-6 py-2.5 rounded-xl text-sm font-medium cursor-pointer">
-                  {savingLogo ? 'Загружаем...' : 'Загрузить логотип'}
+                  {savingLogo ? t.uploadingLabel : t.uploadLogoButton}
                   <input type="file" accept="image/*" className="hidden" onChange={uploadLogo} />
                 </label>
               </div>
@@ -561,10 +565,9 @@ export default function Signature() {
         </div>
 
         <div className="bg-[#1C2056]/5 rounded-2xl p-4">
-          <div className="text-xs text-[#1C2056] font-medium mb-1">💡 Совет</div>
+          <div className="text-xs text-[#1C2056] font-medium mb-1">{t.tipLabel}</div>
           <div className="text-xs text-gray-500 leading-relaxed">
-            Сфотографируйте печать на белом листе — белый фон уберётся автоматически.
-            Перемещайте рамку пальцем, используйте щипок для изменения размера.
+            {t.tipBodyText}
           </div>
         </div>
       </div>
@@ -575,8 +578,8 @@ export default function Signature() {
           <div className="bg-white w-full max-w-lg mx-auto rounded-t-3xl p-5">
             <div className="flex items-center justify-between mb-3">
               <div>
-                <div className="font-semibold text-[#1C2056]">Выберите область печати</div>
-                <div className="text-xs text-gray-400 mt-0.5">Перемещайте рамку · Щипок для размера</div>
+                <div className="font-semibold text-[#1C2056]">{t.cropModalTitle}</div>
+                <div className="text-xs text-gray-400 mt-0.5">{t.cropModalSubtitle}</div>
               </div>
               <button onClick={() => setShowCropModal(false)} className="back-btn text-gray-400 text-xl">✕</button>
             </div>
@@ -600,7 +603,7 @@ export default function Signature() {
             {/* Ползунок размера */}
             <div className="mb-4">
               <div className="flex justify-between text-xs text-gray-400 mb-1">
-                <span>Размер рамки</span>
+                <span>{t.cropSizeLabel}</span>
                 <span>{Math.round(cropSize)}px</span>
               </div>
               <input type="range"
@@ -623,11 +626,11 @@ export default function Signature() {
             <div className="flex gap-2">
               <button onClick={() => setShowCropModal(false)}
                 className="flex-1 border border-gray-200 text-gray-500 rounded-xl py-3 text-sm">
-                Отмена
+                {t.cancelButton}
               </button>
               <button onClick={applyCrop} disabled={saving}
                 className="flex-1 bg-[#2DC48D] text-white rounded-xl py-3 text-sm font-medium">
-                {saving ? 'Сохраняем...' : '✅ Сохранить печать'}
+                {saving ? t.savingEllipsis : t.saveStampButton}
               </button>
             </div>
           </div>
