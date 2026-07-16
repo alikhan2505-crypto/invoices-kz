@@ -1,8 +1,10 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import AppNav from '@/components/AppNav'
+import DesktopShell from '@/components/DesktopShell'
 import { AreaChart, Area, ResponsiveContainer, Tooltip } from 'recharts'
 import { useTheme } from '@/components/ThemeProvider'
 import { useLanguage } from '@/components/LanguageProvider'
@@ -97,18 +99,25 @@ export default function Profile() {
     ...(isAdmin ? [{ icon: '🔐', label: t.adminPanelMenuLabel, href: '/admin' }] : []),
   ]
 
+  const fadeIn = (i: number) => ({
+    initial: { opacity: 0, y: 12 },
+    animate: { opacity: 1, y: 0 },
+    transition: { delay: i * 0.05, duration: 0.4, ease: [0.16, 1, 0.3, 1] as const },
+  })
+
   return (
+    <DesktopShell>
     <main className="min-h-screen bg-gray-50 pb-24 lg:pl-20">
 
-      <div className="sticky top-0 z-30 bg-white border-b px-4 py-3 flex items-center justify-between">
+      <div className="sticky top-0 z-30 bg-white border-b px-4 py-3 flex items-center justify-between lg:h-16">
         <span className="font-bold text-[#1C2056]">INVOICES.KZ</span>
         <span className="text-sm text-gray-500">{profile?.company_name || ''}</span>
       </div>
 
-      <div className="max-w-lg mx-auto p-4 space-y-4">
+      <div className="max-w-lg lg:max-w-5xl mx-auto p-4 space-y-4 lg:space-y-0 lg:grid lg:grid-cols-[360px_1fr] lg:gap-6 lg:items-start">
 
         {/* Profile card */}
-        <div className="bg-white rounded-2xl shadow-sm p-5">
+        <motion.div {...fadeIn(0)} className="bg-white rounded-2xl shadow-sm p-5 lg:col-start-1 lg:row-start-1">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-12 h-12 rounded-full bg-[#1C2056] flex items-center justify-center text-white font-bold text-base flex-shrink-0">
               {initials}
@@ -149,15 +158,15 @@ export default function Profile() {
               </>
             )}
           </div>
-        </div>
+        </motion.div>
 
         {/* Компания */}
-        <div>
+        <motion.div {...fadeIn(1)} className="lg:col-start-2 lg:row-start-1">
           <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">{t.companySectionLabel}</div>
           <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
             {[
               { icon: '🏢', label: t.requisitesMenuLabel, href: '/profile/requisites' },
-              { icon: '✍️', label: t.signatureMenuLabel, href: '/profile/signature' },
+              { icon: '🎨', label: t.signatureMenuLabel, href: '/profile/signature' },
               { icon: '💳', label: t.banksMenuLabel, href: '/profile/banks' },
               { icon: '🔒', label: t.securityMenuLabel, href: '/profile/security' },
               { icon: '🔗', label: t.connectorsMenuLabel, href: '/profile/connectors' },
@@ -172,10 +181,10 @@ export default function Profile() {
               </div>
             ))}
           </div>
-        </div>
+        </motion.div>
 
         {/* Справочники */}
-        <div>
+        <motion.div {...fadeIn(2)} className="lg:col-start-2 lg:row-start-2">
           <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">{t.directoriesSectionLabel}</div>
           <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
             {[
@@ -197,10 +206,10 @@ export default function Profile() {
               </div>
             ))}
           </div>
-        </div>
+        </motion.div>
 
         {/* Настройки */}
-        <div>
+        <motion.div {...fadeIn(3)} className="lg:col-start-2 lg:row-start-3">
           <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">{t.settingsSectionLabel}</div>
           <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
             {settingsItems.map((item, i, arr) => (
@@ -214,10 +223,10 @@ export default function Profile() {
               </div>
             ))}
           </div>
-        </div>
+        </motion.div>
 
         {/* Подписка */}
-        <div>
+        <motion.div {...fadeIn(4)} className="lg:col-start-1 lg:row-start-2">
           <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">{t.subscriptionSectionLabel}</div>
           <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
             <div className="px-4 py-4 flex items-center justify-between cursor-pointer" onClick={() => router.push('/upgrade')}>
@@ -291,10 +300,10 @@ export default function Profile() {
             )}
 
           </div>
-        </div>
+        </motion.div>
 
         {/* Theme toggle */}
-        <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
+        <motion.div {...fadeIn(5)} className="bg-white rounded-2xl overflow-hidden shadow-sm lg:col-start-1 lg:row-start-3">
           <div className="flex items-center justify-between px-4 py-3.5">
             <div className="flex items-center gap-3">
               <span className="text-lg">{theme === 'dark' ? '🌙' : '☀️'}</span>
@@ -325,15 +334,16 @@ export default function Profile() {
               </button>
             </div>
           </div>
-        </div>
+        </motion.div>
 
-        <button onClick={signOut} className="w-full bg-red-50 text-red-500 rounded-xl py-3 text-sm font-medium">
+        <motion.button {...fadeIn(6)} onClick={signOut} className="w-full bg-red-50 text-red-500 rounded-xl py-3 text-sm font-medium lg:col-start-1 lg:row-start-4">
           {t.signOutButton}
-        </button>
+        </motion.button>
 
       </div>
 
       <AppNav />
     </main>
+    </DesktopShell>
   )
 }

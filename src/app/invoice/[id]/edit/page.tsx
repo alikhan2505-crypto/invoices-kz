@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useLanguage } from '@/components/LanguageProvider'
 import { invoiceFlowDict } from '@/lib/i18n/invoiceFlow'
 import AppNav from '@/components/AppNav'
+import DesktopShell from '@/components/DesktopShell'
 
 const UNIT_OPTIONS = ['шт', 'кг', 'л', 'м', 'м²', 'м³', 'час', 'день', 'месяц', 'услуга', 'работа']
 
@@ -136,8 +137,9 @@ export default function EditInvoice() {
   )
 
   return (
+    <DesktopShell>
     <main className="min-h-screen bg-gray-50 pb-8 lg:pl-20">
-      <div className="sticky top-0 z-10 bg-white border-b px-4 py-4 flex items-center gap-3">
+      <div className="sticky top-0 z-10 bg-white border-b px-4 py-4 flex items-center gap-3 lg:h-16">
         <button onClick={() => router.push('/invoice/' + id)} className="back-btn text-gray-400 text-xl">‹</button>
         <span className="font-semibold text-[#1C2056]">{t.editInvoiceHeaderTitle}</span>
       </div>
@@ -312,5 +314,6 @@ export default function EditInvoice() {
 
       <AppNav desktopOnly />
     </main>
+    </DesktopShell>
   )
 }

@@ -5,6 +5,7 @@ import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { generateInvoicePDF } from '@/lib/generatePDF'
 import AppNav from '@/components/AppNav'
+import DesktopShell from '@/components/DesktopShell'
 import InvoiceLivePreview from '@/components/InvoiceLivePreview'
 import { cacheGet, cacheSet } from '@/lib/cache'
 import { getActivePlan } from '@/lib/plan'
@@ -383,8 +384,9 @@ export default function Dashboard() {
   }
 
   return (
+    <DesktopShell>
     <main className="min-h-screen bg-gray-50 pb-24 lg:pl-20">
-      <div className="sticky top-0 z-30 bg-white border-b px-4 py-3 flex items-center justify-between">
+      <div className="sticky top-0 z-30 bg-white border-b px-4 py-3 flex items-center justify-between lg:h-16">
         <span className="font-bold text-[#1C2056]">INVOICES.KZ</span>
         <span className="text-sm text-gray-500">{profile?.company_name || ''}</span>
       </div>
@@ -705,7 +707,7 @@ export default function Dashboard() {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ ease: [0.16, 1, 0.3, 1], duration: 0.4 }}
-          className="hidden lg:block lg:w-[380px] lg:sticky lg:top-6"
+          className="hidden lg:block lg:w-[380px] lg:sticky lg:top-[88px]"
         >
           <InvoiceLivePreview
             invoiceNumber={(profile?.invoice_prefix || 'INV-') + (profile?.invoice_next_number || '0001')}
@@ -803,5 +805,6 @@ export default function Dashboard() {
 
       <AppNav />
     </main>
+    </DesktopShell>
   )
 }

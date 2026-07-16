@@ -12,6 +12,7 @@ import { getActivePlan } from '@/lib/plan'
 import { useLanguage } from '@/components/LanguageProvider'
 import { invoiceFlowDict } from '@/lib/i18n/invoiceFlow'
 import AppNav from '@/components/AppNav'
+import DesktopShell from '@/components/DesktopShell'
 import InvoiceLivePreview from '@/components/InvoiceLivePreview'
 
 const statusIcon: Record<string, string> = {
@@ -350,8 +351,9 @@ export default function InvoicePage() {
   }
 
   return (
+    <DesktopShell>
     <main className="min-h-screen bg-gray-50 pb-8 lg:pl-20">
-      <div className="sticky top-0 z-30 bg-white border-b px-4 py-4 flex items-center gap-3">
+      <div className="sticky top-0 z-30 bg-white border-b px-4 py-4 flex items-center gap-3 lg:h-16">
         <button onClick={() => router.push('/history')} className="back-btn text-gray-400 text-xl">‹</button>
         <span className="font-semibold text-[#1C2056]">{t.invoiceHeaderTitle(invoice.number)}</span>
       </div>
@@ -702,7 +704,7 @@ export default function InvoicePage() {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ ease: [0.16, 1, 0.3, 1], duration: 0.4 }}
-        className="hidden lg:block lg:w-[380px] lg:sticky lg:top-6"
+        className="hidden lg:block lg:w-[380px] lg:sticky lg:top-[88px]"
       >
         <InvoiceLivePreview
           invoiceNumber={invoice.number}
@@ -807,5 +809,6 @@ export default function InvoicePage() {
 
       <AppNav desktopOnly />
     </main>
+    </DesktopShell>
   )
 }

@@ -1,8 +1,10 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import AppNav from '@/components/AppNav'
+import DesktopShell from '@/components/DesktopShell'
 import * as XLSX from 'xlsx'
 import { formatDateTime, formatDate } from '@/lib/date'
 import { useLanguage } from '@/components/LanguageProvider'
@@ -144,8 +146,9 @@ export default function History() {
     .reduce((sum, i) => sum + Number(i.amount), 0)
 
   return (
+    <DesktopShell>
     <main className="min-h-screen bg-gray-50 pb-24 lg:pl-20">
-      <div className="sticky top-0 z-30 bg-white border-b px-4 py-3 flex items-center justify-between">
+      <div className="sticky top-0 z-30 bg-white border-b px-4 py-3 flex items-center justify-between lg:h-16">
         <span className="font-bold text-[#1C2056]">INVOICES.KZ</span>
         <div className="flex gap-2">
           <button onClick={markOverdue}
@@ -159,7 +162,7 @@ export default function History() {
         </div>
       </div>
 
-      <div className="max-w-lg mx-auto p-4">
+      <div className="max-w-lg lg:max-w-5xl mx-auto p-4">
         {/* Search */}
         <div className="bg-white rounded-xl px-3 py-2.5 flex items-center gap-2 shadow-sm mb-3">
           <span className="text-gray-400">🔍</span>
@@ -232,10 +235,13 @@ export default function History() {
             </button>
           </div>
         ) : (
-          <div className="bg-white rounded-2xl shadow-sm overflow-hidden mb-4">
+          <div className="bg-white rounded-2xl shadow-sm overflow-hidden mb-4 lg:bg-transparent lg:shadow-none lg:rounded-none lg:overflow-visible lg:grid lg:grid-cols-2 lg:gap-3">
             {filtered.map((inv, i) => (
-              <div key={inv.id}
-                className={`flex items-center p-4 hover:bg-gray-50 ${i < filtered.length - 1 ? 'border-b border-gray-100' : ''}`}>
+              <motion.div key={inv.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: Math.min(i * 0.04, 0.4), duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                className={`flex items-center p-4 hover:bg-gray-50 ${i < filtered.length - 1 ? 'border-b border-gray-100' : ''} lg:border-b-0 lg:rounded-xl lg:bg-white lg:shadow-sm lg:hover:shadow-md lg:hover:-translate-y-0.5 lg:transition-all`}>
                 <div className="flex-1 flex items-start justify-between cursor-pointer"
                   onClick={() => router.push('/invoice/' + inv.id)}>
                   <div>
@@ -266,7 +272,7 @@ export default function History() {
                   className="text-gray-300 hover:text-red-400 text-lg p-1 flex-shrink-0">
                   ✕
                 </button>
-              </div>
+              </motion.div>
             ))}
           </div>
         )}
@@ -278,5 +284,6 @@ export default function History() {
       </div>
       <AppNav />
     </main>
+    </DesktopShell>
   )
 }
