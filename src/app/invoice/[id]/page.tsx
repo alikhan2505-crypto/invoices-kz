@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { generateInvoicePDF } from '@/lib/generatePDF'
 import { formatDateTime, formatDate } from '@/lib/date'
@@ -11,6 +12,7 @@ import { getActivePlan } from '@/lib/plan'
 import { useLanguage } from '@/components/LanguageProvider'
 import { invoiceFlowDict } from '@/lib/i18n/invoiceFlow'
 import AppNav from '@/components/AppNav'
+import InvoiceLivePreview from '@/components/InvoiceLivePreview'
 
 const statusIcon: Record<string, string> = {
   paid: '✅', sent: '📤', overdue: '⏰', draft: '📝', viewed: '👁'
@@ -355,6 +357,8 @@ export default function InvoicePage() {
       </div>
 
       <div className="max-w-lg mx-auto p-4 space-y-4">
+      <div className="lg:flex lg:gap-6 lg:items-start">
+      <div className="lg:flex-1 lg:min-w-0 space-y-4">
 
         <div className="bg-white rounded-2xl shadow-sm p-5 text-center">
           <div className="text-3xl font-bold text-[#1C2056] mb-1">
@@ -692,6 +696,28 @@ export default function InvoicePage() {
             {t.cancelInvoiceButtonLabel}
           </button>
         </div>
+      </div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ ease: [0.16, 1, 0.3, 1], duration: 0.4 }}
+        className="hidden lg:block lg:w-[380px] lg:sticky lg:top-6"
+      >
+        <InvoiceLivePreview
+          invoiceNumber={invoice.number}
+          date={formatDate(invoice.created_at)}
+          companyName={profile?.company_name || ''}
+          companyBin={profile?.bin_iin || ''}
+          clientName={invoice.client_name || ''}
+          clientBin={invoice.client_bin || ''}
+          services={invoice.services || []}
+          note={invoice.note || ''}
+          vatType={profile?.vat_type || 'no_vat'}
+          total={Number(invoice.amount)}
+        />
+      </motion.div>
+      </div>
       </div>
 
       {/* Модал апгрейда */}
