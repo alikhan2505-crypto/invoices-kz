@@ -1,19 +1,23 @@
 'use client'
 import { useRouter } from 'next/navigation'
+import { useLanguage } from '@/components/LanguageProvider'
+import { profileContentDict } from '@/lib/i18n/profileContent'
 
 export default function Support() {
   const router = useRouter()
+  const { lang } = useLanguage()
+  const t = profileContentDict[lang]
 
   return (
     <main className="min-h-screen bg-gray-50">
       <div className="bg-white border-b px-4 py-4 flex items-center gap-3">
         <button onClick={() => router.push('/profile')} className="back-btn text-gray-400 text-xl">‹</button>
-        <span className="font-semibold text-[#1C2056]">Поддержка</span>
+        <span className="font-semibold text-[#1C2056]">{t.supportHeaderLabel}</span>
       </div>
 
       <div className="max-w-lg mx-auto p-4">
         <p className="text-sm text-gray-400 mb-4">
-          Служба поддержки работает ежедневно с 09:00 до 20:00 (Астанинское время).
+          {t.supportHoursText}
         </p>
 
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden mb-4">
@@ -23,8 +27,8 @@ export default function Support() {
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-xl">✈️</div>
               <div>
-                <div className="text-sm font-medium text-[#1C2056]">Написать в Telegram</div>
-                <div className="text-xs text-[#2DC48D]">Отвечаем в течение 24 часов</div>
+                <div className="text-sm font-medium text-[#1C2056]">{t.telegramContactLabel}</div>
+                <div className="text-xs text-[#2DC48D]">{t.telegramResponseTimeLabel}</div>
               </div>
             </div>
             <span className="text-gray-300">›</span>
@@ -35,8 +39,8 @@ export default function Support() {
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-purple-50 flex items-center justify-center text-xl">✉️</div>
               <div>
-                <div className="text-sm font-medium text-[#1C2056]">Email</div>
-                <div className="text-xs text-gray-400">support@invoices.kz · ответ в течение 14 дней</div>
+                <div className="text-sm font-medium text-[#1C2056]">{t.emailContactLabel}</div>
+                <div className="text-xs text-gray-400">{t.emailResponseTimeLabel}</div>
               </div>
             </div>
             <span className="text-gray-300">›</span>
@@ -45,16 +49,8 @@ export default function Support() {
 
         {/* FAQ */}
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-          <div className="px-4 pt-4 pb-2 text-xs text-gray-400 uppercase tracking-wide">Частые вопросы</div>
-          {[
-            { q: 'Как создать счёт?', a: 'Нажмите «+» на главной странице, заполните данные клиента и услуги, нажмите «Создать и скачать PDF».' },
-            { q: 'Как отправить счёт клиенту?', a: 'Откройте счёт в Истории и нажмите кнопку «WhatsApp» или «Email» — клиент получит ссылку на счёт.' },
-            { q: 'Как скачать PDF?', a: 'На странице счёта нажмите кнопку «PDF» и выберите вариант с подписью или без.' },
-            { q: 'Как изменить реквизиты?', a: 'Профиль → Реквизиты → заполните данные компании и нажмите «Сохранить».' },
-            { q: 'Что входит в пробный период?', a: '7 дней бесплатного доступа ко всем функциям Pro тарифа без ограничений.' },
-            { q: 'Как продлить подписку?', a: 'Профиль → Подписка → выберите тариф и следуйте инструкциям оплаты.' },
-            { q: 'Принимают ли банки такие счета?', a: 'Да. PDF документ соответствует стандартам РК — содержит БИН, ИИК, БИК, КБе и все необходимые реквизиты.' },
-          ].map((item, i, arr) => (
+          <div className="px-4 pt-4 pb-2 text-xs text-gray-400 uppercase tracking-wide">{t.faqHeaderLabel}</div>
+          {t.faqItems.map((item, i, arr) => (
             <details key={i} className={`group px-4 ${i < arr.length - 1 ? 'border-b border-gray-100' : ''}`}>
               <summary className="py-3.5 text-sm font-medium text-[#1C2056] cursor-pointer list-none flex items-center justify-between">
                 {item.q}

@@ -2,11 +2,15 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { useLanguage } from '@/components/LanguageProvider'
+import { profileContentDict } from '@/lib/i18n/profileContent'
 
 const UNIT_OPTIONS = ['шт', 'кг', 'л', 'м', 'м²', 'м³', 'час', 'день', 'месяц', 'услуга', 'работа']
 
 export default function Services() {
   const router = useRouter()
+  const { lang } = useLanguage()
+  const t = profileContentDict[lang]
   const [services, setServices] = useState<any[]>([])
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
@@ -46,7 +50,7 @@ export default function Services() {
   }
 
   async function saveService() {
-    if (!form.name || !form.price) { alert('Заполните название и цену'); return }
+    if (!form.name || !form.price) { alert(t.fillNameAndPriceAlert); return }
     setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
@@ -61,10 +65,10 @@ export default function Services() {
 
     if (editingId) {
       const { error } = await supabase.from('services').update(payload).eq('id', editingId)
-      if (error) { alert('Ошибка: ' + error.message); setSaving(false); return }
+      if (error) { alert(t.errorPrefix(error.message)); setSaving(false); return }
     } else {
       const { error } = await supabase.from('services').insert({ ...payload, user_id: user.id })
-      if (error) { alert('Ошибка: ' + error.message); setSaving(false); return }
+      if (error) { alert(t.errorPrefix(error.message)); setSaving(false); return }
     }
 
     resetForm()
@@ -73,7 +77,7 @@ export default function Services() {
   }
 
   async function deleteService(id: string) {
-    if (!confirm('Удалить позицию?')) return
+    if (!confirm(t.deleteItemConfirm)) return
     await supabase.from('services').delete().eq('id', id)
     setServices(prev => prev.filter(s => s.id !== id))
   }
@@ -91,12 +95,12 @@ export default function Services() {
       <div className="bg-white border-b px-4 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button onClick={() => router.push('/profile')} className="back-btn text-gray-400 text-xl">‹</button>
-          <span className="font-semibold text-[#1C2056]">Услуги и товары</span>
+          <span className="font-semibold text-[#1C2056]">{t.servicesHeaderLabel}</span>
         </div>
         {!showForm && (
           <button onClick={() => setShowForm(true)}
             className="text-xs bg-[#1C2056] text-white px-3 py-1.5 rounded-lg">
-            + Добавить
+            {t.openAddFormButton}
           </button>
         )}
       </div>
@@ -107,7 +111,7 @@ export default function Services() {
           <span className="text-gray-400">🔍</span>
           <input
             className="flex-1 text-sm outline-none"
-            placeholder="Поиск по названию или коду..."
+            placeholder={t.searchServicesPlaceholder}
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
@@ -120,7 +124,7 @@ export default function Services() {
         {showForm && (
           <div className="bg-white rounded-2xl shadow-sm p-5 mb-4 space-y-3">
             <div className="font-medium text-[#1C2056] mb-2">
-              {editingId ? 'Редактировать позицию' : 'Новая позиция'}
+              {editingId ? t.editItemHeading : t.newItemHeading}
             </div>
 
             {/* Тип */}
@@ -128,20 +132,20 @@ export default function Services() {
               <button type="button"
                 onClick={() => setForm({ ...form, type: 'service' })}
                 className={`flex-1 px-3 py-2 text-xs rounded-lg font-medium transition ${form.type === 'service' ? 'bg-[#1C2056] text-white' : 'bg-gray-100 text-gray-500'}`}>
-                📋 Услуга
+                {t.serviceTypeToggleLabel}
               </button>
               <button type="button"
                 onClick={() => setForm({ ...form, type: 'product' })}
                 className={`flex-1 px-3 py-2 text-xs rounded-lg font-medium transition ${form.type === 'product' ? 'bg-[#2DC48D] text-white' : 'bg-gray-100 text-gray-500'}`}>
-                📦 Товар
+                {t.productTypeToggleLabel}
               </button>
             </div>
 
             <div>
-              <label className="text-xs text-gray-500 mb-1 block">Название *</label>
+              <label className="text-xs text-gray-500 mb-1 block">{t.itemNameFieldLabel}</label>
               <input
                 className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-[#1C2056]"
-                placeholder={form.type === 'service' ? 'Услуги дизайна' : 'Кирпич силикатный'}
+                placeholder={form.type === 'service' ? t.serviceNamePlaceholder : t.productNamePlaceholder}
                 value={form.name}
                 onChange={e => setForm({ ...form, name: e.target.value })}
               />
@@ -149,31 +153,31 @@ export default function Services() {
 
             <div className="grid grid-cols-3 gap-3">
               <div>
-                <label className="text-xs text-gray-500 mb-1 block">Код</label>
+                <label className="text-xs text-gray-500 mb-1 block">{t.itemCodeFieldLabel}</label>
                 <input
                   className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-[#1C2056]"
-                  placeholder="001"
+                  placeholder={t.itemCodePlaceholder}
                   value={form.code}
                   onChange={e => setForm({ ...form, code: e.target.value })}
                 />
               </div>
               <div>
-                <label className="text-xs text-gray-500 mb-1 block">Цена ₸ *</label>
+                <label className="text-xs text-gray-500 mb-1 block">{t.itemPriceFieldLabel}</label>
                 <input
                   type="number"
                   className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-[#1C2056]"
-                  placeholder="15000"
+                  placeholder={t.itemPricePlaceholder}
                   value={form.price}
                   onChange={e => setForm({ ...form, price: e.target.value })}
                 />
               </div>
               <div>
-                <label className="text-xs text-gray-500 mb-1 block">Единица</label>
+                <label className="text-xs text-gray-500 mb-1 block">{t.itemUnitFieldLabel}</label>
                 <select
                   className="w-full border-b border-gray-200 py-2 text-sm outline-none bg-white"
                   value={form.unit}
                   onChange={e => setForm({ ...form, unit: e.target.value })}>
-                  {UNIT_OPTIONS.map(u => <option key={u}>{u}</option>)}
+                  {UNIT_OPTIONS.map(u => <option key={u} value={u}>{t.unitLabel(u)}</option>)}
                 </select>
               </div>
             </div>
@@ -181,11 +185,11 @@ export default function Services() {
             <div className="flex gap-2 pt-2">
               <button onClick={resetForm}
                 className="flex-1 border border-gray-200 rounded-xl py-3 text-sm text-gray-500">
-                Отмена
+                {t.cancelButton}
               </button>
               <button onClick={saveService} disabled={saving}
                 className="flex-1 bg-[#1C2056] text-white rounded-xl py-3 text-sm font-medium">
-                {saving ? 'Сохраняем...' : editingId ? 'Сохранить' : 'Добавить'}
+                {t.formSubmitLabel(saving, !!editingId)}
               </button>
             </div>
           </div>
@@ -194,12 +198,12 @@ export default function Services() {
         {loading ? (
           <div className="text-center py-8">
             <div className="w-6 h-6 border-2 border-[#1C2056] border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-            <p className="text-gray-400 text-sm">Загрузка...</p>
+            <p className="text-gray-400 text-sm">{t.servicesLoadingLabel}</p>
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-12">
             <div className="text-4xl mb-3">📋</div>
-            <p className="text-gray-400 text-sm">{search ? 'Не найдено' : 'Нет позиций'}</p>
+            <p className="text-gray-400 text-sm">{t.itemsEmptyStateLabel(!!search)}</p>
           </div>
         ) : (
           <>
@@ -207,7 +211,7 @@ export default function Services() {
             {servicesList.length > 0 && (
               <div className="mb-4">
                 <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">
-                  📋 Услуги ({servicesList.length})
+                  {t.servicesSectionLabel(servicesList.length)}
                 </div>
                 <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
                   {servicesList.map((svc, i) => (
@@ -218,7 +222,7 @@ export default function Services() {
                           <span className="font-medium text-sm text-[#1C2056]">{svc.name}</span>
                           {svc.code && <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{svc.code}</span>}
                         </div>
-                        <div className="text-xs text-gray-400 mt-0.5">{svc.unit}</div>
+                        <div className="text-xs text-gray-400 mt-0.5">{t.unitLabel(svc.unit)}</div>
                       </div>
                       <div className="flex items-center gap-3">
                         <span className="text-sm font-medium text-[#1C2056]">
@@ -237,7 +241,7 @@ export default function Services() {
             {productsList.length > 0 && (
               <div className="mb-4">
                 <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">
-                  📦 Товары ({productsList.length})
+                  {t.productsSectionLabel(productsList.length)}
                 </div>
                 <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
                   {productsList.map((svc, i) => (
@@ -248,7 +252,7 @@ export default function Services() {
                           <span className="font-medium text-sm text-[#1C2056]">{svc.name}</span>
                           {svc.code && <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{svc.code}</span>}
                         </div>
-                        <div className="text-xs text-gray-400 mt-0.5">{svc.unit}</div>
+                        <div className="text-xs text-gray-400 mt-0.5">{t.unitLabel(svc.unit)}</div>
                       </div>
                       <div className="flex items-center gap-3">
                         <span className="text-sm font-medium text-[#1C2056]">
@@ -268,7 +272,7 @@ export default function Services() {
         {!showForm && services.length > 0 && (
           <button onClick={() => setShowForm(true)}
             className="w-full bg-[#1C2056] text-white rounded-xl py-4 font-medium text-sm">
-            + Добавить позицию
+            {t.addItemButton}
           </button>
         )}
       </div>
