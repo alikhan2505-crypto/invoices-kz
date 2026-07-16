@@ -1,11 +1,14 @@
 'use client'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { generateInvoicePDF } from '@/lib/generatePDF'
 import AppNav from '@/components/AppNav'
+import InvoiceLivePreview from '@/components/InvoiceLivePreview'
 import { cacheGet, cacheSet } from '@/lib/cache'
 import { getActivePlan } from '@/lib/plan'
+import { formatDate } from '@/lib/date'
 import { useLanguage } from '@/components/LanguageProvider'
 import { invoiceFlowDict } from '@/lib/i18n/invoiceFlow'
 
@@ -469,229 +472,253 @@ export default function Dashboard() {
           </div>
         )}
 
-        {clients.length > 0 && !clientSelected && (
-          <div className="mb-3">
-            <p className="text-xs text-gray-400 mb-2">{t.quickClientPickLabel}</p>
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              {clients.slice(0, 6).map(c => (
-                <button key={c.id} onClick={() => selectClient(c)}
-                  className="whitespace-nowrap text-xs bg-white border border-gray-200 text-[#1C2056] px-3 py-2 rounded-full hover:bg-[#1C2056] hover:text-white transition flex-shrink-0 shadow-sm">
-                  {c.name}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ ease: [0.16, 1, 0.3, 1], duration: 0.4 }}
+          className="lg:flex lg:gap-6 lg:items-start"
+        >
+        <div className="lg:flex-1 lg:min-w-0">
+          {clients.length > 0 && !clientSelected && (
+            <div className="mb-3">
+              <p className="text-xs text-gray-400 mb-2">{t.quickClientPickLabel}</p>
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {clients.slice(0, 6).map(c => (
+                  <button key={c.id} onClick={() => selectClient(c)}
+                    className="whitespace-nowrap text-xs bg-white border border-gray-200 text-[#1C2056] px-3 py-2 rounded-full hover:bg-[#1C2056] hover:text-white transition flex-shrink-0 shadow-sm">
+                    {c.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Client section */}
+          <div className="bg-white rounded-2xl p-5 mb-4 shadow-sm">
+            <h3 className="font-medium text-[#1C2056] mb-3">{t.clientDataHeader}</h3>
+            {clientSelected ? (
+              <div className="space-y-3">
+                <div className="bg-gray-50 rounded-xl p-3 flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-medium text-[#1C2056]">{clientName}</div>
+                    <div className="text-xs text-gray-400 mt-0.5">{t.binLabel(clientBin)}</div>
+                    {clientEmail && <div className="text-xs text-gray-400">{clientEmail}</div>}
+                  </div>
+                  <button onClick={clearClient} className="text-gray-300 hover:text-red-400 text-xl">✕</button>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">{t.knpLabel}</label>
+                  <select className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056] bg-white"
+                    value={clientKnp} onChange={e => setClientKnp(e.target.value)}>
+                    {KNP_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">{t.buyerPhoneLabel}</label>
+                  <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                    placeholder={t.buyerPhonePlaceholderDashboard} value={clientPhone} type="tel" maxLength={16}
+                    onChange={e => setClientPhone(formatPhone(e.target.value))} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">{t.contractNumberLabelDashboard}</label>
+                    <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                      placeholder={t.contractNumberPlaceholderDashboard} value={contractNumber} onChange={e => setContractNumber(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">{t.contractDateLabel}</label>
+                    <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                      placeholder={t.contractDatePlaceholder} value={contractDate} onChange={e => setContractDate(e.target.value)} />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">{t.companyNameLabel}</label>
+                  <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                    placeholder={t.companyNamePlaceholder} value={clientName} onChange={e => setClientName(e.target.value)} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">{t.binIinLabel}</label>
+                    <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                      placeholder={t.binIinPlaceholder} value={clientBin}
+                      onChange={async e => {
+                        const bin = e.target.value
+                        setClientBin(bin)
+                        if (bin.length === 12) {
+                          const found = clients.find(c => c.bin_iin === bin)
+                          if (found) {
+                            setClientName(found.name)
+                            setClientEmail(found.email || '')
+                            setClientAddress(found.address || '')
+                            setClientPhone(found.phone || '')
+                          }
+                        }
+                      }} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">{t.emailLabel}</label>
+                    <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                      placeholder={t.emailPlaceholder} value={clientEmail} onChange={e => setClientEmail(e.target.value)} />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">{t.addressLabelDashboard}</label>
+                  <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                    placeholder={t.addressPlaceholder} value={clientAddress} onChange={e => setClientAddress(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">{t.buyerPhoneLabel}</label>
+                  <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                    placeholder={t.buyerPhonePlaceholderDashboard} value={clientPhone} type="tel" maxLength={16}
+                    onChange={e => setClientPhone(formatPhone(e.target.value))} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">{t.contractNumberLabelDashboard}</label>
+                    <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                      placeholder={t.contractNumberPlaceholderDashboard} value={contractNumber} onChange={e => setContractNumber(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">{t.contractDateLabel}</label>
+                    <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                      placeholder={t.contractDatePlaceholder} value={contractDate} onChange={e => setContractDate(e.target.value)} />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">{t.knpLabel}</label>
+                  <select className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056] bg-white"
+                    value={clientKnp} onChange={e => setClientKnp(e.target.value)}>
+                    {KNP_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                  </select>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Services section */}
+          <div className="bg-white rounded-2xl p-5 mb-4 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-medium text-[#1C2056]">{t.servicesHeader}</h3>
+              <div className="flex gap-2">
+                {savedServices.length > 0 && (
+                  <button onClick={() => setShowServicePicker(true)}
+                    className="text-xs text-[#1C2056] border border-[#1C2056] rounded-lg px-3 py-1">
+                    {t.fromDirectoryButton}
+                  </button>
+                )}
+                <button onClick={addService} className="text-xs bg-[#1C2056] text-white rounded-lg px-3 py-1">
+                  {t.addButton}
                 </button>
+              </div>
+            </div>
+            <div className="space-y-4" id="services-list">
+              {services.map((svc, idx) => (
+                <div key={idx} className="border border-gray-100 rounded-xl p-3 space-y-2">
+                  <div className="flex gap-2 mb-2">
+                    <button type="button" onClick={() => updateService(idx, 'type', 'service')}
+                      className={`flex-1 px-3 py-1.5 text-xs rounded-lg font-medium transition ${(svc.type || 'service') === 'service' ? 'bg-[#1C2056] text-white' : 'bg-gray-100 text-gray-500'}`}>
+                      {t.serviceToggleLabel}
+                    </button>
+                    <button type="button" onClick={() => updateService(idx, 'type', 'product')}
+                      className={`flex-1 px-3 py-1.5 text-xs rounded-lg font-medium transition ${svc.type === 'product' ? 'bg-[#2DC48D] text-white' : 'bg-gray-100 text-gray-500'}`}>
+                      {t.productToggleLabel}
+                    </button>
+                  </div>
+                  <div className="flex gap-2 items-start">
+                    <input className="flex-1 border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                      placeholder={t.serviceNamePlaceholder} value={svc.name}
+                      onChange={e => updateService(idx, 'name', e.target.value)} />
+                    {services.length > 1 && (
+                      <button onClick={() => removeService(idx)} className="text-gray-300 hover:text-red-400 text-xl mt-1">×</button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-4 gap-2">
+                    <div>
+                      <label className="text-xs text-gray-400 mb-1 block">{t.codeLabel}</label>
+                      <input className="w-full border rounded-lg px-2 py-2 text-sm outline-none focus:border-[#1C2056]"
+                        placeholder={t.codePlaceholder} value={svc.code || ''}
+                        onChange={e => updateService(idx, 'code', e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 mb-1 block">{t.qtyLabel}</label>
+                      <input className="w-full border rounded-lg px-2 py-2 text-sm outline-none focus:border-[#1C2056]"
+                        type="number" placeholder={t.qtyPlaceholder} value={svc.qty || ''}
+                        onChange={e => updateService(idx, 'qty', Number(e.target.value))} />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 mb-1 block">{t.unitLabel}</label>
+                      <select className="w-full border rounded-lg px-2 py-2 text-sm outline-none focus:border-[#1C2056] bg-white"
+                        value={svc.unit || 'шт'} onChange={e => updateService(idx, 'unit', e.target.value)}>
+                        {UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 mb-1 block">{t.priceLabel}</label>
+                      <input className="w-full border rounded-lg px-2 py-2 text-sm outline-none focus:border-[#1C2056]"
+                        type="number" placeholder={t.pricePlaceholder} value={svc.price || ''}
+                        onChange={e => updateService(idx, 'price', Number(e.target.value))} />
+                    </div>
+                  </div>
+                  {svc.name && svc.price > 0 && (
+                    <div className="text-xs text-gray-400 text-right">
+                      {t.perLineTotal((svc.qty * svc.price).toLocaleString('ru-KZ'))}
+                    </div>
+                  )}
+                </div>
               ))}
             </div>
           </div>
-        )}
 
-        {/* Client section */}
-        <div className="bg-white rounded-2xl p-5 mb-4 shadow-sm">
-          <h3 className="font-medium text-[#1C2056] mb-3">{t.clientDataHeader}</h3>
-          {clientSelected ? (
-            <div className="space-y-3">
-              <div className="bg-gray-50 rounded-xl p-3 flex items-center justify-between">
-                <div>
-                  <div className="text-sm font-medium text-[#1C2056]">{clientName}</div>
-                  <div className="text-xs text-gray-400 mt-0.5">{t.binLabel(clientBin)}</div>
-                  {clientEmail && <div className="text-xs text-gray-400">{clientEmail}</div>}
+          {/* Total */}
+          <div className="bg-[#1C2056] rounded-2xl p-5 mb-4">
+            {vatType === 'vat_16' ? (
+              <>
+                <div className="flex justify-between text-sm text-white/70 mb-2">
+                  <span>{t.amountWithoutVatLabel}</span><span>{totalWithoutVat.toLocaleString('ru-KZ')} ₸</span>
                 </div>
-                <button onClick={clearClient} className="text-gray-300 hover:text-red-400 text-xl">✕</button>
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">{t.knpLabel}</label>
-                <select className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056] bg-white"
-                  value={clientKnp} onChange={e => setClientKnp(e.target.value)}>
-                  {KNP_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">{t.buyerPhoneLabel}</label>
-                <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                  placeholder={t.buyerPhonePlaceholderDashboard} value={clientPhone} type="tel" maxLength={16}
-                  onChange={e => setClientPhone(formatPhone(e.target.value))} />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs text-gray-500 mb-1 block">{t.contractNumberLabelDashboard}</label>
-                  <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                    placeholder={t.contractNumberPlaceholderDashboard} value={contractNumber} onChange={e => setContractNumber(e.target.value)} />
+                <div className="flex justify-between text-sm text-white/70 mb-3">
+                  <span>{t.vat16Label}</span><span>{vatAmount.toLocaleString('ru-KZ')} ₸</span>
                 </div>
-                <div>
-                  <label className="text-xs text-gray-500 mb-1 block">{t.contractDateLabel}</label>
-                  <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                    placeholder={t.contractDatePlaceholder} value={contractDate} onChange={e => setContractDate(e.target.value)} />
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">{t.companyNameLabel}</label>
-                <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                  placeholder={t.companyNamePlaceholder} value={clientName} onChange={e => setClientName(e.target.value)} />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs text-gray-500 mb-1 block">{t.binIinLabel}</label>
-                  <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                    placeholder={t.binIinPlaceholder} value={clientBin}
-                    onChange={async e => {
-                      const bin = e.target.value
-                      setClientBin(bin)
-                      if (bin.length === 12) {
-                        const found = clients.find(c => c.bin_iin === bin)
-                        if (found) {
-                          setClientName(found.name)
-                          setClientEmail(found.email || '')
-                          setClientAddress(found.address || '')
-                          setClientPhone(found.phone || '')
-                        }
-                      }
-                    }} />
-                </div>
-                <div>
-                  <label className="text-xs text-gray-500 mb-1 block">{t.emailLabel}</label>
-                  <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                    placeholder={t.emailPlaceholder} value={clientEmail} onChange={e => setClientEmail(e.target.value)} />
-                </div>
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">{t.addressLabelDashboard}</label>
-                <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                  placeholder={t.addressPlaceholder} value={clientAddress} onChange={e => setClientAddress(e.target.value)} />
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">{t.buyerPhoneLabel}</label>
-                <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                  placeholder={t.buyerPhonePlaceholderDashboard} value={clientPhone} type="tel" maxLength={16}
-                  onChange={e => setClientPhone(formatPhone(e.target.value))} />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs text-gray-500 mb-1 block">{t.contractNumberLabelDashboard}</label>
-                  <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                    placeholder={t.contractNumberPlaceholderDashboard} value={contractNumber} onChange={e => setContractNumber(e.target.value)} />
-                </div>
-                <div>
-                  <label className="text-xs text-gray-500 mb-1 block">{t.contractDateLabel}</label>
-                  <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                    placeholder={t.contractDatePlaceholder} value={contractDate} onChange={e => setContractDate(e.target.value)} />
-                </div>
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">{t.knpLabel}</label>
-                <select className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056] bg-white"
-                  value={clientKnp} onChange={e => setClientKnp(e.target.value)}>
-                  {KNP_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                </select>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Services section */}
-        <div className="bg-white rounded-2xl p-5 mb-4 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-medium text-[#1C2056]">{t.servicesHeader}</h3>
-            <div className="flex gap-2">
-              {savedServices.length > 0 && (
-                <button onClick={() => setShowServicePicker(true)}
-                  className="text-xs text-[#1C2056] border border-[#1C2056] rounded-lg px-3 py-1">
-                  {t.fromDirectoryButton}
-                </button>
-              )}
-              <button onClick={addService} className="text-xs bg-[#1C2056] text-white rounded-lg px-3 py-1">
-                {t.addButton}
-              </button>
-            </div>
-          </div>
-          <div className="space-y-4" id="services-list">
-            {services.map((svc, idx) => (
-              <div key={idx} className="border border-gray-100 rounded-xl p-3 space-y-2">
-                <div className="flex gap-2 mb-2">
-                  <button type="button" onClick={() => updateService(idx, 'type', 'service')}
-                    className={`flex-1 px-3 py-1.5 text-xs rounded-lg font-medium transition ${(svc.type || 'service') === 'service' ? 'bg-[#1C2056] text-white' : 'bg-gray-100 text-gray-500'}`}>
-                    {t.serviceToggleLabel}
-                  </button>
-                  <button type="button" onClick={() => updateService(idx, 'type', 'product')}
-                    className={`flex-1 px-3 py-1.5 text-xs rounded-lg font-medium transition ${svc.type === 'product' ? 'bg-[#2DC48D] text-white' : 'bg-gray-100 text-gray-500'}`}>
-                    {t.productToggleLabel}
-                  </button>
-                </div>
-                <div className="flex gap-2 items-start">
-                  <input className="flex-1 border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                    placeholder={t.serviceNamePlaceholder} value={svc.name}
-                    onChange={e => updateService(idx, 'name', e.target.value)} />
-                  {services.length > 1 && (
-                    <button onClick={() => removeService(idx)} className="text-gray-300 hover:text-red-400 text-xl mt-1">×</button>
-                  )}
-                </div>
-                <div className="grid grid-cols-4 gap-2">
-                  <div>
-                    <label className="text-xs text-gray-400 mb-1 block">{t.codeLabel}</label>
-                    <input className="w-full border rounded-lg px-2 py-2 text-sm outline-none focus:border-[#1C2056]"
-                      placeholder={t.codePlaceholder} value={svc.code || ''}
-                      onChange={e => updateService(idx, 'code', e.target.value)} />
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-400 mb-1 block">{t.qtyLabel}</label>
-                    <input className="w-full border rounded-lg px-2 py-2 text-sm outline-none focus:border-[#1C2056]"
-                      type="number" placeholder={t.qtyPlaceholder} value={svc.qty || ''}
-                      onChange={e => updateService(idx, 'qty', Number(e.target.value))} />
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-400 mb-1 block">{t.unitLabel}</label>
-                    <select className="w-full border rounded-lg px-2 py-2 text-sm outline-none focus:border-[#1C2056] bg-white"
-                      value={svc.unit || 'шт'} onChange={e => updateService(idx, 'unit', e.target.value)}>
-                      {UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-400 mb-1 block">{t.priceLabel}</label>
-                    <input className="w-full border rounded-lg px-2 py-2 text-sm outline-none focus:border-[#1C2056]"
-                      type="number" placeholder={t.pricePlaceholder} value={svc.price || ''}
-                      onChange={e => updateService(idx, 'price', Number(e.target.value))} />
-                  </div>
-                </div>
-                {svc.name && svc.price > 0 && (
-                  <div className="text-xs text-gray-400 text-right">
-                    {t.perLineTotal((svc.qty * svc.price).toLocaleString('ru-KZ'))}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Total */}
-        <div className="bg-[#1C2056] rounded-2xl p-5 mb-4">
-          {vatType === 'vat_16' ? (
-            <>
-              <div className="flex justify-between text-sm text-white/70 mb-2">
-                <span>{t.amountWithoutVatLabel}</span><span>{totalWithoutVat.toLocaleString('ru-KZ')} ₸</span>
-              </div>
+              </>
+            ) : vatType === 'vat_0' ? (
               <div className="flex justify-between text-sm text-white/70 mb-3">
-                <span>{t.vat16Label}</span><span>{vatAmount.toLocaleString('ru-KZ')} ₸</span>
+                <span>{t.vat0Label}</span><span>{t.vat0Amount}</span>
               </div>
-            </>
-          ) : vatType === 'vat_0' ? (
-            <div className="flex justify-between text-sm text-white/70 mb-3">
-              <span>{t.vat0Label}</span><span>{t.vat0Amount}</span>
+            ) : (
+              <div className="flex justify-between text-sm text-white/70 mb-3">
+                <span>{t.noVatLabel}</span><span>{t.noVatDash}</span>
+              </div>
+            )}
+            <div className="flex justify-between font-medium text-white border-t border-white/20 pt-3">
+              <span>{t.amountDueLabel}</span>
+              <span className="text-lg">{total.toLocaleString('ru-KZ')} ₸</span>
             </div>
-          ) : (
-            <div className="flex justify-between text-sm text-white/70 mb-3">
-              <span>{t.noVatLabel}</span><span>{t.noVatDash}</span>
-            </div>
-          )}
-          <div className="flex justify-between font-medium text-white border-t border-white/20 pt-3">
-            <span>{t.amountDueLabel}</span>
-            <span className="text-lg">{total.toLocaleString('ru-KZ')} ₸</span>
           </div>
+
+          <button onClick={createInvoice} disabled={loading}
+            className={`w-full rounded-xl py-4 font-medium text-sm text-white transition ${loading ? 'bg-gray-400' : 'bg-[#2DC48D]'}`}>
+            {loading ? t.creatingButton : t.createButton}
+          </button>
         </div>
 
-        <button onClick={createInvoice} disabled={loading}
-          className={`w-full rounded-xl py-4 font-medium text-sm text-white transition ${loading ? 'bg-gray-400' : 'bg-[#2DC48D]'}`}>
-          {loading ? t.creatingButton : t.createButton}
-        </button>
+        <div className="hidden lg:block lg:w-[380px] lg:sticky lg:top-6">
+          <InvoiceLivePreview
+            invoiceNumber={(profile?.invoice_prefix || 'INV-') + (profile?.invoice_next_number || '0001')}
+            date={formatDate(new Date().toISOString())}
+            companyName={profile?.company_name || ''}
+            companyBin={profile?.bin_iin || ''}
+            clientName={clientName}
+            clientBin={clientBin}
+            services={services}
+            note={note}
+            vatType={vatType}
+            total={total}
+          />
+        </div>
+        </motion.div>
       </div>
 
       {/* Service picker modal */}
