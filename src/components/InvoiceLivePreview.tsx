@@ -109,31 +109,33 @@ export default function InvoiceLivePreview({
   const vatAmount = vatType === 'vat_16' ? Math.round(total - total / 1.16) : 0
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm p-5">
+    <div className="bg-white rounded-2xl shadow-lg ring-1 ring-black/5 overflow-hidden">
+      <div className="h-1.5 bg-[#1C2056]" />
+      <div className="p-5">
       {/* Header */}
       <div className="flex items-start justify-between mb-4">
-        <div className="text-base font-semibold text-[#1C2056]">{invoiceNumber}</div>
-        <div className="text-xs text-gray-400">{date}</div>
+        <div className="text-lg font-bold tracking-wide text-[#1C2056]">{invoiceNumber}</div>
+        <div className="text-xs text-gray-400 bg-gray-50 rounded-full px-2.5 py-1">{date}</div>
       </div>
 
       {/* From */}
       {(companyName || companyBin) && (
-        <div className="border-t border-gray-100 pt-3 mb-3">
-          <div className="text-xs text-gray-400 mb-1">{t.previewFromLabel}</div>
+        <div className="border-t border-dashed border-gray-200 pt-3 mb-3">
+          <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">{t.previewFromLabel}</div>
           {companyName && <div className="text-sm font-medium text-[#1C2056]">{companyName}</div>}
           {companyBin && <div className="text-xs text-gray-400">{t.binLabel(companyBin)}</div>}
         </div>
       )}
 
       {/* To */}
-      <div className="border-t border-gray-100 pt-3 mb-4">
-        <div className="text-xs text-gray-400 mb-1">{t.previewToLabel}</div>
+      <div className="border-t border-dashed border-gray-200 pt-3 mb-4">
+        <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">{t.previewToLabel}</div>
         {clientName && <div className="text-sm font-medium text-[#1C2056]">{clientName}</div>}
         {clientBin && <div className="text-xs text-gray-400">{t.binLabel(clientBin)}</div>}
       </div>
 
       {/* Services */}
-      <div className="border-t border-gray-100 pt-3 mb-4">
+      <div className="border-t border-dashed border-gray-200 pt-3 mb-4">
         <AnimatePresence initial={false}>
           {services.filter(svc => svc.name).map((svc, idx) => (
             <motion.div
@@ -159,11 +161,11 @@ export default function InvoiceLivePreview({
 
       {/* Note */}
       {note && (
-        <div className="text-xs text-gray-400 mb-4 border-t border-gray-100 pt-3">{note}</div>
+        <div className="text-xs text-gray-400 mb-4 border-t border-dashed border-gray-200 pt-3">{note}</div>
       )}
 
       {/* Total */}
-      <div className="border-t border-gray-100 pt-3">
+      <div className="border-t-2 border-[#1C2056]/10 pt-3">
         {vatType === 'vat_16' && (
           <div className="flex justify-between text-xs text-gray-400 mb-2">
             <span>{t.vat16Label}</span>
@@ -176,10 +178,11 @@ export default function InvoiceLivePreview({
             <span>{t.vat0Amount}</span>
           </div>
         )}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between bg-[#2DC48D]/10 rounded-xl px-3 py-2.5 -mx-1">
           <span className="text-sm font-semibold text-[#1C2056]">{t.amountDueLabel}</span>
-          <span className="text-lg font-bold text-[#2DC48D]">{formatMoney(displayTotal)}</span>
+          <span className="text-xl font-bold text-[#2DC48D]">{formatMoney(displayTotal)}</span>
         </div>
+      </div>
       </div>
     </div>
   )
