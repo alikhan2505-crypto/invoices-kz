@@ -4,9 +4,13 @@ import { useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { formatDate } from '@/lib/date'
 import { generateInvoicePDF } from '@/lib/generatePDF'
+import { useLanguage } from '@/components/LanguageProvider'
+import { historyDict } from '@/lib/i18n/history'
 
 export default function PublicInvoice() {
   const { token } = useParams()
+  const { lang } = useLanguage()
+  const t = historyDict[lang]
   const [invoice, setInvoice] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
   const [bank, setBank] = useState<any>(null)
@@ -59,7 +63,7 @@ export default function PublicInvoice() {
   }, [])
 
   async function markAsPaid() {
-    if (!confirm('Подтвердить оплату?')) return
+    if (!confirm(t.confirmPaymentConfirm)) return
     setMarking(true)
     await supabase.from('invoices').update({ status: 'paid' }).eq('id', invoice.id)
     setMarked(true)
@@ -68,7 +72,7 @@ export default function PublicInvoice() {
 
   async function openPDF() {
     if (!invoice) return
-    const invoiceServices = invoice.services || [{ name: 'Услуга', qty: 1, price: invoice.amount }]
+    const invoiceServices = invoice.services || [{ name: t.defaultServiceName, qty: 1, price: invoice.amount }]
     const win = window.open('', '_blank')
     const html = await generateInvoicePDF({
       number: invoice.number,
@@ -101,7 +105,7 @@ export default function PublicInvoice() {
 }
   if (loading) return (
     <main className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <p className="text-gray-400">Загрузка...</p>
+      <p className="text-gray-400">{t.loadingLabel}</p>
     </main>
   )
 
@@ -109,7 +113,7 @@ export default function PublicInvoice() {
     <main className="min-h-screen bg-gray-50 flex items-center justify-center">
       <div className="text-center">
         <div className="text-4xl mb-3">😕</div>
-        <p className="text-gray-400">Счёт не найден</p>
+        <p className="text-gray-400">{t.invoiceNotFoundLabel}</p>
       </div>
     </main>
   )
@@ -123,11 +127,9 @@ export default function PublicInvoice() {
     overdue: 'bg-red-100 text-red-700',
     draft: 'bg-gray-100 text-gray-600',
     viewed: 'bg-purple-100 text-purple-700',
+    cancelled: 'bg-gray-100 text-gray-500',
   }
-  const statusLabels: Record<string, string> = {
-    paid: 'Оплачен', sent: 'Отправлен', overdue: 'Просрочен',
-    draft: 'Черновик', viewed: 'Просмотрен'
-  }
+  const statusLabels = t.statusLabels
 
   return (
     <main className="min-h-screen bg-gray-50 pb-8">
@@ -135,7 +137,7 @@ export default function PublicInvoice() {
       <div className="bg-[#1C2056] px-4 py-4 flex items-center justify-between">
         <span className="font-bold text-white text-lg">INVOICES.KZ</span>
         <span className={`text-xs px-2 py-1 rounded-full ${statusColors[invoice.status] || statusColors.draft}`}>
-          {statusLabels[invoice.status] || 'Черновик'}
+          {statusLabels[invoice.status] || statusLabels.draft}
         </span>
       </div>
 
@@ -145,7 +147,7 @@ export default function PublicInvoice() {
         <div className="bg-white rounded-2xl shadow-sm p-5">
           <div className="flex items-start justify-between mb-4">
             <div>
-              <div className="text-xs text-gray-400 mb-1">Счёт на оплату</div>
+              <div className="text-xs text-gray-400 mb-1">{t.invoiceForPaymentLabel}</div>
               <div className="text-xl font-bold text-[#1C2056]">{invoice.number}</div>
               <div className="text-xs text-gray-400 mt-1">{formatDate(invoice.created_at)}</div>
             </div>
@@ -158,18 +160,18 @@ export default function PublicInvoice() {
 
           {/* From */}
           <div className="border-t border-gray-100 pt-4 mb-3">
-            <div className="text-xs text-gray-400 mb-1">От кого</div>
+            <div className="text-xs text-gray-400 mb-1">{t.fromLabel}</div>
             <div className="text-sm font-medium text-[#1C2056]">{profile?.company_name}</div>
-            {profile?.bin_iin && <div className="text-xs text-gray-400">БИН: {profile.bin_iin}</div>}
+            {profile?.bin_iin && <div className="text-xs text-gray-400">{t.binLabel(profile.bin_iin)}</div>}
             {profile?.address && <div className="text-xs text-gray-400">{profile.address}</div>}
             {profile?.phone && <div className="text-xs text-gray-400">{profile.phone}</div>}
           </div>
 
           {/* To */}
           <div className="border-t border-gray-100 pt-3">
-            <div className="text-xs text-gray-400 mb-1">Кому</div>
+            <div className="text-xs text-gray-400 mb-1">{t.toLabel}</div>
             <div className="text-sm font-medium text-[#1C2056]">{invoice.client_name}</div>
-            {invoice.client_bin && <div className="text-xs text-gray-400">БИН: {invoice.client_bin}</div>}
+            {invoice.client_bin && <div className="text-xs text-gray-400">{t.binLabel(invoice.client_bin)}</div>}
             {invoice.client_email && <div className="text-xs text-gray-400">{invoice.client_email}</div>}
           </div>
         </div>
@@ -177,13 +179,13 @@ export default function PublicInvoice() {
         {/* Services */}
         {services.length > 0 && (
           <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-            <div className="px-4 pt-4 pb-2 text-xs text-gray-400 uppercase tracking-wide">Услуги</div>
+            <div className="px-4 pt-4 pb-2 text-xs text-gray-400 uppercase tracking-wide">{t.servicesHeaderLabel}</div>
             {services.map((s: any, i: number) => (
               <div key={i} className={`flex justify-between px-4 py-3 ${i < services.length - 1 ? 'border-b border-gray-100' : ''}`}>
                 <div>
                   <div className="text-sm text-[#1C2056]">{s.name}</div>
                   <div className="text-xs text-gray-400">
-                    {s.qty} {s.unit || 'шт'} × {Number(s.price).toLocaleString('ru-KZ')} ₸
+                    {s.qty} {s.unit || t.defaultUnitLabel} × {Number(s.price).toLocaleString('ru-KZ')} ₸
                   </div>
                 </div>
                 <div className="text-sm font-medium text-[#1C2056]">
@@ -192,7 +194,7 @@ export default function PublicInvoice() {
               </div>
             ))}
             <div className="flex justify-between px-4 py-3 border-t border-gray-100 bg-gray-50">
-              <span className="text-sm font-bold text-[#1C2056]">Итого к оплате</span>
+              <span className="text-sm font-bold text-[#1C2056]">{t.totalDueLabel}</span>
               <span className="text-sm font-bold text-[#1C2056]">{total.toLocaleString('ru-KZ')} ₸</span>
             </div>
           </div>
@@ -201,7 +203,7 @@ export default function PublicInvoice() {
         {/* Note */}
         {invoice.note && (
           <div className="bg-white rounded-2xl shadow-sm p-4">
-            <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">Примечание</div>
+            <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">{t.noteLabel}</div>
             <div className="text-sm text-gray-600">{invoice.note}</div>
           </div>
         )}
@@ -209,25 +211,25 @@ export default function PublicInvoice() {
         {/* Bank details */}
         {bank && (
           <div className="bg-white rounded-2xl shadow-sm p-5">
-            <div className="text-xs text-gray-400 uppercase tracking-wide mb-3">Реквизиты для оплаты</div>
+            <div className="text-xs text-gray-400 uppercase tracking-wide mb-3">{t.paymentDetailsHeader}</div>
             <div className="space-y-2">
               <div className="flex justify-between">
-                <span className="text-xs text-gray-400">Банк</span>
+                <span className="text-xs text-gray-400">{t.bankLabel}</span>
                 <span className="text-xs font-medium text-[#1C2056]">{bank.bank_name}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-xs text-gray-400">ИИК</span>
+                <span className="text-xs text-gray-400">{t.iikLabel}</span>
                 <span className="text-xs font-medium text-[#1C2056] font-mono">{bank.iik}</span>
               </div>
               {bank.bik && (
                 <div className="flex justify-between">
-                  <span className="text-xs text-gray-400">БИК</span>
+                  <span className="text-xs text-gray-400">{t.bikLabel}</span>
                   <span className="text-xs font-medium text-[#1C2056] font-mono">{bank.bik}</span>
                 </div>
               )}
               {bank.kbe && (
                 <div className="flex justify-between">
-                  <span className="text-xs text-gray-400">КБе</span>
+                  <span className="text-xs text-gray-400">{t.kbeLabel}</span>
                   <span className="text-xs font-medium text-[#1C2056]">{bank.kbe}</span>
                 </div>
               )}
@@ -236,14 +238,14 @@ export default function PublicInvoice() {
         )}
 
         {/* Инструкция */}
-        {invoice.status !== 'paid' && !marked && (
+        {invoice.status !== 'paid' && invoice.status !== 'cancelled' && !marked && (
           <div className="bg-blue-50 rounded-2xl p-4">
-            <div className="text-sm font-medium text-[#1C2056] mb-2">📋 Как оплатить</div>
+            <div className="text-sm font-medium text-[#1C2056] mb-2">{t.howToPayHeader}</div>
             <div className="space-y-2">
               {[
-                { step: '1', text: 'Нажмите "Открыть счёт" — скачайте PDF или оплатите через Kaspi/Halyk кнопкой ниже' },
-                { step: '2', text: 'Оплатите через свой банк по реквизитам из PDF' },
-                { step: '3', text: 'Вернитесь сюда и нажмите "Я оплатил"' },
+                { step: '1', text: t.step1Text },
+                { step: '2', text: t.step2Text },
+                { step: '3', text: t.step3Text },
               ].map(item => (
                 <div key={item.step} className="flex gap-2 items-start">
                   <div className="w-5 h-5 rounded-full bg-[#1C2056] text-white text-xs flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -262,13 +264,13 @@ export default function PublicInvoice() {
             {profile?.kaspi_pay_link && (
               <a href={profile.kaspi_pay_link} target="_blank" rel="noopener noreferrer"
                 className="w-full bg-amber-400 text-white rounded-xl py-3.5 font-medium text-sm flex items-center justify-center gap-2 block text-center">
-                🟡 Оплатить через Kaspi
+                {t.payViaKaspiButton}
               </a>
             )}
             {profile?.halyk_pay_link && (
               <a href={profile.halyk_pay_link} target="_blank" rel="noopener noreferrer"
                 className="w-full bg-green-500 text-white rounded-xl py-3.5 font-medium text-sm flex items-center justify-center gap-2 block text-center">
-                🟢 Оплатить через Halyk
+                {t.payViaHalykButton}
               </a>
             )}
             {(profile?.website || profile?.social_links?.length > 0) && (
@@ -276,7 +278,7 @@ export default function PublicInvoice() {
                 {profile?.website && (
                    <a href={profile.website.startsWith('http') ? profile.website : 'https://' + profile.website} target="_blank"
                     className="bg-gray-100 text-gray-600 rounded-lg px-3 py-1.5 text-xs">
-                    🌐 Сайт
+                    {t.websiteLinkLabel}
                   </a>
                 )}
                 {(profile?.social_links || []).map((link: string, i: number) => {
@@ -286,7 +288,7 @@ export default function PublicInvoice() {
                   return (
                     <a key={i} href={link} target="_blank" rel="noopener noreferrer"
                       className="bg-gray-100 text-gray-600 rounded-lg px-3 py-1.5 text-xs">
-                      {icons[key] || '🔗'} {names[key] || 'Ссылка'}
+                      {icons[key] || '🔗'} {names[key] || t.linkFallbackLabel}
                     </a>
                   )
                 })}
@@ -296,13 +298,13 @@ export default function PublicInvoice() {
         )}
 
         {/* Actions */}
-        {invoice.status !== 'paid' && (
+        {invoice.status !== 'paid' && invoice.status !== 'cancelled' && (
           <div className="space-y-3">
             {marked ? (
               <div className="bg-green-50 rounded-2xl p-5 text-center">
                 <div className="text-3xl mb-2">✅</div>
-                <div className="text-sm font-medium text-green-700 mb-1">Спасибо! Оплата подтверждена</div>
-                <div className="text-xs text-green-600">Поставщик получит уведомление</div>
+                <div className="text-sm font-medium text-green-700 mb-1">{t.paymentConfirmedThanksLabel}</div>
+                <div className="text-xs text-green-600">{t.supplierNotifiedLabel}</div>
               </div>
             ) : (
               <>
@@ -310,7 +312,7 @@ export default function PublicInvoice() {
                 <button
                   onClick={openPDF}
                   className="w-full bg-[#1C2056] text-white rounded-2xl py-4 font-medium text-sm flex items-center justify-center gap-2">
-                  📄 Открыть счёт (PDF)
+                  {t.openInvoicePdfButton}
                 </button>
 
                 {/* Вторая кнопка — подтвердить оплату */}
@@ -318,7 +320,7 @@ export default function PublicInvoice() {
                   onClick={markAsPaid}
                   disabled={marking}
                   className="w-full bg-[#2DC48D] text-white rounded-2xl py-4 font-medium text-sm">
-                  {marking ? 'Обрабатываем...' : '✓ Я уже оплатил этот счёт'}
+                  {marking ? t.processingButtonLabel : t.alreadyPaidButton}
                 </button>
               </>
             )}
@@ -328,17 +330,17 @@ export default function PublicInvoice() {
         {invoice.status === 'paid' && (
           <div className="bg-green-50 rounded-2xl p-5 text-center">
             <div className="text-3xl mb-2">✅</div>
-            <div className="text-sm font-medium text-green-700">Счёт оплачен</div>
+            <div className="text-sm font-medium text-green-700">{t.invoicePaidLabel}</div>
             <button
               onClick={openPDF}
               className="mt-3 text-xs text-[#1C2056] underline">
-              Открыть PDF
+              {t.openPdfLinkLabel}
             </button>
           </div>
         )}
 
         <div className="text-center py-4">
-          <p className="text-xs text-gray-400">Счёт создан через</p>
+          <p className="text-xs text-gray-400">{t.createdViaLabel}</p>
           <a href="https://invoices.kz" className="text-xs font-medium text-[#1C2056]">INVOICES.KZ</a>
         </div>
       </div>

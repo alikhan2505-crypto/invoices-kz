@@ -5,17 +5,30 @@ import { supabase } from '@/lib/supabase'
 import BottomNav from '@/components/BottomNav'
 import * as XLSX from 'xlsx'
 import { formatDateTime, formatDate } from '@/lib/date'
+import { useLanguage } from '@/components/LanguageProvider'
+import { historyDict } from '@/lib/i18n/history'
 
-const statusLabel: Record<string, { text: string; color: string }> = {
-  paid:    { text: 'Оплачен',   color: 'bg-green-100 text-green-700' },
-  sent:    { text: 'Отправлен', color: 'bg-blue-100 text-blue-700' },
-  overdue: { text: 'Просрочен', color: 'bg-red-100 text-red-700' },
-  draft:   { text: 'Черновик',  color: 'bg-gray-100 text-gray-600' },
-  viewed:  { text: 'Просмотрен', color: 'bg-purple-100 text-purple-700' },
+const statusColor: Record<string, string> = {
+  paid: 'bg-green-100 text-green-700',
+  sent: 'bg-blue-100 text-blue-700',
+  overdue: 'bg-red-100 text-red-700',
+  draft: 'bg-gray-100 text-gray-600',
+  viewed: 'bg-purple-100 text-purple-700',
+  cancelled: 'bg-gray-100 text-gray-500',
 }
 
 export default function History() {
   const router = useRouter()
+  const { lang } = useLanguage()
+  const t = historyDict[lang]
+  const statusLabel: Record<string, { text: string; color: string }> = {
+    paid: { text: t.statusLabels.paid, color: statusColor.paid },
+    sent: { text: t.statusLabels.sent, color: statusColor.sent },
+    overdue: { text: t.statusLabels.overdue, color: statusColor.overdue },
+    draft: { text: t.statusLabels.draft, color: statusColor.draft },
+    viewed: { text: t.statusLabels.viewed, color: statusColor.viewed },
+    cancelled: { text: t.statusLabels.cancelled, color: statusColor.cancelled },
+  }
   const [invoices, setInvoices] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
@@ -38,10 +51,11 @@ export default function History() {
 
   async function deleteInvoice(e: React.MouseEvent, id: string, number: string) {
     e.stopPropagation()
-    if (!confirm('Аннулировать счёт ' + number + '?')) return
-    const { error } = await supabase.from('invoices').delete().eq('id', id)
-    if (error) { alert('Ошибка: ' + error.message); return }
-    setInvoices(prev => prev.filter(inv => inv.id !== id))
+    if (!confirm(t.confirmCancelInvoice(number))) return
+    const { error } = await supabase.from('invoices').update({ status: 'cancelled' }).eq('id', id)
+    if (error) { alert(t.errorPrefix(error.message)); return }
+    await supabase.from('invoice_logs').insert({ invoice_id: id, status: 'cancelled' })
+    setInvoices(prev => prev.map(inv => inv.id === id ? { ...inv, status: 'cancelled' } : inv))
   }
 
   async function markOverdue() {
@@ -56,33 +70,33 @@ export default function History() {
       .in('status', ['sent', 'viewed'])
       .lt('created_at', sevenDaysAgo.toISOString())
       .select()
-    if (error) { alert('Ошибка: ' + error.message); return }
+    if (error) { alert(t.errorPrefix(error.message)); return }
     if (data && data.length > 0) {
-      alert(`Отмечено просроченных: ${data.length}`)
+      alert(t.markedOverdueMessage(data.length))
       loadInvoices()
     } else {
-      alert('Просроченных счетов нет')
+      alert(t.noOverdueInvoicesAlert)
     }
   }
 
   function exportToExcel() {
     const data = filtered.map(inv => ({
-      'Номер': inv.number,
-      'Клиент': inv.client_name || 'Без клиента',
-      'БИН/ИИН': inv.client_bin || '',
-      'Сумма': Number(inv.amount),
-      'Статус': (statusLabel[inv.status] || statusLabel.draft).text,
-      'Примечание': inv.note || '',
-      'Дата': formatDate(inv.created_at),
+      [t.excelColumnNumber]: inv.number,
+      [t.excelColumnClient]: inv.client_name || t.noClientLabel,
+      [t.excelColumnBinIin]: inv.client_bin || '',
+      [t.excelColumnAmount]: Number(inv.amount),
+      [t.excelColumnStatus]: (statusLabel[inv.status] || statusLabel.draft).text,
+      [t.excelColumnNote]: inv.note || '',
+      [t.excelColumnDate]: formatDate(inv.created_at),
     }))
     const ws = XLSX.utils.json_to_sheet(data)
     const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Счета')
+    XLSX.utils.book_append_sheet(wb, ws, t.excelSheetName)
     ws['!cols'] = [
       { wch: 12 }, { wch: 30 }, { wch: 15 },
       { wch: 15 }, { wch: 12 }, { wch: 30 }, { wch: 15 },
     ]
-    XLSX.writeFile(wb, `Счета_${formatDate(new Date().toISOString())}.xlsx`)
+    XLSX.writeFile(wb, t.excelFileName(formatDate(new Date().toISOString())))
   }
 
   const filtered = invoices.filter(inv => {
@@ -108,10 +122,11 @@ export default function History() {
       matchDate = invDate.getMonth() === now.getMonth() &&
         invDate.getFullYear() === now.getFullYear()
     } else if (dateFilter === 'last_month') {
-      const lastMonth = new Date(now)
-      lastMonth.setMonth(now.getMonth() - 1)
-      matchDate = invDate.getMonth() === lastMonth.getMonth() &&
-        invDate.getFullYear() === lastMonth.getFullYear()
+      let lastMonth = now.getMonth() - 1
+      let lastMonthYear = now.getFullYear()
+      if (lastMonth < 0) { lastMonth = 11; lastMonthYear -= 1 }
+      matchDate = invDate.getMonth() === lastMonth &&
+        invDate.getFullYear() === lastMonthYear
     }
 
     return matchFilter && matchSearch && matchDate
@@ -135,11 +150,11 @@ export default function History() {
         <div className="flex gap-2">
           <button onClick={markOverdue}
             className="text-xs bg-red-50 text-red-500 border border-red-100 px-3 py-1.5 rounded-lg">
-            ⏰ Просрочка
+            {t.markOverdueButtonLabel}
           </button>
           <button onClick={exportToExcel}
             className="text-xs bg-[#1C2056] text-white px-3 py-1.5 rounded-lg">
-            📊 Экспорт
+            {t.exportButtonLabel}
           </button>
         </div>
       </div>
@@ -150,7 +165,7 @@ export default function History() {
           <span className="text-gray-400">🔍</span>
           <input
             className="flex-1 text-sm outline-none"
-            placeholder="Поиск по клиенту, сумме, примечанию..."
+            placeholder={t.searchPlaceholder}
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
@@ -161,13 +176,7 @@ export default function History() {
 
         {/* Date filter */}
         <div className="flex gap-2 mb-3 overflow-x-auto pb-1">
-          {[
-            { key: 'all_time', label: 'Всё время' },
-            { key: 'today', label: 'Сегодня' },
-            { key: 'week', label: 'Неделя' },
-            { key: 'month', label: 'Месяц' },
-            { key: 'last_month', label: 'Прошлый месяц' },
-          ].map(d => (
+          {t.dateFilterOptions.map(d => (
             <button key={d.key}
               onClick={() => setDateFilter(d.key)}
               className={`px-3 py-1.5 rounded-full text-xs whitespace-nowrap transition flex-shrink-0 ${dateFilter === d.key ? 'bg-[#2DC48D] text-white' : 'bg-white text-gray-500 shadow-sm'}`}>
@@ -178,12 +187,7 @@ export default function History() {
 
         {/* Status filter */}
         <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
-          {[
-            { key: 'all', label: 'Все' },
-            { key: 'paid', label: 'Оплачены' },
-            { key: 'sent', label: 'Отправлены' },
-            { key: 'draft', label: 'Черновики' },
-          ].map(f => (
+          {t.statusFilterOptions.map(f => (
             <button key={f.key}
               onClick={() => setFilter(f.key)}
               className={`px-4 py-1.5 rounded-full text-xs whitespace-nowrap transition flex-shrink-0 ${filter === f.key ? 'bg-[#1C2056] text-white' : 'bg-white text-gray-500 shadow-sm'}`}>
@@ -195,10 +199,10 @@ export default function History() {
         {/* Stats */}
         <div className="grid grid-cols-4 gap-2 mb-4">
           {[
-            { label: 'Всего', value: counts.all },
-            { label: 'Оплачено', value: counts.paid },
-            { label: 'Неоплач.', value: counts.sent },
-            { label: 'Просроч.', value: counts.overdue, red: true },
+            { label: t.statsAllLabel, value: counts.all },
+            { label: t.statsPaidLabel, value: counts.paid },
+            { label: t.statsUnpaidLabel, value: counts.sent },
+            { label: t.statsOverdueLabel, value: counts.overdue, red: true },
           ].map(s => (
             <div key={s.label} className="bg-white rounded-xl p-3 text-center shadow-sm">
               <div className={`text-lg font-semibold ${s.red && s.value > 0 ? 'text-red-500' : 'text-[#1C2056]'}`}>
@@ -211,20 +215,20 @@ export default function History() {
 
         {totalAmount > 0 && (
           <div className="bg-[#1C2056] rounded-xl px-4 py-3 mb-4 flex items-center justify-between">
-            <span className="text-white/70 text-sm">Доход за период</span>
+            <span className="text-white/70 text-sm">{t.incomeForPeriodLabel}</span>
             <span className="text-white font-bold">{totalAmount.toLocaleString('ru-KZ')} ₸</span>
           </div>
         )}
 
         {loading ? (
-          <p className="text-center text-gray-400 py-8">Загрузка...</p>
+          <p className="text-center text-gray-400 py-8">{t.loadingLabel}</p>
         ) : filtered.length === 0 ? (
           <div className="text-center py-12">
             <div className="text-4xl mb-3">📄</div>
-            <p className="text-gray-400 text-sm">Счетов нет</p>
+            <p className="text-gray-400 text-sm">{t.noInvoicesLabel}</p>
             <button onClick={() => router.push('/dashboard')}
               className="mt-4 bg-[#1C2056] text-white px-6 py-2.5 rounded-xl text-sm font-medium">
-              Создать первый счёт
+              {t.createFirstInvoiceButton}
             </button>
           </div>
         ) : (
@@ -237,7 +241,7 @@ export default function History() {
                   <div>
                     <div className="text-xs text-gray-400 mb-1">{inv.number}</div>
                     <div className="text-sm font-medium text-[#1C2056]">
-                      {inv.client_name || inv.clients?.name || 'Без клиента'}
+                      {inv.client_name || inv.clients?.name || t.noClientLabel}
                     </div>
                     {inv.note && (
                       <div className="text-xs text-gray-400 mt-0.5 italic truncate max-w-[180px]">
@@ -269,7 +273,7 @@ export default function History() {
 
         <button onClick={() => router.push('/dashboard')}
           className="w-full bg-[#1C2056] text-white rounded-xl py-4 font-medium text-sm">
-          + Создать новый счёт
+          {t.createNewInvoiceButton}
         </button>
       </div>
       <BottomNav />
