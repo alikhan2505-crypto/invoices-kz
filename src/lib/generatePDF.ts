@@ -63,8 +63,11 @@ function numberToWords(n: number): string {
   if (n < 0) return 'минус ' + numberToWords(-n)
 
   let result = ''
-  const th = Math.floor(n / 1000)
+  const millions = Math.floor(n / 1000000)
+  const th = Math.floor((n % 1000000) / 1000)
   const rest = n % 1000
+
+  if (millions > 0) result += numberToWords(millions) + ' миллионов '
 
   if (th > 0 && th < 10) {
     const tWords = ['','одна тысяча','две тысячи','три тысячи','четыре тысячи','пять тысяч','шесть тысяч','семь тысяч','восемь тысяч','девять тысяч']

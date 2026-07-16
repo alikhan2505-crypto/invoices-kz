@@ -4,7 +4,7 @@ export async function resizeToFit(url: string, maxW: number, maxH: number): Prom
     const img = new Image()
     img.crossOrigin = 'anonymous'
     img.onload = () => {
-      const ratio = Math.min(maxW / img.width, maxH / img.height)
+      const ratio = Math.min(1, maxW / img.width, maxH / img.height)
       const w = Math.round(img.width * ratio)
       const h = Math.round(img.height * ratio)
       const canvas = document.createElement('canvas')

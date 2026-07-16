@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
 
     await resend.emails.send({
       from: 'invoices.kz <mail@invoices.kz>',
-      to: inv.client_email,
+      to: recipientEmail,
       subject: `Счёт №${inv.number} на ${amount} ₸ — ${inv.client_name}`,
       html: `
 <!DOCTYPE html>

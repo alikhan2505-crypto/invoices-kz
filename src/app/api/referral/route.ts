@@ -6,9 +6,22 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+const supabaseAuth = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
+
 export async function POST(req: NextRequest) {
   const { userId, referralCode } = await req.json()
   if (!userId || !referralCode) return NextResponse.json({ error: 'Missing params' }, { status: 400 })
+
+  const accessToken = req.headers.get('authorization')?.replace('Bearer ', '')
+  const { data: { user } } = accessToken
+    ? await supabaseAuth.auth.getUser(accessToken)
+    : { data: { user: null } }
+  if (!user || user.id !== userId) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
 
   // Находим владельца реферального кода
   const { data: referrer } = await supabase
