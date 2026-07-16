@@ -100,7 +100,7 @@ export default function Profile() {
   return (
     <main className="min-h-screen bg-gray-50 pb-24 lg:pl-20">
 
-      <div className="bg-white border-b px-4 py-3 flex items-center justify-between">
+      <div className="sticky top-0 z-30 bg-white border-b px-4 py-3 flex items-center justify-between">
         <span className="font-bold text-[#1C2056]">INVOICES.KZ</span>
         <span className="text-sm text-gray-500">{profile?.company_name || ''}</span>
       </div>

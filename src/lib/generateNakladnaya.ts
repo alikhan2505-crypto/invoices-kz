@@ -143,8 +143,8 @@ td, th { border: 1px solid #000; padding: 3px 4px; vertical-align: middle; word-
 <div style="height:44px;"></div>
 
 ${logoBase64 ? `
-<div style="background:white; padding:10px 16px;">
-  <img src="${logoBase64}" style="max-height:48px; max-width:180px; object-fit:contain;" />
+<div style="text-align:center; margin:-4mm 0 6mm;">
+  <img src="${logoBase64}" style="max-height:48px; max-width:180px; object-fit:contain; display:block; margin:0 auto;" />
 </div>
 ` : ''}
 

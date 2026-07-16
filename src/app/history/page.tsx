@@ -145,7 +145,7 @@ export default function History() {
 
   return (
     <main className="min-h-screen bg-gray-50 pb-24 lg:pl-20">
-      <div className="bg-white border-b px-4 py-3 flex items-center justify-between">
+      <div className="sticky top-0 z-30 bg-white border-b px-4 py-3 flex items-center justify-between">
         <span className="font-bold text-[#1C2056]">INVOICES.KZ</span>
         <div className="flex gap-2">
           <button onClick={markOverdue}

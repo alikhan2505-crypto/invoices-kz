@@ -351,12 +351,12 @@ export default function InvoicePage() {
 
   return (
     <main className="min-h-screen bg-gray-50 pb-8 lg:pl-20">
-      <div className="bg-white border-b px-4 py-4 flex items-center gap-3">
+      <div className="sticky top-0 z-30 bg-white border-b px-4 py-4 flex items-center gap-3">
         <button onClick={() => router.push('/history')} className="back-btn text-gray-400 text-xl">‹</button>
         <span className="font-semibold text-[#1C2056]">{t.invoiceHeaderTitle(invoice.number)}</span>
       </div>
 
-      <div className="max-w-lg mx-auto p-4 space-y-4">
+      <div className="max-w-lg lg:max-w-5xl mx-auto p-4">
       <div className="lg:flex lg:gap-6 lg:items-start">
       <div className="lg:flex-1 lg:min-w-0 space-y-4">
 

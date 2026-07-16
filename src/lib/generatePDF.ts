@@ -190,8 +190,8 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<string> {
     <body>
 
       ${logoBase64 ? `
-      <div style="background:white; padding:10px 16px;">
-        <img src="${logoBase64}" style="max-height:48px; max-width:180px; object-fit:contain;" />
+      <div style="text-align:center; margin:-15mm 0 8mm;">
+        <img src="${logoBase64}" style="max-height:48px; max-width:180px; object-fit:contain; display:block; margin:0 auto;" />
       </div>
       ` : ''}
 

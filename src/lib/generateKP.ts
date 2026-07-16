@@ -264,8 +264,8 @@ export async function generateKP(data: KPData, existingWin?: Window | null) {
       <div style="height:55px;"></div>
 
       ${logoBase64 ? `
-      <div style="background:white; padding:12px 40px;">
-        <img src="${logoBase64}" style="max-height:48px; max-width:180px; object-fit:contain;" />
+      <div style="text-align:center; padding:8px 0;">
+        <img src="${logoBase64}" style="max-height:48px; max-width:180px; object-fit:contain; display:block; margin:0 auto;" />
       </div>
       ` : ''}
 

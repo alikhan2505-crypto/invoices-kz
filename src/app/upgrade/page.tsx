@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useLanguage } from '@/components/LanguageProvider'
 import { miscDict } from '@/lib/i18n/misc'
+import { getActivePlan } from '@/lib/plan'
 
 export default function Upgrade() {
   const router = useRouter()
@@ -37,15 +38,15 @@ export default function Upgrade() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     setUserId(user.id)
-    const { data: p } = await supabase.from('profiles').select('plan').eq('id', user.id).single()
-    setPlan(p?.plan || 'free')
+    const { data: p } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+    setPlan(getActivePlan(p).plan)
   }
 
   async function reloadPlan() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-    const { data: p } = await supabase.from('profiles').select('plan').eq('id', user.id).single()
-    setPlan(p?.plan || 'free')
+    const { data: p } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+    setPlan(getActivePlan(p).plan)
   }
 
   function formatPhone(value: string) {

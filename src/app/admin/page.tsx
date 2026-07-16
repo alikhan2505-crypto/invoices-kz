@@ -6,6 +6,7 @@ import { AreaChart, Area, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
 import { formatDateTime, formatDate } from '@/lib/date'
 import { useLanguage } from '@/components/LanguageProvider'
 import { miscDict } from '@/lib/i18n/misc'
+import { getActivePlan } from '@/lib/plan'
 
 export default function Admin() {
   const router = useRouter()
@@ -65,9 +66,10 @@ export default function Admin() {
     }
     setRegChart(days)
 
-    const free = (allUsers || []).filter(u => !u.plan || u.plan === 'free').length
-    const basic = (allUsers || []).filter(u => u.plan === 'basic').length
-    const pro = (allUsers || []).filter(u => u.plan === 'pro').length
+    const activePlans = (allUsers || []).map(u => getActivePlan(u).plan)
+    const free = activePlans.filter(p => p === 'free').length
+    const basic = activePlans.filter(p => p === 'basic').length
+    const pro = activePlans.filter(p => p === 'pro').length
     setPlanStats({ free, basic, pro })
     setLoading(false)
   }
@@ -316,13 +318,24 @@ export default function Admin() {
                   </div>
                   <div className="text-xs text-gray-400">{user.bin_iin || '—'}</div>
                   <div>
-                    <span className={`text-xs px-2 py-1 rounded-full ${
-                      user.plan === 'pro' ? 'bg-yellow-500/20 text-yellow-400' :
-                      user.plan === 'basic' ? 'bg-blue-500/20 text-blue-400' :
-                      'bg-gray-600 text-gray-400'
-                    }`}>
-                      {user.plan || 'free'}
-                    </span>
+                    {(() => {
+                      const activePlan = getActivePlan(user).plan
+                      const expired = !!user.plan && user.plan !== 'free' && activePlan !== user.plan
+                      return (
+                        <>
+                          <span className={`text-xs px-2 py-1 rounded-full ${
+                            activePlan === 'pro' ? 'bg-yellow-500/20 text-yellow-400' :
+                            activePlan === 'basic' ? 'bg-blue-500/20 text-blue-400' :
+                            'bg-gray-600 text-gray-400'
+                          }`}>
+                            {activePlan}
+                          </span>
+                          {expired && (
+                            <div className="text-xs text-red-400 mt-1">истёк ({user.plan})</div>
+                          )}
+                        </>
+                      )
+                    })()}
                   </div>
                   <div>
                     <select
