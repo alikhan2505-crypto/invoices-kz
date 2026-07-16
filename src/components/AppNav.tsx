@@ -113,7 +113,7 @@ export default function AppNav({ desktopOnly = false }: { desktopOnly?: boolean 
               className="absolute w-12 h-12 rounded-2xl bg-[#1C2056]"
               layoutId="appnav-active-indicator"
               transition={{ ease: [0.16, 1, 0.3, 1], duration: 0.35 }}
-              style={{ top: activeIndex * 64 }}
+              style={{ top: activeIndex * 56 }}
             />
           )}
           {items.map(item => {
