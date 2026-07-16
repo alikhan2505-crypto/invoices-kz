@@ -127,6 +127,12 @@ export default function Home() {
               background: lang === 'kk' ? 'var(--green)' : 'transparent',
               color: lang === 'kk' ? '#fff' : 'rgba(255,255,255,.5)',
             }}>ҚЗ</button>
+            <button onClick={() => setLang('en')} style={{
+              fontSize: 11, fontWeight: 600, padding: '5px 9px', borderRadius: 100, border: 'none', cursor: 'pointer',
+              fontFamily: 'Inter,sans-serif',
+              background: lang === 'en' ? 'var(--green)' : 'transparent',
+              color: lang === 'en' ? '#fff' : 'rgba(255,255,255,.5)',
+            }}>EN</button>
           </div>
 
           <button onClick={() => router.push('/login')} style={{
