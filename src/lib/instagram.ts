@@ -45,3 +45,37 @@ export async function publishToInstagram(imageUrl: string, caption: string): Pro
 
   return publishData.id as string
 }
+
+export interface MediaInsights {
+  reach: number | null
+  likes: number | null
+  comments: number | null
+  saved: number | null
+  shares: number | null
+}
+
+export async function getMediaInsights(igMediaId: string): Promise<MediaInsights> {
+  const accessToken = process.env.INSTAGRAM_ACCESS_TOKEN
+  if (!accessToken) throw new Error('Instagram not configured')
+
+  const res = await fetch(
+    `${GRAPH_API}/${igMediaId}/insights?metric=reach,likes,comments,saved,shares&access_token=${accessToken}`
+  )
+  const data = await res.json()
+  if (!res.ok) {
+    throw new Error(data.error?.message || 'Failed to fetch media insights')
+  }
+
+  const byName: Record<string, number> = {}
+  for (const entry of data.data || []) {
+    byName[entry.name] = entry.values?.[0]?.value ?? null
+  }
+
+  return {
+    reach: byName.reach ?? null,
+    likes: byName.likes ?? null,
+    comments: byName.comments ?? null,
+    saved: byName.saved ?? null,
+    shares: byName.shares ?? null,
+  }
+}
