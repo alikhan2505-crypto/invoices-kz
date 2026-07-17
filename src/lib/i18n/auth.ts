@@ -3,6 +3,7 @@ type AccountType = 'ИП' | 'ТОО' | 'Физлицо'
 export interface AuthContent {
   // login/page.tsx
   loginSubtitle: string
+  passkeyLoginButton: string
   googleSignInButton: string
   orEmailDivider: string
   emailLabel: string
@@ -68,6 +69,7 @@ export interface AuthContent {
 export const authDict: Record<'ru' | 'kk' | 'en', AuthContent> = {
   ru: {
     loginSubtitle: 'Создавайте счета за 1 минуту',
+    passkeyLoginButton: 'Войти по Face ID / Touch ID',
     googleSignInButton: 'Войти через Google',
     orEmailDivider: 'или через email',
     emailLabel: 'Email',
@@ -131,6 +133,7 @@ export const authDict: Record<'ru' | 'kk' | 'en', AuthContent> = {
   },
   kk: {
     loginSubtitle: 'Шоттарды 1 минутта жасаңыз',
+    passkeyLoginButton: 'Face ID / Touch ID арқылы кіру',
     googleSignInButton: 'Google арқылы кіру',
     orEmailDivider: 'немесе email арқылы',
     emailLabel: 'Email',
@@ -195,6 +198,7 @@ export const authDict: Record<'ru' | 'kk' | 'en', AuthContent> = {
   },
   en: {
     loginSubtitle: 'Create invoices in 1 minute',
+    passkeyLoginButton: 'Sign in with Face ID / Touch ID',
     googleSignInButton: 'Sign in with Google',
     orEmailDivider: 'or with email',
     emailLabel: 'Email',

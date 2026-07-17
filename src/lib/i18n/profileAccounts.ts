@@ -44,9 +44,13 @@ export interface ProfileAccountsContent {
   connectEcpAlert: string
   connectEcpButton: string
   loginSecuritySectionLabel: string
-  faceIdRowLabel: string
-  comingSoonLabel: string
-  changePinRowLabel: string
+  passkeyDefaultLabel: string
+  passkeyAddedPrefix: (date: string) => string
+  passkeyLastUsedPrefix: (date: string) => string
+  passkeyAddButton: string
+  passkeyNoneHint: string
+  passkeyNotSupportedHint: string
+  passkeyRemoveConfirm: string
   whatIsEcpTitle: string
   whatIsEcpBody: string
 
@@ -140,10 +144,14 @@ export const profileAccountsDict: Record<'ru' | 'kk' | 'en', ProfileAccountsCont
     ecpNotConnectedHint: 'Подключите ЭЦП НУЦ РК для подписания счетов',
     connectEcpAlert: 'Интеграция с НУЦ РК — скоро!',
     connectEcpButton: 'Подключить ЭЦП',
-    loginSecuritySectionLabel: 'Безопасность входа',
-    faceIdRowLabel: 'Вход по FaceID / TouchID',
-    comingSoonLabel: 'Скоро',
-    changePinRowLabel: 'Изменить PIN-код',
+    loginSecuritySectionLabel: 'Вход по Face ID / Touch ID',
+    passkeyDefaultLabel: 'Устройство',
+    passkeyAddedPrefix: (date: string) => `Добавлено: ${date}`,
+    passkeyLastUsedPrefix: (date: string) => `Использовался: ${date}`,
+    passkeyAddButton: '+ Добавить Face ID / Touch ID',
+    passkeyNoneHint: 'Пока нет ни одного устройства — вход только по email',
+    passkeyNotSupportedHint: 'Этот браузер не поддерживает вход по Face ID / Touch ID',
+    passkeyRemoveConfirm: 'Убрать это устройство?',
     whatIsEcpTitle: 'Что такое ЭЦП?',
     whatIsEcpBody: 'Электронная цифровая подпись (ЭЦП) — это аналог рукописной подписи. Счета подписанные ЭЦП имеют юридическую силу в Казахстане. Получить ЭЦП можно бесплатно в НУЦ РК (pki.gov.kz).',
 
@@ -233,10 +241,14 @@ export const profileAccountsDict: Record<'ru' | 'kk' | 'en', ProfileAccountsCont
     ecpNotConnectedHint: 'Шоттарға қол қою үшін ҚР ҰКО ЭЦҚ қосыңыз',
     connectEcpAlert: 'ҚР ҰКО интеграциясы — жақында!',
     connectEcpButton: 'ЭЦҚ қосу',
-    loginSecuritySectionLabel: 'Кіру қауіпсіздігі',
-    faceIdRowLabel: 'FaceID / TouchID арқылы кіру',
-    comingSoonLabel: 'Жақында',
-    changePinRowLabel: 'PIN-кодты өзгерту',
+    loginSecuritySectionLabel: 'Face ID / Touch ID арқылы кіру',
+    passkeyDefaultLabel: 'Құрылғы',
+    passkeyAddedPrefix: (date: string) => `Қосылды: ${date}`,
+    passkeyLastUsedPrefix: (date: string) => `Соңғы рет: ${date}`,
+    passkeyAddButton: '+ Face ID / Touch ID қосу',
+    passkeyNoneHint: 'Әзірге бірде-бір құрылғы жоқ — тек email арқылы кіру',
+    passkeyNotSupportedHint: 'Бұл браузер Face ID / Touch ID арқылы кіруді қолдамайды',
+    passkeyRemoveConfirm: 'Бұл құрылғыны алып тастау керек пе?',
     whatIsEcpTitle: 'ЭЦҚ дегеніміз не?',
     whatIsEcpBody: 'Электрондық цифрлық қолтаңба (ЭЦҚ) — қолжазба қолтаңбаның аналогы. ЭЦҚ қойылған шоттар Қазақстанда заңды күшке ие болады. ЭЦҚ-ны ҚР ҰКО-дан (pki.gov.kz) тегін алуға болады.',
 
@@ -326,10 +338,14 @@ export const profileAccountsDict: Record<'ru' | 'kk' | 'en', ProfileAccountsCont
     ecpNotConnectedHint: 'Connect an NCA RK digital signature to sign invoices',
     connectEcpAlert: 'NCA RK integration — coming soon!',
     connectEcpButton: 'Connect digital signature',
-    loginSecuritySectionLabel: 'Login security',
-    faceIdRowLabel: 'Sign in with FaceID / TouchID',
-    comingSoonLabel: 'Coming soon',
-    changePinRowLabel: 'Change PIN code',
+    loginSecuritySectionLabel: 'Sign in with Face ID / Touch ID',
+    passkeyDefaultLabel: 'Device',
+    passkeyAddedPrefix: (date: string) => `Added: ${date}`,
+    passkeyLastUsedPrefix: (date: string) => `Last used: ${date}`,
+    passkeyAddButton: '+ Add Face ID / Touch ID',
+    passkeyNoneHint: 'No devices added yet — signing in still requires email',
+    passkeyNotSupportedHint: 'This browser doesn’t support Face ID / Touch ID sign-in',
+    passkeyRemoveConfirm: 'Remove this device?',
     whatIsEcpTitle: 'What is a digital signature?',
     whatIsEcpBody: 'A digital signature is the electronic equivalent of a handwritten signature. Invoices signed with a digital signature have legal force in Kazakhstan. You can get a digital signature for free from NCA RK (pki.gov.kz).',
 

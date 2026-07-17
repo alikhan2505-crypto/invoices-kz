@@ -1,21 +1,55 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { startAuthentication } from '@simplewebauthn/browser'
 import { supabase } from '@/lib/supabase'
 import { useLanguage } from '@/components/LanguageProvider'
 import { authDict } from '@/lib/i18n/auth'
 
 export default function Login() {
+  const router = useRouter()
   const { lang } = useLanguage()
   const t = authDict[lang]
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [passkeySupported, setPasskeySupported] = useState(false)
+  const [passkeyLoading, setPasskeyLoading] = useState(false)
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const ref = params.get('ref')
     if (ref) localStorage.setItem('referral_code', ref)
+    setPasskeySupported(typeof window !== 'undefined' && !!window.PublicKeyCredential)
   }, [])
+
+  async function loginWithPasskey() {
+    setPasskeyLoading(true)
+    try {
+      const optRes = await fetch('/api/webauthn/login-options', { method: 'POST' })
+      const optJson = await optRes.json()
+      if (optJson.error) { alert(t.errorPrefix(optJson.error)); return }
+
+      const authResp = await startAuthentication({ optionsJSON: optJson.options })
+
+      const verifyRes = await fetch('/api/webauthn/login-verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ challengeId: optJson.challengeId, response: authResp }),
+      })
+      const verifyJson = await verifyRes.json()
+      if (verifyJson.error) { alert(t.errorPrefix(verifyJson.error)); return }
+
+      const { error } = await supabase.auth.verifyOtp({ token_hash: verifyJson.tokenHash, type: 'email' })
+      if (error) { alert(t.errorPrefix(error.message)); return }
+
+      router.push('/dashboard')
+    } catch (e: any) {
+      if (e?.name !== 'NotAllowedError') alert(t.errorPrefix(e?.message || String(e)))
+    } finally {
+      setPasskeyLoading(false)
+    }
+  }
 
   async function sendLink() {
     if (!email) { alert(t.emailRequiredError); return }
@@ -48,6 +82,13 @@ export default function Login() {
 
         {!sent ? (
           <>
+            {passkeySupported && (
+              <button onClick={loginWithPasskey} disabled={passkeyLoading}
+                className="w-full border border-[#1C2056] text-[#1C2056] rounded-lg py-3 text-sm font-medium flex items-center justify-center gap-2 hover:bg-[#1C2056]/5 transition mb-3">
+                <span className="text-lg">🔐</span>
+                {passkeyLoading ? t.sendingButton : t.passkeyLoginButton}
+              </button>
+            )}
             <button onClick={signInWithGoogle}
               className="w-full border border-gray-200 rounded-lg py-3 text-sm font-medium flex items-center justify-center gap-3 hover:bg-gray-50 transition mb-3">
               <svg width="18" height="18" viewBox="0 0 48 48">
