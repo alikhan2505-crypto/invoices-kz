@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { imageUrl, caption } = await req.json()
+  const { imageUrl, caption, note } = await req.json()
   if (!imageUrl || typeof imageUrl !== 'string' || !caption || typeof caption !== 'string') {
     return NextResponse.json({ error: 'imageUrl and caption are required' }, { status: 400 })
   }
@@ -62,7 +62,10 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         chat_id: chatId,
         photo: publicUrl,
-        caption: `📸 <b>Новый пост для Instagram</b>\n\n${caption}`,
+        // `note` is admin-only context shown in Telegram (e.g. "last post of
+        // the week's batch") — it's never part of `caption`, which is the
+        // exact text that gets published to Instagram if approved.
+        caption: `📸 <b>Новый пост для Instagram</b>\n\n${caption}${note ? `\n\n— — —\n${note}` : ''}`,
         parse_mode: 'HTML',
         reply_markup: {
           inline_keyboard: [[
