@@ -26,6 +26,31 @@ export async function POST(req: NextRequest) {
   }
 
   const update = await req.json()
+
+  // A text reply to a draft's photo message is saved as feedback for Claude to
+  // read at its next content-generation pass — it does not change this draft
+  // or auto-regenerate anything (there's no model running inside this webhook).
+  const msg = update.message
+  if (msg && typeof msg.text === 'string' && msg.reply_to_message?.message_id) {
+    if (String(msg.chat?.id) !== process.env.TELEGRAM_CHAT_ID) {
+      return NextResponse.json({ ok: true })
+    }
+    const { data: draft } = await supabase
+      .from('instagram_drafts')
+      .select('id, status')
+      .eq('telegram_message_id', msg.reply_to_message.message_id)
+      .maybeSingle()
+    if (draft && draft.status === 'pending') {
+      await supabase.from('instagram_drafts').update({ feedback: msg.text }).eq('id', draft.id)
+      await telegram('sendMessage', {
+        chat_id: msg.chat.id,
+        reply_to_message_id: msg.message_id,
+        text: '📝 Записал — учту в следующей версии поста. Эта версия остаётся на ваше решение (Опубликовать/Отклонить).',
+      })
+    }
+    return NextResponse.json({ ok: true })
+  }
+
   const cb = update.callback_query
   if (!cb || typeof cb.data !== 'string') {
     return NextResponse.json({ ok: true })

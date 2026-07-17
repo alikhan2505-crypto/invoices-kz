@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
     body: JSON.stringify({
       url: webhookUrl,
       secret_token: process.env.IG_AUTOMATION_SECRET,
-      allowed_updates: ['callback_query'],
+      allowed_updates: ['callback_query', 'message'],
     }),
   })
   const data = await res.json()
