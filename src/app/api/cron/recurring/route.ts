@@ -32,21 +32,10 @@ export async function GET(request: Request) {
 
   for (const inv of invoices || []) {
     try {
-      // Получаем следующий номер счёта
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('invoice_prefix, invoice_next_number')
-        .eq('id', inv.user_id)
-        .single()
-
-      const prefix = profile?.invoice_prefix || 'INV-'
-      const nextNum = profile?.invoice_next_number || '0001'
-      const invoiceNumber = prefix + nextNum
-      const newNum = String(parseInt(nextNum) + 1).padStart(nextNum.length, '0')
-
-      await supabase.from('profiles')
-        .update({ invoice_next_number: newNum })
-        .eq('id', inv.user_id)
+      // Атомарно получаем следующий номер счёта (без гонки при параллельном запуске)
+      const { data: invoiceNumber, error: numberError } = await supabase
+        .rpc('claim_invoice_number', { p_user_id: inv.user_id })
+      if (numberError) throw numberError
 
       // Создаём новый счёт
       const { data: newInvoice } = await supabase.from('invoices').insert({

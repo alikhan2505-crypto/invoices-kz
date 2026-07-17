@@ -132,13 +132,8 @@ export default function InvoicePage() {
   async function duplicateInvoice() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-    const { data: freshProfile } = await supabase.from('profiles')
-      .select('invoice_prefix, invoice_next_number').eq('id', user.id).single()
-    const prefix = freshProfile?.invoice_prefix || 'INV-'
-    const nextNum = freshProfile?.invoice_next_number || '0001'
-    const invoiceNumber = prefix + nextNum
-    const newNum = String(parseInt(nextNum) + 1).padStart(nextNum.length, '0')
-    await supabase.from('profiles').update({ invoice_next_number: newNum }).eq('id', user.id)
+    const { data: invoiceNumber, error: numberError } = await supabase.rpc('claim_invoice_number', { p_user_id: user.id })
+    if (numberError) { alert(t.errorPrefix(numberError.message)); return }
     const { data, error } = await supabase.from('invoices').insert({
       user_id: user.id, number: invoiceNumber, amount: invoice.amount,
       status: 'draft', client_name: invoice.client_name, client_bin: invoice.client_bin,
@@ -243,28 +238,9 @@ export default function InvoicePage() {
   }
 
   async function getNextNumber(type: 'kp' | 'avr' | 'nakladnaya', userId: string) {
-    const { data: p } = await supabase.from('profiles')
-      .select('kp_prefix, kp_next_number, avr_prefix, avr_next_number, nakladnaya_prefix, nakladnaya_next_number')
-      .eq('id', userId).single()
-
-    let prefix: string
-    let num: number
-
-    if (type === 'kp') {
-      prefix = p?.kp_prefix || 'КП-'
-      num = p?.kp_next_number || 1
-      await supabase.from('profiles').update({ kp_next_number: num + 1 }).eq('id', userId)
-    } else if (type === 'avr') {
-      prefix = p?.avr_prefix || 'АВР-'
-      num = p?.avr_next_number || 1
-      await supabase.from('profiles').update({ avr_next_number: num + 1 }).eq('id', userId)
-    } else {
-      prefix = p?.nakladnaya_prefix || 'НАК-'
-      num = p?.nakladnaya_next_number || 1
-      await supabase.from('profiles').update({ nakladnaya_next_number: num + 1 }).eq('id', userId)
-    }
-
-    return `${prefix}${String(num).padStart(4, '0')}`
+    const { data, error } = await supabase.rpc('claim_doc_number', { p_user_id: userId, p_doc_type: type })
+    if (error) throw error
+    return data as string
   }
 
   if (loading) return (

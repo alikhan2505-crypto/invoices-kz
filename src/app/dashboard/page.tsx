@@ -308,11 +308,12 @@ export default function Dashboard() {
       return
     }
 
-    const prefix = profile?.invoice_prefix || 'INV-'
-    const nextNum = profile?.invoice_next_number || '0001'
-    const invoiceNumber = prefix + nextNum
-    const newNum = String(parseInt(nextNum) + 1).padStart(nextNum.length, '0')
-    await supabase.from('profiles').update({ invoice_next_number: newNum }).eq('id', user.id)
+    const { data: invoiceNumber, error: numberError } = await supabase.rpc('claim_invoice_number', { p_user_id: user.id })
+    if (numberError) {
+      alert(t.errorPrefix(numberError.message))
+      setLoading(false)
+      return
+    }
 
     const { data, error } = await supabase.from('invoices').insert({
       user_id: user.id,
