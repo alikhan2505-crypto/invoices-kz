@@ -1,7 +1,7 @@
 'use client'
 import { useRouter, usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { useLanguage } from './LanguageProvider'
 
@@ -17,6 +17,7 @@ export default function AppNav({ desktopOnly = false }: { desktopOnly?: boolean 
   const { lang } = useLanguage()
   const [unpaid, setUnpaid] = useState(0)
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
+  const [logoLoaded, setLogoLoaded] = useState(false)
 
   useEffect(() => {
     async function loadUnpaid() {
@@ -35,9 +36,10 @@ export default function AppNav({ desktopOnly = false }: { desktopOnly?: boolean 
   useEffect(() => {
     async function loadLogo() {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      if (!user) { setLogoLoaded(true); return }
       const { data } = await supabase.from('profiles').select('logo_url').eq('id', user.id).single()
       setLogoUrl(data?.logo_url || null)
+      setLogoLoaded(true)
     }
     loadLogo()
   }, [])
@@ -119,23 +121,43 @@ export default function AppNav({ desktopOnly = false }: { desktopOnly?: boolean 
       {/* Desktop: left sidebar — a standalone floating rounded card, always fixed to the viewport
           (never moves on scroll), with the app mark pinned top and nav centered below it */}
       <div className="hidden lg:flex fixed left-3 top-3 bottom-3 w-[120px] bg-white rounded-[28px] shadow-2xl ring-1 ring-black/5 flex-col items-center py-6 z-40">
-        {logoUrl ? (
-          <img src={logoUrl} alt="" className="w-[88px] h-[88px] rounded-2xl object-contain bg-white ring-1 ring-black/5 flex-shrink-0" />
-        ) : (
-          <div className="w-[88px] h-[88px] rounded-2xl bg-[#1C2056] flex items-center justify-center text-white font-bold text-2xl flex-shrink-0">
-            IK
-          </div>
-        )}
+        <div className="relative w-[88px] h-[88px] flex-shrink-0">
+          <AnimatePresence>
+            {logoLoaded && (
+              logoUrl ? (
+                <motion.img
+                  key="logo"
+                  src={logoUrl}
+                  alt=""
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+                  className="absolute inset-0 w-full h-full rounded-2xl object-contain bg-white ring-1 ring-black/5"
+                />
+              ) : (
+                <motion.div
+                  key="fallback"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+                  className="absolute inset-0 w-full h-full rounded-2xl bg-[#1C2056] flex items-center justify-center text-white font-bold text-2xl"
+                >
+                  IK
+                </motion.div>
+              )
+            )}
+          </AnimatePresence>
+        </div>
 
         <div className="flex-1" />
 
-        <div className="relative w-full flex flex-col items-center gap-4">
+        <div className="relative w-full flex flex-col items-center gap-6">
           {activeIndex >= 0 && (
             <motion.div
               className="absolute w-20 h-16 rounded-2xl bg-[#1C2056]"
               layoutId="appnav-active-indicator"
               transition={{ ease: [0.16, 1, 0.3, 1], duration: 0.35 }}
-              style={{ top: activeIndex * 80 }}
+              style={{ top: activeIndex * 88 }}
             />
           )}
           {items.map(item => {
