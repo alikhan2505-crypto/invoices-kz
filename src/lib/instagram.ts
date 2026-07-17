@@ -19,6 +19,20 @@ export async function publishToInstagram(imageUrl: string, caption: string): Pro
     throw new Error(containerData.error?.message || 'Failed to create media container')
   }
 
+  // Instagram processes the container asynchronously — publishing before it
+  // reports FINISHED fails with an opaque "Media ID is not available".
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const statusRes = await fetch(
+      `${GRAPH_API}/${containerData.id}?fields=status_code&access_token=${accessToken}`
+    )
+    const statusData = await statusRes.json()
+    if (statusData.status_code === 'FINISHED') break
+    if (statusData.status_code === 'ERROR') {
+      throw new Error('Instagram failed to process the media container')
+    }
+    await new Promise(resolve => setTimeout(resolve, 1500))
+  }
+
   const publishRes = await fetch(`${GRAPH_API}/${igUserId}/media_publish`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
