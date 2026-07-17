@@ -21,7 +21,7 @@ async function telegram(method: string, body: object) {
 // else is ignored. Registered once via /api/instagram/setup-webhook.
 export async function POST(req: NextRequest) {
   const secret = req.headers.get('x-telegram-bot-api-secret-token')
-  if (!secret || secret !== process.env.INTERNAL_API_SECRET) {
+  if (!secret || secret !== process.env.IG_AUTOMATION_SECRET) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

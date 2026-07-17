@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 // this is harmless — Telegram just overwrites the existing webhook config.
 export async function POST(req: NextRequest) {
   const internalSecret = req.headers.get('x-internal-secret')
-  if (!internalSecret || internalSecret !== process.env.INTERNAL_API_SECRET) {
+  if (!internalSecret || internalSecret !== process.env.IG_AUTOMATION_SECRET) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       url: webhookUrl,
-      secret_token: process.env.INTERNAL_API_SECRET,
+      secret_token: process.env.IG_AUTOMATION_SECRET,
       allowed_updates: ['callback_query'],
     }),
   })

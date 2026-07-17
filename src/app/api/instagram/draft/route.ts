@@ -13,7 +13,7 @@ const supabase = createClient(
 // party continuing to host it.
 export async function POST(req: NextRequest) {
   const internalSecret = req.headers.get('x-internal-secret')
-  if (!internalSecret || internalSecret !== process.env.INTERNAL_API_SECRET) {
+  if (!internalSecret || internalSecret !== process.env.IG_AUTOMATION_SECRET) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
