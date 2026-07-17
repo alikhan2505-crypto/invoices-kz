@@ -34,6 +34,12 @@ export default function PublicInvoice() {
         await supabase.from('invoices')
           .update({ status: 'viewed', viewed_at: new Date().toISOString() })
           .eq('id', inv.id)
+        // Best-effort — viewing the invoice shouldn't block on this.
+        fetch('/api/notify-viewed', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ invoiceId: inv.id }),
+        }).catch(() => {})
       }
 
       // Загружаем полный профиль включая подпись и печать
