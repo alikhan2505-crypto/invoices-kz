@@ -68,6 +68,12 @@ export default function PublicInvoice() {
     await supabase.from('invoices').update({ status: 'paid' }).eq('id', invoice.id)
     setMarked(true)
     setMarking(false)
+    // Best-effort — the client's "paid" confirmation shouldn't block on this.
+    fetch('/api/notify-paid', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ invoiceId: invoice.id }),
+    }).catch(() => {})
   }
 
   async function openPDF() {
