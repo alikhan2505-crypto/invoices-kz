@@ -32,7 +32,7 @@ export default function Support() {
                 <div className="text-xs text-[#2DC48D]">{t.telegramResponseTimeLabel}</div>
               </div>
             </div>
-            <span className="text-gray-300">›</span>
+            <span className="text-gray-400">›</span>
           </a>
 
           <a href="mailto:support@invoices.kz"
@@ -44,7 +44,7 @@ export default function Support() {
                 <div className="text-xs text-gray-400">{t.emailResponseTimeLabel}</div>
               </div>
             </div>
-            <span className="text-gray-300">›</span>
+            <span className="text-gray-400">›</span>
           </a>
         </div>
 
@@ -55,7 +55,7 @@ export default function Support() {
             <details key={i} className={`group px-4 ${i < arr.length - 1 ? 'border-b border-gray-100' : ''}`}>
               <summary className="py-3.5 text-sm font-medium text-[#1C2056] cursor-pointer list-none flex items-center justify-between">
                 {item.q}
-                <span className="text-gray-300 group-open:rotate-90 transition-transform">›</span>
+                <span className="text-gray-400 group-open:rotate-90 transition-transform">›</span>
               </summary>
               <p className="text-sm text-gray-500 pb-3.5">{item.a}</p>
             </details>

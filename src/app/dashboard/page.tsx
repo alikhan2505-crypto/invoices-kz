@@ -455,7 +455,7 @@ export default function Dashboard() {
           <div className="bg-white rounded-2xl shadow-sm p-5 mb-4">
             <div className="flex items-center justify-between mb-4">
               <div className="font-medium text-[#1C2056]">{t.onboardingTitle}</div>
-              <button onClick={() => setShowOnboarding(false)} className="text-gray-300 hover:text-gray-500 text-lg" aria-label={closeLabel(lang)}>✕</button>
+              <button onClick={() => setShowOnboarding(false)} className="text-gray-400 hover:text-gray-500 text-lg" aria-label={closeLabel(lang)}>✕</button>
             </div>
             <div className="space-y-3">
               {[
@@ -507,7 +507,7 @@ export default function Dashboard() {
                     <div className="text-xs text-gray-400 mt-0.5">{t.binLabel(clientBin)}</div>
                     {clientEmail && <div className="text-xs text-gray-400">{clientEmail}</div>}
                   </div>
-                  <button onClick={clearClient} className="text-gray-300 hover:text-red-400 text-xl" aria-label={deleteLabel(lang)}>✕</button>
+                  <button onClick={clearClient} className="text-gray-400 hover:text-red-400 text-xl" aria-label={deleteLabel(lang)}>✕</button>
                 </div>
                 <div>
                   <label className="text-xs text-gray-500 mb-1 block">{t.knpLabel}</label>
@@ -636,7 +636,7 @@ export default function Dashboard() {
                       placeholder={t.serviceNamePlaceholder} value={svc.name}
                       onChange={e => updateService(idx, 'name', e.target.value)} />
                     {services.length > 1 && (
-                      <button onClick={() => removeService(idx)} className="text-gray-300 hover:text-red-400 text-xl mt-1" aria-label={deleteLabel(lang)}>×</button>
+                      <button onClick={() => removeService(idx)} className="text-gray-400 hover:text-red-400 text-xl mt-1" aria-label={deleteLabel(lang)}>×</button>
                     )}
                   </div>
                   <div className="grid grid-cols-4 gap-2">
@@ -802,7 +802,7 @@ export default function Dashboard() {
                     </div>
                     <div className="text-xs text-gray-400 mt-0.5">{bank.iik}</div>
                   </div>
-                  <span className="text-gray-300 text-lg">›</span>
+                  <span className="text-gray-400 text-lg">›</span>
                 </div>
               ))}
             </div>

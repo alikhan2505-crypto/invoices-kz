@@ -97,7 +97,7 @@ export default function Templates() {
                     </button>
                     <button
                       onClick={() => deleteTemplate(tpl.id)}
-                      className="text-gray-300 hover:text-red-400 text-lg">
+                      className="text-gray-400 hover:text-red-400 text-lg">
                       ✕
                     </button>
                   </div>

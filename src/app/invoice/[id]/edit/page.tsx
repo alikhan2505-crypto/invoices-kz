@@ -248,7 +248,7 @@ export default function EditInvoice() {
                     onChange={e => updateService(idx, 'name', e.target.value)}
                   />
                   {services.length > 1 && (
-                    <button onClick={() => removeService(idx)} className="text-gray-300 hover:text-red-400 text-xl mt-1" aria-label={deleteLabel(lang)}>×</button>
+                    <button onClick={() => removeService(idx)} className="text-gray-400 hover:text-red-400 text-xl mt-1" aria-label={deleteLabel(lang)}>×</button>
                   )}
                 </div>
                 <div className="grid grid-cols-4 gap-2">

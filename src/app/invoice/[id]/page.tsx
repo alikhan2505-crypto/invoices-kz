@@ -318,9 +318,9 @@ export default function InvoicePage() {
             🔒 {t.proBadge}
           </span>
         ) : isDisabled ? (
-          <span className="text-xs text-gray-300 flex-shrink-0">—</span>
+          <span className="text-xs text-gray-400 flex-shrink-0">—</span>
         ) : (
-          <span className="text-gray-300 flex-shrink-0">›</span>
+          <span className="text-gray-400 flex-shrink-0">›</span>
         )}
       </button>
     )
@@ -339,7 +339,7 @@ export default function InvoicePage() {
             🔒 {lockedLabel === t.proLockedLabel ? t.proBadge : t.basicBadge}
           </span>
         ) : (
-          <span className="text-gray-300">›</span>
+          <span className="text-gray-400">›</span>
         )}
       </button>
     )
@@ -491,7 +491,7 @@ export default function InvoicePage() {
             <button key={s.status} onClick={() => updateStatus(s.status)} disabled={updating}
               className={`w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50 text-sm text-left ${i < arr.length - 1 ? 'border-b border-gray-100' : ''}`}>
               <span className="text-[#1C2056]">{s.label}</span>
-              <span className="text-gray-300">›</span>
+              <span className="text-gray-400">›</span>
             </button>
           ))}
         </div>
@@ -501,13 +501,13 @@ export default function InvoicePage() {
           <button onClick={() => router.push('/invoice/' + id + '/edit')}
             className="w-full flex items-center justify-between px-4 py-3.5 text-sm hover:bg-gray-50 text-[#1C2056] border-b border-gray-100">
             <span>{t.editButtonLabel}</span>
-            <span className="text-gray-300">›</span>
+            <span className="text-gray-400">›</span>
           </button>
 
           <button onClick={duplicateInvoice}
             className="w-full flex items-center justify-between px-4 py-3.5 text-sm hover:bg-gray-50 text-[#1C2056] border-b border-gray-100">
             <span>{t.duplicateButtonLabel}</span>
-            <span className="text-gray-300">›</span>
+            <span className="text-gray-400">›</span>
           </button>
 
           {/* КП */}
@@ -661,7 +661,7 @@ export default function InvoicePage() {
           <button onClick={sendReminder}
             className="w-full flex items-center justify-between px-4 py-3.5 text-sm hover:bg-gray-50 text-[#1C2056] border-b border-gray-100">
             <span>{t.remindPaymentButtonLabel}</span>
-            <span className="text-gray-300">›</span>
+            <span className="text-gray-400">›</span>
           </button>
 
           <LockedButton

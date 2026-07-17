@@ -104,7 +104,7 @@ export default function Banks() {
                     {/* Звёздочка — сделать основным */}
                     {!acc.is_main && (
                       <button onClick={() => setMain(acc.id)}
-                        className="text-gray-300 hover:text-yellow-400 text-xl" title={t.setMainTitle}>
+                        className="text-gray-400 hover:text-yellow-400 text-xl" title={t.setMainTitle}>
                         ☆
                       </button>
                     )}
@@ -113,12 +113,12 @@ export default function Banks() {
                     )}
                     {/* Карандаш — редактировать */}
                     <button onClick={() => startEdit(acc)}
-                      className="text-gray-300 hover:text-[#1C2056] text-lg" title={t.editTitle}>
+                      className="text-gray-400 hover:text-[#1C2056] text-lg" title={t.editTitle}>
                       ✏️
                     </button>
                     {/* Крестик — удалить */}
                     <button onClick={() => deleteAccount(acc.id)}
-                      className="text-gray-300 hover:text-red-400 text-lg" title={t.deleteTitle}>
+                      className="text-gray-400 hover:text-red-400 text-lg" title={t.deleteTitle}>
                       ✕
                     </button>
                   </div>

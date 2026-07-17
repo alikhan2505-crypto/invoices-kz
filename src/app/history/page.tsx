@@ -175,7 +175,7 @@ export default function History() {
             onChange={e => setSearch(e.target.value)}
           />
           {search && (
-            <button onClick={() => setSearch('')} className="text-gray-300 hover:text-gray-500" aria-label={clearSearchLabel(lang)}>✕</button>
+            <button onClick={() => setSearch('')} className="text-gray-400 hover:text-gray-500" aria-label={clearSearchLabel(lang)}>✕</button>
           )}
         </div>
 
@@ -286,7 +286,7 @@ export default function History() {
                 </div>
                 <button
                   onClick={(e) => deleteInvoice(e, inv.id, inv.number)}
-                  className="text-gray-300 hover:text-red-400 text-lg p-1 flex-shrink-0">
+                  className="text-gray-400 hover:text-red-400 text-lg p-1 flex-shrink-0">
                   ✕
                 </button>
               </motion.div>

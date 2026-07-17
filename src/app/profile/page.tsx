@@ -192,7 +192,7 @@ export default function Profile() {
                   <span className="text-lg">{item.icon}</span>
                   <span className="text-sm text-gray-800">{item.label}</span>
                 </div>
-                <span className="text-gray-300 text-lg">›</span>
+                <span className="text-gray-400 text-lg">›</span>
               </div>
             ))}
           </div>
@@ -217,7 +217,7 @@ export default function Profile() {
                 </div>
                 <div className="flex items-center gap-2">
                   {item.badge > 0 && <span className="text-xs text-gray-400 font-medium">{item.badge}</span>}
-                  <span className="text-gray-300 text-lg">›</span>
+                  <span className="text-gray-400 text-lg">›</span>
                 </div>
               </div>
             ))}
@@ -236,7 +236,7 @@ export default function Profile() {
                   <span className="text-lg">{item.icon}</span>
                   <span className="text-sm text-gray-800">{item.label}</span>
                 </div>
-                <span className="text-gray-300 text-lg">›</span>
+                <span className="text-gray-400 text-lg">›</span>
               </div>
             ))}
           </div>
@@ -262,7 +262,7 @@ export default function Profile() {
                   </div>
                 </div>
               </div>
-              <span className="text-gray-300 text-lg">›</span>
+              <span className="text-gray-400 text-lg">›</span>
             </div>
 
             {(profile?.plan_expires_at || profile?.bonus_expires_at || profile?.trial_expires_at) && (

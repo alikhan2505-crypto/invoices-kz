@@ -59,7 +59,7 @@ export default function About() {
               onClick={() => router.push(item.href)}
               className={`flex items-center justify-between px-4 py-3.5 cursor-pointer hover:bg-gray-50 ${i < arr.length - 1 ? 'border-b border-gray-100' : ''}`}>
               <span className="text-sm text-gray-800">{item.label}</span>
-              <span className="text-gray-300 text-lg">›</span>
+              <span className="text-gray-400 text-lg">›</span>
             </div>
           ))}
         </div>

@@ -110,7 +110,7 @@ export default function Clients() {
             onChange={e => setSearch(e.target.value)}
           />
           {search && (
-            <button onClick={() => setSearch('')} className="text-gray-300 hover:text-gray-500" aria-label="Очистить поиск">✕</button>
+            <button onClick={() => setSearch('')} className="text-gray-400 hover:text-gray-500" aria-label="Очистить поиск">✕</button>
           )}
         </div>
 
@@ -225,9 +225,9 @@ export default function Clients() {
                 </div>
                 <div className="flex items-center gap-2 ml-3">
                   <button onClick={() => startEdit(client)}
-                    className="text-gray-300 hover:text-[#1C2056] text-lg" aria-label="Изменить">✏️</button>
+                    className="text-gray-400 hover:text-[#1C2056] text-lg" aria-label="Изменить">✏️</button>
                   <button onClick={() => deleteClient(client.id)}
-                    className="text-gray-300 hover:text-red-400 text-lg" aria-label="Удалить">✕</button>
+                    className="text-gray-400 hover:text-red-400 text-lg" aria-label="Удалить">✕</button>
                 </div>
               </div>
             ))}

@@ -117,7 +117,7 @@ export default function Services() {
             onChange={e => setSearch(e.target.value)}
           />
           {search && (
-            <button onClick={() => setSearch('')} className="text-gray-300 hover:text-gray-500" aria-label={clearSearchLabel(lang)}>✕</button>
+            <button onClick={() => setSearch('')} className="text-gray-400 hover:text-gray-500" aria-label={clearSearchLabel(lang)}>✕</button>
           )}
         </div>
 
@@ -229,8 +229,8 @@ export default function Services() {
                         <span className="text-sm font-medium text-[#1C2056]">
                           {Number(svc.price).toLocaleString('ru-KZ')} ₸
                         </span>
-                        <button onClick={() => startEdit(svc)} className="text-gray-300 hover:text-[#1C2056] text-lg" aria-label={editLabel(lang)}>✏️</button>
-                        <button onClick={() => deleteService(svc.id)} className="text-gray-300 hover:text-red-400 text-lg" aria-label={deleteLabel(lang)}>✕</button>
+                        <button onClick={() => startEdit(svc)} className="text-gray-400 hover:text-[#1C2056] text-lg" aria-label={editLabel(lang)}>✏️</button>
+                        <button onClick={() => deleteService(svc.id)} className="text-gray-400 hover:text-red-400 text-lg" aria-label={deleteLabel(lang)}>✕</button>
                       </div>
                     </div>
                   ))}
@@ -259,8 +259,8 @@ export default function Services() {
                         <span className="text-sm font-medium text-[#1C2056]">
                           {Number(svc.price).toLocaleString('ru-KZ')} ₸
                         </span>
-                        <button onClick={() => startEdit(svc)} className="text-gray-300 hover:text-[#1C2056] text-lg" aria-label={editLabel(lang)}>✏️</button>
-                        <button onClick={() => deleteService(svc.id)} className="text-gray-300 hover:text-red-400 text-lg" aria-label={deleteLabel(lang)}>✕</button>
+                        <button onClick={() => startEdit(svc)} className="text-gray-400 hover:text-[#1C2056] text-lg" aria-label={editLabel(lang)}>✏️</button>
+                        <button onClick={() => deleteService(svc.id)} className="text-gray-400 hover:text-red-400 text-lg" aria-label={deleteLabel(lang)}>✕</button>
                       </div>
                     </div>
                   ))}

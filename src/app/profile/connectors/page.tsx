@@ -135,7 +135,7 @@ export default function ConnectorsPage() {
                   }} />
                 {socialLinks.length > 1 && (
                   <button onClick={() => setSocialLinks(socialLinks.filter((_, j) => j !== i))}
-                    className="text-gray-300 hover:text-red-400 text-xl" aria-label={deleteLabel(lang)}>×</button>
+                    className="text-gray-400 hover:text-red-400 text-xl" aria-label={deleteLabel(lang)}>×</button>
                 )}
               </div>
             ))}
