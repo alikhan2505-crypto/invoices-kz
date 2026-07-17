@@ -317,7 +317,7 @@ export default function PublicInvoice() {
                 {/* Главная кнопка — открыть PDF */}
                 <button
                   onClick={openPDF}
-                  className="w-full bg-[#1C2056] text-white rounded-2xl py-4 font-medium text-sm flex items-center justify-center gap-2">
+                  className="w-full bg-[#1C2056] text-white rounded-xl py-4 font-medium text-sm flex items-center justify-center gap-2">
                   {t.openInvoicePdfButton}
                 </button>
 
@@ -325,7 +325,7 @@ export default function PublicInvoice() {
                 <button
                   onClick={markAsPaid}
                   disabled={marking}
-                  className="w-full bg-[#2DC48D] text-white rounded-2xl py-4 font-medium text-sm">
+                  className="w-full bg-[#2DC48D] text-white rounded-xl py-4 font-medium text-sm">
                   {marking ? t.processingButtonLabel : t.alreadyPaidButton}
                 </button>
               </>

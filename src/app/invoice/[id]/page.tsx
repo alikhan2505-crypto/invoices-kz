@@ -709,7 +709,7 @@ export default function InvoicePage() {
             </div>
             <div className="space-y-2">
               <button onClick={() => { setShowUpgradeModal(false); router.push('/upgrade') }}
-                className="w-full bg-[#1C2056] text-white rounded-xl py-3.5 font-medium text-sm">
+                className="w-full bg-[#1C2056] text-white rounded-xl py-4 font-medium text-sm">
                 {t.goToPlansButton}
               </button>
               <button onClick={() => setShowUpgradeModal(false)}

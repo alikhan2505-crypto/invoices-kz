@@ -75,7 +75,7 @@ export default function Login() {
               onKeyDown={e => e.key === 'Enter' && sendLink()}
             />
             <button onClick={sendLink} disabled={loading}
-              className="w-full bg-[#2DC48D] text-white rounded-lg py-3 font-medium text-sm">
+              className="w-full bg-[#2DC48D] text-white rounded-xl py-4 font-medium text-sm">
               {loading ? t.sendingButton : t.sendLinkButton}
             </button>
           </>
