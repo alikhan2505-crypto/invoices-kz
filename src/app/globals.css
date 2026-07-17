@@ -302,3 +302,26 @@ html {
   scrollbar-width: thin;
 }
 
+/* Desktop hover micro-interaction for primary/secondary buttons — gated to
+   real mouse-hover on a desktop-width viewport so it never sticks after a
+   tap on touch devices. */
+@media (hover: hover) and (pointer: fine) and (min-width: 1024px) {
+  button.bg-\[\#1C2056\]:not(:disabled),
+  button.bg-\[\#2DC48D\]:not(:disabled) {
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), filter 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  button.bg-\[\#1C2056\]:not(:disabled):hover,
+  button.bg-\[\#2DC48D\]:not(:disabled):hover {
+    transform: scale(1.02);
+    filter: brightness(0.9);
+  }
+
+  button.border-\[\#1C2056\]:not(:disabled) {
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  button.border-\[\#1C2056\]:not(:disabled):hover {
+    transform: scale(1.02);
+    background-color: rgba(28, 32, 86, 0.06);
+  }
+}
+
