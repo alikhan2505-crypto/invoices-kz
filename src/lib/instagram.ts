@@ -1,4 +1,8 @@
-const GRAPH_API = 'https://graph.facebook.com/v21.0'
+// "Instagram API with Instagram Login" tokens (prefixed IGAA...) are only
+// valid against graph.instagram.com — the classic graph.facebook.com host
+// (used by the older Facebook-Login flavor of this API) can't parse them
+// at all, which surfaces as an opaque "Cannot parse access token" error.
+const GRAPH_API = 'https://graph.instagram.com/v21.0'
 
 export async function publishToInstagram(imageUrl: string, caption: string): Promise<string> {
   const igUserId = process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID
