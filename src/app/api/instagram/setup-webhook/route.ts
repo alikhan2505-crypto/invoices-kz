@@ -14,7 +14,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'TELEGRAM_BOT_TOKEN not configured' }, { status: 500 })
   }
 
-  const webhookUrl = 'https://invoices.kz/api/instagram/telegram-webhook'
+  // Must be the canonical host — the bare domain 307-redirects to www, and
+  // Telegram treats a redirect response as a delivery failure rather than
+  // following it, silently dropping every update.
+  const webhookUrl = 'https://www.invoices.kz/api/instagram/telegram-webhook'
   const res = await fetch(`https://api.telegram.org/bot${token}/setWebhook`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
