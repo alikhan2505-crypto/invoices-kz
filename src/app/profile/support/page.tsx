@@ -1,6 +1,7 @@
 'use client'
 import { useRouter } from 'next/navigation'
 import { useLanguage } from '@/components/LanguageProvider'
+import { backLabel } from '@/lib/a11yLabels'
 import { profileContentDict } from '@/lib/i18n/profileContent'
 
 export default function Support() {
@@ -11,7 +12,7 @@ export default function Support() {
   return (
     <main className="min-h-screen bg-gray-50">
       <div className="bg-white border-b px-4 py-4 flex items-center gap-3">
-        <button onClick={() => router.push('/profile')} className="back-btn text-gray-400 text-xl">‹</button>
+        <button onClick={() => router.push('/profile')} className="back-btn text-gray-400 text-xl" aria-label={backLabel(lang)}>‹</button>
         <span className="font-semibold text-[#1C2056]">{t.supportHeaderLabel}</span>
       </div>
 

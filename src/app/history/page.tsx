@@ -8,6 +8,7 @@ import DesktopShell from '@/components/DesktopShell'
 import * as XLSX from 'xlsx'
 import { formatDateTime, formatDate } from '@/lib/date'
 import { useLanguage } from '@/components/LanguageProvider'
+import { clearSearchLabel } from '@/lib/a11yLabels'
 import { historyDict } from '@/lib/i18n/history'
 import Skeleton from '@/components/Skeleton'
 
@@ -174,7 +175,7 @@ export default function History() {
             onChange={e => setSearch(e.target.value)}
           />
           {search && (
-            <button onClick={() => setSearch('')} className="text-gray-300 hover:text-gray-500">✕</button>
+            <button onClick={() => setSearch('')} className="text-gray-300 hover:text-gray-500" aria-label={clearSearchLabel(lang)}>✕</button>
           )}
         </div>
 

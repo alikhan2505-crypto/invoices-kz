@@ -5,6 +5,7 @@ import { startRegistration } from '@simplewebauthn/browser'
 import { supabase } from '@/lib/supabase'
 import { formatDate } from '@/lib/date'
 import { useLanguage } from '@/components/LanguageProvider'
+import { backLabel } from '@/lib/a11yLabels'
 import { profileAccountsDict } from '@/lib/i18n/profileAccounts'
 
 type Passkey = { id: string; device_label: string | null; created_at: string; last_used_at: string | null }
@@ -84,7 +85,7 @@ export default function Security() {
   return (
     <main className="min-h-screen bg-gray-50">
       <div className="bg-white border-b px-4 py-4 flex items-center gap-3">
-        <button onClick={() => router.push('/profile')} className="back-btn text-gray-400 text-xl">‹</button>
+        <button onClick={() => router.push('/profile')} className="back-btn text-gray-400 text-xl" aria-label={backLabel(lang)}>‹</button>
         <span className="font-semibold text-[#1C2056]">{t.securityHeaderLabel}</span>
       </div>
 

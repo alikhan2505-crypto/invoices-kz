@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { AreaChart, Area, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
 import { formatDateTime, formatDate } from '@/lib/date'
 import { useLanguage } from '@/components/LanguageProvider'
+import { deleteLabel } from '@/lib/a11yLabels'
 import { miscDict } from '@/lib/i18n/misc'
 import { getActivePlan } from '@/lib/plan'
 
@@ -454,7 +455,7 @@ export default function Admin() {
                       {promo.is_active ? t.activeToggleLabel : t.inactiveToggleLabel}
                     </button>
                     <button onClick={() => deletePromo(promo.id)}
-                      className="text-xs text-red-400 hover:text-red-300">✕</button>
+                      className="text-xs text-red-400 hover:text-red-300" aria-label={deleteLabel(lang)}>✕</button>
                   </div>
                 </div>
               ))}

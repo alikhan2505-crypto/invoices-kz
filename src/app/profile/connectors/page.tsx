@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useLanguage } from '@/components/LanguageProvider'
+import { backLabel, deleteLabel } from '@/lib/a11yLabels'
 import { profileAccountsDict, ProfileAccountsContent } from '@/lib/i18n/profileAccounts'
 
 function getSocialIcon(url: string): string {
@@ -78,7 +79,7 @@ export default function ConnectorsPage() {
   return (
     <main className="min-h-screen bg-gray-50 pb-8">
       <div className="bg-white border-b px-4 py-4 flex items-center gap-3">
-        <button onClick={() => router.push('/profile')} className="back-btn text-gray-400 text-xl">‹</button>
+        <button onClick={() => router.push('/profile')} className="back-btn text-gray-400 text-xl" aria-label={backLabel(lang)}>‹</button>
         <span className="font-semibold text-[#1C2056]">{t.connectorsHeaderLabel}</span>
       </div>
 
@@ -134,7 +135,7 @@ export default function ConnectorsPage() {
                   }} />
                 {socialLinks.length > 1 && (
                   <button onClick={() => setSocialLinks(socialLinks.filter((_, j) => j !== i))}
-                    className="text-gray-300 hover:text-red-400 text-xl">×</button>
+                    className="text-gray-300 hover:text-red-400 text-xl" aria-label={deleteLabel(lang)}>×</button>
                 )}
               </div>
             ))}

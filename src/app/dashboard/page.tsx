@@ -11,6 +11,7 @@ import { cacheGet, cacheSet } from '@/lib/cache'
 import { getActivePlan } from '@/lib/plan'
 import { formatDate } from '@/lib/date'
 import { useLanguage } from '@/components/LanguageProvider'
+import { closeLabel, deleteLabel } from '@/lib/a11yLabels'
 import { invoiceFlowDict } from '@/lib/i18n/invoiceFlow'
 
 const UNIT_OPTIONS = ['шт', 'кг', 'л', 'м', 'м²', 'м³', 'час', 'день', 'месяц', 'услуга', 'работа']
@@ -454,7 +455,7 @@ export default function Dashboard() {
           <div className="bg-white rounded-2xl shadow-sm p-5 mb-4">
             <div className="flex items-center justify-between mb-4">
               <div className="font-medium text-[#1C2056]">{t.onboardingTitle}</div>
-              <button onClick={() => setShowOnboarding(false)} className="text-gray-300 hover:text-gray-500 text-lg">✕</button>
+              <button onClick={() => setShowOnboarding(false)} className="text-gray-300 hover:text-gray-500 text-lg" aria-label={closeLabel(lang)}>✕</button>
             </div>
             <div className="space-y-3">
               {[
@@ -506,7 +507,7 @@ export default function Dashboard() {
                     <div className="text-xs text-gray-400 mt-0.5">{t.binLabel(clientBin)}</div>
                     {clientEmail && <div className="text-xs text-gray-400">{clientEmail}</div>}
                   </div>
-                  <button onClick={clearClient} className="text-gray-300 hover:text-red-400 text-xl">✕</button>
+                  <button onClick={clearClient} className="text-gray-300 hover:text-red-400 text-xl" aria-label={deleteLabel(lang)}>✕</button>
                 </div>
                 <div>
                   <label className="text-xs text-gray-500 mb-1 block">{t.knpLabel}</label>
@@ -635,7 +636,7 @@ export default function Dashboard() {
                       placeholder={t.serviceNamePlaceholder} value={svc.name}
                       onChange={e => updateService(idx, 'name', e.target.value)} />
                     {services.length > 1 && (
-                      <button onClick={() => removeService(idx)} className="text-gray-300 hover:text-red-400 text-xl mt-1">×</button>
+                      <button onClick={() => removeService(idx)} className="text-gray-300 hover:text-red-400 text-xl mt-1" aria-label={deleteLabel(lang)}>×</button>
                     )}
                   </div>
                   <div className="grid grid-cols-4 gap-2">
@@ -737,7 +738,7 @@ export default function Dashboard() {
           <div className="bg-white w-full max-w-lg mx-auto rounded-t-3xl p-5 max-h-[70vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <span className="font-semibold text-[#1C2056]">{t.servicePickerTitle}</span>
-              <button onClick={() => setShowServicePicker(false)} className="back-btn text-gray-400 text-xl">✕</button>
+              <button onClick={() => setShowServicePicker(false)} className="back-btn text-gray-400 text-xl" aria-label={closeLabel(lang)}>✕</button>
             </div>
             <div className="space-y-2">
               {savedServices.map(s => (
@@ -788,7 +789,7 @@ export default function Dashboard() {
 
                 setShowBankPicker(false)
                 setPendingInvoiceData(null)
-              }} className="back-btn text-gray-400 text-xl">✕</button>
+              }} className="back-btn text-gray-400 text-xl" aria-label={closeLabel(lang)}>✕</button>
             </div>
             <div className="space-y-2">
               {bankAccounts.map(bank => (

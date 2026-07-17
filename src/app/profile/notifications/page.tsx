@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import LoadingSpinner from '@/components/LoadingSpinner'
 import { useLanguage } from '@/components/LanguageProvider'
+import { backLabel } from '@/lib/a11yLabels'
 import { profileAccountsDict } from '@/lib/i18n/profileAccounts'
 
 export default function Notifications() {
@@ -109,7 +110,7 @@ export default function Notifications() {
     <main className="min-h-screen bg-gray-50">
       <div className="bg-white border-b px-4 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <button onClick={() => router.push('/profile')} className="back-btn text-gray-400 text-xl">‹</button>
+          <button onClick={() => router.push('/profile')} className="back-btn text-gray-400 text-xl" aria-label={backLabel(lang)}>‹</button>
           <span className="font-semibold text-[#1C2056]">{t.notificationsHeaderLabel}</span>
         </div>
         {saving && <span className="text-xs text-gray-400">{t.savingLabel}</span>}

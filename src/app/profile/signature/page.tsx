@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { resizeToFit } from '@/lib/imageResize'
 import { useLanguage } from '@/components/LanguageProvider'
+import { backLabel, closeLabel } from '@/lib/a11yLabels'
 import { profileCoreDict } from '@/lib/i18n/profileCore'
 
 export default function Signature() {
@@ -427,7 +428,7 @@ export default function Signature() {
   return (
     <main className="min-h-screen bg-gray-50 flex flex-col">
       <div className="sticky top-0 z-10 bg-white border-b px-4 py-4 flex items-center gap-3">
-        <button onClick={() => router.push('/profile')} className="back-btn text-gray-400 text-xl">‹</button>
+        <button onClick={() => router.push('/profile')} className="back-btn text-gray-400 text-xl" aria-label={backLabel(lang)}>‹</button>
         <span className="font-semibold text-[#1C2056]">{t.signatureHeaderLabel}</span>
       </div>
 
@@ -581,7 +582,7 @@ export default function Signature() {
                 <div className="font-semibold text-[#1C2056]">{t.cropModalTitle}</div>
                 <div className="text-xs text-gray-400 mt-0.5">{t.cropModalSubtitle}</div>
               </div>
-              <button onClick={() => setShowCropModal(false)} className="back-btn text-gray-400 text-xl">✕</button>
+              <button onClick={() => setShowCropModal(false)} className="back-btn text-gray-400 text-xl" aria-label={closeLabel(lang)}>✕</button>
             </div>
 
             {/* Canvas кропа */}

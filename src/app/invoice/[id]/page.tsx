@@ -10,6 +10,7 @@ import { generateAVR } from '@/lib/generateAVR'
 import { generateNakladnaya } from '@/lib/generateNakladnaya'
 import { getActivePlan } from '@/lib/plan'
 import { useLanguage } from '@/components/LanguageProvider'
+import { backLabel } from '@/lib/a11yLabels'
 import { invoiceFlowDict } from '@/lib/i18n/invoiceFlow'
 import AppNav from '@/components/AppNav'
 import DesktopShell from '@/components/DesktopShell'
@@ -248,7 +249,7 @@ export default function InvoicePage() {
     <DesktopShell>
     <main className="min-h-screen bg-gray-50 pb-8 lg:pb-6 lg:min-h-full">
       <div className="sticky top-0 z-30 bg-white border-b px-4 py-4 flex items-center gap-3 lg:h-16">
-        <button onClick={() => router.push('/history')} className="back-btn text-gray-400 text-xl">‹</button>
+        <button onClick={() => router.push('/history')} className="back-btn text-gray-400 text-xl" aria-label={backLabel(lang)}>‹</button>
         <Skeleton className="h-4 w-24" />
       </div>
       <div className="max-w-lg lg:max-w-5xl mx-auto p-4">
@@ -348,7 +349,7 @@ export default function InvoicePage() {
     <DesktopShell>
     <main className="min-h-screen bg-gray-50 pb-8 lg:pb-6 lg:min-h-full">
       <div className="sticky top-0 z-30 bg-white border-b px-4 py-4 flex items-center gap-3 lg:h-16">
-        <button onClick={() => router.push('/history')} className="back-btn text-gray-400 text-xl">‹</button>
+        <button onClick={() => router.push('/history')} className="back-btn text-gray-400 text-xl" aria-label={backLabel(lang)}>‹</button>
         <span className="font-semibold text-[#1C2056]">{t.invoiceHeaderTitle(invoice.number)}</span>
       </div>
 

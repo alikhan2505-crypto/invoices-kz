@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useLanguage } from '@/components/LanguageProvider'
+import { backLabel, editLabel, deleteLabel, clearSearchLabel } from '@/lib/a11yLabels'
 import { profileContentDict } from '@/lib/i18n/profileContent'
 
 const UNIT_OPTIONS = ['шт', 'кг', 'л', 'м', 'м²', 'м³', 'час', 'день', 'месяц', 'услуга', 'работа']
@@ -94,7 +95,7 @@ export default function Services() {
     <main className="min-h-screen bg-gray-50">
       <div className="bg-white border-b px-4 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <button onClick={() => router.push('/profile')} className="back-btn text-gray-400 text-xl">‹</button>
+          <button onClick={() => router.push('/profile')} className="back-btn text-gray-400 text-xl" aria-label={backLabel(lang)}>‹</button>
           <span className="font-semibold text-[#1C2056]">{t.servicesHeaderLabel}</span>
         </div>
         {!showForm && (
@@ -116,7 +117,7 @@ export default function Services() {
             onChange={e => setSearch(e.target.value)}
           />
           {search && (
-            <button onClick={() => setSearch('')} className="text-gray-300 hover:text-gray-500">✕</button>
+            <button onClick={() => setSearch('')} className="text-gray-300 hover:text-gray-500" aria-label={clearSearchLabel(lang)}>✕</button>
           )}
         </div>
 
@@ -228,8 +229,8 @@ export default function Services() {
                         <span className="text-sm font-medium text-[#1C2056]">
                           {Number(svc.price).toLocaleString('ru-KZ')} ₸
                         </span>
-                        <button onClick={() => startEdit(svc)} className="text-gray-300 hover:text-[#1C2056] text-lg">✏️</button>
-                        <button onClick={() => deleteService(svc.id)} className="text-gray-300 hover:text-red-400 text-lg">✕</button>
+                        <button onClick={() => startEdit(svc)} className="text-gray-300 hover:text-[#1C2056] text-lg" aria-label={editLabel(lang)}>✏️</button>
+                        <button onClick={() => deleteService(svc.id)} className="text-gray-300 hover:text-red-400 text-lg" aria-label={deleteLabel(lang)}>✕</button>
                       </div>
                     </div>
                   ))}
@@ -258,8 +259,8 @@ export default function Services() {
                         <span className="text-sm font-medium text-[#1C2056]">
                           {Number(svc.price).toLocaleString('ru-KZ')} ₸
                         </span>
-                        <button onClick={() => startEdit(svc)} className="text-gray-300 hover:text-[#1C2056] text-lg">✏️</button>
-                        <button onClick={() => deleteService(svc.id)} className="text-gray-300 hover:text-red-400 text-lg">✕</button>
+                        <button onClick={() => startEdit(svc)} className="text-gray-300 hover:text-[#1C2056] text-lg" aria-label={editLabel(lang)}>✏️</button>
+                        <button onClick={() => deleteService(svc.id)} className="text-gray-300 hover:text-red-400 text-lg" aria-label={deleteLabel(lang)}>✕</button>
                       </div>
                     </div>
                   ))}

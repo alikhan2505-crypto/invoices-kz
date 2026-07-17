@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useLanguage } from '@/components/LanguageProvider'
+import { backLabel, deleteLabel } from '@/lib/a11yLabels'
 import { invoiceFlowDict } from '@/lib/i18n/invoiceFlow'
 import AppNav from '@/components/AppNav'
 import DesktopShell from '@/components/DesktopShell'
@@ -135,7 +136,7 @@ export default function EditInvoice() {
     <DesktopShell>
     <main className="min-h-screen bg-gray-50 pb-8 lg:pb-6 lg:min-h-full">
       <div className="sticky top-0 z-10 bg-white border-b px-4 py-4 flex items-center gap-3 lg:h-16">
-        <button onClick={() => router.push('/invoice/' + id)} className="back-btn text-gray-400 text-xl">‹</button>
+        <button onClick={() => router.push('/invoice/' + id)} className="back-btn text-gray-400 text-xl" aria-label={backLabel(lang)}>‹</button>
         <Skeleton className="h-4 w-32" />
       </div>
       <div className="max-w-lg mx-auto p-4 space-y-4">
@@ -152,7 +153,7 @@ export default function EditInvoice() {
     <DesktopShell>
     <main className="min-h-screen bg-gray-50 pb-8 lg:pb-6 lg:min-h-full">
       <div className="sticky top-0 z-10 bg-white border-b px-4 py-4 flex items-center gap-3 lg:h-16">
-        <button onClick={() => router.push('/invoice/' + id)} className="back-btn text-gray-400 text-xl">‹</button>
+        <button onClick={() => router.push('/invoice/' + id)} className="back-btn text-gray-400 text-xl" aria-label={backLabel(lang)}>‹</button>
         <span className="font-semibold text-[#1C2056]">{t.editInvoiceHeaderTitle}</span>
       </div>
 
@@ -247,7 +248,7 @@ export default function EditInvoice() {
                     onChange={e => updateService(idx, 'name', e.target.value)}
                   />
                   {services.length > 1 && (
-                    <button onClick={() => removeService(idx)} className="text-gray-300 hover:text-red-400 text-xl mt-1">×</button>
+                    <button onClick={() => removeService(idx)} className="text-gray-300 hover:text-red-400 text-xl mt-1" aria-label={deleteLabel(lang)}>×</button>
                   )}
                 </div>
                 <div className="grid grid-cols-4 gap-2">

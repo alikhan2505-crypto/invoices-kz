@@ -88,7 +88,7 @@ export default function Clients() {
     <main className="min-h-screen bg-gray-50">
       <div className="bg-white border-b px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <button onClick={() => router.push('/profile')} className="back-btn text-gray-400 text-xl">‹</button>
+          <button onClick={() => router.push('/profile')} className="back-btn text-gray-400 text-xl" aria-label="Назад">‹</button>
           <span className="font-semibold text-[#1C2056]">Мои клиенты</span>
         </div>
         {!showForm && (
@@ -110,7 +110,7 @@ export default function Clients() {
             onChange={e => setSearch(e.target.value)}
           />
           {search && (
-            <button onClick={() => setSearch('')} className="text-gray-300 hover:text-gray-500">✕</button>
+            <button onClick={() => setSearch('')} className="text-gray-300 hover:text-gray-500" aria-label="Очистить поиск">✕</button>
           )}
         </div>
 
@@ -225,9 +225,9 @@ export default function Clients() {
                 </div>
                 <div className="flex items-center gap-2 ml-3">
                   <button onClick={() => startEdit(client)}
-                    className="text-gray-300 hover:text-[#1C2056] text-lg">✏️</button>
+                    className="text-gray-300 hover:text-[#1C2056] text-lg" aria-label="Изменить">✏️</button>
                   <button onClick={() => deleteClient(client.id)}
-                    className="text-gray-300 hover:text-red-400 text-lg">✕</button>
+                    className="text-gray-300 hover:text-red-400 text-lg" aria-label="Удалить">✕</button>
                 </div>
               </div>
             ))}
