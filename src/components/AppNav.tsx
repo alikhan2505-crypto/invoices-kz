@@ -164,8 +164,10 @@ export default function AppNav({ desktopOnly = false }: { desktopOnly?: boolean 
             const active = path === item.href
             return (
               <button key={item.href} onClick={() => router.push(item.href)}
-                className="relative w-20 h-16 rounded-2xl flex flex-col items-center justify-center gap-1.5 z-10 transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:scale-110">
-                {item.icon(active, true)}
+                className="group relative w-20 h-16 rounded-2xl flex flex-col items-center justify-center gap-1.5 z-10">
+                <span className="transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-110">
+                  {item.icon(active, true)}
+                </span>
                 <span className={`text-xs leading-none whitespace-nowrap ${active ? 'text-white font-medium' : 'text-gray-400'}`}>
                   {item.label}
                 </span>
