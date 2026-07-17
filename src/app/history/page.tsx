@@ -9,6 +9,7 @@ import * as XLSX from 'xlsx'
 import { formatDateTime, formatDate } from '@/lib/date'
 import { useLanguage } from '@/components/LanguageProvider'
 import { historyDict } from '@/lib/i18n/history'
+import Skeleton from '@/components/Skeleton'
 
 const statusColor: Record<string, string> = {
   paid: 'bg-green-100 text-green-700',
@@ -224,7 +225,22 @@ export default function History() {
         )}
 
         {loading ? (
-          <p className="text-center text-gray-400 py-8">{t.loadingLabel}</p>
+          <div className="bg-white rounded-2xl shadow-sm overflow-hidden mb-4 lg:bg-transparent lg:shadow-none lg:rounded-none lg:overflow-visible lg:grid lg:grid-cols-2 lg:gap-3">
+            {[0, 1, 2, 3, 4].map(i => (
+              <div key={i}
+                className={`flex items-center p-4 ${i < 4 ? 'border-b border-gray-100' : ''} lg:border-b-0 lg:rounded-xl lg:bg-white lg:shadow-sm`}>
+                <div className="flex-1">
+                  <Skeleton className="h-3 w-16 mb-2" />
+                  <Skeleton className="h-4 w-32 mb-1.5" />
+                  <Skeleton className="h-3 w-24" />
+                </div>
+                <div className="text-right">
+                  <Skeleton className="h-4 w-16 mb-1.5 ml-auto" />
+                  <Skeleton className="h-5 w-14 rounded-full ml-auto" />
+                </div>
+              </div>
+            ))}
+          </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-12">
             <div className="text-4xl mb-3">📄</div>

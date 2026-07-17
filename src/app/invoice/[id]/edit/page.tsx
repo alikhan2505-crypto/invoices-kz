@@ -6,6 +6,7 @@ import { useLanguage } from '@/components/LanguageProvider'
 import { invoiceFlowDict } from '@/lib/i18n/invoiceFlow'
 import AppNav from '@/components/AppNav'
 import DesktopShell from '@/components/DesktopShell'
+import Skeleton from '@/components/Skeleton'
 
 const UNIT_OPTIONS = ['шт', 'кг', 'л', 'м', 'м²', 'м³', 'час', 'день', 'месяц', 'услуга', 'работа']
 
@@ -131,9 +132,20 @@ export default function EditInvoice() {
   }
 
   if (loading) return (
-    <main className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <p className="text-gray-400">{t.loadingLabel}</p>
+    <DesktopShell>
+    <main className="min-h-screen bg-gray-50 pb-8 lg:pb-6 lg:min-h-full">
+      <div className="sticky top-0 z-10 bg-white border-b px-4 py-4 flex items-center gap-3 lg:h-16">
+        <button onClick={() => router.push('/invoice/' + id)} className="back-btn text-gray-400 text-xl">‹</button>
+        <Skeleton className="h-4 w-32" />
+      </div>
+      <div className="max-w-lg mx-auto p-4 space-y-4">
+        <Skeleton className="h-48 rounded-2xl" />
+        <Skeleton className="h-32 rounded-2xl" />
+        <Skeleton className="h-24 rounded-2xl" />
+      </div>
+      <AppNav desktopOnly />
     </main>
+    </DesktopShell>
   )
 
   return (

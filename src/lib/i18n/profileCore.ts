@@ -12,6 +12,8 @@ export interface ProfileCoreContent {
   incomeThisMonthLabel: string
   totalInvoicesLabel: (count: number) => string
   chartIncomeLabel: string
+  noInvoicesYetHint: string
+  createFirstInvoiceButton: string
   companySectionLabel: string
   requisitesMenuLabel: string
   signatureMenuLabel: string
@@ -130,6 +132,8 @@ export const profileCoreDict: Record<'ru' | 'kk' | 'en', ProfileCoreContent> = {
     incomeThisMonthLabel: 'Доход за месяц',
     totalInvoicesLabel: (count: number) => `Всего счетов: ${count}`,
     chartIncomeLabel: 'Доход',
+    noInvoicesYetHint: 'Здесь появится доход, когда вы создадите первый счёт',
+    createFirstInvoiceButton: 'Создать первый счёт',
     companySectionLabel: 'Компания',
     requisitesMenuLabel: 'Реквизиты',
     signatureMenuLabel: 'Брендинг',
@@ -243,6 +247,8 @@ export const profileCoreDict: Record<'ru' | 'kk' | 'en', ProfileCoreContent> = {
     incomeThisMonthLabel: 'Айлық табыс',
     totalInvoicesLabel: (count: number) => `Барлық шоттар: ${count}`,
     chartIncomeLabel: 'Табыс',
+    noInvoicesYetHint: 'Алғашқы шотты жасағанда мұнда табыс көрсетіледі',
+    createFirstInvoiceButton: 'Алғашқы шотты жасау',
     companySectionLabel: 'Компания',
     requisitesMenuLabel: 'Деректемелер',
     signatureMenuLabel: 'Брендинг',
@@ -356,6 +362,8 @@ export const profileCoreDict: Record<'ru' | 'kk' | 'en', ProfileCoreContent> = {
     incomeThisMonthLabel: 'Income this month',
     totalInvoicesLabel: (count: number) => `Total invoices: ${count}`,
     chartIncomeLabel: 'Income',
+    noInvoicesYetHint: "You'll see income here once you create your first invoice",
+    createFirstInvoiceButton: 'Create your first invoice',
     companySectionLabel: 'Company',
     requisitesMenuLabel: 'Company details',
     signatureMenuLabel: 'Branding',

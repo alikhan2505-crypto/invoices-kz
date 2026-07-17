@@ -14,6 +14,7 @@ import { invoiceFlowDict } from '@/lib/i18n/invoiceFlow'
 import AppNav from '@/components/AppNav'
 import DesktopShell from '@/components/DesktopShell'
 import InvoiceLivePreview from '@/components/InvoiceLivePreview'
+import Skeleton from '@/components/Skeleton'
 
 const statusIcon: Record<string, string> = {
   paid: '✅', sent: '📤', overdue: '⏰', draft: '📝', viewed: '👁'
@@ -244,12 +245,29 @@ export default function InvoicePage() {
   }
 
   if (loading) return (
-    <main className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="text-center">
-        <div className="w-8 h-8 border-2 border-[#1C2056] border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-        <p className="text-gray-400 text-sm">{t.loadingLabel}</p>
+    <DesktopShell>
+    <main className="min-h-screen bg-gray-50 pb-8 lg:pb-6 lg:min-h-full">
+      <div className="sticky top-0 z-30 bg-white border-b px-4 py-4 flex items-center gap-3 lg:h-16">
+        <button onClick={() => router.push('/history')} className="back-btn text-gray-400 text-xl">‹</button>
+        <Skeleton className="h-4 w-24" />
       </div>
+      <div className="max-w-lg lg:max-w-5xl mx-auto p-4">
+      <div className="lg:flex lg:gap-6 lg:items-start">
+      <div className="lg:flex-1 lg:min-w-0 space-y-4">
+        <Skeleton className="h-28 rounded-2xl" />
+        <div className="grid grid-cols-4 gap-2">
+          {[0, 1, 2, 3].map(i => <Skeleton key={i} className="h-16 rounded-xl" />)}
+        </div>
+        <Skeleton className="h-40 rounded-2xl" />
+      </div>
+      <div className="hidden lg:block lg:w-[380px]">
+        <Skeleton className="h-96 rounded-2xl" />
+      </div>
+      </div>
+      </div>
+      <AppNav desktopOnly />
     </main>
+    </DesktopShell>
   )
 
   if (!invoice) return (

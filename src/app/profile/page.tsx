@@ -12,6 +12,7 @@ import { cacheGet, cacheSet, cacheClear } from '@/lib/cache'
 import { getActivePlan } from '@/lib/plan'
 import { profileCoreDict } from '@/lib/i18n/profileCore'
 import { useMediaQuery } from '@/lib/useMediaQuery'
+import Skeleton from '@/components/Skeleton'
 
 export default function Profile() {
   const router = useRouter()
@@ -84,9 +85,19 @@ export default function Profile() {
 
 
   if (loading && !profile) return (
-    <main className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <p className="text-gray-400">{t.loadingLabel}</p>
+    <DesktopShell>
+    <main className="min-h-screen bg-gray-50 pb-24 lg:pb-6 lg:min-h-full">
+      <div className="sticky top-0 z-30 bg-white border-b px-4 py-3 flex items-center justify-between lg:h-16">
+        <span className="font-bold text-[#1C2056]">INVOICES.KZ</span>
+      </div>
+      <div className="max-w-lg lg:max-w-5xl mx-auto p-4 space-y-4">
+        <Skeleton className="h-32 rounded-2xl" />
+        <Skeleton className="h-40 rounded-2xl" />
+        <Skeleton className="h-40 rounded-2xl" />
+      </div>
+      <AppNav />
     </main>
+    </DesktopShell>
   )
 
   const initials = profile?.company_name ? profile.company_name.slice(0, 2).toUpperCase() : 'FP'
@@ -119,10 +130,22 @@ export default function Profile() {
             </div>
           </div>
           <div className="bg-gray-50 rounded-xl p-4">
+            {stats.invoices === 0 ? (
+              <div className="text-center py-2">
+                <p className="text-sm text-gray-400 mb-3">{t.noInvoicesYetHint}</p>
+                <button onClick={() => router.push('/dashboard')}
+                  className="bg-[#1C2056] text-white px-4 py-2 rounded-lg text-xs font-medium">
+                  {t.createFirstInvoiceButton}
+                </button>
+              </div>
+            ) : (
+              <>
             <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">{t.incomeThisMonthLabel}</div>
             <div className="text-2xl font-bold text-[#1C2056]">{stats.income.toLocaleString('ru-KZ')} ₸</div>
             <div className="text-xs text-[#2DC48D] mt-0.5">{t.totalInvoicesLabel(stats.invoices)}</div>
-            {chartData.some(d => d.income > 0) && (
+              </>
+            )}
+            {stats.invoices > 0 && chartData.some(d => d.income > 0) && (
               <>
                 <div className="mt-3 h-16">
                   <ResponsiveContainer width="100%" height="100%">
