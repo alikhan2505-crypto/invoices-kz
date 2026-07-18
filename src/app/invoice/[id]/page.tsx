@@ -405,6 +405,7 @@ export default function InvoicePage() {
           mode="owner"
           documentId={invoice.id}
           documentTitle={`Счёт №${invoice.number}`}
+          ownerCompanyName={profile?.company_name}
           getHtml={async () => generateInvoicePDF({
             number: invoice.number, date: formatDate(invoice.created_at),
             clientName: invoice.client_name || '', clientBin: invoice.client_bin || '',
@@ -414,7 +415,11 @@ export default function InvoicePage() {
             services: invoice.services || [],
             total: Number(invoice.amount), note: invoice.note || profile?.default_note || '',
             autoPrint: true, vatType: profile?.vat_type,
-            profile: buildProfile(true),
+            // No scanned signature/stamp image here — the document is about
+            // to be cryptographically signed with a real ЭЦП, which would
+            // otherwise sit confusingly next to a static picture implying a
+            // second, unrelated "signature".
+            profile: buildProfile(false),
             bank: bank ? { bank_name: bank.bank_name, iik: bank.iik, bik: bank.bik, kbe: bank.kbe } : undefined,
             kaspiPayLink: profile?.kaspi_pay_link || undefined,
             showWatermark: !ap.isActive,

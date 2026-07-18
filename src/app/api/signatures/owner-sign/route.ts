@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
 import crypto from 'crypto'
-import { sigexRegisterDocument, sigexUploadDocumentData, sigexBuildDDC } from '@/lib/sigex'
+import { sigexRegisterDocument, sigexUploadDocumentData, sigexBuildDDC, sigexGetDocument, parseSignerName } from '@/lib/sigex'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -62,10 +62,16 @@ export async function POST(req: NextRequest) {
   const documentHash = crypto.createHash('sha256').update(pdfBytes).digest('hex')
 
   let sigexDocumentId: string
+  let ownerSignerName: string | null = null
+  let ownerSignerIin: string | null = null
   try {
     const registered = await sigexRegisterDocument(`Счёт №${invoice.number}`, signatureCms)
     sigexDocumentId = registered.documentId
     await sigexUploadDocumentData(sigexDocumentId, pdfBytes)
+    const { signatures } = await sigexGetDocument(sigexDocumentId)
+    const ownerSig = signatures[0]
+    ownerSignerName = parseSignerName(ownerSig?.subject)
+    ownerSignerIin = ownerSig?.userId || null
   } catch (e: any) {
     return NextResponse.json({ error: `SIGEX: ${e.message}` }, { status: 502 })
   }
@@ -75,7 +81,7 @@ export async function POST(req: NextRequest) {
 
   if (!requiresClient) {
     try {
-      const ddcBytes = await sigexBuildDDC(sigexDocumentId, pdfBytes)
+      const ddcBytes = await sigexBuildDDC(sigexDocumentId, pdfBytes, `Schet-${invoice.number}.pdf`)
       const path = `${documentId}/${Date.now()}.pdf`
       const { error: uploadError } = await supabase.storage
         .from('signed-documents')
@@ -102,6 +108,8 @@ export async function POST(req: NextRequest) {
       document_hash: documentHash,
       owner_signed_at: new Date().toISOString(),
       owner_signature_cms: signatureCms,
+      owner_signer_name: ownerSignerName,
+      owner_signer_iin: ownerSignerIin,
       sigex_document_id: sigexDocumentId,
       ddc_pdf_url: ddcPdfUrl,
     })

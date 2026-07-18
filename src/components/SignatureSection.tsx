@@ -11,6 +11,10 @@ type Row = {
   status: 'awaiting_owner' | 'awaiting_client' | 'signed' | 'failed'
   owner_signed_at: string | null
   client_signed_at: string | null
+  owner_signer_name: string | null
+  owner_signer_iin: string | null
+  client_signer_name: string | null
+  client_signer_iin: string | null
   ddc_pdf_url: string | null
   snapshot_pdf_url: string
 }
@@ -18,13 +22,14 @@ type Row = {
 type Props = {
   documentId: string
   documentTitle: string
+  ownerCompanyName?: string
 } & (
   | { mode: 'owner'; getHtml: () => Promise<string> }
   | { mode: 'client' }
 )
 
 export default function SignatureSection(props: Props) {
-  const { documentId, documentTitle, mode } = props
+  const { documentId, documentTitle, mode, ownerCompanyName } = props
   const { lang } = useLanguage()
   const t = signatureDict[lang]
 
@@ -39,7 +44,7 @@ export default function SignatureSection(props: Props) {
   async function loadRow() {
     const { data } = await supabase
       .from('document_signatures')
-      .select('id, status, owner_signed_at, client_signed_at, ddc_pdf_url, snapshot_pdf_url')
+      .select('id, status, owner_signed_at, client_signed_at, owner_signer_name, owner_signer_iin, client_signer_name, client_signer_iin, ddc_pdf_url, snapshot_pdf_url')
       .eq('document_type', 'invoice')
       .eq('document_id', documentId)
       .maybeSingle()
@@ -136,8 +141,23 @@ export default function SignatureSection(props: Props) {
                 {row.client_signed_at ? t.signedBothStatus : t.signedOwnerOnlyStatus}
               </div>
             </div>
+            {row.owner_signer_name && (
+              <div className="text-xs text-gray-600 mb-1">
+                <span className="text-gray-400">{t.signedByLabel}</span>{' '}
+                <span className="font-medium">{row.owner_signer_name}</span>
+                {ownerCompanyName && <span>, {t.onBehalfOfPrefix(ownerCompanyName)}</span>}
+                {row.owner_signer_iin && <span className="text-gray-400"> · {t.iinPrefix(row.owner_signer_iin)}</span>}
+              </div>
+            )}
             {row.owner_signed_at && (
               <div className="text-xs text-gray-400">{t.signedOwnerDatePrefix(formatDateTime(row.owner_signed_at))}</div>
+            )}
+            {row.client_signer_name && (
+              <div className="text-xs text-gray-600 mt-2 mb-1">
+                <span className="text-gray-400">{t.signedByLabel}</span>{' '}
+                <span className="font-medium">{row.client_signer_name}</span>
+                {row.client_signer_iin && <span className="text-gray-400"> · {t.iinPrefix(row.client_signer_iin)}</span>}
+              </div>
             )}
             {row.client_signed_at && (
               <div className="text-xs text-gray-400 mb-3">{t.signedClientDatePrefix(formatDateTime(row.client_signed_at))}</div>

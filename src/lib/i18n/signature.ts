@@ -13,6 +13,9 @@ export interface SignatureContent {
   downloadDocumentButton: string
   downloadVerificationCardButton: string
   errorPrefix: (message: string) => string
+  signedByLabel: string
+  onBehalfOfPrefix: (company: string) => string
+  iinPrefix: (iin: string) => string
 }
 
 export const signatureDict: Record<'ru' | 'kk' | 'en', SignatureContent> = {
@@ -31,6 +34,9 @@ export const signatureDict: Record<'ru' | 'kk' | 'en', SignatureContent> = {
     downloadDocumentButton: 'Скачать документ',
     downloadVerificationCardButton: 'Скачать карточку для проверки подписи',
     errorPrefix: (message: string) => `Ошибка подписания: ${message}`,
+    signedByLabel: 'Подписал(а):',
+    onBehalfOfPrefix: (company: string) => `от имени ${company}`,
+    iinPrefix: (iin: string) => `ИИН ${iin}`,
   },
   kk: {
     sectionLabel: 'Электрондық қолтаңба (ЭЦҚ)',
@@ -47,6 +53,9 @@ export const signatureDict: Record<'ru' | 'kk' | 'en', SignatureContent> = {
     downloadDocumentButton: 'Құжатты жүктеу',
     downloadVerificationCardButton: 'Қолтаңбаны тексеру карточкасын жүктеу',
     errorPrefix: (message: string) => `Қол қою қатесі: ${message}`,
+    signedByLabel: 'Қол қойған:',
+    onBehalfOfPrefix: (company: string) => `${company} атынан`,
+    iinPrefix: (iin: string) => `ЖСН ${iin}`,
   },
   en: {
     sectionLabel: 'Digital signature',
@@ -63,5 +72,8 @@ export const signatureDict: Record<'ru' | 'kk' | 'en', SignatureContent> = {
     downloadDocumentButton: 'Download document',
     downloadVerificationCardButton: 'Download signature verification card',
     errorPrefix: (message: string) => `Signing error: ${message}`,
+    signedByLabel: 'Signed by:',
+    onBehalfOfPrefix: (company: string) => `on behalf of ${company}`,
+    iinPrefix: (iin: string) => `IIN ${iin}`,
   },
 }

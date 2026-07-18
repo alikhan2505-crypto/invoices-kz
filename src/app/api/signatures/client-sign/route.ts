@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
-import { sigexAddSignature, sigexBuildDDC } from '@/lib/sigex'
+import { sigexAddSignature, sigexBuildDDC, sigexGetDocument, parseSignerName } from '@/lib/sigex'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -44,15 +44,21 @@ export async function POST(req: NextRequest) {
   if (!pdfRes.ok) return NextResponse.json({ error: 'Could not fetch snapshot PDF' }, { status: 400 })
   const pdfBytes = new Uint8Array(await pdfRes.arrayBuffer())
 
+  let clientSignerName: string | null = null
+  let clientSignerIin: string | null = null
   try {
     await sigexAddSignature(row.sigex_document_id, signatureCms)
+    const { signatures } = await sigexGetDocument(row.sigex_document_id)
+    const clientSig = signatures[signatures.length - 1]
+    clientSignerName = parseSignerName(clientSig?.subject)
+    clientSignerIin = clientSig?.userId || null
   } catch (e: any) {
     return NextResponse.json({ error: `SIGEX: ${e.message}` }, { status: 502 })
   }
 
   let ddcPdfUrl: string | null = null
   try {
-    const ddcBytes = await sigexBuildDDC(row.sigex_document_id, pdfBytes)
+    const ddcBytes = await sigexBuildDDC(row.sigex_document_id, pdfBytes, `Schet-${invoice.number}.pdf`)
     const path = `${row.document_id}/${Date.now()}.pdf`
     const { error: uploadError } = await supabase.storage
       .from('signed-documents')
@@ -73,6 +79,8 @@ export async function POST(req: NextRequest) {
       status: 'signed',
       client_signed_at: new Date().toISOString(),
       client_signature_cms: signatureCms,
+      client_signer_name: clientSignerName,
+      client_signer_iin: clientSignerIin,
       ddc_pdf_url: ddcPdfUrl,
       updated_at: new Date().toISOString(),
     })

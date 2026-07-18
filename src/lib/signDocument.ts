@@ -9,7 +9,21 @@ import { supabase } from './supabase'
 // exact bytes as a Blob, not a browser "save as" dialog. Pass the HTML with
 // `autoPrint: true` from the caller so it comes back without the on-screen
 // toolbar/buttons baked in.
+//
+// html2pdf's `.from(htmlString)` runs the string through DOMPurify, which —
+// unless told otherwise — treats it as a body fragment and silently drops
+// everything that only makes sense in <head> (our whole <style> block),
+// producing an unstyled, "ugly" PDF with no colors/borders/spacing. Parsing
+// it ourselves with DOMParser (a real, unsanitized HTML parse) and handing
+// html2pdf a DOM element instead of a string skips DOMPurify entirely, since
+// `.from(element)` never sanitizes its input.
 export async function renderPdfBlob(html: string): Promise<Blob> {
+  const parsed = new DOMParser().parseFromString(html, 'text/html')
+  const root = parsed.body.cloneNode(true) as HTMLElement
+  parsed.querySelectorAll('style').forEach(style => {
+    root.insertBefore(style.cloneNode(true), root.firstChild)
+  })
+
   const result = await html2pdf()
     .set({
       margin: 0,
@@ -17,7 +31,7 @@ export async function renderPdfBlob(html: string): Promise<Blob> {
       html2canvas: { scale: 2, useCORS: true, logging: false },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
     })
-    .from(html)
+    .from(root)
     .outputPdf('blob')
   return result as Blob
 }

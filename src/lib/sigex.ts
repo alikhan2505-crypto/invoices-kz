@@ -40,12 +40,37 @@ export async function sigexUploadDocumentData(sigexDocumentId: string, bytes: Ui
   if (!res.ok) throw new Error(`SIGEX document data upload failed: ${res.status}`)
 }
 
+export type SigexSignature = {
+  userId?: string
+  businessId?: string
+  subject?: string
+  storedAt?: number
+}
+
+export async function sigexGetDocument(sigexDocumentId: string) {
+  const res = await fetch(`${SIGEX_BASE}/api/${sigexDocumentId}`)
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok || data.message) throw new Error(data.message || `SIGEX get document failed: ${res.status}`)
+  return data as { signatures: SigexSignature[] }
+}
+
+// Signer's subject comes back as an RFC 4514 DN string, e.g.
+// "CN=АБИЛЬБАЕВ АЛИХАН,SURNAME=АБИЛЬБАЕВ,SERIALNUMBER=IIN890525350143,
+// C=KZ,GIVENNAME=МУХАМЕД-АЛИЕВИЧ" — pull out a human-readable full name.
+export function parseSignerName(subject?: string): string | null {
+  if (!subject) return null
+  const cn = subject.match(/CN=([^,]+)/)?.[1]?.trim()
+  const given = subject.match(/GIVENNAME=([^,]+)/)?.[1]?.trim()
+  if (cn && given) return `${cn} ${given}`
+  return cn || null
+}
+
 // Best-effort — callers should catch and continue without a DDC rather than
 // fail the whole signing flow, since the underlying CMS signatures (the
 // legally meaningful part) are already safely captured by this point.
-export async function sigexBuildDDC(sigexDocumentId: string, bytes: Uint8Array): Promise<Buffer> {
+export async function sigexBuildDDC(sigexDocumentId: string, bytes: Uint8Array, fileName: string): Promise<Buffer> {
   const params = new URLSearchParams({
-    fileName: 'signed.pdf',
+    fileName,
     language: 'ru',
     qrWithIDLink: 'true',
     // We show our own generated PDF (real invoice styling) as the primary

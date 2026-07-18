@@ -276,7 +276,7 @@ export default function History() {
                     </div>
                   </div>
                   <div className="text-right mr-3">
-                    <div className="text-sm font-medium mb-1.5">
+                    <div className="text-sm font-medium text-[#1C2056] mb-1.5">
                       {Number(inv.amount).toLocaleString('ru-KZ')} ₸
                     </div>
                     <span className={`text-xs px-2 py-1 rounded-full ${(statusLabel[inv.status] || statusLabel.draft).color}`}>
