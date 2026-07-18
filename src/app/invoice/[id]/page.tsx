@@ -16,6 +16,7 @@ import AppNav from '@/components/AppNav'
 import DesktopShell from '@/components/DesktopShell'
 import InvoiceLivePreview from '@/components/InvoiceLivePreview'
 import Skeleton from '@/components/Skeleton'
+import SignatureSection from '@/components/SignatureSection'
 
 const statusIcon: Record<string, string> = {
   paid: '✅', sent: '📤', overdue: '⏰', draft: '📝', viewed: '👁'
@@ -399,6 +400,26 @@ export default function InvoicePage() {
             )}
           </button>
         </div>
+
+        <SignatureSection
+          mode="owner"
+          documentId={invoice.id}
+          documentTitle={`Счёт №${invoice.number}`}
+          getHtml={async () => generateInvoicePDF({
+            number: invoice.number, date: formatDate(invoice.created_at),
+            clientName: invoice.client_name || '', clientBin: invoice.client_bin || '',
+            clientEmail: invoice.client_email || '', clientAddress: invoice.client_address || '',
+            clientPhone: invoice.client_phone || '', contractNumber: invoice.contract_number || '',
+            contractDate: invoice.contract_date || '',
+            services: invoice.services || [],
+            total: Number(invoice.amount), note: invoice.note || profile?.default_note || '',
+            autoPrint: true, vatType: profile?.vat_type,
+            profile: buildProfile(true),
+            bank: bank ? { bank_name: bank.bank_name, iik: bank.iik, bik: bank.bik, kbe: bank.kbe } : undefined,
+            kaspiPayLink: profile?.kaspi_pay_link || undefined,
+            showWatermark: !ap.isActive,
+          })}
+        />
 
         {services.length > 0 && (
           <div className="bg-white rounded-2xl shadow-sm overflow-hidden">

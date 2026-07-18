@@ -6,6 +6,7 @@ import { formatDate } from '@/lib/date'
 import { generateInvoicePDF } from '@/lib/generatePDF'
 import { useLanguage } from '@/components/LanguageProvider'
 import { historyDict } from '@/lib/i18n/history'
+import SignatureSection from '@/components/SignatureSection'
 
 export default function PublicInvoice() {
   const { token } = useParams()
@@ -350,6 +351,8 @@ export default function PublicInvoice() {
             </button>
           </div>
         )}
+
+        <SignatureSection mode="client" documentId={invoice.id} documentTitle={`Счёт №${invoice.number}`} />
 
         <div className="text-center py-4">
           <p className="text-xs text-gray-400">{t.createdViaLabel}</p>
