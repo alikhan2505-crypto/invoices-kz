@@ -132,7 +132,9 @@ export default function SignatureSection(props: Props) {
           <div>
             <div className="flex items-center gap-3 mb-2">
               <div className="w-10 h-10 rounded-full bg-[#2DC48D]/10 flex items-center justify-center text-xl">✅</div>
-              <div className="text-sm font-medium text-[#2DC48D]">{t.signedStatus}</div>
+              <div className="text-sm font-medium text-[#2DC48D]">
+                {row.client_signed_at ? t.signedBothStatus : t.signedOwnerOnlyStatus}
+              </div>
             </div>
             {row.owner_signed_at && (
               <div className="text-xs text-gray-400">{t.signedOwnerDatePrefix(formatDateTime(row.owner_signed_at))}</div>
@@ -140,10 +142,18 @@ export default function SignatureSection(props: Props) {
             {row.client_signed_at && (
               <div className="text-xs text-gray-400 mb-3">{t.signedClientDatePrefix(formatDateTime(row.client_signed_at))}</div>
             )}
-            <a href={row.ddc_pdf_url || row.snapshot_pdf_url} target="_blank" rel="noreferrer"
-              className="block text-center border border-[#1C2056] text-[#1C2056] rounded-xl py-2.5 text-sm font-medium">
-              {t.downloadSignedButton}
-            </a>
+            <div className="flex gap-2 mt-1">
+              <a href={row.snapshot_pdf_url} target="_blank" rel="noreferrer"
+                className="flex-1 text-center bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium">
+                {t.downloadDocumentButton}
+              </a>
+            </div>
+            {row.ddc_pdf_url && (
+              <a href={row.ddc_pdf_url} target="_blank" rel="noreferrer"
+                className="block text-center text-xs text-gray-400 underline mt-2">
+                {t.downloadVerificationCardButton}
+              </a>
+            )}
           </div>
         ) : row?.status === 'awaiting_client' && mode === 'owner' ? (
           <div className="text-center py-2 text-sm text-gray-500">{t.awaitingClientStatus}</div>

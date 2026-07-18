@@ -48,6 +48,12 @@ export async function sigexBuildDDC(sigexDocumentId: string, bytes: Uint8Array):
     fileName: 'signed.pdf',
     language: 'ru',
     qrWithIDLink: 'true',
+    // We show our own generated PDF (real invoice styling) as the primary
+    // download and this DDC only as the secondary verification artifact —
+    // SIGEX's own re-rendered preview of the document would otherwise
+    // clash visually with it, and its layout isn't configurable beyond
+    // this include/exclude toggle.
+    withoutDocumentVisualization: 'true',
   })
   const res = await fetch(`${SIGEX_BASE}/api/${sigexDocumentId}/buildDDC?${params.toString()}`, {
     method: 'POST',
