@@ -82,7 +82,7 @@ export default function SignatureSection(props: Props) {
       // invoices.kz UI around it) still shows who signed and when.
       if (json.status === 'signed' && json.ownerSignerName) {
         try {
-          const block = buildAttestationHtml({
+          const block = await buildAttestationHtml({
             title: t.attestationTitle,
             signerName: json.ownerSignerName,
             signerIin: json.ownerSignerIin,
@@ -90,6 +90,8 @@ export default function SignatureSection(props: Props) {
             date: formatDateTime(new Date().toISOString()),
             onBehalfOfText: ownerCompanyName ? t.onBehalfOfPrefix(ownerCompanyName) : undefined,
             iinText: json.ownerSignerIin ? t.iinPrefix(json.ownerSignerIin) : undefined,
+            sigexDocumentId: json.sigexDocumentId,
+            verifyCodeLabel: t.attestationVerifyCodeLabel,
           })
           const displayBlob = await renderPdfBlob(injectAttestationBlock(html, block))
           const displayPdfUrl = await uploadSnapshot(documentId, displayBlob, 'display')

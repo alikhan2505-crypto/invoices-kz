@@ -160,5 +160,6 @@ export async function POST(req: NextRequest) {
     status: row.status,
     ownerSignerName,
     ownerSignerIin,
+    sigexDocumentId,
   })
 }

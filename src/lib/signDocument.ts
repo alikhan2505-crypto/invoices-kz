@@ -1,5 +1,6 @@
 'use client'
 import html2pdf from 'html2pdf.js'
+import QRCode from 'qrcode'
 import { QRSigningClientCMS } from 'sigex-qr-signing-client'
 import { supabase } from './supabase'
 
@@ -57,23 +58,33 @@ export function injectAttestationBlock(html: string, blockHtml: string): string 
     : html + blockHtml
 }
 
-export function buildAttestationHtml(params: {
+// Verification is reachable two ways, per the user's request: the printed
+// QR code (scan to land straight on the verify page) and the plain
+// sigexDocumentId text underneath it (type it in manually — e.g. from a
+// faxed/photocopied document where the QR itself didn't reproduce well).
+export async function buildAttestationHtml(params: {
   title: string
   signerName: string
   signerIin: string | null
-  companyName?: string
   dateLabel: string
   date: string
   onBehalfOfText?: string
   iinText?: string
-}): string {
-  const { title, signerName, dateLabel, date, onBehalfOfText, iinText } = params
+  sigexDocumentId: string
+  verifyCodeLabel: string
+}): Promise<string> {
+  const { title, signerName, dateLabel, date, onBehalfOfText, iinText, sigexDocumentId, verifyCodeLabel } = params
+  const verifyUrl = `https://invoices.kz/verify/${sigexDocumentId}`
+  const qrDataUrl = await QRCode.toDataURL(verifyUrl, { width: 240, margin: 1 })
+
   return `
-    <div style="margin-top:16px; padding:12px 16px; border:1px solid #2DC48D; border-radius:8px; background:rgba(45,196,141,0.06);">
-      <div style="font-size:11px; font-weight:bold; color:#1C2056; margin-bottom:6px;">✅ ${title}</div>
+    <div style="margin-top:16px; padding:12px 16px; border:1px solid #2DC48D; border-radius:8px; background:rgba(45,196,141,0.06); display:flex; gap:14px; align-items:center;">
+      <img src="${qrDataUrl}" style="width:64px; height:64px; flex-shrink:0;" />
       <div style="font-size:10px; color:#333; line-height:1.6;">
+        <div style="font-size:11px; font-weight:bold; color:#1C2056; margin-bottom:4px;">✅ ${title}</div>
         ${signerName}${onBehalfOfText ? `, ${onBehalfOfText}` : ''}${iinText ? ` · ${iinText}` : ''}<br>
-        ${dateLabel} ${date}
+        ${dateLabel} ${date}<br>
+        ${verifyCodeLabel} ${sigexDocumentId}
       </div>
     </div>
   `

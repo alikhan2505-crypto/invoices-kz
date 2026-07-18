@@ -73,12 +73,12 @@ export async function sigexBuildDDC(sigexDocumentId: string, bytes: Uint8Array, 
     fileName,
     language: 'ru',
     qrWithIDLink: 'true',
-    // We show our own generated PDF (real invoice styling) as the primary
-    // download and this DDC only as the secondary verification artifact —
-    // SIGEX's own re-rendered preview of the document would otherwise
-    // clash visually with it, and its layout isn't configurable beyond
-    // this include/exclude toggle.
-    withoutDocumentVisualization: 'true',
+    // Document visualization was previously disabled because the source
+    // PDF was unstyled at the time (see the DOMPurify bug in
+    // signDocument.ts) and looked broken inside the card. Now that the
+    // source renders correctly, keep it — the user wants the card to be
+    // self-contained with the full document, not just signatures.
+    withoutDocumentVisualization: 'false',
   })
   const res = await fetch(`${SIGEX_BASE}/api/${sigexDocumentId}/buildDDC?${params.toString()}`, {
     method: 'POST',

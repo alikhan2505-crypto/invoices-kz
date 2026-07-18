@@ -18,6 +18,7 @@ export interface SignatureContent {
   iinPrefix: (iin: string) => string
   attestationTitle: string
   attestationDateLabel: string
+  attestationVerifyCodeLabel: string
 }
 
 export const signatureDict: Record<'ru' | 'kk' | 'en', SignatureContent> = {
@@ -41,6 +42,7 @@ export const signatureDict: Record<'ru' | 'kk' | 'en', SignatureContent> = {
     iinPrefix: (iin: string) => `ИИН ${iin}`,
     attestationTitle: 'Документ подписан электронной цифровой подписью (ЭЦП)',
     attestationDateLabel: 'Дата подписи:',
+    attestationVerifyCodeLabel: 'Код проверки (SIGEX):',
   },
   kk: {
     sectionLabel: 'Электрондық қолтаңба (ЭЦҚ)',
@@ -62,6 +64,7 @@ export const signatureDict: Record<'ru' | 'kk' | 'en', SignatureContent> = {
     iinPrefix: (iin: string) => `ЖСН ${iin}`,
     attestationTitle: 'Құжат электрондық цифрлық қолтаңбамен (ЭЦҚ) қол қойылды',
     attestationDateLabel: 'Қол қою күні:',
+    attestationVerifyCodeLabel: 'Тексеру коды (SIGEX):',
   },
   en: {
     sectionLabel: 'Digital signature',
@@ -83,5 +86,6 @@ export const signatureDict: Record<'ru' | 'kk' | 'en', SignatureContent> = {
     iinPrefix: (iin: string) => `IIN ${iin}`,
     attestationTitle: 'This document is signed with a digital signature (ЭЦП)',
     attestationDateLabel: 'Signed on:',
+    attestationVerifyCodeLabel: 'Verification code (SIGEX):',
   },
 }
