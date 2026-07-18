@@ -36,13 +36,47 @@ export async function renderPdfBlob(html: string): Promise<Blob> {
   return result as Blob
 }
 
-export async function uploadSnapshot(documentId: string, blob: Blob): Promise<string> {
-  const path = `${documentId}/${Date.now()}-snapshot.pdf`
+export async function uploadSnapshot(documentId: string, blob: Blob, suffix = 'snapshot'): Promise<string> {
+  const path = `${documentId}/${Date.now()}-${suffix}.pdf`
   const { error } = await supabase.storage
     .from('signed-documents')
     .upload(path, blob, { contentType: 'application/pdf' })
   if (error) throw error
   return supabase.storage.from('signed-documents').getPublicUrl(path).data.publicUrl
+}
+
+// The originally-signed PDF (`snapshot_pdf_url`) can never be touched again
+// after signing — any edit would change its bytes and invalidate the CMS
+// signature over it. This builds a *separate* copy, visually identical plus
+// a visible "signed with ЭЦП" attestation block, purely so a human opening
+// the file directly (no invoices.kz UI around it) can see who signed and
+// when without having to cross-reference the SIGEX verification card.
+export function injectAttestationBlock(html: string, blockHtml: string): string {
+  return html.includes('</body>')
+    ? html.replace('</body>', `${blockHtml}</body>`)
+    : html + blockHtml
+}
+
+export function buildAttestationHtml(params: {
+  title: string
+  signerName: string
+  signerIin: string | null
+  companyName?: string
+  dateLabel: string
+  date: string
+  onBehalfOfText?: string
+  iinText?: string
+}): string {
+  const { title, signerName, dateLabel, date, onBehalfOfText, iinText } = params
+  return `
+    <div style="margin-top:16px; padding:12px 16px; border:1px solid #2DC48D; border-radius:8px; background:rgba(45,196,141,0.06);">
+      <div style="font-size:11px; font-weight:bold; color:#1C2056; margin-bottom:6px;">✅ ${title}</div>
+      <div style="font-size:10px; color:#333; line-height:1.6;">
+        ${signerName}${onBehalfOfText ? `, ${onBehalfOfText}` : ''}${iinText ? ` · ${iinText}` : ''}<br>
+        ${dateLabel} ${date}
+      </div>
+    </div>
+  `
 }
 
 export type SigexQrState = {

@@ -16,6 +16,8 @@ export interface SignatureContent {
   signedByLabel: string
   onBehalfOfPrefix: (company: string) => string
   iinPrefix: (iin: string) => string
+  attestationTitle: string
+  attestationDateLabel: string
 }
 
 export const signatureDict: Record<'ru' | 'kk' | 'en', SignatureContent> = {
@@ -37,6 +39,8 @@ export const signatureDict: Record<'ru' | 'kk' | 'en', SignatureContent> = {
     signedByLabel: 'Подписал(а):',
     onBehalfOfPrefix: (company: string) => `от имени ${company}`,
     iinPrefix: (iin: string) => `ИИН ${iin}`,
+    attestationTitle: 'Документ подписан электронной цифровой подписью (ЭЦП)',
+    attestationDateLabel: 'Дата подписи:',
   },
   kk: {
     sectionLabel: 'Электрондық қолтаңба (ЭЦҚ)',
@@ -56,6 +60,8 @@ export const signatureDict: Record<'ru' | 'kk' | 'en', SignatureContent> = {
     signedByLabel: 'Қол қойған:',
     onBehalfOfPrefix: (company: string) => `${company} атынан`,
     iinPrefix: (iin: string) => `ЖСН ${iin}`,
+    attestationTitle: 'Құжат электрондық цифрлық қолтаңбамен (ЭЦҚ) қол қойылды',
+    attestationDateLabel: 'Қол қою күні:',
   },
   en: {
     sectionLabel: 'Digital signature',
@@ -75,5 +81,7 @@ export const signatureDict: Record<'ru' | 'kk' | 'en', SignatureContent> = {
     signedByLabel: 'Signed by:',
     onBehalfOfPrefix: (company: string) => `on behalf of ${company}`,
     iinPrefix: (iin: string) => `IIN ${iin}`,
+    attestationTitle: 'This document is signed with a digital signature (ЭЦП)',
+    attestationDateLabel: 'Signed on:',
   },
 }

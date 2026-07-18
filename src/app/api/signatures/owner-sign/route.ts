@@ -154,5 +154,11 @@ export async function POST(req: NextRequest) {
     })
   }
 
-  return NextResponse.json({ ok: true, id: row.id })
+  return NextResponse.json({
+    ok: true,
+    id: row.id,
+    status: row.status,
+    ownerSignerName,
+    ownerSignerIin,
+  })
 }

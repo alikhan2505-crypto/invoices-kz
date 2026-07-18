@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { formatDateTime } from '@/lib/date'
-import { renderPdfBlob, uploadSnapshot, runSigexQrSigning, SigexQrState } from '@/lib/signDocument'
+import { renderPdfBlob, uploadSnapshot, runSigexQrSigning, injectAttestationBlock, buildAttestationHtml, SigexQrState } from '@/lib/signDocument'
 import { useLanguage } from '@/components/LanguageProvider'
 import { signatureDict } from '@/lib/i18n/signature'
 
@@ -17,6 +17,7 @@ type Row = {
   client_signer_iin: string | null
   ddc_pdf_url: string | null
   snapshot_pdf_url: string
+  display_pdf_url: string | null
 }
 
 type Props = {
@@ -44,7 +45,7 @@ export default function SignatureSection(props: Props) {
   async function loadRow() {
     const { data } = await supabase
       .from('document_signatures')
-      .select('id, status, owner_signed_at, client_signed_at, owner_signer_name, owner_signer_iin, client_signer_name, client_signer_iin, ddc_pdf_url, snapshot_pdf_url')
+      .select('id, status, owner_signed_at, client_signed_at, owner_signer_name, owner_signer_iin, client_signer_name, client_signer_iin, ddc_pdf_url, snapshot_pdf_url, display_pdf_url')
       .eq('document_type', 'invoice')
       .eq('document_id', documentId)
       .maybeSingle()
@@ -74,6 +75,34 @@ export default function SignatureSection(props: Props) {
       const json = await res.json()
       if (json.error) { setError(json.error); return }
       await loadRow()
+
+      // Best-effort — the signature itself is already safely recorded above.
+      // This just builds a second, human-readable copy with a visible
+      // "signed with ЭЦП" block so opening the file directly (no
+      // invoices.kz UI around it) still shows who signed and when.
+      if (json.status === 'signed' && json.ownerSignerName) {
+        try {
+          const block = buildAttestationHtml({
+            title: t.attestationTitle,
+            signerName: json.ownerSignerName,
+            signerIin: json.ownerSignerIin,
+            dateLabel: t.attestationDateLabel,
+            date: formatDateTime(new Date().toISOString()),
+            onBehalfOfText: ownerCompanyName ? t.onBehalfOfPrefix(ownerCompanyName) : undefined,
+            iinText: json.ownerSignerIin ? t.iinPrefix(json.ownerSignerIin) : undefined,
+          })
+          const displayBlob = await renderPdfBlob(injectAttestationBlock(html, block))
+          const displayPdfUrl = await uploadSnapshot(documentId, displayBlob, 'display')
+          await fetch('/api/signatures/set-display-pdf', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+            body: JSON.stringify({ signatureId: json.id, displayPdfUrl }),
+          })
+          await loadRow()
+        } catch {
+          // Non-critical — the plain snapshot is still a valid download.
+        }
+      }
     } catch (e: any) {
       if (e?.canceledByUser) return
       setError(e?.message || String(e))
@@ -163,13 +192,13 @@ export default function SignatureSection(props: Props) {
               <div className="text-xs text-gray-400 mb-3">{t.signedClientDatePrefix(formatDateTime(row.client_signed_at))}</div>
             )}
             <div className="flex gap-2 mt-1">
-              <a href={row.snapshot_pdf_url} target="_blank" rel="noreferrer"
+              <a href={`/api/documents/${row.id}/document`} target="_blank" rel="noreferrer"
                 className="flex-1 text-center bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium">
                 {t.downloadDocumentButton}
               </a>
             </div>
             {row.ddc_pdf_url && (
-              <a href={row.ddc_pdf_url} target="_blank" rel="noreferrer"
+              <a href={`/api/documents/${row.id}/card`} target="_blank" rel="noreferrer"
                 className="block text-center text-xs text-gray-400 underline mt-2">
                 {t.downloadVerificationCardButton}
               </a>
