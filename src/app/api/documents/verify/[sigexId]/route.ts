@@ -19,20 +19,25 @@ export async function GET(
 
   const { data: row } = await supabase
     .from('document_signatures')
-    .select('id, document_id, owner_signed_at, client_signed_at, owner_signer_name, owner_signer_iin, client_signer_name, client_signer_iin, owner_user_id, sigex_document_id')
+    .select('id, document_type, document_id, owner_signed_at, client_signed_at, owner_signer_name, owner_signer_iin, client_signer_name, client_signer_iin, owner_user_id, sigex_document_id')
     .eq('sigex_document_id', sigexId)
     .single()
 
   if (!row) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  const [{ data: invoice }, { data: owner }] = await Promise.all([
-    supabase.from('invoices').select('number').eq('id', row.document_id).single(),
+  const [documentTitleResult, { data: owner }] = await Promise.all([
+    row.document_type === 'contract'
+      ? supabase.from('contracts').select('title').eq('id', row.document_id).single()
+      : supabase.from('invoices').select('number').eq('id', row.document_id).single(),
     supabase.from('profiles').select('company_name').eq('id', row.owner_user_id).single(),
   ])
+  const documentTitle = row.document_type === 'contract'
+    ? (documentTitleResult.data as any)?.title || null
+    : (documentTitleResult.data as any)?.number ? `Счёт №${(documentTitleResult.data as any).number}` : null
 
   return NextResponse.json({
     sigexDocumentId: row.sigex_document_id,
-    invoiceNumber: invoice?.number || null,
+    documentTitle,
     companyName: owner?.company_name || null,
     ownerSignerName: row.owner_signer_name,
     ownerSignerIin: row.owner_signer_iin,

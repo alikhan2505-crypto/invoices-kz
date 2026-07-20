@@ -9,11 +9,22 @@ const supabase = createClient(
 )
 const resend = new Resend(process.env.RESEND_API_KEY!)
 
+async function loadDocumentTitleAndToken(documentType: string, documentId: string) {
+  if (documentType === 'invoice') {
+    const { data } = await supabase.from('invoices').select('number, public_token').eq('id', documentId).single()
+    return data ? { title: `Счёт №${data.number}`, publicToken: data.public_token } : null
+  }
+  if (documentType === 'contract') {
+    const { data } = await supabase.from('contracts').select('title, public_token').eq('id', documentId).single()
+    return data ? { title: data.title, publicToken: data.public_token } : null
+  }
+  return null
+}
+
 // No auth — the client is never a registered invoices.kz user. Called from
-// the public invoice page after the client completes their own SIGEX QR/eGov
+// the public document page after the client completes their own SIGEX QR/eGov
 // mobile ceremony. Access is gated by already knowing `signatureId`, which
-// is only ever shown on the public-token-gated invoice page (same trust
-// model as the invoice itself).
+// is only ever shown on the public-token-gated document pages.
 export async function POST(req: NextRequest) {
   const { signatureId, signatureCms } = await req.json()
   if (!signatureId || !signatureCms) {
@@ -30,13 +41,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Not awaiting a client signature' }, { status: 400 })
   }
 
-  const { data: invoice } = await supabase
-    .from('invoices')
-    .select('id, number, public_token')
-    .eq('id', row.document_id)
-    .single()
-
-  if (!invoice?.public_token) {
+  const doc = await loadDocumentTitleAndToken(row.document_type, row.document_id)
+  if (!doc?.publicToken) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
 
@@ -58,7 +64,7 @@ export async function POST(req: NextRequest) {
 
   let ddcPdfUrl: string | null = null
   try {
-    const ddcBytes = await sigexBuildDDC(row.sigex_document_id, pdfBytes, `Schet-${invoice.number}.pdf`)
+    const ddcBytes = await sigexBuildDDC(row.sigex_document_id, pdfBytes, `${doc.title.replace(/[^a-zA-Z0-9-]/g, '_')}.pdf`)
     const path = `${row.document_id}/${Date.now()}.pdf`
     const { error: uploadError } = await supabase.storage
       .from('signed-documents')
@@ -98,7 +104,7 @@ export async function POST(req: NextRequest) {
     await resend.emails.send({
       from: 'invoices.kz <mail@invoices.kz>',
       to: owner.email,
-      subject: `Счёт №${invoice.number} подписан обеими сторонами`,
+      subject: `«${doc.title}» подписан обеими сторонами`,
       html: `
 <!DOCTYPE html>
 <html>
@@ -110,7 +116,7 @@ export async function POST(req: NextRequest) {
   </div>
   <div style="padding:28px 32px;">
     <p style="margin:0; font-size:14px; color:#333;">
-      Клиент подписал счёт №${invoice.number} своей ЭЦП. Документ подписан обеими сторонами — скачать можно на странице счёта.
+      Клиент подписал «${doc.title}» своей ЭЦП. Документ подписан обеими сторонами.
     </p>
   </div>
 </div>

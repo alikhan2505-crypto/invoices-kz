@@ -23,7 +23,7 @@ export async function GET(
 
   const { data: row } = await supabase
     .from('document_signatures')
-    .select('document_id, snapshot_pdf_url, display_pdf_url, ddc_pdf_url')
+    .select('document_type, document_id, snapshot_pdf_url, display_pdf_url, ddc_pdf_url')
     .eq('id', id)
     .single()
 
@@ -32,13 +32,14 @@ export async function GET(
   const sourceUrl = type === 'card' ? row.ddc_pdf_url : (row.display_pdf_url || row.snapshot_pdf_url)
   if (!sourceUrl) return NextResponse.json({ error: 'Not available' }, { status: 404 })
 
-  const { data: invoice } = await supabase
-    .from('invoices')
-    .select('number')
-    .eq('id', row.document_id)
-    .single()
-
-  const label = invoice?.number || id
+  let label = id
+  if (row.document_type === 'invoice') {
+    const { data: invoice } = await supabase.from('invoices').select('number').eq('id', row.document_id).single()
+    label = invoice?.number || id
+  } else if (row.document_type === 'contract') {
+    const { data: contract } = await supabase.from('contracts').select('title').eq('id', row.document_id).single()
+    label = (contract?.title || id).replace(/[^a-zA-Z0-9-]/g, '_')
+  }
   const filename = type === 'card' ? `Card-${label}.pdf` : `Schet-${label}.pdf`
 
   const fileRes = await fetch(sourceUrl)

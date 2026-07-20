@@ -2,7 +2,7 @@ export interface VerifyContent {
   loadingLabel: string
   pageTitle: string
   intro: string
-  invoiceLabel: (number: string) => string
+  documentLabel: (title: string) => string
   codeLabel: string
   signedByLabel: string
   onBehalfOfPrefix: (company: string) => string
@@ -20,7 +20,7 @@ export const verifyDict: Record<'ru' | 'kk' | 'en', VerifyContent> = {
     loadingLabel: 'Загрузка...',
     pageTitle: 'Проверка электронной подписи',
     intro: 'Документ подписан и зарегистрирован в сервисе SIGEX (НУЦ РК). Ниже — подтверждённые данные подписи.',
-    invoiceLabel: (number: string) => `Счёт №${number}`,
+    documentLabel: (title: string) => title,
     codeLabel: 'Номер карточки в SIGEX:',
     signedByLabel: 'Подписал(а):',
     onBehalfOfPrefix: (company: string) => `от имени ${company}`,
@@ -36,7 +36,7 @@ export const verifyDict: Record<'ru' | 'kk' | 'en', VerifyContent> = {
     loadingLabel: 'Жүктелуде...',
     pageTitle: 'Электрондық қолтаңбаны тексеру',
     intro: 'Құжат қол қойылған және SIGEX (ҚР ҰКО) сервисінде тіркелген. Төменде — расталған қолтаңба деректері.',
-    invoiceLabel: (number: string) => `Счёт №${number}`,
+    documentLabel: (title: string) => title,
     codeLabel: 'SIGEX-тегі карточка нөмірі:',
     signedByLabel: 'Қол қойған:',
     onBehalfOfPrefix: (company: string) => `${company} атынан`,
@@ -52,7 +52,7 @@ export const verifyDict: Record<'ru' | 'kk' | 'en', VerifyContent> = {
     loadingLabel: 'Loading...',
     pageTitle: 'Digital signature verification',
     intro: 'This document is signed and registered with the SIGEX (NCA RK) service. Confirmed signature details below.',
-    invoiceLabel: (number: string) => `Invoice №${number}`,
+    documentLabel: (title: string) => title,
     codeLabel: 'SIGEX card number:',
     signedByLabel: 'Signed by:',
     onBehalfOfPrefix: (company: string) => `on behalf of ${company}`,

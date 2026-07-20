@@ -16,15 +16,58 @@ const resend = new Resend(process.env.RESEND_API_KEY!)
 
 // Which document types need the client to counter-sign vs. just the sender.
 // An invoice/КП is a one-directional statement from the sender — only they
-// sign it. An АВР/накладная is a mutual acknowledgment between both parties,
-// so both sign (per the user's own call, 2026-07-18). АВР/накладная aren't
-// wired up yet (no public client-facing page for them), but the flag is
-// here so wiring them in later doesn't require touching this logic again.
+// sign it. An АВР/накладная/contract is a mutual acknowledgment between both
+// parties, so both sign. АВР/накладная aren't wired up yet (no public
+// client-facing page for them), but the flag is here so wiring them in
+// later doesn't require touching this logic again.
 const REQUIRES_CLIENT_SIGNATURE: Record<string, boolean> = {
   invoice: false,
   kp: false,
   avr: true,
   nakladnaya: true,
+  contract: true,
+}
+
+type DocumentRecord = {
+  id: string
+  title: string
+  clientEmail: string | null
+  userId: string
+  publicUrl: string
+}
+
+async function loadDocumentRecord(documentType: string, documentId: string): Promise<DocumentRecord | null> {
+  if (documentType === 'invoice') {
+    const { data } = await supabase
+      .from('invoices')
+      .select('id, number, client_email, user_id, public_token')
+      .eq('id', documentId)
+      .single()
+    if (!data) return null
+    return {
+      id: data.id,
+      title: `Счёт №${data.number}`,
+      clientEmail: data.client_email,
+      userId: data.user_id,
+      publicUrl: `https://invoices.kz/view/${data.public_token}`,
+    }
+  }
+  if (documentType === 'contract') {
+    const { data } = await supabase
+      .from('contracts')
+      .select('id, title, client_email, user_id, public_token')
+      .eq('id', documentId)
+      .single()
+    if (!data) return null
+    return {
+      id: data.id,
+      title: data.title,
+      clientEmail: data.client_email,
+      userId: data.user_id,
+      publicUrl: `https://invoices.kz/contract-view/${data.public_token}`,
+    }
+  }
+  return null
 }
 
 // Called after the owner has already completed the SIGEX QR/eGov mobile
@@ -33,7 +76,7 @@ const REQUIRES_CLIENT_SIGNATURE: Record<string, boolean> = {
 // third-party-verifiable record independent of invoices.kz). For document
 // types that don't need a counter-signature it finalizes immediately
 // (builds the DDC and marks the row signed); otherwise it opens the
-// signature request for the client to complete on the public invoice page.
+// signature request for the client to complete on the public page.
 export async function POST(req: NextRequest) {
   const accessToken = req.headers.get('authorization')?.replace('Bearer ', '')
   const { data: { user } } = accessToken
@@ -42,17 +85,12 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { documentType, documentId, snapshotPdfUrl, signatureCms } = await req.json()
-  if (documentType !== 'invoice' || !documentId || !snapshotPdfUrl || !signatureCms) {
+  if (!['invoice', 'contract'].includes(documentType) || !documentId || !snapshotPdfUrl || !signatureCms) {
     return NextResponse.json({ error: 'Missing params' }, { status: 400 })
   }
 
-  const { data: invoice } = await supabase
-    .from('invoices')
-    .select('id, number, client_email, client_name, user_id, public_token')
-    .eq('id', documentId)
-    .single()
-
-  if (!invoice || invoice.user_id !== user.id) {
+  const doc = await loadDocumentRecord(documentType, documentId)
+  if (!doc || doc.userId !== user.id) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
 
@@ -65,7 +103,7 @@ export async function POST(req: NextRequest) {
   let ownerSignerName: string | null = null
   let ownerSignerIin: string | null = null
   try {
-    const registered = await sigexRegisterDocument(`Счёт №${invoice.number}`, signatureCms)
+    const registered = await sigexRegisterDocument(doc.title, signatureCms)
     sigexDocumentId = registered.documentId
     await sigexUploadDocumentData(sigexDocumentId, pdfBytes)
     const { signatures } = await sigexGetDocument(sigexDocumentId)
@@ -81,7 +119,7 @@ export async function POST(req: NextRequest) {
 
   if (!requiresClient) {
     try {
-      const ddcBytes = await sigexBuildDDC(sigexDocumentId, pdfBytes, `Schet-${invoice.number}.pdf`)
+      const ddcBytes = await sigexBuildDDC(sigexDocumentId, pdfBytes, `${doc.title.replace(/[^a-zA-Z0-9-]/g, '_')}.pdf`)
       const path = `${documentId}/${Date.now()}.pdf`
       const { error: uploadError } = await supabase.storage
         .from('signed-documents')
@@ -100,7 +138,7 @@ export async function POST(req: NextRequest) {
   const { data: row, error } = await supabase
     .from('document_signatures')
     .insert({
-      document_type: 'invoice',
+      document_type: documentType,
       document_id: documentId,
       owner_user_id: user.id,
       status: requiresClient ? 'awaiting_client' : 'signed',
@@ -118,19 +156,18 @@ export async function POST(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  if (invoice.client_email) {
-    const publicLink = `https://invoices.kz/view/${invoice.public_token}`
+  if (doc.clientEmail) {
     const subject = requiresClient
-      ? `Счёт №${invoice.number} ожидает вашей подписи ЭЦП`
-      : `Счёт №${invoice.number} подписан ЭЦП`
+      ? `«${doc.title}» ожидает вашей подписи ЭЦП`
+      : `«${doc.title}» подписан ЭЦП`
     const body = requiresClient
-      ? `Счёт №${invoice.number} подписан отправителем и ожидает вашей подписи ЭЦП. Подписать можно через приложение eGov mobile — QR-код для сканирования на странице счёта.`
-      : `Счёт №${invoice.number} подписан отправителем электронной цифровой подписью. Подписанную версию можно скачать на странице счёта.`
-    const buttonText = requiresClient ? 'Открыть счёт и подписать' : 'Открыть счёт'
+      ? `«${doc.title}» подписан отправителем и ожидает вашей подписи ЭЦП. Подписать можно через приложение eGov mobile — QR-код для сканирования на странице документа.`
+      : `«${doc.title}» подписан отправителем электронной цифровой подписью. Подписанную версию можно скачать на странице документа.`
+    const buttonText = requiresClient ? 'Открыть и подписать' : 'Открыть документ'
 
     await resend.emails.send({
       from: 'invoices.kz <mail@invoices.kz>',
-      to: invoice.client_email,
+      to: doc.clientEmail,
       subject,
       html: `
 <!DOCTYPE html>
@@ -143,7 +180,7 @@ export async function POST(req: NextRequest) {
   </div>
   <div style="padding:28px 32px;">
     <p style="margin:0 0 16px; font-size:14px; color:#333;">${body}</p>
-    <a href="${publicLink}" style="display:block; background:#2DC48D; color:white; text-align:center; padding:14px; border-radius:10px; text-decoration:none; font-size:16px; font-weight:bold;">
+    <a href="${doc.publicUrl}" style="display:block; background:#2DC48D; color:white; text-align:center; padding:14px; border-radius:10px; text-decoration:none; font-size:16px; font-weight:bold;">
       ${buttonText}
     </a>
   </div>

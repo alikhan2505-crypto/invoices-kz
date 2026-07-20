@@ -7,7 +7,7 @@ import { verifyDict } from '@/lib/i18n/verify'
 
 type VerifyData = {
   sigexDocumentId: string
-  invoiceNumber: string | null
+  documentTitle: string | null
   companyName: string | null
   ownerSignerName: string | null
   ownerSignerIin: string | null
@@ -64,8 +64,8 @@ export default function VerifyPage() {
         <div className="bg-white rounded-2xl shadow-sm p-5 text-center">
           <div className="w-14 h-14 mx-auto rounded-full bg-[#2DC48D]/10 flex items-center justify-center text-3xl mb-3">✅</div>
           <div className="font-semibold text-[#1C2056] mb-1">{t.pageTitle}</div>
-          {data.invoiceNumber && (
-            <div className="text-sm text-gray-500 mb-2">{t.invoiceLabel(data.invoiceNumber)}</div>
+          {data.documentTitle && (
+            <div className="text-sm text-gray-500 mb-2">{t.documentLabel(data.documentTitle)}</div>
           )}
           <p className="text-xs text-gray-400 leading-relaxed">{t.intro}</p>
         </div>

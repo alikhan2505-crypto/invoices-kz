@@ -208,6 +208,7 @@ export default function Profile() {
               { icon: '📋', label: t.servicesMenuLabel, href: '/profile/services', badge: stats.services },
               { icon: '⭐', label: t.templatesMenuLabel, href: '/profile/templates', badge: 0 },
               { icon: '🗂️', label: t.documentsMenuLabel, href: '/profile/documents', badge: 0 },
+              { icon: '📃', label: t.contractsMenuLabel, href: '/profile/contracts', badge: 0 },
             ].map((item, i, arr) => (
               <div key={item.href} onClick={() => router.push(item.href)}
                 className={`flex items-center justify-between px-4 py-3.5 cursor-pointer hover:bg-gray-50 ${i < arr.length - 1 ? 'border-b border-gray-100' : ''}`}>

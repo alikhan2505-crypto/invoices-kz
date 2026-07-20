@@ -25,6 +25,7 @@ export interface ProfileCoreContent {
   servicesMenuLabel: string
   templatesMenuLabel: string
   documentsMenuLabel: string
+  contractsMenuLabel: string
   settingsSectionLabel: string
   invoiceSettingsLabel: string
   notificationsMenuLabel: string
@@ -145,6 +146,7 @@ export const profileCoreDict: Record<'ru' | 'kk' | 'en', ProfileCoreContent> = {
     servicesMenuLabel: 'Услуги и товары',
     templatesMenuLabel: 'Шаблоны счетов',
     documentsMenuLabel: 'Документы для налоговой',
+    contractsMenuLabel: 'Договора',
     settingsSectionLabel: 'Настройки',
     invoiceSettingsLabel: 'Настройки счетов',
     notificationsMenuLabel: 'Уведомления',
@@ -260,6 +262,7 @@ export const profileCoreDict: Record<'ru' | 'kk' | 'en', ProfileCoreContent> = {
     servicesMenuLabel: 'Қызметтер мен тауарлар',
     templatesMenuLabel: 'Шот үлгілері',
     documentsMenuLabel: 'Салық құжаттары',
+    contractsMenuLabel: 'Шарттар',
     settingsSectionLabel: 'Баптаулар',
     invoiceSettingsLabel: 'Шот баптаулары',
     notificationsMenuLabel: 'Хабарландырулар',
@@ -375,6 +378,7 @@ export const profileCoreDict: Record<'ru' | 'kk' | 'en', ProfileCoreContent> = {
     servicesMenuLabel: 'Services and products',
     templatesMenuLabel: 'Invoice templates',
     documentsMenuLabel: 'Tax documents',
+    contractsMenuLabel: 'Contracts',
     settingsSectionLabel: 'Settings',
     invoiceSettingsLabel: 'Invoice settings',
     notificationsMenuLabel: 'Notifications',

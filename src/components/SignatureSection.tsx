@@ -23,14 +23,19 @@ type Row = {
 type Props = {
   documentId: string
   documentTitle: string
+  documentType?: 'invoice' | 'contract'
   ownerCompanyName?: string
 } & (
-  | { mode: 'owner'; getHtml: () => Promise<string> }
+  // Invoice-style: no file exists yet, generate one from HTML each time.
+  | { mode: 'owner'; getHtml: () => Promise<string>; getPdfUrl?: never }
+  // Contract-style: an already-uploaded file is what gets signed as-is.
+  | { mode: 'owner'; getPdfUrl: () => Promise<string>; getHtml?: never }
   | { mode: 'client' }
 )
 
 export default function SignatureSection(props: Props) {
   const { documentId, documentTitle, mode, ownerCompanyName } = props
+  const documentType = props.documentType || 'invoice'
   const { lang } = useLanguage()
   const t = signatureDict[lang]
 
@@ -46,7 +51,7 @@ export default function SignatureSection(props: Props) {
     const { data } = await supabase
       .from('document_signatures')
       .select('id, status, owner_signed_at, client_signed_at, owner_signer_name, owner_signer_iin, client_signer_name, client_signer_iin, ddc_pdf_url, snapshot_pdf_url, display_pdf_url')
-      .eq('document_type', 'invoice')
+      .eq('document_type', documentType)
       .eq('document_id', documentId)
       .maybeSingle()
     setRow(data)
@@ -59,9 +64,19 @@ export default function SignatureSection(props: Props) {
     setError('')
     setQr(null)
     try {
-      const html = await props.getHtml()
-      const pdfBlob = await renderPdfBlob(html)
-      const snapshotPdfUrl = await uploadSnapshot(documentId, pdfBlob)
+      let html: string | null = null
+      let pdfBlob: Blob
+      let snapshotPdfUrl: string
+
+      if (props.getHtml) {
+        html = await props.getHtml()
+        pdfBlob = await renderPdfBlob(html)
+        snapshotPdfUrl = await uploadSnapshot(documentId, pdfBlob)
+      } else {
+        // Contract-style: the file was already uploaded — sign it as-is.
+        snapshotPdfUrl = await props.getPdfUrl!()
+        pdfBlob = await (await fetch(snapshotPdfUrl)).blob()
+      }
 
       const signatureCms = await runSigexQrSigning(documentTitle, pdfBlob, setQr)
       setQr(null)
@@ -70,7 +85,7 @@ export default function SignatureSection(props: Props) {
       const res = await fetch('/api/signatures/owner-sign', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ documentType: 'invoice', documentId, snapshotPdfUrl, signatureCms }),
+        body: JSON.stringify({ documentType, documentId, snapshotPdfUrl, signatureCms }),
       })
       const json = await res.json()
       if (json.error) { setError(json.error); return }
@@ -79,8 +94,11 @@ export default function SignatureSection(props: Props) {
       // Best-effort — the signature itself is already safely recorded above.
       // This just builds a second, human-readable copy with a visible
       // "signed with ЭЦП" block so opening the file directly (no
-      // invoices.kz UI around it) still shows who signed and when.
-      if (json.status === 'signed' && json.ownerSignerName) {
+      // invoices.kz UI around it) still shows who signed and when. Only
+      // possible when we have the source HTML to re-render — an uploaded
+      // contract file has no such source, so it's skipped there (the DDC
+      // verification card is still available for those).
+      if (html && json.status === 'signed' && json.ownerSignerName) {
         try {
           const block = await buildAttestationHtml({
             title: t.attestationTitle,
