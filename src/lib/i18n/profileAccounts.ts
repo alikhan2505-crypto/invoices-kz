@@ -35,14 +35,8 @@ export interface ProfileAccountsContent {
   // security page (security/page.tsx)
   securityHeaderLabel: string
   electronicSignatureSectionLabel: string
-  ecpConnectedLabel: string
-  ecpValidUntilDummy: string
-  ecpHolderDummy: string
-  disconnectButton: string
-  ecpNotConnectedLabel: string
-  ecpNotConnectedHint: string
-  connectEcpAlert: string
-  connectEcpButton: string
+  ecpHowItWorksTitle: string
+  ecpHowItWorksBody: string
   loginSecuritySectionLabel: string
   passkeyDefaultLabel: string
   passkeyAddedPrefix: (date: string) => string
@@ -136,14 +130,8 @@ export const profileAccountsDict: Record<'ru' | 'kk' | 'en', ProfileAccountsCont
 
     securityHeaderLabel: 'ЭЦП и безопасность',
     electronicSignatureSectionLabel: 'Электронная подпись',
-    ecpConnectedLabel: 'ЭЦП подключена',
-    ecpValidUntilDummy: 'Годна до: 15.08.2026',
-    ecpHolderDummy: 'ИП First Project',
-    disconnectButton: 'Отключить',
-    ecpNotConnectedLabel: 'ЭЦП не подключена',
-    ecpNotConnectedHint: 'Подключите ЭЦП НУЦ РК для подписания счетов',
-    connectEcpAlert: 'Интеграция с НУЦ РК — скоро!',
-    connectEcpButton: 'Подключить ЭЦП',
+    ecpHowItWorksTitle: 'Как это работает',
+    ecpHowItWorksBody: 'Подпись оформляется отдельно на каждом документе — кнопка «Подписать ЭЦП» есть на странице счёта. Подключать заранее ничего не нужно: достаточно приложения eGov mobile с действующей ЭЦП НУЦ РК на телефоне.',
     loginSecuritySectionLabel: 'Вход по Face ID / Touch ID',
     passkeyDefaultLabel: 'Устройство',
     passkeyAddedPrefix: (date: string) => `Добавлено: ${date}`,
@@ -233,14 +221,8 @@ export const profileAccountsDict: Record<'ru' | 'kk' | 'en', ProfileAccountsCont
 
     securityHeaderLabel: 'ЭЦҚ және қауіпсіздік',
     electronicSignatureSectionLabel: 'Электрондық қолтаңба',
-    ecpConnectedLabel: 'ЭЦҚ қосылған',
-    ecpValidUntilDummy: 'Жарамдылығы: 15.08.2026',
-    ecpHolderDummy: 'ЖК First Project',
-    disconnectButton: 'Ажырату',
-    ecpNotConnectedLabel: 'ЭЦҚ қосылмаған',
-    ecpNotConnectedHint: 'Шоттарға қол қою үшін ҚР ҰКО ЭЦҚ қосыңыз',
-    connectEcpAlert: 'ҚР ҰКО интеграциясы — жақында!',
-    connectEcpButton: 'ЭЦҚ қосу',
+    ecpHowItWorksTitle: 'Бұл қалай жұмыс істейді',
+    ecpHowItWorksBody: 'Қолтаңба әр құжатта жеке қойылады — шот бетінде «ЭЦҚ қою» батырмасы бар. Алдын ала ештеңе қосудың қажеті жоқ: телефоныңызда әрекеттегі ҚР ҰКО ЭЦҚ-сы бар eGov mobile қолданбасы жеткілікті.',
     loginSecuritySectionLabel: 'Face ID / Touch ID арқылы кіру',
     passkeyDefaultLabel: 'Құрылғы',
     passkeyAddedPrefix: (date: string) => `Қосылды: ${date}`,
@@ -330,14 +312,8 @@ export const profileAccountsDict: Record<'ru' | 'kk' | 'en', ProfileAccountsCont
 
     securityHeaderLabel: 'Digital signature and security',
     electronicSignatureSectionLabel: 'Electronic signature',
-    ecpConnectedLabel: 'Digital signature connected',
-    ecpValidUntilDummy: 'Valid until: 15.08.2026',
-    ecpHolderDummy: 'Sole Proprietor First Project',
-    disconnectButton: 'Disconnect',
-    ecpNotConnectedLabel: 'Digital signature not connected',
-    ecpNotConnectedHint: 'Connect an NCA RK digital signature to sign invoices',
-    connectEcpAlert: 'NCA RK integration — coming soon!',
-    connectEcpButton: 'Connect digital signature',
+    ecpHowItWorksTitle: 'How this works',
+    ecpHowItWorksBody: 'Each document is signed individually — a "Sign with ЭЦП" button is on the invoice page. Nothing to connect in advance: just the eGov mobile app with a valid NCA RK digital signature on your phone.',
     loginSecuritySectionLabel: 'Sign in with Face ID / Touch ID',
     passkeyDefaultLabel: 'Device',
     passkeyAddedPrefix: (date: string) => `Added: ${date}`,

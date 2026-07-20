@@ -25,7 +25,6 @@ export default function Security() {
   const router = useRouter()
   const { lang } = useLanguage()
   const t = profileAccountsDict[lang]
-  const [ecpConnected] = useState(false)
   const [passkeys, setPasskeys] = useState<Passkey[]>([])
   const [passkeySupported, setPasskeySupported] = useState(false)
   const [addingPasskey, setAddingPasskey] = useState(false)
@@ -90,36 +89,15 @@ export default function Security() {
       </div>
 
       <div className="max-w-lg mx-auto p-4 space-y-4">
-        {/* ECP status */}
+        {/* ECP explanation */}
         <div>
           <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">{t.electronicSignatureSectionLabel}</div>
           <div className="bg-white rounded-2xl shadow-sm p-4">
-            {ecpConnected ? (
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-[#2DC48D]/10 flex items-center justify-center text-xl">🔒</div>
-                  <div>
-                    <div className="text-sm font-medium text-[#2DC48D]">{t.ecpConnectedLabel}</div>
-                    <div className="text-xs text-gray-400">{t.ecpValidUntilDummy}</div>
-                    <div className="text-xs text-gray-400">{t.ecpHolderDummy}</div>
-                  </div>
-                </div>
-                <button className="text-xs text-red-400 border border-red-200 rounded-lg px-3 py-1.5">
-                  {t.disconnectButton}
-                </button>
-              </div>
-            ) : (
-              <div className="text-center py-4">
-                <div className="text-4xl mb-3">🔓</div>
-                <div className="text-sm font-medium text-[#1C2056] mb-1">{t.ecpNotConnectedLabel}</div>
-                <div className="text-xs text-gray-400 mb-4">{t.ecpNotConnectedHint}</div>
-                <button
-                  onClick={() => alert(t.connectEcpAlert)}
-                  className="bg-[#1C2056] text-white px-6 py-2.5 rounded-xl text-sm font-medium">
-                  {t.connectEcpButton}
-                </button>
-              </div>
-            )}
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 rounded-full bg-[#1C2056]/5 flex items-center justify-center text-xl">✍️</div>
+              <div className="text-sm font-medium text-[#1C2056]">{t.ecpHowItWorksTitle}</div>
+            </div>
+            <div className="text-xs text-gray-500 leading-relaxed">{t.ecpHowItWorksBody}</div>
           </div>
         </div>
 

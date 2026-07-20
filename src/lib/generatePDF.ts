@@ -172,7 +172,7 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<string> {
         .bank-table td { border: 1px solid #000; padding: 5px 8px; vertical-align: top; }
         .title { font-size: 15px; font-weight: bold; margin: 16px 0 10px; }
         .items-table { width: 100%; border-collapse: collapse; margin: 12px 0; }
-        .items-table th, .items-table td { border: 1px solid #000; padding: 4px 6px; text-align: center; }
+        .items-table th, .items-table td { border: 1px solid #000; padding: 4px 6px; text-align: center; vertical-align: middle; }
         .items-table th { background: #f0f0f0; font-weight: bold; }
         .items-table td.left { text-align: left; }
         .totals { margin: 4px 0; }

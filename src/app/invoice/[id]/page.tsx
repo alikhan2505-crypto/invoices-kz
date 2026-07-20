@@ -440,7 +440,7 @@ export default function InvoicePage() {
                   </div>
                   <div className="text-xs text-gray-400">{s.qty} {s.unit || 'шт'} × {Number(s.price).toLocaleString('ru-KZ')} ₸</div>
                 </div>
-                <div className="text-sm font-medium">{(s.qty * s.price).toLocaleString('ru-KZ')} ₸</div>
+                <div className="text-sm font-medium text-[#1C2056]">{(s.qty * s.price).toLocaleString('ru-KZ')} ₸</div>
               </div>
             ))}
             <div className="flex justify-between px-4 py-3 border-t border-gray-100 bg-gray-50">
