@@ -74,33 +74,37 @@ export async function POST(req: NextRequest) {
   if (action === 'ig_reject') {
     await supabase.from('instagram_drafts').update({ status: 'rejected' }).eq('id', draftId)
     await telegram('answerCallbackQuery', { callback_query_id: cb.id, text: 'Отклонено' })
-    await telegram('editMessageCaption', {
+    await telegram('editMessageText', {
       chat_id: cb.message.chat.id,
       message_id: cb.message.message_id,
-      caption: `${cb.message.caption}\n\n❌ Отклонено`,
+      text: `${cb.message.text}\n\n❌ Отклонено`,
+      parse_mode: 'HTML',
     })
     return NextResponse.json({ ok: true })
   }
 
   try {
-    const igMediaId = await publishToInstagram(draft.image_url, draft.caption)
+    const imageUrls: string[] = draft.image_urls?.length ? draft.image_urls : [draft.image_url]
+    const igMediaId = await publishToInstagram(imageUrls, draft.caption)
     await supabase
       .from('instagram_drafts')
       .update({ status: 'published', ig_media_id: igMediaId, published_at: new Date().toISOString() })
       .eq('id', draftId)
     await telegram('answerCallbackQuery', { callback_query_id: cb.id, text: 'Опубликовано!' })
-    await telegram('editMessageCaption', {
+    await telegram('editMessageText', {
       chat_id: cb.message.chat.id,
       message_id: cb.message.message_id,
-      caption: `${cb.message.caption}\n\n✅ Опубликовано в Instagram`,
+      text: `${cb.message.text}\n\n✅ Опубликовано в Instagram`,
+      parse_mode: 'HTML',
     })
   } catch (err: any) {
     await supabase.from('instagram_drafts').update({ status: 'failed', error: err.message }).eq('id', draftId)
     await telegram('answerCallbackQuery', { callback_query_id: cb.id, text: 'Ошибка публикации', show_alert: true })
-    await telegram('editMessageCaption', {
+    await telegram('editMessageText', {
       chat_id: cb.message.chat.id,
       message_id: cb.message.message_id,
-      caption: `${cb.message.caption}\n\n⚠️ Ошибка: ${err.message}`,
+      text: `${cb.message.text}\n\n⚠️ Ошибка: ${err.message}`,
+      parse_mode: 'HTML',
     })
   }
 
