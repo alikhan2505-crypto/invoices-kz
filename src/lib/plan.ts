@@ -9,6 +9,7 @@ export interface PlanInfo {
   canKpAvrNakl: boolean
   canTemplates: boolean
   canRecurring: boolean
+  canEcp: boolean
   invoiceLimit: number | null
 }
 
@@ -18,7 +19,7 @@ export function getActivePlan(profile: any): PlanInfo {
     label: 'Бесплатный', isActive: false,
     invoiceLimit: 3,
     canEmail: false, canSign: false, canKpAvrNakl: false,
-    canTemplates: false, canRecurring: false,
+    canTemplates: false, canRecurring: false, canEcp: false,
   }
 
   const now = new Date()
@@ -34,6 +35,7 @@ export function getActivePlan(profile: any): PlanInfo {
         canKpAvrNakl: profile.plan === 'pro',
         canTemplates: profile.plan === 'pro',
         canRecurring: profile.plan === 'pro',
+        canEcp: profile.plan === 'pro',
       }
     }
     const planEnd = new Date(profile.plan_expires_at)
@@ -47,6 +49,7 @@ export function getActivePlan(profile: any): PlanInfo {
         canKpAvrNakl: profile.plan === 'pro',
         canTemplates: profile.plan === 'pro',
         canRecurring: profile.plan === 'pro',
+        canEcp: profile.plan === 'pro',
       }
     }
   }
@@ -61,7 +64,7 @@ export function getActivePlan(profile: any): PlanInfo {
         label: `Бонус (${daysLeft} дн.)`,
         invoiceLimit: 30,
         canEmail: true, canSign: true,
-        canKpAvrNakl: false, canTemplates: false, canRecurring: false,
+        canKpAvrNakl: false, canTemplates: false, canRecurring: false, canEcp: false,
       }
     }
   }
@@ -76,7 +79,7 @@ export function getActivePlan(profile: any): PlanInfo {
         label: `Пробный (${daysLeft} дн.)`,
         invoiceLimit: 10,
         canEmail: true, canSign: true,
-        canKpAvrNakl: false, canTemplates: false, canRecurring: false,
+        canKpAvrNakl: false, canTemplates: false, canRecurring: false, canEcp: false,
       }
     }
   }
@@ -86,6 +89,6 @@ export function getActivePlan(profile: any): PlanInfo {
     plan: 'free', isTrial: false, daysLeft: null, isActive: false,
     label: 'Бесплатный', invoiceLimit: 3,
     canEmail: false, canSign: false, canKpAvrNakl: false,
-    canTemplates: false, canRecurring: false,
+    canTemplates: false, canRecurring: false, canEcp: false,
   }
 }

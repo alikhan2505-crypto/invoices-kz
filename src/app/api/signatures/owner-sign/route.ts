@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
 import crypto from 'crypto'
 import { sigexRegisterDocument, sigexUploadDocumentData, sigexBuildDDC, sigexGetDocument, parseSignerName } from '@/lib/sigex'
+import { getActivePlan } from '@/lib/plan'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -92,6 +93,14 @@ export async function POST(req: NextRequest) {
   const doc = await loadDocumentRecord(documentType, documentId)
   if (!doc || doc.userId !== user.id) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
+
+  // ЭЦП is a Pro-only feature — checked server-side since it's the actual
+  // authority (the owner-mode UI already hides the signing button for
+  // non-Pro accounts, but that's just UX, not enforcement).
+  const { data: signerProfile } = await supabase.from('profiles').select('plan, plan_expires_at, bonus_expires_at, trial_expires_at').eq('id', user.id).single()
+  if (!getActivePlan(signerProfile).canEcp) {
+    return NextResponse.json({ error: 'ЭЦП доступна только на тарифе Про' }, { status: 403 })
   }
 
   const pdfRes = await fetch(snapshotPdfUrl)

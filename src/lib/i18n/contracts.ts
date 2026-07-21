@@ -33,6 +33,10 @@ export interface ContractsContent {
   deleteButton: string
   publicIntro: string
   publicViewFileButton: string
+  ecpSectionLabel: string
+  proBadge: string
+  proLockedHint: string
+  goToPlansButton: string
 }
 
 export const contractsDict: Record<'ru' | 'kk' | 'en', ContractsContent> = {
@@ -71,6 +75,10 @@ export const contractsDict: Record<'ru' | 'kk' | 'en', ContractsContent> = {
     deleteButton: 'Удалить договор',
     publicIntro: 'Вам направлен договор на подписание электронной цифровой подписью (ЭЦП). Ознакомьтесь с документом и подпишите его через приложение eGov mobile.',
     publicViewFileButton: 'Открыть договор',
+    ecpSectionLabel: 'Электронная подпись (ЭЦП)',
+    proBadge: 'Про',
+    proLockedHint: 'Доступно на тарифе Про',
+    goToPlansButton: 'Перейти к тарифам',
   },
   kk: {
     headerLabel: 'Шарттар',
@@ -107,6 +115,10 @@ export const contractsDict: Record<'ru' | 'kk' | 'en', ContractsContent> = {
     deleteButton: 'Шартты жою',
     publicIntro: 'Сізге электрондық цифрлық қолтаңбамен (ЭЦҚ) қол қою үшін шарт жіберілді. Құжатпен танысып, eGov mobile қосымшасы арқылы қол қойыңыз.',
     publicViewFileButton: 'Шартты ашу',
+    ecpSectionLabel: 'Электрондық қолтаңба (ЭЦҚ)',
+    proBadge: 'Про',
+    proLockedHint: 'Про тарифінде қолжетімді',
+    goToPlansButton: 'Тарифтерге өту',
   },
   en: {
     headerLabel: 'Contracts',
@@ -143,5 +155,9 @@ export const contractsDict: Record<'ru' | 'kk' | 'en', ContractsContent> = {
     deleteButton: 'Delete contract',
     publicIntro: 'You have been sent a contract for electronic digital signature (ЭЦП). Review the document and sign it via the eGov mobile app.',
     publicViewFileButton: 'Open contract',
+    ecpSectionLabel: 'Electronic signature (ЭЦП)',
+    proBadge: 'Pro',
+    proLockedHint: 'Available on the Pro plan',
+    goToPlansButton: 'View plans',
   },
 }

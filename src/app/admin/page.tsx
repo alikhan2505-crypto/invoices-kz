@@ -353,6 +353,9 @@ export default function Admin() {
                           {expired && (
                             <div className="text-xs text-red-400 mt-1">истёк ({user.plan})</div>
                           )}
+                          {!expired && user.plan_expires_at && user.plan !== 'free' && (
+                            <div className="text-xs text-gray-400 mt-1">до {formatDate(user.plan_expires_at)}</div>
+                          )}
                         </>
                       )
                     })()}

@@ -401,6 +401,7 @@ export default function InvoicePage() {
           </button>
         </div>
 
+        {ap.canEcp ? (
         <SignatureSection
           mode="owner"
           documentId={invoice.id}
@@ -425,6 +426,22 @@ export default function InvoicePage() {
             showWatermark: !ap.isActive,
           })}
         />
+        ) : (
+        <div className="bg-white rounded-2xl shadow-sm p-4">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-10 h-10 rounded-full bg-[#1C2056]/5 flex items-center justify-center text-xl">✍️</div>
+            <div className="text-sm font-medium text-[#1C2056] flex-1">{t.ecpSectionLabel}</div>
+            <span className="text-xs bg-amber-50 text-amber-600 border border-amber-200 px-2 py-0.5 rounded-full flex-shrink-0">
+              🔒 {t.proBadge}
+            </span>
+          </div>
+          <div className="text-xs text-gray-400 mb-3">{t.proLockedLabel}</div>
+          <button onClick={() => showUpgrade(t.ecpProUpgradeMessage, 'pro')}
+            className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium">
+            {t.goToPlansButton}
+          </button>
+        </div>
+        )}
 
         {services.length > 0 && (
           <div className="bg-white rounded-2xl shadow-sm overflow-hidden">

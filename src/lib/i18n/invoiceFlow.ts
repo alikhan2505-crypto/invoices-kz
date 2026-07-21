@@ -165,6 +165,8 @@ export interface InvoiceFlowContent {
   basicPlusBadge: string
   withoutSignatureButtonLabel: string
   pdfSignUpgradeMessage: string
+  ecpSectionLabel: string
+  ecpProUpgradeMessage: string
   linkCopiedMessage: (link: string) => string
   tokenNotFoundAlert: string
   enterEmailAddressAlert: string
@@ -358,6 +360,8 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     basicPlusBadge: '🔒 Базовый+',
     withoutSignatureButtonLabel: '📄 Без подписи и печати',
     pdfSignUpgradeMessage: 'PDF с подписью доступен с тарифа Базовый',
+    ecpSectionLabel: 'Электронная подпись (ЭЦП)',
+    ecpProUpgradeMessage: 'Подписание документов ЭЦП доступно на тарифе Про',
     linkCopiedMessage: (link: string) => `Ссылка скопирована: ${link}`,
     tokenNotFoundAlert: 'Ошибка: токен не найден',
     enterEmailAddressAlert: 'Введите email адрес',
@@ -550,6 +554,8 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     basicPlusBadge: '🔒 Базалық+',
     withoutSignatureButtonLabel: '📄 Қолтаңба мен мөрсіз',
     pdfSignUpgradeMessage: 'Қолтаңбасы бар PDF Базалық тарифінен бастап қолжетімді',
+    ecpSectionLabel: 'Электрондық қолтаңба (ЭЦҚ)',
+    ecpProUpgradeMessage: 'Құжаттарға ЭЦҚ қою Про тарифінде қолжетімді',
     linkCopiedMessage: (link: string) => `Сілтеме көшірілді: ${link}`,
     tokenNotFoundAlert: 'Қате: токен табылмады',
     enterEmailAddressAlert: 'Email мекенжайын енгізіңіз',
@@ -742,6 +748,8 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     basicPlusBadge: '🔒 Basic+',
     withoutSignatureButtonLabel: '📄 Without signature and stamp',
     pdfSignUpgradeMessage: 'A signed PDF is available from the Basic plan',
+    ecpSectionLabel: 'Electronic signature (ЭЦП)',
+    ecpProUpgradeMessage: 'Signing documents with ЭЦП is available on the Pro plan',
     linkCopiedMessage: (link: string) => `Link copied: ${link}`,
     tokenNotFoundAlert: 'Error: token not found',
     enterEmailAddressAlert: 'Enter an email address',
