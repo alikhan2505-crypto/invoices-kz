@@ -339,22 +339,32 @@ export default function Admin() {
                   <div className="text-xs text-gray-400">{user.bin_iin || '—'}</div>
                   <div>
                     {(() => {
-                      const activePlan = getActivePlan(user).plan
-                      const expired = !!user.plan && user.plan !== 'free' && activePlan !== user.plan
+                      const ap = getActivePlan(user)
+                      const expired = !!user.plan && user.plan !== 'free' && ap.plan !== user.plan
+                      // Active plan can come from a real purchase (plan_expires_at),
+                      // referral bonus days, or the signup trial — not just a paid
+                      // plan — so check all three to find the date it actually ends.
+                      const expiryDate =
+                        (user.plan && user.plan !== 'free' && user.plan_expires_at) ? user.plan_expires_at :
+                        (user.bonus_expires_at && new Date(user.bonus_expires_at) > new Date()) ? user.bonus_expires_at :
+                        (user.trial_expires_at && new Date(user.trial_expires_at) > new Date()) ? user.trial_expires_at :
+                        null
                       return (
                         <>
                           <span className={`text-xs px-2 py-1 rounded-full ${
-                            activePlan === 'pro' ? 'bg-yellow-500/20 text-yellow-400' :
-                            activePlan === 'basic' ? 'bg-blue-500/20 text-blue-400' :
+                            ap.plan === 'pro' ? 'bg-yellow-500/20 text-yellow-400' :
+                            ap.plan === 'basic' ? 'bg-blue-500/20 text-blue-400' :
                             'bg-gray-600 text-gray-400'
                           }`}>
-                            {activePlan}
+                            {ap.plan}
                           </span>
                           {expired && (
                             <div className="text-xs text-red-400 mt-1">истёк ({user.plan})</div>
                           )}
-                          {!expired && user.plan_expires_at && user.plan !== 'free' && (
-                            <div className="text-xs text-gray-400 mt-1">до {formatDate(user.plan_expires_at)}</div>
+                          {!expired && ap.plan !== 'free' && expiryDate && (
+                            <div className="text-xs text-gray-400 mt-1">
+                              {ap.isTrial ? 'пробный до ' : 'до '}{formatDate(expiryDate)}
+                            </div>
                           )}
                         </>
                       )
