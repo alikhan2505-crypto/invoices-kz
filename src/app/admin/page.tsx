@@ -37,11 +37,12 @@ export default function Admin() {
 
     if (!profile?.is_admin) { router.push('/dashboard'); return }
 
-    const [{ data: allUsers }, { data: allInvoices }, { data: allPromos }, { data: allPayments }, { data: allKp }, { data: allAvr }, { data: allNakladnaya }] = await Promise.all([
+    const [{ data: allUsers }, { data: allInvoices }, { data: allPromos }, { data: allPayments }, { data: allWebhookLogs }, { data: allKp }, { data: allAvr }, { data: allNakladnaya }] = await Promise.all([
       supabase.from('profiles').select('*').order('created_at', { ascending: false }),
       supabase.from('invoices').select('id, user_id, status, amount'),
       supabase.from('promo_codes').select('*').order('created_at', { ascending: false }),
       supabase.from('payment_requests').select('*').order('created_at', { ascending: false }),
+      supabase.from('webhook_logs').select('id, created_at, body').order('created_at', { ascending: false }).limit(300),
       supabase.from('kp_documents').select('invoice_id'),
       supabase.from('avr_documents').select('invoice_id'),
       supabase.from('nakladnaya_documents').select('invoice_id'),
@@ -49,7 +50,34 @@ export default function Admin() {
 
     setUsers(allUsers || [])
     setPromos(allPromos || [])
-    setPayments(allPayments || [])
+
+    // Two independent payment paths write to two different places: the old
+    // manual/QR-link flow leaves a row in payment_requests (pending, admin
+    // clicks Activate); the newer xpayment webhook flow (phone push and the
+    // QR-link's own completion) updates profiles.plan directly and never
+    // touches payment_requests at all — so a webhook-completed payment was
+    // otherwise invisible here. Merge both into one list so nothing is missed.
+    const usersById = new Map((allUsers || []).map((u: any) => [u.id, u]))
+    const webhookPayments = (allWebhookLogs || [])
+      .filter((w: any) => w.body?.event === 'payment.completed' && typeof w.body?.merchant_order_id === 'string' && w.body.merchant_order_id.includes('__|__'))
+      .map((w: any) => {
+        const [userId, plan] = w.body.merchant_order_id.split('__|__')
+        const u = usersById.get(userId)
+        return {
+          id: `webhook-${w.id}`,
+          source: 'webhook' as const,
+          email: u?.company_name || u?.email || userId,
+          plan,
+          amount: plan === 'pro' ? 5990 : 2990,
+          status: 'activated' as const,
+          created_at: w.created_at,
+          activated_at: w.created_at,
+        }
+      })
+    const legacyPayments = (allPayments || []).map((p: any) => ({ ...p, source: 'legacy' as const }))
+    const combinedPayments = [...legacyPayments, ...webhookPayments]
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    setPayments(combinedPayments)
     setStats({
       users: (allUsers || []).length,
       invoices: (allInvoices || []).length,
@@ -273,8 +301,13 @@ export default function Admin() {
                         <span className={`text-xs px-2 py-0.5 rounded-full ${payment.plan === 'pro' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-blue-500/20 text-blue-400'}`}>
                           {payment.plan === 'pro' ? 'Pro' : 'Basic'}
                         </span>
+                        {payment.source === 'webhook' && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300" title="Активировано автоматически через xpayment webhook, без ручной проверки">
+                            ⚡ авто
+                          </span>
+                        )}
                       </div>
-                      <div className="text-sm font-medium mt-1">📱 {payment.email}</div>
+                      <div className="text-sm font-medium mt-1">{payment.source === 'webhook' ? '👤' : '📱'} {payment.email}</div>
                       <div className="text-xs text-gray-400 mt-0.5">
                         {t.amountPrefixLabel}<b>{payment.amount?.toLocaleString('ru-KZ')} ₸</b>
                       </div>
