@@ -184,6 +184,7 @@ export default function Profile() {
               { icon: '🎨', label: t.signatureMenuLabel, href: '/profile/signature' },
               { icon: '💳', label: t.banksMenuLabel, href: '/profile/banks' },
               { icon: '🔒', label: t.securityMenuLabel, href: '/profile/security' },
+              { icon: '🏦', label: t.acquiringMenuLabel, href: '/profile/acquiring' },
               { icon: '🔗', label: t.connectorsMenuLabel, href: '/profile/connectors' },
             ].map((item, i, arr) => (
               <div key={item.href} onClick={() => router.push(item.href)}

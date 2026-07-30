@@ -19,6 +19,7 @@ export interface ProfileCoreContent {
   signatureMenuLabel: string
   banksMenuLabel: string
   securityMenuLabel: string
+  acquiringMenuLabel: string
   connectorsMenuLabel: string
   directoriesSectionLabel: string
   clientsMenuLabel: string
@@ -140,6 +141,7 @@ export const profileCoreDict: Record<'ru' | 'kk' | 'en', ProfileCoreContent> = {
     signatureMenuLabel: 'Брендинг',
     banksMenuLabel: 'Банковские счета',
     securityMenuLabel: 'ЭЦП и безопасность',
+    acquiringMenuLabel: 'Эквайринг',
     connectorsMenuLabel: 'Коннекторы',
     directoriesSectionLabel: 'Справочники',
     clientsMenuLabel: 'Мои клиенты',
@@ -256,6 +258,7 @@ export const profileCoreDict: Record<'ru' | 'kk' | 'en', ProfileCoreContent> = {
     signatureMenuLabel: 'Брендинг',
     banksMenuLabel: 'Банк шоттары',
     securityMenuLabel: 'ЭЦҚ және қауіпсіздік',
+    acquiringMenuLabel: 'Эквайринг',
     connectorsMenuLabel: 'Коннекторлар',
     directoriesSectionLabel: 'Анықтамалар',
     clientsMenuLabel: 'Менің клиенттерім',
@@ -372,6 +375,7 @@ export const profileCoreDict: Record<'ru' | 'kk' | 'en', ProfileCoreContent> = {
     signatureMenuLabel: 'Branding',
     banksMenuLabel: 'Bank accounts',
     securityMenuLabel: 'Digital signature and security',
+    acquiringMenuLabel: 'Acquiring',
     connectorsMenuLabel: 'Connectors',
     directoriesSectionLabel: 'Directories',
     clientsMenuLabel: 'My clients',
