@@ -59,4 +59,13 @@ describe('getActivePlan', () => {
       if (result.plan === 'free') expect(result.isActive).toBe(false)
     }
   })
+
+  it('grants canAcquiring only to an active Pro plan, not Basic/trial/bonus', () => {
+    expect(getActivePlan({ plan: 'pro' }).canAcquiring).toBe(true)
+    expect(getActivePlan({ plan: 'basic' }).canAcquiring).toBe(false)
+    const future = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString()
+    expect(getActivePlan({ bonus_expires_at: future }).canAcquiring).toBe(false)
+    expect(getActivePlan({ trial_expires_at: future }).canAcquiring).toBe(false)
+    expect(getActivePlan(null).canAcquiring).toBe(false)
+  })
 })
