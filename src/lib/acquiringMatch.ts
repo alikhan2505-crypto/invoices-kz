@@ -27,7 +27,7 @@ export function findMatches(rows: StatementRow[], invoices: OpenInvoice[]): Acqu
   for (const row of rows) {
     for (const invoice of invoices) {
       if (!invoice.client_bin) continue
-      if (normalizeBin(invoice.client_bin) !== row.bin) continue
+      if (normalizeBin(invoice.client_bin) !== normalizeBin(row.bin)) continue
       if (Number(invoice.amount) !== Number(row.amount)) continue
       matches.push({ invoice, row })
     }

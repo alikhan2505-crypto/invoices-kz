@@ -47,4 +47,10 @@ describe('findMatches', () => {
     expect(matches).toHaveLength(1)
     expect(matches[0].invoice.id).toBe('inv-3')
   })
+
+  it('matches when row.bin contains spaces but normalizes to invoice client_bin', () => {
+    const matches = findMatches([row({ bin: '123 456 789 012' })], [invoice()])
+    expect(matches).toHaveLength(1)
+    expect(matches[0].invoice.id).toBe('inv-1')
+  })
 })
