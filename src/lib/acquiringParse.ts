@@ -27,18 +27,38 @@ export async function parseStatementFile(file: File): Promise<StatementRow[]> {
   if (!isExcel) {
     throw new AcquiringParseError('Поддерживаются только файлы .xlsx или .xls')
   }
+
+  // Check MIME type: allow empty file.type (browser inconsistency), only reject if non-empty and mismatched
+  const validMimeTypes = [
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+    'application/vnd.ms-excel', // .xls
+  ]
+  if (file.type && !validMimeTypes.includes(file.type)) {
+    throw new AcquiringParseError('Поддерживаются только файлы .xlsx или .xls')
+  }
+
   if (file.size > MAX_FILE_BYTES) {
     throw new AcquiringParseError('Файл слишком большой (максимум 5 МБ)')
   }
 
   const buffer = await file.arrayBuffer()
-  const workbook = XLSX.read(buffer, { type: 'array' })
-  const firstSheetName = workbook.SheetNames[0]
-  if (!firstSheetName) {
-    throw new AcquiringParseError('В файле нет ни одного листа')
+
+  let workbook
+  let grid: unknown[][]
+  try {
+    workbook = XLSX.read(buffer, { type: 'array' })
+    const firstSheetName = workbook.SheetNames[0]
+    if (!firstSheetName) {
+      throw new AcquiringParseError('В файле нет ни одного листа')
+    }
+    const sheet = workbook.Sheets[firstSheetName]
+    grid = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' })
+  } catch (error) {
+    if (error instanceof AcquiringParseError) {
+      throw error
+    }
+    throw new AcquiringParseError('Не удалось прочитать файл — убедитесь, что это корректный Excel-файл')
   }
-  const sheet = workbook.Sheets[firstSheetName]
-  const grid: unknown[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' })
 
   let headerRowIndex = -1
   let binCol = -1
