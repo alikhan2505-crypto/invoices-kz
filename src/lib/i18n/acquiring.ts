@@ -20,6 +20,8 @@ export interface AcquiringContent {
   confirmPaymentButton: string
   confirmingLabel: string
   errorPrefix: (message: string) => string
+  parseErrorMessages: Record<'not_excel' | 'too_large' | 'no_sheet' | 'unreadable' | 'unknown_structure', string>
+  multipleMatchesHint: string
 }
 
 export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
@@ -45,6 +47,14 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     confirmPaymentButton: 'Подтвердить оплату',
     confirmingLabel: 'Подтверждаем...',
     errorPrefix: (message: string) => `Ошибка: ${message}`,
+    parseErrorMessages: {
+      not_excel: 'Поддерживаются только файлы .xlsx или .xls',
+      too_large: 'Файл слишком большой (максимум 5 МБ)',
+      no_sheet: 'В файле нет ни одного листа',
+      unreadable: 'Не удалось прочитать файл — убедитесь, что это корректный Excel-файл',
+      unknown_structure: 'Не удалось распознать структуру файла — попробуйте другой формат экспорта',
+    },
+    multipleMatchesHint: 'Эта операция подходит к нескольким счетам — выберите один',
   },
   kk: {
     headerLabel: 'Эквайринг',
@@ -68,6 +78,14 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     confirmPaymentButton: 'Төлемді растау',
     confirmingLabel: 'Растауда...',
     errorPrefix: (message: string) => `Қате: ${message}`,
+    parseErrorMessages: {
+      not_excel: 'Тек .xlsx немесе .xls файлдары қолдау көрсетіледі',
+      too_large: 'Файл тым үлкен (максимум 5 МБ)',
+      no_sheet: 'Файлда бірде-бір парақ жоқ',
+      unreadable: 'Файлды оқу мүмкін болмады — бұл дұрыс Excel файлы екеніне көз жеткізіңіз',
+      unknown_structure: 'Файл құрылымын тану мүмкін болмады — экспорттың басқа форматын байқап көріңіз',
+    },
+    multipleMatchesHint: 'Бұл операция бірнеше шотқа сәйкес келеді — біреуін таңдаңыз',
   },
   en: {
     headerLabel: 'Acquiring',
@@ -91,5 +109,13 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     confirmPaymentButton: 'Confirm payment',
     confirmingLabel: 'Confirming...',
     errorPrefix: (message: string) => `Error: ${message}`,
+    parseErrorMessages: {
+      not_excel: 'Only .xlsx or .xls files are supported',
+      too_large: 'File is too large (5 MB maximum)',
+      no_sheet: 'The file has no sheets',
+      unreadable: 'Could not read the file — make sure it\'s a valid Excel file',
+      unknown_structure: 'Could not recognize the file structure — try a different export format',
+    },
+    multipleMatchesHint: 'This transaction matches several invoices — choose one',
   },
 }
