@@ -15,6 +15,8 @@
 - **File validation before parsing:** reject anything that isn't `.xlsx`/`.xls` by extension+mimetype, and cap file size (5 MB) before handing it to the parser, to avoid a hostile/corrupt file hanging the browser tab.
 - **No assumed column layout beyond a best-effort guess.** We do not have a real sample of Kaspi Pay's exported statement. The parser must locate columns by matching header text (case-insensitive, Russian labels like "БИН"/"ИИН", "Сумма", "Дата", "Контрагент"/"Назначение") rather than hard-coded column indices, and must fail with a clear, human-readable error (not a silent wrong-column misread) if it cannot confidently locate the required columns. This is a known, disclosed limitation of v1 — flagged to the user, not hidden.
 
+**Known accepted risk (v1):** the `xlsx` npm package is pinned at 0.18.5, which has published CVEs (prototype pollution CVE-2023-30533, ReDoS CVE-2024-22363) fixed only in newer SheetJS-hosted builds not published to the npm registry. Since this feature only parses files the account owner deliberately uploads (their own bank statement) in their own browser session, the blast radius of a malicious file is limited to that user's own session — but this is a real, disclosed gap, not a non-issue. Upgrading to a SheetJS CDN-hosted build is a reasonable v2 follow-up, deliberately deferred here to avoid changing the dependency install source without separate testing.
+
 ## Architecture
 
 ```
