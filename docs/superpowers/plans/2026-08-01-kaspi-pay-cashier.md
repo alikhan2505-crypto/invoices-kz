@@ -1147,7 +1147,15 @@ export async function POST(req: NextRequest) {
   const token = req.headers.get('authorization')?.replace('Bearer ', '')
   if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const found = await loadConnectionByApiToken(token)
+  // loadConnectionByApiToken throws on a genuine DB error (Task 6) rather
+  // than returning null — that must not be conflated with "bad token".
+  let found: Awaited<ReturnType<typeof loadConnectionByApiToken>>
+  try {
+    found = await loadConnectionByApiToken(token)
+  } catch (e: any) {
+    console.error('Kaspi connection lookup error:', e.message)
+    return NextResponse.json({ error: 'kaspi_unavailable' }, { status: 502 })
+  }
   if (!found) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { amount, order_id, callback_url } = await req.json()
