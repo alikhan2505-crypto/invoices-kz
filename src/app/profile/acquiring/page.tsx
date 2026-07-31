@@ -63,6 +63,28 @@ export default function AcquiringPage() {
     const { data: p } = await supabase.from('profiles').select('*').eq('id', user.id).single()
     setProfile(p)
 
+    // bcc_connections has no client-side RLS policy — it's only ever
+    // readable via a service-role client, so the connection status is
+    // fetched through this authenticated route rather than queried
+    // directly from the browser.
+    //
+    // Fetched for EVERY plan, not just Pro: a user whose Pro plan lapsed while
+    // a connection is live still holds a real OAuth token against their bank,
+    // and must be able to see it and disconnect it. /api/bcc/status is
+    // deliberately not Pro-gated for the same reason.
+    const { data: { session } } = await supabase.auth.getSession()
+    try {
+      const res = await fetch('/api/bcc/status', {
+        headers: { 'Authorization': `Bearer ${session?.access_token}` },
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setBccConnection(data.connection as BccConnection | null)
+      }
+    } catch (e: any) {
+      console.error('BCC status fetch error:', e.message)
+    }
+
     if (getActivePlan(p).canAcquiring) {
       const { data: invoices } = await supabase
         .from('invoices')
@@ -71,23 +93,6 @@ export default function AcquiringPage() {
         .not('status', 'in', '(paid,cancelled)')
         .not('client_bin', 'is', null)
       setOpenInvoices((invoices as OpenInvoice[]) || [])
-
-      // bcc_connections has no client-side RLS policy — it's only ever
-      // readable via a service-role client, so the connection status is
-      // fetched through this authenticated route rather than queried
-      // directly from the browser.
-      const { data: { session } } = await supabase.auth.getSession()
-      try {
-        const res = await fetch('/api/bcc/status', {
-          headers: { 'Authorization': `Bearer ${session?.access_token}` },
-        })
-        if (res.ok) {
-          const data = await res.json()
-          setBccConnection(data.connection as BccConnection | null)
-        }
-      } catch (e: any) {
-        console.error('BCC status fetch error:', e.message)
-      }
 
       const { data: pending } = await supabase
         .from('bcc_pending_matches')
@@ -110,7 +115,11 @@ export default function AcquiringPage() {
       })
       const data = await res.json()
       if (!res.ok || !data.authUrl) {
-        setBccMessage(data.error === 'no_bin' ? t.bccErrorNoBin : t.bccErrorGeneric)
+        setBccMessage(
+          data.error === 'no_bin' ? t.bccErrorNoBin
+            : data.error === 'not_pro' ? t.bccErrorNotPro
+              : t.bccErrorGeneric
+        )
         return
       }
       window.location.href = data.authUrl
@@ -190,7 +199,23 @@ export default function AcquiringPage() {
         return
       }
       await supabase.from('invoice_logs').insert({ invoice_id: pending.invoice_id, status: 'paid' })
-      await supabase.from('bcc_pending_matches').delete().eq('id', pending.id)
+
+      // Deleted through an authenticated route, not directly: bcc_pending_matches
+      // has a SELECT policy only, so a client-side .delete() is silently filtered
+      // to zero rows and reports no error — the row would survive and reappear as
+      // a phantom "confirm" card for an already-paid invoice on the next load.
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch(`/api/bcc/pending/${pending.id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${session?.access_token}` },
+      })
+      if (!res.ok) {
+        // The invoice IS paid at this point — keep the card on screen rather
+        // than showing a false "done", so the user can retry the cleanup.
+        setConfirmError(t.bccConfirmDeleteError)
+        return
+      }
+
       setBccPending(prev => prev.filter(p => p.id !== pending.id))
       setOpenInvoices(prev => prev.filter(i => i.id !== pending.invoice_id))
     } finally {
@@ -206,6 +231,25 @@ export default function AcquiringPage() {
 
   const ap = getActivePlan(profile)
 
+  // Rendered in BOTH the Pro and the non-Pro branch below. A user whose Pro
+  // plan lapsed while a BCC connection is live still has a real OAuth token
+  // sitting against their bank account — the "Отключить" button has to stay
+  // reachable for them, even though everything else here is behind the wall.
+  const bccConnectedCard = bccConnection && (
+    <div className="bg-white rounded-2xl shadow-sm p-4">
+      <div className="text-sm font-medium text-[#1C2056] mb-2">{t.bccSectionTitle}</div>
+      <div className="text-xs text-gray-500">{t.bccConnectedIbanLabel}: {bccConnection.iban}</div>
+      <div className="text-xs text-gray-400">{t.bccLastCheckedLabel}: {new Date(bccConnection.last_checked_at).toLocaleString('ru-KZ')}</div>
+      {bccConnection.status === 'error' && (
+        <div className="text-xs text-amber-600 mt-2">{t.bccConnectionErrorHint}</div>
+      )}
+      <button onClick={disconnectBcc} disabled={bccDisconnecting}
+        className="w-full bg-gray-100 text-gray-600 rounded-xl py-2.5 text-sm font-medium mt-3">
+        {bccDisconnecting ? t.bccDisconnectingLabel : t.bccDisconnectButton}
+      </button>
+    </div>
+  )
+
   return (
     <main className="min-h-screen bg-gray-50 pb-8">
       <div className="bg-white border-b px-4 py-4 flex items-center gap-3">
@@ -215,20 +259,29 @@ export default function AcquiringPage() {
 
       <div className="max-w-lg mx-auto p-4 space-y-4">
         {!ap.canAcquiring ? (
-          <div className="bg-white rounded-2xl shadow-sm p-4">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 rounded-full bg-[#1C2056]/5 flex items-center justify-center text-xl">🏦</div>
-              <div className="text-sm font-medium text-[#1C2056] flex-1">{t.headerLabel}</div>
-              <span className="text-xs bg-amber-50 text-amber-600 border border-amber-200 px-2 py-0.5 rounded-full flex-shrink-0">
-                🔒 {t.proBadge}
-              </span>
+          <>
+            <div className="bg-white rounded-2xl shadow-sm p-4">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-10 h-10 rounded-full bg-[#1C2056]/5 flex items-center justify-center text-xl">🏦</div>
+                <div className="text-sm font-medium text-[#1C2056] flex-1">{t.headerLabel}</div>
+                <span className="text-xs bg-amber-50 text-amber-600 border border-amber-200 px-2 py-0.5 rounded-full flex-shrink-0">
+                  🔒 {t.proBadge}
+                </span>
+              </div>
+              <div className="text-xs text-gray-400 mb-3">{t.proLockedHint}</div>
+              <button onClick={() => router.push('/upgrade')}
+                className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium">
+                {t.goToPlansButton}
+              </button>
             </div>
-            <div className="text-xs text-gray-400 mb-3">{t.proLockedHint}</div>
-            <button onClick={() => router.push('/upgrade')}
-              className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium">
-              {t.goToPlansButton}
-            </button>
-          </div>
+
+            {bccConnection && (
+              <>
+                {bccMessage && <p className="text-xs text-[#1C2056] px-1">{bccMessage}</p>}
+                {bccConnectedCard}
+              </>
+            )}
+          </>
         ) : (
           <>
             <div className="bg-blue-50 rounded-2xl p-4">
@@ -237,24 +290,15 @@ export default function AcquiringPage() {
 
             {bccMessage && <p className="text-xs text-[#1C2056] px-1">{bccMessage}</p>}
 
-            <div className="bg-white rounded-2xl shadow-sm p-4">
-              <div className="text-sm font-medium text-[#1C2056] mb-2">{t.bccSectionTitle}</div>
-              {bccConnection ? (
-                <>
-                  <div className="text-xs text-gray-500">{t.bccConnectedIbanLabel}: {bccConnection.iban}</div>
-                  <div className="text-xs text-gray-400 mb-3">{t.bccLastCheckedLabel}: {new Date(bccConnection.last_checked_at).toLocaleString('ru-KZ')}</div>
-                  <button onClick={disconnectBcc} disabled={bccDisconnecting}
-                    className="w-full bg-gray-100 text-gray-600 rounded-xl py-2.5 text-sm font-medium">
-                    {bccDisconnecting ? t.bccDisconnectingLabel : t.bccDisconnectButton}
-                  </button>
-                </>
-              ) : (
+            {bccConnection ? bccConnectedCard : (
+              <div className="bg-white rounded-2xl shadow-sm p-4">
+                <div className="text-sm font-medium text-[#1C2056] mb-2">{t.bccSectionTitle}</div>
                 <button onClick={connectBcc} disabled={bccConnecting}
                   className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium">
                   {bccConnecting ? t.bccConnectingLabel : t.bccConnectButton}
                 </button>
-              )}
-            </div>
+              </div>
+            )}
 
             {bccPending.length > 0 && (
               <>

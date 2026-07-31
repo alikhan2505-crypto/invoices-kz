@@ -33,7 +33,10 @@ export interface AcquiringContent {
   bccConnectedMessage: string
   bccErrorMessage: string
   bccErrorNoBin: string
+  bccErrorNotPro: string
   bccErrorGeneric: string
+  bccConnectionErrorHint: string
+  bccConfirmDeleteError: string
 }
 
 export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
@@ -78,7 +81,10 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     bccConnectedMessage: 'Счёт BCC успешно подключён.',
     bccErrorMessage: 'Не удалось подключить BCC. Попробуйте ещё раз.',
     bccErrorNoBin: 'Укажите БИН/ИИН в реквизитах перед подключением BCC.',
+    bccErrorNotPro: 'Подключение счёта BCC доступно только на тарифе Про.',
     bccErrorGeneric: 'Сервис BCC временно недоступен. Попробуйте позже.',
+    bccConnectionErrorHint: 'Подключение к BCC больше не действует — отключите счёт и подключите его заново.',
+    bccConfirmDeleteError: 'Счёт отмечен оплаченным, но операцию не удалось убрать из списка. Обновите страницу.',
   },
   kk: {
     headerLabel: 'Эквайринг',
@@ -121,7 +127,10 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     bccConnectedMessage: 'BCC шоты сәтті қосылды.',
     bccErrorMessage: 'BCC қосу мүмкін болмады. Қайталап көріңіз.',
     bccErrorNoBin: 'BCC қосу алдында деректемелерде БИН/ИИН көрсетіңіз.',
+    bccErrorNotPro: 'BCC шотын қосу тек Про тарифінде қолжетімді.',
     bccErrorGeneric: 'BCC қызметі уақытша қолжетімсіз. Кейінірек көріңіз.',
+    bccConnectionErrorHint: 'BCC-ке қосылу енді жарамсыз — шотты ажыратып, қайта қосыңыз.',
+    bccConfirmDeleteError: 'Шот төленген деп белгіленді, бірақ операцияны тізімнен алып тастау мүмкін болмады. Бетті жаңартыңыз.',
   },
   en: {
     headerLabel: 'Acquiring',
@@ -164,6 +173,9 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     bccConnectedMessage: 'BCC account connected successfully.',
     bccErrorMessage: 'Could not connect BCC. Please try again.',
     bccErrorNoBin: 'Add your BIN/IIN in your requisites before connecting BCC.',
+    bccErrorNotPro: 'Connecting a BCC account is available on the Pro plan only.',
     bccErrorGeneric: 'The BCC service is temporarily unavailable. Try again later.',
+    bccConnectionErrorHint: 'The BCC connection is no longer valid — disconnect the account and connect it again.',
+    bccConfirmDeleteError: 'The invoice was marked paid, but the transaction could not be removed from the list. Please refresh the page.',
   },
 }
