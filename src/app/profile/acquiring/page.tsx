@@ -293,6 +293,12 @@ export default function AcquiringPage() {
             {bccConnection ? bccConnectedCard : (
               <div className="bg-white rounded-2xl shadow-sm p-4">
                 <div className="text-sm font-medium text-[#1C2056] mb-2">{t.bccSectionTitle}</div>
+                <div className="flex items-center justify-between text-xs text-gray-500 mb-3">
+                  <span>{t.bccBinLabel}: {profile?.bin_iin || t.bccBinMissing}</span>
+                  <button onClick={() => router.push('/profile/requisites')} className="text-[#1C2056] font-medium underline">
+                    {t.bccEditBinLink}
+                  </button>
+                </div>
                 <button onClick={connectBcc} disabled={bccConnecting}
                   className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium">
                   {bccConnecting ? t.bccConnectingLabel : t.bccConnectButton}

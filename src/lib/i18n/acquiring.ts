@@ -37,6 +37,9 @@ export interface AcquiringContent {
   bccErrorGeneric: string
   bccConnectionErrorHint: string
   bccConfirmDeleteError: string
+  bccBinLabel: string
+  bccBinMissing: string
+  bccEditBinLink: string
 }
 
 export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
@@ -85,6 +88,9 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     bccErrorGeneric: 'Сервис BCC временно недоступен. Попробуйте позже.',
     bccConnectionErrorHint: 'Подключение к BCC больше не действует — отключите счёт и подключите его заново.',
     bccConfirmDeleteError: 'Счёт отмечен оплаченным, но операцию не удалось убрать из списка. Обновите страницу.',
+    bccBinLabel: 'БИН/ИИН для подключения',
+    bccBinMissing: 'не указан',
+    bccEditBinLink: 'Изменить',
   },
   kk: {
     headerLabel: 'Эквайринг',
@@ -131,6 +137,9 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     bccErrorGeneric: 'BCC қызметі уақытша қолжетімсіз. Кейінірек көріңіз.',
     bccConnectionErrorHint: 'BCC-ке қосылу енді жарамсыз — шотты ажыратып, қайта қосыңыз.',
     bccConfirmDeleteError: 'Шот төленген деп белгіленді, бірақ операцияны тізімнен алып тастау мүмкін болмады. Бетті жаңартыңыз.',
+    bccBinLabel: 'Қосу үшін БИН/ИИН',
+    bccBinMissing: 'көрсетілмеген',
+    bccEditBinLink: 'Өзгерту',
   },
   en: {
     headerLabel: 'Acquiring',
@@ -177,5 +186,8 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     bccErrorGeneric: 'The BCC service is temporarily unavailable. Try again later.',
     bccConnectionErrorHint: 'The BCC connection is no longer valid — disconnect the account and connect it again.',
     bccConfirmDeleteError: 'The invoice was marked paid, but the transaction could not be removed from the list. Please refresh the page.',
+    bccBinLabel: 'BIN/IIN to connect with',
+    bccBinMissing: 'not set',
+    bccEditBinLink: 'Edit',
   },
 }
