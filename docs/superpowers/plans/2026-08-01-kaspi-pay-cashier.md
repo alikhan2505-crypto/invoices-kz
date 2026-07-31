@@ -1074,9 +1074,12 @@ function toConnection(row: any): KaspiConnection {
   const key = process.env.KASPI_SESSION_ENCRYPTION_KEY!
   return {
     tokenSn: row.token_sn,
+    totpSeed: decryptAtRest(row.totp_seed_enc, key),
     profileId: row.profile_id,
-    devicePrivateKeyPem: decryptAtRest(row.device_private_key_enc, key),
-    totpSeedHex: decryptAtRest(row.totp_seed_enc, key),
+    deviceId: row.device_id,
+    installId: row.install_id,
+    identityPrivateKeyPem: decryptAtRest(row.identity_private_key_enc, key).toString('utf8'),
+    identityPublicKeyPem: row.identity_public_key_pem,
   }
 }
 
