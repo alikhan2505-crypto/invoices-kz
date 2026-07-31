@@ -29,14 +29,39 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'expired_or_invalid_process' }, { status: 400 })
   }
 
+  // Kaspi's processId is single-use — once verifyOtp's "finish" step succeeds,
+  // the device is paired on Kaspi's side whether or not we manage to persist
+  // it, and a retry with the same processId cannot re-run that step. So the
+  // pending attempt is deleted right after this call succeeds (not held for
+  // a retry), and this call's failures are kept in their own try/catch so
+  // they can never be confused with a later persistence failure below.
+  let verified: {
+    tokenSn: string
+    totpSeed: Buffer
+    profileId: string
+    organizationId: string | null
+    organizationIdn: string | null
+    organizationKbe: string | null
+  }
   try {
-    const { tokenSn, totpSeed, profileId, organizationId, organizationIdn, organizationKbe } =
-      await verifyOtp(processId, otp, attempt.identity, attempt.userToken)
-    deletePendingAttempt(processId)
+    verified = await verifyOtp(processId, otp, attempt.identity, attempt.userToken)
+  } catch (e: any) {
+    console.error('Kaspi verify-otp error for user', user.id, 'process', processId, ':', e.message)
+    return NextResponse.json({ error: 'invalid_otp' }, { status: 400 })
+  }
+  deletePendingAttempt(processId)
+
+  // From here on, Kaspi has already paired this device — a failure below
+  // means an orphaned pairing with no corresponding row, not a bad OTP. Kept
+  // in its own try/catch and its own error code so it is never mislabeled
+  // as invalid_otp, per this task's "log failures clearly, no silent
+  // failure" requirement.
+  try {
+    const key = process.env.KASPI_SESSION_ENCRYPTION_KEY
+    if (!key) throw new Error('KASPI_SESSION_ENCRYPTION_KEY is not configured')
 
     const apiToken = crypto.randomBytes(32).toString('hex')
     const apiTokenHash = crypto.createHash('sha256').update(apiToken).digest('hex')
-    const key = process.env.KASPI_SESSION_ENCRYPTION_KEY!
 
     const { error } = await supabase.from('kaspi_connections').upsert({
       user_id: user.id,
@@ -46,25 +71,22 @@ export async function POST(req: NextRequest) {
       pin_hash: attempt.identity.pinHash,
       identity_private_key_enc: encryptAtRest(attempt.identity.identityPrivateKeyPem, key),
       identity_public_key_pem: attempt.identity.identityPublicKeyPem,
-      totp_seed_enc: encryptAtRest(totpSeed, key),
-      token_sn: tokenSn,
-      profile_id: profileId,
-      organization_id: organizationId,
-      organization_idn: organizationIdn,
-      organization_kbe: organizationKbe,
+      totp_seed_enc: encryptAtRest(verified.totpSeed, key),
+      token_sn: verified.tokenSn,
+      profile_id: verified.profileId,
+      organization_id: verified.organizationId,
+      organization_idn: verified.organizationIdn,
+      organization_kbe: verified.organizationKbe,
       api_token_hash: apiTokenHash,
       status: 'active',
     }, { onConflict: 'user_id' })
 
-    if (error) {
-      console.error('Kaspi connection upsert error:', error.message)
-      return NextResponse.json({ error: 'save_failed' }, { status: 500 })
-    }
+    if (error) throw new Error(error.message)
 
     // Shown exactly once — only the hash is ever stored.
     return NextResponse.json({ apiToken })
   } catch (e: any) {
-    console.error('Kaspi verify-otp error:', e.message)
-    return NextResponse.json({ error: 'invalid_otp' }, { status: 400 })
+    console.error('Kaspi connection persistence failed AFTER Kaspi-side pairing succeeded for user', user.id, ':', e.message)
+    return NextResponse.json({ error: 'save_failed' }, { status: 500 })
   }
 }
