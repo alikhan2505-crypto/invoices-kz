@@ -69,11 +69,18 @@ export default function AcquiringPage() {
 
   async function confirmPayment(match: AcquiringMatch) {
     setConfirmingId(match.invoice.id)
-    await supabase.from('invoices').update({ status: 'paid' }).eq('id', match.invoice.id)
-    await supabase.from('invoice_logs').insert({ invoice_id: match.invoice.id, status: 'paid' })
-    setMatches(prev => prev.filter(m => m.invoice.id !== match.invoice.id))
-    setOpenInvoices(prev => prev.filter(i => i.id !== match.invoice.id))
-    setConfirmingId(null)
+    try {
+      const { error: updateError } = await supabase.from('invoices').update({ status: 'paid' }).eq('id', match.invoice.id)
+      if (updateError) {
+        setError(updateError.message || 'Ошибка при обновлении статуса счета')
+        return
+      }
+      await supabase.from('invoice_logs').insert({ invoice_id: match.invoice.id, status: 'paid' })
+      setMatches(prev => prev.filter(m => m.invoice.id !== match.invoice.id))
+      setOpenInvoices(prev => prev.filter(i => i.id !== match.invoice.id))
+    } finally {
+      setConfirmingId(null)
+    }
   }
 
   if (loading) return (
@@ -140,7 +147,7 @@ export default function AcquiringPage() {
                 </div>
 
                 {matches.map(match => (
-                  <div key={match.invoice.id} className="bg-white rounded-2xl shadow-sm p-4">
+                  <div key={`${match.invoice.id}-${match.row.date}-${match.row.amount}-${match.row.description}`} className="bg-white rounded-2xl shadow-sm p-4">
                     <div className="text-sm font-medium text-[#1C2056]">{t.invoiceLabel(match.invoice.number)}</div>
                     <div className="text-xs text-gray-500 mt-1">{t.clientLabel}: {match.invoice.client_name || '—'}</div>
                     <div className="text-xs text-gray-500">{t.amountLabel}: {Number(match.invoice.amount).toLocaleString('ru-KZ')} ₸</div>
