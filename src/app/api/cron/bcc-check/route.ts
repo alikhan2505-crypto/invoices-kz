@@ -35,10 +35,12 @@ async function refreshAccessToken(appToken: string, refreshToken: string) {
   })
   if (!res.ok) {
     const body = await res.text()
-    // A 4xx here is the token itself being refused (Keycloak answers a dead
-    // refresh_token with 400 invalid_grant); a 5xx is BCC's own problem and
-    // says nothing about whether the user's consent still stands.
-    if (res.status < 500) throw new BccConsentError(`refresh rejected: ${res.status} ${body}`)
+    // Only 400/401 mean the token itself was refused (Keycloak answers a dead
+    // refresh_token with 400 invalid_grant) — that's the same precision as the
+    // statement-call check below. Everything else, including 429/408, is
+    // transient (rate-limit or timeout) and must not permanently park a
+    // connection that would have worked again tomorrow.
+    if (res.status === 400 || res.status === 401) throw new BccConsentError(`refresh rejected: ${res.status} ${body}`)
     throw new Error(`refresh failed: ${res.status} ${body}`)
   }
   return res.json() as Promise<{ access_token: string, refresh_token: string, expires_in: number }>
@@ -83,11 +85,12 @@ export async function GET(request: Request) {
       // "N payments found" emails) forever. Skipped silently — a lapsed plan
       // is not a broken connection, so the status stays 'active' and picks
       // back up by itself the day they resubscribe.
-      const { data: ownerProfile } = await supabase
+      const { data: ownerProfile, error: profileError } = await supabase
         .from('profiles')
         .select('email, plan, plan_expires_at, bonus_expires_at, trial_expires_at')
         .eq('id', conn.user_id)
         .single()
+      if (profileError) console.error('BCC cron: profile fetch failed for connection', conn.id, profileError.message)
       if (!getActivePlan(ownerProfile).canAcquiring) continue
 
       let clientToken = conn.access_token
@@ -103,7 +106,7 @@ export async function GET(request: Request) {
 
       const dateFrom = formatDate(new Date(conn.last_checked_at))
       const dateTo = formatDate(new Date())
-      const statementUrl = `${BCC_BUSINESS_ACCOUNT_BASE}/accounts/${encodeURIComponent(conn.iban)}/statement?dateFrom=${dateFrom}&dateTo=${dateTo}&currency=${conn.currency}`
+      const statementUrl = `${BCC_BUSINESS_ACCOUNT_BASE}/accounts/${encodeURIComponent(conn.iban)}/statement?dateFrom=${dateFrom}&dateTo=${dateTo}&currency=${encodeURIComponent(conn.currency)}`
       const statementRes = await fetch(statementUrl, {
         headers: {
           'Authorization': `Bearer ${appToken}`,

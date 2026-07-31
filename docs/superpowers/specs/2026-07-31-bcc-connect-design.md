@@ -9,7 +9,7 @@
 ## Global Constraints
 
 - **Pro plan only**, gated by the existing `canAcquiring` flag (`src/lib/plan.ts`) — same rule as the manual-import path, no new flag needed.
-- **This is a genuine new backend surface** — unlike v1, which deliberately added zero new tables/routes/secrets. A per-user OAuth connection cannot exist client-side-only. Keep the *new* surface as narrow as possible: one table, three thin API routes, one cron route.
+- **This is a genuine new backend surface** — unlike v1, which deliberately added zero new tables/routes/secrets. A per-user OAuth connection cannot exist client-side-only. Keep the *new* surface as narrow as possible: two tables, four thin API routes (connect, callback, disconnect, and a status/pending-delete route added during review since bcc_connections and bcc_pending_matches have no client-facing write/select-of-connection policies), one cron route.
 - **Tokens are never exposed to the browser.** All BCC API calls (connect, callback, statement fetch, revoke) happen server-side. The `bcc_connections` table holding access/refresh tokens has **no client-facing RLS policy at all** — only `service_role` (via server-side API routes) reads or writes it, the same access-control posture already used for `webhook_logs` and other server-only tables in this codebase. Encryption-at-rest of the token columns is not attempted (no existing precedent for column-level encryption in this codebase); the control is access-restriction, not encryption, matching how `SUPABASE_SERVICE_ROLE_KEY` itself and other secrets are handled.
 - **Raw statement rows are never persisted long-term.** The cron job fetches a statement, computes matches in-memory, stores only the resulting **match summaries** (invoice id + matched amount/date/description) until the user confirms or dismisses them, then discards them. This preserves v1's privacy principle: a bank statement contains the owner's entire transaction history including unrelated counterparties, and there is no reason for that data to sit in our database.
 - **No auto-confirmation.** Exactly like v1: a bank-verified match is still shown to the user with a one-click "Подтвердить оплату" button, reusing the exact same confirmation code path (`invoices.update({status:'paid'})` + `invoice_logs.insert(...)`) already in `src/app/profile/acquiring/page.tsx`. A false-positive "paid" mark is worse than a delayed confirmation, even from a bank-verified source — this session's established precedent for this feature is not being revisited without a separate explicit decision.
@@ -49,7 +49,8 @@ Confirming a match:
   /profile/acquiring page, "Connected account" section
     → client reads bcc_pending_matches directly (RLS SELECT policy scopes it to auth.uid(), see Components §1)
     → render with the exact same match-card + confirmPayment() already built for the manual path
-    → on confirm: existing invoices.update + invoice_logs.insert, then delete the bcc_pending_matches row
+    → on confirm: existing invoices.update + invoice_logs.insert, then DELETE /api/bcc/pending/[id]
+      (server route, service-role — bcc_pending_matches has no client-facing DELETE policy, only SELECT)
 
 Disconnect:
   "Отключить BCC" button → POST /api/bcc/disconnect
@@ -131,9 +132,14 @@ create policy "users read own pending matches" on bcc_pending_matches
 ### 6. `src/app/profile/acquiring/page.tsx` (modify)
 
 - Add a "Connected account" section above the existing file-upload card: if no `bcc_connections` row exists for the user, show a "Подключить BCC" button (calls `/api/bcc/connect`, then navigates to the returned `authUrl`); if one exists, show the connected IBAN, last-checked time, and an "Отключить" button.
-- Fetch pending matches (`bcc_pending_matches` joined to `invoices` for display fields) alongside the existing `openInvoices` load in `load()`.
-- Render pending BCC matches using the **same match-card markup** already used for file-based matches (lines 156-172 today) — both are visually `{invoice, row-like fields}`, so this is a shared render, not a duplicate. The confirm button, for a BCC-sourced match, additionally deletes the `bcc_pending_matches` row after the existing `invoices.update`/`invoice_logs.insert` succeeds.
+- Fetch pending matches (`bcc_pending_matches` joined to `invoices` for display fields) alongside the existing `openInvoices` load in `load()`. Connection status itself is read via `GET /api/bcc/status` (added during review), not a direct client query — `bcc_connections` has zero client-facing RLS policies.
+- Render pending BCC matches using the **same match-card markup** already used for file-based matches (lines 156-172 today) — both are visually `{invoice, row-like fields}`, so this is a shared render, not a duplicate. The confirm button, for a BCC-sourced match, additionally calls `DELETE /api/bcc/pending/[id]` after the existing `invoices.update`/`invoice_logs.insert` succeeds (added during review — see §1).
 - Handle `?bcc=connected` / `?bcc=error` query params from the callback redirect to show a one-time toast/message, then strip the param from the URL.
+
+### 8. `src/app/api/bcc/status/route.ts` and `src/app/api/bcc/pending/[id]/route.ts` (new, added during review)
+
+- `GET /api/bcc/status`: Bearer-auth, service-role read of the caller's own `bcc_connections` row. Required because `bcc_connections` has no client-facing SELECT policy (§1) — without this route the page's "connected account" status can never populate.
+- `DELETE /api/bcc/pending/[id]`: Bearer-auth, service-role delete of the caller's own `bcc_pending_matches` row, scoped by both `id` and `user_id`. Required because that table has no client-facing DELETE policy (§1) — a direct client-side delete silently affects zero rows.
 
 ### 7. `src/lib/i18n/acquiring.ts` (modify)
 
