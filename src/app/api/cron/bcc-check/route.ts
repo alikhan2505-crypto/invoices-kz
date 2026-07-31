@@ -24,14 +24,16 @@ async function refreshAccessToken(appToken: string, refreshToken: string) {
   const res = await fetch(`${BCC_AUTH_CLIENT_BASE}/token`, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json',
+      // Same endpoint as the callback route's code exchange — confirmed live
+      // that BCC rejects a JSON body here ("Missing form parameter").
+      'Content-Type': 'application/x-www-form-urlencoded',
       'Authorization': `Bearer ${appToken}`,
     },
-    body: JSON.stringify({
+    body: new URLSearchParams({
       grant_type: 'refresh_token',
-      client_secret: process.env.BCC_CLIENT_SECRET,
+      client_secret: process.env.BCC_CLIENT_SECRET!,
       refresh_token: refreshToken,
-    }),
+    }).toString(),
   })
   if (!res.ok) {
     const body = await res.text()

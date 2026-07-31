@@ -58,13 +58,16 @@ export async function POST(req: NextRequest) {
     const authUrlRes = await fetch(`${BCC_AUTH_CLIENT_BASE}/generate-auth-url`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+        // BCC rejects a JSON body here with "Missing form parameter:
+        // redirect_uri, client_idn" — confirmed live in production logs.
+        // Same encoding as the app-level token request in bccAuth.ts.
+        'Content-Type': 'application/x-www-form-urlencoded',
         'Authorization': `Bearer ${appToken}`,
       },
-      body: JSON.stringify({
+      body: new URLSearchParams({
         redirect_uri: REDIRECT_URI,
         client_idn: normalizeBin(profile.bin_iin),
-      }),
+      }).toString(),
     })
     if (!authUrlRes.ok) {
       console.error('BCC generate-auth-url error:', authUrlRes.status, await authUrlRes.text())

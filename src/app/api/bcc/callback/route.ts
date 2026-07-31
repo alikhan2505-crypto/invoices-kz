@@ -29,15 +29,18 @@ export async function GET(req: NextRequest) {
     const tokenRes = await fetch(`${BCC_AUTH_CLIENT_BASE}/token`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+        // Confirmed live: BCC's /token endpoint rejects a JSON body with
+        // "Missing form parameter" (same as generate-auth-url) — it's a
+        // standard OAuth2/Keycloak endpoint, form-urlencoded throughout.
+        'Content-Type': 'application/x-www-form-urlencoded',
         'Authorization': `Bearer ${appToken}`,
       },
-      body: JSON.stringify({
+      body: new URLSearchParams({
         redirect_uri: REDIRECT_URI,
         grant_type: 'authorization_code',
-        client_secret: process.env.BCC_CLIENT_SECRET,
+        client_secret: process.env.BCC_CLIENT_SECRET!,
         code,
-      }),
+      }).toString(),
     })
     if (!tokenRes.ok) throw new Error(`token exchange failed: ${tokenRes.status} ${await tokenRes.text()}`)
     const { access_token, refresh_token, expires_in } = await tokenRes.json()
