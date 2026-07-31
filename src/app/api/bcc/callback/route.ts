@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
 
     const expiresAt = new Date(Date.now() + expires_in * 1000).toISOString()
 
-    await supabase.from('bcc_connections').upsert({
+    const { error } = await supabase.from('bcc_connections').upsert({
       user_id: verified.userId,
       iban: account.iban,
       currency: account.currency,
@@ -66,6 +66,8 @@ export async function GET(req: NextRequest) {
       status: 'active',
       last_checked_at: new Date().toISOString(),
     }, { onConflict: 'user_id' })
+
+    if (error) throw new Error(`BCC connection upsert failed: ${error.message}`)
 
     return NextResponse.redirect('https://www.invoices.kz/profile/acquiring?bcc=connected')
   } catch (e: any) {
