@@ -72,12 +72,22 @@ export default function AcquiringPage() {
         .not('client_bin', 'is', null)
       setOpenInvoices((invoices as OpenInvoice[]) || [])
 
-      const { data: connection } = await supabase
-        .from('bcc_connections')
-        .select('iban, last_checked_at, status')
-        .eq('user_id', user.id)
-        .maybeSingle()
-      setBccConnection(connection as BccConnection | null)
+      // bcc_connections has no client-side RLS policy — it's only ever
+      // readable via a service-role client, so the connection status is
+      // fetched through this authenticated route rather than queried
+      // directly from the browser.
+      const { data: { session } } = await supabase.auth.getSession()
+      try {
+        const res = await fetch('/api/bcc/status', {
+          headers: { 'Authorization': `Bearer ${session?.access_token}` },
+        })
+        if (res.ok) {
+          const data = await res.json()
+          setBccConnection(data.connection as BccConnection | null)
+        }
+      } catch (e: any) {
+        console.error('BCC status fetch error:', e.message)
+      }
 
       const { data: pending } = await supabase
         .from('bcc_pending_matches')
@@ -110,13 +120,18 @@ export default function AcquiringPage() {
   }
 
   async function disconnectBcc() {
+    setBccMessage('')
     setBccDisconnecting(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      await fetch('/api/bcc/disconnect', {
+      const res = await fetch('/api/bcc/disconnect', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${session?.access_token}` },
       })
+      if (!res.ok) {
+        setBccMessage(t.bccErrorGeneric)
+        return
+      }
       setBccConnection(null)
       setBccPending([])
     } finally {
