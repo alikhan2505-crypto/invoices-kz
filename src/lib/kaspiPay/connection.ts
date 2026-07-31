@@ -22,22 +22,28 @@ function toConnection(row: any): KaspiConnection {
 }
 
 export async function loadConnectionByUserId(userId: string): Promise<KaspiConnection | null> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('kaspi_connections')
     .select('*')
     .eq('user_id', userId)
     .eq('status', 'active')
     .maybeSingle()
+  // A query error must not be folded into "no connection" — Tasks 7/8 trust
+  // this module's output without re-deriving it, and a masked DB error here
+  // would surface as a wrong 404 (public pay API) or a silently-skipped user
+  // (polling cron) instead of a visible failure.
+  if (error) throw new Error(`kaspi_connections lookup by user_id failed: ${error.message}`)
   return data ? toConnection(data) : null
 }
 
 export async function loadConnectionByApiToken(token: string): Promise<{ connection: KaspiConnection, userId: string } | null> {
   const tokenHash = crypto.createHash('sha256').update(token).digest('hex')
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('kaspi_connections')
     .select('*')
     .eq('api_token_hash', tokenHash)
     .eq('status', 'active')
     .maybeSingle()
+  if (error) throw new Error(`kaspi_connections lookup by api token failed: ${error.message}`)
   return data ? { connection: toConnection(data), userId: data.user_id } : null
 }
