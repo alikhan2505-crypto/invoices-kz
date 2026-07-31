@@ -110,9 +110,14 @@ export async function GET(request: Request) {
       }
 
       const matches = findMatches(rows, openInvoices)
+      // Seed with the pre-existing snapshot, then grow as we insert below —
+      // otherwise two distinct transactions in this same statement pull that
+      // both match the same invoice/amount/date (e.g. an accidental double
+      // payment) would both pass the check and get inserted as duplicates.
+      const pendingSnapshot = [...(existingPending || [])] as any[]
       let newMatches = 0
       for (const match of matches) {
-        const alreadyPending = (existingPending || []).some((p: any) =>
+        const alreadyPending = pendingSnapshot.some((p: any) =>
           p.invoice_id === match.invoice.id &&
           Number(p.matched_amount) === Number(match.row.amount) &&
           p.matched_date === match.row.date
@@ -124,6 +129,11 @@ export async function GET(request: Request) {
           matched_amount: match.row.amount,
           matched_date: match.row.date,
           matched_description: match.row.description,
+        })
+        pendingSnapshot.push({
+          invoice_id: match.invoice.id,
+          matched_amount: match.row.amount,
+          matched_date: match.row.date,
         })
         newMatches++
       }
