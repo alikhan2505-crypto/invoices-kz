@@ -1126,7 +1126,7 @@ git commit -m "add shared Kaspi connection loader (by user id or by public API t
 
 **Interfaces:**
 - Consumes: `loadConnectionByApiToken` (Task 6); `createPayment` (Task 2); `kaspi_payment_requests` table (Task 3).
-- Produces: `POST /api/kaspi/pay` → `{ qr_token, payment_link, operation_id, expire_date }` — the documented public shape (matches `create/route.ts`'s existing xpayment response fields, so anyone migrating from that call shape needs zero changes on their end besides the base URL and token).
+- Produces: `POST /api/kaspi/pay` → `{ qr_token, payment_link, operation_id, expire_date }` — this is the real public contract, documented for real external customers in Task 10's docs page. Task review confirmed this is **not** field-for-field identical to `create/route.ts`'s existing xpayment response (that route returns `ext_tran_id`, not `operation_id`) — `create/route.ts` is invoices.kz's own internal subscription-billing integration, not something any external customer ever called, so this is a fresh public contract, not a drop-in replacement for that internal route's shape. Task 10 must document this route's actual fields, not claim parity with `create/route.ts`.
 
 - [ ] **Step 1: Implement**
 

@@ -49,9 +49,15 @@ Creating a payment (the core, reused capability):
     → returns { qrToken, paymentLink, operationId, expiresAt }
   Two callers of this one function:
     (a) Public API — POST /api/kaspi/pay, Bearer <customer's own API token>,
-        body { amount, orderId, callbackUrl? } → same response shape as
-        xpayment's own `create/route.ts` today ({ qr_token, payment_link,
-        ext_tran_id }), so this is a drop-in replacement for that call shape.
+        body { amount, orderId, callbackUrl? } → { qr_token, payment_link,
+        operation_id, expire_date }. This is a fresh public contract
+        documented on its own terms (Task 10's docs page) — plan-execution
+        review found it is NOT field-for-field identical to `create/route.ts`
+        (that route returns `ext_tran_id`, not `operation_id`), and
+        `create/route.ts` is invoices.kz's own internal subscription-billing
+        integration that no external customer ever calls, so there was never
+        a real "drop-in replacement" claim to keep — this note is corrected
+        after the fact, not a design change.
     (b) Invoice auto-link — when an invoice is created/sent and its owner
         has an active kaspi_connections row, the invoice-send code path
         calls createPayment(connection, { amount: invoice.amount, orderId:

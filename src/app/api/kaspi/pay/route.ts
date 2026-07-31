@@ -31,7 +31,11 @@ export async function POST(req: NextRequest) {
   try {
     const payment = await createPayment(found.connection, { amount, orderId: order_id })
 
-    await supabase.from('kaspi_payment_requests').insert({
+    // A payment now genuinely exists on Kaspi's side and money can change
+    // hands — an untracked insert failure here must not still report
+    // success, since Task 8's poller and the caller's own callback_url
+    // webhook would then have no way to ever learn this payment happened.
+    const { error: insertError } = await supabase.from('kaspi_payment_requests').insert({
       user_id: found.userId,
       invoice_id: null,
       order_id,
@@ -43,6 +47,11 @@ export async function POST(req: NextRequest) {
       status: 'pending',
       expires_at: payment.expiresAt,
     })
+
+    if (insertError) {
+      console.error('Kaspi payment created but failed to persist for tracking — operation', payment.operationId, ':', insertError.message)
+      return NextResponse.json({ error: 'tracking_failed' }, { status: 502 })
+    }
 
     return NextResponse.json({
       qr_token: payment.qrToken,
