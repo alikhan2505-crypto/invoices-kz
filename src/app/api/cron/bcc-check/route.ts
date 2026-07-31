@@ -4,12 +4,21 @@ import { Resend } from 'resend'
 import { findMatches, OpenInvoice } from '@/lib/acquiringMatch'
 import { mapBccTransactions } from '@/lib/bccStatement'
 import { getBccAppToken, BCC_AUTH_CLIENT_BASE, BCC_BUSINESS_ACCOUNT_BASE } from '@/lib/bccAuth'
+import { getActivePlan } from '@/lib/plan'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 const resend = new Resend(process.env.RESEND_API_KEY!)
+
+// Thrown only when BCC has actually rejected this user's credentials — a
+// refused refresh_token, or a refreshed/still-valid token the statement call
+// answers with 401/403. That means the user's consent is gone and reconnecting
+// is the only fix, so the connection is parked at status='error'. Every OTHER
+// failure (network, timeout, 5xx, malformed body) is transient and must leave
+// the connection 'active' so tomorrow's run simply retries.
+class BccConsentError extends Error {}
 
 async function refreshAccessToken(appToken: string, refreshToken: string) {
   const res = await fetch(`${BCC_AUTH_CLIENT_BASE}/token`, {
@@ -24,7 +33,14 @@ async function refreshAccessToken(appToken: string, refreshToken: string) {
       refresh_token: refreshToken,
     }),
   })
-  if (!res.ok) throw new Error(`refresh failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) {
+    const body = await res.text()
+    // A 4xx here is the token itself being refused (Keycloak answers a dead
+    // refresh_token with 400 invalid_grant); a 5xx is BCC's own problem and
+    // says nothing about whether the user's consent still stands.
+    if (res.status < 500) throw new BccConsentError(`refresh rejected: ${res.status} ${body}`)
+    throw new Error(`refresh failed: ${res.status} ${body}`)
+  }
   return res.json() as Promise<{ access_token: string, refresh_token: string, expires_in: number }>
 }
 
@@ -61,6 +77,19 @@ export async function GET(request: Request) {
 
   for (const conn of (connections || []) as any[]) {
     try {
+      // The Pro gate is re-checked on every run, not just at connect time:
+      // otherwise a user who connects and then lets Pro lapse keeps having
+      // their real bank statement pulled daily (and keeps getting the
+      // "N payments found" emails) forever. Skipped silently — a lapsed plan
+      // is not a broken connection, so the status stays 'active' and picks
+      // back up by itself the day they resubscribe.
+      const { data: ownerProfile } = await supabase
+        .from('profiles')
+        .select('email, plan, plan_expires_at, bonus_expires_at, trial_expires_at')
+        .eq('id', conn.user_id)
+        .single()
+      if (!getActivePlan(ownerProfile).canAcquiring) continue
+
       let clientToken = conn.access_token
       if (new Date(conn.expires_at) <= new Date()) {
         const refreshed = await refreshAccessToken(appToken, conn.refresh_token)
@@ -74,7 +103,7 @@ export async function GET(request: Request) {
 
       const dateFrom = formatDate(new Date(conn.last_checked_at))
       const dateTo = formatDate(new Date())
-      const statementUrl = `${BCC_BUSINESS_ACCOUNT_BASE}/accounts/${conn.iban}/statement?dateFrom=${dateFrom}&dateTo=${dateTo}&currency=${conn.currency}`
+      const statementUrl = `${BCC_BUSINESS_ACCOUNT_BASE}/accounts/${encodeURIComponent(conn.iban)}/statement?dateFrom=${dateFrom}&dateTo=${dateTo}&currency=${conn.currency}`
       const statementRes = await fetch(statementUrl, {
         headers: {
           'Authorization': `Bearer ${appToken}`,
@@ -82,7 +111,16 @@ export async function GET(request: Request) {
           'accept': 'application/json',
         },
       })
-      if (!statementRes.ok) throw new Error(`statement fetch failed: ${statementRes.status} ${await statementRes.text()}`)
+      if (!statementRes.ok) {
+        const body = await statementRes.text()
+        // 401/403 on the statement call = the per-user token was refused even
+        // though it was fresh (consent revoked from the bank's side); anything
+        // else is transient.
+        if (statementRes.status === 401 || statementRes.status === 403) {
+          throw new BccConsentError(`statement rejected token: ${statementRes.status} ${body}`)
+        }
+        throw new Error(`statement fetch failed: ${statementRes.status} ${body}`)
+      }
       const statement = await statementRes.json()
       const rows = mapBccTransactions(statement.transactions || [])
 
@@ -142,7 +180,6 @@ export async function GET(request: Request) {
       checked++
 
       if (newMatches > 0) {
-        const { data: ownerProfile } = await supabase.from('profiles').select('email').eq('id', conn.user_id).single()
         if (ownerProfile?.email) {
           await resend.emails.send({
             from: 'invoices.kz <mail@invoices.kz>',
@@ -154,8 +191,17 @@ export async function GET(request: Request) {
         }
       }
     } catch (e: any) {
-      console.error('BCC cron error for connection', conn.id, e.message)
-      await supabase.from('bcc_connections').update({ status: 'error' }).eq('id', conn.id)
+      if (e instanceof BccConsentError) {
+        // Terminal: only a fresh OAuth consent can fix this, so park the
+        // connection (the page surfaces status='error' with a reconnect hint).
+        console.error('BCC cron: consent lost for connection', conn.id, e.message)
+        await supabase.from('bcc_connections').update({ status: 'error' }).eq('id', conn.id)
+      } else {
+        // Transient: leave the status alone so tomorrow's run retries. A single
+        // timeout or 5xx used to permanently kill a working connection here,
+        // and nothing ever selects status='error' again.
+        console.error('BCC cron: transient error for connection', conn.id, '— skipping today:', e.message)
+      }
     }
   }
 

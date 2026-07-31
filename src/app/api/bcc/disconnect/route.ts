@@ -43,8 +43,16 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  await supabase.from('bcc_pending_matches').delete().eq('user_id', user.id)
-  await supabase.from('bcc_connections').delete().eq('user_id', user.id)
+  // Both deletes are checked: if either fails the token row and/or the pending
+  // matches are still there server-side and the cron keeps pulling this user's
+  // bank statement — telling the page "disconnected" in that case would be a
+  // lie it has no way to detect (it only checks res.ok).
+  const { error: pendingError } = await supabase.from('bcc_pending_matches').delete().eq('user_id', user.id)
+  const { error: connectionError } = await supabase.from('bcc_connections').delete().eq('user_id', user.id)
+  if (pendingError || connectionError) {
+    console.error('BCC disconnect delete error:', pendingError?.message, connectionError?.message)
+    return NextResponse.json({ error: 'disconnect_failed' }, { status: 500 })
+  }
 
   return NextResponse.json({ ok: true })
 }

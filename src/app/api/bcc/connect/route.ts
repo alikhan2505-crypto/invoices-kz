@@ -28,10 +28,6 @@ export async function POST(req: NextRequest) {
     .select('bin_iin, plan, plan_expires_at, bonus_expires_at, trial_expires_at')
     .eq('id', user.id)
     .single()
-  if (!profile?.bin_iin) {
-    return NextResponse.json({ error: 'no_bin' }, { status: 400 })
-  }
-
   // Acquiring (bank statement import) is a Pro-only feature — checked
   // server-side since it's the actual authority (the client-side UI already
   // hides the "Connect BCC" button for non-Pro accounts, but that's just UX,
@@ -39,8 +35,14 @@ export async function POST(req: NextRequest) {
   // establishes an ongoing automated capability (a live OAuth token, cron
   // processing, shared BCC rate-limit usage), so it's gated at this single
   // entry point rather than being free like marking an invoice paid by hand.
+  // Checked BEFORE the BIN check: a non-Pro user with no BIN needs to be told
+  // they need Pro, not sent off to fill in a field that won't unblock them.
   if (!getActivePlan(profile).canAcquiring) {
     return NextResponse.json({ error: 'not_pro' }, { status: 403 })
+  }
+
+  if (!profile?.bin_iin) {
+    return NextResponse.json({ error: 'no_bin' }, { status: 400 })
   }
 
   let appToken: string
