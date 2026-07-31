@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
-import dns from 'dns/promises'
 import { loadConnectionByUserId } from '@/lib/kaspiPay/connection'
 import { checkStatus } from '@/lib/kaspiPay/client'
+import { isSafeWebhookUrl } from '@/lib/kaspiPay/webhookSafety'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -14,47 +14,25 @@ function signWebhookPayload(rawBody: string, secret: string): string {
   return crypto.createHmac('sha256', secret).update(rawBody).digest('hex')
 }
 
-// Task 7's review flagged callback_url as a caller-controlled-webhook SSRF
-// vector: any customer's own API-token request can set it to an arbitrary
-// URL, and this cron is what actually fires the request from invoices.kz's
-// own infrastructure. Require https, and resolve the hostname to reject
-// loopback/private/link-local targets (a literal IP or a hostname that
-// resolves to one) before ever calling fetch() on it.
-function isPrivateIp(ip: string): boolean {
-  if (ip === '::1' || ip.startsWith('fc') || ip.startsWith('fd') || ip.startsWith('fe80')) return true
-  const parts = ip.split('.').map(Number)
-  if (parts.length !== 4 || parts.some(isNaN)) return false
-  const [a, b] = parts
-  return a === 127 || a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 169 && b === 254) || a === 0
-}
-
-async function isSafeWebhookUrl(rawUrl: string): Promise<boolean> {
-  let url: URL
-  try {
-    url = new URL(rawUrl)
-  } catch {
-    return false
-  }
-  if (url.protocol !== 'https:') return false
-  if (url.hostname === 'localhost') return false
-  try {
-    const { address } = await dns.lookup(url.hostname)
-    return !isPrivateIp(address)
-  } catch {
-    return false // unresolvable hostname — fail closed
-  }
-}
-
 export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization')
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { data: requests } = await supabase
+  const { data: requests, error: requestsError } = await supabase
     .from('kaspi_payment_requests')
     .select('*')
     .eq('status', 'pending')
+
+  // This cron is the sole confirmation path for every pending Kaspi
+  // payment across all customers — a persistent failure here (bad
+  // service-role key, RLS misconfig, Supabase outage) must not silently
+  // report {ok:true, paid:0} forever with no signal anywhere.
+  if (requestsError) {
+    console.error('Kaspi poll: failed to fetch pending requests:', requestsError.message)
+    return NextResponse.json({ error: 'fetch_failed' }, { status: 502 })
+  }
 
   let paid = 0
 
@@ -90,6 +68,9 @@ export async function GET(request: Request) {
             amount: reqRow.amount,
             operation_id: reqRow.kaspi_operation_id,
           })
+          // A non-responding customer endpoint must not stall the rest of
+          // this run's rows — bounded with a timeout, same as any other
+          // outbound call to a third party we don't control.
           await fetch(reqRow.callback_url, {
             method: 'POST',
             headers: {
@@ -97,6 +78,7 @@ export async function GET(request: Request) {
               'X-Kaspi-Pay-Signature': signWebhookPayload(payload, secret),
             },
             body: payload,
+            signal: AbortSignal.timeout(5000),
           }).catch((e) => console.error('Kaspi webhook delivery failed for', reqRow.id, e.message))
         }
       }
