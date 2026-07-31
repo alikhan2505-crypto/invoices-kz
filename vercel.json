@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/bcc-check",
       "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/kaspi-poll",
+      "schedule": "*/5 * * * *"
     }
   ]
 }
