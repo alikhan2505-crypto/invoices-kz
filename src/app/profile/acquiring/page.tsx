@@ -22,6 +22,7 @@ export default function AcquiringPage() {
   const [processing, setProcessing] = useState(false)
   const [confirmingId, setConfirmingId] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [confirmError, setConfirmError] = useState('')
   const [fileName, setFileName] = useState('')
 
   useEffect(() => { load() }, [])
@@ -68,11 +69,12 @@ export default function AcquiringPage() {
   }
 
   async function confirmPayment(match: AcquiringMatch) {
+    setConfirmError('')
     setConfirmingId(match.invoice.id)
     try {
       const { error: updateError } = await supabase.from('invoices').update({ status: 'paid' }).eq('id', match.invoice.id)
       if (updateError) {
-        setError(updateError.message || 'Ошибка при обновлении статуса счета')
+        setConfirmError(updateError.message || 'Ошибка при обновлении статуса счета')
         return
       }
       await supabase.from('invoice_logs').insert({ invoice_id: match.invoice.id, status: 'paid' })
@@ -145,6 +147,8 @@ export default function AcquiringPage() {
                     <span> · {t.unmatchedRowsLabel(unmatchedCount)}</span>
                   )}
                 </div>
+
+                {confirmError && <p className="text-xs text-red-500 mt-2">{t.errorPrefix(confirmError)}</p>}
 
                 {matches.map(match => (
                   <div key={`${match.invoice.id}-${match.row.date}-${match.row.amount}-${match.row.description}`} className="bg-white rounded-2xl shadow-sm p-4">
