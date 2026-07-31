@@ -53,4 +53,20 @@ describe('findMatches', () => {
     expect(matches).toHaveLength(1)
     expect(matches[0].invoice.id).toBe('inv-1')
   })
+
+  it('reuses the same row object reference across multiple invoice matches for one row', () => {
+    // Two open invoices to the same client, same amount — one incoming payment can match both.
+    // The UI relies on reference equality of `row` to know these matches came from the same
+    // statement line (see acquiring page's confirmPayment / unmatched-row counting).
+    const sharedRow = row()
+    const invoices = [
+      invoice({ id: 'inv-a', number: 'INV-A' }),
+      invoice({ id: 'inv-b', number: 'INV-B' }),
+    ]
+    const matches = findMatches([sharedRow], invoices)
+    expect(matches).toHaveLength(2)
+    expect(matches[0].row).toBe(sharedRow)
+    expect(matches[1].row).toBe(sharedRow)
+    expect(matches[0].row).toBe(matches[1].row)
+  })
 })

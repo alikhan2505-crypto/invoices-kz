@@ -60,9 +60,9 @@ export default function AcquiringPage() {
       const rows = await parseStatementFile(file)
       const found = findMatches(rows, openInvoices)
       setMatches(found)
-      setUnmatchedCount(rows.length - found.length)
+      setUnmatchedCount(rows.length - new Set(found.map(m => m.row)).size)
     } catch (e: any) {
-      setError(e instanceof AcquiringParseError ? e.message : (e?.message || String(e)))
+      setError(e instanceof AcquiringParseError ? t.parseErrorMessages[e.code] : (e?.message || String(e)))
     } finally {
       setProcessing(false)
     }
@@ -78,7 +78,10 @@ export default function AcquiringPage() {
         return
       }
       await supabase.from('invoice_logs').insert({ invoice_id: match.invoice.id, status: 'paid' })
-      setMatches(prev => prev.filter(m => m.invoice.id !== match.invoice.id))
+      // Remove every OTHER candidate match for this same statement row too — a single payment
+      // can only ever settle one invoice, so once one is confirmed the other candidates for
+      // that row are no longer valid options.
+      setMatches(prev => prev.filter(m => m.row !== match.row))
       setOpenInvoices(prev => prev.filter(i => i.id !== match.invoice.id))
     } finally {
       setConfirmingId(null)
@@ -150,19 +153,23 @@ export default function AcquiringPage() {
 
                 {confirmError && <p className="text-xs text-red-500 mt-2">{t.errorPrefix(confirmError)}</p>}
 
-                {matches.map(match => (
-                  <div key={`${match.invoice.id}-${match.row.date}-${match.row.amount}-${match.row.description}`} className="bg-white rounded-2xl shadow-sm p-4">
-                    <div className="text-sm font-medium text-[#1C2056]">{t.invoiceLabel(match.invoice.number)}</div>
-                    <div className="text-xs text-gray-500 mt-1">{t.clientLabel}: {match.invoice.client_name || '—'}</div>
-                    <div className="text-xs text-gray-500">{t.amountLabel}: {Number(match.invoice.amount).toLocaleString('ru-KZ')} ₸</div>
-                    {match.row.date && <div className="text-xs text-gray-400 mt-1">{t.statementDateLabel}: {match.row.date}</div>}
-                    {match.row.description && <div className="text-xs text-gray-400">{t.descriptionLabel}: {match.row.description}</div>}
-                    <button onClick={() => confirmPayment(match)} disabled={confirmingId === match.invoice.id}
-                      className="w-full bg-[#2DC48D] text-white rounded-xl py-2.5 text-sm font-medium mt-3">
-                      {confirmingId === match.invoice.id ? t.confirmingLabel : t.confirmPaymentButton}
-                    </button>
-                  </div>
-                ))}
+                {matches.map(match => {
+                  const rowMatchCount = matches.filter(m => m.row === match.row).length
+                  return (
+                    <div key={`${match.invoice.id}-${match.row.date}-${match.row.amount}-${match.row.description}`} className="bg-white rounded-2xl shadow-sm p-4">
+                      <div className="text-sm font-medium text-[#1C2056]">{t.invoiceLabel(match.invoice.number)}</div>
+                      <div className="text-xs text-gray-500 mt-1">{t.clientLabel}: {match.invoice.client_name || '—'}</div>
+                      <div className="text-xs text-gray-500">{t.amountLabel}: {Number(match.invoice.amount).toLocaleString('ru-KZ')} ₸</div>
+                      {match.row.date && <div className="text-xs text-gray-400 mt-1">{t.statementDateLabel}: {match.row.date}</div>}
+                      {match.row.description && <div className="text-xs text-gray-400">{t.descriptionLabel}: {match.row.description}</div>}
+                      {rowMatchCount > 1 && <div className="text-xs text-amber-600 mt-1">{t.multipleMatchesHint}</div>}
+                      <button onClick={() => confirmPayment(match)} disabled={confirmingId === match.invoice.id}
+                        className="w-full bg-[#2DC48D] text-white rounded-xl py-2.5 text-sm font-medium mt-3">
+                        {confirmingId === match.invoice.id ? t.confirmingLabel : t.confirmPaymentButton}
+                      </button>
+                    </div>
+                  )
+                })}
               </>
             )}
           </>
