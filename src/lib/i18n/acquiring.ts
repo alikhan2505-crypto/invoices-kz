@@ -22,6 +22,18 @@ export interface AcquiringContent {
   errorPrefix: (message: string) => string
   parseErrorMessages: Record<'not_excel' | 'too_large' | 'no_sheet' | 'unreadable' | 'unknown_structure', string>
   multipleMatchesHint: string
+  bccSectionTitle: string
+  bccConnectButton: string
+  bccConnectingLabel: string
+  bccDisconnectButton: string
+  bccDisconnectingLabel: string
+  bccConnectedIbanLabel: string
+  bccLastCheckedLabel: string
+  bccPendingMatchesLabel: (count: number) => string
+  bccConnectedMessage: string
+  bccErrorMessage: string
+  bccErrorNoBin: string
+  bccErrorGeneric: string
 }
 
 export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
@@ -55,6 +67,18 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
       unknown_structure: 'Не удалось распознать структуру файла — попробуйте другой формат экспорта',
     },
     multipleMatchesHint: 'Эта операция подходит к нескольким счетам — выберите один',
+    bccSectionTitle: 'Автоматическая проверка через BCC',
+    bccConnectButton: 'Подключить счёт BCC',
+    bccConnectingLabel: 'Подключаем...',
+    bccDisconnectButton: 'Отключить',
+    bccDisconnectingLabel: 'Отключаем...',
+    bccConnectedIbanLabel: 'Счёт',
+    bccLastCheckedLabel: 'Последняя проверка',
+    bccPendingMatchesLabel: (count: number) => `Найдено оплат по BCC: ${count}`,
+    bccConnectedMessage: 'Счёт BCC успешно подключён.',
+    bccErrorMessage: 'Не удалось подключить BCC. Попробуйте ещё раз.',
+    bccErrorNoBin: 'Укажите БИН/ИИН в реквизитах перед подключением BCC.',
+    bccErrorGeneric: 'Сервис BCC временно недоступен. Попробуйте позже.',
   },
   kk: {
     headerLabel: 'Эквайринг',
@@ -86,6 +110,18 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
       unknown_structure: 'Файл құрылымын тану мүмкін болмады — экспорттың басқа форматын байқап көріңіз',
     },
     multipleMatchesHint: 'Бұл операция бірнеше шотқа сәйкес келеді — біреуін таңдаңыз',
+    bccSectionTitle: 'BCC арқылы автоматты тексеру',
+    bccConnectButton: 'BCC шотын қосу',
+    bccConnectingLabel: 'Қосылуда...',
+    bccDisconnectButton: 'Ажырату',
+    bccDisconnectingLabel: 'Ажыратылуда...',
+    bccConnectedIbanLabel: 'Шот',
+    bccLastCheckedLabel: 'Соңғы тексеру',
+    bccPendingMatchesLabel: (count: number) => `BCC бойынша табылған төлемдер: ${count}`,
+    bccConnectedMessage: 'BCC шоты сәтті қосылды.',
+    bccErrorMessage: 'BCC қосу мүмкін болмады. Қайталап көріңіз.',
+    bccErrorNoBin: 'BCC қосу алдында деректемелерде БИН/ИИН көрсетіңіз.',
+    bccErrorGeneric: 'BCC қызметі уақытша қолжетімсіз. Кейінірек көріңіз.',
   },
   en: {
     headerLabel: 'Acquiring',
@@ -117,5 +153,17 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
       unknown_structure: 'Could not recognize the file structure — try a different export format',
     },
     multipleMatchesHint: 'This transaction matches several invoices — choose one',
+    bccSectionTitle: 'Automatic checking via BCC',
+    bccConnectButton: 'Connect BCC account',
+    bccConnectingLabel: 'Connecting...',
+    bccDisconnectButton: 'Disconnect',
+    bccDisconnectingLabel: 'Disconnecting...',
+    bccConnectedIbanLabel: 'Account',
+    bccLastCheckedLabel: 'Last checked',
+    bccPendingMatchesLabel: (count: number) => `Payments found via BCC: ${count}`,
+    bccConnectedMessage: 'BCC account connected successfully.',
+    bccErrorMessage: 'Could not connect BCC. Please try again.',
+    bccErrorNoBin: 'Add your BIN/IIN in your requisites before connecting BCC.',
+    bccErrorGeneric: 'The BCC service is temporarily unavailable. Try again later.',
   },
 }
