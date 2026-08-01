@@ -340,6 +340,24 @@ export async function createPayment(
   }
 }
 
+export async function createInvoiceByPhone(
+  connection: KaspiConnection,
+  params: { phoneNumber: string, amount: number, comment?: string }
+): Promise<{ operationId: string }> {
+  const url = `${KASPI_QRPAY_URL}/v01/remote/create`
+  const payload = JSON.stringify({
+    PhoneNumber: params.phoneNumber,
+    Amount: params.amount,
+    Comment: params.comment || '',
+  })
+  const headers = { ...buildSignedHeaders(url, connection, payload), 'Content-Type': 'application/json' }
+  const res = await fetch(url, { method: 'POST', headers, body: payload })
+  const json = await res.json()
+  const d = json.Data
+  if (!d?.QrOperationId) throw new Error('Kaspi remote/create failed: ' + JSON.stringify(json))
+  return { operationId: String(d.QrOperationId) }
+}
+
 const QR_PAID = new Set(['Processed'])
 const QR_FAILED = new Set([
   'CancelledByUser', 'NotConfirmedByUser', 'CancelledByExternalSource', 'ProcessingFailed',
