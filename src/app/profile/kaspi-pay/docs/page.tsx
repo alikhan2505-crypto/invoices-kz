@@ -205,6 +205,14 @@ const isValid = signature === req.headers['x-kaspi-pay-signature'];
                 <td className="p-2">Bad Request — отсутствуют обязательные параметры</td>
               </tr>
               <tr className="border-b">
+                <td className="p-2"><code className="bg-gray-100 px-1">403</code></td>
+                <td className="p-2">Forbidden — тариф Pro не активен (Kaspi Pay доступен только на тарифе Pro)</td>
+              </tr>
+              <tr className="border-b">
+                <td className="p-2"><code className="bg-gray-100 px-1">429</code></td>
+                <td className="p-2">Too Many Requests — превышен лимит запросов (20 в минуту на одно подключение)</td>
+              </tr>
+              <tr className="border-b">
                 <td className="p-2"><code className="bg-gray-100 px-1">502</code></td>
                 <td className="p-2">Service Unavailable — ошибка при создании платежа на стороне Kaspi</td>
               </tr>

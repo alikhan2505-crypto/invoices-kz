@@ -12,6 +12,9 @@ export function normalizeKzPhone(input: string): string | null {
     : digits.length === 10 ? '7' + digits
     : digits
 
+  // +7 is shared with Russia, so this accepts the shape, not the country —
+  // Kaspi's own backend is the actual authority on whether the number is a
+  // real, pairable Kazakhstani Cashier account.
   if (withCountryCode.length !== 11 || !withCountryCode.startsWith('7')) return null
   return withCountryCode
 }

@@ -64,8 +64,13 @@ export default function InvoicePage() {
     setRefreshingKaspi(true)
     try {
       const res = await fetch(`/api/kaspi/invoice-payment?token=${invoice.public_token}`)
-      const data = await res.json()
-      setKaspiPayment(data.payment || null)
+      if (res.ok) {
+        const data = await res.json()
+        setKaspiPayment(data.payment || null)
+      }
+    } catch {
+      // Network hiccup — leave the current (possibly stale) link showing
+      // rather than clearing it; the button stays available to try again.
     } finally {
       setRefreshingKaspi(false)
     }
