@@ -15,6 +15,7 @@ export default function KaspiPayPage() {
   const [loading, setLoading] = useState(true)
   const [profile, setProfile] = useState<any>(null)
   const [connected, setConnected] = useState(false)
+  const [connectionStatus, setConnectionStatus] = useState<string | null>(null)
   const [phone, setPhone] = useState('')
   const [otp, setOtp] = useState('')
   const [processId, setProcessId] = useState<string | null>(null)
@@ -58,6 +59,7 @@ export default function KaspiPayPage() {
     if (res.ok) {
       const data = await res.json()
       setConnected(!!data.connected)
+      setConnectionStatus(data.status ?? null)
     }
 
     setLoading(false)
@@ -74,7 +76,13 @@ export default function KaspiPayPage() {
         body: JSON.stringify({ phoneNumber: phone }),
       })
       const data = await res.json()
-      if (!res.ok || !data.processId) { setError(t.errorGeneric); return }
+      if (!res.ok || !data.processId) {
+        // The Pro gate is enforced server-side too, so a lapsed plan can be
+        // refused here even though this page rendered the form — say why
+        // instead of blaming Kaspi for being unavailable.
+        setError(data.error === 'not_pro' ? t.errorNotPro : t.errorGeneric)
+        return
+      }
       setProcessId(data.processId)
     } finally {
       setSending(false)
@@ -99,12 +107,17 @@ export default function KaspiPayPage() {
         // attempt is now dead either way — telling the user "wrong code"
         // here would send them into a retry loop that can never succeed,
         // since processId is already gone server-side.
-        setError(data.error === 'invalid_otp' ? t.errorInvalidOtp : t.errorGeneric)
+        setError(
+          data.error === 'invalid_otp' ? t.errorInvalidOtp
+          : data.error === 'not_pro' ? t.errorNotPro
+          : t.errorGeneric
+        )
         setProcessId(null)
         return
       }
       setApiToken(data.apiToken)
       setConnected(true)
+      setConnectionStatus('active')
       setProcessId(null)
     } finally {
       setVerifying(false)
@@ -120,6 +133,7 @@ export default function KaspiPayPage() {
         headers: { 'Authorization': `Bearer ${session?.access_token}` },
       })
       setConnected(false)
+      setConnectionStatus(null)
       setApiToken(null)
     } finally {
       setDisconnecting(false)
@@ -136,10 +150,10 @@ export default function KaspiPayPage() {
 
   // Rendered in BOTH the Pro and non-Pro branches below, same reasoning as
   // /profile/acquiring's bccConnectedCard: a user whose Pro plan lapses
-  // while a Kaspi connection is live still has a real paired device and a
-  // working API token against their own Kaspi account — /api/kaspi/pay has
-  // no Pro check of its own, so the connection keeps working for real
-  // payments either way, and the disconnect control must stay reachable.
+  // while a Kaspi connection is live still has a real device paired against
+  // their own Kaspi account. /api/kaspi/pay now refuses them, but the pairing
+  // itself outlives the subscription, so the disconnect control — the only
+  // way to actually tear it down from here — must stay reachable.
   const connectedCard = apiToken ? (
     <div className="bg-white rounded-2xl shadow-sm p-4">
       <div className="text-sm font-medium text-[#1C2056] mb-2">{t.connectedMessage}</div>
@@ -157,6 +171,13 @@ export default function KaspiPayPage() {
   ) : connected ? (
     <div className="bg-white rounded-2xl shadow-sm p-4">
       <div className="text-sm font-medium text-[#1C2056] mb-3">{t.connectedMessage}</div>
+      {/* The polling cron parks a connection here when Kaspi has refused its
+          credentials or its stored secrets stopped decrypting — reconnecting
+          is the only fix, so say so instead of leaving a dead connection
+          looking healthy. */}
+      {connectionStatus === 'error' && (
+        <div className="text-xs text-amber-600 mb-3">{t.connectionErrorHint}</div>
+      )}
       <button onClick={disconnect} disabled={disconnecting}
         className="w-full bg-gray-100 text-gray-600 rounded-xl py-2.5 text-sm font-medium">
         {disconnecting ? t.disconnectingLabel : t.disconnectButton}

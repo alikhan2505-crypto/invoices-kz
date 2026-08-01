@@ -19,12 +19,16 @@ export async function GET(req: NextRequest) {
     : { data: { user: null } }
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  // Deliberately NOT filtered to status='active' any more: the polling cron
+  // parks a connection at 'error' when Kaspi has refused its credentials or
+  // its stored secrets stopped decrypting, and the page has to be able to
+  // tell that apart from "never connected" so it can show the reconnect hint
+  // (and keep the disconnect button reachable). Same shape as /api/bcc/status.
   const { data } = await supabase
     .from('kaspi_connections')
     .select('status')
     .eq('user_id', user.id)
-    .eq('status', 'active')
     .maybeSingle()
 
-  return NextResponse.json({ connected: !!data })
+  return NextResponse.json({ connected: !!data, status: data?.status ?? null })
 }

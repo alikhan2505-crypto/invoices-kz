@@ -14,12 +14,14 @@ export interface KaspiPayContent {
   verifyButton: string
   verifyingLabel: string
   connectedMessage: string
+  connectionErrorHint: string
   tokenShownOnceWarning: string
   copyTokenButton: string
   disconnectButton: string
   disconnectingLabel: string
   errorGeneric: string
   errorInvalidOtp: string
+  errorNotPro: string
   docsLinkLabel: string
 }
 
@@ -40,12 +42,14 @@ export const kaspiPayDict: Record<'ru' | 'kk' | 'en', KaspiPayContent> = {
     verifyButton: 'Подтвердить',
     verifyingLabel: 'Проверяем...',
     connectedMessage: 'Кассир успешно подключён.',
+    connectionErrorHint: 'Подключение к Kaspi больше не действует — отключите кассира и подключите его заново.',
     tokenShownOnceWarning: 'Сохраните этот токен сейчас — он показывается только один раз и понадобится для вызова API.',
     copyTokenButton: 'Скопировать',
     disconnectButton: 'Отключить',
     disconnectingLabel: 'Отключаем...',
     errorGeneric: 'Сервис Kaspi временно недоступен. Попробуйте позже.',
     errorInvalidOtp: 'Неверный код из SMS. Попробуйте ещё раз.',
+    errorNotPro: 'Приём платежей через Kaspi доступен только на тарифе Про.',
     docsLinkLabel: 'Документация по API',
   },
   kk: {
@@ -64,12 +68,14 @@ export const kaspiPayDict: Record<'ru' | 'kk' | 'en', KaspiPayContent> = {
     verifyButton: 'Растау',
     verifyingLabel: 'Тексерілуде...',
     connectedMessage: 'Кассир сәтті қосылды.',
+    connectionErrorHint: 'Kaspi-ге қосылу енді жарамсыз — кассирді ажыратып, қайта қосыңыз.',
     tokenShownOnceWarning: 'Бұл токенді қазір сақтаңыз — ол тек бір рет көрсетіледі және API шақыру үшін қажет болады.',
     copyTokenButton: 'Көшіру',
     disconnectButton: 'Ажырату',
     disconnectingLabel: 'Ажыратылуда...',
     errorGeneric: 'Kaspi қызметі уақытша қолжетімсіз. Кейінірек көріңіз.',
     errorInvalidOtp: 'SMS коды дұрыс емес. Қайталап көріңіз.',
+    errorNotPro: 'Kaspi арқылы төлемдерді қабылдау тек Про тарифінде қолжетімді.',
     docsLinkLabel: 'API құжаттамасы',
   },
   en: {
@@ -88,12 +94,14 @@ export const kaspiPayDict: Record<'ru' | 'kk' | 'en', KaspiPayContent> = {
     verifyButton: 'Verify',
     verifyingLabel: 'Verifying...',
     connectedMessage: 'Cashier connected successfully.',
+    connectionErrorHint: 'The Kaspi connection is no longer valid — disconnect the cashier and connect it again.',
     tokenShownOnceWarning: 'Save this token now — it is shown only once and is needed to call the API.',
     copyTokenButton: 'Copy',
     disconnectButton: 'Disconnect',
     disconnectingLabel: 'Disconnecting...',
     errorGeneric: 'The Kaspi service is temporarily unavailable. Try again later.',
     errorInvalidOtp: 'Invalid SMS code. Please try again.',
+    errorNotPro: 'Accepting payments via Kaspi is available on the Pro plan only.',
     docsLinkLabel: 'API documentation',
   },
 }
