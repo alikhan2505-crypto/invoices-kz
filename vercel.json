@@ -14,7 +14,7 @@
     },
     {
       "path": "/api/cron/kaspi-poll",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 6 * * *"
     }
   ]
 }

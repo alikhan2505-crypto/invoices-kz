@@ -79,6 +79,51 @@ export default function KaspiPayDocsPage() {
       </section>
 
       <section className="mb-8">
+        <h2 className="text-2xl font-semibold mb-4">Проверка статуса платежа</h2>
+        <p className="text-gray-700 mb-4">
+          Kaspi не присылает нам уведомление о том, что QR оплачен — мы сами должны спросить у Kaspi.
+          Самый быстрый способ узнать, что платёж прошёл — спросить у нас напрямую, пока клиент ещё на странице оплаты:
+        </p>
+
+        <div className="bg-gray-50 p-4 rounded mb-4">
+          <p className="font-semibold mb-2">Endpoint:</p>
+          <code className="text-blue-600">GET https://www.invoices.kz/api/kaspi/pay/status?operation_id=op_123456789</code>
+        </div>
+
+        <div className="bg-gray-50 p-4 rounded mb-4">
+          <p className="font-semibold mb-2">Заголовок аутентификации:</p>
+          <code className="text-sm">Authorization: Bearer &lt;ваш_api_токен&gt;</code>
+        </div>
+
+        <div className="bg-gray-50 p-4 rounded mb-4">
+          <p className="font-semibold mb-2">Ответ (JSON):</p>
+          <pre className="bg-white p-3 rounded border border-gray-300 overflow-x-auto text-sm">
+{`{
+  "operation_id": "op_123456789",
+  "order_id": "order_12345",
+  "amount": 10000,
+  "status": "paid",
+  "paid": true
+}`}
+          </pre>
+          <div className="mt-4 text-sm text-gray-600">
+            <p className="font-semibold mb-2">Значения <code className="bg-gray-100 px-1">status</code>:</p>
+            <ul className="list-disc list-inside space-y-1">
+              <li><code className="bg-gray-100 px-1">pending</code> — ожидает оплаты</li>
+              <li><code className="bg-gray-100 px-1">paid</code> — оплачен</li>
+              <li><code className="bg-gray-100 px-1">expired</code> — QR истёк без оплаты</li>
+            </ul>
+          </div>
+        </div>
+
+        <p className="text-gray-700 mb-4">
+          Каждый вызов этого эндпоинта запускает реальную проверку у Kaspi (не просто читает нашу базу), поэтому
+          опрашивать его можно, например, раз в несколько секунд, пока клиент ждёт оплаты на вашей странице —
+          так же делает и наша собственная страница счёта.
+        </p>
+      </section>
+
+      <section className="mb-8">
         <h2 className="text-2xl font-semibold mb-4">Вебхуки (webhook)</h2>
         <p className="text-gray-700 mb-4">
           Если вы указали <code className="bg-gray-100 px-1">callback_url</code> при создании платежа,
@@ -96,8 +141,11 @@ export default function KaspiPayDocsPage() {
               Это необходимо для безопасности. Если callback_url не пройдет проверку, вебхук будет пропущен.
             </li>
             <li>
-              <strong>Нет гарантии в реальном времени:</strong> вебхук отправляется, когда наш внутренний крон (выполняется периодически)
-              обнаружит, что платеж успешен. Это может произойти с задержкой в несколько минут.
+              <strong>Вебхук — не единственный сигнал:</strong> он отправляется в момент, когда платёж проверяется и
+              оказывается успешным — либо когда вы сами вызываете <code className="bg-white px-1">GET /api/kaspi/pay/status</code> выше,
+              либо (если вы этого не делаете) когда его обнаружит наш внутренний крон, который на бесплатном тарифе
+              нашего хостинга запускается не чаще раза в сутки. Если вам важна скорость подтверждения — опрашивайте
+              статус-эндпоинт сами, не полагайтесь только на вебхук.
             </li>
           </ul>
         </div>
@@ -207,6 +255,10 @@ const isValid = signature === req.headers['x-kaspi-pay-signature'];
               <tr className="border-b">
                 <td className="p-2"><code className="bg-gray-100 px-1">403</code></td>
                 <td className="p-2">Forbidden — тариф Pro не активен (Kaspi Pay доступен только на тарифе Pro)</td>
+              </tr>
+              <tr className="border-b">
+                <td className="p-2"><code className="bg-gray-100 px-1">404</code></td>
+                <td className="p-2">Not Found — платёж с таким operation_id не найден (только для проверки статуса)</td>
               </tr>
               <tr className="border-b">
                 <td className="p-2"><code className="bg-gray-100 px-1">429</code></td>
