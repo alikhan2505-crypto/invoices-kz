@@ -78,7 +78,13 @@ export default function AcquiringPage() {
   // the dashboard once it lands rather than requiring a manual page reload.
   useEffect(() => {
     if (!kaspiTopupPending) return
+    let polls = 0
     const interval = setInterval(async () => {
+      // Capped at 150 polls (~12.5 min), matching /view/[token]'s same
+      // 5s-interval pattern — an abandoned tab with a pending top-up
+      // shouldn't poll forever.
+      polls++
+      if (polls > 150) { clearInterval(interval); return }
       const { data: { session } } = await supabase.auth.getSession()
       const res = await fetch(`/api/kaspi/wallet/topup-status?topup_id=${kaspiTopupPending.topup_id}`, {
         headers: { 'Authorization': `Bearer ${session?.access_token}` },
