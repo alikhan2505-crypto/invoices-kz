@@ -14,6 +14,13 @@ const supabaseAuth = createClient(
 
 const MIN_TOPUP = 1000
 
+// This route hits the single shared platform Kaspi connection (not a
+// per-customer one), same reasoning as PAY_RATE_LIMIT/MINT_LIMIT elsewhere
+// in this codebase: unbounded calls from one authenticated user could get
+// the one connection every customer's billing depends on flagged by Kaspi.
+const TOPUP_RATE_LIMIT = 5
+const TOPUP_RATE_WINDOW_MS = 60_000
+
 export async function POST(req: NextRequest) {
   const accessToken = req.headers.get('authorization')?.replace('Bearer ', '')
   const { data: { user } } = accessToken
@@ -24,6 +31,17 @@ export async function POST(req: NextRequest) {
   const { amount } = await req.json()
   if (!amount || typeof amount !== 'number' || amount < MIN_TOPUP) {
     return NextResponse.json({ error: 'invalid_amount', min: MIN_TOPUP }, { status: 400 })
+  }
+
+  const { count: recentCount, error: rateError } = await supabase
+    .from('kaspi_wallet_topups')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', user.id)
+    .gte('created_at', new Date(Date.now() - TOPUP_RATE_WINDOW_MS).toISOString())
+  if (rateError) console.error('Wallet topup: rate-limit count failed, allowing request:', rateError.message)
+  else if ((recentCount ?? 0) >= TOPUP_RATE_LIMIT) {
+    console.error('Wallet topup: rate limit hit for user', user.id, `— ${recentCount} requests in the last minute`)
+    return NextResponse.json({ error: 'rate_limited' }, { status: 429 })
   }
 
   const connection = await loadPlatformConnection()

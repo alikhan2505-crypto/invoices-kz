@@ -108,12 +108,15 @@ export async function GET(request: Request) {
 
   const { data: pendingPlans } = await supabase
     .from('payment_requests')
-    .select('id, user_id, plan, amount, qr_operation_id')
+    .select('id, user_id, plan, amount, qr_operation_id, created_at')
     .eq('status', 'pending')
   let plansPaid = 0
+  let plansExpired = 0
   for (const row of (pendingPlans || []) as any[]) {
     try {
-      if ((await checkAndSettlePlanPayment(row)) === 'paid') plansPaid++
+      const outcome = await checkAndSettlePlanPayment(row)
+      if (outcome === 'paid') plansPaid++
+      else if (outcome === 'expired') plansExpired++
     } catch (e: any) {
       console.error('Kaspi poll: plan payment check failed for', row.id, '— retrying next run:', e.message)
     }
@@ -121,16 +124,19 @@ export async function GET(request: Request) {
 
   const { data: pendingTopups } = await supabase
     .from('kaspi_wallet_topups')
-    .select('id, user_id, amount, kaspi_operation_id, status')
+    .select('id, user_id, amount, kaspi_operation_id, status, expires_at')
     .eq('status', 'pending')
   let topupsPaid = 0
+  let topupsExpired = 0
   for (const row of (pendingTopups || []) as any[]) {
     try {
-      if ((await checkAndSettleWalletTopup(row)) === 'paid') topupsPaid++
+      const outcome = await checkAndSettleWalletTopup(row)
+      if (outcome === 'paid') topupsPaid++
+      else if (outcome === 'expired') topupsExpired++
     } catch (e: any) {
       console.error('Kaspi poll: wallet topup check failed for', row.id, '— retrying next run:', e.message)
     }
   }
 
-  return NextResponse.json({ ok: true, paid, expired, plansPaid, topupsPaid })
+  return NextResponse.json({ ok: true, paid, expired, plansPaid, plansExpired, topupsPaid, topupsExpired })
 }

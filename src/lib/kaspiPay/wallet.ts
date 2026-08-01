@@ -74,14 +74,42 @@ export interface WalletTopupRow {
   amount: number
   kaspi_operation_id: string
   status: string
+  expires_at?: string | null
 }
 
-export async function checkAndSettleWalletTopup(row: WalletTopupRow): Promise<'paid' | 'not_paid'> {
+function isPastExpiry(row: WalletTopupRow): boolean {
+  return !!row.expires_at && new Date(row.expires_at) <= new Date()
+}
+
+async function tryExpireTopup(row: WalletTopupRow): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('kaspi_wallet_topups')
+    .update({ status: 'expired' })
+    .eq('id', row.id)
+    .eq('status', 'pending')
+    .select('id')
+  if (error) {
+    console.error('Wallet topup: failed to expire', row.id, error.message)
+    return false
+  }
+  return !!(data && data.length > 0)
+}
+
+// Mirrors checkAndSettleKaspiPayment's shape (paid/not_paid/expired) so a
+// row that's dead on Kaspi's side (QR expired unpaid) doesn't accumulate
+// forever in the cron's pending sweep -- without this, every abandoned
+// top-up attempt cost one Kaspi round-trip on every single daily run,
+// indefinitely.
+export async function checkAndSettleWalletTopup(row: WalletTopupRow): Promise<'paid' | 'not_paid' | 'expired'> {
   const connection = await loadPlatformConnection()
   if (!connection) return 'not_paid'
 
   const result = await checkStatus(connection, row.kaspi_operation_id)
-  if (result.status !== 'paid') return 'not_paid'
+  if (result.status !== 'paid') {
+    const expiredOnKaspi = result.status === 'expired'
+    if ((expiredOnKaspi || isPastExpiry(row)) && (await tryExpireTopup(row))) return 'expired'
+    return 'not_paid'
+  }
 
   const { data: claimed, error: claimError } = await supabase
     .from('kaspi_wallet_topups')
@@ -92,6 +120,16 @@ export async function checkAndSettleWalletTopup(row: WalletTopupRow): Promise<'p
   if (claimError) throw new Error(`failed to claim paid topup: ${claimError.message}`)
   if (!claimed || claimed.length === 0) return 'paid' // already settled by another caller
 
-  await creditWallet(row.user_id, row.amount, row.id)
+  // The row is now claimed 'paid', and the cron only ever sweeps 'pending'
+  // rows -- if creditWallet itself throws (a transient Supabase error), this
+  // customer's money is confirmed on Kaspi's side but would never reach
+  // their balance and nothing would ever retry. Logged loudly for manual
+  // reconciliation rather than silently losing the credit; still reports
+  // 'paid' since the Kaspi-side payment genuinely is.
+  try {
+    await creditWallet(row.user_id, row.amount, row.id)
+  } catch (e: any) {
+    console.error('CRITICAL: wallet topup', row.id, 'for user', row.user_id, 'confirmed paid on Kaspi but credit failed:', e.message)
+  }
   return 'paid'
 }

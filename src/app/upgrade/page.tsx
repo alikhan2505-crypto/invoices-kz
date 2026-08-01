@@ -180,6 +180,12 @@ export default function Upgrade() {
       }
       setShowPhoneModal(false)
       alert(t.phoneRequestSentAlert)
+      // Without this, the phone-push path never started the same live poll
+      // the QR path gets (data.payment_id is the same value the create-phone
+      // route stored as payment_requests.order_id) -- it would otherwise
+      // only ever settle via the once-daily cron, a silent regression from
+      // xpayment's near-instant webhook.
+      setExtTranId(data.payment_id)
     } catch (e: any) {
       alert(t.errorPrefix(e.message))
     }

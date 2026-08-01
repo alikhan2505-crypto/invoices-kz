@@ -12,6 +12,12 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+// Same shared-platform-connection reasoning as create/route.ts -- counted
+// against the same payment_requests table, so the two routes share one
+// combined limit against abuse of the one connection all billing depends on.
+const PLAN_PAYMENT_RATE_LIMIT = 5
+const PLAN_PAYMENT_RATE_WINDOW_MS = 60_000
+
 export async function POST(req: NextRequest) {
   try {
     const { userId, plan, phone } = await req.json()
@@ -25,6 +31,17 @@ export async function POST(req: NextRequest) {
       : { data: { user: null } }
     if (!user || user.id !== userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { count: recentCount, error: rateError } = await supabase
+      .from('payment_requests')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .gte('created_at', new Date(Date.now() - PLAN_PAYMENT_RATE_WINDOW_MS).toISOString())
+    if (rateError) console.error('Phone payment: rate-limit count failed, allowing request:', rateError.message)
+    else if ((recentCount ?? 0) >= PLAN_PAYMENT_RATE_LIMIT) {
+      console.error('Phone payment: rate limit hit for user', userId, `— ${recentCount} requests in the last minute`)
+      return NextResponse.json({ error: 'rate_limited' }, { status: 429 })
     }
 
     const connection = await loadPlatformConnection()

@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
   if (!found) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { amount, order_id, callback_url } = await req.json()
-  if (!amount || !order_id) {
+  if (!amount || !order_id || typeof amount !== 'number' || amount <= 0) {
     return NextResponse.json({ error: 'amount and order_id required' }, { status: 400 })
   }
 

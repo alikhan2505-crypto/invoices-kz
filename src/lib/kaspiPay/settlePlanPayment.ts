@@ -13,6 +13,27 @@ export interface PlanPaymentRow {
   plan: string
   amount: number
   qr_operation_id: string
+  created_at?: string
+}
+
+// payment_requests has no expires_at column (unlike kaspi_payment_requests/
+// kaspi_wallet_topups) -- a Kaspi QR itself expires within minutes, so a
+// row still 'pending' a full day after creation is safe to treat as dead
+// rather than sweeping it forever on every future daily cron run.
+const PLAN_PAYMENT_STALE_MS = 24 * 60 * 60 * 1000
+
+async function tryExpirePlanPayment(row: PlanPaymentRow): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('payment_requests')
+    .update({ status: 'expired' })
+    .eq('id', row.id)
+    .eq('status', 'pending')
+    .select('id')
+  if (error) {
+    console.error('Plan payment: failed to expire', row.id, error.message)
+    return false
+  }
+  return !!(data && data.length > 0)
 }
 
 // Parallel to checkAndSettleKaspiPayment, but for invoices.kz's OWN
@@ -20,12 +41,17 @@ export interface PlanPaymentRow {
 // instead of the paying customer's, and activates a plan instead of marking
 // an invoice paid. Ported from the old /api/payment/webhook's bonus-days
 // carry-over logic rather than dropping it.
-export async function checkAndSettlePlanPayment(row: PlanPaymentRow): Promise<'paid' | 'not_paid'> {
+export async function checkAndSettlePlanPayment(row: PlanPaymentRow): Promise<'paid' | 'not_paid' | 'expired'> {
   const connection = await loadPlatformConnection()
   if (!connection) return 'not_paid'
 
   const result = await checkStatus(connection, row.qr_operation_id)
-  if (result.status !== 'paid') return 'not_paid'
+  if (result.status !== 'paid') {
+    const expiredOnKaspi = result.status === 'expired'
+    const isStale = !!row.created_at && (Date.now() - new Date(row.created_at).getTime()) > PLAN_PAYMENT_STALE_MS
+    if ((expiredOnKaspi || isStale) && (await tryExpirePlanPayment(row))) return 'expired'
+    return 'not_paid'
+  }
 
   const { data: claimed, error: claimError } = await supabase
     .from('payment_requests')
@@ -52,7 +78,16 @@ export async function checkAndSettlePlanPayment(row: PlanPaymentRow): Promise<'p
     }
   }
 
-  await supabase.from('profiles').update({ plan: row.plan, plan_expires_at: expiresAt.toISOString() }).eq('id', row.user_id)
+  // The payment_requests row is already claimed 'paid' at this point -- if
+  // this update fails, the customer paid, the row says 'paid', but the plan
+  // never activates and nothing would ever retry (the cron only sweeps
+  // 'pending' rows). Logged loudly for manual reconciliation rather than
+  // silently discarding the failure.
+  const { error: planError } = await supabase
+    .from('profiles')
+    .update({ plan: row.plan, plan_expires_at: expiresAt.toISOString() })
+    .eq('id', row.user_id)
+  if (planError) console.error('CRITICAL: plan payment', row.id, 'for user', row.user_id, 'confirmed paid but plan activation failed:', planError.message)
 
   // Notification to admin on successful plan payment settlement. The admin uses
   // this to notice payments in real time. Best-effort: a notification failure

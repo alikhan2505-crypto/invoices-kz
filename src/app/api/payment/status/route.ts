@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
 
   const { data: row } = await supabase
     .from('payment_requests')
-    .select('id, user_id, plan, amount, qr_operation_id, status')
+    .select('id, user_id, plan, amount, qr_operation_id, status, created_at')
     .eq('order_id', orderId)
     .eq('user_id', user.id)
     .maybeSingle()
@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
   if (row.status === 'pending') {
     try {
       const outcome = await checkAndSettlePlanPayment(row as any)
-      return NextResponse.json({ status: outcome === 'paid' ? 'paid' : 'pending' })
+      return NextResponse.json({ status: outcome === 'not_paid' ? 'pending' : outcome })
     } catch (e: any) {
       console.error('Plan payment status check failed for', orderId, ':', e.message)
       return NextResponse.json({ status: 'pending' })

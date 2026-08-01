@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
 
   const { data: row } = await supabase
     .from('kaspi_wallet_topups')
-    .select('id, user_id, amount, kaspi_operation_id, status')
+    .select('id, user_id, amount, kaspi_operation_id, status, expires_at')
     .eq('id', topupId)
     .eq('user_id', user.id)
     .maybeSingle()
@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
   if (row.status === 'pending') {
     try {
       const outcome = await checkAndSettleWalletTopup(row as any)
-      return NextResponse.json({ status: outcome === 'paid' ? 'paid' : 'pending' })
+      return NextResponse.json({ status: outcome === 'not_paid' ? 'pending' : outcome })
     } catch (e: any) {
       console.error('Wallet topup status check failed for', topupId, ':', e.message)
       return NextResponse.json({ status: 'pending' })

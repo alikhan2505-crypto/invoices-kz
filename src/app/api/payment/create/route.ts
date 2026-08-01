@@ -12,6 +12,12 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+// This route hits the single shared platform Kaspi connection (not a
+// per-customer one) -- unbounded calls from one user could get the one
+// connection every customer's billing depends on flagged by Kaspi.
+const PLAN_PAYMENT_RATE_LIMIT = 5
+const PLAN_PAYMENT_RATE_WINDOW_MS = 60_000
+
 export async function POST(req: NextRequest) {
   try {
     const { userId, plan } = await req.json()
@@ -25,6 +31,17 @@ export async function POST(req: NextRequest) {
       : { data: { user: null } }
     if (!user || user.id !== userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { count: recentCount, error: rateError } = await supabase
+      .from('payment_requests')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .gte('created_at', new Date(Date.now() - PLAN_PAYMENT_RATE_WINDOW_MS).toISOString())
+    if (rateError) console.error('Payment create: rate-limit count failed, allowing request:', rateError.message)
+    else if ((recentCount ?? 0) >= PLAN_PAYMENT_RATE_LIMIT) {
+      console.error('Payment create: rate limit hit for user', userId, `— ${recentCount} requests in the last minute`)
+      return NextResponse.json({ error: 'rate_limited' }, { status: 429 })
     }
 
     const connection = await loadPlatformConnection()
