@@ -3,6 +3,8 @@ import { createClient } from '@supabase/supabase-js'
 import { KaspiConnectionSecretsError } from '@/lib/kaspiPay/connection'
 import { KaspiAuthError } from '@/lib/kaspiPay/client'
 import { checkAndSettleKaspiPayment } from '@/lib/kaspiPay/settlePayment'
+import { checkAndSettlePlanPayment } from '@/lib/kaspiPay/settlePlanPayment'
+import { checkAndSettleWalletTopup } from '@/lib/kaspiPay/wallet'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -104,5 +106,31 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.json({ ok: true, paid, expired })
+  const { data: pendingPlans } = await supabase
+    .from('payment_requests')
+    .select('id, user_id, plan, amount, qr_operation_id')
+    .eq('status', 'pending')
+  let plansPaid = 0
+  for (const row of (pendingPlans || []) as any[]) {
+    try {
+      if ((await checkAndSettlePlanPayment(row)) === 'paid') plansPaid++
+    } catch (e: any) {
+      console.error('Kaspi poll: plan payment check failed for', row.id, '— retrying next run:', e.message)
+    }
+  }
+
+  const { data: pendingTopups } = await supabase
+    .from('kaspi_wallet_topups')
+    .select('id, user_id, amount, kaspi_operation_id, status')
+    .eq('status', 'pending')
+  let topupsPaid = 0
+  for (const row of (pendingTopups || []) as any[]) {
+    try {
+      if ((await checkAndSettleWalletTopup(row)) === 'paid') topupsPaid++
+    } catch (e: any) {
+      console.error('Kaspi poll: wallet topup check failed for', row.id, '— retrying next run:', e.message)
+    }
+  }
+
+  return NextResponse.json({ ok: true, paid, expired, plansPaid, topupsPaid })
 }
