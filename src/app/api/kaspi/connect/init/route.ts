@@ -52,7 +52,11 @@ export async function POST(req: NextRequest) {
     setPendingAttempt(processId, { identity, userToken, userId: user.id, phoneNumber: normalizedPhone })
     return NextResponse.json({ processId })
   } catch (e: any) {
-    console.error('Kaspi connect init error:', e.message)
+    // Logs the exact wire-format number so a Kaspi-side rejection (e.g.
+    // UserPhoneNumberDoesNotBelongToAnyOperator) can be diagnosed from the
+    // logs alone next time, instead of re-deriving normalizeKzPhone's output
+    // by hand from a screenshot.
+    console.error('Kaspi connect init error for phone', normalizedPhone, ':', e.message)
     return NextResponse.json({ error: 'kaspi_unavailable' }, { status: 502 })
   }
 }
