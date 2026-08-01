@@ -1,19 +1,21 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import crypto from 'crypto'
-import { loadConnectionByUserId, KaspiConnectionSecretsError } from '@/lib/kaspiPay/connection'
-import { checkStatus, KaspiAuthError } from '@/lib/kaspiPay/client'
-import { isSafeWebhookUrl } from '@/lib/kaspiPay/webhookSafety'
+import { KaspiConnectionSecretsError } from '@/lib/kaspiPay/connection'
+import { KaspiAuthError } from '@/lib/kaspiPay/client'
+import { checkAndSettleKaspiPayment } from '@/lib/kaspiPay/settlePayment'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-function signWebhookPayload(rawBody: string, secret: string): string {
-  return crypto.createHmac('sha256', secret).update(rawBody).digest('hex')
-}
-
+// This cron is no longer the primary confirmation path -- the payer's own
+// page (/view/[token]) and the public pay-status API check live while
+// someone is actually watching, which is both faster and works within
+// Vercel Hobby's once-a-day cron limit. This run is now the safety net for
+// what nothing else ever polls: an external API customer who never checks
+// their own operation_id, a payer who closes the tab right after paying,
+// and general expiry/reconciliation.
 export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization')
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -35,10 +37,10 @@ export async function GET(request: Request) {
     .select('*')
     .eq('status', 'pending')
 
-  // This cron is the sole confirmation path for every pending Kaspi
-  // payment across all customers — a persistent failure here (bad
-  // service-role key, RLS misconfig, Supabase outage) must not silently
-  // report {ok:true, paid:0} forever with no signal anywhere.
+  // Still the only confirmation path for a payment nothing ever polls live —
+  // a persistent failure here (bad service-role key, RLS misconfig, Supabase
+  // outage) must not silently report {ok:true, paid:0} forever with no
+  // signal anywhere.
   if (requestsError) {
     console.error('Kaspi poll: failed to fetch pending requests:', requestsError.message)
     return NextResponse.json({ error: 'fetch_failed' }, { status: 502 })
@@ -51,111 +53,11 @@ export async function GET(request: Request) {
 
   for (const reqRow of (requests || []) as any[]) {
     try {
-      const connection = await loadConnectionByUserId(reqRow.user_id)
-      if (!connection) {
-        // The connection was disconnected, or a previous run already parked
-        // it at status='error' (loadConnectionByUserId only loads 'active'
-        // rows) — either way nothing can ever check this request's real
-        // status again. Without this, a request whose connection disappears
-        // stays 'pending' forever and gets re-selected by every future run.
-        const pastExpiry = !!reqRow.expires_at && new Date(reqRow.expires_at) <= new Date()
-        if (pastExpiry) {
-          const { data: expiredRows, error: expireError } = await supabase
-            .from('kaspi_payment_requests')
-            .update({ status: 'expired' })
-            .eq('id', reqRow.id)
-            .eq('status', 'pending')
-            .select('id')
-          if (expireError) console.error('Kaspi poll: failed to expire orphaned request', reqRow.id, expireError.message)
-          else if (expiredRows && expiredRows.length > 0) expired++
-        }
-        continue
-      }
-
-      // Deliberately BEFORE any expiry handling. Expiring first (the previous
-      // behaviour) permanently lost every payment that completed during the
-      // last poll interval before expires_at: the row went straight to
-      // 'expired', the invoice was never marked paid and the customer's
-      // webhook never fired, even though the money had actually moved.
-      const result = await checkStatus(connection, reqRow.kaspi_operation_id)
+      const outcome = await checkAndSettleKaspiPayment(reqRow)
+      if (outcome === 'no_connection') continue
       statusChecksOk++
-
-      if (result.status !== 'paid') {
-        // Only now is expiry safe to write: Kaspi itself has confirmed this
-        // operation is not paid. 'failed' rows (cancelled by the payer,
-        // insufficient funds, …) are deliberately left pending until their
-        // own expires_at passes — some of those Kaspi statuses are reachable
-        // while a QR is still usable for another attempt, and we would rather
-        // re-poll a dead QR than kill a live one.
-        const expiredOnKaspi = result.status === 'expired'
-        const pastExpiry = !!reqRow.expires_at && new Date(reqRow.expires_at) <= new Date()
-        if (expiredOnKaspi || pastExpiry) {
-          const { data: expiredRows, error: expireError } = await supabase
-            .from('kaspi_payment_requests')
-            .update({ status: 'expired' })
-            .eq('id', reqRow.id)
-            .eq('status', 'pending')
-            .select('id')
-          if (expireError) console.error('Kaspi poll: failed to expire request', reqRow.id, expireError.message)
-          else if (expiredRows && expiredRows.length > 0) expired++
-        }
-        continue
-      }
-
-      // Vercel does not guarantee cron invocations never overlap, and the
-      // side effects below (marking the invoice paid, POSTing the customer's
-      // webhook) are not idempotent. The status='pending' predicate turns the
-      // update into an atomic claim: whichever run flips the row gets the
-      // returned id and does the work; a concurrent run matches zero rows and
-      // bails out here.
-      const { data: claimed, error: claimError } = await supabase
-        .from('kaspi_payment_requests')
-        .update({ status: 'paid' })
-        .eq('id', reqRow.id)
-        .eq('status', 'pending')
-        .select('id')
-      if (claimError) throw new Error(`failed to claim paid request: ${claimError.message}`)
-      if (!claimed || claimed.length === 0) continue // already claimed by an overlapping run
-
-      paid++
-
-      if (reqRow.invoice_id) {
-        await supabase.from('invoices').update({ status: 'paid' }).eq('id', reqRow.invoice_id)
-        await supabase.from('invoice_logs').insert({ invoice_id: reqRow.invoice_id, status: 'paid' })
-      }
-
-      if (reqRow.callback_url) {
-        // Its own secret, NOT KASPI_SESSION_ENCRYPTION_KEY. That key decrypts
-        // every customer's Kaspi identity, and this one is meant to be handed
-        // to external customers so they can verify our signature — sharing
-        // one value for both would mean giving a single customer the ability
-        // to decrypt every other customer's stored private key.
-        const secret = process.env.KASPI_WEBHOOK_SECRET
-        if (!secret) {
-          console.error('Kaspi webhook skipped for', reqRow.id, '— KASPI_WEBHOOK_SECRET is not configured')
-        } else if (!(await isSafeWebhookUrl(reqRow.callback_url))) {
-          console.error('Kaspi webhook skipped for', reqRow.id, '— unsafe callback_url:', reqRow.callback_url)
-        } else {
-          const payload = JSON.stringify({
-            event: 'payment.success',
-            order_id: reqRow.order_id,
-            amount: reqRow.amount,
-            operation_id: reqRow.kaspi_operation_id,
-          })
-          // A non-responding customer endpoint must not stall the rest of
-          // this run's rows — bounded with a timeout, same as any other
-          // outbound call to a third party we don't control.
-          await fetch(reqRow.callback_url, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Kaspi-Pay-Signature': signWebhookPayload(payload, secret),
-            },
-            body: payload,
-            signal: AbortSignal.timeout(5000),
-          }).catch((e) => console.error('Kaspi webhook delivery failed for', reqRow.id, e.message))
-        }
-      }
+      if (outcome === 'paid') paid++
+      else if (outcome === 'expired') expired++
     } catch (e: any) {
       // Terminal vs transient, same split as the BCC cron. Terminal means the
       // connection itself is dead and no retry can revive it: Kaspi refused

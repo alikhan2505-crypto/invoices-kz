@@ -1,0 +1,127 @@
+import { createClient } from '@supabase/supabase-js'
+import crypto from 'crypto'
+import { loadConnectionByUserId } from './connection'
+import { checkStatus } from './client'
+import { isSafeWebhookUrl } from './webhookSafety'
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
+
+function signWebhookPayload(rawBody: string, secret: string): string {
+  return crypto.createHmac('sha256', secret).update(rawBody).digest('hex')
+}
+
+export interface SettleableRequest {
+  id: string
+  user_id: string
+  invoice_id: string | null
+  order_id: string | null
+  amount: number | string
+  kaspi_operation_id: string
+  callback_url: string | null
+  expires_at: string | null
+}
+
+export type SettleOutcome = 'paid' | 'not_paid' | 'expired' | 'no_connection'
+
+/**
+ * Checks ONE pending kaspi_payment_requests row against Kaspi's real status
+ * and, if paid, atomically settles it: claims the row, marks the linked
+ * invoice paid, logs it, and fires the customer's webhook. Shared by the
+ * daily safety-net cron and every on-demand caller (the payer's own page
+ * while they wait, the public pay-status API) -- "did this get paid" always
+ * means the same live Kaspi check no matter who asks or how often.
+ *
+ * Throws whatever checkStatus/loadConnectionByUserId throw (KaspiAuthError,
+ * KaspiConnectionSecretsError, plain network/Supabase errors) rather than
+ * catching them here: only a caller with context across many rows (the
+ * cron's whole run) can tell a systemic bad-key deploy from one dead
+ * connection, so a single on-demand check must not decide that alone.
+ */
+export async function checkAndSettleKaspiPayment(reqRow: SettleableRequest): Promise<SettleOutcome> {
+  const connection = await loadConnectionByUserId(reqRow.user_id)
+  if (!connection) {
+    // Disconnected, or already parked at status='error' by an earlier run
+    // (loadConnectionByUserId only loads 'active' rows) -- nothing can ever
+    // check this request's real status again, so it's only ever expired.
+    if (isPastExpiry(reqRow) && (await tryExpire(reqRow))) return 'expired'
+    return 'no_connection'
+  }
+
+  const result = await checkStatus(connection, reqRow.kaspi_operation_id)
+
+  if (result.status !== 'paid') {
+    // 'failed' rows (cancelled by the payer, insufficient funds, ...) are
+    // deliberately left pending until their own expires_at passes -- some of
+    // those Kaspi statuses are reachable while a QR is still usable for
+    // another attempt, and we'd rather re-poll a dead QR than kill a live one.
+    const expiredOnKaspi = result.status === 'expired'
+    if ((expiredOnKaspi || isPastExpiry(reqRow)) && (await tryExpire(reqRow))) return 'expired'
+    return 'not_paid'
+  }
+
+  // Concurrent callers (an overlapping cron run, or two poll requests landing
+  // at once) are not idempotent past this point -- the status='pending'
+  // predicate turns this into an atomic claim: whichever caller flips the
+  // row does the side effects below; everyone else matches zero rows.
+  const { data: claimed, error: claimError } = await supabase
+    .from('kaspi_payment_requests')
+    .update({ status: 'paid' })
+    .eq('id', reqRow.id)
+    .eq('status', 'pending')
+    .select('id')
+  if (claimError) throw new Error(`failed to claim paid request: ${claimError.message}`)
+  if (!claimed || claimed.length === 0) return 'paid' // already settled by another caller
+
+  if (reqRow.invoice_id) {
+    await supabase.from('invoices').update({ status: 'paid' }).eq('id', reqRow.invoice_id)
+    await supabase.from('invoice_logs').insert({ invoice_id: reqRow.invoice_id, status: 'paid' })
+  }
+
+  if (reqRow.callback_url) {
+    // Its own secret, NOT KASPI_SESSION_ENCRYPTION_KEY -- that key decrypts
+    // every customer's Kaspi identity, and this one is meant to be handed to
+    // external customers so they can verify our signature.
+    const secret = process.env.KASPI_WEBHOOK_SECRET
+    if (!secret) {
+      console.error('Kaspi webhook skipped for', reqRow.id, '— KASPI_WEBHOOK_SECRET is not configured')
+    } else if (!(await isSafeWebhookUrl(reqRow.callback_url))) {
+      console.error('Kaspi webhook skipped for', reqRow.id, '— unsafe callback_url:', reqRow.callback_url)
+    } else {
+      const payload = JSON.stringify({
+        event: 'payment.success',
+        order_id: reqRow.order_id,
+        amount: reqRow.amount,
+        operation_id: reqRow.kaspi_operation_id,
+      })
+      await fetch(reqRow.callback_url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Kaspi-Pay-Signature': signWebhookPayload(payload, secret) },
+        body: payload,
+        signal: AbortSignal.timeout(5000),
+      }).catch((e) => console.error('Kaspi webhook delivery failed for', reqRow.id, e.message))
+    }
+  }
+
+  return 'paid'
+}
+
+function isPastExpiry(reqRow: SettleableRequest): boolean {
+  return !!reqRow.expires_at && new Date(reqRow.expires_at) <= new Date()
+}
+
+async function tryExpire(reqRow: SettleableRequest): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('kaspi_payment_requests')
+    .update({ status: 'expired' })
+    .eq('id', reqRow.id)
+    .eq('status', 'pending')
+    .select('id')
+  if (error) {
+    console.error('Kaspi settle: failed to expire request', reqRow.id, error.message)
+    return false
+  }
+  return !!(data && data.length > 0)
+}
