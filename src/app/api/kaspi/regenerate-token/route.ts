@@ -25,11 +25,18 @@ export async function POST(req: NextRequest) {
   const apiToken = crypto.randomBytes(32).toString('hex')
   const apiTokenHash = crypto.createHash('sha256').update(apiToken).digest('hex')
 
-  const { error } = await supabase
+  // .update() alone reports no error and no row count when it matches zero
+  // rows — without .select(), a user with no kaspi_connections row (never
+  // connected, or disconnected) would silently get back a 200 and a
+  // freshly generated token that was never persisted anywhere and can
+  // never authenticate anything.
+  const { data, error } = await supabase
     .from('kaspi_connections')
     .update({ api_token_hash: apiTokenHash })
     .eq('user_id', user.id)
+    .select('user_id')
   if (error) return NextResponse.json({ error: 'save_failed' }, { status: 500 })
+  if (!data || data.length === 0) return NextResponse.json({ error: 'not_connected' }, { status: 404 })
 
   return NextResponse.json({ apiToken })
 }
