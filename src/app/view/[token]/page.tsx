@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
+import QRCode from 'qrcode'
 import { supabase } from '@/lib/supabase'
 import { formatDate } from '@/lib/date'
 import { generateInvoicePDF } from '@/lib/generatePDF'
@@ -16,6 +17,7 @@ export default function PublicInvoice() {
   const [profile, setProfile] = useState<any>(null)
   const [bank, setBank] = useState<any>(null)
   const [kaspiPayment, setKaspiPayment] = useState<{ qr_token: string; payment_link: string; status: string } | null>(null)
+  const [kaspiQrDataUrl, setKaspiQrDataUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [marking, setMarking] = useState(false)
   const [marked, setMarked] = useState(false)
@@ -69,7 +71,22 @@ export default function PublicInvoice() {
       // invoice itself from rendering; the client still has bank requisites.
       fetch(`/api/kaspi/invoice-payment?token=${token}`)
         .then(r => r.json())
-        .then(data => setKaspiPayment(data.payment || null))
+        .then(async (data) => {
+          setKaspiPayment(data.payment || null)
+          // Generated client-side (same 'qrcode' package already used for the
+          // ЭЦП verification QR) rather than sending this single-use payment
+          // link to a third-party QR-rendering API on every anonymous page
+          // view — the earlier version of this page did that, review found
+          // it worth avoiding even though the link itself is already shown
+          // as plain text right next to the QR.
+          if (data.payment?.payment_link) {
+            try {
+              setKaspiQrDataUrl(await QRCode.toDataURL(data.payment.payment_link, { width: 120, margin: 1 }))
+            } catch {
+              // No QR image — the plain link below still works.
+            }
+          }
+        })
         .catch(() => {})
 
       setLoading(false)
@@ -234,11 +251,13 @@ export default function PublicInvoice() {
           <div className="bg-white rounded-2xl shadow-sm p-5">
             <div className="text-xs text-gray-400 uppercase tracking-wide mb-3">Оплата через Kaspi</div>
             <div className="flex items-center gap-4 mb-4">
-              <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(kaspiPayment.payment_link)}`}
-                alt="Kaspi QR"
-                className="w-28 h-28 flex-shrink-0"
-              />
+              {kaspiQrDataUrl && (
+                <img
+                  src={kaspiQrDataUrl}
+                  alt="Kaspi QR"
+                  className="w-28 h-28 flex-shrink-0"
+                />
+              )}
               <div className="text-xs text-gray-500">
                 Отсканируйте QR-код камерой телефона или нажмите кнопку ниже, чтобы оплатить через приложение Kaspi.
               </div>

@@ -34,12 +34,15 @@ export async function POST(request: NextRequest) {
     if (inv.user_id !== user.id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
     let kaspiPaymentLink: string | null = null
-    let kaspiQrToken: string | null = null
     try {
       const connection = await loadConnectionByUserId(inv.user_id)
       if (connection) {
         const payment = await createPayment(connection, { amount: Number(inv.amount), orderId: inv.id })
-        await supabase.from('kaspi_payment_requests').insert({
+        // If this insert fails, a real Kaspi payment now exists that Task 8's
+        // poller has no row to ever find — the email must not show a working
+        // link for a payment that can never auto-confirm, so kaspiPaymentLink
+        // stays null (same degraded-but-safe path as createPayment failing).
+        const { error: insertError } = await supabase.from('kaspi_payment_requests').insert({
           user_id: inv.user_id,
           invoice_id: inv.id,
           order_id: inv.id,
@@ -50,8 +53,11 @@ export async function POST(request: NextRequest) {
           status: 'pending',
           expires_at: payment.expiresAt,
         })
-        kaspiPaymentLink = payment.paymentLink
-        kaspiQrToken = payment.qrToken
+        if (insertError) {
+          console.error('Kaspi payment created but failed to persist for tracking — invoice', inv.id, 'operation', payment.operationId, ':', insertError.message)
+        } else {
+          kaspiPaymentLink = payment.paymentLink
+        }
       }
     } catch (e: any) {
       // A Kaspi failure must never block sending the invoice itself — the
