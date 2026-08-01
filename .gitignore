@@ -48,3 +48,6 @@ next-env.d.ts
 
 # playwright mcp scratch screenshots
 .playwright-mcp/
+
+.vercel
+.env*
