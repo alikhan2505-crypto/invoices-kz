@@ -67,6 +67,11 @@ export default function InvoicePage() {
       if (res.ok) {
         const data = await res.json()
         setKaspiPayment(data.payment || null)
+        // A manual refresh can itself be the moment the payment settles
+        // (the route live-checks Kaspi on every call) — reload the whole
+        // invoice so status/История reflect it immediately, not just after
+        // the next full page load.
+        if (data.payment?.status === 'paid') await loadInvoice()
       }
     } catch {
       // Network hiccup — leave the current (possibly stale) link showing
@@ -75,6 +80,30 @@ export default function InvoicePage() {
       setRefreshingKaspi(false)
     }
   }
+
+  // Mirrors /view/[token]'s payer-facing poll: the owner looking at their own
+  // invoice while a Kaspi payment is pending sees status/История update the
+  // moment the customer pays, instead of needing a manual reload (the gap
+  // reported live — the История card only reflected "Оплачен" after F5).
+  // Capped at 150 polls (~12.5 min) so a tab left open doesn't poll forever.
+  const kaspiPollCount = useRef(0)
+  useEffect(() => {
+    if (!kaspiPayment || kaspiPayment.status !== 'pending' || !invoice?.public_token) return
+    kaspiPollCount.current = 0
+    const interval = setInterval(async () => {
+      kaspiPollCount.current++
+      if (kaspiPollCount.current > 150) { clearInterval(interval); return }
+      try {
+        const res = await fetch(`/api/kaspi/invoice-payment?token=${invoice.public_token}`)
+        const data = await res.json()
+        setKaspiPayment(data.payment || null)
+        if (data.payment?.status === 'paid') await loadInvoice()
+      } catch {
+        // Transient network hiccup — the next tick tries again.
+      }
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [kaspiPayment?.status, invoice?.public_token])
 
   async function loadInvoice() {
     const { data: inv } = await supabase.from('invoices').select('*').eq('id', id).single()

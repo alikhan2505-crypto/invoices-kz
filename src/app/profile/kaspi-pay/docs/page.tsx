@@ -1,7 +1,56 @@
+import type { ReactNode } from 'react'
+
+function QuickStartStep({ n, title, children }: { n: number; title: string; children: ReactNode }) {
+  return (
+    <div className="flex gap-4">
+      <div className="w-8 h-8 rounded-full bg-[#1C2056] text-white text-sm font-semibold flex items-center justify-center flex-shrink-0">
+        {n}
+      </div>
+      <div className="flex-1 pb-6">
+        <div className="font-semibold text-[#1C2056] mb-1">{title}</div>
+        <div className="text-sm text-gray-600">{children}</div>
+      </div>
+    </div>
+  )
+}
+
 export default function KaspiPayDocsPage() {
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold mb-8">API документация Kaspi Pay</h1>
+
+      <section className="mb-10 bg-blue-50 border border-blue-100 rounded-2xl p-6">
+        <h2 className="text-2xl font-semibold mb-1 text-[#1C2056]">Быстрый старт: приём оплаты на вашем сайте</h2>
+        <p className="text-sm text-gray-600 mb-6">
+          Эти шаги нужно пройти один раз, чтобы ваш сайт, приложение или бот сами создавали ссылки на оплату Kaspi
+          и узнавали, когда клиент оплатил — без вашего участия в каждой оплате.
+        </p>
+
+        <div>
+          <QuickStartStep n={1} title="Подключите роль «Кассир»">
+            На странице <code className="bg-white px-1.5 py-0.5 rounded border">/profile/kaspi-pay</code> введите номер
+            телефона, на котором в приложении Kaspi Pay уже выдана роль «Кассир», и подтвердите код из SMS.
+          </QuickStartStep>
+          <QuickStartStep n={2} title="Сохраните API-токен">
+            Сразу после подключения на этой же странице один раз покажется токен вида{' '}
+            <code className="bg-white px-1.5 py-0.5 rounded border">62d919bd...</code>. Скопируйте и сохраните его —
+            второй раз он не показывается (можно только отключить кассира и подключить заново).
+          </QuickStartStep>
+          <QuickStartStep n={3} title="Передайте токен разработчику или вставьте в свой сайт">
+            Если сайт делаете не вы сами — отправьте этот токен и ссылку на этот документ вашему разработчику.
+            Всё, что нужно на вашей стороне — один HTTP-запрос ниже.
+          </QuickStartStep>
+          <QuickStartStep n={4} title="Создайте платёж">
+            Ваш сайт отправляет запрос из раздела «Пример запроса (curl)» ниже, указав сумму и свой номер заказа.
+            В ответе придёт ссылка/QR — покажите её клиенту.
+          </QuickStartStep>
+          <QuickStartStep n={5} title="Узнайте об оплате автоматически">
+            Проще всего — periодически спрашивать статус (раздел «Проверка статуса платежа» ниже), пока клиент на
+            странице оплаты. Если у вас есть свой сервер — можно вместо этого настроить вебхук (раздел «Вебхуки» ниже),
+            и мы сами пришлём уведомление.
+          </QuickStartStep>
+        </div>
+      </section>
 
       <section className="mb-8">
         <h2 className="text-2xl font-semibold mb-4">Получение API токена</h2>
