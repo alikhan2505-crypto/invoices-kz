@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { loadConnectionByUserId } from './connection'
 import { createPayment } from './client'
-import { getActivePlan } from '@/lib/plan'
+import { getWalletBalance, computeCommission } from './wallet'
 import type { SettleableRequest } from './settlePayment'
 
 const supabase = createClient(
@@ -74,19 +74,14 @@ export async function getOrCreateKaspiPaymentForInvoice(invoice: {
   // A settled invoice must never get a fresh payment link minted for it.
   if (invoice.status && CLOSED_INVOICE_STATUSES.has(invoice.status)) return null
 
-  // Kaspi Pay is Pro-only, enforced server-side on every route that lets a
-  // user set one up or spend it directly — but this helper mints on the
-  // owner's behalf from two call sites (send-invoice, and the public
-  // invoice-payment endpoint) with no auth header to gate. Checked here,
-  // right before minting, so a lapsed Pro user's still-valid existing link
-  // (returned above) keeps working, but no further Kaspi payment is ever
-  // created for their invoices once Pro expires.
-  const { data: ownerProfile } = await supabase
-    .from('profiles')
-    .select('plan, plan_expires_at, bonus_expires_at, trial_expires_at')
-    .eq('id', invoice.user_id)
-    .single()
-  if (!getActivePlan(ownerProfile).canAcquiring) return null
+  // Kaspi Pay Cashier is open to every plan; it's monetized per-payment
+  // instead (5% commission funded by the connection owner's prepaid wallet
+  // balance — see wallet.ts). Checked here, right before minting a NEW
+  // payment, so an owner with insufficient balance keeps their still-valid
+  // existing link (returned above) but gets no further payment created for
+  // their invoices until they top up.
+  const balance = await getWalletBalance(invoice.user_id)
+  if (balance < computeCommission(Number(invoice.amount))) return null
 
   const { count: recentMints, error: rateError } = await supabase
     .from('kaspi_payment_requests')

@@ -3,7 +3,6 @@ import { createClient } from '@supabase/supabase-js'
 import { initConnect } from '@/lib/kaspiPay/client'
 import { setPendingAttempt } from '@/lib/kaspiPay/pendingConnect'
 import { normalizeKzPhone } from '@/lib/kaspiPay/phone'
-import { getActivePlan } from '@/lib/plan'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -21,19 +20,7 @@ export async function POST(req: NextRequest) {
     : { data: { user: null } }
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  // Kaspi Pay is Pro-only, enforced server-side — the page hides the form for
-  // non-Pro accounts, but that is UX, not enforcement. Same gate and same
-  // 403 {error:'not_pro'} shape as /api/bcc/connect: connecting here starts
-  // an ongoing automated capability (a live device pairing against the
-  // customer's own Kaspi account, plus cron polling), not a one-off action.
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('plan, plan_expires_at, bonus_expires_at, trial_expires_at')
-    .eq('id', user.id)
-    .single()
-  if (!getActivePlan(profile).canAcquiring) {
-    return NextResponse.json({ error: 'not_pro' }, { status: 403 })
-  }
+  // Connecting a Cashier is free on every plan — usage is what's monetized (see /api/kaspi/pay, invoicePayment.ts).
 
   const { phoneNumber } = await req.json()
   if (!phoneNumber) return NextResponse.json({ error: 'phoneNumber required' }, { status: 400 })

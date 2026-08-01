@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { loadConnectionByApiToken } from '@/lib/kaspiPay/connection'
 import { createPayment } from '@/lib/kaspiPay/client'
-import { getActivePlan } from '@/lib/plan'
+import { getWalletBalance, computeCommission } from '@/lib/kaspiPay/wallet'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -33,25 +33,20 @@ export async function POST(req: NextRequest) {
   }
   if (!found) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  // The real enforcement point for the whole feature. This route is called
-  // by the customer's own site indefinitely, so without a plan check here a
-  // user could subscribe to Pro for one month, connect, and keep full
-  // production API access forever. Deliberately NOT applied to the polling
-  // cron: that only resolves already-created requests (money that may
-  // already have moved), so gating it would strand real payments — creation
-  // is the point where the paid capability is actually consumed.
-  const { data: ownerProfile } = await supabase
-    .from('profiles')
-    .select('plan, plan_expires_at, bonus_expires_at, trial_expires_at')
-    .eq('id', found.userId)
-    .single()
-  if (!getActivePlan(ownerProfile).canAcquiring) {
-    return NextResponse.json({ error: 'not_pro' }, { status: 403 })
-  }
-
   const { amount, order_id, callback_url } = await req.json()
   if (!amount || !order_id) {
     return NextResponse.json({ error: 'amount and order_id required' }, { status: 400 })
+  }
+
+  // The real enforcement point for the whole feature: creating a NEW payment
+  // is what's monetized (5% of it, debited on settlement), not connecting or
+  // holding a connection. Deliberately NOT applied to the polling cron: that
+  // only resolves already-created requests (money that may already have
+  // moved), so gating it would strand real payments.
+  const balance = await getWalletBalance(found.userId)
+  const required = computeCommission(Number(amount))
+  if (balance < required) {
+    return NextResponse.json({ error: 'insufficient_balance', required, balance }, { status: 402 })
   }
 
   const { count: recentCount, error: rateError } = await supabase

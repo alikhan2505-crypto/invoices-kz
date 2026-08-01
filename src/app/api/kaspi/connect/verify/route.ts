@@ -4,7 +4,6 @@ import crypto from 'crypto'
 import { verifyOtp } from '@/lib/kaspiPay/client'
 import { encryptAtRest } from '@/lib/kaspiPay/crypto'
 import { getPendingAttempt, deletePendingAttempt } from '@/lib/kaspiPay/pendingConnect'
-import { getActivePlan } from '@/lib/plan'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -22,17 +21,7 @@ export async function POST(req: NextRequest) {
     : { data: { user: null } }
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  // Belt-and-suspenders alongside the same check in /connect/init: a plan can
-  // lapse between sending the SMS and entering the code, and this is the call
-  // that actually persists a working connection + issues the API token.
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('plan, plan_expires_at, bonus_expires_at, trial_expires_at')
-    .eq('id', user.id)
-    .single()
-  if (!getActivePlan(profile).canAcquiring) {
-    return NextResponse.json({ error: 'not_pro' }, { status: 403 })
-  }
+  // Connecting a Cashier is free on every plan — usage is what's monetized (see /api/kaspi/pay, invoicePayment.ts).
 
   const { processId, otp } = await req.json()
   if (!processId || !otp) return NextResponse.json({ error: 'processId and otp required' }, { status: 400 })
