@@ -54,6 +54,18 @@ export async function GET(req: NextRequest) {
     return { count: paid.length, amount: paid.reduce((sum, r) => sum + Number(r.amount), 0) }
   }
 
+  // Separate from `all` above on purpose: kaspi_payment_requests is money
+  // customers pay INTO this connection (invoice links, the public API),
+  // kaspi_wallet_topups is money the connection owner pays OUT to fund
+  // their own commission balance — two different directions of money, so
+  // they're returned as two separate lists rather than merged into one.
+  const { data: topupRows } = await supabase
+    .from('kaspi_wallet_topups')
+    .select('amount, status, created_at')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false })
+    .limit(20)
+
   return NextResponse.json({
     connected: true,
     status: conn.status,
@@ -73,6 +85,11 @@ export async function GET(req: NextRequest) {
       status: r.status,
       createdAt: r.created_at,
       source: r.invoice_id ? 'invoice' : 'api',
+    })),
+    recentTopups: (topupRows || []).map(r => ({
+      amount: Number(r.amount),
+      status: r.status,
+      createdAt: r.created_at,
     })),
   })
 }

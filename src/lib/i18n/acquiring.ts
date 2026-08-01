@@ -67,6 +67,21 @@ export interface AcquiringContent {
   kaspiTopupPendingHint: string
   kaspiTopupPayLinkLabel: string
   kaspiInsufficientBalanceHint: string
+  kaspiCommissionHint: string
+  kaspiPlatformConnectionNote: string
+  kaspiHistoryTitle: string
+  kaspiHistoryEmptyLabel: string
+  kaspiStatsTodayLabel: string
+  kaspiStatsMonthLabel: string
+  kaspiStatsAllTimeLabel: string
+  kaspiStatusPaid: string
+  kaspiStatusPending: string
+  kaspiStatusExpired: string
+  kaspiStatusFailed: string
+  kaspiSourceInvoice: string
+  kaspiSourceApi: string
+  kaspiTopupExpiredError: string
+  kaspiTopupHistoryTitle: string
 }
 
 export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
@@ -145,6 +160,21 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiTopupPendingHint: 'Ссылка на пополнение готова — оплатите через Kaspi, баланс обновится автоматически.',
     kaspiTopupPayLinkLabel: 'Перейти к оплате',
     kaspiInsufficientBalanceHint: 'Баланс кошелька слишком низкий — при нехватке средств новые ссылки на оплату через Kaspi для ваших счетов создаваться не будут. Пополните баланс.',
+    kaspiCommissionHint: 'Подключение и приём платежей через Kaspi — бесплатно. С каждого успешного платежа списывается комиссия 5% с баланса кошелька (пополняется заранее).',
+    kaspiPlatformConnectionNote: 'Это подключение также используется для приёма оплаты тарифов и пополнений баланса от других пользователей invoices.kz — как административное подключение платформы.',
+    kaspiHistoryTitle: 'История платежей',
+    kaspiHistoryEmptyLabel: 'Платежей пока нет',
+    kaspiStatsTodayLabel: 'За 24 часа',
+    kaspiStatsMonthLabel: 'За 30 дней',
+    kaspiStatsAllTimeLabel: 'Всего',
+    kaspiStatusPaid: 'Оплачен',
+    kaspiStatusPending: 'Ожидает',
+    kaspiStatusExpired: 'Истёк',
+    kaspiStatusFailed: 'Не удался',
+    kaspiSourceInvoice: 'счёт',
+    kaspiSourceApi: 'API',
+    kaspiTopupExpiredError: 'Ссылка на оплату истекла (действует несколько минут, как любой QR Kaspi) — попробуйте пополнить ещё раз.',
+    kaspiTopupHistoryTitle: 'История пополнений баланса',
   },
   kk: {
     headerLabel: 'Эквайринг',
@@ -221,6 +251,21 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiTopupPendingHint: 'Толтыру сілтемесі дайын — Kaspi арқылы төлеңіз, баланс автоматты түрде жаңарады.',
     kaspiTopupPayLinkLabel: 'Төлеуге өту',
     kaspiInsufficientBalanceHint: 'Әмиян балансы тым төмен — қаражат жеткіліксіз болса, шоттарыңыз үшін Kaspi арқылы жаңа төлем сілтемелері жасалмайды. Балансты толтырыңыз.',
+    kaspiCommissionHint: 'Kaspi арқылы қосылу және төлемдерді қабылдау — тегін. Әрбір сәтті төлемнен әмиян балансынан 5% комиссия алынады (алдын ала толтырылады).',
+    kaspiPlatformConnectionNote: 'Бұл қосылым invoices.kz-тің басқа пайдаланушыларынан тариф пен әмиян толтыруларын қабылдау үшін де қолданылады — платформаның әкімшілік қосылымы ретінде.',
+    kaspiHistoryTitle: 'Төлемдер тарихы',
+    kaspiHistoryEmptyLabel: 'Әзірге төлемдер жоқ',
+    kaspiStatsTodayLabel: '24 сағат ішінде',
+    kaspiStatsMonthLabel: '30 күн ішінде',
+    kaspiStatsAllTimeLabel: 'Барлығы',
+    kaspiStatusPaid: 'Төленді',
+    kaspiStatusPending: 'Күтілуде',
+    kaspiStatusExpired: 'Мерзімі өтті',
+    kaspiStatusFailed: 'Сәтсіз',
+    kaspiSourceInvoice: 'шот',
+    kaspiSourceApi: 'API',
+    kaspiTopupExpiredError: 'Төлем сілтемесінің мерзімі өтті (бірнеше минут жарамды, кез келген Kaspi QR сияқты) — қайта толтырып көріңіз.',
+    kaspiTopupHistoryTitle: 'Әмиян толтыру тарихы',
   },
   en: {
     headerLabel: 'Acquiring',
@@ -297,5 +342,20 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiTopupPendingHint: 'Your top-up payment link is ready — pay via Kaspi and the balance will update automatically.',
     kaspiTopupPayLinkLabel: 'Go to payment',
     kaspiInsufficientBalanceHint: 'Your wallet balance is too low — new Kaspi payment links for your invoices won\'t be created if funds run out. Top up your balance.',
+    kaspiCommissionHint: 'Connecting and accepting Kaspi payments is free. A 5% commission is charged from your wallet balance (topped up in advance) on every successful payment.',
+    kaspiPlatformConnectionNote: 'This connection is also used to accept plan payments and wallet top-ups from other invoices.kz users — as the platform\'s admin connection.',
+    kaspiHistoryTitle: 'Payment history',
+    kaspiHistoryEmptyLabel: 'No payments yet',
+    kaspiStatsTodayLabel: 'Last 24h',
+    kaspiStatsMonthLabel: 'Last 30 days',
+    kaspiStatsAllTimeLabel: 'All time',
+    kaspiStatusPaid: 'Paid',
+    kaspiStatusPending: 'Pending',
+    kaspiStatusExpired: 'Expired',
+    kaspiStatusFailed: 'Failed',
+    kaspiSourceInvoice: 'invoice',
+    kaspiSourceApi: 'API',
+    kaspiTopupExpiredError: 'The payment link expired (valid for a few minutes, like any Kaspi QR) — please try topping up again.',
+    kaspiTopupHistoryTitle: 'Top-up history',
   },
 }

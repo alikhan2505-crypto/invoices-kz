@@ -61,6 +61,9 @@ export default function AcquiringPage() {
   const [kaspiDisconnecting, setKaspiDisconnecting] = useState(false)
   const [kaspiToppingUp, setKaspiToppingUp] = useState(false)
   const [kaspiError, setKaspiError] = useState('')
+  const [kaspiStats, setKaspiStats] = useState<{ last24h: { count: number, amount: number }, last30d: { count: number, amount: number }, allTime: { count: number, amount: number } } | null>(null)
+  const [kaspiRecentPayments, setKaspiRecentPayments] = useState<{ orderId: string, amount: number, status: string, createdAt: string, source: string }[]>([])
+  const [kaspiRecentTopups, setKaspiRecentTopups] = useState<{ amount: number, status: string, createdAt: string }[]>([])
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -94,6 +97,14 @@ export default function AcquiringPage() {
         clearInterval(interval)
         setKaspiTopupPending(null)
         load()
+      } else if (data.status === 'expired') {
+        // A Kaspi payment QR is only valid for a few minutes (the same as
+        // scanning one generated directly in the Kaspi Pay app) — without
+        // this, closing the sheet and coming back later left the UI silently
+        // polling a dead link forever with no feedback at all.
+        clearInterval(interval)
+        setKaspiTopupPending(null)
+        setKaspiError(t.kaspiTopupExpiredError)
       }
     }, 5000)
     return () => clearInterval(interval)
@@ -142,6 +153,9 @@ export default function AcquiringPage() {
         setKaspiConnected(!!data.connected)
         setKaspiStatus(data.status ?? null)
         setKaspiWalletBalance(data.walletBalance ?? 0)
+        setKaspiStats(data.stats ?? null)
+        setKaspiRecentPayments(data.recentPayments ?? [])
+        setKaspiRecentTopups(data.recentTopups ?? [])
       }
     } catch (e: any) {
       console.error('Kaspi dashboard fetch error:', e.message)
@@ -548,7 +562,11 @@ export default function AcquiringPage() {
             in both the locked and unlocked branches for that reason. */}
         <div className="bg-white rounded-2xl shadow-sm p-4">
           <div className="text-sm font-medium text-[#1C2056] mb-2">{t.kaspiSectionTitle}</div>
-          {!kaspiConnected && <p className="text-xs text-gray-500 mb-3">{t.kaspiIntroText}</p>}
+          {!kaspiConnected && <p className="text-xs text-gray-500 mb-2">{t.kaspiIntroText}</p>}
+          <p className="text-xs text-gray-500 mb-3">{t.kaspiCommissionHint}</p>
+          {profile?.is_admin && (
+            <p className="text-xs text-blue-600 bg-blue-50 rounded-lg px-3 py-2 mb-3">{t.kaspiPlatformConnectionNote}</p>
+          )}
           {kaspiError && <p className="text-xs text-red-500 mb-2">{kaspiError}</p>}
 
           {kaspiConnected ? (
@@ -603,6 +621,72 @@ export default function AcquiringPage() {
                     {t.kaspiTopupPayLinkLabel}
                   </a>
                 </div>
+              )}
+
+              {kaspiStats && (
+                <div className="grid grid-cols-3 gap-2 mb-3 mt-3">
+                  {[
+                    { label: t.kaspiStatsTodayLabel, stat: kaspiStats.last24h },
+                    { label: t.kaspiStatsMonthLabel, stat: kaspiStats.last30d },
+                    { label: t.kaspiStatsAllTimeLabel, stat: kaspiStats.allTime },
+                  ].map(({ label, stat }) => (
+                    <div key={label} className="bg-gray-50 rounded-xl p-2.5 text-center">
+                      <div className="text-xs text-gray-400 mb-0.5">{label}</div>
+                      <div className="text-sm font-semibold text-[#1C2056]">{stat.amount.toLocaleString('ru-KZ')} ₸</div>
+                      <div className="text-[10px] text-gray-400">{stat.count}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="text-xs text-gray-500 mb-2 mt-2">{t.kaspiHistoryTitle}</div>
+              {kaspiRecentPayments.length === 0 ? (
+                <p className="text-xs text-gray-400 text-center py-3 mb-3">{t.kaspiHistoryEmptyLabel}</p>
+              ) : (
+                <div className="mb-3 -mx-1 max-h-64 overflow-y-auto">
+                  {kaspiRecentPayments.map((p, i) => {
+                    const statusLabel = p.status === 'paid' ? t.kaspiStatusPaid
+                      : p.status === 'pending' ? t.kaspiStatusPending
+                      : p.status === 'expired' ? t.kaspiStatusExpired
+                      : t.kaspiStatusFailed
+                    const statusColor = p.status === 'paid' ? 'text-green-600' : p.status === 'pending' ? 'text-blue-600' : 'text-gray-400'
+                    return (
+                      <div key={p.orderId + i} className="flex items-center justify-between px-1 py-2 border-b border-gray-50 last:border-0">
+                        <div>
+                          <div className="text-xs text-[#1C2056]">{p.amount.toLocaleString('ru-KZ')} ₸</div>
+                          <div className="text-[10px] text-gray-400">
+                            {new Date(p.createdAt).toLocaleString('ru-KZ')} · {p.source === 'invoice' ? t.kaspiSourceInvoice : t.kaspiSourceApi}
+                          </div>
+                        </div>
+                        <div className={`text-xs font-medium ${statusColor}`}>{statusLabel}</div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {kaspiRecentTopups.length > 0 && (
+                <>
+                  <div className="text-xs text-gray-500 mb-2 mt-2">{t.kaspiTopupHistoryTitle}</div>
+                  <div className="mb-3 -mx-1 max-h-40 overflow-y-auto">
+                    {kaspiRecentTopups.map((tp, i) => {
+                      const statusLabel = tp.status === 'paid' ? t.kaspiStatusPaid
+                        : tp.status === 'pending' ? t.kaspiStatusPending
+                        : tp.status === 'expired' ? t.kaspiStatusExpired
+                        : t.kaspiStatusFailed
+                      const statusColor = tp.status === 'paid' ? 'text-green-600' : tp.status === 'pending' ? 'text-blue-600' : 'text-gray-400'
+                      return (
+                        <div key={tp.createdAt + i} className="flex items-center justify-between px-1 py-2 border-b border-gray-50 last:border-0">
+                          <div>
+                            <div className="text-xs text-[#1C2056]">{tp.amount.toLocaleString('ru-KZ')} ₸</div>
+                            <div className="text-[10px] text-gray-400">{new Date(tp.createdAt).toLocaleString('ru-KZ')}</div>
+                          </div>
+                          <div className={`text-xs font-medium ${statusColor}`}>{statusLabel}</div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </>
               )}
 
               <button onClick={disconnectKaspi} disabled={kaspiDisconnecting}
