@@ -3,6 +3,7 @@ import crypto from 'crypto'
 import { loadConnectionByUserId } from './connection'
 import { checkStatus } from './client'
 import { isSafeWebhookUrl } from './webhookSafety'
+import { debitWalletForCommission } from './wallet'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -78,6 +79,20 @@ export async function checkAndSettleKaspiPayment(reqRow: SettleableRequest): Pro
   if (reqRow.invoice_id) {
     await supabase.from('invoices').update({ status: 'paid' }).eq('id', reqRow.invoice_id)
     await supabase.from('invoice_logs').insert({ invoice_id: reqRow.invoice_id, status: 'paid' })
+  }
+
+  // Commission is charged exactly once, here — the moment a payment is
+  // confirmed paid, never at link-creation time and never for anything that
+  // expires unpaid. This applies uniformly whether the payment came from an
+  // invoice auto-mint link or the external API — one rule, no special cases.
+  try {
+    await debitWalletForCommission(reqRow.user_id, Number(reqRow.amount), reqRow.id)
+  } catch (e: any) {
+    // A failed debit must never un-confirm a real payment the customer
+    // already received — logged for manual reconciliation, not retried
+    // automatically (retrying here could double-charge if the RPC itself
+    // partially succeeded before erroring).
+    console.error('Kaspi settle: commission debit failed for request', reqRow.id, 'user', reqRow.user_id, ':', e.message)
   }
 
   if (reqRow.callback_url) {
