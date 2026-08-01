@@ -127,10 +127,20 @@ export async function initConnect(phoneNumber: string): Promise<{ processId: str
   const processId = initBody.meta?.pId
   if (!processId) throw new Error('Kaspi entrance init did not return a processId: ' + JSON.stringify(initBody))
 
+  // Kaspi's EnterPhoneNumber step specifically rejects the 11-digit
+  // `7XXXXXXXXXX` form with a business error (UserPhoneNumberDoesNotBelong-
+  // ToAnyOperator) even for real, active Cashier numbers — confirmed live
+  // against entrance-pay.kaspi.kz after exhausting every other variable
+  // (IP, TLS fingerprint, device fingerprint, timing, the number itself).
+  // Only this one wire field wants the bare 10-digit subscriber number; the
+  // 11-digit form is still what's normalized, stored, and displayed
+  // everywhere else in this codebase (see normalizeKzPhone in ./phone).
+  const entrancePhoneNumber = phoneNumber.replace(/^7/, '')
+
   const phoneReferer = `${KASPI_ENTRANCE_URL}/process/universal-enter-phone-number?pId=${processId}&firstPage=KPUniversalEnterPhoneNumber`
   const { json: phoneBody } = await entranceStep({
     meta: { pId: processId, sn: 'EnterPhoneNumber' },
-    data: { phoneNumber },
+    data: { phoneNumber: entrancePhoneNumber },
     actType: 'Success',
   }, phoneReferer, identity, pk, pkTag, userToken)
 
