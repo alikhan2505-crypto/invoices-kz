@@ -358,6 +358,56 @@ export async function createInvoiceByPhone(
   return { operationId: String(d.QrOperationId) }
 }
 
+export interface KaspiHistoryOperation {
+  id: string
+  orderNumber: string
+  regDate: string
+  amount: number
+  clientName: string | null
+  direction: 'in' | 'out'
+}
+
+// Kaspi's real transaction-history feed -- not just what we ourselves
+// created via createPayment/createInvoiceByPhone, but every operation on
+// the connected Cashier account. StatementPeriodCode: 2 returns a rolling
+// multi-day window (confirmed live) rather than just endDate's single day,
+// so a daily sync never has a gap between runs.
+export async function getOperationsHistory(
+  connection: KaspiConnection,
+  params: { endDate: string }
+): Promise<KaspiHistoryOperation[]> {
+  const url = `${KASPI_QRPAY_URL}/v02/history/operations`
+  const payload = JSON.stringify({ EndDate: params.endDate, LastTransactionDate: '', StatementPeriodCode: 2 })
+  const headers = { ...buildSignedHeaders(url, connection, payload), 'Content-Type': 'application/json' }
+  const res = await fetch(url, { method: 'POST', headers, body: payload })
+  const json = await res.json()
+  const dailySets = json.Data?.DailySets
+  if (!Array.isArray(dailySets)) throw new Error('Kaspi history/operations failed: ' + JSON.stringify(json))
+
+  const operations: KaspiHistoryOperation[] = []
+  for (const day of dailySets) {
+    for (const op of day.Operations || []) {
+      operations.push({
+        id: String(op.Id),
+        orderNumber: op.OrderNumber,
+        regDate: op.OrderRegDate,
+        // Amount arrives as a pre-formatted display string (" 100 ₸", or
+        // "10 000 ₸" for larger amounts where the space is a thousands
+        // separator) -- stripping everything but digits handles both.
+        amount: Number(String(op.Amount).replace(/[^\d]/g, '')),
+        clientName: op.ClientShortName || null,
+        // OperationType's exact value-to-direction mapping is not fully
+        // confirmed (no live refund/outgoing sample was ever observed) --
+        // every observed sample so far had OperationType 0 and was a sale.
+        // Treated as 'in' unless a future live sample proves another value
+        // means 'out'; do not extend this without a real observed example.
+        direction: 'in',
+      })
+    }
+  }
+  return operations
+}
+
 const QR_PAID = new Set(['Processed'])
 const QR_FAILED = new Set([
   'CancelledByUser', 'NotConfirmedByUser', 'CancelledByExternalSource', 'ProcessingFailed',
