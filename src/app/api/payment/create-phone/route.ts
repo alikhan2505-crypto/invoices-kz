@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { loadPlatformConnection } from '@/lib/kaspiPay/connection'
+import { createInvoiceByPhone } from '@/lib/kaspiPay/client'
 
 const supabaseAuth = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
 export async function POST(req: NextRequest) {
@@ -21,39 +27,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const apiKey = process.env.XPAYMENT_API_KEY
-    if (!apiKey) {
-      return NextResponse.json({ error: 'API key not configured' }, { status: 500 })
-    }
+    const connection = await loadPlatformConnection()
+    if (!connection) return NextResponse.json({ error: 'Platform Kaspi connection not set up' }, { status: 500 })
 
     const amount = plan === 'pro' ? 5990 : 2990
-    const orderId = `${userId}__|__${plan}__|__${Date.now()}`
+    const comment = plan === 'pro' ? 'INVOICES.KZ Pro тариф' : 'INVOICES.KZ Basic тариф'
+    const invoice = await createInvoiceByPhone(connection, { phoneNumber: phone, amount, comment })
 
-    const res = await fetch('https://api.xpayment.kz/v1/payments', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'X-Idempotency-Key': orderId,
-      },
-      body: JSON.stringify({
-        amount,
-        comment: plan === 'pro' ? 'INVOICES.KZ Pro тариф' : 'INVOICES.KZ Basic тариф',
-        currency: 'KZT',
-        payer_phone: phone,
-        merchant_order_id: orderId,
-      }),
+    const { error: insertError } = await supabase.from('payment_requests').insert({
+      user_id: userId,
+      email: user.email,
+      plan,
+      amount,
+      status: 'pending',
+      order_id: invoice.operationId,
+      qr_operation_id: invoice.operationId,
     })
-
-    const data = await res.json()
-    console.log('Phone payment response:', JSON.stringify(data))
-
-    if (!res.ok) {
-      return NextResponse.json({ error: data.message || data.error || 'xpayment error' }, { status: 400 })
+    if (insertError) {
+      console.error('Plan phone-payment created but failed to persist — operation', invoice.operationId, ':', insertError.message)
+      return NextResponse.json({ error: 'tracking_failed' }, { status: 502 })
     }
 
-    return NextResponse.json({ payment_id: data.payment_id, status: data.status })
-
+    return NextResponse.json({ payment_id: invoice.operationId, status: 'pending' })
   } catch (e: any) {
     console.error('Phone payment error:', e)
     return NextResponse.json({ error: e.message || 'Server error' }, { status: 500 })

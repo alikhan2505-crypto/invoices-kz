@@ -22,6 +22,7 @@ export default function Upgrade() {
   const [step, setStep] = useState<'pending' | 'success'>('pending')
   const [submitting, setSubmitting] = useState(false)
   const [qrToken, setQrToken] = useState('')
+  const [extTranId, setExtTranId] = useState('')
   const [checkingStatus, setCheckingStatus] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [showPhoneModal, setShowPhoneModal] = useState(false)
@@ -34,6 +35,34 @@ export default function Upgrade() {
     setIsMobile(/iPhone|iPad|iPod|Android/i.test(navigator.userAgent))
     return () => { if (statusInterval.current) clearInterval(statusInterval.current) }
   }, [])
+
+  // Live-polls the in-house Kaspi rail's own settlement status by order_id,
+  // in parallel with checkPaymentStatus's profile-based check above — this
+  // one settles the payment_requests row itself (via /api/payment/status),
+  // so it works even if the profile poll's timing window is missed.
+  useEffect(() => {
+    if (!extTranId) return
+    let cancelled = false
+    let polls = 0
+    const interval = setInterval(async () => {
+      polls++
+      if (polls > 150 || cancelled) { clearInterval(interval); return }
+      const { data: { session } } = await supabase.auth.getSession()
+      try {
+        const res = await fetch(`/api/payment/status?order_id=${extTranId}`, {
+          headers: { 'Authorization': `Bearer ${session?.access_token}` },
+        })
+        const data = await res.json()
+        if (data.status === 'paid' && !cancelled) {
+          clearInterval(interval)
+          router.push('/profile?upgraded=1')
+        }
+      } catch {
+        // Transient network hiccup — the next tick tries again.
+      }
+    }, 5000)
+    return () => { cancelled = true; clearInterval(interval) }
+  }, [extTranId])
 
   async function loadData() {
     const { data: { user } } = await supabase.auth.getUser()
@@ -64,6 +93,7 @@ export default function Upgrade() {
   async function openModal(planName: string, amount: number, planKey: string) {
     setSelectedPlan({ name: planName, amount, plan: planKey })
     setQrToken('')
+    setExtTranId('')
     setStep('pending')
     setShowModal(true)
     setSubmitting(true)
@@ -89,6 +119,7 @@ export default function Upgrade() {
       }
 
       setQrToken(data.qr_token)
+      setExtTranId(data.ext_tran_id)
 
       if (isMobile) {
         window.location.href = data.qr_token

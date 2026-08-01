@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { loadPlatformConnection } from '@/lib/kaspiPay/connection'
+import { createPayment } from '@/lib/kaspiPay/client'
 
 const supabaseAuth = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
 export async function POST(req: NextRequest) {
@@ -21,56 +27,31 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const apiKey = process.env.XPAYMENT_API_KEY
-    if (!apiKey) {
-      return NextResponse.json({ error: 'API key not configured' }, { status: 500 })
-    }
+    const connection = await loadPlatformConnection()
+    if (!connection) return NextResponse.json({ error: 'Platform Kaspi connection not set up' }, { status: 500 })
 
     const amount = plan === 'pro' ? 5990 : 2990
+    const payment = await createPayment(connection, { amount, orderId: `${userId}__${plan}__${Date.now()}` })
 
-    const res = await fetch('https://api.xpayment.kz/v1/payments/link', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        amount,
-        merchant_order_id: `${userId}__|__${plan}__|__${Date.now()}`,
-      }),
-    })
-
-    const data = await res.json()
-    console.log('xpayment response:', JSON.stringify(data))
-
-    if (!res.ok) {
-      console.error('xpayment error:', JSON.stringify(data))
-      return NextResponse.json({ error: data.message || data.error || 'xpayment error' }, { status: 400 })
-    }
-
-    // Сохраняем userId и plan в Supabase — свяжем с платежом через ext_tran_id
-    const { createClient: create } = await import('@supabase/supabase-js')
-    const supabase = create(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-    await supabase.from('payment_requests').insert({
+    const { error: insertError } = await supabase.from('payment_requests').insert({
       user_id: userId,
+      email: user.email,
       plan,
       amount,
       status: 'pending',
-      order_id: data.ext_tran_id,
+      order_id: payment.operationId,
+      qr_operation_id: payment.operationId,
     })
-
-    const paymentUrl = data.payment_link || data.qr_token
-    console.log('payment url:', paymentUrl, 'full response keys:', Object.keys(data))
+    if (insertError) {
+      console.error('Plan payment created but failed to persist for tracking — operation', payment.operationId, ':', insertError.message)
+      return NextResponse.json({ error: 'tracking_failed' }, { status: 502 })
+    }
 
     return NextResponse.json({
-      qr_token: paymentUrl,
-      ext_tran_id: data.ext_tran_id || data.qr_operation_id,
-      expire_date: data.expire_date,
+      qr_token: payment.paymentLink,
+      ext_tran_id: payment.operationId,
+      expire_date: payment.expiresAt,
     })
-
   } catch (e: any) {
     console.error('Payment create error:', e)
     return NextResponse.json({ error: e.message || 'Server error' }, { status: 500 })
