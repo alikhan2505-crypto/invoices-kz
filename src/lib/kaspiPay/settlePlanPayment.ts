@@ -54,10 +54,9 @@ export async function checkAndSettlePlanPayment(row: PlanPaymentRow): Promise<'p
 
   await supabase.from('profiles').update({ plan: row.plan, plan_expires_at: expiresAt.toISOString() }).eq('id', row.user_id)
 
-  // Ported from the old xpayment webhook, which the code review caught this
-  // rail had dropped — the admin used this to notice payments in real time,
-  // not something to lose silently just because the transport underneath it
-  // changed. Best-effort: a notification failure must not affect billing.
+  // Notification to admin on successful plan payment settlement. The admin uses
+  // this to notice payments in real time. Best-effort: a notification failure
+  // must not affect billing.
   try {
     const { data: prof } = await supabase.from('profiles').select('company_name').eq('id', row.user_id).single()
     await fetch('https://invoices.kz/api/telegram', {

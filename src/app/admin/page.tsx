@@ -53,7 +53,7 @@ export default function Admin() {
 
     // Two independent payment paths write to two different places: the old
     // manual/QR-link flow leaves a row in payment_requests (pending, admin
-    // clicks Activate); the newer xpayment webhook flow (phone push and the
+    // clicks Activate); the Kaspi Pay webhook flow (phone push and the
     // QR-link's own completion) updates profiles.plan directly and never
     // touches payment_requests at all — so a webhook-completed payment was
     // otherwise invisible here. Merge both into one list so nothing is missed.
@@ -302,7 +302,7 @@ export default function Admin() {
                           {payment.plan === 'pro' ? 'Pro' : 'Basic'}
                         </span>
                         {payment.source === 'webhook' && (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300" title="Активировано автоматически через xpayment webhook, без ручной проверки">
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300" title="Активировано автоматически через Kaspi Pay webhook, без ручной проверки">
                             ⚡ авто
                           </span>
                         )}
