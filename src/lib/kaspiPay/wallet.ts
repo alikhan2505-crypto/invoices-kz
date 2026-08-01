@@ -50,7 +50,7 @@ export async function creditWallet(userId: string, amount: number, topupId: stri
 // Postgres function does the check-free debit in one statement; going
 // negative here is an accepted outcome (see Global Constraints — gating
 // happens at mint time, not here), not a bug to guard against.
-export async function debitWalletForCommission(userId: string, amount: number, kaspiPaymentRequestId: string): Promise<number> {
+export async function debitWalletForCommission(userId: string, amount: number, kaspiPaymentRequestId: string | null, note?: string): Promise<number> {
   const commission = computeCommission(amount)
   const { data, error } = await supabase.rpc('debit_wallet_balance', { p_user_id: userId, p_amount: commission })
   if (error) throw new Error(`wallet commission debit failed for user ${userId}: ${error.message}`)
@@ -63,6 +63,7 @@ export async function debitWalletForCommission(userId: string, amount: number, k
     amount: -commission,
     balance_after: data,
     kaspi_payment_request_id: kaspiPaymentRequestId,
+    note: note ?? null,
   })
   if (ledgerError) console.error('wallet_ledger insert failed after commission debit for user', userId, ':', ledgerError.message)
   return data as number
