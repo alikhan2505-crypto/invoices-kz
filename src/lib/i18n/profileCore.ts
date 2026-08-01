@@ -20,6 +20,7 @@ export interface ProfileCoreContent {
   banksMenuLabel: string
   securityMenuLabel: string
   acquiringMenuLabel: string
+  kaspiPayMenuLabel: string
   connectorsMenuLabel: string
   directoriesSectionLabel: string
   clientsMenuLabel: string
@@ -142,6 +143,7 @@ export const profileCoreDict: Record<'ru' | 'kk' | 'en', ProfileCoreContent> = {
     banksMenuLabel: 'Банковские счета',
     securityMenuLabel: 'ЭЦП и безопасность',
     acquiringMenuLabel: 'Эквайринг',
+    kaspiPayMenuLabel: 'Приём Kaspi',
     connectorsMenuLabel: 'Коннекторы',
     directoriesSectionLabel: 'Справочники',
     clientsMenuLabel: 'Мои клиенты',
@@ -259,6 +261,7 @@ export const profileCoreDict: Record<'ru' | 'kk' | 'en', ProfileCoreContent> = {
     banksMenuLabel: 'Банк шоттары',
     securityMenuLabel: 'ЭЦҚ және қауіпсіздік',
     acquiringMenuLabel: 'Эквайринг',
+    kaspiPayMenuLabel: 'Kaspi қабылдау',
     connectorsMenuLabel: 'Коннекторлар',
     directoriesSectionLabel: 'Анықтамалар',
     clientsMenuLabel: 'Менің клиенттерім',
@@ -376,6 +379,7 @@ export const profileCoreDict: Record<'ru' | 'kk' | 'en', ProfileCoreContent> = {
     banksMenuLabel: 'Bank accounts',
     securityMenuLabel: 'Digital signature and security',
     acquiringMenuLabel: 'Acquiring',
+    kaspiPayMenuLabel: 'Kaspi payments',
     connectorsMenuLabel: 'Connectors',
     directoriesSectionLabel: 'Directories',
     clientsMenuLabel: 'My clients',
