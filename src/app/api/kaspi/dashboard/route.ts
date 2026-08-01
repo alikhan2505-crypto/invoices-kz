@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getWalletBalance } from '@/lib/kaspiPay/wallet'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -33,6 +34,8 @@ export async function GET(req: NextRequest) {
 
   if (!conn) return NextResponse.json({ connected: false })
 
+  const walletBalance = await getWalletBalance(user.id)
+
   const { data: rows } = await supabase
     .from('kaspi_payment_requests')
     .select('order_id, invoice_id, amount, status, created_at')
@@ -58,6 +61,7 @@ export async function GET(req: NextRequest) {
     connectedSince: conn.created_at,
     defaultWebhookUrl: conn.default_webhook_url,
     lastUsedAt: conn.last_used_at,
+    walletBalance,
     stats: {
       last24h: rollup(since24h),
       last30d: rollup(since30d),
