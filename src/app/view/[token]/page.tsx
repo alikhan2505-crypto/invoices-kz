@@ -350,18 +350,9 @@ export default function PublicInvoice() {
           </div>
         )}
 
-        {/* Коннекторы — оплата и соцсети. Static kaspi_pay_link is the old
-            manual-link feature this connection-based flow supersedes — shown
-            only when there's no live Kaspi Cashier link on this invoice, so
-            the payer never sees two competing "pay via Kaspi" buttons. */}
-        {(!(kaspiPayment && kaspiPayment.status === 'pending') && profile?.kaspi_pay_link || profile?.halyk_pay_link || profile?.website || profile?.social_links?.length > 0) && (
+        {/* Коннекторы — оплата и соцсети. */}
+        {(profile?.halyk_pay_link || profile?.website || profile?.social_links?.length > 0) && (
           <div className="bg-white rounded-2xl shadow-sm p-4 space-y-3">
-            {!(kaspiPayment && kaspiPayment.status === 'pending') && profile?.kaspi_pay_link && (
-              <a href={profile.kaspi_pay_link} target="_blank" rel="noopener noreferrer"
-                className="w-full bg-amber-400 text-white rounded-xl py-3.5 font-medium text-sm flex items-center justify-center gap-2 block text-center">
-                {t.payViaKaspiButton}
-              </a>
-            )}
             {profile?.halyk_pay_link && (
               <a href={profile.halyk_pay_link} target="_blank" rel="noopener noreferrer"
                 className="w-full bg-green-500 text-white rounded-xl py-3.5 font-medium text-sm flex items-center justify-center gap-2 block text-center">

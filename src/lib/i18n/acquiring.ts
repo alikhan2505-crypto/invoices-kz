@@ -40,6 +40,33 @@ export interface AcquiringContent {
   bccBinLabel: string
   bccBinMissing: string
   bccEditBinLink: string
+  kaspiSectionTitle: string
+  kaspiIntroText: string
+  kaspiPhoneLabel: string
+  kaspiPhonePlaceholder: string
+  kaspiSendCodeButton: string
+  kaspiSendingCodeLabel: string
+  kaspiOtpLabel: string
+  kaspiOtpPlaceholder: string
+  kaspiVerifyButton: string
+  kaspiVerifyingLabel: string
+  kaspiConnectedMessage: string
+  kaspiConnectionErrorHint: string
+  kaspiTokenShownOnceWarning: string
+  kaspiCopyTokenButton: string
+  kaspiDisconnectButton: string
+  kaspiDisconnectingLabel: string
+  kaspiErrorGeneric: string
+  kaspiErrorInvalidOtp: string
+  kaspiDocsLinkLabel: string
+  kaspiWalletBalanceLabel: string
+  kaspiTopupPresetsLabel: string
+  kaspiTopupCustomPlaceholder: string
+  kaspiTopupButton: string
+  kaspiTopupStartingLabel: string
+  kaspiTopupPendingHint: string
+  kaspiTopupPayLinkLabel: string
+  kaspiInsufficientBalanceHint: string
 }
 
 export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
@@ -91,6 +118,33 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     bccBinLabel: 'БИН/ИИН для подключения',
     bccBinMissing: 'не указан',
     bccEditBinLink: 'Изменить',
+    kaspiSectionTitle: 'Приём платежей через Kaspi',
+    kaspiIntroText: 'Подключите роль «Кассир» из вашего приложения Kaspi Pay, чтобы автоматически получать ссылки на оплату для своих счетов и принимать платежи на своём сайте или в приложении через наш API.',
+    kaspiPhoneLabel: 'Номер телефона кассира',
+    kaspiPhonePlaceholder: '+7 707 123 45 67',
+    kaspiSendCodeButton: 'Отправить код',
+    kaspiSendingCodeLabel: 'Отправляем...',
+    kaspiOtpLabel: 'Код из SMS',
+    kaspiOtpPlaceholder: '1234',
+    kaspiVerifyButton: 'Подтвердить',
+    kaspiVerifyingLabel: 'Проверяем...',
+    kaspiConnectedMessage: 'Кассир успешно подключён.',
+    kaspiConnectionErrorHint: 'Подключение к Kaspi больше не действует — отключите кассира и подключите его заново.',
+    kaspiTokenShownOnceWarning: 'Сохраните этот токен сейчас — он показывается только один раз и понадобится для вызова API.',
+    kaspiCopyTokenButton: 'Скопировать',
+    kaspiDisconnectButton: 'Отключить',
+    kaspiDisconnectingLabel: 'Отключаем...',
+    kaspiErrorGeneric: 'Сервис Kaspi временно недоступен. Попробуйте позже.',
+    kaspiErrorInvalidOtp: 'Неверный код из SMS. Попробуйте ещё раз.',
+    kaspiDocsLinkLabel: 'Документация по API',
+    kaspiWalletBalanceLabel: 'Баланс кошелька',
+    kaspiTopupPresetsLabel: 'Пополнить на сумму',
+    kaspiTopupCustomPlaceholder: 'Своя сумма, ₸',
+    kaspiTopupButton: 'Пополнить',
+    kaspiTopupStartingLabel: 'Готовим оплату...',
+    kaspiTopupPendingHint: 'Ссылка на пополнение готова — оплатите через Kaspi, баланс обновится автоматически.',
+    kaspiTopupPayLinkLabel: 'Перейти к оплате',
+    kaspiInsufficientBalanceHint: 'Баланс кошелька слишком низкий — при нехватке средств новые ссылки на оплату через Kaspi для ваших счетов создаваться не будут. Пополните баланс.',
   },
   kk: {
     headerLabel: 'Эквайринг',
@@ -140,6 +194,33 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     bccBinLabel: 'Қосу үшін БИН/ИИН',
     bccBinMissing: 'көрсетілмеген',
     bccEditBinLink: 'Өзгерту',
+    kaspiSectionTitle: 'Kaspi арқылы төлемдерді қабылдау',
+    kaspiIntroText: 'Шоттарыңыз үшін автоматты түрде төлем сілтемелерін алу және өз сайтыңызда немесе қосымшаңызда біздің API арқылы төлемдерді қабылдау үшін Kaspi Pay қосымшасындағы «Кассир» рөлін қосыңыз.',
+    kaspiPhoneLabel: 'Кассирдің телефон нөмірі',
+    kaspiPhonePlaceholder: '+7 707 123 45 67',
+    kaspiSendCodeButton: 'Кодты жіберу',
+    kaspiSendingCodeLabel: 'Жіберілуде...',
+    kaspiOtpLabel: 'SMS кодын',
+    kaspiOtpPlaceholder: '1234',
+    kaspiVerifyButton: 'Растау',
+    kaspiVerifyingLabel: 'Тексерілуде...',
+    kaspiConnectedMessage: 'Кассир сәтті қосылды.',
+    kaspiConnectionErrorHint: 'Kaspi-ге қосылу енді жарамсыз — кассирді ажыратып, қайта қосыңыз.',
+    kaspiTokenShownOnceWarning: 'Бұл токенді қазір сақтаңыз — ол тек бір рет көрсетіледі және API шақыру үшін қажет болады.',
+    kaspiCopyTokenButton: 'Көшіру',
+    kaspiDisconnectButton: 'Ажырату',
+    kaspiDisconnectingLabel: 'Ажыратылуда...',
+    kaspiErrorGeneric: 'Kaspi қызметі уақытша қолжетімсіз. Кейінірек көріңіз.',
+    kaspiErrorInvalidOtp: 'SMS коды дұрыс емес. Қайталап көріңіз.',
+    kaspiDocsLinkLabel: 'API құжаттамасы',
+    kaspiWalletBalanceLabel: 'Әмиян балансы',
+    kaspiTopupPresetsLabel: 'Мына сомаға толтыру',
+    kaspiTopupCustomPlaceholder: 'Өз сомаңыз, ₸',
+    kaspiTopupButton: 'Толтыру',
+    kaspiTopupStartingLabel: 'Төлем дайындалуда...',
+    kaspiTopupPendingHint: 'Толтыру сілтемесі дайын — Kaspi арқылы төлеңіз, баланс автоматты түрде жаңарады.',
+    kaspiTopupPayLinkLabel: 'Төлеуге өту',
+    kaspiInsufficientBalanceHint: 'Әмиян балансы тым төмен — қаражат жеткіліксіз болса, шоттарыңыз үшін Kaspi арқылы жаңа төлем сілтемелері жасалмайды. Балансты толтырыңыз.',
   },
   en: {
     headerLabel: 'Acquiring',
@@ -189,5 +270,32 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     bccBinLabel: 'BIN/IIN to connect with',
     bccBinMissing: 'not set',
     bccEditBinLink: 'Edit',
+    kaspiSectionTitle: 'Accept payments via Kaspi',
+    kaspiIntroText: 'Connect the "Cashier" role from your Kaspi Pay app to automatically get payment links for your invoices and accept payments on your own site or app through our API.',
+    kaspiPhoneLabel: 'Cashier phone number',
+    kaspiPhonePlaceholder: '+7 707 123 45 67',
+    kaspiSendCodeButton: 'Send code',
+    kaspiSendingCodeLabel: 'Sending...',
+    kaspiOtpLabel: 'SMS code',
+    kaspiOtpPlaceholder: '1234',
+    kaspiVerifyButton: 'Verify',
+    kaspiVerifyingLabel: 'Verifying...',
+    kaspiConnectedMessage: 'Cashier connected successfully.',
+    kaspiConnectionErrorHint: 'The Kaspi connection is no longer valid — disconnect the cashier and connect it again.',
+    kaspiTokenShownOnceWarning: 'Save this token now — it is shown only once and is needed to call the API.',
+    kaspiCopyTokenButton: 'Copy',
+    kaspiDisconnectButton: 'Disconnect',
+    kaspiDisconnectingLabel: 'Disconnecting...',
+    kaspiErrorGeneric: 'The Kaspi service is temporarily unavailable. Try again later.',
+    kaspiErrorInvalidOtp: 'Invalid SMS code. Please try again.',
+    kaspiDocsLinkLabel: 'API documentation',
+    kaspiWalletBalanceLabel: 'Wallet balance',
+    kaspiTopupPresetsLabel: 'Top up by',
+    kaspiTopupCustomPlaceholder: 'Custom amount, ₸',
+    kaspiTopupButton: 'Top up',
+    kaspiTopupStartingLabel: 'Preparing payment...',
+    kaspiTopupPendingHint: 'Your top-up payment link is ready — pay via Kaspi and the balance will update automatically.',
+    kaspiTopupPayLinkLabel: 'Go to payment',
+    kaspiInsufficientBalanceHint: 'Your wallet balance is too low — new Kaspi payment links for your invoices won\'t be created if funds run out. Top up your balance.',
   },
 }

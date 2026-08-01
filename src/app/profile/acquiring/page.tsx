@@ -46,6 +46,22 @@ export default function AcquiringPage() {
   const [bccDisconnecting, setBccDisconnecting] = useState(false)
   const [bccMessage, setBccMessage] = useState('')
 
+  const [kaspiConnected, setKaspiConnected] = useState(false)
+  const [kaspiStatus, setKaspiStatus] = useState<string | null>(null)
+  const [kaspiPhone, setKaspiPhone] = useState('')
+  const [kaspiOtp, setKaspiOtp] = useState('')
+  const [kaspiProcessId, setKaspiProcessId] = useState<string | null>(null)
+  const [kaspiApiToken, setKaspiApiToken] = useState<string | null>(null)
+  const [kaspiWalletBalance, setKaspiWalletBalance] = useState(0)
+  const [kaspiTopupAmount, setKaspiTopupAmount] = useState<number | null>(null)
+  const [kaspiTopupCustom, setKaspiTopupCustom] = useState('')
+  const [kaspiTopupPending, setKaspiTopupPending] = useState<{ topup_id: string, payment_link: string } | null>(null)
+  const [kaspiSending, setKaspiSending] = useState(false)
+  const [kaspiVerifying, setKaspiVerifying] = useState(false)
+  const [kaspiDisconnecting, setKaspiDisconnecting] = useState(false)
+  const [kaspiToppingUp, setKaspiToppingUp] = useState(false)
+  const [kaspiError, setKaspiError] = useState('')
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const bccStatus = params.get('bcc')
@@ -55,6 +71,28 @@ export default function AcquiringPage() {
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Same 5s-polling pattern used elsewhere in this codebase (e.g. /view/[token]
+  // polling /api/kaspi/invoice-payment) — the wallet topup itself settles via
+  // Kaspi's own webhook/cron, so this just picks up the result and refreshes
+  // the dashboard once it lands rather than requiring a manual page reload.
+  useEffect(() => {
+    if (!kaspiTopupPending) return
+    const interval = setInterval(async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch(`/api/kaspi/wallet/topup-status?topup_id=${kaspiTopupPending.topup_id}`, {
+        headers: { 'Authorization': `Bearer ${session?.access_token}` },
+      })
+      const data = await res.json()
+      if (data.status === 'paid') {
+        clearInterval(interval)
+        setKaspiTopupPending(null)
+        load()
+      }
+    }, 5000)
+    return () => clearInterval(interval)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kaspiTopupPending?.topup_id])
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
@@ -83,6 +121,24 @@ export default function AcquiringPage() {
       }
     } catch (e: any) {
       console.error('BCC status fetch error:', e.message)
+    }
+
+    // Same reasoning as /api/bcc/status above: kaspi_connections has no
+    // client-facing RLS policy, and the Kaspi Pay Cashier section is open to
+    // every plan (unlike the BCC/Excel-import sections above), so this is
+    // fetched unconditionally rather than gated behind canAcquiring.
+    try {
+      const res = await fetch('/api/kaspi/dashboard', {
+        headers: { 'Authorization': `Bearer ${session?.access_token}` },
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setKaspiConnected(!!data.connected)
+        setKaspiStatus(data.status ?? null)
+        setKaspiWalletBalance(data.walletBalance ?? 0)
+      }
+    } catch (e: any) {
+      console.error('Kaspi dashboard fetch error:', e.message)
     }
 
     if (getActivePlan(p).canAcquiring) {
@@ -145,6 +201,109 @@ export default function AcquiringPage() {
       setBccPending([])
     } finally {
       setBccDisconnecting(false)
+    }
+  }
+
+  // Same formatting as the phone field in /profile/requisites and the old
+  // /profile/kaspi-pay page — keeps the input's shape consistent across the
+  // app rather than accepting anything a user happens to type before it's
+  // sent to Kaspi's own entrance API.
+  function formatKaspiPhone(value: string) {
+    const digits = value.replace(/\D/g, '')
+    if (digits.length === 0) return ''
+    let result = '+7'
+    if (digits.length > 1) result += ' ' + digits.slice(1, 4)
+    if (digits.length > 4) result += ' ' + digits.slice(4, 7)
+    if (digits.length > 7) result += ' ' + digits.slice(7, 9)
+    if (digits.length > 9) result += ' ' + digits.slice(9, 11)
+    return result
+  }
+
+  async function sendKaspiCode() {
+    setKaspiError('')
+    setKaspiSending(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/kaspi/connect/init', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phoneNumber: kaspiPhone }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.processId) {
+        setKaspiError(t.kaspiErrorGeneric)
+        return
+      }
+      setKaspiProcessId(data.processId)
+    } finally {
+      setKaspiSending(false)
+    }
+  }
+
+  async function verifyKaspiCode() {
+    setKaspiError('')
+    setKaspiVerifying(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/kaspi/connect/verify', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ processId: kaspiProcessId, otp: kaspiOtp }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.apiToken) {
+        // invalid_otp means the code was wrong — the user can retry with a
+        // new one. Anything else means Kaspi-side pairing may have already
+        // succeeded but this attempt is now dead either way, since
+        // kaspiProcessId is already gone server-side — see the equivalent
+        // comment in the old /profile/kaspi-pay page this was ported from.
+        setKaspiError(data.error === 'invalid_otp' ? t.kaspiErrorInvalidOtp : t.kaspiErrorGeneric)
+        setKaspiProcessId(null)
+        return
+      }
+      setKaspiApiToken(data.apiToken)
+      setKaspiConnected(true)
+      setKaspiStatus('active')
+      setKaspiProcessId(null)
+    } finally {
+      setKaspiVerifying(false)
+    }
+  }
+
+  async function disconnectKaspi() {
+    setKaspiDisconnecting(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      await fetch('/api/kaspi/disconnect', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${session?.access_token}` },
+      })
+      setKaspiConnected(false)
+      setKaspiStatus(null)
+      setKaspiApiToken(null)
+    } finally {
+      setKaspiDisconnecting(false)
+    }
+  }
+
+  async function startTopup(amount: number) {
+    setKaspiError('')
+    setKaspiToppingUp(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/kaspi/wallet/topup', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setKaspiTopupPending({ topup_id: data.topup_id, payment_link: data.payment_link })
+      } else {
+        setKaspiError(t.kaspiErrorGeneric)
+      }
+    } finally {
+      setKaspiToppingUp(false)
     }
   }
 
@@ -375,6 +534,105 @@ export default function AcquiringPage() {
             )}
           </>
         )}
+
+        {/* Kaspi Pay Cashier — deliberately NOT gated behind ap.canAcquiring
+            (unlike the BCC/Excel-import sections above): connecting a
+            Cashier is free on every plan, only usage is monetized via the
+            wallet balance (see /api/kaspi/pay, invoicePayment.ts). Rendered
+            in both the locked and unlocked branches for that reason. */}
+        <div className="bg-white rounded-2xl shadow-sm p-4">
+          <div className="text-sm font-medium text-[#1C2056] mb-2">{t.kaspiSectionTitle}</div>
+          {!kaspiConnected && <p className="text-xs text-gray-500 mb-3">{t.kaspiIntroText}</p>}
+          {kaspiError && <p className="text-xs text-red-500 mb-2">{kaspiError}</p>}
+
+          {kaspiConnected ? (
+            <>
+              {kaspiApiToken && (
+                <>
+                  <div className="text-xs text-amber-600 mb-2">{t.kaspiTokenShownOnceWarning}</div>
+                  <div className="bg-gray-50 rounded-xl p-3 text-xs font-mono break-all mb-3">{kaspiApiToken}</div>
+                  <button onClick={() => navigator.clipboard.writeText(kaspiApiToken)}
+                    className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium mb-3">
+                    {t.kaspiCopyTokenButton}
+                  </button>
+                </>
+              )}
+
+              {kaspiStatus === 'error' && (
+                <div className="text-xs text-amber-600 mb-3">{t.kaspiConnectionErrorHint}</div>
+              )}
+
+              <div className="text-xs text-gray-500 mb-1">
+                {t.kaspiWalletBalanceLabel}: {kaspiWalletBalance.toLocaleString('ru-KZ')} ₸
+              </div>
+              {kaspiWalletBalance <= 0 && (
+                <div className="text-xs text-amber-600 mb-2">{t.kaspiInsufficientBalanceHint}</div>
+              )}
+
+              <div className="text-xs text-gray-500 mb-1 mt-2">{t.kaspiTopupPresetsLabel}</div>
+              <div className="flex gap-2 flex-wrap mb-2">
+                {[1000, 5000, 10000, 50000].map(amount => (
+                  <button key={amount}
+                    onClick={() => { setKaspiTopupAmount(amount); setKaspiTopupCustom('') }}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-medium ${kaspiTopupAmount === amount ? 'bg-[#1C2056] text-white' : 'bg-gray-100 text-[#1C2056]'}`}>
+                    {amount.toLocaleString('ru-KZ')} ₸
+                  </button>
+                ))}
+              </div>
+              <input value={kaspiTopupCustom}
+                onChange={e => { setKaspiTopupCustom(e.target.value.replace(/\D/g, '')); setKaspiTopupAmount(null) }}
+                placeholder={t.kaspiTopupCustomPlaceholder} type="text" inputMode="numeric"
+                className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-[#1C2056] mb-3" />
+              <button onClick={() => startTopup((kaspiTopupAmount ?? Number(kaspiTopupCustom)) || 0)}
+                disabled={kaspiToppingUp || !(kaspiTopupAmount || kaspiTopupCustom)}
+                className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium mb-3 disabled:opacity-50">
+                {kaspiToppingUp ? t.kaspiTopupStartingLabel : t.kaspiTopupButton}
+              </button>
+
+              {kaspiTopupPending && (
+                <div className="bg-blue-50 rounded-xl p-3 mb-3">
+                  <p className="text-xs text-gray-600 mb-2">{t.kaspiTopupPendingHint}</p>
+                  <a href={kaspiTopupPending.payment_link} target="_blank" rel="noopener noreferrer"
+                    className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium block text-center">
+                    {t.kaspiTopupPayLinkLabel}
+                  </a>
+                </div>
+              )}
+
+              <button onClick={disconnectKaspi} disabled={kaspiDisconnecting}
+                className="w-full bg-gray-100 text-gray-600 rounded-xl py-2.5 text-sm font-medium">
+                {kaspiDisconnecting ? t.kaspiDisconnectingLabel : t.kaspiDisconnectButton}
+              </button>
+            </>
+          ) : !kaspiProcessId ? (
+            <>
+              <label className="block text-xs text-gray-500 mb-1">{t.kaspiPhoneLabel}</label>
+              <input value={kaspiPhone} onChange={e => setKaspiPhone(formatKaspiPhone(e.target.value))} placeholder={t.kaspiPhonePlaceholder}
+                type="tel" maxLength={16}
+                className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-[#1C2056] mb-3" />
+              <button onClick={sendKaspiCode} disabled={kaspiSending || !kaspiPhone}
+                className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium">
+                {kaspiSending ? t.kaspiSendingCodeLabel : t.kaspiSendCodeButton}
+              </button>
+            </>
+          ) : (
+            <>
+              <label className="block text-xs text-gray-500 mb-1">{t.kaspiOtpLabel}</label>
+              <input value={kaspiOtp} onChange={e => setKaspiOtp(e.target.value)} placeholder={t.kaspiOtpPlaceholder}
+                type="text" inputMode="numeric" maxLength={6}
+                className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-[#1C2056] mb-3" />
+              <button onClick={verifyKaspiCode} disabled={kaspiVerifying || !kaspiOtp}
+                className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium">
+                {kaspiVerifying ? t.kaspiVerifyingLabel : t.kaspiVerifyButton}
+              </button>
+            </>
+          )}
+
+          <button onClick={() => router.push('/profile/kaspi-pay/docs')}
+            className="w-full text-xs text-[#1C2056] underline text-center py-2 mt-2">
+            {t.kaspiDocsLinkLabel}
+          </button>
+        </div>
       </div>
     </main>
   )
