@@ -1,0 +1,220 @@
+export default function KaspiPayDocsPage() {
+  return (
+    <div className="max-w-4xl mx-auto px-4 py-8">
+      <h1 className="text-3xl font-bold mb-8">API документация Kaspi Pay</h1>
+
+      <section className="mb-8">
+        <h2 className="text-2xl font-semibold mb-4">Получение API токена</h2>
+        <p className="text-gray-700 mb-4">
+          При подключении Kaspi Pay к вашему аккаунту на invoices.kz вам будет выдан уникальный API токен.
+          Этот токен отображается один раз при подключении в разделе{' '}
+          <code className="bg-gray-100 px-2 py-1 rounded">/profile/kaspi-pay</code>.
+          Сохраните его в безопасном месте — он понадобится для всех запросов к API.
+        </p>
+      </section>
+
+      <section className="mb-8">
+        <h2 className="text-2xl font-semibold mb-4">Создание платежа</h2>
+        <p className="text-gray-700 mb-4">
+          Для создания платежа выполните POST запрос к нашему API:
+        </p>
+
+        <div className="bg-gray-50 p-4 rounded mb-4">
+          <p className="font-semibold mb-2">Endpoint:</p>
+          <code className="text-blue-600">POST https://www.invoices.kz/api/kaspi/pay</code>
+        </div>
+
+        <div className="bg-gray-50 p-4 rounded mb-4">
+          <p className="font-semibold mb-2">Заголовок аутентификации:</p>
+          <code className="text-sm">Authorization: Bearer &lt;ваш_api_токен&gt;</code>
+        </div>
+
+        <div className="bg-gray-50 p-4 rounded mb-4">
+          <p className="font-semibold mb-2">Тело запроса (JSON):</p>
+          <pre className="bg-white p-3 rounded border border-gray-300 overflow-x-auto text-sm">
+{`{
+  "amount": 10000,
+  "order_id": "order_12345",
+  "callback_url": "https://example.com/webhook/kaspi"
+}`}
+          </pre>
+          <div className="mt-4 text-sm text-gray-600">
+            <p className="font-semibold mb-2">Параметры:</p>
+            <ul className="list-disc list-inside space-y-1">
+              <li><code className="bg-gray-100 px-1">amount</code> (обязательно) — сумма платежа в тенге (число)</li>
+              <li><code className="bg-gray-100 px-1">order_id</code> (обязательно) — уникальный идентификатор заказа (строка)</li>
+              <li>
+                <code className="bg-gray-100 px-1">callback_url</code> (опционально) — URL вашего вебхука для уведомлений об успешном платеже
+              </li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section className="mb-8">
+        <h2 className="text-2xl font-semibold mb-4">Ответ API</h2>
+        <p className="text-gray-700 mb-4">
+          При успешном запросе вы получите ответ со статусом 200:
+        </p>
+
+        <div className="bg-gray-50 p-4 rounded mb-4">
+          <pre className="bg-white p-3 rounded border border-gray-300 overflow-x-auto text-sm">
+{`{
+  "qr_token": "eyJhbGc...",
+  "payment_link": "https://kaspi.kz/pay/...",
+  "operation_id": "op_123456789",
+  "expire_date": "2024-12-31T23:59:59Z"
+}`}
+          </pre>
+          <div className="mt-4 text-sm text-gray-600">
+            <p className="font-semibold mb-2">Поля ответа:</p>
+            <ul className="list-disc list-inside space-y-1">
+              <li><code className="bg-gray-100 px-1">qr_token</code> — токен для отображения QR кода платежа</li>
+              <li><code className="bg-gray-100 px-1">payment_link</code> — ссылка для платежа (может быть передана клиентам)</li>
+              <li><code className="bg-gray-100 px-1">operation_id</code> — уникальный идентификатор операции на стороне Kaspi</li>
+              <li><code className="bg-gray-100 px-1">expire_date</code> — дата и время истечения QR кода</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section className="mb-8">
+        <h2 className="text-2xl font-semibold mb-4">Вебхуки (webhook)</h2>
+        <p className="text-gray-700 mb-4">
+          Если вы указали <code className="bg-gray-100 px-1">callback_url</code> при создании платежа,
+          мы отправим уведомление об успешном платеже POST запросом на этот URL.
+        </p>
+
+        <div className="bg-blue-50 border border-blue-200 p-4 rounded mb-4">
+          <p className="font-semibold text-blue-900 mb-2">⚠️ Важно:</p>
+          <ul className="text-sm text-blue-900 space-y-2">
+            <li>
+              <strong>HTTPS обязателен:</strong> callback_url должен начинаться с <code className="bg-white px-1">https://</code>
+            </li>
+            <li>
+              <strong>Не localhost/частные сети:</strong> URL не должен указывать на localhost, 192.168.x.x, 10.x.x.x, 172.16–31.x.x или другие приватные адреса.
+              Это необходимо для безопасности. Если callback_url не пройдет проверку, вебхук будет пропущен.
+            </li>
+            <li>
+              <strong>Нет гарантии в реальном времени:</strong> вебхук отправляется, когда наш внутренний крон (выполняется периодически)
+              обнаружит, что платеж успешен. Это может произойти с задержкой в несколько минут.
+            </li>
+          </ul>
+        </div>
+
+        <p className="text-gray-700 mb-4">Тело вебхука (JSON):</p>
+        <div className="bg-gray-50 p-4 rounded mb-4">
+          <pre className="bg-white p-3 rounded border border-gray-300 overflow-x-auto text-sm">
+{`{
+  "event": "payment.success",
+  "order_id": "order_12345",
+  "amount": 10000,
+  "operation_id": "op_123456789"
+}`}
+          </pre>
+        </div>
+
+        <p className="text-gray-700 mb-4">Заголовок вебхука:</p>
+        <div className="bg-gray-50 p-4 rounded mb-4">
+          <pre className="bg-white p-3 rounded border border-gray-300 overflow-x-auto text-sm">
+X-Kaspi-Pay-Signature: &lt;hex-encoded HMAC-SHA256&gt;
+          </pre>
+        </div>
+      </section>
+
+      <section className="mb-8">
+        <h2 className="text-2xl font-semibold mb-4">Верификация подписи вебхука</h2>
+        <p className="text-gray-700 mb-4">
+          Вебхуки подписаны HMAC-SHA256 подписью в заголовке <code className="bg-gray-100 px-1">X-Kaspi-Pay-Signature</code>.
+          Это позволяет вам убедиться, что вебхук действительно от invoices.kz.
+        </p>
+
+        <p className="text-gray-700 mb-4">
+          Для верификации подписи вычислите HMAC-SHA256 от сырого JSON тела вебхука, используя секретный ключ,
+          и сравните результат с заголовком. Вот пример на Node.js:
+        </p>
+
+        <div className="bg-gray-50 p-4 rounded mb-4">
+          <pre className="bg-white p-3 rounded border border-gray-300 overflow-x-auto text-sm">
+{`const crypto = require('crypto');
+
+// rawBody — это точная строка JSON, полученная из тела запроса
+// secret — секретный ключ, который будет предоставлен вам
+const signature = crypto
+  .createHmac('sha256', secret)
+  .update(rawBody)
+  .digest('hex');
+
+const isValid = signature === req.headers['x-kaspi-pay-signature'];
+`}
+          </pre>
+        </div>
+
+        <div className="bg-yellow-50 border border-yellow-200 p-4 rounded">
+          <p className="font-semibold text-yellow-900 mb-2">⚠️ Примечание о верификации:</p>
+          <p className="text-sm text-yellow-900">
+            В текущей версии механизм распределения секретного ключа для внешних клиентов еще не финализирован.
+            Верификация подписей будет полностью документирована перед использованием этого API реальными внешними клиентами.
+            На данный момент заголовок подписи отправляется, но способ получения секретного ключа будет уточнен позже.
+          </p>
+        </div>
+      </section>
+
+      <section className="mb-8">
+        <h2 className="text-2xl font-semibold mb-4">Пример запроса (curl)</h2>
+        <p className="text-gray-700 mb-4">
+          Вот полный пример создания платежа через curl:
+        </p>
+
+        <div className="bg-gray-50 p-4 rounded">
+          <pre className="bg-white p-3 rounded border border-gray-300 overflow-x-auto text-sm">
+{`curl -X POST https://www.invoices.kz/api/kaspi/pay \\
+  -H "Authorization: Bearer YOUR_API_TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "amount": 10000,
+    "order_id": "order_12345",
+    "callback_url": "https://example.com/webhook/kaspi"
+  }'
+`}
+          </pre>
+        </div>
+      </section>
+
+      <section className="mb-8">
+        <h2 className="text-2xl font-semibold mb-4">Коды ошибок</h2>
+        <div className="bg-gray-50 p-4 rounded">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b">
+                <th className="text-left p-2">Код</th>
+                <th className="text-left p-2">Описание</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-b">
+                <td className="p-2"><code className="bg-gray-100 px-1">401</code></td>
+                <td className="p-2">Unauthorized — токен отсутствует или некорректен</td>
+              </tr>
+              <tr className="border-b">
+                <td className="p-2"><code className="bg-gray-100 px-1">400</code></td>
+                <td className="p-2">Bad Request — отсутствуют обязательные параметры</td>
+              </tr>
+              <tr className="border-b">
+                <td className="p-2"><code className="bg-gray-100 px-1">502</code></td>
+                <td className="p-2">Service Unavailable — ошибка при создании платежа на стороне Kaspi</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2 className="text-2xl font-semibold mb-4">Поддержка</h2>
+        <p className="text-gray-700">
+          Если у вас возникли вопросы по использованию API, свяжитесь с нами через форму обратной связи в вашем аккаунте.
+        </p>
+      </section>
+    </div>
+  )
+}
