@@ -46,11 +46,31 @@ export async function GET(request: Request) {
 
   let paid = 0
   let expired = 0
+  let statusChecksOk = 0
+  const secretsErrorUserIds = new Set<string>()
 
   for (const reqRow of (requests || []) as any[]) {
     try {
       const connection = await loadConnectionByUserId(reqRow.user_id)
-      if (!connection) continue // connection was disconnected after the request was created
+      if (!connection) {
+        // The connection was disconnected, or a previous run already parked
+        // it at status='error' (loadConnectionByUserId only loads 'active'
+        // rows) — either way nothing can ever check this request's real
+        // status again. Without this, a request whose connection disappears
+        // stays 'pending' forever and gets re-selected by every future run.
+        const pastExpiry = !!reqRow.expires_at && new Date(reqRow.expires_at) <= new Date()
+        if (pastExpiry) {
+          const { data: expiredRows, error: expireError } = await supabase
+            .from('kaspi_payment_requests')
+            .update({ status: 'expired' })
+            .eq('id', reqRow.id)
+            .eq('status', 'pending')
+            .select('id')
+          if (expireError) console.error('Kaspi poll: failed to expire orphaned request', reqRow.id, expireError.message)
+          else if (expiredRows && expiredRows.length > 0) expired++
+        }
+        continue
+      }
 
       // Deliberately BEFORE any expiry handling. Expiring first (the previous
       // behaviour) permanently lost every payment that completed during the
@@ -58,6 +78,7 @@ export async function GET(request: Request) {
       // 'expired', the invoice was never marked paid and the customer's
       // webhook never fired, even though the money had actually moved.
       const result = await checkStatus(connection, reqRow.kaspi_operation_id)
+      statusChecksOk++
 
       if (result.status !== 'paid') {
         // Only now is expiry safe to write: Kaspi itself has confirmed this
@@ -69,13 +90,14 @@ export async function GET(request: Request) {
         const expiredOnKaspi = result.status === 'expired'
         const pastExpiry = !!reqRow.expires_at && new Date(reqRow.expires_at) <= new Date()
         if (expiredOnKaspi || pastExpiry) {
-          const { error: expireError } = await supabase
+          const { data: expiredRows, error: expireError } = await supabase
             .from('kaspi_payment_requests')
             .update({ status: 'expired' })
             .eq('id', reqRow.id)
             .eq('status', 'pending')
+            .select('id')
           if (expireError) console.error('Kaspi poll: failed to expire request', reqRow.id, expireError.message)
-          else expired++
+          else if (expiredRows && expiredRows.length > 0) expired++
         }
         continue
       }
@@ -138,19 +160,44 @@ export async function GET(request: Request) {
       // Terminal vs transient, same split as the BCC cron. Terminal means the
       // connection itself is dead and no retry can revive it: Kaspi refused
       // its credentials (device unpaired / Cashier role revoked), or its
-      // stored secrets no longer decrypt. Those park the connection at
-      // status='error', which the Kaspi Pay page surfaces as a reconnect
-      // hint. EVERYTHING else — network errors, timeouts, Kaspi 5xx, a
-      // Supabase hiccup — leaves the connection 'active' so the next run
-      // simply retries it.
-      if (e instanceof KaspiAuthError || e instanceof KaspiConnectionSecretsError) {
+      // stored secrets no longer decrypt. EVERYTHING else — network errors,
+      // timeouts, Kaspi 5xx, a Supabase hiccup — leaves the connection
+      // 'active' so the next run simply retries it.
+      if (e instanceof KaspiAuthError) {
         console.error('Kaspi poll: connection dead for user', reqRow.user_id, '— parking at status=error:', e.message)
         await supabase.from('kaspi_connections')
           .update({ status: 'error' })
           .eq('user_id', reqRow.user_id)
           .eq('status', 'active')
+      } else if (e instanceof KaspiConnectionSecretsError) {
+        // Decided after the loop, not here: a decrypt failure is only
+        // evidence the connection's OWN row is corrupt if other rows this
+        // run decrypted fine. If every row fails to decrypt, the far more
+        // likely cause is a bad KASPI_SESSION_ENCRYPTION_KEY deploy — and
+        // parking every customer at status=error for that would be exactly
+        // the mass-lockout this split was meant to prevent.
+        secretsErrorUserIds.add(reqRow.user_id)
       } else {
         console.error('Kaspi poll: transient error for request', reqRow.id, '— retrying next run:', e.message)
+      }
+    }
+  }
+
+  if (secretsErrorUserIds.size > 0) {
+    const looksSystemic = statusChecksOk === 0 && secretsErrorUserIds.size >= 2
+    if (looksSystemic) {
+      console.error(
+        'Kaspi poll:', secretsErrorUserIds.size, 'connections failed to decrypt and zero succeeded this run —',
+        'this looks like a bad KASPI_SESSION_ENCRYPTION_KEY rather than per-row corruption.',
+        'Leaving all of them active for retry instead of parking every customer at status=error.'
+      )
+    } else {
+      for (const userId of secretsErrorUserIds) {
+        console.error('Kaspi poll: connection dead for user', userId, '— parking at status=error: secrets no longer decrypt')
+        await supabase.from('kaspi_connections')
+          .update({ status: 'error' })
+          .eq('user_id', userId)
+          .eq('status', 'active')
       }
     }
   }
