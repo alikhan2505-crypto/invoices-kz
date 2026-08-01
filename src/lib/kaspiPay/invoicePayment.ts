@@ -2,17 +2,23 @@ import { createClient } from '@supabase/supabase-js'
 import { loadConnectionByUserId } from './connection'
 import { createPayment } from './client'
 import { getActivePlan } from '@/lib/plan'
+import type { SettleableRequest } from './settlePayment'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-export interface KaspiInvoicePayment {
+// Extends SettleableRequest so a 'pending' result can be handed straight to
+// checkAndSettleKaspiPayment by a caller that wants a live check, not just a
+// stale DB read (the payer's own page while they wait, /view/[token]'s poll).
+export interface KaspiInvoicePayment extends SettleableRequest {
   qr_token: string | null
   payment_link: string | null
   status: string
 }
+
+const SETTLEABLE_COLUMNS = 'id, user_id, invoice_id, order_id, amount, kaspi_operation_id, callback_url, expires_at, qr_token, payment_link, status'
 
 // A Kaspi QR is short-lived, but an emailed invoice is routinely opened hours
 // or days later. Minting it once at send time meant that by the time the payer
@@ -53,7 +59,7 @@ export async function getOrCreateKaspiPaymentForInvoice(invoice: {
   // which silently hid the QR on both the payer's and the owner's page.
   const { data: existing, error } = await supabase
     .from('kaspi_payment_requests')
-    .select('qr_token, payment_link, status, expires_at')
+    .select(SETTLEABLE_COLUMNS)
     .eq('invoice_id', invoice.id)
     .eq('status', 'pending')
     .order('created_at', { ascending: false })
@@ -62,7 +68,7 @@ export async function getOrCreateKaspiPaymentForInvoice(invoice: {
   if (error) throw new Error(`kaspi_payment_requests lookup for invoice ${invoice.id} failed: ${error.message}`)
 
   if (existing && (!existing.expires_at || new Date(existing.expires_at) > new Date())) {
-    return { qr_token: existing.qr_token, payment_link: existing.payment_link, status: existing.status }
+    return existing as KaspiInvoicePayment
   }
 
   // A settled invoice must never get a fresh payment link minted for it.
@@ -102,17 +108,21 @@ export async function getOrCreateKaspiPaymentForInvoice(invoice: {
   // marked expired here: the polling cron checks its real status with Kaspi
   // before expiring anything, and a payment that landed in the last seconds
   // before expiry still needs to be caught there.
-  const { error: insertError } = await supabase.from('kaspi_payment_requests').insert({
-    user_id: invoice.user_id,
-    invoice_id: invoice.id,
-    order_id: invoice.id,
-    amount: invoice.amount,
-    kaspi_operation_id: payment.operationId,
-    qr_token: payment.qrToken,
-    payment_link: payment.paymentLink,
-    status: 'pending',
-    expires_at: payment.expiresAt,
-  })
+  const { data: inserted, error: insertError } = await supabase
+    .from('kaspi_payment_requests')
+    .insert({
+      user_id: invoice.user_id,
+      invoice_id: invoice.id,
+      order_id: invoice.id,
+      amount: invoice.amount,
+      kaspi_operation_id: payment.operationId,
+      qr_token: payment.qrToken,
+      payment_link: payment.paymentLink,
+      status: 'pending',
+      expires_at: payment.expiresAt,
+    })
+    .select(SETTLEABLE_COLUMNS)
+    .single()
   if (insertError) {
     // Unique violation on kaspi_payment_requests_invoice_pending_idx (one
     // partial-unique row per invoice_id where status='pending') means a
@@ -126,13 +136,13 @@ export async function getOrCreateKaspiPaymentForInvoice(invoice: {
     if (insertError.code === '23505') {
       const { data: winner } = await supabase
         .from('kaspi_payment_requests')
-        .select('qr_token, payment_link, status')
+        .select(SETTLEABLE_COLUMNS)
         .eq('invoice_id', invoice.id)
         .eq('status', 'pending')
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle()
-      if (winner) return { qr_token: winner.qr_token, payment_link: winner.payment_link, status: winner.status }
+      if (winner) return winner as KaspiInvoicePayment
     }
     // A real payment now exists on Kaspi's side that the poller has no row to
     // find. Surfacing a link that can never auto-confirm would be worse than
@@ -142,5 +152,5 @@ export async function getOrCreateKaspiPaymentForInvoice(invoice: {
     return null
   }
 
-  return { qr_token: payment.qrToken, payment_link: payment.paymentLink, status: 'pending' }
+  return inserted as KaspiInvoicePayment
 }

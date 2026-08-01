@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import QRCode from 'qrcode'
 import { supabase } from '@/lib/supabase'
@@ -71,28 +71,52 @@ export default function PublicInvoice() {
       // invoice itself from rendering; the client still has bank requisites.
       fetch(`/api/kaspi/invoice-payment?token=${token}`)
         .then(r => r.json())
-        .then(async (data) => {
-          setKaspiPayment(data.payment || null)
-          // Generated client-side (same 'qrcode' package already used for the
-          // ЭЦП verification QR) rather than sending this single-use payment
-          // link to a third-party QR-rendering API on every anonymous page
-          // view — the earlier version of this page did that, review found
-          // it worth avoiding even though the link itself is already shown
-          // as plain text right next to the QR.
-          if (data.payment?.payment_link) {
-            try {
-              setKaspiQrDataUrl(await QRCode.toDataURL(data.payment.payment_link, { width: 120, margin: 1 }))
-            } catch {
-              // No QR image — the plain link below still works.
-            }
-          }
-        })
+        .then((data) => setKaspiPayment(data.payment || null))
         .catch(() => {})
 
       setLoading(false)
     }
     load()
   }, [])
+
+  // Generated client-side (same 'qrcode' package already used for the ЭЦП
+  // verification QR) rather than sending this single-use payment link to a
+  // third-party QR-rendering API on every anonymous page view.
+  useEffect(() => {
+    if (!kaspiPayment?.payment_link) { setKaspiQrDataUrl(null); return }
+    let cancelled = false
+    QRCode.toDataURL(kaspiPayment.payment_link, { width: 120, margin: 1 })
+      .then((url) => { if (!cancelled) setKaspiQrDataUrl(url) })
+      .catch(() => {}) // No QR image — the plain link still works.
+    return () => { cancelled = true }
+  }, [kaspiPayment?.payment_link])
+
+  // Kaspi has no webhook to us, so the only way to learn a QR got paid is to
+  // actively ask while the payer is here — this is what makes payment
+  // confirmation instant and click-free without needing a frequent cron
+  // (Vercel's free plan only allows once-a-day crons; see the daily
+  // kaspi-poll cron for the safety net that catches everything this misses).
+  // Capped at 150 polls (~12.5 min) so an abandoned tab doesn't poll forever.
+  const kaspiPollCount = useRef(0)
+  useEffect(() => {
+    if (!kaspiPayment || kaspiPayment.status !== 'pending' || !token) return
+    kaspiPollCount.current = 0
+    const interval = setInterval(async () => {
+      kaspiPollCount.current++
+      if (kaspiPollCount.current > 150) { clearInterval(interval); return }
+      try {
+        const res = await fetch(`/api/kaspi/invoice-payment?token=${token}`)
+        const data = await res.json()
+        setKaspiPayment(data.payment || null)
+        if (data.payment?.status === 'paid') {
+          setInvoice((prev: any) => (prev ? { ...prev, status: 'paid' } : prev))
+        }
+      } catch {
+        // Transient network hiccup — the next tick tries again.
+      }
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [kaspiPayment?.status, token])
 
   async function markAsPaid() {
     if (!confirm(t.confirmPaymentConfirm)) return
@@ -247,7 +271,7 @@ export default function PublicInvoice() {
         )}
 
         {/* Kaspi payment */}
-        {kaspiPayment && (
+        {kaspiPayment && kaspiPayment.status === 'pending' && (
           <div className="bg-white rounded-2xl shadow-sm p-5">
             <div className="text-xs text-gray-400 uppercase tracking-wide mb-3">Оплата через Kaspi</div>
             <div className="flex items-center gap-4 mb-4">
@@ -270,6 +294,9 @@ export default function PublicInvoice() {
             >
               Оплатить через Kaspi
             </a>
+            <div className="text-xs text-gray-400 text-center mt-3">
+              Счёт подтвердится автоматически сразу после оплаты — обновлять страницу не нужно.
+            </div>
           </div>
         )}
 
