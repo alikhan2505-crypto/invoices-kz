@@ -29,13 +29,18 @@ export async function getWalletBalance(userId: string): Promise<number> {
 export async function creditWallet(userId: string, amount: number, topupId: string): Promise<void> {
   const { data, error } = await supabase.rpc('debit_wallet_balance', { p_user_id: userId, p_amount: -amount })
   if (error) throw new Error(`wallet credit failed for user ${userId}: ${error.message}`)
-  await supabase.from('wallet_ledger').insert({
+  // The balance mutation above already succeeded — a failed ledger insert
+  // here would leave a real balance change with no audit trail, so it's
+  // logged loudly rather than silently swallowed (the credit itself must
+  // not be rolled back for this: the customer's money already moved).
+  const { error: ledgerError } = await supabase.from('wallet_ledger').insert({
     user_id: userId,
     type: 'topup',
     amount,
     balance_after: data,
     kaspi_wallet_topup_id: topupId,
   })
+  if (ledgerError) console.error('wallet_ledger insert failed after topup credit for user', userId, ':', ledgerError.message)
 }
 
 // The only balance mutation that MUST be atomic: two settlements racing
@@ -47,12 +52,16 @@ export async function debitWalletForCommission(userId: string, amount: number, k
   const commission = computeCommission(amount)
   const { data, error } = await supabase.rpc('debit_wallet_balance', { p_user_id: userId, p_amount: commission })
   if (error) throw new Error(`wallet commission debit failed for user ${userId}: ${error.message}`)
-  await supabase.from('wallet_ledger').insert({
+  // Same reasoning as creditWallet's ledger insert: the debit already
+  // happened, so a failed insert here is an audit-trail gap, not something
+  // that should un-debit a commission the platform is legitimately owed.
+  const { error: ledgerError } = await supabase.from('wallet_ledger').insert({
     user_id: userId,
     type: 'commission',
     amount: -commission,
     balance_after: data,
     kaspi_payment_request_id: kaspiPaymentRequestId,
   })
+  if (ledgerError) console.error('wallet_ledger insert failed after commission debit for user', userId, ':', ledgerError.message)
   return data as number
 }
