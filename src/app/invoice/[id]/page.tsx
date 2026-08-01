@@ -37,6 +37,7 @@ export default function InvoicePage() {
   const [invoice, setInvoice] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
   const [bank, setBank] = useState<any>(null)
+  const [kaspiPayment, setKaspiPayment] = useState<{ qr_token: string; payment_link: string; status: string } | null>(null)
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState(false)
   const [logs, setLogs] = useState<any[]>([])
@@ -61,6 +62,15 @@ export default function InvoicePage() {
     const { data: inv } = await supabase.from('invoices').select('*').eq('id', id).single()
     setInvoice(inv)
     if (inv?.client_email) setEmailTo(inv.client_email)
+
+    const { data: kaspiPaymentData } = await supabase
+      .from('kaspi_payment_requests')
+      .select('qr_token, payment_link, status')
+      .eq('invoice_id', id)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false })
+      .maybeSingle()
+    setKaspiPayment(kaspiPaymentData || null)
 
     const { data: logsData } = await supabase
       .from('invoice_logs').select('*').eq('invoice_id', id)
@@ -400,6 +410,20 @@ export default function InvoicePage() {
             )}
           </button>
         </div>
+
+        {kaspiPayment && (
+          <div className="bg-white rounded-2xl shadow-sm p-4">
+            <div className="text-xs text-gray-400 uppercase tracking-wide mb-3">Оплата через Kaspi</div>
+            <a
+              href={kaspiPayment.payment_link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full block text-center bg-[#E4171F] text-white rounded-xl py-3 text-sm font-medium"
+            >
+              Ссылка на оплату Kaspi →
+            </a>
+          </div>
+        )}
 
         {ap.canEcp ? (
         <SignatureSection

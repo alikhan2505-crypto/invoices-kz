@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
 import { createClient } from '@supabase/supabase-js'
+import { loadConnectionByUserId } from '@/lib/kaspiPay/connection'
+import { createPayment } from '@/lib/kaspiPay/client'
 
 const resend = new Resend(process.env.RESEND_API_KEY!)
 const supabase = createClient(
@@ -30,6 +32,33 @@ export async function POST(request: NextRequest) {
 
     if (!inv) return NextResponse.json({ error: 'Счёт не найден' }, { status: 404 })
     if (inv.user_id !== user.id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+    let kaspiPaymentLink: string | null = null
+    let kaspiQrToken: string | null = null
+    try {
+      const connection = await loadConnectionByUserId(inv.user_id)
+      if (connection) {
+        const payment = await createPayment(connection, { amount: Number(inv.amount), orderId: inv.id })
+        await supabase.from('kaspi_payment_requests').insert({
+          user_id: inv.user_id,
+          invoice_id: inv.id,
+          order_id: inv.id,
+          amount: inv.amount,
+          kaspi_operation_id: payment.operationId,
+          qr_token: payment.qrToken,
+          payment_link: payment.paymentLink,
+          status: 'pending',
+          expires_at: payment.expiresAt,
+        })
+        kaspiPaymentLink = payment.paymentLink
+        kaspiQrToken = payment.qrToken
+      }
+    } catch (e: any) {
+      // A Kaspi failure must never block sending the invoice itself — the
+      // client can still pay by bank transfer, the owner just won't get an
+      // automated Kaspi link for this particular send.
+      console.error('Kaspi payment-link generation failed for invoice', inv.id, e.message)
+    }
 
     const recipientEmail = overrideEmail || inv.client_email
     if (!recipientEmail) return NextResponse.json({ error: 'Нет email клиента' }, { status: 400 })
@@ -111,6 +140,12 @@ export async function POST(request: NextRequest) {
     <a href="${publicLink}" style="display:block; background:#1C2056; color:white; text-align:center; padding:14px 20px; text-decoration:none; font-size:14px; font-weight:bold; letter-spacing:0.5px; margin-bottom:16px;">
       ОТКРЫТЬ СЧЁТ ОНЛАЙН →
     </a>
+
+    ${kaspiPaymentLink ? `
+    <a href="${kaspiPaymentLink}" style="display:block; background:#E4171F; color:white; text-align:center; padding:14px 20px; text-decoration:none; font-size:14px; font-weight:bold; letter-spacing:0.5px; margin-bottom:16px;">
+      ОПЛАТИТЬ ЧЕРЕЗ KASPI →
+    </a>
+    ` : ''}
 
     <p style="font-size:12px; color:#aaa; text-align:center; margin:0;">
       <a href="${publicLink}" style="color:#aaa;">${publicLink}</a>
