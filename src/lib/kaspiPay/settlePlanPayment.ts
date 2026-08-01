@@ -54,5 +54,22 @@ export async function checkAndSettlePlanPayment(row: PlanPaymentRow): Promise<'p
 
   await supabase.from('profiles').update({ plan: row.plan, plan_expires_at: expiresAt.toISOString() }).eq('id', row.user_id)
 
+  // Ported from the old xpayment webhook, which the code review caught this
+  // rail had dropped — the admin used this to notice payments in real time,
+  // not something to lose silently just because the transport underneath it
+  // changed. Best-effort: a notification failure must not affect billing.
+  try {
+    const { data: prof } = await supabase.from('profiles').select('company_name').eq('id', row.user_id).single()
+    await fetch('https://invoices.kz/api/telegram', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-internal-secret': process.env.INTERNAL_API_SECRET! },
+      body: JSON.stringify({
+        message: `💳 <b>Оплата!</b>\n👤 ${prof?.company_name || row.user_id}\n📦 ${row.plan === 'pro' ? 'Pro 5 990 ₸' : 'Basic 2 990 ₸'}\n📅 до ${expiresAt.toLocaleDateString('ru-KZ')}`,
+      }),
+    })
+  } catch (e: any) {
+    console.error('Plan payment Telegram notification failed for', row.user_id, ':', e.message)
+  }
+
   return 'paid'
 }
