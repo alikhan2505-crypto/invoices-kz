@@ -50,7 +50,7 @@ export async function loadConnectionByUserId(userId: string): Promise<KaspiConne
   return data ? toConnection(data) : null
 }
 
-export async function loadConnectionByApiToken(token: string): Promise<{ connection: KaspiConnection, userId: string } | null> {
+export async function loadConnectionByApiToken(token: string): Promise<{ connection: KaspiConnection, userId: string, defaultWebhookUrl: string | null } | null> {
   const tokenHash = crypto.createHash('sha256').update(token).digest('hex')
   const { data, error } = await supabase
     .from('kaspi_connections')
@@ -59,5 +59,5 @@ export async function loadConnectionByApiToken(token: string): Promise<{ connect
     .eq('status', 'active')
     .maybeSingle()
   if (error) throw new Error(`kaspi_connections lookup by api token failed: ${error.message}`)
-  return data ? { connection: toConnection(data), userId: data.user_id } : null
+  return data ? { connection: toConnection(data), userId: data.user_id, defaultWebhookUrl: data.default_webhook_url ?? null } : null
 }
