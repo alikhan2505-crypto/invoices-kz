@@ -5,6 +5,7 @@ import { KaspiAuthError } from '@/lib/kaspiPay/client'
 import { checkAndSettleKaspiPayment } from '@/lib/kaspiPay/settlePayment'
 import { checkAndSettlePlanPayment } from '@/lib/kaspiPay/settlePlanPayment'
 import { checkAndSettleWalletTopup } from '@/lib/kaspiPay/wallet'
+import { syncKaspiHistory } from '@/lib/kaspiPay/historySync'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -138,5 +139,21 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.json({ ok: true, paid, expired, plansPaid, plansExpired, topupsPaid, topupsExpired })
+  const { data: activeConnections } = await supabase
+    .from('kaspi_connections')
+    .select('user_id')
+    .eq('status', 'active')
+  let historySynced = 0
+  let historyAutoConfirmed = 0
+  for (const { user_id } of (activeConnections || []) as any[]) {
+    try {
+      const result = await syncKaspiHistory(user_id)
+      historySynced += result.synced
+      historyAutoConfirmed += result.autoConfirmed
+    } catch (e: any) {
+      console.error('Kaspi poll: history sync failed for user', user_id, '— retrying next run:', e.message)
+    }
+  }
+
+  return NextResponse.json({ ok: true, paid, expired, plansPaid, plansExpired, topupsPaid, topupsExpired, historySynced, historyAutoConfirmed })
 }
