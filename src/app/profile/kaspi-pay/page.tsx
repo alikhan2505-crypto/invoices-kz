@@ -29,6 +29,20 @@ export default function KaspiPayPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Same formatting as the phone field in /profile/requisites — keeps the
+  // input's shape consistent across the app rather than accepting anything
+  // a user happens to type before it's sent to Kaspi's own entrance API.
+  function formatPhone(value: string) {
+    const digits = value.replace(/\D/g, '')
+    if (digits.length === 0) return ''
+    let result = '+7'
+    if (digits.length > 1) result += ' ' + digits.slice(1, 4)
+    if (digits.length > 4) result += ' ' + digits.slice(4, 7)
+    if (digits.length > 7) result += ' ' + digits.slice(7, 9)
+    if (digits.length > 9) result += ' ' + digits.slice(9, 11)
+    return result
+  }
+
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
@@ -78,7 +92,17 @@ export default function KaspiPayPage() {
         body: JSON.stringify({ processId, otp }),
       })
       const data = await res.json()
-      if (!res.ok || !data.apiToken) { setError(t.errorInvalidOtp); return }
+      if (!res.ok || !data.apiToken) {
+        // invalid_otp means the code was wrong — the user can retry with a
+        // new one. Anything else (save_failed, expired_or_invalid_process)
+        // means Kaspi-side pairing may have already succeeded but this
+        // attempt is now dead either way — telling the user "wrong code"
+        // here would send them into a retry loop that can never succeed,
+        // since processId is already gone server-side.
+        setError(data.error === 'invalid_otp' ? t.errorInvalidOtp : t.errorGeneric)
+        setProcessId(null)
+        return
+      }
       setApiToken(data.apiToken)
       setConnected(true)
       setProcessId(null)
@@ -110,6 +134,36 @@ export default function KaspiPayPage() {
 
   const ap = getActivePlan(profile)
 
+  // Rendered in BOTH the Pro and non-Pro branches below, same reasoning as
+  // /profile/acquiring's bccConnectedCard: a user whose Pro plan lapses
+  // while a Kaspi connection is live still has a real paired device and a
+  // working API token against their own Kaspi account — /api/kaspi/pay has
+  // no Pro check of its own, so the connection keeps working for real
+  // payments either way, and the disconnect control must stay reachable.
+  const connectedCard = apiToken ? (
+    <div className="bg-white rounded-2xl shadow-sm p-4">
+      <div className="text-sm font-medium text-[#1C2056] mb-2">{t.connectedMessage}</div>
+      <div className="text-xs text-amber-600 mb-2">{t.tokenShownOnceWarning}</div>
+      <div className="bg-gray-50 rounded-xl p-3 text-xs font-mono break-all mb-3">{apiToken}</div>
+      <button onClick={() => navigator.clipboard.writeText(apiToken)}
+        className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium mb-2">
+        {t.copyTokenButton}
+      </button>
+      <button onClick={disconnect} disabled={disconnecting}
+        className="w-full bg-gray-100 text-gray-600 rounded-xl py-2.5 text-sm font-medium">
+        {disconnecting ? t.disconnectingLabel : t.disconnectButton}
+      </button>
+    </div>
+  ) : connected ? (
+    <div className="bg-white rounded-2xl shadow-sm p-4">
+      <div className="text-sm font-medium text-[#1C2056] mb-3">{t.connectedMessage}</div>
+      <button onClick={disconnect} disabled={disconnecting}
+        className="w-full bg-gray-100 text-gray-600 rounded-xl py-2.5 text-sm font-medium">
+        {disconnecting ? t.disconnectingLabel : t.disconnectButton}
+      </button>
+    </div>
+  ) : null
+
   return (
     <main className="min-h-screen bg-gray-50 pb-8">
       <div className="bg-white border-b px-4 py-4 flex items-center gap-3">
@@ -119,19 +173,28 @@ export default function KaspiPayPage() {
 
       <div className="max-w-lg mx-auto p-4 space-y-4">
         {!ap.canAcquiring ? (
-          <div className="bg-white rounded-2xl shadow-sm p-4">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="text-sm font-medium text-[#1C2056] flex-1">{t.headerLabel}</div>
-              <span className="text-xs bg-amber-50 text-amber-600 border border-amber-200 px-2 py-0.5 rounded-full flex-shrink-0">
-                🔒 {t.proBadge}
-              </span>
+          <>
+            <div className="bg-white rounded-2xl shadow-sm p-4">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="text-sm font-medium text-[#1C2056] flex-1">{t.headerLabel}</div>
+                <span className="text-xs bg-amber-50 text-amber-600 border border-amber-200 px-2 py-0.5 rounded-full flex-shrink-0">
+                  🔒 {t.proBadge}
+                </span>
+              </div>
+              <div className="text-xs text-gray-400 mb-3">{t.proLockedHint}</div>
+              <button onClick={() => router.push('/upgrade')}
+                className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium">
+                {t.goToPlansButton}
+              </button>
             </div>
-            <div className="text-xs text-gray-400 mb-3">{t.proLockedHint}</div>
-            <button onClick={() => router.push('/upgrade')}
-              className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium">
-              {t.goToPlansButton}
-            </button>
-          </div>
+
+            {connectedCard && (
+              <>
+                {error && <p className="text-xs text-red-500 px-1">{error}</p>}
+                {connectedCard}
+              </>
+            )}
+          </>
         ) : (
           <>
             <div className="bg-blue-50 rounded-2xl p-4">
@@ -140,32 +203,11 @@ export default function KaspiPayPage() {
 
             {error && <p className="text-xs text-red-500 px-1">{error}</p>}
 
-            {apiToken ? (
-              <div className="bg-white rounded-2xl shadow-sm p-4">
-                <div className="text-sm font-medium text-[#1C2056] mb-2">{t.connectedMessage}</div>
-                <div className="text-xs text-amber-600 mb-2">{t.tokenShownOnceWarning}</div>
-                <div className="bg-gray-50 rounded-xl p-3 text-xs font-mono break-all mb-3">{apiToken}</div>
-                <button onClick={() => navigator.clipboard.writeText(apiToken)}
-                  className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium mb-2">
-                  {t.copyTokenButton}
-                </button>
-                <button onClick={disconnect} disabled={disconnecting}
-                  className="w-full bg-gray-100 text-gray-600 rounded-xl py-2.5 text-sm font-medium">
-                  {disconnecting ? t.disconnectingLabel : t.disconnectButton}
-                </button>
-              </div>
-            ) : connected ? (
-              <div className="bg-white rounded-2xl shadow-sm p-4">
-                <div className="text-sm font-medium text-[#1C2056] mb-3">{t.connectedMessage}</div>
-                <button onClick={disconnect} disabled={disconnecting}
-                  className="w-full bg-gray-100 text-gray-600 rounded-xl py-2.5 text-sm font-medium">
-                  {disconnecting ? t.disconnectingLabel : t.disconnectButton}
-                </button>
-              </div>
-            ) : !processId ? (
+            {connectedCard ? connectedCard : !processId ? (
               <div className="bg-white rounded-2xl shadow-sm p-4">
                 <label className="block text-xs text-gray-500 mb-1">{t.phoneLabel}</label>
-                <input value={phone} onChange={e => setPhone(e.target.value)} placeholder={t.phonePlaceholder}
+                <input value={phone} onChange={e => setPhone(formatPhone(e.target.value))} placeholder={t.phonePlaceholder}
+                  type="tel" maxLength={16}
                   className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-[#1C2056] mb-3" />
                 <button onClick={sendCode} disabled={sending || !phone}
                   className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium">
@@ -176,6 +218,7 @@ export default function KaspiPayPage() {
               <div className="bg-white rounded-2xl shadow-sm p-4">
                 <label className="block text-xs text-gray-500 mb-1">{t.otpLabel}</label>
                 <input value={otp} onChange={e => setOtp(e.target.value)} placeholder={t.otpPlaceholder}
+                  type="text" inputMode="numeric" maxLength={6}
                   className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-[#1C2056] mb-3" />
                 <button onClick={verify} disabled={verifying || !otp}
                   className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium">
