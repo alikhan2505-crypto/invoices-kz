@@ -14,6 +14,17 @@ import {
   computeXSU,
   computeXSign,
 } from './crypto'
+import { deriveGeoLocation, deriveClientIp } from './deviceContext'
+
+// Kaspi has refused THIS connection's credentials outright (401/403): the
+// paired device was removed from the customer's Kaspi Pay app, or the
+// Cashier role was revoked. Nothing on our side can recover from that — the
+// customer has to pair again — so callers treat it as terminal, exactly like
+// the BCC cron treats BccConsentError. Every other failure mode (network
+// error, timeout, Kaspi 5xx, unparseable body) stays an ordinary Error and
+// must be retried, never used to park a connection that would have worked
+// again on the next run.
+export class KaspiAuthError extends Error {}
 
 const KASPI_ENTRANCE_URL = 'https://entrance-pay.kaspi.kz'
 const KASPI_MTOKEN_URL = 'https://mtoken.kaspi.kz'
@@ -95,6 +106,8 @@ async function entranceStep(body: object, referer: string, identity: Identity, p
   return { json, userToken: newUserToken }
 }
 
+// `phoneNumber` must already be a bare digit string (`77071234567`) — see
+// normalizeKzPhone in ./phone, applied by the route before we get here.
 export async function initConnect(phoneNumber: string): Promise<{ processId: string, identity: Identity, userToken: string | null }> {
   const identity = generateIdentity()
   const { pk, pkTag } = derivePkAndTag(identity.identityPublicKeyPem)
@@ -213,7 +226,11 @@ export async function verifyOtp(
     'X-Time': nowISO(),
     'X-S': 'R:0|E:0|RH:0|N:0',
     'X-SV': '2',
-    'X-Kb-Client-Ip': '192.168.1.96',
+    // The phone's own LAN address. Kept (it is part of the signed X-SH list,
+    // so dropping it would change the signature base string for a protocol
+    // we cannot re-test against Kaspi), but derived per connection instead of
+    // being the same literal for every customer — see deviceContext.ts.
+    'X-Kb-Client-Ip': deriveClientIp(identity.deviceId),
     'X-PkTag': pkTag,
     'X-SU': computeXSU(orgUrl),
     'X-SH': 'url,X-Kb-Client-Ip,X-Time,X-App-Ver,X-SV,X-Locale,X-App-Bld,X-Install-ID,X-Kb-TokenSn,X-S,X-Kb-TokenSnMac,X-Call',
@@ -289,11 +306,15 @@ export async function createPayment(
   params: { amount: number, orderId: string }
 ): Promise<{ operationId: string, qrToken: string, paymentLink: string, expiresAt: string }> {
   const url = `${KASPI_QRPAY_URL}/v01/qr-token/create`
+  // Per connection, not per request: a real POS terminal sits still, so the
+  // same connection must always report the same coordinates — but every
+  // business reporting the exact same Almaty point is itself a fraud signal.
+  const { latitude, longitude } = deriveGeoLocation(connection.deviceId)
   const payload = JSON.stringify({
     PaymentAmount: params.amount,
     DeviceInterface: 'Pos',
-    Latitude: 43.204643483375889,
-    Longitude: 76.891962364115912,
+    Latitude: latitude,
+    Longitude: longitude,
   })
   const headers = { ...buildSignedHeaders(url, connection, payload), 'Content-Type': 'application/json' }
   const res = await fetch(url, { method: 'POST', headers, body: payload })
@@ -324,6 +345,18 @@ export async function checkStatus(
 ): Promise<{ status: 'pending' | 'paid' | 'expired' | 'failed' }> {
   const url = `${KASPI_QRPAY_URL}/v02/kaspi-qr/status?qrOperationId=${operationId}`
   const res = await fetch(url, { headers: buildSignedHeaders(url, connection) })
+
+  // 401/403 = Kaspi refused this connection's signed request, not "the
+  // payment isn't done yet". Without this the poller read the missing
+  // Data.Status off the error body and reported 'pending' forever, so a
+  // connection whose device was unpaired on the Kaspi side stayed 'active'
+  // and its payments were polled indefinitely with no signal anywhere. Same
+  // precision as the BCC cron: only these two statuses mean the credentials
+  // themselves were rejected; 429/5xx/timeouts stay transient below.
+  if (res.status === 401 || res.status === 403) {
+    throw new KaspiAuthError(`Kaspi rejected this connection's credentials: ${res.status}`)
+  }
+
   const json = await res.json()
   const status: string | undefined = json.Data?.Status
 
