@@ -50,6 +50,22 @@ export async function loadConnectionByUserId(userId: string): Promise<KaspiConne
   return data ? toConnection(data) : null
 }
 
+// invoices.kz's own Kaspi Cashier connection, used to collect money FROM
+// users (plan payments, wallet top-ups) -- not a new connection type, just
+// whichever kaspi_connections row belongs to the one admin profile. Looked
+// up dynamically rather than a hardcoded user id so this keeps working if
+// the admin account ever changes.
+export async function loadPlatformConnection(): Promise<KaspiConnection | null> {
+  const { data: admin, error: adminError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('is_admin', true)
+    .maybeSingle()
+  if (adminError) throw new Error(`admin profile lookup failed: ${adminError.message}`)
+  if (!admin) return null
+  return loadConnectionByUserId(admin.id)
+}
+
 export async function loadConnectionByApiToken(token: string): Promise<{ connection: KaspiConnection, userId: string, defaultWebhookUrl: string | null } | null> {
   const tokenHash = crypto.createHash('sha256').update(token).digest('hex')
   const { data, error } = await supabase
