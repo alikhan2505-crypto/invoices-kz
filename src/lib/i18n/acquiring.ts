@@ -82,6 +82,19 @@ export interface AcquiringContent {
   kaspiSourceApi: string
   kaspiTopupExpiredError: string
   kaspiTopupHistoryTitle: string
+  kaspiPendingMatchesTitle: string
+  kaspiPendingMatchCandidate: string
+  kaspiConfirmMatchButton: string
+  kaspiFilterAll: string
+  kaspiFilterIn: string
+  kaspiFilterOut: string
+  kaspiFilterPlatform: string
+  kaspiFilterOther: string
+  kaspiColDate: string
+  kaspiColAmount: string
+  kaspiColDirection: string
+  kaspiColInvoice: string
+  kaspiColCategory: string
 }
 
 export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
@@ -175,6 +188,19 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiSourceApi: 'API',
     kaspiTopupExpiredError: 'Ссылка на оплату истекла (действует несколько минут, как любой QR Kaspi) — попробуйте пополнить ещё раз.',
     kaspiTopupHistoryTitle: 'История пополнений баланса',
+    kaspiPendingMatchesTitle: 'Требуют подтверждения',
+    kaspiPendingMatchCandidate: 'вероятный счёт',
+    kaspiConfirmMatchButton: 'Подтвердить',
+    kaspiFilterAll: 'Все',
+    kaspiFilterIn: 'Входящие',
+    kaspiFilterOut: 'Исходящие',
+    kaspiFilterPlatform: 'По счетам',
+    kaspiFilterOther: 'Прочие',
+    kaspiColDate: 'Дата',
+    kaspiColAmount: 'Сумма',
+    kaspiColDirection: 'Направление',
+    kaspiColInvoice: 'Счёт / клиент',
+    kaspiColCategory: 'Категория',
   },
   kk: {
     headerLabel: 'Эквайринг',
@@ -266,6 +292,19 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiSourceApi: 'API',
     kaspiTopupExpiredError: 'Төлем сілтемесінің мерзімі өтті (бірнеше минут жарамды, кез келген Kaspi QR сияқты) — қайта толтырып көріңіз.',
     kaspiTopupHistoryTitle: 'Әмиян толтыру тарихы',
+    kaspiPendingMatchesTitle: 'Растауды қажет етеді',
+    kaspiPendingMatchCandidate: 'ықтимал шот',
+    kaspiConfirmMatchButton: 'Растау',
+    kaspiFilterAll: 'Барлығы',
+    kaspiFilterIn: 'Кіріс',
+    kaspiFilterOut: 'Шығыс',
+    kaspiFilterPlatform: 'Шоттар бойынша',
+    kaspiFilterOther: 'Басқа',
+    kaspiColDate: 'Күні',
+    kaspiColAmount: 'Сома',
+    kaspiColDirection: 'Бағыты',
+    kaspiColInvoice: 'Шот / клиент',
+    kaspiColCategory: 'Санаты',
   },
   en: {
     headerLabel: 'Acquiring',
@@ -357,5 +396,18 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiSourceApi: 'API',
     kaspiTopupExpiredError: 'The payment link expired (valid for a few minutes, like any Kaspi QR) — please try topping up again.',
     kaspiTopupHistoryTitle: 'Top-up history',
+    kaspiPendingMatchesTitle: 'Needs confirmation',
+    kaspiPendingMatchCandidate: 'likely invoice',
+    kaspiConfirmMatchButton: 'Confirm',
+    kaspiFilterAll: 'All',
+    kaspiFilterIn: 'Incoming',
+    kaspiFilterOut: 'Outgoing',
+    kaspiFilterPlatform: 'Invoice payments',
+    kaspiFilterOther: 'Other',
+    kaspiColDate: 'Date',
+    kaspiColAmount: 'Amount',
+    kaspiColDirection: 'Direction',
+    kaspiColInvoice: 'Invoice / client',
+    kaspiColCategory: 'Category',
   },
 }

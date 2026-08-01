@@ -61,9 +61,12 @@ export default function AcquiringPage() {
   const [kaspiDisconnecting, setKaspiDisconnecting] = useState(false)
   const [kaspiToppingUp, setKaspiToppingUp] = useState(false)
   const [kaspiError, setKaspiError] = useState('')
-  const [kaspiStats, setKaspiStats] = useState<{ last24h: { count: number, amount: number }, last30d: { count: number, amount: number }, allTime: { count: number, amount: number } } | null>(null)
-  const [kaspiRecentPayments, setKaspiRecentPayments] = useState<{ orderId: string, amount: number, status: string, createdAt: string, source: string }[]>([])
   const [kaspiRecentTopups, setKaspiRecentTopups] = useState<{ amount: number, status: string, createdAt: string }[]>([])
+  const [kaspiOperations, setKaspiOperations] = useState<{ id: string, orderNumber: string, amount: number, direction: string, category: string, clientName: string | null, matchedInvoiceNumber: string | null, operationDate: string }[]>([])
+  const [kaspiPendingMatches, setKaspiPendingMatches] = useState<{ id: string, invoiceNumber: string | null, clientName: string | null, matchedAmount: number, matchedDate: string }[]>([])
+  const [kaspiDirectionFilter, setKaspiDirectionFilter] = useState<'all' | 'in' | 'out'>('all')
+  const [kaspiCategoryFilter, setKaspiCategoryFilter] = useState<'all' | 'platform' | 'other'>('all')
+  const [kaspiConfirmingMatchId, setKaspiConfirmingMatchId] = useState<string | null>(null)
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -153,13 +156,13 @@ export default function AcquiringPage() {
         setKaspiConnected(!!data.connected)
         setKaspiStatus(data.status ?? null)
         setKaspiWalletBalance(data.walletBalance ?? 0)
-        setKaspiStats(data.stats ?? null)
-        setKaspiRecentPayments(data.recentPayments ?? [])
         setKaspiRecentTopups(data.recentTopups ?? [])
       }
     } catch (e: any) {
       console.error('Kaspi dashboard fetch error:', e.message)
     }
+
+    await loadKaspiOperations()
 
     if (getActivePlan(p).canAcquiring) {
       const { data: invoices } = await supabase
@@ -178,6 +181,33 @@ export default function AcquiringPage() {
     }
 
     setLoading(false)
+  }
+
+  async function loadKaspiOperations(direction = kaspiDirectionFilter, category = kaspiCategoryFilter) {
+    const { data: { session } } = await supabase.auth.getSession()
+    const res = await fetch(`/api/kaspi/operations?direction=${direction}&category=${category}`, {
+      headers: { 'Authorization': `Bearer ${session?.access_token}` },
+    })
+    if (res.ok) {
+      const data = await res.json()
+      setKaspiOperations(data.operations || [])
+      setKaspiPendingMatches(data.pendingMatches || [])
+    }
+  }
+
+  async function confirmKaspiPendingMatch(pendingMatchId: string) {
+    setKaspiConfirmingMatchId(pendingMatchId)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      await fetch('/api/kaspi/pending-matches/confirm', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pendingMatchId }),
+      })
+      await loadKaspiOperations()
+    } finally {
+      setKaspiConfirmingMatchId(null)
+    }
   }
 
   async function connectBcc() {
@@ -623,48 +653,6 @@ export default function AcquiringPage() {
                 </div>
               )}
 
-              {kaspiStats && (
-                <div className="grid grid-cols-3 gap-2 mb-3 mt-3">
-                  {[
-                    { label: t.kaspiStatsTodayLabel, stat: kaspiStats.last24h },
-                    { label: t.kaspiStatsMonthLabel, stat: kaspiStats.last30d },
-                    { label: t.kaspiStatsAllTimeLabel, stat: kaspiStats.allTime },
-                  ].map(({ label, stat }) => (
-                    <div key={label} className="bg-gray-50 rounded-xl p-2.5 text-center">
-                      <div className="text-xs text-gray-400 mb-0.5">{label}</div>
-                      <div className="text-sm font-semibold text-[#1C2056]">{stat.amount.toLocaleString('ru-KZ')} ₸</div>
-                      <div className="text-[10px] text-gray-400">{stat.count}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="text-xs text-gray-500 mb-2 mt-2">{t.kaspiHistoryTitle}</div>
-              {kaspiRecentPayments.length === 0 ? (
-                <p className="text-xs text-gray-400 text-center py-3 mb-3">{t.kaspiHistoryEmptyLabel}</p>
-              ) : (
-                <div className="mb-3 -mx-1 max-h-64 overflow-y-auto">
-                  {kaspiRecentPayments.map((p, i) => {
-                    const statusLabel = p.status === 'paid' ? t.kaspiStatusPaid
-                      : p.status === 'pending' ? t.kaspiStatusPending
-                      : p.status === 'expired' ? t.kaspiStatusExpired
-                      : t.kaspiStatusFailed
-                    const statusColor = p.status === 'paid' ? 'text-green-600' : p.status === 'pending' ? 'text-blue-600' : 'text-gray-400'
-                    return (
-                      <div key={p.orderId + i} className="flex items-center justify-between px-1 py-2 border-b border-gray-50 last:border-0">
-                        <div>
-                          <div className="text-xs text-[#1C2056]">{p.amount.toLocaleString('ru-KZ')} ₸</div>
-                          <div className="text-[10px] text-gray-400">
-                            {new Date(p.createdAt).toLocaleString('ru-KZ')} · {p.source === 'invoice' ? t.kaspiSourceInvoice : t.kaspiSourceApi}
-                          </div>
-                        </div>
-                        <div className={`text-xs font-medium ${statusColor}`}>{statusLabel}</div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-
               {kaspiRecentTopups.length > 0 && (
                 <>
                   <div className="text-xs text-gray-500 mb-2 mt-2">{t.kaspiTopupHistoryTitle}</div>
@@ -722,6 +710,75 @@ export default function AcquiringPage() {
             className="w-full text-xs text-[#1C2056] underline text-center py-2 mt-2">
             {t.kaspiDocsLinkLabel}
           </button>
+        </div>
+      </div>
+
+      {/* Breaks out of the max-w-lg column above -- this section is a wide,
+          filterable dashboard table and deliberately isn't confined to the
+          narrow mobile-first form column the rest of the page uses. */}
+      <div className="px-4 pb-4 space-y-3">
+        {kaspiPendingMatches.length > 0 && (
+          <div className="bg-amber-50 rounded-2xl shadow-sm p-4 -mx-1 sm:mx-0 sm:max-w-3xl">
+            <div className="text-sm font-medium text-[#1C2056] mb-2">{t.kaspiPendingMatchesTitle}</div>
+            {kaspiPendingMatches.map(pm => (
+              <div key={pm.id} className="flex items-center justify-between py-2 border-b border-amber-100 last:border-0">
+                <div className="text-xs text-gray-600">
+                  {pm.matchedAmount.toLocaleString('ru-KZ')} ₸ — {t.kaspiPendingMatchCandidate}: {pm.invoiceNumber} ({pm.clientName || '—'})
+                </div>
+                <button onClick={() => confirmKaspiPendingMatch(pm.id)} disabled={kaspiConfirmingMatchId === pm.id}
+                  className="bg-[#1C2056] text-white rounded-lg px-3 py-1.5 text-xs font-medium">
+                  {t.kaspiConfirmMatchButton}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="bg-white rounded-2xl shadow-sm p-4 -mx-1 sm:mx-0 sm:max-w-3xl">
+          <div className="text-sm font-medium text-[#1C2056] mb-3">{t.kaspiHistoryTitle}</div>
+          <div className="flex gap-2 mb-3 flex-wrap">
+            {(['all', 'in', 'out'] as const).map(d => (
+              <button key={d} onClick={() => { setKaspiDirectionFilter(d); loadKaspiOperations(d, kaspiCategoryFilter) }}
+                className={`rounded-lg px-3 py-1.5 text-xs font-medium ${kaspiDirectionFilter === d ? 'bg-[#1C2056] text-white' : 'bg-gray-100 text-[#1C2056]'}`}>
+                {d === 'all' ? t.kaspiFilterAll : d === 'in' ? t.kaspiFilterIn : t.kaspiFilterOut}
+              </button>
+            ))}
+            {(['all', 'platform', 'other'] as const).map(c => (
+              <button key={c} onClick={() => { setKaspiCategoryFilter(c); loadKaspiOperations(kaspiDirectionFilter, c) }}
+                className={`rounded-lg px-3 py-1.5 text-xs font-medium ${kaspiCategoryFilter === c ? 'bg-[#1C2056] text-white' : 'bg-gray-100 text-[#1C2056]'}`}>
+                {c === 'all' ? t.kaspiFilterAll : c === 'platform' ? t.kaspiFilterPlatform : t.kaspiFilterOther}
+              </button>
+            ))}
+          </div>
+
+          {kaspiOperations.length === 0 ? (
+            <p className="text-xs text-gray-400 text-center py-3">{t.kaspiHistoryEmptyLabel}</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-gray-400 text-left border-b border-gray-100">
+                    <th className="py-2 pr-3 font-normal">{t.kaspiColDate}</th>
+                    <th className="py-2 pr-3 font-normal">{t.kaspiColAmount}</th>
+                    <th className="py-2 pr-3 font-normal">{t.kaspiColDirection}</th>
+                    <th className="py-2 pr-3 font-normal">{t.kaspiColInvoice}</th>
+                    <th className="py-2 font-normal">{t.kaspiColCategory}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {kaspiOperations.map(op => (
+                    <tr key={op.id} className="border-b border-gray-50 last:border-0">
+                      <td className="py-2 pr-3 text-gray-500">{new Date(op.operationDate).toLocaleString('ru-KZ')}</td>
+                      <td className="py-2 pr-3 text-[#1C2056] font-medium">{op.amount.toLocaleString('ru-KZ')} ₸</td>
+                      <td className="py-2 pr-3 text-gray-500">{op.direction === 'in' ? t.kaspiFilterIn : t.kaspiFilterOut}</td>
+                      <td className="py-2 pr-3 text-gray-500">{op.matchedInvoiceNumber || op.clientName || '—'}</td>
+                      <td className="py-2 text-gray-500">{op.category === 'platform' ? t.kaspiFilterPlatform : t.kaspiFilterOther}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
     </main>
