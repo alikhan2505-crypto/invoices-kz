@@ -1,4 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
+import { loadPlatformConnection } from './connection'
+import { checkStatus } from './client'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -64,4 +66,32 @@ export async function debitWalletForCommission(userId: string, amount: number, k
   })
   if (ledgerError) console.error('wallet_ledger insert failed after commission debit for user', userId, ':', ledgerError.message)
   return data as number
+}
+
+export interface WalletTopupRow {
+  id: string
+  user_id: string
+  amount: number
+  kaspi_operation_id: string
+  status: string
+}
+
+export async function checkAndSettleWalletTopup(row: WalletTopupRow): Promise<'paid' | 'not_paid'> {
+  const connection = await loadPlatformConnection()
+  if (!connection) return 'not_paid'
+
+  const result = await checkStatus(connection, row.kaspi_operation_id)
+  if (result.status !== 'paid') return 'not_paid'
+
+  const { data: claimed, error: claimError } = await supabase
+    .from('kaspi_wallet_topups')
+    .update({ status: 'paid' })
+    .eq('id', row.id)
+    .eq('status', 'pending')
+    .select('id')
+  if (claimError) throw new Error(`failed to claim paid topup: ${claimError.message}`)
+  if (!claimed || claimed.length === 0) return 'paid' // already settled by another caller
+
+  await creditWallet(row.user_id, row.amount, row.id)
+  return 'paid'
 }
