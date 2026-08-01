@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
 import { createClient } from '@supabase/supabase-js'
-import { loadConnectionByUserId } from '@/lib/kaspiPay/connection'
-import { createPayment } from '@/lib/kaspiPay/client'
+import { getOrCreateKaspiPaymentForInvoice } from '@/lib/kaspiPay/invoicePayment'
 
 const resend = new Resend(process.env.RESEND_API_KEY!)
 const supabase = createClient(
@@ -35,30 +34,12 @@ export async function POST(request: NextRequest) {
 
     let kaspiPaymentLink: string | null = null
     try {
-      const connection = await loadConnectionByUserId(inv.user_id)
-      if (connection) {
-        const payment = await createPayment(connection, { amount: Number(inv.amount), orderId: inv.id })
-        // If this insert fails, a real Kaspi payment now exists that Task 8's
-        // poller has no row to ever find — the email must not show a working
-        // link for a payment that can never auto-confirm, so kaspiPaymentLink
-        // stays null (same degraded-but-safe path as createPayment failing).
-        const { error: insertError } = await supabase.from('kaspi_payment_requests').insert({
-          user_id: inv.user_id,
-          invoice_id: inv.id,
-          order_id: inv.id,
-          amount: inv.amount,
-          kaspi_operation_id: payment.operationId,
-          qr_token: payment.qrToken,
-          payment_link: payment.paymentLink,
-          status: 'pending',
-          expires_at: payment.expiresAt,
-        })
-        if (insertError) {
-          console.error('Kaspi payment created but failed to persist for tracking — invoice', inv.id, 'operation', payment.operationId, ':', insertError.message)
-        } else {
-          kaspiPaymentLink = payment.paymentLink
-        }
-      }
+      // Shared with the payer-facing /api/kaspi/invoice-payment route, which
+      // regenerates this link on demand once it expires. Going through the
+      // same helper also means a resend reuses the invoice's still-valid
+      // payment instead of minting a second one for the same invoice.
+      const payment = await getOrCreateKaspiPaymentForInvoice(inv)
+      kaspiPaymentLink = payment?.payment_link ?? null
     } catch (e: any) {
       // A Kaspi failure must never block sending the invoice itself — the
       // client can still pay by bank transfer, the owner just won't get an

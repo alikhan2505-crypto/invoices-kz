@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getOrCreateKaspiPaymentForInvoice } from '@/lib/kaspiPay/invoicePayment'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -18,18 +19,23 @@ export async function GET(req: NextRequest) {
 
   const { data: invoice } = await supabase
     .from('invoices')
-    .select('id')
+    .select('id, user_id, amount, status')
     .eq('public_token', token)
     .maybeSingle()
   if (!invoice) return NextResponse.json({ payment: null })
 
-  const { data: payment } = await supabase
-    .from('kaspi_payment_requests')
-    .select('qr_token, payment_link, status')
-    .eq('invoice_id', invoice.id)
-    .eq('status', 'pending')
-    .order('created_at', { ascending: false })
-    .maybeSingle()
-
-  return NextResponse.json({ payment: payment || null })
+  // Regenerates on demand rather than only reading: the link is minted when
+  // the invoice is emailed, but the recipient often opens that email hours or
+  // days later, by which point the original QR has expired and the payer was
+  // left with no way to pay through Kaspi at all.
+  try {
+    const payment = await getOrCreateKaspiPaymentForInvoice(invoice)
+    return NextResponse.json({ payment: payment || null })
+  } catch (e: any) {
+    // The page treats a null payment as "no Kaspi option here" and still
+    // renders the bank requisites, so a Kaspi-side failure degrades rather
+    // than breaking the payer's view of the invoice.
+    console.error('Kaspi invoice-payment lookup failed for invoice', invoice.id, e.message)
+    return NextResponse.json({ payment: null })
+  }
 }

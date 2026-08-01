@@ -38,6 +38,7 @@ export default function InvoicePage() {
   const [profile, setProfile] = useState<any>(null)
   const [bank, setBank] = useState<any>(null)
   const [kaspiPayment, setKaspiPayment] = useState<{ qr_token: string; payment_link: string; status: string } | null>(null)
+  const [refreshingKaspi, setRefreshingKaspi] = useState(false)
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState(false)
   const [logs, setLogs] = useState<any[]>([])
@@ -58,17 +59,34 @@ export default function InvoicePage() {
 
   useEffect(() => { loadInvoice() }, [])
 
+  async function refreshKaspiLink() {
+    if (!invoice?.public_token) return
+    setRefreshingKaspi(true)
+    try {
+      const res = await fetch(`/api/kaspi/invoice-payment?token=${invoice.public_token}`)
+      const data = await res.json()
+      setKaspiPayment(data.payment || null)
+    } finally {
+      setRefreshingKaspi(false)
+    }
+  }
+
   async function loadInvoice() {
     const { data: inv } = await supabase.from('invoices').select('*').eq('id', id).single()
     setInvoice(inv)
     if (inv?.client_email) setEmailTo(inv.client_email)
 
+    // .limit(1) is load-bearing: resending an invoice can leave more than one
+    // 'pending' row for it, and .maybeSingle() answers >1 row with a PGRST116
+    // error and null data — which used to make the Kaspi link silently vanish
+    // from this page after a perfectly normal resend.
     const { data: kaspiPaymentData } = await supabase
       .from('kaspi_payment_requests')
       .select('qr_token, payment_link, status')
       .eq('invoice_id', id)
       .eq('status', 'pending')
       .order('created_at', { ascending: false })
+      .limit(1)
       .maybeSingle()
     setKaspiPayment(kaspiPaymentData || null)
 
@@ -422,6 +440,13 @@ export default function InvoicePage() {
             >
               Ссылка на оплату Kaspi →
             </a>
+            {/* Kaspi QR codes expire. This asks the same endpoint the payer's
+                page uses, which hands back the live link or mints a fresh one
+                if the old one has run out. */}
+            <button onClick={refreshKaspiLink} disabled={refreshingKaspi}
+              className="w-full mt-2 bg-gray-100 text-gray-600 rounded-xl py-2.5 text-sm font-medium">
+              {refreshingKaspi ? 'Обновляем...' : 'Обновить ссылку'}
+            </button>
           </div>
         )}
 
