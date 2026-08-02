@@ -3,7 +3,7 @@ import { matchOperation, OpenInvoiceForMatch, MatchResult } from './historyMatch
 import { KaspiHistoryOperation } from './client'
 
 function op(amount: number, direction: 'in' | 'out' = 'in'): KaspiHistoryOperation {
-  return { id: '1', orderNumber: 'QR1', regDate: '2026-08-01T00:00:00+05:00', amount, clientName: 'Test', direction }
+  return { id: '1', orderNumber: 'QR1', regDate: '2026-08-01T00:00:00+05:00', amount, clientName: 'Test', direction, operationType: direction === 'in' ? 0 : 1 }
 }
 
 function invoice(id: string, amount: number): OpenInvoiceForMatch {

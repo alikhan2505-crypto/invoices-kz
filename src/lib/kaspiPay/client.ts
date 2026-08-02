@@ -365,6 +365,12 @@ export interface KaspiHistoryOperation {
   amount: number
   clientName: string | null
   direction: 'in' | 'out'
+  // Raw OperationType, kept alongside the derived `direction` rather than
+  // discarded -- without it, a future correction to the in/out mapping (once
+  // a real refund sample is observed) would have no way to re-derive past
+  // rows' true direction; every operation synced under the old mapping
+  // would stay permanently mislabeled.
+  operationType: number | null
 }
 
 // Kaspi's real transaction-history feed -- not just what we ourselves
@@ -409,6 +415,7 @@ export async function getOperationsHistory(
         // operation type (e.g. a real refund) the first time Kaspi sends
         // one, which is the exact failure this guards against.
         direction: op.OperationType === 0 ? 'in' : 'out',
+        operationType: typeof op.OperationType === 'number' ? op.OperationType : null,
       })
     }
   }
