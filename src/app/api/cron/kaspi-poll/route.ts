@@ -19,6 +19,16 @@ const supabase = createClient(
 // what nothing else ever polls: an external API customer who never checks
 // their own operation_id, a payer who closes the tab right after paying,
 // and general expiry/reconciliation.
+//
+// Phase 2's per-connection history sync added a real Kaspi HTTP round trip
+// (plus several Supabase writes) per active connection to this same run --
+// extended past Vercel's short serverless default so a growing connection
+// count doesn't start silently truncating the loop before it reaches every
+// customer (each connection's own sync is independently idempotent, so a
+// truncated run is still safe to simply retry next time, just slower to
+// reach connections late in the list).
+export const maxDuration = 60
+
 export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization')
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {

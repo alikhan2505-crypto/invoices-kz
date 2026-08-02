@@ -397,11 +397,18 @@ export async function getOperationsHistory(
         amount: Number(String(op.Amount).replace(/[^\d]/g, '')),
         clientName: op.ClientShortName || null,
         // OperationType's exact value-to-direction mapping is not fully
-        // confirmed (no live refund/outgoing sample was ever observed) --
-        // every observed sample so far had OperationType 0 and was a sale.
-        // Treated as 'in' unless a future live sample proves another value
-        // means 'out'; do not extend this without a real observed example.
-        direction: 'in',
+        // confirmed (no live refund/outgoing sample was ever observed).
+        // Fail-safe direction, NOT a best-effort one: only the one
+        // confirmed-live value (0, a real sale) is trusted as 'in' --
+        // literally everything else (including any future OperationType
+        // this codebase hasn't seen yet, which could be a refund) is
+        // treated as 'out' and excluded from invoice-matching/commission
+        // by matchOperation's own direction guard. Do not weaken this to
+        // "default in, treat only a confirmed value as out" -- that
+        // ordering would auto-charge commission on an unconfirmed
+        // operation type (e.g. a real refund) the first time Kaspi sends
+        // one, which is the exact failure this guards against.
+        direction: op.OperationType === 0 ? 'in' : 'out',
       })
     }
   }

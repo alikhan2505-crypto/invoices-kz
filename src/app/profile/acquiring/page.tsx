@@ -715,7 +715,13 @@ export default function AcquiringPage() {
 
       {/* Breaks out of the max-w-lg column above -- this section is a wide,
           filterable dashboard table and deliberately isn't confined to the
-          narrow mobile-first form column the rest of the page uses. */}
+          narrow mobile-first form column the rest of the page uses.
+          Gated on kaspiConnected (not rendered unconditionally like an
+          earlier version of this section had it): a non-Pro or
+          never-connected user has no Kaspi activity to show, and would
+          otherwise see an empty table with filter chips sitting right
+          under the "Про" lock card above. */}
+      {kaspiConnected && (
       <div className="px-4 pb-4 space-y-3">
         {kaspiPendingMatches.length > 0 && (
           <div className="bg-amber-50 rounded-2xl shadow-sm p-4 -mx-1 sm:mx-0 sm:max-w-3xl">
@@ -781,6 +787,7 @@ export default function AcquiringPage() {
           )}
         </div>
       </div>
+      )}
     </main>
   )
 }

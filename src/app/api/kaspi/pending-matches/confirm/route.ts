@@ -33,6 +33,30 @@ export async function POST(req: NextRequest) {
     .maybeSingle()
   if (!pendingMatch) return NextResponse.json({ error: 'not_found' }, { status: 404 })
 
+  // Atomic claim: deleting every sibling candidate for this SAME operation
+  // FIRST (not after settling, as an earlier version of this route had it)
+  // means two concurrent confirms of the same operation can't both pass —
+  // only the caller whose delete actually removed rows proceeds; the loser
+  // gets a clean "already resolved" response instead of double-settling.
+  const { data: deleted, error: deleteError } = await supabase
+    .from('kaspi_pending_matches')
+    .delete()
+    .eq('user_id', user.id)
+    .eq('kaspi_operation_id', pendingMatch.kaspi_operation_id)
+    .select('id')
+  if (deleteError) return NextResponse.json({ error: 'save_failed' }, { status: 500 })
+  if (!deleted || deleted.length === 0) return NextResponse.json({ error: 'already_resolved' }, { status: 409 })
+
+  // The invoice may have been closed by an entirely different path (BCC,
+  // Excel-import, a manual mark-paid) while this ambiguous match sat
+  // pending — re-checked here, after winning the claim above, so this
+  // route never re-marks an already-settled invoice or double-charges
+  // commission for a payment already accounted for elsewhere.
+  const { data: invoice } = await supabase.from('invoices').select('status').eq('id', pendingMatch.invoice_id).maybeSingle()
+  if (!invoice || invoice.status === 'paid' || invoice.status === 'cancelled') {
+    return NextResponse.json({ success: true, skipped: 'invoice_already_closed' })
+  }
+
   await supabase.from('invoices').update({ status: 'paid' }).eq('id', pendingMatch.invoice_id)
   await supabase.from('invoice_logs').insert({ invoice_id: pendingMatch.invoice_id, status: 'paid' })
   await supabase.from('kaspi_operations')
@@ -45,14 +69,6 @@ export async function POST(req: NextRequest) {
   } catch (e: any) {
     console.error('CRITICAL: commission debit failed on manual pending-match confirm for user', user.id, ':', e.message)
   }
-
-  // Every other candidate for the SAME operation is now resolved -- a
-  // single payment can only ever settle one invoice, mirroring
-  // confirmBccMatch's identical cleanup on the client side.
-  await supabase.from('kaspi_pending_matches')
-    .delete()
-    .eq('user_id', user.id)
-    .eq('kaspi_operation_id', pendingMatch.kaspi_operation_id)
 
   return NextResponse.json({ success: true })
 }
