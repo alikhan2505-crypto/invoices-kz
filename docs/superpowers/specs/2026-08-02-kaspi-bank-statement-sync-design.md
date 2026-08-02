@@ -1,5 +1,7 @@
 # Kaspi Bank Statement Sync — Design
 
+> **STATUS: SHELVED (2026-08-02).** Live testing found the Бухгалтер-role web login (`pay.kaspi.kz`) requires a QR-code device-confirmation step (scan with the phone's Kaspi app) on any browser/device Kaspi hasn't already trusted — and that trust is short-lived: inspecting the full cookie jar (including HttpOnly) of an already-trusted session found no cookie surviving more than ~6 days (`KB_SPECIAL_USER`), with the actual session cookie (`ASP.NET_SessionId`) being a pure browser-session cookie with no persistence at all. This invalidates the core premise of this spec (§ "As a real HTTP client... a fresh login every sync run") — an unattended daily cron is, from Kaspi's perspective, always an untrusted new device, and there is no human available to scan a QR on its behalf. Automating this would need the customer to re-scan a QR every few days, which is no better than the existing manual Excel/PDF upload fallback it was meant to replace. Shelved rather than deleted: the confirmed protocol details below (particularly the real `/api/statement/account` response shape with genuine counterparty BIN) remain valid and useful if a future session finds a different way to establish durable device trust.
+
 ## Motivation
 
 invoices.kz already has three separate Kaspi/bank reconciliation paths on `/profile/acquiring`:
