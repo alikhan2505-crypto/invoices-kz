@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { debitWalletForCommission } from '@/lib/kaspiPay/wallet'
+import { alreadyCharged } from '@/lib/kaspiPay/historySync'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -64,7 +65,18 @@ export async function POST(req: NextRequest) {
     .eq('user_id', user.id)
     .eq('kaspi_operation_id', pendingMatch.kaspi_operation_id)
 
+  // The delete-based claim above only stops two concurrent confirms of the
+  // SAME still-pending candidate set from both winning. It does not stop a
+  // second confirm on a DIFFERENT candidate for this same kaspi operation
+  // if a concurrent history-sync run re-inserted (resurrected) the sibling
+  // rows this route already deleted for a prior confirm -- checked here
+  // rather than trusting that resurrection can't happen, since a
+  // background sync run can still be mid-flight against a stale snapshot
+  // when this request lands.
   try {
+    if (await alreadyCharged(user.id, pendingMatch.kaspi_operation_id)) {
+      return NextResponse.json({ success: true })
+    }
     await debitWalletForCommission(user.id, Number(pendingMatch.matched_amount), null, `kaspi_operation:${pendingMatch.kaspi_operation_id}`)
   } catch (e: any) {
     console.error('CRITICAL: commission debit failed on manual pending-match confirm for user', user.id, ':', e.message)

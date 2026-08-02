@@ -54,9 +54,16 @@ export async function debitWalletForCommission(userId: string, amount: number, k
   const commission = computeCommission(amount)
   const { data, error } = await supabase.rpc('debit_wallet_balance', { p_user_id: userId, p_amount: commission })
   if (error) throw new Error(`wallet commission debit failed for user ${userId}: ${error.message}`)
-  // Same reasoning as creditWallet's ledger insert: the debit already
-  // happened, so a failed insert here is an audit-trail gap, not something
-  // that should un-debit a commission the platform is legitimately owed.
+  // Unlike creditWallet's ledger insert, this one is NOT allowed to fail
+  // silently: Kaspi history sync's alreadyCharged() guard (and the pending-
+  // match confirm route's own copy of it) both key off this exact row's
+  // existence to decide whether a commission was already charged for a
+  // given Kaspi operation. A swallowed failure here would leave the balance
+  // debited with no record of it, so a crash-recovery retry sees "not yet
+  // charged" and debits a second time -- throwing surfaces the failure to
+  // the caller (which already treats a failed debit as best-effort/logged,
+  // never as a reason to un-confirm the underlying payment) instead of
+  // silently creating that gap.
   const { error: ledgerError } = await supabase.from('wallet_ledger').insert({
     user_id: userId,
     type: 'commission',
@@ -65,7 +72,7 @@ export async function debitWalletForCommission(userId: string, amount: number, k
     kaspi_payment_request_id: kaspiPaymentRequestId,
     note: note ?? null,
   })
-  if (ledgerError) console.error('wallet_ledger insert failed after commission debit for user', userId, ':', ledgerError.message)
+  if (ledgerError) throw new Error(`wallet_ledger insert failed after commission debit for user ${userId}: ${ledgerError.message}`)
   return data as number
 }
 

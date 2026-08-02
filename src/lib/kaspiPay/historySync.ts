@@ -25,18 +25,39 @@ interface ExistingOpRow {
 // next run and get charged a second time. This check is the belt-and-
 // suspenders that also covers the narrower residual window between a
 // successful debit and the settled_at update that marks it done.
-async function alreadyCharged(userId: string, opId: string): Promise<boolean> {
-  const { data } = await supabase
+// Exported so the pending-match confirm route (a second, independent path
+// that can also charge commission for the same kaspi_operation_id) can use
+// the exact same guard instead of trusting its own single delete-based claim
+// -- a re-review found that guard alone doesn't stop a SECOND confirm on a
+// pending-match candidate resurrected by a concurrent sync run from also
+// charging commission for an operation already paid for.
+export async function alreadyCharged(userId: string, opId: string): Promise<boolean> {
+  const { data, error } = await supabase
     .from('wallet_ledger')
     .select('id')
     .eq('user_id', userId)
     .eq('note', `kaspi_operation:${opId}`)
     .limit(1)
     .maybeSingle()
+  // A query failure is NOT "not charged" -- treating it as such on a
+  // crash-recovery retry is exactly the kind of silent assumption that
+  // already caused a double-charge bug twice in this feature. Throwing
+  // aborts processing of this operation (and, via the caller's lack of a
+  // catch around this call, the rest of this sync run) rather than risking
+  // a second debit; the next run retries cleanly since settled_at was never
+  // reached for this operation.
+  if (error) throw new Error(`alreadyCharged check failed for user ${userId} operation ${opId}: ${error.message}`)
   return !!data
 }
 
 async function settleUnambiguous(userId: string, op: KaspiHistoryOperation, invoiceId: string) {
+  // Re-checked here (not just at claim time): the crash-recovery path can
+  // reach this function for an invoice that was closed through an entirely
+  // different channel (BCC, Excel-import, manual mark-paid, or this same
+  // operation's own earlier attempt) in between the original claim and this
+  // retry -- mirrors the pending-match confirm route's identical check.
+  const { data: invoice } = await supabase.from('invoices').select('status').eq('id', invoiceId).maybeSingle()
+  if (!invoice || invoice.status === 'paid' || invoice.status === 'cancelled') return
   await supabase.from('invoices').update({ status: 'paid' }).eq('id', invoiceId)
   await supabase.from('invoice_logs').insert({ invoice_id: invoiceId, status: 'paid' })
   if (await alreadyCharged(userId, op.id)) return
@@ -128,17 +149,47 @@ export async function syncKaspiHistory(userId: string): Promise<{ synced: number
 
     if (existing && !existing.settled_at) {
       // Crash-recovery path: this operation was claimed but never finished
-      // settling. Complete it using the STORED decision, not a fresh match.
-      if (existing.category === 'platform' && existing.matched_invoice_id) {
-        await settleUnambiguous(userId, op, existing.matched_invoice_id)
+      // settling. Re-fetch live state instead of trusting the batch
+      // snapshot taken at the top of this run -- the pending-matches
+      // confirm route can resolve this exact operation (category/
+      // matched_invoice_id) concurrently while this run is still working
+      // through earlier operations, and acting on a stale snapshot here was
+      // itself a prior bug (a resolved operation could get its deleted
+      // pending-match candidates silently re-inserted). This still leaves a
+      // narrow window if two sync runs for the same user overlap (no
+      // manual "sync now" trigger exists yet, only the shared daily cron,
+      // so this is deliberately not fully lock-guarded) -- logged as an
+      // accepted residual risk, not a gap to silently ignore.
+      const { data: liveRow } = await supabase
+        .from('kaspi_operations')
+        .select('matched_invoice_id, category, settled_at')
+        .eq('user_id', userId)
+        .eq('kaspi_operation_id', op.id)
+        .maybeSingle()
+      if (!liveRow || liveRow.settled_at) continue // already finished by a concurrent confirm/run
+
+      if (liveRow.category === 'platform' && liveRow.matched_invoice_id) {
+        await settleUnambiguous(userId, op, liveRow.matched_invoice_id)
         autoConfirmed++
       } else {
         // Ambiguous or unmatched at claim time -- no money was ever at
         // stake for this branch, so it's safe to recompute fresh against
         // the current open-invoice pool rather than trust a stale
-        // candidate list.
+        // candidate list. Every outcome must be handled here: silently
+        // handling only 'ambiguous' and falling through to settled_at for
+        // an operation that recomputes as 'unambiguous' was itself a bug --
+        // it permanently lost the operation (never settled, never queued
+        // for confirmation) the instant it was marked settled_at.
         const match = matchOperation(op, openInvoices)
-        if (match.kind === 'ambiguous') {
+        if (match.kind === 'unambiguous') {
+          await supabase.from('kaspi_operations')
+            .update({ matched_invoice_id: match.invoice.id, category: 'platform' })
+            .eq('user_id', userId).eq('kaspi_operation_id', op.id)
+          await settleUnambiguous(userId, op, match.invoice.id)
+          autoConfirmed++
+          const idx = openInvoices.findIndex(i => i.id === match.invoice.id)
+          if (idx !== -1) openInvoices.splice(idx, 1)
+        } else if (match.kind === 'ambiguous') {
           await recordPendingMatches(userId, op, match.invoices)
           pending++
         }
