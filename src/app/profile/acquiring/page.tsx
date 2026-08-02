@@ -69,6 +69,7 @@ export default function AcquiringPage() {
   const [kaspiConfirmingMatchId, setKaspiConfirmingMatchId] = useState<string | null>(null)
   const [kaspiSyncing, setKaspiSyncing] = useState(false)
   const [kaspiSyncError, setKaspiSyncError] = useState('')
+  const [kaspiLastSyncedAt, setKaspiLastSyncedAt] = useState<string | null>(null)
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -194,6 +195,7 @@ export default function AcquiringPage() {
       const data = await res.json()
       setKaspiOperations(data.operations || [])
       setKaspiPendingMatches(data.pendingMatches || [])
+      setKaspiLastSyncedAt(data.lastSyncedAt ?? null)
     }
   }
 
@@ -638,12 +640,17 @@ export default function AcquiringPage() {
       )}
 
       <div className="bg-white rounded-2xl shadow-sm p-4">
-        <div className="flex items-center justify-between mb-3 gap-2">
+        <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
           <div className="text-sm font-medium text-[#1C2056]">{t.kaspiHistoryTitle}</div>
-          <button onClick={syncKaspiStatement} disabled={kaspiSyncing || !kaspiConnected}
-            className="bg-gray-100 text-[#1C2056] rounded-lg px-3 py-1.5 text-xs font-medium disabled:opacity-50 flex-shrink-0">
-            {kaspiSyncing ? t.kaspiSyncingLabel : t.kaspiSyncButton}
-          </button>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-gray-400">
+              {kaspiLastSyncedAt ? t.kaspiLastSyncedLabel(new Date(kaspiLastSyncedAt).toLocaleString('ru-KZ')) : t.kaspiNeverSyncedLabel}
+            </span>
+            <button onClick={syncKaspiStatement} disabled={kaspiSyncing || !kaspiConnected}
+              className="bg-gray-100 text-[#1C2056] rounded-lg px-3 py-1.5 text-xs font-medium disabled:opacity-50 flex-shrink-0">
+              {kaspiSyncing ? t.kaspiSyncingLabel : t.kaspiSyncButton}
+            </button>
+          </div>
         </div>
         {kaspiSyncError && <p className="text-xs text-red-500 mb-3">{kaspiSyncError}</p>}
         <div className="flex gap-2 mb-3 flex-wrap">
@@ -701,7 +708,7 @@ export default function AcquiringPage() {
       </div>
 
       <div className="max-w-lg mx-auto px-4 pt-4 space-y-4">
-        {!ap.canAcquiring ? (
+        {!ap.canAcquiring && (
           <div className="bg-white rounded-2xl shadow-sm p-4">
             <div className="flex items-center gap-3 mb-2">
               <div className="w-10 h-10 rounded-full bg-[#1C2056]/5 flex items-center justify-center text-xl">🏦</div>
@@ -715,10 +722,6 @@ export default function AcquiringPage() {
               className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium">
               {t.goToPlansButton}
             </button>
-          </div>
-        ) : (
-          <div className="bg-blue-50 rounded-2xl p-4">
-            <p className="text-xs text-gray-600 leading-relaxed">{t.introText}</p>
           </div>
         )}
 
@@ -789,6 +792,7 @@ export default function AcquiringPage() {
             )}
 
             <div className="bg-white rounded-2xl shadow-sm p-4">
+              <p className="text-xs text-gray-500 leading-relaxed mb-3">{t.introText}</p>
               <label className="block border-2 border-dashed border-gray-200 rounded-xl py-4 text-center cursor-pointer">
                 <span className="text-sm text-[#1C2056]">
                   {fileName ? t.fileChosenLabel(fileName) : t.chooseFileButton}

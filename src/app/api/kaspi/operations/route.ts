@@ -20,6 +20,12 @@ export async function GET(req: NextRequest) {
   const direction = req.nextUrl.searchParams.get('direction') || 'all'
   const category = req.nextUrl.searchParams.get('category') || 'all'
 
+  const { data: connection } = await supabase
+    .from('kaspi_connections')
+    .select('last_history_sync_at')
+    .eq('user_id', user.id)
+    .maybeSingle()
+
   let query = supabase
     .from('kaspi_operations')
     .select('id, order_number, amount, direction, category, client_name, matched_invoice_id, operation_date, invoices(number, client_name)')
@@ -37,6 +43,7 @@ export async function GET(req: NextRequest) {
     .eq('user_id', user.id)
 
   return NextResponse.json({
+    lastSyncedAt: connection?.last_history_sync_at ?? null,
     operations: (ops || []).map((o: any) => ({
       id: o.id,
       orderNumber: o.order_number,

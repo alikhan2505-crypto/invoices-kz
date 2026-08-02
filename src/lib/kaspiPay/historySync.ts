@@ -258,5 +258,10 @@ export async function syncKaspiHistory(userId: string): Promise<{ synced: number
     await supabase.from('kaspi_operations').update({ settled_at: new Date().toISOString() }).eq('user_id', userId).eq('kaspi_operation_id', op.id)
   }
 
+  // Recorded even when nothing new was found -- "we checked and there was
+  // nothing" is still a real sync, and the dashboard shows this timestamp
+  // regardless of whether it came from the daily cron or a manual refresh.
+  await supabase.from('kaspi_connections').update({ last_history_sync_at: new Date().toISOString() }).eq('user_id', userId)
+
   return { synced, autoConfirmed, pending }
 }

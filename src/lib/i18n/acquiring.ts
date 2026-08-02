@@ -74,6 +74,8 @@ export interface AcquiringContent {
   kaspiSyncButton: string
   kaspiSyncingLabel: string
   kaspiSyncErrorHint: string
+  kaspiLastSyncedLabel: (date: string) => string
+  kaspiNeverSyncedLabel: string
   kaspiStatsTodayLabel: string
   kaspiStatsMonthLabel: string
   kaspiStatsAllTimeLabel: string
@@ -183,6 +185,8 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiSyncButton: 'Обновить',
     kaspiSyncingLabel: 'Обновляем...',
     kaspiSyncErrorHint: 'Не удалось обновить выписку. Попробуйте ещё раз.',
+    kaspiLastSyncedLabel: (date: string) => `Обновлено: ${date}`,
+    kaspiNeverSyncedLabel: 'Ещё не обновлялось',
     kaspiStatsTodayLabel: 'За 24 часа',
     kaspiStatsMonthLabel: 'За 30 дней',
     kaspiStatsAllTimeLabel: 'Всего',
@@ -290,6 +294,8 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiSyncButton: 'Жаңарту',
     kaspiSyncingLabel: 'Жаңартылуда...',
     kaspiSyncErrorHint: 'Үзінді көшірмені жаңарту мүмкін болмады. Қайталап көріңіз.',
+    kaspiLastSyncedLabel: (date: string) => `Жаңартылды: ${date}`,
+    kaspiNeverSyncedLabel: 'Әлі жаңартылған жоқ',
     kaspiStatsTodayLabel: '24 сағат ішінде',
     kaspiStatsMonthLabel: '30 күн ішінде',
     kaspiStatsAllTimeLabel: 'Барлығы',
@@ -397,6 +403,8 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiSyncButton: 'Refresh',
     kaspiSyncingLabel: 'Refreshing...',
     kaspiSyncErrorHint: 'Could not refresh the statement. Please try again.',
+    kaspiLastSyncedLabel: (date: string) => `Updated: ${date}`,
+    kaspiNeverSyncedLabel: 'Never updated yet',
     kaspiStatsTodayLabel: 'Last 24h',
     kaspiStatsMonthLabel: 'Last 30 days',
     kaspiStatsAllTimeLabel: 'All time',
