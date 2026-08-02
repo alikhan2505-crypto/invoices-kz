@@ -112,7 +112,7 @@ export default function Upgrade() {
       const data = await res.json()
 
       if (!res.ok || data.error) {
-        alert(t.errorPrefix(data.error || t.tryAgainDefault))
+        alert(data.error === 'already_pending' ? t.alreadyPendingAlert : t.errorPrefix(data.error || t.tryAgainDefault))
         setShowModal(false)
         setSubmitting(false)
         return
@@ -174,7 +174,7 @@ export default function Upgrade() {
       })
       const data = await res.json()
       if (!res.ok || data.error) {
-        alert(t.errorPrefix(data.error || t.tryAgainDefault))
+        alert(data.error === 'already_pending' ? t.alreadyPendingAlert : t.errorPrefix(data.error || t.tryAgainDefault))
         setPhoneSubmitting(false)
         return
       }

@@ -44,6 +44,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'rate_limited' }, { status: 429 })
     }
 
+    // Same reasoning as create-phone/route.ts's identical check: the rate
+    // limit above only stops rapid spam, not a customer creating a second
+    // real Kaspi operation a minute or more later because the first one's
+    // confirmation wasn't obviously visible. Blocks on ANY pending request
+    // regardless of which route created it (both write the same table).
+    const { count: pendingCount, error: pendingError } = await supabase
+      .from('payment_requests')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('status', 'pending')
+    if (pendingError) console.error('Payment create: pending-check failed, allowing request:', pendingError.message)
+    else if ((pendingCount ?? 0) > 0) {
+      return NextResponse.json({ error: 'already_pending' }, { status: 409 })
+    }
+
     const connection = await loadPlatformConnection()
     if (!connection) return NextResponse.json({ error: 'Platform Kaspi connection not set up' }, { status: 500 })
 
