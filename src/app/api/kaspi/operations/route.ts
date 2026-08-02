@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
 
   const { data: pending } = await supabase
     .from('kaspi_pending_matches')
-    .select('id, kaspi_operation_id, invoice_id, matched_amount, matched_date, client_name, invoices(number)')
+    .select('id, kaspi_operation_id, invoice_id, matched_amount, matched_date, client_name, invoices(number, client_name)')
     .eq('user_id', user.id)
 
   return NextResponse.json({
@@ -60,7 +60,14 @@ export async function GET(req: NextRequest) {
       kaspiOperationId: p.kaspi_operation_id,
       invoiceId: p.invoice_id,
       invoiceNumber: p.invoices?.number ?? null,
+      // clientName is the Kaspi payer's own name (from the operation itself,
+      // the same for every candidate of one operation); invoiceClientName is
+      // the candidate INVOICE's own client name -- shown side by side so the
+      // user can eyeball-match by name when Kaspi's API gives us no BIN to
+      // match on automatically, without the platform auto-picking a
+      // candidate based on a fuzzy name comparison it can't be sure about.
       clientName: p.client_name,
+      invoiceClientName: p.invoices?.client_name ?? null,
       matchedAmount: Number(p.matched_amount),
       matchedDate: p.matched_date,
     })),

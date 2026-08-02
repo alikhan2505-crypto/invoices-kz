@@ -63,7 +63,7 @@ export default function AcquiringPage() {
   const [kaspiError, setKaspiError] = useState('')
   const [kaspiRecentTopups, setKaspiRecentTopups] = useState<{ amount: number, status: string, createdAt: string }[]>([])
   const [kaspiOperations, setKaspiOperations] = useState<{ id: string, orderNumber: string, amount: number, direction: string, category: string, clientName: string | null, matchedInvoiceNumber: string | null, operationDate: string }[]>([])
-  const [kaspiPendingMatches, setKaspiPendingMatches] = useState<{ id: string, invoiceNumber: string | null, clientName: string | null, matchedAmount: number, matchedDate: string }[]>([])
+  const [kaspiPendingMatches, setKaspiPendingMatches] = useState<{ id: string, invoiceNumber: string | null, clientName: string | null, invoiceClientName: string | null, matchedAmount: number, matchedDate: string }[]>([])
   const [kaspiDirectionFilter, setKaspiDirectionFilter] = useState<'all' | 'in' | 'out'>('all')
   const [kaspiCategoryFilter, setKaspiCategoryFilter] = useState<'all' | 'platform' | 'other'>('all')
   const [kaspiConfirmingMatchId, setKaspiConfirmingMatchId] = useState<string | null>(null)
@@ -626,12 +626,13 @@ export default function AcquiringPage() {
         <div className="bg-amber-50 rounded-2xl shadow-sm p-4">
           <div className="text-sm font-medium text-[#1C2056] mb-2">{t.kaspiPendingMatchesTitle}</div>
           {kaspiPendingMatches.map(pm => (
-            <div key={pm.id} className="flex items-center justify-between py-2 border-b border-amber-100 last:border-0">
+            <div key={pm.id} className="flex items-center justify-between py-2 border-b border-amber-100 last:border-0 gap-2">
               <div className="text-xs text-gray-600">
-                {pm.matchedAmount.toLocaleString('ru-KZ')} ₸ — {t.kaspiPendingMatchCandidate}: {pm.invoiceNumber} ({pm.clientName || '—'})
+                <div>{pm.matchedAmount.toLocaleString('ru-KZ')} ₸ — {t.kaspiPendingMatchCandidate}: {pm.invoiceNumber} ({pm.invoiceClientName || '—'})</div>
+                <div className="text-[10px] text-gray-400 mt-0.5">{t.kaspiPendingMatchPayerLabel}: {pm.clientName || '—'}</div>
               </div>
               <button onClick={() => confirmKaspiPendingMatch(pm.id)} disabled={kaspiConfirmingMatchId === pm.id}
-                className="bg-[#1C2056] text-white rounded-lg px-3 py-1.5 text-xs font-medium">
+                className="bg-[#1C2056] text-white rounded-lg px-3 py-1.5 text-xs font-medium flex-shrink-0">
                 {t.kaspiConfirmMatchButton}
               </button>
             </div>

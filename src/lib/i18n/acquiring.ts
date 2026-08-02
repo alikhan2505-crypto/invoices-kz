@@ -89,6 +89,7 @@ export interface AcquiringContent {
   kaspiTopupHistoryTitle: string
   kaspiPendingMatchesTitle: string
   kaspiPendingMatchCandidate: string
+  kaspiPendingMatchPayerLabel: string
   kaspiConfirmMatchButton: string
   kaspiFilterAll: string
   kaspiFilterIn: string
@@ -200,6 +201,7 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiTopupHistoryTitle: 'История пополнений баланса',
     kaspiPendingMatchesTitle: 'Требуют подтверждения',
     kaspiPendingMatchCandidate: 'вероятный счёт',
+    kaspiPendingMatchPayerLabel: 'плательщик в Kaspi',
     kaspiConfirmMatchButton: 'Подтвердить',
     kaspiFilterAll: 'Все',
     kaspiFilterIn: 'Входящие',
@@ -309,6 +311,7 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiTopupHistoryTitle: 'Әмиян толтыру тарихы',
     kaspiPendingMatchesTitle: 'Растауды қажет етеді',
     kaspiPendingMatchCandidate: 'ықтимал шот',
+    kaspiPendingMatchPayerLabel: 'Kaspi-дегі төлеуші',
     kaspiConfirmMatchButton: 'Растау',
     kaspiFilterAll: 'Барлығы',
     kaspiFilterIn: 'Кіріс',
@@ -418,6 +421,7 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiTopupHistoryTitle: 'Top-up history',
     kaspiPendingMatchesTitle: 'Needs confirmation',
     kaspiPendingMatchCandidate: 'likely invoice',
+    kaspiPendingMatchPayerLabel: 'Kaspi payer',
     kaspiConfirmMatchButton: 'Confirm',
     kaspiFilterAll: 'All',
     kaspiFilterIn: 'Incoming',
