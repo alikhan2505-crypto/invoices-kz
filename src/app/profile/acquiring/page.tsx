@@ -67,6 +67,8 @@ export default function AcquiringPage() {
   const [kaspiDirectionFilter, setKaspiDirectionFilter] = useState<'all' | 'in' | 'out'>('all')
   const [kaspiCategoryFilter, setKaspiCategoryFilter] = useState<'all' | 'platform' | 'other'>('all')
   const [kaspiConfirmingMatchId, setKaspiConfirmingMatchId] = useState<string | null>(null)
+  const [kaspiSyncing, setKaspiSyncing] = useState(false)
+  const [kaspiSyncError, setKaspiSyncError] = useState('')
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -192,6 +194,30 @@ export default function AcquiringPage() {
       const data = await res.json()
       setKaspiOperations(data.operations || [])
       setKaspiPendingMatches(data.pendingMatches || [])
+    }
+  }
+
+  async function syncKaspiStatement() {
+    setKaspiSyncError('')
+    setKaspiSyncing(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/kaspi/sync', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${session?.access_token}` },
+      })
+      if (!res.ok) {
+        setKaspiSyncError(t.kaspiSyncErrorHint)
+        return
+      }
+      // A sync can pay off an invoice and charge commission, not just add
+      // rows to the table -- reloading everything keeps the wallet balance
+      // and top-up history honest too, not just the operations list.
+      await load()
+    } catch (e: any) {
+      setKaspiSyncError(t.kaspiSyncErrorHint)
+    } finally {
+      setKaspiSyncing(false)
     }
   }
 
@@ -459,6 +485,214 @@ export default function AcquiringPage() {
     </div>
   )
 
+  // 1. Kaspi Cashier connect/wallet card — free on every plan, always shown
+  // first: everything else on this page (the statement below it, BCC) is
+  // either about or downstream of this connection.
+  const kaspiCashierCard = (
+    <div className="bg-white rounded-2xl shadow-sm p-4">
+      <div className="text-sm font-medium text-[#1C2056] mb-2">{t.kaspiSectionTitle}</div>
+      {!kaspiConnected && <p className="text-xs text-gray-500 mb-2">{t.kaspiIntroText}</p>}
+      <p className="text-xs text-gray-500 mb-3">{t.kaspiCommissionHint}</p>
+      {profile?.is_admin && (
+        <p className="text-xs text-blue-600 bg-blue-50 rounded-lg px-3 py-2 mb-3">{t.kaspiPlatformConnectionNote}</p>
+      )}
+      {kaspiError && <p className="text-xs text-red-500 mb-2">{kaspiError}</p>}
+
+      {kaspiConnected ? (
+        <>
+          {kaspiApiToken && (
+            <>
+              <div className="text-xs text-amber-600 mb-2">{t.kaspiTokenShownOnceWarning}</div>
+              <div className="bg-gray-50 rounded-xl p-3 text-xs font-mono break-all mb-3">{kaspiApiToken}</div>
+              <button onClick={() => navigator.clipboard.writeText(kaspiApiToken)}
+                className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium mb-3">
+                {t.kaspiCopyTokenButton}
+              </button>
+            </>
+          )}
+
+          {kaspiStatus === 'error' && (
+            <div className="text-xs text-amber-600 mb-3">{t.kaspiConnectionErrorHint}</div>
+          )}
+
+          <div className="text-xs text-gray-500 mb-1">
+            {t.kaspiWalletBalanceLabel}: {kaspiWalletBalance.toLocaleString('ru-KZ')} ₸
+          </div>
+          {kaspiWalletBalance <= 0 && (
+            <div className="text-xs text-amber-600 mb-2">{t.kaspiInsufficientBalanceHint}</div>
+          )}
+
+          <div className="text-xs text-gray-500 mb-1 mt-2">{t.kaspiTopupPresetsLabel}</div>
+          <div className="flex gap-2 flex-wrap mb-2">
+            {[1000, 5000, 10000, 50000].map(amount => (
+              <button key={amount}
+                onClick={() => { setKaspiTopupAmount(amount); setKaspiTopupCustom('') }}
+                className={`rounded-lg px-3 py-1.5 text-xs font-medium ${kaspiTopupAmount === amount ? 'bg-[#1C2056] text-white' : 'bg-gray-100 text-[#1C2056]'}`}>
+                {amount.toLocaleString('ru-KZ')} ₸
+              </button>
+            ))}
+          </div>
+          <input value={kaspiTopupCustom}
+            onChange={e => { setKaspiTopupCustom(e.target.value.replace(/\D/g, '')); setKaspiTopupAmount(null) }}
+            placeholder={t.kaspiTopupCustomPlaceholder} type="text" inputMode="numeric"
+            className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-[#1C2056] mb-3" />
+          <button onClick={() => startTopup((kaspiTopupAmount ?? Number(kaspiTopupCustom)) || 0)}
+            disabled={kaspiToppingUp || !(kaspiTopupAmount || kaspiTopupCustom)}
+            className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium mb-3 disabled:opacity-50">
+            {kaspiToppingUp ? t.kaspiTopupStartingLabel : t.kaspiTopupButton}
+          </button>
+
+          {kaspiTopupPending && (
+            <div className="bg-blue-50 rounded-xl p-3 mb-3">
+              <p className="text-xs text-gray-600 mb-2">{t.kaspiTopupPendingHint}</p>
+              <a href={kaspiTopupPending.payment_link} target="_blank" rel="noopener noreferrer"
+                className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium block text-center">
+                {t.kaspiTopupPayLinkLabel}
+              </a>
+            </div>
+          )}
+
+          {kaspiRecentTopups.length > 0 && (
+            <>
+              <div className="text-xs text-gray-500 mb-2 mt-2">{t.kaspiTopupHistoryTitle}</div>
+              <div className="mb-3 -mx-1 max-h-40 overflow-y-auto">
+                {kaspiRecentTopups.map((tp, i) => {
+                  const statusLabel = tp.status === 'paid' ? t.kaspiStatusPaid
+                    : tp.status === 'pending' ? t.kaspiStatusPending
+                    : tp.status === 'expired' ? t.kaspiStatusExpired
+                    : t.kaspiStatusFailed
+                  const statusColor = tp.status === 'paid' ? 'text-green-600' : tp.status === 'pending' ? 'text-blue-600' : 'text-gray-400'
+                  return (
+                    <div key={tp.createdAt + i} className="flex items-center justify-between px-1 py-2 border-b border-gray-50 last:border-0">
+                      <div>
+                        <div className="text-xs text-[#1C2056]">{tp.amount.toLocaleString('ru-KZ')} ₸</div>
+                        <div className="text-[10px] text-gray-400">{new Date(tp.createdAt).toLocaleString('ru-KZ')}</div>
+                      </div>
+                      <div className={`text-xs font-medium ${statusColor}`}>{statusLabel}</div>
+                    </div>
+                  )
+                })}
+              </div>
+            </>
+          )}
+
+          <button onClick={disconnectKaspi} disabled={kaspiDisconnecting}
+            className="w-full bg-gray-100 text-gray-600 rounded-xl py-2.5 text-sm font-medium">
+            {kaspiDisconnecting ? t.kaspiDisconnectingLabel : t.kaspiDisconnectButton}
+          </button>
+        </>
+      ) : !kaspiProcessId ? (
+        <>
+          <label className="block text-xs text-gray-500 mb-1">{t.kaspiPhoneLabel}</label>
+          <input value={kaspiPhone} onChange={e => setKaspiPhone(formatKaspiPhone(e.target.value))} placeholder={t.kaspiPhonePlaceholder}
+            type="tel" maxLength={16}
+            className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-[#1C2056] mb-3" />
+          <button onClick={sendKaspiCode} disabled={kaspiSending || !kaspiPhone}
+            className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium">
+            {kaspiSending ? t.kaspiSendingCodeLabel : t.kaspiSendCodeButton}
+          </button>
+        </>
+      ) : (
+        <>
+          <label className="block text-xs text-gray-500 mb-1">{t.kaspiOtpLabel}</label>
+          <input value={kaspiOtp} onChange={e => setKaspiOtp(e.target.value)} placeholder={t.kaspiOtpPlaceholder}
+            type="text" inputMode="numeric" maxLength={6}
+            className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-[#1C2056] mb-3" />
+          <button onClick={verifyKaspiCode} disabled={kaspiVerifying || !kaspiOtp}
+            className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium">
+            {kaspiVerifying ? t.kaspiVerifyingLabel : t.kaspiVerifyButton}
+          </button>
+        </>
+      )}
+
+      <button onClick={() => router.push('/profile/kaspi-pay/docs')}
+        className="w-full text-xs text-[#1C2056] underline text-center py-2 mt-2">
+        {t.kaspiDocsLinkLabel}
+      </button>
+    </div>
+  )
+
+  // 2. Kaspi statement ("Выписка") — every transaction on the connected
+  // account, not just ones minted through our own links, plus the manual
+  // "sync now" refresh (the daily cron alone is too slow to feel real-time
+  // for a customer checking right after a sale). Shown once there's a live
+  // connection or something left over from before (see the gating comment
+  // further down for why a disconnected-but-unresolved case still renders).
+  const kaspiStatementSection = (kaspiConnected || kaspiOperations.length > 0 || kaspiPendingMatches.length > 0) && (
+    <>
+      {kaspiPendingMatches.length > 0 && (
+        <div className="bg-amber-50 rounded-2xl shadow-sm p-4">
+          <div className="text-sm font-medium text-[#1C2056] mb-2">{t.kaspiPendingMatchesTitle}</div>
+          {kaspiPendingMatches.map(pm => (
+            <div key={pm.id} className="flex items-center justify-between py-2 border-b border-amber-100 last:border-0">
+              <div className="text-xs text-gray-600">
+                {pm.matchedAmount.toLocaleString('ru-KZ')} ₸ — {t.kaspiPendingMatchCandidate}: {pm.invoiceNumber} ({pm.clientName || '—'})
+              </div>
+              <button onClick={() => confirmKaspiPendingMatch(pm.id)} disabled={kaspiConfirmingMatchId === pm.id}
+                className="bg-[#1C2056] text-white rounded-lg px-3 py-1.5 text-xs font-medium">
+                {t.kaspiConfirmMatchButton}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="bg-white rounded-2xl shadow-sm p-4">
+        <div className="flex items-center justify-between mb-3 gap-2">
+          <div className="text-sm font-medium text-[#1C2056]">{t.kaspiHistoryTitle}</div>
+          <button onClick={syncKaspiStatement} disabled={kaspiSyncing || !kaspiConnected}
+            className="bg-gray-100 text-[#1C2056] rounded-lg px-3 py-1.5 text-xs font-medium disabled:opacity-50 flex-shrink-0">
+            {kaspiSyncing ? t.kaspiSyncingLabel : t.kaspiSyncButton}
+          </button>
+        </div>
+        {kaspiSyncError && <p className="text-xs text-red-500 mb-3">{kaspiSyncError}</p>}
+        <div className="flex gap-2 mb-3 flex-wrap">
+          {(['all', 'in', 'out'] as const).map(d => (
+            <button key={d} onClick={() => { setKaspiDirectionFilter(d); loadKaspiOperations(d, kaspiCategoryFilter) }}
+              className={`rounded-lg px-3 py-1.5 text-xs font-medium ${kaspiDirectionFilter === d ? 'bg-[#1C2056] text-white' : 'bg-gray-100 text-[#1C2056]'}`}>
+              {d === 'all' ? t.kaspiFilterAll : d === 'in' ? t.kaspiFilterIn : t.kaspiFilterOut}
+            </button>
+          ))}
+          {(['all', 'platform', 'other'] as const).map(c => (
+            <button key={c} onClick={() => { setKaspiCategoryFilter(c); loadKaspiOperations(kaspiDirectionFilter, c) }}
+              className={`rounded-lg px-3 py-1.5 text-xs font-medium ${kaspiCategoryFilter === c ? 'bg-[#1C2056] text-white' : 'bg-gray-100 text-[#1C2056]'}`}>
+              {c === 'all' ? t.kaspiFilterAll : c === 'platform' ? t.kaspiFilterPlatform : t.kaspiFilterOther}
+            </button>
+          ))}
+        </div>
+
+        {kaspiOperations.length === 0 ? (
+          <p className="text-xs text-gray-400 text-center py-3">{t.kaspiHistoryEmptyLabel}</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-gray-400 text-left border-b border-gray-100">
+                  <th className="py-2 pr-3 font-normal">{t.kaspiColDate}</th>
+                  <th className="py-2 pr-3 font-normal">{t.kaspiColAmount}</th>
+                  <th className="py-2 pr-3 font-normal">{t.kaspiColDirection}</th>
+                  <th className="py-2 pr-3 font-normal">{t.kaspiColInvoice}</th>
+                  <th className="py-2 font-normal">{t.kaspiColCategory}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {kaspiOperations.map(op => (
+                  <tr key={op.id} className="border-b border-gray-50 last:border-0">
+                    <td className="py-2 pr-3 text-gray-500">{new Date(op.operationDate).toLocaleString('ru-KZ')}</td>
+                    <td className="py-2 pr-3 text-[#1C2056] font-medium">{op.amount.toLocaleString('ru-KZ')} ₸</td>
+                    <td className="py-2 pr-3 text-gray-500">{op.direction === 'in' ? t.kaspiFilterIn : t.kaspiFilterOut}</td>
+                    <td className="py-2 pr-3 text-gray-500">{op.matchedInvoiceNumber || op.clientName || '—'}</td>
+                    <td className="py-2 text-gray-500">{op.category === 'platform' ? t.kaspiFilterPlatform : t.kaspiFilterOther}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </>
+  )
+
   return (
     <main className="min-h-screen bg-gray-50 pb-8">
       <div className="bg-white border-b px-4 py-4 flex items-center gap-3">
@@ -466,37 +700,56 @@ export default function AcquiringPage() {
         <span className="font-semibold text-[#1C2056]">{t.headerLabel}</span>
       </div>
 
-      <div className="max-w-lg mx-auto p-4 space-y-4">
+      <div className="max-w-lg mx-auto px-4 pt-4 space-y-4">
         {!ap.canAcquiring ? (
-          <>
-            <div className="bg-white rounded-2xl shadow-sm p-4">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 rounded-full bg-[#1C2056]/5 flex items-center justify-center text-xl">🏦</div>
-                <div className="text-sm font-medium text-[#1C2056] flex-1">{t.headerLabel}</div>
-                <span className="text-xs bg-amber-50 text-amber-600 border border-amber-200 px-2 py-0.5 rounded-full flex-shrink-0">
-                  🔒 {t.proBadge}
-                </span>
-              </div>
-              <div className="text-xs text-gray-400 mb-3">{t.proLockedHint}</div>
-              <button onClick={() => router.push('/upgrade')}
-                className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium">
-                {t.goToPlansButton}
-              </button>
+          <div className="bg-white rounded-2xl shadow-sm p-4">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 rounded-full bg-[#1C2056]/5 flex items-center justify-center text-xl">🏦</div>
+              <div className="text-sm font-medium text-[#1C2056] flex-1">{t.headerLabel}</div>
+              <span className="text-xs bg-amber-50 text-amber-600 border border-amber-200 px-2 py-0.5 rounded-full flex-shrink-0">
+                🔒 {t.proBadge}
+              </span>
             </div>
+            <div className="text-xs text-gray-400 mb-3">{t.proLockedHint}</div>
+            <button onClick={() => router.push('/upgrade')}
+              className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium">
+              {t.goToPlansButton}
+            </button>
+          </div>
+        ) : (
+          <div className="bg-blue-50 rounded-2xl p-4">
+            <p className="text-xs text-gray-600 leading-relaxed">{t.introText}</p>
+          </div>
+        )}
 
-            {bccConnection && (
-              <>
-                {bccMessage && <p className="text-xs text-[#1C2056] px-1">{bccMessage}</p>}
-                {bccConnectedCard}
-              </>
-            )}
-          </>
+        {/* Kaspi Pay Cashier — deliberately NOT gated behind ap.canAcquiring
+            (unlike the BCC/Excel-import sections below): connecting a
+            Cashier is free on every plan, only usage is monetized via the
+            wallet balance (see /api/kaspi/pay, invoicePayment.ts). */}
+        {kaspiCashierCard}
+      </div>
+
+      {/* Breaks out to a wider column than the narrow form cards above and
+          below it — a filterable transaction table needs the room, and
+          putting it directly under the Kaspi card it belongs to (instead of
+          detached at the very bottom of the page) is the whole point of
+          this section existing as its own container. */}
+      {kaspiStatementSection && (
+        <div className="max-w-3xl mx-auto px-4 py-4 space-y-3">
+          {kaspiStatementSection}
+        </div>
+      )}
+
+      <div className="max-w-lg mx-auto px-4 pb-8 space-y-4">
+        {!ap.canAcquiring ? (
+          bccConnection && (
+            <>
+              {bccMessage && <p className="text-xs text-[#1C2056] px-1">{bccMessage}</p>}
+              {bccConnectedCard}
+            </>
+          )
         ) : (
           <>
-            <div className="bg-blue-50 rounded-2xl p-4">
-              <p className="text-xs text-gray-600 leading-relaxed">{t.introText}</p>
-            </div>
-
             {bccMessage && <p className="text-xs text-[#1C2056] px-1">{bccMessage}</p>}
 
             {bccConnection ? bccConnectedCard : (
@@ -584,213 +837,7 @@ export default function AcquiringPage() {
             )}
           </>
         )}
-
-        {/* Kaspi Pay Cashier — deliberately NOT gated behind ap.canAcquiring
-            (unlike the BCC/Excel-import sections above): connecting a
-            Cashier is free on every plan, only usage is monetized via the
-            wallet balance (see /api/kaspi/pay, invoicePayment.ts). Rendered
-            in both the locked and unlocked branches for that reason. */}
-        <div className="bg-white rounded-2xl shadow-sm p-4">
-          <div className="text-sm font-medium text-[#1C2056] mb-2">{t.kaspiSectionTitle}</div>
-          {!kaspiConnected && <p className="text-xs text-gray-500 mb-2">{t.kaspiIntroText}</p>}
-          <p className="text-xs text-gray-500 mb-3">{t.kaspiCommissionHint}</p>
-          {profile?.is_admin && (
-            <p className="text-xs text-blue-600 bg-blue-50 rounded-lg px-3 py-2 mb-3">{t.kaspiPlatformConnectionNote}</p>
-          )}
-          {kaspiError && <p className="text-xs text-red-500 mb-2">{kaspiError}</p>}
-
-          {kaspiConnected ? (
-            <>
-              {kaspiApiToken && (
-                <>
-                  <div className="text-xs text-amber-600 mb-2">{t.kaspiTokenShownOnceWarning}</div>
-                  <div className="bg-gray-50 rounded-xl p-3 text-xs font-mono break-all mb-3">{kaspiApiToken}</div>
-                  <button onClick={() => navigator.clipboard.writeText(kaspiApiToken)}
-                    className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium mb-3">
-                    {t.kaspiCopyTokenButton}
-                  </button>
-                </>
-              )}
-
-              {kaspiStatus === 'error' && (
-                <div className="text-xs text-amber-600 mb-3">{t.kaspiConnectionErrorHint}</div>
-              )}
-
-              <div className="text-xs text-gray-500 mb-1">
-                {t.kaspiWalletBalanceLabel}: {kaspiWalletBalance.toLocaleString('ru-KZ')} ₸
-              </div>
-              {kaspiWalletBalance <= 0 && (
-                <div className="text-xs text-amber-600 mb-2">{t.kaspiInsufficientBalanceHint}</div>
-              )}
-
-              <div className="text-xs text-gray-500 mb-1 mt-2">{t.kaspiTopupPresetsLabel}</div>
-              <div className="flex gap-2 flex-wrap mb-2">
-                {[1000, 5000, 10000, 50000].map(amount => (
-                  <button key={amount}
-                    onClick={() => { setKaspiTopupAmount(amount); setKaspiTopupCustom('') }}
-                    className={`rounded-lg px-3 py-1.5 text-xs font-medium ${kaspiTopupAmount === amount ? 'bg-[#1C2056] text-white' : 'bg-gray-100 text-[#1C2056]'}`}>
-                    {amount.toLocaleString('ru-KZ')} ₸
-                  </button>
-                ))}
-              </div>
-              <input value={kaspiTopupCustom}
-                onChange={e => { setKaspiTopupCustom(e.target.value.replace(/\D/g, '')); setKaspiTopupAmount(null) }}
-                placeholder={t.kaspiTopupCustomPlaceholder} type="text" inputMode="numeric"
-                className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-[#1C2056] mb-3" />
-              <button onClick={() => startTopup((kaspiTopupAmount ?? Number(kaspiTopupCustom)) || 0)}
-                disabled={kaspiToppingUp || !(kaspiTopupAmount || kaspiTopupCustom)}
-                className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium mb-3 disabled:opacity-50">
-                {kaspiToppingUp ? t.kaspiTopupStartingLabel : t.kaspiTopupButton}
-              </button>
-
-              {kaspiTopupPending && (
-                <div className="bg-blue-50 rounded-xl p-3 mb-3">
-                  <p className="text-xs text-gray-600 mb-2">{t.kaspiTopupPendingHint}</p>
-                  <a href={kaspiTopupPending.payment_link} target="_blank" rel="noopener noreferrer"
-                    className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium block text-center">
-                    {t.kaspiTopupPayLinkLabel}
-                  </a>
-                </div>
-              )}
-
-              {kaspiRecentTopups.length > 0 && (
-                <>
-                  <div className="text-xs text-gray-500 mb-2 mt-2">{t.kaspiTopupHistoryTitle}</div>
-                  <div className="mb-3 -mx-1 max-h-40 overflow-y-auto">
-                    {kaspiRecentTopups.map((tp, i) => {
-                      const statusLabel = tp.status === 'paid' ? t.kaspiStatusPaid
-                        : tp.status === 'pending' ? t.kaspiStatusPending
-                        : tp.status === 'expired' ? t.kaspiStatusExpired
-                        : t.kaspiStatusFailed
-                      const statusColor = tp.status === 'paid' ? 'text-green-600' : tp.status === 'pending' ? 'text-blue-600' : 'text-gray-400'
-                      return (
-                        <div key={tp.createdAt + i} className="flex items-center justify-between px-1 py-2 border-b border-gray-50 last:border-0">
-                          <div>
-                            <div className="text-xs text-[#1C2056]">{tp.amount.toLocaleString('ru-KZ')} ₸</div>
-                            <div className="text-[10px] text-gray-400">{new Date(tp.createdAt).toLocaleString('ru-KZ')}</div>
-                          </div>
-                          <div className={`text-xs font-medium ${statusColor}`}>{statusLabel}</div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </>
-              )}
-
-              <button onClick={disconnectKaspi} disabled={kaspiDisconnecting}
-                className="w-full bg-gray-100 text-gray-600 rounded-xl py-2.5 text-sm font-medium">
-                {kaspiDisconnecting ? t.kaspiDisconnectingLabel : t.kaspiDisconnectButton}
-              </button>
-            </>
-          ) : !kaspiProcessId ? (
-            <>
-              <label className="block text-xs text-gray-500 mb-1">{t.kaspiPhoneLabel}</label>
-              <input value={kaspiPhone} onChange={e => setKaspiPhone(formatKaspiPhone(e.target.value))} placeholder={t.kaspiPhonePlaceholder}
-                type="tel" maxLength={16}
-                className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-[#1C2056] mb-3" />
-              <button onClick={sendKaspiCode} disabled={kaspiSending || !kaspiPhone}
-                className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium">
-                {kaspiSending ? t.kaspiSendingCodeLabel : t.kaspiSendCodeButton}
-              </button>
-            </>
-          ) : (
-            <>
-              <label className="block text-xs text-gray-500 mb-1">{t.kaspiOtpLabel}</label>
-              <input value={kaspiOtp} onChange={e => setKaspiOtp(e.target.value)} placeholder={t.kaspiOtpPlaceholder}
-                type="text" inputMode="numeric" maxLength={6}
-                className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-[#1C2056] mb-3" />
-              <button onClick={verifyKaspiCode} disabled={kaspiVerifying || !kaspiOtp}
-                className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium">
-                {kaspiVerifying ? t.kaspiVerifyingLabel : t.kaspiVerifyButton}
-              </button>
-            </>
-          )}
-
-          <button onClick={() => router.push('/profile/kaspi-pay/docs')}
-            className="w-full text-xs text-[#1C2056] underline text-center py-2 mt-2">
-            {t.kaspiDocsLinkLabel}
-          </button>
-        </div>
       </div>
-
-      {/* Breaks out of the max-w-lg column above -- this section is a wide,
-          filterable dashboard table and deliberately isn't confined to the
-          narrow mobile-first form column the rest of the page uses.
-          Gated on having anything to show (not rendered unconditionally
-          like an earlier version of this section had it, and not gated on
-          kaspiConnected alone either): a non-Pro or never-connected user
-          has no Kaspi activity to show, and would otherwise see an empty
-          table with filter chips sitting right under the "Про" lock card
-          above -- but a user who's since DISCONNECTED must still be able
-          to see (and resolve) an ambiguous match left over from before,
-          which kaspiConnected alone would hide along with everything else. */}
-      {(kaspiConnected || kaspiOperations.length > 0 || kaspiPendingMatches.length > 0) && (
-      <div className="px-4 pb-4 space-y-3">
-        {kaspiPendingMatches.length > 0 && (
-          <div className="bg-amber-50 rounded-2xl shadow-sm p-4 -mx-1 sm:mx-0 sm:max-w-3xl">
-            <div className="text-sm font-medium text-[#1C2056] mb-2">{t.kaspiPendingMatchesTitle}</div>
-            {kaspiPendingMatches.map(pm => (
-              <div key={pm.id} className="flex items-center justify-between py-2 border-b border-amber-100 last:border-0">
-                <div className="text-xs text-gray-600">
-                  {pm.matchedAmount.toLocaleString('ru-KZ')} ₸ — {t.kaspiPendingMatchCandidate}: {pm.invoiceNumber} ({pm.clientName || '—'})
-                </div>
-                <button onClick={() => confirmKaspiPendingMatch(pm.id)} disabled={kaspiConfirmingMatchId === pm.id}
-                  className="bg-[#1C2056] text-white rounded-lg px-3 py-1.5 text-xs font-medium">
-                  {t.kaspiConfirmMatchButton}
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <div className="bg-white rounded-2xl shadow-sm p-4 -mx-1 sm:mx-0 sm:max-w-3xl">
-          <div className="text-sm font-medium text-[#1C2056] mb-3">{t.kaspiHistoryTitle}</div>
-          <div className="flex gap-2 mb-3 flex-wrap">
-            {(['all', 'in', 'out'] as const).map(d => (
-              <button key={d} onClick={() => { setKaspiDirectionFilter(d); loadKaspiOperations(d, kaspiCategoryFilter) }}
-                className={`rounded-lg px-3 py-1.5 text-xs font-medium ${kaspiDirectionFilter === d ? 'bg-[#1C2056] text-white' : 'bg-gray-100 text-[#1C2056]'}`}>
-                {d === 'all' ? t.kaspiFilterAll : d === 'in' ? t.kaspiFilterIn : t.kaspiFilterOut}
-              </button>
-            ))}
-            {(['all', 'platform', 'other'] as const).map(c => (
-              <button key={c} onClick={() => { setKaspiCategoryFilter(c); loadKaspiOperations(kaspiDirectionFilter, c) }}
-                className={`rounded-lg px-3 py-1.5 text-xs font-medium ${kaspiCategoryFilter === c ? 'bg-[#1C2056] text-white' : 'bg-gray-100 text-[#1C2056]'}`}>
-                {c === 'all' ? t.kaspiFilterAll : c === 'platform' ? t.kaspiFilterPlatform : t.kaspiFilterOther}
-              </button>
-            ))}
-          </div>
-
-          {kaspiOperations.length === 0 ? (
-            <p className="text-xs text-gray-400 text-center py-3">{t.kaspiHistoryEmptyLabel}</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="text-gray-400 text-left border-b border-gray-100">
-                    <th className="py-2 pr-3 font-normal">{t.kaspiColDate}</th>
-                    <th className="py-2 pr-3 font-normal">{t.kaspiColAmount}</th>
-                    <th className="py-2 pr-3 font-normal">{t.kaspiColDirection}</th>
-                    <th className="py-2 pr-3 font-normal">{t.kaspiColInvoice}</th>
-                    <th className="py-2 font-normal">{t.kaspiColCategory}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {kaspiOperations.map(op => (
-                    <tr key={op.id} className="border-b border-gray-50 last:border-0">
-                      <td className="py-2 pr-3 text-gray-500">{new Date(op.operationDate).toLocaleString('ru-KZ')}</td>
-                      <td className="py-2 pr-3 text-[#1C2056] font-medium">{op.amount.toLocaleString('ru-KZ')} ₸</td>
-                      <td className="py-2 pr-3 text-gray-500">{op.direction === 'in' ? t.kaspiFilterIn : t.kaspiFilterOut}</td>
-                      <td className="py-2 pr-3 text-gray-500">{op.matchedInvoiceNumber || op.clientName || '—'}</td>
-                      <td className="py-2 text-gray-500">{op.category === 'platform' ? t.kaspiFilterPlatform : t.kaspiFilterOther}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </div>
-      )}
     </main>
   )
 }

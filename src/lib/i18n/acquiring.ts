@@ -71,6 +71,9 @@ export interface AcquiringContent {
   kaspiPlatformConnectionNote: string
   kaspiHistoryTitle: string
   kaspiHistoryEmptyLabel: string
+  kaspiSyncButton: string
+  kaspiSyncingLabel: string
+  kaspiSyncErrorHint: string
   kaspiStatsTodayLabel: string
   kaspiStatsMonthLabel: string
   kaspiStatsAllTimeLabel: string
@@ -175,8 +178,11 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiInsufficientBalanceHint: 'Баланс кошелька слишком низкий — при нехватке средств новые ссылки на оплату через Kaspi для ваших счетов создаваться не будут. Пополните баланс.',
     kaspiCommissionHint: 'Подключение и приём платежей через Kaspi — бесплатно. С каждого успешного платежа списывается комиссия 5% с баланса кошелька (пополняется заранее).',
     kaspiPlatformConnectionNote: 'Это подключение также используется для приёма оплаты тарифов и пополнений баланса от других пользователей invoices.kz — как административное подключение платформы.',
-    kaspiHistoryTitle: 'История платежей',
-    kaspiHistoryEmptyLabel: 'Платежей пока нет',
+    kaspiHistoryTitle: 'Выписка Kaspi',
+    kaspiHistoryEmptyLabel: 'Операций пока нет — нажмите «Обновить», чтобы загрузить выписку',
+    kaspiSyncButton: 'Обновить',
+    kaspiSyncingLabel: 'Обновляем...',
+    kaspiSyncErrorHint: 'Не удалось обновить выписку. Попробуйте ещё раз.',
     kaspiStatsTodayLabel: 'За 24 часа',
     kaspiStatsMonthLabel: 'За 30 дней',
     kaspiStatsAllTimeLabel: 'Всего',
@@ -279,8 +285,11 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiInsufficientBalanceHint: 'Әмиян балансы тым төмен — қаражат жеткіліксіз болса, шоттарыңыз үшін Kaspi арқылы жаңа төлем сілтемелері жасалмайды. Балансты толтырыңыз.',
     kaspiCommissionHint: 'Kaspi арқылы қосылу және төлемдерді қабылдау — тегін. Әрбір сәтті төлемнен әмиян балансынан 5% комиссия алынады (алдын ала толтырылады).',
     kaspiPlatformConnectionNote: 'Бұл қосылым invoices.kz-тің басқа пайдаланушыларынан тариф пен әмиян толтыруларын қабылдау үшін де қолданылады — платформаның әкімшілік қосылымы ретінде.',
-    kaspiHistoryTitle: 'Төлемдер тарихы',
-    kaspiHistoryEmptyLabel: 'Әзірге төлемдер жоқ',
+    kaspiHistoryTitle: 'Kaspi үзінді көшірмесі',
+    kaspiHistoryEmptyLabel: 'Әзірге операциялар жоқ — үзінді көшірмені жүктеу үшін «Жаңарту» басыңыз',
+    kaspiSyncButton: 'Жаңарту',
+    kaspiSyncingLabel: 'Жаңартылуда...',
+    kaspiSyncErrorHint: 'Үзінді көшірмені жаңарту мүмкін болмады. Қайталап көріңіз.',
     kaspiStatsTodayLabel: '24 сағат ішінде',
     kaspiStatsMonthLabel: '30 күн ішінде',
     kaspiStatsAllTimeLabel: 'Барлығы',
@@ -383,8 +392,11 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiInsufficientBalanceHint: 'Your wallet balance is too low — new Kaspi payment links for your invoices won\'t be created if funds run out. Top up your balance.',
     kaspiCommissionHint: 'Connecting and accepting Kaspi payments is free. A 5% commission is charged from your wallet balance (topped up in advance) on every successful payment.',
     kaspiPlatformConnectionNote: 'This connection is also used to accept plan payments and wallet top-ups from other invoices.kz users — as the platform\'s admin connection.',
-    kaspiHistoryTitle: 'Payment history',
-    kaspiHistoryEmptyLabel: 'No payments yet',
+    kaspiHistoryTitle: 'Kaspi statement',
+    kaspiHistoryEmptyLabel: 'No transactions yet — press "Refresh" to load your statement',
+    kaspiSyncButton: 'Refresh',
+    kaspiSyncingLabel: 'Refreshing...',
+    kaspiSyncErrorHint: 'Could not refresh the statement. Please try again.',
     kaspiStatsTodayLabel: 'Last 24h',
     kaspiStatsMonthLabel: 'Last 30 days',
     kaspiStatsAllTimeLabel: 'All time',
