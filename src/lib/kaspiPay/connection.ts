@@ -66,6 +66,27 @@ export async function loadPlatformConnection(): Promise<KaspiConnection | null> 
   return loadConnectionByUserId(admin.id)
 }
 
+// A dedicated lookup rather than folding this onto loadConnectionByUserId's
+// return shape: that function's KaspiConnection return type is consumed by
+// every Kaspi API call site (and unit tests that construct KaspiConnection
+// objects directly) — adding a field there for one caller (settlePayment.ts,
+// signing outbound webhooks) would touch all of them for no reason. This
+// row can lack webhook_secret_enc for a connection made before this secret
+// existed; callers must have their own fallback for null.
+export async function loadWebhookSecretByUserId(userId: string): Promise<string | null> {
+  const key = process.env.KASPI_SESSION_ENCRYPTION_KEY
+  if (!key) throw new Error('KASPI_SESSION_ENCRYPTION_KEY is not configured')
+  const { data, error } = await supabase
+    .from('kaspi_connections')
+    .select('webhook_secret_enc')
+    .eq('user_id', userId)
+    .eq('status', 'active')
+    .maybeSingle()
+  if (error) throw new Error(`kaspi_connections webhook-secret lookup failed: ${error.message}`)
+  if (!data?.webhook_secret_enc) return null
+  return decryptAtRest(data.webhook_secret_enc, key).toString('utf8')
+}
+
 export async function loadConnectionByApiToken(token: string): Promise<{ connection: KaspiConnection, userId: string, defaultWebhookUrl: string | null } | null> {
   const tokenHash = crypto.createHash('sha256').update(token).digest('hex')
   const { data, error } = await supabase

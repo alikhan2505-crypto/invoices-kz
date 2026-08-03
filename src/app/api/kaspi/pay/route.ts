@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
   }
 
   // The real enforcement point for the whole feature: creating a NEW payment
-  // is what's monetized (5% of it, debited on settlement), not connecting or
+  // is what's monetized (2% of it, debited on settlement), not connecting or
   // holding a connection. Deliberately NOT applied to the polling cron: that
   // only resolves already-created requests (money that may already have
   // moved), so gating it would strand real payments.

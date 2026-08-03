@@ -65,6 +65,15 @@ export async function POST(req: NextRequest) {
     const apiToken = crypto.randomBytes(32).toString('hex')
     const apiTokenHash = crypto.createHash('sha256').update(apiToken).digest('hex')
 
+    // Own per-connection secret for signing outbound webhooks — NOT the
+    // shared KASPI_WEBHOOK_SECRET env var. A single shared secret handed to
+    // every customer (as the docs page used to describe) would let any one
+    // customer forge a payment.success event for any OTHER customer's
+    // callback_url. Stored encrypted (not just hashed, like the API token)
+    // because our own code needs the plaintext back later to compute the
+    // HMAC when actually sending a webhook — see settlePayment.ts.
+    const webhookSecret = crypto.randomBytes(32).toString('hex')
+
     const { error } = await supabase.from('kaspi_connections').upsert({
       user_id: user.id,
       phone_number: attempt.phoneNumber,
@@ -80,13 +89,14 @@ export async function POST(req: NextRequest) {
       organization_idn: verified.organizationIdn,
       organization_kbe: verified.organizationKbe,
       api_token_hash: apiTokenHash,
+      webhook_secret_enc: encryptAtRest(webhookSecret, key),
       status: 'active',
     }, { onConflict: 'user_id' })
 
     if (error) throw new Error(error.message)
 
-    // Shown exactly once — only the hash is ever stored.
-    return NextResponse.json({ apiToken })
+    // Both shown exactly once — only the hash/ciphertext is ever stored.
+    return NextResponse.json({ apiToken, webhookSecret })
   } catch (e: any) {
     console.error('Kaspi connection persistence failed AFTER Kaspi-side pairing succeeded for user', user.id, ':', e.message)
     return NextResponse.json({ error: 'save_failed' }, { status: 500 })

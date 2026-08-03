@@ -52,6 +52,7 @@ export default function AcquiringPage() {
   const [kaspiOtp, setKaspiOtp] = useState('')
   const [kaspiProcessId, setKaspiProcessId] = useState<string | null>(null)
   const [kaspiApiToken, setKaspiApiToken] = useState<string | null>(null)
+  const [kaspiWebhookSecret, setKaspiWebhookSecret] = useState<string | null>(null)
   const [kaspiWalletBalance, setKaspiWalletBalance] = useState(0)
   const [kaspiTopupAmount, setKaspiTopupAmount] = useState<number | null>(null)
   const [kaspiTopupCustom, setKaspiTopupCustom] = useState('')
@@ -340,6 +341,7 @@ export default function AcquiringPage() {
         return
       }
       setKaspiApiToken(data.apiToken)
+      setKaspiWebhookSecret(data.webhookSecret ?? null)
       setKaspiConnected(true)
       setKaspiStatus('active')
       setKaspiProcessId(null)
@@ -505,11 +507,23 @@ export default function AcquiringPage() {
           {kaspiApiToken && (
             <>
               <div className="text-xs text-amber-600 mb-2">{t.kaspiTokenShownOnceWarning}</div>
+              <div className="text-xs text-gray-500 mb-1">{t.kaspiApiTokenLabel}</div>
               <div className="bg-gray-50 rounded-xl p-3 text-xs font-mono break-all mb-3">{kaspiApiToken}</div>
               <button onClick={() => navigator.clipboard.writeText(kaspiApiToken)}
                 className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium mb-3">
                 {t.kaspiCopyTokenButton}
               </button>
+            </>
+          )}
+          {kaspiWebhookSecret && (
+            <>
+              <div className="text-xs text-gray-500 mb-1">{t.kaspiWebhookSecretLabel}</div>
+              <div className="bg-gray-50 rounded-xl p-3 text-xs font-mono break-all mb-3">{kaspiWebhookSecret}</div>
+              <button onClick={() => navigator.clipboard.writeText(kaspiWebhookSecret)}
+                className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium mb-3">
+                {t.kaspiCopyTokenButton}
+              </button>
+              <p className="text-xs text-gray-400 mb-3">{t.kaspiWebhookSecretHint}</p>
             </>
           )}
 

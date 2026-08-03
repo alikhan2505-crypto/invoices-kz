@@ -7,7 +7,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-export const COMMISSION_RATE = 0.05
+export const COMMISSION_RATE = 0.02
 
 export function computeCommission(amount: number): number {
   return Math.round(amount * COMMISSION_RATE)

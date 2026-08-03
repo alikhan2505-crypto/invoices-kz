@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
-import { loadConnectionByUserId } from './connection'
+import { loadConnectionByUserId, loadWebhookSecretByUserId } from './connection'
 import { checkStatus } from './client'
 import { isSafeWebhookUrl } from './webhookSafety'
 import { debitWalletForCommission } from './wallet'
@@ -96,12 +96,16 @@ export async function checkAndSettleKaspiPayment(reqRow: SettleableRequest): Pro
   }
 
   if (reqRow.callback_url) {
-    // Its own secret, NOT KASPI_SESSION_ENCRYPTION_KEY -- that key decrypts
-    // every customer's Kaspi identity, and this one is meant to be handed to
-    // external customers so they can verify our signature.
-    const secret = process.env.KASPI_WEBHOOK_SECRET
+    // Each connection signs with its OWN secret (generated at connect time,
+    // never the shared KASPI_WEBHOOK_SECRET env var) -- a single shared
+    // secret handed to every customer would let any one of them forge a
+    // payment.success event for any OTHER customer's callback_url. The env
+    // var remains only as a fallback for a connection made before this
+    // secret existed (regenerate the token on /profile/acquiring to pick up
+    // a real per-connection one).
+    const secret = (await loadWebhookSecretByUserId(reqRow.user_id)) ?? process.env.KASPI_WEBHOOK_SECRET
     if (!secret) {
-      console.error('Kaspi webhook skipped for', reqRow.id, '— KASPI_WEBHOOK_SECRET is not configured')
+      console.error('Kaspi webhook skipped for', reqRow.id, '— no webhook secret available (neither per-connection nor KASPI_WEBHOOK_SECRET)')
     } else if (!(await isSafeWebhookUrl(reqRow.callback_url))) {
       console.error('Kaspi webhook skipped for', reqRow.id, '— unsafe callback_url:', reqRow.callback_url)
     } else {

@@ -31,13 +31,13 @@ export default function KaspiPayDocsPage() {
             На странице <code className="bg-white px-1.5 py-0.5 rounded border">/profile/kaspi-pay</code> введите номер
             телефона, на котором в приложении Kaspi Pay уже выдана роль «Кассир», и подтвердите код из SMS.
           </QuickStartStep>
-          <QuickStartStep n={2} title="Сохраните API-токен">
-            Сразу после подключения на этой же странице один раз покажется токен вида{' '}
-            <code className="bg-white px-1.5 py-0.5 rounded border">62d919bd...</code>. Скопируйте и сохраните его —
-            второй раз он не показывается (можно только отключить кассира и подключить заново).
+          <QuickStartStep n={2} title="Сохраните API-токен и webhook-секрет">
+            Сразу после подключения на этой же странице один раз покажутся два значения: API-токен (для запросов к
+            API) и отдельный webhook-секрет (для проверки подписи вебхуков, см. ниже). Скопируйте и сохраните оба —
+            второй раз они не показываются (можно только отключить кассира и подключить заново, тогда выдадутся новые).
           </QuickStartStep>
-          <QuickStartStep n={3} title="Передайте токен разработчику или вставьте в свой сайт">
-            Если сайт делаете не вы сами — отправьте этот токен и ссылку на этот документ вашему разработчику.
+          <QuickStartStep n={3} title="Передайте их разработчику или вставьте в свой сайт">
+            Если сайт делаете не вы сами — отправьте эти два значения и ссылку на этот документ вашему разработчику.
             Всё, что нужно на вашей стороне — один HTTP-запрос ниже.
           </QuickStartStep>
           <QuickStartStep n={4} title="Создайте платёж">
@@ -50,15 +50,25 @@ export default function KaspiPayDocsPage() {
             и мы сами пришлём уведомление.
           </QuickStartStep>
         </div>
+
+        <div className="bg-white rounded-xl p-4 border border-blue-100 mt-2">
+          <p className="text-sm text-gray-600">
+            <strong className="text-[#1C2056]">Сколько это стоит:</strong> подключение и приём платежей — бесплатно на
+            любом тарифе. Комиссия 2% списывается с баланса вашего кошелька только с подтверждённых оплат — например,
+            с платежа на 10 000 ₸ спишется 200 ₸. Баланс пополняется заранее на той же странице подключения; пока на
+            балансе достаточно средств, оплату можно принимать без ограничений.
+          </p>
+        </div>
       </section>
 
       <section className="mb-8">
-        <h2 className="text-2xl font-semibold mb-4">Получение API токена</h2>
+        <h2 className="text-2xl font-semibold mb-4">Получение API токена и webhook-секрета</h2>
         <p className="text-gray-700 mb-4">
-          При подключении Kaspi Pay к вашему аккаунту на invoices.kz вам будет выдан уникальный API токен.
-          Этот токен отображается один раз при подключении в разделе{' '}
-          <code className="bg-gray-100 px-2 py-1 rounded">/profile/kaspi-pay</code>.
-          Сохраните его в безопасном месте — он понадобится для всех запросов к API.
+          При подключении Kaspi Pay к вашему аккаунту на invoices.kz вам будет выдан уникальный API токен и отдельный
+          webhook-секрет. Оба отображаются один раз при подключении в разделе{' '}
+          <code className="bg-gray-100 px-2 py-1 rounded">/profile/acquiring</code>.
+          Сохраните оба в безопасном месте — токен понадобится для всех запросов к API, секрет — для проверки подписи
+          входящих вебхуков (см. ниже). Они принадлежат только вашему подключению — ни с кем не переиспользуются.
         </p>
       </section>
 
@@ -236,7 +246,7 @@ X-Kaspi-Pay-Signature: &lt;hex-encoded HMAC-SHA256&gt;
 {`const crypto = require('crypto');
 
 // rawBody — это точная строка JSON, полученная из тела запроса
-// secret — секретный ключ, который будет предоставлен вам
+// secret — ваш webhook-секрет, показанный один раз при подключении
 const signature = crypto
   .createHmac('sha256', secret)
   .update(rawBody)
@@ -248,15 +258,12 @@ const isValid = signature === req.headers['x-kaspi-pay-signature'];
         </div>
 
         <div className="bg-yellow-50 border border-yellow-200 p-4 rounded">
-          <p className="font-semibold text-yellow-900 mb-2">⚠️ Примечание о верификации:</p>
+          <p className="font-semibold text-yellow-900 mb-2">Где взять секрет:</p>
           <p className="text-sm text-yellow-900 mb-2">
-            Вебхуки подписываются отдельным ключом, который используется <strong>только</strong> для подписи вебхуков.
-            Он никак не связан с ключом шифрования подключений — тем, которым защищены данные вашей связки с Kaspi,
-            — поэтому передача этого ключа клиенту не влияет на безопасность подключений.
-          </p>
-          <p className="text-sm text-yellow-900">
-            При этом сам механизм выдачи ключа внешним клиентам ещё не финализирован: на данный момент заголовок подписи
-            отправляется, а способ получения ключа будет уточнён до того, как этим API начнут пользоваться внешние клиенты.
+            Ваш webhook-секрет показывается один раз при подключении Кассира, рядом с API-токеном (раздел{' '}
+            <code className="bg-white px-1">/profile/acquiring</code>). Он свой у каждого подключения — вебхуки
+            других клиентов invoices.kz подписываются другим ключом, и наоборот. Если секрет потеряли или он
+            попал не в те руки — отключите и снова подключите Кассира, будет выдан новый.
           </p>
         </div>
       </section>
@@ -299,11 +306,11 @@ const isValid = signature === req.headers['x-kaspi-pay-signature'];
               </tr>
               <tr className="border-b">
                 <td className="p-2"><code className="bg-gray-100 px-1">400</code></td>
-                <td className="p-2">Bad Request — отсутствуют обязательные параметры</td>
+                <td className="p-2">Bad Request — отсутствуют обязательные параметры (только для создания платежа)</td>
               </tr>
               <tr className="border-b">
-                <td className="p-2"><code className="bg-gray-100 px-1">403</code></td>
-                <td className="p-2">Forbidden — тариф Pro не активен (Kaspi Pay доступен только на тарифе Pro)</td>
+                <td className="p-2"><code className="bg-gray-100 px-1">402</code></td>
+                <td className="p-2">Payment Required — недостаточно средств на балансе кошелька для комиссии (только для создания платежа); пополните баланс на странице подключения</td>
               </tr>
               <tr className="border-b">
                 <td className="p-2"><code className="bg-gray-100 px-1">404</code></td>
@@ -311,11 +318,11 @@ const isValid = signature === req.headers['x-kaspi-pay-signature'];
               </tr>
               <tr className="border-b">
                 <td className="p-2"><code className="bg-gray-100 px-1">429</code></td>
-                <td className="p-2">Too Many Requests — превышен лимит запросов (20 в минуту на одно подключение)</td>
+                <td className="p-2">Too Many Requests — превышен лимит запросов (20 в минуту на одно подключение, только для создания платежа)</td>
               </tr>
               <tr className="border-b">
                 <td className="p-2"><code className="bg-gray-100 px-1">502</code></td>
-                <td className="p-2">Service Unavailable — ошибка при создании платежа на стороне Kaspi</td>
+                <td className="p-2">Bad Gateway — ошибка при обращении к Kaspi</td>
               </tr>
             </tbody>
           </table>

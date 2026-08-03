@@ -75,7 +75,7 @@ export async function getOrCreateKaspiPaymentForInvoice(invoice: {
   if (invoice.status && CLOSED_INVOICE_STATUSES.has(invoice.status)) return null
 
   // Kaspi Pay Cashier is open to every plan; it's monetized per-payment
-  // instead (5% commission funded by the connection owner's prepaid wallet
+  // instead (2% commission funded by the connection owner's prepaid wallet
   // balance — see wallet.ts). Checked here, right before minting a NEW
   // payment, so an owner with insufficient balance keeps their still-valid
   // existing link (returned above) but gets no further payment created for
