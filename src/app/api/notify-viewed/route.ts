@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
 import { createClient } from '@supabase/supabase-js'
+import { sendTelegramNotification } from '@/lib/telegramNotify'
 
 const resend = new Resend(process.env.RESEND_API_KEY!)
 const supabase = createClient(
@@ -10,8 +11,8 @@ const supabase = createClient(
 
 // Called from the public invoice page right after a client's first view flips
 // status sent -> viewed. No auth (page is anonymous, gated by public_token) —
-// invoiceId alone can't do anything beyond sending this one email, and only
-// for an invoice that's actually in `viewed` status.
+// invoiceId alone can't do anything beyond sending this one notification, and
+// only for an invoice that's actually in `viewed` status.
 export async function POST(request: NextRequest) {
   try {
     const { invoiceId } = await request.json()
@@ -29,21 +30,25 @@ export async function POST(request: NextRequest) {
 
     const { data: owner } = await supabase
       .from('profiles')
-      .select('email, notify_client_viewed')
+      .select('email, notify_client_viewed, notify_telegram, telegram_chat_id')
       .eq('id', inv.user_id)
       .single()
 
-    if (!owner?.email || owner.notify_client_viewed === false) {
+    if (!owner) {
       return NextResponse.json({ ok: true, skipped: true })
     }
 
     const amount = Number(inv.amount).toLocaleString('ru-KZ')
 
-    await resend.emails.send({
-      from: 'invoices.kz <mail@invoices.kz>',
-      to: owner.email,
-      subject: `Клиент открыл счёт №${inv.number}`,
-      html: `
+    // Email and Telegram are independent channels (see plan's Global
+    // Constraints) — each gets its own guard, neither nested inside the
+    // other, so a user with only one channel enabled still gets that one.
+    if (owner.email && owner.notify_client_viewed !== false) {
+      await resend.emails.send({
+        from: 'invoices.kz <mail@invoices.kz>',
+        to: owner.email,
+        subject: `Клиент открыл счёт №${inv.number}`,
+        html: `
 <!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"></head>
@@ -64,8 +69,14 @@ export async function POST(request: NextRequest) {
 </div>
 </body>
 </html>
-      `,
-    })
+        `,
+      })
+    }
+
+    if (owner.notify_telegram && owner.telegram_chat_id) {
+      await sendTelegramNotification(owner.telegram_chat_id,
+        `👀 Клиент <b>${inv.client_name || ''}</b> открыл счёт №${inv.number} на сумму <b>${amount} ₸</b>.`)
+    }
 
     return NextResponse.json({ ok: true })
   } catch (e: any) {

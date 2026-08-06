@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
 import { createClient } from '@supabase/supabase-js'
+import { sendTelegramNotification } from '@/lib/telegramNotify'
 
 const resend = new Resend(process.env.RESEND_API_KEY!)
 const supabase = createClient(
@@ -11,7 +12,7 @@ const supabase = createClient(
 // Called from the public invoice page after a client marks an invoice paid.
 // No auth (the page itself is anonymous, gated only by the unguessable
 // public_token) — invoiceId alone can't do anything beyond sending this one
-// email, and only for an invoice that's actually in `paid` status.
+// notification, and only for an invoice that's actually in `paid` status.
 export async function POST(request: NextRequest) {
   try {
     const { invoiceId } = await request.json()
@@ -29,21 +30,22 @@ export async function POST(request: NextRequest) {
 
     const { data: owner } = await supabase
       .from('profiles')
-      .select('email, notify_email')
+      .select('email, notify_email, notify_telegram, telegram_chat_id')
       .eq('id', inv.user_id)
       .single()
 
-    if (!owner?.email || owner.notify_email === false) {
+    if (!owner) {
       return NextResponse.json({ ok: true, skipped: true })
     }
 
     const amount = Number(inv.amount).toLocaleString('ru-KZ')
 
-    await resend.emails.send({
-      from: 'invoices.kz <mail@invoices.kz>',
-      to: owner.email,
-      subject: `Счёт №${inv.number} отмечен как оплаченный`,
-      html: `
+    if (owner.email && owner.notify_email !== false) {
+      await resend.emails.send({
+        from: 'invoices.kz <mail@invoices.kz>',
+        to: owner.email,
+        subject: `Счёт №${inv.number} отмечен как оплаченный`,
+        html: `
 <!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"></head>
@@ -64,8 +66,14 @@ export async function POST(request: NextRequest) {
 </div>
 </body>
 </html>
-      `,
-    })
+        `,
+      })
+    }
+
+    if (owner.notify_telegram && owner.telegram_chat_id) {
+      await sendTelegramNotification(owner.telegram_chat_id,
+        `💰 Клиент <b>${inv.client_name || ''}</b> отметил счёт №${inv.number} на сумму <b>${amount} ₸</b> как оплаченный.`)
+    }
 
     return NextResponse.json({ ok: true })
   } catch (e: any) {
