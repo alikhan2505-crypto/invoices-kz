@@ -63,9 +63,9 @@ Each call site already loads the owning profile for the email send; the Telegram
 
 ## External setup required before this works live (not code — flagged now so it isn't a surprise at deploy time)
 
-1. Create a new bot via **@BotFather** in Telegram (`/newbot`), get its token and `@username`.
-2. Add `CUSTOMER_TELEGRAM_BOT_TOKEN` (the token) and a freshly generated `TELEGRAM_NOTIFY_WEBHOOK_SECRET` (any random string, e.g. `openssl rand -hex 32`) to `.env.local`, then to Vercel's Production env vars, then redeploy.
-3. Hit `POST /api/telegram-notify-webhook/setup` once (same one-time, idempotent step this project already uses for the Instagram webhook) to register the webhook URL with Telegram.
+1. ~~Create a new bot via @BotFather~~ — **done 2026-08-06**: `@invoices_notify_bot` (`t.me/invoices_notify_bot`).
+2. ~~Add `CUSTOMER_TELEGRAM_BOT_TOKEN`, `TELEGRAM_NOTIFY_WEBHOOK_SECRET`, `CUSTOMER_TELEGRAM_BOT_USERNAME` to `.env.local`~~ — **done 2026-08-06** (local only). Still needed: the same three vars added to Vercel's Production env vars, then a redeploy — can happen right before this ships, doesn't block implementation.
+3. Hit `POST /api/telegram-notify-webhook/setup` once (same one-time, idempotent step this project already uses for the Instagram webhook) to register the webhook URL with Telegram — happens after deploy, not before.
 
 ## Explicitly out of scope
 
