@@ -43,12 +43,17 @@ export async function POST(request: NextRequest) {
     // Email and Telegram are independent channels (see plan's Global
     // Constraints) — each gets its own guard, neither nested inside the
     // other, so a user with only one channel enabled still gets that one.
+    // Own try/catch, not just the outer one — email and Telegram are meant
+    // to be fully independent channels (see plan's Global Constraints), so
+    // a Resend failure (bad key, rate limit, network blip) must not prevent
+    // the Telegram branch below from still running.
     if (owner.email && owner.notify_client_viewed !== false) {
-      await resend.emails.send({
-        from: 'invoices.kz <mail@invoices.kz>',
-        to: owner.email,
-        subject: `Клиент открыл счёт №${inv.number}`,
-        html: `
+      try {
+        await resend.emails.send({
+          from: 'invoices.kz <mail@invoices.kz>',
+          to: owner.email,
+          subject: `Клиент открыл счёт №${inv.number}`,
+          html: `
 <!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"></head>
@@ -69,8 +74,11 @@ export async function POST(request: NextRequest) {
 </div>
 </body>
 </html>
-        `,
-      })
+          `,
+        })
+      } catch (e: any) {
+        console.error('notify-viewed: email send failed for invoice', invoiceId, ':', e.message)
+      }
     }
 
     if (owner.notify_telegram && owner.telegram_chat_id) {

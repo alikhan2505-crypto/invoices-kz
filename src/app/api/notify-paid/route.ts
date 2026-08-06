@@ -40,12 +40,17 @@ export async function POST(request: NextRequest) {
 
     const amount = Number(inv.amount).toLocaleString('ru-KZ')
 
+    // Own try/catch, not just the outer one — email and Telegram are meant
+    // to be fully independent channels (see plan's Global Constraints), so
+    // a Resend failure (bad key, rate limit, network blip) must not prevent
+    // the Telegram branch below from still running.
     if (owner.email && owner.notify_email !== false) {
-      await resend.emails.send({
-        from: 'invoices.kz <mail@invoices.kz>',
-        to: owner.email,
-        subject: `Счёт №${inv.number} отмечен как оплаченный`,
-        html: `
+      try {
+        await resend.emails.send({
+          from: 'invoices.kz <mail@invoices.kz>',
+          to: owner.email,
+          subject: `Счёт №${inv.number} отмечен как оплаченный`,
+          html: `
 <!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"></head>
@@ -66,8 +71,11 @@ export async function POST(request: NextRequest) {
 </div>
 </body>
 </html>
-        `,
-      })
+          `,
+        })
+      } catch (e: any) {
+        console.error('notify-paid: email send failed for invoice', invoiceId, ':', e.message)
+      }
     }
 
     if (owner.notify_telegram && owner.telegram_chat_id) {
