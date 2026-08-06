@@ -30,6 +30,15 @@ export default function Dashboard() {
   const [showSaveClient, setShowSaveClient] = useState(false)
   const [lastInvoiceClient, setLastInvoiceClient] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
+  // Distinct from `profile` itself being truthy: a cache hit sets `profile`
+  // to last-known-good data almost immediately, but a user with no cache yet
+  // (new device, cleared storage, or simply first load of the session) saw
+  // the invoice-number preview fall back to a hardcoded "INV-0001" for the
+  // brief window before the real fetch resolved -- indistinguishable from a
+  // genuine, freshly-reset counter. This flag lets the preview show nothing
+  // instead of that misleading default until the real profile has loaded at
+  // least once.
+  const [profileLoaded, setProfileLoaded] = useState(false)
   const [monthCount, setMonthCount] = useState(0)
   const [monthStats, setMonthStats] = useState({ paid: 0, total: 0, amount: 0 })
   const [showOnboarding, setShowOnboarding] = useState(false)
@@ -73,6 +82,7 @@ export default function Dashboard() {
     ])
 
     setProfile(p)
+    setProfileLoaded(true)
     if (p) cacheSet('profile_' + user.id, p)
     if (p?.default_note) setNote(p.default_note)
 
@@ -717,7 +727,7 @@ export default function Dashboard() {
           className="hidden lg:block lg:w-[400px] lg:flex-shrink-0 lg:sticky lg:top-[88px]"
         >
           <InvoiceLivePreview
-            invoiceNumber={(profile?.invoice_prefix || 'INV-') + (profile?.invoice_next_number || '0001')}
+            invoiceNumber={!profileLoaded ? '' : (profile?.invoice_prefix || 'INV-') + (profile?.invoice_next_number || '0001')}
             date={formatDate(new Date().toISOString())}
             companyName={profile?.company_name || ''}
             companyBin={profile?.bin_iin || ''}
