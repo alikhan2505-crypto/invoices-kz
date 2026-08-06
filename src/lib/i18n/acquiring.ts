@@ -59,6 +59,9 @@ export interface AcquiringContent {
   kaspiWebhookSecretHint: string
   kaspiDisconnectButton: string
   kaspiDisconnectingLabel: string
+  kaspiRegenerateButton: string
+  kaspiRegeneratingLabel: string
+  kaspiRegenerateConfirm: string
   kaspiErrorGeneric: string
   kaspiErrorInvalidOtp: string
   kaspiDocsLinkLabel: string
@@ -174,6 +177,9 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiWebhookSecretHint: 'Используйте этот ключ, чтобы проверять подпись X-Kaspi-Pay-Signature в приходящих от нас вебхуках — он свой у каждого подключения, никому больше не передаётся.',
     kaspiDisconnectButton: 'Отключить',
     kaspiDisconnectingLabel: 'Отключаем...',
+    kaspiRegenerateButton: 'Перевыпустить токен и webhook-секрет',
+    kaspiRegeneratingLabel: 'Перевыпускаем...',
+    kaspiRegenerateConfirm: 'Старые API-токен и webhook-секрет сразу перестанут работать — все ваши интеграции, использующие их, нужно будет обновить на новые значения. Продолжить?',
     kaspiErrorGeneric: 'Сервис Kaspi временно недоступен. Попробуйте позже.',
     kaspiErrorInvalidOtp: 'Неверный код из SMS. Попробуйте ещё раз.',
     kaspiDocsLinkLabel: 'Документация по API',
@@ -287,6 +293,9 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiWebhookSecretHint: 'Бізден келетін вебхуктардағы X-Kaspi-Pay-Signature қолын тексеру үшін осы кілтті пайдаланыңыз — ол әр қосылымда бөлек, ешкімге басқа берілмейді.',
     kaspiDisconnectButton: 'Ажырату',
     kaspiDisconnectingLabel: 'Ажыратылуда...',
+    kaspiRegenerateButton: 'Токен мен webhook-құпияны қайта шығару',
+    kaspiRegeneratingLabel: 'Қайта шығарылуда...',
+    kaspiRegenerateConfirm: 'Ескі API-токен мен webhook-құпия бірден жұмыс істемей қалады — оларды пайдаланатын интеграцияларды жаңа мәндерге жаңарту керек болады. Жалғастыру керек пе?',
     kaspiErrorGeneric: 'Kaspi қызметі уақытша қолжетімсіз. Кейінірек көріңіз.',
     kaspiErrorInvalidOtp: 'SMS коды дұрыс емес. Қайталап көріңіз.',
     kaspiDocsLinkLabel: 'API құжаттамасы',
@@ -400,6 +409,9 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiWebhookSecretHint: 'Use this key to verify the X-Kaspi-Pay-Signature header on webhooks we send you — it is unique to this connection and never shared with anyone else.',
     kaspiDisconnectButton: 'Disconnect',
     kaspiDisconnectingLabel: 'Disconnecting...',
+    kaspiRegenerateButton: 'Regenerate token and webhook secret',
+    kaspiRegeneratingLabel: 'Regenerating...',
+    kaspiRegenerateConfirm: 'Your old API token and webhook secret will stop working immediately — any integrations using them need to be updated to the new values. Continue?',
     kaspiErrorGeneric: 'The Kaspi service is temporarily unavailable. Try again later.',
     kaspiErrorInvalidOtp: 'Invalid SMS code. Please try again.',
     kaspiDocsLinkLabel: 'API documentation',

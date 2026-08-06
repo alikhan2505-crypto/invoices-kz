@@ -53,6 +53,7 @@ export default function AcquiringPage() {
   const [kaspiProcessId, setKaspiProcessId] = useState<string | null>(null)
   const [kaspiApiToken, setKaspiApiToken] = useState<string | null>(null)
   const [kaspiWebhookSecret, setKaspiWebhookSecret] = useState<string | null>(null)
+  const [kaspiRegenerating, setKaspiRegenerating] = useState(false)
   const [kaspiWalletBalance, setKaspiWalletBalance] = useState(0)
   const [kaspiTopupAmount, setKaspiTopupAmount] = useState<number | null>(null)
   const [kaspiTopupCustom, setKaspiTopupCustom] = useState('')
@@ -350,6 +351,28 @@ export default function AcquiringPage() {
     }
   }
 
+  async function regenerateKaspiCredentials() {
+    if (!confirm(t.kaspiRegenerateConfirm)) return
+    setKaspiError('')
+    setKaspiRegenerating(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/kaspi/regenerate-token', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${session?.access_token}` },
+      })
+      const data = await res.json()
+      if (!res.ok || !data.apiToken) {
+        setKaspiError(t.kaspiErrorGeneric)
+        return
+      }
+      setKaspiApiToken(data.apiToken)
+      setKaspiWebhookSecret(data.webhookSecret ?? null)
+    } finally {
+      setKaspiRegenerating(false)
+    }
+  }
+
   async function disconnectKaspi() {
     setKaspiDisconnecting(true)
     try {
@@ -361,6 +384,7 @@ export default function AcquiringPage() {
       setKaspiConnected(false)
       setKaspiStatus(null)
       setKaspiApiToken(null)
+      setKaspiWebhookSecret(null)
     } finally {
       setKaspiDisconnecting(false)
     }
@@ -591,6 +615,11 @@ export default function AcquiringPage() {
               </div>
             </>
           )}
+
+          <button onClick={regenerateKaspiCredentials} disabled={kaspiRegenerating}
+            className="w-full bg-gray-100 text-gray-600 rounded-xl py-2.5 text-sm font-medium mb-3">
+            {kaspiRegenerating ? t.kaspiRegeneratingLabel : t.kaspiRegenerateButton}
+          </button>
 
           <button onClick={disconnectKaspi} disabled={kaspiDisconnecting}
             className="w-full bg-gray-100 text-gray-600 rounded-xl py-2.5 text-sm font-medium">
