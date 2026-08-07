@@ -17,6 +17,7 @@ export default function PublicInvoice() {
   const [profile, setProfile] = useState<any>(null)
   const [bank, setBank] = useState<any>(null)
   const [kaspiPayment, setKaspiPayment] = useState<{ qr_token: string; payment_link: string; status: string } | null>(null)
+  const [kaspiPaymentLoading, setKaspiPaymentLoading] = useState(true)
   const [kaspiQrDataUrl, setKaspiQrDataUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [marking, setMarking] = useState(false)
@@ -31,8 +32,20 @@ export default function PublicInvoice() {
         .single()
 
 
-      if (!inv) { setLoading(false); return }   
+      if (!inv) { setLoading(false); return }
       setInvoice(inv)
+
+      // Fired immediately, in parallel with the profile/bank queries below
+      // rather than after them — this hits Kaspi's own API to mint a live QR,
+      // which is the slowest thing on this page, so every millisecond it
+      // isn't queued behind unrelated Supabase reads is visible to the payer.
+      // Best-effort, non-blocking — a Kaspi lookup failure shouldn't stop the
+      // invoice itself from rendering; the client still has bank requisites.
+      fetch(`/api/kaspi/invoice-payment?token=${token}`)
+        .then(r => r.json())
+        .then((data) => setKaspiPayment(data.payment || null))
+        .catch(() => {})
+        .finally(() => setKaspiPaymentLoading(false))
 
       if (inv.status === 'sent') {
         await supabase.from('invoices')
@@ -66,13 +79,6 @@ export default function PublicInvoice() {
           .eq('is_main', true).single()
         setBank(b)
       }
-
-      // Best-effort, non-blocking — a Kaspi lookup failure shouldn't stop the
-      // invoice itself from rendering; the client still has bank requisites.
-      fetch(`/api/kaspi/invoice-payment?token=${token}`)
-        .then(r => r.json())
-        .then((data) => setKaspiPayment(data.payment || null))
-        .catch(() => {})
 
       setLoading(false)
     }
@@ -270,7 +276,16 @@ export default function PublicInvoice() {
           </div>
         )}
 
-        {/* Kaspi payment */}
+        {/* Kaspi payment — brief loading hint while the live QR is still being
+            minted against Kaspi's own API (the slowest thing on this page),
+            so the gap doesn't read as "there's no Kaspi option here". */}
+        {kaspiPaymentLoading && !kaspiPayment && invoice.status !== 'paid' && invoice.status !== 'cancelled' && (
+          <div className="bg-white rounded-2xl shadow-sm p-4 flex items-center gap-2">
+            <div className="w-4 h-4 border-2 border-gray-200 border-t-[#1C2056] rounded-full animate-spin flex-shrink-0" />
+            <span className="text-xs text-gray-400">Проверяем возможность оплаты через Kaspi...</span>
+          </div>
+        )}
+
         {kaspiPayment && kaspiPayment.status === 'pending' && (
           <div className="bg-white rounded-2xl shadow-sm p-5">
             <div className="text-xs text-gray-400 uppercase tracking-wide mb-3">Оплата через Kaspi</div>
