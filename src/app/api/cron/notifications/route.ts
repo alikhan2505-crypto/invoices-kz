@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
 import { sendTelegramNotification } from '@/lib/telegramNotify'
+import { addDaysToDateString, todayDateString } from '@/lib/dueDate'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -52,15 +53,28 @@ export async function GET(request: Request) {
   let overdue = 0
   let reports = 0
 
-  // --- Payment reminder: sent 3 days ago, still unpaid ---
-  const { data: reminderInvoices } = await supabase
+  // --- Payment reminder ---
+  // Invoices with a real due_date: remind exactly 1 day before it's due
+  // (date equality is safe against double-sending since the cron runs once
+  // a day). Invoices without one (every invoice created before this
+  // feature existed, or wherever the date was cleared): keep the original
+  // heuristic, 3 days after the invoice was sent, still unpaid.
+  const reminderDueDateTarget = addDaysToDateString(todayDateString(), 1)
+  const { data: reminderByDueDate } = await supabase
     .from('invoices')
     .select('id, number, amount, client_name, profiles(email, notify_payment_reminder, notify_telegram, telegram_chat_id)')
     .in('status', ['sent', 'viewed'])
+    .eq('due_date', reminderDueDateTarget)
+
+  const { data: reminderLegacy } = await supabase
+    .from('invoices')
+    .select('id, number, amount, client_name, profiles(email, notify_payment_reminder, notify_telegram, telegram_chat_id)')
+    .in('status', ['sent', 'viewed'])
+    .is('due_date', null)
     .gte('created_at', startOfDayAgo(3).toISOString())
     .lt('created_at', startOfDayAgo(2).toISOString())
 
-  for (const inv of (reminderInvoices || []) as any[]) {
+  for (const inv of [...(reminderByDueDate || []), ...(reminderLegacy || [])] as any[]) {
     const owner = inv.profiles
     if (owner?.email && owner.notify_payment_reminder !== false) {
       try {
@@ -86,14 +100,25 @@ export async function GET(request: Request) {
     }
   }
 
-  // --- Overdue: sent 7+ days ago, still unpaid — transition status + notify owner ---
-  const { data: overdueInvoices } = await supabase
+  // --- Overdue: transition status + notify owner ---
+  // Invoices with a real due_date: overdue once the due date is more than
+  // 1 day in the past (a short grace period). Invoices without one: the
+  // original heuristic, 7+ days since the invoice was sent.
+  const overdueDueDateTarget = addDaysToDateString(todayDateString(), -1)
+  const { data: overdueByDueDate } = await supabase
     .from('invoices')
     .select('id, number, amount, client_name, profiles(email, notify_overdue, notify_telegram, telegram_chat_id)')
     .in('status', ['sent', 'viewed'])
+    .lt('due_date', overdueDueDateTarget)
+
+  const { data: overdueLegacy } = await supabase
+    .from('invoices')
+    .select('id, number, amount, client_name, profiles(email, notify_overdue, notify_telegram, telegram_chat_id)')
+    .in('status', ['sent', 'viewed'])
+    .is('due_date', null)
     .lt('created_at', startOfDayAgo(7).toISOString())
 
-  for (const inv of (overdueInvoices || []) as any[]) {
+  for (const inv of [...(overdueByDueDate || []), ...(overdueLegacy || [])] as any[]) {
     await supabase.from('invoices').update({ status: 'overdue' }).eq('id', inv.id)
     const owner = inv.profiles
     if (owner?.email && owner.notify_overdue !== false) {
