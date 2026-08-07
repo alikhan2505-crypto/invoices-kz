@@ -64,6 +64,7 @@ export interface AcquiringContent {
   kaspiRegenerateConfirm: string
   kaspiErrorGeneric: string
   kaspiErrorInvalidOtp: string
+  kaspiErrorInvalidAmount: (min: number) => string
   kaspiDocsLinkLabel: string
   kaspiWalletBalanceLabel: string
   kaspiTopupPresetsLabel: string
@@ -182,6 +183,7 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiRegenerateConfirm: 'Старые API-токен и webhook-секрет сразу перестанут работать — все ваши интеграции, использующие их, нужно будет обновить на новые значения. Продолжить?',
     kaspiErrorGeneric: 'Сервис Kaspi временно недоступен. Попробуйте позже.',
     kaspiErrorInvalidOtp: 'Неверный код из SMS. Попробуйте ещё раз.',
+    kaspiErrorInvalidAmount: (min: number) => `Минимальная сумма пополнения — ${min.toLocaleString('ru-KZ')} ₸.`,
     kaspiDocsLinkLabel: 'Документация по API',
     kaspiWalletBalanceLabel: 'Баланс кошелька',
     kaspiTopupPresetsLabel: 'Пополнить на сумму',
@@ -298,6 +300,7 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiRegenerateConfirm: 'Ескі API-токен мен webhook-құпия бірден жұмыс істемей қалады — оларды пайдаланатын интеграцияларды жаңа мәндерге жаңарту керек болады. Жалғастыру керек пе?',
     kaspiErrorGeneric: 'Kaspi қызметі уақытша қолжетімсіз. Кейінірек көріңіз.',
     kaspiErrorInvalidOtp: 'SMS коды дұрыс емес. Қайталап көріңіз.',
+    kaspiErrorInvalidAmount: (min: number) => `Ең аз толтыру сомасы — ${min.toLocaleString('ru-KZ')} ₸.`,
     kaspiDocsLinkLabel: 'API құжаттамасы',
     kaspiWalletBalanceLabel: 'Әмиян балансы',
     kaspiTopupPresetsLabel: 'Мына сомаға толтыру',
@@ -414,6 +417,7 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiRegenerateConfirm: 'Your old API token and webhook secret will stop working immediately — any integrations using them need to be updated to the new values. Continue?',
     kaspiErrorGeneric: 'The Kaspi service is temporarily unavailable. Try again later.',
     kaspiErrorInvalidOtp: 'Invalid SMS code. Please try again.',
+    kaspiErrorInvalidAmount: (min: number) => `The minimum top-up amount is ${min.toLocaleString('en-US')} ₸.`,
     kaspiDocsLinkLabel: 'API documentation',
     kaspiWalletBalanceLabel: 'Wallet balance',
     kaspiTopupPresetsLabel: 'Top up by',

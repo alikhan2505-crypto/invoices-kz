@@ -9,6 +9,11 @@ import { useLanguage } from '@/components/LanguageProvider'
 import { backLabel } from '@/lib/a11yLabels'
 import { acquiringDict } from '@/lib/i18n/acquiring'
 
+// Matches MIN_TOPUP in src/app/api/kaspi/wallet/topup/route.ts — kept here
+// too so the button can refuse an obviously-too-small amount before ever
+// hitting the API (the server still enforces it independently).
+const MIN_TOPUP_AMOUNT = 1000
+
 interface BccConnection {
   iban: string
   last_checked_at: string
@@ -403,6 +408,8 @@ export default function AcquiringPage() {
       const data = await res.json()
       if (res.ok) {
         setKaspiTopupPending({ topup_id: data.topup_id, payment_link: data.payment_link })
+      } else if (data.error === 'invalid_amount') {
+        setKaspiError(t.kaspiErrorInvalidAmount(data.min || MIN_TOPUP_AMOUNT))
       } else {
         setKaspiError(t.kaspiErrorGeneric)
       }
@@ -575,9 +582,12 @@ export default function AcquiringPage() {
           <input value={kaspiTopupCustom}
             onChange={e => { setKaspiTopupCustom(e.target.value.replace(/\D/g, '')); setKaspiTopupAmount(null) }}
             placeholder={t.kaspiTopupCustomPlaceholder} type="text" inputMode="numeric"
-            className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-[#1C2056] mb-3" />
+            className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-[#1C2056] mb-1" />
+          {kaspiTopupCustom !== '' && Number(kaspiTopupCustom) < MIN_TOPUP_AMOUNT && (
+            <div className="text-xs text-amber-600 mb-2">{t.kaspiErrorInvalidAmount(MIN_TOPUP_AMOUNT)}</div>
+          )}
           <button onClick={() => startTopup((kaspiTopupAmount ?? Number(kaspiTopupCustom)) || 0)}
-            disabled={kaspiToppingUp || !(kaspiTopupAmount || kaspiTopupCustom)}
+            disabled={kaspiToppingUp || !((kaspiTopupAmount ?? Number(kaspiTopupCustom)) >= MIN_TOPUP_AMOUNT)}
             className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium mb-3 disabled:opacity-50">
             {kaspiToppingUp ? t.kaspiTopupStartingLabel : t.kaspiTopupButton}
           </button>
