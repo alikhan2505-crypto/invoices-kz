@@ -7,6 +7,7 @@ import AppNav from '@/components/AppNav'
 import DesktopShell from '@/components/DesktopShell'
 import * as XLSX from 'xlsx'
 import { formatDateTime, formatDate } from '@/lib/date'
+import { addDaysToDateString, todayDateString } from '@/lib/dueDate'
 import { useLanguage } from '@/components/LanguageProvider'
 import { clearSearchLabel } from '@/lib/a11yLabels'
 import { historyDict } from '@/lib/i18n/history'
@@ -67,16 +68,30 @@ export default function History() {
     if (!user) return
     const sevenDaysAgo = new Date()
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-    const { data, error } = await supabase
+    const overdueDueDateTarget = addDaysToDateString(todayDateString(), -1)
+
+    const { data: byDueDate, error: dueDateError } = await supabase
       .from('invoices')
       .update({ status: 'overdue' })
       .eq('user_id', user.id)
       .in('status', ['sent', 'viewed'])
+      .lt('due_date', overdueDueDateTarget)
+      .select()
+    if (dueDateError) { alert(t.errorPrefix(dueDateError.message)); return }
+
+    const { data: legacy, error: legacyError } = await supabase
+      .from('invoices')
+      .update({ status: 'overdue' })
+      .eq('user_id', user.id)
+      .in('status', ['sent', 'viewed'])
+      .is('due_date', null)
       .lt('created_at', sevenDaysAgo.toISOString())
       .select()
-    if (error) { alert(t.errorPrefix(error.message)); return }
-    if (data && data.length > 0) {
-      alert(t.markedOverdueMessage(data.length))
+    if (legacyError) { alert(t.errorPrefix(legacyError.message)); return }
+
+    const total = (byDueDate?.length || 0) + (legacy?.length || 0)
+    if (total > 0) {
+      alert(t.markedOverdueMessage(total))
       loadInvoices()
     } else {
       alert(t.noOverdueInvoicesAlert)
