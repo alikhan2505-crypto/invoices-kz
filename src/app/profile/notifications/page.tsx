@@ -13,6 +13,10 @@ export default function Notifications() {
   const t = profileAccountsDict[lang]
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [telegramChatId, setTelegramChatId] = useState<string | null>(null)
+  const [telegramConnecting, setTelegramConnecting] = useState(false)
+  const [telegramDisconnecting, setTelegramDisconnecting] = useState(false)
+  const [telegramError, setTelegramError] = useState('')
   const [settings, setSettings] = useState({
     notify_email: true,
     notify_telegram: false,
@@ -36,6 +40,7 @@ export default function Notifications() {
           notify_overdue: data.notify_overdue ?? true,
           notify_weekly_report: data.notify_weekly_report ?? false,
         })
+        setTelegramChatId(data.telegram_chat_id ?? null)
       }
       setLoading(false)
     }
@@ -50,6 +55,40 @@ export default function Notifications() {
     if (!user) return
     await supabase.from('profiles').upsert({ id: user.id, ...newSettings })
     setSaving(false)
+  }
+
+  async function connectTelegram() {
+    setTelegramError('')
+    setTelegramConnecting(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/telegram-connect/init', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${session?.access_token}` },
+      })
+      const data = await res.json()
+      if (!res.ok || !data.token) {
+        setTelegramError(t.telegramConnectErrorGeneric)
+        return
+      }
+      window.location.href = `https://t.me/${data.botUsername}?start=${data.token}`
+    } finally {
+      setTelegramConnecting(false)
+    }
+  }
+
+  async function disconnectTelegram() {
+    setTelegramDisconnecting(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      await fetch('/api/telegram-connect/disconnect', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${session?.access_token}` },
+      })
+      setTelegramChatId(null)
+    } finally {
+      setTelegramDisconnecting(false)
+    }
   }
 
   function Toggle({ value, onChange }: { value: boolean, onChange: (v: boolean) => void }) {
@@ -150,15 +189,28 @@ export default function Notifications() {
         {/* Telegram подключение */}
         {settings.notify_telegram && (
           <div className="bg-white rounded-2xl shadow-sm p-4">
-            <div className="text-sm font-medium text-[#1C2056] mb-2">{t.connectTelegramTitle}</div>
-            <div className="text-xs text-gray-500 mb-3">
-              {t.connectTelegramBodyBefore} <span className="font-mono bg-gray-100 px-1 rounded">/start</span> {t.connectTelegramBodyAfter}
-            </div>
-            <a href="https://t.me/invoiceskz_support_bot"
-              target="_blank"
-              className="flex items-center justify-center gap-2 w-full bg-[#1C2056] text-white rounded-xl py-3 text-sm font-medium">
-              {t.connectTelegramBotButton}
-            </a>
+            {telegramChatId ? (
+              <>
+                <div className="text-sm font-medium text-[#1C2056] mb-1">{t.telegramConnectedLabel}</div>
+                <div className="text-xs text-gray-500 mb-3">{t.telegramConnectedHint}</div>
+                <button onClick={disconnectTelegram} disabled={telegramDisconnecting}
+                  className="w-full bg-gray-100 text-gray-600 rounded-xl py-3 text-sm font-medium">
+                  {telegramDisconnecting ? t.disconnectingLabel : t.disconnectTelegramButton}
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="text-sm font-medium text-[#1C2056] mb-2">{t.connectTelegramTitle}</div>
+                <div className="text-xs text-gray-500 mb-3">
+                  {t.connectTelegramBodyBefore} <span className="font-mono bg-gray-100 px-1 rounded">/start</span> {t.connectTelegramBodyAfter}
+                </div>
+                {telegramError && <p className="text-xs text-red-500 mb-2">{telegramError}</p>}
+                <button onClick={connectTelegram} disabled={telegramConnecting}
+                  className="flex items-center justify-center gap-2 w-full bg-[#1C2056] text-white rounded-xl py-3 text-sm font-medium">
+                  {telegramConnecting ? t.disconnectingLabel : t.connectTelegramBotButton}
+                </button>
+              </>
+            )}
           </div>
         )}
 

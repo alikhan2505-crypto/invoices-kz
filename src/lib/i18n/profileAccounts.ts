@@ -93,6 +93,11 @@ export interface ProfileAccountsContent {
   connectTelegramBodyBefore: string
   connectTelegramBodyAfter: string
   connectTelegramBotButton: string
+  telegramConnectedLabel: string
+  telegramConnectedHint: string
+  disconnectTelegramButton: string
+  disconnectingLabel: string
+  telegramConnectErrorGeneric: string
 }
 
 export const profileAccountsDict: Record<'ru' | 'kk' | 'en', ProfileAccountsContent> = {
@@ -186,6 +191,11 @@ export const profileAccountsDict: Record<'ru' | 'kk' | 'en', ProfileAccountsCont
     connectTelegramBodyBefore: 'Напишите боту команду',
     connectTelegramBodyAfter: 'чтобы получать уведомления',
     connectTelegramBotButton: '✈️ Открыть Telegram бот',
+    telegramConnectedLabel: '✅ Telegram подключён',
+    telegramConnectedHint: 'Вы будете получать уведомления в этот чат, пока включён тумблер выше.',
+    disconnectTelegramButton: 'Отключить Telegram',
+    disconnectingLabel: 'Отключаем...',
+    telegramConnectErrorGeneric: 'Не удалось подключить Telegram. Попробуйте ещё раз.',
   },
   kk: {
     loadingLabel: 'Жүктелуде...',
@@ -277,6 +287,11 @@ export const profileAccountsDict: Record<'ru' | 'kk' | 'en', ProfileAccountsCont
     connectTelegramBodyBefore: 'Хабарландыруларды алу үшін ботқа',
     connectTelegramBodyAfter: 'командасын жазыңыз',
     connectTelegramBotButton: '✈️ Telegram ботты ашу',
+    telegramConnectedLabel: '✅ Telegram қосылды',
+    telegramConnectedHint: 'Жоғарыдағы қосқыш қосулы тұрғанда осы чатқа хабарландырулар келеді.',
+    disconnectTelegramButton: 'Telegram-ды ажырату',
+    disconnectingLabel: 'Ажыратылуда...',
+    telegramConnectErrorGeneric: 'Telegram қосу мүмкін болмады. Қайталап көріңіз.',
   },
   en: {
     loadingLabel: 'Loading...',
@@ -368,5 +383,10 @@ export const profileAccountsDict: Record<'ru' | 'kk' | 'en', ProfileAccountsCont
     connectTelegramBodyBefore: 'Send the bot the command',
     connectTelegramBodyAfter: 'to receive notifications',
     connectTelegramBotButton: '✈️ Open Telegram bot',
+    telegramConnectedLabel: '✅ Telegram connected',
+    telegramConnectedHint: "You'll get notifications in this chat while the toggle above is on.",
+    disconnectTelegramButton: 'Disconnect Telegram',
+    disconnectingLabel: 'Disconnecting...',
+    telegramConnectErrorGeneric: 'Could not connect Telegram. Please try again.',
   },
 }
