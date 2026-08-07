@@ -10,6 +10,7 @@ import InvoiceLivePreview from '@/components/InvoiceLivePreview'
 import { cacheGet, cacheSet } from '@/lib/cache'
 import { getActivePlan } from '@/lib/plan'
 import { formatDate } from '@/lib/date'
+import { computeDefaultDueDate, todayDateString } from '@/lib/dueDate'
 import { useLanguage } from '@/components/LanguageProvider'
 import { closeLabel, deleteLabel } from '@/lib/a11yLabels'
 import { invoiceFlowDict } from '@/lib/i18n/invoiceFlow'
@@ -54,6 +55,7 @@ export default function Dashboard() {
   const [clientPhone, setClientPhone] = useState('')
   const [contractNumber, setContractNumber] = useState('')
   const [contractDate, setContractDate] = useState('')
+  const [dueDate, setDueDate] = useState('')
   const [clientKnp, setClientKnp] = useState('849')
   const [note, setNote] = useState('')
   const [services, setServices] = useState<any[]>([{ name: '', qty: 1, price: 0, unit: 'шт', code: '', type: 'service' }])
@@ -85,6 +87,7 @@ export default function Dashboard() {
     setProfileLoaded(true)
     if (p) cacheSet('profile_' + user.id, p)
     if (p?.default_note) setNote(p.default_note)
+    setDueDate(computeDefaultDueDate(todayDateString(), p?.default_due_days))
 
     supabase.from('profiles').update({ last_active_at: new Date().toISOString() }).eq('id', user.id).then(() => {})
 
@@ -179,6 +182,7 @@ export default function Dashboard() {
     setClientKnp('849')
     setClientSelected(false)
     setNote('')
+    setDueDate(computeDefaultDueDate(todayDateString(), profile?.default_due_days))
   }
 
   function selectService(svc: any) {
@@ -229,7 +233,7 @@ export default function Dashboard() {
   async function generateWithBank(bank: any) {
     if (!pendingInvoiceData) return
     const win = window.open('', '_blank')
-    const { invoiceNumber, invoiceDate, cn, cb, ce, ca, cp, cn2, cd, svcs, tot, nt, knp, pt } = pendingInvoiceData
+    const { invoiceNumber, invoiceDate, cn, cb, ce, ca, cp, cn2, cd, svcs, tot, nt, knp, pt, dd } = pendingInvoiceData
     // Берём окно из ref (было открыто при клике на банк — прямой клик пользователя)
     const html = await generateInvoicePDF({
       number: invoiceNumber,
@@ -256,6 +260,7 @@ export default function Dashboard() {
       },
       kaspiPayLink: profile?.kaspi_pay_link || undefined,
       viewUrl: pt ? `https://www.invoices.kz/view/${pt}` : undefined,
+      dueDate: dd ? formatDate(dd) : undefined,
       showWatermark: !getActivePlan(profile).isActive,
     })
     setShowBankPicker(false)
@@ -339,6 +344,7 @@ export default function Dashboard() {
       client_phone: clientPhone || null,
       contract_number: contractNumber || null,
       contract_date: contractDate || null,
+      due_date: dueDate || null,
       services,
       note: note || profile?.default_note || null,
     }).select().single()
@@ -368,6 +374,7 @@ export default function Dashboard() {
         cn2: contractNumber, cd: contractDate,
         knp: clientKnp, svcs: services, tot: total, nt: note,
         pt: data.public_token,
+        dd: dueDate,
       })
       setShowBankPicker(true)
       clearClient()
@@ -390,6 +397,7 @@ export default function Dashboard() {
       },
       kaspiPayLink: profile?.kaspi_pay_link || undefined,
       viewUrl: data.public_token ? `https://www.invoices.kz/view/${data.public_token}` : undefined,
+      dueDate: dueDate ? formatDate(dueDate) : undefined,
       showWatermark: !getActivePlan(profile).isActive,
     })
     if (win) { win.document.write(html); win.document.close() }
@@ -547,6 +555,11 @@ export default function Dashboard() {
                       placeholder={t.contractDatePlaceholder} value={contractDate} onChange={e => setContractDate(e.target.value)} />
                   </div>
                 </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">{t.dueDateLabel}</label>
+                  <input type="date" className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                    value={dueDate} onChange={e => setDueDate(e.target.value)} />
+                </div>
               </div>
             ) : (
               <div className="space-y-3">
@@ -602,6 +615,11 @@ export default function Dashboard() {
                     <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
                       placeholder={t.contractDatePlaceholder} value={contractDate} onChange={e => setContractDate(e.target.value)} />
                   </div>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">{t.dueDateLabel}</label>
+                  <input type="date" className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                    value={dueDate} onChange={e => setDueDate(e.target.value)} />
                 </div>
                 <div>
                   <label className="text-xs text-gray-500 mb-1 block">{t.knpLabel}</label>
@@ -732,6 +750,7 @@ export default function Dashboard() {
           <InvoiceLivePreview
             invoiceNumber={!profileLoaded ? '' : (profile?.invoice_prefix || 'INV-') + (profile?.invoice_next_number || '0001')}
             date={formatDate(new Date().toISOString())}
+            dueDate={dueDate ? formatDate(dueDate) : undefined}
             companyName={profile?.company_name || ''}
             companyBin={profile?.bin_iin || ''}
             clientName={clientName}
