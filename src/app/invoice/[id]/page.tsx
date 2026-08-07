@@ -289,6 +289,7 @@ export default function InvoicePage() {
       profile: buildProfile(withSignature),
       bank: bank ? { bank_name: bank.bank_name, iik: bank.iik, bik: bank.bik, kbe: bank.kbe } : undefined,
       kaspiPayLink: profile?.kaspi_pay_link || undefined,
+      viewUrl: invoice.public_token ? `https://www.invoices.kz/view/${invoice.public_token}` : undefined,
       showWatermark: !ap.isActive,
     })
     if (win) { win.document.write(html); win.document.close() }
@@ -506,6 +507,7 @@ export default function InvoicePage() {
             profile: buildProfile(false),
             bank: bank ? { bank_name: bank.bank_name, iik: bank.iik, bik: bank.bik, kbe: bank.kbe } : undefined,
             kaspiPayLink: profile?.kaspi_pay_link || undefined,
+            viewUrl: invoice.public_token ? `https://www.invoices.kz/view/${invoice.public_token}` : undefined,
             showWatermark: !ap.isActive,
           })}
         />

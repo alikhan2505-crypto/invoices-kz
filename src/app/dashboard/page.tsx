@@ -229,7 +229,7 @@ export default function Dashboard() {
   async function generateWithBank(bank: any) {
     if (!pendingInvoiceData) return
     const win = window.open('', '_blank')
-    const { invoiceNumber, invoiceDate, cn, cb, ce, ca, cp, cn2, cd, svcs, tot, nt, knp } = pendingInvoiceData
+    const { invoiceNumber, invoiceDate, cn, cb, ce, ca, cp, cn2, cd, svcs, tot, nt, knp, pt } = pendingInvoiceData
     // Берём окно из ref (было открыто при клике на банк — прямой клик пользователя)
     const html = await generateInvoicePDF({
       number: invoiceNumber,
@@ -255,6 +255,7 @@ export default function Dashboard() {
         kbe: bank.kbe || '19',
       },
       kaspiPayLink: profile?.kaspi_pay_link || undefined,
+      viewUrl: pt ? `https://www.invoices.kz/view/${pt}` : undefined,
       showWatermark: !getActivePlan(profile).isActive,
     })
     setShowBankPicker(false)
@@ -366,6 +367,7 @@ export default function Dashboard() {
         ca: clientAddress, cp: clientPhone,
         cn2: contractNumber, cd: contractDate,
         knp: clientKnp, svcs: services, tot: total, nt: note,
+        pt: data.public_token,
       })
       setShowBankPicker(true)
       clearClient()
@@ -387,6 +389,7 @@ export default function Dashboard() {
         kbe: bank.kbe || '19',
       },
       kaspiPayLink: profile?.kaspi_pay_link || undefined,
+      viewUrl: data.public_token ? `https://www.invoices.kz/view/${data.public_token}` : undefined,
       showWatermark: !getActivePlan(profile).isActive,
     })
     if (win) { win.document.write(html); win.document.close() }

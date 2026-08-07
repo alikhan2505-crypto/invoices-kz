@@ -115,6 +115,11 @@ export async function runSigexQrSigning(
     businessLink: client.getEGovBusinessLaunchLink(),
   })
 
-  const signatures = await client.getSignatures()
+  // debugErrorsCallback surfaces the exceptions the library otherwise
+  // swallows silently on each retry (network blips against sigex.kz) — with
+  // no logging here, a failed ceremony left zero trace of why.
+  const signatures = await client.getSignatures(undefined, (err: unknown) => {
+    console.error('SIGEX getSignatures retry error:', err)
+  })
   return signatures[0]
 }

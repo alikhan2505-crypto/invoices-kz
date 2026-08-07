@@ -1,10 +1,18 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { formatDateTime } from '@/lib/date'
 import { renderPdfBlob, uploadSnapshot, runSigexQrSigning, injectAttestationBlock, buildAttestationHtml, SigexQrState } from '@/lib/signDocument'
 import { useLanguage } from '@/components/LanguageProvider'
 import { signatureDict } from '@/lib/i18n/signature'
+
+// SIGEX itself keeps the QR valid for ~15 minutes (its own `expireAt`, not
+// surfaced by the client library), but leaving someone staring at a QR with
+// zero feedback for that long reads as "frozen" — this is a much shorter,
+// client-side give-up point after which we show an explicit message instead
+// of silence. Well under the real QR expiry, so it never fires while a
+// signature is still genuinely possible on the phone side.
+const SIGNING_TIMEOUT_MS = 4 * 60 * 1000
 
 type Row = {
   id: string
@@ -44,8 +52,44 @@ export default function SignatureSection(props: Props) {
   const [signing, setSigning] = useState(false)
   const [qr, setQr] = useState<SigexQrState | null>(null)
   const [error, setError] = useState('')
+  const cancelRef = useRef<(() => void) | null>(null)
 
   useEffect(() => { loadRow() }, [documentId])
+
+  // Wraps the real SIGEX ceremony (which otherwise waits patiently on
+  // whatever sigex.kz does, up to its own ~15min QR expiry) with an escape
+  // hatch: either the user clicks Отмена (cancelRef, wired to the QR panel)
+  // or SIGNING_TIMEOUT_MS elapses. Either way we stop waiting and reset the
+  // UI — the abandoned network calls just get ignored, not aborted.
+  function signWithEscape(pdfBlob: Blob): Promise<string> {
+    return new Promise<string>((resolve, reject) => {
+      let settled = false
+      const timeoutId = setTimeout(() => {
+        if (settled) return
+        settled = true
+        reject(Object.assign(new Error('Signing wait timed out'), { timedOut: true }))
+      }, SIGNING_TIMEOUT_MS)
+      cancelRef.current = () => {
+        if (settled) return
+        settled = true
+        clearTimeout(timeoutId)
+        reject(Object.assign(new Error('Signing cancelled by user'), { userCancelled: true }))
+      }
+      runSigexQrSigning(documentTitle, pdfBlob, setQr)
+        .then((sig) => {
+          if (settled) return
+          settled = true
+          clearTimeout(timeoutId)
+          resolve(sig)
+        })
+        .catch((err) => {
+          if (settled) return
+          settled = true
+          clearTimeout(timeoutId)
+          reject(err)
+        })
+    })
+  }
 
   async function loadRow() {
     const { data } = await supabase
@@ -78,7 +122,7 @@ export default function SignatureSection(props: Props) {
         pdfBlob = await (await fetch(snapshotPdfUrl)).blob()
       }
 
-      const signatureCms = await runSigexQrSigning(documentTitle, pdfBlob, setQr)
+      const signatureCms = await signWithEscape(pdfBlob)
       setQr(null)
 
       const { data: { session } } = await supabase.auth.getSession()
@@ -132,6 +176,8 @@ export default function SignatureSection(props: Props) {
       // that a retry was expected. Always show something now — a neutral,
       // non-alarming message, not the raw error framing, since a genuine
       // user-initiated cancel isn't really a bug.
+      if (e?.userCancelled) { return }
+      if (e?.timedOut) { setError(t.signingTimedOutMessage); return }
       if (e?.canceledByUser) { setError(t.signingNotCompletedMessage); return }
       setError(e?.message || String(e))
     } finally {
@@ -149,7 +195,7 @@ export default function SignatureSection(props: Props) {
       const pdfRes = await fetch(row.snapshot_pdf_url)
       const pdfBlob = await pdfRes.blob()
 
-      const signatureCms = await runSigexQrSigning(documentTitle, pdfBlob, setQr)
+      const signatureCms = await signWithEscape(pdfBlob)
       setQr(null)
 
       const res = await fetch('/api/signatures/client-sign', {
@@ -169,6 +215,8 @@ export default function SignatureSection(props: Props) {
       // that a retry was expected. Always show something now — a neutral,
       // non-alarming message, not the raw error framing, since a genuine
       // user-initiated cancel isn't really a bug.
+      if (e?.userCancelled) { return }
+      if (e?.timedOut) { setError(t.signingTimedOutMessage); return }
       if (e?.canceledByUser) { setError(t.signingNotCompletedMessage); return }
       setError(e?.message || String(e))
     } finally {
@@ -196,7 +244,10 @@ export default function SignatureSection(props: Props) {
                 {t.openInEgovButton}
               </a>
             )}
-            <p className="text-xs text-gray-400">{t.signingLabel}</p>
+            <p className="text-xs text-gray-400 mb-2">{t.signingLabel}</p>
+            <button onClick={() => cancelRef.current?.()} className="text-xs text-gray-400 underline">
+              {t.cancelButton}
+            </button>
           </div>
         ) : row?.status === 'signed' ? (
           <div>

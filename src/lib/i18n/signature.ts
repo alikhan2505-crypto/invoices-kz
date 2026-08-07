@@ -14,6 +14,7 @@ export interface SignatureContent {
   downloadVerificationCardButton: string
   errorPrefix: (message: string) => string
   signingNotCompletedMessage: string
+  signingTimedOutMessage: string
   signedByLabel: string
   onBehalfOfPrefix: (company: string) => string
   iinPrefix: (iin: string) => string
@@ -39,6 +40,7 @@ export const signatureDict: Record<'ru' | 'kk' | 'en', SignatureContent> = {
     downloadVerificationCardButton: 'Скачать карточку для проверки подписи',
     errorPrefix: (message: string) => `Ошибка подписания: ${message}`,
     signingNotCompletedMessage: 'Подписание не завершено — сессия истекла или была прервана. Если вы не отменяли процесс сами, попробуйте ещё раз.',
+    signingTimedOutMessage: 'Не дождались подписи в приложении eGov mobile. Попробуйте ещё раз и убедитесь, что успели отсканировать и подтвердить QR-код на телефоне.',
     signedByLabel: 'Подписал(а):',
     onBehalfOfPrefix: (company: string) => `от имени ${company}`,
     iinPrefix: (iin: string) => `ИИН ${iin}`,
@@ -62,6 +64,7 @@ export const signatureDict: Record<'ru' | 'kk' | 'en', SignatureContent> = {
     downloadVerificationCardButton: 'Қолтаңбаны тексеру карточкасын жүктеу',
     errorPrefix: (message: string) => `Қол қою қатесі: ${message}`,
     signingNotCompletedMessage: 'Қол қою аяқталмады — сессия мерзімі өтті немесе үзілді. Егер сіз процесті өзіңіз тоқтатпаған болсаңыз, қайталап көріңіз.',
+    signingTimedOutMessage: 'eGov mobile қолданбасында қол қоюды күте алмадық. Қайталап көріңіз және QR-кодты телефонда сканерлеп, растауға үлгергеніңізге көз жеткізіңіз.',
     signedByLabel: 'Қол қойған:',
     onBehalfOfPrefix: (company: string) => `${company} атынан`,
     iinPrefix: (iin: string) => `ЖСН ${iin}`,
@@ -85,6 +88,7 @@ export const signatureDict: Record<'ru' | 'kk' | 'en', SignatureContent> = {
     downloadVerificationCardButton: 'Download signature verification card',
     errorPrefix: (message: string) => `Signing error: ${message}`,
     signingNotCompletedMessage: "Signing wasn't completed — the session expired or was interrupted. If you didn't cancel it yourself, please try again.",
+    signingTimedOutMessage: "We didn't receive a signature from the eGov mobile app in time. Please try again and make sure to scan and confirm the QR code on your phone.",
     signedByLabel: 'Signed by:',
     onBehalfOfPrefix: (company: string) => `on behalf of ${company}`,
     iinPrefix: (iin: string) => `IIN ${iin}`,
