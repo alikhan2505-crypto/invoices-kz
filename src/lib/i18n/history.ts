@@ -39,6 +39,7 @@ export interface HistoryContent {
   defaultServiceName: string
   invoiceNotFoundLabel: string
   invoiceForPaymentLabel: string
+  dueDateLabel: string
   fromLabel: string
   toLabel: string
   binLabel: (bin: string) => string
@@ -124,6 +125,7 @@ export const historyDict: Record<'ru' | 'kk' | 'en', HistoryContent> = {
     defaultServiceName: 'Услуга',
     invoiceNotFoundLabel: 'Счёт не найден',
     invoiceForPaymentLabel: 'Счёт на оплату',
+    dueDateLabel: 'Срок оплаты',
     fromLabel: 'От кого',
     toLabel: 'Кому',
     binLabel: (bin: string) => `БИН: ${bin}`,
@@ -207,6 +209,7 @@ export const historyDict: Record<'ru' | 'kk' | 'en', HistoryContent> = {
     defaultServiceName: 'Қызмет',
     invoiceNotFoundLabel: 'Шот табылмады',
     invoiceForPaymentLabel: 'Төлеуге арналған шот',
+    dueDateLabel: 'Төлеу мерзімі',
     fromLabel: 'Кімнен',
     toLabel: 'Кімге',
     binLabel: (bin: string) => `БСН: ${bin}`,
@@ -290,6 +293,7 @@ export const historyDict: Record<'ru' | 'kk' | 'en', HistoryContent> = {
     defaultServiceName: 'Service',
     invoiceNotFoundLabel: 'Invoice not found',
     invoiceForPaymentLabel: 'Invoice for payment',
+    dueDateLabel: 'Due date',
     fromLabel: 'From',
     toLabel: 'To',
     binLabel: (bin: string) => `BIN: ${bin}`,

@@ -50,6 +50,7 @@ interface InvoiceData {
   contractDate?: string
   kaspiPayLink?: string
   viewUrl?: string
+  dueDate?: string
   showWatermark?: boolean
 }
 
@@ -217,6 +218,7 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<string> {
       </table>
 
       <div class="title">Счет на оплату №${data.number} от ${data.date}</div>
+      ${data.dueDate ? `<div style="font-size:11px;color:#6b7280;margin-top:-8px;margin-bottom:10px;">Срок оплаты: ${data.dueDate}</div>` : ''}
 
       <table style="width:100%; border-collapse:collapse; margin-bottom:10px;">
         <tr>

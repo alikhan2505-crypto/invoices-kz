@@ -18,6 +18,7 @@ export interface InvoiceFlowContent {
   addressPlaceholder: string
   contractDateLabel: string
   contractDatePlaceholder: string
+  dueDateLabel: string
   servicesHeader: string
   addButton: string
   serviceToggleLabel: string
@@ -205,6 +206,7 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     addressPlaceholder: 'г. Алматы, ул. Абая 1',
     contractDateLabel: 'Дата договора',
     contractDatePlaceholder: '01.01.2026',
+    dueDateLabel: 'Срок оплаты',
     servicesHeader: 'Услуги / Товары',
     addButton: '+ Добавить',
     serviceToggleLabel: '📋 Услуга',
@@ -399,6 +401,7 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     addressPlaceholder: 'Алматы қ., Абай көш. 1',
     contractDateLabel: 'Шарт күні',
     contractDatePlaceholder: '01.01.2026',
+    dueDateLabel: 'Төлеу мерзімі',
     servicesHeader: 'Қызметтер / Тауарлар',
     addButton: '+ Қосу',
     serviceToggleLabel: '📋 Қызмет',
@@ -593,6 +596,7 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     addressPlaceholder: 'Almaty, Abay St. 1',
     contractDateLabel: 'Contract date',
     contractDatePlaceholder: '01.01.2026',
+    dueDateLabel: 'Due date',
     servicesHeader: 'Services / Goods',
     addButton: '+ Add',
     serviceToggleLabel: '📋 Service',

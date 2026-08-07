@@ -8,6 +8,7 @@ import { invoiceFlowDict } from '@/lib/i18n/invoiceFlow'
 export interface InvoiceLivePreviewProps {
   invoiceNumber: string
   date: string
+  dueDate?: string
   companyName: string
   companyBin: string
   clientName: string
@@ -62,6 +63,7 @@ function formatMoney(n: number): string {
 export default function InvoiceLivePreview({
   invoiceNumber,
   date,
+  dueDate,
   companyName,
   companyBin,
   clientName,
@@ -117,6 +119,10 @@ export default function InvoiceLivePreview({
         <div className="text-lg font-bold tracking-wide text-[#1C2056]">{invoiceNumber}</div>
         <div className="text-xs text-gray-400 bg-gray-50 rounded-full px-2.5 py-1">{date}</div>
       </div>
+
+      {dueDate && (
+        <div className="text-xs text-gray-400 mb-3">{t.dueDateLabel}: {dueDate}</div>
+      )}
 
       {/* From */}
       {(companyName || companyBin) && (
