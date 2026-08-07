@@ -13,6 +13,7 @@ export interface SignatureContent {
   downloadDocumentButton: string
   downloadVerificationCardButton: string
   errorPrefix: (message: string) => string
+  signingNotCompletedMessage: string
   signedByLabel: string
   onBehalfOfPrefix: (company: string) => string
   iinPrefix: (iin: string) => string
@@ -37,6 +38,7 @@ export const signatureDict: Record<'ru' | 'kk' | 'en', SignatureContent> = {
     downloadDocumentButton: 'Скачать документ',
     downloadVerificationCardButton: 'Скачать карточку для проверки подписи',
     errorPrefix: (message: string) => `Ошибка подписания: ${message}`,
+    signingNotCompletedMessage: 'Подписание не завершено — сессия истекла или была прервана. Если вы не отменяли процесс сами, попробуйте ещё раз.',
     signedByLabel: 'Подписал(а):',
     onBehalfOfPrefix: (company: string) => `от имени ${company}`,
     iinPrefix: (iin: string) => `ИИН ${iin}`,
@@ -59,6 +61,7 @@ export const signatureDict: Record<'ru' | 'kk' | 'en', SignatureContent> = {
     downloadDocumentButton: 'Құжатты жүктеу',
     downloadVerificationCardButton: 'Қолтаңбаны тексеру карточкасын жүктеу',
     errorPrefix: (message: string) => `Қол қою қатесі: ${message}`,
+    signingNotCompletedMessage: 'Қол қою аяқталмады — сессия мерзімі өтті немесе үзілді. Егер сіз процесті өзіңіз тоқтатпаған болсаңыз, қайталап көріңіз.',
     signedByLabel: 'Қол қойған:',
     onBehalfOfPrefix: (company: string) => `${company} атынан`,
     iinPrefix: (iin: string) => `ЖСН ${iin}`,
@@ -81,6 +84,7 @@ export const signatureDict: Record<'ru' | 'kk' | 'en', SignatureContent> = {
     downloadDocumentButton: 'Download document',
     downloadVerificationCardButton: 'Download signature verification card',
     errorPrefix: (message: string) => `Signing error: ${message}`,
+    signingNotCompletedMessage: "Signing wasn't completed — the session expired or was interrupted. If you didn't cancel it yourself, please try again.",
     signedByLabel: 'Signed by:',
     onBehalfOfPrefix: (company: string) => `on behalf of ${company}`,
     iinPrefix: (iin: string) => `IIN ${iin}`,

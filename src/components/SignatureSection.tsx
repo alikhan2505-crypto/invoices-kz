@@ -124,7 +124,15 @@ export default function SignatureSection(props: Props) {
         }
       }
     } catch (e: any) {
-      if (e?.canceledByUser) return
+      // sigex-qr-signing-client flags this for more than just an explicit
+      // "cancel" tap in the eGov app — a session timeout or an interrupted
+      // ceremony can land here too, and the previous silent `return` gave
+      // the user zero feedback: the QR just vanished and the button went
+      // back to "Подписать ЭЦП" with no indication of what happened or
+      // that a retry was expected. Always show something now — a neutral,
+      // non-alarming message, not the raw error framing, since a genuine
+      // user-initiated cancel isn't really a bug.
+      if (e?.canceledByUser) { setError(t.signingNotCompletedMessage); return }
       setError(e?.message || String(e))
     } finally {
       setSigning(false)
@@ -153,7 +161,15 @@ export default function SignatureSection(props: Props) {
       if (json.error) { setError(json.error); return }
       await loadRow()
     } catch (e: any) {
-      if (e?.canceledByUser) return
+      // sigex-qr-signing-client flags this for more than just an explicit
+      // "cancel" tap in the eGov app — a session timeout or an interrupted
+      // ceremony can land here too, and the previous silent `return` gave
+      // the user zero feedback: the QR just vanished and the button went
+      // back to "Подписать ЭЦП" with no indication of what happened or
+      // that a retry was expected. Always show something now — a neutral,
+      // non-alarming message, not the raw error framing, since a genuine
+      // user-initiated cancel isn't really a bug.
+      if (e?.canceledByUser) { setError(t.signingNotCompletedMessage); return }
       setError(e?.message || String(e))
     } finally {
       setSigning(false)
