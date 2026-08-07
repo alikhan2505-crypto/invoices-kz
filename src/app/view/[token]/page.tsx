@@ -167,6 +167,7 @@ export default function PublicInvoice() {
         bik: bank.bik,
         kbe: bank.kbe,
       } : undefined,
+      dueDate: invoice.due_date ? formatDate(invoice.due_date) : undefined,
       autoPrint: false,
     })
   if (win) { win.document.write(html); win.document.close() }
@@ -218,6 +219,9 @@ export default function PublicInvoice() {
               <div className="text-xs text-gray-400 mb-1">{t.invoiceForPaymentLabel}</div>
               <div className="text-xl font-bold text-[#1C2056]">{invoice.number}</div>
               <div className="text-xs text-gray-400 mt-1">{formatDate(invoice.created_at)}</div>
+              {invoice.due_date && (
+                <div className="text-xs text-gray-400 mt-1">{t.dueDateLabel}: {formatDate(invoice.due_date)}</div>
+              )}
             </div>
             <div className="text-right">
               <div className="text-2xl font-bold text-[#1C2056]">
