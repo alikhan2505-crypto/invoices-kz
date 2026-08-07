@@ -635,24 +635,30 @@ The weekly-report profiles query becomes:
 
 - [ ] **Step 2: Add the three independent Telegram branches**
 
+**Cross-task correctness note (found during Task 5's review, applies here even more since this loop touches every subscriber, not just one request):** each `resend.emails.send(...)` call must have its OWN `try/catch` (log-and-continue), not rely on the surrounding loop/route to absorb a failure. Unlike the per-request routes in Task 5, this file's loop bodies currently have NO enclosing try/catch at all — an unhandled Resend exception here would throw out of the whole `GET` handler, abandoning every remaining user in every remaining loop for the rest of this cron run, not just skipping one channel for one user. Wrap each `resend.emails.send` call individually as shown below; `sendTelegramNotification` never throws (see `src/lib/telegramNotify.ts`) so it needs no wrapping.
+
 After the existing reminder email block (the `if (!owner?.email || owner.notify_payment_reminder === false) continue` line stays, but add a **separate** check right after it — do not let the `continue` skip Telegram for a user with email off but Telegram on; restructure as two independent `if`s, matching Task 5's reasoning):
 
 ```ts
   for (const inv of (reminderInvoices || []) as any[]) {
     const owner = inv.profiles
     if (owner?.email && owner.notify_payment_reminder !== false) {
-      await resend.emails.send({
-        from: 'invoices.kz <mail@invoices.kz>',
-        to: owner.email,
-        subject: `Напоминание: счёт №${inv.number} ещё не оплачен`,
-        html: wrapEmail('#F5A623', 'Напоминание об оплате', `
-          <p style="margin:0 0 12px; font-size:14px; color:#333;">
-            Счёт №${inv.number} для <strong>${inv.client_name || ''}</strong> на сумму
-            <strong>${Number(inv.amount).toLocaleString('ru-KZ')} ₸</strong> отправлен 3 дня назад и всё ещё не оплачен.
-          </p>
-        `),
-      })
-      reminders++
+      try {
+        await resend.emails.send({
+          from: 'invoices.kz <mail@invoices.kz>',
+          to: owner.email,
+          subject: `Напоминание: счёт №${inv.number} ещё не оплачен`,
+          html: wrapEmail('#F5A623', 'Напоминание об оплате', `
+            <p style="margin:0 0 12px; font-size:14px; color:#333;">
+              Счёт №${inv.number} для <strong>${inv.client_name || ''}</strong> на сумму
+              <strong>${Number(inv.amount).toLocaleString('ru-KZ')} ₸</strong> отправлен 3 дня назад и всё ещё не оплачен.
+            </p>
+          `),
+        })
+        reminders++
+      } catch (e: any) {
+        console.error('cron/notifications: reminder email failed for invoice', inv.id, ':', e.message)
+      }
     }
     if (owner?.notify_telegram && owner.telegram_chat_id) {
       await sendTelegramNotification(owner.telegram_chat_id,
@@ -668,18 +674,22 @@ For the overdue loop, the status-transition `await supabase.from('invoices').upd
     await supabase.from('invoices').update({ status: 'overdue' }).eq('id', inv.id)
     const owner = inv.profiles
     if (owner?.email && owner.notify_overdue !== false) {
-      await resend.emails.send({
-        from: 'invoices.kz <mail@invoices.kz>',
-        to: owner.email,
-        subject: `Счёт №${inv.number} просрочен`,
-        html: wrapEmail('#E05252', 'Счёт просрочен', `
-          <p style="margin:0 0 12px; font-size:14px; color:#333;">
-            Счёт №${inv.number} для <strong>${inv.client_name || ''}</strong> на сумму
-            <strong>${Number(inv.amount).toLocaleString('ru-KZ')} ₸</strong> не оплачен уже 7 дней и помечен как просроченный.
-          </p>
-        `),
-      })
-      overdue++
+      try {
+        await resend.emails.send({
+          from: 'invoices.kz <mail@invoices.kz>',
+          to: owner.email,
+          subject: `Счёт №${inv.number} просрочен`,
+          html: wrapEmail('#E05252', 'Счёт просрочен', `
+            <p style="margin:0 0 12px; font-size:14px; color:#333;">
+              Счёт №${inv.number} для <strong>${inv.client_name || ''}</strong> на сумму
+              <strong>${Number(inv.amount).toLocaleString('ru-KZ')} ₸</strong> не оплачен уже 7 дней и помечен как просроченный.
+            </p>
+          `),
+        })
+        overdue++
+      } catch (e: any) {
+        console.error('cron/notifications: overdue email failed for invoice', inv.id, ':', e.message)
+      }
     }
     if (owner?.notify_telegram && owner.telegram_chat_id) {
       await sendTelegramNotification(owner.telegram_chat_id,
@@ -692,20 +702,24 @@ For the weekly report block (inside `if (new Date().getUTCDay() === 1)`), after 
 
 ```ts
       if (p.email && (p as any).notify_weekly_report) {
-        await resend.emails.send({
-          from: 'invoices.kz <mail@invoices.kz>',
-          to: p.email,
-          subject: 'Ваш еженедельный отчёт invoices.kz',
-          html: wrapEmail('#1C2056', 'Отчёт за неделю', `
-            <p style="margin:0 0 12px; font-size:14px; color:#333;">За последние 7 дней:</p>
-            <ul style="margin:0 0 12px; padding-left:18px; font-size:14px; color:#333;">
-              <li>Создано счетов: <strong>${list.length}</strong></li>
-              <li>Оплачено: <strong>${paid.length}</strong> на сумму <strong>${paidSum.toLocaleString('ru-KZ')} ₸</strong></li>
-              <li>Ожидают оплаты: <strong>${unpaidCount}</strong></li>
-            </ul>
-          `),
-        })
-        reports++
+        try {
+          await resend.emails.send({
+            from: 'invoices.kz <mail@invoices.kz>',
+            to: p.email,
+            subject: 'Ваш еженедельный отчёт invoices.kz',
+            html: wrapEmail('#1C2056', 'Отчёт за неделю', `
+              <p style="margin:0 0 12px; font-size:14px; color:#333;">За последние 7 дней:</p>
+              <ul style="margin:0 0 12px; padding-left:18px; font-size:14px; color:#333;">
+                <li>Создано счетов: <strong>${list.length}</strong></li>
+                <li>Оплачено: <strong>${paid.length}</strong> на сумму <strong>${paidSum.toLocaleString('ru-KZ')} ₸</strong></li>
+                <li>Ожидают оплаты: <strong>${unpaidCount}</strong></li>
+              </ul>
+            `),
+          })
+          reports++
+        } catch (e: any) {
+          console.error('cron/notifications: weekly report email failed for profile', p.id, ':', e.message)
+        }
       }
       if ((p as any).notify_telegram && (p as any).telegram_chat_id) {
         await sendTelegramNotification((p as any).telegram_chat_id,
