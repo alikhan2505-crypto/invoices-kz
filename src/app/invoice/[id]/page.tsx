@@ -290,6 +290,7 @@ export default function InvoicePage() {
       bank: bank ? { bank_name: bank.bank_name, iik: bank.iik, bik: bank.bik, kbe: bank.kbe } : undefined,
       kaspiPayLink: profile?.kaspi_pay_link || undefined,
       viewUrl: invoice.public_token ? `https://www.invoices.kz/view/${invoice.public_token}` : undefined,
+      dueDate: invoice.due_date ? formatDate(invoice.due_date) : undefined,
       showWatermark: !ap.isActive,
     })
     if (win) { win.document.write(html); win.document.close() }
@@ -508,6 +509,7 @@ export default function InvoicePage() {
             bank: bank ? { bank_name: bank.bank_name, iik: bank.iik, bik: bank.bik, kbe: bank.kbe } : undefined,
             kaspiPayLink: profile?.kaspi_pay_link || undefined,
             viewUrl: invoice.public_token ? `https://www.invoices.kz/view/${invoice.public_token}` : undefined,
+            dueDate: invoice.due_date ? formatDate(invoice.due_date) : undefined,
             showWatermark: !ap.isActive,
           })}
         />
@@ -832,6 +834,7 @@ export default function InvoicePage() {
         <InvoiceLivePreview
           invoiceNumber={invoice.number}
           date={formatDate(invoice.created_at)}
+          dueDate={invoice.due_date ? formatDate(invoice.due_date) : undefined}
           companyName={profile?.company_name || ''}
           companyBin={profile?.bin_iin || ''}
           clientName={invoice.client_name || ''}
