@@ -29,6 +29,7 @@ export default function EditInvoice() {
   const [clientPhone, setClientPhone] = useState('')
   const [contractNumber, setContractNumber] = useState('')
   const [contractDate, setContractDate] = useState('')
+  const [dueDate, setDueDate] = useState('')
   const [note, setNote] = useState('')
   const [services, setServices] = useState<any[]>([{ name: '', qty: 1, price: 0, unit: 'шт', code: '', type: 'service' }])
   const [invoiceNumber, setInvoiceNumber] = useState('')
@@ -59,6 +60,7 @@ export default function EditInvoice() {
       setClientPhone(inv.client_phone || '')
       setContractNumber(inv.contract_number || '')
       setContractDate(inv.contract_date || '')
+      setDueDate(inv.due_date || '')
       setNote(inv.note || '')
       setInvoiceNumber(inv.number || '')
       setInvoiceDate(inv.created_at ? new Date(inv.created_at).toLocaleDateString('ru-KZ') : '')
@@ -122,6 +124,7 @@ export default function EditInvoice() {
       client_phone: clientPhone,
       contract_number: contractNumber || null,
       contract_date: contractDate || null,
+      due_date: dueDate || null,
       services,
       amount: total,
       note: note || null,
@@ -214,6 +217,11 @@ export default function EditInvoice() {
                 placeholder={t.contractDatePlaceholder} value={contractDate}
                 onChange={e => setContractDate(e.target.value)} />
             </div>
+          </div>
+          <div className="mt-3">
+            <label className="text-xs text-gray-500 mb-1 block">{t.dueDateLabel}</label>
+            <input type="date" className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+              value={dueDate} onChange={e => setDueDate(e.target.value)} />
           </div>
         </div>
 
