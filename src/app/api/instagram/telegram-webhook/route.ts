@@ -51,6 +51,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true })
   }
 
+  // A plain (non-reply) text message from the admin is a task/instruction for
+  // Claude to pick up on its next periodic check — not read live, there is no
+  // process listening to this webhook in real time. Stored as-is; Claude marks
+  // processed_at once it has acted on it.
+  if (msg && typeof msg.text === 'string' && !msg.text.startsWith('/')) {
+    if (String(msg.chat?.id) !== process.env.TELEGRAM_CHAT_ID) {
+      return NextResponse.json({ ok: true })
+    }
+    await supabase.from('admin_telegram_inbox').insert({
+      message_text: msg.text,
+      telegram_message_id: msg.message_id,
+      chat_id: String(msg.chat.id),
+    })
+    await telegram('sendMessage', {
+      chat_id: msg.chat.id,
+      reply_to_message_id: msg.message_id,
+      text: '📥 Записал. Увижу в течение ~25 минут на следующей проверке.',
+    })
+    return NextResponse.json({ ok: true })
+  }
+
   const cb = update.callback_query
   if (!cb || typeof cb.data !== 'string') {
     return NextResponse.json({ ok: true })
