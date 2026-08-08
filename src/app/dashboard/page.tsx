@@ -56,6 +56,7 @@ export default function Dashboard() {
   const [contractNumber, setContractNumber] = useState('')
   const [contractDate, setContractDate] = useState('')
   const [dueDate, setDueDate] = useState('')
+  const [dueDateTouched, setDueDateTouched] = useState(false)
   const [clientKnp, setClientKnp] = useState('849')
   const [note, setNote] = useState('')
   const [services, setServices] = useState<any[]>([{ name: '', qty: 1, price: 0, unit: 'шт', code: '', type: 'service' }])
@@ -87,7 +88,7 @@ export default function Dashboard() {
     setProfileLoaded(true)
     if (p) cacheSet('profile_' + user.id, p)
     if (p?.default_note) setNote(p.default_note)
-    setDueDate(computeDefaultDueDate(todayDateString(), p?.default_due_days))
+    if (!dueDateTouched) setDueDate(computeDefaultDueDate(todayDateString(), p?.default_due_days))
 
     supabase.from('profiles').update({ last_active_at: new Date().toISOString() }).eq('id', user.id).then(() => {})
 
@@ -183,6 +184,7 @@ export default function Dashboard() {
     setClientSelected(false)
     setNote('')
     setDueDate(computeDefaultDueDate(todayDateString(), profile?.default_due_days))
+    setDueDateTouched(false)
   }
 
   function selectService(svc: any) {
@@ -558,7 +560,7 @@ export default function Dashboard() {
                 <div>
                   <label className="text-xs text-gray-500 mb-1 block">{t.dueDateLabel}</label>
                   <input type="date" className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                    value={dueDate} onChange={e => setDueDate(e.target.value)} />
+                    value={dueDate} onChange={e => { setDueDate(e.target.value); setDueDateTouched(true) }} />
                 </div>
               </div>
             ) : (
@@ -619,7 +621,7 @@ export default function Dashboard() {
                 <div>
                   <label className="text-xs text-gray-500 mb-1 block">{t.dueDateLabel}</label>
                   <input type="date" className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
-                    value={dueDate} onChange={e => setDueDate(e.target.value)} />
+                    value={dueDate} onChange={e => { setDueDate(e.target.value); setDueDateTouched(true) }} />
                 </div>
                 <div>
                   <label className="text-xs text-gray-500 mb-1 block">{t.knpLabel}</label>

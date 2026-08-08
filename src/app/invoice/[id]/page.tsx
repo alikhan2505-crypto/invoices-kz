@@ -431,6 +431,9 @@ export default function InvoicePage() {
             <span className={`w-2 h-2 rounded-full ${status.dot}`}></span>
             {status.text}
           </span>
+          {invoice.due_date && (
+            <div className="text-xs text-gray-400 mt-2">{t.dueDateLabel}: {formatDate(invoice.due_date)}</div>
+          )}
         </div>
 
         {/* 4 кнопки действий */}

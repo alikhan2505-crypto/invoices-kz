@@ -38,11 +38,6 @@ function wrapEmail(accentColor: string, title: string, bodyHtml: string) {
 </html>`
 }
 
-// No due_date is ever set on invoices (default_due_days is decorative), so
-// "payment reminder" / "overdue" are defined off `created_at` — 3 and 7 days
-// since sending, respectively — matching the existing manual "mark overdue"
-// button on the history page (kept as-is; this cron is now the reliable,
-// automatic path and is what actually fires the notification emails).
 export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization')
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -85,7 +80,7 @@ export async function GET(request: Request) {
           html: wrapEmail('#F5A623', 'Напоминание об оплате', `
             <p style="margin:0 0 12px; font-size:14px; color:#333;">
               Счёт №${inv.number} для <strong>${inv.client_name || ''}</strong> на сумму
-              <strong>${Number(inv.amount).toLocaleString('ru-KZ')} ₸</strong> отправлен 3 дня назад и всё ещё не оплачен.
+              <strong>${Number(inv.amount).toLocaleString('ru-KZ')} ₸</strong> ещё не оплачен.
             </p>
           `),
         })
@@ -96,7 +91,7 @@ export async function GET(request: Request) {
     }
     if (owner?.notify_telegram && owner.telegram_chat_id) {
       await sendTelegramNotification(owner.telegram_chat_id,
-        `⏰ Счёт №${inv.number} для <b>${inv.client_name || ''}</b> на сумму <b>${Number(inv.amount).toLocaleString('ru-KZ')} ₸</b> отправлен 3 дня назад и всё ещё не оплачен.`)
+        `⏰ Счёт №${inv.number} для <b>${inv.client_name || ''}</b> на сумму <b>${Number(inv.amount).toLocaleString('ru-KZ')} ₸</b> ещё не оплачен.`)
     }
   }
 
@@ -130,7 +125,7 @@ export async function GET(request: Request) {
           html: wrapEmail('#E05252', 'Счёт просрочен', `
             <p style="margin:0 0 12px; font-size:14px; color:#333;">
               Счёт №${inv.number} для <strong>${inv.client_name || ''}</strong> на сумму
-              <strong>${Number(inv.amount).toLocaleString('ru-KZ')} ₸</strong> не оплачен уже 7 дней и помечен как просроченный.
+              <strong>${Number(inv.amount).toLocaleString('ru-KZ')} ₸</strong> не оплачен и помечен как просроченный.
             </p>
           `),
         })
@@ -141,7 +136,7 @@ export async function GET(request: Request) {
     }
     if (owner?.notify_telegram && owner.telegram_chat_id) {
       await sendTelegramNotification(owner.telegram_chat_id,
-        `🔴 Счёт №${inv.number} для <b>${inv.client_name || ''}</b> на сумму <b>${Number(inv.amount).toLocaleString('ru-KZ')} ₸</b> не оплачен уже 7 дней и помечен как просроченный.`)
+        `🔴 Счёт №${inv.number} для <b>${inv.client_name || ''}</b> на сумму <b>${Number(inv.amount).toLocaleString('ru-KZ')} ₸</b> не оплачен и помечен как просроченный.`)
     }
   }
 
