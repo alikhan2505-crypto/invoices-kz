@@ -107,3 +107,43 @@ export async function getMediaInsights(igMediaId: string): Promise<MediaInsights
     shares: byName.shares ?? null,
   }
 }
+
+// Replies to a comment on any post on the account (not just ones published
+// through our own draft-approval flow) — Instagram's own comment-reply
+// endpoint, scoped by the comment's own ID rather than a media ID.
+export async function replyToComment(commentId: string, message: string): Promise<void> {
+  const accessToken = process.env.INSTAGRAM_ACCESS_TOKEN
+  if (!accessToken) throw new Error('Instagram not configured')
+
+  const res = await fetch(`${GRAPH_API}/${commentId}/replies`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message, access_token: accessToken }),
+  })
+  const data = await res.json()
+  if (!res.ok) {
+    throw new Error(data.error?.message || 'Failed to reply to comment')
+  }
+}
+
+// Sends a direct message reply. `recipientId` is the sender's Instagram-
+// scoped user ID from the incoming webhook event, not a username.
+export async function sendDirectMessage(recipientId: string, message: string): Promise<void> {
+  const igUserId = process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID
+  const accessToken = process.env.INSTAGRAM_ACCESS_TOKEN
+  if (!igUserId || !accessToken) throw new Error('Instagram not configured')
+
+  const res = await fetch(`${GRAPH_API}/${igUserId}/messages`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      recipient: { id: recipientId },
+      message: { text: message },
+      access_token: accessToken,
+    }),
+  })
+  const data = await res.json()
+  if (!res.ok) {
+    throw new Error(data.error?.message || 'Failed to send direct message')
+  }
+}
