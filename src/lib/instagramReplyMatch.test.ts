@@ -8,7 +8,7 @@ const templates = [
 
 describe('findMatchingTemplate', () => {
   it('matches a single trigger word case-insensitively', () => {
-    const result = findMatchingTemplate('А сколько это стоит?', templates)
+    const result = findMatchingTemplate('Какая у вас цена?', templates)
     expect(result?.id).toBe('t1')
   })
 
