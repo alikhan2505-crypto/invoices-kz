@@ -24,6 +24,14 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ error: 'Verification failed' }, { status: 403 })
 }
 
+// fromUsername/incomingText come straight from the Instagram commenter/DM
+// sender — untrusted. Telegram's HTML parse_mode renders <a>/<b>/etc., so an
+// unescaped value could show the admin a phishing link disguised as part of
+// this bot's own message.
+function escapeHtml(text: string): string {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
 function verifySignature(rawBody: string, signatureHeader: string | null): boolean {
   const appSecret = process.env.INSTAGRAM_APP_SECRET
   if (!appSecret || !signatureHeader) return false
@@ -140,7 +148,7 @@ async function handleIncoming(params: {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       chat_id: chatId,
-      text: `💬 Новый ${sourceLabel} от <b>${params.fromUsername}</b>:\n"${params.incomingText}"\n\n<b>Черновик ответа:</b>\n${draftReply}`,
+      text: `💬 Новый ${sourceLabel} от <b>${escapeHtml(params.fromUsername)}</b>:\n"${escapeHtml(params.incomingText)}"\n\n<b>Черновик ответа:</b>\n${escapeHtml(draftReply)}`,
       parse_mode: 'HTML',
       reply_markup: {
         inline_keyboard: [[
