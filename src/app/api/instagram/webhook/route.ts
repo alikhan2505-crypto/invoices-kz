@@ -166,14 +166,17 @@ async function handleIncoming(params: {
   // this handler or the rest of the batch, so it's caught here. Nothing is
   // inserted on failure, so Meta's webhook redelivery will retry it.
   let draftReply: string
+  let urgent: boolean
   try {
-    draftReply = await generateAiReply({
+    const result = await generateAiReply({
       incomingText: params.incomingText,
       fromUsername: params.fromUsername,
       postCaption: params.postCaption,
       source: params.source,
       conversationHistory,
     })
+    draftReply = result.replyText
+    urgent = result.urgent
   } catch (err: any) {
     console.error('instagram webhook: AI reply generation failed for', params.externalId, ':', err.message)
     return
@@ -190,6 +193,7 @@ async function handleIncoming(params: {
       reply_text: draftReply,
       reply_type: 'ai',
       status: 'pending_review',
+      is_urgent: urgent,
     })
     .select()
     .single()
@@ -200,12 +204,13 @@ async function handleIncoming(params: {
   if (!token || !chatId) return
 
   const sourceLabel = params.source === 'comment' ? 'комментарий' : 'сообщение (DM)'
+  const urgentPrefix = urgent ? '🔴 СРОЧНО — похоже на жалобу/негатив, лучше ответить самому\n\n' : ''
   const tgRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       chat_id: chatId,
-      text: `💬 Новый ${sourceLabel} от <b>${escapeHtml(params.fromUsername)}</b>:\n"${escapeHtml(params.incomingText)}"\n\n<b>Черновик ответа:</b>\n${escapeHtml(draftReply)}`,
+      text: `${urgentPrefix}💬 Новый ${sourceLabel} от <b>${escapeHtml(params.fromUsername)}</b>:\n"${escapeHtml(params.incomingText)}"\n\n<b>Черновик ответа:</b>\n${escapeHtml(draftReply)}`,
       parse_mode: 'HTML',
       reply_markup: {
         inline_keyboard: [[

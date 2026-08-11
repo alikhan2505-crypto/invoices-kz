@@ -14,7 +14,7 @@ export async function generateAiReply(params: {
   // Only ever populated for source: 'dm' -- a comment thread under a post
   // isn't a continuous conversation the same way.
   conversationHistory?: { incoming: string; reply: string }[]
-}): Promise<string> {
+}): Promise<{ replyText: string; urgent: boolean }> {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured')
 
@@ -48,7 +48,13 @@ export async function generateAiReply(params: {
 
 Пользователь ${params.fromUsername} написал: "${params.incomingText}"
 
-${lengthInstruction} Ответь на ТОМ ЖЕ ЯЗЫКЕ, на котором написал пользователь (например, казахский → отвечай на казахском, английский → на английском, русский → на русском). Пиши вежливо и дружелюбно. Не придумывай факты о ценах, сроках или функциях, которых ты не знаешь — в таком случае вежливо предложи написать в директ для уточнения деталей. Верни только текст ответа, без кавычек и пояснений.`,
+${lengthInstruction} Ответь на ТОМ ЖЕ ЯЗЫКЕ, на котором написал пользователь (например, казахский → отвечай на казахском, английский → на английском, русский → на русском). Пиши вежливо и дружелюбно. Не придумывай факты о ценах, сроках или функциях, которых ты не знаешь — в таком случае вежливо предложи написать в директ для уточнения деталей.
+
+Также оцени: сигнализирует ли сообщение о срочности или негативе (явно злой/раздражённый тон, жалоба, угроза уйти/оставить плохой отзыв, требование вернуть деньги, срочная просьба связаться с человеком) — обычный вопрос про цены/функции НЕ считается срочным.
+
+Верни ответ СТРОГО в этом формате, ничего больше:
+URGENT: yes ИЛИ no
+REPLY: текст ответа без кавычек и пояснений`,
     }],
   })
 
@@ -56,7 +62,22 @@ ${lengthInstruction} Ответь на ТОМ ЖЕ ЯЗЫКЕ, на которо
   if (!textBlock || textBlock.type !== 'text') {
     throw new Error('AI reply generation returned no text')
   }
-  return textBlock.text.trim()
+  return parseUrgentReply(textBlock.text.trim())
+}
+
+// Tolerant of the model not matching the requested format exactly -- if no
+// REPLY: marker is found, the whole response is treated as the reply text
+// and urgency defaults to false (safe degradation: worst case a genuinely
+// urgent message doesn't get flagged, rather than a parsing glitch blocking
+// the reply entirely).
+function parseUrgentReply(text: string): { replyText: string; urgent: boolean } {
+  const replyMatch = text.match(/REPLY:\s*([\s\S]*)/i)
+  if (!replyMatch) return { replyText: text, urgent: false }
+  const urgentMatch = text.match(/URGENT:\s*(yes|no)/i)
+  return {
+    replyText: replyMatch[1].trim(),
+    urgent: urgentMatch?.[1].toLowerCase() === 'yes',
+  }
 }
 
 // Used to turn an admin-approved AI reply into a reusable template (see

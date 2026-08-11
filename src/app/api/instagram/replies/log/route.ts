@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
 
   const { data } = await supabase
     .from('instagram_auto_replies')
-    .select('id, source, from_username, incoming_text, reply_text, status, created_at')
+    .select('id, source, from_username, incoming_text, reply_text, status, is_urgent, created_at')
     .order('created_at', { ascending: false })
     .limit(50)
   return NextResponse.json({ log: data || [] })

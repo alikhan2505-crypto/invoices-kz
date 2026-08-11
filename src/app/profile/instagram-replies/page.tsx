@@ -14,7 +14,17 @@ type LogEntry = {
   reply_text: string | null
   reply_type: string
   status: string
+  is_urgent: boolean
   created_at: string
+}
+type Analytics = {
+  totalHandled: number
+  templateMatchCount: number
+  aiDraftCount: number
+  aiSentCount: number
+  aiSkippedCount: number
+  urgentCount: number
+  templateUsage: { id: string; triggerWords: string[]; channel: 'dm' | 'comment' | null; count: number }[]
 }
 
 export default function InstagramReplies() {
@@ -22,6 +32,7 @@ export default function InstagramReplies() {
   const [loading, setLoading] = useState(true)
   const [templates, setTemplates] = useState<Template[]>([])
   const [log, setLog] = useState<LogEntry[]>([])
+  const [analytics, setAnalytics] = useState<Analytics | null>(null)
   const [paused, setPaused] = useState(false)
   const [newWords, setNewWords] = useState('')
   const [newReply, setNewReply] = useState('')
@@ -42,10 +53,11 @@ export default function InstagramReplies() {
     if (!profile?.is_admin) { router.push('/dashboard'); return }
 
     const headers = await authHeader()
-    const [templatesRes, settingsRes, logRes] = await Promise.all([
+    const [templatesRes, settingsRes, logRes, analyticsRes] = await Promise.all([
       fetch('/api/instagram/replies/templates', { headers }),
       fetch('/api/instagram/replies/settings', { headers }),
       fetch('/api/instagram/replies/log', { headers }),
+      fetch('/api/instagram/replies/analytics', { headers }),
     ])
     const templatesData = await templatesRes.json()
     const settingsData = await settingsRes.json()
@@ -53,6 +65,7 @@ export default function InstagramReplies() {
     setTemplates(templatesData.templates || [])
     setPaused(settingsData.paused || false)
     setLog(logData.log || [])
+    if (analyticsRes.ok) setAnalytics(await analyticsRes.json())
     setLoading(false)
   }
 
@@ -106,6 +119,41 @@ export default function InstagramReplies() {
           </button>
         </div>
 
+        {analytics && analytics.totalHandled > 0 && (
+          <div className="bg-white rounded-2xl shadow-sm p-4">
+            <div className="text-sm font-medium text-[#1C2056] mb-3">Аналитика</div>
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              <div className="bg-gray-50 rounded-xl p-2 text-center">
+                <div className="text-lg font-semibold text-[#1C2056]">{analytics.templateMatchCount}</div>
+                <div className="text-[10px] text-gray-400">Через шаблоны</div>
+              </div>
+              <div className="bg-gray-50 rounded-xl p-2 text-center">
+                <div className="text-lg font-semibold text-[#1C2056]">{analytics.aiDraftCount}</div>
+                <div className="text-[10px] text-gray-400">Ушло в AI</div>
+              </div>
+            </div>
+            <div className="text-xs text-gray-500 mb-1">
+              AI-черновиков отправлено: {analytics.aiSentCount} · пропущено: {analytics.aiSkippedCount}
+            </div>
+            {analytics.urgentCount > 0 && (
+              <div className="text-xs text-red-500 mb-2">🔴 Срочных обращений: {analytics.urgentCount}</div>
+            )}
+            {analytics.templateUsage.some(t => t.count > 0) && (
+              <>
+                <div className="text-xs text-gray-500 mb-1 mt-2">Топ шаблонов по использованию:</div>
+                <div className="space-y-1">
+                  {analytics.templateUsage.filter(t => t.count > 0).slice(0, 5).map(t => (
+                    <div key={t.id} className="flex items-center justify-between text-xs">
+                      <span className="text-gray-600 truncate mr-2">{t.triggerWords.join(', ')}</span>
+                      <span className="text-gray-400 flex-shrink-0">{t.count}×</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
         <div className="bg-white rounded-2xl shadow-sm p-4">
           <div className="text-sm font-medium text-[#1C2056] mb-3">Шаблоны</div>
           <div className="space-y-2 mb-3">
@@ -144,8 +192,11 @@ export default function InstagramReplies() {
           <div className="text-sm font-medium text-[#1C2056] mb-3">Журнал (последние 50)</div>
           <div className="space-y-2">
             {log.map(entry => (
-              <div key={entry.id} className="border border-gray-100 rounded-xl p-3 text-xs">
-                <div className="text-gray-400 mb-1">{entry.from_username} · {entry.source} · {entry.status}</div>
+              <div key={entry.id} className={`border rounded-xl p-3 text-xs ${entry.is_urgent ? 'border-red-200 bg-red-50' : 'border-gray-100'}`}>
+                <div className="text-gray-400 mb-1">
+                  {entry.is_urgent && <span className="text-red-500 mr-1">🔴</span>}
+                  {entry.from_username} · {entry.source} · {entry.status}
+                </div>
                 <div className="text-gray-700 mb-1">→ {entry.incoming_text}</div>
                 {entry.reply_text && <div className="text-gray-500">← {entry.reply_text}</div>}
               </div>
