@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { publishToInstagram } from '@/lib/instagram'
+import { publishToInstagram, replyToComment, sendDirectMessage } from '@/lib/instagram'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -47,6 +47,24 @@ export async function POST(req: NextRequest) {
         reply_to_message_id: msg.message_id,
         text: '📝 Записал — учту в следующей версии поста. Эта версия остаётся на ваше решение (Опубликовать/Отклонить).',
       })
+      return NextResponse.json({ ok: true })
+    }
+
+    // A text reply to a pending AI-drafted comment/DM reply overwrites the
+    // draft's text before it's sent — the original Send/Skip buttons stay
+    // attached to the earlier message and still work against the updated row.
+    const { data: pendingReply } = await supabase
+      .from('instagram_auto_replies')
+      .select('id, status')
+      .eq('telegram_message_id', msg.reply_to_message.message_id)
+      .maybeSingle()
+    if (pendingReply && pendingReply.status === 'pending_review') {
+      await supabase.from('instagram_auto_replies').update({ reply_text: msg.text }).eq('id', pendingReply.id)
+      await telegram('sendMessage', {
+        chat_id: msg.chat.id,
+        reply_to_message_id: msg.message_id,
+        text: '✏️ Текст ответа обновлён. Нажмите «✅ Отправить» на исходном сообщении, чтобы опубликовать новую версию.',
+      })
     }
     return NextResponse.json({ ok: true })
   }
@@ -81,7 +99,60 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true })
   }
 
-  const [action, draftId] = cb.data.split(':')
+  const [action, entityId] = cb.data.split(':')
+
+  if (action === 'ig_reply_send' || action === 'ig_reply_skip') {
+    const { data: reply } = await supabase.from('instagram_auto_replies').select('*').eq('id', entityId).single()
+    if (!reply || reply.status !== 'pending_review') {
+      await telegram('answerCallbackQuery', { callback_query_id: cb.id, text: 'Уже обработано' })
+      return NextResponse.json({ ok: true })
+    }
+
+    if (action === 'ig_reply_skip') {
+      await supabase
+        .from('instagram_auto_replies')
+        .update({ status: 'skipped', resolved_at: new Date().toISOString() })
+        .eq('id', entityId)
+      await telegram('answerCallbackQuery', { callback_query_id: cb.id, text: 'Пропущено' })
+      await telegram('editMessageText', {
+        chat_id: cb.message.chat.id,
+        message_id: cb.message.message_id,
+        text: `${cb.message.text}\n\n⏭️ Пропущено`,
+        parse_mode: 'HTML',
+      })
+      return NextResponse.json({ ok: true })
+    }
+
+    try {
+      if (reply.source === 'comment') {
+        await replyToComment(reply.reply_target, reply.reply_text)
+      } else {
+        await sendDirectMessage(reply.reply_target, reply.reply_text)
+      }
+      await supabase
+        .from('instagram_auto_replies')
+        .update({ status: 'sent_after_review', resolved_at: new Date().toISOString() })
+        .eq('id', entityId)
+      await telegram('answerCallbackQuery', { callback_query_id: cb.id, text: 'Отправлено!' })
+      await telegram('editMessageText', {
+        chat_id: cb.message.chat.id,
+        message_id: cb.message.message_id,
+        text: `${cb.message.text}\n\n✅ Отправлено`,
+        parse_mode: 'HTML',
+      })
+    } catch (err: any) {
+      await telegram('answerCallbackQuery', { callback_query_id: cb.id, text: 'Ошибка отправки', show_alert: true })
+      await telegram('editMessageText', {
+        chat_id: cb.message.chat.id,
+        message_id: cb.message.message_id,
+        text: `${cb.message.text}\n\n⚠️ Ошибка: ${err.message}`,
+        parse_mode: 'HTML',
+      })
+    }
+    return NextResponse.json({ ok: true })
+  }
+
+  const draftId = entityId
   if (!draftId || (action !== 'ig_publish' && action !== 'ig_reject')) {
     return NextResponse.json({ ok: true })
   }
