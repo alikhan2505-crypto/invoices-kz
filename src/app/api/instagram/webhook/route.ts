@@ -78,9 +78,16 @@ async function handleIncoming(params: {
     return
   }
 
+  // channel NULL applies to both comments and DMs; 'dm'/'comment' scopes a
+  // template to only that channel -- a detailed DM template with a link
+  // shouldn't fire as a public comment reply, and vice versa (see the
+  // comment-brevity fix above). Ordered for a deterministic winner if two
+  // templates' trigger_words could both match the same message.
   const { data: templates } = await supabase
     .from('instagram_reply_templates')
     .select('id, trigger_words, reply_text')
+    .or(`channel.is.null,channel.eq.${params.source}`)
+    .order('created_at', { ascending: true })
 
   const match = findMatchingTemplate(params.incomingText, templates || [])
 

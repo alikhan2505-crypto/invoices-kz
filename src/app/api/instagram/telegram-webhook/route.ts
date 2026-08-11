@@ -143,9 +143,14 @@ export async function POST(req: NextRequest) {
         try {
           const triggerWords = await extractTriggerWords(reply.incoming_text)
           if (triggerWords.length > 0) {
+            // Scoped to the channel it was actually written for -- a short
+            // comment reply ("напишите в личку") shouldn't later fire as a
+            // DM reply, and a detailed DM answer with a link shouldn't spam
+            // a public comment thread (see the comment-brevity fix above).
             await supabase.from('instagram_reply_templates').insert({
               trigger_words: triggerWords,
               reply_text: reply.reply_text,
+              channel: reply.source,
             })
           }
         } catch (err: any) {

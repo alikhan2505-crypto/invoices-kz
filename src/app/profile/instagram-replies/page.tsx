@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import LoadingSpinner from '@/components/LoadingSpinner'
 import { backLabel } from '@/lib/a11yLabels'
 
-type Template = { id: string; trigger_words: string[]; reply_text: string }
+type Template = { id: string; trigger_words: string[]; reply_text: string; channel: 'dm' | 'comment' | null }
 type LogEntry = {
   id: string
   source: string
@@ -25,6 +25,7 @@ export default function InstagramReplies() {
   const [paused, setPaused] = useState(false)
   const [newWords, setNewWords] = useState('')
   const [newReply, setNewReply] = useState('')
+  const [newChannel, setNewChannel] = useState<'both' | 'dm' | 'comment'>('both')
   const [saving, setSaving] = useState(false)
 
   useEffect(() => { load() }, [])
@@ -68,10 +69,12 @@ export default function InstagramReplies() {
     setSaving(true)
     const headers = await authHeader()
     await fetch('/api/instagram/replies/templates', {
-      method: 'POST', headers, body: JSON.stringify({ trigger_words: words, reply_text: newReply }),
+      method: 'POST', headers,
+      body: JSON.stringify({ trigger_words: words, reply_text: newReply, channel: newChannel === 'both' ? null : newChannel }),
     })
     setNewWords('')
     setNewReply('')
+    setNewChannel('both')
     setSaving(false)
     load()
   }
@@ -108,7 +111,12 @@ export default function InstagramReplies() {
           <div className="space-y-2 mb-3">
             {templates.map(t => (
               <div key={t.id} className="border border-gray-100 rounded-xl p-3">
-                <div className="text-xs text-gray-400 mb-1">{t.trigger_words.join(', ')}</div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs text-gray-400">{t.trigger_words.join(', ')}</span>
+                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">
+                    {t.channel === 'dm' ? 'Только DM' : t.channel === 'comment' ? 'Только комментарии' : 'DM + комментарии'}
+                  </span>
+                </div>
                 <div className="text-sm text-gray-700 mb-2">{t.reply_text}</div>
                 <button onClick={() => deleteTemplate(t.id)} className="text-xs text-red-500">Удалить</button>
               </div>
@@ -118,6 +126,14 @@ export default function InstagramReplies() {
             value={newWords} onChange={e => setNewWords(e.target.value)} />
           <textarea className="w-full border rounded-lg px-3 py-2 text-sm mb-2" placeholder="Текст ответа" rows={2}
             value={newReply} onChange={e => setNewReply(e.target.value)} />
+          <div className="flex gap-2 mb-2">
+            {([['both', 'DM + комментарии'], ['dm', 'Только DM'], ['comment', 'Только комментарии']] as const).map(([val, label]) => (
+              <button key={val} onClick={() => setNewChannel(val)}
+                className={`flex-1 text-xs rounded-lg py-2 border ${newChannel === val ? 'bg-[#1C2056] text-white border-[#1C2056]' : 'bg-white text-gray-500 border-gray-200'}`}>
+                {label}
+              </button>
+            ))}
+          </div>
           <button onClick={addTemplate} disabled={saving}
             className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium">
             {saving ? 'Сохраняем...' : 'Добавить шаблон'}

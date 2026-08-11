@@ -35,14 +35,17 @@ export async function POST(req: NextRequest) {
   const user = await requireAdmin(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { trigger_words, reply_text } = await req.json()
+  const { trigger_words, reply_text, channel } = await req.json()
   if (!Array.isArray(trigger_words) || trigger_words.length === 0 || !reply_text) {
     return NextResponse.json({ error: 'trigger_words (non-empty array) and reply_text are required' }, { status: 400 })
+  }
+  if (channel !== undefined && channel !== null && channel !== 'dm' && channel !== 'comment') {
+    return NextResponse.json({ error: "channel must be 'dm', 'comment', or omitted for both" }, { status: 400 })
   }
 
   const { data, error } = await supabase
     .from('instagram_reply_templates')
-    .insert({ trigger_words, reply_text })
+    .insert({ trigger_words, reply_text, channel: channel || null })
     .select()
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
