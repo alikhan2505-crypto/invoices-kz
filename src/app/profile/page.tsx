@@ -109,7 +109,10 @@ export default function Profile() {
     { icon: '💬', label: t.supportMenuLabel, href: '/profile/support' },
     { icon: 'ℹ️', label: t.aboutMenuLabel, href: '/profile/about' },
     { icon: '🎁', label: t.referralMenuLabel, href: '/profile/referral' },
-    ...(isAdmin ? [{ icon: '🔐', label: t.adminPanelMenuLabel, href: '/admin' }] : []),
+    ...(isAdmin ? [
+      { icon: '🔐', label: t.adminPanelMenuLabel, href: '/admin' },
+      { icon: '💬', label: t.igRepliesMenuLabel, href: '/profile/instagram-replies' },
+    ] : []),
   ]
 
   const fadeIn = (i: number) => ({
