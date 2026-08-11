@@ -443,12 +443,21 @@ async function handleIncoming(params: {
   }
 
   // No template — draft with AI, send to Telegram for approval. Never
-  // published automatically.
-  const draftReply = await generateAiReply({
-    incomingText: params.incomingText,
-    fromUsername: params.fromUsername,
-    postCaption: params.postCaption,
-  })
+  // published automatically. generateAiReply doesn't catch its own errors
+  // (by design, see Task 4) — a transient Anthropic failure must not crash
+  // this handler or the rest of the batch, so it's caught here. Nothing is
+  // inserted on failure, so Meta's webhook redelivery will retry it.
+  let draftReply: string
+  try {
+    draftReply = await generateAiReply({
+      incomingText: params.incomingText,
+      fromUsername: params.fromUsername,
+      postCaption: params.postCaption,
+    })
+  } catch (err: any) {
+    console.error('instagram webhook: AI reply generation failed for', params.externalId, ':', err.message)
+    return
+  }
 
   const { data: inserted } = await supabase
     .from('instagram_auto_replies')
