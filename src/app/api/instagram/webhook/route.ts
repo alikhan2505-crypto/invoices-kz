@@ -133,6 +133,26 @@ async function handleIncoming(params: {
     return
   }
 
+  // For DMs, pull prior sent exchanges with this same sender so the AI
+  // doesn't re-greet someone mid-conversation. Only replies that actually
+  // went out to the customer count as "already said" -- a skipped draft
+  // was never seen by them. Comments aren't a continuous conversation the
+  // same way, so no history is fetched for them.
+  let conversationHistory: { incoming: string; reply: string }[] | undefined
+  if (params.source === 'dm') {
+    const { data: history } = await supabase
+      .from('instagram_auto_replies')
+      .select('incoming_text, reply_text')
+      .eq('source', 'dm')
+      .eq('reply_target', params.replyTarget)
+      .in('status', ['sent', 'sent_after_review'])
+      .order('created_at', { ascending: true })
+      .limit(5)
+    conversationHistory = (history || [])
+      .filter((h): h is { incoming_text: string; reply_text: string } => !!h.reply_text)
+      .map(h => ({ incoming: h.incoming_text, reply: h.reply_text }))
+  }
+
   // No template — draft with AI, send to Telegram for approval. Never
   // published automatically. generateAiReply doesn't catch its own errors
   // (by design, see Task 4) — a transient Anthropic failure must not crash
@@ -144,6 +164,8 @@ async function handleIncoming(params: {
       incomingText: params.incomingText,
       fromUsername: params.fromUsername,
       postCaption: params.postCaption,
+      source: params.source,
+      conversationHistory,
     })
   } catch (err: any) {
     console.error('instagram webhook: AI reply generation failed for', params.externalId, ':', err.message)
