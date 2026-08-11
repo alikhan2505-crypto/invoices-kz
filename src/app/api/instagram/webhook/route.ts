@@ -210,6 +210,14 @@ export async function POST(req: NextRequest) {
       if (change.field !== 'comments') continue
       const value = change.value
       if (!value?.id || !value?.text) continue
+      // Our own replyToComment() calls land back here as a brand-new
+      // "comments" event (Instagram doesn't distinguish a reply from a
+      // top-level comment in this webhook). Without this check, a template
+      // reply whose own text matches its own trigger word (e.g. a greeting
+      // template starting with "Здравствуйте!") replies to itself forever.
+      // Confirmed live 2026-08-11: 8 duplicate public replies went out
+      // before Instagram itself started rejecting the requests.
+      if (value.from?.id && value.from.id === process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID) continue
       await handleIncoming({
         source: 'comment',
         externalId: value.id,
