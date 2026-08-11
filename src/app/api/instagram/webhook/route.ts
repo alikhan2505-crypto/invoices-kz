@@ -85,23 +85,51 @@ async function handleIncoming(params: {
   const match = findMatchingTemplate(params.incomingText, templates || [])
 
   if (match) {
-    if (params.source === 'comment') {
-      await replyToComment(params.replyTarget, match.reply_text)
-    } else {
-      await sendDirectMessage(params.replyTarget, match.reply_text)
+    // Claim the external_id via the unique constraint BEFORE sending —
+    // sending first and logging after left a window where a redelivered
+    // webhook (the exact case the dedup check exists for) could resend the
+    // same reply to a real customer if the log insert failed after a
+    // successful send. A concurrent delivery losing the race here hits a
+    // 23505 unique violation, which is expected, not an error.
+    const { data: claimed, error: claimError } = await supabase
+      .from('instagram_auto_replies')
+      .insert({
+        source: params.source,
+        external_id: params.externalId,
+        reply_target: params.replyTarget,
+        from_username: params.fromUsername,
+        incoming_text: params.incomingText,
+        reply_text: match.reply_text,
+        reply_type: 'template',
+        template_id: match.id,
+        status: 'sent',
+        resolved_at: new Date().toISOString(),
+      })
+      .select()
+      .single()
+
+    if (claimError) {
+      if (claimError.code !== '23505') {
+        console.error('instagram webhook: failed to claim template-match row for', params.externalId, ':', claimError.message)
+      }
+      return
     }
-    await supabase.from('instagram_auto_replies').insert({
-      source: params.source,
-      external_id: params.externalId,
-      reply_target: params.replyTarget,
-      from_username: params.fromUsername,
-      incoming_text: params.incomingText,
-      reply_text: match.reply_text,
-      reply_type: 'template',
-      template_id: match.id,
-      status: 'sent',
-      resolved_at: new Date().toISOString(),
-    })
+    if (!claimed) return
+
+    try {
+      if (params.source === 'comment') {
+        await replyToComment(params.replyTarget, match.reply_text)
+      } else {
+        await sendDirectMessage(params.replyTarget, match.reply_text)
+      }
+    } catch (err: any) {
+      // A thrown send error here must not abort the rest of this webhook
+      // delivery's batch (other comments/DMs in the same payload) the way
+      // an uncaught throw would. The row is already claimed 'sent' even
+      // though delivery failed -- logged for investigation, not retried,
+      // since a retry risks the double-send this claim was built to avoid.
+      console.error('instagram webhook: template reply send failed for', params.externalId, ':', err.message)
+    }
     return
   }
 
