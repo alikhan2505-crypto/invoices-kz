@@ -69,6 +69,8 @@ export default function AcquiringPage() {
   const [kaspiToppingUp, setKaspiToppingUp] = useState(false)
   const [kaspiError, setKaspiError] = useState('')
   const [kaspiRecentTopups, setKaspiRecentTopups] = useState<{ amount: number, status: string, createdAt: string }[]>([])
+  type KaspiPeriodStat = { count: number, amount: number, total: number, conversionRate: number | null }
+  const [kaspiStats, setKaspiStats] = useState<{ last24h: KaspiPeriodStat, last30d: KaspiPeriodStat, allTime: KaspiPeriodStat } | null>(null)
   const [kaspiOperations, setKaspiOperations] = useState<{ id: string, orderNumber: string, amount: number, direction: string, category: string, clientName: string | null, matchedInvoiceNumber: string | null, operationDate: string }[]>([])
   const [kaspiPendingMatches, setKaspiPendingMatches] = useState<{ id: string, invoiceNumber: string | null, clientName: string | null, invoiceClientName: string | null, matchedAmount: number, matchedDate: string }[]>([])
   const [kaspiDirectionFilter, setKaspiDirectionFilter] = useState<'all' | 'in' | 'out'>('all')
@@ -167,6 +169,7 @@ export default function AcquiringPage() {
         setKaspiStatus(data.status ?? null)
         setKaspiWalletBalance(data.walletBalance ?? 0)
         setKaspiRecentTopups(data.recentTopups ?? [])
+        setKaspiStats(data.stats ?? null)
       }
     } catch (e: any) {
       console.error('Kaspi dashboard fetch error:', e.message)
@@ -567,6 +570,29 @@ export default function AcquiringPage() {
           </div>
           {kaspiWalletBalance <= 0 && (
             <div className="text-xs text-amber-600 mb-2">{t.kaspiInsufficientBalanceHint}</div>
+          )}
+
+          {kaspiStats && (
+            <div className="bg-gray-50 rounded-xl p-3 mb-3 mt-2">
+              <div className="text-xs font-medium text-[#1C2056] mb-2">{t.kaspiConversionStatsTitle}</div>
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  [t.kaspiStatsTodayLabel, kaspiStats.last24h],
+                  [t.kaspiStatsMonthLabel, kaspiStats.last30d],
+                  [t.kaspiStatsAllTimeLabel, kaspiStats.allTime],
+                ] as const).map(([label, s]) => (
+                  <div key={label} className="text-center">
+                    <div className="text-[10px] text-gray-400 mb-1">{label}</div>
+                    <div className="text-sm font-semibold text-[#1C2056]">
+                      {s.conversionRate !== null ? `${Math.round(s.conversionRate * 100)}%` : '—'}
+                    </div>
+                    <div className="text-[10px] text-gray-400">
+                      {s.total > 0 ? `${s.count}/${s.total}` : t.kaspiConversionNoDataLabel}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
 
           <div className="text-xs text-gray-500 mb-1 mt-2">{t.kaspiTopupPresetsLabel}</div>

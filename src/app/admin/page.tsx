@@ -25,6 +25,7 @@ export default function Admin() {
   const [regChart, setRegChart] = useState<{ day: string; count: number }[]>([])
   const [planStats, setPlanStats] = useState({ free: 0, basic: 0, pro: 0 })
   const [docCounts, setDocCounts] = useState<Record<string, { invoices: number; kp: number; avr: number; nakladnaya: number }>>({})
+  const [kaspiAdminStats, setKaspiAdminStats] = useState<{ activeConnections: number; totalRequests: number; paidCount: number; paidAmount: number; conversionRate: number | null } | null>(null)
 
   useEffect(() => { load() }, [])
 
@@ -117,6 +118,20 @@ export default function Admin() {
     const basic = activePlans.filter(p => p === 'basic').length
     const pro = activePlans.filter(p => p === 'pro').length
     setPlanStats({ free, basic, pro })
+
+    // kaspi_connections/kaspi_payment_requests have no client-facing RLS
+    // policy (service-role only, by design), unlike the tables above --
+    // has to go through a service-role route instead of a direct query.
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const kaspiRes = await fetch('/api/kaspi/admin-stats', {
+        headers: { 'Authorization': `Bearer ${session?.access_token}` },
+      })
+      if (kaspiRes.ok) setKaspiAdminStats(await kaspiRes.json())
+    } catch (e: any) {
+      console.error('Kaspi admin stats fetch error:', e.message)
+    }
+
     setLoading(false)
   }
 
@@ -511,6 +526,32 @@ export default function Admin() {
 
         {tab === 'stats' && (
           <div className="space-y-4">
+            {kaspiAdminStats && (
+              <div className="bg-gray-800 rounded-xl border border-gray-700 p-4">
+                <div className="font-medium text-sm mb-4">{t.kaspiAdminStatsTitle}</div>
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                  <div className="bg-gray-700 rounded-xl p-3 text-center">
+                    <div className="text-2xl font-bold text-purple-400">{kaspiAdminStats.activeConnections}</div>
+                    <div className="text-xs text-gray-400 mt-1">{t.kaspiAdminActiveConnectionsLabel}</div>
+                  </div>
+                  <div className="bg-gray-700 rounded-xl p-3 text-center">
+                    <div className="text-2xl font-bold text-blue-400">{kaspiAdminStats.totalRequests}</div>
+                    <div className="text-xs text-gray-400 mt-1">{t.kaspiAdminTotalRequestsLabel}</div>
+                  </div>
+                </div>
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="text-gray-400">{t.kaspiAdminPaidLabel}</span>
+                  <span className="text-green-400 font-medium">{kaspiAdminStats.paidCount} · {kaspiAdminStats.paidAmount.toLocaleString('ru-KZ')} ₸</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">{t.kaspiAdminConversionLabel}</span>
+                  <span className="text-[#2DC48D] font-medium">
+                    {kaspiAdminStats.conversionRate !== null ? `${Math.round(kaspiAdminStats.conversionRate * 100)}%` : '—'}
+                  </span>
+                </div>
+              </div>
+            )}
+
             <div className="bg-gray-800 rounded-xl border border-gray-700 p-4">
               <div className="font-medium text-sm mb-4">{t.planDistributionLabel}</div>
               <div className="grid grid-cols-3 gap-3">

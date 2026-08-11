@@ -86,6 +86,9 @@ export interface AcquiringContent {
   kaspiStatsTodayLabel: string
   kaspiStatsMonthLabel: string
   kaspiStatsAllTimeLabel: string
+  kaspiConversionStatsTitle: string
+  kaspiConversionRateLabel: string
+  kaspiConversionNoDataLabel: string
   kaspiStatusPaid: string
   kaspiStatusPending: string
   kaspiStatusExpired: string
@@ -205,6 +208,9 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiStatsTodayLabel: 'За 24 часа',
     kaspiStatsMonthLabel: 'За 30 дней',
     kaspiStatsAllTimeLabel: 'Всего',
+    kaspiConversionStatsTitle: 'Статистика приёма платежей',
+    kaspiConversionRateLabel: 'Конверсия',
+    kaspiConversionNoDataLabel: 'Нет данных',
     kaspiStatusPaid: 'Оплачен',
     kaspiStatusPending: 'Ожидает',
     kaspiStatusExpired: 'Истёк',
@@ -322,6 +328,9 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiStatsTodayLabel: '24 сағат ішінде',
     kaspiStatsMonthLabel: '30 күн ішінде',
     kaspiStatsAllTimeLabel: 'Барлығы',
+    kaspiConversionStatsTitle: 'Төлемдерді қабылдау статистикасы',
+    kaspiConversionRateLabel: 'Конверсия',
+    kaspiConversionNoDataLabel: 'Деректер жоқ',
     kaspiStatusPaid: 'Төленді',
     kaspiStatusPending: 'Күтілуде',
     kaspiStatusExpired: 'Мерзімі өтті',
@@ -439,6 +448,9 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiStatsTodayLabel: 'Last 24h',
     kaspiStatsMonthLabel: 'Last 30 days',
     kaspiStatsAllTimeLabel: 'All time',
+    kaspiConversionStatsTitle: 'Payment acceptance stats',
+    kaspiConversionRateLabel: 'Conversion',
+    kaspiConversionNoDataLabel: 'No data',
     kaspiStatusPaid: 'Paid',
     kaspiStatusPending: 'Pending',
     kaspiStatusExpired: 'Expired',

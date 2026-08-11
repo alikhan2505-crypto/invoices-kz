@@ -51,7 +51,16 @@ export async function GET(req: NextRequest) {
   function rollup(cutoffMs: number | null) {
     const set = cutoffMs ? all.filter(r => new Date(r.created_at).getTime() >= cutoffMs) : all
     const paid = set.filter(r => r.status === 'paid')
-    return { count: paid.length, amount: paid.reduce((sum, r) => sum + Number(r.amount), 0) }
+    const expired = set.filter(r => r.status === 'expired')
+    // 'pending' rows are still in flight -- not counted against conversion
+    // either way until they resolve to paid or expired.
+    const resolved = paid.length + expired.length
+    return {
+      count: paid.length,
+      amount: paid.reduce((sum, r) => sum + Number(r.amount), 0),
+      total: set.length,
+      conversionRate: resolved > 0 ? paid.length / resolved : null,
+    }
   }
 
   // Separate from `all` above on purpose: kaspi_payment_requests is money

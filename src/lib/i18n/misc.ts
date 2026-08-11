@@ -106,6 +106,11 @@ export interface MiscContent {
   promoDaysLabel: (days: number) => string
   activeToggleLabel: string
   inactiveToggleLabel: string
+  kaspiAdminStatsTitle: string
+  kaspiAdminActiveConnectionsLabel: string
+  kaspiAdminTotalRequestsLabel: string
+  kaspiAdminPaidLabel: string
+  kaspiAdminConversionLabel: string
   planDistributionLabel: string
   registrationsLabel: string
   totalPeriodLabel: (count: number) => string
@@ -230,6 +235,11 @@ export const miscDict: Record<'ru' | 'kk' | 'en', MiscContent> = {
     promoDaysLabel: (days) => `${days} дн.`,
     activeToggleLabel: 'Актив',
     inactiveToggleLabel: 'Откл',
+    kaspiAdminStatsTitle: 'Kaspi Pay Cashier — приём платежей',
+    kaspiAdminActiveConnectionsLabel: 'Активных подключений',
+    kaspiAdminTotalRequestsLabel: 'Всего запросов',
+    kaspiAdminPaidLabel: 'Оплачено',
+    kaspiAdminConversionLabel: 'Конверсия',
     planDistributionLabel: 'Распределение по тарифам',
     registrationsLabel: 'Регистрации за 14 дней',
     totalPeriodLabel: (count) => `Всего за период: ${count} пользователей`,
@@ -352,6 +362,11 @@ export const miscDict: Record<'ru' | 'kk' | 'en', MiscContent> = {
     promoDaysLabel: (days) => `${days} күн`,
     activeToggleLabel: 'Белсенді',
     inactiveToggleLabel: 'Өшірулі',
+    kaspiAdminStatsTitle: 'Kaspi Pay Cashier — төлемдерді қабылдау',
+    kaspiAdminActiveConnectionsLabel: 'Белсенді қосылымдар',
+    kaspiAdminTotalRequestsLabel: 'Барлық сұраулар',
+    kaspiAdminPaidLabel: 'Төленді',
+    kaspiAdminConversionLabel: 'Конверсия',
     planDistributionLabel: 'Тарифтер бойынша бөлініс',
     registrationsLabel: '14 күндегі тіркелулер',
     totalPeriodLabel: (count) => `Кезең бойынша барлығы: ${count} пайдаланушы`,
@@ -474,6 +489,11 @@ export const miscDict: Record<'ru' | 'kk' | 'en', MiscContent> = {
     promoDaysLabel: (days) => `${days} days`,
     activeToggleLabel: 'Active',
     inactiveToggleLabel: 'Off',
+    kaspiAdminStatsTitle: 'Kaspi Pay Cashier — payment acceptance',
+    kaspiAdminActiveConnectionsLabel: 'Active connections',
+    kaspiAdminTotalRequestsLabel: 'Total requests',
+    kaspiAdminPaidLabel: 'Paid',
+    kaspiAdminConversionLabel: 'Conversion',
     planDistributionLabel: 'Plan distribution',
     registrationsLabel: 'Registrations over 14 days',
     totalPeriodLabel: (count) => `Total for period: ${count} users`,
