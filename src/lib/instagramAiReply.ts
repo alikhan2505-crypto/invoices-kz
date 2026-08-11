@@ -37,3 +37,35 @@ export async function generateAiReply(params: {
   }
   return textBlock.text.trim()
 }
+
+// Used to turn an admin-approved AI reply into a reusable template (see
+// telegram-webhook's ig_reply_send handler). Deliberately told to avoid a
+// bare generic greeting as a standalone trigger -- a live incident
+// (2026-08-11) showed a template whose own reply text started with the
+// same word as its trigger ("Здравствуйте!") can match its own replies
+// and self-loop. That specific failure mode is now also blocked
+// structurally (webhook route skips our own account's comments), but this
+// prompt avoids growing more templates with the same generic-trigger shape.
+export async function extractTriggerWords(incomingText: string): Promise<string[]> {
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured')
+
+  const client = new Anthropic({ apiKey })
+
+  const message = await client.messages.create({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 60,
+    messages: [{
+      role: 'user',
+      content: `Сообщение от клиента: "${incomingText}"
+
+Выдели 1-3 коротких ключевых слова или фразы (на русском, каждая по 1-3 слова), по которым это сообщение можно узнать среди похожих будущих сообщений. Не используй голые приветствия/вводные слова отдельным пунктом (например одно "здравствуйте" или "привет") -- только то, что различает именно эту тему обращения. Верни только список через запятую, без нумерации и пояснений.`,
+    }],
+  })
+
+  const textBlock = message.content.find(block => block.type === 'text')
+  if (!textBlock || textBlock.type !== 'text') {
+    throw new Error('Trigger word extraction returned no text')
+  }
+  return textBlock.text.trim().split(',').map(w => w.trim().toLowerCase()).filter(Boolean).slice(0, 3)
+}

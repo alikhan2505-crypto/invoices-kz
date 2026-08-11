@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { publishToInstagram, replyToComment, sendDirectMessage } from '@/lib/instagram'
+import { extractTriggerWords } from '@/lib/instagramAiReply'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -133,6 +134,25 @@ export async function POST(req: NextRequest) {
         .from('instagram_auto_replies')
         .update({ status: 'sent_after_review', resolved_at: new Date().toISOString() })
         .eq('id', entityId)
+
+      // Turn this approved AI reply into a reusable template, so a similar
+      // future message gets an instant reply instead of another AI+approval
+      // round trip. Best-effort: a failure here must not affect the reply
+      // that was already sent to the customer.
+      if (reply.reply_type === 'ai') {
+        try {
+          const triggerWords = await extractTriggerWords(reply.incoming_text)
+          if (triggerWords.length > 0) {
+            await supabase.from('instagram_reply_templates').insert({
+              trigger_words: triggerWords,
+              reply_text: reply.reply_text,
+            })
+          }
+        } catch (err: any) {
+          console.error('telegram-webhook: failed to save AI reply as template for', entityId, ':', err.message)
+        }
+      }
+
       await telegram('answerCallbackQuery', { callback_query_id: cb.id, text: 'Отправлено!' })
       await telegram('editMessageText', {
         chat_id: cb.message.chat.id,
