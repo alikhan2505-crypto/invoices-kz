@@ -1,0 +1,15 @@
+name: Kaspi Shop price check
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch: {}
+
+jobs:
+  check-prices:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call price-check endpoint
+        run: |
+          curl -sf -X GET "https://www.invoices.kz/api/kaspi-shop/cron/check-prices" \
+            -H "x-kaspi-shop-cron-secret: ${{ secrets.KASPI_SHOP_CRON_SECRET }}"
