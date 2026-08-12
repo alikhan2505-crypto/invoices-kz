@@ -1,4 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
+import { loadPlatformConnection } from '@/lib/kaspiPay/connection'
+import { checkStatus } from '@/lib/kaspiPay/client'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -52,4 +54,57 @@ export async function creditKaspiShopWallet(userId: string, credits: number, not
   })
   if (ledgerError) console.error('kaspi_shop_wallet_ledger insert failed after topup credit for user', userId, ':', ledgerError.message)
   return data as number
+}
+
+export interface KaspiShopWalletTopupRow {
+  id: string
+  user_id: string
+  credits: number
+  kaspi_operation_id: string
+  status: string
+  expires_at?: string | null
+}
+
+function isPastExpiry(row: KaspiShopWalletTopupRow): boolean {
+  return !!row.expires_at && new Date(row.expires_at) <= new Date()
+}
+
+// Mirrors checkAndSettleWalletTopup's shape (paid/not_paid/expired) from
+// Kaspi Pay Cashier's own wallet.ts, adapted to credit kaspi_shop_wallet
+// instead -- fully separate table, fully separate ledger, same underlying
+// Kaspi payment-status-check mechanism.
+export async function checkAndSettleKaspiShopWalletTopup(row: KaspiShopWalletTopupRow): Promise<'paid' | 'not_paid' | 'expired'> {
+  const connection = await loadPlatformConnection()
+  if (!connection) return 'not_paid'
+
+  const result = await checkStatus(connection, row.kaspi_operation_id)
+  if (result.status !== 'paid') {
+    const expiredOnKaspi = result.status === 'expired'
+    if (expiredOnKaspi || isPastExpiry(row)) {
+      const { data } = await supabase
+        .from('kaspi_shop_wallet_topups')
+        .update({ status: 'expired' })
+        .eq('id', row.id)
+        .eq('status', 'pending')
+        .select('id')
+      if (data && data.length > 0) return 'expired'
+    }
+    return 'not_paid'
+  }
+
+  const { data: claimed, error: claimError } = await supabase
+    .from('kaspi_shop_wallet_topups')
+    .update({ status: 'paid' })
+    .eq('id', row.id)
+    .eq('status', 'pending')
+    .select('id')
+  if (claimError) throw new Error(`failed to claim paid kaspi_shop_wallet_topups row: ${claimError.message}`)
+  if (!claimed || claimed.length === 0) return 'paid' // already settled by another caller
+
+  try {
+    await creditKaspiShopWallet(row.user_id, row.credits, `Пополнение: топап ${row.id}`)
+  } catch (e: any) {
+    console.error('CRITICAL: kaspi_shop_wallet_topups', row.id, 'for user', row.user_id, 'confirmed paid on Kaspi but credit failed:', e.message)
+  }
+  return 'paid'
 }
