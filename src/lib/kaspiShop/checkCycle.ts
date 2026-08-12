@@ -63,10 +63,14 @@ export async function applyPriceCheckResult(
   let ownPriceAfter = ownPriceBefore
 
   if (!fetchError) {
+    // TEMPORARY: single-price/single-city call, matching v1 behavior --
+    // Task 9 (Kaspi Shop v2) rewires this to loop per city with the
+    // seller's chosen demping_strategy and excluded cities/merchants.
     const { price, heldAtFloor } = computeRepriceCandidate({
-      competitorPrice,
+      competitorPrices: competitorPrice === null ? [] : [competitorPrice],
       undercutStep: Number(product.undercut_step),
       floorPrice: Number(product.floor_price),
+      ownCurrentPrice: ownPriceBefore,
     })
     ownPriceAfter = price
     action = heldAtFloor ? 'held_at_floor' : (price === ownPriceBefore ? 'no_change' : 'updated')

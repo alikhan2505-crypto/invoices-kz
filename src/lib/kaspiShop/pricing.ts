@@ -1,22 +1,65 @@
-// Kaspi has no confirmed instant single-SKU price-update endpoint (researched
-// live 2026-08-11, guide.kaspi.kz) -- the only documented mechanism is an
-// hourly-polled XML price-list feed. This module's output feeds that feed
-// (see the /api/kaspi-shop/pricelist/[connectionId] route) -- it does not
-// call Kaspi directly.
-export function computeRepriceCandidate(params: {
-  competitorPrice: number | null
+export type DempingStrategy = 'undercut_leader' | 'match_leader' | 'stay_above_leader' | 'be_second'
+
+export type RepriceInput = {
+  competitorPrices: number[]
   undercutStep: number
   floorPrice: number
-}): { price: number; heldAtFloor: boolean } {
-  if (params.competitorPrice === null) {
-    // Nothing to undercut (no competitor offer found) -- hold at the floor
-    // rather than guessing a price, since undercutting nothing isn't a
-    // meaningful action.
-    return { price: params.floorPrice, heldAtFloor: true }
+  strategy?: DempingStrategy
+  ownCurrentPrice?: number
+}
+
+export type RepriceResult = {
+  price: number
+  heldAtFloor: boolean
+}
+
+// Given the set of competitor prices already visible for one city (after
+// excluded cities/merchants have been filtered out by the caller -- this
+// function has no opinion on which competitors count, only what price to
+// pick given the ones it's handed), compute the candidate own price under
+// one of four strategies. Kaspi Shop v1 (2026-08-11) only had
+// undercut_leader against a single lowest price; v2 (2026-08-12) adds the
+// rest to match what competitor repricers (Northline, PriceFeed) expose.
+export function computeRepriceCandidate({
+  competitorPrices,
+  undercutStep,
+  floorPrice,
+  strategy = 'undercut_leader',
+  ownCurrentPrice,
+}: RepriceInput): RepriceResult {
+  if (competitorPrices.length === 0) {
+    // No competitors to react to -- hold at whatever we're already at (or
+    // the floor if we have no current price to hold at). Not flagged as
+    // heldAtFloor: that signal means "a competitor is forcing us down to
+    // the floor", which isn't true when there's no competitor at all.
+    return { price: ownCurrentPrice ?? floorPrice, heldAtFloor: false }
   }
-  const candidate = params.competitorPrice - params.undercutStep
-  if (candidate < params.floorPrice) {
-    return { price: params.floorPrice, heldAtFloor: true }
+
+  const sorted = [...competitorPrices].sort((a, b) => a - b)
+  const lowest = sorted[0]
+  let candidate: number
+
+  if (strategy === 'undercut_leader') {
+    candidate = lowest - undercutStep
+  } else if (strategy === 'match_leader') {
+    candidate = lowest
+  } else if (strategy === 'stay_above_leader') {
+    // Always steps above the lowest competitor, regardless of where our own
+    // current price sits -- if we happened to be cheapest before this
+    // recompute, moving to lowest+step naturally cedes that spot without
+    // needing a special case.
+    candidate = lowest + undercutStep
+  } else {
+    // be_second: sit just above whichever price separates us from being
+    // cheapest -- the second-lowest competitor if there are 2+, or the
+    // only competitor if there's just one (nothing to be "second" to
+    // otherwise, so we sit above them the same as stay_above_leader would).
+    const tier = sorted.length > 1 ? sorted[1] : sorted[0]
+    candidate = tier + undercutStep
+  }
+
+  if (candidate < floorPrice) {
+    return { price: floorPrice, heldAtFloor: true }
   }
   return { price: candidate, heldAtFloor: false }
 }
