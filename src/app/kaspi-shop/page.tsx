@@ -25,6 +25,7 @@ type Product = {
 export default function KaspiShop() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [connected, setConnected] = useState(false)
   const [paused, setPaused] = useState(false)
   const [balance, setBalance] = useState(0)
@@ -58,22 +59,33 @@ export default function KaspiShop() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
 
-    const headers = await authHeader()
-    const [productsRes, walletRes] = await Promise.all([
-      fetch('/api/kaspi-shop/products', { headers }),
-      fetch('/api/kaspi-shop/wallet', { headers }),
-    ])
-    if (productsRes.ok) {
-      const data = await productsRes.json()
-      setProducts(data.products || [])
+    setLoadError('')
+    try {
+      const headers = await authHeader()
+      const [productsRes, walletRes] = await Promise.all([
+        fetch('/api/kaspi-shop/products', { headers }),
+        fetch('/api/kaspi-shop/wallet', { headers }),
+      ])
+      if (productsRes.ok) {
+        const data = await productsRes.json()
+        setProducts(data.products || [])
+      }
+      if (walletRes.ok) {
+        const data = await walletRes.json()
+        setBalance(data.balance ?? 0)
+        setConnected(!!data.connected)
+        setPaused(!!data.paused)
+      }
+    } catch (e: any) {
+      // A rejected fetch (offline, DNS failure) throws rather than
+      // resolving to a non-ok response -- without this catch, the .ok
+      // checks above are never reached and the page was left stuck on
+      // the loading spinner forever with no way to retry.
+      console.error('Kaspi Shop load error:', e.message)
+      setLoadError('Не удалось загрузить данные. Проверьте соединение и попробуйте ещё раз.')
+    } finally {
+      setLoading(false)
     }
-    if (walletRes.ok) {
-      const data = await walletRes.json()
-      setBalance(data.balance ?? 0)
-      setConnected(!!data.connected)
-      setPaused(!!data.paused)
-    }
-    setLoading(false)
   }
 
   async function connect() {
@@ -177,6 +189,15 @@ export default function KaspiShop() {
       </div>
 
       <div className="max-w-lg lg:max-w-4xl mx-auto p-4 space-y-4">
+        {loadError && (
+          <div className="bg-red-50 rounded-2xl p-4 flex items-center justify-between gap-3">
+            <span className="text-sm text-red-600">{loadError}</span>
+            <button onClick={load} className="text-xs bg-red-500 text-white rounded-lg px-3 py-1.5 flex-shrink-0">
+              Повторить
+            </button>
+          </div>
+        )}
+
         {!connected ? (
           <div className="bg-white rounded-2xl shadow-sm p-4">
             <div className="text-sm font-medium text-[#1C2056] mb-1">Подключить Kaspi Магазин</div>
