@@ -18,6 +18,7 @@ export default function AppNav({ desktopOnly = false }: { desktopOnly?: boolean 
   const [unpaid, setUnpaid] = useState(0)
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
   const [logoLoaded, setLogoLoaded] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
 
   useEffect(() => {
     async function loadUnpaid() {
@@ -37,8 +38,9 @@ export default function AppNav({ desktopOnly = false }: { desktopOnly?: boolean 
     async function loadLogo() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { setLogoLoaded(true); return }
-      const { data } = await supabase.from('profiles').select('logo_url').eq('id', user.id).single()
+      const { data } = await supabase.from('profiles').select('logo_url, is_admin').eq('id', user.id).single()
       setLogoUrl(data?.logo_url || null)
+      setIsAdmin(!!data?.is_admin)
       setLogoLoaded(true)
     }
     loadLogo()
@@ -86,7 +88,12 @@ export default function AppNav({ desktopOnly = false }: { desktopOnly?: boolean 
         </svg>
       )
     },
-    {
+    // Kaspi Shop is a brand-new, still-being-verified feature -- admin-only
+    // for now so existing customers don't stumble into it before it's ready
+    // to open up. Remove this gate once the feature is ready for everyone
+    // (the design's original intent was to show it to all users as a
+    // cross-sell bridge between the two customer segments).
+    ...(isAdmin ? [{
       label: labels[lang].kaspiShop,
       href: '/kaspi-shop',
       icon: (active: boolean, invert = false) => (
@@ -97,7 +104,7 @@ export default function AppNav({ desktopOnly = false }: { desktopOnly?: boolean 
             stroke={active ? (invert ? 'white' : '#1C2056') : '#9CA3AF'} strokeWidth="1.5" strokeLinecap="round"/>
         </svg>
       )
-    },
+    }] : []),
   ]
 
   const activeIndex = items.findIndex(i => path === i.href)

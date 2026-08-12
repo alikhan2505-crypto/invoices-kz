@@ -58,6 +58,12 @@ export default function KaspiShop() {
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
+    // Kaspi Shop is a brand-new, still-being-verified feature -- admin-only
+    // for now (see the matching gate in AppNav.tsx) so existing customers
+    // don't stumble into it before it's ready. Same admin-check pattern as
+    // /admin (src/app/admin/page.tsx) -- remove once ready for everyone.
+    const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', user.id).single()
+    if (!profile?.is_admin) { router.push('/dashboard'); return }
 
     setLoadError('')
     try {
