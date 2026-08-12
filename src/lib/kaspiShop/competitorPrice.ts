@@ -6,8 +6,17 @@
 // this throws (never silently returns a wrong price) so a broken selector
 // surfaces as a visible check-cycle error, not a bad reprice.
 export async function fetchLowestCompetitorPrice(kaspiSku: string): Promise<number | null> {
+  // A self-identifying User-Agent ("... price checker") got a consistent,
+  // reproducible 429 from Vercel's IPs on the very first request (confirmed
+  // live 2026-08-12, not a rate-limit from volume) -- looks like Kaspi's
+  // bot detection, not a request-frequency limit. Headers below mimic a
+  // real Chrome browser request instead.
   const res = await fetch(`https://kaspi.kz/shop/p/-${encodeURIComponent(kaspiSku)}/`, {
-    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; invoices.kz price checker)' },
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+      'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
+    },
   })
   if (!res.ok) {
     throw new Error(`Kaspi product page fetch failed for sku ${kaspiSku}: HTTP ${res.status}`)
