@@ -19,6 +19,14 @@ export async function fetchLowestCompetitorPrice(kaspiSku: string): Promise<numb
     },
   })
   if (!res.ok) {
+    // TEMPORARY diagnostic logging (2026-08-12) -- trying to tell a
+    // transient rate-limit (would carry Retry-After / rate-limit-* headers)
+    // apart from a hard WAF/bot-detection block (Cloudflare-style headers,
+    // e.g. cf-ray, cf-mitigated) before deciding how to fix this properly.
+    // Remove once diagnosed.
+    const headerDump = Array.from(res.headers.entries()).map(([k, v]) => `${k}: ${v}`).join(' | ')
+    const bodySnippet = (await res.text().catch(() => '')).slice(0, 300)
+    console.error(`Kaspi 429 diagnostic — headers: ${headerDump} — body: ${bodySnippet}`)
     throw new Error(`Kaspi product page fetch failed for sku ${kaspiSku}: HTTP ${res.status}`)
   }
   const html = await res.text()
