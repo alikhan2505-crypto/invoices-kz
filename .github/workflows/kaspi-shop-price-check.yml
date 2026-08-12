@@ -9,15 +9,8 @@ jobs:
   check-prices:
     runs-on: ubuntu-latest
     steps:
-      # TEMPORARY (2026-08-12): checking whether GitHub Actions' runner IPs
-      # get the same 429 Vercel's IPs get from Kaspi, or whether the block is
-      # specific to Vercel's ranges. Remove once diagnosed.
-      - name: DEBUG - probe Kaspi product page from this runner's IP
-        run: |
-          curl -s -o /dev/null -w "status=%{http_code}\n" \
-            -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36" \
-            "https://kaspi.kz/shop/p/-897654888/"
-      - name: Call price-check endpoint
-        run: |
-          curl -sf -X GET "https://www.invoices.kz/api/kaspi-shop/cron/check-prices" \
-            -H "x-kaspi-shop-cron-secret: ${{ secrets.KASPI_SHOP_CRON_SECRET }}"
+      - uses: actions/checkout@v4
+      - name: Run price check
+        env:
+          KASPI_SHOP_CRON_SECRET: ${{ secrets.KASPI_SHOP_CRON_SECRET }}
+        run: node .github/scripts/kaspi-shop-price-check.mjs
