@@ -13,8 +13,9 @@ const supabase = createClient(
 // Not admin/session-gated, but the connectionId path segment is a random
 // uuid (kaspi_shop_connections.id), not a predictable/sequential value, so
 // it's not practically guessable.
-export async function GET(req: NextRequest, { params }: { params: { connectionId: string } }) {
-  const connection = await loadConnectionById(params.connectionId)
+export async function GET(req: NextRequest, { params }: { params: Promise<{ connectionId: string }> }) {
+  const { connectionId } = await params
+  const connection = await loadConnectionById(connectionId)
   if (!connection || connection.status !== 'active') {
     return new NextResponse('Not found', { status: 404 })
   }
@@ -22,7 +23,7 @@ export async function GET(req: NextRequest, { params }: { params: { connectionId
   const { data: products } = await supabase
     .from('kaspi_shop_tracked_products')
     .select('kaspi_sku, product_name, brand, store_id, stock_count, own_current_price')
-    .eq('connection_id', params.connectionId)
+    .eq('connection_id', connectionId)
     .eq('enabled', true)
 
   const xml = generatePriceListXml({
