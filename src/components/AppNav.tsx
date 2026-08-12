@@ -5,10 +5,10 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { useLanguage } from './LanguageProvider'
 
-const labels: Record<'ru' | 'kk' | 'en', { create: string; history: string; profile: string }> = {
-  ru: { create: 'Создать', history: 'История', profile: 'Профиль' },
-  kk: { create: 'Жасау', history: 'Тарих', profile: 'Профиль' },
-  en: { create: 'Create', history: 'History', profile: 'Profile' },
+const labels: Record<'ru' | 'kk' | 'en', { create: string; history: string; profile: string; kaspiShop: string }> = {
+  ru: { create: 'Создать', history: 'История', profile: 'Профиль', kaspiShop: 'Kaspi Магазин' },
+  kk: { create: 'Жасау', history: 'Тарих', profile: 'Профиль', kaspiShop: 'Kaspi Дүкені' },
+  en: { create: 'Create', history: 'History', profile: 'Profile', kaspiShop: 'Kaspi Shop' },
 }
 
 export default function AppNav({ desktopOnly = false }: { desktopOnly?: boolean }) {
@@ -82,6 +82,18 @@ export default function AppNav({ desktopOnly = false }: { desktopOnly?: boolean 
           <circle cx="12" cy="8" r="4"
             stroke={active ? (invert ? 'white' : '#1C2056') : '#9CA3AF'} strokeWidth="1.5"/>
           <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"
+            stroke={active ? (invert ? 'white' : '#1C2056') : '#9CA3AF'} strokeWidth="1.5" strokeLinecap="round"/>
+        </svg>
+      )
+    },
+    {
+      label: labels[lang].kaspiShop,
+      href: '/kaspi-shop',
+      icon: (active: boolean, invert = false) => (
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <path d="M4 8h16l-1.5 10a2 2 0 0 1-2 1.7H7.5a2 2 0 0 1-2-1.7L4 8Z"
+            stroke={active ? (invert ? 'white' : '#1C2056') : '#9CA3AF'} strokeWidth="1.5" strokeLinejoin="round"/>
+          <path d="M8 8V6a4 4 0 0 1 8 0v2"
             stroke={active ? (invert ? 'white' : '#1C2056') : '#9CA3AF'} strokeWidth="1.5" strokeLinecap="round"/>
         </svg>
       )
