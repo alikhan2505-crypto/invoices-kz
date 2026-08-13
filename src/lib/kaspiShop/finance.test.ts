@@ -3,7 +3,7 @@ import { computeFinanceSummary } from './finance'
 import type { Order } from './cabinetApi'
 
 function makeOrder(code: string, totalPrice: number, creationTime: string): Order {
-  return { code, status: 'TRANSMITTED', customerFirstName: 'Test', customerLastName: 'T', totalPrice, creationTime }
+  return { code, status: 'TRANSMITTED', customerFirstName: 'Test', customerLastName: 'T', totalPrice, creationTime, items: [] }
 }
 
 describe('computeFinanceSummary', () => {

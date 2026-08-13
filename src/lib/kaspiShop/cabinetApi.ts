@@ -106,6 +106,19 @@ export async function listCatalog(sessionCookies: string, merchantId: string, av
 // presetFilter uses the SAME status codes as the cabinet's own sidebar nav
 // links (e.g. "NEW", "KASPI_DELIVERY_WAIT_FOR_COURIER" for Передача), and
 // orders are identified by `code`, not a separate `id` field.
+// entries[].product.images (baseUrl + paths[]) confirmed live 2026-08-13 --
+// the same field works whether requested from the list query (getOrders)
+// or the single-order query (getOrderDetails), so the list can show real
+// product photos without a second fetch per order. Real URL = baseUrl +
+// paths[0] (paths is an array of angles/crops -- first one is the primary
+// photo, confirmed against real captured data).
+export type OrderItem = {
+  code: string
+  name: string
+  imageUrl: string | null
+  quantity: number
+}
+
 export type Order = {
   code: string
   status: string
@@ -113,6 +126,18 @@ export type Order = {
   customerLastName: string
   totalPrice: number
   creationTime: string
+  items: OrderItem[]
+}
+
+function mapOrderItems(entries: any[] | undefined): OrderItem[] {
+  return (entries || []).map((e: any) => ({
+    code: e.product?.code ?? '',
+    name: e.product?.name ?? '',
+    imageUrl: e.product?.images?.baseUrl && e.product?.images?.paths?.[0]
+      ? e.product.images.baseUrl + e.product.images.paths[0]
+      : null,
+    quantity: Number(e.quantity) || 1,
+  }))
 }
 
 const GET_ORDERS_QUERY = `query getOrders($merchantUid: String!, $input: MerchantOrderInput!, $advancedInput: MerchantOrderAdvancedInput!, $withAdvancedOrders: Boolean!, $page: Int!, $size: Int, $sort: [String!]) {
@@ -138,7 +163,86 @@ fragment OrdersPageFragment on Order {
   creationTime
   modificationTime
   status
+  entries {
+    quantity
+    product { code name images { baseUrl paths } }
+  }
 }`
+
+// Real query/response shape confirmed live 2026-08-13 -- a trimmed
+// selection of the real getOrderDetails query (the full one carries many
+// fields this feature doesn't use: cancelReason, courierDetails,
+// consignments, markers, payments, returnRequests, orderSteps, etc).
+// customer.phoneNumber comes back masked ("+0(000)-000-00-00") even when
+// requested -- confirmed live, not a permissions gap in this session --
+// so it's skipped entirely via skipCustomerPhone rather than requested
+// and discarded.
+export type OrderDetail = {
+  code: string
+  status: string
+  creationTime: string
+  totalPrice: number
+  customerFirstName: string
+  customerLastName: string
+  cityName: string | null
+  plannedDeliveryDate: string | null
+  items: OrderItem[]
+}
+
+const GET_ORDER_DETAILS_QUERY = `query getOrderDetails($merchantUid: String!, $orderCode: String!, $skipCustomerPhone: Boolean! = false) {
+  merchant(id: $merchantUid) {
+    orderDetail(code: $orderCode) {
+      code
+      status
+      creationTime
+      totalPrice
+      customer { phoneNumber @skip(if: $skipCustomerPhone) lastName firstName }
+      destination {
+        ... on Postomat { city { name } }
+        ... on OrderAddress { city { name } }
+        ... on Point { city { name } }
+      }
+      warehouse {
+        ... on Postomat { city { name } }
+        ... on OrderAddress { city { name } }
+        ... on Point { city { name } }
+      }
+      delivery { plannedDeliveryDate }
+      entries {
+        quantity
+        totalPrice
+        product { code name images { baseUrl paths } }
+      }
+    }
+  }
+}`
+
+export async function getOrderDetail(sessionCookies: string, merchantId: string, orderCode: string): Promise<OrderDetail | null> {
+  const res = await fetch('https://mc.shop.kaspi.kz/mc/facade/graphql?opName=getOrderDetails', {
+    method: 'POST',
+    headers: authHeaders(sessionCookies),
+    body: JSON.stringify({
+      operationName: 'getOrderDetails',
+      variables: { merchantUid: merchantId, orderCode, skipCustomerPhone: true },
+      query: GET_ORDER_DETAILS_QUERY,
+    }),
+  })
+  if (!res.ok) return null
+  const json = await res.json().catch(() => null)
+  const d = json?.data?.merchant?.orderDetail
+  if (!d) return null
+  return {
+    code: d.code,
+    status: d.status,
+    creationTime: d.creationTime,
+    totalPrice: Number(d.totalPrice) || 0,
+    customerFirstName: d.customer?.firstName ?? '',
+    customerLastName: d.customer?.lastName ?? '',
+    cityName: d.destination?.city?.name ?? d.warehouse?.city?.name ?? null,
+    plannedDeliveryDate: d.delivery?.plannedDeliveryDate ?? null,
+    items: mapOrderItems(d.entries),
+  }
+}
 
 // Real shape confirmed live 2026-08-13 -- the badge counts shown next to
 // each status tab in the cabinet's own sidebar (e.g. "Упаковка 2"). Cheaper
@@ -214,6 +318,7 @@ export async function listOrders(sessionCookies: string, merchantId: string, sta
       customerLastName: o.customer?.lastName ?? '',
       totalPrice: Number(o.totalPrice) || 0,
       creationTime: o.creationTime,
+      items: mapOrderItems(o.entries),
     })),
   }
 }
