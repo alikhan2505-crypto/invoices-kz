@@ -4,7 +4,7 @@
 // the original trace. Requires session cookies from a completed
 // cabinetAuth.submitOtp() login.
 
-function authHeaders(sessionCookies: string): Record<string, string> {
+export function authHeaders(sessionCookies: string): Record<string, string> {
   return {
     'x-auth-version': '3',
     'content-type': 'application/json',
