@@ -10,6 +10,7 @@ export interface KaspiShopConnection {
   id: string
   userId: string
   apiToken?: string
+  sessionCookies: string | null
   merchantId: string
   companyName: string
   status: string
@@ -29,7 +30,7 @@ export function getKey(): string {
 export async function loadConnection(userId: string): Promise<KaspiShopConnection | null> {
   const { data, error } = await supabase
     .from('kaspi_shop_connections')
-    .select('id, user_id, api_token_enc, merchant_id, company_name, status, paused')
+    .select('id, user_id, api_token_enc, session_cookies, merchant_id, company_name, status, paused')
     .eq('user_id', userId)
     .maybeSingle()
   if (error) throw new Error(`kaspi_shop_connections lookup failed for user ${userId}: ${error.message}`)
@@ -38,6 +39,7 @@ export async function loadConnection(userId: string): Promise<KaspiShopConnectio
     id: data.id,
     userId: data.user_id,
     apiToken: data.api_token_enc ? decryptAtRest(data.api_token_enc, getKey()).toString('utf8') : undefined,
+    sessionCookies: data.session_cookies ? decryptAtRest(data.session_cookies, getKey()).toString('utf8') : null,
     merchantId: data.merchant_id,
     companyName: data.company_name,
     status: data.status,
@@ -50,7 +52,7 @@ export async function loadConnection(userId: string): Promise<KaspiShopConnectio
 export async function loadConnectionById(connectionId: string): Promise<KaspiShopConnection | null> {
   const { data, error } = await supabase
     .from('kaspi_shop_connections')
-    .select('id, user_id, api_token_enc, merchant_id, company_name, status, paused')
+    .select('id, user_id, api_token_enc, session_cookies, merchant_id, company_name, status, paused')
     .eq('id', connectionId)
     .maybeSingle()
   if (error) throw new Error(`kaspi_shop_connections lookup failed for connection ${connectionId}: ${error.message}`)
@@ -59,6 +61,7 @@ export async function loadConnectionById(connectionId: string): Promise<KaspiSho
     id: data.id,
     userId: data.user_id,
     apiToken: data.api_token_enc ? decryptAtRest(data.api_token_enc, getKey()).toString('utf8') : undefined,
+    sessionCookies: data.session_cookies ? decryptAtRest(data.session_cookies, getKey()).toString('utf8') : null,
     merchantId: data.merchant_id,
     companyName: data.company_name,
     status: data.status,
