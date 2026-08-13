@@ -1,10 +1,9 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import LoadingSpinner from '@/components/LoadingSpinner'
-import { backLabel } from '@/lib/a11yLabels'
-import AppNav from '@/components/AppNav'
 
 type Product = {
   id: string
@@ -26,10 +25,55 @@ type Product = {
 }
 
 const STRATEGY_LABELS: Record<string, string> = {
-  undercut_leader: 'Быть 1-м (подрезать конкурента)',
+  undercut_leader: 'Быть 1-м',
   match_leader: 'Цена лидера',
   stay_above_leader: 'Держаться над лидером',
   be_second: 'Быть 2-м',
+}
+
+const EASE = [0.16, 1, 0.3, 1] as const
+
+// The core mechanic of this whole feature is a race: our price against the
+// lowest competitor, bounded below by a floor we never cross. Everywhere
+// else in this UI that gets summarized as three numbers in a row -- here
+// it's drawn as an actual position on a track, because "am I winning right
+// now" is the one question a seller opens this page to answer.
+function PriceLadder({ own, competitor, floor }: { own: number; competitor: number | null; floor: number }) {
+  const ceiling = Math.max(own, competitor ?? own, floor) * 1.15
+  const span = Math.max(ceiling - floor, 1)
+  const pct = (v: number) => Math.min(100, Math.max(0, ((v - floor) / span) * 100))
+  const winning = competitor !== null && own <= competitor
+  const atFloor = own <= floor + 0.01
+
+  return (
+    <div className="pt-1">
+      <div className="relative h-1.5 rounded-full bg-gray-100">
+        <div
+          className="absolute inset-y-0 left-0 rounded-full"
+          style={{ width: `${pct(floor)}%`, background: 'repeating-linear-gradient(135deg, #FFE2E3 0, #FFE2E3 4px, transparent 4px, transparent 8px)' }}
+        />
+        {competitor !== null && (
+          <motion.div
+            className="absolute -top-1.5 w-3.5 h-3.5 rounded-full bg-white ring-2 ring-[#1C2056]/30"
+            initial={false}
+            animate={{ left: `calc(${pct(competitor)}% - 7px)` }}
+            transition={{ duration: 0.6, ease: EASE }}
+          />
+        )}
+        <motion.div
+          className={`absolute -top-1.5 w-3.5 h-3.5 rounded-full ring-2 ring-white shadow ${winning ? 'bg-[#00C880]' : 'bg-[#FF5A5F]'}`}
+          initial={false}
+          animate={{ left: `calc(${pct(own)}% - 7px)` }}
+          transition={{ duration: 0.6, ease: EASE }}
+        />
+      </div>
+      <div className="flex items-center justify-between mt-2 text-[11px] text-gray-400">
+        <span>Пол {floor.toLocaleString('ru-KZ')} ₸</span>
+        {atFloor && <span className="text-[#FF5A5F] font-medium">Упёрлись в минимум</span>}
+        {competitor !== null && <span>Конкурент {competitor.toLocaleString('ru-KZ')} ₸</span>}
+      </div>
+    </div>
+  )
 }
 
 export default function KaspiShop() {
@@ -42,10 +86,8 @@ export default function KaspiShop() {
   const [companyName, setCompanyName] = useState<string | null>(null)
   const [balance, setBalance] = useState(0)
   const [products, setProducts] = useState<Product[]>([])
+  const [expandedId, setExpandedId] = useState<string | null>(null)
 
-  // Connect flow: phone + merchantId -> OTP code, matching the real
-  // idmc.shop.kaspi.kz login (confirmed live 2026-08-13 -- phone + SMS
-  // code only, no separate password for this login method).
   const [phone, setPhone] = useState('')
   const [merchantId, setMerchantId] = useState('')
   const [connecting, setConnecting] = useState(false)
@@ -57,6 +99,7 @@ export default function KaspiShop() {
   const [topupCustom, setTopupCustom] = useState('')
   const [toppingUp, setToppingUp] = useState(false)
   const [topupPending, setTopupPending] = useState<{ topup_id: string, payment_link: string } | null>(null)
+  const [walletOpen, setWalletOpen] = useState(false)
 
   const [suggestingFor, setSuggestingFor] = useState<string | null>(null)
   const [editValues, setEditValues] = useState<Record<string, { floorPrice: string; undercutStep: string; strategy: string; excludedCities: string; excludedMerchants: string }>>({})
@@ -71,10 +114,6 @@ export default function KaspiShop() {
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
-    // Kaspi Shop is a brand-new, still-being-verified feature -- admin-only
-    // for now (see the matching gate in AppNav.tsx) so existing customers
-    // don't stumble into it before it's ready. Same admin-check pattern as
-    // /admin (src/app/admin/page.tsx) -- remove once ready for everyone.
     const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', user.id).single()
     if (!profile?.is_admin) { router.push('/dashboard'); return }
 
@@ -114,10 +153,6 @@ export default function KaspiShop() {
         setCompanyName(data.companyName ?? null)
       }
     } catch (e: any) {
-      // A rejected fetch (offline, DNS failure) throws rather than
-      // resolving to a non-ok response -- without this catch, the .ok
-      // checks above are never reached and the page was left stuck on
-      // the loading spinner forever with no way to retry.
       console.error('Kaspi Shop load error:', e.message)
       setLoadError('Не удалось загрузить данные. Проверьте соединение и попробуйте ещё раз.')
     } finally {
@@ -130,16 +165,10 @@ export default function KaspiShop() {
     setConnecting(true)
     setConnectError('')
     const headers = await authHeader()
-    const res = await fetch('/api/kaspi-shop/connect', {
-      method: 'POST', headers,
-      body: JSON.stringify({ phone, merchantId }),
-    })
+    const res = await fetch('/api/kaspi-shop/connect', { method: 'POST', headers, body: JSON.stringify({ phone, merchantId }) })
     const data = await res.json()
     setConnecting(false)
-    if (!res.ok) {
-      setConnectError(data.error || 'Не удалось подключиться')
-      return
-    }
+    if (!res.ok) { setConnectError(data.error || 'Не удалось подключиться'); return }
     setOtpToken(data.otpToken)
   }
 
@@ -148,16 +177,10 @@ export default function KaspiShop() {
     setConnecting(true)
     setConnectError('')
     const headers = await authHeader()
-    const res = await fetch('/api/kaspi-shop/connect/otp', {
-      method: 'POST', headers,
-      body: JSON.stringify({ otpToken, code: otpCode, merchantId }),
-    })
+    const res = await fetch('/api/kaspi-shop/connect/otp', { method: 'POST', headers, body: JSON.stringify({ otpToken, code: otpCode, merchantId }) })
     const data = await res.json()
     setConnecting(false)
-    if (!res.ok) {
-      setConnectError(data.error || 'Не удалось подтвердить код')
-      return
-    }
+    if (!res.ok) { setConnectError(data.error || 'Не удалось подтвердить код'); return }
     setOtpToken(null)
     setOtpCode('')
     setConnected(true)
@@ -183,9 +206,6 @@ export default function KaspiShop() {
     pollTopupStatus(data.topup_id)
   }
 
-  // Same short-poll pattern as /profile/acquiring's own Kaspi Pay top-up --
-  // stops after ~2.5 minutes (a QR that's still unpaid by then is most
-  // likely abandoned, not about to be paid this session).
   function pollTopupStatus(topupId: string) {
     let attempts = 0
     const interval = setInterval(async () => {
@@ -193,14 +213,8 @@ export default function KaspiShop() {
       const headers = await authHeader()
       const res = await fetch(`/api/kaspi-shop/wallet/topup-status?topup_id=${topupId}`, { headers })
       const data = await res.json()
-      if (data.status === 'paid') {
-        clearInterval(interval)
-        setTopupPending(null)
-        load()
-      } else if (data.status === 'expired' || attempts >= 30) {
-        clearInterval(interval)
-        setTopupPending(null)
-      }
+      if (data.status === 'paid') { clearInterval(interval); setTopupPending(null); load() }
+      else if (data.status === 'expired' || attempts >= 30) { clearInterval(interval); setTopupPending(null) }
     }, 5000)
   }
 
@@ -237,181 +251,266 @@ export default function KaspiShop() {
   async function suggestPricing(id: string) {
     setSuggestingFor(id)
     const headers = await authHeader()
-    const res = await fetch('/api/kaspi-shop/products/suggest-pricing', {
-      method: 'POST', headers,
-      body: JSON.stringify({ productId: id }),
-    })
+    const res = await fetch('/api/kaspi-shop/products/suggest-pricing', { method: 'POST', headers, body: JSON.stringify({ productId: id }) })
     const data = await res.json()
     setSuggestingFor(null)
     if (!res.ok) return
-    setEditValues(prev => ({
-      ...prev,
-      [id]: { ...prev[id], floorPrice: String(data.floorPrice), undercutStep: String(data.undercutStep) },
-    }))
+    setEditValues(prev => ({ ...prev, [id]: { ...prev[id], floorPrice: String(data.floorPrice), undercutStep: String(data.undercutStep) } }))
   }
 
   if (loading) return <LoadingSpinner />
 
-  return (
-    <main className="min-h-screen bg-gray-50 pb-20 lg:pb-0 lg:pl-[144px]">
-      <div className="bg-white border-b px-4 py-4 flex items-center gap-3">
-        <button onClick={() => router.push('/dashboard')} className="back-btn text-gray-400 text-xl" aria-label={backLabel('ru')}>‹</button>
-        <span className="font-semibold text-[#1C2056]">Kaspi Магазин</span>
-      </div>
+  const winningCount = products.filter(p => p.last_competitor_price !== null && p.own_current_price <= p.last_competitor_price).length
+  const atFloorCount = products.filter(p => p.own_current_price <= p.floor_price + 0.01).length
+  const activeCount = products.filter(p => p.enabled).length
 
-      <div className="max-w-lg lg:max-w-4xl mx-auto p-4 space-y-4">
+  const soonItems = ['Заказы', 'Финансы', 'Каталог НКТ', 'Ниши', 'Предзаказ']
+
+  return (
+    <main className="min-h-screen bg-[#F6F6FB] lg:flex">
+      {/* Own sidebar for this section -- same floating-card language as the
+          rest of invoices.kz (AppNav), but scoped to Kaspi Shop's own
+          sections so this reads as a real sub-cabinet, not one lonely page. */}
+      <aside className="lg:w-[220px] lg:flex-shrink-0 lg:p-4">
+        <div className="lg:sticky lg:top-4 bg-white lg:rounded-[28px] lg:shadow-2xl lg:ring-1 lg:ring-black/5 px-4 py-4 lg:py-6">
+          <div className="flex items-center gap-2 mb-1 lg:mb-6">
+            <button onClick={() => router.push('/dashboard')} className="text-gray-400 text-xl leading-none" aria-label="Назад">‹</button>
+            <div>
+              <div className="text-[10px] font-semibold tracking-wider text-gray-400 uppercase">Kaspi</div>
+              <div className="text-sm font-extrabold text-[#1C2056] -mt-0.5">Магазин</div>
+            </div>
+          </div>
+          <nav className="hidden lg:flex flex-col gap-1">
+            <div className="rounded-xl bg-[#1C2056] text-white text-sm font-medium px-3 py-2.5">Демпинг</div>
+            {soonItems.map(item => (
+              <div key={item} className="flex items-center justify-between rounded-xl text-sm text-gray-300 px-3 py-2.5 select-none">
+                <span>{item}</span>
+                <span className="text-[9px] font-semibold tracking-wide bg-gray-100 text-gray-400 rounded-full px-1.5 py-0.5">СКОРО</span>
+              </div>
+            ))}
+          </nav>
+        </div>
+      </aside>
+
+      <div className="flex-1 min-w-0 p-4 lg:p-6 pb-24 lg:pb-6">
         {loadError && (
-          <div className="bg-red-50 rounded-2xl p-4 flex items-center justify-between gap-3">
+          <div className="bg-red-50 rounded-2xl p-4 flex items-center justify-between gap-3 mb-4">
             <span className="text-sm text-red-600">{loadError}</span>
-            <button onClick={load} className="text-xs bg-red-500 text-white rounded-lg px-3 py-1.5 flex-shrink-0">
-              Повторить
-            </button>
+            <button onClick={load} className="text-xs bg-red-500 text-white rounded-lg px-3 py-1.5 flex-shrink-0">Повторить</button>
           </div>
         )}
 
         {connected && sessionStatus === 'session_expired' && (
-          <div className="bg-red-50 rounded-2xl p-4 flex items-center justify-between gap-3">
-            <span className="text-sm text-red-600">Сессия кабинета Kaspi истекла — переподключитесь, чтобы демпинг продолжил работать.</span>
-            <button onClick={() => { setConnected(false); setSessionStatus(null) }} className="text-xs bg-red-500 text-white rounded-lg px-3 py-1.5 flex-shrink-0">
-              Переподключиться
-            </button>
+          <div className="bg-[#FFF4E5] rounded-2xl p-4 flex items-center justify-between gap-3 mb-4">
+            <span className="text-sm text-[#B15E00]">Сессия кабинета Kaspi истекла — переподключитесь, чтобы демпинг продолжил работать.</span>
+            <button onClick={() => { setConnected(false); setSessionStatus(null) }} className="text-xs bg-[#B15E00] text-white rounded-lg px-3 py-1.5 flex-shrink-0">Переподключиться</button>
           </div>
         )}
 
         {!connected ? (
-          <div className="bg-white rounded-2xl shadow-sm p-4">
-            <div className="text-sm font-medium text-[#1C2056] mb-1">Подключить Kaspi Магазин</div>
-            <div className="text-xs text-gray-400 mb-3">
-              ID продавца — в вашем кабинете Kaspi, в правом верхнем углу («ID - ...»). Название компании подтянется автоматически.
-            </div>
-            {connectError && <div className="text-xs text-red-500 mb-2">{connectError}</div>}
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}
+            className="bg-[#12142E] rounded-[28px] p-6 lg:p-10 mb-4 text-white">
+            <div className="text-[11px] font-semibold tracking-wider text-white/40 uppercase mb-2">Подключение</div>
+            <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight mb-1">Подключите Kaspi Магазин</h1>
+            <p className="text-sm text-white/50 mb-6 max-w-md">ID продавца — в вашем кабинете Kaspi, в правом верхнем углу («ID - ...»). Название магазина подтянется само.</p>
+            {connectError && <div className="text-sm text-[#FF8A8E] mb-3">{connectError}</div>}
 
             {!otpToken ? (
-              <>
-                <input className="w-full border rounded-lg px-3 py-2 text-sm mb-2" placeholder="Телефон (как при входе в Kaspi)"
-                  value={phone} onChange={e => setPhone(e.target.value)} />
-                <input className="w-full border rounded-lg px-3 py-2 text-sm mb-2" placeholder="ID продавца (merchantId)"
-                  value={merchantId} onChange={e => setMerchantId(e.target.value)} />
+              <div className="flex flex-col gap-2 max-w-sm">
+                <input className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-sm placeholder:text-white/30 outline-none focus:border-white/30"
+                  placeholder="Телефон (как при входе в Kaspi)" value={phone} onChange={e => setPhone(e.target.value)} />
+                <input className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-sm placeholder:text-white/30 outline-none focus:border-white/30"
+                  placeholder="ID продавца" value={merchantId} onChange={e => setMerchantId(e.target.value)} />
                 <button onClick={startConnect} disabled={connecting}
-                  className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium">
+                  className="mt-1 bg-white text-[#12142E] rounded-xl py-3 text-sm font-semibold disabled:opacity-50">
                   {connecting ? 'Отправляем код...' : 'Продолжить'}
                 </button>
-              </>
+              </div>
             ) : (
-              <>
-                <div className="text-xs text-gray-500 mb-2">Код из SMS отправлен на {phone}</div>
-                <input className="w-full border rounded-lg px-3 py-2 text-sm mb-2" placeholder="Код из SMS"
-                  value={otpCode} onChange={e => setOtpCode(e.target.value)} />
+              <div className="flex flex-col gap-2 max-w-sm">
+                <div className="text-xs text-white/40 mb-1">Код из SMS отправлен на {phone}</div>
+                <input className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-sm placeholder:text-white/30 outline-none focus:border-white/30 font-mono tracking-widest"
+                  placeholder="000000" value={otpCode} onChange={e => setOtpCode(e.target.value)} />
                 <button onClick={completeConnect} disabled={connecting}
-                  className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium">
+                  className="mt-1 bg-white text-[#12142E] rounded-xl py-3 text-sm font-semibold disabled:opacity-50">
                   {connecting ? 'Проверяем...' : 'Подтвердить'}
                 </button>
-              </>
+              </div>
             )}
-          </div>
-        ) : null}
-
-        {connected && companyName && (
-          <div className="text-xs text-gray-400 px-1">Подключено: {companyName}</div>
-        )}
-
-        <div className="bg-white rounded-2xl shadow-sm p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <div className="text-sm font-medium text-[#1C2056]">Баланс Kaspi Shop Wallet</div>
-              <div className="text-xs text-gray-400">{balance} кредитов · 1 кредит = 5 ₸</div>
-            </div>
-            <button onClick={togglePause}
-              className={`w-12 h-6 rounded-full transition-colors relative flex-shrink-0 ${paused ? 'bg-red-500' : 'bg-gray-200'}`}>
-              <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${paused ? 'left-7' : 'left-1'}`}></span>
-            </button>
-          </div>
-
-          <div className="flex gap-2 flex-wrap mb-2">
-            {[1000, 5000, 10000].map(amount => (
-              <button key={amount}
-                onClick={() => { setTopupAmount(amount); setTopupCustom('') }}
-                className={`rounded-lg px-3 py-1.5 text-xs font-medium ${topupAmount === amount ? 'bg-[#1C2056] text-white' : 'bg-gray-100 text-[#1C2056]'}`}>
-                {amount.toLocaleString('ru-KZ')} ₸
-              </button>
-            ))}
-          </div>
-          <input value={topupCustom}
-            onChange={e => { setTopupCustom(e.target.value.replace(/\D/g, '')); setTopupAmount(null) }}
-            placeholder="Своя сумма, ₸" type="text" inputMode="numeric"
-            className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-[#1C2056] mb-2" />
-          <button onClick={() => startTopup((topupAmount ?? Number(topupCustom)) || 0)}
-            disabled={toppingUp || !((topupAmount ?? Number(topupCustom)) >= 500)}
-            className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium disabled:opacity-50">
-            {toppingUp ? 'Готовим QR...' : 'Пополнить'}
-          </button>
-
-          {topupPending && (
-            <div className="bg-blue-50 rounded-xl p-3 mt-3">
-              <p className="text-xs text-gray-600 mb-2">Оплатите QR-код Kaspi — баланс пополнится автоматически.</p>
-              <a href={topupPending.payment_link} target="_blank" rel="noopener noreferrer"
-                className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium block text-center">
-                Оплатить
-              </a>
-            </div>
-          )}
-        </div>
-
-        <div className="bg-white rounded-2xl shadow-sm p-4">
-          <div className="text-sm font-medium text-[#1C2056] mb-3">Отслеживаемые товары</div>
-          <div className="space-y-3 mb-3">
-            {products.map(p => {
-              const v = editValues[p.id] || { floorPrice: String(p.floor_price), undercutStep: String(p.undercut_step), strategy: p.demping_strategy, excludedCities: '', excludedMerchants: '' }
-              return (
-                <div key={p.id} className="border border-gray-100 rounded-xl p-3">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm font-medium text-gray-800">{p.product_name}</span>
-                    <button onClick={() => toggleProduct(p.id, p.enabled)}
-                      className={`text-xs px-2 py-0.5 rounded-full ${p.enabled ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500'}`}>
-                      {p.enabled ? 'Активно' : 'Пауза'}
-                    </button>
-                  </div>
-                  <div className="text-xs text-gray-500 mb-2">
-                    Наша цена: {p.own_current_price} ₸ · Конкурент: {p.last_competitor_price ?? '—'} ₸
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 mb-2">
-                    <input className="border rounded-lg px-2 py-1.5 text-xs" placeholder="Минимальная цена (пол)" type="number"
-                      value={v.floorPrice} onChange={e => setEditValues(prev => ({ ...prev, [p.id]: { ...v, floorPrice: e.target.value } }))} />
-                    <input className="border rounded-lg px-2 py-1.5 text-xs" placeholder="Шаг, ₸" type="number"
-                      value={v.undercutStep} onChange={e => setEditValues(prev => ({ ...prev, [p.id]: { ...v, undercutStep: e.target.value } }))} />
-                  </div>
-                  <select className="w-full border rounded-lg px-2 py-1.5 text-xs mb-2"
-                    value={v.strategy} onChange={e => setEditValues(prev => ({ ...prev, [p.id]: { ...v, strategy: e.target.value } }))}>
-                    {Object.entries(STRATEGY_LABELS).map(([key, label]) => (
-                      <option key={key} value={key}>{label}</option>
-                    ))}
-                  </select>
-                  <input className="w-full border rounded-lg px-2 py-1.5 text-xs mb-2" placeholder="Исключить города (коды через запятую)"
-                    value={v.excludedCities} onChange={e => setEditValues(prev => ({ ...prev, [p.id]: { ...v, excludedCities: e.target.value } }))} />
-                  <input className="w-full border rounded-lg px-2 py-1.5 text-xs mb-2" placeholder="Не конкурировать с продавцами (ID через запятую)"
-                    value={v.excludedMerchants} onChange={e => setEditValues(prev => ({ ...prev, [p.id]: { ...v, excludedMerchants: e.target.value } }))} />
-
-                  <div className="flex gap-2">
-                    <button onClick={() => suggestPricing(p.id)} disabled={suggestingFor === p.id}
-                      className="flex-1 text-xs bg-gray-100 text-[#1C2056] rounded-lg px-3 py-1.5">
-                      {suggestingFor === p.id ? 'Думаем...' : 'ИИ-подбор цены'}
-                    </button>
-                    <button onClick={() => saveProductSettings(p.id)}
-                      className="flex-1 text-xs bg-[#1C2056] text-white rounded-lg px-3 py-1.5">
-                      Сохранить
-                    </button>
-                  </div>
-                  <button onClick={() => deleteProduct(p.id)} className="text-xs text-red-500 mt-2">Удалить</button>
+          </motion.div>
+        ) : (
+          <>
+            {/* Hero: the one question this page answers, stated as three
+                numbers, not buried in per-product rows. */}
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}
+              className="bg-[#12142E] rounded-[28px] p-6 lg:p-8 mb-4 text-white">
+              <div className="flex items-start justify-between gap-4 mb-6">
+                <div>
+                  <div className="text-[11px] font-semibold tracking-wider text-white/40 uppercase mb-1">{companyName || 'Магазин подключён'}</div>
+                  <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight">Гонка цен сейчас</h1>
                 </div>
-              )
-            })}
-            {products.length === 0 && <div className="text-xs text-gray-400">Пока нет товаров — подключите кабинет, чтобы импортировать каталог</div>}
-          </div>
-        </div>
+                <button onClick={togglePause}
+                  className={`text-xs font-medium rounded-full px-3 py-2 flex-shrink-0 transition-colors ${paused ? 'bg-[#FF5A5F]/20 text-[#FF8A8E]' : 'bg-[#00C880]/15 text-[#00C880]'}`}>
+                  {paused ? '⏸ На паузе' : '● Работает'}
+                </button>
+              </div>
+              <div className="grid grid-cols-3 gap-3 lg:gap-6">
+                <div>
+                  <div className="text-3xl lg:text-4xl font-black font-mono tabular-nums">{winningCount}</div>
+                  <div className="text-xs text-white/40 mt-1">из {products.length} — мы дешевле</div>
+                </div>
+                <div>
+                  <div className="text-3xl lg:text-4xl font-black font-mono tabular-nums text-[#FF8A8E]">{atFloorCount}</div>
+                  <div className="text-xs text-white/40 mt-1">упёрлись в минимум</div>
+                </div>
+                <div>
+                  <div className="text-3xl lg:text-4xl font-black font-mono tabular-nums">{balance}</div>
+                  <div className="text-xs text-white/40 mt-1">кредитов · <button onClick={() => setWalletOpen(true)} className="underline underline-offset-2">пополнить</button></div>
+                </div>
+              </div>
+            </motion.div>
+
+            {companyName && activeCount === 0 && products.length > 0 && (
+              <div className="text-xs text-gray-400 mb-4 px-1">{products.length} товаров импортировано и на паузе — включите нужные ниже, чтобы демпинг начал работать.</div>
+            )}
+
+            <div className="space-y-3">
+              <AnimatePresence initial={false}>
+                {products.map((p, i) => {
+                  const v = editValues[p.id] || { floorPrice: String(p.floor_price), undercutStep: String(p.undercut_step), strategy: p.demping_strategy, excludedCities: '', excludedMerchants: '' }
+                  const expanded = expandedId === p.id
+                  return (
+                    <motion.div key={p.id}
+                      initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                      transition={{ duration: 0.35, ease: EASE, delay: Math.min(i * 0.04, 0.3) }}
+                      className="bg-white rounded-2xl shadow-sm overflow-hidden">
+                      <button onClick={() => setExpandedId(expanded ? null : p.id)} className="w-full text-left p-4">
+                        <div className="flex items-center justify-between gap-3 mb-3">
+                          <div className="min-w-0">
+                            <div className="text-sm font-semibold text-gray-800 truncate">{p.product_name}</div>
+                            <div className="text-[11px] text-gray-400">{STRATEGY_LABELS[p.demping_strategy] || p.demping_strategy} · проверка каждые {p.check_frequency_minutes} мин</div>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <span className="font-mono font-bold text-sm text-[#1C2056] tabular-nums">{p.own_current_price.toLocaleString('ru-KZ')} ₸</span>
+                            <span onClick={e => { e.stopPropagation(); toggleProduct(p.id, p.enabled) }}
+                              className={`text-[11px] px-2 py-1 rounded-full cursor-pointer ${p.enabled ? 'bg-[#00C880]/10 text-[#00A468]' : 'bg-gray-100 text-gray-500'}`}>
+                              {p.enabled ? 'Активно' : 'Пауза'}
+                            </span>
+                          </div>
+                        </div>
+                        <PriceLadder own={p.own_current_price} competitor={p.last_competitor_price} floor={p.floor_price} />
+                      </button>
+
+                      <AnimatePresence initial={false}>
+                        {expanded && (
+                          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.25, ease: EASE }} className="overflow-hidden">
+                            <div className="border-t border-gray-100 p-4 pt-3 bg-gray-50/50">
+                              <div className="grid grid-cols-2 gap-2 mb-2">
+                                <label className="block">
+                                  <span className="text-[11px] text-gray-400 mb-1 block">Минимальная цена</span>
+                                  <input className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-mono" type="number"
+                                    value={v.floorPrice} onChange={e => setEditValues(prev => ({ ...prev, [p.id]: { ...v, floorPrice: e.target.value } }))} />
+                                </label>
+                                <label className="block">
+                                  <span className="text-[11px] text-gray-400 mb-1 block">Шаг, ₸</span>
+                                  <input className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-mono" type="number"
+                                    value={v.undercutStep} onChange={e => setEditValues(prev => ({ ...prev, [p.id]: { ...v, undercutStep: e.target.value } }))} />
+                                </label>
+                              </div>
+                              <label className="block mb-2">
+                                <span className="text-[11px] text-gray-400 mb-1 block">Стратегия</span>
+                                <select className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white"
+                                  value={v.strategy} onChange={e => setEditValues(prev => ({ ...prev, [p.id]: { ...v, strategy: e.target.value } }))}>
+                                  {Object.entries(STRATEGY_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+                                </select>
+                              </label>
+                              <label className="block mb-2">
+                                <span className="text-[11px] text-gray-400 mb-1 block">Исключить города (коды через запятую)</span>
+                                <input className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs"
+                                  value={v.excludedCities} onChange={e => setEditValues(prev => ({ ...prev, [p.id]: { ...v, excludedCities: e.target.value } }))} />
+                              </label>
+                              <label className="block mb-3">
+                                <span className="text-[11px] text-gray-400 mb-1 block">Не конкурировать с продавцами (ID через запятую)</span>
+                                <input className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs"
+                                  value={v.excludedMerchants} onChange={e => setEditValues(prev => ({ ...prev, [p.id]: { ...v, excludedMerchants: e.target.value } }))} />
+                              </label>
+                              <div className="flex gap-2">
+                                <button onClick={() => suggestPricing(p.id)} disabled={suggestingFor === p.id}
+                                  className="flex-1 text-xs bg-white border border-gray-200 text-[#1C2056] rounded-lg px-3 py-2 font-medium">
+                                  {suggestingFor === p.id ? 'Думаем...' : '✨ ИИ-подбор цены'}
+                                </button>
+                                <button onClick={() => saveProductSettings(p.id)}
+                                  className="flex-1 text-xs bg-[#1C2056] text-white rounded-lg px-3 py-2 font-medium">
+                                  Сохранить
+                                </button>
+                              </div>
+                              <button onClick={() => deleteProduct(p.id)} className="text-[11px] text-gray-400 hover:text-red-500 mt-3">Удалить товар</button>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </motion.div>
+                  )
+                })}
+              </AnimatePresence>
+
+              {products.length === 0 && (
+                <div className="bg-white rounded-2xl shadow-sm p-8 text-center">
+                  <div className="text-sm text-gray-500">Каталог ещё импортируется или пуст.</div>
+                  <div className="text-xs text-gray-400 mt-1">Товары появятся здесь после подключения кабинета.</div>
+                </div>
+              )}
+            </div>
+          </>
+        )}
       </div>
 
-      <AppNav />
+      <AnimatePresence>
+        {walletOpen && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/40 z-50 flex items-end lg:items-center justify-center p-0 lg:p-4"
+            onClick={() => setWalletOpen(false)}>
+            <motion.div initial={{ y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }}
+              transition={{ duration: 0.3, ease: EASE }}
+              onClick={e => e.stopPropagation()}
+              className="bg-white rounded-t-[28px] lg:rounded-[28px] w-full lg:max-w-sm p-5">
+              <div className="text-sm font-semibold text-[#1C2056] mb-1">Пополнить Kaspi Shop Wallet</div>
+              <div className="text-xs text-gray-400 mb-4">{balance} кредитов · 1 кредит = 5 ₸</div>
+              <div className="flex gap-2 flex-wrap mb-2">
+                {[1000, 5000, 10000].map(amount => (
+                  <button key={amount} onClick={() => { setTopupAmount(amount); setTopupCustom('') }}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-medium ${topupAmount === amount ? 'bg-[#1C2056] text-white' : 'bg-gray-100 text-[#1C2056]'}`}>
+                    {amount.toLocaleString('ru-KZ')} ₸
+                  </button>
+                ))}
+              </div>
+              <input value={topupCustom} onChange={e => { setTopupCustom(e.target.value.replace(/\D/g, '')); setTopupAmount(null) }}
+                placeholder="Своя сумма, ₸" type="text" inputMode="numeric"
+                className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-[#1C2056] mb-3" />
+              <button onClick={() => startTopup((topupAmount ?? Number(topupCustom)) || 0)}
+                disabled={toppingUp || !((topupAmount ?? Number(topupCustom)) >= 500)}
+                className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium disabled:opacity-50">
+                {toppingUp ? 'Готовим QR...' : 'Пополнить'}
+              </button>
+              {topupPending && (
+                <div className="bg-blue-50 rounded-xl p-3 mt-3">
+                  <p className="text-xs text-gray-600 mb-2">Оплатите QR-код Kaspi — баланс пополнится автоматически.</p>
+                  <a href={topupPending.payment_link} target="_blank" rel="noopener noreferrer"
+                    className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium block text-center">Оплатить</a>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Mobile bottom bar: same tab set as the desktop sidebar, since the
+          floating sidebar is desktop-only. */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t px-4 py-2 flex items-center justify-between z-40">
+        <div className="text-xs font-semibold text-[#1C2056]">Демпинг</div>
+        <button onClick={() => setWalletOpen(true)} className="text-xs text-gray-400">{balance} кредитов</button>
+      </div>
     </main>
   )
 }
