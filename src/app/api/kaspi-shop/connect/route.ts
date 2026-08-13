@@ -29,9 +29,9 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: 'Некорректный JSON' }, { status: 400 })
   }
-  const { phone, merchantId } = body
-  if (!phone || !merchantId) {
-    return NextResponse.json({ error: 'phone и merchantId обязательны' }, { status: 400 })
+  const { phone } = body
+  if (!phone) {
+    return NextResponse.json({ error: 'phone обязателен' }, { status: 400 })
   }
 
   const result = await startPhoneLogin(phone)

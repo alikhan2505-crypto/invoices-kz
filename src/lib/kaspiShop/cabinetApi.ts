@@ -2,10 +2,7 @@
 // live 2026-08-12 against a real seller account (merchant id 30067228,
 // "ИП FIRST PROJECT"). See project memory / the 2026-08-12 findings doc for
 // the original trace. Requires session cookies from a completed
-// cabinetAuth.submitOtp() login -- merchantId is NOT auto-discovered here
-// (no confirmed endpoint for "what merchants can this session access"),
-// the seller provides it themselves at connect time (visible in their own
-// cabinet header as "ID - {merchantId}").
+// cabinetAuth.submitOtp() login.
 
 function authHeaders(sessionCookies: string): Record<string, string> {
   return {
@@ -15,6 +12,22 @@ function authHeaders(sessionCookies: string): Record<string, string> {
     'referer': 'https://kaspi.kz/',
     'cookie': sessionCookies,
   }
+}
+
+// Confirmed live 2026-08-13: this is the same call the real cabinet's own
+// SPA makes right after landing on kaspi.kz/mc/ to figure out which
+// merchant(s) the logged-in phone number can manage -- one login can have
+// access to more than one seller account (observed live: a phone linked as
+// a user on two separate shops returned both merchant uids here). Used at
+// connect time so the seller picks from a real list instead of typing an
+// ID off their own cabinet header.
+export async function listMerchants(sessionCookies: string): Promise<{ uid: string }[]> {
+  const res = await fetch('https://mc.shop.kaspi.kz/s/m', { headers: authHeaders(sessionCookies) })
+  if (!res.ok) return []
+  const json = await res.json().catch(() => null)
+  const merchants = json?.merchants
+  if (!Array.isArray(merchants)) return []
+  return merchants.map((m: any) => ({ uid: String(m.uid) }))
 }
 
 export type MerchantInfo = {

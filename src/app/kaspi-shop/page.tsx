@@ -90,11 +90,12 @@ export default function KaspiShop() {
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
   const [phone, setPhone] = useState('')
-  const [merchantId, setMerchantId] = useState('')
   const [connecting, setConnecting] = useState(false)
   const [connectError, setConnectError] = useState('')
   const [otpToken, setOtpToken] = useState<string | null>(null)
   const [otpCode, setOtpCode] = useState('')
+  const [merchantChoices, setMerchantChoices] = useState<{ id: string; name: string }[] | null>(null)
+  const [sessionToken, setSessionToken] = useState<string | null>(null)
 
   const [topupAmount, setTopupAmount] = useState<number | null>(null)
   const [topupCustom, setTopupCustom] = useState('')
@@ -162,11 +163,11 @@ export default function KaspiShop() {
   }
 
   async function startConnect() {
-    if (!phone || !merchantId) return
+    if (!phone) return
     setConnecting(true)
     setConnectError('')
     const headers = await authHeader()
-    const res = await fetch('/api/kaspi-shop/connect', { method: 'POST', headers, body: JSON.stringify({ phone, merchantId }) })
+    const res = await fetch('/api/kaspi-shop/connect', { method: 'POST', headers, body: JSON.stringify({ phone }) })
     const data = await res.json()
     setConnecting(false)
     if (!res.ok) { setConnectError(data.error || 'Не удалось подключиться'); return }
@@ -178,12 +179,32 @@ export default function KaspiShop() {
     setConnecting(true)
     setConnectError('')
     const headers = await authHeader()
-    const res = await fetch('/api/kaspi-shop/connect/otp', { method: 'POST', headers, body: JSON.stringify({ otpToken, code: otpCode, merchantId }) })
+    const res = await fetch('/api/kaspi-shop/connect/otp', { method: 'POST', headers, body: JSON.stringify({ otpToken, code: otpCode }) })
     const data = await res.json()
     setConnecting(false)
     if (!res.ok) { setConnectError(data.error || 'Не удалось подтвердить код'); return }
     setOtpToken(null)
     setOtpCode('')
+    if (data.status === 'merchant_required') {
+      setSessionToken(data.sessionToken)
+      setMerchantChoices(data.merchants)
+      return
+    }
+    setConnected(true)
+    load()
+  }
+
+  async function selectMerchant(merchantId: string) {
+    if (!sessionToken) return
+    setConnecting(true)
+    setConnectError('')
+    const headers = await authHeader()
+    const res = await fetch('/api/kaspi-shop/connect/select-merchant', { method: 'POST', headers, body: JSON.stringify({ sessionToken, merchantId }) })
+    const data = await res.json()
+    setConnecting(false)
+    if (!res.ok) { setConnectError(data.error || 'Не удалось подключить магазин'); return }
+    setSessionToken(null)
+    setMerchantChoices(null)
     setConnected(true)
     load()
   }
@@ -301,12 +322,21 @@ export default function KaspiShop() {
             <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight mb-6">Подключите Kaspi Магазин</h1>
             {connectError && <div className="text-sm text-[#FF8A8E] mb-3">{connectError}</div>}
 
-            {!otpToken ? (
+            {merchantChoices ? (
+              <div className="flex flex-col gap-2 max-w-sm">
+                <div className="text-xs text-white/40 mb-1">На этом номере найдено магазинов: {merchantChoices.length}. Выберите нужный.</div>
+                {merchantChoices.map(m => (
+                  <button key={m.id} onClick={() => selectMerchant(m.id)} disabled={connecting}
+                    className="w-full text-left bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-sm text-white hover:border-white/30 transition-colors disabled:opacity-50">
+                    <div className="font-semibold">{m.name}</div>
+                    <div className="text-[11px] text-white/40 mt-0.5">ID {m.id}</div>
+                  </button>
+                ))}
+              </div>
+            ) : !otpToken ? (
               <div className="flex flex-col gap-2 max-w-sm">
                 <input className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-sm text-white! [-webkit-text-fill-color:#fff]! placeholder:text-white/30 outline-none focus:border-white/30"
                   placeholder="Телефон (как при входе в Kaspi)" value={phone} onChange={e => setPhone(e.target.value)} />
-                <input className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-sm text-white! [-webkit-text-fill-color:#fff]! placeholder:text-white/30 outline-none focus:border-white/30"
-                  placeholder="ID продавца (правый верхний угол кабинета)" value={merchantId} onChange={e => setMerchantId(e.target.value)} />
                 <button onClick={startConnect} disabled={connecting}
                   className="mt-1 bg-white text-[#12142E] rounded-xl py-3 text-sm font-semibold disabled:opacity-50">
                   {connecting ? 'Отправляем код...' : 'Продолжить'}
