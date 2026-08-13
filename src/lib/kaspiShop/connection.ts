@@ -18,8 +18,9 @@ export interface KaspiShopConnection {
 
 // A dedicated key, separate from KASPI_SESSION_ENCRYPTION_KEY (Kaspi Pay
 // Cashier's) -- one secret per integration, so rotating or losing one never
-// affects the other.
-function getKey(): string {
+// affects the other. Exported so other Kaspi Shop modules (e.g. checkCycle's
+// session-cookie decryption) reuse the same key instead of re-deriving it.
+export function getKey(): string {
   const key = process.env.KASPI_SHOP_ENCRYPTION_KEY
   if (!key) throw new Error('KASPI_SHOP_ENCRYPTION_KEY is not configured')
   return key
