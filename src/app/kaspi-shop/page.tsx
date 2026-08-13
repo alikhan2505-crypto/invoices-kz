@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import LoadingSpinner from '@/components/LoadingSpinner'
+import KaspiShopSidebar from '@/components/kaspiShop/Sidebar'
 
 type Product = {
   id: string
@@ -274,33 +275,9 @@ export default function KaspiShop() {
   const atFloorCount = products.filter(p => p.own_current_price <= p.floor_price + 0.01).length
   const activeCount = products.filter(p => p.enabled).length
 
-  const soonItems = ['Заказы', 'Финансы', 'Каталог НКТ', 'Ниши', 'Предзаказ']
-
   return (
     <main className="min-h-screen bg-[#F6F6FB] lg:flex">
-      {/* Own sidebar for this section -- same floating-card language as the
-          rest of invoices.kz (AppNav), but scoped to Kaspi Shop's own
-          sections so this reads as a real sub-cabinet, not one lonely page. */}
-      <aside className="lg:w-[220px] lg:flex-shrink-0 lg:p-4">
-        <div className="lg:sticky lg:top-4 bg-white lg:rounded-[28px] lg:shadow-2xl lg:ring-1 lg:ring-black/5 px-4 py-4 lg:py-6">
-          <div className="flex items-center gap-2 mb-1 lg:mb-6">
-            <button onClick={() => router.push('/dashboard')} className="text-gray-400 text-xl leading-none" aria-label="Назад">‹</button>
-            <div>
-              <div className="text-[10px] font-semibold tracking-wider text-gray-400 uppercase">Kaspi</div>
-              <div className="text-sm font-extrabold text-[#1C2056] -mt-0.5">Магазин</div>
-            </div>
-          </div>
-          <nav className="hidden lg:flex flex-col gap-1">
-            <div className="rounded-xl bg-[#1C2056] text-white text-sm font-medium px-3 py-2.5">Демпинг</div>
-            {soonItems.map(item => (
-              <div key={item} className="flex items-center justify-between rounded-xl text-sm text-gray-300 px-3 py-2.5 select-none">
-                <span>{item}</span>
-                <span className="text-[9px] font-semibold tracking-wide bg-gray-100 text-gray-400 rounded-full px-1.5 py-0.5">СКОРО</span>
-              </div>
-            ))}
-          </nav>
-        </div>
-      </aside>
+      <KaspiShopSidebar active="demping" />
 
       <div className="flex-1 min-w-0 p-4 lg:p-6 pb-24 lg:pb-6">
         {loadError && (
