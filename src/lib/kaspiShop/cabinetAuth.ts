@@ -10,18 +10,12 @@
 //   POST https://idmc.shop.kaspi.kz/api/p/login  { "_ph": "{phone}" }   -> sends SMS
 //   POST https://idmc.shop.kaspi.kz/api/p/login  { "_c": "{code}" }     -> { redirectUrl: "/" }
 //
-// UNVERIFIED PIECE: what was captured stops at the { redirectUrl: "/" }
-// response -- the browser then does a full-page cross-origin navigation to
-// kaspi.kz/mc/, which is where mc-session/mc-sid (the cookies every later
-// cabinet API call actually needs) get set, and that hop was never directly
-// observed (a full page navigation isn't visible to the XHR/fetch
-// interceptor technique that caught everything else). This module's best
-// reconstruction is to carry every cookie collected so far into a GET of
-// https://kaspi.kz/mc/ and hope the backend recognizes the session by
-// value regardless of the browser's own cookie-domain scoping (which
-// wouldn't apply here anyway -- this is a server-side request, not a
-// browser one). isSessionValid() is exactly the way to confirm whether
-// that reconstruction actually works before trusting it in production.
+// The hop from { redirectUrl: "/" } to mc-session/mc-sid was live-traced via
+// the browser's own network log 2026-08-13 (see MC_URL's comment below for
+// the confirmed OAuth2 Authorization Code + PKCE chain) after an earlier
+// guess-based reconstruction (a single GET of kaspi.kz/mc/) failed live
+// twice. isSessionValid() remains the way to confirm a session actually
+// works before trusting it in production.
 
 type CookieJar = Map<string, string>
 
@@ -70,7 +64,23 @@ export type LoginResult =
 
 const IDMC_BASE = 'https://idmc.shop.kaspi.kz'
 const LOGIN_URL = `${IDMC_BASE}/api/p/login`
-const MC_URL = 'https://kaspi.kz/mc/'
+// Live-traced 2026-08-13 (real network capture, not a guess this time): after
+// OTP success the real app does NOT navigate straight to kaspi.kz/mc/ -- it
+// kicks off a full OAuth2 Authorization Code + PKCE flow:
+//   GET https://mc.shop.kaspi.kz/oauth2/authorization/1?redirectUrl=... [302]
+//   -> GET https://idmc.shop.kaspi.kz/oauth2/authorize?...&code_challenge=...&code_challenge_method=S256 [302]
+//      (idmc silently approves via its own already-logged-in session -- SSO,
+//      no re-prompt -- and redirects back with an authorization code)
+//   -> GET https://mc.shop.kaspi.kz/login/oauth2/code/1?code=...&state=... [302]
+//      (mc's backend exchanges the code server-side against idmc's token
+//      endpoint -- invisible to us -- and THIS is the hop that actually sets
+//      mc-session/mc-sid via Set-Cookie)
+//   -> GET https://kaspi.kz/mc/ [now authenticated]
+// The previous version of this module started the walk at kaspi.kz/mc/
+// directly and never triggered this chain at all, which is why it
+// consistently failed live. Starting at the real OAuth kickoff URL is what
+// the walk-the-redirect-chain logic below was actually missing.
+const MC_URL = 'https://mc.shop.kaspi.kz/oauth2/authorization/1?redirectUrl=' + encodeURIComponent('https://kaspi.kz/mc/')
 
 export async function startPhoneLogin(phone: string): Promise<LoginResult> {
   const jar: CookieJar = new Map()
@@ -130,15 +140,10 @@ export async function submitOtp(otpToken: string, code: string): Promise<LoginRe
   }
   mergeJar(jar, parseSetCookies(res))
 
-  // Follow the SPA's own next step: a GET of kaspi.kz/mc/ carrying
-  // everything collected so far. Confirmed live 2026-08-13 that a single
-  // request here is NOT enough -- the real browser flow is a redirect
-  // chain, and fetch()'s automatic redirect-following hides every
-  // intermediate response's Set-Cookie header from us (a real Fetch API
-  // limitation, not a bug we can work around by reading res.headers after
-  // the fact). So this walks the chain by hand, merging cookies at each
-  // hop, since the session may be minted partway through rather than on
-  // the first or last response.
+  // Walk the real OAuth2 redirect chain by hand (see MC_URL's comment) --
+  // fetch()'s automatic redirect-following would hide every intermediate
+  // response's Set-Cookie header, and mc-session/mc-sid are minted partway
+  // through (the login/oauth2/code/1 hop), not on the first or last one.
   let nextUrl = MC_URL
   for (let hop = 0; hop < 10; hop++) {
     if (!isTrustedKaspiHost(nextUrl)) {

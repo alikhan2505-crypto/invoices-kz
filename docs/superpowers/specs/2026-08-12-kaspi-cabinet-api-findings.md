@@ -90,9 +90,34 @@ Response body:
 ```json
 { "redirectUrl": "/" }
 ```
-The frontend then does a full navigation to `https://kaspi.kz/mc/` (client-side, not an HTTP redirect from this response) using the `redirectUrl` value. No separate password/PIN step exists for phone-based login -- phone + SMS code is the complete flow. Successful verification lands on `kaspi.kz/mc` fully authenticated with `mc-session`/`mc-sid` cookies (matching the original 2026-08-12 read-only trace).
+No separate password/PIN step exists for phone-based login -- phone + SMS code is the complete flow.
 
 Three real SMS codes were spent across this session getting to this confirmed result (two lost to the navigation/log-reset problem, one spent proving the `fetch` patch didn't work before the `XMLHttpRequest` version succeeded on the fourth attempt) -- the account owner's active, repeated participation is the only reason this is fully documented now.
+
+## Login step 3: `redirectUrl` to authenticated session (CONFIRMED, 2026-08-13, second live session)
+
+The `2026-08-12` capture stopped at `{ "redirectUrl": "/" }` and assumed the frontend then just navigates to `https://kaspi.kz/mc/` directly. **That assumption was wrong** -- a reconstruction built on it (a single GET of `kaspi.kz/mc/` carrying all collected cookies) failed live twice (real SMS codes spent both times), always with the same result: Kaspi accepted the login, but `mc-session`/`mc-sid` never appeared.
+
+The real mechanism, captured via `list_network_requests` right after landing on `kaspi.kz/mc/` in a real browser (its "Redirect chain" view on the final `GET kaspi.kz/mc/` request shows every hop): a full **OAuth2 Authorization Code + PKCE** flow between `mc.shop.kaspi.kz` (the relying party) and `idmc.shop.kaspi.kz` (the authorization server), using idmc's already-authenticated session for silent SSO (no re-prompt):
+
+```
+GET https://mc.shop.kaspi.kz/oauth2/authorization/1?redirectUrl=https%3A%2F%2Fkaspi.kz%2Fmc%2F        [302]
+ -> GET https://idmc.shop.kaspi.kz/oauth2/authorize?response_type=code&client_id={clientId}
+        &scope=openid&state={state}&redirect_uri=https://mc.shop.kaspi.kz/login/oauth2/code/1
+        &nonce={nonce}&code_challenge={challenge}&code_challenge_method=S256                          [302]
+    (idmc recognizes the caller as already logged in from step 1/2 above and
+    silently issues an authorization code -- no login page shown)
+ -> GET https://mc.shop.kaspi.kz/login/oauth2/code/1?code={code}&state={state}                        [302]
+    (mc's backend exchanges the code for a token against idmc server-to-server
+    -- invisible to the browser -- and THIS is the hop that sets mc-session/
+    mc-sid via Set-Cookie; matches Spring Security's default OAuth2 login
+    callback path shape, /login/oauth2/code/{registrationId})
+ -> GET https://kaspi.kz/mc/                                                                          [now authenticated]
+```
+
+`client_id` observed live: `da68118c-9671-4cb5-8c9e-c08785ad204b` (may or may not be stable/reusable -- treat as informational, not hardcode-worthy, since the flow discovers it fresh via the redirect chain each time regardless).
+
+Implication for `cabinetAuth.ts`: the redirect-chain walk must start at `https://mc.shop.kaspi.kz/oauth2/authorization/1?redirectUrl=https%3A%2F%2Fkaspi.kz%2Fmc%2F`, not at `kaspi.kz/mc/` directly -- starting at `kaspi.kz/mc/` never triggers this chain at all (it's a static SPA shell, not what redirects). Fixed 2026-08-13.
 
 ## Account state note (2026-08-12)
 
