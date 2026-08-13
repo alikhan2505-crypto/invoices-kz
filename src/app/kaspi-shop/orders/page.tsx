@@ -1,10 +1,14 @@
 'use client'
 import { useState, useEffect, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
+import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import LoadingSpinner from '@/components/LoadingSpinner'
 import KaspiShopSidebar from '@/components/kaspiShop/Sidebar'
 import { ORDER_STATUS_TABS, TRANSFER_STATUS } from '@/lib/kaspiShop/orderStatuses'
+
+const EASE = [0.16, 1, 0.3, 1] as const
 
 type Order = {
   code: string
@@ -13,6 +17,7 @@ type Order = {
   customerLastName: string
   totalPrice: number
   creationTime: string
+  items: { code: string; name: string; imageUrl: string | null; quantity: number }[]
 }
 
 function KaspiShopOrdersInner() {
@@ -176,19 +181,35 @@ function KaspiShopOrdersInner() {
           </div>
         ) : (
           <div className="space-y-2">
-            {orders.map(o => (
-              <div key={o.code} className="bg-white rounded-2xl shadow-sm p-4 flex items-center gap-3">
-                {status === TRANSFER_STATUS && (
-                  <input type="checkbox" checked={selected.has(o.code)} onChange={() => toggleSelected(o.code)}
-                    className="accent-[#2DC48D] w-4 h-4 flex-shrink-0" />
-                )}
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-semibold text-gray-800 truncate">№ {o.code} · {o.customerFirstName} {o.customerLastName}</div>
-                  <div className="text-[11px] text-gray-400">{o.creationTime}</div>
-                </div>
-                <span className="font-mono font-bold text-sm text-[#1C2056] tabular-nums flex-shrink-0">{o.totalPrice.toLocaleString('ru-KZ')} ₸</span>
-              </div>
-            ))}
+            {orders.map((o, i) => {
+              const firstItem = o.items[0]
+              const extraCount = o.items.length - 1
+              return (
+                <motion.div key={o.code} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, ease: EASE, delay: Math.min(i * 0.03, 0.3) }}>
+                  <Link href={`/kaspi-shop/orders/${o.code}`}
+                    className="bg-white rounded-2xl shadow-sm p-3 flex items-center gap-3 hover:shadow-md hover:-translate-y-0.5 transition-all">
+                    {status === TRANSFER_STATUS && (
+                      <input type="checkbox" checked={selected.has(o.code)} onClick={e => e.stopPropagation()}
+                        onChange={() => toggleSelected(o.code)} className="accent-[#2DC48D] w-4 h-4 flex-shrink-0" />
+                    )}
+                    {firstItem?.imageUrl ? (
+                      <img src={firstItem.imageUrl} alt={firstItem.name} className="w-14 h-14 rounded-xl object-cover flex-shrink-0 bg-gray-100" />
+                    ) : (
+                      <div className="w-14 h-14 rounded-xl bg-gray-100 flex-shrink-0" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-semibold text-gray-800 truncate">
+                        {firstItem?.name || `Заказ №${o.code}`}
+                        {extraCount > 0 && <span className="text-gray-400 font-normal"> +{extraCount}</span>}
+                      </div>
+                      <div className="text-[11px] text-gray-400">{o.customerFirstName} {o.customerLastName} · {new Date(o.creationTime).toLocaleDateString('ru-KZ')}</div>
+                    </div>
+                    <span className="font-mono font-bold text-sm text-[#1C2056] tabular-nums flex-shrink-0">{o.totalPrice.toLocaleString('ru-KZ')} ₸</span>
+                  </Link>
+                </motion.div>
+              )
+            })}
           </div>
         )}
 
