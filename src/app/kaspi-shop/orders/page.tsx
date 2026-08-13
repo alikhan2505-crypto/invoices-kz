@@ -1,9 +1,10 @@
 'use client'
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import LoadingSpinner from '@/components/LoadingSpinner'
 import KaspiShopSidebar from '@/components/kaspiShop/Sidebar'
+import { ORDER_STATUS_TABS, TRANSFER_STATUS } from '@/lib/kaspiShop/orderStatuses'
 
 type Order = {
   code: string
@@ -14,37 +15,21 @@ type Order = {
   creationTime: string
 }
 
-// Real status codes, read off the cabinet's own sidebar nav links (see
-// docs/superpowers/specs/2026-08-13-kaspi-orders-api-findings.md, section
-// 4). Возвраты is a separate query family (refunds, not orders) per the
-// same findings doc -- out of scope here, not wired up as a dead tab.
-const STATUS_TABS: { label: string; value: string }[] = [
-  { label: 'Новые', value: 'NEW' },
-  { label: 'На подписании', value: 'SIGN_REQUIRED' },
-  { label: 'Самовывоз', value: 'PICKUP' },
-  { label: 'Моя доставка', value: 'DELIVERY' },
-  { label: 'Предзаказ', value: 'KASPI_DELIVERY_WAIT_FOR_POINT_DELIVERY' },
-  { label: 'Упаковка', value: 'KASPI_DELIVERY_CARGO_ASSEMBLY' },
-  { label: 'Передача', value: 'KASPI_DELIVERY_WAIT_FOR_COURIER' },
-  { label: 'Переданы на доставку', value: 'KASPI_DELIVERY_TRANSMITTED' },
-  { label: 'Отменены при доставке', value: 'KASPI_DELIVERY_RETURN_REQUEST' },
-  { label: 'Архив', value: 'ARCHIVED' },
-]
-
-const TRANSFER_STATUS = 'KASPI_DELIVERY_WAIT_FOR_COURIER'
-
-export default function KaspiShopOrders() {
+function KaspiShopOrdersInner() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const status = searchParams.get('status') || ORDER_STATUS_TABS[0].value
+
   const [loading, setLoading] = useState(true)
-  const [status, setStatus] = useState(STATUS_TABS[0].value)
   const [orders, setOrders] = useState<Order[]>([])
+  const [counts, setCounts] = useState<Record<string, number>>({})
   const [ordersLoading, setOrdersLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [printing, setPrinting] = useState(false)
 
   useEffect(() => { checkAccess() }, [])
-  useEffect(() => { if (!loading) loadOrders(status) }, [status, loading])
+  useEffect(() => { if (!loading) { loadOrders(status); loadCounts() } }, [status, loading])
 
   async function authHeader() {
     const { data: { session } } = await supabase.auth.getSession()
@@ -74,6 +59,19 @@ export default function KaspiShopOrders() {
       setOrders([])
     } finally {
       setOrdersLoading(false)
+    }
+  }
+
+  async function loadCounts() {
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/kaspi-shop/orders/counters', { headers })
+      if (!res.ok) return
+      const data = await res.json()
+      setCounts(data.counts || {})
+    } catch {
+      // Badge counts are a nice-to-have -- a failure here shouldn't block
+      // the order list itself from showing.
     }
   }
 
@@ -116,7 +114,7 @@ export default function KaspiShopOrders() {
 
   return (
     <main className="min-h-screen bg-[#F6F6FB] lg:flex">
-      <KaspiShopSidebar active="orders" />
+      <KaspiShopSidebar active="orders" orderStatus={status} orderCounts={counts} />
 
       <div className="flex-1 min-w-0 p-4 lg:p-6 pb-24 lg:pb-6">
         <h1 className="text-2xl font-extrabold text-[#1C2056] mb-4">Заказы</h1>
@@ -128,11 +126,14 @@ export default function KaspiShopOrders() {
           </div>
         )}
 
-        <div className="flex gap-2 overflow-x-auto pb-2 mb-4">
-          {STATUS_TABS.map(tab => (
-            <button key={tab.value} onClick={() => setStatus(tab.value)}
+        {/* Desktop switches status from the sidebar's own nested subnav
+            (matches the real Kaspi cabinet's left-hand layout); mobile has
+            no sidebar at all, so it keeps a horizontal tab strip here. */}
+        <div className="lg:hidden flex gap-2 overflow-x-auto pb-2 mb-4">
+          {ORDER_STATUS_TABS.map(tab => (
+            <button key={tab.value} onClick={() => router.push(`/kaspi-shop/orders?status=${tab.value}`)}
               className={`flex-shrink-0 rounded-full px-3 py-1.5 text-xs font-medium whitespace-nowrap ${status === tab.value ? 'bg-[#1C2056] text-white' : 'bg-white text-gray-500'}`}>
-              {tab.label}
+              {tab.label}{!!counts[tab.value] && ` ${counts[tab.value]}`}
             </button>
           ))}
         </div>
@@ -176,5 +177,13 @@ export default function KaspiShopOrders() {
         <div className="text-xs font-semibold text-[#1C2056]">Заказы</div>
       </div>
     </main>
+  )
+}
+
+export default function KaspiShopOrders() {
+  return (
+    <Suspense fallback={<LoadingSpinner />}>
+      <KaspiShopOrdersInner />
+    </Suspense>
   )
 }

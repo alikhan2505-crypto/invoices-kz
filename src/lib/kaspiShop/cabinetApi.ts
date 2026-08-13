@@ -140,6 +140,36 @@ fragment OrdersPageFragment on Order {
   status
 }`
 
+// Real shape confirmed live 2026-08-13 -- the badge counts shown next to
+// each status tab in the cabinet's own sidebar (e.g. "Упаковка 2"). Cheaper
+// than fetching every status's full order list just to show counts.
+export type OrderCounts = Record<string, number>
+
+const GET_ORDER_COUNTERS_QUERY = `query getOrderCounters($merchantUid: String!) {
+  merchant(id: $merchantUid) {
+    orders { counts { tab count } }
+  }
+}`
+
+export async function getOrderCounters(sessionCookies: string, merchantId: string): Promise<OrderCounts> {
+  const res = await fetch('https://mc.shop.kaspi.kz/mc/facade/graphql?opName=getOrderCounters', {
+    method: 'POST',
+    headers: authHeaders(sessionCookies),
+    body: JSON.stringify({
+      operationName: 'getOrderCounters',
+      variables: { merchantUid: merchantId },
+      query: GET_ORDER_COUNTERS_QUERY,
+    }),
+  })
+  if (!res.ok) return {}
+  const json = await res.json().catch(() => null)
+  const counts = json?.data?.merchant?.orders?.counts
+  if (!Array.isArray(counts)) return {}
+  const result: OrderCounts = {}
+  for (const c of counts) result[c.tab] = c.count
+  return result
+}
+
 export async function listOrders(sessionCookies: string, merchantId: string, status: string): Promise<Order[]> {
   const res = await fetch('https://mc.shop.kaspi.kz/mc/facade/graphql?opName=getOrders', {
     method: 'POST',

@@ -1,13 +1,21 @@
 'use client'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { ORDER_STATUS_TABS } from '@/lib/kaspiShop/orderStatuses'
 
-const SOON_ITEMS = ['Финансы', 'Каталог НКТ', 'Ниши', 'Предзаказ']
+const SOON_ITEMS = ['Финансы', 'Каталог НКТ', 'Ниши']
 
 // Shared across every Kaspi Shop sub-page -- same floating-card language as
 // the rest of invoices.kz (AppNav), scoped to Kaspi Shop's own sections so
-// this reads as a real sub-cabinet, not one lonely page.
-export default function KaspiShopSidebar({ active }: { active: 'demping' | 'orders' }) {
+// this reads as a real sub-cabinet, not one lonely page. When active is
+// "orders", nests the real status list under "Заказы" (desktop only --
+// same pattern as the real Kaspi cabinet's own left-hand nav), matching
+// orderStatus/orderCounts passed down from the orders page.
+export default function KaspiShopSidebar({ active, orderStatus, orderCounts }: {
+  active: 'demping' | 'orders'
+  orderStatus?: string
+  orderCounts?: Record<string, number>
+}) {
   const router = useRouter()
 
   return (
@@ -29,6 +37,21 @@ export default function KaspiShopSidebar({ active }: { active: 'demping' | 'orde
             className={`rounded-xl text-sm font-medium px-3 py-2.5 ${active === 'orders' ? 'bg-[#1C2056] text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
             Заказы
           </Link>
+          {active === 'orders' && (
+            <div className="ml-2 pl-3 border-l border-gray-100 flex flex-col gap-0.5 mb-1">
+              {ORDER_STATUS_TABS.map(tab => {
+                const count = orderCounts?.[tab.value]
+                const isActive = orderStatus === tab.value
+                return (
+                  <Link key={tab.value} href={`/kaspi-shop/orders?status=${tab.value}`}
+                    className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs ${isActive ? 'bg-[#1C2056]/5 text-[#1C2056] font-semibold' : 'text-gray-500 hover:bg-gray-50'}`}>
+                    <span>{tab.label}</span>
+                    {!!count && <span className="text-[10px] text-gray-400 tabular-nums">{count}</span>}
+                  </Link>
+                )
+              })}
+            </div>
+          )}
           {SOON_ITEMS.map(item => (
             <div key={item} className="flex items-center justify-between rounded-xl text-sm text-gray-300 px-3 py-2.5 select-none">
               <span>{item}</span>
