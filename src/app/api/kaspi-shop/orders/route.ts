@@ -21,12 +21,13 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const status = req.nextUrl.searchParams.get('status') || 'NEW'
+  const page = Number(req.nextUrl.searchParams.get('page')) || 0
 
   const connection = await loadConnection(user.id)
   if (!connection || !connection.sessionCookies) {
     return NextResponse.json({ error: 'Кабинет не подключён — подключите его через Kaspi Магазин' }, { status: 400 })
   }
 
-  const orders = await listOrders(connection.sessionCookies, connection.merchantId, status)
-  return NextResponse.json({ orders })
+  const { orders, total } = await listOrders(connection.sessionCookies, connection.merchantId, status, page)
+  return NextResponse.json({ orders, total })
 }

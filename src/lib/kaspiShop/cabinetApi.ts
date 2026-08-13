@@ -170,7 +170,17 @@ export async function getOrderCounters(sessionCookies: string, merchantId: strin
   return result
 }
 
-export async function listOrders(sessionCookies: string, merchantId: string, status: string): Promise<Order[]> {
+export type OrdersPage = { orders: Order[]; total: number }
+
+// size MUST stay at 10 -- confirmed live 2026-08-13: the real cabinet's own
+// SPA always requests size:10, and requesting size:50 (an earlier,
+// unconfirmed guess) got a GraphQL "Bad Request" error back from Kaspi's
+// backend for at least one status (KASPI_DELIVERY_CARGO_ASSEMBLY), even
+// though the same shape with size:10 succeeds. Pagination (page) exists
+// because of this limit -- any status with more than 10 orders needs it.
+const PAGE_SIZE = 10
+
+export async function listOrders(sessionCookies: string, merchantId: string, status: string, page = 0): Promise<OrdersPage> {
   const res = await fetch('https://mc.shop.kaspi.kz/mc/facade/graphql?opName=getOrders', {
     method: 'POST',
     headers: authHeaders(sessionCookies),
@@ -178,8 +188,8 @@ export async function listOrders(sessionCookies: string, merchantId: string, sta
       operationName: 'getOrders',
       variables: {
         merchantUid: merchantId,
-        size: 50,
-        page: 0,
+        size: PAGE_SIZE,
+        page,
         input: { presetFilter: status, orderCode: '', cityId: '' },
         advancedInput: { orderCode: '', phoneNumber: '', productCode: '' },
         withAdvancedOrders: false,
@@ -187,19 +197,23 @@ export async function listOrders(sessionCookies: string, merchantId: string, sta
       query: GET_ORDERS_QUERY,
     }),
   })
-  if (!res.ok) return []
+  if (!res.ok) return { orders: [], total: 0 }
   const json = await res.json().catch(() => null)
-  const orders = json?.data?.merchant?.orders?.orders?.orders
+  const page_ = json?.data?.merchant?.orders?.orders
+  const orders = page_?.orders
   if (!Array.isArray(orders)) {
     console.error('kaspi-shop listOrders: unexpected response shape for status', status, JSON.stringify(json)?.slice(0, 2000))
-    return []
+    return { orders: [], total: 0 }
   }
-  return orders.map((o: any) => ({
-    code: o.code,
-    status: o.status,
-    customerFirstName: o.customer?.firstName ?? '',
-    customerLastName: o.customer?.lastName ?? '',
-    totalPrice: Number(o.totalPrice) || 0,
-    creationTime: o.creationTime,
-  }))
+  return {
+    total: Number(page_.total) || 0,
+    orders: orders.map((o: any) => ({
+      code: o.code,
+      status: o.status,
+      customerFirstName: o.customer?.firstName ?? '',
+      customerLastName: o.customer?.lastName ?? '',
+      totalPrice: Number(o.totalPrice) || 0,
+      creationTime: o.creationTime,
+    })),
+  }
 }

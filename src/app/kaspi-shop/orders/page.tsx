@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import LoadingSpinner from '@/components/LoadingSpinner'
@@ -22,14 +22,32 @@ function KaspiShopOrdersInner() {
 
   const [loading, setLoading] = useState(true)
   const [orders, setOrders] = useState<Order[]>([])
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(0)
   const [counts, setCounts] = useState<Record<string, number>>({})
   const [ordersLoading, setOrdersLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [printing, setPrinting] = useState(false)
 
+  const PAGE_SIZE = 10
+  const prevStatus = useRef(status)
+
   useEffect(() => { checkAccess() }, [])
-  useEffect(() => { if (!loading) { loadOrders(status); loadCounts() } }, [status, loading])
+  useEffect(() => {
+    if (loading) return
+    // A status switch resets to page 0 -- skip this render's fetch (it'd
+    // use the stale page from the previous status) and let the resulting
+    // setPage(0) re-trigger this effect with the right value instead.
+    if (prevStatus.current !== status) {
+      prevStatus.current = status
+      setPage(0)
+      if (page === 0) { loadOrders(status, 0); loadCounts() }
+      return
+    }
+    loadOrders(status, page)
+    loadCounts()
+  }, [status, page, loading])
 
   async function authHeader() {
     const { data: { session } } = await supabase.auth.getSession()
@@ -44,19 +62,21 @@ function KaspiShopOrdersInner() {
     setLoading(false)
   }
 
-  async function loadOrders(forStatus: string) {
+  async function loadOrders(forStatus: string, forPage: number) {
     setOrdersLoading(true)
     setLoadError('')
     setSelected(new Set())
     try {
       const headers = await authHeader()
-      const res = await fetch(`/api/kaspi-shop/orders?status=${encodeURIComponent(forStatus)}`, { headers })
+      const res = await fetch(`/api/kaspi-shop/orders?status=${encodeURIComponent(forStatus)}&page=${forPage}`, { headers })
       const data = await res.json()
-      if (!res.ok) { setLoadError(data.error || 'Не удалось загрузить заказы'); setOrders([]); return }
+      if (!res.ok) { setLoadError(data.error || 'Не удалось загрузить заказы'); setOrders([]); setTotal(0); return }
       setOrders(data.orders || [])
+      setTotal(data.total || 0)
     } catch (e: any) {
       setLoadError('Не удалось загрузить заказы. Проверьте соединение и попробуйте ещё раз.')
       setOrders([])
+      setTotal(0)
     } finally {
       setOrdersLoading(false)
     }
@@ -122,7 +142,7 @@ function KaspiShopOrdersInner() {
         {loadError && (
           <div className="bg-red-50 rounded-2xl p-4 flex items-center justify-between gap-3 mb-4">
             <span className="text-sm text-red-600">{loadError}</span>
-            <button onClick={() => loadOrders(status)} className="text-xs bg-red-500 text-white rounded-lg px-3 py-1.5 flex-shrink-0">Повторить</button>
+            <button onClick={() => loadOrders(status, page)} className="text-xs bg-red-500 text-white rounded-lg px-3 py-1.5 flex-shrink-0">Повторить</button>
           </div>
         )}
 
@@ -169,6 +189,18 @@ function KaspiShopOrdersInner() {
                 <span className="font-mono font-bold text-sm text-[#1C2056] tabular-nums flex-shrink-0">{o.totalPrice.toLocaleString('ru-KZ')} ₸</span>
               </div>
             ))}
+          </div>
+        )}
+
+        {total > PAGE_SIZE && (
+          <div className="flex items-center justify-between mt-4">
+            <span className="text-xs text-gray-400">{page * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE + orders.length, total)} из {total}</span>
+            <div className="flex gap-2">
+              <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}
+                className="text-xs font-medium bg-white text-[#1C2056] rounded-lg px-3 py-1.5 disabled:opacity-40 shadow-sm">Назад</button>
+              <button onClick={() => setPage(p => p + 1)} disabled={page * PAGE_SIZE + orders.length >= total}
+                className="text-xs font-medium bg-white text-[#1C2056] rounded-lg px-3 py-1.5 disabled:opacity-40 shadow-sm">Дальше</button>
+            </div>
           </div>
         )}
       </div>
