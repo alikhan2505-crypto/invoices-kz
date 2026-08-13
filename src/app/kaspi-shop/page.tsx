@@ -327,9 +327,9 @@ export default function KaspiShop() {
 
             {!otpToken ? (
               <div className="flex flex-col gap-2 max-w-sm">
-                <input className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-sm placeholder:text-white/30 outline-none focus:border-white/30"
+                <input className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/30 outline-none focus:border-white/30"
                   placeholder="Телефон (как при входе в Kaspi)" value={phone} onChange={e => setPhone(e.target.value)} />
-                <input className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-sm placeholder:text-white/30 outline-none focus:border-white/30"
+                <input className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/30 outline-none focus:border-white/30"
                   placeholder="ID продавца" value={merchantId} onChange={e => setMerchantId(e.target.value)} />
                 <button onClick={startConnect} disabled={connecting}
                   className="mt-1 bg-white text-[#12142E] rounded-xl py-3 text-sm font-semibold disabled:opacity-50">
@@ -339,7 +339,7 @@ export default function KaspiShop() {
             ) : (
               <div className="flex flex-col gap-2 max-w-sm">
                 <div className="text-xs text-white/40 mb-1">Код из SMS отправлен на {phone}</div>
-                <input className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-sm placeholder:text-white/30 outline-none focus:border-white/30 font-mono tracking-widest"
+                <input className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/30 outline-none focus:border-white/30 font-mono tracking-widest"
                   placeholder="000000" value={otpCode} onChange={e => setOtpCode(e.target.value)} />
                 <button onClick={completeConnect} disabled={connecting}
                   className="mt-1 bg-white text-[#12142E] rounded-xl py-3 text-sm font-semibold disabled:opacity-50">
