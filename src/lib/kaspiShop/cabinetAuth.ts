@@ -49,6 +49,20 @@ function mergeJar(into: CookieJar, from: CookieJar) {
   for (const [k, v] of from) into.set(k, v)
 }
 
+// jar is a flat, unscoped cookie map (unlike a browser's per-domain jar), so
+// nothing stops us from attaching it to whatever host a redirect happens to
+// point at. Kaspi's own redirect chain should never leave kaspi.kz, so this
+// is a belt-and-suspenders check against ever sending session cookies to an
+// unexpected host if a hop's Location header is malformed or points off-site.
+function isTrustedKaspiHost(url: string): boolean {
+  try {
+    const host = new URL(url).hostname
+    return host === 'kaspi.kz' || host.endsWith('.kaspi.kz')
+  } catch {
+    return false
+  }
+}
+
 export type LoginResult =
   | { status: 'otp_required'; otpToken: string }
   | { status: 'success'; sessionCookies: string }
@@ -127,6 +141,9 @@ export async function submitOtp(otpToken: string, code: string): Promise<LoginRe
   // the first or last response.
   let nextUrl = MC_URL
   for (let hop = 0; hop < 10; hop++) {
+    if (!isTrustedKaspiHost(nextUrl)) {
+      return { status: 'error', message: `redirect chain left kaspi.kz (${nextUrl}) -- aborted` }
+    }
     let hopRes: Response
     try {
       hopRes = await fetch(nextUrl, { headers: { cookie: cookieHeader(jar) }, redirect: 'manual' })
