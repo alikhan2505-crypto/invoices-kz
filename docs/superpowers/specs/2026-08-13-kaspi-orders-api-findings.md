@@ -44,7 +44,13 @@ Response body (this test account, "Новые" tab, genuinely empty):
 ```json
 {"data":{"merchant":{"id":"30067228","orders":{"orders":{"total":0,"orders":[],"__typename":"OrdersPage"},"__typename":"Orders"},"__typename":"Merchant"}}}
 ```
-No real order objects were observed this session (see section 5) -- the `OrdersPageFragment` field list above is authoritative for *shape*, but no live example of a populated `Order` object exists yet. Treat field names as confirmed, actual value formats (e.g. `creationTime`'s exact string format, `status`'s exact enum values beyond the tab codes) as unconfirmed until a real order is seen.
+**UPDATE 2026-08-13 (second capture, real seller account with real orders, merchant 425002):** a populated response was observed. Confirms the field shape above, plus one important correction:
+
+- **`status` (the field on each `Order`) uses a DIFFERENT vocabulary than `presetFilter` (the query's status filter/the tab codes)**. A real order fetched via `presetFilter: "KASPI_DELIVERY_TRANSMITTED"` (Переданы на доставку tab) came back with `"status": "TRANSMITTED"`, not `"KASPI_DELIVERY_TRANSMITTED"`. Do not assume `order.status === presetFilter` -- the tab/filter codes (section 4's table) are a request-side concept only; the response's `status` field is a separate, shorter enum (`TRANSMITTED` observed so far, others unconfirmed). Any UI that displays or branches on `order.status` must not compare it against the tab codes.
+- `creationTime`/`modificationTime` are ISO 8601 UTC strings with milliseconds (e.g. `2026-08-12T14:24:27.379Z`).
+- `customer.lastName` in real data is already truncated to an initial by Kaspi itself (e.g. a surname rendered as a single letter) -- this is Kaspi's own privacy behavior in this API, not something we need to redact ourselves.
+- `entries[].product`/`merchantProduct` carry real product identifiers (`code`, `name`) matching the same catalog `code`/`sku` space as `listCatalog`.
+- `markers[]` is a real order-history/audit-log array (`APPROVED_BY_BANK`, `ACCEPTED_BY_MERCHANT`, `CARGO_ASSEMBLED`, courier handoff, etc., each with a timestamp and acting user) -- a richer timeline than currently modeled in `listOrders`'s trimmed `Order` type; a future enhancement, not needed for v1's read-only list.
 
 ## 3. Order status counts (CONFIRMED, bonus capture)
 
