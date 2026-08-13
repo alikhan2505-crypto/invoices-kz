@@ -20,6 +20,16 @@ type Product = {
   enabled: boolean
   last_checked_at: string | null
   last_competitor_price: number | null
+  demping_strategy: string
+  excluded_city_codes: string[]
+  excluded_merchant_ids: string[]
+}
+
+const STRATEGY_LABELS: Record<string, string> = {
+  undercut_leader: 'Быть 1-м (подрезать конкурента)',
+  match_leader: 'Цена лидера',
+  stay_above_leader: 'Держаться над лидером',
+  be_second: 'Быть 2-м',
 }
 
 export default function KaspiShop() {
@@ -28,25 +38,28 @@ export default function KaspiShop() {
   const [loadError, setLoadError] = useState('')
   const [connected, setConnected] = useState(false)
   const [paused, setPaused] = useState(false)
+  const [sessionStatus, setSessionStatus] = useState<string | null>(null)
+  const [companyName, setCompanyName] = useState<string | null>(null)
   const [balance, setBalance] = useState(0)
   const [products, setProducts] = useState<Product[]>([])
 
-  const [apiToken, setApiToken] = useState('')
+  // Connect flow: phone + merchantId -> OTP code, matching the real
+  // idmc.shop.kaspi.kz login (confirmed live 2026-08-13 -- phone + SMS
+  // code only, no separate password for this login method).
+  const [phone, setPhone] = useState('')
   const [merchantId, setMerchantId] = useState('')
-  const [companyName, setCompanyName] = useState('')
   const [connecting, setConnecting] = useState(false)
   const [connectError, setConnectError] = useState('')
-
-  const [newProduct, setNewProduct] = useState({
-    kaspiSku: '', productName: '', brand: '', storeId: '', stockCount: '0',
-    ownCurrentPrice: '', floorPrice: '', undercutStep: '', checkFrequencyMinutes: '15',
-  })
-  const [addingProduct, setAddingProduct] = useState(false)
+  const [otpToken, setOtpToken] = useState<string | null>(null)
+  const [otpCode, setOtpCode] = useState('')
 
   const [topupAmount, setTopupAmount] = useState<number | null>(null)
   const [topupCustom, setTopupCustom] = useState('')
   const [toppingUp, setToppingUp] = useState(false)
   const [topupPending, setTopupPending] = useState<{ topup_id: string, payment_link: string } | null>(null)
+
+  const [suggestingFor, setSuggestingFor] = useState<string | null>(null)
+  const [editValues, setEditValues] = useState<Record<string, { floorPrice: string; undercutStep: string; strategy: string; excludedCities: string; excludedMerchants: string }>>({})
 
   useEffect(() => { load() }, [])
 
@@ -74,13 +87,31 @@ export default function KaspiShop() {
       ])
       if (productsRes.ok) {
         const data = await productsRes.json()
-        setProducts(data.products || [])
+        const list: Product[] = data.products || []
+        setProducts(list)
+        setEditValues(prev => {
+          const next = { ...prev }
+          for (const p of list) {
+            if (!next[p.id]) {
+              next[p.id] = {
+                floorPrice: String(p.floor_price),
+                undercutStep: String(p.undercut_step),
+                strategy: p.demping_strategy || 'undercut_leader',
+                excludedCities: (p.excluded_city_codes || []).join(', '),
+                excludedMerchants: (p.excluded_merchant_ids || []).join(', '),
+              }
+            }
+          }
+          return next
+        })
       }
       if (walletRes.ok) {
         const data = await walletRes.json()
         setBalance(data.balance ?? 0)
         setConnected(!!data.connected)
         setPaused(!!data.paused)
+        setSessionStatus(data.sessionStatus ?? null)
+        setCompanyName(data.companyName ?? null)
       }
     } catch (e: any) {
       // A rejected fetch (offline, DNS failure) throws rather than
@@ -94,23 +125,42 @@ export default function KaspiShop() {
     }
   }
 
-  async function connect() {
-    if (!apiToken || !merchantId || !companyName) return
+  async function startConnect() {
+    if (!phone || !merchantId) return
     setConnecting(true)
     setConnectError('')
     const headers = await authHeader()
     const res = await fetch('/api/kaspi-shop/connect', {
       method: 'POST', headers,
-      body: JSON.stringify({ apiToken, merchantId, companyName }),
+      body: JSON.stringify({ phone, merchantId }),
     })
     const data = await res.json()
+    setConnecting(false)
     if (!res.ok) {
       setConnectError(data.error || 'Не удалось подключиться')
-      setConnecting(false)
       return
     }
-    setConnected(true)
+    setOtpToken(data.otpToken)
+  }
+
+  async function completeConnect() {
+    if (!otpToken || !otpCode) return
+    setConnecting(true)
+    setConnectError('')
+    const headers = await authHeader()
+    const res = await fetch('/api/kaspi-shop/connect/otp', {
+      method: 'POST', headers,
+      body: JSON.stringify({ otpToken, code: otpCode, merchantId }),
+    })
+    const data = await res.json()
     setConnecting(false)
+    if (!res.ok) {
+      setConnectError(data.error || 'Не удалось подтвердить код')
+      return
+    }
+    setOtpToken(null)
+    setOtpCode('')
+    setConnected(true)
     load()
   }
 
@@ -154,25 +204,6 @@ export default function KaspiShop() {
     }, 5000)
   }
 
-  async function addProduct() {
-    const { kaspiSku, productName, brand, storeId, stockCount, ownCurrentPrice, floorPrice, undercutStep, checkFrequencyMinutes } = newProduct
-    if (!kaspiSku || !productName || !brand || !storeId || !ownCurrentPrice || !floorPrice || !undercutStep) return
-    setAddingProduct(true)
-    const headers = await authHeader()
-    await fetch('/api/kaspi-shop/products', {
-      method: 'POST', headers,
-      body: JSON.stringify({
-        kaspiSku, productName, brand, storeId,
-        stockCount: Number(stockCount), ownCurrentPrice: Number(ownCurrentPrice),
-        floorPrice: Number(floorPrice), undercutStep: Number(undercutStep),
-        checkFrequencyMinutes: Number(checkFrequencyMinutes),
-      }),
-    })
-    setNewProduct({ kaspiSku: '', productName: '', brand: '', storeId: '', stockCount: '0', ownCurrentPrice: '', floorPrice: '', undercutStep: '', checkFrequencyMinutes: '15' })
-    setAddingProduct(false)
-    load()
-  }
-
   async function toggleProduct(id: string, enabled: boolean) {
     const headers = await authHeader()
     await fetch('/api/kaspi-shop/products', { method: 'PATCH', headers, body: JSON.stringify({ id, enabled: !enabled }) })
@@ -183,6 +214,40 @@ export default function KaspiShop() {
     const headers = await authHeader()
     await fetch('/api/kaspi-shop/products', { method: 'DELETE', headers, body: JSON.stringify({ id }) })
     load()
+  }
+
+  async function saveProductSettings(id: string) {
+    const v = editValues[id]
+    if (!v) return
+    const headers = await authHeader()
+    await fetch('/api/kaspi-shop/products', {
+      method: 'PATCH', headers,
+      body: JSON.stringify({
+        id,
+        floor_price: Number(v.floorPrice),
+        undercut_step: Number(v.undercutStep),
+        demping_strategy: v.strategy,
+        excluded_city_codes: v.excludedCities.split(',').map(s => s.trim()).filter(Boolean),
+        excluded_merchant_ids: v.excludedMerchants.split(',').map(s => s.trim()).filter(Boolean),
+      }),
+    })
+    load()
+  }
+
+  async function suggestPricing(id: string) {
+    setSuggestingFor(id)
+    const headers = await authHeader()
+    const res = await fetch('/api/kaspi-shop/products/suggest-pricing', {
+      method: 'POST', headers,
+      body: JSON.stringify({ productId: id }),
+    })
+    const data = await res.json()
+    setSuggestingFor(null)
+    if (!res.ok) return
+    setEditValues(prev => ({
+      ...prev,
+      [id]: { ...prev[id], floorPrice: String(data.floorPrice), undercutStep: String(data.undercutStep) },
+    }))
   }
 
   if (loading) return <LoadingSpinner />
@@ -204,25 +269,51 @@ export default function KaspiShop() {
           </div>
         )}
 
+        {connected && sessionStatus === 'session_expired' && (
+          <div className="bg-red-50 rounded-2xl p-4 flex items-center justify-between gap-3">
+            <span className="text-sm text-red-600">Сессия кабинета Kaspi истекла — переподключитесь, чтобы демпинг продолжил работать.</span>
+            <button onClick={() => { setConnected(false); setSessionStatus(null) }} className="text-xs bg-red-500 text-white rounded-lg px-3 py-1.5 flex-shrink-0">
+              Переподключиться
+            </button>
+          </div>
+        )}
+
         {!connected ? (
           <div className="bg-white rounded-2xl shadow-sm p-4">
             <div className="text-sm font-medium text-[#1C2056] mb-1">Подключить Kaspi Магазин</div>
             <div className="text-xs text-gray-400 mb-3">
-              Токен API — в вашем кабинете продавца Kaspi: Настройки → Токен API → Сформировать.
+              ID продавца — в вашем кабинете Kaspi, в правом верхнем углу («ID - ...»). Название компании подтянется автоматически.
             </div>
             {connectError && <div className="text-xs text-red-500 mb-2">{connectError}</div>}
-            <input className="w-full border rounded-lg px-3 py-2 text-sm mb-2" placeholder="Токен API"
-              value={apiToken} onChange={e => setApiToken(e.target.value)} />
-            <input className="w-full border rounded-lg px-3 py-2 text-sm mb-2" placeholder="ID продавца (merchantId)"
-              value={merchantId} onChange={e => setMerchantId(e.target.value)} />
-            <input className="w-full border rounded-lg px-3 py-2 text-sm mb-2" placeholder="Название компании"
-              value={companyName} onChange={e => setCompanyName(e.target.value)} />
-            <button onClick={connect} disabled={connecting}
-              className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium">
-              {connecting ? 'Подключаем...' : 'Подключить'}
-            </button>
+
+            {!otpToken ? (
+              <>
+                <input className="w-full border rounded-lg px-3 py-2 text-sm mb-2" placeholder="Телефон (как при входе в Kaspi)"
+                  value={phone} onChange={e => setPhone(e.target.value)} />
+                <input className="w-full border rounded-lg px-3 py-2 text-sm mb-2" placeholder="ID продавца (merchantId)"
+                  value={merchantId} onChange={e => setMerchantId(e.target.value)} />
+                <button onClick={startConnect} disabled={connecting}
+                  className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium">
+                  {connecting ? 'Отправляем код...' : 'Продолжить'}
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="text-xs text-gray-500 mb-2">Код из SMS отправлен на {phone}</div>
+                <input className="w-full border rounded-lg px-3 py-2 text-sm mb-2" placeholder="Код из SMS"
+                  value={otpCode} onChange={e => setOtpCode(e.target.value)} />
+                <button onClick={completeConnect} disabled={connecting}
+                  className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium">
+                  {connecting ? 'Проверяем...' : 'Подтвердить'}
+                </button>
+              </>
+            )}
           </div>
         ) : null}
+
+        {connected && companyName && (
+          <div className="text-xs text-gray-400 px-1">Подключено: {companyName}</div>
+        )}
 
         <div className="bg-white rounded-2xl shadow-sm p-4">
           <div className="flex items-center justify-between mb-3">
@@ -268,51 +359,55 @@ export default function KaspiShop() {
 
         <div className="bg-white rounded-2xl shadow-sm p-4">
           <div className="text-sm font-medium text-[#1C2056] mb-3">Отслеживаемые товары</div>
-          <div className="space-y-2 mb-3">
-            {products.map(p => (
-              <div key={p.id} className="border border-gray-100 rounded-xl p-3">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm font-medium text-gray-800">{p.product_name}</span>
-                  <button onClick={() => toggleProduct(p.id, p.enabled)}
-                    className={`text-xs px-2 py-0.5 rounded-full ${p.enabled ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
-                    {p.enabled ? 'Активно' : 'Пауза'}
-                  </button>
-                </div>
-                <div className="text-xs text-gray-500">
-                  Наша цена: {p.own_current_price} ₸ · Конкурент: {p.last_competitor_price ?? '—'} ₸ · Пол: {p.floor_price} ₸ · Шаг: {p.undercut_step} ₸
-                </div>
-                <div className="text-xs text-gray-400">Проверка каждые {p.check_frequency_minutes} мин</div>
-                <button onClick={() => deleteProduct(p.id)} className="text-xs text-red-500 mt-1">Удалить</button>
-              </div>
-            ))}
-            {products.length === 0 && <div className="text-xs text-gray-400">Пока нет товаров</div>}
-          </div>
+          <div className="space-y-3 mb-3">
+            {products.map(p => {
+              const v = editValues[p.id] || { floorPrice: String(p.floor_price), undercutStep: String(p.undercut_step), strategy: p.demping_strategy, excludedCities: '', excludedMerchants: '' }
+              return (
+                <div key={p.id} className="border border-gray-100 rounded-xl p-3">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm font-medium text-gray-800">{p.product_name}</span>
+                    <button onClick={() => toggleProduct(p.id, p.enabled)}
+                      className={`text-xs px-2 py-0.5 rounded-full ${p.enabled ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500'}`}>
+                      {p.enabled ? 'Активно' : 'Пауза'}
+                    </button>
+                  </div>
+                  <div className="text-xs text-gray-500 mb-2">
+                    Наша цена: {p.own_current_price} ₸ · Конкурент: {p.last_competitor_price ?? '—'} ₸
+                  </div>
 
-          <div className="text-xs text-gray-500 mb-2 mt-3">Добавить товар</div>
-          <input className="w-full border rounded-lg px-3 py-2 text-sm mb-2" placeholder="SKU на Kaspi"
-            value={newProduct.kaspiSku} onChange={e => setNewProduct({ ...newProduct, kaspiSku: e.target.value })} />
-          <input className="w-full border rounded-lg px-3 py-2 text-sm mb-2" placeholder="Название товара"
-            value={newProduct.productName} onChange={e => setNewProduct({ ...newProduct, productName: e.target.value })} />
-          <input className="w-full border rounded-lg px-3 py-2 text-sm mb-2" placeholder="Бренд"
-            value={newProduct.brand} onChange={e => setNewProduct({ ...newProduct, brand: e.target.value })} />
-          <input className="w-full border rounded-lg px-3 py-2 text-sm mb-2" placeholder="Код склада (storeId из кабинета Kaspi)"
-            value={newProduct.storeId} onChange={e => setNewProduct({ ...newProduct, storeId: e.target.value })} />
-          <div className="grid grid-cols-2 gap-2 mb-2">
-            <input className="border rounded-lg px-3 py-2 text-sm" placeholder="Остаток на складе" type="number"
-              value={newProduct.stockCount} onChange={e => setNewProduct({ ...newProduct, stockCount: e.target.value })} />
-            <input className="border rounded-lg px-3 py-2 text-sm" placeholder="Текущая цена, ₸" type="number"
-              value={newProduct.ownCurrentPrice} onChange={e => setNewProduct({ ...newProduct, ownCurrentPrice: e.target.value })} />
-            <input className="border rounded-lg px-3 py-2 text-sm" placeholder="Минимальная цена (пол), ₸" type="number"
-              value={newProduct.floorPrice} onChange={e => setNewProduct({ ...newProduct, floorPrice: e.target.value })} />
-            <input className="border rounded-lg px-3 py-2 text-sm" placeholder="Шаг отступа, ₸" type="number"
-              value={newProduct.undercutStep} onChange={e => setNewProduct({ ...newProduct, undercutStep: e.target.value })} />
+                  <div className="grid grid-cols-2 gap-2 mb-2">
+                    <input className="border rounded-lg px-2 py-1.5 text-xs" placeholder="Минимальная цена (пол)" type="number"
+                      value={v.floorPrice} onChange={e => setEditValues(prev => ({ ...prev, [p.id]: { ...v, floorPrice: e.target.value } }))} />
+                    <input className="border rounded-lg px-2 py-1.5 text-xs" placeholder="Шаг, ₸" type="number"
+                      value={v.undercutStep} onChange={e => setEditValues(prev => ({ ...prev, [p.id]: { ...v, undercutStep: e.target.value } }))} />
+                  </div>
+                  <select className="w-full border rounded-lg px-2 py-1.5 text-xs mb-2"
+                    value={v.strategy} onChange={e => setEditValues(prev => ({ ...prev, [p.id]: { ...v, strategy: e.target.value } }))}>
+                    {Object.entries(STRATEGY_LABELS).map(([key, label]) => (
+                      <option key={key} value={key}>{label}</option>
+                    ))}
+                  </select>
+                  <input className="w-full border rounded-lg px-2 py-1.5 text-xs mb-2" placeholder="Исключить города (коды через запятую)"
+                    value={v.excludedCities} onChange={e => setEditValues(prev => ({ ...prev, [p.id]: { ...v, excludedCities: e.target.value } }))} />
+                  <input className="w-full border rounded-lg px-2 py-1.5 text-xs mb-2" placeholder="Не конкурировать с продавцами (ID через запятую)"
+                    value={v.excludedMerchants} onChange={e => setEditValues(prev => ({ ...prev, [p.id]: { ...v, excludedMerchants: e.target.value } }))} />
+
+                  <div className="flex gap-2">
+                    <button onClick={() => suggestPricing(p.id)} disabled={suggestingFor === p.id}
+                      className="flex-1 text-xs bg-gray-100 text-[#1C2056] rounded-lg px-3 py-1.5">
+                      {suggestingFor === p.id ? 'Думаем...' : 'ИИ-подбор цены'}
+                    </button>
+                    <button onClick={() => saveProductSettings(p.id)}
+                      className="flex-1 text-xs bg-[#1C2056] text-white rounded-lg px-3 py-1.5">
+                      Сохранить
+                    </button>
+                  </div>
+                  <button onClick={() => deleteProduct(p.id)} className="text-xs text-red-500 mt-2">Удалить</button>
+                </div>
+              )
+            })}
+            {products.length === 0 && <div className="text-xs text-gray-400">Пока нет товаров — подключите кабинет, чтобы импортировать каталог</div>}
           </div>
-          <input className="w-full border rounded-lg px-3 py-2 text-sm mb-2" placeholder="Частота проверки, минут" type="number"
-            value={newProduct.checkFrequencyMinutes} onChange={e => setNewProduct({ ...newProduct, checkFrequencyMinutes: e.target.value })} />
-          <button onClick={addProduct} disabled={addingProduct}
-            className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium">
-            {addingProduct ? 'Добавляем...' : 'Добавить товар'}
-          </button>
         </div>
       </div>
 
