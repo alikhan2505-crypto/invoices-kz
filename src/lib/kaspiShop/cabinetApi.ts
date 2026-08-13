@@ -178,7 +178,7 @@ export type OrdersPage = { orders: Order[]; total: number }
 // backend for at least one status (KASPI_DELIVERY_CARGO_ASSEMBLY), even
 // though the same shape with size:10 succeeds. Pagination (page) exists
 // because of this limit -- any status with more than 10 orders needs it.
-const PAGE_SIZE = 10
+export const PAGE_SIZE = 10
 
 export async function listOrders(sessionCookies: string, merchantId: string, status: string, page = 0): Promise<OrdersPage> {
   const res = await fetch('https://mc.shop.kaspi.kz/mc/facade/graphql?opName=getOrders', {
