@@ -87,3 +87,73 @@ export async function listCatalog(sessionCookies: string, merchantId: string, av
   }
   return offers
 }
+
+// Real query/variables/response shape confirmed live 2026-08-13 (see
+// docs/superpowers/specs/2026-08-13-kaspi-orders-api-findings.md) --
+// presetFilter uses the SAME status codes as the cabinet's own sidebar nav
+// links (e.g. "NEW", "KASPI_DELIVERY_WAIT_FOR_COURIER" for Передача), and
+// orders are identified by `code`, not a separate `id` field.
+export type Order = {
+  code: string
+  status: string
+  customerFirstName: string
+  customerLastName: string
+  totalPrice: number
+  creationTime: string
+}
+
+const GET_ORDERS_QUERY = `query getOrders($merchantUid: String!, $input: MerchantOrderInput!, $advancedInput: MerchantOrderAdvancedInput!, $withAdvancedOrders: Boolean!, $page: Int!, $size: Int, $sort: [String!]) {
+  merchant(id: $merchantUid) {
+    id
+    orders {
+      orders(input: $input, page: $page, size: $size, sort: $sort) @skip(if: $withAdvancedOrders) {
+        total
+        orders { ...OrdersPageFragment }
+      }
+      advancedOrders(input: $advancedInput, page: $page, size: $size, sort: $sort) @include(if: $withAdvancedOrders) {
+        total
+        orders { ...OrdersPageFragment }
+      }
+    }
+  }
+}
+
+fragment OrdersPageFragment on Order {
+  code
+  customer { firstName lastName }
+  totalPrice
+  creationTime
+  modificationTime
+  status
+}`
+
+export async function listOrders(sessionCookies: string, merchantId: string, status: string): Promise<Order[]> {
+  const res = await fetch('https://mc.shop.kaspi.kz/mc/facade/graphql?opName=getOrders', {
+    method: 'POST',
+    headers: authHeaders(sessionCookies),
+    body: JSON.stringify({
+      operationName: 'getOrders',
+      variables: {
+        merchantUid: merchantId,
+        size: 50,
+        page: 0,
+        input: { presetFilter: status, orderCode: '', cityId: '' },
+        advancedInput: { orderCode: '', phoneNumber: '', productCode: '' },
+        withAdvancedOrders: false,
+      },
+      query: GET_ORDERS_QUERY,
+    }),
+  })
+  if (!res.ok) return []
+  const json = await res.json().catch(() => null)
+  const orders = json?.data?.merchant?.orders?.orders?.orders
+  if (!Array.isArray(orders)) return []
+  return orders.map((o: any) => ({
+    code: o.code,
+    status: o.status,
+    customerFirstName: o.customer?.firstName ?? '',
+    customerLastName: o.customer?.lastName ?? '',
+    totalPrice: Number(o.totalPrice) || 0,
+    creationTime: o.creationTime,
+  }))
+}
