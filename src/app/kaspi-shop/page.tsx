@@ -34,6 +34,19 @@ const STRATEGY_LABELS: Record<string, string> = {
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
+// Always normalizes to +7, regardless of whether the seller types the
+// domestic 8-prefix or the international 7 -- the leading digit is
+// discarded either way and replaced with the hardcoded +7.
+function formatPhone(value: string): string {
+  const digits = value.replace(/\D/g, '')
+  if (digits.length === 0) return ''
+  let result = '+7'
+  if (digits.length > 1) result += ' ' + digits.slice(1, 4)
+  if (digits.length > 4) result += ' ' + digits.slice(4, 7)
+  if (digits.length > 7) result += ' ' + digits.slice(7, 11)
+  return result
+}
+
 // The core mechanic of this whole feature is a race: our price against the
 // lowest competitor, bounded below by a floor we never cross. Everywhere
 // else in this UI that gets summarized as three numbers in a row -- here
@@ -336,7 +349,7 @@ export default function KaspiShop() {
             ) : !otpToken ? (
               <div className="flex flex-col gap-2 max-w-sm">
                 <input className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-sm text-white! [-webkit-text-fill-color:#fff]! placeholder:text-white/30 outline-none focus:border-white/30"
-                  placeholder="Телефон (как при входе в Kaspi)" value={phone} onChange={e => setPhone(e.target.value)} />
+                  placeholder="Телефон (как при входе в Kaspi)" value={phone} onChange={e => setPhone(formatPhone(e.target.value))} />
                 <button onClick={startConnect} disabled={connecting}
                   className="mt-1 bg-white text-[#12142E] rounded-xl py-3 text-sm font-semibold disabled:opacity-50">
                   {connecting ? 'Отправляем код...' : 'Продолжить'}
