@@ -68,13 +68,31 @@ Response body:
 ```
 Response also sets a **new** `MS_AUTH_SSO` cookie (`Set-Cookie`, `HttpOnly; SameSite=Lax`) — this appears to be the flow-correlation token carried into the OTP step. After this call, the page swaps to an OTP-entry form ("Мы отправили сообщение с кодом на номер телефона ..., введите код из SMS") and a real SMS is sent.
 
-## Login step 2: OTP verification (STILL NOT CAPTURED — same root cause, twice)
+## Login step 2: OTP verification (CONFIRMED)
 
-Two separate live attempts (each consuming a real SMS code on the account owner's phone) both failed to capture this request, for the identical reason: submitting the code makes the app immediately cross-origin-navigate from `idmc.shop.kaspi.kz` to `kaspi.kz/mc/#/...`, and the browser tool's network request log is reset by that navigation — by the time it's checked afterward (even on the very next tool call), the OTP-verify request is already gone. This isn't a timing mistake that can be fixed by checking faster; the log appears to be tied to the page/target lifecycle and the navigation happens synchronously with (or immediately after) the verify call resolving.
+Two live attempts to catch this via `list_network_requests` after the fact both failed -- the cross-origin navigation from `idmc.shop.kaspi.kz` to `kaspi.kz/mc/#/...` on success resets the browser tool's network log before it can be read, and this isn't fixable by checking faster (the log is tied to the page/target lifecycle).
 
-What IS re-confirmed both times: the flow genuinely only needs phone + SMS code (no separate password/PIN step for phone-based login), and successful verification lands on `kaspi.kz/mc` fully authenticated with `mc-session`/`mc-sid` cookies (matching the very first read-only trace from 2026-08-12).
+**What worked**: this app uses `XMLHttpRequest`, not `fetch` (confirmed by first trying a `window.fetch` monkey-patch, which caught nothing at all -- the app's HTTP calls never touched the overridden `fetch`). Patching `XMLHttpRequest.prototype.open`/`.send` instead, installed via the browser tool's script-evaluation capability *before* submitting the phone number, captured both steps by writing each request/response into `localStorage` (same-origin on `idmc.shop.kaspi.kz`) as soon as each XHR's `loadend` event fires -- synchronously ahead of the app's own success handler getting a chance to navigate away. Since `kaspi.kz` and `idmc.shop.kaspi.kz` are different origins, the captured data isn't readable from `kaspi.kz/mc` after the redirect, but navigating back to any `idmc.shop.kaspi.kz` page afterward and reading `localStorage` there recovers it intact.
 
-**Untried for next attempt**: monkey-patch `window.fetch` via the browser tool's script-evaluation capability *before* submitting the code, so the wrapper captures the request/response into `localStorage` (same-origin, `idmc.shop.kaspi.kz`) synchronously as part of resolving the app's own fetch promise -- before the app's `.then()` handler gets control back to trigger navigation. Since `kaspi.kz` and `idmc.shop.kaspi.kz` are different origins, the captured data can't be read from `kaspi.kz/mc` after the redirect, but navigating back to any `idmc.shop.kaspi.kz` page afterward and reading `localStorage` there should recover it. Not yet tried because it needs a fresh SMS code to test, and two real codes were already spent this session on the approach that turned out not to work.
+Both steps turned out to be the **same endpoint**, correlated via the `MS_AUTH_SSO` cookie (rotated after step 1, sent automatically on step 2 since it's `HttpOnly` and same-origin):
+
+```
+POST https://idmc.shop.kaspi.kz/api/p/login
+```
+
+Step 1 (phone) request body: `{"_ph": "+7 (776) 355-51-77"}` → response `{"phone": "+7 (776) 355-51-77"}` (as already documented above).
+
+Step 2 (OTP code) request body:
+```json
+{ "_c": "458801" }
+```
+Response body:
+```json
+{ "redirectUrl": "/" }
+```
+The frontend then does a full navigation to `https://kaspi.kz/mc/` (client-side, not an HTTP redirect from this response) using the `redirectUrl` value. No separate password/PIN step exists for phone-based login -- phone + SMS code is the complete flow. Successful verification lands on `kaspi.kz/mc` fully authenticated with `mc-session`/`mc-sid` cookies (matching the original 2026-08-12 read-only trace).
+
+Three real SMS codes were spent across this session getting to this confirmed result (two lost to the navigation/log-reset problem, one spent proving the `fetch` patch didn't work before the `XMLHttpRequest` version succeeded on the fourth attempt) -- the account owner's active, repeated participation is the only reason this is fully documented now.
 
 ## Account state note (2026-08-12)
 
