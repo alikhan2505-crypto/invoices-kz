@@ -194,6 +194,16 @@ export default function KaspiShop() {
     await fetch('/api/kaspi-shop/settings', { method: 'POST', headers, body: JSON.stringify({ paused: next }) })
   }
 
+  async function disconnect() {
+    if (!confirm('Отключить кабинет Kaspi? Отслеживаемые товары и их настройки будут удалены — при повторном подключении каталог импортируется заново.')) return
+    const headers = await authHeader()
+    await fetch('/api/kaspi-shop/settings', { method: 'DELETE', headers })
+    setConnected(false)
+    setProducts([])
+    setCompanyName(null)
+    setSessionStatus(null)
+  }
+
   async function startTopup(amountTenge: number) {
     if (amountTenge < 500) return
     setToppingUp(true)
@@ -349,10 +359,15 @@ export default function KaspiShop() {
                   <div className="text-[11px] font-semibold tracking-wider text-white/40 uppercase mb-1">{companyName || 'Магазин подключён'}</div>
                   <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight">Гонка цен сейчас</h1>
                 </div>
-                <button onClick={togglePause}
-                  className={`text-xs font-medium rounded-full px-3 py-2 flex-shrink-0 transition-colors ${paused ? 'bg-[#FF5A5F]/20 text-[#FF8A8E]' : 'bg-[#00C880]/15 text-[#00C880]'}`}>
-                  {paused ? '⏸ На паузе' : '● Работает'}
-                </button>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <button onClick={togglePause}
+                    className={`text-xs font-medium rounded-full px-3 py-2 transition-colors ${paused ? 'bg-[#FF5A5F]/20 text-[#FF8A8E]' : 'bg-[#00C880]/15 text-[#00C880]'}`}>
+                    {paused ? '⏸ На паузе' : '● Работает'}
+                  </button>
+                  <button onClick={disconnect} className="text-xs font-medium rounded-full px-3 py-2 bg-white/10 text-white/50 hover:text-white/80 transition-colors">
+                    Отключить
+                  </button>
+                </div>
               </div>
               <div className="grid grid-cols-3 gap-3 lg:gap-6">
                 <div>

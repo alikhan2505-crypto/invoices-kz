@@ -38,3 +38,35 @@ export async function POST(req: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true })
 }
+
+// Full disconnect -- removes the connection and everything scoped to it
+// (tracked products, per-city prices) rather than just clearing session
+// cookies, so a later reconnect starts from a clean re-import instead of
+// resurrecting settings tied to a cabinet the seller may have deliberately
+// walked away from. Deleted explicitly in dependency order rather than
+// relying on an assumed ON DELETE CASCADE.
+export async function DELETE(req: NextRequest) {
+  const user = await requireUser(req)
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { data: connection } = await supabase
+    .from('kaspi_shop_connections')
+    .select('id')
+    .eq('user_id', user.id)
+    .maybeSingle()
+  if (!connection) return NextResponse.json({ ok: true })
+
+  const { data: products } = await supabase
+    .from('kaspi_shop_tracked_products')
+    .select('id')
+    .eq('connection_id', connection.id)
+  const productIds = (products || []).map(p => p.id)
+
+  if (productIds.length > 0) {
+    await supabase.from('kaspi_shop_product_city_prices').delete().in('tracked_product_id', productIds)
+    await supabase.from('kaspi_shop_tracked_products').delete().eq('connection_id', connection.id)
+  }
+  const { error } = await supabase.from('kaspi_shop_connections').delete().eq('id', connection.id)
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ ok: true })
+}
