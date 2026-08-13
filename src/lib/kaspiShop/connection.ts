@@ -68,17 +68,24 @@ export async function loadConnectionById(connectionId: string): Promise<KaspiSho
 
 export async function saveConnection(params: {
   userId: string
-  apiToken: string
+  apiToken?: string
+  sessionCookies?: string
   merchantId: string
   companyName: string
 }): Promise<void> {
-  const { error } = await supabase.from('kaspi_shop_connections').upsert({
+  const row: Record<string, any> = {
     user_id: params.userId,
-    api_token_enc: encryptAtRest(params.apiToken, getKey()),
     merchant_id: params.merchantId,
     company_name: params.companyName,
     status: 'active',
-  }, { onConflict: 'user_id' })
+  }
+  if (params.apiToken) row.api_token_enc = encryptAtRest(params.apiToken, getKey())
+  if (params.sessionCookies) {
+    row.session_cookies = encryptAtRest(params.sessionCookies, getKey())
+    row.session_status = 'active'
+  }
+
+  const { error } = await supabase.from('kaspi_shop_connections').upsert(row, { onConflict: 'user_id' })
   if (error) throw new Error(`kaspi_shop_connections save failed for user ${params.userId}: ${error.message}`)
 
   // A fresh connection needs its own wallet row before any check cycle can

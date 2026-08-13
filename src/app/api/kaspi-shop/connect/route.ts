@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { saveConnection } from '@/lib/kaspiShop/connection'
+import { startPhoneLogin } from '@/lib/kaspiShop/cabinetAuth'
 
 const supabaseAuth = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -15,35 +15,28 @@ async function requireUser(req: NextRequest) {
   return user
 }
 
-// Validates the token against a real, confirmed Kaspi Merchant API endpoint
-// (the products/import JSON-schema endpoint) before we ever store it --
-// catches a typo'd or already-revoked token immediately instead of only
-// discovering it on the next scheduled check cycle.
-async function validateKaspiToken(apiToken: string): Promise<boolean> {
-  try {
-    const res = await fetch('https://kaspi.kz/shop/api/products/import/schema', {
-      headers: { 'X-Auth-Token': apiToken, 'Accept': 'application/json' },
-    })
-    return res.ok
-  } catch {
-    return false
-  }
-}
-
+// Step 1 of the real cabinet login (phone + SMS, confirmed live 2026-08-13
+// -- see docs/superpowers/specs/2026-08-12-kaspi-cabinet-api-findings.md).
+// Nothing is saved yet -- POST /api/kaspi-shop/connect/otp completes the
+// login and does the actual save + auto-import.
 export async function POST(req: NextRequest) {
   const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { apiToken, merchantId, companyName } = await req.json()
-  if (!apiToken || !merchantId || !companyName) {
-    return NextResponse.json({ error: 'apiToken, merchantId and companyName are required' }, { status: 400 })
+  let body: any
+  try {
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'Некорректный JSON' }, { status: 400 })
+  }
+  const { phone, merchantId } = body
+  if (!phone || !merchantId) {
+    return NextResponse.json({ error: 'phone и merchantId обязательны' }, { status: 400 })
   }
 
-  const valid = await validateKaspiToken(apiToken)
-  if (!valid) {
-    return NextResponse.json({ error: 'Kaspi отклонил токен — проверьте, что он скопирован верно и не истёк' }, { status: 400 })
+  const result = await startPhoneLogin(phone)
+  if (result.status !== 'otp_required') {
+    return NextResponse.json({ error: result.status === 'error' ? result.message : 'Неожиданный ответ Kaspi' }, { status: 400 })
   }
-
-  await saveConnection({ userId: user.id, apiToken, merchantId, companyName })
-  return NextResponse.json({ ok: true })
+  return NextResponse.json({ status: 'otp_required', otpToken: result.otpToken })
 }
