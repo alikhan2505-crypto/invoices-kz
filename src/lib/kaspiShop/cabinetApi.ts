@@ -190,7 +190,10 @@ export async function listOrders(sessionCookies: string, merchantId: string, sta
   if (!res.ok) return []
   const json = await res.json().catch(() => null)
   const orders = json?.data?.merchant?.orders?.orders?.orders
-  if (!Array.isArray(orders)) return []
+  if (!Array.isArray(orders)) {
+    console.error('kaspi-shop listOrders: unexpected response shape for status', status, JSON.stringify(json)?.slice(0, 2000))
+    return []
+  }
   return orders.map((o: any) => ({
     code: o.code,
     status: o.status,
