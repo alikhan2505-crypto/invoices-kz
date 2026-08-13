@@ -117,15 +117,28 @@ export async function submitOtp(otpToken: string, code: string): Promise<LoginRe
   mergeJar(jar, parseSetCookies(res))
 
   // Follow the SPA's own next step: a GET of kaspi.kz/mc/ carrying
-  // everything collected so far. See the module-level comment -- this hop
-  // is the unverified piece.
-  let mcRes: Response
-  try {
-    mcRes = await fetch(MC_URL, { headers: { cookie: cookieHeader(jar) }, redirect: 'manual' })
-  } catch (err: any) {
-    return { status: 'error', message: `network error reaching kaspi.kz/mc: ${err.message}` }
+  // everything collected so far. Confirmed live 2026-08-13 that a single
+  // request here is NOT enough -- the real browser flow is a redirect
+  // chain, and fetch()'s automatic redirect-following hides every
+  // intermediate response's Set-Cookie header from us (a real Fetch API
+  // limitation, not a bug we can work around by reading res.headers after
+  // the fact). So this walks the chain by hand, merging cookies at each
+  // hop, since the session may be minted partway through rather than on
+  // the first or last response.
+  let nextUrl = MC_URL
+  for (let hop = 0; hop < 10; hop++) {
+    let hopRes: Response
+    try {
+      hopRes = await fetch(nextUrl, { headers: { cookie: cookieHeader(jar) }, redirect: 'manual' })
+    } catch (err: any) {
+      return { status: 'error', message: `network error reaching ${nextUrl}: ${err.message}` }
+    }
+    mergeJar(jar, parseSetCookies(hopRes))
+    if (hopRes.status < 300 || hopRes.status >= 400) break
+    const location = hopRes.headers.get('location')
+    if (!location) break
+    nextUrl = new URL(location, nextUrl).toString()
   }
-  mergeJar(jar, parseSetCookies(mcRes))
 
   const sessionCookies = cookieHeader(jar)
   if (!jar.has('mc-session') || !jar.has('mc-sid')) {
