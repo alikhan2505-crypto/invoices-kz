@@ -321,8 +321,7 @@ export default function KaspiShop() {
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}
             className="bg-[#12142E] rounded-[28px] p-6 lg:p-10 mb-4 text-white">
             <div className="text-[11px] font-semibold tracking-wider text-white/40 uppercase mb-2">Подключение</div>
-            <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight mb-1">Подключите Kaspi Магазин</h1>
-            <p className="text-sm text-white/50 mb-6 max-w-md">ID продавца — в вашем кабинете Kaspi, в правом верхнем углу («ID - ...»). Название магазина подтянется само.</p>
+            <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight mb-6">Подключите Kaspi Магазин</h1>
             {connectError && <div className="text-sm text-[#FF8A8E] mb-3">{connectError}</div>}
 
             {!otpToken ? (
@@ -330,7 +329,7 @@ export default function KaspiShop() {
                 <input className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/30 outline-none focus:border-white/30"
                   placeholder="Телефон (как при входе в Kaspi)" value={phone} onChange={e => setPhone(e.target.value)} />
                 <input className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/30 outline-none focus:border-white/30"
-                  placeholder="ID продавца" value={merchantId} onChange={e => setMerchantId(e.target.value)} />
+                  placeholder="ID продавца (правый верхний угол кабинета)" value={merchantId} onChange={e => setMerchantId(e.target.value)} />
                 <button onClick={startConnect} disabled={connecting}
                   className="mt-1 bg-white text-[#12142E] rounded-xl py-3 text-sm font-semibold disabled:opacity-50">
                   {connecting ? 'Отправляем код...' : 'Продолжить'}
