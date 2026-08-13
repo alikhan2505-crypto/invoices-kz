@@ -46,16 +46,35 @@ A job/tracking ID, not the updated resource — matches the `pricefeed/upload/..
 
 **Rate limit interaction not directly observed**: only one real call was made (deliberately, to minimize real-account risk), so the 250-changes/30-min limit's exact response shape when exceeded (status code, body, headers) was NOT captured. Budget defensively (client-side tracking per Task 4) rather than relying on detecting the block reactively until this is confirmed.
 
-## Login / OTP verification (NOT CAPTURED — still a gap)
+## Login step 1: phone submission (CONFIRMED)
 
-Two live attempts this session both failed to capture the actual login POST to `idmc.shop.kaspi.kz`:
+Captured live 2026-08-13, driven directly (not just observed) with the account owner supplying the phone number and, out of band, the SMS code:
 
-1. First attempt hit the wrong system entirely (`merchant.kaspi.kz`, a different Kaspi property — Kaspi Pay/acquiring, not the Kaspi Магазин seller cabinet) and triggered a real SMS to the account owner's phone before the mistake was caught.
-2. Second attempt correctly loaded `idmc.shop.kaspi.kz/login`, but by the time network requests were checked, the login had already completed and the browser had cross-origin-navigated to `kaspi.kz/mc/#/...` — which appears to reset the captured network request log (login POST, any OTP step, and the resulting `Set-Cookie` response were all gone by the time they were inspected).
+```
+POST https://idmc.shop.kaspi.kz/api/p/login
+```
 
-What IS confirmed: the resulting authenticated session uses cookies `mc-session` and `mc-sid` (both present on every subsequent `mc.shop.kaspi.kz` request, `mc-session` cookie value observed in the form `{timestamp}.{n}.{n}.{n}|{hex}`), plus a `x-auth-version: 3` request header on API calls. The login page itself (`idmc.shop.kaspi.kz/login`) has two tabs, "Телефон" and "Email", each a single-field form.
+Headers: `content-type: application/json`, `origin`/`referer: https://idmc.shop.kaspi.kz...`, a pre-existing `MS_AUTH_SSO` cookie sent along (present from page load, before any submission).
 
-**For a future session**: capturing this needs tighter choreography than "ask the user to log in, then check requests afterward" — the cross-origin redirect happens too fast. Options to try next time: (a) ask the user to pause right after typing credentials but before submitting, so network capture can be armed first; (b) check if the browser tool's network log can be configured to persist across a cross-origin navigation within the same tab; (c) capture via a proxy/HAR export instead of the live request list if the tool supports it.
+Request body:
+```json
+{ "_ph": "+7 (776) 355-51-77" }
+```
+(the phone number, in the same human-formatted shape the input mask displays it in — not digits-only).
+
+Response body:
+```json
+{ "phone": "+7 (776) 355-51-77" }
+```
+Response also sets a **new** `MS_AUTH_SSO` cookie (`Set-Cookie`, `HttpOnly; SameSite=Lax`) — this appears to be the flow-correlation token carried into the OTP step. After this call, the page swaps to an OTP-entry form ("Мы отправили сообщение с кодом на номер телефона ..., введите код из SMS") and a real SMS is sent.
+
+## Login step 2: OTP verification (STILL NOT CAPTURED — same root cause, twice)
+
+Two separate live attempts (each consuming a real SMS code on the account owner's phone) both failed to capture this request, for the identical reason: submitting the code makes the app immediately cross-origin-navigate from `idmc.shop.kaspi.kz` to `kaspi.kz/mc/#/...`, and the browser tool's network request log is reset by that navigation — by the time it's checked afterward (even on the very next tool call), the OTP-verify request is already gone. This isn't a timing mistake that can be fixed by checking faster; the log appears to be tied to the page/target lifecycle and the navigation happens synchronously with (or immediately after) the verify call resolving.
+
+What IS re-confirmed both times: the flow genuinely only needs phone + SMS code (no separate password/PIN step for phone-based login), and successful verification lands on `kaspi.kz/mc` fully authenticated with `mc-session`/`mc-sid` cookies (matching the very first read-only trace from 2026-08-12).
+
+**Untried for next attempt**: monkey-patch `window.fetch` via the browser tool's script-evaluation capability *before* submitting the code, so the wrapper captures the request/response into `localStorage` (same-origin, `idmc.shop.kaspi.kz`) synchronously as part of resolving the app's own fetch promise -- before the app's `.then()` handler gets control back to trigger navigation. Since `kaspi.kz` and `idmc.shop.kaspi.kz` are different origins, the captured data can't be read from `kaspi.kz/mc` after the redirect, but navigating back to any `idmc.shop.kaspi.kz` page afterward and reading `localStorage` there should recover it. Not yet tried because it needs a fresh SMS code to test, and two real codes were already spent this session on the approach that turned out not to work.
 
 ## Account state note (2026-08-12)
 
