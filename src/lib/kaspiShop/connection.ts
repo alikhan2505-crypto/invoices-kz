@@ -9,7 +9,7 @@ const supabase = createClient(
 export interface KaspiShopConnection {
   id: string
   userId: string
-  apiToken: string
+  apiToken?: string
   merchantId: string
   companyName: string
   status: string
@@ -37,7 +37,7 @@ export async function loadConnection(userId: string): Promise<KaspiShopConnectio
   return {
     id: data.id,
     userId: data.user_id,
-    apiToken: decryptAtRest(data.api_token_enc, getKey()).toString('utf8'),
+    apiToken: data.api_token_enc ? decryptAtRest(data.api_token_enc, getKey()).toString('utf8') : undefined,
     merchantId: data.merchant_id,
     companyName: data.company_name,
     status: data.status,
@@ -58,7 +58,7 @@ export async function loadConnectionById(connectionId: string): Promise<KaspiSho
   return {
     id: data.id,
     userId: data.user_id,
-    apiToken: decryptAtRest(data.api_token_enc, getKey()).toString('utf8'),
+    apiToken: data.api_token_enc ? decryptAtRest(data.api_token_enc, getKey()).toString('utf8') : undefined,
     merchantId: data.merchant_id,
     companyName: data.company_name,
     status: data.status,
