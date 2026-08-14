@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
   const balance = await getKaspiShopWalletBalance(user.id)
   const { data: connection } = await supabase
     .from('kaspi_shop_connections')
-    .select('paused, session_status, company_name')
+    .select('paused, session_status, company_name, tracked_city_codes, city_lookup_cache')
     .eq('user_id', user.id)
     .maybeSingle()
   return NextResponse.json({
@@ -30,5 +30,7 @@ export async function GET(req: NextRequest) {
     paused: connection?.paused ?? false,
     sessionStatus: connection?.session_status ?? null,
     companyName: connection?.company_name ?? null,
+    trackedCityCodes: connection?.tracked_city_codes ?? [],
+    cityLookupCache: connection?.city_lookup_cache ?? {},
   })
 }

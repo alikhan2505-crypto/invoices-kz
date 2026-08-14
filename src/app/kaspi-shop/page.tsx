@@ -101,6 +101,7 @@ export default function KaspiShop() {
   const [balance, setBalance] = useState(0)
   const [products, setProducts] = useState<Product[]>([])
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [cityPrices, setCityPrices] = useState<Record<string, { cityCode: string; cityName: string; ownPrice: number; competitorPrice: number | null }[]>>({})
 
   const [phone, setPhone] = useState('')
   const [connecting, setConnecting] = useState(false)
@@ -118,6 +119,9 @@ export default function KaspiShop() {
 
   const [suggestingFor, setSuggestingFor] = useState<string | null>(null)
   const [editValues, setEditValues] = useState<Record<string, { floorPrice: string; undercutStep: string; strategy: string; excludedCities: string; excludedMerchants: string }>>({})
+  const [trackedCities, setTrackedCities] = useState<string[]>([])
+  const [availableCities, setAvailableCities] = useState<{ code: string; name: string }[]>([])
+  const [citiesSaving, setCitiesSaving] = useState(false)
 
   useEffect(() => { load() }, [])
 
@@ -166,6 +170,8 @@ export default function KaspiShop() {
         setPaused(!!data.paused)
         setSessionStatus(data.sessionStatus ?? null)
         setCompanyName(data.companyName ?? null)
+        setTrackedCities(data.trackedCityCodes || [])
+        setAvailableCities(Object.entries(data.cityLookupCache || {}).map(([code, name]) => ({ code, name: String(name) })))
       }
     } catch (e: any) {
       console.error('Kaspi Shop load error:', e.message)
@@ -227,6 +233,19 @@ export default function KaspiShop() {
     setPaused(next)
     const headers = await authHeader()
     await fetch('/api/kaspi-shop/settings', { method: 'POST', headers, body: JSON.stringify({ paused: next }) })
+  }
+
+  async function saveTrackedCities(codes: string[]) {
+    setTrackedCities(codes)
+    setCitiesSaving(true)
+    const headers = await authHeader()
+    await fetch('/api/kaspi-shop/settings/cities', { method: 'PATCH', headers, body: JSON.stringify({ trackedCityCodes: codes }) })
+    setCitiesSaving(false)
+  }
+
+  function toggleTrackedCity(code: string) {
+    const next = trackedCities.includes(code) ? trackedCities.filter(c => c !== code) : [...trackedCities, code]
+    saveTrackedCities(next)
   }
 
   async function disconnect() {
@@ -404,6 +423,27 @@ export default function KaspiShop() {
               </div>
             </motion.div>
 
+            <div className="bg-white rounded-2xl shadow-sm p-4 mb-4">
+              <div className="text-sm font-semibold text-gray-800 mb-1">Города для отслеживания конкурентов</div>
+              <div className="text-[11px] text-gray-400 mb-3">
+                {trackedCities.length === 0
+                  ? 'Не настроено — цена реагирует на одного эталонного конкурента для всех городов, как раньше.'
+                  : `Выбрано: ${trackedCities.length}. Конкурента и цену проверяем отдельно по каждому.`}
+                {citiesSaving && ' Сохраняем…'}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {availableCities.map(city => (
+                  <button key={city.code} onClick={() => toggleTrackedCity(city.code)}
+                    className={`text-xs px-3 py-1.5 rounded-full transition-colors ${trackedCities.includes(city.code) ? 'bg-[#1C2056] text-white' : 'bg-gray-100 text-gray-500'}`}>
+                    {city.name}
+                  </button>
+                ))}
+                {availableCities.length === 0 && (
+                  <div className="text-[11px] text-gray-400">Список городов ещё не загружен.</div>
+                )}
+              </div>
+            </div>
+
             {companyName && activeCount === 0 && products.length > 0 && (
               <div className="text-xs text-gray-400 mb-4 px-1">{products.length} товаров импортировано и на паузе — включите нужные ниже, чтобы демпинг начал работать.</div>
             )}
@@ -418,7 +458,17 @@ export default function KaspiShop() {
                       initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
                       transition={{ duration: 0.35, ease: EASE, delay: Math.min(i * 0.04, 0.3) }}
                       className="bg-white rounded-2xl shadow-sm overflow-hidden">
-                      <button onClick={() => setExpandedId(expanded ? null : p.id)} className="w-full text-left p-4">
+                      <button onClick={() => {
+                        const next = expanded ? null : p.id
+                        setExpandedId(next)
+                        if (next && !cityPrices[p.id] && trackedCities.length > 0) {
+                          authHeader().then(headers =>
+                            fetch(`/api/kaspi-shop/products/city-prices?id=${p.id}`, { headers })
+                              .then(res => res.ok ? res.json() : { cities: [] })
+                              .then(data => setCityPrices(prev => ({ ...prev, [p.id]: data.cities || [] })))
+                          )
+                        }
+                      }} className="w-full text-left p-4">
                         <div className="flex items-center justify-between gap-3 mb-3">
                           <div className="min-w-0">
                             <div className="text-sm font-semibold text-gray-800 truncate">{p.product_name}</div>
@@ -460,15 +510,53 @@ export default function KaspiShop() {
                                 </select>
                               </label>
                               <label className="block mb-2">
-                                <span className="text-[11px] text-gray-400 mb-1 block">Исключить города (коды через запятую)</span>
-                                <input className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs"
-                                  value={v.excludedCities} onChange={e => setEditValues(prev => ({ ...prev, [p.id]: { ...v, excludedCities: e.target.value } }))} />
+                                <span className="text-[11px] text-gray-400 mb-1 block">Исключить города (для этого товара)</span>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {trackedCities.length === 0 && <span className="text-[11px] text-gray-400">Сначала выберите отслеживаемые города выше.</span>}
+                                  {trackedCities.map(code => {
+                                    const excluded = v.excludedCities.split(',').map(s => s.trim()).filter(Boolean).includes(code)
+                                    const cityName = availableCities.find(c => c.code === code)?.name || code
+                                    return (
+                                      <button key={code} type="button"
+                                        onClick={() => {
+                                          const current = v.excludedCities.split(',').map(s => s.trim()).filter(Boolean)
+                                          const next = excluded ? current.filter(c => c !== code) : [...current, code]
+                                          setEditValues(prev => ({ ...prev, [p.id]: { ...v, excludedCities: next.join(', ') } }))
+                                        }}
+                                        className={`text-[11px] px-2 py-1 rounded-full ${excluded ? 'bg-red-50 text-red-500' : 'bg-gray-100 text-gray-500'}`}>
+                                        {cityName}
+                                      </button>
+                                    )
+                                  })}
+                                </div>
                               </label>
                               <label className="block mb-3">
                                 <span className="text-[11px] text-gray-400 mb-1 block">Не конкурировать с продавцами (ID через запятую)</span>
                                 <input className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs"
                                   value={v.excludedMerchants} onChange={e => setEditValues(prev => ({ ...prev, [p.id]: { ...v, excludedMerchants: e.target.value } }))} />
                               </label>
+                              {trackedCities.length > 0 && (
+                                <div className="mb-3">
+                                  <span className="text-[11px] text-gray-400 mb-1 block">Цены по городам</span>
+                                  {!cityPrices[p.id] && <div className="text-[11px] text-gray-400">Загрузка…</div>}
+                                  {cityPrices[p.id] && cityPrices[p.id].length === 0 && (
+                                    <div className="text-[11px] text-gray-400">Нет данных ещё — появятся после первой проверки цен по этому товару.</div>
+                                  )}
+                                  {cityPrices[p.id] && cityPrices[p.id].length > 0 && (
+                                    <div className="space-y-1">
+                                      {cityPrices[p.id].map(c => (
+                                        <div key={c.cityCode} className="flex items-center justify-between text-[11px]">
+                                          <span className="text-gray-500">{c.cityName}</span>
+                                          <span className="font-mono">
+                                            <span className="text-[#1C2056] font-semibold">{c.ownPrice.toLocaleString('ru-KZ')} ₸</span>
+                                            {c.competitorPrice !== null && <span className="text-gray-400"> · конкурент {c.competitorPrice.toLocaleString('ru-KZ')} ₸</span>}
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                               <div className="flex gap-2">
                                 <button onClick={() => suggestPricing(p.id)} disabled={suggestingFor === p.id}
                                   className="flex-1 text-xs bg-white border border-gray-200 text-[#1C2056] rounded-lg px-3 py-2 font-medium">
