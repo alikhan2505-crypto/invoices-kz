@@ -1,0 +1,23 @@
+name: Kaspi Shop niche check
+
+on:
+  workflow_dispatch:
+    inputs:
+      checkId:
+        required: true
+        type: string
+      query:
+        required: true
+        type: string
+
+jobs:
+  check-niche:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run niche check
+        env:
+          KASPI_SHOP_CRON_SECRET: ${{ secrets.KASPI_SHOP_CRON_SECRET }}
+          CHECK_ID: ${{ inputs.checkId }}
+          QUERY: ${{ inputs.query }}
+        run: node .github/scripts/kaspi-shop-niche-check.mjs

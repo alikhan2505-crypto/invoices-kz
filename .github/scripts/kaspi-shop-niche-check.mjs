@@ -1,0 +1,53 @@
+#!/usr/bin/env node
+// Runs from the GitHub Actions runner, not Vercel -- Kaspi returns a
+// persistent HTTP 403 (nginx) to this endpoint from Vercel's IP ranges
+// (confirmed 2026-08-14), same IP-block class already known from Kaspi
+// product-page fetches. This script does the actual fetch to kaspi.kz
+// itself, then delivers the raw response back to the Vercel API, which
+// does the mapping and Supabase write.
+
+const baseUrl = process.env.BASE_URL || 'https://www.invoices.kz'
+const secret = process.env.KASPI_SHOP_CRON_SECRET
+const checkId = process.env.CHECK_ID
+const query = process.env.QUERY
+
+const CITY_ID = '750000000' // Almaty -- hardcoded in v1, no city picker
+
+async function main() {
+  if (!secret) {
+    console.error('KASPI_SHOP_CRON_SECRET is not set')
+    process.exit(1)
+  }
+  if (!checkId || !query) {
+    console.error('CHECK_ID/QUERY is not set')
+    process.exit(1)
+  }
+
+  const url = `https://kaspi.kz/yml/product-view/pl/filters?text=${encodeURIComponent(query)}&page=0&all=false&fl=true&ui=d&c=${CITY_ID}`
+
+  let upstreamStatus = 0
+  let upstreamBodyText = ''
+  try {
+    const res = await fetch(url, { headers: { accept: 'application/json, text/*' } })
+    upstreamStatus = res.status
+    upstreamBodyText = await res.text()
+  } catch (err) {
+    upstreamBodyText = String(err)
+  }
+
+  const deliverRes = await fetch(`${baseUrl}/api/kaspi-shop/niches/deliver`, {
+    method: 'POST',
+    headers: { 'x-kaspi-shop-cron-secret': secret, 'content-type': 'application/json' },
+    body: JSON.stringify({ checkId, upstreamStatus, upstreamBodyText }),
+  })
+  if (!deliverRes.ok) {
+    console.error(`deliver failed: HTTP ${deliverRes.status}`)
+    process.exit(1)
+  }
+  console.log(`checkId=${checkId} upstreamStatus=${upstreamStatus} delivered`)
+}
+
+main().catch(err => {
+  console.error(err)
+  process.exit(1)
+})
