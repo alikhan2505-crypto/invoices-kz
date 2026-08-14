@@ -4,47 +4,47 @@ import { computeRepriceCandidate, generatePriceListXml, resolveTargetCities, com
 describe('computeRepriceCandidate', () => {
   it('undercuts the competitor by the seller-set step when above the floor (default strategy)', () => {
     const result = computeRepriceCandidate({ competitorPrices: [10000], undercutStep: 100, floorPrice: 5000 })
-    expect(result).toEqual({ price: 9900, heldAtFloor: false })
+    expect(result).toEqual({ price: 9900, heldAtFloor: false, newStreak: 0 })
   })
 
   it('holds at the floor when undercutting would go below it', () => {
     const result = computeRepriceCandidate({ competitorPrices: [5050], undercutStep: 100, floorPrice: 5000 })
-    expect(result).toEqual({ price: 5000, heldAtFloor: true })
+    expect(result).toEqual({ price: 5000, heldAtFloor: true, newStreak: 0 })
   })
 
   it('holds at exactly the floor when the candidate lands exactly on it', () => {
     const result = computeRepriceCandidate({ competitorPrices: [5100], undercutStep: 100, floorPrice: 5000 })
-    expect(result).toEqual({ price: 5000, heldAtFloor: false })
+    expect(result).toEqual({ price: 5000, heldAtFloor: false, newStreak: 0 })
   })
 
   it('holds at own current price (not flagged heldAtFloor) when there are no competitors', () => {
     const result = computeRepriceCandidate({ competitorPrices: [], undercutStep: 100, floorPrice: 5000, ownCurrentPrice: 8500 })
-    expect(result).toEqual({ price: 8500, heldAtFloor: false })
+    expect(result).toEqual({ price: 8500, heldAtFloor: false, newStreak: 1 })
   })
 
   it('falls back to the floor when there are no competitors and no current price', () => {
     const result = computeRepriceCandidate({ competitorPrices: [], undercutStep: 100, floorPrice: 5000 })
-    expect(result).toEqual({ price: 5000, heldAtFloor: false })
+    expect(result).toEqual({ price: 5000, heldAtFloor: false, newStreak: 1 })
   })
 
   it('steps back up by undercutStep when no competitor is found and we are pinned at the floor', () => {
     const result = computeRepriceCandidate({ competitorPrices: [], undercutStep: 100, floorPrice: 5000, ownCurrentPrice: 5000 })
-    expect(result).toEqual({ price: 5100, heldAtFloor: false })
+    expect(result).toEqual({ price: 5100, heldAtFloor: false, newStreak: 1 })
   })
 
   it('also recovers if own current price somehow sits below the floor', () => {
     const result = computeRepriceCandidate({ competitorPrices: [], undercutStep: 50, floorPrice: 5000, ownCurrentPrice: 4900 })
-    expect(result).toEqual({ price: 4950, heldAtFloor: false })
+    expect(result).toEqual({ price: 4950, heldAtFloor: false, newStreak: 1 })
   })
 
-  it('does not keep climbing once recovered above the floor -- holds flat on the next no-competitor cycle', () => {
+  it('does not keep climbing once recovered above the floor -- holds flat on the next no-competitor cycle (no maxPrice configured)', () => {
     const result = computeRepriceCandidate({ competitorPrices: [], undercutStep: 100, floorPrice: 5000, ownCurrentPrice: 5100 })
-    expect(result).toEqual({ price: 5100, heldAtFloor: false })
+    expect(result).toEqual({ price: 5100, heldAtFloor: false, newStreak: 1 })
   })
 
   it('undercut_leader uses the lowest of several competitor prices', () => {
     const result = computeRepriceCandidate({ competitorPrices: [10500, 10000, 11000], undercutStep: 100, floorPrice: 5000 })
-    expect(result).toEqual({ price: 9900, heldAtFloor: false })
+    expect(result).toEqual({ price: 9900, heldAtFloor: false, newStreak: 0 })
   })
 })
 
@@ -56,7 +56,7 @@ describe('computeRepriceCandidate strategies', () => {
       floorPrice: 8000,
       strategy: 'match_leader',
     })
-    expect(result).toEqual({ price: 10000, heldAtFloor: false })
+    expect(result).toEqual({ price: 10000, heldAtFloor: false, newStreak: 0 })
   })
 
   it('match_leader holds at floor if the leader price is below floor', () => {
@@ -66,7 +66,7 @@ describe('computeRepriceCandidate strategies', () => {
       floorPrice: 8000,
       strategy: 'match_leader',
     })
-    expect(result).toEqual({ price: 8000, heldAtFloor: true })
+    expect(result).toEqual({ price: 8000, heldAtFloor: true, newStreak: 0 })
   })
 
   it('stay_above_leader sits step above the lowest competitor when we are not already cheapest', () => {
@@ -77,7 +77,7 @@ describe('computeRepriceCandidate strategies', () => {
       strategy: 'stay_above_leader',
       ownCurrentPrice: 10200,
     })
-    expect(result).toEqual({ price: 10100, heldAtFloor: false })
+    expect(result).toEqual({ price: 10100, heldAtFloor: false, newStreak: 0 })
   })
 
   it('stay_above_leader cedes the top spot and moves above the next seller if we are already cheapest', () => {
@@ -88,7 +88,7 @@ describe('computeRepriceCandidate strategies', () => {
       strategy: 'stay_above_leader',
       ownCurrentPrice: 9500,
     })
-    expect(result).toEqual({ price: 10100, heldAtFloor: false })
+    expect(result).toEqual({ price: 10100, heldAtFloor: false, newStreak: 0 })
   })
 
   it('be_second sits step above the second-lowest competitor when there are 2+ competitors', () => {
@@ -98,7 +98,7 @@ describe('computeRepriceCandidate strategies', () => {
       floorPrice: 8000,
       strategy: 'be_second',
     })
-    expect(result).toEqual({ price: 10600, heldAtFloor: false })
+    expect(result).toEqual({ price: 10600, heldAtFloor: false, newStreak: 0 })
   })
 
   it('be_second sits step above the only competitor when there is exactly one', () => {
@@ -108,7 +108,7 @@ describe('computeRepriceCandidate strategies', () => {
       floorPrice: 8000,
       strategy: 'be_second',
     })
-    expect(result).toEqual({ price: 10100, heldAtFloor: false })
+    expect(result).toEqual({ price: 10100, heldAtFloor: false, newStreak: 0 })
   })
 
   it('be_second holds at floor if the second-lowest tier would be below floor', () => {
@@ -118,7 +118,73 @@ describe('computeRepriceCandidate strategies', () => {
       floorPrice: 8000,
       strategy: 'be_second',
     })
-    expect(result).toEqual({ price: 8000, heldAtFloor: true })
+    expect(result).toEqual({ price: 8000, heldAtFloor: true, newStreak: 0 })
+  })
+})
+
+describe('computeRepriceCandidate pump behavior (Макс-памп)', () => {
+  it('increments the streak on a no-competitor cycle without pumping while below the trigger threshold', () => {
+    const result = computeRepriceCandidate({
+      competitorPrices: [], undercutStep: 100, floorPrice: 5000, maxPrice: 8000,
+      ownCurrentPrice: 6000, noCompetitorStreak: 1,
+    })
+    expect(result).toEqual({ price: 6000, heldAtFloor: false, newStreak: 2 })
+  })
+
+  it('pumps by undercutStep once the streak reaches the trigger threshold', () => {
+    const result = computeRepriceCandidate({
+      competitorPrices: [], undercutStep: 100, floorPrice: 5000, maxPrice: 8000,
+      ownCurrentPrice: 6000, noCompetitorStreak: 2,
+    })
+    expect(result).toEqual({ price: 6100, heldAtFloor: false, newStreak: 3 })
+  })
+
+  it('caps the pumped price at maxPrice instead of overshooting', () => {
+    const result = computeRepriceCandidate({
+      competitorPrices: [], undercutStep: 500, floorPrice: 5000, maxPrice: 8000,
+      ownCurrentPrice: 7800, noCompetitorStreak: 5,
+    })
+    expect(result).toEqual({ price: 8000, heldAtFloor: false, newStreak: 6 })
+  })
+
+  it('does not pump when maxPrice is not configured, even past the trigger', () => {
+    const result = computeRepriceCandidate({
+      competitorPrices: [], undercutStep: 100, floorPrice: 5000,
+      ownCurrentPrice: 6000, noCompetitorStreak: 5,
+    })
+    expect(result).toEqual({ price: 6000, heldAtFloor: false, newStreak: 6 })
+  })
+
+  it('does not pump when ownCurrentPrice is not supplied, even past the trigger', () => {
+    const result = computeRepriceCandidate({
+      competitorPrices: [], undercutStep: 100, floorPrice: 5000, maxPrice: 8000,
+      noCompetitorStreak: 5,
+    })
+    expect(result).toEqual({ price: 5000, heldAtFloor: false, newStreak: 6 })
+  })
+
+  it('resets the streak to 0 the instant a competitor is found again', () => {
+    const result = computeRepriceCandidate({
+      competitorPrices: [6200], undercutStep: 100, floorPrice: 5000, maxPrice: 8000,
+      ownCurrentPrice: 6000, noCompetitorStreak: 5,
+    })
+    expect(result.newStreak).toBe(0)
+  })
+
+  it('floor-recovery takes priority over pumping when at or below the floor, even past the pump trigger', () => {
+    const result = computeRepriceCandidate({
+      competitorPrices: [], undercutStep: 100, floorPrice: 5000, maxPrice: 8000,
+      ownCurrentPrice: 5000, noCompetitorStreak: 5,
+    })
+    expect(result).toEqual({ price: 5100, heldAtFloor: false, newStreak: 6 })
+  })
+
+  it('treats a missing noCompetitorStreak as 0 (first-ever check)', () => {
+    const result = computeRepriceCandidate({
+      competitorPrices: [], undercutStep: 100, floorPrice: 5000, maxPrice: 8000,
+      ownCurrentPrice: 6000,
+    })
+    expect(result).toEqual({ price: 6000, heldAtFloor: false, newStreak: 1 })
   })
 })
 
@@ -154,8 +220,8 @@ describe('computePerCityReprice', () => {
       currentCityPrices: { A: 9950, B: 8200 },
     })
     expect(results).toEqual([
-      { cityCode: 'A', price: 9900, heldAtFloor: false },
-      { cityCode: 'B', price: 7900, heldAtFloor: false },
+      { cityCode: 'A', price: 9900, heldAtFloor: false, newStreak: 0 },
+      { cityCode: 'B', price: 7900, heldAtFloor: false, newStreak: 0 },
     ])
   })
 
@@ -168,7 +234,7 @@ describe('computePerCityReprice', () => {
       strategy: 'undercut_leader',
       currentCityPrices: {},
     })
-    expect(results).toEqual([{ cityCode: 'A', price: 8900, heldAtFloor: false }])
+    expect(results).toEqual([{ cityCode: 'A', price: 8900, heldAtFloor: false, newStreak: 0 }])
   })
 
   it('holds a city at the floor independently of other cities', () => {
@@ -184,8 +250,8 @@ describe('computePerCityReprice', () => {
       currentCityPrices: { A: 5000, B: 5000 },
     })
     expect(results).toEqual([
-      { cityCode: 'A', price: 5000, heldAtFloor: true },
-      { cityCode: 'B', price: 19900, heldAtFloor: false },
+      { cityCode: 'A', price: 5000, heldAtFloor: true, newStreak: 0 },
+      { cityCode: 'B', price: 19900, heldAtFloor: false, newStreak: 0 },
     ])
   })
 
@@ -193,6 +259,39 @@ describe('computePerCityReprice', () => {
     expect(computePerCityReprice({
       cityOffers: [], excludedMerchantIds: [], undercutStep: 100, floorPrice: 500, strategy: 'undercut_leader', currentCityPrices: {},
     })).toEqual([])
+  })
+
+  it('pumps a city independently once its own streak crosses the trigger, even while a sibling city still has a competitor', () => {
+    const results = computePerCityReprice({
+      cityOffers: [
+        { cityCode: 'A', offers: [] },
+        { cityCode: 'B', offers: [{ merchantId: 'm1', price: 9000 }] },
+      ],
+      excludedMerchantIds: [],
+      undercutStep: 100,
+      floorPrice: 5000,
+      maxPrice: 8000,
+      strategy: 'undercut_leader',
+      currentCityPrices: { A: 6000, B: 6000 },
+      currentCityStreaks: { A: 2, B: 2 },
+    })
+    expect(results).toEqual([
+      { cityCode: 'A', price: 6100, heldAtFloor: false, newStreak: 3 },
+      { cityCode: 'B', price: 8900, heldAtFloor: false, newStreak: 0 },
+    ])
+  })
+
+  it('defaults a missing per-city streak to 0 when currentCityStreaks is omitted entirely', () => {
+    const results = computePerCityReprice({
+      cityOffers: [{ cityCode: 'A', offers: [] }],
+      excludedMerchantIds: [],
+      undercutStep: 100,
+      floorPrice: 5000,
+      maxPrice: 8000,
+      strategy: 'undercut_leader',
+      currentCityPrices: { A: 6000 },
+    })
+    expect(results).toEqual([{ cityCode: 'A', price: 6000, heldAtFloor: false, newStreak: 1 }])
   })
 })
 

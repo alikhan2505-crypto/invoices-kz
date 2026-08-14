@@ -4,14 +4,23 @@ export type RepriceInput = {
   competitorPrices: number[]
   undercutStep: number
   floorPrice: number
+  maxPrice?: number
   strategy?: DempingStrategy
   ownCurrentPrice?: number
+  noCompetitorStreak?: number
 }
 
 export type RepriceResult = {
   price: number
   heldAtFloor: boolean
+  newStreak: number
 }
+
+// How many consecutive no-competitor cycles must pass before Макс-памп
+// starts climbing toward maxPrice, on top of the existing (faster, floor-
+// only) auto-recovery. Fixed, not seller-configurable, to avoid an extra
+// UI control for v1 -- see docs/superpowers/specs/2026-08-15-kaspi-shop-max-pump-design.md.
+export const PUMP_TRIGGER_CYCLES = 3
 
 // Given the set of competitor prices already visible for one city (after
 // excluded cities/merchants have been filtered out by the caller -- this
@@ -24,26 +33,47 @@ export function computeRepriceCandidate({
   competitorPrices,
   undercutStep,
   floorPrice,
+  maxPrice,
   strategy = 'undercut_leader',
   ownCurrentPrice,
+  noCompetitorStreak = 0,
 }: RepriceInput): RepriceResult {
   if (competitorPrices.length === 0) {
-    // Auto-recovery from the floor ("автовыход из ямы минимальной цены"):
-    // if we're still sitting at (or, defensively, below) the floor from a
-    // previous cycle's undercut race and this cycle finds no competitor at
-    // all, step back up by the same increment we'd normally undercut by,
-    // instead of staying pinned at the floor forever once the race is
-    // over. Only fires when ownCurrentPrice was actually supplied -- a
-    // product with no price history yet (first-ever check) still falls
-    // through to the plain floor default below, not a recovery step.
+    // Every no-competitor cycle advances the streak, regardless of which
+    // of the three cases below fires -- this is what Макс-памп counts
+    // against PUMP_TRIGGER_CYCLES.
+    const newStreak = noCompetitorStreak + 1
+
+    // Auto-recovery from the floor ("автовыход из ямы минимальной цены")
+    // takes priority over pumping: if we're still sitting at (or,
+    // defensively, below) the floor from a previous cycle's undercut race,
+    // step back up by the same increment we'd normally undercut by, instead
+    // of staying pinned at the floor forever once the race is over. Only
+    // fires when ownCurrentPrice was actually supplied -- a product with no
+    // price history yet (first-ever check) still falls through to the plain
+    // floor default below, not a recovery step.
     if (ownCurrentPrice !== undefined && ownCurrentPrice <= floorPrice) {
-      return { price: ownCurrentPrice + undercutStep, heldAtFloor: false }
+      return { price: ownCurrentPrice + undercutStep, heldAtFloor: false, newStreak }
     }
-    // No competitors to react to -- hold at whatever we're already at (or
-    // the floor if we have no current price to hold at). Not flagged as
-    // heldAtFloor: that signal means "a competitor is forcing us down to
-    // the floor", which isn't true when there's no competitor at all.
-    return { price: ownCurrentPrice ?? floorPrice, heldAtFloor: false }
+
+    // Макс-памп: sustained absence of competition (not just one blip)
+    // gradually recovers margin by climbing toward the seller's own
+    // ceiling, one undercutStep at a time, never overshooting it.
+    if (
+      ownCurrentPrice !== undefined &&
+      newStreak >= PUMP_TRIGGER_CYCLES &&
+      maxPrice !== undefined &&
+      ownCurrentPrice < maxPrice
+    ) {
+      return { price: Math.min(ownCurrentPrice + undercutStep, maxPrice), heldAtFloor: false, newStreak }
+    }
+
+    // No competitors to react to and not yet pumping -- hold at whatever
+    // we're already at (or the floor if we have no current price to hold
+    // at). Not flagged as heldAtFloor: that signal means "a competitor is
+    // forcing us down to the floor", which isn't true when there's no
+    // competitor at all.
+    return { price: ownCurrentPrice ?? floorPrice, heldAtFloor: false, newStreak }
   }
 
   const sorted = [...competitorPrices].sort((a, b) => a - b)
@@ -69,15 +99,17 @@ export function computeRepriceCandidate({
     candidate = tier + undercutStep
   }
 
+  // A real competitor is present -- the pump/no-competitor streak always
+  // resets here, this is the automatic "retreat" Макс-памп needs.
   if (candidate < floorPrice) {
-    return { price: floorPrice, heldAtFloor: true }
+    return { price: floorPrice, heldAtFloor: true, newStreak: 0 }
   }
-  return { price: candidate, heldAtFloor: false }
+  return { price: candidate, heldAtFloor: false, newStreak: 0 }
 }
 
 export type CompetitorOffer = { merchantId: string; price: number }
 export type CityOffers = { cityCode: string; offers: CompetitorOffer[] }
-export type CityRepriceResult = { cityCode: string; price: number; heldAtFloor: boolean }
+export type CityRepriceResult = { cityCode: string; price: number; heldAtFloor: boolean; newStreak: number }
 
 // Store-wide "important cities" list, minus this one product's own per-product
 // exclusion override -- a city outside trackedCityCodes was never in scope to
@@ -87,31 +119,36 @@ export function resolveTargetCities(trackedCityCodes: string[], excludedCityCode
 }
 
 // Runs computeRepriceCandidate once per city, using that city's OWN
-// competitor offers and OWN current price as the starting point -- this is
-// what makes cities actually diverge instead of every city recomputing
-// against one shared reference-city offer list (the bug this feature exists
-// to fix; see docs/superpowers/specs/2026-08-14-kaspi-shop-city-pricing-design.md).
-// floorPrice/undercutStep/strategy stay global per product by design.
+// competitor offers, own current price, AND own no-competitor streak as
+// the starting point -- this is what lets Макс-памп pump one city
+// independently of a sibling city that still has active competition.
+// floorPrice/undercutStep/strategy/maxPrice stay global per product by
+// design; only the streak varies per city.
 export function computePerCityReprice(params: {
   cityOffers: CityOffers[]
   excludedMerchantIds: string[]
   undercutStep: number
   floorPrice: number
+  maxPrice?: number
   strategy: DempingStrategy
   currentCityPrices: Record<string, number>
+  currentCityStreaks?: Record<string, number>
 }): CityRepriceResult[] {
+  const streaks = params.currentCityStreaks ?? {}
   return params.cityOffers.map(({ cityCode, offers }) => {
     const competitorPrices = offers
       .filter(o => !params.excludedMerchantIds.includes(o.merchantId))
       .map(o => o.price)
-    const { price, heldAtFloor } = computeRepriceCandidate({
+    const { price, heldAtFloor, newStreak } = computeRepriceCandidate({
       competitorPrices,
       undercutStep: params.undercutStep,
       floorPrice: params.floorPrice,
+      maxPrice: params.maxPrice,
       strategy: params.strategy,
       ownCurrentPrice: params.currentCityPrices[cityCode],
+      noCompetitorStreak: streaks[cityCode],
     })
-    return { cityCode, price, heldAtFloor }
+    return { cityCode, price, heldAtFloor, newStreak }
   })
 }
 
