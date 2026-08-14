@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import { computeRepriceCandidate, DempingStrategy } from './pricing'
+import { computeRepriceCandidate, DempingStrategy, resolveTargetCities } from './pricing'
 import { debitKaspiShopWallet } from './wallet'
 import { getKey } from './connection'
 import { decryptAtRest } from '@/lib/kaspiPay/crypto'
@@ -12,7 +12,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-export type DueTrackedProduct = { id: string; kaspiSku: string }
+export type DueTrackedProduct = { id: string; kaspiSku: string; targetCities: string[] }
 
 // Kaspi returns a persistent HTTP 429 to its public product pages from
 // Vercel's IP ranges (confirmed live 2026-08-12: identical block across 4
@@ -26,7 +26,7 @@ export type DueTrackedProduct = { id: string; kaspiSku: string }
 export async function getDueTrackedProducts(): Promise<DueTrackedProduct[]> {
   const { data: due } = await supabase
     .from('kaspi_shop_tracked_products')
-    .select('id, kaspi_sku, last_checked_at, check_frequency_minutes, enabled, kaspi_shop_connections(paused)')
+    .select('id, kaspi_sku, last_checked_at, check_frequency_minutes, enabled, excluded_city_codes, kaspi_shop_connections(paused, tracked_city_codes)')
     .eq('enabled', true)
 
   const now = Date.now()
@@ -37,7 +37,11 @@ export async function getDueTrackedProducts(): Promise<DueTrackedProduct[]> {
       const elapsedMinutes = (now - new Date(p.last_checked_at).getTime()) / 60000
       return elapsedMinutes >= p.check_frequency_minutes
     })
-    .map((p: any) => ({ id: p.id, kaspiSku: p.kaspi_sku }))
+    .map((p: any) => ({
+      id: p.id,
+      kaspiSku: p.kaspi_sku,
+      targetCities: resolveTargetCities(p.kaspi_shop_connections?.tracked_city_codes || [], p.excluded_city_codes || []),
+    }))
 }
 
 // Pushes one city's recomputed price through the cabinet session, respecting
@@ -57,13 +61,17 @@ async function pushCityPrice(params: {
   newPrice: number
 }): Promise<{ pushed: boolean; sessionExpired: boolean; message?: string }> {
   const since = new Date(Date.now() - KASPI_RATE_LIMIT_WINDOW_MS).toISOString()
+  const { data: connProducts } = await supabase
+    .from('kaspi_shop_tracked_products')
+    .select('id')
+    .eq('connection_id', params.connectionId)
+  const productIds = (connProducts || []).map((p: any) => p.id)
   const { data: recentPushes } = await supabase
-    .from('kaspi_shop_price_checks')
-    .select('checked_at')
-    .eq('tracked_product_id', params.trackedProductId)
-    .eq('action', 'updated')
-    .gte('checked_at', since)
-  const timestamps = (recentPushes || []).map(r => new Date(r.checked_at).getTime())
+    .from('kaspi_shop_product_city_prices')
+    .select('updated_at')
+    .in('tracked_product_id', productIds)
+    .gte('updated_at', since)
+  const timestamps = (recentPushes || []).map((r: any) => new Date(r.updated_at).getTime())
   if (!isWithinBudget(timestamps, Date.now())) {
     return { pushed: false, sessionExpired: false, message: 'rate limit budget exhausted for this 30-minute window' }
   }
