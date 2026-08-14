@@ -265,7 +265,11 @@ export async function getOrderCounters(sessionCookies: string, merchantId: strin
       query: GET_ORDER_COUNTERS_QUERY,
     }),
   })
-  if (!res.ok) return {}
+  if (!res.ok) {
+    const bodyText = await res.text().catch(() => '')
+    console.error('kaspi-shop getOrderCounters: upstream not ok', res.status, bodyText.slice(0, 1000))
+    return {}
+  }
   const json = await res.json().catch(() => null)
   const counts = json?.data?.merchant?.orders?.counts
   if (!Array.isArray(counts)) return {}
@@ -301,7 +305,11 @@ export async function listOrders(sessionCookies: string, merchantId: string, sta
       query: GET_ORDERS_QUERY,
     }),
   })
-  if (!res.ok) return { orders: [], total: 0 }
+  if (!res.ok) {
+    const bodyText = await res.text().catch(() => '')
+    console.error('kaspi-shop listOrders: upstream not ok', res.status, bodyText.slice(0, 1000))
+    return { orders: [], total: 0 }
+  }
   const json = await res.json().catch(() => null)
   const page_ = json?.data?.merchant?.orders?.orders
   const orders = page_?.orders
