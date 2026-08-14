@@ -1,59 +1,49 @@
 #!/usr/bin/env node
 // Runs from the GitHub Actions runner, not Vercel -- Kaspi returns a
-// persistent HTTP 429 to Kaspi product-page fetches from Vercel's IP ranges
-// (confirmed 2026-08-12), but not from GitHub Actions' runner IPs. This
-// script does the actual fetch to kaspi.kz itself, then reports each
-// result back to the Vercel API, which does the rest (pricing, wallet
-// debit, Supabase writes, Telegram notification).
+// persistent HTTP 403 to this endpoint from Vercel's IP ranges AND from a
+// bare GitHub Actions fetch with no browser-like headers (confirmed live
+// 2026-08-14). Unlike the earlier product-page-HTML approach this script
+// used to take, kaspi.kz/yml/offer-view/offers/{sku} is a real,
+// unauthenticated per-merchant offers API -- it needs a full
+// same-origin-request header set (Referer + sec-fetch-*) to get past
+// Kaspi's block, copied verbatim from a captured real working browser
+// request. This script does the actual fetch to kaspi.kz itself, then
+// reports each result back to the Vercel API, which does the pricing math
+// (including filtering out the seller's own blocklisted merchants -- this
+// script has no opinion on that, it just reports raw offers).
 
 const baseUrl = process.env.BASE_URL || 'https://www.invoices.kz'
 const secret = process.env.KASPI_SHOP_CRON_SECRET
 
-async function fetchCompetitorPrice(kaspiSku) {
-  const res = await fetch(`https://kaspi.kz/shop/p/-${encodeURIComponent(kaspiSku)}/`, {
+const CITY_ID = '750000000' // Almaty -- one reference city, same scope as before (no per-city competitor discovery yet)
+const OFFERS_LIMIT = 50 // covers every real product observed live (max seen: 30 offers) in one request, no pagination needed
+
+async function fetchCompetitorOffers(kaspiSku) {
+  const productPageUrl = `https://kaspi.kz/shop/p/-${encodeURIComponent(kaspiSku)}/?c=${CITY_ID}`
+  const res = await fetch(`https://kaspi.kz/yml/offer-view/offers/${encodeURIComponent(kaspiSku)}`, {
+    method: 'POST',
     headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+      accept: 'application/json, text/*',
+      'content-type': 'application/json; charset=UTF-8',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36',
       'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
+      'Accept-Encoding': 'gzip, deflate, br, zstd',
+      Referer: productPageUrl,
+      Origin: 'https://kaspi.kz',
+      'sec-fetch-dest': 'empty',
+      'sec-fetch-mode': 'cors',
+      'sec-fetch-site': 'same-origin',
     },
+    body: JSON.stringify({ cityId: CITY_ID, id: kaspiSku, merchantUID: [], limit: OFFERS_LIMIT, page: 0, sortOption: 'PRICE' }),
   })
   if (!res.ok) {
-    throw new Error(`Kaspi product page fetch failed for sku ${kaspiSku}: HTTP ${res.status}`)
+    throw new Error(`Kaspi offer-view fetch failed for sku ${kaspiSku}: HTTP ${res.status}`)
   }
-  const html = await res.text()
-  const matches = [...html.matchAll(/"price"\s*:\s*(\d+)/g)].map(m => Number(m[1])).filter(n => n > 0)
-  return matches.length ? Math.min(...matches) : null
-}
-
-// TEMPORARY diagnostic -- checking whether yml/offer-view/offers/{sku} (a
-// richer, per-merchant competitor-price endpoint found live 2026-08-14) is
-// reachable from this GitHub Actions runner, the same way the existing
-// product-page scrape above already is. Remove once confirmed either way.
-async function diagnosticCheckOfferViewEndpoint() {
-  const testSku = '114958921'
-  const productPageUrl = 'https://kaspi.kz/shop/p/termokruzhka-0-51-l-18712026-flow-3-chernyi-114958921/?c=750000000'
-  try {
-    const res = await fetch(`https://kaspi.kz/yml/offer-view/offers/${testSku}`, {
-      method: 'POST',
-      headers: {
-        accept: 'application/json, text/*',
-        'content-type': 'application/json; charset=UTF-8',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36',
-        'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
-        'Accept-Encoding': 'gzip, deflate, br, zstd',
-        Referer: productPageUrl,
-        Origin: 'https://kaspi.kz',
-        'sec-fetch-dest': 'empty',
-        'sec-fetch-mode': 'cors',
-        'sec-fetch-site': 'same-origin',
-      },
-      body: JSON.stringify({ cityId: '750000000', id: testSku, merchantUID: [], limit: 5, page: 0, sortOption: 'PRICE' }),
-    })
-    const bodyText = await res.text()
-    console.log(`[diagnostic] offer-view status=${res.status} bodyLen=${bodyText.length} bodyPreview=${bodyText.slice(0, 300)}`)
-  } catch (err) {
-    console.log(`[diagnostic] offer-view fetch threw: ${err}`)
-  }
+  const json = await res.json()
+  const offers = Array.isArray(json.offers) ? json.offers : []
+  return offers
+    .filter(o => o && o.merchantId != null && Number(o.price) > 0)
+    .map(o => ({ merchantId: String(o.merchantId), price: Number(o.price) }))
 }
 
 async function main() {
@@ -61,8 +51,6 @@ async function main() {
     console.error('KASPI_SHOP_CRON_SECRET is not set')
     process.exit(1)
   }
-
-  await diagnosticCheckOfferViewEndpoint()
 
   const dueRes = await fetch(`${baseUrl}/api/kaspi-shop/cron/due`, {
     headers: { 'x-kaspi-shop-cron-secret': secret },
@@ -75,10 +63,10 @@ async function main() {
   console.log(`${due.length} product(s) due`)
 
   for (const product of due) {
-    let competitorPrice = null
+    let competitorOffers = null
     let fetchError = null
     try {
-      competitorPrice = await fetchCompetitorPrice(product.kaspiSku)
+      competitorOffers = await fetchCompetitorOffers(product.kaspiSku)
     } catch (err) {
       fetchError = err.message
     }
@@ -86,12 +74,12 @@ async function main() {
     const applyRes = await fetch(`${baseUrl}/api/kaspi-shop/cron/apply`, {
       method: 'POST',
       headers: { 'x-kaspi-shop-cron-secret': secret, 'content-type': 'application/json' },
-      body: JSON.stringify({ trackedProductId: product.id, competitorPrice, fetchError }),
+      body: JSON.stringify({ trackedProductId: product.id, competitorOffers, fetchError }),
     })
     if (!applyRes.ok) {
       console.error(`apply failed for ${product.id}: HTTP ${applyRes.status}`)
     } else {
-      console.log(`${product.id}: competitorPrice=${competitorPrice} fetchError=${fetchError}`)
+      console.log(`${product.id}: ${competitorOffers ? competitorOffers.length : 0} offer(s) fetchError=${fetchError}`)
     }
   }
 }

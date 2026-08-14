@@ -87,31 +87,30 @@ async function pushCityPrice(params: {
   return { pushed: false, sessionExpired: false, message: result.message }
 }
 
-// One tracked product, one already-fetched competitor price (or a fetch
-// error, reported by the caller since the fetch itself no longer happens
-// here). Never throws -- a single product's failure must not abort the
-// rest of the caller's batch. Always logs a kaspi_shop_price_checks row and
-// debits one credit, even on error -- the competitor-price check itself is
-// the billable work (see Global Constraints), and an error row is real
+export type CompetitorOffer = { merchantId: string; price: number }
+
+// One tracked product, one already-fetched set of competitor offers (or a
+// fetch error, reported by the caller since the fetch itself no longer
+// happens here). Never throws -- a single product's failure must not abort
+// the rest of the caller's batch. Always logs a kaspi_shop_price_checks row
+// and debits one credit, even on error -- the competitor-price check itself
+// is the billable work (see Global Constraints), and an error row is real
 // information the seller should see in their history, not a silently
 // dropped cycle.
 //
 // v2 note: Kaspi genuinely prices per delivery city (confirmed live
 // 2026-08-12 -- allCityPrices on a real product has ~150 city codes, each
-// with its own price), but the public competitor-price fetch this codebase
-// uses only ever returns ONE overall lowest price across all cities, not a
-// price per city (confirming a true per-city competitor read would need
-// further live research, not yet done). So the same competitorPrice is
-// applied as the reference for every one of the product's tracked cities
-// below -- city-level awareness here means per-city OWN price and city
-// exclusions, not yet per-city COMPETITOR discovery. For the same reason,
-// product.excluded_merchant_ids (the seller-blocklist filter) isn't applied
-// yet either -- the fetch has no per-offer merchant identity to filter by,
-// only a single lowest price. Both need the competitor-price fetch itself
-// to be extended before they can do anything.
+// with its own price), but the competitor-offers fetch this codebase uses
+// (yml/offer-view/offers/{sku}, confirmed live 2026-08-14) is only ever
+// queried for one reference city (Almaty), not per-tracked-city -- a true
+// per-city COMPETITOR read would need the caller to fetch once per city,
+// not yet done. So the same filtered offer set is applied as the reference
+// for every one of the product's tracked cities below -- city-level
+// awareness here means per-city OWN price and city exclusions, not yet
+// per-city competitor discovery.
 export async function applyPriceCheckResult(
   trackedProductId: string,
-  competitorPrice: number | null,
+  competitorOffers: CompetitorOffer[] | null,
   fetchError: string | null
 ): Promise<void> {
   const { data: product } = await supabase
@@ -127,9 +126,19 @@ export async function applyPriceCheckResult(
   const ownPriceBefore = Number(product.own_current_price)
   let action: 'updated' | 'held_at_floor' | 'no_change' | 'error' = 'no_change'
   let ownPriceAfter = ownPriceBefore
+  let competitorPrice: number | null = null
 
   if (!fetchError) {
-    const competitorPrices = competitorPrice === null ? [] : [competitorPrice]
+    // Confirmed live 2026-08-14: yml/offer-view/offers does NOT return
+    // offers strictly sorted by price (Kaspi appears to pin a
+    // higher-rated/higher-volume seller first even when a cheaper offer
+    // exists elsewhere in the array) -- never trust array order or
+    // offers[0], always filter then take the explicit minimum.
+    const excludedMerchants: string[] = product.excluded_merchant_ids || []
+    const competitorPrices = (competitorOffers || [])
+      .filter(o => !excludedMerchants.includes(o.merchantId))
+      .map(o => o.price)
+    competitorPrice = competitorPrices.length > 0 ? Math.min(...competitorPrices) : null
     const { price, heldAtFloor } = computeRepriceCandidate({
       competitorPrices,
       undercutStep: Number(product.undercut_step),
