@@ -14,10 +14,22 @@ const CITY_ID = '750000000' // Almaty -- hardcoded in v1, no city picker
 export async function checkNiche(query: string, fetchFn: typeof fetch = fetch): Promise<NicheSummary> {
   const url = `https://kaspi.kz/yml/product-view/pl/filters?text=${encodeURIComponent(query)}&page=0&all=false&fl=true&ui=d&c=${CITY_ID}`
   const res = await fetchFn(url, { headers: { accept: 'application/json, text/*' } })
-  if (!res.ok) return { total: 0, priceRanges: [], topBrands: [], products: [] }
-  const json = await res.json().catch(() => null)
+  if (!res.ok) {
+    const bodyText = await res.text().catch(() => '')
+    console.error('kaspi-shop checkNiche: upstream not ok', res.status, bodyText.slice(0, 500))
+    return { total: 0, priceRanges: [], topBrands: [], products: [] }
+  }
+  const rawText = await res.text()
+  const json = (() => { try { return JSON.parse(rawText) } catch { return null } })()
+  if (!json) {
+    console.error('kaspi-shop checkNiche: response not JSON', rawText.slice(0, 500))
+    return { total: 0, priceRanges: [], topBrands: [], products: [] }
+  }
   const data = json?.data
-  if (!data) return { total: 0, priceRanges: [], topBrands: [], products: [] }
+  if (!data) {
+    console.error('kaspi-shop checkNiche: no data field', JSON.stringify(json).slice(0, 500))
+    return { total: 0, priceRanges: [], topBrands: [], products: [] }
+  }
 
   const filters = Array.isArray(data.filters) ? data.filters : []
   const priceFilter = filters.find((f: any) => f.id === 'price')

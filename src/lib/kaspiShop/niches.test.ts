@@ -6,6 +6,7 @@ function fakeFetch(status: number, body: any): typeof fetch {
     ok: status >= 200 && status < 300,
     status,
     json: async () => body,
+    text: async () => JSON.stringify(body),
   })) as unknown as typeof fetch
 }
 
