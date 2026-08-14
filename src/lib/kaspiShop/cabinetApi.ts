@@ -117,6 +117,7 @@ export type OrderItem = {
   name: string
   imageUrl: string | null
   quantity: number
+  totalPrice: number
 }
 
 export type Order = {
@@ -137,6 +138,7 @@ function mapOrderItems(entries: any[] | undefined): OrderItem[] {
       ? e.product.images.baseUrl + e.product.images.paths[0]
       : null,
     quantity: Number(e.quantity) || 1,
+    totalPrice: Number(e.totalPrice) || 0,
   }))
 }
 
@@ -165,6 +167,7 @@ fragment OrdersPageFragment on Order {
   status
   entries {
     quantity
+    totalPrice
     product { code name images { baseUrl paths } }
   }
 }`
