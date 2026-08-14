@@ -53,7 +53,17 @@ export function computeRepriceCandidate({
     // price history yet (first-ever check) still falls through to the plain
     // floor default below, not a recovery step.
     if (ownCurrentPrice !== undefined && ownCurrentPrice <= floorPrice) {
-      return { price: ownCurrentPrice + undercutStep, heldAtFloor: false, newStreak }
+      const recovered = ownCurrentPrice + undercutStep
+      // Cap the recovery step at maxPrice too, same as the pump branch
+      // below, so a tight maxPrice/floorPrice gap (undercutStep larger than
+      // the room between them) can't strand the price permanently above the
+      // seller's own ceiling -- the pump branch only ever climbs further
+      // from there, nothing else brings it back down (final-review finding
+      // M1). Only applied when maxPrice is actually above the floor --
+      // capping against a misconfigured maxPrice at or below the floor
+      // would incorrectly drag the recovery price back down instead.
+      const price = maxPrice !== undefined && maxPrice > floorPrice ? Math.min(recovered, maxPrice) : recovered
+      return { price, heldAtFloor: false, newStreak }
     }
 
     // Макс-памп: sustained absence of competition (not just one blip)

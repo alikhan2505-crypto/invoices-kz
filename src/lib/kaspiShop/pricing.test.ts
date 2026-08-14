@@ -179,6 +179,22 @@ describe('computeRepriceCandidate pump behavior (Макс-памп)', () => {
     expect(result).toEqual({ price: 5100, heldAtFloor: false, newStreak: 6 })
   })
 
+  it('caps floor-recovery at maxPrice instead of overshooting it when the step is larger than the floor-to-ceiling gap', () => {
+    const result = computeRepriceCandidate({
+      competitorPrices: [], undercutStep: 100, floorPrice: 5000, maxPrice: 5050,
+      ownCurrentPrice: 5000, noCompetitorStreak: 5,
+    })
+    expect(result).toEqual({ price: 5050, heldAtFloor: false, newStreak: 6 })
+  })
+
+  it('does not drag floor-recovery down when maxPrice is misconfigured at or below the floor', () => {
+    const result = computeRepriceCandidate({
+      competitorPrices: [], undercutStep: 100, floorPrice: 5000, maxPrice: 4500,
+      ownCurrentPrice: 5000, noCompetitorStreak: 5,
+    })
+    expect(result).toEqual({ price: 5100, heldAtFloor: false, newStreak: 6 })
+  })
+
   it('treats a missing noCompetitorStreak as 0 (first-ever check)', () => {
     const result = computeRepriceCandidate({
       competitorPrices: [], undercutStep: 100, floorPrice: 5000, maxPrice: 8000,
