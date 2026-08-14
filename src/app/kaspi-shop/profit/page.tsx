@@ -85,16 +85,36 @@ export default function KaspiShopProfit() {
 
   async function saveCommission() {
     const value = commissionInput.trim() === '' ? null : Number(commissionInput)
-    const headers = await authHeader()
-    await fetch('/api/kaspi-shop/profit/commission', { method: 'PATCH', headers, body: JSON.stringify({ commissionRatePercent: value }) })
-    loadSummary(days)
+    setLoadError('')
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/kaspi-shop/profit/commission', { method: 'PATCH', headers, body: JSON.stringify({ commissionRatePercent: value }) })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setLoadError(data.error || 'Не удалось сохранить комиссию')
+        return
+      }
+      await loadSummary(days)
+    } catch {
+      setLoadError('Не удалось сохранить комиссию. Проверьте соединение и попробуйте ещё раз.')
+    }
   }
 
   async function saveAdSpend() {
     const value = Number(adSpendInput) || 0
-    const headers = await authHeader()
-    await fetch('/api/kaspi-shop/profit/ad-spend', { method: 'PATCH', headers, body: JSON.stringify({ days, amount: value }) })
-    loadSummary(days)
+    setLoadError('')
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/kaspi-shop/profit/ad-spend', { method: 'PATCH', headers, body: JSON.stringify({ days, amount: value }) })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setLoadError(data.error || 'Не удалось сохранить расходы на рекламу')
+        return
+      }
+      await loadSummary(days)
+    } catch {
+      setLoadError('Не удалось сохранить расходы на рекламу. Проверьте соединение и попробуйте ещё раз.')
+    }
   }
 
   async function saveCogs(trackedProductId: string) {
