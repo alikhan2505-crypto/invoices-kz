@@ -31,14 +31,21 @@ async function fetchCompetitorPrice(kaspiSku) {
 // product-page scrape above already is. Remove once confirmed either way.
 async function diagnosticCheckOfferViewEndpoint() {
   const testSku = '114958921'
+  const productPageUrl = 'https://kaspi.kz/shop/p/termokruzhka-0-51-l-18712026-flow-3-chernyi-114958921/?c=750000000'
   try {
     const res = await fetch(`https://kaspi.kz/yml/offer-view/offers/${testSku}`, {
       method: 'POST',
       headers: {
         accept: 'application/json, text/*',
         'content-type': 'application/json; charset=UTF-8',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36',
         'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
+        'Accept-Encoding': 'gzip, deflate, br, zstd',
+        Referer: productPageUrl,
+        Origin: 'https://kaspi.kz',
+        'sec-fetch-dest': 'empty',
+        'sec-fetch-mode': 'cors',
+        'sec-fetch-site': 'same-origin',
       },
       body: JSON.stringify({ cityId: '750000000', id: testSku, merchantUID: [], limit: 5, page: 0, sortOption: 'PRICE' }),
     })
