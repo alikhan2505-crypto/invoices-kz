@@ -27,6 +27,21 @@ describe('computeRepriceCandidate', () => {
     expect(result).toEqual({ price: 5000, heldAtFloor: false })
   })
 
+  it('steps back up by undercutStep when no competitor is found and we are pinned at the floor', () => {
+    const result = computeRepriceCandidate({ competitorPrices: [], undercutStep: 100, floorPrice: 5000, ownCurrentPrice: 5000 })
+    expect(result).toEqual({ price: 5100, heldAtFloor: false })
+  })
+
+  it('also recovers if own current price somehow sits below the floor', () => {
+    const result = computeRepriceCandidate({ competitorPrices: [], undercutStep: 50, floorPrice: 5000, ownCurrentPrice: 4900 })
+    expect(result).toEqual({ price: 4950, heldAtFloor: false })
+  })
+
+  it('does not keep climbing once recovered above the floor -- holds flat on the next no-competitor cycle', () => {
+    const result = computeRepriceCandidate({ competitorPrices: [], undercutStep: 100, floorPrice: 5000, ownCurrentPrice: 5100 })
+    expect(result).toEqual({ price: 5100, heldAtFloor: false })
+  })
+
   it('undercut_leader uses the lowest of several competitor prices', () => {
     const result = computeRepriceCandidate({ competitorPrices: [10500, 10000, 11000], undercutStep: 100, floorPrice: 5000 })
     expect(result).toEqual({ price: 9900, heldAtFloor: false })

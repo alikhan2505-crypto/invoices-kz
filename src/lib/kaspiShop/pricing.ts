@@ -28,6 +28,17 @@ export function computeRepriceCandidate({
   ownCurrentPrice,
 }: RepriceInput): RepriceResult {
   if (competitorPrices.length === 0) {
+    // Auto-recovery from the floor ("автовыход из ямы минимальной цены"):
+    // if we're still sitting at (or, defensively, below) the floor from a
+    // previous cycle's undercut race and this cycle finds no competitor at
+    // all, step back up by the same increment we'd normally undercut by,
+    // instead of staying pinned at the floor forever once the race is
+    // over. Only fires when ownCurrentPrice was actually supplied -- a
+    // product with no price history yet (first-ever check) still falls
+    // through to the plain floor default below, not a recovery step.
+    if (ownCurrentPrice !== undefined && ownCurrentPrice <= floorPrice) {
+      return { price: ownCurrentPrice + undercutStep, heldAtFloor: false }
+    }
     // No competitors to react to -- hold at whatever we're already at (or
     // the floor if we have no current price to hold at). Not flagged as
     // heldAtFloor: that signal means "a competitor is forcing us down to
