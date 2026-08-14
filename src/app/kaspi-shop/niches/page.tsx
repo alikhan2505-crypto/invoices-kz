@@ -10,11 +10,27 @@ const EASE = [0.16, 1, 0.3, 1] as const
 const POLL_INTERVAL_MS = 2000
 const POLL_TIMEOUT_MS = 60000
 
+type NicheProduct = { sku: string; name: string; price: number; rating: number; reviewsCount: number; brand: string; imageUrl: string | null; shopUrl: string | null }
+
 type NicheSummary = {
   total: number
   priceRanges: { label: string; count: number }[]
   topBrands: { name: string; count: number }[]
-  products: { name: string; price: number; rating: number; reviewsCount: number; brand: string; imageUrl: string | null }[]
+  products: NicheProduct[]
+}
+
+// Kaspi's price-range labels are free text ("до 10 000 т", "10 000 - 49 999 т",
+// "более 500 000 т"), not a structured min/max -- parsed here so a click can
+// filter the already-fetched product cards by which bucket their own price
+// falls into. Note this only ever filters the up to 12 cards this page
+// already has, not the full (often much larger) count shown next to each
+// bucket -- Kaspi's search API isn't re-queried on a filter click.
+function parsePriceRangeLabel(label: string): { min: number; max: number } {
+  const nums = (label.match(/[\d\s ]+/g) || []).map(s => Number(s.replace(/[\s ]/g, ''))).filter(n => !Number.isNaN(n))
+  if (label.includes('до') && nums.length >= 1) return { min: 0, max: nums[0] }
+  if (label.includes('более') && nums.length >= 1) return { min: nums[0], max: Infinity }
+  if (nums.length >= 2) return { min: nums[0], max: nums[1] }
+  return { min: 0, max: Infinity }
 }
 
 export default function KaspiShopNiches() {
@@ -26,6 +42,9 @@ export default function KaspiShopNiches() {
   const [searching, setSearching] = useState(false)
   const [searched, setSearched] = useState(false)
   const [loadError, setLoadError] = useState('')
+  const [activePriceRange, setActivePriceRange] = useState<string | null>(null)
+  const [activeBrand, setActiveBrand] = useState<string | null>(null)
+  const [openProduct, setOpenProduct] = useState<NicheProduct | null>(null)
   const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => { checkAccess() }, [])
@@ -87,6 +106,8 @@ export default function KaspiShopNiches() {
     setSearched(true)
     setSearchedQuery(query.trim())
     setSummary(null)
+    setActivePriceRange(null)
+    setActiveBrand(null)
     try {
       const headers = await authHeader()
       const res = await fetch('/api/kaspi-shop/niches/request', {
@@ -156,10 +177,11 @@ export default function KaspiShopNiches() {
                   <div className="bg-white rounded-2xl shadow-sm divide-y divide-gray-50">
                     <div className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Диапазоны цен</div>
                     {summary.priceRanges.map(r => (
-                      <div key={r.label} className="flex items-center justify-between px-4 py-2.5">
-                        <span className="text-sm text-gray-600">{r.label}</span>
-                        <span className="text-xs text-gray-400 tabular-nums">{r.count}</span>
-                      </div>
+                      <button key={r.label} onClick={() => setActivePriceRange(v => v === r.label ? null : r.label)}
+                        className={`w-full flex items-center justify-between px-4 py-2.5 text-left transition-colors ${activePriceRange === r.label ? 'bg-[#1C2056] text-white' : 'hover:bg-gray-50'}`}>
+                        <span className={`text-sm ${activePriceRange === r.label ? 'text-white' : 'text-gray-600'}`}>{r.label}</span>
+                        <span className={`text-xs tabular-nums ${activePriceRange === r.label ? 'text-white/70' : 'text-gray-400'}`}>{r.count}</span>
+                      </button>
                     ))}
                   </div>
                 )}
@@ -167,37 +189,83 @@ export default function KaspiShopNiches() {
                   <div className="bg-white rounded-2xl shadow-sm divide-y divide-gray-50">
                     <div className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Топ брендов</div>
                     {summary.topBrands.map(b => (
-                      <div key={b.name} className="flex items-center justify-between px-4 py-2.5">
-                        <span className="text-sm text-gray-600">{b.name}</span>
-                        <span className="text-xs text-gray-400 tabular-nums">{b.count}</span>
-                      </div>
+                      <button key={b.name} onClick={() => setActiveBrand(v => v === b.name ? null : b.name)}
+                        className={`w-full flex items-center justify-between px-4 py-2.5 text-left transition-colors ${activeBrand === b.name ? 'bg-[#1C2056] text-white' : 'hover:bg-gray-50'}`}>
+                        <span className={`text-sm ${activeBrand === b.name ? 'text-white' : 'text-gray-600'}`}>{b.name}</span>
+                        <span className={`text-xs tabular-nums ${activeBrand === b.name ? 'text-white/70' : 'text-gray-400'}`}>{b.count}</span>
+                      </button>
                     ))}
                   </div>
                 )}
               </div>
             )}
 
-            {summary.products.length > 0 && (
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                {summary.products.map((p, i) => (
-                  <div key={i} className="bg-white rounded-2xl shadow-sm p-3">
-                    {p.imageUrl ? (
-                      <img src={p.imageUrl} alt={p.name} className="w-full aspect-square rounded-xl object-cover bg-gray-100 mb-2" />
-                    ) : (
-                      <div className="w-full aspect-square rounded-xl bg-gray-100 mb-2" />
-                    )}
-                    <div className="text-xs font-semibold text-gray-800 line-clamp-2 mb-1">{p.name}</div>
-                    <div className="flex items-center justify-between">
-                      <span className="font-mono font-bold text-sm text-[#1C2056] tabular-nums">{p.price.toLocaleString('ru-KZ')} ₸</span>
-                      <span className="text-[11px] text-gray-400">★{p.rating.toFixed(1)} ({p.reviewsCount})</span>
-                    </div>
-                  </div>
-                ))}
+            {(activePriceRange || activeBrand) && (
+              <div className="text-[11px] text-gray-400 mb-2 px-1">
+                Фильтр применяется к показанным ниже {summary.products.length} товарам (не ко всей выдаче Kaspi) —{' '}
+                <button onClick={() => { setActivePriceRange(null); setActiveBrand(null) }} className="underline underline-offset-2">сбросить</button>
               </div>
             )}
+
+            {(() => {
+              const range = activePriceRange ? parsePriceRangeLabel(activePriceRange) : null
+              const filtered = summary.products.filter(p =>
+                (!range || (p.price >= range.min && p.price <= range.max)) &&
+                (!activeBrand || p.brand === activeBrand)
+              )
+              if (filtered.length === 0) {
+                return (
+                  <div className="bg-white rounded-2xl shadow-sm p-8 text-center">
+                    <div className="text-sm text-gray-500">Среди показанных товаров нет совпадений с этим фильтром.</div>
+                  </div>
+                )
+              }
+              return (
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  {filtered.map((p, i) => (
+                    <button key={i} onClick={() => setOpenProduct(p)} className="bg-white rounded-2xl shadow-sm p-3 text-left hover:shadow-md transition-shadow">
+                      {p.imageUrl ? (
+                        <img src={p.imageUrl} alt={p.name} className="w-full aspect-square rounded-xl object-cover bg-gray-100 mb-2" />
+                      ) : (
+                        <div className="w-full aspect-square rounded-xl bg-gray-100 mb-2" />
+                      )}
+                      <div className="text-xs font-semibold text-gray-800 line-clamp-2 mb-1">{p.name}</div>
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono font-bold text-sm text-[#1C2056] tabular-nums">{p.price.toLocaleString('ru-KZ')} ₸</span>
+                        <span className="text-[11px] text-gray-400">★{p.rating.toFixed(1)} ({p.reviewsCount})</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )
+            })()}
           </>
         )}
       </div>
+
+      {openProduct && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setOpenProduct(null)}>
+          <div onClick={e => e.stopPropagation()} className="bg-white rounded-2xl shadow-xl max-w-sm w-full overflow-hidden">
+            {openProduct.imageUrl ? (
+              <img src={openProduct.imageUrl} alt={openProduct.name} className="w-full aspect-square object-cover bg-gray-100" />
+            ) : (
+              <div className="w-full aspect-square bg-gray-100" />
+            )}
+            <div className="p-4">
+              <div className="text-sm font-semibold text-gray-800 mb-1">{openProduct.name}</div>
+              <div className="text-xs text-gray-400 mb-3">{openProduct.brand} · ★{openProduct.rating.toFixed(1)} ({openProduct.reviewsCount} отзывов)</div>
+              <div className="font-mono font-bold text-xl text-[#1C2056] tabular-nums mb-4">{openProduct.price.toLocaleString('ru-KZ')} ₸</div>
+              {openProduct.shopUrl && (
+                <a href={openProduct.shopUrl} target="_blank" rel="noopener noreferrer"
+                  className="block text-center text-sm font-medium bg-[#1C2056] text-white rounded-xl px-4 py-2.5">
+                  Открыть на Kaspi ↗
+                </a>
+              )}
+              <button onClick={() => setOpenProduct(null)} className="block w-full text-center text-xs text-gray-400 mt-3">Закрыть</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t px-4 py-2 flex items-center justify-between z-40">
         <div className="text-xs font-semibold text-[#1C2056]">Ниши</div>

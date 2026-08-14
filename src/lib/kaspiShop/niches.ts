@@ -11,7 +11,7 @@ export type NicheSummary = {
   total: number
   priceRanges: { label: string; count: number }[]
   topBrands: { name: string; count: number }[]
-  products: { name: string; price: number; rating: number; reviewsCount: number; brand: string; imageUrl: string | null }[]
+  products: { sku: string; name: string; price: number; rating: number; reviewsCount: number; brand: string; imageUrl: string | null; shopUrl: string | null }[]
 }
 
 const EMPTY_SUMMARY: NicheSummary = { total: 0, priceRanges: [], topBrands: [], products: [] }
@@ -32,12 +32,18 @@ export function mapNicheResponse(json: any): NicheSummary {
 
   const cards = Array.isArray(data.cards) ? data.cards.slice(0, 12) : []
   const products = cards.map((c: any) => ({
+    sku: String(c.id ?? c.configSku ?? ''),
     name: c.title,
     price: Number(c.unitSalePrice) || 0,
     rating: Number(c.rating) || 0,
     reviewsCount: Number(c.reviewsQuantity) || 0,
     brand: c.brand ?? '',
     imageUrl: c.previewImages?.[0]?.medium ?? null,
+    // Real per-product page link, confirmed live in the raw card object
+    // (`shopLink`, a relative path like "/p/slug-114958921/?c=750000000")
+    // -- lets the seller open the real Kaspi listing straight from the
+    // quick-look modal instead of having to search for it themselves.
+    shopUrl: c.shopLink ? `https://kaspi.kz${c.shopLink}` : null,
   }))
 
   return { total: Number(data.total) || 0, priceRanges, topBrands, products }

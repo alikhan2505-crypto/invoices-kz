@@ -21,8 +21,8 @@ describe('mapNicheResponse', () => {
           ] },
         ],
         cards: [
-          { title: 'Термокружка 1', unitSalePrice: 1102, rating: 4.8, reviewsQuantity: 619, brand: 'Без бренда', previewImages: [{ medium: 'https://cdn/1.jpg' }] },
-          { title: 'Термокружка 2', unitSalePrice: 1535, rating: 4.8, reviewsQuantity: 296, brand: 'RedFox', previewImages: [] },
+          { id: '114958921', title: 'Термокружка 1', unitSalePrice: 1102, rating: 4.8, reviewsQuantity: 619, brand: 'Без бренда', previewImages: [{ medium: 'https://cdn/1.jpg' }], shopLink: '/p/termokruzhka-1-114958921/?c=750000000' },
+          { id: '103109291', title: 'Термокружка 2', unitSalePrice: 1535, rating: 4.8, reviewsQuantity: 296, brand: 'RedFox', previewImages: [] },
         ],
       },
     }
@@ -42,8 +42,8 @@ describe('mapNicheResponse', () => {
       { name: 'B', count: 2 },
     ])
     expect(result.products).toEqual([
-      { name: 'Термокружка 1', price: 1102, rating: 4.8, reviewsCount: 619, brand: 'Без бренда', imageUrl: 'https://cdn/1.jpg' },
-      { name: 'Термокружка 2', price: 1535, rating: 4.8, reviewsCount: 296, brand: 'RedFox', imageUrl: null },
+      { sku: '114958921', name: 'Термокружка 1', price: 1102, rating: 4.8, reviewsCount: 619, brand: 'Без бренда', imageUrl: 'https://cdn/1.jpg', shopUrl: 'https://kaspi.kz/p/termokruzhka-1-114958921/?c=750000000' },
+      { sku: '103109291', name: 'Термокружка 2', price: 1535, rating: 4.8, reviewsCount: 296, brand: 'RedFox', imageUrl: null, shopUrl: null },
     ])
   })
 
