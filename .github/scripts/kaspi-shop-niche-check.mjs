@@ -1,10 +1,15 @@
 #!/usr/bin/env node
 // Runs from the GitHub Actions runner, not Vercel -- Kaspi returns a
-// persistent HTTP 403 (nginx) to this endpoint from Vercel's IP ranges
-// (confirmed 2026-08-14), same IP-block class already known from Kaspi
-// product-page fetches. This script does the actual fetch to kaspi.kz
-// itself, then delivers the raw response back to the Vercel API, which
-// does the mapping and Supabase write.
+// persistent HTTP 403 (nginx) to this endpoint from BOTH Vercel's and
+// GitHub Actions' IP ranges (confirmed 2026-08-14 -- unlike the sibling
+// price-check script's endpoint, which only blocks Vercel). Live A/B
+// testing from a real Chrome tab found the block is NOT cookie-dependent
+// (a same-origin fetch with credentials:'omit' still succeeds) -- the
+// distinguishing factor between the successful browser request and this
+// script's plain fetch is the header set: a real same-origin XHR sends
+// Referer + the sec-fetch-* triad, which a bare server-side fetch never
+// does. Headers below are copied verbatim from a captured real, working
+// browser request (see docs/superpowers/specs/2026-08-14-kaspi-shop-niches-design.md).
 
 const baseUrl = process.env.BASE_URL || 'https://www.invoices.kz'
 const secret = process.env.KASPI_SHOP_CRON_SECRET
@@ -24,6 +29,7 @@ async function main() {
   }
 
   const url = `https://kaspi.kz/yml/product-view/pl/filters?text=${encodeURIComponent(query)}&page=0&all=false&fl=true&ui=d&c=${CITY_ID}`
+  const searchPageUrl = `https://kaspi.kz/shop/search/?text=${encodeURIComponent(query)}`
 
   let upstreamStatus = 0
   let upstreamBodyText = ''
@@ -31,8 +37,13 @@ async function main() {
     const res = await fetch(url, {
       headers: {
         accept: 'application/json, text/*',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36',
         'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
+        'Accept-Encoding': 'gzip, deflate, br, zstd',
+        Referer: searchPageUrl,
+        'sec-fetch-dest': 'empty',
+        'sec-fetch-mode': 'cors',
+        'sec-fetch-site': 'same-origin',
       },
     })
     upstreamStatus = res.status
