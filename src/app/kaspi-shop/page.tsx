@@ -15,6 +15,7 @@ type Product = {
   stock_count: number
   own_current_price: number
   floor_price: number
+  max_price: number | null
   undercut_step: number
   check_frequency_minutes: number
   enabled: boolean
@@ -52,9 +53,9 @@ function formatPhone(value: string): string {
 // else in this UI that gets summarized as three numbers in a row -- here
 // it's drawn as an actual position on a track, because "am I winning right
 // now" is the one question a seller opens this page to answer.
-function PriceLadder({ own, competitor, floor }: { own: number; competitor: number | null; floor: number }) {
-  const ceiling = Math.max(own, competitor ?? own, floor) * 1.15
-  const span = Math.max(ceiling - floor, 1)
+function PriceLadder({ own, competitor, floor, maxPrice }: { own: number; competitor: number | null; floor: number; maxPrice: number | null }) {
+  const gaugeTop = Math.max(own, competitor ?? own, floor, maxPrice ?? 0) * 1.15
+  const span = Math.max(gaugeTop - floor, 1)
   const pct = (v: number) => Math.min(100, Math.max(0, ((v - floor) / span) * 100))
   const winning = competitor !== null && own <= competitor
   const atFloor = own <= floor + 0.01
@@ -66,6 +67,12 @@ function PriceLadder({ own, competitor, floor }: { own: number; competitor: numb
           className="absolute inset-y-0 left-0 rounded-full"
           style={{ width: `${pct(floor)}%`, background: 'repeating-linear-gradient(135deg, #FFE2E3 0, #FFE2E3 4px, transparent 4px, transparent 8px)' }}
         />
+        {maxPrice !== null && (
+          <div
+            className="absolute inset-y-0 right-0 rounded-full"
+            style={{ width: `${100 - pct(maxPrice)}%`, background: 'repeating-linear-gradient(135deg, #E2F7EE 0, #E2F7EE 4px, transparent 4px, transparent 8px)' }}
+          />
+        )}
         {competitor !== null && (
           <motion.div
             className="absolute -top-1.5 w-3.5 h-3.5 rounded-full bg-white ring-2 ring-[#1C2056]/30"
@@ -85,6 +92,7 @@ function PriceLadder({ own, competitor, floor }: { own: number; competitor: numb
         <span>Пол {floor.toLocaleString('ru-KZ')} ₸</span>
         {atFloor && <span className="text-[#FF5A5F] font-medium">Упёрлись в минимум</span>}
         {competitor !== null && <span>Конкурент {competitor.toLocaleString('ru-KZ')} ₸</span>}
+        {maxPrice !== null && <span>Потолок {maxPrice.toLocaleString('ru-KZ')} ₸</span>}
       </div>
     </div>
   )
@@ -118,7 +126,7 @@ export default function KaspiShop() {
   const [walletOpen, setWalletOpen] = useState(false)
 
   const [suggestingFor, setSuggestingFor] = useState<string | null>(null)
-  const [editValues, setEditValues] = useState<Record<string, { floorPrice: string; undercutStep: string; strategy: string; excludedCities: string; excludedMerchants: string }>>({})
+  const [editValues, setEditValues] = useState<Record<string, { floorPrice: string; maxPrice: string; undercutStep: string; strategy: string; excludedCities: string; excludedMerchants: string }>>({})
   const [trackedCities, setTrackedCities] = useState<string[]>([])
   const [availableCities, setAvailableCities] = useState<{ code: string; name: string }[]>([])
   const [citiesSaving, setCitiesSaving] = useState(false)
@@ -168,6 +176,7 @@ export default function KaspiShop() {
             if (!next[p.id]) {
               next[p.id] = {
                 floorPrice: String(p.floor_price),
+                maxPrice: p.max_price !== null ? String(p.max_price) : '',
                 undercutStep: String(p.undercut_step),
                 strategy: p.demping_strategy || 'undercut_leader',
                 excludedCities: (p.excluded_city_codes || []).join(', '),
@@ -334,6 +343,7 @@ export default function KaspiShop() {
       body: JSON.stringify({
         id,
         floor_price: Number(v.floorPrice),
+        max_price: v.maxPrice.trim() === '' ? null : Number(v.maxPrice),
         undercut_step: Number(v.undercutStep),
         demping_strategy: v.strategy,
         excluded_city_codes: v.excludedCities.split(',').map(s => s.trim()).filter(Boolean),
@@ -482,7 +492,7 @@ export default function KaspiShop() {
             <div className="space-y-3">
               <AnimatePresence initial={false}>
                 {products.map((p, i) => {
-                  const v = editValues[p.id] || { floorPrice: String(p.floor_price), undercutStep: String(p.undercut_step), strategy: p.demping_strategy, excludedCities: '', excludedMerchants: '' }
+                  const v = editValues[p.id] || { floorPrice: String(p.floor_price), maxPrice: p.max_price !== null ? String(p.max_price) : '', undercutStep: String(p.undercut_step), strategy: p.demping_strategy, excludedCities: '', excludedMerchants: '' }
                   const expanded = expandedId === p.id
                   return (
                     <motion.div key={p.id}
@@ -513,7 +523,7 @@ export default function KaspiShop() {
                             </span>
                           </div>
                         </div>
-                        <PriceLadder own={p.own_current_price} competitor={p.last_competitor_price} floor={p.floor_price} />
+                        <PriceLadder own={p.own_current_price} competitor={p.last_competitor_price} floor={p.floor_price} maxPrice={p.max_price} />
                       </button>
 
                       <AnimatePresence initial={false}>
@@ -521,11 +531,16 @@ export default function KaspiShop() {
                           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
                             transition={{ duration: 0.25, ease: EASE }} className="overflow-hidden">
                             <div className="border-t border-gray-100 p-4 pt-3 bg-gray-50/50">
-                              <div className="grid grid-cols-2 gap-2 mb-2">
+                              <div className="grid grid-cols-3 gap-2 mb-2">
                                 <label className="block">
                                   <span className="text-[11px] text-gray-400 mb-1 block">Минимальная цена</span>
                                   <input className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-mono" type="number"
                                     value={v.floorPrice} onChange={e => setEditValues(prev => ({ ...prev, [p.id]: { ...v, floorPrice: e.target.value } }))} />
+                                </label>
+                                <label className="block">
+                                  <span className="text-[11px] text-gray-400 mb-1 block">Максимальная цена</span>
+                                  <input className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-mono" type="number" placeholder="—"
+                                    value={v.maxPrice} onChange={e => setEditValues(prev => ({ ...prev, [p.id]: { ...v, maxPrice: e.target.value } }))} />
                                 </label>
                                 <label className="block">
                                   <span className="text-[11px] text-gray-400 mb-1 block">Шаг, ₸</span>
