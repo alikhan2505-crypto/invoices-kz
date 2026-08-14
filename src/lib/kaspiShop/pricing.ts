@@ -75,6 +75,46 @@ export function computeRepriceCandidate({
   return { price: candidate, heldAtFloor: false }
 }
 
+export type CompetitorOffer = { merchantId: string; price: number }
+export type CityOffers = { cityCode: string; offers: CompetitorOffer[] }
+export type CityRepriceResult = { cityCode: string; price: number; heldAtFloor: boolean }
+
+// Store-wide "important cities" list, minus this one product's own per-product
+// exclusion override -- a city outside trackedCityCodes was never in scope to
+// begin with, so excluding it is a no-op.
+export function resolveTargetCities(trackedCityCodes: string[], excludedCityCodes: string[]): string[] {
+  return trackedCityCodes.filter(c => !excludedCityCodes.includes(c))
+}
+
+// Runs computeRepriceCandidate once per city, using that city's OWN
+// competitor offers and OWN current price as the starting point -- this is
+// what makes cities actually diverge instead of every city recomputing
+// against one shared reference-city offer list (the bug this feature exists
+// to fix; see docs/superpowers/specs/2026-08-14-kaspi-shop-city-pricing-design.md).
+// floorPrice/undercutStep/strategy stay global per product by design.
+export function computePerCityReprice(params: {
+  cityOffers: CityOffers[]
+  excludedMerchantIds: string[]
+  undercutStep: number
+  floorPrice: number
+  strategy: DempingStrategy
+  currentCityPrices: Record<string, number>
+}): CityRepriceResult[] {
+  return params.cityOffers.map(({ cityCode, offers }) => {
+    const competitorPrices = offers
+      .filter(o => !params.excludedMerchantIds.includes(o.merchantId))
+      .map(o => o.price)
+    const { price, heldAtFloor } = computeRepriceCandidate({
+      competitorPrices,
+      undercutStep: params.undercutStep,
+      floorPrice: params.floorPrice,
+      strategy: params.strategy,
+      ownCurrentPrice: params.currentCityPrices[cityCode],
+    })
+    return { cityCode, price, heldAtFloor }
+  })
+}
+
 function escapeXml(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }

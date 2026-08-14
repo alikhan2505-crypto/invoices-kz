@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeRepriceCandidate, generatePriceListXml } from './pricing'
+import { computeRepriceCandidate, generatePriceListXml, resolveTargetCities, computePerCityReprice } from './pricing'
 
 describe('computeRepriceCandidate', () => {
   it('undercuts the competitor by the seller-set step when above the floor (default strategy)', () => {
@@ -119,6 +119,80 @@ describe('computeRepriceCandidate strategies', () => {
       strategy: 'be_second',
     })
     expect(result).toEqual({ price: 8000, heldAtFloor: true })
+  })
+})
+
+describe('resolveTargetCities', () => {
+  it('returns the tracked list unchanged when nothing is excluded', () => {
+    expect(resolveTargetCities(['750000000', '710000000'], [])).toEqual(['750000000', '710000000'])
+  })
+
+  it('removes cities that are in this product\'s own exclusion list', () => {
+    expect(resolveTargetCities(['750000000', '710000000', '590000000'], ['710000000'])).toEqual(['750000000', '590000000'])
+  })
+
+  it('excluding a city not in the tracked list is a no-op', () => {
+    expect(resolveTargetCities(['750000000'], ['999999999'])).toEqual(['750000000'])
+  })
+
+  it('returns an empty list when nothing is tracked', () => {
+    expect(resolveTargetCities([], ['710000000'])).toEqual([])
+  })
+})
+
+describe('computePerCityReprice', () => {
+  it('computes an independent price per city from that city\'s own competitor offers and own current price', () => {
+    const results = computePerCityReprice({
+      cityOffers: [
+        { cityCode: 'A', offers: [{ merchantId: 'm1', price: 10000 }] },
+        { cityCode: 'B', offers: [{ merchantId: 'm2', price: 8000 }] },
+      ],
+      excludedMerchantIds: [],
+      undercutStep: 100,
+      floorPrice: 5000,
+      strategy: 'undercut_leader',
+      currentCityPrices: { A: 9950, B: 8200 },
+    })
+    expect(results).toEqual([
+      { cityCode: 'A', price: 9900, heldAtFloor: false },
+      { cityCode: 'B', price: 7900, heldAtFloor: false },
+    ])
+  })
+
+  it('filters excluded merchants per city before computing', () => {
+    const results = computePerCityReprice({
+      cityOffers: [{ cityCode: 'A', offers: [{ merchantId: 'blocked', price: 1000 }, { merchantId: 'm2', price: 9000 }] }],
+      excludedMerchantIds: ['blocked'],
+      undercutStep: 100,
+      floorPrice: 500,
+      strategy: 'undercut_leader',
+      currentCityPrices: {},
+    })
+    expect(results).toEqual([{ cityCode: 'A', price: 8900, heldAtFloor: false }])
+  })
+
+  it('holds a city at the floor independently of other cities', () => {
+    const results = computePerCityReprice({
+      cityOffers: [
+        { cityCode: 'A', offers: [{ merchantId: 'm1', price: 5050 }] },
+        { cityCode: 'B', offers: [{ merchantId: 'm2', price: 20000 }] },
+      ],
+      excludedMerchantIds: [],
+      undercutStep: 100,
+      floorPrice: 5000,
+      strategy: 'undercut_leader',
+      currentCityPrices: { A: 5000, B: 5000 },
+    })
+    expect(results).toEqual([
+      { cityCode: 'A', price: 5000, heldAtFloor: true },
+      { cityCode: 'B', price: 19900, heldAtFloor: false },
+    ])
+  })
+
+  it('returns an empty array for an empty city-offers list', () => {
+    expect(computePerCityReprice({
+      cityOffers: [], excludedMerchantIds: [], undercutStep: 100, floorPrice: 500, strategy: 'undercut_leader', currentCityPrices: {},
+    })).toEqual([])
   })
 })
 
