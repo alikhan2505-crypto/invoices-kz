@@ -231,36 +231,46 @@ export default function KaspiShopProfit() {
             <div className="text-sm text-gray-500">За этот период продаж нет.</div>
           </div>
         ) : (
-          <div className="space-y-2">
-            <div className="text-[11px] text-gray-400 px-1">Прибыль по товару — выручка минус себестоимость (без учёта рекламы и комиссии, которые не делятся по товарам)</div>
-            {summary.products.map(p => (
-              <div key={p.kaspiMasterSku} className="bg-white rounded-2xl shadow-sm p-3 flex items-center gap-3">
-                {p.imageUrl ? (
-                  <img src={p.imageUrl} alt={p.productName} className="w-14 h-14 rounded-xl object-cover flex-shrink-0 bg-gray-100" />
-                ) : (
-                  <div className="w-14 h-14 rounded-xl bg-gray-100 flex-shrink-0" />
-                )}
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-semibold text-gray-800 truncate">{p.productName || p.kaspiMasterSku}</div>
-                  <div className="text-[11px] text-gray-400">{p.unitsSold} шт · {p.revenue.toLocaleString('ru-KZ')} ₸ выручка</div>
-                </div>
-                {p.trackedProductId && (
-                  <div className="flex items-center gap-1.5 flex-shrink-0">
-                    <input
-                      value={cogsInputs[p.trackedProductId] ?? (p.cogsAmount !== null ? String(p.cogsAmount) : '')}
-                      onChange={e => setCogsInputs(prev => ({ ...prev, [p.trackedProductId!]: e.target.value }))}
-                      placeholder="себест."
-                      className="w-20 rounded-lg bg-gray-50 text-gray-800 placeholder-gray-400 px-2 py-1.5 text-xs outline-none focus:bg-gray-100 text-right" />
-                    <button onClick={() => saveCogs(p.trackedProductId!)} disabled={savingCogsFor === p.trackedProductId}
-                      className="text-xs font-medium bg-[#1C2056] text-white rounded-lg px-2 py-1.5 disabled:opacity-50">✓</button>
+          <>
+            <div className="text-[11px] text-gray-400 px-1 mb-2">Прибыль по товару — выручка минус себестоимость (без учёта рекламы и комиссии, которые не делятся по товарам)</div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+              {summary.products.map(p => (
+                <div key={p.kaspiMasterSku} className="bg-white rounded-2xl shadow-sm overflow-hidden flex flex-col">
+                  {p.imageUrl ? (
+                    <img src={p.imageUrl} alt={p.productName} className="w-full aspect-square object-cover bg-gray-100" />
+                  ) : (
+                    <div className="w-full aspect-square bg-gray-100" />
+                  )}
+                  <div className="p-3 flex flex-col flex-1">
+                    <div className="text-xs font-semibold text-gray-800 line-clamp-2 min-h-[2.2em]">{p.productName || p.kaspiMasterSku}</div>
+                    <div className="text-[11px] text-gray-400 mt-1">{p.unitsSold} шт · {p.revenue.toLocaleString('ru-KZ')} ₸</div>
+
+                    {p.trackedProductId && (
+                      <label className="block mt-2">
+                        <span className="text-[10px] text-gray-400 mb-1 block">Себестоимость за шт.</span>
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            value={cogsInputs[p.trackedProductId] ?? (p.cogsAmount !== null ? String(p.cogsAmount) : '')}
+                            onChange={e => setCogsInputs(prev => ({ ...prev, [p.trackedProductId!]: e.target.value }))}
+                            placeholder="₸"
+                            className="w-full min-w-0 rounded-lg bg-gray-50 text-gray-800 placeholder-gray-400 px-2 py-1.5 text-xs outline-none focus:bg-gray-100" />
+                          <button onClick={() => saveCogs(p.trackedProductId!)} disabled={savingCogsFor === p.trackedProductId}
+                            className="flex-shrink-0 text-xs font-medium bg-[#1C2056] text-white rounded-lg px-2.5 py-1.5 disabled:opacity-50">✓</button>
+                        </div>
+                      </label>
+                    )}
+
+                    <div className="mt-auto pt-2 flex items-baseline justify-between">
+                      <span className="text-[10px] text-gray-400">Прибыль</span>
+                      <span className="font-mono font-bold text-sm text-[#1C2056] tabular-nums">
+                        {p.profit !== null ? `${p.profit.toLocaleString('ru-KZ')} ₸` : <span className="text-gray-400 text-[11px] font-normal">укажите себест.</span>}
+                      </span>
+                    </div>
                   </div>
-                )}
-                <span className="font-mono font-bold text-sm text-[#1C2056] tabular-nums flex-shrink-0 w-20 text-right">
-                  {p.profit !== null ? `${p.profit.toLocaleString('ru-KZ')} ₸` : <span className="text-gray-400 text-[11px] font-normal">укажите себест.</span>}
-                </span>
-              </div>
-            ))}
-          </div>
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </div>
 
