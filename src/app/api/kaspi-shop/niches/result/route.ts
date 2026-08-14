@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { createNicheCheck } from '@/lib/kaspiShop/nicheChecks'
+import { getNicheCheck } from '@/lib/kaspiShop/nicheChecks'
 
 const supabaseAuth = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -19,9 +19,11 @@ export async function GET(req: NextRequest) {
   const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const query = req.nextUrl.searchParams.get('query')?.trim()
-  if (!query) return NextResponse.json({ error: 'query обязателен' }, { status: 400 })
+  const checkId = req.nextUrl.searchParams.get('checkId')
+  if (!checkId) return NextResponse.json({ error: 'checkId обязателен' }, { status: 400 })
 
-  const checkId = await createNicheCheck(query)
-  return NextResponse.json({ id: checkId })
+  const check = await getNicheCheck(checkId)
+  if (!check) return NextResponse.json({ error: 'Проверка не найдена' }, { status: 404 })
+
+  return NextResponse.json(check)
 }
