@@ -34,27 +34,67 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Кабинет не подключён' }, { status: 400 })
   }
 
-  const { data: connRow } = await supabase
+  const { data: connRow, error: connError } = await supabase
     .from('kaspi_shop_connections')
     .select('commission_rate_percent')
     .eq('id', connection.id)
     .single()
+  if (connError) {
+    console.error('kaspi-shop profit: failed to load commission rate', connError.message)
+    return NextResponse.json({ error: 'Не удалось загрузить прибыль' }, { status: 500 })
+  }
   const commissionRatePercent = connRow?.commission_rate_percent ?? null
 
-  const { data: productRows } = await supabase
+  const { data: productRows, error: productsError } = await supabase
     .from('kaspi_shop_tracked_products')
-    .select('id, kaspi_master_sku, cogs_amount')
+    .select('id, kaspi_master_sku, cogs_amount, created_at')
     .eq('connection_id', connection.id)
-  const catalog = (productRows || [])
-    .filter(p => p.kaspi_master_sku)
-    .map(p => ({ kaspiMasterSku: p.kaspi_master_sku as string, trackedProductId: p.id as string, cogsAmount: p.cogs_amount as number | null }))
+  if (productsError) {
+    console.error('kaspi-shop profit: failed to load tracked products', productsError.message)
+    return NextResponse.json({ error: 'Не удалось загрузить прибыль' }, { status: 500 })
+  }
 
-  const { data: adSpendRow } = await supabase
+  // Reconnecting re-imports the seller's whole catalog (finalizeConnection.ts
+  // inserts fresh rows rather than upserting), so more than one row can
+  // share the same kaspi_master_sku -- confirmed live 2026-08-14 (68 master
+  // SKUs with 2 rows each on the connected account, from today's earlier
+  // reconnect). An undeterministic "last one seen" pick would let an
+  // entered COGS value silently vanish on the next load if a different
+  // duplicate won. Prefer whichever row already has a real cogs_amount; if
+  // several/none do, prefer the most recently created row for stability.
+  const canonicalByMasterSku = new Map<string, { id: string; cogsAmount: number | null; createdAt: string }>()
+  for (const p of productRows || []) {
+    if (!p.kaspi_master_sku) continue
+    const candidate = { id: p.id as string, cogsAmount: p.cogs_amount as number | null, createdAt: p.created_at as string }
+    const existing = canonicalByMasterSku.get(p.kaspi_master_sku)
+    if (!existing) {
+      canonicalByMasterSku.set(p.kaspi_master_sku, candidate)
+      continue
+    }
+    const existingHasCogs = existing.cogsAmount !== null
+    const candidateHasCogs = candidate.cogsAmount !== null
+    if (candidateHasCogs && !existingHasCogs) {
+      canonicalByMasterSku.set(p.kaspi_master_sku, candidate)
+    } else if (candidateHasCogs === existingHasCogs && candidate.createdAt > existing.createdAt) {
+      canonicalByMasterSku.set(p.kaspi_master_sku, candidate)
+    }
+  }
+  const catalog = Array.from(canonicalByMasterSku.entries()).map(([kaspiMasterSku, row]) => ({
+    kaspiMasterSku,
+    trackedProductId: row.id,
+    cogsAmount: row.cogsAmount,
+  }))
+
+  const { data: adSpendRow, error: adSpendError } = await supabase
     .from('kaspi_shop_ad_spend')
     .select('amount')
     .eq('connection_id', connection.id)
     .eq('days', days)
     .maybeSingle()
+  if (adSpendError) {
+    console.error('kaspi-shop profit: failed to load ad spend', adSpendError.message)
+    return NextResponse.json({ error: 'Не удалось загрузить прибыль' }, { status: 500 })
+  }
   const adSpend = { amount: Number(adSpendRow?.amount) || 0, configured: !!adSpendRow }
 
   const summary = await computeProfitSummary(connection.sessionCookies, connection.merchantId, days, catalog, adSpend, commissionRatePercent)

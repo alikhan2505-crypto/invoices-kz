@@ -51,6 +51,27 @@ describe('computeProfitSummary', () => {
     expect(sku2).toMatchObject({ trackedProductId: 'tp-2', unitsSold: 1, revenue: 500, cogsAmount: null, cogsTotal: null, profit: null })
   })
 
+  it('uses the first-encountered name/imageUrl for a SKU across multiple orders (documents actual behavior, not aggregated/deduped)', async () => {
+    const fakeListOrders = vi.fn(async (_c: string, _m: string, status: string, _page = 0) => {
+      if (status === 'KASPI_DELIVERY_TRANSMITTED') {
+        return {
+          total: 2,
+          sessionExpired: false,
+          orders: [
+            makeOrder('1', '2026-08-13T10:00:00.000Z', [{ code: 'SKU1', name: 'Первое имя', imageUrl: 'https://cdn/first.jpg', quantity: 1, totalPrice: 500 }]),
+            makeOrder('2', '2026-08-13T11:00:00.000Z', [{ code: 'SKU1', name: 'Второе имя', imageUrl: 'https://cdn/second.jpg', quantity: 1, totalPrice: 500 }]),
+          ],
+        }
+      }
+      return { total: 0, sessionExpired: false, orders: [] }
+    })
+
+    const summary = await computeProfitSummary('cookies', 'merchant1', 7, [], { amount: 0, configured: false }, null, fakeListOrders as any)
+
+    expect(summary.products).toHaveLength(1)
+    expect(summary.products[0]).toMatchObject({ productName: 'Первое имя', imageUrl: 'https://cdn/first.jpg', unitsSold: 2, revenue: 1000 })
+  })
+
   it('sorts products by revenue descending', async () => {
     const fakeListOrders = vi.fn(async (_c: string, _m: string, status: string, _page = 0) => {
       if (status === 'KASPI_DELIVERY_TRANSMITTED') {

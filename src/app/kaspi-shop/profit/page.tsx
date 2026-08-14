@@ -121,10 +121,18 @@ export default function KaspiShopProfit() {
     const raw = cogsInputs[trackedProductId]
     const value = raw === undefined || raw.trim() === '' ? null : Number(raw)
     setSavingCogsFor(trackedProductId)
+    setLoadError('')
     try {
       const headers = await authHeader()
-      await fetch('/api/kaspi-shop/profit/cogs', { method: 'PATCH', headers, body: JSON.stringify({ trackedProductId, cogsAmount: value }) })
+      const res = await fetch('/api/kaspi-shop/profit/cogs', { method: 'PATCH', headers, body: JSON.stringify({ trackedProductId, cogsAmount: value }) })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setLoadError(data.error || 'Не удалось сохранить себестоимость')
+        return
+      }
       await loadSummary(days)
+    } catch {
+      setLoadError('Не удалось сохранить себестоимость. Проверьте соединение и попробуйте ещё раз.')
     } finally {
       setSavingCogsFor(null)
     }
@@ -211,6 +219,9 @@ export default function KaspiShopProfit() {
           {!!summary && summary.productsWithoutCogsCount > 0 && (
             <div className="text-[11px] text-white/50 mt-4">⚠ {summary.productsWithoutCogsCount} {summary.productsWithoutCogsCount === 1 ? 'товар' : 'товаров'} без себестоимости — прибыль может быть занижена.</div>
           )}
+          {summary?.truncated && (
+            <div className="text-[11px] text-white/40 mt-2">Учтены последние 200 заказов на статус — на большом объёме сумма может быть неполной.</div>
+          )}
         </motion.div>
 
         {summaryLoading ? (
@@ -221,6 +232,7 @@ export default function KaspiShopProfit() {
           </div>
         ) : (
           <div className="space-y-2">
+            <div className="text-[11px] text-gray-400 px-1">Прибыль по товару — выручка минус себестоимость (без учёта рекламы и комиссии, которые не делятся по товарам)</div>
             {summary.products.map(p => (
               <div key={p.kaspiMasterSku} className="bg-white rounded-2xl shadow-sm p-3 flex items-center gap-3">
                 {p.imageUrl ? (

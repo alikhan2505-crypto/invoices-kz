@@ -29,11 +29,30 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'trackedProductId и корректная cogsAmount обязательны' }, { status: 400 })
   }
 
-  const { error } = await supabase
+  const { data: productRow, error: lookupError } = await supabase
     .from('kaspi_shop_tracked_products')
-    .update({ cogs_amount: cogsAmount })
+    .select('kaspi_master_sku')
     .eq('id', trackedProductId)
     .eq('user_id', user.id)
+    .maybeSingle()
+  if (lookupError) return NextResponse.json({ error: 'Не удалось сохранить себестоимость' }, { status: 500 })
+  if (!productRow) return NextResponse.json({ error: 'Товар не найден' }, { status: 404 })
+
+  // Reconnecting can leave more than one row for the same real product
+  // (finalizeConnection.ts re-imports the catalog on every reconnect
+  // instead of upserting -- confirmed live 2026-08-14, 68 duplicated
+  // master SKUs on the connected account). Writing cogs_amount to every
+  // row sharing this master SKU, not just the one the seller is currently
+  // looking at, keeps the value from silently disappearing if a different
+  // duplicate gets picked as canonical on a future load (see
+  // src/app/api/kaspi-shop/profit/route.ts's canonical-row selection).
+  const updateQuery = supabase
+    .from('kaspi_shop_tracked_products')
+    .update({ cogs_amount: cogsAmount })
+    .eq('user_id', user.id)
+  const { error } = productRow.kaspi_master_sku
+    ? await updateQuery.eq('kaspi_master_sku', productRow.kaspi_master_sku)
+    : await updateQuery.eq('id', trackedProductId)
   if (error) return NextResponse.json({ error: 'Не удалось сохранить себестоимость' }, { status: 500 })
 
   return NextResponse.json({ ok: true })
