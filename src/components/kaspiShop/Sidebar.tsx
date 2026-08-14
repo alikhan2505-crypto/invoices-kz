@@ -10,7 +10,7 @@ import { ORDER_STATUS_TABS } from '@/lib/kaspiShop/orderStatuses'
 // same pattern as the real Kaspi cabinet's own left-hand nav), matching
 // orderStatus/orderCounts passed down from the orders page.
 export default function KaspiShopSidebar({ active, orderStatus, orderCounts }: {
-  active: 'demping' | 'orders' | 'finance' | 'pending-products' | 'niches'
+  active: 'demping' | 'orders' | 'finance' | 'pending-products' | 'niches' | 'profit'
   orderStatus?: string
   orderCounts?: Record<string, number>
 }) {
@@ -61,6 +61,10 @@ export default function KaspiShopSidebar({ active, orderStatus, orderCounts }: {
           <Link href="/kaspi-shop/niches"
             className={`rounded-xl text-sm font-medium px-3 py-2.5 ${active === 'niches' ? 'bg-[#1C2056] text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
             Ниши
+          </Link>
+          <Link href="/kaspi-shop/profit"
+            className={`rounded-xl text-sm font-medium px-3 py-2.5 ${active === 'profit' ? 'bg-[#1C2056] text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
+            Прибыль
           </Link>
         </nav>
       </div>
