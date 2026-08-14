@@ -37,17 +37,15 @@ export default function KaspiShopSidebar({ active, orderStatus, orderCounts }: {
             <Link href="/kaspi-shop/orders" className="flex-1 text-sm font-medium px-3 py-2.5">
               Заказы
             </Link>
-            {active === 'orders' && (
-              <button
-                type="button"
-                onClick={() => setOrdersExpanded(v => !v)}
-                aria-label={ordersExpanded ? 'Свернуть' : 'Развернуть'}
-                className="px-2.5 py-2.5 text-white/60 hover:text-white transition-colors">
-                <span className={`inline-block transition-transform ${ordersExpanded ? 'rotate-90' : ''}`}>›</span>
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => setOrdersExpanded(v => !v)}
+              aria-label={ordersExpanded ? 'Свернуть' : 'Развернуть'}
+              className={`px-2.5 py-2.5 transition-colors ${active === 'orders' ? 'text-white/60 hover:text-white' : 'text-gray-300 hover:text-gray-500'}`}>
+              <span className={`inline-block transition-transform ${ordersExpanded ? 'rotate-90' : ''}`}>›</span>
+            </button>
           </div>
-          {active === 'orders' && ordersExpanded && (
+          {ordersExpanded && (
             <div className="ml-2 pl-3 border-l border-gray-100 flex flex-col gap-0.5 mb-1">
               {ORDER_STATUS_TABS.map(tab => {
                 const count = orderCounts?.[tab.value]
