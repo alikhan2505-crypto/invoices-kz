@@ -209,6 +209,24 @@ export async function applyPriceCheckResult(
         .update({ own_current_price: ownPriceAfter, last_checked_at: new Date().toISOString(), last_competitor_price: competitorPrice })
         .eq('id', trackedProductId)
 
+      // Streak persistence runs unconditionally, independent of the
+      // session-active guard below -- the competitor observation happens in
+      // the GitHub Actions relay, which has nothing to do with whether the
+      // cabinet session is alive. Writing this only inside the push-attempt
+      // loop (as before) meant an expired/absent session silently dropped
+      // every city's streak for the cycle, freezing the Макс-памп countdown
+      // exactly when a stale session made it most likely to matter
+      // (final-review finding I1). Skips the common no-op case where a city
+      // has competitors every cycle and the streak stays at 0.
+      for (const result of results) {
+        if (currentCityStreaks[result.cityCode] === result.newStreak) continue
+        await supabase
+          .from('kaspi_shop_product_city_prices')
+          .update({ no_competitor_streak: result.newStreak })
+          .eq('tracked_product_id', trackedProductId)
+          .eq('city_code', result.cityCode)
+      }
+
       if (connection?.session_cookies && connection.session_status === 'active') {
         const sessionCookies = decryptAtRest(connection.session_cookies, getKey()).toString('utf8')
         const { data: connProducts } = await supabase
@@ -220,18 +238,10 @@ export async function applyPriceCheckResult(
           // Decide per city, not from the aggregate `action` above -- the
           // aggregate can read "no_change" even when one city genuinely
           // moved, if a different city happens to still hold the overall
-          // minimum. The streak is written every time regardless of push
-          // outcome below -- it reflects "was a competitor seen this
-          // cycle", not "did the push succeed", so a rate-limited or
-          // otherwise-failed cycle must still let the pump countdown
-          // advance (a version that only advanced on successful push would
-          // let a busy 30-minute window silently stall the pump forever).
+          // minimum. The streak itself is written unconditionally above,
+          // regardless of push outcome -- this loop only decides whether a
+          // push to Kaspi is attempted at all.
           if (currentCityPrices[result.cityCode] !== undefined && result.price === currentCityPrices[result.cityCode]) {
-            await supabase
-              .from('kaspi_shop_product_city_prices')
-              .update({ no_competitor_streak: result.newStreak })
-              .eq('tracked_product_id', trackedProductId)
-              .eq('city_code', result.cityCode)
             continue
           }
           const pushResult = await pushCityPrice({
@@ -250,17 +260,12 @@ export async function applyPriceCheckResult(
             const pushedAt = new Date().toISOString()
             await supabase
               .from('kaspi_shop_product_city_prices')
-              .update({ own_current_price: result.price, last_competitor_price: competitorPrice, updated_at: pushedAt, last_pushed_at: pushedAt, no_competitor_streak: result.newStreak })
+              .update({ own_current_price: result.price, last_competitor_price: competitorPrice, updated_at: pushedAt, last_pushed_at: pushedAt })
               .eq('tracked_product_id', trackedProductId)
               .eq('city_code', result.cityCode)
           } else {
             console.error('kaspi-shop checkCycle: price push skipped for product', trackedProductId, 'city', result.cityCode, '--', pushResult.message)
             pushIssues.push(`${result.cityCode}: ${pushResult.message}`)
-            await supabase
-              .from('kaspi_shop_product_city_prices')
-              .update({ no_competitor_streak: result.newStreak })
-              .eq('tracked_product_id', trackedProductId)
-              .eq('city_code', result.cityCode)
           }
           if (pushResult.sessionExpired) {
             console.error('kaspi-shop checkCycle: session expired for connection', connection.id, '-- stopping city pushes for this product')
