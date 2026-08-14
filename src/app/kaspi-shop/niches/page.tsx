@@ -116,7 +116,7 @@ export default function KaspiShopNiches() {
           <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight mb-6">Проверить идею товара</h1>
           <form onSubmit={e => { e.preventDefault(); doSearch() }} className="flex gap-2">
             <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Например: термокружка"
-              className="flex-1 rounded-xl bg-white/10 text-white placeholder-white/40 px-4 py-3 text-sm outline-none focus:bg-white/15" />
+              className="flex-1 rounded-xl bg-white/15 text-white placeholder-white/60 px-4 py-3 text-sm outline-none focus:bg-white/20" />
             <button type="submit" disabled={searching || !query.trim()}
               className="rounded-xl bg-white text-[#12142E] text-sm font-semibold px-5 py-3 disabled:opacity-40">
               {searching ? 'Ищем...' : 'Проверить'}

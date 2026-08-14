@@ -1,4 +1,5 @@
 'use client'
+import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ORDER_STATUS_TABS } from '@/lib/kaspiShop/orderStatuses'
@@ -15,6 +16,7 @@ export default function KaspiShopSidebar({ active, orderStatus, orderCounts }: {
   orderCounts?: Record<string, number>
 }) {
   const router = useRouter()
+  const [ordersExpanded, setOrdersExpanded] = useState(true)
 
   return (
     <aside className="lg:w-[220px] lg:flex-shrink-0 lg:p-4">
@@ -31,20 +33,30 @@ export default function KaspiShopSidebar({ active, orderStatus, orderCounts }: {
             className={`rounded-xl text-sm font-medium px-3 py-2.5 ${active === 'demping' ? 'bg-[#1C2056] text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
             Демпинг
           </Link>
-          <Link href="/kaspi-shop/orders"
-            className={`rounded-xl text-sm font-medium px-3 py-2.5 ${active === 'orders' ? 'bg-[#1C2056] text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
-            Заказы
-          </Link>
-          {active === 'orders' && (
+          <div className={`flex items-center rounded-xl ${active === 'orders' ? 'bg-[#1C2056] text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
+            <Link href="/kaspi-shop/orders" className="flex-1 text-sm font-medium px-3 py-2.5">
+              Заказы
+            </Link>
+            {active === 'orders' && (
+              <button
+                type="button"
+                onClick={() => setOrdersExpanded(v => !v)}
+                aria-label={ordersExpanded ? 'Свернуть' : 'Развернуть'}
+                className="px-2.5 py-2.5 text-white/60 hover:text-white transition-colors">
+                <span className={`inline-block transition-transform ${ordersExpanded ? 'rotate-90' : ''}`}>›</span>
+              </button>
+            )}
+          </div>
+          {active === 'orders' && ordersExpanded && (
             <div className="ml-2 pl-3 border-l border-gray-100 flex flex-col gap-0.5 mb-1">
               {ORDER_STATUS_TABS.map(tab => {
                 const count = orderCounts?.[tab.value]
                 const isActive = orderStatus === tab.value
                 return (
                   <Link key={tab.value} href={`/kaspi-shop/orders?status=${tab.value}`}
-                    className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs ${isActive ? 'bg-[#1C2056]/5 text-[#1C2056] font-semibold' : 'text-gray-500 hover:bg-gray-50'}`}>
+                    className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs ${isActive ? 'bg-[#1C2056] text-white font-semibold' : 'text-gray-500 hover:bg-gray-50'}`}>
                     <span>{tab.label}</span>
-                    {!!count && <span className="text-[10px] text-gray-400 tabular-nums">{count}</span>}
+                    {!!count && <span className={`text-[10px] tabular-nums ${isActive ? 'text-white/70' : 'text-gray-400'}`}>{count}</span>}
                   </Link>
                 )
               })}
