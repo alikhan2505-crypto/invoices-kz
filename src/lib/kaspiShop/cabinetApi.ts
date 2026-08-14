@@ -249,13 +249,23 @@ export async function getOrderDetail(sessionCookies: string, merchantId: string,
 // than fetching every status's full order list just to show counts.
 export type OrderCounts = Record<string, number>
 
+// sessionExpired is specifically res.status === 401 -- Kaspi's real
+// signal that mc-session/mc-sid are no longer valid, distinct from any
+// other upstream failure (network error, unexpected shape). Callers use
+// this to write kaspi_shop_connections.session_status via
+// connection.ts's markSessionExpired, so the reconnect banner (read from
+// that column by /api/kaspi-shop/wallet) reflects reality promptly
+// instead of only updating when the repricer's own price-push cron
+// happens to hit the same 401 (which never runs for a paused connection).
+export type OrderCountersResult = { counts: OrderCounts; sessionExpired: boolean }
+
 const GET_ORDER_COUNTERS_QUERY = `query getOrderCounters($merchantUid: String!) {
   merchant(id: $merchantUid) {
     orders { counts { tab count } }
   }
 }`
 
-export async function getOrderCounters(sessionCookies: string, merchantId: string): Promise<OrderCounts> {
+export async function getOrderCounters(sessionCookies: string, merchantId: string): Promise<OrderCountersResult> {
   const res = await fetch('https://mc.shop.kaspi.kz/mc/facade/graphql?opName=getOrderCounters', {
     method: 'POST',
     headers: authHeaders(sessionCookies),
@@ -268,17 +278,17 @@ export async function getOrderCounters(sessionCookies: string, merchantId: strin
   if (!res.ok) {
     const bodyText = await res.text().catch(() => '')
     console.error('kaspi-shop getOrderCounters: upstream not ok', res.status, bodyText.slice(0, 1000))
-    return {}
+    return { counts: {}, sessionExpired: res.status === 401 }
   }
   const json = await res.json().catch(() => null)
   const counts = json?.data?.merchant?.orders?.counts
-  if (!Array.isArray(counts)) return {}
+  if (!Array.isArray(counts)) return { counts: {}, sessionExpired: false }
   const result: OrderCounts = {}
   for (const c of counts) result[c.tab] = c.count
-  return result
+  return { counts: result, sessionExpired: false }
 }
 
-export type OrdersPage = { orders: Order[]; total: number }
+export type OrdersPage = { orders: Order[]; total: number; sessionExpired: boolean }
 
 // size MUST stay at 10 -- confirmed live 2026-08-13: the real cabinet's own
 // SPA always requests size:10, and requesting size:50 (an earlier,
@@ -308,17 +318,18 @@ export async function listOrders(sessionCookies: string, merchantId: string, sta
   if (!res.ok) {
     const bodyText = await res.text().catch(() => '')
     console.error('kaspi-shop listOrders: upstream not ok', res.status, bodyText.slice(0, 1000))
-    return { orders: [], total: 0 }
+    return { orders: [], total: 0, sessionExpired: res.status === 401 }
   }
   const json = await res.json().catch(() => null)
   const page_ = json?.data?.merchant?.orders?.orders
   const orders = page_?.orders
   if (!Array.isArray(orders)) {
     console.error('kaspi-shop listOrders: unexpected response shape for status', status, JSON.stringify(json)?.slice(0, 2000))
-    return { orders: [], total: 0 }
+    return { orders: [], total: 0, sessionExpired: false }
   }
   return {
     total: Number(page_.total) || 0,
+    sessionExpired: false,
     orders: orders.map((o: any) => ({
       code: o.code,
       status: o.status,

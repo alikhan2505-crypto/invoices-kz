@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { loadConnection } from '@/lib/kaspiShop/connection'
+import { loadConnection, markSessionExpired } from '@/lib/kaspiShop/connection'
 import { computeFinanceSummary } from '@/lib/kaspiShop/finance'
 
 const supabaseAuth = createClient(
@@ -31,5 +31,6 @@ export async function GET(req: NextRequest) {
   }
 
   const summary = await computeFinanceSummary(connection.sessionCookies, connection.merchantId, days)
+  if (summary.sessionExpired) await markSessionExpired(connection.id)
   return NextResponse.json(summary)
 }

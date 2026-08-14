@@ -21,16 +21,16 @@ export async function listPendingProducts(
   merchantId: string,
   page: number,
   fetchFn: typeof fetch = fetch
-): Promise<{ products: PendingProduct[]; hasMore: boolean }> {
+): Promise<{ products: PendingProduct[]; hasMore: boolean; sessionExpired: boolean }> {
   const res = await fetchFn(`https://mc.shop.kaspi.kz/bff/pending-products/${merchantId}`, {
     method: 'POST',
     headers: authHeaders(sessionCookies),
     body: JSON.stringify({ page, searchTerm: '', pageSize: PAGE_SIZE, approvalStatus: 'CHECK', isMobileApp: false }),
   })
-  if (!res.ok) return { products: [], hasMore: false }
+  if (!res.ok) return { products: [], hasMore: false, sessionExpired: res.status === 401 }
   const json = await res.json().catch(() => null)
   const data = json?.data
-  if (!Array.isArray(data)) return { products: [], hasMore: false }
+  if (!Array.isArray(data)) return { products: [], hasMore: false, sessionExpired: false }
   return {
     products: data.map((p: any) => ({
       code: p.code,
@@ -40,6 +40,7 @@ export async function listPendingProducts(
       imageUrl: p.images?.[0]?.medium ?? null,
     })),
     hasMore: data.length === PAGE_SIZE,
+    sessionExpired: false,
   }
 }
 
@@ -49,11 +50,11 @@ export async function getPendingCount(
   sessionCookies: string,
   merchantId: string,
   fetchFn: typeof fetch = fetch
-): Promise<number> {
+): Promise<{ count: number; sessionExpired: boolean }> {
   const res = await fetchFn(`https://mc.shop.kaspi.kz/content/pending/mc/product/${merchantId}/count`, {
     headers: authHeaders(sessionCookies),
   })
-  if (!res.ok) return 0
+  if (!res.ok) return { count: 0, sessionExpired: res.status === 401 }
   const json = await res.json().catch(() => null)
-  return Number(json?.CHECK) || 0
+  return { count: Number(json?.CHECK) || 0, sessionExpired: false }
 }

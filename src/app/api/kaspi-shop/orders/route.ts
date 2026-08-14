@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { loadConnection } from '@/lib/kaspiShop/connection'
+import { loadConnection, markSessionExpired } from '@/lib/kaspiShop/connection'
 import { listOrders } from '@/lib/kaspiShop/cabinetApi'
 
 const supabaseAuth = createClient(
@@ -28,6 +28,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Кабинет не подключён — подключите его через Kaspi Магазин' }, { status: 400 })
   }
 
-  const { orders, total } = await listOrders(connection.sessionCookies, connection.merchantId, status, page)
-  return NextResponse.json({ orders, total })
+  const { orders, total, sessionExpired } = await listOrders(connection.sessionCookies, connection.merchantId, status, page)
+  if (sessionExpired) await markSessionExpired(connection.id)
+  return NextResponse.json({ orders, total, sessionExpired })
 }

@@ -25,6 +25,7 @@ describe('listPendingProducts', () => {
     expect(result.products[0]).toEqual({ code: 'A1', name: 'Товар 1', brand: 'Abil.Sisters', categoryName: 'Одежда', imageUrl: 'https://cdn/1.jpg' })
     expect(result.products[1]).toEqual({ code: 'A2', name: 'Товар 2', brand: null, categoryName: null, imageUrl: null })
     expect(result.hasMore).toBe(true)
+    expect(result.sessionExpired).toBe(false)
   })
 
   it('sets hasMore false on a short page', async () => {
@@ -33,23 +34,29 @@ describe('listPendingProducts', () => {
     expect(result.hasMore).toBe(false)
   })
 
-  it('returns an empty result on a failed request', async () => {
+  it('returns an empty result and sessionExpired:true on a 401', async () => {
     const fetchFn = fakeFetch(401, {})
     const result = await listPendingProducts('cookies', 'merchant1', 1, fetchFn)
-    expect(result).toEqual({ products: [], hasMore: false })
+    expect(result).toEqual({ products: [], hasMore: false, sessionExpired: true })
+  })
+
+  it('returns an empty result and sessionExpired:false on a non-401 failure', async () => {
+    const fetchFn = fakeFetch(500, {})
+    const result = await listPendingProducts('cookies', 'merchant1', 1, fetchFn)
+    expect(result).toEqual({ products: [], hasMore: false, sessionExpired: false })
   })
 })
 
 describe('getPendingCount', () => {
   it('returns just the CHECK count', async () => {
     const fetchFn = fakeFetch(200, { IMPORTED: 0, CHECK: 3, PENDING: 0, TRASH: 0 })
-    const count = await getPendingCount('cookies', 'merchant1', fetchFn)
-    expect(count).toBe(3)
+    const result = await getPendingCount('cookies', 'merchant1', fetchFn)
+    expect(result).toEqual({ count: 3, sessionExpired: false })
   })
 
-  it('returns 0 on a failed request', async () => {
+  it('returns 0 and sessionExpired:true on a 401', async () => {
     const fetchFn = fakeFetch(401, {})
-    const count = await getPendingCount('cookies', 'merchant1', fetchFn)
-    expect(count).toBe(0)
+    const result = await getPendingCount('cookies', 'merchant1', fetchFn)
+    expect(result).toEqual({ count: 0, sessionExpired: true })
   })
 })

@@ -69,6 +69,19 @@ export async function loadConnectionById(connectionId: string): Promise<KaspiSho
   }
 }
 
+// Single write path for marking a connection's real Kaspi cabinet session
+// invalid -- previously only checkCycle.ts's repricer price-push wrote this
+// column inline, so a connection that's paused (price-push never attempted)
+// could sit with a stale session_status:'active' indefinitely even though
+// every live read (orders, finance, pending-products) was already getting
+// a real 401 from Kaspi. Callers that detect a 401 from any Kaspi endpoint
+// should call this so /api/kaspi-shop/wallet's sessionStatus (read by the
+// Демпинг page's reconnect banner) reflects reality promptly.
+export async function markSessionExpired(connectionId: string): Promise<void> {
+  const { error } = await supabase.from('kaspi_shop_connections').update({ session_status: 'session_expired' }).eq('id', connectionId)
+  if (error) throw new Error(`kaspi_shop_connections markSessionExpired failed for ${connectionId}: ${error.message}`)
+}
+
 export async function saveConnection(params: {
   userId: string
   apiToken?: string

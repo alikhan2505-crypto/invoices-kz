@@ -5,6 +5,7 @@ import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import LoadingSpinner from '@/components/LoadingSpinner'
 import KaspiShopSidebar from '@/components/kaspiShop/Sidebar'
+import SessionExpiredBanner from '@/components/kaspiShop/SessionExpiredBanner'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -14,6 +15,7 @@ type FinanceSummary = {
   averageOrderValue: number
   byDay: { date: string; revenue: number; orderCount: number }[]
   truncated: boolean
+  sessionExpired: boolean
 }
 
 const PERIODS = [7, 30, 90]
@@ -66,6 +68,8 @@ export default function KaspiShopFinance() {
       <KaspiShopSidebar active="finance" />
 
       <div className="flex-1 min-w-0 p-4 lg:p-6 pb-24 lg:pb-6">
+        {summary?.sessionExpired && <SessionExpiredBanner />}
+
         {loadError && (
           <div className="bg-red-50 rounded-2xl p-4 flex items-center justify-between gap-3 mb-4">
             <span className="text-sm text-red-600">{loadError}</span>

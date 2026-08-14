@@ -5,6 +5,7 @@ import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import LoadingSpinner from '@/components/LoadingSpinner'
 import KaspiShopSidebar from '@/components/kaspiShop/Sidebar'
+import SessionExpiredBanner from '@/components/kaspiShop/SessionExpiredBanner'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -32,6 +33,7 @@ export default function KaspiShopPendingProducts() {
   const [count, setCount] = useState(0)
   const [listLoading, setListLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
+  const [sessionExpired, setSessionExpired] = useState(false)
 
   useEffect(() => { checkAccess() }, [])
   useEffect(() => { if (!loading) loadProducts(page) }, [page, loading])
@@ -60,6 +62,7 @@ export default function KaspiShopPendingProducts() {
       setProducts(data.products || [])
       setHasMore(!!data.hasMore)
       setCount(data.count || 0)
+      if (data.sessionExpired) setSessionExpired(true)
     } catch {
       setLoadError('Не удалось загрузить товары. Проверьте соединение и попробуйте ещё раз.')
       setProducts([])
@@ -76,6 +79,8 @@ export default function KaspiShopPendingProducts() {
       <KaspiShopSidebar active="pending-products" />
 
       <div className="flex-1 min-w-0 p-4 lg:p-6 pb-24 lg:pb-6">
+        {sessionExpired && <SessionExpiredBanner />}
+
         {loadError && (
           <div className="bg-red-50 rounded-2xl p-4 flex items-center justify-between gap-3 mb-4">
             <span className="text-sm text-red-600">{loadError}</span>

@@ -11,6 +11,7 @@ export type FinanceSummary = {
   averageOrderValue: number
   byDay: { date: string; revenue: number; orderCount: number }[]
   truncated: boolean
+  sessionExpired: boolean
 }
 
 // Only these two statuses represent fulfilled/completed orders -- an order
@@ -32,13 +33,20 @@ export async function computeFinanceSummary(
   const cutoffMs = Date.now() - sinceDays * 24 * 60 * 60 * 1000
   const allOrders: Order[] = []
   let truncated = false
+  let sessionExpired = false
 
-  for (const status of REVENUE_STATUSES) {
+  statusLoop: for (const status of REVENUE_STATUSES) {
     let page = 0
     let fetchedForStatus = 0
     let totalForStatus = 0
     while (page < MAX_PAGES_PER_STATUS) {
       const result = await listOrdersFn(sessionCookies, merchantId, status, page)
+      if (result.sessionExpired) {
+        // A dead session won't recover mid-loop -- stop paginating
+        // entirely rather than burning MAX_PAGES_PER_STATUS more 401s.
+        sessionExpired = true
+        break statusLoop
+      }
       allOrders.push(...result.orders)
       fetchedForStatus += result.orders.length
       totalForStatus = result.total
@@ -66,5 +74,5 @@ export async function computeFinanceSummary(
   const orderCount = inWindow.length
   const averageOrderValue = orderCount > 0 ? totalRevenue / orderCount : 0
 
-  return { totalRevenue, orderCount, averageOrderValue, byDay, truncated }
+  return { totalRevenue, orderCount, averageOrderValue, byDay, truncated, sessionExpired }
 }

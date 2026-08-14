@@ -6,6 +6,7 @@ import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import LoadingSpinner from '@/components/LoadingSpinner'
 import KaspiShopSidebar from '@/components/kaspiShop/Sidebar'
+import SessionExpiredBanner from '@/components/kaspiShop/SessionExpiredBanner'
 import { ORDER_STATUS_TABS, TRANSFER_STATUS } from '@/lib/kaspiShop/orderStatuses'
 
 const EASE = [0.16, 1, 0.3, 1] as const
@@ -34,6 +35,7 @@ function KaspiShopOrdersInner() {
   const [loadError, setLoadError] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [printing, setPrinting] = useState(false)
+  const [sessionExpired, setSessionExpired] = useState(false)
 
   const PAGE_SIZE = 10
   const prevStatus = useRef(status)
@@ -78,6 +80,7 @@ function KaspiShopOrdersInner() {
       if (!res.ok) { setLoadError(data.error || 'Не удалось загрузить заказы'); setOrders([]); setTotal(0); return }
       setOrders(data.orders || [])
       setTotal(data.total || 0)
+      if (data.sessionExpired) setSessionExpired(true)
     } catch (e: any) {
       setLoadError('Не удалось загрузить заказы. Проверьте соединение и попробуйте ещё раз.')
       setOrders([])
@@ -94,6 +97,7 @@ function KaspiShopOrdersInner() {
       if (!res.ok) return
       const data = await res.json()
       setCounts(data.counts || {})
+      if (data.sessionExpired) setSessionExpired(true)
     } catch {
       // Badge counts are a nice-to-have -- a failure here shouldn't block
       // the order list itself from showing.
@@ -142,6 +146,8 @@ function KaspiShopOrdersInner() {
       <KaspiShopSidebar active="orders" orderStatus={status} orderCounts={counts} />
 
       <div className="flex-1 min-w-0 p-4 lg:p-6 pb-24 lg:pb-6">
+        {sessionExpired && <SessionExpiredBanner />}
+
         <h1 className="text-2xl font-extrabold text-[#1C2056] mb-4">Заказы</h1>
 
         {loadError && (
