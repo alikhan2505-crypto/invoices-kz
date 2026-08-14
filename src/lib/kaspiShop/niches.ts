@@ -1,6 +1,11 @@
 // Real endpoint confirmed live 2026-08-14 -- kaspi.kz's own public product
-// search, fully unauthenticated (unlike every other kaspiShop lib module,
-// this one needs no session cookies or merchantId at all). See
+// search, fully unauthenticated. ALSO confirmed live 2026-08-14: Kaspi
+// blocks this endpoint from Vercel's production IP range (403, nginx --
+// same IP-block class already known from public product-page HTML). The
+// actual fetch now happens on a GitHub Actions runner (see
+// .github/scripts/kaspi-shop-niche-check.mjs), which delivers the raw
+// response to POST /api/kaspi-shop/niches/deliver -- that route calls
+// mapNicheResponse below on the raw JSON. See
 // docs/superpowers/specs/2026-08-14-kaspi-shop-niches-design.md.
 export type NicheSummary = {
   total: number
@@ -9,27 +14,11 @@ export type NicheSummary = {
   products: { name: string; price: number; rating: number; reviewsCount: number; brand: string; imageUrl: string | null }[]
 }
 
-const CITY_ID = '750000000' // Almaty -- hardcoded in v1, no city picker
+const EMPTY_SUMMARY: NicheSummary = { total: 0, priceRanges: [], topBrands: [], products: [] }
 
-export async function checkNiche(query: string, fetchFn: typeof fetch = fetch): Promise<NicheSummary> {
-  const url = `https://kaspi.kz/yml/product-view/pl/filters?text=${encodeURIComponent(query)}&page=0&all=false&fl=true&ui=d&c=${CITY_ID}`
-  const res = await fetchFn(url, { headers: { accept: 'application/json, text/*' } })
-  if (!res.ok) {
-    const bodyText = await res.text().catch(() => '')
-    console.error('kaspi-shop checkNiche: upstream not ok', res.status, bodyText.slice(0, 500))
-    return { total: 0, priceRanges: [], topBrands: [], products: [] }
-  }
-  const rawText = await res.text()
-  const json = (() => { try { return JSON.parse(rawText) } catch { return null } })()
-  if (!json) {
-    console.error('kaspi-shop checkNiche: response not JSON', rawText.slice(0, 500))
-    return { total: 0, priceRanges: [], topBrands: [], products: [] }
-  }
+export function mapNicheResponse(json: any): NicheSummary {
   const data = json?.data
-  if (!data) {
-    console.error('kaspi-shop checkNiche: no data field', JSON.stringify(json).slice(0, 500))
-    return { total: 0, priceRanges: [], topBrands: [], products: [] }
-  }
+  if (!data) return EMPTY_SUMMARY
 
   const filters = Array.isArray(data.filters) ? data.filters : []
   const priceFilter = filters.find((f: any) => f.id === 'price')

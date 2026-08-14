@@ -1,18 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { checkNiche } from './niches'
+import { mapNicheResponse } from './niches'
 
-function fakeFetch(status: number, body: any): typeof fetch {
-  return (async () => ({
-    ok: status >= 200 && status < 300,
-    status,
-    json: async () => body,
-    text: async () => JSON.stringify(body),
-  })) as unknown as typeof fetch
-}
-
-describe('checkNiche', () => {
-  it('maps the real response shape into a NicheSummary', async () => {
-    const fetchFn = fakeFetch(200, {
+describe('mapNicheResponse', () => {
+  it('maps the real response shape into a NicheSummary', () => {
+    const json = {
       data: {
         total: 6192,
         filters: [
@@ -34,9 +25,9 @@ describe('checkNiche', () => {
           { title: 'Термокружка 2', unitSalePrice: 1535, rating: 4.8, reviewsQuantity: 296, brand: 'RedFox', previewImages: [] },
         ],
       },
-    })
+    }
 
-    const result = await checkNiche('термокружка', fetchFn)
+    const result = mapNicheResponse(json)
 
     expect(result.total).toBe(6192)
     expect(result.priceRanges).toEqual([
@@ -56,24 +47,21 @@ describe('checkNiche', () => {
     ])
   })
 
-  it('caps products at 12 even if more cards are returned', async () => {
+  it('caps products at 12 even if more cards are returned', () => {
     const cards = Array.from({ length: 15 }, (_, i) => ({
       title: `Товар ${i}`, unitSalePrice: 1000, rating: 5, reviewsQuantity: 1, brand: 'X', previewImages: [],
     }))
-    const fetchFn = fakeFetch(200, { data: { total: 100, filters: [], cards } })
-    const result = await checkNiche('x', fetchFn)
+    const result = mapNicheResponse({ data: { total: 100, filters: [], cards } })
     expect(result.products).toHaveLength(12)
   })
 
-  it('returns an empty summary on a failed request', async () => {
-    const fetchFn = fakeFetch(500, {})
-    const result = await checkNiche('x', fetchFn)
+  it('returns an empty summary when data is missing from the response', () => {
+    const result = mapNicheResponse({})
     expect(result).toEqual({ total: 0, priceRanges: [], topBrands: [], products: [] })
   })
 
-  it('returns an empty summary when data is missing from the response', async () => {
-    const fetchFn = fakeFetch(200, {})
-    const result = await checkNiche('x', fetchFn)
+  it('returns an empty summary for a null input', () => {
+    const result = mapNicheResponse(null)
     expect(result).toEqual({ total: 0, priceRanges: [], topBrands: [], products: [] })
   })
 })
