@@ -3,8 +3,6 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ORDER_STATUS_TABS } from '@/lib/kaspiShop/orderStatuses'
 
-const SOON_ITEMS: string[] = []
-
 // Shared across every Kaspi Shop sub-page -- same floating-card language as
 // the rest of invoices.kz (AppNav), scoped to Kaspi Shop's own sections so
 // this reads as a real sub-cabinet, not one lonely page. When active is
@@ -64,12 +62,6 @@ export default function KaspiShopSidebar({ active, orderStatus, orderCounts }: {
             className={`rounded-xl text-sm font-medium px-3 py-2.5 ${active === 'niches' ? 'bg-[#1C2056] text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
             Ниши
           </Link>
-          {SOON_ITEMS.map(item => (
-            <div key={item} className="flex items-center justify-between rounded-xl text-sm text-gray-300 px-3 py-2.5 select-none">
-              <span>{item}</span>
-              <span className="text-[9px] font-semibold tracking-wide bg-gray-100 text-gray-400 rounded-full px-1.5 py-0.5">СКОРО</span>
-            </div>
-          ))}
         </nav>
       </div>
     </aside>

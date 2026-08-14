@@ -15,17 +15,22 @@ export async function POST(req: NextRequest) {
   if (!checkId) return NextResponse.json({ error: 'checkId обязателен' }, { status: 400 })
 
   if (upstreamStatus < 200 || upstreamStatus >= 300) {
-    await failNicheCheck(checkId, `Kaspi upstream HTTP ${upstreamStatus}`)
+    console.error(`kaspi-shop niches deliver: upstream HTTP ${upstreamStatus}, body: ${upstreamBodyText.slice(0, 500)}`)
+    await failNicheCheck(checkId, `Не удалось получить данные с Kaspi (HTTP ${upstreamStatus})`)
     return NextResponse.json({ ok: true })
   }
 
   const parsed = (() => { try { return JSON.parse(upstreamBodyText) } catch { return null } })()
   if (!parsed) {
-    await failNicheCheck(checkId, 'Kaspi upstream returned a non-JSON response')
+    console.error(`kaspi-shop niches deliver: non-JSON response, body: ${upstreamBodyText.slice(0, 500)}`)
+    await failNicheCheck(checkId, 'Kaspi вернул неожиданный ответ')
     return NextResponse.json({ ok: true })
   }
 
   const summary = mapNicheResponse(parsed)
+  if (summary.total === 0 && summary.products.length === 0) {
+    console.error(`kaspi-shop niches deliver: parsed OK but summary is empty, raw body: ${upstreamBodyText.slice(0, 500)}`)
+  }
   await completeNicheCheck(checkId, summary)
   return NextResponse.json({ ok: true })
 }

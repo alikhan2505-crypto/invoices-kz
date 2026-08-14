@@ -21,6 +21,7 @@ export default function KaspiShopNiches() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
+  const [searchedQuery, setSearchedQuery] = useState('')
   const [summary, setSummary] = useState<NicheSummary | null>(null)
   const [searching, setSearching] = useState(false)
   const [searched, setSearched] = useState(false)
@@ -84,6 +85,7 @@ export default function KaspiShopNiches() {
     setSearching(true)
     setLoadError('')
     setSearched(true)
+    setSearchedQuery(query.trim())
     setSummary(null)
     try {
       const headers = await authHeader()
@@ -126,7 +128,7 @@ export default function KaspiShopNiches() {
           {summary && !isEmpty && (
             <div className="mt-6 text-3xl lg:text-4xl font-black font-mono tabular-nums">
               {summary.total.toLocaleString('ru-KZ')}
-              <span className="text-sm font-medium text-white/40 ml-2">товаров по запросу «{query}»</span>
+              <span className="text-sm font-medium text-white/40 ml-2">товаров по запросу «{searchedQuery}»</span>
             </div>
           )}
         </motion.div>
