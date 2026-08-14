@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ORDER_STATUS_TABS } from '@/lib/kaspiShop/orderStatuses'
 
-const SOON_ITEMS = ['Ниши']
+const SOON_ITEMS: string[] = []
 
 // Shared across every Kaspi Shop sub-page -- same floating-card language as
 // the rest of invoices.kz (AppNav), scoped to Kaspi Shop's own sections so
@@ -12,7 +12,7 @@ const SOON_ITEMS = ['Ниши']
 // same pattern as the real Kaspi cabinet's own left-hand nav), matching
 // orderStatus/orderCounts passed down from the orders page.
 export default function KaspiShopSidebar({ active, orderStatus, orderCounts }: {
-  active: 'demping' | 'orders' | 'finance' | 'pending-products'
+  active: 'demping' | 'orders' | 'finance' | 'pending-products' | 'niches'
   orderStatus?: string
   orderCounts?: Record<string, number>
 }) {
@@ -59,6 +59,10 @@ export default function KaspiShopSidebar({ active, orderStatus, orderCounts }: {
           <Link href="/kaspi-shop/pending-products"
             className={`rounded-xl text-sm font-medium px-3 py-2.5 ${active === 'pending-products' ? 'bg-[#1C2056] text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
             Нераспознанные товары
+          </Link>
+          <Link href="/kaspi-shop/niches"
+            className={`rounded-xl text-sm font-medium px-3 py-2.5 ${active === 'niches' ? 'bg-[#1C2056] text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
+            Ниши
           </Link>
           {SOON_ITEMS.map(item => (
             <div key={item} className="flex items-center justify-between rounded-xl text-sm text-gray-300 px-3 py-2.5 select-none">
