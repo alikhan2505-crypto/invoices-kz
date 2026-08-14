@@ -55,6 +55,42 @@ export async function getMerchantInfo(sessionCookies: string, merchantId: string
   return { id: merchant.id, name: merchant.name, logoUrl: merchant.logo?.url ?? null }
 }
 
+// Confirmed live 2026-08-14 against the real connected ABIL-SISTERS session
+// (see docs/superpowers/specs/2026-08-14-kaspi-cabinet-city-names-findings.md)
+// -- same authenticated GraphQL facade as getMerchant/listCatalog above.
+// `cities` takes no arguments and isn't merchant-scoped (confirmed: returns
+// the full national city/point list, not filtered per seller) --
+// merchantId is accepted only for signature consistency with this module's
+// other functions. Backs a best-effort local cache
+// (kaspi_shop_connections.city_lookup_cache) so the city picker can show
+// real names instead of raw Kaspi city codes; never throws -- returns {} on
+// any non-ok response or unexpected shape, since a cache refresh must never
+// block saving the seller's city selection.
+export async function fetchCityNames(sessionCookies: string, _merchantId: string): Promise<Record<string, string>> {
+  try {
+    const res = await fetch('https://mc.shop.kaspi.kz/mc/facade/graphql?opName=getCities', {
+      method: 'POST',
+      headers: authHeaders(sessionCookies),
+      body: JSON.stringify({
+        operationName: 'getCities',
+        variables: {},
+        query: `query getCities { cities { id name } }`,
+      }),
+    })
+    if (!res.ok) return {}
+    const json = await res.json().catch(() => null)
+    const cities = json?.data?.cities
+    if (!Array.isArray(cities)) return {}
+    const result: Record<string, string> = {}
+    for (const c of cities) {
+      if (c?.id && c?.name) result[String(c.id)] = String(c.name)
+    }
+    return result
+  } catch {
+    return {}
+  }
+}
+
 export type CatalogOffer = {
   sku: string
   masterSku: string | null
