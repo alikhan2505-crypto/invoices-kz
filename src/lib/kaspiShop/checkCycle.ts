@@ -163,14 +163,27 @@ export async function applyPriceCheckResult(
   // previously these were silently discarded (final-review finding I2).
   const pushIssues: string[] = []
 
+  // maxPrice/noCompetitorStreak are read once here and reused by both the
+  // top-level computeRepriceCandidate call AND the legacy branch's inner
+  // per-city loop -- the loop's own newStreak results are never persisted
+  // (the legacy path only tracks one streak per product, per the design),
+  // so all its calls deliberately reuse this same "before this cycle"
+  // value rather than each other's outputs.
+  const maxPrice = product.max_price !== null && product.max_price !== undefined ? Number(product.max_price) : undefined
+  const noCompetitorStreak = Number(product.no_competitor_streak) || 0
+
   if (!fetchError && offers && 'perCityOffers' in offers) {
     const excludedMerchants: string[] = product.excluded_merchant_ids || []
     const { data: cityRows } = await supabase
       .from('kaspi_shop_product_city_prices')
-      .select('city_code, own_current_price')
+      .select('city_code, own_current_price, no_competitor_streak')
       .eq('tracked_product_id', trackedProductId)
     const currentCityPrices: Record<string, number> = {}
-    for (const c of cityRows || []) currentCityPrices[c.city_code] = Number(c.own_current_price)
+    const currentCityStreaks: Record<string, number> = {}
+    for (const c of cityRows || []) {
+      currentCityPrices[c.city_code] = Number(c.own_current_price)
+      currentCityStreaks[c.city_code] = Number(c.no_competitor_streak) || 0
+    }
 
     const cityOffersList: CityOffers[] = Object.entries(offers.perCityOffers).map(([cityCode, cityOffers]) => ({ cityCode, offers: cityOffers }))
     const results = computePerCityReprice({
@@ -178,8 +191,10 @@ export async function applyPriceCheckResult(
       excludedMerchantIds: excludedMerchants,
       undercutStep: Number(product.undercut_step),
       floorPrice: Number(product.floor_price),
+      maxPrice,
       strategy: (product.demping_strategy as DempingStrategy) || 'undercut_leader',
       currentCityPrices,
+      currentCityStreaks,
     })
 
     if (results.length > 0) {
@@ -196,9 +211,6 @@ export async function applyPriceCheckResult(
 
       if (connection?.session_cookies && connection.session_status === 'active') {
         const sessionCookies = decryptAtRest(connection.session_cookies, getKey()).toString('utf8')
-        // Hoisted out of pushCityPrice -- loop-invariant for this whole
-        // product, so one fetch here replaces what used to be one redundant
-        // fetch per city push (final-review finding I4).
         const { data: connProducts } = await supabase
           .from('kaspi_shop_tracked_products')
           .select('id')
@@ -208,8 +220,20 @@ export async function applyPriceCheckResult(
           // Decide per city, not from the aggregate `action` above -- the
           // aggregate can read "no_change" even when one city genuinely
           // moved, if a different city happens to still hold the overall
-          // minimum.
-          if (currentCityPrices[result.cityCode] !== undefined && result.price === currentCityPrices[result.cityCode]) continue
+          // minimum. The streak is written every time regardless of push
+          // outcome below -- it reflects "was a competitor seen this
+          // cycle", not "did the push succeed", so a rate-limited or
+          // otherwise-failed cycle must still let the pump countdown
+          // advance (a version that only advanced on successful push would
+          // let a busy 30-minute window silently stall the pump forever).
+          if (currentCityPrices[result.cityCode] !== undefined && result.price === currentCityPrices[result.cityCode]) {
+            await supabase
+              .from('kaspi_shop_product_city_prices')
+              .update({ no_competitor_streak: result.newStreak })
+              .eq('tracked_product_id', trackedProductId)
+              .eq('city_code', result.cityCode)
+            continue
+          }
           const pushResult = await pushCityPrice({
             connectionId: connection.id,
             merchantId: connection.merchant_id,
@@ -226,12 +250,17 @@ export async function applyPriceCheckResult(
             const pushedAt = new Date().toISOString()
             await supabase
               .from('kaspi_shop_product_city_prices')
-              .update({ own_current_price: result.price, last_competitor_price: competitorPrice, updated_at: pushedAt, last_pushed_at: pushedAt })
+              .update({ own_current_price: result.price, last_competitor_price: competitorPrice, updated_at: pushedAt, last_pushed_at: pushedAt, no_competitor_streak: result.newStreak })
               .eq('tracked_product_id', trackedProductId)
               .eq('city_code', result.cityCode)
           } else {
             console.error('kaspi-shop checkCycle: price push skipped for product', trackedProductId, 'city', result.cityCode, '--', pushResult.message)
             pushIssues.push(`${result.cityCode}: ${pushResult.message}`)
+            await supabase
+              .from('kaspi_shop_product_city_prices')
+              .update({ no_competitor_streak: result.newStreak })
+              .eq('tracked_product_id', trackedProductId)
+              .eq('city_code', result.cityCode)
           }
           if (pushResult.sessionExpired) {
             console.error('kaspi-shop checkCycle: session expired for connection', connection.id, '-- stopping city pushes for this product')
@@ -259,19 +288,21 @@ export async function applyPriceCheckResult(
       .filter(o => !excludedMerchants.includes(o.merchantId))
       .map(o => o.price)
     competitorPrice = competitorPrices.length > 0 ? Math.min(...competitorPrices) : null
-    const { price, heldAtFloor } = computeRepriceCandidate({
+    const { price, heldAtFloor, newStreak } = computeRepriceCandidate({
       competitorPrices,
       undercutStep: Number(product.undercut_step),
       floorPrice: Number(product.floor_price),
+      maxPrice,
       strategy: (product.demping_strategy as DempingStrategy) || 'undercut_leader',
       ownCurrentPrice: ownPriceBefore,
+      noCompetitorStreak,
     })
     ownPriceAfter = price
     action = heldAtFloor ? 'held_at_floor' : (price === ownPriceBefore ? 'no_change' : 'updated')
 
     await supabase
       .from('kaspi_shop_tracked_products')
-      .update({ own_current_price: ownPriceAfter, last_checked_at: new Date().toISOString(), last_competitor_price: competitorPrice })
+      .update({ own_current_price: ownPriceAfter, last_checked_at: new Date().toISOString(), last_competitor_price: competitorPrice, no_competitor_streak: newStreak })
       .eq('id', trackedProductId)
 
     if (action === 'updated' && connection?.session_cookies && connection.session_status === 'active') {
@@ -284,10 +315,6 @@ export async function applyPriceCheckResult(
 
       if (citiesToPush.length > 0) {
         const sessionCookies = decryptAtRest(connection.session_cookies, getKey()).toString('utf8')
-        // Hoisted out of pushCityPrice -- loop-invariant for this whole
-        // product (up to ~320 legacy cities), so one fetch here replaces
-        // what used to be one redundant fetch per city push (final-review
-        // finding I4).
         const { data: connProducts } = await supabase
           .from('kaspi_shop_tracked_products')
           .select('id')
@@ -298,8 +325,10 @@ export async function applyPriceCheckResult(
             competitorPrices,
             undercutStep: Number(product.undercut_step),
             floorPrice: Number(product.floor_price),
+            maxPrice,
             strategy: (product.demping_strategy as DempingStrategy) || 'undercut_leader',
             ownCurrentPrice: Number(city.own_current_price ?? ownPriceBefore),
+            noCompetitorStreak,
           })
 
           const result = await pushCityPrice({
