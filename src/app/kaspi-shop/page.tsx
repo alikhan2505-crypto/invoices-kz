@@ -130,6 +130,7 @@ export default function KaspiShop() {
   const [trackedCities, setTrackedCities] = useState<string[]>([])
   const [availableCities, setAvailableCities] = useState<{ code: string; name: string }[]>([])
   const [citiesSaving, setCitiesSaving] = useState(false)
+  const [citySearch, setCitySearch] = useState('')
 
   useEffect(() => { load() }, [])
 
@@ -472,17 +473,37 @@ export default function KaspiShop() {
                   : `Выбрано: ${trackedCities.length}. Конкурента и цену проверяем отдельно по каждому.`}
                 {citiesSaving && ' Сохраняем…'}
               </div>
-              <div className="flex flex-wrap gap-2">
-                {availableCities.map(city => (
-                  <button key={city.code} onClick={() => toggleTrackedCity(city.code)}
-                    className={`text-xs px-3 py-1.5 rounded-full transition-colors ${trackedCities.includes(city.code) ? 'bg-[#1C2056] text-white' : 'bg-gray-100 text-gray-500'}`}>
-                    {city.name}
-                  </button>
-                ))}
-                {availableCities.length === 0 && (
-                  <div className="text-[11px] text-gray-400">Список городов ещё не загружен.</div>
-                )}
-              </div>
+              {trackedCities.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {availableCities.filter(c => trackedCities.includes(c.code)).map(city => (
+                    <button key={city.code} onClick={() => toggleTrackedCity(city.code)}
+                      className="text-xs pl-3 pr-2 py-1.5 rounded-full bg-[#1C2056] text-white flex items-center gap-1.5">
+                      {city.name}
+                      <span className="text-white/50">✕</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {availableCities.length === 0 ? (
+                <div className="text-[11px] text-gray-400">Список городов ещё не загружен.</div>
+              ) : (
+                <>
+                  <input value={citySearch} onChange={e => setCitySearch(e.target.value)} placeholder="Найти город…"
+                    className="w-full rounded-lg bg-gray-50 text-gray-800 placeholder-gray-400 px-3 py-2 text-xs outline-none focus:bg-gray-100 mb-2" />
+                  <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto">
+                    {availableCities
+                      .filter(c => !trackedCities.includes(c.code))
+                      .filter(c => c.name.toLowerCase().includes(citySearch.trim().toLowerCase()))
+                      .map(city => (
+                        <button key={city.code} onClick={() => toggleTrackedCity(city.code)}
+                          className="text-xs px-3 py-1.5 rounded-full bg-gray-100 text-gray-500 transition-colors hover:bg-gray-200">
+                          {city.name}
+                        </button>
+                      ))}
+                  </div>
+                </>
+              )}
             </div>
 
             {companyName && activeCount === 0 && products.length > 0 && (
