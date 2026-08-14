@@ -2,17 +2,30 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createNicheCheck, failNicheCheck } from '@/lib/kaspiShop/nicheChecks'
 
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
 const supabaseAuth = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-async function requireUser(req: NextRequest) {
+// checkId is an opaque identifier with no owner column -- unlike the other
+// kaspi-shop routes (which only ever return the CALLER's own connected
+// shop's data via loadConnection(user.id)), any authenticated user could
+// otherwise poll another user's checkId. Requiring is_admin closes that gap
+// server-side, matching the requireAdmin pattern already used by
+// src/app/api/kaspi/admin-stats/route.ts, since this whole feature is
+// admin-only in practice (the page itself already gates on is_admin).
+async function requireAdmin(req: NextRequest) {
   const accessToken = req.headers.get('authorization')?.replace('Bearer ', '')
   const { data: { user } } = accessToken
     ? await supabaseAuth.auth.getUser(accessToken)
     : { data: { user: null } }
-  return user
+  if (!user) return null
+  const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', user.id).single()
+  return profile?.is_admin ? user : null
 }
 
 // Static -- this repo never changes owner/name, so these are constants,
@@ -22,7 +35,7 @@ const GITHUB_REPO = 'invoices-kz'
 const GITHUB_WORKFLOW = 'kaspi-shop-niche-check.yml'
 
 export async function POST(req: NextRequest) {
-  const user = await requireUser(req)
+  const user = await requireAdmin(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json().catch(() => null)
