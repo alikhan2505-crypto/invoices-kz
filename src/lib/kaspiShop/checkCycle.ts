@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import { computeRepriceCandidate, DempingStrategy, resolveTargetCities } from './pricing'
+import { computeRepriceCandidate, DempingStrategy, resolveTargetCities, computePerCityReprice, CompetitorOffer, CityOffers } from './pricing'
 import { debitKaspiShopWallet } from './wallet'
 import { getKey } from './connection'
 import { decryptAtRest } from '@/lib/kaspiPay/crypto'
@@ -95,30 +95,27 @@ async function pushCityPrice(params: {
   return { pushed: false, sessionExpired: false, message: result.message }
 }
 
-export type CompetitorOffer = { merchantId: string; price: number }
+export type ApplyOffers =
+  | { perCityOffers: Record<string, CompetitorOffer[]> }
+  | { competitorOffers: CompetitorOffer[] }
 
 // One tracked product, one already-fetched set of competitor offers (or a
 // fetch error, reported by the caller since the fetch itself no longer
 // happens here). Never throws -- a single product's failure must not abort
 // the rest of the caller's batch. Always logs a kaspi_shop_price_checks row
 // and debits one credit, even on error -- the competitor-price check itself
-// is the billable work (see Global Constraints), and an error row is real
-// information the seller should see in their history, not a silently
-// dropped cycle.
+// is the billable work, and an error row is real information the seller
+// should see in their history, not a silently dropped cycle.
 //
-// v2 note: Kaspi genuinely prices per delivery city (confirmed live
-// 2026-08-12 -- allCityPrices on a real product has ~150 city codes, each
-// with its own price), but the competitor-offers fetch this codebase uses
-// (yml/offer-view/offers/{sku}, confirmed live 2026-08-14) is only ever
-// queried for one reference city (Almaty), not per-tracked-city -- a true
-// per-city COMPETITOR read would need the caller to fetch once per city,
-// not yet done. So the same filtered offer set is applied as the reference
-// for every one of the product's tracked cities below -- city-level
-// awareness here means per-city OWN price and city exclusions, not yet
-// per-city competitor discovery.
+// Two payload shapes: `perCityOffers` (the store has configured
+// tracked_city_codes -- each city gets its own competitor offers and its
+// own computeRepriceCandidate call) and the legacy `competitorOffers` flat
+// array (the store hasn't configured per-city tracking yet -- exact
+// pre-existing behavior, untouched, so nothing changes for a store that
+// hasn't opted in). See docs/superpowers/specs/2026-08-14-kaspi-shop-city-pricing-design.md.
 export async function applyPriceCheckResult(
   trackedProductId: string,
-  competitorOffers: CompetitorOffer[] | null,
+  offers: ApplyOffers | null,
   fetchError: string | null
 ): Promise<void> {
   const { data: product } = await supabase
@@ -136,12 +133,84 @@ export async function applyPriceCheckResult(
   let ownPriceAfter = ownPriceBefore
   let competitorPrice: number | null = null
 
-  if (!fetchError) {
-    // Confirmed live 2026-08-14: yml/offer-view/offers does NOT return
-    // offers strictly sorted by price (Kaspi appears to pin a
-    // higher-rated/higher-volume seller first even when a cheaper offer
-    // exists elsewhere in the array) -- never trust array order or
-    // offers[0], always filter then take the explicit minimum.
+  if (!fetchError && offers && 'perCityOffers' in offers) {
+    const excludedMerchants: string[] = product.excluded_merchant_ids || []
+    const { data: cityRows } = await supabase
+      .from('kaspi_shop_product_city_prices')
+      .select('city_code, own_current_price')
+      .eq('tracked_product_id', trackedProductId)
+    const currentCityPrices: Record<string, number> = {}
+    for (const c of cityRows || []) currentCityPrices[c.city_code] = Number(c.own_current_price)
+
+    const cityOffersList: CityOffers[] = Object.entries(offers.perCityOffers).map(([cityCode, cityOffers]) => ({ cityCode, offers: cityOffers }))
+    const results = computePerCityReprice({
+      cityOffers: cityOffersList,
+      excludedMerchantIds: excludedMerchants,
+      undercutStep: Number(product.undercut_step),
+      floorPrice: Number(product.floor_price),
+      strategy: (product.demping_strategy as DempingStrategy) || 'undercut_leader',
+      currentCityPrices,
+    })
+
+    if (results.length > 0) {
+      ownPriceAfter = Math.min(...results.map(r => r.price))
+      const anyHeldAtFloor = results.some(r => r.heldAtFloor)
+      action = anyHeldAtFloor ? 'held_at_floor' : (ownPriceAfter === ownPriceBefore ? 'no_change' : 'updated')
+      const allCompetitorPrices = cityOffersList.flatMap(c => c.offers.filter(o => !excludedMerchants.includes(o.merchantId)).map(o => o.price))
+      competitorPrice = allCompetitorPrices.length > 0 ? Math.min(...allCompetitorPrices) : null
+
+      await supabase
+        .from('kaspi_shop_tracked_products')
+        .update({ own_current_price: ownPriceAfter, last_checked_at: new Date().toISOString(), last_competitor_price: competitorPrice })
+        .eq('id', trackedProductId)
+
+      if (connection?.session_cookies && connection.session_status === 'active') {
+        const sessionCookies = decryptAtRest(connection.session_cookies, getKey()).toString('utf8')
+        for (const result of results) {
+          // Decide per city, not from the aggregate `action` above -- the
+          // aggregate can read "no_change" even when one city genuinely
+          // moved, if a different city happens to still hold the overall
+          // minimum.
+          if (currentCityPrices[result.cityCode] !== undefined && result.price === currentCityPrices[result.cityCode]) continue
+          const pushResult = await pushCityPrice({
+            connectionId: connection.id,
+            merchantId: connection.merchant_id,
+            sessionCookies,
+            trackedProductId,
+            sku: product.kaspi_sku,
+            model: product.product_name,
+            storeId: product.store_id,
+            cityCode: result.cityCode,
+            newPrice: result.price,
+          })
+          if (pushResult.pushed) {
+            await supabase
+              .from('kaspi_shop_product_city_prices')
+              .update({ own_current_price: result.price, last_competitor_price: competitorPrice, updated_at: new Date().toISOString() })
+              .eq('tracked_product_id', trackedProductId)
+              .eq('city_code', result.cityCode)
+          }
+          if (pushResult.sessionExpired) {
+            console.error('kaspi-shop checkCycle: session expired for connection', connection.id, '-- stopping city pushes for this product')
+            break
+          }
+        }
+      }
+
+      if (anyHeldAtFloor) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('telegram_chat_id, notify_telegram')
+          .eq('id', userId)
+          .single()
+        if (profile?.notify_telegram && profile.telegram_chat_id) {
+          await sendTelegramNotification(profile.telegram_chat_id,
+            `🔴 Kaspi Магазин: цена товара «${product.product_name}» упёрлась в ваш минимум (${product.floor_price} ₸) в одном или нескольких городах — конкурент дешевле, но снижать дальше нельзя. Проверьте вручную, если хотите скорректировать минимум.`)
+        }
+      }
+    }
+  } else if (!fetchError) {
+    const competitorOffers = offers && 'competitorOffers' in offers ? offers.competitorOffers : null
     const excludedMerchants: string[] = product.excluded_merchant_ids || []
     const competitorPrices = (competitorOffers || [])
       .filter(o => !excludedMerchants.includes(o.merchantId))
@@ -162,13 +231,6 @@ export async function applyPriceCheckResult(
       .update({ own_current_price: ownPriceAfter, last_checked_at: new Date().toISOString(), last_competitor_price: competitorPrice })
       .eq('id', trackedProductId)
 
-    // Cabinet-bot connections (session_cookies present, e.g. from a future
-    // Task 6 connect flow) push per-city instantly instead of waiting on
-    // the hourly XML feed. A connection with no session_cookies (still the
-    // only kind that exists in production as of this task -- Task 6, which
-    // performs the real cabinet login, hasn't shipped yet) keeps behaving
-    // exactly as v1: only the stored price changes, picked up by the
-    // existing pricelist route on Kaspi's own schedule.
     if (action === 'updated' && connection?.session_cookies && connection.session_status === 'active') {
       const { data: cityRows } = await supabase
         .from('kaspi_shop_product_city_prices')
@@ -213,9 +275,6 @@ export async function applyPriceCheckResult(
           }
         }
       }
-      // No city rows yet (Task 6 hasn't imported the catalog for this
-      // connection) -- nothing more to do here; the top-level
-      // own_current_price update above still applies.
     }
 
     if (heldAtFloor) {

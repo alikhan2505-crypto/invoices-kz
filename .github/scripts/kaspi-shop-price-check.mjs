@@ -15,11 +15,11 @@
 const baseUrl = process.env.BASE_URL || 'https://www.invoices.kz'
 const secret = process.env.KASPI_SHOP_CRON_SECRET
 
-const CITY_ID = '750000000' // Almaty -- one reference city, same scope as before (no per-city competitor discovery yet)
+const CITY_ID = '750000000' // Almaty -- legacy reference city, used only when a product has no targetCities configured
 const OFFERS_LIMIT = 50 // covers every real product observed live (max seen: 30 offers) in one request, no pagination needed
 
-async function fetchCompetitorOffers(kaspiSku) {
-  const productPageUrl = `https://kaspi.kz/shop/p/-${encodeURIComponent(kaspiSku)}/?c=${CITY_ID}`
+async function fetchOffersForCity(kaspiSku, cityId) {
+  const productPageUrl = `https://kaspi.kz/shop/p/-${encodeURIComponent(kaspiSku)}/?c=${cityId}`
   const res = await fetch(`https://kaspi.kz/yml/offer-view/offers/${encodeURIComponent(kaspiSku)}`, {
     method: 'POST',
     headers: {
@@ -34,16 +34,20 @@ async function fetchCompetitorOffers(kaspiSku) {
       'sec-fetch-mode': 'cors',
       'sec-fetch-site': 'same-origin',
     },
-    body: JSON.stringify({ cityId: CITY_ID, id: kaspiSku, merchantUID: [], limit: OFFERS_LIMIT, page: 0, sortOption: 'PRICE' }),
+    body: JSON.stringify({ cityId, id: kaspiSku, merchantUID: [], limit: OFFERS_LIMIT, page: 0, sortOption: 'PRICE' }),
   })
   if (!res.ok) {
-    throw new Error(`Kaspi offer-view fetch failed for sku ${kaspiSku}: HTTP ${res.status}`)
+    throw new Error(`Kaspi offer-view fetch failed for sku ${kaspiSku} city ${cityId}: HTTP ${res.status}`)
   }
   const json = await res.json()
   const offers = Array.isArray(json.offers) ? json.offers : []
   return offers
     .filter(o => o && o.merchantId != null && Number(o.price) > 0)
     .map(o => ({ merchantId: String(o.merchantId), price: Number(o.price) }))
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms))
 }
 
 async function main() {
@@ -64,9 +68,18 @@ async function main() {
 
   for (const product of due) {
     let competitorOffers = null
+    let perCityOffers = null
     let fetchError = null
     try {
-      competitorOffers = await fetchCompetitorOffers(product.kaspiSku)
+      if (product.targetCities && product.targetCities.length > 0) {
+        perCityOffers = {}
+        for (const cityCode of product.targetCities) {
+          perCityOffers[cityCode] = await fetchOffersForCity(product.kaspiSku, cityCode)
+          await sleep(300)
+        }
+      } else {
+        competitorOffers = await fetchOffersForCity(product.kaspiSku, CITY_ID)
+      }
     } catch (err) {
       fetchError = err.message
     }
@@ -74,12 +87,13 @@ async function main() {
     const applyRes = await fetch(`${baseUrl}/api/kaspi-shop/cron/apply`, {
       method: 'POST',
       headers: { 'x-kaspi-shop-cron-secret': secret, 'content-type': 'application/json' },
-      body: JSON.stringify({ trackedProductId: product.id, competitorOffers, fetchError }),
+      body: JSON.stringify({ trackedProductId: product.id, competitorOffers, perCityOffers, fetchError }),
     })
     if (!applyRes.ok) {
       console.error(`apply failed for ${product.id}: HTTP ${applyRes.status}`)
     } else {
-      console.log(`${product.id}: ${competitorOffers ? competitorOffers.length : 0} offer(s) fetchError=${fetchError}`)
+      const offerCount = perCityOffers ? Object.values(perCityOffers).reduce((sum, arr) => sum + arr.length, 0) : (competitorOffers ? competitorOffers.length : 0)
+      console.log(`${product.id}: ${offerCount} offer(s) across ${perCityOffers ? Object.keys(perCityOffers).length : 1} cit(y/ies), fetchError=${fetchError}`)
     }
   }
 }

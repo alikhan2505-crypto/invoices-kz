@@ -18,6 +18,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'trackedProductId required' }, { status: 400 })
   }
 
-  await applyPriceCheckResult(body.trackedProductId, body.competitorOffers ?? null, body.fetchError ?? null)
+  const offers = body.perCityOffers
+    ? { perCityOffers: body.perCityOffers }
+    : body.competitorOffers
+    ? { competitorOffers: body.competitorOffers }
+    : null
+
+  await applyPriceCheckResult(body.trackedProductId, offers, body.fetchError ?? null)
   return NextResponse.json({ ok: true })
 }
