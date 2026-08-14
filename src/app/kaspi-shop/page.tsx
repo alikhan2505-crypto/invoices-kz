@@ -130,6 +130,20 @@ export default function KaspiShop() {
     return { 'Authorization': `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' }
   }
 
+  // Shared by load() and saveTrackedCities() -- GET /settings/cities is the
+  // single source of truth for availableCities (real names when
+  // city_lookup_cache has them, lazily seeded on first call if it's empty,
+  // raw codes as a last resort -- see that route for the full chain).
+  // Returns null on any non-ok response (e.g. not connected yet) so callers
+  // can leave the existing state alone instead of clobbering it with an
+  // empty list.
+  async function fetchAvailableCities(headers: Record<string, string>): Promise<{ code: string; name: string }[] | null> {
+    const res = await fetch('/api/kaspi-shop/settings/cities', { headers })
+    if (!res.ok) return null
+    const data = await res.json()
+    return (data.cities || []).map((c: any) => ({ code: c.code, name: String(c.name) }))
+  }
+
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
@@ -139,9 +153,10 @@ export default function KaspiShop() {
     setLoadError('')
     try {
       const headers = await authHeader()
-      const [productsRes, walletRes] = await Promise.all([
+      const [productsRes, walletRes, cities] = await Promise.all([
         fetch('/api/kaspi-shop/products', { headers }),
         fetch('/api/kaspi-shop/wallet', { headers }),
+        fetchAvailableCities(headers),
       ])
       if (productsRes.ok) {
         const data = await productsRes.json()
@@ -171,8 +186,8 @@ export default function KaspiShop() {
         setSessionStatus(data.sessionStatus ?? null)
         setCompanyName(data.companyName ?? null)
         setTrackedCities(data.trackedCityCodes || [])
-        setAvailableCities(Object.entries(data.cityLookupCache || {}).map(([code, name]) => ({ code, name: String(name) })))
       }
+      if (cities) setAvailableCities(cities)
     } catch (e: any) {
       console.error('Kaspi Shop load error:', e.message)
       setLoadError('Не удалось загрузить данные. Проверьте соединение и попробуйте ещё раз.')
@@ -236,10 +251,26 @@ export default function KaspiShop() {
   }
 
   async function saveTrackedCities(codes: string[]) {
+    const previous = trackedCities
     setTrackedCities(codes)
     setCitiesSaving(true)
     const headers = await authHeader()
-    await fetch('/api/kaspi-shop/settings/cities', { method: 'PATCH', headers, body: JSON.stringify({ trackedCityCodes: codes }) })
+    const res = await fetch('/api/kaspi-shop/settings/cities', { method: 'PATCH', headers, body: JSON.stringify({ trackedCityCodes: codes }) })
+    if (!res.ok) {
+      // Revert the optimistic chip toggle -- without this a chip stayed
+      // selected in the UI even when the save failed (e.g. not connected,
+      // or the new >15 cap rejected it), silently diverging from what's
+      // actually stored server-side.
+      setTrackedCities(previous)
+    } else {
+      // The PATCH may have just seeded city_lookup_cache for the first
+      // time (a fresh connect's best-effort seed can still miss, e.g. a
+      // session that was expired at connect time and only later renewed) --
+      // re-read availableCities so newly-available names show up now,
+      // instead of only after a manual page reload.
+      const refreshed = await fetchAvailableCities(headers)
+      if (refreshed) setAvailableCities(refreshed)
+    }
     setCitiesSaving(false)
   }
 

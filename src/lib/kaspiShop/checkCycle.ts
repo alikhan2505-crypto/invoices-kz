@@ -49,29 +49,39 @@ export async function getDueTrackedProducts(): Promise<DueTrackedProduct[]> {
 // and whether the session turned out to be expired (caller stops the whole
 // batch for this connection when that happens, rather than retrying a dead
 // session city after city).
+//
+// `productIds` is the connection's product id list, hoisted up to
+// applyPriceCheckResult and passed in -- it's loop-invariant for the whole
+// product being processed (up to ~320 pushes on the live legacy path), so
+// re-fetching it on every single push was pure waste on the critical path
+// of one /cron/apply request (final-review finding I4).
 async function pushCityPrice(params: {
   connectionId: string
   merchantId: string
   sessionCookies: string
   trackedProductId: string
+  productIds: string[]
   sku: string
   model: string
   storeId: string
   cityCode: string
   newPrice: number
 }): Promise<{ pushed: boolean; sessionExpired: boolean; message?: string }> {
+  // Budget signal is last_pushed_at, not updated_at -- updated_at is also
+  // set by finalizeConnection's bulk catalog-import insert (NOT NULL
+  // DEFAULT now(), 43,840 rows in one shot on the live account), which
+  // isn't a real push to Kaspi and must never count against the real
+  // 250/30min ceiling. last_pushed_at is nullable and written ONLY on a
+  // confirmed successful push (right below, and in applyPriceCheckResult),
+  // so rows from catalog import never contribute here (final-review
+  // finding I1).
   const since = new Date(Date.now() - KASPI_RATE_LIMIT_WINDOW_MS).toISOString()
-  const { data: connProducts } = await supabase
-    .from('kaspi_shop_tracked_products')
-    .select('id')
-    .eq('connection_id', params.connectionId)
-  const productIds = (connProducts || []).map((p: any) => p.id)
   const { data: recentPushes } = await supabase
     .from('kaspi_shop_product_city_prices')
-    .select('updated_at')
-    .in('tracked_product_id', productIds)
-    .gte('updated_at', since)
-  const timestamps = (recentPushes || []).map((r: any) => new Date(r.updated_at).getTime())
+    .select('last_pushed_at')
+    .in('tracked_product_id', params.productIds)
+    .gte('last_pushed_at', since)
+  const timestamps = (recentPushes || []).map((r: any) => new Date(r.last_pushed_at).getTime())
   if (!isWithinBudget(timestamps, Date.now())) {
     return { pushed: false, sessionExpired: false, message: 'rate limit budget exhausted for this 30-minute window' }
   }
@@ -93,6 +103,21 @@ async function pushCityPrice(params: {
     return { pushed: false, sessionExpired: true, message: result.message }
   }
   return { pushed: false, sessionExpired: false, message: result.message }
+}
+
+// A single throttled cycle can generate one issue per remaining city in the
+// loop (up to ~320 on the live legacy path, almost all identical "rate
+// limit budget exhausted" messages) -- capped so kaspi_shop_price_checks'
+// error_message stays a readable signal instead of a wall of repeats.
+// Previously this was discarded entirely: own_current_price got updated in
+// our DB to a price Kaspi never actually received, with no log line and no
+// signal anywhere the seller could see (final-review finding I2; also the
+// only visibility into I1's fix actually taking effect).
+function summarizePushIssues(issues: string[]): string | null {
+  if (issues.length === 0) return null
+  const shown = issues.slice(0, 5)
+  const suffix = issues.length > shown.length ? ` (+${issues.length - shown.length} more)` : ''
+  return (shown.join('; ') + suffix).slice(0, 2000)
 }
 
 export type ApplyOffers =
@@ -132,6 +157,11 @@ export async function applyPriceCheckResult(
   let action: 'updated' | 'held_at_floor' | 'no_change' | 'error' = 'no_change'
   let ownPriceAfter = ownPriceBefore
   let competitorPrice: number | null = null
+  // Collects a message for every push that didn't happen (rate-limited,
+  // session issue, upstream error) across whichever branch below runs, so
+  // it can be surfaced in the kaspi_shop_price_checks row at the end --
+  // previously these were silently discarded (final-review finding I2).
+  const pushIssues: string[] = []
 
   if (!fetchError && offers && 'perCityOffers' in offers) {
     const excludedMerchants: string[] = product.excluded_merchant_ids || []
@@ -166,6 +196,14 @@ export async function applyPriceCheckResult(
 
       if (connection?.session_cookies && connection.session_status === 'active') {
         const sessionCookies = decryptAtRest(connection.session_cookies, getKey()).toString('utf8')
+        // Hoisted out of pushCityPrice -- loop-invariant for this whole
+        // product, so one fetch here replaces what used to be one redundant
+        // fetch per city push (final-review finding I4).
+        const { data: connProducts } = await supabase
+          .from('kaspi_shop_tracked_products')
+          .select('id')
+          .eq('connection_id', connection.id)
+        const productIds = (connProducts || []).map((p: any) => p.id)
         for (const result of results) {
           // Decide per city, not from the aggregate `action` above -- the
           // aggregate can read "no_change" even when one city genuinely
@@ -177,6 +215,7 @@ export async function applyPriceCheckResult(
             merchantId: connection.merchant_id,
             sessionCookies,
             trackedProductId,
+            productIds,
             sku: product.kaspi_sku,
             model: product.product_name,
             storeId: product.store_id,
@@ -184,11 +223,15 @@ export async function applyPriceCheckResult(
             newPrice: result.price,
           })
           if (pushResult.pushed) {
+            const pushedAt = new Date().toISOString()
             await supabase
               .from('kaspi_shop_product_city_prices')
-              .update({ own_current_price: result.price, last_competitor_price: competitorPrice, updated_at: new Date().toISOString() })
+              .update({ own_current_price: result.price, last_competitor_price: competitorPrice, updated_at: pushedAt, last_pushed_at: pushedAt })
               .eq('tracked_product_id', trackedProductId)
               .eq('city_code', result.cityCode)
+          } else {
+            console.error('kaspi-shop checkCycle: price push skipped for product', trackedProductId, 'city', result.cityCode, '--', pushResult.message)
+            pushIssues.push(`${result.cityCode}: ${pushResult.message}`)
           }
           if (pushResult.sessionExpired) {
             console.error('kaspi-shop checkCycle: session expired for connection', connection.id, '-- stopping city pushes for this product')
@@ -241,6 +284,15 @@ export async function applyPriceCheckResult(
 
       if (citiesToPush.length > 0) {
         const sessionCookies = decryptAtRest(connection.session_cookies, getKey()).toString('utf8')
+        // Hoisted out of pushCityPrice -- loop-invariant for this whole
+        // product (up to ~320 legacy cities), so one fetch here replaces
+        // what used to be one redundant fetch per city push (final-review
+        // finding I4).
+        const { data: connProducts } = await supabase
+          .from('kaspi_shop_tracked_products')
+          .select('id')
+          .eq('connection_id', connection.id)
+        const productIds = (connProducts || []).map((p: any) => p.id)
         for (const city of citiesToPush) {
           const cityCandidate = computeRepriceCandidate({
             competitorPrices,
@@ -255,6 +307,7 @@ export async function applyPriceCheckResult(
             merchantId: connection.merchant_id,
             sessionCookies,
             trackedProductId,
+            productIds,
             sku: product.kaspi_sku,
             model: product.product_name,
             storeId: product.store_id,
@@ -263,11 +316,15 @@ export async function applyPriceCheckResult(
           })
 
           if (result.pushed) {
+            const pushedAt = new Date().toISOString()
             await supabase
               .from('kaspi_shop_product_city_prices')
-              .update({ own_current_price: cityCandidate.price, last_competitor_price: competitorPrice, updated_at: new Date().toISOString() })
+              .update({ own_current_price: cityCandidate.price, last_competitor_price: competitorPrice, updated_at: pushedAt, last_pushed_at: pushedAt })
               .eq('tracked_product_id', trackedProductId)
               .eq('city_code', city.city_code)
+          } else {
+            console.error('kaspi-shop checkCycle: price push skipped for product', trackedProductId, 'city', city.city_code, '--', result.message)
+            pushIssues.push(`${city.city_code}: ${result.message}`)
           }
           if (result.sessionExpired) {
             console.error('kaspi-shop checkCycle: session expired for connection', connection.id, '-- stopping city pushes for this product')
@@ -296,6 +353,13 @@ export async function applyPriceCheckResult(
       .eq('id', trackedProductId)
   }
 
+  // fetchError takes priority (it's a distinct, more specific failure this
+  // cycle never got past); otherwise surface any push issues collected
+  // above -- e.g. own_current_price was updated in our DB but Kaspi never
+  // actually received it because the rate-limit budget was exhausted, one
+  // of the two cases finding I2 flagged as previously silent.
+  const errorMessage = fetchError ?? summarizePushIssues(pushIssues)
+
   await supabase.from('kaspi_shop_price_checks').insert({
     tracked_product_id: trackedProductId,
     competitor_price: competitorPrice,
@@ -303,7 +367,7 @@ export async function applyPriceCheckResult(
     own_price_after: ownPriceAfter,
     action,
     credit_cost: 1,
-    error_message: fetchError,
+    error_message: errorMessage,
   })
 
   try {

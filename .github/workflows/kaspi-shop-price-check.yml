@@ -5,9 +5,25 @@ on:
     - cron: '*/10 * * * *'
   workflow_dispatch: {}
 
+# Per-city fetching turned one run from N products x 1 fetch (seconds) into
+# N x C cities x (fetch + 300ms sleep) -- a run can now genuinely exceed the
+# 10-minute schedule interval. last_checked_at is only written once
+# /cron/apply completes for a product, so an overlapping run would re-fetch
+# the same still-"due" products: two credit debits and two rounds of price
+# pushes for one logical cycle (final-review finding I3). This group name is
+# unique to this workflow, so a new scheduled/dispatched run queues behind
+# whichever run is already in progress instead of running alongside it.
+concurrency:
+  group: kaspi-shop-price-check
+  cancel-in-progress: false
+
 jobs:
   check-prices:
     runs-on: ubuntu-latest
+    # Kept under the 10-minute schedule interval so a stuck run self-
+    # terminates before it can pile up behind the concurrency group and
+    # push every later run further and further behind.
+    timeout-minutes: 9
     steps:
       - uses: actions/checkout@v4
       - name: Run price check

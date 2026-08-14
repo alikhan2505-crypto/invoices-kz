@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import { listCatalog } from './cabinetApi'
+import { listCatalog, fetchCityNames } from './cabinetApi'
 import { saveConnection, loadConnection } from './connection'
 
 const supabase = createClient(
@@ -62,6 +62,24 @@ export async function finalizeConnection(userId: string, sessionCookies: string,
     // failed catalog import is a recoverable follow-up, not a reason to
     // report the whole connect as failed.
     console.error('kaspi-shop finalizeConnection: catalog import failed', err.message)
+  }
+
+  // Best-effort seed of the city-name cache so the city picker on
+  // /kaspi-shop has real names to render right after connecting, instead
+  // of depending entirely on the lazy on-demand refresh in
+  // GET /api/kaspi-shop/settings/cities. There are no city chips to click
+  // until this cache has *something* in it (self-referential gap fixed as
+  // final-review finding C1) -- for a brand-new connection we already have
+  // valid session cookies right here, so there's no reason to wait.
+  // Independent try/catch from the catalog import above: a failure here
+  // must never affect catalog import or fail the connect itself.
+  try {
+    const cityNames = await fetchCityNames(sessionCookies, merchantId)
+    if (Object.keys(cityNames).length > 0) {
+      await supabase.from('kaspi_shop_connections').update({ city_lookup_cache: cityNames }).eq('id', connection.id)
+    }
+  } catch (err: any) {
+    console.error('kaspi-shop finalizeConnection: city name cache seed failed (non-fatal)', err.message)
   }
 
   return { importedProducts: imported }
