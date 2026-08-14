@@ -25,11 +25,37 @@ async function fetchCompetitorPrice(kaspiSku) {
   return matches.length ? Math.min(...matches) : null
 }
 
+// TEMPORARY diagnostic -- checking whether yml/offer-view/offers/{sku} (a
+// richer, per-merchant competitor-price endpoint found live 2026-08-14) is
+// reachable from this GitHub Actions runner, the same way the existing
+// product-page scrape above already is. Remove once confirmed either way.
+async function diagnosticCheckOfferViewEndpoint() {
+  const testSku = '114958921'
+  try {
+    const res = await fetch(`https://kaspi.kz/yml/offer-view/offers/${testSku}`, {
+      method: 'POST',
+      headers: {
+        accept: 'application/json, text/*',
+        'content-type': 'application/json; charset=UTF-8',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
+      },
+      body: JSON.stringify({ cityId: '750000000', id: testSku, merchantUID: [], limit: 5, page: 0, sortOption: 'PRICE' }),
+    })
+    const bodyText = await res.text()
+    console.log(`[diagnostic] offer-view status=${res.status} bodyLen=${bodyText.length} bodyPreview=${bodyText.slice(0, 300)}`)
+  } catch (err) {
+    console.log(`[diagnostic] offer-view fetch threw: ${err}`)
+  }
+}
+
 async function main() {
   if (!secret) {
     console.error('KASPI_SHOP_CRON_SECRET is not set')
     process.exit(1)
   }
+
+  await diagnosticCheckOfferViewEndpoint()
 
   const dueRes = await fetch(`${baseUrl}/api/kaspi-shop/cron/due`, {
     headers: { 'x-kaspi-shop-cron-secret': secret },
