@@ -65,7 +65,7 @@ select updated_at from kaspi_shop_product_city_prices
 
 ### UI
 
-- New card on `/kaspi-shop` (near the existing pause toggle): city multi-select, backed by `city_lookup_cache` names (raw codes as fallback), chips for currently selected, saves via new `PATCH /api/kaspi-shop/settings/cities` (extends the existing `settings/route.ts` file) updating `tracked_city_codes`.
+- New card on `/kaspi-shop` (near the existing pause toggle): city multi-select, backed by `city_lookup_cache` names (raw codes as fallback), chips for currently selected, saves via new `PATCH /api/kaspi-shop/settings/cities` (own route file, nested under `settings/` — Next.js route-file nesting means it can't live inside the existing `settings/route.ts`, which only serves `/api/kaspi-shop/settings`) updating `tracked_city_codes`.
 - Product edit form's `excludedCities` field: replaced from raw comma-separated text input to a multi-select populated only from the store's current `tracked_city_codes` (excluding a city outside that list is a no-op, so it's not offered).
 - Product card: new expandable "Цены по городам" section listing, per tracked city, the city name, current `own_current_price`, and `last_competitor_price` — the first real visibility the seller gets into what this feature is actually doing.
 
