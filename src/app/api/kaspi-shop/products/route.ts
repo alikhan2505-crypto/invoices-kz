@@ -95,6 +95,19 @@ export async function PATCH(req: NextRequest) {
   for (const key of allowed) if (key in updates) patch[key] = updates[key]
   if (Object.keys(patch).length === 0) return NextResponse.json({ error: 'no updatable fields provided' }, { status: 400 })
 
+  // Only checked when both fields are being set in the same PATCH -- the
+  // live caller (the product settings form) always sends floor_price and
+  // max_price together, and validating a max_price-only PATCH against the
+  // row's existing floor_price would need an extra read before the write.
+  // A PATCH touching only one of the two fields (or neither) is unaffected.
+  if ('floor_price' in patch && 'max_price' in patch && patch.max_price !== null) {
+    const floorPriceNum = Number(patch.floor_price)
+    const maxPriceNum = Number(patch.max_price)
+    if (Number.isFinite(floorPriceNum) && Number.isFinite(maxPriceNum) && maxPriceNum <= floorPriceNum) {
+      return NextResponse.json({ error: 'max_price должен быть больше floor_price' }, { status: 400 })
+    }
+  }
+
   const { error } = await supabase
     .from('kaspi_shop_tracked_products')
     .update(patch)
