@@ -74,6 +74,18 @@ export async function GET(req: NextRequest) {
       throw new Error('failed to identify the connected Instagram account')
     }
 
+    // Without this per-account subscription Meta silently delivers NO
+    // webhooks for the account, even with the app-level instagram topic
+    // subscribed -- confirmed live 2026-08-16 (alikhan_abil had to be
+    // subscribed manually before any comment event arrived). Required, not
+    // best-effort: an unsubscribed connection looks connected but the agent
+    // never hears anything.
+    const subRes = await fetch(`https://graph.instagram.com/v21.0/me/subscribed_apps?subscribed_fields=comments,messages&access_token=${encodeURIComponent(longLivedData.access_token)}`, { method: 'POST' })
+    const subData = await subRes.json()
+    if (!subRes.ok || !subData.success) {
+      throw new Error(subData.error?.message || 'failed to subscribe the account to webhooks')
+    }
+
     const { data: agent } = await supabase.from('ai_agents').select('id').eq('user_id', verified.userId).single()
     if (!agent) throw new Error('no agent found for this user -- settings must be saved before connecting a channel')
 
