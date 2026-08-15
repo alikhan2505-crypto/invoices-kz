@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
 import { ThemeProvider } from '@/components/ThemeProvider'
 import { LanguageProvider } from '@/components/LanguageProvider'
+import WalletWidget from '@/components/WalletWidget'
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -65,6 +66,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <LanguageProvider>
           <ThemeProvider>
             {children}
+            <WalletWidget />
           </ThemeProvider>
         </LanguageProvider>
       </body>
