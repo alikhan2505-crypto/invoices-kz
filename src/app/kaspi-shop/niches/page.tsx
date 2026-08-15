@@ -130,7 +130,7 @@ export default function KaspiShopNiches() {
     <main className="min-h-screen bg-[#F6F6FB] lg:flex">
       <KaspiShopSidebar active="niches" />
 
-      <div className="flex-1 min-w-0 p-4 lg:p-6 pb-24 lg:pb-6">
+      <div className="flex-1 min-w-0 pt-16 px-4 pb-24 lg:px-6 lg:pb-6">
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}
           className="bg-[#12142E] rounded-[28px] p-6 lg:p-8 mb-4 text-white">
           <div className="text-[11px] font-semibold tracking-wider text-white/40 uppercase mb-1">Ниши</div>

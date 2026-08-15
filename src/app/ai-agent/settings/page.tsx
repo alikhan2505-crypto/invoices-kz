@@ -5,10 +5,10 @@ import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 
 const TONE_OPTIONS = [
-  { value: 'friendly', label: '🤗 Дружелюбный и тёплый' },
-  { value: 'professional', label: '💼 Профессиональный и деловой' },
-  { value: 'energetic', label: '⚡️ Мотивирующий и энергичный' },
-  { value: 'caring', label: '🫶 Заботливый и внимательный' },
+  { value: 'friendly', label: 'Дружелюбный и тёплый' },
+  { value: 'professional', label: 'Профессиональный и деловой' },
+  { value: 'energetic', label: 'Мотивирующий и энергичный' },
+  { value: 'caring', label: 'Заботливый и внимательный' },
 ]
 
 const GOAL_OPTIONS = [
@@ -105,7 +105,10 @@ export default function AiAgentSettings() {
   const instagramConnection = connections.find(c => c.channel === 'instagram')
 
   return (
-    <div className="max-w-xl mx-auto p-6 pb-24">
+    <div className="max-w-xl mx-auto pt-16 px-6 pb-24">
+      <button onClick={() => router.push('/dashboard')} className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 mb-3">
+        <span className="text-lg leading-none">‹</span> Назад
+      </button>
       <h1 className="text-xl font-bold text-[#1C2056] mb-1">AI-агент</h1>
       <p className="text-sm text-gray-500 mb-6">Настройте ассистента, который отвечает вашим клиентам в Instagram</p>
 

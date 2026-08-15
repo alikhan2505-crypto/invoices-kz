@@ -68,7 +68,7 @@ export default function AiAgentReview() {
   if (loading) return <div className="p-8 text-center text-gray-400">Загрузка…</div>
 
   return (
-    <div className="max-w-xl mx-auto p-6 pb-24">
+    <div className="max-w-xl mx-auto pt-16 px-6 pb-24">
       <Link href="/ai-agent/settings" className="text-xs text-gray-400 hover:text-gray-600 mb-2 inline-block">← Настройки агента</Link>
       <h1 className="text-xl font-bold text-[#1C2056] mb-1">Диалоги на проверке</h1>
       <p className="text-sm text-gray-500 mb-6">Агент ещё обучается — черновики ответов ждут вашего одобрения</p>

@@ -62,7 +62,7 @@ export default function KaspiShopOrderDetail() {
     <main className="min-h-screen bg-[#F6F6FB] lg:flex">
       <KaspiShopSidebar active="orders" />
 
-      <div className="flex-1 min-w-0 p-4 lg:p-6 pb-24 lg:pb-6 max-w-2xl">
+      <div className="flex-1 min-w-0 pt-16 px-4 pb-24 lg:px-6 lg:pb-6 max-w-2xl">
         <button onClick={() => router.back()} className="text-sm text-gray-400 mb-4">‹ Назад к заказам</button>
 
         {loadError && (

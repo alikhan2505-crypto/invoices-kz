@@ -275,7 +275,7 @@ export default function TopUtilityBar() {
 
           {panel === 'wallet' && (
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mt-14 max-h-[80vh] overflow-hidden flex" onClick={e => e.stopPropagation()}>
-              <div className="w-40 flex-shrink-0 bg-gray-50 border-r border-gray-100 p-3">
+              <div className="w-40 flex-shrink-0 bg-gray-50 border-r border-gray-100 p-4">
                 <div className="text-xs font-semibold text-gray-400 px-2 mb-2">Кошельки</div>
                 {visibleWallets.map(w => (
                   <button key={w.key} onClick={() => selectWallet(w.key)}
@@ -335,11 +335,16 @@ export default function TopUtilityBar() {
                         placeholder="Своя сумма, ₸" type="text" inputMode="numeric" name="topupCustomAmount"
                         className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-xs mb-2" />
                       {topupError && <div className="text-xs text-red-500 mb-2">{topupError}</div>}
-                      <button onClick={() => startTopup(wallet, (topupAmount ?? Number(topupCustom)) || 0)}
-                        disabled={toppingUp || !((topupAmount ?? Number(topupCustom)) >= wallet.minAmount)}
-                        className="w-full bg-[#1C2056] text-white rounded-lg px-3 py-2 text-xs font-medium disabled:opacity-40">
-                        {toppingUp ? 'Создаём оплату…' : 'Пополнить'}
-                      </button>
+                      {(() => {
+                        const topupDisabled = toppingUp || !((topupAmount ?? Number(topupCustom)) >= wallet.minAmount)
+                        return (
+                          <button onClick={() => startTopup(wallet, (topupAmount ?? Number(topupCustom)) || 0)}
+                            disabled={topupDisabled}
+                            className={`w-full rounded-lg px-3 py-2 text-xs font-medium transition-colors ${topupDisabled ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-[#1C2056] text-white hover:bg-[#252a6b]'}`}>
+                            {toppingUp ? 'Создаём оплату…' : 'Пополнить'}
+                          </button>
+                        )
+                      })()}
                     </>
                   )}
                 </div>
@@ -396,12 +401,20 @@ export default function TopUtilityBar() {
                   <button onClick={() => setPanel(null)} className="text-gray-400 text-lg leading-none">✕</button>
                 </div>
                 <Link href="/profile/support" onClick={() => setPanel(null)}
-                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-gray-50 text-sm text-gray-700 transition-colors">
-                  💬 Поддержка
+                  className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-gray-50 text-sm text-gray-700 transition-colors">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="flex-shrink-0">
+                    <path d="M4 11a8 8 0 1 1 3.5 6.6L4 19l1.3-3.3A7.96 7.96 0 0 1 4 11Z" stroke="#1C2056" strokeWidth="1.6" strokeLinejoin="round" />
+                  </svg>
+                  Поддержка
                 </Link>
                 <Link href="/profile/about" onClick={() => setPanel(null)}
-                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-gray-50 text-sm text-gray-700 transition-colors">
-                  ℹ️ О сервисе
+                  className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-gray-50 text-sm text-gray-700 transition-colors">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="flex-shrink-0">
+                    <circle cx="12" cy="12" r="9" stroke="#1C2056" strokeWidth="1.6" />
+                    <path d="M12 11v5.5" stroke="#1C2056" strokeWidth="1.6" strokeLinecap="round" />
+                    <circle cx="12" cy="8" r="1" fill="#1C2056" />
+                  </svg>
+                  О сервисе
                 </Link>
               </div>
             </div>
@@ -420,12 +433,19 @@ export default function TopUtilityBar() {
                   </div>
                 </div>
                 <Link href="/profile" onClick={() => setPanel(null)}
-                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-gray-50 text-sm text-gray-700 transition-colors">
-                  ⚙️ Профиль и настройки
+                  className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-gray-50 text-sm text-gray-700 transition-colors">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="flex-shrink-0">
+                    <circle cx="12" cy="8" r="4" stroke="#1C2056" strokeWidth="1.6" />
+                    <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="#1C2056" strokeWidth="1.6" strokeLinecap="round" />
+                  </svg>
+                  Профиль и настройки
                 </Link>
                 <button onClick={signOut}
-                  className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-red-50 text-sm text-red-500 transition-colors text-left">
-                  ⎋ Выйти
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-red-50 text-sm text-red-500 transition-colors text-left">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="flex-shrink-0">
+                    <path d="M15 4h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-2M10 8l-4 4 4 4M6 12h11" stroke="#FF5A5F" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  Выйти
                 </button>
               </div>
             </div>
