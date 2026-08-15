@@ -174,6 +174,7 @@ async function handleIncoming(params: {
       postCaption: params.postCaption,
       source: params.source,
       conversationHistory,
+      businessContextLine: 'Ты отвечаешь от имени бизнес-аккаунта в Instagram (invoices.kz — сервис для выставления счетов в Казахстане).',
     })
     draftReply = result.replyText
     urgent = result.urgent

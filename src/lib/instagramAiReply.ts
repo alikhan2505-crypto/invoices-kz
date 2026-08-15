@@ -14,6 +14,7 @@ export async function generateAiReply(params: {
   // Only ever populated for source: 'dm' -- a comment thread under a post
   // isn't a continuous conversation the same way.
   conversationHistory?: { incoming: string; reply: string }[]
+  businessContextLine: string
 }): Promise<{ replyText: string; urgent: boolean }> {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured')
@@ -44,7 +45,7 @@ export async function generateAiReply(params: {
     max_tokens: 300,
     messages: [{
       role: 'user',
-      content: `Ты отвечаешь от имени бизнес-аккаунта в Instagram (invoices.kz — сервис для выставления счетов в Казахстане). ${contextLine}${historyBlock}
+      content: `${params.businessContextLine} ${contextLine}${historyBlock}
 
 Пользователь ${params.fromUsername} написал: "${params.incomingText}"
 
