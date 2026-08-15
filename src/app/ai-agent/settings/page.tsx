@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 
 const TONE_OPTIONS = [
@@ -28,6 +29,7 @@ export default function AiAgentSettings() {
   const [agentId, setAgentId] = useState<string | null>(null)
   const [connections, setConnections] = useState<{ channel: string; external_account_name: string | null; status: string }[]>([])
   const [connecting, setConnecting] = useState(false)
+  const [oauthNotice, setOauthNotice] = useState<'connected' | 'error' | null>(null)
 
   async function authHeader() {
     const { data: { session } } = await supabase.auth.getSession()
@@ -35,6 +37,17 @@ export default function AiAgentSettings() {
   }
 
   useEffect(() => {
+    // The Instagram OAuth callback redirects back here with a plain query
+    // flag (no Authorization header exists on that server-side redirect to
+    // report anything richer) -- read it once client-side and strip it from
+    // the URL so a page refresh doesn't keep re-showing the notice.
+    const params = new URLSearchParams(window.location.search)
+    if (params.has('instagram_connected')) setOauthNotice('connected')
+    else if (params.has('instagram_error')) setOauthNotice('error')
+    if (params.has('instagram_connected') || params.has('instagram_error')) {
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
@@ -96,6 +109,15 @@ export default function AiAgentSettings() {
       <h1 className="text-xl font-bold text-[#1C2056] mb-1">AI-агент</h1>
       <p className="text-sm text-gray-500 mb-6">Настройте ассистента, который отвечает вашим клиентам в Instagram</p>
 
+      {oauthNotice === 'connected' && (
+        <div className="bg-[#E2F7EE] text-[#00A468] rounded-lg px-3 py-2 text-sm mb-4">✓ Instagram подключён</div>
+      )}
+      {oauthNotice === 'error' && (
+        <div className="bg-red-50 text-red-600 rounded-lg px-3 py-2 text-sm mb-4">
+          Не удалось подключить Instagram. Попробуйте ещё раз — если не получится снова, напишите в поддержку.
+        </div>
+      )}
+
       <label className="block mb-4">
         <span className="text-xs text-gray-500 mb-1 block">Название компании</span>
         <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" value={name} onChange={e => setName(e.target.value)} />
@@ -151,7 +173,13 @@ export default function AiAgentSettings() {
         <div className="border-t border-gray-100 pt-4">
           <span className="text-xs text-gray-500 mb-2 block">Instagram</span>
           {instagramConnection?.status === 'active' && (
-            <div className="text-sm text-[#00A468]">✓ Подключено: {instagramConnection.external_account_name || instagramConnection.channel}</div>
+            <>
+              <div className="text-sm text-[#00A468] mb-3">✓ Подключено: {instagramConnection.external_account_name || instagramConnection.channel}</div>
+              <Link href="/ai-agent/review"
+                className="block text-center bg-gray-50 hover:bg-gray-100 text-[#1C2056] rounded-lg px-4 py-2.5 text-sm font-medium transition-colors">
+                Диалоги на проверке →
+              </Link>
+            </>
           )}
           {instagramConnection?.status === 'token_expired' && (
             // Same sessionExpired-style reconnect banner this codebase

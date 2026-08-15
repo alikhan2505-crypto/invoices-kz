@@ -138,6 +138,37 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
     return
   }
 
+  // For DMs, pull prior exchanges with this same conversation so the model
+  // doesn't re-greet someone mid-conversation -- mirrors the legacy bot's
+  // own history fetch (instagram/webhook/route.ts's handleIncoming), just
+  // reshaped for this schema: ai_agent_messages stores one row per
+  // inbound/outbound message rather than one row per exchange, so rows are
+  // paired up here (inbound followed by the next *sent* outbound reply --
+  // a still-pending or skipped draft was never actually seen by the
+  // customer, so it doesn't count as "already said"). The current turn's
+  // own just-inserted inbound row naturally never forms a pair (nothing
+  // outbound follows it yet), so it doesn't need to be excluded separately.
+  let conversationHistory: { incoming: string; reply: string }[] | undefined
+  if (params.source === 'dm') {
+    const { data: historyRows } = await supabase
+      .from('ai_agent_messages')
+      .select('direction, text, status, created_at')
+      .eq('conversation_id', conversation.id)
+      .order('created_at', { ascending: true })
+      .limit(20)
+    const pairs: { incoming: string; reply: string }[] = []
+    let pendingIncoming: string | null = null
+    for (const row of historyRows || []) {
+      if (row.direction === 'inbound') {
+        pendingIncoming = row.text
+      } else if (row.direction === 'outbound' && row.status === 'sent' && pendingIncoming) {
+        pairs.push({ incoming: pendingIncoming, reply: row.text })
+        pendingIncoming = null
+      }
+    }
+    if (pairs.length > 0) conversationHistory = pairs.slice(-5)
+  }
+
   // No template -- generate an AI reply.
   let draftReply: string
   let urgent: boolean
@@ -146,6 +177,7 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
       incomingText: params.incomingText,
       fromUsername: params.fromUsername,
       source: params.source,
+      conversationHistory,
       businessContextLine: buildBusinessContextLine({
         name: agent.name,
         tone: agent.tone as AgentTone,
@@ -175,7 +207,7 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
     const { data: profile } = await supabase.from('profiles').select('telegram_chat_id, notify_telegram').eq('id', agent.user_id).single()
     if (profile?.notify_telegram && profile.telegram_chat_id && inserted) {
       try {
-        await sendTelegramNotification(profile.telegram_chat_id, 'У вас новый черновик ответа на проверке в AI-агенте. Загляните в приложение, чтобы отправить или отредактировать.')
+        await sendTelegramNotification(profile.telegram_chat_id, 'У вас новый черновик ответа на проверке в AI-агенте: https://www.invoices.kz/ai-agent/review')
       } catch (telegramErr: any) {
         console.error('ai-agent webhook: training-mode Telegram nudge failed for user', agent.user_id, ':', telegramErr.message)
       }

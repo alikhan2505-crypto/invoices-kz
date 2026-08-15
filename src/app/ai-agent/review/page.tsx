@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 
 interface ReviewItem {
@@ -68,6 +69,7 @@ export default function AiAgentReview() {
 
   return (
     <div className="max-w-xl mx-auto p-6 pb-24">
+      <Link href="/ai-agent/settings" className="text-xs text-gray-400 hover:text-gray-600 mb-2 inline-block">← Настройки агента</Link>
       <h1 className="text-xl font-bold text-[#1C2056] mb-1">Диалоги на проверке</h1>
       <p className="text-sm text-gray-500 mb-6">Агент ещё обучается — черновики ответов ждут вашего одобрения</p>
 
