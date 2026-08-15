@@ -17,6 +17,7 @@ export default function AiAgentReview() {
   const [items, setItems] = useState<ReviewItem[]>([])
   const [edits, setEdits] = useState<Record<string, string>>({})
   const [acting, setActing] = useState<string | null>(null)
+  const [errors, setErrors] = useState<Record<string, string>>({})
 
   async function authHeader() {
     const { data: { session } } = await supabase.auth.getSession()
@@ -39,14 +40,28 @@ export default function AiAgentReview() {
 
   async function act(id: string, action: 'send' | 'skip') {
     setActing(id)
-    const headers = await authHeader()
-    await fetch('/api/ai-agent/review', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ messageId: id, action, editedText: edits[id] }),
+    setErrors(prev => {
+      const next = { ...prev }
+      delete next[id]
+      return next
     })
-    setItems(prev => prev.filter(i => i.id !== id))
-    setActing(null)
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/ai-agent/review', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ messageId: id, action, editedText: edits[id] }),
+      })
+      if (!res.ok) {
+        setErrors(prev => ({ ...prev, [id]: 'Не удалось выполнить действие. Попробуйте ещё раз.' }))
+        return
+      }
+      setItems(prev => prev.filter(i => i.id !== id))
+    } catch {
+      setErrors(prev => ({ ...prev, [id]: 'Ошибка сети. Проверьте соединение и попробуйте ещё раз.' }))
+    } finally {
+      setActing(null)
+    }
   }
 
   if (loading) return <div className="p-8 text-center text-gray-400">Загрузка…</div>
@@ -68,6 +83,7 @@ export default function AiAgentReview() {
               value={edits[item.id] ?? item.text}
               onChange={e => setEdits(prev => ({ ...prev, [item.id]: e.target.value }))}
             />
+            {errors[item.id] && <div className="text-xs text-red-500 mb-2">{errors[item.id]}</div>}
             <div className="flex gap-2">
               <button onClick={() => act(item.id, 'send')} disabled={acting === item.id}
                 className="flex-1 bg-[#1C2056] text-white rounded-lg px-3 py-2 text-sm font-medium">
