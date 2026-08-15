@@ -33,19 +33,19 @@ export async function GET(req: NextRequest) {
   if (oauthError || !code || !state) {
     return NextResponse.redirect(`${appUrl}/ai-agent/settings?instagram_error=1`)
   }
-  const verified = verifyOAuthState(state)
-  if (!verified) {
-    return NextResponse.redirect(`${appUrl}/ai-agent/settings?instagram_error=1`)
-  }
-
-  const appId = process.env.NEXT_PUBLIC_INSTAGRAM_APP_ID
-  const appSecret = process.env.INSTAGRAM_APP_SECRET
-  const redirectUri = `${appUrl}/api/ai-agent/instagram/callback`
-  if (!appId || !appSecret) {
-    return NextResponse.redirect(`${appUrl}/ai-agent/settings?instagram_error=1`)
-  }
-
   try {
+    const verified = verifyOAuthState(state)
+    if (!verified) {
+      return NextResponse.redirect(`${appUrl}/ai-agent/settings?instagram_error=1`)
+    }
+
+    const appId = process.env.NEXT_PUBLIC_INSTAGRAM_APP_ID
+    const appSecret = process.env.INSTAGRAM_APP_SECRET
+    const redirectUri = `${appUrl}/api/ai-agent/instagram/callback`
+    if (!appId || !appSecret) {
+      return NextResponse.redirect(`${appUrl}/ai-agent/settings?instagram_error=1`)
+    }
+
     const tokenRes = await fetch('https://api.instagram.com/oauth/access_token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
