@@ -7,6 +7,7 @@ import { buildBusinessContextLine, AgentTone, AgentGoal } from './promptContext'
 import { shouldExitTraining } from './trainingStatus'
 import { debitAiAgentWallet, AI_AGENT_CREDITS_PER_AI_REPLY } from './wallet'
 import { sendTelegramNotification } from '@/lib/telegramNotify'
+import { createNotification } from '@/lib/notifications'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -202,7 +203,15 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
       urgent,
     }).select('id').single()
 
-    // Best-effort nudge -- wrapped in try/catch so a Telegram failure can
+    // In-app inbox entry -- unconditional (unlike the Telegram nudge below,
+    // this doesn't depend on the user having opted into anything, it's the
+    // baseline in-product notification). Best-effort, same reasoning as
+    // every other notification call here.
+    if (inserted) {
+      await createNotification(agent.user_id, 'Новый черновик ответа на проверке', draftReply.slice(0, 120), '/ai-agent/review')
+    }
+
+    // Best-effort Telegram nudge -- wrapped in try/catch so a failure can
     // never block or abort the rest of this webhook delivery.
     const { data: profile } = await supabase.from('profiles').select('telegram_chat_id, notify_telegram').eq('id', agent.user_id).single()
     if (profile?.notify_telegram && profile.telegram_chat_id && inserted) {
