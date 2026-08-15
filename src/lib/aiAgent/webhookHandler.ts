@@ -159,11 +159,15 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
       urgent,
     }).select('id').single()
 
-    // Best-effort nudge, exactly like every other sendTelegramNotification
-    // call in this codebase -- never blocks, never throws.
+    // Best-effort nudge -- wrapped in try/catch so a Telegram failure can
+    // never block or abort the rest of this webhook delivery.
     const { data: profile } = await supabase.from('profiles').select('telegram_chat_id, notify_telegram').eq('id', agent.user_id).single()
     if (profile?.notify_telegram && profile.telegram_chat_id && inserted) {
-      await sendTelegramNotification(profile.telegram_chat_id, 'У вас новый черновик ответа на проверке в AI-агенте. Загляните в приложение, чтобы отправить или отредактировать.')
+      try {
+        await sendTelegramNotification(profile.telegram_chat_id, 'У вас новый черновик ответа на проверке в AI-агенте. Загляните в приложение, чтобы отправить или отредактировать.')
+      } catch (telegramErr: any) {
+        console.error('ai-agent webhook: training-mode Telegram nudge failed for user', agent.user_id, ':', telegramErr.message)
+      }
     }
     return
   }
