@@ -87,7 +87,7 @@ export default function Profile() {
   if (loading && !profile) return (
     <DesktopShell>
     <main className="min-h-screen bg-gray-50 pb-24 lg:pb-6 lg:min-h-full">
-      <div className="sticky top-0 z-30 bg-white border-b px-4 py-3 flex items-center justify-between lg:h-16">
+      <div className="sticky top-16 z-30 bg-white border-b px-4 py-3 flex items-center justify-between lg:h-16">
         <span className="font-bold text-[#1C2056]">INVOICES.KZ</span>
       </div>
       <div className="max-w-lg lg:max-w-5xl mx-auto p-4 space-y-4">
@@ -371,7 +371,7 @@ export default function Profile() {
     <DesktopShell>
     <main className="min-h-screen bg-gray-50 pb-24 lg:pb-6 lg:min-h-full">
 
-      <div className="sticky top-0 z-30 bg-white border-b px-4 py-3 flex items-center justify-between lg:h-16">
+      <div className="sticky top-16 z-30 bg-white border-b px-4 py-3 flex items-center justify-between lg:h-16">
         <span className="font-bold text-[#1C2056]">INVOICES.KZ</span>
         <span className="text-sm text-gray-500">{profile?.company_name || ''}</span>
       </div>

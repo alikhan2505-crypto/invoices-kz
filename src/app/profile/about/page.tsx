@@ -15,7 +15,7 @@ export default function About() {
 
   return (
     <main className="min-h-screen bg-gray-50">
-      <div className="sticky top-0 z-10 bg-white border-b px-4 py-4 flex items-center gap-3">
+      <div className="sticky top-16 z-10 bg-white border-b px-4 py-4 flex items-center gap-3">
         <button onClick={() => router.push('/profile')} className="back-btn text-gray-400 text-xl" aria-label={backLabel(lang)}>‹</button>
         <span className="font-semibold text-[#1C2056]">{t.aboutHeaderLabel}</span>
       </div>
