@@ -35,6 +35,7 @@ function KaspiShopOrdersInner() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [printing, setPrinting] = useState(false)
   const [sessionExpired, setSessionExpired] = useState(false)
+  const [groupBy, setGroupBy] = useState<'type' | 'date' | null>(null)
 
   const PAGE_SIZE = 10
   const prevStatus = useRef(status)
@@ -147,7 +148,17 @@ function KaspiShopOrdersInner() {
       <div className="flex-1 min-w-0 p-4 lg:p-6 pb-24 lg:pb-6">
         {sessionExpired && <SessionExpiredBanner />}
 
-        <h1 className="text-2xl font-extrabold text-[#1C2056] mb-4">Заказы</h1>
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <h1 className="text-2xl font-extrabold text-[#1C2056]">Заказы</h1>
+          <div className="flex items-center gap-1 bg-white rounded-full p-1 shadow-sm">
+            {([['type', 'По виду'], ['date', 'По дате']] as const).map(([value, label]) => (
+              <button key={value} onClick={() => setGroupBy(g => g === value ? null : value)}
+                className={`text-xs font-medium rounded-full px-3 py-1.5 transition-colors ${groupBy === value ? 'bg-[#1C2056] text-white' : 'text-gray-500'}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
 
         {loadError && (
           <div className="bg-red-50 rounded-2xl p-4 flex items-center justify-between gap-3 mb-4">
@@ -184,41 +195,68 @@ function KaspiShopOrdersInner() {
           <div className="bg-white rounded-2xl shadow-sm p-8 text-center">
             <div className="text-sm text-gray-500">Заказов в этом статусе нет.</div>
           </div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-            {orders.map((o, i) => {
-              const firstItem = o.items[0]
-              const extraCount = o.items.length - 1
-              const selectable = status === TRANSFER_STATUS
-              return (
-                <motion.div key={o.code} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, ease: EASE, delay: Math.min(i * 0.03, 0.3) }}
-                  onClick={() => selectable && toggleSelected(o.code)}
-                  className={`relative bg-white rounded-2xl shadow-sm overflow-hidden transition-all ${selectable ? 'cursor-pointer hover:shadow-md' : ''} ${selectable && selected.has(o.code) ? 'ring-2 ring-[#2DC48D]' : ''}`}>
-                  {selectable && (
-                    <input type="checkbox" checked={selected.has(o.code)} onClick={e => e.stopPropagation()}
-                      onChange={() => toggleSelected(o.code)}
-                      className="absolute top-2 left-2 z-10 accent-[#2DC48D] w-4 h-4" />
-                  )}
-                  {firstItem?.imageUrl ? (
-                    <img src={firstItem.imageUrl} alt={firstItem.name} className="w-full aspect-square object-cover bg-gray-100" />
-                  ) : (
-                    <div className="w-full aspect-square bg-gray-100" />
-                  )}
-                  <div className="p-3">
-                    <div className="text-xs font-semibold text-gray-800 line-clamp-2 min-h-[2.2em]">
-                      {firstItem?.name || `Заказ №${o.code}`}
-                      {extraCount > 0 && <span className="text-gray-400 font-normal"> +{extraCount}</span>}
-                    </div>
-                    <div className="text-[11px] text-gray-400 mt-1 truncate">{o.customerFirstName} {o.customerLastName}</div>
-                    <div className="text-[11px] text-gray-400">{new Date(o.creationTime).toLocaleDateString('ru-KZ')}</div>
-                    <div className="font-mono font-bold text-sm text-[#1C2056] tabular-nums mt-1.5">{o.totalPrice.toLocaleString('ru-KZ')} ₸</div>
+        ) : (() => {
+          const CARD_GRID = 'grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-2.5'
+
+          function renderCard(o: Order, i: number) {
+            const firstItem = o.items[0]
+            const extraCount = o.items.length - 1
+            const selectable = status === TRANSFER_STATUS
+            return (
+              <motion.div key={o.code} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25, ease: EASE, delay: Math.min(i * 0.02, 0.2) }}
+                onClick={() => selectable && toggleSelected(o.code)}
+                className={`relative bg-white rounded-xl shadow-sm overflow-hidden transition-all ${selectable ? 'cursor-pointer hover:shadow-md' : ''} ${selectable && selected.has(o.code) ? 'ring-2 ring-[#2DC48D]' : ''}`}>
+                {selectable && (
+                  <input type="checkbox" checked={selected.has(o.code)} onClick={e => e.stopPropagation()}
+                    onChange={() => toggleSelected(o.code)}
+                    className="absolute top-1.5 left-1.5 z-10 accent-[#2DC48D] w-3.5 h-3.5" />
+                )}
+                {firstItem?.imageUrl ? (
+                  <img src={firstItem.imageUrl} alt={firstItem.name} className="w-full aspect-square object-cover bg-gray-100" />
+                ) : (
+                  <div className="w-full aspect-square bg-gray-100" />
+                )}
+                <div className="p-2">
+                  <div className="text-[11px] font-semibold text-gray-800 line-clamp-2 min-h-[2em]">
+                    {firstItem?.name || `Заказ №${o.code}`}
+                    {extraCount > 0 && <span className="text-gray-400 font-normal"> +{extraCount}</span>}
                   </div>
-                </motion.div>
-              )
-            })}
-          </div>
-        )}
+                  <div className="text-[10px] text-gray-400 mt-0.5 truncate">{o.customerFirstName} {o.customerLastName}</div>
+                  <div className="font-mono font-bold text-xs text-[#1C2056] tabular-nums mt-1">{o.totalPrice.toLocaleString('ru-KZ')} ₸</div>
+                </div>
+              </motion.div>
+            )
+          }
+
+          if (!groupBy) {
+            return <div className={CARD_GRID}>{orders.map((o, i) => renderCard(o, i))}</div>
+          }
+
+          const groups = new Map<string, Order[]>()
+          for (const o of orders) {
+            const key = groupBy === 'type'
+              ? (o.items[0]?.name || 'Без названия')
+              : new Date(o.creationTime).toLocaleDateString('ru-KZ')
+            const list = groups.get(key) || []
+            list.push(o)
+            groups.set(key, list)
+          }
+          const sortedGroups = Array.from(groups.entries()).sort((a, b) =>
+            groupBy === 'date' ? b[1][0].creationTime.localeCompare(a[1][0].creationTime) : b[1].length - a[1].length
+          )
+
+          return (
+            <div className="space-y-5">
+              {sortedGroups.map(([key, groupOrders]) => (
+                <div key={key}>
+                  <div className="text-xs font-semibold text-gray-500 mb-2 px-1">{key} <span className="text-gray-300 font-normal">· {groupOrders.length}</span></div>
+                  <div className={CARD_GRID}>{groupOrders.map((o, i) => renderCard(o, i))}</div>
+                </div>
+              ))}
+            </div>
+          )
+        })()}
 
         {total > PAGE_SIZE && (
           <div className="flex items-center justify-between mt-4">
