@@ -100,11 +100,12 @@ export default function AiAgentSettings() {
     }
   }
 
-  if (loading) return <div className="p-8 text-center text-gray-400">Загрузка…</div>
+  if (loading) return <div className="min-h-screen bg-gray-50 p-8 text-center text-gray-400">Загрузка…</div>
 
   const instagramConnection = connections.find(c => c.channel === 'instagram')
 
   return (
+    <main className="min-h-screen bg-gray-50">
     <div className="max-w-xl mx-auto pt-16 px-6 pb-24">
       <button onClick={() => router.push('/dashboard')} className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 mb-3">
         <span className="text-lg leading-none">‹</span> Назад
@@ -208,5 +209,6 @@ export default function AiAgentSettings() {
         </div>
       )}
     </div>
+    </main>
   )
 }
