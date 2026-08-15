@@ -4,6 +4,7 @@ import crypto from 'crypto'
 import { findMatchingTemplate } from '@/lib/instagramReplyMatch'
 import { replyToComment, sendDirectMessage } from '@/lib/instagram'
 import { generateAiReply } from '@/lib/instagramAiReply'
+import { loadTenantConnection, handleTenantIncoming } from '@/lib/aiAgent/webhookHandler'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -240,44 +241,68 @@ export async function POST(req: NextRequest) {
   const payload = JSON.parse(rawBody)
 
   for (const entry of payload.entry || []) {
-    // Comments arrive under `changes` with field "comments".
+    // entry.id is the Instagram-scoped account id the event occurred on --
+    // a Meta app has exactly one webhook callback URL per subscribed
+    // object, so every connected account's events (the single-tenant
+    // invoices.kz one AND every multi-tenant customer's one) arrive here.
+    const accountId = entry.id
+    const isLegacyAccount = accountId === process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID
+
+    let tenantConnection: Awaited<ReturnType<typeof loadTenantConnection>> = null
+    if (!isLegacyAccount) {
+      tenantConnection = await loadTenantConnection(accountId)
+      if (!tenantConnection) continue // unknown account -- shouldn't happen, defensive skip
+    }
+    const ownAccountId = isLegacyAccount ? process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID : tenantConnection!.externalAccountId
+
     for (const change of entry.changes || []) {
       if (change.field !== 'comments') continue
       const value = change.value
       if (!value?.id || !value?.text) continue
-      // Our own replyToComment() calls land back here as a brand-new
-      // "comments" event (Instagram doesn't distinguish a reply from a
-      // top-level comment in this webhook). Without this check, a template
-      // reply whose own text matches its own trigger word (e.g. a greeting
-      // template starting with "Здравствуйте!") replies to itself forever.
-      // Confirmed live 2026-08-11: 8 duplicate public replies went out
-      // before Instagram itself started rejecting the requests.
-      if (value.from?.id && value.from.id === process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID) continue
-      await handleIncoming({
-        source: 'comment',
-        externalId: value.id,
-        fromUsername: value.from?.username || 'unknown',
-        incomingText: value.text,
-        // Comment payloads don't carry the post's caption directly — fetching
-        // it would need a second call to `${GRAPH_API}/${value.media.id}?fields=caption`.
-        // Skipped for v1 (postCaption is optional in generateAiReply, and the
-        // AI prompt already handles its absence) — left as a real follow-up,
-        // not built here, per YAGNI until it's actually needed.
-        replyTarget: value.id,
-      })
+      // Self-reply-loop guard, now per-account instead of a single global
+      // env var -- see the 2026-08-11 incident in this feature's own
+      // history for why this check exists at all.
+      if (value.from?.id && value.from.id === ownAccountId) continue
+
+      if (isLegacyAccount) {
+        await handleIncoming({
+          source: 'comment',
+          externalId: value.id,
+          fromUsername: value.from?.username || 'unknown',
+          incomingText: value.text,
+          replyTarget: value.id,
+        })
+      } else {
+        await handleTenantIncoming(tenantConnection!, {
+          source: 'comment',
+          externalId: value.id,
+          fromUsername: value.from?.username || 'unknown',
+          incomingText: value.text,
+          replyTarget: value.id,
+        })
+      }
     }
 
-    // DMs arrive under `messaging`.
     for (const messaging of entry.messaging || []) {
       const msg = messaging.message
       if (!msg?.mid || !msg?.text || msg.is_echo) continue
-      await handleIncoming({
-        source: 'dm',
-        externalId: msg.mid,
-        fromUsername: messaging.sender?.id || 'unknown',
-        incomingText: msg.text,
-        replyTarget: messaging.sender?.id,
-      })
+      if (isLegacyAccount) {
+        await handleIncoming({
+          source: 'dm',
+          externalId: msg.mid,
+          fromUsername: messaging.sender?.id || 'unknown',
+          incomingText: msg.text,
+          replyTarget: messaging.sender?.id,
+        })
+      } else {
+        await handleTenantIncoming(tenantConnection!, {
+          source: 'dm',
+          externalId: msg.mid,
+          fromUsername: messaging.sender?.id || 'unknown',
+          incomingText: msg.text,
+          replyTarget: messaging.sender?.id,
+        })
+      }
     }
   }
 
