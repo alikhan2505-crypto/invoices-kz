@@ -108,11 +108,24 @@ export async function getMediaInsights(igMediaId: string): Promise<MediaInsights
   }
 }
 
+// Thrown instead of a bare Error so callers that need to distinguish "the
+// token is dead" (401 -- Task 8/9 mark the connection token_expired) from
+// any other failure (transient, malformed request, etc.) can do so without
+// parsing error message text. Still an Error, so the existing
+// single-tenant caller's `console.error(err.message)` handling needs no
+// changes.
+export class InstagramApiError extends Error {
+  constructor(message: string, public status: number) {
+    super(message)
+    this.name = 'InstagramApiError'
+  }
+}
+
 // Replies to a comment on any post on the account (not just ones published
 // through our own draft-approval flow) — Instagram's own comment-reply
 // endpoint, scoped by the comment's own ID rather than a media ID.
-export async function replyToComment(commentId: string, message: string): Promise<void> {
-  const accessToken = process.env.INSTAGRAM_ACCESS_TOKEN
+export async function replyToComment(commentId: string, message: string, credentials?: { accessToken: string }): Promise<void> {
+  const accessToken = credentials?.accessToken ?? process.env.INSTAGRAM_ACCESS_TOKEN
   if (!accessToken) throw new Error('Instagram not configured')
 
   const res = await fetch(`${GRAPH_API}/${commentId}/replies`, {
@@ -122,15 +135,15 @@ export async function replyToComment(commentId: string, message: string): Promis
   })
   const data = await res.json()
   if (!res.ok) {
-    throw new Error(data.error?.message || 'Failed to reply to comment')
+    throw new InstagramApiError(data.error?.message || 'Failed to reply to comment', res.status)
   }
 }
 
 // Sends a direct message reply. `recipientId` is the sender's Instagram-
 // scoped user ID from the incoming webhook event, not a username.
-export async function sendDirectMessage(recipientId: string, message: string): Promise<void> {
-  const igUserId = process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID
-  const accessToken = process.env.INSTAGRAM_ACCESS_TOKEN
+export async function sendDirectMessage(recipientId: string, message: string, credentials?: { igUserId: string; accessToken: string }): Promise<void> {
+  const igUserId = credentials?.igUserId ?? process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID
+  const accessToken = credentials?.accessToken ?? process.env.INSTAGRAM_ACCESS_TOKEN
   if (!igUserId || !accessToken) throw new Error('Instagram not configured')
 
   const res = await fetch(`${GRAPH_API}/${igUserId}/messages`, {
@@ -144,6 +157,6 @@ export async function sendDirectMessage(recipientId: string, message: string): P
   })
   const data = await res.json()
   if (!res.ok) {
-    throw new Error(data.error?.message || 'Failed to send direct message')
+    throw new InstagramApiError(data.error?.message || 'Failed to send direct message', res.status)
   }
 }
