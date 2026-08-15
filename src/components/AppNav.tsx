@@ -5,10 +5,10 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { useLanguage } from './LanguageProvider'
 
-const labels: Record<'ru' | 'kk' | 'en', { create: string; history: string; profile: string; kaspiShop: string }> = {
-  ru: { create: 'Создать', history: 'История', profile: 'Профиль', kaspiShop: 'Kaspi Магазин' },
-  kk: { create: 'Жасау', history: 'Тарих', profile: 'Профиль', kaspiShop: 'Kaspi Дүкені' },
-  en: { create: 'Create', history: 'History', profile: 'Profile', kaspiShop: 'Kaspi Shop' },
+const labels: Record<'ru' | 'kk' | 'en', { create: string; history: string; profile: string; kaspiShop: string; aiAgent: string }> = {
+  ru: { create: 'Создать', history: 'История', profile: 'Профиль', kaspiShop: 'Kaspi Магазин', aiAgent: 'AI-агент' },
+  kk: { create: 'Жасау', history: 'Тарих', profile: 'Профиль', kaspiShop: 'Kaspi Дүкені', aiAgent: 'AI-агент' },
+  en: { create: 'Create', history: 'History', profile: 'Profile', kaspiShop: 'Kaspi Shop', aiAgent: 'AI Agent' },
 }
 
 export default function AppNav({ desktopOnly = false }: { desktopOnly?: boolean }) {
@@ -101,6 +101,22 @@ export default function AppNav({ desktopOnly = false }: { desktopOnly?: boolean 
           <path d="M4 8h16l-1.5 10a2 2 0 0 1-2 1.7H7.5a2 2 0 0 1-2-1.7L4 8Z"
             stroke={active ? (invert ? 'white' : '#1C2056') : '#9CA3AF'} strokeWidth="1.5" strokeLinejoin="round"/>
           <path d="M8 8V6a4 4 0 0 1 8 0v2"
+            stroke={active ? (invert ? 'white' : '#1C2056') : '#9CA3AF'} strokeWidth="1.5" strokeLinecap="round"/>
+        </svg>
+      )
+    }] : []),
+    // Same "still-being-verified feature" precedent as Kaspi Shop above --
+    // admin-only until the multi-tenant Instagram OAuth flow has been
+    // live-tested against a real Meta App Review approval, then opened to
+    // everyone as the real cross-sell rollout.
+    ...(isAdmin ? [{
+      label: labels[lang].aiAgent,
+      href: '/ai-agent/settings',
+      icon: (active: boolean, invert = false) => (
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="9"
+            stroke={active ? (invert ? 'white' : '#1C2056') : '#9CA3AF'} strokeWidth="1.5"/>
+          <path d="M9 10h.01M15 10h.01M8 15c1 1 2 1.5 4 1.5s3-.5 4-1.5"
             stroke={active ? (invert ? 'white' : '#1C2056') : '#9CA3AF'} strokeWidth="1.5" strokeLinecap="round"/>
         </svg>
       )
