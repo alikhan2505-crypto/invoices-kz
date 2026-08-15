@@ -20,6 +20,51 @@ export async function finalizeConnection(userId: string, sessionCookies: string,
   try {
     const offers = await listCatalog(sessionCookies, merchantId, true)
     for (const offer of offers) {
+      // Reconnecting (e.g. after a session expiry) used to blind-INSERT a
+      // fresh row per offer every time, producing real duplicate rows per
+      // (connection_id, kaspi_master_sku) in production -- confirmed live
+      // 2026-08-15, 204 rows for 70 real products before this was fixed.
+      // Look up whether this product already has a row for this connection
+      // first: if it does, refresh only the fields Kaspi's own catalog
+      // actually owns (name/brand/category/the seller's own per-offer sku)
+      // and leave every seller-configured field untouched (floor_price,
+      // max_price, undercut_step, enabled, demping_strategy, excluded_*,
+      // cogs_amount, no_competitor_streak, own_current_price -- the last of
+      // these is the repricer's own live state, not a catalog snapshot, so
+      // overwriting it here would clobber real repricing progress on every
+      // reconnect). City price rows are left alone entirely for an
+      // existing product -- they already exist from its first import.
+      const { data: existing, error: lookupError } = await supabase
+        .from('kaspi_shop_tracked_products')
+        .select('id')
+        .eq('connection_id', connection.id)
+        .eq('kaspi_master_sku', offer.masterSku)
+        .maybeSingle()
+      if (lookupError) {
+        console.error('kaspi-shop finalizeConnection: failed to check for an existing row for', offer.sku, lookupError.message)
+        continue
+      }
+
+      if (existing) {
+        const { error: updateError } = await supabase
+          .from('kaspi_shop_tracked_products')
+          .update({
+            kaspi_sku: offer.sku,
+            product_name: offer.title,
+            brand: offer.brandName || offer.brandCode || '',
+            store_id: offer.points[0] || '',
+            kaspi_brand: offer.brandName || offer.brandCode || null,
+            kaspi_category: offer.masterCategory,
+          })
+          .eq('id', existing.id)
+        if (updateError) {
+          console.error('kaspi-shop finalizeConnection: failed to refresh existing offer', offer.sku, updateError.message)
+          continue
+        }
+        imported += 1
+        continue
+      }
+
       const { data: product, error: productError } = await supabase
         .from('kaspi_shop_tracked_products')
         .insert({
