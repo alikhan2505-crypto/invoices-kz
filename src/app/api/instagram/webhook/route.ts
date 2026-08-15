@@ -251,7 +251,10 @@ export async function POST(req: NextRequest) {
     let tenantConnection: Awaited<ReturnType<typeof loadTenantConnection>> = null
     if (!isLegacyAccount) {
       tenantConnection = await loadTenantConnection(accountId)
-      if (!tenantConnection) continue // unknown account -- shouldn't happen, defensive skip
+      if (!tenantConnection) {
+        console.error('instagram webhook: no tenant connection found for entry.id', accountId)
+        continue // unknown account -- shouldn't happen, defensive skip
+      }
     }
     const ownAccountId = isLegacyAccount ? process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID : tenantConnection!.externalAccountId
 

@@ -88,13 +88,24 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
     .single()
   if (!conversation) return
 
-  // Log the inbound message.
-  await supabase.from('ai_agent_messages').insert({
+  // Log the inbound message. If two concurrent deliveries of the same event
+  // both pass the SELECT-based dedup check above, the unique index on
+  // external_id (ai_agent_messages_external_id_idx) catches the race here --
+  // a 23505 means another call already claimed this externalId, so stop
+  // processing this duplicate exactly like the dedup SELECT catching it
+  // would have.
+  const { error: insertError } = await supabase.from('ai_agent_messages').insert({
     conversation_id: conversation.id,
     direction: 'inbound',
     text: params.incomingText,
     external_id: params.externalId,
   })
+  if (insertError) {
+    if (insertError.code !== '23505') {
+      console.error('ai-agent webhook: failed to log inbound message for', params.externalId, ':', insertError.message)
+    }
+    return
+  }
 
   // Template match first, same channel-scoping rule as instagram_reply_templates.
   const { data: templates } = await supabase
