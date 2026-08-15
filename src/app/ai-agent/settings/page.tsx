@@ -90,12 +90,19 @@ export default function AiAgentSettings() {
 
   async function connectInstagram() {
     setConnecting(true)
-    const headers = await authHeader()
-    const res = await fetch('/api/ai-agent/instagram/connect', { headers })
-    if (res.ok) {
-      const data = await res.json()
-      window.location.href = data.authorizeUrl
-    } else {
+    setOauthNotice(null)
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/ai-agent/instagram/connect', { headers })
+      if (res.ok) {
+        const data = await res.json()
+        window.location.href = data.authorizeUrl
+      } else {
+        setOauthNotice('error')
+        setConnecting(false)
+      }
+    } catch {
+      setOauthNotice('error')
       setConnecting(false)
     }
   }
