@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeRepriceCandidate, generatePriceListXml, resolveTargetCities, computePerCityReprice } from './pricing'
+import { computeRepriceCandidate, generatePriceListXml, resolveTargetCities, computePerCityReprice, computeMarketPosition } from './pricing'
 
 describe('computeRepriceCandidate', () => {
   it('undercuts the competitor by the seller-set step when above the floor (default strategy)', () => {
@@ -219,6 +219,32 @@ describe('resolveTargetCities', () => {
 
   it('returns an empty list when nothing is tracked', () => {
     expect(resolveTargetCities([], ['710000000'])).toEqual([])
+  })
+})
+
+describe('computeMarketPosition', () => {
+  it('is #1 of 1 when there are no other sellers', () => {
+    expect(computeMarketPosition([], 'me', 9000)).toEqual({ position: 1, totalOffers: 1 })
+  })
+
+  it('counts strictly-cheaper offers to rank us, ignoring more expensive ones', () => {
+    const offers = [{ merchantId: 'a', price: 8000 }, { merchantId: 'b', price: 9500 }, { merchantId: 'c', price: 7000 }]
+    expect(computeMarketPosition(offers, 'me', 9000)).toEqual({ position: 3, totalOffers: 4 })
+  })
+
+  it('is #1 when every other seller is more expensive', () => {
+    const offers = [{ merchantId: 'a', price: 9500 }, { merchantId: 'b', price: 9800 }]
+    expect(computeMarketPosition(offers, 'me', 9000)).toEqual({ position: 1, totalOffers: 3 })
+  })
+
+  it('a tie does not push us down -- we get the best rank achievable at that price', () => {
+    const offers = [{ merchantId: 'a', price: 9000 }, { merchantId: 'b', price: 12000 }]
+    expect(computeMarketPosition(offers, 'me', 9000)).toEqual({ position: 1, totalOffers: 3 })
+  })
+
+  it('excludes an offer matching our own merchant id defensively', () => {
+    const offers = [{ merchantId: 'me', price: 5000 }, { merchantId: 'a', price: 9500 }]
+    expect(computeMarketPosition(offers, 'me', 9000)).toEqual({ position: 1, totalOffers: 2 })
   })
 })
 

@@ -162,6 +162,27 @@ export function computePerCityReprice(params: {
   })
 }
 
+export type MarketPosition = { position: number; totalOffers: number }
+
+// Price-rank among ALL sellers of this product right now, not just whether
+// we're beating the single cheapest competitor -- "#2 of 6 sellers" rather
+// than the win/lose signal PriceLadder already draws. This is a disclosed
+// approximation: Kaspi's real buy-box algorithm isn't public and may weigh
+// rating/delivery/promotions, not just price, and we only have
+// {merchantId, price} per offer. A tie with a competitor counts in our
+// favor (we show the best rank achievable at that price) since we can't
+// replicate whatever tiebreaker Kaspi actually uses. `offers` should be the
+// RAW offer list for this cycle, not filtered by the seller's own
+// excluded_merchant_ids -- position reflects real market reality, not the
+// seller's "ignore this competitor for repricing" preference. Own-merchant
+// entries are excluded defensively in case Kaspi's endpoint ever includes
+// the caller's own listing.
+export function computeMarketPosition(offers: CompetitorOffer[], ownMerchantId: string, ownPrice: number): MarketPosition {
+  const others = offers.filter(o => o.merchantId !== ownMerchantId)
+  const cheaperCount = others.filter(o => o.price < ownPrice).length
+  return { position: cheaperCount + 1, totalOffers: others.length + 1 }
+}
+
 function escapeXml(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }

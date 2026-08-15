@@ -24,6 +24,8 @@ type Product = {
   demping_strategy: string
   excluded_city_codes: string[]
   excluded_merchant_ids: string[]
+  market_position: number | null
+  market_offer_count: number | null
 }
 
 const STRATEGY_LABELS: Record<string, string> = {
@@ -109,7 +111,7 @@ export default function KaspiShop() {
   const [balance, setBalance] = useState(0)
   const [products, setProducts] = useState<Product[]>([])
   const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [cityPrices, setCityPrices] = useState<Record<string, { cityCode: string; cityName: string; ownPrice: number; competitorPrice: number | null }[]>>({})
+  const [cityPrices, setCityPrices] = useState<Record<string, { cityCode: string; cityName: string; ownPrice: number; competitorPrice: number | null; marketPosition: number | null; marketOfferCount: number | null }[]>>({})
 
   const [phone, setPhone] = useState('')
   const [connecting, setConnecting] = useState(false)
@@ -536,7 +538,12 @@ export default function KaspiShop() {
                         <div className="flex items-center justify-between gap-3 mb-3">
                           <div className="min-w-0">
                             <div className="text-sm font-semibold text-gray-800 truncate">{p.product_name}</div>
-                            <div className="text-[11px] text-gray-400">{STRATEGY_LABELS[p.demping_strategy] || p.demping_strategy} · проверка каждые {p.check_frequency_minutes} мин</div>
+                            <div className="text-[11px] text-gray-400">
+                              {STRATEGY_LABELS[p.demping_strategy] || p.demping_strategy} · проверка каждые {p.check_frequency_minutes} мин
+                              {p.market_position !== null && p.market_offer_count !== null && (
+                                <> · <span className="font-medium text-gray-500" title="Место по цене среди всех продавцов на Kaspi. Kaspi может учитывать не только цену — это оценка.">#{p.market_position} из {p.market_offer_count}</span></>
+                              )}
+                            </div>
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0">
                             <span className="font-mono font-bold text-sm text-[#1C2056] tabular-nums">{p.own_current_price.toLocaleString('ru-KZ')} ₸</span>
@@ -619,6 +626,7 @@ export default function KaspiShop() {
                                           <span className="font-mono">
                                             <span className="text-[#1C2056] font-semibold">{c.ownPrice.toLocaleString('ru-KZ')} ₸</span>
                                             {c.competitorPrice !== null && <span className="text-gray-400"> · конкурент {c.competitorPrice.toLocaleString('ru-KZ')} ₸</span>}
+                                            {c.marketPosition !== null && c.marketOfferCount !== null && <span className="text-gray-400"> · #{c.marketPosition} из {c.marketOfferCount}</span>}
                                           </span>
                                         </div>
                                       ))}

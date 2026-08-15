@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import { computeRepriceCandidate, DempingStrategy, resolveTargetCities, computePerCityReprice, CompetitorOffer, CityOffers } from './pricing'
+import { computeRepriceCandidate, DempingStrategy, resolveTargetCities, computePerCityReprice, computeMarketPosition, CompetitorOffer, CityOffers } from './pricing'
 import { debitKaspiShopWallet } from './wallet'
 import { getKey } from './connection'
 import { decryptAtRest } from '@/lib/kaspiPay/crypto'
@@ -216,13 +216,21 @@ export async function applyPriceCheckResult(
       // loop (as before) meant an expired/absent session silently dropped
       // every city's streak for the cycle, freezing the Макс-памп countdown
       // exactly when a stale session made it most likely to matter
-      // (final-review finding I1). Skips the common no-op case where a city
-      // has competitors every cycle and the streak stays at 0.
+      // (final-review finding I1). Also carries this cycle's market
+      // position (price-rank among ALL sellers in this city, computed from
+      // the raw per-city offers -- not the excludedMerchants-filtered
+      // competitorPrices used for the repricing math above, since position
+      // should reflect real market reality, not this seller's own "ignore
+      // this competitor" preference). No longer skips on an unchanged
+      // streak -- position can move even when the streak doesn't (e.g. a
+      // competitor's price shifts without disappearing), so every city gets
+      // written every cycle now.
       for (const result of results) {
-        if (currentCityStreaks[result.cityCode] === result.newStreak) continue
+        const rawOffers = cityOffersList.find(c => c.cityCode === result.cityCode)?.offers || []
+        const { position, totalOffers } = computeMarketPosition(rawOffers, connection.merchant_id, result.price)
         await supabase
           .from('kaspi_shop_product_city_prices')
-          .update({ no_competitor_streak: result.newStreak })
+          .update({ no_competitor_streak: result.newStreak, market_position: position, market_offer_count: totalOffers })
           .eq('tracked_product_id', trackedProductId)
           .eq('city_code', result.cityCode)
       }
@@ -305,9 +313,15 @@ export async function applyPriceCheckResult(
     ownPriceAfter = price
     action = heldAtFloor ? 'held_at_floor' : (price === ownPriceBefore ? 'no_change' : 'updated')
 
+    // Raw competitorOffers (not the excludedMerchants-filtered
+    // competitorPrices used for the repricing math above) -- position
+    // reflects real market reality, not this seller's own "ignore this
+    // competitor" preference.
+    const { position, totalOffers } = computeMarketPosition(competitorOffers || [], connection.merchant_id, ownPriceAfter)
+
     await supabase
       .from('kaspi_shop_tracked_products')
-      .update({ own_current_price: ownPriceAfter, last_checked_at: new Date().toISOString(), last_competitor_price: competitorPrice, no_competitor_streak: newStreak })
+      .update({ own_current_price: ownPriceAfter, last_checked_at: new Date().toISOString(), last_competitor_price: competitorPrice, no_competitor_streak: newStreak, market_position: position, market_offer_count: totalOffers })
       .eq('id', trackedProductId)
 
     if (action === 'updated' && connection?.session_cookies && connection.session_status === 'active') {

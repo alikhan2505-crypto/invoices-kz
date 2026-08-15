@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
 
   const { data: cityRows, error: cityError } = await supabase
     .from('kaspi_shop_product_city_prices')
-    .select('city_code, own_current_price, last_competitor_price')
+    .select('city_code, own_current_price, last_competitor_price, market_position, market_offer_count')
     .eq('tracked_product_id', trackedProductId)
     .in('city_code', trackedCityCodes)
   if (cityError) return NextResponse.json({ error: 'Не удалось загрузить цены по городам' }, { status: 500 })
@@ -53,6 +53,8 @@ export async function GET(req: NextRequest) {
     cityName: cityNames[c.city_code] || c.city_code,
     ownPrice: Number(c.own_current_price),
     competitorPrice: c.last_competitor_price !== null ? Number(c.last_competitor_price) : null,
+    marketPosition: c.market_position !== null ? Number(c.market_position) : null,
+    marketOfferCount: c.market_offer_count !== null ? Number(c.market_offer_count) : null,
   }))
 
   return NextResponse.json({ cities })
