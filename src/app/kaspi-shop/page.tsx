@@ -376,7 +376,7 @@ export default function KaspiShop() {
     <main className="min-h-screen bg-[#F6F6FB] lg:flex">
       <KaspiShopSidebar active="demping" />
 
-      <div className="flex-1 min-w-0 pt-16 px-4 pb-24 lg:px-6 lg:pb-6">
+      <div className="flex-1 min-w-0 p-4 lg:p-6 pb-24 lg:pb-6">
         {loadError && (
           <div className="bg-red-50 rounded-2xl p-4 flex items-center justify-between gap-3 mb-4">
             <span className="text-sm text-red-600">{loadError}</span>

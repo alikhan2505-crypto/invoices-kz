@@ -313,7 +313,7 @@ export default function InvoicePage() {
   if (loading) return (
     <DesktopShell>
     <main className="min-h-screen bg-gray-50 pb-8 lg:pb-6 lg:min-h-full">
-      <div className="sticky top-16 z-30 bg-white border-b px-4 py-4 flex items-center gap-3 lg:h-16">
+      <div className="sticky top-0 z-30 bg-white border-b px-4 py-4 flex items-center gap-3 lg:h-16">
         <button onClick={() => router.push('/history')} className="back-btn text-gray-400 text-xl" aria-label={backLabel(lang)}>‹</button>
         <Skeleton className="h-4 w-24" />
       </div>
@@ -413,7 +413,7 @@ export default function InvoicePage() {
   return (
     <DesktopShell>
     <main className="min-h-screen bg-gray-50 pb-8 lg:pb-6 lg:min-h-full">
-      <div className="sticky top-16 z-30 bg-white border-b px-4 py-4 flex items-center gap-3 lg:h-16">
+      <div className="sticky top-0 z-30 bg-white border-b px-4 py-4 flex items-center gap-3 lg:h-16">
         <button onClick={() => router.push('/history')} className="back-btn text-gray-400 text-xl" aria-label={backLabel(lang)}>‹</button>
         <span className="font-semibold text-[#1C2056]">{t.invoiceHeaderTitle(invoice.number)}</span>
       </div>

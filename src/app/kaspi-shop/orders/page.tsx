@@ -145,7 +145,7 @@ function KaspiShopOrdersInner() {
     <main className="min-h-screen bg-[#F6F6FB] lg:flex">
       <KaspiShopSidebar active="orders" orderStatus={status} orderCounts={counts} />
 
-      <div className="flex-1 min-w-0 pt-16 px-4 pb-24 lg:px-6 lg:pb-6">
+      <div className="flex-1 min-w-0 p-4 lg:p-6 pb-24 lg:pb-6">
         {sessionExpired && <SessionExpiredBanner />}
 
         <div className="flex items-center justify-between gap-3 mb-4">

@@ -229,7 +229,8 @@ export default function TopUtilityBar() {
 
   return (
     <>
-      <div className="fixed top-3 right-3 z-50 flex items-center gap-1.5 bg-white rounded-full shadow-lg ring-1 ring-black/5 px-1.5 py-1.5">
+      {/* bottom-20 on mobile clears the fixed bottom nav (AppNav's lg:hidden bar); lg:bottom-3 on desktop where the sidebar replaces it */}
+      <div className="fixed bottom-20 lg:bottom-3 right-3 z-50 flex items-center gap-1.5 bg-white rounded-full shadow-lg ring-1 ring-black/5 px-1.5 py-1.5">
         <button onClick={() => openPanel('wallet')} title="Кошелёк"
           className="flex items-center gap-1.5 rounded-full pl-2 pr-2.5 py-1.5 hover:bg-gray-50 transition-colors">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
@@ -271,10 +272,10 @@ export default function TopUtilityBar() {
       </div>
 
       {panel && (
-        <div className="fixed inset-0 z-50 flex items-start justify-end p-3 bg-black/30" onClick={() => setPanel(null)}>
+        <div className="fixed inset-0 z-50 flex items-end justify-end p-3 bg-black/30" onClick={() => setPanel(null)}>
 
           {panel === 'wallet' && (
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mt-14 max-h-[80vh] overflow-hidden flex" onClick={e => e.stopPropagation()}>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mb-32 lg:mb-14 max-h-[80vh] overflow-hidden flex" onClick={e => e.stopPropagation()}>
               <div className="w-40 flex-shrink-0 bg-gray-50 border-r border-gray-100 p-4">
                 <div className="text-xs font-semibold text-gray-400 px-2 mb-2">Кошельки</div>
                 {visibleWallets.map(w => (
@@ -353,7 +354,7 @@ export default function TopUtilityBar() {
           )}
 
           {panel === 'notifications' && (
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mt-14 max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mb-32 lg:mb-14 max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
               <div className="p-4">
                 <div className="flex items-center justify-between mb-1">
                   <h2 className="text-sm font-bold text-[#1C2056]">Уведомления</h2>
@@ -394,7 +395,7 @@ export default function TopUtilityBar() {
           )}
 
           {panel === 'help' && (
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs mt-14" onClick={e => e.stopPropagation()}>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs mb-32 lg:mb-14" onClick={e => e.stopPropagation()}>
               <div className="p-3">
                 <div className="flex items-center justify-between mb-1 px-1">
                   <h2 className="text-sm font-bold text-[#1C2056]">Помощь</h2>
@@ -421,7 +422,7 @@ export default function TopUtilityBar() {
           )}
 
           {panel === 'account' && (
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs mt-14" onClick={e => e.stopPropagation()}>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs mb-32 lg:mb-14" onClick={e => e.stopPropagation()}>
               <div className="p-3">
                 <div className="flex items-center gap-3 px-2 py-2 mb-1">
                   <div className="w-10 h-10 rounded-full bg-[#1C2056] text-white text-xs font-bold flex items-center justify-center flex-shrink-0">

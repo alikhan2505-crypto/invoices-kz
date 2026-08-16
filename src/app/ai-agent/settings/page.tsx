@@ -113,7 +113,7 @@ export default function AiAgentSettings() {
 
   return (
     <main className="min-h-screen bg-gray-50">
-    <div className="max-w-xl mx-auto pt-16 px-6 pb-24">
+    <div className="max-w-xl mx-auto p-6 pb-24">
       <button onClick={() => router.push('/dashboard')} className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 mb-3">
         <span className="text-lg leading-none">‹</span> Назад
       </button>
