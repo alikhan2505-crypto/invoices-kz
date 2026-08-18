@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
+import SiteNav from '@/components/SiteNav'
 
 const TONE_OPTIONS = [
   { value: 'friendly', label: 'Дружелюбный и тёплый' },
@@ -107,12 +108,18 @@ export default function AiAgentSettings() {
     }
   }
 
-  if (loading) return <div className="min-h-screen bg-gray-50 p-8 text-center text-gray-400">Загрузка…</div>
+  if (loading) return (
+    <main className="min-h-screen bg-gray-50">
+      <SiteNav />
+      <div className="p-8 text-center text-gray-400">Загрузка…</div>
+    </main>
+  )
 
   const instagramConnection = connections.find(c => c.channel === 'instagram')
 
   return (
     <main className="min-h-screen bg-gray-50">
+    <SiteNav />
     <div className="max-w-xl mx-auto p-6 pb-24">
       <button onClick={() => router.push('/dashboard')} className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 mb-3">
         <span className="text-lg leading-none">‹</span> Назад

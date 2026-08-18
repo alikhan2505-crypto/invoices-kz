@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
+import SiteNav from '@/components/SiteNav'
 
 interface ReviewItem {
   id: string
@@ -65,10 +66,16 @@ export default function AiAgentReview() {
     }
   }
 
-  if (loading) return <div className="min-h-screen bg-gray-50 p-8 text-center text-gray-400">Загрузка…</div>
+  if (loading) return (
+    <main className="min-h-screen bg-gray-50">
+      <SiteNav />
+      <div className="p-8 text-center text-gray-400">Загрузка…</div>
+    </main>
+  )
 
   return (
     <main className="min-h-screen bg-gray-50">
+    <SiteNav />
     <div className="max-w-xl mx-auto p-6 pb-24">
       <Link href="/ai-agent/settings" className="text-xs text-gray-400 hover:text-gray-600 mb-2 inline-block">← Настройки агента</Link>
       <h1 className="text-xl font-bold text-[#1C2056] mb-1">Диалоги на проверке</h1>
