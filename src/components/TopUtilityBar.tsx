@@ -230,9 +230,11 @@ export default function TopUtilityBar() {
   return (
     <>
       {/* bottom-20 on mobile clears SiteNav's fixed bottom bar (mobile has no top bar);
-          lg:top-2.5 on desktop centers this pill within SiteNav's ~64.8px-tall sticky top bar
-          (pill content is 32px tall + 6px top/bottom padding = 44px; (64.8-44)/2 ≈ 10.4px, closest token is top-2.5/10px) */}
-      <div className="fixed bottom-20 lg:bottom-auto lg:top-2.5 right-3 z-50 flex items-center gap-1.5 nav-glass rounded-full px-1.5 py-1.5"
+          lg:top-3 on desktop keeps this pill at-or-below DesktopShell's own lg:top-3 (12px)
+          card edge on the 5 DesktopShell pages, so it never pokes above the card's rounded
+          top corner; on the other 9 pages (bar starts at y=0) this is a hair off perfect
+          centering vs. the original top-2.5/10px calculation, an accepted tradeoff. */}
+      <div className="fixed bottom-20 lg:bottom-auto lg:top-3 right-3 z-50 flex items-center gap-1.5 nav-glass rounded-full px-1.5 py-1.5"
         style={{ boxShadow: `0 12px 30px -14px rgba(10,10,15,0.35), var(--nav-card-glow)` }}>
         <button onClick={() => openPanel('wallet')} title="Кошелёк"
           className="flex items-center gap-1.5 rounded-full pl-2 pr-2.5 py-1.5 hover:bg-gray-50 transition-colors">
@@ -275,10 +277,10 @@ export default function TopUtilityBar() {
       </div>
 
       {panel && (
-        <div className="fixed inset-0 z-50 flex items-end justify-end p-3 bg-black/30" onClick={() => setPanel(null)}>
+        <div className="fixed inset-0 z-50 flex items-end lg:items-start justify-end p-3 bg-black/30" onClick={() => setPanel(null)}>
 
           {panel === 'wallet' && (
-            <div className="nav-glass rounded-2xl w-full max-w-2xl mb-32 lg:mb-14 max-h-[80vh] overflow-hidden flex" style={{ boxShadow: 'var(--nav-card-glow)' }} onClick={e => e.stopPropagation()}>
+            <div className="nav-glass rounded-2xl w-full max-w-2xl mb-32 lg:mb-0 lg:mt-14 max-h-[80vh] overflow-hidden flex" style={{ boxShadow: 'var(--nav-card-glow)' }} onClick={e => e.stopPropagation()}>
               <div className="w-40 flex-shrink-0 bg-gray-50 border-r border-[var(--nav-border-soft)] p-4">
                 <div className="text-xs font-semibold text-[var(--nav-text-secondary)] px-2 mb-2">Кошельки</div>
                 {visibleWallets.map(w => (
@@ -357,7 +359,7 @@ export default function TopUtilityBar() {
           )}
 
           {panel === 'notifications' && (
-            <div className="nav-glass rounded-2xl w-full max-w-sm mb-32 lg:mb-14 max-h-[80vh] overflow-y-auto" style={{ boxShadow: 'var(--nav-card-glow)' }} onClick={e => e.stopPropagation()}>
+            <div className="nav-glass rounded-2xl w-full max-w-sm mb-32 lg:mb-0 lg:mt-14 max-h-[80vh] overflow-y-auto" style={{ boxShadow: 'var(--nav-card-glow)' }} onClick={e => e.stopPropagation()}>
               <div className="p-4">
                 <div className="flex items-center justify-between mb-1">
                   <h2 className="text-sm font-bold text-[var(--nav-accent)]">Уведомления</h2>
@@ -398,7 +400,7 @@ export default function TopUtilityBar() {
           )}
 
           {panel === 'help' && (
-            <div className="nav-glass rounded-2xl w-full max-w-xs mb-32 lg:mb-14" style={{ boxShadow: 'var(--nav-card-glow)' }} onClick={e => e.stopPropagation()}>
+            <div className="nav-glass rounded-2xl w-full max-w-xs mb-32 lg:mb-0 lg:mt-14" style={{ boxShadow: 'var(--nav-card-glow)' }} onClick={e => e.stopPropagation()}>
               <div className="p-3">
                 <div className="flex items-center justify-between mb-1 px-1">
                   <h2 className="text-sm font-bold text-[var(--nav-accent)]">Помощь</h2>
@@ -425,7 +427,7 @@ export default function TopUtilityBar() {
           )}
 
           {panel === 'account' && (
-            <div className="nav-glass rounded-2xl w-full max-w-xs mb-32 lg:mb-14" style={{ boxShadow: 'var(--nav-card-glow)' }} onClick={e => e.stopPropagation()}>
+            <div className="nav-glass rounded-2xl w-full max-w-xs mb-32 lg:mb-0 lg:mt-14" style={{ boxShadow: 'var(--nav-card-glow)' }} onClick={e => e.stopPropagation()}>
               <div className="p-3">
                 <div className="flex items-center gap-3 px-2 py-2 mb-1">
                   <div className="w-10 h-10 rounded-full bg-[var(--nav-accent)] text-white text-xs font-bold flex items-center justify-center flex-shrink-0">

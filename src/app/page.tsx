@@ -58,7 +58,7 @@ export default function Home() {
   const who = t.who
 
   return (
-    <>
+    <div style={{ background: 'var(--dark)' }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Inter:wght@300;400;500;600&display=swap');
         :root{--navy:#1C2056;--green:#2DC48D;--dark:#0a0d1f;--glass:rgba(255,255,255,0.07);--glass-border:rgba(255,255,255,0.12)}
@@ -404,6 +404,6 @@ export default function Home() {
           {t.footerBottom}
         </div>
       </footer>
-    </>
+    </div>
   )
 }
