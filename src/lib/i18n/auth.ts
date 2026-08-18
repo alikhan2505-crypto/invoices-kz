@@ -5,6 +5,7 @@ export interface AuthContent {
   loginSubtitle: string
   passkeyLoginButton: string
   googleSignInButton: string
+  facebookSignInButton: string
   orEmailDivider: string
   emailLabel: string
   emailPlaceholder: string
@@ -71,6 +72,7 @@ export const authDict: Record<'ru' | 'kk' | 'en', AuthContent> = {
     loginSubtitle: 'Создавайте счета за 1 минуту',
     passkeyLoginButton: 'Войти по Face ID / Touch ID',
     googleSignInButton: 'Войти через Google',
+    facebookSignInButton: 'Войти через Facebook',
     orEmailDivider: 'или через email',
     emailLabel: 'Email',
     emailPlaceholder: 'example@mail.kz',
@@ -135,6 +137,7 @@ export const authDict: Record<'ru' | 'kk' | 'en', AuthContent> = {
     loginSubtitle: 'Шоттарды 1 минутта жасаңыз',
     passkeyLoginButton: 'Face ID / Touch ID арқылы кіру',
     googleSignInButton: 'Google арқылы кіру',
+    facebookSignInButton: 'Facebook арқылы кіру',
     orEmailDivider: 'немесе email арқылы',
     emailLabel: 'Email',
     emailPlaceholder: 'example@mail.kz',
@@ -200,6 +203,7 @@ export const authDict: Record<'ru' | 'kk' | 'en', AuthContent> = {
     loginSubtitle: 'Create invoices in 1 minute',
     passkeyLoginButton: 'Sign in with Face ID / Touch ID',
     googleSignInButton: 'Sign in with Google',
+    facebookSignInButton: 'Sign in with Facebook',
     orEmailDivider: 'or with email',
     emailLabel: 'Email',
     emailPlaceholder: 'example@mail.kz',

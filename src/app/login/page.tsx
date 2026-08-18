@@ -74,6 +74,13 @@ export default function Login() {
     })
   }
 
+  async function signInWithFacebook() {
+    await supabase.auth.signInWithOAuth({
+      provider: 'facebook',
+      options: { redirectTo: 'https://invoices.kz/auth/callback' }
+    })
+  }
+
   return (
     <main className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl p-8 w-full max-w-sm shadow-sm">
@@ -98,6 +105,13 @@ export default function Login() {
                 <path fill="#1976D2" d="M43.6 20H24v8h11.3c-.8 2.3-2.3 4.2-4.2 5.6l6.2 5.2C40.9 35.4 44 30.1 44 24c0-1.3-.1-2.7-.4-4z"/>
               </svg>
               {t.googleSignInButton}
+            </button>
+            <button onClick={signInWithFacebook}
+              className="w-full border border-gray-200 rounded-lg py-3 text-sm font-medium flex items-center justify-center gap-3 hover:bg-gray-50 transition mb-3">
+              <svg width="18" height="18" viewBox="0 0 24 24">
+                <path fill="#1877F2" d="M24 12c0-6.6-5.4-12-12-12S0 5.4 0 12c0 6 4.4 11 10.1 11.9v-8.4H7.1V12h3v-2.6c0-3 1.8-4.7 4.6-4.7 1.3 0 2.7.2 2.7.2v3h-1.5c-1.5 0-2 .9-2 1.9V12h3.3l-.5 3.5h-2.8v8.4C19.6 23 24 18 24 12z"/>
+              </svg>
+              {t.facebookSignInButton}
             </button>
 
             <div className="flex items-center gap-3 mb-4">
