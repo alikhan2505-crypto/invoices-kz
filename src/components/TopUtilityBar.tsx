@@ -237,11 +237,10 @@ export default function TopUtilityBar() {
   return (
     <>
       {/* bottom-20 on mobile clears SiteNav's fixed bottom bar (mobile has no top bar);
-          lg:top-3 on desktop keeps this pill at-or-below DesktopShell's own lg:top-3 (12px)
-          card edge on the 5 DesktopShell pages, so it never pokes above the card's rounded
-          top corner; on the other 9 pages (bar starts at y=0) this is a hair off perfect
-          centering vs. the original top-2.5/10px calculation, an accepted tradeoff. */}
-      <div className="fixed bottom-20 lg:bottom-auto lg:top-3 right-3 z-50 flex items-center gap-1.5 nav-glass rounded-full px-1.5 py-1.5"
+          lg:top-2.5 centers the ~46px pill inside SiteNav's ~65px sticky bar — valid on
+          ALL pages now that DesktopShell's card is top-flush (lg:top-0), so the bar
+          starts at y=0 everywhere. */}
+      <div className="fixed bottom-20 lg:bottom-auto lg:top-2.5 right-3 z-50 flex items-center gap-1.5 nav-glass rounded-full px-1.5 py-1.5"
         style={{ boxShadow: `0 12px 30px -14px rgba(10,10,15,0.35), var(--nav-card-glow)` }}>
         <button onClick={() => openPanel('wallet')} title="Кошелёк"
           className="flex items-center gap-1.5 rounded-full pl-2 pr-2.5 py-1.5 hover:bg-gray-50 transition-colors">
