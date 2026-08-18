@@ -462,7 +462,7 @@ export default function KaspiShop() {
                 </div>
                 <div>
                   <div className="text-3xl lg:text-4xl font-black font-mono tabular-nums">{balance}</div>
-                  <div className="text-xs text-white/40 mt-1">кредитов · <button onClick={() => setWalletOpen(true)} className="underline underline-offset-2">пополнить</button></div>
+                  <div className="text-xs text-white/40 mt-1">₸ на балансе · <button onClick={() => setWalletOpen(true)} className="underline underline-offset-2">пополнить</button></div>
                 </div>
               </div>
             </motion.div>
@@ -674,8 +674,8 @@ export default function KaspiShop() {
               transition={{ duration: 0.3, ease: EASE }}
               onClick={e => e.stopPropagation()}
               className="bg-white rounded-t-[28px] lg:rounded-[28px] w-full lg:max-w-sm p-5">
-              <div className="text-sm font-semibold text-[#1C2056] mb-1">Пополнить Kaspi Shop Wallet</div>
-              <div className="text-xs text-gray-400 mb-4">{balance} кредитов · 1 кредит = 5 ₸</div>
+              <div className="text-sm font-semibold text-[#1C2056] mb-1">Пополнить кошелёк</div>
+              <div className="text-xs text-gray-400 mb-4">Баланс: {balance.toLocaleString('ru-KZ')} ₸ · проверка цены — 5 ₸</div>
               <div className="flex gap-2 flex-wrap mb-2">
                 {[1000, 5000, 10000].map(amount => (
                   <button key={amount} onClick={() => { setTopupAmount(amount); setTopupCustom('') }}
@@ -708,7 +708,7 @@ export default function KaspiShop() {
           floating sidebar is desktop-only. */}
       <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t px-4 py-2 flex items-center justify-between z-40">
         <div className="text-xs font-semibold text-[#1C2056]">Демпинг</div>
-        <button onClick={() => setWalletOpen(true)} className="text-xs text-gray-400">{balance} кредитов</button>
+        <button onClick={() => setWalletOpen(true)} className="text-xs text-gray-400">{balance.toLocaleString('ru-KZ')} ₸</button>
       </div>
     </main>
   )

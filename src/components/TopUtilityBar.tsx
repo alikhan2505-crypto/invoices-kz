@@ -49,7 +49,7 @@ const WALLETS: WalletConfig[] = [
     balanceUrl: '/api/kaspi/wallet', historyUrl: '/api/kaspi/wallet/history',
     topupUrl: '/api/kaspi/wallet/topup', topupStatusUrl: '/api/kaspi/wallet/topup-status',
     amountField: 'amount', minAmount: 1000, presets: [1000, 2000, 5000, 10000],
-    formatBalance: (n: number) => `${n} ₸`,
+    formatBalance: (n: number) => `${n.toLocaleString('ru-KZ')} ₸`,
   },
 ]
 
