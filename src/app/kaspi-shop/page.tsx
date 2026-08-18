@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import LoadingSpinner from '@/components/LoadingSpinner'
-import KaspiShopSidebar from '@/components/kaspiShop/Sidebar'
+import SiteNav from '@/components/SiteNav'
 
 type Product = {
   id: string
@@ -373,8 +373,8 @@ export default function KaspiShop() {
   const activeCount = products.filter(p => p.enabled).length
 
   return (
-    <main className="min-h-screen bg-[#F6F6FB] lg:flex">
-      <KaspiShopSidebar active="demping" />
+    <main className="min-h-screen bg-[#F6F6FB]">
+      <SiteNav />
 
       <div className="flex-1 min-w-0 p-4 lg:p-6 pb-24 lg:pb-6">
         {loadError && (

@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import LoadingSpinner from '@/components/LoadingSpinner'
-import KaspiShopSidebar from '@/components/kaspiShop/Sidebar'
+import SiteNav from '@/components/SiteNav'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 const POLL_INTERVAL_MS = 2000
@@ -127,8 +127,8 @@ export default function KaspiShopNiches() {
   const isEmpty = !!summary && summary.total === 0 && summary.products.length === 0
 
   return (
-    <main className="min-h-screen bg-[#F6F6FB] lg:flex">
-      <KaspiShopSidebar active="niches" />
+    <main className="min-h-screen bg-[#F6F6FB]">
+      <SiteNav />
 
       <div className="flex-1 min-w-0 p-4 lg:p-6 pb-24 lg:pb-6">
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}

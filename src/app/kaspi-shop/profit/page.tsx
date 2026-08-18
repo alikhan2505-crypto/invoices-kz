@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import LoadingSpinner from '@/components/LoadingSpinner'
-import KaspiShopSidebar from '@/components/kaspiShop/Sidebar'
+import SiteNav from '@/components/SiteNav'
 import SessionExpiredBanner from '@/components/kaspiShop/SessionExpiredBanner'
 
 const EASE = [0.16, 1, 0.3, 1] as const
@@ -141,8 +141,8 @@ export default function KaspiShopProfit() {
   if (loading) return <LoadingSpinner />
 
   return (
-    <main className="min-h-screen bg-[#F6F6FB] lg:flex">
-      <KaspiShopSidebar active="profit" />
+    <main className="min-h-screen bg-[#F6F6FB]">
+      <SiteNav />
 
       <div className="flex-1 min-w-0 p-4 lg:p-6 pb-24 lg:pb-6">
         {summary?.sessionExpired && <SessionExpiredBanner />}
