@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
@@ -13,27 +13,86 @@ import { clearSearchLabel } from '@/lib/a11yLabels'
 import { historyDict } from '@/lib/i18n/history'
 import Skeleton from '@/components/Skeleton'
 
-const statusColor: Record<string, string> = {
-  paid: 'bg-green-100 text-green-700',
-  sent: 'bg-blue-100 text-blue-700',
-  overdue: 'bg-red-100 text-red-700',
-  draft: 'bg-gray-100 text-gray-600',
-  viewed: 'bg-purple-100 text-purple-700',
-  cancelled: 'bg-gray-100 text-gray-500',
+// Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
+// kept identical rather than inventing a second "house" ease.
+const EASE = [0.16, 1, 0.3, 1] as const
+
+// Flat solid-fill status badges -- same approved treatment as dashboard/page.tsx's
+// statusFill (a solid color + white text, replacing the old soft-tint statusColor
+// map this page used to have).
+const statusFill: Record<string, string> = {
+  paid: 'var(--nav-success)',
+  sent: 'var(--nav-accent)',
+  viewed: 'var(--nav-teal)',
+  overdue: 'var(--nav-critical)',
+  draft: 'var(--nav-text-muted)',
+  cancelled: 'var(--nav-text-muted)',
+}
+
+const CARD_HOVER = 'transition-all duration-200 ease-out hover:-translate-y-1 hover:shadow-[var(--nav-card-glow)]'
+
+function SearchIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="7" />
+      <path d="m21 21-4.3-4.3" />
+    </svg>
+  )
+}
+
+function XIcon({ size = 13 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 6 6 18M6 6l12 12" />
+    </svg>
+  )
+}
+
+function DocumentIcon() {
+  return (
+    <svg width="34" height="34" viewBox="0 0 24 24" fill="none" style={{ color: 'var(--nav-text-muted)' }}>
+      <path d="M7 3h7l4 4v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="M14 3v4h4" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="M9 12h6M9 15.5h6M9 8.5h2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+// Animates an integer up from 0 to `value` -- copied from dashboard/page.tsx's
+// CountUp. Unlike the dashboard (where each call site is keyed by a value that
+// changes rarely, e.g. the period toggle), history's counts can change on every
+// keystroke/filter click, so callers here key each instance by its own value
+// (`key={s.value}`) -- that remounts a fresh CountUp (and replays the animation)
+// only when the number actually changes, same mechanism the dashboard uses for
+// its period-scoped stats.
+function CountUp({ value, reduceMotion, format }: { value: number; reduceMotion: boolean; format?: (n: number) => string }) {
+  const [display, setDisplay] = useState(reduceMotion ? value : 0)
+
+  useEffect(() => {
+    if (reduceMotion) { setDisplay(value); return }
+    let raf = 0
+    const duration = 700
+    const start = performance.now()
+    function tick(now: number) {
+      const progress = Math.min((now - start) / duration, 1)
+      const eased = 1 - Math.pow(1 - progress, 3)
+      setDisplay(Math.round(value * eased))
+      if (progress < 1) raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  return <>{format ? format(display) : display.toLocaleString('ru-KZ')}</>
 }
 
 export default function History() {
   const router = useRouter()
   const { lang } = useLanguage()
   const t = historyDict[lang]
-  const statusLabel: Record<string, { text: string; color: string }> = {
-    paid: { text: t.statusLabels.paid, color: statusColor.paid },
-    sent: { text: t.statusLabels.sent, color: statusColor.sent },
-    overdue: { text: t.statusLabels.overdue, color: statusColor.overdue },
-    draft: { text: t.statusLabels.draft, color: statusColor.draft },
-    viewed: { text: t.statusLabels.viewed, color: statusColor.viewed },
-    cancelled: { text: t.statusLabels.cancelled, color: statusColor.cancelled },
-  }
+  const reduceMotionRaw = useReducedMotion()
+  const reduceMotion = !!reduceMotionRaw
   const [invoices, setInvoices] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
@@ -104,7 +163,7 @@ export default function History() {
       [t.excelColumnClient]: inv.client_name || t.noClientLabel,
       [t.excelColumnBinIin]: inv.client_bin || '',
       [t.excelColumnAmount]: Number(inv.amount),
-      [t.excelColumnStatus]: (statusLabel[inv.status] || statusLabel.draft).text,
+      [t.excelColumnStatus]: t.statusLabels[inv.status] || t.statusLabels.draft,
       [t.excelColumnNote]: inv.note || '',
       [t.excelColumnDate]: formatDate(inv.created_at),
     }))
@@ -162,159 +221,260 @@ export default function History() {
     .filter(i => i.status === 'paid')
     .reduce((sum, i) => sum + Number(i.amount), 0)
 
+  const statCards = [
+    { key: 'all', label: t.statsAllLabel, value: counts.all, critical: false },
+    { key: 'paid', label: t.statsPaidLabel, value: counts.paid, critical: false },
+    { key: 'sent', label: t.statsUnpaidLabel, value: counts.sent, critical: false },
+    { key: 'overdue', label: t.statsOverdueLabel, value: counts.overdue, critical: true },
+  ]
+
   return (
     <DesktopShell>
-    <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
-      <SiteNav />
-      <div className="max-w-lg lg:max-w-5xl mx-auto p-4">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-xl font-bold text-[#1C2056]">История счетов</h2>
-          <div className="flex gap-2">
-            <button onClick={markOverdue}
-              className="text-xs bg-red-50 text-red-500 border border-red-100 px-3 py-1.5 rounded-lg">
-              {t.markOverdueButtonLabel}
-            </button>
-            <button onClick={exportToExcel}
-              className="text-xs bg-[#1C2056] text-white px-3 py-1.5 rounded-lg">
-              {t.exportButtonLabel}
-            </button>
-          </div>
-        </div>
-        {/* Search */}
-        <div className="bg-white rounded-xl px-3 py-2.5 flex items-center gap-2 shadow-sm mb-3">
-          <span className="text-gray-400">🔍</span>
-          <input
-            className="flex-1 text-sm outline-none"
-            placeholder={t.searchPlaceholder}
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-          {search && (
-            <button onClick={() => setSearch('')} className="text-gray-400 hover:text-gray-500" aria-label={clearSearchLabel(lang)}>✕</button>
-          )}
-        </div>
-
-        {/* Date filter */}
-        <div className="flex gap-2 mb-3 overflow-x-auto pb-1">
-          {t.dateFilterOptions.map(d => (
-            <button key={d.key}
-              onClick={() => setDateFilter(d.key)}
-              className={`px-3 py-1.5 rounded-full text-xs whitespace-nowrap transition flex-shrink-0 ${dateFilter === d.key ? 'bg-[#2DC48D] text-white' : 'bg-white text-gray-500 shadow-sm'}`}>
-              {d.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Status filter */}
-        <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
-          {t.statusFilterOptions.map(f => (
-            <button key={f.key}
-              onClick={() => setFilter(f.key)}
-              className={`px-4 py-1.5 rounded-full text-xs whitespace-nowrap transition flex-shrink-0 ${filter === f.key ? 'bg-[#1C2056] text-white' : 'bg-white text-gray-500 shadow-sm'}`}>
-              {f.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-4 gap-2 mb-4">
-          {[
-            { label: t.statsAllLabel, value: counts.all },
-            { label: t.statsPaidLabel, value: counts.paid },
-            { label: t.statsUnpaidLabel, value: counts.sent },
-            { label: t.statsOverdueLabel, value: counts.overdue, red: true },
-          ].map(s => (
-            <div key={s.label} className="bg-white rounded-xl p-3 text-center shadow-sm">
-              <div className={`text-lg font-semibold ${s.red && s.value > 0 ? 'text-red-500' : 'text-[#1C2056]'}`}>
-                {s.value}
-              </div>
-              <div className="text-xs text-gray-400 mt-0.5 leading-tight">{s.label}</div>
+      <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
+        <SiteNav />
+        <div className="max-w-lg lg:max-w-5xl mx-auto p-4">
+          {/* Header row */}
+          <motion.div
+            className="flex items-center justify-between flex-wrap gap-2 mb-5"
+            initial={reduceMotion ? false : { opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE }}
+          >
+            <h2 className="text-xl font-bold" style={{ color: 'var(--nav-text-primary)' }}>История счетов</h2>
+            <div className="flex gap-2 flex-shrink-0">
+              <button
+                onClick={markOverdue}
+                className="nav-glass text-xs font-semibold px-3 py-1.5 rounded-lg"
+                style={{ color: 'var(--nav-critical)' }}
+              >
+                {t.markOverdueButtonLabel}
+              </button>
+              <button
+                onClick={exportToExcel}
+                className="text-xs font-semibold px-3 py-1.5 rounded-lg"
+                style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}
+              >
+                {t.exportButtonLabel}
+              </button>
             </div>
-          ))}
-        </div>
+          </motion.div>
 
-        {totalAmount > 0 && (
-          <div className="bg-[#1C2056] rounded-xl px-4 py-3 mb-4 flex items-center justify-between">
-            <span className="text-white/70 text-sm">{t.incomeForPeriodLabel}</span>
-            <span className="text-white font-bold">{totalAmount.toLocaleString('ru-KZ')} ₸</span>
-          </div>
-        )}
+          {/* Search */}
+          <motion.div
+            className="nav-glass rounded-xl px-3 py-2.5 flex items-center gap-2 mb-3"
+            initial={reduceMotion ? false : { opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE, delay: reduceMotion ? 0 : 0.05 }}
+          >
+            <span className="flex-shrink-0" style={{ color: 'var(--nav-text-muted)' }}>
+              <SearchIcon />
+            </span>
+            <input
+              className="flex-1 text-sm outline-none bg-transparent"
+              placeholder={t.searchPlaceholder}
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              style={{ color: 'var(--nav-text-primary)' }}
+            />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="flex-shrink-0 text-[color:var(--nav-text-muted)] hover:text-[color:var(--nav-text-secondary)] transition-colors"
+                aria-label={clearSearchLabel(lang)}
+              >
+                <XIcon />
+              </button>
+            )}
+          </motion.div>
 
-        {loading ? (
-          <div className="bg-white rounded-2xl shadow-sm overflow-hidden mb-4 lg:bg-transparent lg:shadow-none lg:rounded-none lg:overflow-visible lg:grid lg:grid-cols-2 lg:gap-3">
-            {[0, 1, 2, 3, 4].map(i => (
-              <div key={i}
-                className={`flex items-center p-4 ${i < 4 ? 'border-b border-gray-100' : ''} lg:border-b-0 lg:rounded-xl lg:bg-white lg:shadow-sm`}>
-                <div className="flex-1">
-                  <Skeleton className="h-3 w-16 mb-2" />
-                  <Skeleton className="h-4 w-32 mb-1.5" />
-                  <Skeleton className="h-3 w-24" />
-                </div>
-                <div className="text-right">
-                  <Skeleton className="h-4 w-16 mb-1.5 ml-auto" />
-                  <Skeleton className="h-5 w-14 rounded-full ml-auto" />
-                </div>
-              </div>
+          {/* Date filter */}
+          <motion.div
+            className="flex gap-2 mb-3 overflow-x-auto pb-1"
+            initial={reduceMotion ? false : { opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE, delay: reduceMotion ? 0 : 0.08 }}
+          >
+            {t.dateFilterOptions.map(d => (
+              <button
+                key={d.key}
+                type="button"
+                onClick={() => setDateFilter(d.key)}
+                className="relative overflow-hidden px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 transition-colors duration-200"
+                style={{
+                  color: dateFilter === d.key ? 'var(--nav-accent-ink)' : 'var(--nav-text-secondary)',
+                  background: dateFilter === d.key ? 'transparent' : 'var(--nav-surface-glass)',
+                }}
+              >
+                {dateFilter === d.key && (
+                  <motion.span
+                    layoutId="dateFilterPill"
+                    className="absolute inset-0 rounded-full"
+                    style={{ background: 'var(--nav-accent)' }}
+                    transition={reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 380, damping: 32 }}
+                  />
+                )}
+                <span className="relative">{d.label}</span>
+              </button>
             ))}
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="text-4xl mb-3">📄</div>
-            <p className="text-gray-400 text-sm">{t.noInvoicesLabel}</p>
-            <button onClick={() => router.push('/create')}
-              className="mt-4 bg-[#1C2056] text-white px-6 py-2.5 rounded-xl text-sm font-medium">
-              {t.createFirstInvoiceButton}
-            </button>
-          </div>
-        ) : (
-          <div className="bg-white rounded-2xl shadow-sm overflow-hidden mb-4 lg:bg-transparent lg:shadow-none lg:rounded-none lg:overflow-visible lg:grid lg:grid-cols-2 lg:gap-3">
-            {filtered.map((inv, i) => (
-              <motion.div key={inv.id}
-                initial={{ opacity: 0, y: 10 }}
+          </motion.div>
+
+          {/* Status filter */}
+          <motion.div
+            className="flex gap-2 mb-4 overflow-x-auto pb-1"
+            initial={reduceMotion ? false : { opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE, delay: reduceMotion ? 0 : 0.11 }}
+          >
+            {t.statusFilterOptions.map(f => (
+              <button
+                key={f.key}
+                type="button"
+                onClick={() => setFilter(f.key)}
+                className="relative overflow-hidden px-4 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 transition-colors duration-200"
+                style={{
+                  color: filter === f.key ? 'var(--nav-accent-ink)' : 'var(--nav-text-secondary)',
+                  background: filter === f.key ? 'transparent' : 'var(--nav-surface-glass)',
+                }}
+              >
+                {filter === f.key && (
+                  <motion.span
+                    layoutId="statusFilterPill"
+                    className="absolute inset-0 rounded-full"
+                    style={{ background: 'var(--nav-accent)' }}
+                    transition={reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 380, damping: 32 }}
+                  />
+                )}
+                <span className="relative">{f.label}</span>
+              </button>
+            ))}
+          </motion.div>
+
+          {/* Stats */}
+          <div className="grid grid-cols-4 gap-2 mb-4">
+            {statCards.map((s, i) => (
+              <motion.div
+                key={s.key}
+                className={`nav-glass rounded-xl p-3 text-center ${CARD_HOVER}`}
+                initial={reduceMotion ? false : { opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: Math.min(i * 0.04, 0.4), duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-                className={`flex items-center p-4 hover:bg-gray-50 ${i < filtered.length - 1 ? 'border-b border-gray-100' : ''} lg:border-b-0 lg:rounded-xl lg:bg-white lg:shadow-sm lg:hover:shadow-md lg:hover:-translate-y-0.5 lg:transition-all`}>
-                <div className="flex-1 flex items-start justify-between cursor-pointer"
-                  onClick={() => router.push('/invoice/' + inv.id)}>
-                  <div>
-                    <div className="text-xs text-gray-400 mb-1">{inv.number}</div>
-                    <div className="text-sm font-medium text-[#1C2056]">
-                      {inv.client_name || inv.clients?.name || t.noClientLabel}
-                    </div>
-                    {inv.note && (
-                      <div className="text-xs text-gray-400 mt-0.5 italic truncate max-w-[180px]">
-                        {inv.note}
-                      </div>
-                    )}
-                    <div className="text-xs text-gray-400 mt-1">
-                      {formatDateTime(inv.created_at)}
-                    </div>
-                  </div>
-                  <div className="text-right mr-3">
-                    <div className="text-sm font-medium text-[#1C2056] mb-1.5">
-                      {Number(inv.amount).toLocaleString('ru-KZ')} ₸
-                    </div>
-                    <span className={`text-xs px-2 py-1 rounded-full ${(statusLabel[inv.status] || statusLabel.draft).color}`}>
-                      {(statusLabel[inv.status] || statusLabel.draft).text}
-                    </span>
-                  </div>
+                transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE, delay: reduceMotion ? 0 : 0.14 + i * 0.04 }}
+              >
+                <div
+                  className="text-lg font-bold tabular-nums"
+                  style={{ color: s.critical && s.value > 0 ? 'var(--nav-critical)' : 'var(--nav-text-primary)' }}
+                >
+                  <CountUp key={s.value} value={s.value} reduceMotion={reduceMotion} />
                 </div>
-                <button
-                  onClick={(e) => deleteInvoice(e, inv.id, inv.number)}
-                  className="text-gray-400 hover:text-red-400 text-lg p-1 flex-shrink-0">
-                  ✕
-                </button>
+                <div className="text-xs mt-0.5 leading-tight" style={{ color: 'var(--nav-text-muted)' }}>{s.label}</div>
               </motion.div>
             ))}
           </div>
-        )}
 
-        <button onClick={() => router.push('/create')}
-          className="w-full bg-[#1C2056] text-white rounded-xl py-4 font-medium text-sm">
-          {t.createNewInvoiceButton}
-        </button>
-      </div>
-    </main>
+          {totalAmount > 0 && (
+            <motion.div
+              className={`nav-glass nav-card-accent rounded-xl px-4 py-3 mb-4 flex items-center justify-between ${CARD_HOVER}`}
+              initial={reduceMotion ? false : { opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE, delay: reduceMotion ? 0 : 0.28 }}
+            >
+              <span className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>{t.incomeForPeriodLabel}</span>
+              <span className="font-bold tabular-nums" style={{ color: 'var(--nav-accent)' }}>
+                <CountUp key={totalAmount} value={totalAmount} reduceMotion={reduceMotion} format={n => `${n.toLocaleString('ru-KZ')} ₸`} />
+              </span>
+            </motion.div>
+          )}
+
+          {loading ? (
+            <div className="rounded-2xl overflow-hidden mb-4 border border-[color:var(--nav-border-soft)] bg-[var(--nav-surface-chrome)] lg:border-0 lg:bg-transparent lg:rounded-none lg:overflow-visible lg:grid lg:grid-cols-2 lg:gap-3">
+              {[0, 1, 2, 3, 4].map(i => (
+                <div
+                  key={i}
+                  className={`flex items-center p-4 lg:rounded-xl lg:border lg:border-[color:var(--nav-border-soft)] lg:bg-[var(--nav-surface-chrome)] ${i < 4 ? 'border-b border-b-[color:var(--nav-border-soft)] lg:border-b-0' : ''}`}
+                >
+                  <div className="flex-1">
+                    <Skeleton className="h-3 w-16 mb-2" />
+                    <Skeleton className="h-4 w-32 mb-1.5" />
+                    <Skeleton className="h-3 w-24" />
+                  </div>
+                  <div className="text-right">
+                    <Skeleton className="h-4 w-16 mb-1.5 ml-auto" />
+                    <Skeleton className="h-5 w-14 rounded-full ml-auto" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="flex flex-col items-center text-center py-12">
+              <DocumentIcon />
+              <p className="text-sm mt-3 mb-4" style={{ color: 'var(--nav-text-secondary)' }}>{t.noInvoicesLabel}</p>
+              <button
+                onClick={() => router.push('/create')}
+                className="px-6 py-2.5 rounded-xl text-sm font-semibold"
+                style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}
+              >
+                {t.createFirstInvoiceButton}
+              </button>
+            </div>
+          ) : (
+            <div className="rounded-2xl overflow-hidden mb-4 border border-[color:var(--nav-border-soft)] bg-[var(--nav-surface-chrome)] lg:border-0 lg:bg-transparent lg:rounded-none lg:overflow-visible lg:grid lg:grid-cols-2 lg:gap-3">
+              {filtered.map((inv, i) => (
+                <motion.div key={inv.id}
+                  initial={reduceMotion ? false : { opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: reduceMotion ? 0 : Math.min(i * 0.035, 0.4), duration: reduceMotion ? 0 : 0.35, ease: EASE }}
+                  className={`flex items-center p-4 transition-all duration-150 hover:translate-x-1 hover:bg-[var(--nav-surface-glass)] lg:hover:translate-x-0 lg:hover:-translate-y-1 lg:hover:shadow-[var(--nav-card-glow)] lg:rounded-xl lg:border lg:border-[color:var(--nav-border-soft)] lg:bg-[var(--nav-surface-chrome)] ${i < filtered.length - 1 ? 'border-b border-b-[color:var(--nav-border-soft)] lg:border-b-0' : ''}`}
+                >
+                  <div className="flex-1 flex items-start justify-between cursor-pointer min-w-0"
+                    onClick={() => router.push('/invoice/' + inv.id)}>
+                    <div className="min-w-0">
+                      <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>{inv.number}</div>
+                      <div className="text-sm font-medium truncate" style={{ color: 'var(--nav-text-primary)' }}>
+                        {inv.client_name || inv.clients?.name || t.noClientLabel}
+                      </div>
+                      {inv.note && (
+                        <div className="text-xs mt-0.5 italic truncate max-w-[180px]" style={{ color: 'var(--nav-text-muted)' }}>
+                          {inv.note}
+                        </div>
+                      )}
+                      <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>
+                        {formatDateTime(inv.created_at)}
+                      </div>
+                    </div>
+                    <div className="text-right ml-3 flex-shrink-0">
+                      <div className="text-sm font-medium tabular-nums mb-1.5" style={{ color: 'var(--nav-text-primary)' }}>
+                        {Number(inv.amount).toLocaleString('ru-KZ')} ₸
+                      </div>
+                      <span
+                        className="text-xs px-2 py-1 rounded-full font-semibold text-white"
+                        style={{ background: statusFill[inv.status] || statusFill.draft }}
+                      >
+                        {t.statusLabels[inv.status] || t.statusLabels.draft}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={(e) => deleteInvoice(e, inv.id, inv.number)}
+                    className="p-1 ml-2 flex-shrink-0 text-[color:var(--nav-text-muted)] hover:text-[color:var(--nav-critical)] transition-colors"
+                  >
+                    <XIcon size={15} />
+                  </button>
+                </motion.div>
+              ))}
+            </div>
+          )}
+
+          <motion.button
+            onClick={() => router.push('/create')}
+            initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.34 }}
+            className="w-full flex items-center justify-center px-4 py-3.5 rounded-xl text-sm font-semibold transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0"
+            style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)', boxShadow: '0 10px 24px -10px var(--nav-accent)' }}
+          >
+            {t.createNewInvoiceButton}
+          </motion.button>
+        </div>
+      </main>
     </DesktopShell>
   )
 }
