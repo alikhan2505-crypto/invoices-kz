@@ -309,28 +309,15 @@ html {
   background: var(--nav-bg);
 }
 
-/* Desktop window shell: inset the scrollbar track from the rounded corners
-   (top/bottom margins matching the card's border-radius) so the browser's
-   own scrollbar never overlaps — and visually squares off — the curve. */
+/* Desktop window shell: the card scrolls its own content (overflow-y-auto),
+   but the founder wants the scrollbar ("ползунок") itself fully invisible —
+   scrolling still works, only the visual bar is gone. */
 .desktop-shell-scroll::-webkit-scrollbar {
-  width: 10px;
-}
-
-.desktop-shell-scroll::-webkit-scrollbar-track {
-  background: transparent;
-  margin-top: 28px;
-  margin-bottom: 28px;
-}
-
-.desktop-shell-scroll::-webkit-scrollbar-thumb {
-  background-color: rgba(0, 0, 0, 0.15);
-  border-radius: 999px;
-  border: 3px solid transparent;
-  background-clip: padding-box;
+  display: none;
 }
 
 .desktop-shell-scroll {
-  scrollbar-width: thin;
+  scrollbar-width: none;
 }
 
 /* Desktop hover micro-interaction for primary/secondary buttons — gated to

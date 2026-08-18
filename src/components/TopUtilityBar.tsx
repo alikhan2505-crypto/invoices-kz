@@ -252,14 +252,19 @@ export default function TopUtilityBar() {
 
   return (
     <>
-      {/* bottom-20 on mobile clears SiteNav's fixed bottom bar (mobile has no top bar);
-          lg:top-2.5 centers the ~46px pill inside SiteNav's ~65px sticky bar — valid on
-          ALL pages now that DesktopShell's card is top-flush (lg:top-0), so the bar
-          starts at y=0 everywhere. lg:right-6 (not right-3): DesktopShell's card has a
-          28px corner radius at the same right-3 edge -- right-3 crowded the pill right
-          into that curve, reading as jammed into the corner rather than sitting in the
-          bar. right-6 clears it. */}
-      <div className="fixed bottom-20 lg:bottom-auto lg:top-2.5 right-3 lg:right-6 z-50 flex items-center gap-1.5 nav-glass rounded-full px-1.5 py-1.5"
+      {/* bottom-20 on mobile clears SiteNav's fixed bottom bar (mobile has no top bar).
+          lg:top-[21px] (not top-2.5): DesktopShell's card went back to a lg:top-3 gap
+          (floating/"парение" effect on all 4 sides), which shifts SiteNav's sticky bar
+          — and everything in it — 12px lower on the 5 DesktopShell pages. The bar now
+          spans roughly y=12..~77 there, and centering the ~46px pill in that range
+          works out to top-[21px]. The 9 standalone kaspi-shop/ai-agent pages don't use
+          DesktopShell, so their bar still starts at y=0 -- this pill sits ~11px low on
+          those. Left as-is: those pages are admin-locked for regular users right now,
+          so it's not worth a page-aware split for a gap only admins see. lg:right-6
+          (not right-3): DesktopShell's card has a 28px corner radius at the same
+          right-3 edge -- right-3 crowded the pill right into that curve, reading as
+          jammed into the corner rather than sitting in the bar. right-6 clears it. */}
+      <div className="fixed bottom-20 lg:bottom-auto lg:top-[21px] right-3 lg:right-6 z-50 flex items-center gap-1.5 nav-glass rounded-full px-1.5 py-1.5"
         style={{ boxShadow: `0 12px 30px -14px rgba(10,10,15,0.35), var(--nav-card-glow)` }}>
         <button onClick={() => openPanel('wallet')} title="Кошелёк"
           className="flex items-center gap-1.5 rounded-full pl-2 pr-2.5 py-1.5 hover:bg-gray-50 transition-colors">
@@ -305,7 +310,7 @@ export default function TopUtilityBar() {
         <div className="fixed inset-0 z-50 flex items-end lg:items-start justify-end p-3 lg:pr-6 bg-black/30" onClick={() => setPanel(null)}>
 
           {panel === 'wallet' && (
-            <div className="nav-glass rounded-2xl w-full max-w-2xl mb-32 lg:mb-0 lg:mt-14 max-h-[80vh] overflow-y-auto" style={{ boxShadow: 'var(--nav-card-glow)' }} onClick={e => e.stopPropagation()}>
+            <div className="nav-glass rounded-2xl w-full max-w-2xl mb-32 lg:mb-0 lg:mt-[76px] max-h-[80vh] overflow-y-auto" style={{ boxShadow: 'var(--nav-card-glow)' }} onClick={e => e.stopPropagation()}>
               <div className="p-4">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-sm font-bold text-[var(--nav-accent)]">{wallet.label}</h2>
@@ -399,7 +404,7 @@ export default function TopUtilityBar() {
           )}
 
           {panel === 'notifications' && (
-            <div className="nav-glass rounded-2xl w-full max-w-sm mb-32 lg:mb-0 lg:mt-14 max-h-[80vh] overflow-y-auto" style={{ boxShadow: 'var(--nav-card-glow)' }} onClick={e => e.stopPropagation()}>
+            <div className="nav-glass rounded-2xl w-full max-w-sm mb-32 lg:mb-0 lg:mt-[76px] max-h-[80vh] overflow-y-auto" style={{ boxShadow: 'var(--nav-card-glow)' }} onClick={e => e.stopPropagation()}>
               <div className="p-4">
                 <div className="flex items-center justify-between mb-1">
                   <h2 className="text-sm font-bold text-[var(--nav-accent)]">Уведомления</h2>
@@ -440,7 +445,7 @@ export default function TopUtilityBar() {
           )}
 
           {panel === 'help' && (
-            <div className="nav-glass rounded-2xl w-full max-w-xs mb-32 lg:mb-0 lg:mt-14" style={{ boxShadow: 'var(--nav-card-glow)' }} onClick={e => e.stopPropagation()}>
+            <div className="nav-glass rounded-2xl w-full max-w-xs mb-32 lg:mb-0 lg:mt-[76px]" style={{ boxShadow: 'var(--nav-card-glow)' }} onClick={e => e.stopPropagation()}>
               <div className="p-3">
                 <div className="flex items-center justify-between mb-1 px-1">
                   <h2 className="text-sm font-bold text-[var(--nav-accent)]">Помощь</h2>
@@ -467,7 +472,7 @@ export default function TopUtilityBar() {
           )}
 
           {panel === 'account' && (
-            <div className="nav-glass rounded-2xl w-full max-w-xs mb-32 lg:mb-0 lg:mt-14" style={{ boxShadow: 'var(--nav-card-glow)' }} onClick={e => e.stopPropagation()}>
+            <div className="nav-glass rounded-2xl w-full max-w-xs mb-32 lg:mb-0 lg:mt-[76px]" style={{ boxShadow: 'var(--nav-card-glow)' }} onClick={e => e.stopPropagation()}>
               <div className="p-3">
                 <div className="flex items-center gap-3 px-2 py-2 mb-1">
                   <div className="w-10 h-10 rounded-full bg-[var(--nav-accent)] text-white text-xs font-bold flex items-center justify-center flex-shrink-0">

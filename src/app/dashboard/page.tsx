@@ -85,6 +85,16 @@ function AgentIcon() {
   )
 }
 
+function ApiIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 3v4M15 3v4M9 17v4M15 17v4" />
+      <rect x="6" y="7" width="12" height="10" rx="2" />
+      <path d="M6 10H3M6 14H3M21 10h-3M21 14h-3" />
+    </svg>
+  )
+}
+
 function LockIcon() {
   return (
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" style={{ color: 'var(--nav-text-muted)', flexShrink: 0 }}>
@@ -172,7 +182,7 @@ type ProductState = 'data' | 'locked' | 'neutral'
 
 function ProductCard({
   index, reduceMotion, icon, colorVar, softVar, title, state,
-  subtitle, deltaPct, deltaLabel, sparkValues, neutralText, onClick,
+  subtitle, deltaPct, deltaLabel, sparkValues, neutralText, ctaLabel, onClick,
 }: {
   index: number
   reduceMotion: boolean
@@ -186,6 +196,7 @@ function ProductCard({
   deltaLabel?: string
   sparkValues?: number[]
   neutralText?: string
+  ctaLabel?: string
   onClick?: () => void
 }) {
   return (
@@ -233,7 +244,14 @@ function ProductCard({
         <div className="text-[11.5px] mt-2" style={{ color: 'var(--nav-text-muted)' }}>{LOCKED_TEXT}</div>
       )}
       {state === 'neutral' && (
-        <div className="text-[11.5px] mt-2" style={{ color: 'var(--nav-text-muted)' }}>{neutralText}</div>
+        <>
+          <div className="text-[11.5px] mt-2" style={{ color: 'var(--nav-text-muted)' }}>{neutralText}</div>
+          {ctaLabel && (
+            <div className="text-xs font-bold mt-2.5" style={{ color: `var(${colorVar})` }}>
+              {ctaLabel}
+            </div>
+          )}
+        </>
       )}
     </motion.div>
   )
@@ -311,6 +329,14 @@ function RevenueAreaChart({ days, reduceMotion, period }: { days: { date: Date; 
   const chartW = VIEW_W - PAD_LEFT - PAD_RIGHT
   const chartH = VIEW_H - PAD_TOP - PAD_BOTTOM
 
+  // Hand-rolled hover state (no chart library): index of the nearest day
+  // plus its already-computed plot coordinates, so the guide line/dot/
+  // tooltip all read from one source. Reset whenever the period changes
+  // (7д/14д/30д) since `days` gets a different length and old indices/
+  // coordinates from the previous period would otherwise dangle.
+  const [hover, setHover] = useState<{ i: number; x: number; y: number } | null>(null)
+  useEffect(() => { setHover(null) }, [period])
+
   const maxValue = Math.max(...days.map(d => d.total), 0)
   if (maxValue === 0) {
     return (
@@ -337,75 +363,174 @@ function RevenueAreaChart({ days, reduceMotion, period }: { days: { date: Date; 
 
   const tickIdx = Array.from(new Set([0, Math.floor((days.length - 1) / 2), days.length - 1]))
 
+  // Nearest-day snapping (not pixel-exact): maps a pointer x (already in
+  // viewBox units) to the closest day index.
+  function nearestIndex(mx: number) {
+    const ratio = (mx - PAD_LEFT) / chartW
+    const i = Math.round(ratio * (days.length - 1))
+    return Math.max(0, Math.min(days.length - 1, i))
+  }
+
+  function updateHoverFromClientX(clientX: number, svgEl: SVGSVGElement) {
+    const rect = svgEl.getBoundingClientRect()
+    const mx = ((clientX - rect.left) / rect.width) * VIEW_W
+    const i = nearestIndex(mx)
+    setHover({ i, x: x(i), y: y(days[i].total) })
+  }
+
+  function handlePointerMove(e: React.PointerEvent<SVGRectElement>) {
+    updateHoverFromClientX(e.clientX, e.currentTarget.ownerSVGElement!)
+  }
+
+  function handlePointerLeave(e: React.PointerEvent<SVGRectElement>) {
+    // Touch pointers fire a leave/out as soon as the finger lifts (no
+    // hover concept on touch) -- a tap should behave like the mouse
+    // hover it's standing in for, so it stays put until the next tap.
+    if (e.pointerType === 'touch') return
+    setHover(null)
+  }
+
+  const hoverRatio = hover ? hover.x / VIEW_W : 0
+  const tooltipFlip = hoverRatio > 0.72
+
   return (
     <div className="overflow-x-auto">
-      <motion.svg
-        key={period}
-        viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
-        width="100%"
-        height="220"
-        preserveAspectRatio="none"
-        style={{ minWidth: '420px', display: 'block', overflow: 'visible' }}
-        initial={reduceMotion ? false : { opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: reduceMotion ? 0 : 0.25, ease: EASE }}
-      >
-        <defs>
-          <linearGradient id="dashboardRevenueGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--nav-accent)" stopOpacity="0.32" />
-            <stop offset="100%" stopColor="var(--nav-accent)" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-
-        {[0, 0.5, 1].map(f => {
-          const gy = PAD_TOP + chartH - f * chartH
-          return <line key={f} x1={PAD_LEFT} y1={gy} x2={VIEW_W - PAD_RIGHT} y2={gy} stroke="var(--nav-text-muted)" strokeOpacity={0.12} strokeWidth={1} />
-        })}
-
-        <motion.path
-          d={areaPathD}
-          fill="url(#dashboardRevenueGradient)"
-          stroke="none"
+      <div style={{ position: 'relative', minWidth: '420px' }}>
+        <motion.svg
+          key={period}
+          viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
+          width="100%"
+          height="220"
+          preserveAspectRatio="none"
+          style={{ minWidth: '420px', display: 'block', overflow: 'visible' }}
           initial={reduceMotion ? false : { opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ duration: reduceMotion ? 0 : 0.6, delay: reduceMotion ? 0 : 0.35, ease: EASE }}
-        />
-
-        <motion.path
-          d={linePathD}
-          fill="none"
-          stroke="var(--nav-accent)"
-          strokeWidth="2"
-          strokeLinejoin="round"
-          strokeLinecap="round"
-          initial={reduceMotion ? false : { pathLength: 0 }}
-          animate={{ pathLength: 1 }}
-          transition={{ duration: reduceMotion ? 0 : 0.9, ease: EASE }}
-        />
-
-        <motion.circle
-          cx={endX} cy={endY} r={4}
-          fill="var(--nav-accent)" stroke="var(--nav-bg)" strokeWidth={2.5}
-          initial={reduceMotion ? false : { opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: reduceMotion ? 0 : 0.3, delay: reduceMotion ? 0 : 0.9, ease: EASE }}
-        />
-        <motion.text
-          x={labelX} y={endY - 10} textAnchor="end"
-          fontSize="10.5" fontWeight={700} fill="var(--nav-text-primary)"
-          initial={reduceMotion ? false : { opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: reduceMotion ? 0 : 0.3, delay: reduceMotion ? 0 : 0.9, ease: EASE }}
+          transition={{ duration: reduceMotion ? 0 : 0.25, ease: EASE }}
         >
-          {Math.round(days[endIdx].total).toLocaleString('ru-KZ')} ₸
-        </motion.text>
+          <defs>
+            <linearGradient id="dashboardRevenueGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--nav-accent)" stopOpacity="0.32" />
+              <stop offset="100%" stopColor="var(--nav-accent)" stopOpacity="0" />
+            </linearGradient>
+          </defs>
 
-        {tickIdx.map(i => (
-          <text key={i} x={x(i)} y={VIEW_H - 6} textAnchor="middle" fontSize="9" fill="var(--nav-text-muted)">
-            {`${days[i].date.getDate()} ${MONTH_ABBR_RU[days[i].date.getMonth()]}`}
-          </text>
-        ))}
-      </motion.svg>
+          {[0, 0.5, 1].map(f => {
+            const gy = PAD_TOP + chartH - f * chartH
+            return <line key={f} x1={PAD_LEFT} y1={gy} x2={VIEW_W - PAD_RIGHT} y2={gy} stroke="var(--nav-text-muted)" strokeOpacity={0.12} strokeWidth={1} />
+          })}
+
+          <motion.path
+            d={areaPathD}
+            fill="url(#dashboardRevenueGradient)"
+            stroke="none"
+            initial={reduceMotion ? false : { opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: reduceMotion ? 0 : 0.6, delay: reduceMotion ? 0 : 0.35, ease: EASE }}
+          />
+
+          <motion.path
+            d={linePathD}
+            fill="none"
+            stroke="var(--nav-accent)"
+            strokeWidth="2"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            initial={reduceMotion ? false : { pathLength: 0 }}
+            animate={{ pathLength: 1 }}
+            transition={{ duration: reduceMotion ? 0 : 0.9, ease: EASE }}
+          />
+
+          <motion.circle
+            cx={endX} cy={endY} r={4}
+            fill="var(--nav-accent)" stroke="var(--nav-bg)" strokeWidth={2.5}
+            initial={reduceMotion ? false : { opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: reduceMotion ? 0 : 0.3, delay: reduceMotion ? 0 : 0.9, ease: EASE }}
+          />
+          <motion.text
+            x={labelX} y={endY - 10} textAnchor="end"
+            fontSize="10.5" fontWeight={700} fill="var(--nav-text-primary)"
+            initial={reduceMotion ? false : { opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: reduceMotion ? 0 : 0.3, delay: reduceMotion ? 0 : 0.9, ease: EASE }}
+          >
+            {Math.round(days[endIdx].total).toLocaleString('ru-KZ')} ₸
+          </motion.text>
+
+          {tickIdx.map(i => (
+            <text key={i} x={x(i)} y={VIEW_H - 6} textAnchor="middle" fontSize="9" fill="var(--nav-text-muted)">
+              {`${days[i].date.getDate()} ${MONTH_ABBR_RU[days[i].date.getMonth()]}`}
+            </text>
+          ))}
+
+          {hover && (
+            <>
+              <line
+                x1={hover.x} x2={hover.x} y1={PAD_TOP} y2={bottomY}
+                stroke="var(--nav-text-muted)" strokeOpacity={0.4} strokeWidth={1} strokeDasharray="3 3"
+              />
+              <circle cx={hover.x} cy={hover.y} r={4.5} fill="var(--nav-accent)" stroke="var(--nav-bg)" strokeWidth={2.5} />
+            </>
+          )}
+
+          {/* Invisible hit layer on top, spanning the whole plot -- pointer
+              position within it maps to the nearest day (not pixel-exact),
+              same pointermove/pointerdown handler serving mouse hover and
+              touch tap alike. */}
+          <rect
+            x={0} y={0} width={VIEW_W} height={VIEW_H} fill="transparent"
+            style={{ cursor: 'crosshair', pointerEvents: 'all' }}
+            onPointerMove={handlePointerMove}
+            onPointerDown={handlePointerMove}
+            onPointerLeave={handlePointerLeave}
+          />
+        </motion.svg>
+
+        {hover && (
+          <div
+            className="nav-glass"
+            style={{
+              position: 'absolute',
+              left: `${hoverRatio * 100}%`,
+              top: hover.y - 10,
+              transform: tooltipFlip ? 'translate(calc(-100% - 10px), -100%)' : 'translate(10px, -100%)',
+              padding: '6px 10px',
+              borderRadius: '10px',
+              fontSize: '11px',
+              fontWeight: 600,
+              color: 'var(--nav-text-primary)',
+              whiteSpace: 'nowrap',
+              pointerEvents: 'none',
+              boxShadow: 'var(--nav-card-glow)',
+              zIndex: 2,
+            }}
+          >
+            <div style={{ fontSize: '9.5px', fontWeight: 500, color: 'var(--nav-text-muted)' }}>
+              {`${days[hover.i].date.getDate()} ${MONTH_ABBR_RU[days[hover.i].date.getMonth()]}`}
+            </div>
+            {Math.round(days[hover.i].total).toLocaleString('ru-KZ')} ₸
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// One row of the "Топ покупателей"/"Топ товаров и услуг" lists: a name
+// (truncated with an ellipsis, full text available via title on hover), a
+// formatted value, and a thin progress track filled proportionally to the
+// largest value in that top-5 set (not to any absolute scale).
+function AnalyticsRow({ name, value, displayValue, max }: { name: string; value: number; displayValue: string; max: number }) {
+  const pct = max > 0 ? Math.max((value / max) * 100, 4) : 0
+  return (
+    <div className="mb-2.5 last:mb-0">
+      <div className="flex items-center justify-between gap-2 mb-1">
+        <span className="text-xs font-medium truncate" title={name} style={{ color: 'var(--nav-text-primary)' }}>{name}</span>
+        <span className="text-xs font-semibold tabular-nums flex-shrink-0" style={{ color: 'var(--nav-text-secondary)' }}>{displayValue}</span>
+      </div>
+      <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--nav-accent-track)' }}>
+        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: 'var(--nav-accent)' }} />
+      </div>
     </div>
   )
 }
@@ -497,6 +622,45 @@ export default function DashboardPage() {
   const recentInvoices = invoices.slice(0, 5)
   const hasAnyInvoices = invoices.length > 0
 
+  // Top 5 clients by summed PAID invoice amount. Line items live directly on
+  // `invoices.services` (a JSONB array -- see src/app/create/page.tsx, each
+  // entry shaped { name, qty, price, unit, code, type }), and the dashboard's
+  // existing `select('*', ...)` already pulls that column in, so no extra
+  // query is needed for either list below.
+  const topClients = useMemo(() => {
+    const totals = new Map<string, number>()
+    invoices.forEach(inv => {
+      if (inv.status !== 'paid') return
+      const name = inv.client_name || inv.clients?.name || 'Без клиента'
+      totals.set(name, (totals.get(name) || 0) + Number(inv.amount))
+    })
+    return Array.from(totals.entries())
+      .map(([name, total]) => ({ name, total }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 5)
+  }, [invoices])
+
+  // Top 5 items/services by number of occurrences across all of the user's
+  // invoices (any status) -- a count of appearances, not a sum of quantities.
+  const topItems = useMemo(() => {
+    const counts = new Map<string, number>()
+    invoices.forEach(inv => {
+      const services = Array.isArray(inv.services) ? inv.services : []
+      services.forEach((s: any) => {
+        const name = (s?.name || '').trim()
+        if (!name) return
+        counts.set(name, (counts.get(name) || 0) + 1)
+      })
+    })
+    return Array.from(counts.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5)
+  }, [invoices])
+
+  const maxClientTotal = Math.max(...topClients.map(c => c.total), 1)
+  const maxItemCount = Math.max(...topItems.map(i => i.count), 1)
+
   const kaspiState: ProductState = isAdmin ? 'neutral' : 'locked'
   const agentState: ProductState = isAdmin ? 'neutral' : 'locked'
 
@@ -528,9 +692,9 @@ export default function DashboardPage() {
             <div className="text-[11px] font-extrabold uppercase mb-3" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.09em' }}>
               Продукты платформы
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               {loading ? (
-                [0, 1, 2].map(i => <div key={i} className="nav-glass nav-card-accent rounded-[22px] p-[18px]"><Skeleton className="h-8 w-8 rounded-[9px] mb-3" /><Skeleton className="h-4 w-24 mb-2" /><Skeleton className="h-3 w-32" /></div>)
+                [0, 1, 2, 3].map(i => <div key={i} className="nav-glass nav-card-accent rounded-[22px] p-[18px]"><Skeleton className="h-8 w-8 rounded-[9px] mb-3" /><Skeleton className="h-4 w-24 mb-2" /><Skeleton className="h-3 w-32" /></div>)
               ) : (
                 <>
                   <ProductCard
@@ -568,6 +732,18 @@ export default function DashboardPage() {
                     state={agentState}
                     neutralText="Диалоги появятся здесь"
                     onClick={isAdmin ? () => router.push('/ai-agent/settings') : undefined}
+                  />
+                  <ProductCard
+                    index={3}
+                    reduceMotion={reduceMotion}
+                    icon={<ApiIcon />}
+                    colorVar="--nav-accent"
+                    softVar="--nav-accent-soft"
+                    title="Kaspi API"
+                    state="neutral"
+                    neutralText="Приём оплат Kaspi на вашем сайте"
+                    ctaLabel="Документация →"
+                    onClick={() => router.push('/profile/kaspi-pay/docs')}
                   />
                 </>
               )}
@@ -684,80 +860,163 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Recent invoices */}
-          <motion.div
-            className={`nav-glass nav-card-accent rounded-2xl ${CARD_HOVER}`}
-            initial={reduceMotion ? false : { opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.25 }}
-          >
-            <div className="flex items-center justify-between px-4 pt-4 pb-1">
-              <h3 className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>Последние счета</h3>
-              <button onClick={() => router.push('/history')} className="text-xs font-medium" style={{ color: 'var(--nav-accent)' }}>
-                Вся история →
-              </button>
+          {/* Bottom section: recent invoices (narrower, left) + a new create-
+              invoice button under it, and a two-block invoice analytics card
+              (right). Right column stacks below the left one under lg. */}
+          <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-4 items-start">
+            {/* Left: Recent invoices + Create button */}
+            <div className="flex flex-col gap-4">
+              <motion.div
+                className={`nav-glass nav-card-accent rounded-2xl ${CARD_HOVER}`}
+                initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.25 }}
+              >
+                <div className="flex items-center justify-between px-4 pt-4 pb-1">
+                  <h3 className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>Последние счета</h3>
+                  <button onClick={() => router.push('/history')} className="text-xs font-medium" style={{ color: 'var(--nav-accent)' }}>
+                    Вся история →
+                  </button>
+                </div>
+
+                {loading ? (
+                  <div className="p-2">
+                    {[0, 1, 2].map(i => (
+                      <div key={i} className="flex items-center justify-between p-3">
+                        <div>
+                          <Skeleton className="h-3 w-14 mb-2" />
+                          <Skeleton className="h-4 w-32" />
+                        </div>
+                        <Skeleton className="h-5 w-16 rounded-full" />
+                      </div>
+                    ))}
+                  </div>
+                ) : !hasAnyInvoices ? (
+                  <div className="flex flex-col items-center text-center px-4 py-10">
+                    <DocumentIcon />
+                    <p className="text-sm mt-3 mb-4" style={{ color: 'var(--nav-text-secondary)' }}>
+                      У вас пока нет счетов. Создайте первый, чтобы начать.
+                    </p>
+                    <button
+                      onClick={() => router.push('/create')}
+                      className="px-5 py-2.5 rounded-xl text-sm font-semibold"
+                      style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}
+                    >
+                      Создать первый счёт
+                    </button>
+                  </div>
+                ) : (
+                  <div className="pb-2">
+                    {recentInvoices.map((inv, i) => (
+                      <div
+                        key={inv.id}
+                        onClick={() => router.push('/invoice/' + inv.id)}
+                        className="flex items-center justify-between mx-2 px-3 py-3 rounded-xl cursor-pointer transition-all duration-150 hover:translate-x-1 hover:bg-[var(--nav-surface-glass)]"
+                        style={{
+                          borderBottom: i < recentInvoices.length - 1 ? '1px solid var(--nav-border-soft)' : 'none',
+                        }}
+                      >
+                        <div className="min-w-0">
+                          <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>{inv.number}</div>
+                          <div className="text-sm font-medium truncate" style={{ color: 'var(--nav-text-primary)' }}>
+                            {inv.client_name || inv.clients?.name || 'Без клиента'}
+                          </div>
+                          <div className="text-xs mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{formatDateTime(inv.created_at)}</div>
+                        </div>
+                        <div className="text-right ml-3 flex-shrink-0">
+                          <div className="text-sm font-medium tabular-nums mb-1.5" style={{ color: 'var(--nav-text-primary)' }}>
+                            {Number(inv.amount).toLocaleString('ru-KZ')} ₸
+                          </div>
+                          <span
+                            className="text-xs px-2 py-1 rounded-full font-semibold text-white"
+                            style={{ background: statusFill[inv.status] || statusFill.draft }}
+                          >
+                            {statusText[inv.status] || statusText.draft}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </motion.div>
+
+              <motion.button
+                onClick={() => router.push('/create')}
+                initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.3 }}
+                className="w-full flex items-center justify-center gap-1.5 px-4 py-3 rounded-xl text-sm font-semibold transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0"
+                style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)', boxShadow: '0 10px 24px -10px var(--nav-accent)' }}
+              >
+                <PlusIcon />
+                Создать счёт
+              </motion.button>
             </div>
 
-            {loading ? (
-              <div className="p-2">
-                {[0, 1, 2].map(i => (
-                  <div key={i} className="flex items-center justify-between p-3">
-                    <div>
-                      <Skeleton className="h-3 w-14 mb-2" />
-                      <Skeleton className="h-4 w-32" />
-                    </div>
-                    <Skeleton className="h-5 w-16 rounded-full" />
-                  </div>
-                ))}
+            {/* Right: Аналитика по счетам -- top clients (paid revenue) and
+                top items/services (occurrence count), both derived client-side
+                from the invoices already loaded above (client_name/clients.name
+                and the `services` JSONB column both come back from the
+                existing select('*', ...) in load()). */}
+            <motion.div
+              className={`nav-glass nav-card-accent rounded-2xl p-4 ${CARD_HOVER}`}
+              initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.3 }}
+            >
+              <h3 className="text-sm font-semibold mb-4" style={{ color: 'var(--nav-text-primary)' }}>Аналитика по счетам</h3>
+
+              <div className="mb-5">
+                <div className="text-[11px] font-extrabold uppercase mb-2.5" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.07em' }}>
+                  Топ покупателей
+                </div>
+                {loading ? (
+                  <>
+                    <Skeleton className="h-3 w-full mb-3" />
+                    <Skeleton className="h-3 w-full mb-3" />
+                    <Skeleton className="h-3 w-full" />
+                  </>
+                ) : topClients.length === 0 ? (
+                  <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>Пока нет оплаченных счетов</div>
+                ) : (
+                  topClients.map(c => (
+                    <AnalyticsRow
+                      key={c.name}
+                      name={c.name}
+                      value={c.total}
+                      displayValue={`${Math.round(c.total).toLocaleString('ru-KZ')} ₸`}
+                      max={maxClientTotal}
+                    />
+                  ))
+                )}
               </div>
-            ) : !hasAnyInvoices ? (
-              <div className="flex flex-col items-center text-center px-4 py-10">
-                <DocumentIcon />
-                <p className="text-sm mt-3 mb-4" style={{ color: 'var(--nav-text-secondary)' }}>
-                  У вас пока нет счетов. Создайте первый, чтобы начать.
-                </p>
-                <button
-                  onClick={() => router.push('/create')}
-                  className="px-5 py-2.5 rounded-xl text-sm font-semibold"
-                  style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}
-                >
-                  Создать первый счёт
-                </button>
+
+              <div>
+                <div className="text-[11px] font-extrabold uppercase mb-2.5" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.07em' }}>
+                  Топ товаров и услуг
+                </div>
+                {loading ? (
+                  <>
+                    <Skeleton className="h-3 w-full mb-3" />
+                    <Skeleton className="h-3 w-full mb-3" />
+                    <Skeleton className="h-3 w-full" />
+                  </>
+                ) : topItems.length === 0 ? (
+                  <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>Появятся после первых счетов</div>
+                ) : (
+                  topItems.map(it => (
+                    <AnalyticsRow
+                      key={it.name}
+                      name={it.name}
+                      value={it.count}
+                      displayValue={it.count.toLocaleString('ru-KZ')}
+                      max={maxItemCount}
+                    />
+                  ))
+                )}
               </div>
-            ) : (
-              <div className="pb-2">
-                {recentInvoices.map((inv, i) => (
-                  <div
-                    key={inv.id}
-                    onClick={() => router.push('/invoice/' + inv.id)}
-                    className="flex items-center justify-between mx-2 px-3 py-3 rounded-xl cursor-pointer transition-all duration-150 hover:translate-x-1 hover:bg-[var(--nav-surface-glass)]"
-                    style={{
-                      borderBottom: i < recentInvoices.length - 1 ? '1px solid var(--nav-border-soft)' : 'none',
-                    }}
-                  >
-                    <div className="min-w-0">
-                      <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>{inv.number}</div>
-                      <div className="text-sm font-medium truncate" style={{ color: 'var(--nav-text-primary)' }}>
-                        {inv.client_name || inv.clients?.name || 'Без клиента'}
-                      </div>
-                      <div className="text-xs mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{formatDateTime(inv.created_at)}</div>
-                    </div>
-                    <div className="text-right ml-3 flex-shrink-0">
-                      <div className="text-sm font-medium tabular-nums mb-1.5" style={{ color: 'var(--nav-text-primary)' }}>
-                        {Number(inv.amount).toLocaleString('ru-KZ')} ₸
-                      </div>
-                      <span
-                        className="text-xs px-2 py-1 rounded-full font-semibold text-white"
-                        style={{ background: statusFill[inv.status] || statusFill.draft }}
-                      >
-                        {statusText[inv.status] || statusText.draft}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </motion.div>
+            </motion.div>
+          </div>
         </div>
       </main>
     </DesktopShell>
