@@ -93,11 +93,9 @@ export async function POST(req: NextRequest) {
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  const { error: walletError } = await supabase.from('ai_agent_wallet').upsert(
-    { user_id: user.id, balance: 0 },
-    { onConflict: 'user_id', ignoreDuplicates: true }
-  )
-  if (walletError) console.error('ai_agent_wallet creation failed for user', user.id, ':', walletError.message)
+  // No wallet row to seed since the 2026-08-18 unified-wallet merge: spend
+  // now debits the shared profiles.kaspi_wallet_balance, which always exists
+  // (every user has a profiles row) and reads as 0 via COALESCE when untouched.
 
   return NextResponse.json({ agent })
 }

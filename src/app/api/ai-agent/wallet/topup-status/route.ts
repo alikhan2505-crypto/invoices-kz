@@ -22,8 +22,8 @@ export async function GET(req: NextRequest) {
   if (!topupId) return NextResponse.json({ error: 'topup_id required' }, { status: 400 })
 
   const { data: row } = await supabase
-    .from('ai_agent_wallet_topups')
-    .select('id, user_id, credits, kaspi_operation_id, status, expires_at')
+    .from('kaspi_wallet_topups')
+    .select('id, user_id, amount, kaspi_operation_id, status, expires_at')
     .eq('id', topupId)
     .eq('user_id', user.id)
     .maybeSingle()

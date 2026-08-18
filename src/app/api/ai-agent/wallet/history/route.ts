@@ -12,7 +12,7 @@ const supabaseAuth = createClient(
 
 const TYPE_LABELS: Record<string, string> = {
   topup: 'Пополнение',
-  reply_debit: 'ИИ-ответ',
+  ai_agent_reply: 'ИИ-ответ',
 }
 
 export async function GET(req: NextRequest) {
@@ -22,10 +22,14 @@ export async function GET(req: NextRequest) {
     : { data: { user: null } }
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  // Unified wallet_ledger holds every wallet-spend category for a user;
+  // filtered to this product's own debit type since a shared 'topup' can no
+  // longer be attributed to one specific product page (see task-3 brief).
   const { data, error } = await supabase
-    .from('ai_agent_wallet_ledger')
+    .from('wallet_ledger')
     .select('type, amount, note, created_at')
     .eq('user_id', user.id)
+    .in('type', ['ai_agent_reply'])
     .order('created_at', { ascending: false })
     .limit(20)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

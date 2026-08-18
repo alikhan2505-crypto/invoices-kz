@@ -104,17 +104,7 @@ export async function saveConnection(params: {
   const { error } = await supabase.from('kaspi_shop_connections').upsert(row, { onConflict: 'user_id' })
   if (error) throw new Error(`kaspi_shop_connections save failed for user ${params.userId}: ${error.message}`)
 
-  // A fresh connection needs its own wallet row before any check cycle can
-  // debit credits -- created here so every connection always has exactly
-  // one wallet, never a missing-row edge case downstream. Thrown, not
-  // logged-and-swallowed: the connection row above already committed, so a
-  // silently missing wallet here would leave a connection that looks fully
-  // set up but can never pay for a check cycle -- surfacing the failure to
-  // the caller (who reports a 500 instead of a false "ok") is safer than
-  // pretending the connect succeeded.
-  const { error: walletError } = await supabase.from('kaspi_shop_wallet').upsert(
-    { user_id: params.userId, balance: 0 },
-    { onConflict: 'user_id', ignoreDuplicates: true }
-  )
-  if (walletError) throw new Error(`kaspi_shop_wallet creation failed for user ${params.userId}: ${walletError.message}`)
+  // No wallet row to seed since the 2026-08-18 unified-wallet merge: spend
+  // now debits the shared profiles.kaspi_wallet_balance, which always exists
+  // (every user has a profiles row) and reads as 0 via COALESCE when untouched.
 }
