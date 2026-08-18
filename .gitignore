@@ -51,3 +51,6 @@ next-env.d.ts
 
 .vercel
 .env*
+
+# MCP server secrets (API keys as headers)
+.mcp.json
