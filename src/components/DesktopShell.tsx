@@ -1,7 +1,11 @@
 export default function DesktopShell({ children }: { children: React.ReactNode }) {
   return (
     <>
-      <div className="hidden lg:block fixed inset-0 -z-10 bg-[#EEF0F7]" />
+      {/* Was a hardcoded bg-[#EEF0F7] (always pale, regardless of theme) --
+          this backdrop fills the gutter around the floating card (the
+          right-3/bottom-3/left-3 margins), so a theme-unaware color here
+          read as a white/pale frame around the card even in dark mode. */}
+      <div className="hidden lg:block fixed inset-0 -z-10" style={{ background: 'var(--nav-bg)' }} />
       {/* The card itself is the fixed, never-moving window frame — rounded on all four
           corners, scrolling its own content internally (overflow-y-auto) so the frame
           stays put while the text inside moves. The sidebar is a fully separate fixed

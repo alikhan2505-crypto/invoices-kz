@@ -291,8 +291,17 @@ button:active, a[href]:active {
    prefers-color-scheme) — no visual change for any page that already
    fully covers the viewport with its own background. Trade-off: the brief
    navy flash before hydration is gone; flag to the user if that's missed. */
+/* --nav-bg (not the legacy --background above): --background only ever
+   responds to the OS-level prefers-color-scheme media query, never to
+   this app's own manual [data-theme] toggle -- confirmed live (toggled
+   in-app to dark, reloaded: data-theme="dark" set correctly, body went
+   dark via the [data-theme="dark"] body rule below, but html stayed
+   pure white because nothing overrides --background for a manual
+   toggle). --nav-bg already has correct values in all four token
+   blocks (:root, the prefers-color-scheme media query, and both
+   [data-theme] blocks), so it tracks the real active theme instead. */
 html {
-  background: var(--background);
+  background: var(--nav-bg);
 }
 
 /* Desktop window shell: inset the scrollbar track from the rounded corners
