@@ -166,21 +166,20 @@ export default function History() {
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
       <SiteNav />
-      <div className="sticky top-0 lg:top-16 z-30 bg-white border-b px-4 py-3 flex items-center justify-between lg:h-16">
-        <span className="font-bold text-[#1C2056]">История счетов</span>
-        <div className="flex gap-2">
-          <button onClick={markOverdue}
-            className="text-xs bg-red-50 text-red-500 border border-red-100 px-3 py-1.5 rounded-lg">
-            {t.markOverdueButtonLabel}
-          </button>
-          <button onClick={exportToExcel}
-            className="text-xs bg-[#1C2056] text-white px-3 py-1.5 rounded-lg">
-            {t.exportButtonLabel}
-          </button>
-        </div>
-      </div>
-
       <div className="max-w-lg lg:max-w-5xl mx-auto p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-xl font-bold text-[#1C2056]">История счетов</h2>
+          <div className="flex gap-2">
+            <button onClick={markOverdue}
+              className="text-xs bg-red-50 text-red-500 border border-red-100 px-3 py-1.5 rounded-lg">
+              {t.markOverdueButtonLabel}
+            </button>
+            <button onClick={exportToExcel}
+              className="text-xs bg-[#1C2056] text-white px-3 py-1.5 rounded-lg">
+              {t.exportButtonLabel}
+            </button>
+          </div>
+        </div>
         {/* Search */}
         <div className="bg-white rounded-xl px-3 py-2.5 flex items-center gap-2 shadow-sm mb-3">
           <span className="text-gray-400">🔍</span>

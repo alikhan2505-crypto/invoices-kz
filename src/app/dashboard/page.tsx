@@ -412,11 +412,6 @@ export default function Dashboard() {
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
       <SiteNav />
-      <div className="sticky top-0 lg:top-16 z-30 bg-white border-b px-4 py-3 flex items-center justify-between lg:h-16">
-        <span className="font-bold text-[#1C2056]">{t.newInvoiceTitle}</span>
-        <span className="text-sm text-gray-500">{profile?.company_name || ''}</span>
-      </div>
-
       <div className="max-w-lg lg:max-w-7xl mx-auto p-4">
         <h2 className="text-xl font-bold text-[#1C2056] mb-1">{t.newInvoiceTitle}</h2>
         <p className="text-sm text-gray-500 mb-4">{t.newInvoiceSubtitle}</p>
