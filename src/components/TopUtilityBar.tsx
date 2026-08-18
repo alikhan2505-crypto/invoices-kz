@@ -1,8 +1,10 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
+import { motion, useReducedMotion } from 'framer-motion'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
+import { getActivePlan } from '@/lib/plan'
 
 type WalletKey = 'unified'
 type Panel = 'wallet' | 'notifications' | 'help' | 'account' | null
@@ -69,14 +71,39 @@ function timeAgo(iso: string): string {
   return `${Math.floor(hr / 24)} дн назад`
 }
 
+// Russian plural agreement for "день" (1 день / 2 дня / 5 дней).
+function pluralDays(n: number): string {
+  const mod10 = n % 10
+  const mod100 = n % 100
+  if (mod10 === 1 && mod100 !== 11) return 'день'
+  if ([2, 3, 4].includes(mod10) && ![12, 13, 14].includes(mod100)) return 'дня'
+  return 'дней'
+}
+
+// The ledger API (src/app/api/kaspi/wallet/history/route.ts) only returns
+// {label, amount, createdAt} -- no category -- so operation dots are
+// approximated from the label text it already sends (matches the same
+// TYPE_LABELS strings that route uses) rather than touching that API,
+// which is out of scope for this component-only pass. Topups (amount >= 0)
+// always get the success dot regardless of label.
+function walletDotColor(entry: HistoryEntry): string {
+  if (entry.amount >= 0) return 'var(--nav-success)'
+  if (entry.label.includes('Kaspi Bot')) return 'var(--nav-teal)'
+  if (entry.label.includes('ИИ-агент')) return 'var(--nav-magenta)'
+  return 'var(--nav-accent)'
+}
+
 export default function TopUtilityBar() {
   const router = useRouter()
   const pathname = usePathname()
+  const reduceMotion = !!useReducedMotion()
   const [loggedIn, setLoggedIn] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
   const [companyName, setCompanyName] = useState('')
   const [email, setEmail] = useState('')
   const [panel, setPanel] = useState<Panel>(null)
+  const [userId, setUserId] = useState<string | null>(null)
+  const [profile, setProfile] = useState<any>(null)
 
   // Wallet state
   const [balances, setBalances] = useState<Partial<Record<WalletKey, number>>>({})
@@ -89,6 +116,12 @@ export default function TopUtilityBar() {
   const [toppingUp, setToppingUp] = useState(false)
   const [topupError, setTopupError] = useState('')
   const [topupPending, setTopupPending] = useState<{ topup_id: string; payment_link: string } | null>(null)
+  const [showTopup, setShowTopup] = useState(false)
+  // "Заработано через Kaspi" (paid invoices, last 30 days) and the tariff
+  // row's "used this month" count -- both real, fetched only when the
+  // wallet panel actually opens (not worth loading on every page mount).
+  const [kaspiEarned30d, setKaspiEarned30d] = useState<number | null>(null)
+  const [monthInvoiceCount, setMonthInvoiceCount] = useState<number | null>(null)
 
   // Notifications state
   const [notifications, setNotifications] = useState<NotificationItem[]>([])
@@ -127,10 +160,15 @@ export default function TopUtilityBar() {
       if (!user) return
       setLoggedIn(true)
       setEmail(user.email || '')
-      const { data: profile } = await supabase.from('profiles').select('is_admin, company_name').eq('id', user.id).maybeSingle()
-      const admin = !!profile?.is_admin
+      setUserId(user.id)
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('is_admin, company_name, plan, plan_expires_at, trial_expires_at, bonus_expires_at')
+        .eq('id', user.id).maybeSingle()
+      const admin = !!profileData?.is_admin
       setIsAdmin(admin)
-      setCompanyName(profile?.company_name || '')
+      setCompanyName(profileData?.company_name || '')
+      setProfile(profileData)
       const headers = await authHeader()
       const visible = WALLETS.filter(w => !w.adminOnly || admin)
       refreshBalances(visible, headers)
@@ -139,12 +177,30 @@ export default function TopUtilityBar() {
     init()
   }, [refreshBalances, refreshUnreadCount])
 
+  // "Заработано через Kaspi" (sum of PAID invoices, last 30 days) and the
+  // tariff row's "used this month" count (all invoices, any status, since
+  // the 1st of the current calendar month -- same window create/page.tsx's
+  // own monthCount uses, so the two "N/limit" numbers agree everywhere).
+  async function loadWalletExtras(uid: string) {
+    const since30 = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString()
+    const monthStart = new Date()
+    monthStart.setDate(1)
+    monthStart.setHours(0, 0, 0, 0)
+    const [{ data: paidInvoices }, { count }] = await Promise.all([
+      supabase.from('invoices').select('amount').eq('user_id', uid).eq('status', 'paid').gte('created_at', since30),
+      supabase.from('invoices').select('*', { count: 'exact', head: true }).eq('user_id', uid).gte('created_at', monthStart.toISOString()),
+    ])
+    setKaspiEarned30d((paidInvoices || []).reduce((sum, inv: any) => sum + Number(inv.amount), 0))
+    setMonthInvoiceCount(count || 0)
+  }
+
   async function selectWallet(key: WalletKey) {
     setActiveWallet(key)
     setTopupAmount(null)
     setTopupCustom('')
     setTopupError('')
     setTopupPending(null)
+    setShowTopup(false)
     setHistoryLoading(true)
     const wallet = WALLETS.find(w => w.key === key)!
     const headers = await authHeader()
@@ -162,7 +218,10 @@ export default function TopUtilityBar() {
 
   function openPanel(p: Exclude<Panel, null>) {
     setPanel(p)
-    if (p === 'wallet') selectWallet(activeWallet)
+    if (p === 'wallet') {
+      selectWallet(activeWallet)
+      if (userId) loadWalletExtras(userId)
+    }
     if (p === 'notifications') loadNotifications()
   }
 
@@ -250,6 +309,15 @@ export default function TopUtilityBar() {
   const wallet = visibleWallets.find(w => w.key === activeWallet) ?? visibleWallets[0]
   const initials = companyName ? companyName.slice(0, 2).toUpperCase() : '··'
 
+  const activePlan = getActivePlan(profile)
+  const totalSpend30d = breakdown ? breakdown.commission + breakdown.kaspi_shop_check + breakdown.ai_agent_reply : 0
+  const currentBalance = balances[activeWallet]
+  const daysLeft = totalSpend30d > 0 && currentBalance !== undefined
+    ? Math.max(0, Math.floor(currentBalance / (totalSpend30d / 30)))
+    : null
+  const topupOpen = showTopup || !!topupPending
+  const isWalletPanel = panel === 'wallet'
+
   return (
     <>
       {/* bottom-20 on mobile clears SiteNav's fixed bottom bar (mobile has no top bar).
@@ -307,100 +375,205 @@ export default function TopUtilityBar() {
       </div>
 
       {panel && (
-        <div className="fixed inset-0 z-50 flex items-end lg:items-start justify-end p-3 lg:pr-6 bg-black/30" onClick={() => setPanel(null)}>
+        <div
+          className={
+            isWalletPanel
+              // Approved-form redesign: the wallet modal is centered on lg+
+              // (max-w-md, true dialog) instead of dropping from the pill --
+              // notifications/help/account are untouched top-right drops.
+              ? 'fixed inset-0 z-50 flex items-end justify-center lg:items-center lg:justify-center p-3 bg-black/30'
+              : 'fixed inset-0 z-50 flex items-end lg:items-start justify-end p-3 lg:pr-6 bg-black/30'
+          }
+          onClick={() => setPanel(null)}>
 
           {panel === 'wallet' && (
-            <div className="nav-glass rounded-2xl w-full max-w-2xl mb-32 lg:mb-0 lg:mt-[76px] max-h-[80vh] overflow-y-auto" style={{ boxShadow: 'var(--nav-card-glow)' }} onClick={e => e.stopPropagation()}>
-              <div className="p-4">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-sm font-bold text-[var(--nav-accent)]">{wallet.label}</h2>
+            <motion.div
+              initial={reduceMotion ? false : { opacity: 0, scale: 0.97, y: 6 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              transition={{ duration: reduceMotion ? 0 : 0.22, ease: [0.16, 1, 0.3, 1] }}
+              className="relative nav-glass rounded-[24px] w-full max-w-md mb-32 lg:mb-0 max-h-[84vh] overflow-y-auto overflow-x-hidden"
+              style={{ boxShadow: '0 34px 80px -20px rgba(10,10,15,0.4), var(--nav-card-glow)' }}
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Approved form's signature 4px accent->teal top bar. */}
+              <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[24px]" style={{ background: 'linear-gradient(90deg, var(--nav-accent), var(--nav-teal))' }} />
+
+              <div className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="text-[11px] font-extrabold uppercase" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.08em' }}>Баланс</div>
                   <button onClick={() => setPanel(null)} className="text-[var(--nav-text-secondary)] text-lg leading-none">✕</button>
                 </div>
-                <div className="bg-[var(--nav-accent)] rounded-xl px-4 py-3 mb-4">
-                  <div className="text-white text-lg font-bold tabular-nums">
-                    {balances[activeWallet] !== undefined ? wallet.formatBalance(balances[activeWallet]!) : '···'}
-                  </div>
+
+                <div className="text-4xl font-bold tabular-nums mt-2" style={{ color: 'var(--nav-text-primary)', letterSpacing: '-0.03em' }}>
+                  {currentBalance !== undefined ? `${currentBalance.toLocaleString('ru-KZ')} ₸` : '···'}
                 </div>
-                {breakdown && (breakdown.commission + breakdown.kaspi_shop_check + breakdown.ai_agent_reply > 0) && (
-                  <div className="mb-4">
-                    <div className="text-xs text-gray-500 mb-2">Расходы за 30 дней</div>
-                    <div className="flex h-2 rounded-full overflow-hidden bg-gray-100 mb-2">
+                <p className="text-xs mt-2 leading-relaxed" style={{ color: 'var(--nav-text-secondary)' }}>
+                  Один баланс на все сервисы — пополняете один раз, тратится там, где используете.
+                </p>
+
+                {breakdown && totalSpend30d > 0 && (
+                  <div className="mt-5">
+                    <div className="text-xs mb-2" style={{ color: 'var(--nav-text-muted)' }}>Расходы за 30 дней</div>
+                    <div className="flex h-2 rounded-full overflow-hidden w-full" style={{ background: 'var(--nav-bg)' }}>
                       {BREAKDOWN_SEGMENTS.filter(s => breakdown[s.key] > 0).map(s => (
-                        <div key={s.key} style={{ flexGrow: breakdown[s.key], backgroundColor: s.color }} />
+                        <div key={s.key} style={{ flexGrow: breakdown[s.key], background: s.color }} />
                       ))}
                     </div>
-                    <div className="space-y-1">
+                    <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-2.5">
                       {BREAKDOWN_SEGMENTS.filter(s => breakdown[s.key] > 0).map(s => (
                         <div key={s.key} className="flex items-center gap-1.5 text-xs">
-                          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: s.color }} />
-                          <span className="text-gray-600">{s.label}</span>
-                          <span className="ml-auto tabular-nums text-gray-500">{breakdown[s.key].toLocaleString('ru-KZ')} ₸</span>
+                          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: s.color }} />
+                          <span style={{ color: 'var(--nav-text-secondary)' }}>{s.label}</span>
+                          <span className="font-semibold tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{breakdown[s.key].toLocaleString('ru-KZ')} ₸</span>
                         </div>
                       ))}
                     </div>
                     {breakdown.topup > 0 && (
-                      <div className="text-[11px] text-[var(--nav-text-muted)] mt-1.5">
+                      <div className="text-[11px] mt-2" style={{ color: 'var(--nav-text-muted)' }}>
                         Пополнено за 30 дней: {breakdown.topup.toLocaleString('ru-KZ')} ₸
                       </div>
                     )}
                   </div>
                 )}
-                <div className="mb-4">
-                  <div className="text-xs text-gray-500 mb-2">История списаний</div>
-                  {historyLoading && <div className="text-xs text-[var(--nav-text-secondary)]">Загрузка…</div>}
-                  {!historyLoading && history.length === 0 && <div className="text-xs text-[var(--nav-text-secondary)]">Пока нет операций</div>}
+
+                <div className="flex items-center justify-between gap-3 mt-5">
+                  <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>
+                    {daysLeft !== null ? (
+                      <>Хватит на <b style={{ color: 'var(--nav-text-primary)' }}>{daysLeft} {pluralDays(daysLeft)}</b> при текущем темпе</>
+                    ) : <>&nbsp;</>}
+                  </div>
+                  <button
+                    onClick={() => setShowTopup(v => !v)}
+                    className="px-4 py-2 rounded-lg text-xs font-semibold flex-shrink-0 transition-colors"
+                    style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}
+                  >
+                    Пополнить
+                  </button>
+                </div>
+
+                {topupOpen && (
+                  <div className="mt-3 pt-4" style={{ borderTop: '1px solid var(--nav-border-soft)' }}>
+                    {topupPending ? (
+                      <div>
+                        <p className="text-xs mb-2" style={{ color: 'var(--nav-text-secondary)' }}>Оплатите QR-код Kaspi — баланс пополнится автоматически.</p>
+                        <a href={topupPending.payment_link} target="_blank" rel="noopener noreferrer"
+                          className="block text-center rounded-lg px-3 py-2 text-xs font-medium"
+                          style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                          Открыть оплату
+                        </a>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="grid grid-cols-4 gap-1.5 mb-2">
+                          {wallet.presets.map(amount => (
+                            <button key={amount} onClick={() => { setTopupAmount(amount); setTopupCustom('') }}
+                              className="rounded-lg px-2 py-1.5 text-xs font-medium transition-colors"
+                              style={topupAmount === amount
+                                ? { background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }
+                                : { background: 'var(--nav-bg)', color: 'var(--nav-accent)' }}>
+                              {amount.toLocaleString('ru-KZ')}
+                            </button>
+                          ))}
+                        </div>
+                        <input value={topupCustom} onChange={e => { setTopupCustom(e.target.value.replace(/\D/g, '')); setTopupAmount(null) }}
+                          placeholder="Своя сумма, ₸" type="text" inputMode="numeric" name="topupCustomAmount"
+                          className="w-full border rounded-lg px-3 py-1.5 text-xs mb-2"
+                          style={{ borderColor: 'var(--nav-border-soft)', background: 'var(--nav-bg)', color: 'var(--nav-text-primary)' }} />
+                        {topupError && <div className="text-xs mb-2" style={{ color: 'var(--nav-critical)' }}>{topupError}</div>}
+                        {(() => {
+                          const topupDisabled = toppingUp || !((topupAmount ?? Number(topupCustom)) >= wallet.minAmount)
+                          return (
+                            <button onClick={() => startTopup(wallet, (topupAmount ?? Number(topupCustom)) || 0)}
+                              disabled={topupDisabled}
+                              className="w-full rounded-lg px-3 py-2 text-xs font-medium transition-colors"
+                              style={topupDisabled
+                                ? { background: 'var(--nav-bg)', color: 'var(--nav-text-secondary)', cursor: 'not-allowed' }
+                                : { background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                              {toppingUp ? 'Создаём оплату…' : 'Пополнить'}
+                            </button>
+                          )
+                        })()}
+                      </>
+                    )}
+                  </div>
+                )}
+
+                <div className="mt-5 pt-5" style={{ borderTop: '1px solid var(--nav-border-soft)' }}>
+                  <div className="text-[11px] font-extrabold uppercase mb-2.5" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.07em' }}>
+                    Последние операции
+                  </div>
+                  {historyLoading && <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>Загрузка…</div>}
+                  {!historyLoading && history.length === 0 && <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>Пока нет операций</div>}
                   {!historyLoading && history.length > 0 && (
-                    <div className="space-y-1.5 max-h-40 overflow-y-auto">
-                      {history.map((h, i) => (
-                        <div key={i} className="flex items-center justify-between text-xs">
-                          <span className="text-gray-600 truncate mr-2">{h.label}</span>
-                          <span className={`tabular-nums font-medium whitespace-nowrap ${h.amount >= 0 ? 'text-[#00A468]' : 'text-gray-500'}`}>
+                    <div className="space-y-0.5 max-h-40 overflow-y-auto">
+                      {history.slice(0, 8).map((h, i) => (
+                        <motion.div
+                          key={i}
+                          initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: reduceMotion ? 0 : 0.2, delay: reduceMotion ? 0 : 0.05 + i * 0.03, ease: [0.16, 1, 0.3, 1] }}
+                          className="flex items-center justify-between gap-2 py-1.5"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: walletDotColor(h) }} />
+                            <span className="text-xs truncate" style={{ color: 'var(--nav-text-primary)' }}>{h.label}</span>
+                            <span className="text-[10px] flex-shrink-0" style={{ color: 'var(--nav-text-muted)' }}>{timeAgo(h.createdAt)}</span>
+                          </div>
+                          <span className="text-xs font-semibold tabular-nums flex-shrink-0" style={{ color: h.amount >= 0 ? 'var(--nav-success)' : 'var(--nav-text-primary)' }}>
                             {h.amount >= 0 ? '+' : ''}{h.amount.toLocaleString('ru-KZ')}
                           </span>
-                        </div>
+                        </motion.div>
                       ))}
                     </div>
                   )}
                 </div>
-                <div className="border-t border-[var(--nav-border-soft)] pt-4">
-                  <div className="text-xs text-gray-500 mb-2">Пополнить</div>
-                  {topupPending ? (
-                    <div>
-                      <p className="text-xs text-gray-600 mb-2">Оплатите QR-код Kaspi — баланс пополнится автоматически.</p>
-                      <a href={topupPending.payment_link} target="_blank" rel="noopener noreferrer"
-                        className="block text-center bg-[var(--nav-accent)] text-white rounded-lg px-3 py-2 text-xs font-medium">
-                        Открыть оплату
-                      </a>
+
+                <div className="mt-5 pt-5 flex items-center justify-between gap-3" style={{ borderTop: '1px solid var(--nav-border-soft)' }}>
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="w-8 h-8 rounded-[9px] flex items-center justify-center flex-shrink-0"
+                      style={{ background: 'linear-gradient(135deg, var(--nav-accent-soft), transparent)', color: 'var(--nav-accent)' }}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                        <rect x="2" y="6" width="20" height="13" rx="3" stroke="currentColor" strokeWidth="1.8" />
+                        <path d="M2 10h20" stroke="currentColor" strokeWidth="1.8" />
+                        <circle cx="17" cy="14.5" r="1.2" fill="currentColor" />
+                      </svg>
+                    </span>
+                    <div className="min-w-0">
+                      <div className="text-xs font-semibold" style={{ color: 'var(--nav-text-primary)' }}>Заработано через Kaspi</div>
+                      <div className="text-[11px] truncate" style={{ color: 'var(--nav-text-muted)' }}>
+                        Оплаты приходят напрямую на ваш Kaspi ·{' '}
+                        <Link href="/profile/kaspi-pay" onClick={() => setPanel(null)} className="font-medium" style={{ color: 'var(--nav-accent)' }}>Kaspi Pay →</Link>
+                      </div>
                     </div>
+                  </div>
+                  <div className="text-sm font-bold tabular-nums flex-shrink-0" style={{ color: 'var(--nav-text-primary)' }}>
+                    {kaspiEarned30d !== null ? `${kaspiEarned30d.toLocaleString('ru-KZ')} ₸` : '···'}
+                  </div>
+                </div>
+
+                <div className="mt-5 pt-5 flex items-center gap-3" style={{ borderTop: '1px solid var(--nav-border-soft)' }}>
+                  <div className="text-xs flex-shrink-0" style={{ color: 'var(--nav-text-secondary)' }}>
+                    Тариф <b style={{ color: 'var(--nav-text-primary)' }}>{activePlan.label}</b>
+                  </div>
+                  {activePlan.invoiceLimit === null ? (
+                    <div className="text-xs ml-auto" style={{ color: 'var(--nav-text-muted)' }}>безлимит</div>
                   ) : (
                     <>
-                      <div className="grid grid-cols-4 gap-1.5 mb-2">
-                        {wallet.presets.map(amount => (
-                          <button key={amount} onClick={() => { setTopupAmount(amount); setTopupCustom('') }}
-                            className={`rounded-lg px-2 py-1.5 text-xs font-medium ${topupAmount === amount ? 'bg-[var(--nav-accent)] text-white' : 'bg-gray-100 text-[var(--nav-accent)]'}`}>
-                            {amount.toLocaleString('ru-KZ')}
-                          </button>
-                        ))}
+                      <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--nav-accent-track)' }}>
+                        <div className="h-full rounded-full"
+                          style={{
+                            width: `${Math.min(100, ((monthInvoiceCount ?? 0) / activePlan.invoiceLimit) * 100)}%`,
+                            background: 'var(--nav-accent)',
+                          }} />
                       </div>
-                      <input value={topupCustom} onChange={e => { setTopupCustom(e.target.value.replace(/\D/g, '')); setTopupAmount(null) }}
-                        placeholder="Своя сумма, ₸" type="text" inputMode="numeric" name="topupCustomAmount"
-                        className="w-full border border-[var(--nav-border-soft)] rounded-lg px-3 py-1.5 text-xs mb-2" />
-                      {topupError && <div className="text-xs text-red-500 mb-2">{topupError}</div>}
-                      {(() => {
-                        const topupDisabled = toppingUp || !((topupAmount ?? Number(topupCustom)) >= wallet.minAmount)
-                        return (
-                          <button onClick={() => startTopup(wallet, (topupAmount ?? Number(topupCustom)) || 0)}
-                            disabled={topupDisabled}
-                            className={`w-full rounded-lg px-3 py-2 text-xs font-medium transition-colors ${topupDisabled ? 'bg-gray-100 text-[var(--nav-text-secondary)] cursor-not-allowed' : 'bg-[var(--nav-accent)] text-white hover:brightness-90'}`}>
-                            {toppingUp ? 'Создаём оплату…' : 'Пополнить'}
-                          </button>
-                        )
-                      })()}
+                      <div className="text-xs flex-shrink-0" style={{ color: 'var(--nav-text-secondary)' }}>
+                        <b style={{ color: 'var(--nav-text-primary)' }}>{monthInvoiceCount ?? '···'}/{activePlan.invoiceLimit}</b> счетов
+                      </div>
                     </>
                   )}
                 </div>
               </div>
-            </div>
+            </motion.div>
           )}
 
           {panel === 'notifications' && (
