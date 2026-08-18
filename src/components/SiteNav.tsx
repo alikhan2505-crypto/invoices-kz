@@ -26,6 +26,9 @@ const invoicesLinks: { href: string; label: LocalizedLabel }[] = [
   { href: '/history', label: { ru: 'История', kk: 'Тарих', en: 'History' } },
   { href: '/profile/templates', label: { ru: 'Шаблоны', kk: 'Үлгілер', en: 'Templates' } },
 ]
+// /dashboard stays in the dropdown but doesn't light Счета's underline --
+// the top-level Главная button owns that route (both were underlining at once).
+const invoicesActiveLinks = invoicesLinks.filter(l => l.href !== '/dashboard')
 
 const kaspiShopLinks: { href: string; label: LocalizedLabel }[] = [
   { href: '/kaspi-shop', label: { ru: 'Демпинг', kk: 'Демпинг', en: 'Repricer' } },
@@ -63,7 +66,7 @@ function isActiveSection(links: { href: string }[], path: string) {
 
 function Dropdown({
   menuKey, label, links, dotColor, openMenu, setOpenMenu, router, path, lang,
-  locked = false, lockedHintOpen = false, onLockedClick,
+  locked = false, lockedHintOpen = false, onLockedClick, activeLinks,
 }: {
   menuKey: MenuKey
   label: string
@@ -77,8 +80,12 @@ function Dropdown({
   locked?: boolean
   lockedHintOpen?: boolean
   onLockedClick?: () => void
+  // Routes counted for the active underline; defaults to `links`. Lets a
+  // section list a route in its dropdown without claiming it as "its own"
+  // when a top-level button (Главная = /dashboard) already owns that route.
+  activeLinks?: { href: string }[]
 }) {
-  const active = !locked && isActiveSection(links, path)
+  const active = !locked && isActiveSection(activeLinks ?? links, path)
   const open = !locked && openMenu === menuKey
   return (
     <div className="relative">
@@ -297,7 +304,7 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
           {labels[lang].home}
         </button>
 
-        <Dropdown menuKey="invoices" label={labels[lang].invoices} links={invoicesLinks} dotColor="var(--nav-accent)" openMenu={openMenu} setOpenMenu={setOpenMenu} router={router} path={path} lang={lang} />
+        <Dropdown menuKey="invoices" label={labels[lang].invoices} links={invoicesLinks} activeLinks={invoicesActiveLinks} dotColor="var(--nav-accent)" openMenu={openMenu} setOpenMenu={setOpenMenu} router={router} path={path} lang={lang} />
         <Dropdown
           menuKey="kaspiShop" label={labels[lang].kaspiShop} links={kaspiShopLinks} dotColor="var(--nav-teal)"
           openMenu={openMenu} setOpenMenu={setOpenMenu} router={router} path={path} lang={lang}
