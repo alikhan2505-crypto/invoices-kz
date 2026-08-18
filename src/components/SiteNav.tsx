@@ -22,7 +22,7 @@ type MenuKey = 'invoices' | 'kaspiShop' | 'aiAgent' | 'kaspiApi'
 type LocalizedLabel = Record<Lang, string>
 
 const invoicesLinks: { href: string; label: LocalizedLabel }[] = [
-  { href: '/dashboard', label: { ru: 'Создать счёт', kk: 'Шот құру', en: 'Create invoice' } },
+  { href: '/create', label: { ru: 'Создать счёт', kk: 'Шот құру', en: 'Create invoice' } },
   { href: '/history', label: { ru: 'История', kk: 'Тарих', en: 'History' } },
   { href: '/profile/templates', label: { ru: 'Шаблоны', kk: 'Үлгілер', en: 'Templates' } },
 ]
