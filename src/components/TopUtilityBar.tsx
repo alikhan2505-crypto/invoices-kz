@@ -279,8 +279,8 @@ export default function TopUtilityBar() {
 
           {panel === 'wallet' && (
             <div className="nav-glass rounded-2xl w-full max-w-2xl mb-32 lg:mb-14 max-h-[80vh] overflow-hidden flex" style={{ boxShadow: 'var(--nav-card-glow)' }} onClick={e => e.stopPropagation()}>
-              <div className="w-40 flex-shrink-0 bg-gray-50 border-r border-gray-100 p-4">
-                <div className="text-xs font-semibold text-gray-400 px-2 mb-2">Кошельки</div>
+              <div className="w-40 flex-shrink-0 bg-gray-50 border-r border-[var(--nav-border-soft)] p-4">
+                <div className="text-xs font-semibold text-[var(--nav-text-secondary)] px-2 mb-2">Кошельки</div>
                 {visibleWallets.map(w => (
                   <button key={w.key} onClick={() => selectWallet(w.key)}
                     className={`w-full text-left px-3 py-2 rounded-lg text-sm mb-1 transition-colors ${activeWallet === w.key ? 'bg-[var(--nav-accent)] text-white font-medium' : 'text-gray-600 hover:bg-gray-100'}`}>
@@ -291,7 +291,7 @@ export default function TopUtilityBar() {
               <div className="flex-1 p-4 overflow-y-auto">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-sm font-bold text-[var(--nav-accent)]">{wallet.label}</h2>
-                  <button onClick={() => setPanel(null)} className="text-gray-400 text-lg leading-none">✕</button>
+                  <button onClick={() => setPanel(null)} className="text-[var(--nav-text-secondary)] text-lg leading-none">✕</button>
                 </div>
                 <div className="bg-[var(--nav-accent)] rounded-xl px-4 py-3 mb-4">
                   <div className="text-white text-lg font-bold tabular-nums">
@@ -300,8 +300,8 @@ export default function TopUtilityBar() {
                 </div>
                 <div className="mb-4">
                   <div className="text-xs text-gray-500 mb-2">История списаний</div>
-                  {historyLoading && <div className="text-xs text-gray-400">Загрузка…</div>}
-                  {!historyLoading && history.length === 0 && <div className="text-xs text-gray-400">Пока нет операций</div>}
+                  {historyLoading && <div className="text-xs text-[var(--nav-text-secondary)]">Загрузка…</div>}
+                  {!historyLoading && history.length === 0 && <div className="text-xs text-[var(--nav-text-secondary)]">Пока нет операций</div>}
                   {!historyLoading && history.length > 0 && (
                     <div className="space-y-1.5 max-h-40 overflow-y-auto">
                       {history.map((h, i) => (
@@ -315,7 +315,7 @@ export default function TopUtilityBar() {
                     </div>
                   )}
                 </div>
-                <div className="border-t border-gray-100 pt-4">
+                <div className="border-t border-[var(--nav-border-soft)] pt-4">
                   <div className="text-xs text-gray-500 mb-2">Пополнить</div>
                   {topupPending ? (
                     <div>
@@ -337,14 +337,14 @@ export default function TopUtilityBar() {
                       </div>
                       <input value={topupCustom} onChange={e => { setTopupCustom(e.target.value.replace(/\D/g, '')); setTopupAmount(null) }}
                         placeholder="Своя сумма, ₸" type="text" inputMode="numeric" name="topupCustomAmount"
-                        className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-xs mb-2" />
+                        className="w-full border border-[var(--nav-border-soft)] rounded-lg px-3 py-1.5 text-xs mb-2" />
                       {topupError && <div className="text-xs text-red-500 mb-2">{topupError}</div>}
                       {(() => {
                         const topupDisabled = toppingUp || !((topupAmount ?? Number(topupCustom)) >= wallet.minAmount)
                         return (
                           <button onClick={() => startTopup(wallet, (topupAmount ?? Number(topupCustom)) || 0)}
                             disabled={topupDisabled}
-                            className={`w-full rounded-lg px-3 py-2 text-xs font-medium transition-colors ${topupDisabled ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-[var(--nav-accent)] text-white hover:brightness-90'}`}>
+                            className={`w-full rounded-lg px-3 py-2 text-xs font-medium transition-colors ${topupDisabled ? 'bg-gray-100 text-[var(--nav-text-secondary)] cursor-not-allowed' : 'bg-[var(--nav-accent)] text-white hover:brightness-90'}`}>
                             {toppingUp ? 'Создаём оплату…' : 'Пополнить'}
                           </button>
                         )
@@ -361,14 +361,14 @@ export default function TopUtilityBar() {
               <div className="p-4">
                 <div className="flex items-center justify-between mb-1">
                   <h2 className="text-sm font-bold text-[var(--nav-accent)]">Уведомления</h2>
-                  <button onClick={() => setPanel(null)} className="text-gray-400 text-lg leading-none">✕</button>
+                  <button onClick={() => setPanel(null)} className="text-[var(--nav-text-secondary)] text-lg leading-none">✕</button>
                 </div>
                 {unreadCount > 0 && (
-                  <button onClick={markAllRead} className="text-xs text-gray-400 hover:text-[var(--nav-accent)] mb-3">Отметить всё прочитанным</button>
+                  <button onClick={markAllRead} className="text-xs text-[var(--nav-text-secondary)] hover:text-[var(--nav-accent)] mb-3">Отметить всё прочитанным</button>
                 )}
-                {notificationsLoading && <div className="text-xs text-gray-400 py-4 text-center">Загрузка…</div>}
+                {notificationsLoading && <div className="text-xs text-[var(--nav-text-secondary)] py-4 text-center">Загрузка…</div>}
                 {!notificationsLoading && notifications.length === 0 && (
-                  <div className="text-xs text-gray-400 py-8 text-center">Пока нет уведомлений</div>
+                  <div className="text-xs text-[var(--nav-text-secondary)] py-8 text-center">Пока нет уведомлений</div>
                 )}
                 <div className="space-y-1 mt-2">
                   {notifications.map(n => {
@@ -378,8 +378,8 @@ export default function TopUtilityBar() {
                           <span className={`text-sm ${n.read ? 'text-gray-600' : 'text-[var(--nav-accent)] font-medium'}`}>{n.title}</span>
                           {!n.read && <span className="w-1.5 h-1.5 rounded-full bg-[var(--nav-accent)] mt-1.5 flex-shrink-0" />}
                         </div>
-                        {n.body && <div className="text-xs text-gray-400 mt-0.5">{n.body}</div>}
-                        <div className="text-[10px] text-gray-300 mt-1">{timeAgo(n.createdAt)}</div>
+                        {n.body && <div className="text-xs text-[var(--nav-text-secondary)] mt-0.5">{n.body}</div>}
+                        <div className="text-[10px] text-[var(--nav-text-muted)] mt-1">{timeAgo(n.createdAt)}</div>
                       </div>
                     )
                     return n.link ? (
@@ -390,7 +390,7 @@ export default function TopUtilityBar() {
                   })}
                 </div>
                 <Link href="/profile/notifications" onClick={() => setPanel(null)}
-                  className="block text-center text-xs text-gray-400 hover:text-[var(--nav-accent)] mt-4 pt-3 border-t border-gray-100">
+                  className="block text-center text-xs text-[var(--nav-text-secondary)] hover:text-[var(--nav-accent)] mt-4 pt-3 border-t border-[var(--nav-border-soft)]">
                   Настройки уведомлений
                 </Link>
               </div>
@@ -402,7 +402,7 @@ export default function TopUtilityBar() {
               <div className="p-3">
                 <div className="flex items-center justify-between mb-1 px-1">
                   <h2 className="text-sm font-bold text-[var(--nav-accent)]">Помощь</h2>
-                  <button onClick={() => setPanel(null)} className="text-gray-400 text-lg leading-none">✕</button>
+                  <button onClick={() => setPanel(null)} className="text-[var(--nav-text-secondary)] text-lg leading-none">✕</button>
                 </div>
                 <Link href="/profile/support" onClick={() => setPanel(null)}
                   className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-gray-50 text-sm text-gray-700 transition-colors">
@@ -433,7 +433,7 @@ export default function TopUtilityBar() {
                   </div>
                   <div className="min-w-0">
                     <div className="text-sm font-semibold text-[var(--nav-accent)] truncate">{companyName || 'Без названия'}</div>
-                    <div className="text-xs text-gray-400 truncate">{email}</div>
+                    <div className="text-xs text-[var(--nav-text-secondary)] truncate">{email}</div>
                   </div>
                 </div>
                 <Link href="/profile" onClick={() => setPanel(null)}

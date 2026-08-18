@@ -382,6 +382,34 @@ html {
   }
 }
 
+/* Same dark values as the media query above, but scoped to this project's
+   manual [data-theme] toggle (see ThemeProvider/useTheme) so --nav-* tokens
+   also respond when a user flips the in-app dark mode while their OS stays
+   light (or vice versa). Matches the plain [data-theme="dark"] selector
+   convention already used for --bg/--accent/etc earlier in this file; same
+   specificity as the :root media block above, so source order (this block
+   comes after) lets the manual toggle win when both are in play. */
+[data-theme="dark"] {
+  --nav-bg: #0A0B17;
+  --nav-surface-glass: rgba(255, 255, 255, 0.05);
+  --nav-accent: #7A6CF0;
+  --nav-accent-ink: #14162A;
+  --nav-accent-soft: rgba(122, 108, 240, 0.22);
+  --nav-accent-track: rgba(122, 108, 240, 0.26);
+  --nav-teal: #0E99AA;
+  --nav-teal-soft: rgba(14, 153, 170, 0.24);
+  --nav-magenta: #CE4C86;
+  --nav-magenta-soft: rgba(206, 76, 134, 0.24);
+  --nav-success: #3ED598;
+  --nav-success-soft: rgba(62, 213, 152, 0.18);
+  --nav-text-primary: #F2F3FA;
+  --nav-text-secondary: #A6ACC9;
+  --nav-text-muted: #6B7094;
+  --nav-border: rgba(255, 255, 255, 0.10);
+  --nav-border-soft: rgba(255, 255, 255, 0.07);
+  --nav-card-glow: 0 26px 60px -20px rgba(0, 0, 0, 0.55);
+}
+
 .nav-glass {
   background: var(--nav-surface-glass);
   backdrop-filter: blur(24px) saturate(140%);
