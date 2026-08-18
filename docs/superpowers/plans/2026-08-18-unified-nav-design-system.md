@@ -485,6 +485,8 @@ git commit -m "feat(kaspi-shop): move order-status filter from sidebar submenu t
 **Interfaces:**
 - Consumes: `SiteNav` from Task 2 (`src/components/SiteNav.tsx`), same props as old `AppNav`.
 
+**⚠️ Correction (found during Task 4 execution, applies to every step below):** the old `AppNav` was `position: fixed` on desktop, so its position in the JSX tree never mattered — every one of these 5 pages happens to render it as the **last** child inside `<main>`. `SiteNav`'s new desktop bar is `position: sticky`, where DOM order is load-bearing: a sticky element only sticks relative to where it sits in normal flow, so placing it *after* all the scrollable page content means it never visibly sticks to the top (on short pages it appears mid-page; on tall pages it stays invisible until scrolled to the bottom). **Do not do a same-position swap for the render call — move `<SiteNav ... />` to be the *first* child inside `<main>` in every file below, ahead of whatever content currently follows the old `<AppNav ... />` call.** (This mirrors the placement Task 6/7 already use for `KaspiShopSidebar`'s and the AI-agent pages' nav calls, which were already first-child and are correct as written.)
+
 - [ ] **Step 1: `src/app/dashboard/page.tsx`**
 
 Change the import (was line 7): `import AppNav from '@/components/AppNav'` → `import SiteNav from '@/components/SiteNav'`
