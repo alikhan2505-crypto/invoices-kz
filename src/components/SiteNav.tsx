@@ -2,71 +2,105 @@
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { useLanguage } from './LanguageProvider'
+import { useLanguage, type Lang } from './LanguageProvider'
 
-const labels: Record<'ru' | 'kk' | 'en', { home: string; invoices: string; kaspiShop: string; aiAgent: string; profile: string; history: string }> = {
+const labels: Record<Lang, { home: string; invoices: string; kaspiShop: string; aiAgent: string; profile: string; history: string }> = {
   ru: { home: 'Главная', invoices: 'Счета', kaspiShop: 'Kaspi Магазин', aiAgent: 'AI-агент', profile: 'Профиль', history: 'История' },
   kk: { home: 'Басты бет', invoices: 'Шоттар', kaspiShop: 'Kaspi Дүкені', aiAgent: 'AI-агент', profile: 'Профиль', history: 'Тарих' },
   en: { home: 'Home', invoices: 'Invoices', kaspiShop: 'Kaspi Shop', aiAgent: 'AI Agent', profile: 'Profile', history: 'History' },
 }
 
+// Copy shown to non-admins when they interact with an admin-gated section
+// that's visible but not yet open to everyone (see isAdmin gating below).
+const lockedMessages: Record<Lang, string> = {
+  ru: 'Скоро откроем всем',
+  kk: 'Жақында бәріне ашамыз',
+  en: 'Coming soon for everyone',
+}
+
 type MenuKey = 'invoices' | 'kaspiShop' | 'aiAgent'
+type LocalizedLabel = Record<Lang, string>
 
-const invoicesLinks = [
-  { href: '/dashboard', label: 'Создать счёт' },
-  { href: '/history', label: 'История' },
-  { href: '/profile/templates', label: 'Шаблоны' },
+const invoicesLinks: { href: string; label: LocalizedLabel }[] = [
+  { href: '/dashboard', label: { ru: 'Создать счёт', kk: 'Шот құру', en: 'Create invoice' } },
+  { href: '/history', label: { ru: 'История', kk: 'Тарих', en: 'History' } },
+  { href: '/profile/templates', label: { ru: 'Шаблоны', kk: 'Үлгілер', en: 'Templates' } },
 ]
 
-const kaspiShopLinks = [
-  { href: '/kaspi-shop', label: 'Демпинг' },
-  { href: '/kaspi-shop/orders', label: 'Заказы' },
-  { href: '/kaspi-shop/finance', label: 'Финансы' },
-  { href: '/kaspi-shop/pending-products', label: 'Нераспознанные товары' },
-  { href: '/kaspi-shop/niches', label: 'Ниши' },
-  { href: '/kaspi-shop/profit', label: 'Прибыль' },
+const kaspiShopLinks: { href: string; label: LocalizedLabel }[] = [
+  { href: '/kaspi-shop', label: { ru: 'Демпинг', kk: 'Демпинг', en: 'Repricer' } },
+  { href: '/kaspi-shop/orders', label: { ru: 'Заказы', kk: 'Тапсырыстар', en: 'Orders' } },
+  { href: '/kaspi-shop/finance', label: { ru: 'Финансы', kk: 'Қаржы', en: 'Finance' } },
+  { href: '/kaspi-shop/pending-products', label: { ru: 'Нераспознанные товары', kk: 'Танылмаған тауарлар', en: 'Unmatched products' } },
+  { href: '/kaspi-shop/niches', label: { ru: 'Ниши', kk: 'Нишалар', en: 'Niches' } },
+  { href: '/kaspi-shop/profit', label: { ru: 'Прибыль', kk: 'Пайда', en: 'Profit' } },
 ]
 
-const aiAgentLinks = [
-  { href: '/ai-agent/review', label: 'Диалоги' },
-  { href: '/ai-agent/settings', label: 'Настройки' },
+const aiAgentLinks: { href: string; label: LocalizedLabel }[] = [
+  { href: '/ai-agent/review', label: { ru: 'Диалоги', kk: 'Диалогтар', en: 'Conversations' } },
+  { href: '/ai-agent/settings', label: { ru: 'Настройки', kk: 'Баптаулар', en: 'Settings' } },
 ]
+
+function LockIcon({ size = 10 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
+      <rect x="5" y="11" width="14" height="9" rx="2" stroke="currentColor" strokeWidth="2" />
+      <path d="M8 11V7a4 4 0 0 1 8 0v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  )
+}
 
 function isActiveSection(links: { href: string }[], path: string) {
   return links.some(l => path === l.href || path.startsWith(l.href + '/'))
 }
 
 function Dropdown({
-  menuKey, label, links, dotColor, openMenu, setOpenMenu, router, path,
+  menuKey, label, links, dotColor, openMenu, setOpenMenu, router, path, lang,
+  locked = false, lockedHintOpen = false, onLockedClick,
 }: {
   menuKey: MenuKey
   label: string
-  links: { href: string; label: string }[]
+  links: { href: string; label: LocalizedLabel }[]
   dotColor: string
   openMenu: MenuKey | null
   setOpenMenu: (key: MenuKey | null) => void
   router: ReturnType<typeof useRouter>
   path: string
+  lang: Lang
+  locked?: boolean
+  lockedHintOpen?: boolean
+  onLockedClick?: () => void
 }) {
-  const active = isActiveSection(links, path)
-  const open = openMenu === menuKey
+  const active = !locked && isActiveSection(links, path)
+  const open = !locked && openMenu === menuKey
   return (
     <div className="relative">
       <button
         type="button"
-        onClick={(e) => { e.stopPropagation(); setOpenMenu(open ? null : menuKey) }}
+        onClick={(e) => {
+          e.stopPropagation()
+          if (locked) { onLockedClick?.(); return }
+          setOpenMenu(open ? null : menuKey)
+        }}
         aria-expanded={open}
+        aria-disabled={locked}
         className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-colors"
         style={{
           color: active ? 'var(--nav-text-primary)' : 'var(--nav-text-secondary)',
           background: open ? 'var(--nav-surface-glass)' : 'transparent',
           boxShadow: active ? `inset 0 -2px 0 var(--nav-accent)` : 'none',
+          opacity: locked ? 0.6 : 1,
+          cursor: locked ? 'not-allowed' : 'pointer',
         }}
       >
         {label}
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s ease' }}>
-          <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        {locked ? (
+          <LockIcon />
+        ) : (
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s ease' }}>
+            <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        )}
       </button>
       {open && (
         <div
@@ -86,10 +120,18 @@ function Dropdown({
                 }}
               >
                 <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: linkActive ? dotColor : 'transparent' }} />
-                {l.label}
+                {l.label[lang]}
               </button>
             )
           })}
+        </div>
+      )}
+      {locked && lockedHintOpen && (
+        <div
+          className="nav-glass absolute top-[calc(100%+10px)] left-0 whitespace-nowrap px-3 py-2 rounded-xl text-xs font-medium z-20"
+          style={{ color: 'var(--nav-text-primary)', boxShadow: `0 20px 44px -18px rgba(10,10,15,0.3), var(--nav-card-glow)` }}
+        >
+          {lockedMessages[lang]}
         </div>
       )}
     </div>
@@ -102,8 +144,17 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
   const { lang } = useLanguage()
   const [unpaid, setUnpaid] = useState(0)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [logoUrl, setLogoUrl] = useState<string | null>(null)
   const [openMenu, setOpenMenu] = useState<MenuKey | null>(null)
+  const [lockedHint, setLockedHint] = useState<string | null>(null)
   const navRef = useRef<HTMLElement>(null)
+  const lockedHintTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  function showLockedHint(id: string) {
+    setLockedHint(id)
+    if (lockedHintTimeout.current) clearTimeout(lockedHintTimeout.current)
+    lockedHintTimeout.current = setTimeout(() => setLockedHint(null), 2200)
+  }
 
   useEffect(() => {
     async function loadUnpaid() {
@@ -123,8 +174,9 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
     async function loadAdmin() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
-      const { data } = await supabase.from('profiles').select('is_admin').eq('id', user.id).single()
+      const { data } = await supabase.from('profiles').select('logo_url, is_admin').eq('id', user.id).single()
       setIsAdmin(!!data?.is_admin)
+      setLogoUrl(data?.logo_url || null)
     }
     loadAdmin()
   }, [])
@@ -152,26 +204,51 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
           className="lg:hidden fixed bottom-0 left-0 right-0 flex z-40 nav-glass"
           style={{ borderLeft: 'none', borderRight: 'none', borderBottom: 'none' }}
         >
-          {[
+          {([
             { href: '/dashboard', label: labels[lang].home },
             { href: '/history', label: labels[lang].history, badge: unpaid },
             { href: '/profile', label: labels[lang].profile },
-            ...(isAdmin ? [{ href: '/kaspi-shop', label: labels[lang].kaspiShop }] : []),
-            ...(isAdmin ? [{ href: '/ai-agent/settings', label: labels[lang].aiAgent }] : []),
-          ].map(item => {
-            const active = path === item.href || path.startsWith(item.href + '/')
+            { href: '/kaspi-shop', label: labels[lang].kaspiShop, locked: !isAdmin, hintId: 'mobile-kaspiShop' },
+            { href: '/ai-agent/settings', label: labels[lang].aiAgent, locked: !isAdmin, hintId: 'mobile-aiAgent' },
+          ] as { href: string; label: string; badge?: number; locked?: boolean; hintId?: string }[]).map(item => {
+            const active = !item.locked && (path === item.href || path.startsWith(item.href + '/'))
             return (
-              <button key={item.href} onClick={() => router.push(item.href)} className="flex-1 flex flex-col items-center py-3 gap-1 relative">
-                <div className="w-2 h-2 rounded-full" style={{ background: active ? 'var(--nav-accent)' : 'var(--nav-text-muted)', opacity: active ? 1 : 0.4 }} />
-                {'badge' in item && item.badge ? (
-                  <div className="absolute -top-0.5 right-[calc(50%-18px)] bg-red-500 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center font-medium">
-                    {item.badge > 9 ? '9+' : item.badge}
+              <div key={item.href} className="relative flex-1">
+                <button
+                  onClick={() => {
+                    if (item.locked) { showLockedHint(item.hintId!); return }
+                    router.push(item.href)
+                  }}
+                  aria-disabled={item.locked}
+                  className="w-full flex flex-col items-center py-3 gap-1"
+                  style={{ opacity: item.locked ? 0.6 : 1, cursor: item.locked ? 'not-allowed' : 'pointer' }}
+                >
+                  <div className="relative flex items-center justify-center">
+                    <div className="w-2 h-2 rounded-full" style={{ background: active ? 'var(--nav-accent)' : 'var(--nav-text-muted)', opacity: active ? 1 : 0.4 }} />
+                    {item.locked && (
+                      <span className="absolute -top-1.5 -right-2.5" style={{ color: 'var(--nav-text-muted)' }}>
+                        <LockIcon size={9} />
+                      </span>
+                    )}
                   </div>
-                ) : null}
-                <span className="text-[11px]" style={{ color: active ? 'var(--nav-text-primary)' : 'var(--nav-text-muted)', fontWeight: active ? 600 : 400 }}>
-                  {item.label}
-                </span>
-              </button>
+                  {item.badge ? (
+                    <div className="absolute -top-0.5 right-[calc(50%-18px)] bg-red-500 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center font-medium">
+                      {item.badge > 9 ? '9+' : item.badge}
+                    </div>
+                  ) : null}
+                  <span className="text-[11px]" style={{ color: active ? 'var(--nav-text-primary)' : 'var(--nav-text-muted)', fontWeight: active ? 600 : 400 }}>
+                    {item.label}
+                  </span>
+                </button>
+                {item.locked && lockedHint === item.hintId && (
+                  <div
+                    className="nav-glass absolute bottom-[calc(100%+8px)] left-1/2 -translate-x-1/2 whitespace-nowrap px-3 py-1.5 rounded-xl text-xs font-medium z-20"
+                    style={{ color: 'var(--nav-text-primary)' }}
+                  >
+                    {lockedMessages[lang]}
+                  </div>
+                )}
+              </div>
             )
           })}
         </div>
@@ -184,12 +261,21 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
         style={{ borderLeft: 'none', borderRight: 'none', borderTop: 'none' }}
       >
         <button onClick={() => router.push('/dashboard')} className="flex items-center gap-2 mr-5 flex-shrink-0">
-          <span
-            className="w-6 h-6 rounded-lg flex items-center justify-center text-white font-extrabold text-[10px]"
-            style={{ background: `linear-gradient(135deg, var(--nav-accent), var(--nav-teal))`, boxShadow: '0 6px 14px -6px var(--nav-accent)' }}
-          >
-            IK
-          </span>
+          {logoUrl ? (
+            <img
+              src={logoUrl}
+              alt=""
+              className="w-6 h-6 rounded-lg object-contain bg-white"
+              style={{ boxShadow: '0 6px 14px -6px var(--nav-accent)' }}
+            />
+          ) : (
+            <span
+              className="w-6 h-6 rounded-lg flex items-center justify-center text-white font-extrabold text-[10px]"
+              style={{ background: `linear-gradient(135deg, var(--nav-accent), var(--nav-teal))`, boxShadow: '0 6px 14px -6px var(--nav-accent)' }}
+            >
+              IK
+            </span>
+          )}
           <span className="font-semibold text-sm" style={{ color: 'var(--nav-text-primary)', letterSpacing: '-0.02em' }}>invoices.kz</span>
         </button>
 
@@ -204,9 +290,17 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
           {labels[lang].home}
         </button>
 
-        <Dropdown menuKey="invoices" label={labels[lang].invoices} links={invoicesLinks} dotColor="var(--nav-accent)" openMenu={openMenu} setOpenMenu={setOpenMenu} router={router} path={path} />
-        {isAdmin && <Dropdown menuKey="kaspiShop" label={labels[lang].kaspiShop} links={kaspiShopLinks} dotColor="var(--nav-teal)" openMenu={openMenu} setOpenMenu={setOpenMenu} router={router} path={path} />}
-        {isAdmin && <Dropdown menuKey="aiAgent" label={labels[lang].aiAgent} links={aiAgentLinks} dotColor="var(--nav-magenta)" openMenu={openMenu} setOpenMenu={setOpenMenu} router={router} path={path} />}
+        <Dropdown menuKey="invoices" label={labels[lang].invoices} links={invoicesLinks} dotColor="var(--nav-accent)" openMenu={openMenu} setOpenMenu={setOpenMenu} router={router} path={path} lang={lang} />
+        <Dropdown
+          menuKey="kaspiShop" label={labels[lang].kaspiShop} links={kaspiShopLinks} dotColor="var(--nav-teal)"
+          openMenu={openMenu} setOpenMenu={setOpenMenu} router={router} path={path} lang={lang}
+          locked={!isAdmin} lockedHintOpen={lockedHint === 'desktop-kaspiShop'} onLockedClick={() => showLockedHint('desktop-kaspiShop')}
+        />
+        <Dropdown
+          menuKey="aiAgent" label={labels[lang].aiAgent} links={aiAgentLinks} dotColor="var(--nav-magenta)"
+          openMenu={openMenu} setOpenMenu={setOpenMenu} router={router} path={path} lang={lang}
+          locked={!isAdmin} lockedHintOpen={lockedHint === 'desktop-aiAgent'} onLockedClick={() => showLockedHint('desktop-aiAgent')}
+        />
 
         {unpaid > 0 && (
           <button
