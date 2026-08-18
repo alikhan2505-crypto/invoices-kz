@@ -331,3 +331,91 @@ html {
   }
 }
 
+/* ---- SiteNav design tokens (2026-08-18 unified-nav phase) ----
+   Deliberately prefixed --nav-* to avoid collision with the existing
+   [data-theme] dark-mode variables above (--bg/--accent/etc are already
+   claimed by that system). Light values apply by default; dark values
+   apply under prefers-color-scheme, matching this project's existing
+   OS-level dark media query rather than the [data-theme] toggle system,
+   since SiteNav is new UI with no legacy light/dark expectation to match. */
+:root {
+  --nav-bg: #FFFFFF;
+  --nav-surface-glass: rgba(20, 22, 42, 0.035);
+  --nav-accent: #5B4CE0;
+  --nav-accent-ink: #FFFFFF;
+  --nav-accent-soft: rgba(91, 76, 224, 0.12);
+  --nav-accent-track: rgba(91, 76, 224, 0.18);
+  --nav-teal: #00A0B8;
+  --nav-teal-soft: rgba(0, 160, 184, 0.14);
+  --nav-magenta: #B23A70;
+  --nav-magenta-soft: rgba(178, 58, 112, 0.14);
+  --nav-success: #12946B;
+  --nav-success-soft: rgba(18, 148, 107, 0.12);
+  --nav-text-primary: #14162A;
+  --nav-text-secondary: #565C7E;
+  --nav-text-muted: #8A8FB0;
+  --nav-border: rgba(20, 22, 42, 0.09);
+  --nav-border-soft: rgba(20, 22, 42, 0.07);
+  --nav-card-glow: 0 20px 50px -22px rgba(30, 25, 90, 0.28);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --nav-bg: #0A0B17;
+    --nav-surface-glass: rgba(255, 255, 255, 0.05);
+    --nav-accent: #7A6CF0;
+    --nav-accent-ink: #14162A;
+    --nav-accent-soft: rgba(122, 108, 240, 0.22);
+    --nav-accent-track: rgba(122, 108, 240, 0.26);
+    --nav-teal: #0E99AA;
+    --nav-teal-soft: rgba(14, 153, 170, 0.24);
+    --nav-magenta: #CE4C86;
+    --nav-magenta-soft: rgba(206, 76, 134, 0.24);
+    --nav-success: #3ED598;
+    --nav-success-soft: rgba(62, 213, 152, 0.18);
+    --nav-text-primary: #F2F3FA;
+    --nav-text-secondary: #A6ACC9;
+    --nav-text-muted: #6B7094;
+    --nav-border: rgba(255, 255, 255, 0.10);
+    --nav-border-soft: rgba(255, 255, 255, 0.07);
+    --nav-card-glow: 0 26px 60px -20px rgba(0, 0, 0, 0.55);
+  }
+}
+
+.nav-glass {
+  background: var(--nav-surface-glass);
+  backdrop-filter: blur(24px) saturate(140%);
+  -webkit-backdrop-filter: blur(24px) saturate(140%);
+  border: 1px solid var(--nav-border-soft);
+}
+
+.nav-aurora {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+.nav-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(90px);
+  opacity: 0.16;
+  will-change: transform;
+}
+@media (prefers-color-scheme: dark) {
+  .nav-blob { opacity: 0.24; }
+}
+.nav-blob--a { width: 540px; height: 540px; left: -140px; top: -160px; background: var(--nav-accent); animation: nav-drift1 26s ease-in-out infinite alternate; }
+.nav-blob--b { width: 470px; height: 470px; right: -140px; top: 5%; background: var(--nav-teal); animation: nav-drift2 32s ease-in-out infinite alternate; }
+.nav-blob--c { width: 320px; height: 320px; left: 25%; bottom: -170px; background: var(--nav-magenta); opacity: 0.10; animation: nav-drift3 29s ease-in-out infinite alternate; }
+@media (prefers-color-scheme: dark) {
+  .nav-blob--c { opacity: 0.14; }
+}
+@keyframes nav-drift1 { from { transform: translate(0,0) scale(1); } to { transform: translate(50px, 40px) scale(1.08); } }
+@keyframes nav-drift2 { from { transform: translate(0,0) scale(1); } to { transform: translate(-40px, 50px) scale(1.05); } }
+@keyframes nav-drift3 { from { transform: translate(0,0) scale(1); } to { transform: translate(35px, -40px) scale(1.1); } }
+@media (prefers-reduced-motion: reduce) {
+  .nav-blob { animation: none !important; }
+}
+

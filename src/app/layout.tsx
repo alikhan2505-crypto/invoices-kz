@@ -4,6 +4,7 @@ import './globals.css'
 import { ThemeProvider } from '@/components/ThemeProvider'
 import { LanguageProvider } from '@/components/LanguageProvider'
 import TopUtilityBar from '@/components/TopUtilityBar'
+import NavAurora from '@/components/NavAurora'
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -65,6 +66,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <LanguageProvider>
           <ThemeProvider>
+            <NavAurora />
             {children}
             <TopUtilityBar />
           </ThemeProvider>
