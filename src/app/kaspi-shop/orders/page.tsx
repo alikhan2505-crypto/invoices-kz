@@ -167,10 +167,12 @@ function KaspiShopOrdersInner() {
           </div>
         )}
 
-        {/* Desktop switches status from the sidebar's own nested subnav
-            (matches the real Kaspi cabinet's left-hand layout); mobile has
-            no sidebar at all, so it keeps a horizontal tab strip here. */}
-        <div className="lg:hidden flex gap-2 overflow-x-auto pb-2 mb-4">
+        {/* Order-status filter chips -- used to be a desktop-only nested
+            subnav inside KaspiShopSidebar, which left mobile with no way to
+            filter by status at all. Now page-local and works at every
+            width; the sidebar's own duplicate submenu goes away once that
+            component is replaced by SiteNav in a later pass. */}
+        <div className="flex gap-2 overflow-x-auto pb-2 mb-4">
           {ORDER_STATUS_TABS.map(tab => (
             <button key={tab.value} onClick={() => router.push(`/kaspi-shop/orders?status=${tab.value}`)}
               className={`flex-shrink-0 rounded-full px-3 py-1.5 text-xs font-medium whitespace-nowrap ${status === tab.value ? 'bg-[#1C2056] text-white' : 'bg-white text-gray-500'}`}>
