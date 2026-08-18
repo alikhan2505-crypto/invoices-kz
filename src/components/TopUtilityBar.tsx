@@ -255,8 +255,11 @@ export default function TopUtilityBar() {
       {/* bottom-20 on mobile clears SiteNav's fixed bottom bar (mobile has no top bar);
           lg:top-2.5 centers the ~46px pill inside SiteNav's ~65px sticky bar — valid on
           ALL pages now that DesktopShell's card is top-flush (lg:top-0), so the bar
-          starts at y=0 everywhere. */}
-      <div className="fixed bottom-20 lg:bottom-auto lg:top-2.5 right-3 z-50 flex items-center gap-1.5 nav-glass rounded-full px-1.5 py-1.5"
+          starts at y=0 everywhere. lg:right-6 (not right-3): DesktopShell's card has a
+          28px corner radius at the same right-3 edge -- right-3 crowded the pill right
+          into that curve, reading as jammed into the corner rather than sitting in the
+          bar. right-6 clears it. */}
+      <div className="fixed bottom-20 lg:bottom-auto lg:top-2.5 right-3 lg:right-6 z-50 flex items-center gap-1.5 nav-glass rounded-full px-1.5 py-1.5"
         style={{ boxShadow: `0 12px 30px -14px rgba(10,10,15,0.35), var(--nav-card-glow)` }}>
         <button onClick={() => openPanel('wallet')} title="Кошелёк"
           className="flex items-center gap-1.5 rounded-full pl-2 pr-2.5 py-1.5 hover:bg-gray-50 transition-colors">
@@ -299,7 +302,7 @@ export default function TopUtilityBar() {
       </div>
 
       {panel && (
-        <div className="fixed inset-0 z-50 flex items-end lg:items-start justify-end p-3 bg-black/30" onClick={() => setPanel(null)}>
+        <div className="fixed inset-0 z-50 flex items-end lg:items-start justify-end p-3 lg:pr-6 bg-black/30" onClick={() => setPanel(null)}>
 
           {panel === 'wallet' && (
             <div className="nav-glass rounded-2xl w-full max-w-2xl mb-32 lg:mb-0 lg:mt-14 max-h-[80vh] overflow-y-auto" style={{ boxShadow: 'var(--nav-card-glow)' }} onClick={e => e.stopPropagation()}>
