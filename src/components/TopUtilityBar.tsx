@@ -229,16 +229,19 @@ export default function TopUtilityBar() {
 
   return (
     <>
-      {/* bottom-20 on mobile clears the fixed bottom nav (AppNav's lg:hidden bar); lg:bottom-3 on desktop where the sidebar replaces it */}
-      <div className="fixed bottom-20 lg:bottom-3 right-3 z-50 flex items-center gap-1.5 bg-white rounded-full shadow-lg ring-1 ring-black/5 px-1.5 py-1.5">
+      {/* bottom-20 on mobile clears SiteNav's fixed bottom bar (mobile has no top bar);
+          lg:top-2.5 on desktop centers this pill within SiteNav's ~64.8px-tall sticky top bar
+          (pill content is 32px tall + 6px top/bottom padding = 44px; (64.8-44)/2 ≈ 10.4px, closest token is top-2.5/10px) */}
+      <div className="fixed bottom-20 lg:bottom-auto lg:top-2.5 right-3 z-50 flex items-center gap-1.5 nav-glass rounded-full px-1.5 py-1.5"
+        style={{ boxShadow: `0 12px 30px -14px rgba(10,10,15,0.35), var(--nav-card-glow)` }}>
         <button onClick={() => openPanel('wallet')} title="Кошелёк"
           className="flex items-center gap-1.5 rounded-full pl-2 pr-2.5 py-1.5 hover:bg-gray-50 transition-colors">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
-            <rect x="3" y="6" width="18" height="13" rx="2.5" stroke="#1C2056" strokeWidth="1.6" />
-            <path d="M3 10h18" stroke="#1C2056" strokeWidth="1.6" />
-            <circle cx="17" cy="14" r="1.3" fill="#1C2056" />
+            <rect x="3" y="6" width="18" height="13" rx="2.5" stroke="var(--nav-accent)" strokeWidth="1.6" />
+            <path d="M3 10h18" stroke="var(--nav-accent)" strokeWidth="1.6" />
+            <circle cx="17" cy="14" r="1.3" fill="var(--nav-accent)" />
           </svg>
-          <span className="text-xs font-medium text-[#1C2056] tabular-nums">
+          <span className="text-xs font-medium text-[var(--nav-accent)] tabular-nums">
             {balances.invoices !== undefined ? `${balances.invoices.toLocaleString('ru-KZ')} ₸` : '···'}
           </span>
         </button>
@@ -246,8 +249,8 @@ export default function TopUtilityBar() {
         <button onClick={() => openPanel('notifications')} title="Уведомления"
           className="relative w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-50 transition-colors">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
-            <path d="M6 10a6 6 0 1 1 12 0c0 4 1.5 5.5 1.5 5.5H4.5S6 14 6 10Z" stroke="#1C2056" strokeWidth="1.6" strokeLinejoin="round" />
-            <path d="M10 19a2 2 0 0 0 4 0" stroke="#1C2056" strokeWidth="1.6" strokeLinecap="round" />
+            <path d="M6 10a6 6 0 1 1 12 0c0 4 1.5 5.5 1.5 5.5H4.5S6 14 6 10Z" stroke="var(--nav-accent)" strokeWidth="1.6" strokeLinejoin="round" />
+            <path d="M10 19a2 2 0 0 0 4 0" stroke="var(--nav-accent)" strokeWidth="1.6" strokeLinecap="round" />
           </svg>
           {unreadCount > 0 && (
             <span className="absolute top-0.5 right-0.5 bg-[#FF5A5F] text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
@@ -259,14 +262,14 @@ export default function TopUtilityBar() {
         <button onClick={() => openPanel('help')} title="Помощь"
           className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-50 transition-colors">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="9" stroke="#1C2056" strokeWidth="1.6" />
-            <path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .8-1 1.4v.3" stroke="#1C2056" strokeWidth="1.6" strokeLinecap="round" />
-            <circle cx="12" cy="17" r="0.9" fill="#1C2056" />
+            <circle cx="12" cy="12" r="9" stroke="var(--nav-accent)" strokeWidth="1.6" />
+            <path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .8-1 1.4v.3" stroke="var(--nav-accent)" strokeWidth="1.6" strokeLinecap="round" />
+            <circle cx="12" cy="17" r="0.9" fill="var(--nav-accent)" />
           </svg>
         </button>
 
         <button onClick={() => openPanel('account')} title="Аккаунт"
-          className="w-8 h-8 rounded-full bg-[#1C2056] text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">
+          className="w-8 h-8 rounded-full bg-[var(--nav-accent)] text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">
           {initials}
         </button>
       </div>
@@ -275,22 +278,22 @@ export default function TopUtilityBar() {
         <div className="fixed inset-0 z-50 flex items-end justify-end p-3 bg-black/30" onClick={() => setPanel(null)}>
 
           {panel === 'wallet' && (
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mb-32 lg:mb-14 max-h-[80vh] overflow-hidden flex" onClick={e => e.stopPropagation()}>
+            <div className="nav-glass rounded-2xl w-full max-w-2xl mb-32 lg:mb-14 max-h-[80vh] overflow-hidden flex" style={{ boxShadow: 'var(--nav-card-glow)' }} onClick={e => e.stopPropagation()}>
               <div className="w-40 flex-shrink-0 bg-gray-50 border-r border-gray-100 p-4">
                 <div className="text-xs font-semibold text-gray-400 px-2 mb-2">Кошельки</div>
                 {visibleWallets.map(w => (
                   <button key={w.key} onClick={() => selectWallet(w.key)}
-                    className={`w-full text-left px-3 py-2 rounded-lg text-sm mb-1 transition-colors ${activeWallet === w.key ? 'bg-[#1C2056] text-white font-medium' : 'text-gray-600 hover:bg-gray-100'}`}>
+                    className={`w-full text-left px-3 py-2 rounded-lg text-sm mb-1 transition-colors ${activeWallet === w.key ? 'bg-[var(--nav-accent)] text-white font-medium' : 'text-gray-600 hover:bg-gray-100'}`}>
                     {w.label}
                   </button>
                 ))}
               </div>
               <div className="flex-1 p-4 overflow-y-auto">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-sm font-bold text-[#1C2056]">{wallet.label}</h2>
+                  <h2 className="text-sm font-bold text-[var(--nav-accent)]">{wallet.label}</h2>
                   <button onClick={() => setPanel(null)} className="text-gray-400 text-lg leading-none">✕</button>
                 </div>
-                <div className="bg-[#1C2056] rounded-xl px-4 py-3 mb-4">
+                <div className="bg-[var(--nav-accent)] rounded-xl px-4 py-3 mb-4">
                   <div className="text-white text-lg font-bold tabular-nums">
                     {balances[activeWallet] !== undefined ? wallet.formatBalance(balances[activeWallet]!) : '···'}
                   </div>
@@ -318,7 +321,7 @@ export default function TopUtilityBar() {
                     <div>
                       <p className="text-xs text-gray-600 mb-2">Оплатите QR-код Kaspi — баланс пополнится автоматически.</p>
                       <a href={topupPending.payment_link} target="_blank" rel="noopener noreferrer"
-                        className="block text-center bg-[#1C2056] text-white rounded-lg px-3 py-2 text-xs font-medium">
+                        className="block text-center bg-[var(--nav-accent)] text-white rounded-lg px-3 py-2 text-xs font-medium">
                         Открыть оплату
                       </a>
                     </div>
@@ -327,7 +330,7 @@ export default function TopUtilityBar() {
                       <div className="grid grid-cols-4 gap-1.5 mb-2">
                         {wallet.presets.map(amount => (
                           <button key={amount} onClick={() => { setTopupAmount(amount); setTopupCustom('') }}
-                            className={`rounded-lg px-2 py-1.5 text-xs font-medium ${topupAmount === amount ? 'bg-[#1C2056] text-white' : 'bg-gray-100 text-[#1C2056]'}`}>
+                            className={`rounded-lg px-2 py-1.5 text-xs font-medium ${topupAmount === amount ? 'bg-[var(--nav-accent)] text-white' : 'bg-gray-100 text-[var(--nav-accent)]'}`}>
                             {amount.toLocaleString('ru-KZ')}
                           </button>
                         ))}
@@ -341,7 +344,7 @@ export default function TopUtilityBar() {
                         return (
                           <button onClick={() => startTopup(wallet, (topupAmount ?? Number(topupCustom)) || 0)}
                             disabled={topupDisabled}
-                            className={`w-full rounded-lg px-3 py-2 text-xs font-medium transition-colors ${topupDisabled ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-[#1C2056] text-white hover:bg-[#252a6b]'}`}>
+                            className={`w-full rounded-lg px-3 py-2 text-xs font-medium transition-colors ${topupDisabled ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-[var(--nav-accent)] text-white hover:brightness-90'}`}>
                             {toppingUp ? 'Создаём оплату…' : 'Пополнить'}
                           </button>
                         )
@@ -354,14 +357,14 @@ export default function TopUtilityBar() {
           )}
 
           {panel === 'notifications' && (
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mb-32 lg:mb-14 max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="nav-glass rounded-2xl w-full max-w-sm mb-32 lg:mb-14 max-h-[80vh] overflow-y-auto" style={{ boxShadow: 'var(--nav-card-glow)' }} onClick={e => e.stopPropagation()}>
               <div className="p-4">
                 <div className="flex items-center justify-between mb-1">
-                  <h2 className="text-sm font-bold text-[#1C2056]">Уведомления</h2>
+                  <h2 className="text-sm font-bold text-[var(--nav-accent)]">Уведомления</h2>
                   <button onClick={() => setPanel(null)} className="text-gray-400 text-lg leading-none">✕</button>
                 </div>
                 {unreadCount > 0 && (
-                  <button onClick={markAllRead} className="text-xs text-gray-400 hover:text-[#1C2056] mb-3">Отметить всё прочитанным</button>
+                  <button onClick={markAllRead} className="text-xs text-gray-400 hover:text-[var(--nav-accent)] mb-3">Отметить всё прочитанным</button>
                 )}
                 {notificationsLoading && <div className="text-xs text-gray-400 py-4 text-center">Загрузка…</div>}
                 {!notificationsLoading && notifications.length === 0 && (
@@ -372,8 +375,8 @@ export default function TopUtilityBar() {
                     const content = (
                       <div className={`rounded-lg px-3 py-2.5 ${n.read ? '' : 'bg-[#F5F6FB]'}`}>
                         <div className="flex items-start justify-between gap-2">
-                          <span className={`text-sm ${n.read ? 'text-gray-600' : 'text-[#1C2056] font-medium'}`}>{n.title}</span>
-                          {!n.read && <span className="w-1.5 h-1.5 rounded-full bg-[#1C2056] mt-1.5 flex-shrink-0" />}
+                          <span className={`text-sm ${n.read ? 'text-gray-600' : 'text-[var(--nav-accent)] font-medium'}`}>{n.title}</span>
+                          {!n.read && <span className="w-1.5 h-1.5 rounded-full bg-[var(--nav-accent)] mt-1.5 flex-shrink-0" />}
                         </div>
                         {n.body && <div className="text-xs text-gray-400 mt-0.5">{n.body}</div>}
                         <div className="text-[10px] text-gray-300 mt-1">{timeAgo(n.createdAt)}</div>
@@ -387,7 +390,7 @@ export default function TopUtilityBar() {
                   })}
                 </div>
                 <Link href="/profile/notifications" onClick={() => setPanel(null)}
-                  className="block text-center text-xs text-gray-400 hover:text-[#1C2056] mt-4 pt-3 border-t border-gray-100">
+                  className="block text-center text-xs text-gray-400 hover:text-[var(--nav-accent)] mt-4 pt-3 border-t border-gray-100">
                   Настройки уведомлений
                 </Link>
               </div>
@@ -395,25 +398,25 @@ export default function TopUtilityBar() {
           )}
 
           {panel === 'help' && (
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs mb-32 lg:mb-14" onClick={e => e.stopPropagation()}>
+            <div className="nav-glass rounded-2xl w-full max-w-xs mb-32 lg:mb-14" style={{ boxShadow: 'var(--nav-card-glow)' }} onClick={e => e.stopPropagation()}>
               <div className="p-3">
                 <div className="flex items-center justify-between mb-1 px-1">
-                  <h2 className="text-sm font-bold text-[#1C2056]">Помощь</h2>
+                  <h2 className="text-sm font-bold text-[var(--nav-accent)]">Помощь</h2>
                   <button onClick={() => setPanel(null)} className="text-gray-400 text-lg leading-none">✕</button>
                 </div>
                 <Link href="/profile/support" onClick={() => setPanel(null)}
                   className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-gray-50 text-sm text-gray-700 transition-colors">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="flex-shrink-0">
-                    <path d="M4 11a8 8 0 1 1 3.5 6.6L4 19l1.3-3.3A7.96 7.96 0 0 1 4 11Z" stroke="#1C2056" strokeWidth="1.6" strokeLinejoin="round" />
+                    <path d="M4 11a8 8 0 1 1 3.5 6.6L4 19l1.3-3.3A7.96 7.96 0 0 1 4 11Z" stroke="var(--nav-accent)" strokeWidth="1.6" strokeLinejoin="round" />
                   </svg>
                   Поддержка
                 </Link>
                 <Link href="/profile/about" onClick={() => setPanel(null)}
                   className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-gray-50 text-sm text-gray-700 transition-colors">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="flex-shrink-0">
-                    <circle cx="12" cy="12" r="9" stroke="#1C2056" strokeWidth="1.6" />
-                    <path d="M12 11v5.5" stroke="#1C2056" strokeWidth="1.6" strokeLinecap="round" />
-                    <circle cx="12" cy="8" r="1" fill="#1C2056" />
+                    <circle cx="12" cy="12" r="9" stroke="var(--nav-accent)" strokeWidth="1.6" />
+                    <path d="M12 11v5.5" stroke="var(--nav-accent)" strokeWidth="1.6" strokeLinecap="round" />
+                    <circle cx="12" cy="8" r="1" fill="var(--nav-accent)" />
                   </svg>
                   О сервисе
                 </Link>
@@ -422,22 +425,22 @@ export default function TopUtilityBar() {
           )}
 
           {panel === 'account' && (
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs mb-32 lg:mb-14" onClick={e => e.stopPropagation()}>
+            <div className="nav-glass rounded-2xl w-full max-w-xs mb-32 lg:mb-14" style={{ boxShadow: 'var(--nav-card-glow)' }} onClick={e => e.stopPropagation()}>
               <div className="p-3">
                 <div className="flex items-center gap-3 px-2 py-2 mb-1">
-                  <div className="w-10 h-10 rounded-full bg-[#1C2056] text-white text-xs font-bold flex items-center justify-center flex-shrink-0">
+                  <div className="w-10 h-10 rounded-full bg-[var(--nav-accent)] text-white text-xs font-bold flex items-center justify-center flex-shrink-0">
                     {initials}
                   </div>
                   <div className="min-w-0">
-                    <div className="text-sm font-semibold text-[#1C2056] truncate">{companyName || 'Без названия'}</div>
+                    <div className="text-sm font-semibold text-[var(--nav-accent)] truncate">{companyName || 'Без названия'}</div>
                     <div className="text-xs text-gray-400 truncate">{email}</div>
                   </div>
                 </div>
                 <Link href="/profile" onClick={() => setPanel(null)}
                   className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-gray-50 text-sm text-gray-700 transition-colors">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="flex-shrink-0">
-                    <circle cx="12" cy="8" r="4" stroke="#1C2056" strokeWidth="1.6" />
-                    <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="#1C2056" strokeWidth="1.6" strokeLinecap="round" />
+                    <circle cx="12" cy="8" r="4" stroke="var(--nav-accent)" strokeWidth="1.6" />
+                    <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="var(--nav-accent)" strokeWidth="1.6" strokeLinecap="round" />
                   </svg>
                   Профиль и настройки
                 </Link>
