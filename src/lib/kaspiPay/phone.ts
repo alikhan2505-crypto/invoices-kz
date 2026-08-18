@@ -1,5 +1,5 @@
 // Kaspi's entrance API expects a bare digit string (`77071234567`), not the
-// `+7 777 123 45 67` display format the /profile/kaspi-pay input produces.
+// `+7 777 123 45 67` display format the /kaspi-api input produces.
 // The page keeps its formatting for the human; this normalizes what actually
 // goes over the wire.
 export function normalizeKzPhone(input: string): string | null {

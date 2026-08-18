@@ -13,7 +13,7 @@ const supabaseAuth = createClient(
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
-// Everything /profile/kaspi-pay's dashboard needs in one round trip: the
+// Everything /kaspi-api's dashboard needs in one round trip: the
 // connection's own details, rollup stats, and a recent-activity list. Stats
 // are computed in JS off a bounded recent-rows fetch (Supabase's REST client
 // has no server-side sum()) rather than a dedicated Postgres view/RPC — this

@@ -542,7 +542,7 @@ export default function TopUtilityBar() {
                       <div className="text-xs font-semibold" style={{ color: 'var(--nav-text-primary)' }}>Заработано через Kaspi</div>
                       <div className="text-[11px] truncate" style={{ color: 'var(--nav-text-muted)' }}>
                         Оплаты приходят напрямую на ваш Kaspi ·{' '}
-                        <Link href="/profile/kaspi-pay" onClick={() => setPanel(null)} className="font-medium" style={{ color: 'var(--nav-accent)' }}>Kaspi Pay →</Link>
+                        <Link href="/kaspi-api" onClick={() => setPanel(null)} className="font-medium" style={{ color: 'var(--nav-accent)' }}>Kaspi Pay →</Link>
                       </div>
                     </div>
                   </div>

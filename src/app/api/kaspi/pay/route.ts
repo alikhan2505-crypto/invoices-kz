@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
       qr_token: payment.qrToken,
       payment_link: payment.paymentLink,
       // Per-request callback_url wins; falling back to the connection's own
-      // default (set once on /profile/kaspi-pay) means callers who always
+      // default (set once on /kaspi-api) means callers who always
       // want the same webhook don't have to pass it on every single call.
       callback_url: callback_url || found.defaultWebhookUrl || null,
       status: 'pending',

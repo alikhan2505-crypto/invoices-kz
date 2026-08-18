@@ -44,11 +44,12 @@ const aiAgentLinks: { href: string; label: LocalizedLabel }[] = [
   { href: '/ai-agent/settings', label: { ru: 'Настройки', kk: 'Баптаулар', en: 'Settings' } },
 ]
 
-// Kaspi Pay's public payment API + webhooks, surfaced as its own product
-// (previously reachable only by knowing the /profile/kaspi-pay URL).
+// Kaspi Pay's public payment API + webhooks, surfaced as its own standalone
+// section (2026-08-19: moved out from under /profile to /kaspi-api, same as
+// Kaspi Bot and AI-агент).
 const kaspiApiLinks: { href: string; label: LocalizedLabel }[] = [
-  { href: '/profile/kaspi-pay', label: { ru: 'Подключение', kk: 'Қосылу', en: 'Setup' } },
-  { href: '/profile/kaspi-pay/docs', label: { ru: 'Документация API', kk: 'API құжаттамасы', en: 'API docs' } },
+  { href: '/kaspi-api', label: { ru: 'Подключение', kk: 'Қосылу', en: 'Setup' } },
+  { href: '/kaspi-api/docs', label: { ru: 'Документация API', kk: 'API құжаттамасы', en: 'API docs' } },
 ]
 
 function LockIcon({ size = 10 }: { size?: number }) {

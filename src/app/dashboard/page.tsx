@@ -182,7 +182,7 @@ type ProductState = 'data' | 'locked' | 'neutral'
 
 function ProductCard({
   index, reduceMotion, icon, colorVar, softVar, title, state,
-  subtitle, deltaPct, deltaLabel, sparkValues, neutralText, ctaLabel, onClick,
+  subtitle, deltaPct, deltaLabel, sparkValues, neutralText, ctaLabel, onClick, onCtaClick,
 }: {
   index: number
   reduceMotion: boolean
@@ -198,6 +198,10 @@ function ProductCard({
   neutralText?: string
   ctaLabel?: string
   onClick?: () => void
+  // Optional distinct target for the small ctaLabel line (e.g. "Документация →")
+  // -- stops propagation so clicking it doesn't also fire the card's own
+  // onClick. Falls back to the card's onClick when omitted.
+  onCtaClick?: () => void
 }) {
   return (
     <motion.div
@@ -247,7 +251,11 @@ function ProductCard({
         <>
           <div className="text-[11.5px] mt-2" style={{ color: 'var(--nav-text-muted)' }}>{neutralText}</div>
           {ctaLabel && (
-            <div className="text-xs font-bold mt-2.5" style={{ color: `var(${colorVar})` }}>
+            <div
+              className="text-xs font-bold mt-2.5"
+              style={{ color: `var(${colorVar})` }}
+              onClick={onCtaClick ? (e) => { e.stopPropagation(); onCtaClick() } : undefined}
+            >
               {ctaLabel}
             </div>
           )}
@@ -704,7 +712,7 @@ export default function DashboardPage() {
                     deltaPct={invoiceCountDelta}
                     deltaLabel="к прошлому месяцу"
                     sparkValues={last14CreatedCounts}
-                    onClick={() => router.push('/history')}
+                    onClick={() => router.push('/create')}
                   />
                   <ProductCard
                     index={1}
@@ -716,7 +724,8 @@ export default function DashboardPage() {
                     state="neutral"
                     neutralText="Приём оплат Kaspi на вашем сайте"
                     ctaLabel="Документация →"
-                    onClick={() => router.push('/profile/kaspi-pay/docs')}
+                    onClick={() => router.push('/kaspi-api')}
+                    onCtaClick={() => router.push('/kaspi-api/docs')}
                   />
                   <ProductCard
                     index={2}
