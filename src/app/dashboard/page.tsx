@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { generateInvoicePDF } from '@/lib/generatePDF'
-import AppNav from '@/components/AppNav'
+import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import InvoiceLivePreview from '@/components/InvoiceLivePreview'
 import { cacheGet, cacheSet } from '@/lib/cache'
@@ -844,7 +844,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      <AppNav />
+      <SiteNav />
     </main>
     </DesktopShell>
   )

@@ -12,7 +12,7 @@ import { getActivePlan } from '@/lib/plan'
 import { useLanguage } from '@/components/LanguageProvider'
 import { backLabel } from '@/lib/a11yLabels'
 import { invoiceFlowDict } from '@/lib/i18n/invoiceFlow'
-import AppNav from '@/components/AppNav'
+import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import InvoiceLivePreview from '@/components/InvoiceLivePreview'
 import Skeleton from '@/components/Skeleton'
@@ -331,7 +331,7 @@ export default function InvoicePage() {
       </div>
       </div>
       </div>
-      <AppNav desktopOnly />
+      <SiteNav desktopOnly />
     </main>
     </DesktopShell>
   )
@@ -936,7 +936,7 @@ export default function InvoicePage() {
         </div>
       )}
 
-      <AppNav desktopOnly />
+      <SiteNav desktopOnly />
     </main>
     </DesktopShell>
   )

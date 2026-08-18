@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
-import AppNav from '@/components/AppNav'
+import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import * as XLSX from 'xlsx'
 import { formatDateTime, formatDate } from '@/lib/date'
@@ -314,7 +314,7 @@ export default function History() {
           {t.createNewInvoiceButton}
         </button>
       </div>
-      <AppNav />
+      <SiteNav />
     </main>
     </DesktopShell>
   )

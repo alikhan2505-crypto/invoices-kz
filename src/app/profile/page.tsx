@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
-import AppNav from '@/components/AppNav'
+import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import { AreaChart, Area, ResponsiveContainer, Tooltip } from 'recharts'
 import { useTheme } from '@/components/ThemeProvider'
@@ -95,7 +95,7 @@ export default function Profile() {
         <Skeleton className="h-40 rounded-2xl" />
         <Skeleton className="h-40 rounded-2xl" />
       </div>
-      <AppNav />
+      <SiteNav />
     </main>
     </DesktopShell>
   )
@@ -404,7 +404,7 @@ export default function Profile() {
         )}
       </div>
 
-      <AppNav />
+      <SiteNav />
     </main>
     </DesktopShell>
   )
