@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 
@@ -71,6 +71,7 @@ function timeAgo(iso: string): string {
 
 export default function TopUtilityBar() {
   const router = useRouter()
+  const pathname = usePathname()
   const [loggedIn, setLoggedIn] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
   const [companyName, setCompanyName] = useState('')
@@ -227,6 +228,21 @@ export default function TopUtilityBar() {
     await supabase.auth.signOut()
     router.push('/login')
   }
+
+  // App chrome has no business on public/marketing pages: the landing, auth,
+  // legal pages, and client-facing public document views (where the viewer
+  // may be a logged-in platform user who is NOT the document's owner).
+  const isPublicPage =
+    pathname === '/' ||
+    pathname === '/login' ||
+    pathname === '/privacy' ||
+    pathname === '/terms' ||
+    pathname === '/data-deletion' ||
+    pathname.startsWith('/view/') ||
+    pathname.startsWith('/contract-view/') ||
+    pathname.startsWith('/verify/') ||
+    pathname.startsWith('/promo/')
+  if (isPublicPage) return null
 
   if (!loggedIn) return null
 
