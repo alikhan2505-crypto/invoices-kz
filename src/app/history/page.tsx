@@ -167,7 +167,7 @@ export default function History() {
     <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
       <SiteNav />
       <div className="sticky top-0 lg:top-16 z-30 bg-white border-b px-4 py-3 flex items-center justify-between lg:h-16">
-        <span className="font-bold text-[#1C2056]">INVOICES.KZ</span>
+        <span className="font-bold text-[#1C2056]">История счетов</span>
         <div className="flex gap-2">
           <button onClick={markOverdue}
             className="text-xs bg-red-50 text-red-500 border border-red-100 px-3 py-1.5 rounded-lg">
