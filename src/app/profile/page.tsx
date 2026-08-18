@@ -87,6 +87,7 @@ export default function Profile() {
   if (loading && !profile) return (
     <DesktopShell>
     <main className="min-h-screen bg-gray-50 pb-24 lg:pb-6 lg:min-h-full">
+      <SiteNav />
       <div className="sticky top-0 z-30 bg-white border-b px-4 py-3 flex items-center justify-between lg:h-16">
         <span className="font-bold text-[#1C2056]">INVOICES.KZ</span>
       </div>
@@ -95,7 +96,6 @@ export default function Profile() {
         <Skeleton className="h-40 rounded-2xl" />
         <Skeleton className="h-40 rounded-2xl" />
       </div>
-      <SiteNav />
     </main>
     </DesktopShell>
   )
@@ -370,6 +370,7 @@ export default function Profile() {
   return (
     <DesktopShell>
     <main className="min-h-screen bg-gray-50 pb-24 lg:pb-6 lg:min-h-full">
+      <SiteNav />
 
       <div className="sticky top-0 z-30 bg-white border-b px-4 py-3 flex items-center justify-between lg:h-16">
         <span className="font-bold text-[#1C2056]">INVOICES.KZ</span>
@@ -404,7 +405,6 @@ export default function Profile() {
         )}
       </div>
 
-      <SiteNav />
     </main>
     </DesktopShell>
   )
