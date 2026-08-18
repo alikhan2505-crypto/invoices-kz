@@ -17,7 +17,7 @@ import { invoiceFlowDict } from '@/lib/i18n/invoiceFlow'
 
 const UNIT_OPTIONS = ['шт', 'кг', 'л', 'м', 'м²', 'м³', 'час', 'день', 'месяц', 'услуга', 'работа']
 
-export default function Dashboard() {
+export default function CreateInvoicePage() {
   const router = useRouter()
   const { lang } = useLanguage()
   const t = invoiceFlowDict[lang]

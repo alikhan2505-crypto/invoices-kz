@@ -261,7 +261,7 @@ export default function History() {
           <div className="text-center py-12">
             <div className="text-4xl mb-3">📄</div>
             <p className="text-gray-400 text-sm">{t.noInvoicesLabel}</p>
-            <button onClick={() => router.push('/dashboard')}
+            <button onClick={() => router.push('/create')}
               className="mt-4 bg-[#1C2056] text-white px-6 py-2.5 rounded-xl text-sm font-medium">
               {t.createFirstInvoiceButton}
             </button>
@@ -309,7 +309,7 @@ export default function History() {
           </div>
         )}
 
-        <button onClick={() => router.push('/dashboard')}
+        <button onClick={() => router.push('/create')}
           className="w-full bg-[#1C2056] text-white rounded-xl py-4 font-medium text-sm">
           {t.createNewInvoiceButton}
         </button>

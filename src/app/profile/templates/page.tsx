@@ -75,7 +75,7 @@ export default function Templates() {
             {templates.map(tpl => (
               <div key={tpl.id} className="bg-white rounded-2xl p-4 shadow-sm">
                 <div className="flex items-start justify-between">
-                  <div className="flex-1 cursor-pointer" onClick={() => router.push('/dashboard?template=' + tpl.id)}>
+                  <div className="flex-1 cursor-pointer" onClick={() => router.push('/create?template=' + tpl.id)}>
                     <div className="font-medium text-[#1C2056] mb-1">{tpl.name}</div>
                     {tpl.client_name && (
                       <div className="text-xs text-gray-400 mb-1">{t.templateClientLabel(tpl.client_name)}</div>
@@ -91,7 +91,7 @@ export default function Templates() {
                   </div>
                   <div className="flex gap-2 ml-3">
                     <button
-                      onClick={() => router.push('/dashboard?template=' + tpl.id)}
+                      onClick={() => router.push('/create?template=' + tpl.id)}
                       className="text-xs bg-[#1C2056] text-white px-3 py-1.5 rounded-lg">
                       {t.useTemplateButton}
                     </button>

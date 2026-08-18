@@ -133,7 +133,7 @@ export default function Profile() {
             {stats.invoices === 0 ? (
               <div className="text-center py-2">
                 <p className="text-sm text-gray-400 mb-3">{t.noInvoicesYetHint}</p>
-                <button onClick={() => router.push('/dashboard')}
+                <button onClick={() => router.push('/create')}
                   className="bg-[#1C2056] text-white px-4 py-2 rounded-lg text-xs font-medium">
                   {t.createFirstInvoiceButton}
                 </button>
