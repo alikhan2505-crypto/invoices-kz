@@ -410,6 +410,33 @@ html {
   --nav-card-glow: 0 26px 60px -20px rgba(0, 0, 0, 0.55);
 }
 
+/* Same light values as the unconditional :root block above, but scoped to
+   this project's manual [data-theme] toggle so --nav-* tokens also respond
+   when a user flips to light mode in-app while their OS stays dark. Mirrors
+   the [data-theme="dark"] block above; needed because the unconditional
+   @media (prefers-color-scheme: dark) block otherwise wins by source order
+   when no more-specific [data-theme="light"] rule exists to override it. */
+[data-theme="light"] {
+  --nav-bg: #FFFFFF;
+  --nav-surface-glass: rgba(20, 22, 42, 0.035);
+  --nav-accent: #5B4CE0;
+  --nav-accent-ink: #FFFFFF;
+  --nav-accent-soft: rgba(91, 76, 224, 0.12);
+  --nav-accent-track: rgba(91, 76, 224, 0.18);
+  --nav-teal: #00A0B8;
+  --nav-teal-soft: rgba(0, 160, 184, 0.14);
+  --nav-magenta: #B23A70;
+  --nav-magenta-soft: rgba(178, 58, 112, 0.14);
+  --nav-success: #12946B;
+  --nav-success-soft: rgba(18, 148, 107, 0.12);
+  --nav-text-primary: #14162A;
+  --nav-text-secondary: #565C7E;
+  --nav-text-muted: #8A8FB0;
+  --nav-border: rgba(20, 22, 42, 0.09);
+  --nav-border-soft: rgba(20, 22, 42, 0.07);
+  --nav-card-glow: 0 20px 50px -22px rgba(30, 25, 90, 0.28);
+}
+
 .nav-glass {
   background: var(--nav-surface-glass);
   backdrop-filter: blur(24px) saturate(140%);
