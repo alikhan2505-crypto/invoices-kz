@@ -261,7 +261,7 @@ const COPY: Record<Lang, Copy> = {
     heroSubtitle: 'Счета с подписью и печатью, оплата через Kaspi, ЭЦП, договоры и Kaspi-бот для магазина — всё в одном месте.',
     heroPrimaryCta: 'Начать бесплатно',
     heroSecondaryCta: 'Как это работает',
-    heroNote: '7 дней Pro бесплатно при регистрации · Без карты',
+    heroNote: '7 дней бесплатно на тарифе Базовый',
     heroChip1: 'Счёт оплачен · 12 000 ₸',
     heroChip2: '2% комиссия',
     stats: [
@@ -308,7 +308,7 @@ const COPY: Record<Lang, Copy> = {
       { icon: 'gift', label: 'Реферальная программа' },
     ],
     ctaTitle: 'Готовы избавиться от бумажной волокиты?',
-    ctaSubtitle: 'Зарегистрируйтесь и получите 7 дней Pro бесплатно — без карты.',
+    ctaSubtitle: 'Зарегистрируйтесь и получите 7 дней бесплатного доступа.',
     ctaButton: 'Начать бесплатно',
     ctaNote: 'Отмена в любое время',
     footerLinks: [
@@ -331,7 +331,7 @@ const COPY: Record<Lang, Copy> = {
     heroSubtitle: 'Қолтаңба мен мөрі бар шоттар, Kaspi арқылы төлем, ЭЦҚ, келісімшарттар және дүкенге арналған Kaspi-бот — бәрі бір жерде.',
     heroPrimaryCta: 'Тегін бастау',
     heroSecondaryCta: 'Бұл қалай жұмыс істейді',
-    heroNote: 'Тіркелгенде 7 күн Pro тегін · Карта қажет емес',
+    heroNote: 'Тіркелгенде 7 күн тегін (Негізгі тариф)',
     heroChip1: 'Шот төленді · 12 000 ₸',
     heroChip2: '2% комиссия',
     stats: [
@@ -378,7 +378,7 @@ const COPY: Record<Lang, Copy> = {
       { icon: 'gift', label: 'Реферал бағдарламасы' },
     ],
     ctaTitle: 'Қағаз әуреден құтылуға дайынсыз ба?',
-    ctaSubtitle: 'Тіркеліп, 7 күн Pro жоспарын тегін алыңыз — карта қажет емес.',
+    ctaSubtitle: 'Тіркеліп, 7 күн тегін қолжетімділік алыңыз.',
     ctaButton: 'Тегін бастау',
     ctaNote: 'Кез келген уақытта бас тартуға болады',
     footerLinks: [
@@ -401,7 +401,7 @@ const COPY: Record<Lang, Copy> = {
     heroSubtitle: 'Signed and stamped invoices, Kaspi payments, digital signatures, contracts, and a Kaspi price bot for your store — all in one place.',
     heroPrimaryCta: 'Start for free',
     heroSecondaryCta: 'How it works',
-    heroNote: '7 days of Pro free on signup · No card required',
+    heroNote: '7 days free on the Basic plan',
     heroChip1: 'Invoice paid · ₸12,000',
     heroChip2: '2% fee',
     stats: [
@@ -448,7 +448,7 @@ const COPY: Record<Lang, Copy> = {
       { icon: 'gift', label: 'Referral program' },
     ],
     ctaTitle: 'Ready to drop the paperwork?',
-    ctaSubtitle: 'Sign up and get 7 days of Pro free — no card required.',
+    ctaSubtitle: 'Sign up and get 7 days of free access.',
     ctaButton: 'Start for free',
     ctaNote: 'Cancel anytime',
     footerLinks: [

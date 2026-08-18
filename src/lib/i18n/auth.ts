@@ -127,7 +127,7 @@ export const authDict: Record<'ru' | 'kk' | 'en', AuthContent> = {
     stampItemTitle: 'Печать',
     stampItemDesc: 'Загрузите фото печати компании',
     trialActivatedMessage: '7 дней бесплатно активированы!',
-    proFeaturesUnlockedMessage: 'Все функции Pro открыты',
+    proFeaturesUnlockedMessage: 'Возможности тарифа Базовый открыты',
     addSignatureButton: '✍️ Добавить подпись',
     skipToAppButton: 'Пропустить — перейти в приложение',
 
@@ -193,7 +193,7 @@ export const authDict: Record<'ru' | 'kk' | 'en', AuthContent> = {
     stampItemTitle: 'Мөр',
     stampItemDesc: 'Компания мөрінің фотосын жүктеңіз',
     trialActivatedMessage: '7 күн тегін кезең іске қосылды!',
-    proFeaturesUnlockedMessage: 'Pro нұсқасының барлық мүмкіндіктері ашық',
+    proFeaturesUnlockedMessage: 'Негізгі тариф мүмкіндіктері ашық',
     addSignatureButton: '✍️ Қолтаңба қосу',
     skipToAppButton: 'Өткізіп жіберу — қосымшаға өту',
 
@@ -259,7 +259,7 @@ export const authDict: Record<'ru' | 'kk' | 'en', AuthContent> = {
     stampItemTitle: 'Stamp',
     stampItemDesc: 'Upload a photo of your company stamp',
     trialActivatedMessage: '7 days free trial activated!',
-    proFeaturesUnlockedMessage: 'All Pro features unlocked',
+    proFeaturesUnlockedMessage: 'Basic plan features unlocked',
     addSignatureButton: '✍️ Add signature',
     skipToAppButton: 'Skip — go to the app',
 
