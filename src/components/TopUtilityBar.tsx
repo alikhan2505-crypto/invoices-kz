@@ -4,13 +4,20 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 
-type WalletKey = 'invoices' | 'kaspiShop' | 'aiAgent'
+type WalletKey = 'unified'
 type Panel = 'wallet' | 'notifications' | 'help' | 'account' | null
 
 interface HistoryEntry {
   label: string
   amount: number
   createdAt: string
+}
+
+interface WalletBreakdown {
+  topup: number
+  commission: number
+  kaspi_shop_check: number
+  ai_agent_reply: number
 }
 
 interface NotificationItem {
@@ -38,26 +45,18 @@ interface WalletConfig {
 
 const WALLETS: WalletConfig[] = [
   {
-    key: 'invoices', label: 'Счета', adminOnly: false,
+    key: 'unified', label: 'Кошелёк', adminOnly: false,
     balanceUrl: '/api/kaspi/wallet', historyUrl: '/api/kaspi/wallet/history',
     topupUrl: '/api/kaspi/wallet/topup', topupStatusUrl: '/api/kaspi/wallet/topup-status',
     amountField: 'amount', minAmount: 1000, presets: [1000, 2000, 5000, 10000],
-    formatBalance: n => `${n.toLocaleString('ru-KZ')} ₸`,
+    formatBalance: (n: number) => `${n} ₸`,
   },
-  {
-    key: 'kaspiShop', label: 'Магазин', adminOnly: true,
-    balanceUrl: '/api/kaspi-shop/wallet', historyUrl: '/api/kaspi-shop/wallet/history',
-    topupUrl: '/api/kaspi-shop/wallet/topup', topupStatusUrl: '/api/kaspi-shop/wallet/topup-status',
-    amountField: 'amountTenge', minAmount: 500, presets: [500, 1000, 2500, 5000],
-    formatBalance: n => `${n.toLocaleString('ru-KZ')} кредитов`,
-  },
-  {
-    key: 'aiAgent', label: 'ИИ бот', adminOnly: true,
-    balanceUrl: '/api/ai-agent/wallet', historyUrl: '/api/ai-agent/wallet/history',
-    topupUrl: '/api/ai-agent/wallet/topup', topupStatusUrl: '/api/ai-agent/wallet/topup-status',
-    amountField: 'amountTenge', minAmount: 500, presets: [500, 1000, 2500, 5000],
-    formatBalance: n => `${n.toLocaleString('ru-KZ')} кредитов`,
-  },
+]
+
+const BREAKDOWN_SEGMENTS: { key: keyof Omit<WalletBreakdown, 'topup'>; label: string; color: string }[] = [
+  { key: 'commission', label: 'Счета', color: 'var(--nav-accent)' },
+  { key: 'kaspi_shop_check', label: 'Kaspi Магазин', color: 'var(--nav-teal)' },
+  { key: 'ai_agent_reply', label: 'ИИ-агент', color: 'var(--nav-magenta)' },
 ]
 
 function timeAgo(iso: string): string {
@@ -80,9 +79,10 @@ export default function TopUtilityBar() {
 
   // Wallet state
   const [balances, setBalances] = useState<Partial<Record<WalletKey, number>>>({})
-  const [activeWallet, setActiveWallet] = useState<WalletKey>('invoices')
+  const [activeWallet, setActiveWallet] = useState<WalletKey>('unified')
   const [history, setHistory] = useState<HistoryEntry[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
+  const [breakdown, setBreakdown] = useState<WalletBreakdown | null>(null)
   const [topupAmount, setTopupAmount] = useState<number | null>(null)
   const [topupCustom, setTopupCustom] = useState('')
   const [toppingUp, setToppingUp] = useState(false)
@@ -148,7 +148,14 @@ export default function TopUtilityBar() {
     const wallet = WALLETS.find(w => w.key === key)!
     const headers = await authHeader()
     const res = await fetch(wallet.historyUrl, { headers })
-    setHistory(res.ok ? (await res.json()).entries || [] : [])
+    if (res.ok) {
+      const data = await res.json()
+      setHistory(data.entries || [])
+      setBreakdown(data.breakdown || null)
+    } else {
+      setHistory([])
+      setBreakdown(null)
+    }
     setHistoryLoading(false)
   }
 
@@ -224,7 +231,7 @@ export default function TopUtilityBar() {
   if (!loggedIn) return null
 
   const visibleWallets = WALLETS.filter(w => !w.adminOnly || isAdmin)
-  const wallet = WALLETS.find(w => w.key === activeWallet)!
+  const wallet = visibleWallets.find(w => w.key === activeWallet) ?? visibleWallets[0]
   const initials = companyName ? companyName.slice(0, 2).toUpperCase() : '··'
 
   return (
@@ -244,7 +251,7 @@ export default function TopUtilityBar() {
             <circle cx="17" cy="14" r="1.3" fill="var(--nav-accent)" />
           </svg>
           <span className="text-xs font-medium text-[var(--nav-accent)] tabular-nums">
-            {balances.invoices !== undefined ? `${balances.invoices.toLocaleString('ru-KZ')} ₸` : '···'}
+            {balances.unified !== undefined ? `${balances.unified.toLocaleString('ru-KZ')} ₸` : '···'}
           </span>
         </button>
 
@@ -280,17 +287,8 @@ export default function TopUtilityBar() {
         <div className="fixed inset-0 z-50 flex items-end lg:items-start justify-end p-3 bg-black/30" onClick={() => setPanel(null)}>
 
           {panel === 'wallet' && (
-            <div className="nav-glass rounded-2xl w-full max-w-2xl mb-32 lg:mb-0 lg:mt-14 max-h-[80vh] overflow-hidden flex" style={{ boxShadow: 'var(--nav-card-glow)' }} onClick={e => e.stopPropagation()}>
-              <div className="w-40 flex-shrink-0 bg-gray-50 border-r border-[var(--nav-border-soft)] p-4">
-                <div className="text-xs font-semibold text-[var(--nav-text-secondary)] px-2 mb-2">Кошельки</div>
-                {visibleWallets.map(w => (
-                  <button key={w.key} onClick={() => selectWallet(w.key)}
-                    className={`w-full text-left px-3 py-2 rounded-lg text-sm mb-1 transition-colors ${activeWallet === w.key ? 'bg-[var(--nav-accent)] text-white font-medium' : 'text-gray-600 hover:bg-gray-100'}`}>
-                    {w.label}
-                  </button>
-                ))}
-              </div>
-              <div className="flex-1 p-4 overflow-y-auto">
+            <div className="nav-glass rounded-2xl w-full max-w-2xl mb-32 lg:mb-0 lg:mt-14 max-h-[80vh] overflow-y-auto" style={{ boxShadow: 'var(--nav-card-glow)' }} onClick={e => e.stopPropagation()}>
+              <div className="p-4">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-sm font-bold text-[var(--nav-accent)]">{wallet.label}</h2>
                   <button onClick={() => setPanel(null)} className="text-[var(--nav-text-secondary)] text-lg leading-none">✕</button>
@@ -300,6 +298,30 @@ export default function TopUtilityBar() {
                     {balances[activeWallet] !== undefined ? wallet.formatBalance(balances[activeWallet]!) : '···'}
                   </div>
                 </div>
+                {breakdown && (breakdown.commission + breakdown.kaspi_shop_check + breakdown.ai_agent_reply > 0) && (
+                  <div className="mb-4">
+                    <div className="text-xs text-gray-500 mb-2">Расходы за 30 дней</div>
+                    <div className="flex h-2 rounded-full overflow-hidden bg-gray-100 mb-2">
+                      {BREAKDOWN_SEGMENTS.filter(s => breakdown[s.key] > 0).map(s => (
+                        <div key={s.key} style={{ flexGrow: breakdown[s.key], backgroundColor: s.color }} />
+                      ))}
+                    </div>
+                    <div className="space-y-1">
+                      {BREAKDOWN_SEGMENTS.filter(s => breakdown[s.key] > 0).map(s => (
+                        <div key={s.key} className="flex items-center gap-1.5 text-xs">
+                          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: s.color }} />
+                          <span className="text-gray-600">{s.label}</span>
+                          <span className="ml-auto tabular-nums text-gray-500">{breakdown[s.key].toLocaleString('ru-KZ')} ₸</span>
+                        </div>
+                      ))}
+                    </div>
+                    {breakdown.topup > 0 && (
+                      <div className="text-[11px] text-[var(--nav-text-muted)] mt-1.5">
+                        Пополнено за 30 дней: {breakdown.topup.toLocaleString('ru-KZ')} ₸
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div className="mb-4">
                   <div className="text-xs text-gray-500 mb-2">История списаний</div>
                   {historyLoading && <div className="text-xs text-[var(--nav-text-secondary)]">Загрузка…</div>}

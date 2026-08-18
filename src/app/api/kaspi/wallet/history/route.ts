@@ -13,6 +13,8 @@ const supabaseAuth = createClient(
 const TYPE_LABELS: Record<string, string> = {
   topup: 'Пополнение',
   commission: 'Комиссия за оплату счёта',
+  kaspi_shop_check: 'Kaspi Магазин: проверка цены',
+  ai_agent_reply: 'ИИ-агент: ответ',
 }
 
 export async function GET(req: NextRequest) {
@@ -35,5 +37,16 @@ export async function GET(req: NextRequest) {
     amount: Number(row.amount),
     createdAt: row.created_at,
   }))
-  return NextResponse.json({ entries })
+
+  const since = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString()
+  const { data: recent } = await supabase
+    .from('wallet_ledger')
+    .select('type, amount')
+    .eq('user_id', user.id)
+    .gte('created_at', since)
+  const breakdown: Record<string, number> = { topup: 0, commission: 0, kaspi_shop_check: 0, ai_agent_reply: 0 }
+  for (const row of recent || []) {
+    if (row.type in breakdown) breakdown[row.type] += Math.abs(Number(row.amount))
+  }
+  return NextResponse.json({ entries, breakdown })
 }
