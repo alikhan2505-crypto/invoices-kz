@@ -4,10 +4,10 @@ import { useRouter, usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useLanguage, type Lang } from './LanguageProvider'
 
-const labels: Record<Lang, { home: string; invoices: string; kaspiShop: string; aiAgent: string; profile: string; history: string }> = {
-  ru: { home: 'Главная', invoices: 'Счета', kaspiShop: 'Kaspi Магазин', aiAgent: 'AI-агент', profile: 'Профиль', history: 'История' },
-  kk: { home: 'Басты бет', invoices: 'Шоттар', kaspiShop: 'Kaspi Дүкені', aiAgent: 'AI-агент', profile: 'Профиль', history: 'Тарих' },
-  en: { home: 'Home', invoices: 'Invoices', kaspiShop: 'Kaspi Shop', aiAgent: 'AI Agent', profile: 'Profile', history: 'History' },
+const labels: Record<Lang, { home: string; invoices: string; kaspiShop: string; aiAgent: string; kaspiApi: string; profile: string; history: string }> = {
+  ru: { home: 'Главная', invoices: 'Счета', kaspiShop: 'Kaspi Магазин', aiAgent: 'AI-агент', kaspiApi: 'Kaspi API', profile: 'Профиль', history: 'История' },
+  kk: { home: 'Басты бет', invoices: 'Шоттар', kaspiShop: 'Kaspi Дүкені', aiAgent: 'AI-агент', kaspiApi: 'Kaspi API', profile: 'Профиль', history: 'Тарих' },
+  en: { home: 'Home', invoices: 'Invoices', kaspiShop: 'Kaspi Shop', aiAgent: 'AI Agent', kaspiApi: 'Kaspi API', profile: 'Profile', history: 'History' },
 }
 
 // Copy shown to non-admins when they interact with an admin-gated section
@@ -18,7 +18,7 @@ const lockedMessages: Record<Lang, string> = {
   en: 'Coming soon for everyone',
 }
 
-type MenuKey = 'invoices' | 'kaspiShop' | 'aiAgent'
+type MenuKey = 'invoices' | 'kaspiShop' | 'aiAgent' | 'kaspiApi'
 type LocalizedLabel = Record<Lang, string>
 
 const invoicesLinks: { href: string; label: LocalizedLabel }[] = [
@@ -39,6 +39,13 @@ const kaspiShopLinks: { href: string; label: LocalizedLabel }[] = [
 const aiAgentLinks: { href: string; label: LocalizedLabel }[] = [
   { href: '/ai-agent/review', label: { ru: 'Диалоги', kk: 'Диалогтар', en: 'Conversations' } },
   { href: '/ai-agent/settings', label: { ru: 'Настройки', kk: 'Баптаулар', en: 'Settings' } },
+]
+
+// Kaspi Pay's public payment API + webhooks, surfaced as its own product
+// (previously reachable only by knowing the /profile/kaspi-pay URL).
+const kaspiApiLinks: { href: string; label: LocalizedLabel }[] = [
+  { href: '/profile/kaspi-pay', label: { ru: 'Подключение', kk: 'Қосылу', en: 'Setup' } },
+  { href: '/profile/kaspi-pay/docs', label: { ru: 'Документация API', kk: 'API құжаттамасы', en: 'API docs' } },
 ]
 
 function LockIcon({ size = 10 }: { size?: number }) {
@@ -301,6 +308,7 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
           openMenu={openMenu} setOpenMenu={setOpenMenu} router={router} path={path} lang={lang}
           locked={!isAdmin} lockedHintOpen={lockedHint === 'desktop-aiAgent'} onLockedClick={() => showLockedHint('desktop-aiAgent')}
         />
+        <Dropdown menuKey="kaspiApi" label={labels[lang].kaspiApi} links={kaspiApiLinks} dotColor="var(--nav-accent)" openMenu={openMenu} setOpenMenu={setOpenMenu} router={router} path={path} lang={lang} />
 
         {unpaid > 0 && (
           <button
