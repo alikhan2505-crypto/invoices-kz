@@ -5,9 +5,9 @@ import { supabase } from '@/lib/supabase'
 import { useLanguage, type Lang } from './LanguageProvider'
 
 const labels: Record<Lang, { home: string; invoices: string; kaspiShop: string; aiAgent: string; kaspiApi: string; profile: string; history: string }> = {
-  ru: { home: 'Главная', invoices: 'Счета', kaspiShop: 'Kaspi Магазин', aiAgent: 'AI-агент', kaspiApi: 'Kaspi API', profile: 'Профиль', history: 'История' },
-  kk: { home: 'Басты бет', invoices: 'Шоттар', kaspiShop: 'Kaspi Дүкені', aiAgent: 'AI-агент', kaspiApi: 'Kaspi API', profile: 'Профиль', history: 'Тарих' },
-  en: { home: 'Home', invoices: 'Invoices', kaspiShop: 'Kaspi Shop', aiAgent: 'AI Agent', kaspiApi: 'Kaspi API', profile: 'Profile', history: 'History' },
+  ru: { home: 'Главная', invoices: 'Счета', kaspiShop: 'Kaspi Bot', aiAgent: 'AI-агент', kaspiApi: 'Kaspi API', profile: 'Профиль', history: 'История' },
+  kk: { home: 'Басты бет', invoices: 'Шоттар', kaspiShop: 'Kaspi Bot', aiAgent: 'AI-агент', kaspiApi: 'Kaspi API', profile: 'Профиль', history: 'Тарих' },
+  en: { home: 'Home', invoices: 'Invoices', kaspiShop: 'Kaspi Bot', aiAgent: 'AI Agent', kaspiApi: 'Kaspi API', profile: 'Profile', history: 'History' },
 }
 
 // Copy shown to non-admins when they interact with an admin-gated section

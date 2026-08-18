@@ -13,7 +13,7 @@ const supabaseAuth = createClient(
 const TYPE_LABELS: Record<string, string> = {
   topup: 'Пополнение',
   commission: 'Комиссия за оплату счёта',
-  kaspi_shop_check: 'Kaspi Магазин: проверка цены',
+  kaspi_shop_check: 'Kaspi Bot: проверка цены',
   ai_agent_reply: 'ИИ-агент: ответ',
 }
 

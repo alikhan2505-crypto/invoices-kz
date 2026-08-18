@@ -465,7 +465,12 @@ html {
 }
 
 .nav-glass {
-  background: var(--nav-surface-glass);
+  /* Was var(--nav-surface-glass) (~4% tint) -- readable only when
+     backdrop-filter blur actually applies, which the production build
+     does not guarantee (observed live: fully transparent dropdowns over
+     page content). The elevated ~90% surface is legible with or without
+     blur; blur remains as progressive enhancement. */
+  background: var(--nav-surface-elevated);
   backdrop-filter: blur(24px) saturate(140%);
   -webkit-backdrop-filter: blur(24px) saturate(140%);
   border: 1px solid var(--nav-border-soft);

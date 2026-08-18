@@ -55,7 +55,7 @@ const WALLETS: WalletConfig[] = [
 
 const BREAKDOWN_SEGMENTS: { key: keyof Omit<WalletBreakdown, 'topup'>; label: string; color: string }[] = [
   { key: 'commission', label: 'Счета', color: 'var(--nav-accent)' },
-  { key: 'kaspi_shop_check', label: 'Kaspi Магазин', color: 'var(--nav-teal)' },
+  { key: 'kaspi_shop_check', label: 'Kaspi Bot', color: 'var(--nav-teal)' },
   { key: 'ai_agent_reply', label: 'ИИ-агент', color: 'var(--nav-magenta)' },
 ]
 
