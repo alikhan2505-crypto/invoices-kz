@@ -306,7 +306,7 @@ function RevenueAreaChart({ days, reduceMotion, period }: { days: { date: Date; 
   const VIEW_H = 220
   const PAD_LEFT = 8
   const PAD_RIGHT = 8
-  const PAD_TOP = 16
+  const PAD_TOP = 28
   const PAD_BOTTOM = 24
   const chartW = VIEW_W - PAD_LEFT - PAD_RIGHT
   const chartH = VIEW_H - PAD_TOP - PAD_BOTTOM
