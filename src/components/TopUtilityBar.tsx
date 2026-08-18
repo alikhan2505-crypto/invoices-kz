@@ -552,13 +552,15 @@ export default function TopUtilityBar() {
                 </div>
 
                 <div className="mt-5 pt-5 flex items-center gap-3" style={{ borderTop: '1px solid var(--nav-border-soft)' }}>
-                  <div className="text-xs flex-shrink-0" style={{ color: 'var(--nav-text-secondary)' }}>
-                    Тариф <b style={{ color: 'var(--nav-text-primary)' }}>{activePlan.label}</b>
-                  </div>
                   {activePlan.invoiceLimit === null ? (
-                    <div className="text-xs ml-auto" style={{ color: 'var(--nav-text-muted)' }}>безлимит</div>
+                    <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>
+                      Тариф <b style={{ color: 'var(--nav-text-primary)' }}>{activePlan.label}</b> · безлимит
+                    </div>
                   ) : (
                     <>
+                      <div className="text-xs flex-shrink-0" style={{ color: 'var(--nav-text-secondary)' }}>
+                        Тариф <b style={{ color: 'var(--nav-text-primary)' }}>{activePlan.label}</b>
+                      </div>
                       <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--nav-accent-track)' }}>
                         <div className="h-full rounded-full"
                           style={{
