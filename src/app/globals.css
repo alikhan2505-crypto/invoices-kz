@@ -19,8 +19,13 @@
   }
 }
 
+/* body's own background is deliberately transparent — see the `html` rule
+   below (2026-08-18 aurora-visibility fix) for why. --background still
+   drives the app's default canvas color, just applied one element higher
+   up so NavAurora (position:fixed, z-index:-1, mounted as body's first
+   child in layout.tsx) can actually render above it. */
 body {
-  background: var(--background);
+  background: transparent;
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
@@ -273,9 +278,21 @@ button:active, a[href]:active {
   transform: scale(0.92);
 }
 
-/* Синий фон пока грузится страница = плавный переход со сплэшем */
+/* Was a hardcoded navy (#1C2056) "splash while loading" color; changed
+   2026-08-18 as part of the aurora-visibility fix. Root cause found while
+   verifying that fix: browsers hide position:fixed/z-index:-1 descendants
+   of <body> (NavAurora, src/components/NavAurora.tsx) behind ANY opaque
+   `body` background, even one that's only "canvas-propagated" per the
+   CSS spec — confirmed empirically via chrome-devtools (a plain z-index:-1
+   div stayed invisible until body's background was made transparent).
+   Moving the real background here and making body transparent (see body
+   rule above) fixes that everywhere in the app at once, since --background
+   resolves to the exact same value body used to paint (white / #0a0a0a per
+   prefers-color-scheme) — no visual change for any page that already
+   fully covers the viewport with its own background. Trade-off: the brief
+   navy flash before hydration is gone; flag to the user if that's missed. */
 html {
-  background: #1C2056;
+  background: var(--background);
 }
 
 /* Desktop window shell: inset the scrollbar track from the rounded corners
@@ -341,6 +358,13 @@ html {
 :root {
   --nav-bg: #FFFFFF;
   --nav-surface-glass: rgba(20, 22, 42, 0.035);
+  /* Page-level "elevated" glass: same aurora-glass idea as --nav-surface-glass
+     but ~90% opaque instead of ~3.5%. .nav-glass's near-total transparency is
+     fine for thin nav chrome; dense page content (invoice tables, order
+     lists) needs to stay legible, so this trades most of the transparency
+     for readability while still letting blurred aurora color bleed through
+     at the edges via backdrop-filter. See .nav-surface-elevated below. */
+  --nav-surface-elevated: rgba(255, 255, 255, 0.9);
   --nav-accent: #5B4CE0;
   --nav-accent-ink: #FFFFFF;
   --nav-accent-soft: rgba(91, 76, 224, 0.12);
@@ -363,6 +387,7 @@ html {
   :root {
     --nav-bg: #0A0B17;
     --nav-surface-glass: rgba(255, 255, 255, 0.05);
+    --nav-surface-elevated: rgba(10, 11, 23, 0.88);
     --nav-accent: #7A6CF0;
     --nav-accent-ink: #14162A;
     --nav-accent-soft: rgba(122, 108, 240, 0.22);
@@ -392,6 +417,7 @@ html {
 [data-theme="dark"] {
   --nav-bg: #0A0B17;
   --nav-surface-glass: rgba(255, 255, 255, 0.05);
+  --nav-surface-elevated: rgba(10, 11, 23, 0.88);
   --nav-accent: #7A6CF0;
   --nav-accent-ink: #14162A;
   --nav-accent-soft: rgba(122, 108, 240, 0.22);
@@ -419,6 +445,7 @@ html {
 [data-theme="light"] {
   --nav-bg: #FFFFFF;
   --nav-surface-glass: rgba(20, 22, 42, 0.035);
+  --nav-surface-elevated: rgba(255, 255, 255, 0.9);
   --nav-accent: #5B4CE0;
   --nav-accent-ink: #FFFFFF;
   --nav-accent-soft: rgba(91, 76, 224, 0.12);
@@ -442,6 +469,54 @@ html {
   backdrop-filter: blur(24px) saturate(140%);
   -webkit-backdrop-filter: blur(24px) saturate(140%);
   border: 1px solid var(--nav-border-soft);
+}
+
+/* Page-level counterpart to .nav-glass — see --nav-surface-elevated above.
+   Used as the base background for the 14 unified-nav pages' outermost
+   wrapper (DesktopShell's card + the 9 standalone Kaspi Shop / AI-agent
+   pages) so the fixed NavAurora layer (src/components/NavAurora.tsx,
+   mounted in layout.tsx behind all page content) is genuinely visible
+   instead of being fully occluded by an opaque page background. */
+.nav-surface-elevated {
+  background: var(--nav-surface-elevated);
+  backdrop-filter: blur(28px) saturate(120%);
+  -webkit-backdrop-filter: blur(28px) saturate(120%);
+}
+
+/* Same treatment as .nav-surface-elevated, but scoped to the lg breakpoint
+   (matches Tailwind's default `lg:` = 1024px) — for DesktopShell's card,
+   whose background was previously only ever applied via `lg:bg-white`
+   (mobile got no background from this element at all). Kept desktop-only
+   so mobile layout/behavior is unchanged by this fix. */
+@media (min-width: 1024px) {
+  .desktop-shell-glass {
+    background: var(--nav-surface-elevated);
+    backdrop-filter: blur(28px) saturate(120%);
+    -webkit-backdrop-filter: blur(28px) saturate(120%);
+  }
+}
+
+/* The 5 DesktopShell-wrapped pages (dashboard/history/profile/invoice) each
+   render their own <main> as the direct child of DesktopShell's card. Below
+   lg, DesktopShell paints no background at all (mobile doesn't use the
+   floating-card chrome), so this <main> needs to carry the translucent
+   surface itself — same as .nav-surface-elevated. At lg and above,
+   DesktopShell's own .desktop-shell-glass card already provides that
+   translucent surface; if this <main> also painted one on top, the two
+   ~90%-opaque layers would compound to ~99% opaque and hide the aurora
+   again, so it goes fully transparent here and lets the shell's layer be
+   the only one doing the work. */
+.page-surface-in-shell {
+  background: var(--nav-surface-elevated);
+  backdrop-filter: blur(28px) saturate(120%);
+  -webkit-backdrop-filter: blur(28px) saturate(120%);
+}
+@media (min-width: 1024px) {
+  .page-surface-in-shell {
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
 }
 
 .nav-aurora {

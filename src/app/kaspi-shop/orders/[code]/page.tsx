@@ -59,7 +59,7 @@ export default function KaspiShopOrderDetail() {
   if (loading) return <LoadingSpinner />
 
   return (
-    <main className="min-h-screen bg-[#F6F6FB]">
+    <main className="nav-surface-elevated min-h-screen">
       <SiteNav />
 
       <div className="flex-1 min-w-0 p-4 lg:p-6 pb-24 lg:pb-6 max-w-2xl">

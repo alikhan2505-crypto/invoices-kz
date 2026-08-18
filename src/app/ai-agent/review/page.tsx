@@ -76,21 +76,21 @@ export default function AiAgentReview() {
   }
 
   if (loading) return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="nav-surface-elevated min-h-screen">
       <SiteNav />
       <div className="p-8 text-center text-gray-400">Загрузка…</div>
     </main>
   )
 
   if (forbidden) return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="nav-surface-elevated min-h-screen">
       <SiteNav />
       <div className="p-8 text-center text-gray-400 text-sm">Эта функция пока доступна только администраторам.</div>
     </main>
   )
 
   return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="nav-surface-elevated min-h-screen">
     <SiteNav />
     <div className="max-w-xl mx-auto p-6 pb-24">
       <Link href="/ai-agent/settings" className="text-xs text-gray-400 hover:text-gray-600 mb-2 inline-block">← Настройки агента</Link>

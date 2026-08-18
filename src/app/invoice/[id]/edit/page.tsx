@@ -137,7 +137,7 @@ export default function EditInvoice() {
 
   if (loading) return (
     <DesktopShell>
-    <main className="min-h-screen bg-gray-50 pb-8 lg:pb-6 lg:min-h-full">
+    <main className="page-surface-in-shell min-h-screen pb-8 lg:pb-6 lg:min-h-full">
       <SiteNav desktopOnly />
       <div className="sticky top-0 lg:top-16 z-10 bg-white border-b px-4 py-4 flex items-center gap-3 lg:h-16">
         <button onClick={() => router.push('/invoice/' + id)} className="back-btn text-gray-400 text-xl" aria-label={backLabel(lang)}>‹</button>
@@ -154,7 +154,7 @@ export default function EditInvoice() {
 
   return (
     <DesktopShell>
-    <main className="min-h-screen bg-gray-50 pb-8 lg:pb-6 lg:min-h-full">
+    <main className="page-surface-in-shell min-h-screen pb-8 lg:pb-6 lg:min-h-full">
       <SiteNav desktopOnly />
       <div className="sticky top-0 lg:top-16 z-10 bg-white border-b px-4 py-4 flex items-center gap-3 lg:h-16">
         <button onClick={() => router.push('/invoice/' + id)} className="back-btn text-gray-400 text-xl" aria-label={backLabel(lang)}>‹</button>

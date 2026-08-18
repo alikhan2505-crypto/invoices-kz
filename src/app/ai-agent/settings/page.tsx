@@ -118,14 +118,14 @@ export default function AiAgentSettings() {
   }
 
   if (loading) return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="nav-surface-elevated min-h-screen">
       <SiteNav />
       <div className="p-8 text-center text-gray-400">Загрузка…</div>
     </main>
   )
 
   if (forbidden) return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="nav-surface-elevated min-h-screen">
       <SiteNav />
       <div className="p-8 text-center text-gray-400 text-sm">Эта функция пока доступна только администраторам.</div>
     </main>
@@ -134,7 +134,7 @@ export default function AiAgentSettings() {
   const instagramConnection = connections.find(c => c.channel === 'instagram')
 
   return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="nav-surface-elevated min-h-screen">
     <SiteNav />
     <div className="max-w-xl mx-auto p-6 pb-24">
       <button onClick={() => router.push('/dashboard')} className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 mb-3">

@@ -312,7 +312,7 @@ export default function InvoicePage() {
 
   if (loading) return (
     <DesktopShell>
-    <main className="min-h-screen bg-gray-50 pb-8 lg:pb-6 lg:min-h-full">
+    <main className="page-surface-in-shell min-h-screen pb-8 lg:pb-6 lg:min-h-full">
       <SiteNav desktopOnly />
       <div className="sticky top-0 lg:top-16 z-30 bg-white border-b px-4 py-4 flex items-center gap-3 lg:h-16">
         <button onClick={() => router.push('/history')} className="back-btn text-gray-400 text-xl" aria-label={backLabel(lang)}>‹</button>
@@ -337,7 +337,7 @@ export default function InvoicePage() {
   )
 
   if (!invoice) return (
-    <main className="min-h-screen bg-gray-50 flex items-center justify-center">
+    <main className="page-surface-in-shell min-h-screen flex items-center justify-center">
       <p className="text-gray-400">{t.invoiceNotFoundLabel}</p>
     </main>
   )
@@ -412,7 +412,7 @@ export default function InvoicePage() {
 
   return (
     <DesktopShell>
-    <main className="min-h-screen bg-gray-50 pb-8 lg:pb-6 lg:min-h-full">
+    <main className="page-surface-in-shell min-h-screen pb-8 lg:pb-6 lg:min-h-full">
       <SiteNav desktopOnly />
       <div className="sticky top-0 lg:top-16 z-30 bg-white border-b px-4 py-4 flex items-center gap-3 lg:h-16">
         <button onClick={() => router.push('/history')} className="back-btn text-gray-400 text-xl" aria-label={backLabel(lang)}>‹</button>
