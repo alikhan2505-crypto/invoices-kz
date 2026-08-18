@@ -76,6 +76,28 @@ export async function debitWalletForCommission(userId: string, amount: number, k
   return data as number
 }
 
+// Generic unified-wallet debit for non-commission spend categories
+// (Kaspi Shop price checks, AI-agent replies). Same atomic RPC + loud
+// ledger-failure contract as debitWalletForCommission.
+export async function debitWallet(
+  userId: string,
+  amountTenge: number,
+  type: 'kaspi_shop_check' | 'ai_agent_reply',
+  note: string
+): Promise<number> {
+  const { data, error } = await supabase.rpc('debit_wallet_balance', { p_user_id: userId, p_amount: amountTenge })
+  if (error) throw new Error(`wallet debit (${type}) failed for user ${userId}: ${error.message}`)
+  const { error: ledgerError } = await supabase.from('wallet_ledger').insert({
+    user_id: userId,
+    type,
+    amount: -amountTenge,
+    balance_after: data,
+    note,
+  })
+  if (ledgerError) console.error(`wallet_ledger insert failed after ${type} debit for user`, userId, ':', ledgerError.message)
+  return data as number
+}
+
 export interface WalletTopupRow {
   id: string
   user_id: string
