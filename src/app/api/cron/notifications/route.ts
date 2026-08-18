@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
 import { sendTelegramNotification } from '@/lib/telegramNotify'
+import { createNotification } from '@/lib/notifications'
 import { addDaysToDateString, todayDateString } from '@/lib/dueDate'
 
 const supabase = createClient(
@@ -140,6 +141,36 @@ export async function GET(request: Request) {
     }
   }
 
+  // --- Daily in-app bell: unpaid invoices summary ---
+  // Replaces the permanent «N неоплаченных» pill that used to live in the
+  // SiteNav bar. Runs once per cron day; the previous day's summary row is
+  // deleted first so the bell always holds ONE current summary per user
+  // instead of a growing daily pile.
+  let unpaidBells = 0
+  {
+    const { data: unpaidRows } = await supabase
+      .from('invoices')
+      .select('user_id')
+      .in('status', ['sent', 'viewed', 'overdue'])
+    const unpaidByUser = new Map<string, number>()
+    for (const row of (unpaidRows || []) as { user_id: string }[]) {
+      unpaidByUser.set(row.user_id, (unpaidByUser.get(row.user_id) || 0) + 1)
+    }
+    for (const [userId, count] of unpaidByUser) {
+      await supabase.from('app_notifications').delete()
+        .eq('user_id', userId)
+        .eq('link', '/history')
+        .like('title', 'Неоплаченных счетов%')
+      await createNotification(
+        userId,
+        `Неоплаченных счетов: ${count}`,
+        'Откройте историю, чтобы посмотреть и напомнить клиентам об оплате.',
+        '/history'
+      )
+      unpaidBells++
+    }
+  }
+
   // --- Weekly report: Mondays only ---
   if (new Date().getUTCDay() === 1) {
     const { data: profiles } = await supabase
@@ -188,5 +219,5 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.json({ success: true, reminders, overdue, reports })
+  return NextResponse.json({ success: true, reminders, overdue, reports, unpaidBells })
 }
