@@ -166,7 +166,7 @@ export default function DashboardPage() {
           {/* Stat cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
             {statCards.map(card => (
-              <div key={card.label} className="nav-glass rounded-2xl p-4" style={{ boxShadow: 'var(--nav-card-glow)' }}>
+              <div key={card.label} className="nav-glass nav-card-accent rounded-2xl p-4" style={{ boxShadow: 'var(--nav-card-glow)' }}>
                 <div className="text-3xl font-bold tabular-nums" style={{ color: 'var(--nav-text-primary)', letterSpacing: '-0.02em' }}>
                   {loading ? (
                     <Skeleton className="h-8 w-16" />
@@ -182,7 +182,7 @@ export default function DashboardPage() {
           </div>
 
           {/* 30-day revenue chart */}
-          <div className="nav-glass rounded-2xl p-4 mb-4" style={{ boxShadow: 'var(--nav-card-glow)' }}>
+          <div className="nav-glass nav-card-accent rounded-2xl p-4 mb-4" style={{ boxShadow: 'var(--nav-card-glow)' }}>
             <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--nav-text-primary)' }}>Доход за 30 дней</h3>
             {loading ? (
               <Skeleton className="h-48 w-full" />
@@ -192,7 +192,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Recent invoices */}
-          <div className="nav-glass rounded-2xl overflow-hidden" style={{ boxShadow: 'var(--nav-card-glow)' }}>
+          <div className="nav-glass nav-card-accent rounded-2xl" style={{ boxShadow: 'var(--nav-card-glow)' }}>
             <div className="flex items-center justify-between px-4 pt-4 pb-1">
               <h3 className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>Последние счета</h3>
               <button onClick={() => router.push('/history')} className="text-xs font-medium" style={{ color: 'var(--nav-accent)' }}>

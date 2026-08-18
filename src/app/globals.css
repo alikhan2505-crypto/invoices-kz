@@ -365,7 +365,7 @@ html {
    OS-level dark media query rather than the [data-theme] toggle system,
    since SiteNav is new UI with no legacy light/dark expectation to match. */
 :root {
-  --nav-bg: #FFFFFF;
+  --nav-bg: #F5F6FB;
   --nav-surface-glass: rgba(20, 22, 42, 0.035);
   /* Page-level "elevated" glass: same aurora-glass idea as --nav-surface-glass
      but ~90% opaque instead of ~3.5%. .nav-glass's near-total transparency is
@@ -373,7 +373,7 @@ html {
      lists) needs to stay legible, so this trades most of the transparency
      for readability while still letting blurred aurora color bleed through
      at the edges via backdrop-filter. See .nav-surface-elevated below. */
-  --nav-surface-elevated: rgba(255, 255, 255, 0.9);
+  --nav-surface-elevated: rgba(245, 246, 251, 0.55);
   --nav-surface-chrome: #FFFFFF;
   --nav-accent: #5B4CE0;
   --nav-accent-ink: #FFFFFF;
@@ -458,9 +458,9 @@ html {
    @media (prefers-color-scheme: dark) block otherwise wins by source order
    when no more-specific [data-theme="light"] rule exists to override it. */
 [data-theme="light"] {
-  --nav-bg: #FFFFFF;
+  --nav-bg: #F5F6FB;
   --nav-surface-glass: rgba(20, 22, 42, 0.035);
-  --nav-surface-elevated: rgba(255, 255, 255, 0.9);
+  --nav-surface-elevated: rgba(245, 246, 251, 0.55);
   --nav-surface-chrome: #FFFFFF;
   --nav-accent: #5B4CE0;
   --nav-accent-ink: #FFFFFF;
@@ -540,6 +540,23 @@ html {
   }
 }
 
+/* Signature card treatment from the approved Focus artifact: a 3px
+   accent->teal gradient bar along the top edge of major cards
+   (.prod-card/.analytics-card::before in the reference source). */
+.nav-card-accent {
+  position: relative;
+  overflow: hidden;
+}
+.nav-card-accent::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--nav-accent), var(--nav-teal));
+}
+
 .nav-aurora {
   position: fixed;
   inset: 0;
@@ -551,18 +568,26 @@ html {
   position: absolute;
   border-radius: 50%;
   filter: blur(90px);
-  opacity: 0.16;
+  /* Reference (Focus artifact) shows blobs at 0.16 directly on the ground;
+     in the app they sit BEHIND the ~55%-opaque page surface, which roughly
+     halves their visible strength -- 0.3 here lands at ~0.14 effective,
+     matching the reference. */
+  opacity: 0.3;
   will-change: transform;
 }
 @media (prefers-color-scheme: dark) {
   .nav-blob { opacity: 0.24; }
 }
+[data-theme="dark"] .nav-blob { opacity: 0.24; }
+[data-theme="light"] .nav-blob { opacity: 0.3; }
 .nav-blob--a { width: 540px; height: 540px; left: -140px; top: -160px; background: var(--nav-accent); animation: nav-drift1 26s ease-in-out infinite alternate; }
 .nav-blob--b { width: 470px; height: 470px; right: -140px; top: 5%; background: var(--nav-teal); animation: nav-drift2 32s ease-in-out infinite alternate; }
-.nav-blob--c { width: 320px; height: 320px; left: 25%; bottom: -170px; background: var(--nav-magenta); opacity: 0.10; animation: nav-drift3 29s ease-in-out infinite alternate; }
+.nav-blob--c { width: 320px; height: 320px; left: 25%; bottom: -170px; background: var(--nav-magenta); opacity: 0.18; animation: nav-drift3 29s ease-in-out infinite alternate; }
 @media (prefers-color-scheme: dark) {
   .nav-blob--c { opacity: 0.14; }
 }
+[data-theme="dark"] .nav-blob--c { opacity: 0.14; }
+[data-theme="light"] .nav-blob--c { opacity: 0.18; }
 @keyframes nav-drift1 { from { transform: translate(0,0) scale(1); } to { transform: translate(50px, 40px) scale(1.08); } }
 @keyframes nav-drift2 { from { transform: translate(0,0) scale(1); } to { transform: translate(-40px, 50px) scale(1.05); } }
 @keyframes nav-drift3 { from { transform: translate(0,0) scale(1); } to { transform: translate(35px, -40px) scale(1.1); } }

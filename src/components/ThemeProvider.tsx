@@ -1,18 +1,19 @@
 'use client'
 import { createContext, useContext, useEffect, useState } from 'react'
 
-// Dark is the default theme (the approved aurora-glass design is dark-first;
-// light exists and is fully supported, but only for users who explicitly
-// choose it -- see toggle() below). Both the pre-effect initial state and
-// the localStorage fallback agree on 'dark' so there's no flash of the
-// wrong theme between first paint and this effect running.
-const ThemeContext = createContext({ theme: 'dark', toggle: () => {} })
+// Light is the default theme -- the approved reference design (the Focus
+// artifact) is the LIGHT version: soft #F5F6FB ground with pastel aurora
+// blobs and white cards. Dark exists as a fully supported alternative for
+// users who toggle it. (A brief dark-default experiment on 2026-08-19 was
+// reverted the same day once the founder confirmed the approved reference
+// is the light one.)
+const ThemeContext = createContext({ theme: 'light', toggle: () => {} })
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState('dark')
+  const [theme, setTheme] = useState('light')
 
   useEffect(() => {
-    const saved = localStorage.getItem('theme') || 'dark'
+    const saved = localStorage.getItem('theme') || 'light'
     setTheme(saved)
     document.documentElement.setAttribute('data-theme', saved)
   }, [])
