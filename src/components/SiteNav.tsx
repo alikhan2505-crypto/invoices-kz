@@ -32,6 +32,70 @@ const aiAgentLinks = [
   { href: '/ai-agent/settings', label: 'Настройки' },
 ]
 
+function isActiveSection(links: { href: string }[], path: string) {
+  return links.some(l => path === l.href || path.startsWith(l.href + '/'))
+}
+
+function Dropdown({
+  menuKey, label, links, dotColor, openMenu, setOpenMenu, router, path,
+}: {
+  menuKey: MenuKey
+  label: string
+  links: { href: string; label: string }[]
+  dotColor: string
+  openMenu: MenuKey | null
+  setOpenMenu: (key: MenuKey | null) => void
+  router: ReturnType<typeof useRouter>
+  path: string
+}) {
+  const active = isActiveSection(links, path)
+  const open = openMenu === menuKey
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); setOpenMenu(open ? null : menuKey) }}
+        aria-expanded={open}
+        className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-colors"
+        style={{
+          color: active ? 'var(--nav-text-primary)' : 'var(--nav-text-secondary)',
+          background: open ? 'var(--nav-surface-glass)' : 'transparent',
+          boxShadow: active ? `inset 0 -2px 0 var(--nav-accent)` : 'none',
+        }}
+      >
+        {label}
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s ease' }}>
+          <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+      {open && (
+        <div
+          className="nav-glass absolute top-[calc(100%+10px)] left-0 min-w-[210px] rounded-2xl p-1.5 z-20"
+          style={{ boxShadow: `0 20px 44px -18px rgba(10,10,15,0.3), var(--nav-card-glow)` }}
+        >
+          {links.map(l => {
+            const linkActive = path === l.href
+            return (
+              <button
+                key={l.href}
+                onClick={() => { setOpenMenu(null); router.push(l.href) }}
+                className="w-full text-left flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors"
+                style={{
+                  color: linkActive ? 'var(--nav-accent)' : 'var(--nav-text-secondary)',
+                  background: linkActive ? 'var(--nav-accent-soft)' : 'transparent',
+                }}
+              >
+                <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: linkActive ? dotColor : 'transparent' }} />
+                {l.label}
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean }) {
   const router = useRouter()
   const path = usePathname()
@@ -79,59 +143,6 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
       document.removeEventListener('keydown', onEscape)
     }
   }, [])
-
-  function isActiveSection(links: { href: string }[]) {
-    return links.some(l => path === l.href || path.startsWith(l.href + '/'))
-  }
-
-  function Dropdown({ menuKey, label, links, dotClass }: { menuKey: MenuKey; label: string; links: { href: string; label: string }[]; dotClass: string }) {
-    const active = isActiveSection(links)
-    const open = openMenu === menuKey
-    return (
-      <div className="relative">
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); setOpenMenu(open ? null : menuKey) }}
-          aria-expanded={open}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-colors"
-          style={{
-            color: active ? 'var(--nav-text-primary)' : 'var(--nav-text-secondary)',
-            background: open ? 'var(--nav-surface-glass)' : 'transparent',
-            boxShadow: active ? `inset 0 -2px 0 var(--nav-accent)` : 'none',
-          }}
-        >
-          {label}
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s ease' }}>
-            <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </button>
-        {open && (
-          <div
-            className="nav-glass absolute top-[calc(100%+10px)] left-0 min-w-[210px] rounded-2xl p-1.5 z-20"
-            style={{ boxShadow: `0 20px 44px -18px rgba(10,10,15,0.3), var(--nav-card-glow)` }}
-          >
-            {links.map(l => {
-              const linkActive = path === l.href
-              return (
-                <button
-                  key={l.href}
-                  onClick={() => { setOpenMenu(null); router.push(l.href) }}
-                  className="w-full text-left flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors"
-                  style={{
-                    color: linkActive ? 'var(--nav-accent)' : 'var(--nav-text-secondary)',
-                    background: linkActive ? 'var(--nav-accent-soft)' : 'transparent',
-                  }}
-                >
-                  <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: linkActive ? dotClass : 'transparent' }} />
-                  {l.label}
-                </button>
-              )
-            })}
-          </div>
-        )}
-      </div>
-    )
-  }
 
   return (
     <>
@@ -193,17 +204,17 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
           {labels[lang].home}
         </button>
 
-        <Dropdown menuKey="invoices" label={labels[lang].invoices} links={invoicesLinks} dotClass="var(--nav-accent)" />
-        {isAdmin && <Dropdown menuKey="kaspiShop" label={labels[lang].kaspiShop} links={kaspiShopLinks} dotClass="var(--nav-teal)" />}
-        {isAdmin && <Dropdown menuKey="aiAgent" label={labels[lang].aiAgent} links={aiAgentLinks} dotClass="var(--nav-magenta)" />}
+        <Dropdown menuKey="invoices" label={labels[lang].invoices} links={invoicesLinks} dotColor="var(--nav-accent)" openMenu={openMenu} setOpenMenu={setOpenMenu} router={router} path={path} />
+        {isAdmin && <Dropdown menuKey="kaspiShop" label={labels[lang].kaspiShop} links={kaspiShopLinks} dotColor="var(--nav-teal)" openMenu={openMenu} setOpenMenu={setOpenMenu} router={router} path={path} />}
+        {isAdmin && <Dropdown menuKey="aiAgent" label={labels[lang].aiAgent} links={aiAgentLinks} dotColor="var(--nav-magenta)" openMenu={openMenu} setOpenMenu={setOpenMenu} router={router} path={path} />}
 
         {unpaid > 0 && (
           <button
             onClick={() => router.push('/history')}
             className="ml-2 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold"
-            style={{ background: 'var(--nav-magenta-soft)', color: 'var(--nav-magenta)' }}
+            style={{ background: 'rgba(239, 68, 68, 0.14)', color: '#ef4444' }}
           >
-            {unpaid} неоплачен{unpaid === 1 ? 'ный' : unpaid < 5 ? 'ных' : 'ных'}
+            {unpaid} неоплачен{unpaid === 1 ? 'ный' : 'ных'}
           </button>
         )}
 
