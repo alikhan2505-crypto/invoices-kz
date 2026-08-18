@@ -676,15 +676,10 @@ export default function DashboardPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE }}
           >
+            {/* Header button removed 2026-08-19 (founder) -- the full-width
+                «Создать счёт» under the recent-invoices list is the single
+                create entry point on this page now. */}
             <h2 className="text-xl font-bold" style={{ color: 'var(--nav-text-primary)' }}>Главная</h2>
-            <button
-              onClick={() => router.push('/create')}
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0"
-              style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)', boxShadow: '0 10px 24px -10px var(--nav-accent)' }}
-            >
-              <PlusIcon />
-              Создать счёт
-            </button>
           </motion.div>
 
           {/* Продукты платформы */}
@@ -714,6 +709,18 @@ export default function DashboardPage() {
                   <ProductCard
                     index={1}
                     reduceMotion={reduceMotion}
+                    icon={<ApiIcon />}
+                    colorVar="--nav-accent"
+                    softVar="--nav-accent-soft"
+                    title="Kaspi API"
+                    state="neutral"
+                    neutralText="Приём оплат Kaspi на вашем сайте"
+                    ctaLabel="Документация →"
+                    onClick={() => router.push('/profile/kaspi-pay/docs')}
+                  />
+                  <ProductCard
+                    index={2}
+                    reduceMotion={reduceMotion}
                     icon={<ShopIcon />}
                     colorVar="--nav-teal"
                     softVar="--nav-teal-soft"
@@ -723,7 +730,7 @@ export default function DashboardPage() {
                     onClick={isAdmin ? () => router.push('/kaspi-shop') : undefined}
                   />
                   <ProductCard
-                    index={2}
+                    index={3}
                     reduceMotion={reduceMotion}
                     icon={<AgentIcon />}
                     colorVar="--nav-magenta"
@@ -732,18 +739,6 @@ export default function DashboardPage() {
                     state={agentState}
                     neutralText="Диалоги появятся здесь"
                     onClick={isAdmin ? () => router.push('/ai-agent/settings') : undefined}
-                  />
-                  <ProductCard
-                    index={3}
-                    reduceMotion={reduceMotion}
-                    icon={<ApiIcon />}
-                    colorVar="--nav-accent"
-                    softVar="--nav-accent-soft"
-                    title="Kaspi API"
-                    state="neutral"
-                    neutralText="Приём оплат Kaspi на вашем сайте"
-                    ctaLabel="Документация →"
-                    onClick={() => router.push('/profile/kaspi-pay/docs')}
                   />
                 </>
               )}
@@ -863,7 +858,11 @@ export default function DashboardPage() {
           {/* Bottom section: recent invoices (narrower, left) + a new create-
               invoice button under it, and a two-block invoice analytics card
               (right). Right column stacks below the left one under lg. */}
-          <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-4 items-start">
+          {/* items-stretch (not items-start): the right analytics card runs
+              the full height of the left column, so its bottom edge lines up
+              with the «Создать счёт» button's bottom edge (founder request:
+              "аналитику подлить до нижнего края кнопки Создать"). */}
+          <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-4 lg:items-stretch">
             {/* Left: Recent invoices + Create button */}
             <div className="flex flex-col gap-4">
               <motion.div
@@ -959,7 +958,7 @@ export default function DashboardPage() {
                 and the `services` JSONB column both come back from the
                 existing select('*', ...) in load()). */}
             <motion.div
-              className={`nav-glass nav-card-accent rounded-2xl p-4 ${CARD_HOVER}`}
+              className={`nav-glass nav-card-accent rounded-2xl p-4 lg:h-full ${CARD_HOVER}`}
               initial={reduceMotion ? false : { opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.3 }}

@@ -157,7 +157,6 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
   const path = usePathname()
   const { lang } = useLanguage()
   const [isAdmin, setIsAdmin] = useState(false)
-  const [logoUrl, setLogoUrl] = useState<string | null>(null)
   const [openMenu, setOpenMenu] = useState<MenuKey | null>(null)
   const [lockedHint, setLockedHint] = useState<string | null>(null)
   const navRef = useRef<HTMLElement>(null)
@@ -179,9 +178,8 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
     async function loadAdmin() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
-      const { data } = await supabase.from('profiles').select('logo_url, is_admin').eq('id', user.id).single()
+      const { data } = await supabase.from('profiles').select('is_admin').eq('id', user.id).single()
       setIsAdmin(!!data?.is_admin)
-      setLogoUrl(data?.logo_url || null)
     }
     loadAdmin()
   }, [])
@@ -265,22 +263,18 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
         className="hidden lg:flex items-center gap-1 sticky top-0 z-30 px-7 py-3.5 nav-glass"
         style={{ borderLeft: 'none', borderRight: 'none', borderTop: 'none' }}
       >
+        {/* Always the invoices.kz brand mark here (2026-08-19, founder:
+            "тут надо поставить лого invoices.kz") -- the user's uploaded
+            company logo used to render in this slot, which read as the
+            wrong identity for the platform's own nav. /icon.svg is the
+            same IK mark used for the favicon/PWA icons. */}
         <button onClick={() => router.push('/dashboard')} className="flex items-center gap-2 mr-5 flex-shrink-0">
-          {logoUrl ? (
-            <img
-              src={logoUrl}
-              alt=""
-              className="w-6 h-6 rounded-lg object-contain bg-white"
-              style={{ boxShadow: '0 6px 14px -6px var(--nav-accent)' }}
-            />
-          ) : (
-            <span
-              className="w-6 h-6 rounded-lg flex items-center justify-center text-white font-extrabold text-[10px]"
-              style={{ background: `linear-gradient(135deg, var(--nav-accent), var(--nav-teal))`, boxShadow: '0 6px 14px -6px var(--nav-accent)' }}
-            >
-              IK
-            </span>
-          )}
+          <img
+            src="/icon.svg"
+            alt=""
+            className="w-6 h-6 rounded-lg"
+            style={{ boxShadow: '0 6px 14px -6px var(--nav-accent)' }}
+          />
           <span className="font-semibold text-sm" style={{ color: 'var(--nav-text-primary)', letterSpacing: '-0.02em' }}>invoices.kz</span>
         </button>
 
