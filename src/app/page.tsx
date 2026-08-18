@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useRef, useState, type ComponentType } from 'react'
+import { Component, useEffect, useRef, useState, type ComponentType, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import { motion, useInView, useReducedMotion } from 'framer-motion'
 import { useLanguage, type Lang } from '@/components/LanguageProvider'
 
@@ -13,6 +14,12 @@ const COLOR = {
   magenta: '#CE4C86',
   ground: '#0a0d1f',
 }
+
+// Shared with the standalone HeroMockupCard below (it has no access to
+// Home()'s local `surface`/`border` consts since it doubles as the
+// Spline 3D block's lazy-load/error fallback, defined at module scope).
+const SURFACE = 'rgba(20,23,46,0.86)'
+const BORDER = 'rgba(255,255,255,0.12)'
 
 const ICON_PROPS = {
   viewBox: '0 0 24 24',
@@ -217,6 +224,8 @@ interface Copy {
   heroPrimaryCta: string
   heroSecondaryCta: string
   heroNote: string
+  heroChip1: string
+  heroChip2: string
   stats: { value: number; suffix: string; label: string }[]
   mock: { url: string; number: string; client: string; service: string; vat: string; total: string; paid: string }
   stepsEyebrow: string
@@ -253,6 +262,8 @@ const COPY: Record<Lang, Copy> = {
     heroPrimaryCta: 'Начать бесплатно',
     heroSecondaryCta: 'Как это работает',
     heroNote: '7 дней Pro бесплатно при регистрации · Без карты',
+    heroChip1: 'Счёт оплачен · 12 000 ₸',
+    heroChip2: '2% комиссия',
     stats: [
       { value: 1, suffix: ' минута', label: 'от создания до отправки счёта' },
       { value: 2, suffix: '%', label: 'комиссия — только с оплаченных через Kaspi счетов' },
@@ -321,6 +332,8 @@ const COPY: Record<Lang, Copy> = {
     heroPrimaryCta: 'Тегін бастау',
     heroSecondaryCta: 'Бұл қалай жұмыс істейді',
     heroNote: 'Тіркелгенде 7 күн Pro тегін · Карта қажет емес',
+    heroChip1: 'Шот төленді · 12 000 ₸',
+    heroChip2: '2% комиссия',
     stats: [
       { value: 1, suffix: ' минут', label: 'шот жасаудан жіберуге дейін' },
       { value: 2, suffix: '%', label: 'тек Kaspi арқылы төленген шоттан алынатын комиссия' },
@@ -389,6 +402,8 @@ const COPY: Record<Lang, Copy> = {
     heroPrimaryCta: 'Start for free',
     heroSecondaryCta: 'How it works',
     heroNote: '7 days of Pro free on signup · No card required',
+    heroChip1: 'Invoice paid · ₸12,000',
+    heroChip2: '2% fee',
     stats: [
       { value: 1, suffix: ' minute', label: 'from creating to sending an invoice' },
       { value: 2, suffix: '%', label: 'fee — only on invoices actually paid via Kaspi' },
@@ -510,6 +525,126 @@ function CountUp({ value, suffix, reduce }: { value: number; suffix: string; red
   )
 }
 
+/* The invoice/Kaspi mockup card that used to be the hero's only visual. It
+   now also does double duty as the lazy-loaded 3D scene's loading and
+   error fallback (see Spline3D/SplineErrorBoundary below), so it's a
+   standalone component that fetches its own copy via useLanguage() rather
+   than a prop, since next/dynamic's `loading` option and a class-based
+   error boundary can't easily be handed Home()'s local `t`. */
+function HeroMockupCard() {
+  const { lang } = useLanguage()
+  const t = COPY[lang].mock
+  const reduce = useReducedMotion()
+
+  return (
+    <motion.div
+      initial={reduce ? false : { opacity: 0, y: 30, scale: 0.97 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: reduce ? 0 : 0.7, ease: EASE }}
+      className="relative mx-auto w-full max-w-md"
+    >
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -inset-16 rounded-full"
+        style={{ background: `radial-gradient(closest-side, ${COLOR.violet}33, transparent 72%)`, filter: 'blur(30px)' }}
+      />
+      <motion.div
+        animate={reduce ? undefined : { y: [0, -10, 0] }}
+        transition={reduce ? undefined : { duration: 6, repeat: Infinity, ease: 'easeInOut' }}
+        className="relative overflow-hidden rounded-3xl text-left"
+        style={{ background: SURFACE, border: `1px solid ${BORDER}`, boxShadow: '0 40px 80px rgba(0,0,0,0.55)' }}
+      >
+        <div className="flex items-center gap-2 px-5 py-3" style={{ borderBottom: `1px solid ${BORDER}` }}>
+          <span className="h-2.5 w-2.5 rounded-full" style={{ background: COLOR.magenta, opacity: 0.7 }} />
+          <span className="h-2.5 w-2.5 rounded-full" style={{ background: COLOR.violet, opacity: 0.7 }} />
+          <span className="h-2.5 w-2.5 rounded-full" style={{ background: COLOR.teal, opacity: 0.7 }} />
+          <span className="ml-2 truncate text-[11px]" style={{ color: 'rgba(255,255,255,0.4)' }}>
+            {t.url}
+          </span>
+        </div>
+        <div className="p-5">
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="text-[11px]" style={{ color: 'rgba(255,255,255,0.4)' }}>{t.number}</div>
+              <div className="mt-0.5 text-[16px] font-semibold">{t.client}</div>
+            </div>
+            <span className="rounded-lg px-2.5 py-1 text-[10px] font-bold text-white" style={{ background: COLOR.teal }}>
+              {t.paid}
+            </span>
+          </div>
+          <div className="mt-4 space-y-2 text-[12px]" style={{ color: 'rgba(255,255,255,0.55)' }}>
+            <div className="flex justify-between">
+              <span>{t.service}</span>
+              <span>150 000 ₸</span>
+            </div>
+            <div className="flex justify-between">
+              <span>{t.vat}</span>
+              <span>18 000 ₸</span>
+            </div>
+          </div>
+          <div className="mt-4 flex items-center justify-between border-t pt-4" style={{ borderColor: BORDER }}>
+            <span className="text-[12px]" style={{ color: 'rgba(255,255,255,0.5)' }}>{t.total}</span>
+            <span className="text-[20px] font-bold" style={{ color: COLOR.teal }}>168 000 ₸</span>
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  )
+}
+
+/* Desktop-only interactive 3D hero visual — vendored from 21st.dev
+   (component `splite` by serafimcloud, fetched via the 21st MCP:
+   mcp__21st__search + mcp__21st__get_component, source at
+   src/components/ui/splite.tsx). Loaded through next/dynamic with
+   ssr:false so the ~1MB @splinetool/react-spline runtime never touches
+   the server render or ships in the initial bundle; `loading` reuses the
+   same mockup card so there's no layout jump while the chunk fetches.
+   Defined at module scope (not inside Home()) so it isn't re-created,
+   and thus re-fetched, on every render. */
+const Spline3D = dynamic(() => import('@/components/ui/splite').then((mod) => mod.SplineScene), {
+  ssr: false,
+  loading: () => <HeroMockupCard />,
+})
+
+/* React error boundaries are the only way to catch a failed lazy chunk
+   (e.g. the Spline CDN or our own JS chunk failing to fetch) — Suspense's
+   `loading` only covers the pending state, not a rejected one. Falls back
+   to the same mockup card rather than leaving the hero blank. */
+class SplineErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  constructor(props: { children: ReactNode }) {
+    super(props)
+    this.state = { hasError: false }
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true }
+  }
+  componentDidCatch(error: unknown) {
+    console.error('[hero-3d] Spline scene failed to load, showing fallback', error)
+  }
+  render() {
+    if (this.state.hasError) return <HeroMockupCard />
+    return this.props.children
+  }
+}
+
+/* Gates the 3D scene to lg+ viewports client-side, on purpose: this is
+   what actually stops the ~1MB @splinetool/react-spline chunk and the
+   Spline scene request from ever being fetched on phones, not the `lg:`
+   CSS class alone (a CSS-hidden element still mounts and fetches). Starts
+   false so SSR/first client render agree (no hydration mismatch) and the
+   3D block only mounts after this flips true post-hydration. */
+function useIsDesktop(breakpoint = 1024) {
+  const [isDesktop, setIsDesktop] = useState(false)
+  useEffect(() => {
+    const mq = window.matchMedia(`(min-width: ${breakpoint}px)`)
+    setIsDesktop(mq.matches)
+    const onChange = (e: MediaQueryListEvent) => setIsDesktop(e.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [breakpoint])
+  return isDesktop
+}
+
 /* ----------------------------------------------------------------- page */
 
 export default function Home() {
@@ -518,6 +653,7 @@ export default function Home() {
   const t = COPY[lang]
   const reduce = useReducedMotion()
   const [scrolled, setScrolled] = useState(false)
+  const isDesktop = useIsDesktop()
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24)
@@ -529,8 +665,8 @@ export default function Home() {
   const goLogin = () => router.push('/login')
   const scrollToSteps = () => document.getElementById('how')?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth' })
 
-  const surface = 'rgba(20,23,46,0.86)'
-  const border = 'rgba(255,255,255,0.12)'
+  const surface = SURFACE
+  const border = BORDER
 
   return (
     <div
@@ -582,133 +718,124 @@ export default function Home() {
       <section className="relative overflow-hidden pt-32 pb-20 sm:pt-40 sm:pb-28">
         <AmbientBlobs reduce={!!reduce} />
 
-        <div className="relative z-10 mx-auto flex max-w-6xl flex-col items-center px-5 text-center sm:px-8">
-          <motion.div
-            initial={reduce ? false : { opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: reduce ? 0 : 0.5, ease: EASE }}
-            className="mb-7 inline-flex items-center gap-2 rounded-full px-4 py-2 text-[12px] font-semibold"
-            style={{ background: surface, border: `1px solid ${border}`, color: 'rgba(255,255,255,0.85)' }}
-          >
-            <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: COLOR.teal }} />
-            {t.heroBadge}
-          </motion.div>
+        <div className="relative z-10 mx-auto max-w-6xl px-5 sm:px-8">
+          <div className="flex flex-col items-center text-center lg:flex-row lg:items-center lg:gap-14 lg:text-left">
+            <div className="flex w-full flex-col items-center lg:w-1/2 lg:items-start">
+              <motion.div
+                initial={reduce ? false : { opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: reduce ? 0 : 0.5, ease: EASE }}
+                className="mb-7 inline-flex items-center gap-2 rounded-full px-4 py-2 text-[12px] font-semibold"
+                style={{ background: surface, border: `1px solid ${border}`, color: 'rgba(255,255,255,0.85)' }}
+              >
+                <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: COLOR.teal }} />
+                {t.heroBadge}
+              </motion.div>
 
-          <motion.h1
-            initial={reduce ? false : { opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: reduce ? 0 : 0.6, ease: EASE, delay: reduce ? 0 : 0.06 }}
-            className="text-[clamp(2.4rem,7vw,4.6rem)] font-bold leading-[1.02] tracking-[-0.03em]"
-          >
-            {t.heroTitleLine1}
-            <br />
-            <span
-              style={{
-                background: `linear-gradient(120deg, ${COLOR.violet}, ${COLOR.teal})`,
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text',
-              }}
-            >
-              {t.heroTitleLine2}
-            </span>
-          </motion.h1>
-
-          <motion.p
-            initial={reduce ? false : { opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: reduce ? 0 : 0.6, ease: EASE, delay: reduce ? 0 : 0.14 }}
-            className="mt-6 max-w-xl text-[16px] leading-relaxed"
-            style={{ color: 'rgba(255,255,255,0.64)' }}
-          >
-            {t.heroSubtitle}
-          </motion.p>
-
-          <motion.div
-            initial={reduce ? false : { opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: reduce ? 0 : 0.6, ease: EASE, delay: reduce ? 0 : 0.2 }}
-            className="mt-9 flex flex-wrap items-center justify-center gap-3"
-          >
-            <button
-              onClick={goLogin}
-              className="motion-safe:transition-all motion-safe:duration-200 motion-safe:hover:-translate-y-0.5 motion-safe:active:scale-[0.97] flex items-center gap-2 rounded-2xl px-7 py-3.5 text-[15px] font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-              style={{ background: COLOR.violet, boxShadow: `0 14px 34px -12px ${COLOR.violet}` }}
-            >
-              {t.heroPrimaryCta}
-              <ArrowRightIcon className="h-4 w-4" />
-            </button>
-            <button
-              onClick={scrollToSteps}
-              className="motion-safe:transition-all motion-safe:duration-200 motion-safe:hover:-translate-y-0.5 motion-safe:active:scale-[0.97] rounded-2xl px-7 py-3.5 text-[15px] font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-              style={{ background: surface, border: `1px solid ${border}`, color: 'rgba(255,255,255,0.85)' }}
-            >
-              {t.heroSecondaryCta}
-            </button>
-          </motion.div>
-          <motion.p
-            initial={reduce ? false : { opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: reduce ? 0 : 0.6, ease: EASE, delay: reduce ? 0 : 0.28 }}
-            className="mt-4 text-[12px]"
-            style={{ color: 'rgba(255,255,255,0.4)' }}
-          >
-            {t.heroNote}
-          </motion.p>
-
-          {/* mockup */}
-          <motion.div
-            initial={reduce ? false : { opacity: 0, y: 30, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ duration: reduce ? 0 : 0.7, ease: EASE, delay: reduce ? 0 : 0.34 }}
-            className="relative mx-auto mt-16 w-full max-w-md"
-          >
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute -inset-16 rounded-full"
-              style={{ background: `radial-gradient(closest-side, ${COLOR.violet}33, transparent 72%)`, filter: 'blur(30px)' }}
-            />
-            <motion.div
-              animate={reduce ? undefined : { y: [0, -10, 0] }}
-              transition={reduce ? undefined : { duration: 6, repeat: Infinity, ease: 'easeInOut' }}
-              className="relative overflow-hidden rounded-3xl text-left"
-              style={{ background: surface, border: `1px solid ${border}`, boxShadow: '0 40px 80px rgba(0,0,0,0.55)' }}
-            >
-              <div className="flex items-center gap-2 px-5 py-3" style={{ borderBottom: `1px solid ${border}` }}>
-                <span className="h-2.5 w-2.5 rounded-full" style={{ background: COLOR.magenta, opacity: 0.7 }} />
-                <span className="h-2.5 w-2.5 rounded-full" style={{ background: COLOR.violet, opacity: 0.7 }} />
-                <span className="h-2.5 w-2.5 rounded-full" style={{ background: COLOR.teal, opacity: 0.7 }} />
-                <span className="ml-2 truncate text-[11px]" style={{ color: 'rgba(255,255,255,0.4)' }}>
-                  {t.mock.url}
+              <motion.h1
+                initial={reduce ? false : { opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: reduce ? 0 : 0.6, ease: EASE, delay: reduce ? 0 : 0.06 }}
+                className="text-[clamp(2.4rem,7vw,4.6rem)] font-bold leading-[1.02] tracking-[-0.03em]"
+              >
+                {t.heroTitleLine1}
+                <br />
+                <span
+                  style={{
+                    background: `linear-gradient(120deg, ${COLOR.violet}, ${COLOR.teal})`,
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    backgroundClip: 'text',
+                  }}
+                >
+                  {t.heroTitleLine2}
                 </span>
+              </motion.h1>
+
+              <motion.p
+                initial={reduce ? false : { opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: reduce ? 0 : 0.6, ease: EASE, delay: reduce ? 0 : 0.14 }}
+                className="mt-6 max-w-xl text-[16px] leading-relaxed"
+                style={{ color: 'rgba(255,255,255,0.64)' }}
+              >
+                {t.heroSubtitle}
+              </motion.p>
+
+              <motion.div
+                initial={reduce ? false : { opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: reduce ? 0 : 0.6, ease: EASE, delay: reduce ? 0 : 0.2 }}
+                className="mt-9 flex flex-wrap items-center justify-center gap-3 lg:justify-start"
+              >
+                <button
+                  onClick={goLogin}
+                  className="motion-safe:transition-all motion-safe:duration-200 motion-safe:hover:-translate-y-0.5 motion-safe:active:scale-[0.97] flex items-center gap-2 rounded-2xl px-7 py-3.5 text-[15px] font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                  style={{ background: COLOR.violet, boxShadow: `0 14px 34px -12px ${COLOR.violet}` }}
+                >
+                  {t.heroPrimaryCta}
+                  <ArrowRightIcon className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={scrollToSteps}
+                  className="motion-safe:transition-all motion-safe:duration-200 motion-safe:hover:-translate-y-0.5 motion-safe:active:scale-[0.97] rounded-2xl px-7 py-3.5 text-[15px] font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                  style={{ background: surface, border: `1px solid ${border}`, color: 'rgba(255,255,255,0.85)' }}
+                >
+                  {t.heroSecondaryCta}
+                </button>
+              </motion.div>
+              <motion.p
+                initial={reduce ? false : { opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: reduce ? 0 : 0.6, ease: EASE, delay: reduce ? 0 : 0.28 }}
+                className="mt-4 text-[12px]"
+                style={{ color: 'rgba(255,255,255,0.4)' }}
+              >
+                {t.heroNote}
+              </motion.p>
+            </div>
+
+            {/* Interactive 3D scene — desktop only (lg+), gated client-side
+                by isDesktop so nothing Spline-related ever loads on phones.
+                Falls back to the invoice mockup card while the chunk loads
+                or if it errors (see Spline3D/SplineErrorBoundary). */}
+            {isDesktop && (
+              <div className="relative h-[420px] w-full shrink-0 lg:h-[480px] lg:w-1/2">
+                <SplineErrorBoundary>
+                  <Spline3D scene="https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode" className="h-full w-full" />
+                </SplineErrorBoundary>
+
+                {/* real-data chips, tying the demo scene back to the product */}
+                <motion.div
+                  initial={reduce ? false : { opacity: 0, y: -10 }}
+                  animate={reduce ? { opacity: 1, y: 0 } : { opacity: 1, y: [0, -8, 0] }}
+                  transition={reduce ? { duration: 0 } : { opacity: { duration: 0.5, delay: 0.6 }, y: { duration: 5, repeat: Infinity, ease: 'easeInOut', delay: 0.6 } }}
+                  className="pointer-events-none absolute left-2 top-8 flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-[12.5px] font-semibold"
+                  style={{ background: surface, border: `1px solid ${border}`, color: 'rgba(255,255,255,0.9)' }}
+                >
+                  <span className="inline-block h-2 w-2 rounded-full" style={{ background: COLOR.teal }} />
+                  {t.heroChip1}
+                </motion.div>
+                <motion.div
+                  initial={reduce ? false : { opacity: 0, y: 10 }}
+                  animate={reduce ? { opacity: 1, y: 0 } : { opacity: 1, y: [0, 8, 0] }}
+                  transition={reduce ? { duration: 0 } : { opacity: { duration: 0.5, delay: 0.8 }, y: { duration: 6, repeat: Infinity, ease: 'easeInOut', delay: 0.8 } }}
+                  className="pointer-events-none absolute bottom-10 right-2 flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-[12.5px] font-semibold"
+                  style={{ background: surface, border: `1px solid ${border}`, color: 'rgba(255,255,255,0.9)' }}
+                >
+                  <span className="inline-block h-2 w-2 rounded-full" style={{ background: COLOR.violet }} />
+                  {t.heroChip2}
+                </motion.div>
               </div>
-              <div className="p-5">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="text-[11px]" style={{ color: 'rgba(255,255,255,0.4)' }}>{t.mock.number}</div>
-                    <div className="mt-0.5 text-[16px] font-semibold">{t.mock.client}</div>
-                  </div>
-                  <span className="rounded-lg px-2.5 py-1 text-[10px] font-bold text-white" style={{ background: COLOR.teal }}>
-                    {t.mock.paid}
-                  </span>
-                </div>
-                <div className="mt-4 space-y-2 text-[12px]" style={{ color: 'rgba(255,255,255,0.55)' }}>
-                  <div className="flex justify-between">
-                    <span>{t.mock.service}</span>
-                    <span>150 000 ₸</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>{t.mock.vat}</span>
-                    <span>18 000 ₸</span>
-                  </div>
-                </div>
-                <div className="mt-4 flex items-center justify-between border-t pt-4" style={{ borderColor: border }}>
-                  <span className="text-[12px]" style={{ color: 'rgba(255,255,255,0.5)' }}>{t.mock.total}</span>
-                  <span className="text-[20px] font-bold" style={{ color: COLOR.teal }}>168 000 ₸</span>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
+            )}
+          </div>
+
+          {/* mockup — mobile/tablet hero visual; on lg+ the 3D scene above
+              takes over (this card only reappears there as its load/error
+              fallback) */}
+          <div className="mt-16 lg:hidden">
+            <HeroMockupCard />
+          </div>
         </div>
       </section>
 
