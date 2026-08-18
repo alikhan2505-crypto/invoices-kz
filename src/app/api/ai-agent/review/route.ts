@@ -23,9 +23,21 @@ async function requireUser(req: NextRequest) {
   return user
 }
 
+// AI-агент is admin-only for now (founder decision, not yet a public plan
+// perk) -- same requireAdmin shape as src/app/api/kaspi/admin-stats/route.ts
+// and src/app/api/kaspi-shop/niches/{request,result}/route.ts, kept as a
+// separate check after requireUser (rather than folded into one function)
+// so a logged-out caller still gets 401 Unauthorized and only a logged-in
+// non-admin gets the distinct 403 admin_only body.
+async function isAdmin(userId: string): Promise<boolean> {
+  const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', userId).single()
+  return !!profile?.is_admin
+}
+
 export async function GET(req: NextRequest) {
   const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!(await isAdmin(user.id))) return NextResponse.json({ error: 'admin_only' }, { status: 403 })
 
   const { data: agent } = await supabase.from('ai_agents').select('id').eq('user_id', user.id).maybeSingle()
   if (!agent) return NextResponse.json({ items: [] })
@@ -65,6 +77,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!(await isAdmin(user.id))) return NextResponse.json({ error: 'admin_only' }, { status: 403 })
 
   const { messageId, action, editedText } = await req.json()
   if (!messageId || !['send', 'skip'].includes(action)) {

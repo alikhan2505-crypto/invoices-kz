@@ -20,6 +20,7 @@ export default function AiAgentReview() {
   const [edits, setEdits] = useState<Record<string, string>>({})
   const [acting, setActing] = useState<string | null>(null)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [forbidden, setForbidden] = useState(false)
 
   async function authHeader() {
     const { data: { session } } = await supabase.auth.getSession()
@@ -29,6 +30,14 @@ export default function AiAgentReview() {
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
+    // AI-агент is admin-only for now -- same client-side is_admin check this
+    // codebase already uses on /admin and every kaspi-shop/* page. The real
+    // enforcement is server-side (the API routes below now 403 admin_only
+    // for non-admins); this just swaps their redirect-to-/dashboard for an
+    // inline message, since a redirect can misfire on a legitimate admin
+    // session that hasn't finished loading yet.
+    const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', user.id).single()
+    if (!profile?.is_admin) { setForbidden(true); setLoading(false); return }
     const headers = await authHeader()
     const res = await fetch('/api/ai-agent/review', { headers })
     if (res.ok) {
@@ -70,6 +79,13 @@ export default function AiAgentReview() {
     <main className="min-h-screen bg-gray-50">
       <SiteNav />
       <div className="p-8 text-center text-gray-400">Загрузка…</div>
+    </main>
+  )
+
+  if (forbidden) return (
+    <main className="min-h-screen bg-gray-50">
+      <SiteNav />
+      <div className="p-8 text-center text-gray-400 text-sm">Эта функция пока доступна только администраторам.</div>
     </main>
   )
 
