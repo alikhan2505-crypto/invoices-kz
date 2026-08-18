@@ -30,13 +30,18 @@ body {
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
 
+/* Lightened 2026-08-19 (founder: "границ не видно и все сливается") --
+   card/ground separation now comes from a real lightness step, not just
+   the border; border itself bumped for legibility. These legacy tokens
+   drive every not-yet-redesigned page's dark look via the .bg-white /
+   .border-gray-* overrides below. */
 [data-theme="dark"] {
-  --bg: #0f1117;
-  --bg-card: #1a1d27;
-  --bg-hover: #222536;
+  --bg: #12141f;
+  --bg-card: #1e2233;
+  --bg-hover: #293049;
   --text-primary: #ffffff;
   --text-secondary: #a0aec0;
-  --border: #2d3148;
+  --border: #3b4060;
   --accent: #1C2056;
 }
 
@@ -396,10 +401,10 @@ html {
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --nav-bg: #0A0B17;
+    --nav-bg: #0E1020;
     --nav-surface-glass: rgba(255, 255, 255, 0.05);
-    --nav-surface-elevated: rgba(10, 11, 23, 0.88);
-  --nav-surface-chrome: #0A0B17;
+    --nav-surface-elevated: rgba(20, 22, 40, 0.82);
+  --nav-surface-chrome: #171A2E;
     --nav-accent: #7A6CF0;
     --nav-accent-ink: #14162A;
     --nav-accent-soft: rgba(122, 108, 240, 0.22);
@@ -414,8 +419,8 @@ html {
     --nav-text-primary: #F2F3FA;
     --nav-text-secondary: #A6ACC9;
     --nav-text-muted: #6B7094;
-    --nav-border: rgba(255, 255, 255, 0.10);
-    --nav-border-soft: rgba(255, 255, 255, 0.07);
+    --nav-border: rgba(255, 255, 255, 0.14);
+    --nav-border-soft: rgba(255, 255, 255, 0.10);
     --nav-card-glow: 0 26px 60px -20px rgba(0, 0, 0, 0.55);
   }
 }
@@ -428,10 +433,10 @@ html {
    specificity as the :root media block above, so source order (this block
    comes after) lets the manual toggle win when both are in play. */
 [data-theme="dark"] {
-  --nav-bg: #0A0B17;
+  --nav-bg: #0E1020;
   --nav-surface-glass: rgba(255, 255, 255, 0.05);
-  --nav-surface-elevated: rgba(10, 11, 23, 0.88);
-  --nav-surface-chrome: #0A0B17;
+  --nav-surface-elevated: rgba(20, 22, 40, 0.82);
+  --nav-surface-chrome: #171A2E;
   --nav-accent: #7A6CF0;
   --nav-accent-ink: #14162A;
   --nav-accent-soft: rgba(122, 108, 240, 0.22);
@@ -446,8 +451,8 @@ html {
   --nav-text-primary: #F2F3FA;
   --nav-text-secondary: #A6ACC9;
   --nav-text-muted: #6B7094;
-  --nav-border: rgba(255, 255, 255, 0.10);
-  --nav-border-soft: rgba(255, 255, 255, 0.07);
+  --nav-border: rgba(255, 255, 255, 0.14);
+  --nav-border-soft: rgba(255, 255, 255, 0.10);
   --nav-card-glow: 0 26px 60px -20px rgba(0, 0, 0, 0.55);
 }
 
