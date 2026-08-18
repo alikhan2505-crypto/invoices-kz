@@ -8,15 +8,16 @@ import { useMediaQuery } from '@/lib/useMediaQuery'
 import { formatDateTime } from '@/lib/date'
 import Skeleton from '@/components/Skeleton'
 
-// Same status -> color/label mapping as src/app/history/page.tsx (kept in
-// sync manually since the original const there isn't exported).
-const statusColor: Record<string, string> = {
-  paid: 'bg-green-100 text-green-700',
-  sent: 'bg-blue-100 text-blue-700',
-  overdue: 'bg-red-100 text-red-700',
-  draft: 'bg-gray-100 text-gray-600',
-  viewed: 'bg-purple-100 text-purple-700',
-  cancelled: 'bg-gray-100 text-gray-500',
+// Flat solid-fill status badges (design spec: status chips are a solid
+// color + white text, not a soft translucent tint) -- history/page.tsx
+// still uses the old soft-tint style; this page uses the approved one.
+const statusFill: Record<string, string> = {
+  paid: 'var(--nav-success)',
+  sent: 'var(--nav-accent)',
+  viewed: 'var(--nav-teal)',
+  overdue: 'var(--nav-critical)',
+  draft: 'var(--nav-text-muted)',
+  cancelled: 'var(--nav-text-muted)',
 }
 const statusText: Record<string, string> = {
   paid: 'Оплачен',
@@ -165,7 +166,7 @@ export default function DashboardPage() {
           {/* Stat cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
             {statCards.map(card => (
-              <div key={card.label} className="bg-white rounded-2xl p-4 shadow-sm">
+              <div key={card.label} className="nav-glass rounded-2xl p-4" style={{ boxShadow: 'var(--nav-card-glow)' }}>
                 <div className="text-3xl font-bold tabular-nums" style={{ color: 'var(--nav-text-primary)', letterSpacing: '-0.02em' }}>
                   {loading ? (
                     <Skeleton className="h-8 w-16" />
@@ -181,7 +182,7 @@ export default function DashboardPage() {
           </div>
 
           {/* 30-day revenue chart */}
-          <div className="bg-white rounded-2xl p-4 shadow-sm mb-4">
+          <div className="nav-glass rounded-2xl p-4 mb-4" style={{ boxShadow: 'var(--nav-card-glow)' }}>
             <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--nav-text-primary)' }}>Доход за 30 дней</h3>
             {loading ? (
               <Skeleton className="h-48 w-full" />
@@ -191,7 +192,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Recent invoices */}
-          <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+          <div className="nav-glass rounded-2xl overflow-hidden" style={{ boxShadow: 'var(--nav-card-glow)' }}>
             <div className="flex items-center justify-between px-4 pt-4 pb-1">
               <h3 className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>Последние счета</h3>
               <button onClick={() => router.push('/history')} className="text-xs font-medium" style={{ color: 'var(--nav-accent)' }}>
@@ -231,7 +232,12 @@ export default function DashboardPage() {
                   <div
                     key={inv.id}
                     onClick={() => router.push('/invoice/' + inv.id)}
-                    className={`flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-gray-50 ${i < recentInvoices.length - 1 ? 'border-b border-gray-100' : ''}`}
+                    className="flex items-center justify-between px-4 py-3 cursor-pointer transition-colors duration-150"
+                    style={{
+                      borderBottom: i < recentInvoices.length - 1 ? '1px solid var(--nav-border-soft)' : 'none',
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--nav-surface-glass)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                   >
                     <div className="min-w-0">
                       <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>{inv.number}</div>
@@ -244,7 +250,10 @@ export default function DashboardPage() {
                       <div className="text-sm font-medium tabular-nums mb-1.5" style={{ color: 'var(--nav-text-primary)' }}>
                         {Number(inv.amount).toLocaleString('ru-KZ')} ₸
                       </div>
-                      <span className={`text-xs px-2 py-1 rounded-full ${statusColor[inv.status] || statusColor.draft}`}>
+                      <span
+                        className="text-xs px-2 py-1 rounded-full font-semibold text-white"
+                        style={{ background: statusFill[inv.status] || statusFill.draft }}
+                      >
                         {statusText[inv.status] || statusText.draft}
                       </span>
                     </div>

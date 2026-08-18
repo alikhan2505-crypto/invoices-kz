@@ -376,6 +376,7 @@ html {
   --nav-magenta-soft: rgba(178, 58, 112, 0.14);
   --nav-success: #12946B;
   --nav-success-soft: rgba(18, 148, 107, 0.12);
+  --nav-critical: #DC2626;
   --nav-text-primary: #14162A;
   --nav-text-secondary: #565C7E;
   --nav-text-muted: #8A8FB0;
@@ -400,6 +401,7 @@ html {
     --nav-magenta-soft: rgba(206, 76, 134, 0.24);
     --nav-success: #3ED598;
     --nav-success-soft: rgba(62, 213, 152, 0.18);
+    --nav-critical: #F87171;
     --nav-text-primary: #F2F3FA;
     --nav-text-secondary: #A6ACC9;
     --nav-text-muted: #6B7094;
@@ -431,6 +433,7 @@ html {
   --nav-magenta-soft: rgba(206, 76, 134, 0.24);
   --nav-success: #3ED598;
   --nav-success-soft: rgba(62, 213, 152, 0.18);
+  --nav-critical: #F87171;
   --nav-text-primary: #F2F3FA;
   --nav-text-secondary: #A6ACC9;
   --nav-text-muted: #6B7094;
@@ -460,6 +463,7 @@ html {
   --nav-magenta-soft: rgba(178, 58, 112, 0.14);
   --nav-success: #12946B;
   --nav-success-soft: rgba(18, 148, 107, 0.12);
+  --nav-critical: #DC2626;
   --nav-text-primary: #14162A;
   --nav-text-secondary: #565C7E;
   --nav-text-muted: #8A8FB0;
