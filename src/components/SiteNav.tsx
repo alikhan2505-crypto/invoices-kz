@@ -156,7 +156,6 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
   const router = useRouter()
   const path = usePathname()
   const { lang } = useLanguage()
-  const [unpaid, setUnpaid] = useState(0)
   const [isAdmin, setIsAdmin] = useState(false)
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
   const [openMenu, setOpenMenu] = useState<MenuKey | null>(null)
@@ -170,19 +169,11 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
     lockedHintTimeout.current = setTimeout(() => setLockedHint(null), 2200)
   }
 
-  useEffect(() => {
-    async function loadUnpaid() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { count } = await supabase
-        .from('invoices')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .in('status', ['sent', 'overdue'])
-      setUnpaid(count || 0)
-    }
-    loadUnpaid()
-  }, [path])
+  // Unpaid-invoice count used to live-query here and show as a permanent
+  // nav pill/badge. Replaced by the daily cron bell summary (see
+  // src/app/api/cron/notifications/route.ts) -- one source of truth,
+  // refreshed once a day, instead of a live count computed on every route
+  // change.
 
   useEffect(() => {
     async function loadAdmin() {
@@ -220,7 +211,7 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
         >
           {([
             { href: '/dashboard', label: labels[lang].home },
-            { href: '/history', label: labels[lang].history, badge: unpaid },
+            { href: '/history', label: labels[lang].history },
             { href: '/profile', label: labels[lang].profile },
             { href: '/kaspi-shop', label: labels[lang].kaspiShop, locked: !isAdmin, hintId: 'mobile-kaspiShop' },
             { href: '/ai-agent/settings', label: labels[lang].aiAgent, locked: !isAdmin, hintId: 'mobile-aiAgent' },
@@ -305,6 +296,7 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
         </button>
 
         <Dropdown menuKey="invoices" label={labels[lang].invoices} links={invoicesLinks} activeLinks={invoicesActiveLinks} dotColor="var(--nav-accent)" openMenu={openMenu} setOpenMenu={setOpenMenu} router={router} path={path} lang={lang} />
+        <Dropdown menuKey="kaspiApi" label={labels[lang].kaspiApi} links={kaspiApiLinks} dotColor="var(--nav-accent)" openMenu={openMenu} setOpenMenu={setOpenMenu} router={router} path={path} lang={lang} />
         <Dropdown
           menuKey="kaspiShop" label={labels[lang].kaspiShop} links={kaspiShopLinks} dotColor="var(--nav-teal)"
           openMenu={openMenu} setOpenMenu={setOpenMenu} router={router} path={path} lang={lang}
@@ -315,17 +307,6 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
           openMenu={openMenu} setOpenMenu={setOpenMenu} router={router} path={path} lang={lang}
           locked={!isAdmin} lockedHintOpen={lockedHint === 'desktop-aiAgent'} onLockedClick={() => showLockedHint('desktop-aiAgent')}
         />
-        <Dropdown menuKey="kaspiApi" label={labels[lang].kaspiApi} links={kaspiApiLinks} dotColor="var(--nav-accent)" openMenu={openMenu} setOpenMenu={setOpenMenu} router={router} path={path} lang={lang} />
-
-        {unpaid > 0 && (
-          <button
-            onClick={() => router.push('/history')}
-            className="ml-2 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold"
-            style={{ background: 'rgba(239, 68, 68, 0.14)', color: '#ef4444' }}
-          >
-            {unpaid} неоплачен{unpaid === 1 ? 'ный' : 'ных'}
-          </button>
-        )}
 
         <div className="flex-1" />
         {/* TopUtilityBar renders its own wallet/notifications/account trigger buttons
