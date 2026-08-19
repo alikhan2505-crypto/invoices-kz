@@ -1,11 +1,15 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { motion, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
+import SiteNav from '@/components/SiteNav'
+import DesktopShell from '@/components/DesktopShell'
 import { formatDate } from '@/lib/date'
 import { useLanguage } from '@/components/LanguageProvider'
-import { backLabel } from '@/lib/a11yLabels'
+import { backLabel, deleteLabel } from '@/lib/a11yLabels'
 import { contractsDict } from '@/lib/i18n/contracts'
+import Skeleton from '@/components/Skeleton'
 
 type Contract = {
   id: string
@@ -16,10 +20,66 @@ type Contract = {
   created_at: string
 }
 
+// Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
+// kept identical rather than inventing a second "house" ease.
+const EASE = [0.16, 1, 0.3, 1] as const
+
+// Same input treatment as src/app/create/page.tsx's form fields.
+const inputClass = 'w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]'
+
+// Flat solid-fill status badges -- same approved treatment as dashboard/page.tsx's statusFill.
+const statusFill: Record<string, string> = {
+  signed: 'var(--nav-success)',
+  awaiting_client: 'var(--nav-accent)',
+  not_sent: 'var(--nav-text-muted)',
+}
+
+function ChevronLeftIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m15 6-6 6 6 6" />
+    </svg>
+  )
+}
+function PlusIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+      <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+    </svg>
+  )
+}
+function XIcon({ size = 15 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 6 6 18M6 6l12 12" />
+    </svg>
+  )
+}
+function UploadIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 15V3M7 8l5-5 5 5" />
+      <path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
+    </svg>
+  )
+}
+function ContractIcon() {
+  return (
+    <svg width="34" height="34" viewBox="0 0 24 24" fill="none" style={{ color: 'var(--nav-text-muted)' }}>
+      <path d="M8 3h6l4 4v13a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="M14 3v4h4" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="M9 12h6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      <path d="m9 16 2 1.5L15 15" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 export default function Contracts() {
   const router = useRouter()
   const { lang } = useLanguage()
   const t = contractsDict[lang]
+  const reduceMotionRaw = useReducedMotion()
+  const reduceMotion = !!reduceMotionRaw
 
   const [contracts, setContracts] = useState<Contract[]>([])
   const [statuses, setStatuses] = useState<Record<string, string>>({})
@@ -91,120 +151,166 @@ export default function Contracts() {
 
   function statusBadge(id: string) {
     const status = statuses[id]
-    if (status === 'signed') return { text: t.statusSigned, className: 'bg-green-100 text-green-700' }
-    if (status === 'awaiting_client') return { text: t.statusAwaitingClient, className: 'bg-blue-100 text-blue-700' }
-    return { text: t.statusNotSent, className: 'bg-gray-100 text-gray-500' }
+    if (status === 'signed') return { text: t.statusSigned, fill: statusFill.signed }
+    if (status === 'awaiting_client') return { text: t.statusAwaitingClient, fill: statusFill.awaiting_client }
+    return { text: t.statusNotSent, fill: statusFill.not_sent }
   }
 
   return (
-    <main className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <button onClick={() => router.push('/profile')} className="back-btn text-gray-400 text-xl" aria-label={backLabel(lang)}>‹</button>
-          <span className="font-semibold text-[#1C2056]">{t.headerLabel}</span>
-        </div>
-        {!showForm && (
-          <button onClick={() => setShowForm(true)}
-            className="text-xs bg-[#1C2056] text-white px-3 py-1.5 rounded-lg">
-            {t.uploadButton}
-          </button>
-        )}
-      </div>
-
-      <div className="max-w-lg mx-auto p-4">
-
-        {showForm && (
-          <div className="bg-white rounded-2xl shadow-sm p-5 mb-4 space-y-3">
-            <div className="font-medium text-[#1C2056] mb-2">{t.newContractTitle}</div>
-
-            <div>
-              <label className="text-xs text-gray-500 mb-1 block">{t.titleFieldLabel}</label>
-              <input
-                className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-[#1C2056]"
-                placeholder={t.titleFieldPlaceholder}
-                value={form.title}
-                onChange={e => setForm({ ...form, title: e.target.value })}
-              />
-            </div>
-
-            <div>
-              <label className="text-xs text-gray-500 mb-1 block">{t.clientNameFieldLabel}</label>
-              <input
-                className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-[#1C2056]"
-                placeholder={t.clientNameFieldPlaceholder}
-                value={form.client_name}
-                onChange={e => setForm({ ...form, client_name: e.target.value })}
-              />
-            </div>
-
-            <div>
-              <label className="text-xs text-gray-500 mb-1 block">{t.clientEmailFieldLabel}</label>
-              <input
-                className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-[#1C2056]"
-                placeholder={t.clientEmailFieldPlaceholder}
-                type="email"
-                value={form.client_email}
-                onChange={e => setForm({ ...form, client_email: e.target.value })}
-              />
-            </div>
-
-            <div>
-              <label className="text-xs text-gray-500 mb-1 block">{t.fileFieldLabel}</label>
-              <label className="block border-2 border-dashed border-gray-200 rounded-xl py-4 text-center cursor-pointer">
-                <span className="text-sm text-[#1C2056]">
-                  {file ? t.fileChosenLabel(file.name) : t.chooseFileButton}
-                </span>
-                <input type="file" accept="application/pdf" className="hidden"
-                  onChange={e => setFile(e.target.files?.[0] || null)} />
-              </label>
-            </div>
-
-            <div className="flex gap-2 pt-2">
-              <button onClick={resetForm}
-                className="flex-1 border border-gray-200 rounded-xl py-3 text-sm text-gray-500">
-                {t.cancelButton}
+    <DesktopShell>
+      <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
+        <SiteNav />
+        <div className="max-w-lg lg:max-w-3xl mx-auto p-4">
+          <motion.div
+            className="flex items-center justify-between gap-3 mb-5"
+            initial={reduceMotion ? false : { opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE }}
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <button
+                onClick={() => router.push('/profile')}
+                aria-label={backLabel(lang)}
+                className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0 transition-colors hover:bg-[var(--nav-surface-glass)]"
+                style={{ color: 'var(--nav-text-muted)' }}
+              >
+                <ChevronLeftIcon />
               </button>
-              <button onClick={saveContract} disabled={saving}
-                className="flex-1 bg-[#1C2056] text-white rounded-xl py-3 text-sm font-medium">
-                {saving ? t.savingLabel : t.saveButton}
-              </button>
+              <h2 className="text-xl font-bold truncate" style={{ color: 'var(--nav-text-primary)' }}>{t.headerLabel}</h2>
             </div>
-          </div>
-        )}
+            {!showForm && (
+              <button onClick={() => setShowForm(true)}
+                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg flex-shrink-0 transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0"
+                style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                <PlusIcon />
+                {t.uploadButton}
+              </button>
+            )}
+          </motion.div>
 
-        {loading ? (
-          <p className="text-center text-gray-400 py-8">{t.loadingLabel}</p>
-        ) : contracts.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="text-4xl mb-3">📃</div>
-            <p className="text-gray-400 text-sm">{t.noContractsHint}</p>
-            <p className="text-xs text-gray-400 mt-1 px-6">{t.noContractsSubHint}</p>
-          </div>
-        ) : (
-          <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-            {contracts.map((c, i) => {
-              const badge = statusBadge(c.id)
-              return (
-                <div key={c.id} onClick={() => router.push(`/contract/${c.id}`)}
-                  className={`flex items-start justify-between px-4 py-3.5 cursor-pointer hover:bg-gray-50 ${i < contracts.length - 1 ? 'border-b border-gray-100' : ''}`}>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-[#1C2056] truncate">{c.title}</div>
-                    {c.client_name && <div className="text-xs text-gray-500 mt-0.5">{c.client_name}</div>}
-                    <div className="text-xs text-gray-400 mt-0.5">{formatDate(c.created_at)}</div>
-                    <span className={`inline-block text-xs px-1.5 py-0.5 rounded mt-1.5 ${badge.className}`}>{badge.text}</span>
-                  </div>
-                  <button
-                    onClick={e => { e.stopPropagation(); deleteContract(c.id) }}
-                    aria-label={t.deleteButton}
-                    className="w-8 h-8 flex items-center justify-center rounded-full text-red-400 hover:text-red-600 hover:bg-red-50 flex-shrink-0 ml-2">
-                    <span className="text-base leading-none">✕</span>
-                  </button>
+          {showForm && (
+            <motion.div
+              initial={reduceMotion ? false : { opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: reduceMotion ? 0 : 0.3, ease: EASE }}
+              className="nav-glass nav-card-accent rounded-2xl p-5 mb-4 space-y-3"
+            >
+              <div className="font-semibold text-sm mb-1" style={{ color: 'var(--nav-text-primary)' }}>{t.newContractTitle}</div>
+
+              <div>
+                <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.titleFieldLabel}</label>
+                <input
+                  className={inputClass}
+                  placeholder={t.titleFieldPlaceholder}
+                  value={form.title}
+                  onChange={e => setForm({ ...form, title: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.clientNameFieldLabel}</label>
+                <input
+                  className={inputClass}
+                  placeholder={t.clientNameFieldPlaceholder}
+                  value={form.client_name}
+                  onChange={e => setForm({ ...form, client_name: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.clientEmailFieldLabel}</label>
+                <input
+                  className={inputClass}
+                  placeholder={t.clientEmailFieldPlaceholder}
+                  type="email"
+                  value={form.client_email}
+                  onChange={e => setForm({ ...form, client_email: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.fileFieldLabel}</label>
+                <label
+                  className="flex flex-col items-center gap-2 rounded-xl py-6 text-center cursor-pointer transition-colors hover:bg-[var(--nav-surface-glass)]"
+                  style={{ border: '1.5px dashed var(--nav-border)' }}
+                >
+                  <span style={{ color: 'var(--nav-text-muted)' }}><UploadIcon /></span>
+                  <span className="text-sm" style={{ color: 'var(--nav-text-primary)' }}>
+                    {file ? t.fileChosenLabel(file.name) : t.chooseFileButton}
+                  </span>
+                  <input type="file" accept="application/pdf" className="hidden"
+                    onChange={e => setFile(e.target.files?.[0] || null)} />
+                </label>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button onClick={resetForm}
+                  className="flex-1 nav-glass rounded-xl py-3 text-sm font-medium transition-colors hover:bg-[var(--nav-surface-glass)]"
+                  style={{ color: 'var(--nav-text-secondary)' }}>
+                  {t.cancelButton}
+                </button>
+                <button onClick={saveContract} disabled={saving}
+                  className="flex-1 rounded-xl py-3 text-sm font-semibold transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60"
+                  style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                  {saving ? t.savingLabel : t.saveButton}
+                </button>
+              </div>
+            </motion.div>
+          )}
+
+          {loading ? (
+            <div className="nav-glass rounded-2xl overflow-hidden">
+              {[0, 1, 2].map(i => (
+                <div key={i} className="px-4 py-3.5" style={{ borderBottom: i < 2 ? '1px solid var(--nav-border-soft)' : 'none' }}>
+                  <Skeleton className="h-4 w-40 mb-2" />
+                  <Skeleton className="h-3 w-24" />
                 </div>
-              )
-            })}
-          </div>
-        )}
-      </div>
-    </main>
+              ))}
+            </div>
+          ) : contracts.length === 0 ? (
+            <div className="flex flex-col items-center text-center py-12">
+              <ContractIcon />
+              <p className="text-sm mt-3" style={{ color: 'var(--nav-text-secondary)' }}>{t.noContractsHint}</p>
+              <p className="text-xs mt-1 px-6" style={{ color: 'var(--nav-text-muted)' }}>{t.noContractsSubHint}</p>
+            </div>
+          ) : (
+            <div className="nav-glass rounded-2xl overflow-hidden">
+              {contracts.map((c, i) => {
+                const badge = statusBadge(c.id)
+                return (
+                  <motion.div key={c.id}
+                    initial={reduceMotion ? false : { opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: reduceMotion ? 0 : Math.min(i * 0.035, 0.3), duration: reduceMotion ? 0 : 0.35, ease: EASE }}
+                    onClick={() => router.push(`/contract/${c.id}`)}
+                    className="flex items-start justify-between px-4 py-3.5 cursor-pointer transition-colors hover:bg-[var(--nav-surface-glass)]"
+                    style={{ borderBottom: i < contracts.length - 1 ? '1px solid var(--nav-border-soft)' : 'none' }}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium truncate" style={{ color: 'var(--nav-text-primary)' }}>{c.title}</div>
+                      {c.client_name && <div className="text-xs mt-0.5" style={{ color: 'var(--nav-text-secondary)' }}>{c.client_name}</div>}
+                      <div className="text-xs mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{formatDate(c.created_at)}</div>
+                      <span
+                        className="inline-block text-xs px-2 py-0.5 rounded-full font-semibold text-white mt-1.5"
+                        style={{ background: badge.fill }}>
+                        {badge.text}
+                      </span>
+                    </div>
+                    <button
+                      onClick={e => { e.stopPropagation(); deleteContract(c.id) }}
+                      aria-label={deleteLabel(lang)}
+                      title={t.deleteButton}
+                      className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0 ml-2 transition-colors hover:bg-[var(--nav-surface-glass)] hover:text-[color:var(--nav-critical)]"
+                      style={{ color: 'var(--nav-text-muted)' }}>
+                      <XIcon />
+                    </button>
+                  </motion.div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </main>
+    </DesktopShell>
   )
 }

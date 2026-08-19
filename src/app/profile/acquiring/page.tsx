@@ -1,13 +1,17 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { motion, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
+import SiteNav from '@/components/SiteNav'
+import DesktopShell from '@/components/DesktopShell'
 import { getActivePlan } from '@/lib/plan'
 import { parseStatementFile, AcquiringParseError } from '@/lib/acquiringParse'
 import { findMatches, AcquiringMatch, OpenInvoice } from '@/lib/acquiringMatch'
 import { useLanguage } from '@/components/LanguageProvider'
 import { backLabel } from '@/lib/a11yLabels'
 import { acquiringDict } from '@/lib/i18n/acquiring'
+import Skeleton from '@/components/Skeleton'
 
 interface BccConnection {
   iban: string
@@ -24,10 +28,73 @@ interface BccPendingMatch {
   invoices: { id: string, number: string, client_name: string | null, client_bin: string | null, amount: number } | null
 }
 
+// Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
+// kept identical rather than inventing a second "house" ease.
+const EASE = [0.16, 1, 0.3, 1] as const
+
+const CARD_HOVER = 'transition-all duration-200 ease-out hover:-translate-y-1 hover:shadow-[var(--nav-card-glow)]'
+
+function ChevronLeftIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m15 6-6 6 6 6" />
+    </svg>
+  )
+}
+function ChevronRightIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m9 6 6 6-6 6" />
+    </svg>
+  )
+}
+function BankIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 21h18M4 21V10M20 21V10M2 10l10-6 10 6M6 21v-6M10 21v-6M14 21v-6M18 21v-6" />
+    </svg>
+  )
+}
+function ApiIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 3v4M15 3v4M9 17v4M15 17v4" />
+      <rect x="6" y="7" width="12" height="10" rx="2" />
+      <path d="M6 10H3M6 14H3M21 10h-3M21 14h-3" />
+    </svg>
+  )
+}
+function LockIcon({ size = 40 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--nav-text-muted)' }}>
+      <rect x="5" y="11" width="14" height="9" rx="2" />
+      <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+    </svg>
+  )
+}
+function UploadIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 15V3M7 8l5-5 5 5" />
+      <path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
+    </svg>
+  )
+}
+function AlertIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+      <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
+      <path d="M12 9v4M12 17h.01" />
+    </svg>
+  )
+}
+
 export default function AcquiringPage() {
   const router = useRouter()
   const { lang } = useLanguage()
   const t = acquiringDict[lang]
+  const reduceMotionRaw = useReducedMotion()
+  const reduceMotion = !!reduceMotionRaw
 
   const [loading, setLoading] = useState(true)
   const [profile, setProfile] = useState<any>(null)
@@ -223,10 +290,38 @@ export default function AcquiringPage() {
     }
   }
 
+  const header = (
+    <motion.div
+      className="flex items-center gap-3 mb-5"
+      initial={reduceMotion ? false : { opacity: 0, y: 14 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE }}
+    >
+      <button
+        onClick={() => router.push('/profile')}
+        aria-label={backLabel(lang)}
+        className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0 transition-colors hover:bg-[var(--nav-surface-glass)]"
+        style={{ color: 'var(--nav-text-muted)' }}
+      >
+        <ChevronLeftIcon />
+      </button>
+      <h2 className="text-xl font-bold" style={{ color: 'var(--nav-text-primary)' }}>{t.headerLabel}</h2>
+    </motion.div>
+  )
+
   if (loading) return (
-    <main className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <p className="text-gray-400">{t.loadingLabel}</p>
-    </main>
+    <DesktopShell>
+      <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
+        <SiteNav />
+        <div className="max-w-lg lg:max-w-3xl mx-auto p-4">
+          {header}
+          <div className="space-y-3">
+            <div className="nav-glass rounded-2xl p-4"><Skeleton className="h-4 w-40 mb-2" /><Skeleton className="h-3 w-56" /></div>
+            <div className="nav-glass rounded-2xl p-4"><Skeleton className="h-4 w-40 mb-2" /><Skeleton className="h-3 w-56" /></div>
+          </div>
+        </div>
+      </main>
+    </DesktopShell>
   )
 
   const ap = getActivePlan(profile)
@@ -236,158 +331,211 @@ export default function AcquiringPage() {
   // sitting against their bank account — the "Отключить" button has to stay
   // reachable for them, even though everything else here is behind the wall.
   const bccConnectedCard = bccConnection && (
-    <div className="bg-white rounded-2xl shadow-sm p-4">
-      <div className="text-sm font-medium text-[#1C2056] mb-2">{t.bccSectionTitle}</div>
-      <div className="text-xs text-gray-500">{t.bccConnectedIbanLabel}: {bccConnection.iban}</div>
-      <div className="text-xs text-gray-400">{t.bccLastCheckedLabel}: {new Date(bccConnection.last_checked_at).toLocaleString('ru-KZ')}</div>
+    <div className={`nav-glass rounded-2xl p-4 ${CARD_HOVER}`}>
+      <div className="text-sm font-semibold mb-2" style={{ color: 'var(--nav-text-primary)' }}>{t.bccSectionTitle}</div>
+      <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>{t.bccConnectedIbanLabel}: {bccConnection.iban}</div>
+      <div className="text-xs mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{t.bccLastCheckedLabel}: {new Date(bccConnection.last_checked_at).toLocaleString('ru-KZ')}</div>
       {bccConnection.status === 'error' && (
-        <div className="text-xs text-amber-600 mt-2">{t.bccConnectionErrorHint}</div>
+        <div className="flex items-center gap-1.5 text-xs mt-2" style={{ color: '#D97706' }}>
+          <AlertIcon />
+          {t.bccConnectionErrorHint}
+        </div>
       )}
       <button onClick={disconnectBcc} disabled={bccDisconnecting}
-        className="w-full bg-gray-100 text-gray-600 rounded-xl py-2.5 text-sm font-medium mt-3">
+        className="w-full nav-glass rounded-xl py-2.5 text-sm font-medium mt-3 transition-colors hover:bg-[var(--nav-surface-glass)] disabled:opacity-60"
+        style={{ color: 'var(--nav-text-secondary)' }}>
         {bccDisconnecting ? t.bccDisconnectingLabel : t.bccDisconnectButton}
       </button>
     </div>
   )
 
   return (
-    <main className="min-h-screen bg-gray-50 pb-8">
-      <div className="bg-white border-b px-4 py-4 flex items-center gap-3">
-        <button onClick={() => router.push('/profile')} className="back-btn text-gray-400 text-xl" aria-label={backLabel(lang)}>‹</button>
-        <span className="font-semibold text-[#1C2056]">{t.headerLabel}</span>
-      </div>
+    <DesktopShell>
+      <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
+        <SiteNav />
+        <div className="max-w-lg lg:max-w-3xl mx-auto p-4">
+          {header}
 
-      <div className="max-w-lg mx-auto px-4 pt-4 space-y-4">
-        {!ap.canAcquiring && (
-          <div className="bg-white rounded-2xl shadow-sm p-4">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 rounded-full bg-[#1C2056]/5 flex items-center justify-center text-xl">🏦</div>
-              <div className="text-sm font-medium text-[#1C2056] flex-1">{t.headerLabel}</div>
-              <span className="text-xs bg-amber-50 text-amber-600 border border-amber-200 px-2 py-0.5 rounded-full flex-shrink-0">
-                🔒 {t.proBadge}
-              </span>
-            </div>
-            <div className="text-xs text-gray-400 mb-3">{t.proLockedHint}</div>
-            <button onClick={() => router.push('/upgrade')}
-              className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium">
-              {t.goToPlansButton}
-            </button>
-          </div>
-        )}
-
-        {/* Kaspi Pay Cashier connection/wallet/statement moved out to its own
-            standalone page (2026-08-19, founder: "Kaspi API выведен отдельно
-            так же как Каспи кабинет и ИИ агент") — see /kaspi-api. This card
-            just points there now instead of duplicating that whole UI here. */}
-        <div className="bg-white rounded-2xl shadow-sm p-4">
-          <div className="text-sm font-medium text-[#1C2056] mb-1">Kaspi API</div>
-          <p className="text-xs text-gray-500 mb-3">Подключение Kaspi Pay Cashier, API-токен, вебхуки и выписка теперь в своём разделе.</p>
-          <button onClick={() => router.push('/kaspi-api')}
-            className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium">
-            Перейти в Kaspi API →
-          </button>
-        </div>
-      </div>
-
-      <div className="max-w-lg mx-auto px-4 pb-8 space-y-4">
-        {!ap.canAcquiring ? (
-          bccConnection && (
-            <>
-              {bccMessage && <p className="text-xs text-[#1C2056] px-1">{bccMessage}</p>}
-              {bccConnectedCard}
-            </>
-          )
-        ) : (
-          <>
-            {bccMessage && <p className="text-xs text-[#1C2056] px-1">{bccMessage}</p>}
-
-            {bccConnection ? bccConnectedCard : (
-              <div className="bg-white rounded-2xl shadow-sm p-4">
-                <div className="text-sm font-medium text-[#1C2056] mb-2">{t.bccSectionTitle}</div>
-                <div className="flex items-center justify-between text-xs text-gray-500 mb-3">
-                  <span>{t.bccBinLabel}: {profile?.bin_iin || t.bccBinMissing}</span>
-                  <button onClick={() => router.push('/profile/requisites')} className="text-[#1C2056] font-medium underline">
-                    {t.bccEditBinLink}
-                  </button>
+          <div className="space-y-4">
+            {!ap.canAcquiring && (
+              <motion.div
+                initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.05 }}
+                className={`nav-glass nav-card-accent rounded-2xl p-4 ${CARD_HOVER}`}
+              >
+                <div className="flex items-center gap-3 mb-2">
+                  <span
+                    className="w-9 h-9 rounded-[10px] flex items-center justify-center flex-shrink-0"
+                    style={{ background: 'linear-gradient(135deg, var(--nav-accent-soft), transparent)', color: 'var(--nav-accent)' }}
+                  >
+                    <BankIcon />
+                  </span>
+                  <div className="text-sm font-semibold flex-1" style={{ color: 'var(--nav-text-primary)' }}>{t.headerLabel}</div>
+                  <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0" style={{ background: 'var(--nav-accent-soft)', color: 'var(--nav-accent)' }}>
+                    <LockIcon size={10} />
+                    {t.proBadge}
+                  </span>
                 </div>
-                <button onClick={connectBcc} disabled={bccConnecting}
-                  className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium">
-                  {bccConnecting ? t.bccConnectingLabel : t.bccConnectButton}
+                <div className="text-xs mb-3" style={{ color: 'var(--nav-text-muted)' }}>{t.proLockedHint}</div>
+                <button onClick={() => router.push('/upgrade')}
+                  className="w-full rounded-xl py-2.5 text-sm font-semibold transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0"
+                  style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                  {t.goToPlansButton}
                 </button>
-              </div>
+              </motion.div>
             )}
 
-            {bccPending.length > 0 && (
-              <>
-                <div className="text-xs text-gray-400 px-1">{t.bccPendingMatchesLabel(bccPending.length)}</div>
-                {confirmError && <p className="text-xs text-red-500 mt-2">{t.errorPrefix(confirmError)}</p>}
-                {bccPending.map(pending => pending.invoices && (
-                  <div key={pending.id} className="bg-white rounded-2xl shadow-sm p-4">
-                    <div className="text-sm font-medium text-[#1C2056]">{t.invoiceLabel(pending.invoices.number)}</div>
-                    <div className="text-xs text-gray-500 mt-1">{t.clientLabel}: {pending.invoices.client_name || '—'}</div>
-                    <div className="text-xs text-gray-500">{t.amountLabel}: {Number(pending.invoices.amount).toLocaleString('ru-KZ')} ₸</div>
-                    {pending.matched_date && <div className="text-xs text-gray-400 mt-1">{t.statementDateLabel}: {pending.matched_date}</div>}
-                    {pending.matched_description && <div className="text-xs text-gray-400">{t.descriptionLabel}: {pending.matched_description}</div>}
-                    <button onClick={() => confirmBccMatch(pending)} disabled={confirmingId === pending.invoice_id}
-                      className="w-full bg-[#2DC48D] text-white rounded-xl py-2.5 text-sm font-medium mt-3">
-                      {confirmingId === pending.invoice_id ? t.confirmingLabel : t.confirmPaymentButton}
-                    </button>
-                  </div>
-                ))}
-              </>
-            )}
-
-            <div className="bg-white rounded-2xl shadow-sm p-4">
-              <p className="text-xs text-gray-500 leading-relaxed mb-3">{t.introText}</p>
-              <label className="block border-2 border-dashed border-gray-200 rounded-xl py-4 text-center cursor-pointer">
-                <span className="text-sm text-[#1C2056]">
-                  {fileName ? t.fileChosenLabel(fileName) : t.chooseFileButton}
+            {/* Kaspi Pay Cashier connection/wallet/statement moved out to its own
+                standalone page (2026-08-19, founder: "Kaspi API выведен отдельно
+                так же как Каспи кабинет и ИИ агент") — see /kaspi-api. This card
+                just points there now instead of duplicating that whole UI here. */}
+            <motion.div
+              initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.1 }}
+              onClick={() => router.push('/kaspi-api')}
+              className={`nav-glass rounded-2xl p-4 cursor-pointer ${CARD_HOVER}`}
+            >
+              <div className="flex items-center gap-3">
+                <span
+                  className="w-9 h-9 rounded-[10px] flex items-center justify-center flex-shrink-0"
+                  style={{ background: 'linear-gradient(135deg, var(--nav-teal-soft), transparent)', color: 'var(--nav-teal)' }}
+                >
+                  <ApiIcon />
                 </span>
-                <input type="file" accept=".xlsx,.xls" className="hidden" onChange={onFileChange} />
-              </label>
-              {processing && <p className="text-xs text-gray-400 text-center mt-2">{t.processingLabel}</p>}
-              {error && <p className="text-xs text-red-500 mt-2">{t.errorPrefix(error)}</p>}
-            </div>
-
-            {openInvoices.length === 0 && (
-              <div className="text-center py-8">
-                <p className="text-sm text-gray-400">{t.noOpenInvoicesHint}</p>
-              </div>
-            )}
-
-            {fileName && !processing && !error && (
-              <>
-                <div className="text-xs text-gray-400 px-1">
-                  {matches.length > 0 ? t.matchesFoundLabel(matches.length) : t.noMatchesFoundHint}
-                  {unmatchedCount !== null && unmatchedCount > 0 && (
-                    <span> · {t.unmatchedRowsLabel(unmatchedCount)}</span>
-                  )}
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>Kaspi API</div>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>Подключение Kaspi Pay Cashier, API-токен, вебхуки и выписка теперь в своём разделе.</p>
                 </div>
+                <span className="flex-shrink-0" style={{ color: 'var(--nav-text-muted)' }}><ChevronRightIcon /></span>
+              </div>
+            </motion.div>
 
-                {confirmError && <p className="text-xs text-red-500 mt-2">{t.errorPrefix(confirmError)}</p>}
+            {!ap.canAcquiring ? (
+              bccConnection && (
+                <>
+                  {bccMessage && <p className="text-xs px-1" style={{ color: 'var(--nav-accent)' }}>{bccMessage}</p>}
+                  {bccConnectedCard}
+                </>
+              )
+            ) : (
+              <>
+                {bccMessage && <p className="text-xs px-1" style={{ color: 'var(--nav-accent)' }}>{bccMessage}</p>}
 
-                {matches.map(match => {
-                  const rowMatchCount = matches.filter(m => m.row === match.row).length
-                  return (
-                    <div key={`${match.invoice.id}-${match.row.date}-${match.row.amount}-${match.row.description}`} className="bg-white rounded-2xl shadow-sm p-4">
-                      <div className="text-sm font-medium text-[#1C2056]">{t.invoiceLabel(match.invoice.number)}</div>
-                      <div className="text-xs text-gray-500 mt-1">{t.clientLabel}: {match.invoice.client_name || '—'}</div>
-                      <div className="text-xs text-gray-500">{t.amountLabel}: {Number(match.invoice.amount).toLocaleString('ru-KZ')} ₸</div>
-                      {match.row.date && <div className="text-xs text-gray-400 mt-1">{t.statementDateLabel}: {match.row.date}</div>}
-                      {match.row.description && <div className="text-xs text-gray-400">{t.descriptionLabel}: {match.row.description}</div>}
-                      {rowMatchCount > 1 && <div className="text-xs text-amber-600 mt-1">{t.multipleMatchesHint}</div>}
-                      <button onClick={() => confirmPayment(match)} disabled={confirmingId === match.invoice.id}
-                        className="w-full bg-[#2DC48D] text-white rounded-xl py-2.5 text-sm font-medium mt-3">
-                        {confirmingId === match.invoice.id ? t.confirmingLabel : t.confirmPaymentButton}
+                {bccConnection ? bccConnectedCard : (
+                  <motion.div
+                    initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.14 }}
+                    className={`nav-glass rounded-2xl p-4 ${CARD_HOVER}`}
+                  >
+                    <div className="text-sm font-semibold mb-2" style={{ color: 'var(--nav-text-primary)' }}>{t.bccSectionTitle}</div>
+                    <div className="flex items-center justify-between text-xs mb-3" style={{ color: 'var(--nav-text-secondary)' }}>
+                      <span>{t.bccBinLabel}: {profile?.bin_iin || t.bccBinMissing}</span>
+                      <button onClick={() => router.push('/profile/requisites')} className="font-medium underline" style={{ color: 'var(--nav-accent)' }}>
+                        {t.bccEditBinLink}
                       </button>
                     </div>
-                  )
-                })}
+                    <button onClick={connectBcc} disabled={bccConnecting}
+                      className="w-full rounded-xl py-2.5 text-sm font-semibold transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60"
+                      style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                      {bccConnecting ? t.bccConnectingLabel : t.bccConnectButton}
+                    </button>
+                  </motion.div>
+                )}
+
+                {bccPending.length > 0 && (
+                  <>
+                    <div className="text-[11px] font-extrabold uppercase px-1" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.09em' }}>
+                      {t.bccPendingMatchesLabel(bccPending.length)}
+                    </div>
+                    {confirmError && <p className="text-xs" style={{ color: 'var(--nav-critical)' }}>{t.errorPrefix(confirmError)}</p>}
+                    {bccPending.map(pending => pending.invoices && (
+                      <div key={pending.id} className={`nav-glass rounded-2xl p-4 ${CARD_HOVER}`}>
+                        <div className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{t.invoiceLabel(pending.invoices.number)}</div>
+                        <div className="text-xs mt-1" style={{ color: 'var(--nav-text-secondary)' }}>{t.clientLabel}: {pending.invoices.client_name || '—'}</div>
+                        <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>{t.amountLabel}: {Number(pending.invoices.amount).toLocaleString('ru-KZ')} ₸</div>
+                        {pending.matched_date && <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>{t.statementDateLabel}: {pending.matched_date}</div>}
+                        {pending.matched_description && <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>{t.descriptionLabel}: {pending.matched_description}</div>}
+                        <button onClick={() => confirmBccMatch(pending)} disabled={confirmingId === pending.invoice_id}
+                          className="w-full rounded-xl py-2.5 text-sm font-semibold mt-3 transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60"
+                          style={{ background: 'var(--nav-success)', color: 'white' }}>
+                          {confirmingId === pending.invoice_id ? t.confirmingLabel : t.confirmPaymentButton}
+                        </button>
+                      </div>
+                    ))}
+                  </>
+                )}
+
+                <motion.div
+                  initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.18 }}
+                  className={`nav-glass rounded-2xl p-4 ${CARD_HOVER}`}
+                >
+                  <p className="text-xs leading-relaxed mb-3" style={{ color: 'var(--nav-text-muted)' }}>{t.introText}</p>
+                  <label
+                    className="flex flex-col items-center gap-2 rounded-xl py-6 text-center cursor-pointer transition-colors hover:bg-[var(--nav-surface-glass)]"
+                    style={{ border: '1.5px dashed var(--nav-border)' }}
+                  >
+                    <span style={{ color: 'var(--nav-text-muted)' }}><UploadIcon /></span>
+                    <span className="text-sm" style={{ color: 'var(--nav-text-primary)' }}>
+                      {fileName ? t.fileChosenLabel(fileName) : t.chooseFileButton}
+                    </span>
+                    <input type="file" accept=".xlsx,.xls" className="hidden" onChange={onFileChange} />
+                  </label>
+                  {processing && <p className="text-xs text-center mt-2" style={{ color: 'var(--nav-text-muted)' }}>{t.processingLabel}</p>}
+                  {error && <p className="text-xs mt-2" style={{ color: 'var(--nav-critical)' }}>{t.errorPrefix(error)}</p>}
+                </motion.div>
+
+                {openInvoices.length === 0 && (
+                  <div className="text-center py-8">
+                    <p className="text-sm" style={{ color: 'var(--nav-text-muted)' }}>{t.noOpenInvoicesHint}</p>
+                  </div>
+                )}
+
+                {fileName && !processing && !error && (
+                  <>
+                    <div className="text-xs px-1" style={{ color: 'var(--nav-text-muted)' }}>
+                      {matches.length > 0 ? t.matchesFoundLabel(matches.length) : t.noMatchesFoundHint}
+                      {unmatchedCount !== null && unmatchedCount > 0 && (
+                        <span> · {t.unmatchedRowsLabel(unmatchedCount)}</span>
+                      )}
+                    </div>
+
+                    {confirmError && <p className="text-xs mt-2" style={{ color: 'var(--nav-critical)' }}>{t.errorPrefix(confirmError)}</p>}
+
+                    {matches.map(match => {
+                      const rowMatchCount = matches.filter(m => m.row === match.row).length
+                      return (
+                        <div key={`${match.invoice.id}-${match.row.date}-${match.row.amount}-${match.row.description}`} className={`nav-glass rounded-2xl p-4 ${CARD_HOVER}`}>
+                          <div className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{t.invoiceLabel(match.invoice.number)}</div>
+                          <div className="text-xs mt-1" style={{ color: 'var(--nav-text-secondary)' }}>{t.clientLabel}: {match.invoice.client_name || '—'}</div>
+                          <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>{t.amountLabel}: {Number(match.invoice.amount).toLocaleString('ru-KZ')} ₸</div>
+                          {match.row.date && <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>{t.statementDateLabel}: {match.row.date}</div>}
+                          {match.row.description && <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>{t.descriptionLabel}: {match.row.description}</div>}
+                          {rowMatchCount > 1 && (
+                            <div className="flex items-center gap-1.5 text-xs mt-1" style={{ color: '#D97706' }}>
+                              <AlertIcon />
+                              {t.multipleMatchesHint}
+                            </div>
+                          )}
+                          <button onClick={() => confirmPayment(match)} disabled={confirmingId === match.invoice.id}
+                            className="w-full rounded-xl py-2.5 text-sm font-semibold mt-3 transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60"
+                            style={{ background: 'var(--nav-success)', color: 'white' }}>
+                            {confirmingId === match.invoice.id ? t.confirmingLabel : t.confirmPaymentButton}
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </>
+                )}
               </>
             )}
-          </>
-        )}
-      </div>
-    </main>
+          </div>
+        </div>
+      </main>
+    </DesktopShell>
   )
 }

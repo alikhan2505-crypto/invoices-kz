@@ -1,15 +1,63 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { motion, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
+import SiteNav from '@/components/SiteNav'
+import DesktopShell from '@/components/DesktopShell'
 import { useLanguage } from '@/components/LanguageProvider'
 import { backLabel } from '@/lib/a11yLabels'
 import { profileCoreDict } from '@/lib/i18n/profileCore'
+
+// Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
+// kept identical rather than inventing a second "house" ease.
+const EASE = [0.16, 1, 0.3, 1] as const
+
+const CARD_HOVER = 'transition-all duration-200 ease-out hover:-translate-y-1 hover:shadow-[var(--nav-card-glow)]'
+
+// Same input treatment as src/app/create/page.tsx's form fields -- token
+// borders/focus ring, no remount-on-keystroke (plain controlled input).
+const inputClass = 'w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]'
+
+function ChevronLeftIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m15 6-6 6 6 6" />
+    </svg>
+  )
+}
+
+function Field({
+  label, value, onChange, placeholder, type = 'text', maxLength,
+}: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+  placeholder?: string
+  type?: string
+  maxLength?: number
+}) {
+  return (
+    <div>
+      <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{label}</label>
+      <input
+        className={inputClass}
+        placeholder={placeholder}
+        value={value}
+        type={type}
+        maxLength={maxLength}
+        onChange={e => onChange(e.target.value)}
+      />
+    </div>
+  )
+}
 
 export default function Requisites() {
   const router = useRouter()
   const { lang } = useLanguage()
   const t = profileCoreDict[lang]
+  const reduceMotionRaw = useReducedMotion()
+  const reduceMotion = !!reduceMotionRaw
   const [saving, setSaving] = useState(false)
   const [profile, setProfile] = useState({
     company_name: '', bin_iin: '', address: '', email: '', phone: '',
@@ -24,6 +72,7 @@ export default function Requisites() {
       if (data) setProfile({ ...profile, ...data })
     }
     load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   function formatPhone(value: string) {
@@ -48,94 +97,68 @@ export default function Requisites() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b px-4 py-4 flex items-center gap-3">
-        <button onClick={() => router.push('/profile')} className="back-btn text-gray-400 text-xl" aria-label={backLabel(lang)}>‹</button>
-        <span className="font-semibold text-[#1C2056]">{t.requisitesHeaderLabel}</span>
-      </div>
+    <DesktopShell>
+      <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
+        <SiteNav />
+        <div className="max-w-lg lg:max-w-2xl mx-auto p-4">
+          <motion.div
+            className="flex items-center gap-3 mb-5"
+            initial={reduceMotion ? false : { opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE }}
+          >
+            <button
+              onClick={() => router.push('/profile')}
+              aria-label={backLabel(lang)}
+              className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0 transition-colors hover:bg-[var(--nav-surface-glass)]"
+              style={{ color: 'var(--nav-text-muted)' }}
+            >
+              <ChevronLeftIcon />
+            </button>
+            <h2 className="text-xl font-bold" style={{ color: 'var(--nav-text-primary)' }}>{t.requisitesHeaderLabel}</h2>
+          </motion.div>
 
-      <div className="max-w-lg mx-auto p-4">
-        <div className="bg-white rounded-2xl shadow-sm p-4 space-y-4">
+          <motion.div
+            className={`nav-glass nav-card-accent rounded-2xl p-5 space-y-4 ${CARD_HOVER}`}
+            initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.06 }}
+          >
+            <Field label={t.companyNameFieldLabel} placeholder={t.companyNamePlaceholder}
+              value={profile.company_name} onChange={v => setProfile({ ...profile, company_name: v })} />
 
-          <div>
-            <label className="text-xs text-gray-500 mb-1 block">{t.companyNameFieldLabel}</label>
-            <input
-              className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-[#1C2056]"
-              placeholder={t.companyNamePlaceholder}
-              value={profile.company_name}
-              onChange={e => setProfile({ ...profile, company_name: e.target.value })}
-            />
-          </div>
+            <Field label={t.binIinFieldLabel} placeholder={t.binIinPlaceholder}
+              value={profile.bin_iin} onChange={v => setProfile({ ...profile, bin_iin: v })} />
 
-          <div>
-            <label className="text-xs text-gray-500 mb-1 block">{t.binIinFieldLabel}</label>
-            <input
-              className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-[#1C2056]"
-              placeholder={t.binIinPlaceholder}
-              value={profile.bin_iin}
-              onChange={e => setProfile({ ...profile, bin_iin: e.target.value })}
-            />
-          </div>
+            <Field label={t.legalAddressFieldLabel} placeholder={t.legalAddressPlaceholder}
+              value={profile.address} onChange={v => setProfile({ ...profile, address: v })} />
 
-          <div>
-            <label className="text-xs text-gray-500 mb-1 block">{t.legalAddressFieldLabel}</label>
-            <input
-              className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-[#1C2056]"
-              placeholder={t.legalAddressPlaceholder}
-              value={profile.address}
-              onChange={e => setProfile({ ...profile, address: e.target.value })}
-            />
-          </div>
+            <Field label={t.emailFieldLabel} placeholder={t.emailPlaceholder}
+              value={profile.email} onChange={v => setProfile({ ...profile, email: v })} />
 
-          <div>
-            <label className="text-xs text-gray-500 mb-1 block">{t.emailFieldLabel}</label>
-            <input
-              className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-[#1C2056]"
-              placeholder={t.emailPlaceholder}
-              value={profile.email}
-              onChange={e => setProfile({ ...profile, email: e.target.value })}
-            />
-          </div>
+            <Field label={t.phoneFieldLabel} placeholder={t.phonePlaceholder} type="tel" maxLength={16}
+              value={profile.phone} onChange={v => setProfile({ ...profile, phone: formatPhone(v) })} />
 
-          <div>
-            <label className="text-xs text-gray-500 mb-1 block">{t.phoneFieldLabel}</label>
-            <input
-              className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-[#1C2056]"
-              placeholder={t.phonePlaceholder}
-              value={profile.phone}
-              type="tel"
-              maxLength={16}
-              onChange={e => setProfile({ ...profile, phone: formatPhone(e.target.value) })}
-            />
-          </div>
+            <Field label={t.directorNameFieldLabel} placeholder={t.personNamePlaceholder}
+              value={profile.director_name} onChange={v => setProfile({ ...profile, director_name: v })} />
 
-          <div>
-            <label className="text-xs text-gray-500 mb-1 block">{t.directorNameFieldLabel}</label>
-            <input
-              className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-[#1C2056]"
-              placeholder={t.personNamePlaceholder}
-              value={profile.director_name}
-              onChange={e => setProfile({ ...profile, director_name: e.target.value })}
-            />
-          </div>
+            <Field label={t.accountantNameFieldLabel} placeholder={t.personNamePlaceholder}
+              value={profile.accountant_name} onChange={v => setProfile({ ...profile, accountant_name: v })} />
+          </motion.div>
 
-          <div>
-            <label className="text-xs text-gray-500 mb-1 block">{t.accountantNameFieldLabel}</label>
-            <input
-              className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-[#1C2056]"
-              placeholder={t.personNamePlaceholder}
-              value={profile.accountant_name}
-              onChange={e => setProfile({ ...profile, accountant_name: e.target.value })}
-            />
-          </div>
-
+          <motion.button
+            onClick={save}
+            disabled={saving}
+            initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.14 }}
+            className="w-full rounded-xl py-3.5 text-sm font-semibold mt-4 transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60"
+            style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)', boxShadow: '0 10px 24px -10px var(--nav-accent)' }}
+          >
+            {saving ? t.savingEllipsis : t.saveChangesButton}
+          </motion.button>
         </div>
-
-        <button onClick={save} disabled={saving}
-          className="w-full bg-[#1C2056] text-white rounded-xl py-4 font-medium text-sm mt-4">
-          {saving ? t.savingEllipsis : t.saveChangesButton}
-        </button>
-      </div>
-    </main>
+      </main>
+    </DesktopShell>
   )
 }
