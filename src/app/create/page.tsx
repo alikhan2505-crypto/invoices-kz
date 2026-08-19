@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { generateInvoicePDF } from '@/lib/generatePDF'
 import SiteNav from '@/components/SiteNav'
@@ -17,11 +17,46 @@ import { invoiceFlowDict } from '@/lib/i18n/invoiceFlow'
 
 const UNIT_OPTIONS = ['шт', 'кг', 'л', 'м', 'м²', 'м³', 'час', 'день', 'месяц', 'услуга', 'работа']
 
+// Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
+// kept identical rather than inventing a second "house" ease.
+const EASE = [0.16, 1, 0.3, 1] as const
+
+const CARD_HOVER = 'transition-all duration-200 ease-out hover:-translate-y-1 hover:shadow-[var(--nav-card-glow)]'
+
+function XIcon({ size = 15 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 6 6 18M6 6l12 12" />
+    </svg>
+  )
+}
+
+function ChevronRightIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m9 6 6 6-6 6" />
+    </svg>
+  )
+}
+
+function PeopleIcon() {
+  return (
+    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--nav-accent)' }}>
+      <circle cx="9" cy="8" r="3.2" />
+      <path d="M2.5 19c0-3.3 2.9-5.5 6.5-5.5s6.5 2.2 6.5 5.5" />
+      <path d="M16 4.3c1.5.4 2.6 1.7 2.6 3.3 0 1.6-1.1 2.9-2.6 3.3" />
+      <path d="M15 13.7c2.7.5 4.5 2.4 4.5 5.3" />
+    </svg>
+  )
+}
+
 export default function CreateInvoicePage() {
   const router = useRouter()
   const { lang } = useLanguage()
   const t = invoiceFlowDict[lang]
   const KNP_OPTIONS = t.knpOptions
+  const reduceMotionRaw = useReducedMotion()
+  const reduceMotion = !!reduceMotionRaw
   const [loading, setLoading] = useState(false)
   const [lastCreated, setLastCreated] = useState<number | null>(null)
   const [clients, setClients] = useState<any[]>([])
@@ -413,68 +448,76 @@ export default function CreateInvoicePage() {
     <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
       <SiteNav />
       <div className="max-w-lg lg:max-w-7xl mx-auto p-4">
-        <h2 className="text-xl font-bold text-[#1C2056] mb-1">{t.newInvoiceTitle}</h2>
-        <p className="text-sm text-gray-500 mb-4">{t.newInvoiceSubtitle}</p>
+        <motion.div
+          initial={reduceMotion ? false : { opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE }}
+        >
+          <h2 className="text-xl font-bold mb-1" style={{ color: 'var(--nav-text-primary)' }}>{t.newInvoiceTitle}</h2>
+          <p className="text-sm mb-4" style={{ color: 'var(--nav-text-secondary)' }}>{t.newInvoiceSubtitle}</p>
+        </motion.div>
 
         <div className="lg:flex lg:gap-6 lg:items-start">
         <div className="lg:flex-1 lg:min-w-0">
 
         {monthStats.total > 0 && (
           <div className="grid grid-cols-3 gap-1 mb-4">
-            <div className="bg-white rounded-xl p-3 text-center shadow-sm">
-              <div className="text-lg font-bold text-[#1C2056]">{monthStats.total}</div>
-              <div className="text-xs text-gray-400 mt-0.5">{t.statsInvoicesLabel}</div>
-            </div>
-            <div className="bg-white rounded-xl p-3 text-center shadow-sm">
-              <div className="text-lg font-bold text-[#2DC48D]">{monthStats.paid}</div>
-              <div className="text-xs text-gray-400 mt-0.5">{t.statsPaidLabel}</div>
-            </div>
-            <div className="bg-white rounded-xl p-3 text-center shadow-sm">
-              <div className="text-lg font-bold text-[#1C2056]">
-                {monthStats.amount > 0 ? (monthStats.amount / 1000).toFixed(0) + 'K' : '0'}
-              </div>
-              <div className="text-xs text-gray-400 mt-0.5">{t.statsIncomeLabel}</div>
-            </div>
+            {[
+              { value: monthStats.total, label: t.statsInvoicesLabel, color: 'var(--nav-text-primary)' },
+              { value: monthStats.paid, label: t.statsPaidLabel, color: 'var(--nav-success)' },
+              { value: monthStats.amount > 0 ? (monthStats.amount / 1000).toFixed(0) + 'K' : '0', label: t.statsIncomeLabel, color: 'var(--nav-text-primary)' },
+            ].map((s, i) => (
+              <motion.div
+                key={s.label}
+                className={`nav-glass rounded-xl p-3 text-center ${CARD_HOVER}`}
+                initial={reduceMotion ? false : { opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE, delay: reduceMotion ? 0 : 0.05 + i * 0.04 }}
+              >
+                <div className="text-lg font-bold tabular-nums" style={{ color: s.color }}>{s.value}</div>
+                <div className="text-xs mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{s.label}</div>
+              </motion.div>
+            ))}
           </div>
         )}
 
         {(() => {
           const activePlan = getActivePlan(profile)
           if (activePlan.plan === 'free') return (
-            <div className="flex items-center justify-between rounded-xl px-4 py-3 mb-4 bg-blue-50 border border-blue-100">
+            <div className="nav-glass flex items-center justify-between rounded-xl px-4 py-3 mb-4" style={{ background: 'var(--nav-accent-soft)' }}>
               <div>
-                <div className="text-sm font-medium text-[#1C2056]">{t.freePlanTitle}</div>
-                <div className="text-xs text-gray-400 mt-0.5">{t.freePlanSubtitle}</div>
+                <div className="text-sm font-medium" style={{ color: 'var(--nav-text-primary)' }}>{t.freePlanTitle}</div>
+                <div className="text-xs mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{t.freePlanSubtitle}</div>
               </div>
-              <button onClick={() => router.push('/upgrade')} className="text-xs bg-[#1C2056] text-white px-3 py-1.5 rounded-lg">{t.ratesButton}</button>
+              <button onClick={() => router.push('/upgrade')} className="text-xs font-semibold px-3 py-1.5 rounded-lg flex-shrink-0" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>{t.ratesButton}</button>
             </div>
           )
           if (activePlan.isTrial) return (
-            <div className="flex items-center justify-between rounded-xl px-4 py-3 mb-4 bg-green-50 border border-green-100">
+            <div className="nav-glass flex items-center justify-between rounded-xl px-4 py-3 mb-4" style={{ background: 'var(--nav-success-soft)' }}>
               <div>
-                <div className="text-sm font-medium text-green-700">{t.trialPlanTitle}</div>
-                <div className="text-xs text-gray-400 mt-0.5">{t.trialDaysLeftLabel(activePlan.daysLeft!, activePlan.invoiceLimit! - monthCount)}</div>
+                <div className="text-sm font-medium" style={{ color: 'var(--nav-success)' }}>{t.trialPlanTitle}</div>
+                <div className="text-xs mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{t.trialDaysLeftLabel(activePlan.daysLeft!, activePlan.invoiceLimit! - monthCount)}</div>
               </div>
-              <button onClick={() => router.push('/upgrade')} className="text-xs bg-[#2DC48D] text-white px-3 py-1.5 rounded-lg">{t.buyButton}</button>
+              <button onClick={() => router.push('/upgrade')} className="text-xs font-semibold px-3 py-1.5 rounded-lg flex-shrink-0" style={{ background: 'var(--nav-success)', color: '#fff' }}>{t.buyButton}</button>
             </div>
           )
           if (activePlan.daysLeft !== null && activePlan.daysLeft <= 3) return (
-            <div className="flex items-center justify-between rounded-xl px-4 py-3 mb-4 bg-red-50 border border-red-100">
+            <div className="nav-glass flex items-center justify-between rounded-xl px-4 py-3 mb-4">
               <div>
-                <div className="text-sm font-medium text-red-600">{t.expiringPlanTitle}</div>
-                <div className="text-xs text-gray-400 mt-0.5">{t.daysLeftLabel(activePlan.daysLeft)}</div>
+                <div className="text-sm font-medium" style={{ color: 'var(--nav-critical)' }}>{t.expiringPlanTitle}</div>
+                <div className="text-xs mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{t.daysLeftLabel(activePlan.daysLeft)}</div>
               </div>
-              <button onClick={() => router.push('/upgrade')} className="text-xs bg-red-500 text-white px-3 py-1.5 rounded-lg">{t.extendButton}</button>
+              <button onClick={() => router.push('/upgrade')} className="text-xs font-semibold px-3 py-1.5 rounded-lg flex-shrink-0" style={{ background: 'var(--nav-critical)', color: '#fff' }}>{t.extendButton}</button>
             </div>
           )
           return null
         })()}
 
         {showOnboarding && (
-          <div className="bg-white rounded-2xl shadow-sm p-5 mb-4">
+          <div className="nav-glass nav-card-accent rounded-2xl p-5 mb-4">
             <div className="flex items-center justify-between mb-4">
-              <div className="font-medium text-[#1C2056]">{t.onboardingTitle}</div>
-              <button onClick={() => setShowOnboarding(false)} className="text-gray-400 hover:text-gray-500 text-lg" aria-label={closeLabel(lang)}>✕</button>
+              <div className="font-medium" style={{ color: 'var(--nav-text-primary)' }}>{t.onboardingTitle}</div>
+              <button onClick={() => setShowOnboarding(false)} className="transition-colors text-[color:var(--nav-text-muted)] hover:text-[color:var(--nav-text-secondary)]" aria-label={closeLabel(lang)}><XIcon /></button>
             </div>
             <div className="space-y-3">
               {[
@@ -483,16 +526,16 @@ export default function CreateInvoicePage() {
                 { step: 3, title: t.onboardingStep3Title, desc: t.onboardingStep3Desc, done: !!(profile?.signature_url), action: () => router.push('/profile/signature'), btn: t.onboardingStep3Btn },
                 { step: 4, title: t.onboardingStep4Title, desc: t.onboardingStep4Desc, done: monthStats.total > 0, action: () => {}, btn: '' },
               ].map((item, i) => (
-                <div key={i} className={`flex items-center gap-3 p-3 rounded-xl ${item.done ? 'bg-green-50' : 'bg-gray-50'}`}>
-                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${item.done ? 'bg-[#2DC48D] text-white' : 'bg-gray-200 text-gray-500'}`}>
+                <div key={i} className="flex items-center gap-3 p-3 rounded-xl" style={{ background: item.done ? 'var(--nav-success-soft)' : 'var(--nav-surface-glass)' }}>
+                  <div className="w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0" style={item.done ? { background: 'var(--nav-success)', color: '#fff' } : { background: 'var(--nav-border-soft)', color: 'var(--nav-text-muted)' }}>
                     {item.done ? '✓' : item.step}
                   </div>
                   <div className="flex-1">
-                    <div className={`text-sm font-medium ${item.done ? 'text-green-700 line-through' : 'text-[#1C2056]'}`}>{item.title}</div>
-                    <div className="text-xs text-gray-400">{item.desc}</div>
+                    <div className="text-sm font-medium" style={{ color: item.done ? 'var(--nav-success)' : 'var(--nav-text-primary)', textDecoration: item.done ? 'line-through' : 'none' }}>{item.title}</div>
+                    <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>{item.desc}</div>
                   </div>
                   {!item.done && item.btn && (
-                    <button onClick={item.action} className="text-xs bg-[#1C2056] text-white px-3 py-1.5 rounded-lg flex-shrink-0">{item.btn}</button>
+                    <button onClick={item.action} className="text-xs font-semibold px-3 py-1.5 rounded-lg flex-shrink-0" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>{item.btn}</button>
                   )}
                 </div>
               ))}
@@ -502,11 +545,12 @@ export default function CreateInvoicePage() {
 
           {clients.length > 0 && !clientSelected && (
             <div className="mb-3">
-              <p className="text-xs text-gray-400 mb-2">{t.quickClientPickLabel}</p>
+              <p className="text-xs mb-2" style={{ color: 'var(--nav-text-muted)' }}>{t.quickClientPickLabel}</p>
               <div className="flex gap-2 overflow-x-auto pb-1">
                 {clients.slice(0, 6).map(c => (
                   <button key={c.id} onClick={() => selectClient(c)}
-                    className="whitespace-nowrap text-xs bg-white border border-gray-200 text-[#1C2056] px-3 py-2 rounded-full hover:bg-[#1C2056] hover:text-white transition flex-shrink-0 shadow-sm">
+                    className="nav-glass whitespace-nowrap text-xs px-3 py-2 rounded-full flex-shrink-0 transition-colors hover:bg-[var(--nav-accent)] hover:text-[var(--nav-accent-ink)] hover:border-[color:var(--nav-accent)]"
+                    style={{ color: 'var(--nav-text-primary)' }}>
                     {c.name}
                   </button>
                 ))}
@@ -516,60 +560,65 @@ export default function CreateInvoicePage() {
 
           <div className="lg:grid lg:grid-cols-2 lg:gap-4 lg:items-start lg:mb-4">
           {/* Client section */}
-          <div className="bg-white rounded-2xl p-5 mb-4 shadow-sm lg:mb-0">
-            <h3 className="font-medium text-[#1C2056] mb-3">{t.clientDataHeader}</h3>
+          <motion.div
+            className="nav-glass nav-card-accent rounded-2xl p-5 mb-4 lg:mb-0"
+            initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.1 }}
+          >
+            <h3 className="font-medium mb-3" style={{ color: 'var(--nav-text-primary)' }}>{t.clientDataHeader}</h3>
             {clientSelected ? (
               <div className="space-y-3">
-                <div className="bg-gray-50 rounded-xl p-3 flex items-center justify-between">
+                <div className="rounded-xl p-3 flex items-center justify-between" style={{ background: 'var(--nav-surface-glass)' }}>
                   <div>
-                    <div className="text-sm font-medium text-[#1C2056]">{clientName}</div>
-                    <div className="text-xs text-gray-400 mt-0.5">{t.binLabel(clientBin)}</div>
-                    {clientEmail && <div className="text-xs text-gray-400">{clientEmail}</div>}
+                    <div className="text-sm font-medium" style={{ color: 'var(--nav-text-primary)' }}>{clientName}</div>
+                    <div className="text-xs mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{t.binLabel(clientBin)}</div>
+                    {clientEmail && <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>{clientEmail}</div>}
                   </div>
-                  <button onClick={clearClient} className="text-gray-400 hover:text-red-400 text-xl" aria-label={deleteLabel(lang)}>✕</button>
+                  <button onClick={clearClient} className="transition-colors text-[color:var(--nav-text-muted)] hover:text-[color:var(--nav-critical)]" aria-label={deleteLabel(lang)}><XIcon /></button>
                 </div>
                 <div>
-                  <label className="text-xs text-gray-500 mb-1 block">{t.knpLabel}</label>
-                  <select className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056] bg-white"
+                  <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.knpLabel}</label>
+                  <select className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
                     value={clientKnp} onChange={e => setClientKnp(e.target.value)}>
                     {KNP_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs text-gray-500 mb-1 block">{t.buyerPhoneLabel}</label>
-                  <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                  <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.buyerPhoneLabel}</label>
+                  <input className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
                     placeholder={t.buyerPhonePlaceholderDashboard} value={clientPhone} type="tel" maxLength={16}
                     onChange={e => setClientPhone(formatPhone(e.target.value))} />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">{t.contractNumberLabelDashboard}</label>
-                    <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                    <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.contractNumberLabelDashboard}</label>
+                    <input className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
                       placeholder={t.contractNumberPlaceholderDashboard} value={contractNumber} onChange={e => setContractNumber(e.target.value)} />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">{t.contractDateLabel}</label>
-                    <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                    <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.contractDateLabel}</label>
+                    <input className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
                       placeholder={t.contractDatePlaceholder} value={contractDate} onChange={e => setContractDate(e.target.value)} />
                   </div>
                 </div>
                 <div>
-                  <label className="text-xs text-gray-500 mb-1 block">{t.dueDateLabel}</label>
-                  <input type="date" className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                  <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.dueDateLabel}</label>
+                  <input type="date" className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
                     value={dueDate} onChange={e => { setDueDate(e.target.value); setDueDateTouched(true) }} />
                 </div>
               </div>
             ) : (
               <div className="space-y-3">
                 <div>
-                  <label className="text-xs text-gray-500 mb-1 block">{t.companyNameLabel}</label>
-                  <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                  <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.companyNameLabel}</label>
+                  <input className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
                     placeholder={t.companyNamePlaceholder} value={clientName} onChange={e => setClientName(e.target.value)} />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">{t.binIinLabel}</label>
-                    <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                    <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.binIinLabel}</label>
+                    <input className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
                       placeholder={t.binIinPlaceholder} value={clientBin}
                       onChange={async e => {
                         const bin = e.target.value
@@ -586,133 +635,152 @@ export default function CreateInvoicePage() {
                       }} />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">{t.emailLabel}</label>
-                    <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                    <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.emailLabel}</label>
+                    <input className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
                       placeholder={t.emailPlaceholder} value={clientEmail} onChange={e => setClientEmail(e.target.value)} />
                   </div>
                 </div>
                 <div>
-                  <label className="text-xs text-gray-500 mb-1 block">{t.addressLabelDashboard}</label>
-                  <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                  <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.addressLabelDashboard}</label>
+                  <input className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
                     placeholder={t.addressPlaceholder} value={clientAddress} onChange={e => setClientAddress(e.target.value)} />
                 </div>
                 <div>
-                  <label className="text-xs text-gray-500 mb-1 block">{t.buyerPhoneLabel}</label>
-                  <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                  <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.buyerPhoneLabel}</label>
+                  <input className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
                     placeholder={t.buyerPhonePlaceholderDashboard} value={clientPhone} type="tel" maxLength={16}
                     onChange={e => setClientPhone(formatPhone(e.target.value))} />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">{t.contractNumberLabelDashboard}</label>
-                    <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                    <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.contractNumberLabelDashboard}</label>
+                    <input className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
                       placeholder={t.contractNumberPlaceholderDashboard} value={contractNumber} onChange={e => setContractNumber(e.target.value)} />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">{t.contractDateLabel}</label>
-                    <input className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                    <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.contractDateLabel}</label>
+                    <input className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
                       placeholder={t.contractDatePlaceholder} value={contractDate} onChange={e => setContractDate(e.target.value)} />
                   </div>
                 </div>
                 <div>
-                  <label className="text-xs text-gray-500 mb-1 block">{t.dueDateLabel}</label>
-                  <input type="date" className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                  <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.dueDateLabel}</label>
+                  <input type="date" className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
                     value={dueDate} onChange={e => { setDueDate(e.target.value); setDueDateTouched(true) }} />
                 </div>
                 <div>
-                  <label className="text-xs text-gray-500 mb-1 block">{t.knpLabel}</label>
-                  <select className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056] bg-white"
+                  <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.knpLabel}</label>
+                  <select className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
                     value={clientKnp} onChange={e => setClientKnp(e.target.value)}>
                     {KNP_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                   </select>
                 </div>
               </div>
             )}
-          </div>
+          </motion.div>
 
           {/* Services section + Total, grouped so Total sits directly under Services */}
           <div>
-          <div className="bg-white rounded-2xl p-5 mb-4 shadow-sm">
+          <motion.div
+            className="nav-glass nav-card-accent rounded-2xl p-5 mb-4"
+            initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.15 }}
+          >
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-medium text-[#1C2056]">{t.servicesHeader}</h3>
+              <h3 className="font-medium" style={{ color: 'var(--nav-text-primary)' }}>{t.servicesHeader}</h3>
               <div className="flex gap-2">
                 {savedServices.length > 0 && (
                   <button onClick={() => setShowServicePicker(true)}
-                    className="text-xs text-[#1C2056] border border-[#1C2056] rounded-lg px-3 py-1">
+                    className="text-xs font-semibold rounded-lg px-3 py-1 border border-[color:var(--nav-accent)]" style={{ color: 'var(--nav-accent)' }}>
                     {t.fromDirectoryButton}
                   </button>
                 )}
-                <button onClick={addService} className="text-xs bg-[#1C2056] text-white rounded-lg px-3 py-1">
+                <button onClick={addService} className="text-xs font-semibold rounded-lg px-3 py-1" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                   {t.addButton}
                 </button>
               </div>
             </div>
             <div className="space-y-4" id="services-list">
               {services.map((svc, idx) => (
-                <div key={idx} className="border border-gray-100 rounded-xl p-3 space-y-2">
+                <motion.div
+                  key={idx}
+                  initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: reduceMotion ? 0 : 0.18, ease: EASE }}
+                  className="rounded-xl p-3 space-y-2 border border-[color:var(--nav-border-soft)]"
+                >
                   <div className="flex gap-2 mb-2">
                     <button type="button" onClick={() => updateService(idx, 'type', 'service')}
-                      className={`flex-1 px-3 py-1.5 text-xs rounded-lg font-medium transition ${(svc.type || 'service') === 'service' ? 'bg-[#1C2056] text-white' : 'bg-gray-100 text-gray-500'}`}>
+                      className="flex-1 px-3 py-1.5 text-xs rounded-lg font-medium transition"
+                      style={(svc.type || 'service') === 'service' ? { background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' } : { background: 'var(--nav-surface-glass)', color: 'var(--nav-text-secondary)' }}>
                       {t.serviceToggleLabel}
                     </button>
                     <button type="button" onClick={() => updateService(idx, 'type', 'product')}
-                      className={`flex-1 px-3 py-1.5 text-xs rounded-lg font-medium transition ${svc.type === 'product' ? 'bg-[#2DC48D] text-white' : 'bg-gray-100 text-gray-500'}`}>
+                      className="flex-1 px-3 py-1.5 text-xs rounded-lg font-medium transition"
+                      style={svc.type === 'product' ? { background: 'var(--nav-success)', color: '#fff' } : { background: 'var(--nav-surface-glass)', color: 'var(--nav-text-secondary)' }}>
                       {t.productToggleLabel}
                     </button>
                   </div>
                   <div className="flex gap-2 items-start">
-                    <input className="flex-1 border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056]"
+                    <input className="flex-1 rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
                       placeholder={t.serviceNamePlaceholder} value={svc.name}
                       onChange={e => updateService(idx, 'name', e.target.value)} />
                     {services.length > 1 && (
-                      <button onClick={() => removeService(idx)} className="text-gray-400 hover:text-red-400 text-xl mt-1" aria-label={deleteLabel(lang)}>×</button>
+                      <button onClick={() => removeService(idx)} className="mt-1 transition-colors text-[color:var(--nav-text-muted)] hover:text-[color:var(--nav-critical)]" aria-label={deleteLabel(lang)}><XIcon /></button>
                     )}
                   </div>
                   <div className="grid grid-cols-4 gap-2">
                     <div>
-                      <label className="text-xs text-gray-400 mb-1 block">{t.codeLabel}</label>
-                      <input className="w-full border rounded-lg px-2 py-2 text-sm outline-none focus:border-[#1C2056]"
+                      <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>{t.codeLabel}</label>
+                      <input className="w-full rounded-lg px-2 py-2 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
                         placeholder={t.codePlaceholder} value={svc.code || ''}
                         onChange={e => updateService(idx, 'code', e.target.value)} />
                     </div>
                     <div>
-                      <label className="text-xs text-gray-400 mb-1 block">{t.qtyLabel}</label>
-                      <input className="w-full border rounded-lg px-2 py-2 text-sm outline-none focus:border-[#1C2056]"
+                      <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>{t.qtyLabel}</label>
+                      <input className="w-full rounded-lg px-2 py-2 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
                         type="number" placeholder={t.qtyPlaceholder} value={svc.qty || ''}
                         onChange={e => updateService(idx, 'qty', Number(e.target.value))} />
                     </div>
                     <div>
-                      <label className="text-xs text-gray-400 mb-1 block">{t.unitLabel}</label>
-                      <select className="w-full border rounded-lg px-2 py-2 text-sm outline-none focus:border-[#1C2056] bg-white"
+                      <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>{t.unitLabel}</label>
+                      <select className="w-full rounded-lg px-2 py-2 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
                         value={svc.unit || 'шт'} onChange={e => updateService(idx, 'unit', e.target.value)}>
                         {UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
                       </select>
                     </div>
                     <div>
-                      <label className="text-xs text-gray-400 mb-1 block">{t.priceLabel}</label>
-                      <input className="w-full border rounded-lg px-2 py-2 text-sm outline-none focus:border-[#1C2056]"
+                      <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>{t.priceLabel}</label>
+                      <input className="w-full rounded-lg px-2 py-2 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
                         type="number" placeholder={t.pricePlaceholder} value={svc.price || ''}
                         onChange={e => updateService(idx, 'price', Number(e.target.value))} />
                     </div>
                   </div>
                   {svc.name && svc.price > 0 && (
-                    <div className="text-xs text-gray-400 text-right">
+                    <div className="text-xs text-right tabular-nums" style={{ color: 'var(--nav-text-muted)' }}>
                       {t.perLineTotal((svc.qty * svc.price).toLocaleString('ru-KZ'))}
                     </div>
                   )}
-                </div>
+                </motion.div>
               ))}
             </div>
-          </div>
+          </motion.div>
 
           {/* Total */}
-          <div className="bg-[#1C2056] rounded-2xl p-5 mb-4">
+          <motion.div
+            className="rounded-2xl p-5 mb-4"
+            style={{ background: 'var(--nav-accent)' }}
+            initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.2 }}
+          >
             {vatType === 'vat_16' ? (
               <>
-                <div className="flex justify-between text-sm text-white/70 mb-2">
+                <div className="flex justify-between text-sm text-white/70 mb-2 tabular-nums">
                   <span>{t.amountWithoutVatLabel}</span><span>{totalWithoutVat.toLocaleString('ru-KZ')} ₸</span>
                 </div>
-                <div className="flex justify-between text-sm text-white/70 mb-3">
+                <div className="flex justify-between text-sm text-white/70 mb-3 tabular-nums">
                   <span>{t.vat16Label}</span><span>{vatAmount.toLocaleString('ru-KZ')} ₸</span>
                 </div>
               </>
@@ -727,23 +795,33 @@ export default function CreateInvoicePage() {
             )}
             <div className="flex justify-between font-medium text-white border-t border-white/20 pt-3">
               <span>{t.amountDueLabel}</span>
-              <span className="text-lg">{total.toLocaleString('ru-KZ')} ₸</span>
+              <span className="text-lg tabular-nums">{total.toLocaleString('ru-KZ')} ₸</span>
             </div>
-          </div>
+          </motion.div>
           </div>
           </div>
 
-          <button onClick={createInvoice} disabled={loading}
-            className={`w-full rounded-xl py-4 font-medium text-sm text-white transition ${loading ? 'bg-gray-400' : 'bg-[#2DC48D]'}`}>
+          <motion.button
+            onClick={createInvoice} disabled={loading}
+            initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.25 }}
+            className="w-full rounded-xl py-4 font-medium text-sm transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0 disabled:hover:translate-y-0"
+            style={{
+              background: loading ? 'var(--nav-text-muted)' : 'var(--nav-success)',
+              color: '#fff',
+              boxShadow: loading ? 'none' : '0 10px 24px -10px var(--nav-success)',
+            }}
+          >
             {loading ? t.creatingButton : t.createButton}
-          </button>
+          </motion.button>
         </div>
 
         <motion.div
-          initial={{ opacity: 0, y: 12 }}
+          initial={reduceMotion ? false : { opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ ease: [0.16, 1, 0.3, 1], duration: 0.4 }}
-          className="hidden lg:block lg:w-[400px] lg:flex-shrink-0 lg:sticky lg:top-[88px]"
+          transition={{ ease: EASE, duration: reduceMotion ? 0 : 0.4 }}
+          className="hidden lg:block lg:w-[400px] lg:flex-shrink-0 lg:sticky lg:top-[65px]"
         >
           <InvoiceLivePreview
             invoiceNumber={!profileLoaded ? '' : (profile?.invoice_prefix || 'INV-') + (profile?.invoice_next_number || '0001')}
@@ -765,20 +843,20 @@ export default function CreateInvoicePage() {
       {/* Service picker modal */}
       {showServicePicker && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-end">
-          <div className="bg-white w-full max-w-lg mx-auto rounded-t-3xl p-5 max-h-[70vh] overflow-y-auto">
+          <div className="w-full max-w-lg mx-auto rounded-t-3xl p-5 max-h-[70vh] overflow-y-auto" style={{ background: 'var(--nav-surface-chrome)' }}>
             <div className="flex items-center justify-between mb-4">
-              <span className="font-semibold text-[#1C2056]">{t.servicePickerTitle}</span>
-              <button onClick={() => setShowServicePicker(false)} className="back-btn text-gray-400 text-xl" aria-label={closeLabel(lang)}>✕</button>
+              <span className="font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{t.servicePickerTitle}</span>
+              <button onClick={() => setShowServicePicker(false)} className="back-btn transition-colors text-[color:var(--nav-text-muted)] hover:text-[color:var(--nav-text-secondary)]" aria-label={closeLabel(lang)}><XIcon /></button>
             </div>
             <div className="space-y-2">
               {savedServices.map(s => (
                 <div key={s.id} onClick={() => selectService(s)}
-                  className="flex items-center justify-between p-3 rounded-xl border border-gray-100 cursor-pointer hover:border-[#1C2056]">
+                  className="flex items-center justify-between p-3 rounded-xl cursor-pointer transition-colors border border-[color:var(--nav-border-soft)] hover:border-[color:var(--nav-accent)]">
                   <div>
-                    <div className="font-medium text-sm text-[#1C2056]">{s.name}</div>
-                    <div className="text-xs text-gray-400">{s.unit || 'шт'}</div>
+                    <div className="font-medium text-sm" style={{ color: 'var(--nav-text-primary)' }}>{s.name}</div>
+                    <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>{s.unit || 'шт'}</div>
                   </div>
-                  <div className="text-sm font-medium text-[#1C2056]">{Number(s.price).toLocaleString('ru-KZ')} ₸</div>
+                  <div className="text-sm font-medium tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{Number(s.price).toLocaleString('ru-KZ')} ₸</div>
                 </div>
               ))}
             </div>
@@ -789,19 +867,19 @@ export default function CreateInvoicePage() {
       {/* Save client modal */}
       {showSaveClient && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-end">
-          <div className="bg-white w-full max-w-lg mx-auto rounded-t-3xl p-6">
+          <div className="w-full max-w-lg mx-auto rounded-t-3xl p-6" style={{ background: 'var(--nav-surface-chrome)' }}>
             <div className="text-center mb-5">
-              <div className="text-3xl mb-2">👥</div>
-              <div className="font-semibold text-[#1C2056] mb-1">{t.saveClientModalTitle}</div>
-              <div className="text-sm text-gray-400">{t.saveClientPrompt(lastInvoiceClient?.name)}</div>
+              <div className="flex justify-center mb-2"><PeopleIcon /></div>
+              <div className="font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>{t.saveClientModalTitle}</div>
+              <div className="text-sm" style={{ color: 'var(--nav-text-muted)' }}>{t.saveClientPrompt(lastInvoiceClient?.name)}</div>
             </div>
             <div className="flex gap-3">
               <button onClick={() => setShowSaveClient(false)}
-                className="flex-1 border border-gray-200 rounded-xl py-3 text-sm text-gray-500">
+                className="flex-1 rounded-xl py-3 text-sm border border-[color:var(--nav-border)]" style={{ color: 'var(--nav-text-secondary)' }}>
                 {t.skipButton}
               </button>
               <button onClick={saveClientToDirectory}
-                className="flex-1 bg-[#1C2056] text-white rounded-xl py-3 text-sm font-medium">
+                className="flex-1 rounded-xl py-3 text-sm font-medium" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                 {t.saveButtonLabel}
               </button>
             </div>
@@ -812,27 +890,27 @@ export default function CreateInvoicePage() {
       {/* Bank picker modal */}
       {showBankPicker && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-end">
-          <div className="bg-white w-full max-w-lg mx-auto rounded-t-3xl p-5">
+          <div className="w-full max-w-lg mx-auto rounded-t-3xl p-5" style={{ background: 'var(--nav-surface-chrome)' }}>
             <div className="flex items-center justify-between mb-4">
-              <span className="font-semibold text-[#1C2056]">{t.bankPickerTitle}</span>
+              <span className="font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{t.bankPickerTitle}</span>
               <button onClick={() => {
 
                 setShowBankPicker(false)
                 setPendingInvoiceData(null)
-              }} className="back-btn text-gray-400 text-xl" aria-label={closeLabel(lang)}>✕</button>
+              }} className="back-btn transition-colors text-[color:var(--nav-text-muted)] hover:text-[color:var(--nav-text-secondary)]" aria-label={closeLabel(lang)}><XIcon /></button>
             </div>
             <div className="space-y-2">
               {bankAccounts.map(bank => (
                 <div key={bank.id} onClick={() => generateWithBank(bank)}
-                  className="flex items-center justify-between p-4 rounded-xl border border-gray-100 cursor-pointer hover:border-[#1C2056] hover:bg-gray-50">
+                  className="flex items-center justify-between p-4 rounded-xl cursor-pointer transition-colors border border-[color:var(--nav-border-soft)] hover:border-[color:var(--nav-accent)] hover:bg-[var(--nav-surface-glass)]">
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm text-[#1C2056]">{bank.bank_name}</span>
-                      {bank.is_main && <span className="text-xs bg-[#2DC48D]/10 text-[#2DC48D] px-2 py-0.5 rounded-full">{t.mainBankBadge}</span>}
+                      <span className="font-medium text-sm" style={{ color: 'var(--nav-text-primary)' }}>{bank.bank_name}</span>
+                      {bank.is_main && <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'var(--nav-success-soft)', color: 'var(--nav-success)' }}>{t.mainBankBadge}</span>}
                     </div>
-                    <div className="text-xs text-gray-400 mt-0.5">{bank.iik}</div>
+                    <div className="text-xs mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{bank.iik}</div>
                   </div>
-                  <span className="text-gray-400 text-lg">›</span>
+                  <span style={{ color: 'var(--nav-text-muted)' }}><ChevronRightIcon /></span>
                 </div>
               ))}
             </div>
