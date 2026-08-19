@@ -1,9 +1,12 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { motion, useReducedMotion } from 'framer-motion'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import SiteNav from '@/components/SiteNav'
+
+const EASE = [0.16, 1, 0.3, 1] as const
 
 const TONE_OPTIONS = [
   { value: 'friendly', label: 'Дружелюбный и тёплый' },
@@ -17,8 +20,44 @@ const GOAL_OPTIONS = [
   { value: 'qualify_lead', label: 'Квалифицировать заявку' },
 ]
 
+function BackIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m15 18-6-6 6-6" />
+    </svg>
+  )
+}
+
+function CheckCircleIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="m9 12 2 2 4-4" />
+    </svg>
+  )
+}
+
+function WarnIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+      <path d="M12 9v4M12 17h.01" />
+      <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
+    </svg>
+  )
+}
+
+function ArrowRightIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M5 12h14M13 6l6 6-6 6" />
+    </svg>
+  )
+}
+
 export default function AiAgentSettings() {
   const router = useRouter()
+  const reduceMotionRaw = useReducedMotion()
+  const reduceMotion = !!reduceMotionRaw
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [name, setName] = useState('')
@@ -120,14 +159,14 @@ export default function AiAgentSettings() {
   if (loading) return (
     <main className="nav-surface-elevated min-h-screen">
       <SiteNav />
-      <div className="p-8 text-center text-gray-400">Загрузка…</div>
+      <div className="p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Загрузка…</div>
     </main>
   )
 
   if (forbidden) return (
     <main className="nav-surface-elevated min-h-screen">
       <SiteNav />
-      <div className="p-8 text-center text-gray-400 text-sm">Эта функция пока доступна только администраторам.</div>
+      <div className="p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Эта функция пока доступна только администраторам.</div>
     </main>
   )
 
@@ -135,110 +174,145 @@ export default function AiAgentSettings() {
 
   return (
     <main className="nav-surface-elevated min-h-screen">
-    <SiteNav />
-    <div className="max-w-xl mx-auto p-6 pb-24">
-      <button onClick={() => router.push('/dashboard')} className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 mb-3">
-        <span className="text-lg leading-none">‹</span> Назад
-      </button>
-      <h1 className="text-xl font-bold text-[#1C2056] mb-1">AI-агент</h1>
-      <p className="text-sm text-gray-500 mb-6">Настройте ассистента, который отвечает вашим клиентам в Instagram</p>
+      <SiteNav />
+      <div className="max-w-xl mx-auto p-4 lg:p-6 pb-24 lg:pb-6">
+        <motion.div
+          initial={reduceMotion ? false : { opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE }}
+        >
+          <button onClick={() => router.push('/dashboard')} className="flex items-center gap-1 text-xs mb-3 transition-colors" style={{ color: 'var(--nav-text-muted)' }}>
+            <BackIcon /> Назад
+          </button>
+          <h1 className="text-xl font-bold mb-1" style={{ color: 'var(--nav-text-primary)' }}>AI-агент</h1>
+          <p className="text-sm mb-6" style={{ color: 'var(--nav-text-secondary)' }}>Настройте ассистента, который отвечает вашим клиентам в Instagram</p>
+        </motion.div>
 
-      {oauthNotice === 'connected' && (
-        <div className="bg-[#E2F7EE] text-[#00A468] rounded-lg px-3 py-2 text-sm mb-4">✓ Instagram подключён</div>
-      )}
-      {oauthNotice === 'error' && (
-        <div className="bg-red-50 text-red-600 rounded-lg px-3 py-2 text-sm mb-4">
-          Не удалось подключить Instagram. Попробуйте ещё раз — если не получится снова, напишите в поддержку.
-        </div>
-      )}
+        {oauthNotice === 'connected' && (
+          <div className="rounded-lg px-3 py-2 text-sm mb-4 flex items-center gap-2" style={{ background: 'var(--nav-success)', color: '#fff' }}>
+            <CheckCircleIcon /> Instagram подключён
+          </div>
+        )}
+        {oauthNotice === 'error' && (
+          <div className="rounded-lg px-3 py-2 text-sm mb-4" style={{ background: 'var(--nav-critical)', color: '#fff' }}>
+            Не удалось подключить Instagram. Попробуйте ещё раз — если не получится снова, напишите в поддержку.
+          </div>
+        )}
 
-      <label className="block mb-4">
-        <span className="text-xs text-gray-500 mb-1 block">Название компании</span>
-        <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" value={name} onChange={e => setName(e.target.value)} />
-      </label>
+        <motion.div
+          className="nav-glass nav-card-accent rounded-2xl p-5"
+          initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.06 }}
+        >
+          <label className="block mb-4">
+            <span className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>Название компании</span>
+            <input
+              className="w-full rounded-lg px-3 py-2 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
+              style={{ color: 'var(--nav-text-primary)' }}
+              value={name} onChange={e => setName(e.target.value)} />
+          </label>
 
-      <div className="mb-4">
-        <span className="text-xs text-gray-500 mb-2 block">Формат общения</span>
-        <div className="grid grid-cols-2 gap-2">
-          {TONE_OPTIONS.map(t => (
-            <button key={t.value} onClick={() => setTone(t.value)}
-              className={`text-xs px-3 py-2 rounded-lg text-left ${tone === t.value ? 'bg-[#1C2056] text-white' : 'bg-gray-50 text-gray-600'}`}>
-              {t.label}
-            </button>
-          ))}
-        </div>
-      </div>
+          <div className="mb-4">
+            <span className="text-xs mb-2 block" style={{ color: 'var(--nav-text-secondary)' }}>Формат общения</span>
+            <div className="grid grid-cols-2 gap-2">
+              {TONE_OPTIONS.map(t => {
+                const active = tone === t.value
+                return (
+                  <button key={t.value} onClick={() => setTone(t.value)}
+                    className="text-xs px-3 py-2 rounded-lg text-left transition-colors"
+                    style={active ? { background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' } : { background: 'var(--nav-bg)', color: 'var(--nav-text-secondary)' }}>
+                    {t.label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
 
-      <label className="block mb-4">
-        <span className="text-xs text-gray-500 mb-1 block">О бизнесе</span>
-        <textarea className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm min-h-[100px]"
-          placeholder="Опишите подробнее что вы продаёте и как работаете"
-          value={businessDescription} onChange={e => setBusinessDescription(e.target.value)} />
-      </label>
+          <label className="block mb-4">
+            <span className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>О бизнесе</span>
+            <textarea
+              className="w-full rounded-lg px-3 py-2 text-sm min-h-[100px] outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
+              style={{ color: 'var(--nav-text-primary)' }}
+              placeholder="Опишите подробнее что вы продаёте и как работаете"
+              value={businessDescription} onChange={e => setBusinessDescription(e.target.value)} />
+          </label>
 
-      <div className="mb-4">
-        <span className="text-xs text-gray-500 mb-2 block">Основная цель</span>
-        <div className="grid grid-cols-2 gap-2">
-          {GOAL_OPTIONS.map(g => (
-            <button key={g.value} onClick={() => setGoal(g.value)}
-              className={`text-xs px-3 py-2 rounded-lg ${goal === g.value ? 'bg-[#1C2056] text-white' : 'bg-gray-50 text-gray-600'}`}>
-              {g.label}
-            </button>
-          ))}
-        </div>
-      </div>
+          <div className="mb-4">
+            <span className="text-xs mb-2 block" style={{ color: 'var(--nav-text-secondary)' }}>Основная цель</span>
+            <div className="grid grid-cols-2 gap-2">
+              {GOAL_OPTIONS.map(g => {
+                const active = goal === g.value
+                return (
+                  <button key={g.value} onClick={() => setGoal(g.value)}
+                    className="text-xs px-3 py-2 rounded-lg transition-colors"
+                    style={active ? { background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' } : { background: 'var(--nav-bg)', color: 'var(--nav-text-secondary)' }}>
+                    {g.label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
 
-      <div className="mb-6">
-        <span className="text-xs text-gray-500 mb-2 block">Что собирать у клиента</span>
-        <label className="flex items-center gap-2 text-sm mb-1">
-          <input type="checkbox" checked={collectName} onChange={e => setCollectName(e.target.checked)} /> Имя
-        </label>
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={collectPhone} onChange={e => setCollectPhone(e.target.checked)} /> Телефон
-        </label>
-      </div>
+          <div className="mb-6">
+            <span className="text-xs mb-2 block" style={{ color: 'var(--nav-text-secondary)' }}>Что собирать у клиента</span>
+            <label className="flex items-center gap-2 text-sm mb-1.5" style={{ color: 'var(--nav-text-primary)' }}>
+              <input type="checkbox" checked={collectName} onChange={e => setCollectName(e.target.checked)} className="accent-[var(--nav-accent)] w-3.5 h-3.5" /> Имя
+            </label>
+            <label className="flex items-center gap-2 text-sm" style={{ color: 'var(--nav-text-primary)' }}>
+              <input type="checkbox" checked={collectPhone} onChange={e => setCollectPhone(e.target.checked)} className="accent-[var(--nav-accent)] w-3.5 h-3.5" /> Телефон
+            </label>
+          </div>
 
-      <button onClick={save} disabled={saving}
-        className="w-full bg-[#1C2056] text-white rounded-lg px-4 py-3 text-sm font-medium mb-4">
-        {saving ? 'Сохраняем…' : 'Сохранить'}
-      </button>
+          <button onClick={save} disabled={saving}
+            className="w-full rounded-lg px-4 py-3 text-sm font-semibold transition-transform hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0"
+            style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)', boxShadow: '0 10px 24px -10px var(--nav-accent)' }}>
+            {saving ? 'Сохраняем…' : 'Сохранить'}
+          </button>
 
-      {agentId && (
-        <div className="border-t border-gray-100 pt-4">
-          <span className="text-xs text-gray-500 mb-2 block">Instagram</span>
-          {instagramConnection?.status === 'active' && (
-            <>
-              <div className="text-sm text-[#00A468] mb-3">✓ Подключено: {instagramConnection.external_account_name || instagramConnection.channel}</div>
-              <Link href="/ai-agent/review"
-                className="block text-center bg-gray-50 hover:bg-gray-100 text-[#1C2056] rounded-lg px-4 py-2.5 text-sm font-medium transition-colors">
-                Диалоги на проверке →
-              </Link>
-            </>
-          )}
-          {instagramConnection?.status === 'token_expired' && (
-            // Same sessionExpired-style reconnect banner this codebase
-            // already uses in Kaspi Shop -- set by Task 8/9's 401 handling,
-            // not guessed at here. Reconnecting reuses the same OAuth flow;
-            // Task 7's callback upserts on (channel, external_account_id)
-            // and always writes status: 'active', so a successful
-            // reconnect clears this automatically.
-            <div className="bg-red-50 rounded-lg p-3 mb-2">
-              <div className="text-sm text-red-600 mb-2">⚠️ Instagram отключился — переподключите аккаунт, чтобы агент снова отвечал</div>
-              <button onClick={connectInstagram} disabled={connecting}
-                className="w-full bg-white border border-red-200 text-red-600 rounded-lg px-4 py-2 text-sm font-medium">
-                {connecting ? 'Открываем Instagram…' : 'Переподключить Instagram'}
-              </button>
+          {agentId && (
+            <div className="mt-4 pt-4" style={{ borderTop: '1px solid var(--nav-border-soft)' }}>
+              <span className="text-xs mb-2 block" style={{ color: 'var(--nav-text-secondary)' }}>Instagram</span>
+              {instagramConnection?.status === 'active' && (
+                <>
+                  <div className="text-sm mb-3 flex items-center gap-1.5" style={{ color: 'var(--nav-success)' }}>
+                    <CheckCircleIcon /> Подключено: {instagramConnection.external_account_name || instagramConnection.channel}
+                  </div>
+                  <Link href="/ai-agent/review"
+                    className="flex items-center justify-center gap-1.5 nav-glass rounded-lg px-4 py-2.5 text-sm font-medium transition-colors"
+                    style={{ color: 'var(--nav-text-primary)' }}>
+                    Диалоги на проверке <ArrowRightIcon />
+                  </Link>
+                </>
+              )}
+              {instagramConnection?.status === 'token_expired' && (
+                // Same sessionExpired-style reconnect banner this codebase
+                // already uses in Kaspi Shop -- set by Task 8/9's 401 handling,
+                // not guessed at here. Reconnecting reuses the same OAuth flow;
+                // Task 7's callback upserts on (channel, external_account_id)
+                // and always writes status: 'active', so a successful
+                // reconnect clears this automatically.
+                <div className="nav-glass rounded-lg p-3 mb-2">
+                  <div className="text-sm mb-2 flex items-center gap-1.5" style={{ color: 'var(--nav-critical)' }}>
+                    <WarnIcon /> Instagram отключился — переподключите аккаунт, чтобы агент снова отвечал
+                  </div>
+                  <button onClick={connectInstagram} disabled={connecting}
+                    className="w-full rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50"
+                    style={{ background: 'var(--nav-critical)', color: '#fff' }}>
+                    {connecting ? 'Открываем Instagram…' : 'Переподключить Instagram'}
+                  </button>
+                </div>
+              )}
+              {!instagramConnection && (
+                <button onClick={connectInstagram} disabled={connecting}
+                  className="w-full nav-glass rounded-lg px-4 py-3 text-sm font-medium disabled:opacity-50" style={{ color: 'var(--nav-text-primary)' }}>
+                  {connecting ? 'Открываем Instagram…' : 'Подключить Instagram'}
+                </button>
+              )}
             </div>
           )}
-          {!instagramConnection && (
-            <button onClick={connectInstagram} disabled={connecting}
-              className="w-full bg-white border border-gray-200 text-[#1C2056] rounded-lg px-4 py-3 text-sm font-medium">
-              {connecting ? 'Открываем Instagram…' : 'Подключить Instagram'}
-            </button>
-          )}
-        </div>
-      )}
-    </div>
+        </motion.div>
+      </div>
     </main>
   )
 }

@@ -8,6 +8,26 @@ import SiteNav from '@/components/SiteNav'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
+function PinIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+      <circle cx="12" cy="10" r="3" />
+    </svg>
+  )
+}
+
+function TruckIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 17V6a1 1 0 0 1 1-1h9v12" />
+      <path d="M13 9h4l3 3v5h-2" />
+      <circle cx="7.5" cy="17.5" r="1.7" />
+      <circle cx="16.5" cy="17.5" r="1.7" />
+    </svg>
+  )
+}
+
 type OrderDetail = {
   code: string
   status: string
@@ -63,41 +83,41 @@ export default function KaspiShopOrderDetail() {
       <SiteNav />
 
       <div className="flex-1 min-w-0 p-4 lg:p-6 pb-24 lg:pb-6 max-w-2xl">
-        <button onClick={() => router.back()} className="text-sm text-gray-400 mb-4">‹ Назад к заказам</button>
+        <button onClick={() => router.back()} className="text-sm mb-4 transition-colors" style={{ color: 'var(--nav-text-muted)' }}>‹ Назад к заказам</button>
 
         {loadError && (
-          <div className="bg-red-50 rounded-2xl p-4 text-sm text-red-600 mb-4">{loadError}</div>
+          <div className="nav-glass rounded-2xl p-4 text-sm mb-4" style={{ color: 'var(--nav-critical)' }}>{loadError}</div>
         )}
 
         {!order ? (
-          <div className="bg-white rounded-2xl shadow-sm p-8 text-center text-sm text-gray-400">Загружаем заказ...</div>
+          <div className="nav-glass rounded-2xl p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Загружаем заказ...</div>
         ) : (
           <>
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}
-              className="bg-[#12142E] rounded-[28px] p-6 lg:p-8 mb-4 text-white">
-              <div className="text-[11px] font-semibold tracking-wider text-white/40 uppercase mb-1">Заказ № {order.code}</div>
-              <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight mb-4">{order.customerFirstName} {order.customerLastName}</h1>
-              <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-white/60">
-                {order.cityName && <div>📍 {order.cityName}</div>}
-                {order.plannedDeliveryDate && <div>🚚 до {new Date(order.plannedDeliveryDate).toLocaleDateString('ru-KZ')}</div>}
+              className="nav-glass nav-card-accent rounded-[28px] p-6 lg:p-8 mb-4">
+              <div className="text-[11px] font-semibold tracking-wider uppercase mb-1" style={{ color: 'var(--nav-text-muted)' }}>Заказ № {order.code}</div>
+              <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight mb-4" style={{ color: 'var(--nav-text-primary)' }}>{order.customerFirstName} {order.customerLastName}</h1>
+              <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
+                {order.cityName && <div className="flex items-center gap-1.5"><PinIcon />{order.cityName}</div>}
+                {order.plannedDeliveryDate && <div className="flex items-center gap-1.5"><TruckIcon />до {new Date(order.plannedDeliveryDate).toLocaleDateString('ru-KZ')}</div>}
                 <div>{new Date(order.creationTime).toLocaleString('ru-KZ')}</div>
               </div>
-              <div className="text-3xl lg:text-4xl font-black font-mono tabular-nums mt-4">{order.totalPrice.toLocaleString('ru-KZ')} ₸</div>
+              <div className="text-3xl lg:text-4xl font-black font-mono tabular-nums mt-4" style={{ color: 'var(--nav-text-primary)' }}>{order.totalPrice.toLocaleString('ru-KZ')} ₸</div>
             </motion.div>
 
             <div className="space-y-2">
               {order.items.map((item, i) => (
                 <motion.div key={item.code + i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.3, ease: EASE, delay: i * 0.05 }}
-                  className="bg-white rounded-2xl shadow-sm p-3 flex items-center gap-3">
+                  className="nav-glass rounded-2xl p-3 flex items-center gap-3">
                   {item.imageUrl ? (
-                    <img src={item.imageUrl} alt={item.name} className="w-16 h-16 rounded-xl object-cover flex-shrink-0 bg-gray-100" />
+                    <img src={item.imageUrl} alt={item.name} className="w-16 h-16 rounded-xl object-cover flex-shrink-0" style={{ background: 'var(--nav-bg)' }} />
                   ) : (
-                    <div className="w-16 h-16 rounded-xl bg-gray-100 flex-shrink-0" />
+                    <div className="w-16 h-16 rounded-xl flex-shrink-0" style={{ background: 'var(--nav-bg)' }} />
                   )}
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm font-semibold text-gray-800 line-clamp-2">{item.name}</div>
-                    <div className="text-xs text-gray-400 mt-0.5">× {item.quantity}</div>
+                    <div className="text-sm font-semibold line-clamp-2" style={{ color: 'var(--nav-text-primary)' }}>{item.name}</div>
+                    <div className="text-xs mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>× {item.quantity}</div>
                   </div>
                 </motion.div>
               ))}

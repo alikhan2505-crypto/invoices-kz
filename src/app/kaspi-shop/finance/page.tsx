@@ -80,36 +80,36 @@ function FinanceChart({ byDay }: { byDay: FinanceSummary['byDay'] }) {
       <svg width={width} height={height} className="block">
         {monthBands.map((b, i) => (
           <rect key={b.month} x={x(b.startI) - gap / 2} y={0} width={(b.endI - b.startI + 1) * (barWidth + gap)} height={height}
-            fill={i % 2 === 0 ? '#F6F6FB' : '#FFFFFF'} />
+            fill="var(--nav-bg)" opacity={i % 2 === 0 ? 1 : 0} />
         ))}
 
         {byDay.map((d, i) => {
           const barHeight = (d.revenue / maxRevenue) * plotHeight
           return (
             <rect key={d.date} x={x(i)} y={padTop + plotHeight - barHeight} width={barWidth} height={barHeight}
-              rx={3} fill="#1C2056" opacity={0.85}>
+              rx={3} fill="var(--nav-accent)" opacity={0.85}>
               <title>{`${d.date}\nВыручка: ${d.revenue.toLocaleString('ru-KZ')} ₸\nЗаказов: ${d.orderCount}\nШтук: ${d.unitsSold}${d.unitsSold > 0 ? `\nЦена/шт: ${Math.round(d.revenue / d.unitsSold).toLocaleString('ru-KZ')} ₸` : ''}`}</title>
             </rect>
           )
         })}
 
-        <path d={ordersPath} fill="none" stroke="#2DC48D" strokeWidth={2} />
-        <path d={pricePath} fill="none" stroke="#FF8A00" strokeWidth={2.5} strokeDasharray="6 4" />
+        <path d={ordersPath} fill="none" stroke="var(--nav-success)" strokeWidth={2} />
+        <path d={pricePath} fill="none" stroke="var(--nav-magenta)" strokeWidth={2.5} strokeDasharray="6 4" />
 
         {/* Min/max revenue labels directly on the chart, not tucked into a tooltip */}
         <text x={barCenter(byDay.indexOf(maxDay))} y={padTop + plotHeight - (maxDay.revenue / maxRevenue) * plotHeight - 6}
-          textAnchor="middle" fontSize={9} fontWeight={700} fill="#1C2056">
+          textAnchor="middle" fontSize={9} fontWeight={700} fill="var(--nav-text-primary)">
           {maxDay.revenue.toLocaleString('ru-KZ')}
         </text>
         <text x={barCenter(byDay.indexOf(minDay))} y={padTop + plotHeight - (minDay.revenue / maxRevenue) * plotHeight - 6}
-          textAnchor="middle" fontSize={9} fontWeight={700} fill="#9CA3AF">
+          textAnchor="middle" fontSize={9} fontWeight={700} fill="var(--nav-text-muted)">
           {minDay.revenue.toLocaleString('ru-KZ')}
         </text>
       </svg>
-      <div className="flex items-center gap-4 mt-2 text-[11px] text-gray-400 px-1">
-        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-[#1C2056] inline-block" />Выручка по дням</span>
-        <span className="flex items-center gap-1.5"><span className="w-2.5 h-0.5 bg-[#2DC48D] inline-block" />Заказов (тренд)</span>
-        <span className="flex items-center gap-1.5"><span className="w-2.5 h-0.5 border-t-2 border-dashed border-[#FF8A00] inline-block" />Цена за штуку (тренд)</span>
+      <div className="flex items-center flex-wrap gap-4 mt-2 text-[11px] px-1" style={{ color: 'var(--nav-text-muted)' }}>
+        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: 'var(--nav-accent)' }} />Выручка по дням</span>
+        <span className="flex items-center gap-1.5"><span className="w-2.5 h-0.5 inline-block" style={{ background: 'var(--nav-success)' }} />Заказов (тренд)</span>
+        <span className="flex items-center gap-1.5"><span className="w-2.5 h-0.5 inline-block" style={{ borderTop: '2px dashed var(--nav-magenta)' }} />Цена за штуку (тренд)</span>
       </div>
     </div>
   )
@@ -166,73 +166,81 @@ export default function KaspiShopFinance() {
         {summary?.sessionExpired && <SessionExpiredBanner />}
 
         {loadError && (
-          <div className="bg-red-50 rounded-2xl p-4 flex items-center justify-between gap-3 mb-4">
-            <span className="text-sm text-red-600">{loadError}</span>
-            <button onClick={() => loadSummary(days)} className="text-xs bg-red-500 text-white rounded-lg px-3 py-1.5 flex-shrink-0">Повторить</button>
+          <div className="nav-glass rounded-2xl p-4 flex items-center justify-between gap-3 mb-4">
+            <span className="text-sm" style={{ color: 'var(--nav-critical)' }}>{loadError}</span>
+            <button onClick={() => loadSummary(days)} className="text-xs font-semibold rounded-lg px-3 py-1.5 flex-shrink-0" style={{ background: 'var(--nav-critical)', color: '#fff' }}>Повторить</button>
           </div>
         )}
 
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}
-          className="bg-[#12142E] rounded-[28px] p-6 lg:p-8 mb-4 text-white">
-          <div className="flex items-start justify-between gap-4 mb-6">
+          className="nav-glass nav-card-accent rounded-[28px] p-6 lg:p-8 mb-4">
+          <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
             <div>
-              <div className="text-[11px] font-semibold tracking-wider text-white/40 uppercase mb-1">Финансы</div>
-              <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight">Выручка</h1>
+              <div className="text-[11px] font-semibold tracking-wider uppercase mb-1" style={{ color: 'var(--nav-text-muted)' }}>Финансы</div>
+              <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight" style={{ color: 'var(--nav-text-primary)' }}>Выручка</h1>
             </div>
-            <div className="flex items-center gap-1 flex-shrink-0 bg-white/10 rounded-full p-1">
-              {PERIODS.map(p => (
-                <button key={p} onClick={() => setDays(p)}
-                  className={`text-xs font-medium rounded-full px-3 py-1.5 transition-colors ${days === p ? 'bg-white text-[#12142E]' : 'text-white/60'}`}>
-                  {p} дн.
-                </button>
-              ))}
+            <div className="flex items-center gap-1 flex-shrink-0 nav-glass rounded-full p-1">
+              {PERIODS.map(p => {
+                const active = days === p
+                return (
+                  <button key={p} onClick={() => setDays(p)}
+                    className="relative text-xs font-medium rounded-full px-3 py-1.5 transition-colors"
+                    style={{ color: active ? 'var(--nav-accent-ink)' : 'var(--nav-text-secondary)' }}>
+                    {active && (
+                      <motion.span layoutId="financePeriodPill" className="absolute inset-0 rounded-full" style={{ background: 'var(--nav-accent)', zIndex: 0 }}
+                        transition={{ type: 'spring', stiffness: 380, damping: 32 }} />
+                    )}
+                    <span className="relative" style={{ zIndex: 1 }}>{p} дн.</span>
+                  </button>
+                )
+              })}
             </div>
           </div>
           <div className="grid grid-cols-3 gap-3 lg:gap-6">
             <div>
-              <div className="text-3xl lg:text-4xl font-black font-mono tabular-nums">{(summary?.totalRevenue ?? 0).toLocaleString('ru-KZ')}</div>
-              <div className="text-xs text-white/40 mt-1">₸ выручка</div>
+              <div className="text-3xl lg:text-4xl font-black font-mono tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{(summary?.totalRevenue ?? 0).toLocaleString('ru-KZ')}</div>
+              <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>₸ выручка</div>
             </div>
             <div>
-              <div className="text-3xl lg:text-4xl font-black font-mono tabular-nums">{summary?.orderCount ?? 0}</div>
-              <div className="text-xs text-white/40 mt-1">заказов</div>
+              <div className="text-3xl lg:text-4xl font-black font-mono tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{summary?.orderCount ?? 0}</div>
+              <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>заказов</div>
             </div>
             <div>
-              <div className="text-3xl lg:text-4xl font-black font-mono tabular-nums">{Math.round(summary?.averageOrderValue ?? 0).toLocaleString('ru-KZ')}</div>
-              <div className="text-xs text-white/40 mt-1">₸ средний чек</div>
+              <div className="text-3xl lg:text-4xl font-black font-mono tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{Math.round(summary?.averageOrderValue ?? 0).toLocaleString('ru-KZ')}</div>
+              <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>₸ средний чек</div>
             </div>
           </div>
           {summary?.truncated && (
-            <div className="text-[11px] text-white/40 mt-4">Учтены последние 200 заказов на статус — на большом объёме сумма может быть неполной.</div>
+            <div className="text-[11px] mt-4" style={{ color: 'var(--nav-text-muted)' }}>Учтены последние 200 заказов на статус — на большом объёме сумма может быть неполной.</div>
           )}
         </motion.div>
 
         {summaryLoading ? (
-          <div className="bg-white rounded-2xl shadow-sm p-8 text-center text-sm text-gray-400">Считаем...</div>
+          <div className="nav-glass rounded-2xl p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Считаем...</div>
         ) : !summary || summary.byDay.length === 0 ? (
-          <div className="bg-white rounded-2xl shadow-sm p-8 text-center">
-            <div className="text-sm text-gray-500">За этот период выполненных заказов нет.</div>
+          <div className="nav-glass rounded-2xl p-8 text-center">
+            <div className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>За этот период выполненных заказов нет.</div>
           </div>
         ) : (
           <>
-            <div className="bg-white rounded-2xl shadow-sm p-4 mb-4">
+            <div className="nav-glass rounded-2xl p-4 mb-4">
               <FinanceChart byDay={summary.byDay} />
             </div>
 
-            <div className="bg-white rounded-2xl shadow-sm divide-y divide-gray-50 mb-4 max-h-64 overflow-y-auto">
-              {[...summary.byDay].reverse().map(d => (
-                <div key={d.date} className="flex items-center justify-between px-4 py-3">
-                  <span className="text-sm text-gray-600">{d.date}</span>
-                  <span className="text-xs text-gray-400">{d.orderCount} {d.orderCount === 1 ? 'заказ' : 'заказов'}</span>
-                  <span className="font-mono font-semibold text-sm text-[#1C2056] tabular-nums">{d.revenue.toLocaleString('ru-KZ')} ₸</span>
+            <div className="nav-glass rounded-2xl mb-4 max-h-64 overflow-y-auto">
+              {[...summary.byDay].reverse().map((d, i) => (
+                <div key={d.date} className="flex items-center justify-between px-4 py-3" style={i > 0 ? { borderTop: '1px solid var(--nav-border-soft)' } : undefined}>
+                  <span className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>{d.date}</span>
+                  <span className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>{d.orderCount} {d.orderCount === 1 ? 'заказ' : 'заказов'}</span>
+                  <span className="font-mono font-semibold text-sm tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{d.revenue.toLocaleString('ru-KZ')} ₸</span>
                 </div>
               ))}
             </div>
 
-            <div className="text-sm font-semibold text-gray-800 mb-2 px-1">Поведение покупателей</div>
+            <div className="text-sm font-semibold mb-2 px-1" style={{ color: 'var(--nav-text-primary)' }}>Поведение покупателей</div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              <div className="bg-white rounded-2xl shadow-sm p-4">
-                <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Дни недели</div>
+              <div className="nav-glass rounded-2xl p-4">
+                <div className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--nav-text-muted)' }}>Дни недели</div>
                 {(() => {
                   const maxW = Math.max(...summary.behavioral.byWeekday.map(w => w.orderCount), 1)
                   const order = [1, 2, 3, 4, 5, 6, 0] // Пн..Вс
@@ -242,11 +250,11 @@ export default function KaspiShopFinance() {
                         const w = summary.behavioral.byWeekday.find(x => x.day === day)!
                         return (
                           <div key={day} className="flex items-center gap-2">
-                            <span className="text-[11px] text-gray-400 w-5 flex-shrink-0">{w.label}</span>
-                            <div className="flex-1 h-2 rounded-full bg-gray-100 overflow-hidden">
-                              <div className="h-full bg-[#1C2056] rounded-full" style={{ width: `${(w.orderCount / maxW) * 100}%` }} />
+                            <span className="text-[11px] w-5 flex-shrink-0" style={{ color: 'var(--nav-text-muted)' }}>{w.label}</span>
+                            <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: 'var(--nav-accent-track)' }}>
+                              <div className="h-full rounded-full" style={{ width: `${(w.orderCount / maxW) * 100}%`, background: 'var(--nav-accent)' }} />
                             </div>
-                            <span className="text-[11px] text-gray-400 w-5 text-right flex-shrink-0">{w.orderCount}</span>
+                            <span className="text-[11px] w-5 text-right flex-shrink-0 tabular-nums" style={{ color: 'var(--nav-text-muted)' }}>{w.orderCount}</span>
                           </div>
                         )
                       })}
@@ -255,17 +263,17 @@ export default function KaspiShopFinance() {
                 })()}
               </div>
 
-              <div className="bg-white rounded-2xl shadow-sm p-4">
-                <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Часы (по времени Казахстана)</div>
+              <div className="nav-glass rounded-2xl p-4">
+                <div className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--nav-text-muted)' }}>Часы (по времени Казахстана)</div>
                 {(() => {
                   const topHours = [...summary.behavioral.byHour].sort((a, b) => b.orderCount - a.orderCount).slice(0, 3).filter(h => h.orderCount > 0)
-                  if (topHours.length === 0) return <div className="text-[11px] text-gray-400">Недостаточно данных.</div>
+                  if (topHours.length === 0) return <div className="text-[11px]" style={{ color: 'var(--nav-text-muted)' }}>Недостаточно данных.</div>
                   return (
                     <div className="space-y-1.5">
                       {topHours.map(h => (
                         <div key={h.hour} className="flex items-center justify-between">
-                          <span className="text-sm text-gray-600">{h.hour}:00–{h.hour + 1}:00</span>
-                          <span className="text-xs text-gray-400 tabular-nums">{h.orderCount} {h.orderCount === 1 ? 'заказ' : 'заказов'}</span>
+                          <span className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>{h.hour}:00–{h.hour + 1}:00</span>
+                          <span className="text-xs tabular-nums" style={{ color: 'var(--nav-text-muted)' }}>{h.orderCount} {h.orderCount === 1 ? 'заказ' : 'заказов'}</span>
                         </div>
                       ))}
                     </div>
@@ -273,35 +281,35 @@ export default function KaspiShopFinance() {
                 })()}
               </div>
 
-              <div className="bg-white rounded-2xl shadow-sm p-4">
-                <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Зарплатный цикл</div>
+              <div className="nav-glass rounded-2xl p-4">
+                <div className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--nav-text-muted)' }}>Зарплатный цикл</div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-sm text-gray-600">До 10 числа</span>
-                  <span className="font-mono font-semibold text-sm text-[#1C2056] tabular-nums">{summary.behavioral.beforePayday.revenue.toLocaleString('ru-KZ')} ₸</span>
+                  <span className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>До 10 числа</span>
+                  <span className="font-mono font-semibold text-sm tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{summary.behavioral.beforePayday.revenue.toLocaleString('ru-KZ')} ₸</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">После 10 числа</span>
-                  <span className="font-mono font-semibold text-sm text-[#1C2056] tabular-nums">{summary.behavioral.afterPayday.revenue.toLocaleString('ru-KZ')} ₸</span>
+                  <span className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>После 10 числа</span>
+                  <span className="font-mono font-semibold text-sm tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{summary.behavioral.afterPayday.revenue.toLocaleString('ru-KZ')} ₸</span>
                 </div>
               </div>
 
-              <div className="bg-white rounded-2xl shadow-sm p-4">
-                <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Пол покупателей</div>
-                <div className="text-[10px] text-gray-400 mb-3">оценочно по имени, не данные Kaspi</div>
+              <div className="nav-glass rounded-2xl p-4">
+                <div className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--nav-text-muted)' }}>Пол покупателей</div>
+                <div className="text-[10px] mb-3" style={{ color: 'var(--nav-text-muted)' }}>оценочно по имени, не данные Kaspi</div>
                 {(() => {
                   const g = summary.behavioral.genderEstimate
                   const total = g.male + g.female + g.unknown || 1
                   return (
                     <>
-                      <div className="h-2.5 rounded-full overflow-hidden flex mb-2">
-                        <div className="h-full bg-[#1C2056]" style={{ width: `${(g.female / total) * 100}%` }} />
-                        <div className="h-full bg-[#2DC48D]" style={{ width: `${(g.male / total) * 100}%` }} />
-                        <div className="h-full bg-gray-200" style={{ width: `${(g.unknown / total) * 100}%` }} />
+                      <div className="h-2.5 rounded-full overflow-hidden flex mb-2" style={{ background: 'var(--nav-border-soft)' }}>
+                        <div className="h-full" style={{ width: `${(g.female / total) * 100}%`, background: 'var(--nav-accent)' }} />
+                        <div className="h-full" style={{ width: `${(g.male / total) * 100}%`, background: 'var(--nav-teal)' }} />
+                        <div className="h-full" style={{ width: `${(g.unknown / total) * 100}%`, background: 'var(--nav-text-muted)' }} />
                       </div>
-                      <div className="flex items-center gap-3 text-[11px] text-gray-500">
-                        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#1C2056] inline-block" />Ж {g.female}</span>
-                        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#2DC48D] inline-block" />М {g.male}</span>
-                        {g.unknown > 0 && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-gray-200 inline-block" />? {g.unknown}</span>}
+                      <div className="flex items-center flex-wrap gap-3 text-[11px]" style={{ color: 'var(--nav-text-secondary)' }}>
+                        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full inline-block" style={{ background: 'var(--nav-accent)' }} />Ж {g.female}</span>
+                        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full inline-block" style={{ background: 'var(--nav-teal)' }} />М {g.male}</span>
+                        {g.unknown > 0 && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full inline-block" style={{ background: 'var(--nav-text-muted)' }} />? {g.unknown}</span>}
                       </div>
                     </>
                   )
@@ -309,13 +317,13 @@ export default function KaspiShopFinance() {
               </div>
 
               {summary.behavioral.holidayOrders.length > 0 && (
-                <div className="bg-white rounded-2xl shadow-sm p-4 sm:col-span-2 lg:col-span-1">
-                  <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">В праздники</div>
+                <div className="nav-glass rounded-2xl p-4 sm:col-span-2 lg:col-span-1">
+                  <div className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--nav-text-muted)' }}>В праздники</div>
                   <div className="space-y-1.5">
                     {summary.behavioral.holidayOrders.map(h => (
                       <div key={h.date} className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600">{h.label}</span>
-                        <span className="text-xs text-gray-400 tabular-nums">{h.orderCount} · {h.revenue.toLocaleString('ru-KZ')} ₸</span>
+                        <span className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>{h.label}</span>
+                        <span className="text-xs tabular-nums" style={{ color: 'var(--nav-text-muted)' }}>{h.orderCount} · {h.revenue.toLocaleString('ru-KZ')} ₸</span>
                       </div>
                     ))}
                   </div>
@@ -324,10 +332,6 @@ export default function KaspiShopFinance() {
             </div>
           </>
         )}
-      </div>
-
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t px-4 py-2 flex items-center justify-between z-40">
-        <div className="text-xs font-semibold text-[#1C2056]">Финансы</div>
       </div>
     </main>
   )

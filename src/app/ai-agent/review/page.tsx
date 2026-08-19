@@ -1,9 +1,12 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { motion, useReducedMotion } from 'framer-motion'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import SiteNav from '@/components/SiteNav'
+
+const EASE = [0.16, 1, 0.3, 1] as const
 
 interface ReviewItem {
   id: string
@@ -13,8 +16,19 @@ interface ReviewItem {
   createdAt: string
 }
 
+function AlertIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+      <path d="M12 9v4M12 17h.01" />
+      <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
+    </svg>
+  )
+}
+
 export default function AiAgentReview() {
   const router = useRouter()
+  const reduceMotionRaw = useReducedMotion()
+  const reduceMotion = !!reduceMotionRaw
   const [loading, setLoading] = useState(true)
   const [items, setItems] = useState<ReviewItem[]>([])
   const [edits, setEdits] = useState<Record<string, string>>({})
@@ -78,52 +92,71 @@ export default function AiAgentReview() {
   if (loading) return (
     <main className="nav-surface-elevated min-h-screen">
       <SiteNav />
-      <div className="p-8 text-center text-gray-400">Загрузка…</div>
+      <div className="p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Загрузка…</div>
     </main>
   )
 
   if (forbidden) return (
     <main className="nav-surface-elevated min-h-screen">
       <SiteNav />
-      <div className="p-8 text-center text-gray-400 text-sm">Эта функция пока доступна только администраторам.</div>
+      <div className="p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Эта функция пока доступна только администраторам.</div>
     </main>
   )
 
   return (
     <main className="nav-surface-elevated min-h-screen">
-    <SiteNav />
-    <div className="max-w-xl mx-auto p-6 pb-24">
-      <Link href="/ai-agent/settings" className="text-xs text-gray-400 hover:text-gray-600 mb-2 inline-block">← Настройки агента</Link>
-      <h1 className="text-xl font-bold text-[#1C2056] mb-1">Диалоги на проверке</h1>
-      <p className="text-sm text-gray-500 mb-6">Агент ещё обучается — черновики ответов ждут вашего одобрения</p>
+      <SiteNav />
+      <div className="max-w-xl mx-auto p-4 lg:p-6 pb-24 lg:pb-6">
+        <motion.div
+          initial={reduceMotion ? false : { opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE }}
+        >
+          <Link href="/ai-agent/settings" className="text-xs mb-2 inline-block transition-colors" style={{ color: 'var(--nav-text-muted)' }}>← Настройки агента</Link>
+          <h1 className="text-xl font-bold mb-1" style={{ color: 'var(--nav-text-primary)' }}>Диалоги на проверке</h1>
+          <p className="text-sm mb-6" style={{ color: 'var(--nav-text-secondary)' }}>Агент ещё обучается — черновики ответов ждут вашего одобрения</p>
+        </motion.div>
 
-      {items.length === 0 && <div className="text-sm text-gray-400 text-center py-8">Пока нечего проверять</div>}
+        {items.length === 0 && (
+          <div className="text-sm text-center py-8" style={{ color: 'var(--nav-text-muted)' }}>Пока нечего проверять</div>
+        )}
 
-      <div className="space-y-4">
-        {items.map(item => (
-          <div key={item.id} className="bg-white rounded-xl shadow-sm p-4">
-            {item.urgent && <div className="text-xs text-red-500 font-medium mb-2">🔴 Похоже на срочное/негатив</div>}
-            <div className="text-xs text-gray-400 mb-2">Клиент: {item.customerHandle}</div>
-            <textarea
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm mb-3 min-h-[80px]"
-              value={edits[item.id] ?? item.text}
-              onChange={e => setEdits(prev => ({ ...prev, [item.id]: e.target.value }))}
-            />
-            {errors[item.id] && <div className="text-xs text-red-500 mb-2">{errors[item.id]}</div>}
-            <div className="flex gap-2">
-              <button onClick={() => act(item.id, 'send')} disabled={acting === item.id}
-                className="flex-1 bg-[#1C2056] text-white rounded-lg px-3 py-2 text-sm font-medium">
-                Отправить
-              </button>
-              <button onClick={() => act(item.id, 'skip')} disabled={acting === item.id}
-                className="flex-1 bg-white border border-gray-200 text-gray-500 rounded-lg px-3 py-2 text-sm font-medium">
-                Пропустить
-              </button>
-            </div>
-          </div>
-        ))}
+        <div className="space-y-4">
+          {items.map((item, i) => (
+            <motion.div
+              key={item.id}
+              initial={reduceMotion ? false : { opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE, delay: reduceMotion ? 0 : Math.min(i * 0.05, 0.3) }}
+              className="nav-glass rounded-2xl p-4"
+            >
+              {item.urgent && (
+                <div className="text-xs font-medium mb-2 flex items-center gap-1.5" style={{ color: 'var(--nav-critical)' }}>
+                  <AlertIcon /> Похоже на срочное/негатив
+                </div>
+              )}
+              <div className="text-xs mb-2" style={{ color: 'var(--nav-text-muted)' }}>Клиент: {item.customerHandle}</div>
+              <textarea
+                className="w-full rounded-lg px-3 py-2 text-sm mb-3 min-h-[80px] outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
+                style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }}
+                value={edits[item.id] ?? item.text}
+                onChange={e => setEdits(prev => ({ ...prev, [item.id]: e.target.value }))}
+              />
+              {errors[item.id] && <div className="text-xs mb-2" style={{ color: 'var(--nav-critical)' }}>{errors[item.id]}</div>}
+              <div className="flex gap-2">
+                <button onClick={() => act(item.id, 'send')} disabled={acting === item.id}
+                  className="flex-1 rounded-lg px-3 py-2 text-sm font-medium disabled:opacity-50" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                  Отправить
+                </button>
+                <button onClick={() => act(item.id, 'skip')} disabled={acting === item.id}
+                  className="flex-1 nav-glass rounded-lg px-3 py-2 text-sm font-medium disabled:opacity-50" style={{ color: 'var(--nav-text-secondary)' }}>
+                  Пропустить
+                </button>
+              </div>
+            </motion.div>
+          ))}
+        </div>
       </div>
-    </div>
     </main>
   )
 }

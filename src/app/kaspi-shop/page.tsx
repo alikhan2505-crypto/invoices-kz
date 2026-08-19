@@ -35,7 +35,11 @@ const STRATEGY_LABELS: Record<string, string> = {
   be_second: 'Быть 2-м',
 }
 
+// Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
+// kept identical rather than inventing a second "house" ease.
 const EASE = [0.16, 1, 0.3, 1] as const
+const CARD_HOVER = 'transition-all duration-200 ease-out hover:-translate-y-1 hover:shadow-[var(--nav-card-glow)]'
+const INPUT_CLS = 'w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]'
 
 // Always normalizes to +7, regardless of whether the seller types the
 // domestic 8-prefix or the international 7 -- the leading digit is
@@ -48,6 +52,31 @@ function formatPhone(value: string): string {
   if (digits.length > 4) result += ' ' + digits.slice(4, 7)
   if (digits.length > 7) result += ' ' + digits.slice(7, 11)
   return result
+}
+
+function PauseIcon() {
+  return (
+    <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+      <rect x="5" y="4" width="5" height="16" rx="1.5" />
+      <rect x="14" y="4" width="5" height="16" rx="1.5" />
+    </svg>
+  )
+}
+
+function XIcon({ size = 12 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 6 6 18M6 6l12 12" />
+    </svg>
+  )
+}
+
+function SparkleIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+      <path d="M12 3l1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8L12 3z" />
+    </svg>
+  )
 }
 
 // The core mechanic of this whole feature is a race: our price against the
@@ -64,35 +93,37 @@ function PriceLadder({ own, competitor, floor, maxPrice }: { own: number; compet
 
   return (
     <div className="pt-1">
-      <div className="relative h-1.5 rounded-full bg-gray-100">
+      <div className="relative h-1.5 rounded-full" style={{ background: 'var(--nav-border-soft)' }}>
         <div
           className="absolute inset-y-0 left-0 rounded-full"
-          style={{ width: `${pct(floor)}%`, background: 'repeating-linear-gradient(135deg, #FFE2E3 0, #FFE2E3 4px, transparent 4px, transparent 8px)' }}
+          style={{ width: `${pct(floor)}%`, background: 'repeating-linear-gradient(135deg, var(--nav-critical) 0, var(--nav-critical) 4px, transparent 4px, transparent 8px)', opacity: 0.18 }}
         />
         {maxPrice !== null && (
           <div
             className="absolute inset-y-0 right-0 rounded-full"
-            style={{ width: `${100 - pct(maxPrice)}%`, background: 'repeating-linear-gradient(135deg, #E2F7EE 0, #E2F7EE 4px, transparent 4px, transparent 8px)' }}
+            style={{ width: `${100 - pct(maxPrice)}%`, background: 'repeating-linear-gradient(135deg, var(--nav-success) 0, var(--nav-success) 4px, transparent 4px, transparent 8px)', opacity: 0.18 }}
           />
         )}
         {competitor !== null && (
           <motion.div
-            className="absolute -top-1.5 w-3.5 h-3.5 rounded-full bg-white ring-2 ring-[#1C2056]/30"
+            className="absolute -top-1.5 w-3.5 h-3.5 rounded-full"
+            style={{ background: 'var(--nav-surface-chrome)', boxShadow: '0 0 0 2px var(--nav-text-muted)' }}
             initial={false}
             animate={{ left: `calc(${pct(competitor)}% - 7px)` }}
             transition={{ duration: 0.6, ease: EASE }}
           />
         )}
         <motion.div
-          className={`absolute -top-1.5 w-3.5 h-3.5 rounded-full ring-2 ring-white shadow ${winning ? 'bg-[#00C880]' : 'bg-[#FF5A5F]'}`}
+          className="absolute -top-1.5 w-3.5 h-3.5 rounded-full"
+          style={{ background: winning ? 'var(--nav-success)' : 'var(--nav-critical)', boxShadow: '0 0 0 2px var(--nav-bg)' }}
           initial={false}
           animate={{ left: `calc(${pct(own)}% - 7px)` }}
           transition={{ duration: 0.6, ease: EASE }}
         />
       </div>
-      <div className="flex items-center justify-between mt-2 text-[11px] text-gray-400">
+      <div className="flex items-center justify-between flex-wrap gap-x-3 gap-y-1 mt-2 text-[11px]" style={{ color: 'var(--nav-text-muted)' }}>
         <span>Пол {floor.toLocaleString('ru-KZ')} ₸</span>
-        {atFloor && <span className="text-[#FF5A5F] font-medium">Упёрлись в минимум</span>}
+        {atFloor && <span className="font-semibold" style={{ color: 'var(--nav-critical)' }}>Упёрлись в минимум</span>}
         {competitor !== null && <span>Конкурент {competitor.toLocaleString('ru-KZ')} ₸</span>}
         {maxPrice !== null && <span>Потолок {maxPrice.toLocaleString('ru-KZ')} ₸</span>}
       </div>
@@ -378,53 +409,54 @@ export default function KaspiShop() {
 
       <div className="flex-1 min-w-0 p-4 lg:p-6 pb-24 lg:pb-6">
         {loadError && (
-          <div className="bg-red-50 rounded-2xl p-4 flex items-center justify-between gap-3 mb-4">
-            <span className="text-sm text-red-600">{loadError}</span>
-            <button onClick={load} className="text-xs bg-red-500 text-white rounded-lg px-3 py-1.5 flex-shrink-0">Повторить</button>
+          <div className="nav-glass rounded-2xl p-4 flex items-center justify-between gap-3 mb-4">
+            <span className="text-sm" style={{ color: 'var(--nav-critical)' }}>{loadError}</span>
+            <button onClick={load} className="text-xs font-semibold rounded-lg px-3 py-1.5 flex-shrink-0" style={{ background: 'var(--nav-critical)', color: '#fff' }}>Повторить</button>
           </div>
         )}
 
         {connected && sessionStatus === 'session_expired' && (
-          <div className="bg-[#FFF4E5] rounded-2xl p-4 flex items-center justify-between gap-3 mb-4">
-            <span className="text-sm text-[#B15E00]">Сессия кабинета Kaspi истекла — переподключитесь, чтобы демпинг продолжил работать.</span>
-            <button onClick={() => { setConnected(false); setSessionStatus(null) }} className="text-xs bg-[#B15E00] text-white rounded-lg px-3 py-1.5 flex-shrink-0">Переподключиться</button>
+          <div className="nav-glass rounded-2xl p-4 flex items-center justify-between gap-3 mb-4">
+            <span className="text-sm" style={{ color: 'var(--nav-critical)' }}>Сессия кабинета Kaspi истекла — переподключитесь, чтобы демпинг продолжил работать.</span>
+            <button onClick={() => { setConnected(false); setSessionStatus(null) }} className="text-xs font-semibold rounded-lg px-3 py-1.5 flex-shrink-0" style={{ background: 'var(--nav-critical)', color: '#fff' }}>Переподключиться</button>
           </div>
         )}
 
         {!connected ? (
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}
-            className="bg-[#12142E] rounded-[28px] p-6 lg:p-10 mb-4 text-white">
-            <div className="text-[11px] font-semibold tracking-wider text-white/40 uppercase mb-2">Подключение</div>
-            <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight mb-6">Подключите Kaspi Магазин</h1>
-            {connectError && <div className="text-sm text-[#FF8A8E] mb-3">{connectError}</div>}
+            className="nav-glass nav-card-accent rounded-[28px] p-6 lg:p-10 mb-4">
+            <div className="text-[11px] font-semibold tracking-wider uppercase mb-2" style={{ color: 'var(--nav-text-muted)' }}>Подключение</div>
+            <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight mb-6" style={{ color: 'var(--nav-text-primary)' }}>Подключите Kaspi Магазин</h1>
+            {connectError && <div className="text-sm mb-3" style={{ color: 'var(--nav-critical)' }}>{connectError}</div>}
 
             {merchantChoices ? (
               <div className="flex flex-col gap-2 max-w-sm">
-                <div className="text-xs text-white/40 mb-1">На этом номере найдено магазинов: {merchantChoices.length}. Выберите нужный.</div>
+                <div className="text-xs mb-1" style={{ color: 'var(--nav-text-muted)' }}>На этом номере найдено магазинов: {merchantChoices.length}. Выберите нужный.</div>
                 {merchantChoices.map(m => (
                   <button key={m.id} onClick={() => selectMerchant(m.id)} disabled={connecting}
-                    className="w-full text-left bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-sm text-white hover:border-white/30 transition-colors disabled:opacity-50">
+                    className="w-full text-left nav-glass rounded-xl px-4 py-3 text-sm transition-colors hover:border-[color:var(--nav-accent)] disabled:opacity-50"
+                    style={{ color: 'var(--nav-text-primary)' }}>
                     <div className="font-semibold">{m.name}</div>
-                    <div className="text-[11px] text-white/40 mt-0.5">ID {m.id}</div>
+                    <div className="text-[11px] mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>ID {m.id}</div>
                   </button>
                 ))}
               </div>
             ) : !otpToken ? (
               <div className="flex flex-col gap-2 max-w-sm">
-                <input className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-sm text-white! [-webkit-text-fill-color:#fff]! placeholder:text-white/30 outline-none focus:border-white/30"
+                <input className={INPUT_CLS} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }}
                   placeholder="Телефон (как при входе в Kaspi)" value={phone} onChange={e => setPhone(formatPhone(e.target.value))} />
                 <button onClick={startConnect} disabled={connecting}
-                  className="mt-1 bg-white text-[#12142E] rounded-xl py-3 text-sm font-semibold disabled:opacity-50">
+                  className="mt-1 rounded-xl py-3 text-sm font-semibold disabled:opacity-50" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                   {connecting ? 'Отправляем код...' : 'Продолжить'}
                 </button>
               </div>
             ) : (
               <div className="flex flex-col gap-2 max-w-sm">
-                <div className="text-xs text-white/40 mb-1">Код из SMS отправлен на {phone}</div>
-                <input className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-sm text-white! [-webkit-text-fill-color:#fff]! placeholder:text-white/30 outline-none focus:border-white/30 font-mono tracking-widest"
+                <div className="text-xs mb-1" style={{ color: 'var(--nav-text-muted)' }}>Код из SMS отправлен на {phone}</div>
+                <input className={`${INPUT_CLS} font-mono tracking-widest`} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }}
                   placeholder="000000" value={otpCode} onChange={e => setOtpCode(e.target.value)} />
                 <button onClick={completeConnect} disabled={connecting}
-                  className="mt-1 bg-white text-[#12142E] rounded-xl py-3 text-sm font-semibold disabled:opacity-50">
+                  className="mt-1 rounded-xl py-3 text-sm font-semibold disabled:opacity-50" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                   {connecting ? 'Проверяем...' : 'Подтвердить'}
                 </button>
               </div>
@@ -435,41 +467,45 @@ export default function KaspiShop() {
             {/* Hero: the one question this page answers, stated as three
                 numbers, not buried in per-product rows. */}
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}
-              className="bg-[#12142E] rounded-[28px] p-6 lg:p-8 mb-4 text-white">
-              <div className="flex items-start justify-between gap-4 mb-6">
+              className="nav-glass nav-card-accent rounded-[28px] p-6 lg:p-8 mb-4">
+              <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
                 <div>
-                  <div className="text-[11px] font-semibold tracking-wider text-white/40 uppercase mb-1">{companyName || 'Магазин подключён'}</div>
-                  <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight">Гонка цен сейчас</h1>
+                  <div className="text-[11px] font-semibold tracking-wider uppercase mb-1" style={{ color: 'var(--nav-text-muted)' }}>{companyName || 'Магазин подключён'}</div>
+                  <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight" style={{ color: 'var(--nav-text-primary)' }}>Гонка цен сейчас</h1>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <button onClick={togglePause}
-                    className={`text-xs font-medium rounded-full px-3 py-2 transition-colors ${paused ? 'bg-[#FF5A5F]/20 text-[#FF8A8E]' : 'bg-[#00C880]/15 text-[#00C880]'}`}>
-                    {paused ? '⏸ На паузе' : '● Работает'}
+                    className="text-xs font-bold rounded-full px-3 py-2 flex items-center gap-1.5 transition-transform hover:-translate-y-0.5"
+                    style={{ background: paused ? 'var(--nav-critical)' : 'var(--nav-success)', color: '#fff' }}>
+                    {paused ? <PauseIcon /> : <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#fff' }} />}
+                    {paused ? 'На паузе' : 'Работает'}
                   </button>
-                  <button onClick={disconnect} className="text-xs font-medium rounded-full px-3 py-2 bg-white/10 text-white/50 hover:text-white/80 transition-colors">
+                  <button onClick={disconnect} className="nav-glass text-xs font-medium rounded-full px-3 py-2 transition-colors" style={{ color: 'var(--nav-text-muted)' }}>
                     Отключить
                   </button>
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-3 lg:gap-6">
                 <div>
-                  <div className="text-3xl lg:text-4xl font-black font-mono tabular-nums">{winningCount}</div>
-                  <div className="text-xs text-white/40 mt-1">из {products.length} — мы дешевле</div>
+                  <div className="text-3xl lg:text-4xl font-black font-mono tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{winningCount}</div>
+                  <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>из {products.length} — мы дешевле</div>
                 </div>
                 <div>
-                  <div className="text-3xl lg:text-4xl font-black font-mono tabular-nums text-[#FF8A8E]">{atFloorCount}</div>
-                  <div className="text-xs text-white/40 mt-1">упёрлись в минимум</div>
+                  <div className="text-3xl lg:text-4xl font-black font-mono tabular-nums" style={{ color: 'var(--nav-critical)' }}>{atFloorCount}</div>
+                  <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>упёрлись в минимум</div>
                 </div>
                 <div>
-                  <div className="text-3xl lg:text-4xl font-black font-mono tabular-nums">{balance}</div>
-                  <div className="text-xs text-white/40 mt-1">₸ на балансе · <button onClick={() => setWalletOpen(true)} className="underline underline-offset-2">пополнить</button></div>
+                  <div className="text-3xl lg:text-4xl font-black font-mono tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{balance}</div>
+                  <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>
+                    ₸ на балансе · <button onClick={() => setWalletOpen(true)} className="underline underline-offset-2" style={{ color: 'var(--nav-accent)' }}>пополнить</button>
+                  </div>
                 </div>
               </div>
             </motion.div>
 
-            <div className="bg-white rounded-2xl shadow-sm p-4 mb-4">
-              <div className="text-sm font-semibold text-gray-800 mb-1">Города для отслеживания конкурентов</div>
-              <div className="text-[11px] text-gray-400 mb-3">
+            <div className="nav-glass rounded-2xl p-4 mb-4">
+              <div className="text-sm font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>Города для отслеживания конкурентов</div>
+              <div className="text-[11px] mb-3" style={{ color: 'var(--nav-text-muted)' }}>
                 {trackedCities.length === 0
                   ? 'Не настроено — цена реагирует на одного эталонного конкурента для всех городов, как раньше.'
                   : `Выбрано: ${trackedCities.length}. Конкурента и цену проверяем отдельно по каждому.`}
@@ -479,20 +515,21 @@ export default function KaspiShop() {
                 <div className="flex flex-wrap gap-2 mb-3">
                   {availableCities.filter(c => trackedCities.includes(c.code)).map(city => (
                     <button key={city.code} onClick={() => toggleTrackedCity(city.code)}
-                      className="text-xs pl-3 pr-2 py-1.5 rounded-full bg-[#1C2056] text-white flex items-center gap-1.5">
+                      className="text-xs pl-3 pr-2 py-1.5 rounded-full flex items-center gap-1.5 transition-transform hover:-translate-y-0.5"
+                      style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                       {city.name}
-                      <span className="text-white/50">✕</span>
+                      <XIcon size={11} />
                     </button>
                   ))}
                 </div>
               )}
 
               {availableCities.length === 0 ? (
-                <div className="text-[11px] text-gray-400">Список городов ещё не загружен.</div>
+                <div className="text-[11px]" style={{ color: 'var(--nav-text-muted)' }}>Список городов ещё не загружен.</div>
               ) : (
                 <>
                   <input value={citySearch} onChange={e => setCitySearch(e.target.value)} placeholder="Найти город…"
-                    className="w-full rounded-lg bg-gray-50 text-gray-800 placeholder-gray-400 px-3 py-2 text-xs outline-none focus:bg-gray-100" />
+                    className={INPUT_CLS} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
                   {citySearch.trim() !== '' && (
                     <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto mt-2">
                       {availableCities
@@ -500,7 +537,8 @@ export default function KaspiShop() {
                         .filter(c => c.name.toLowerCase().includes(citySearch.trim().toLowerCase()))
                         .map(city => (
                           <button key={city.code} onClick={() => { toggleTrackedCity(city.code); setCitySearch('') }}
-                            className="text-xs px-3 py-1.5 rounded-full bg-gray-100 text-gray-500 transition-colors hover:bg-gray-200">
+                            className="nav-glass whitespace-nowrap text-xs px-3 py-1.5 rounded-full transition-colors hover:bg-[var(--nav-accent)] hover:text-[var(--nav-accent-ink)] hover:border-[color:var(--nav-accent)]"
+                            style={{ color: 'var(--nav-text-secondary)' }}>
                             {city.name}
                           </button>
                         ))}
@@ -511,7 +549,7 @@ export default function KaspiShop() {
             </div>
 
             {companyName && activeCount === 0 && products.length > 0 && (
-              <div className="text-xs text-gray-400 mb-4 px-1">{products.length} товаров импортировано и на паузе — включите нужные ниже, чтобы демпинг начал работать.</div>
+              <div className="text-xs mb-4 px-1" style={{ color: 'var(--nav-text-muted)' }}>{products.length} товаров импортировано и на паузе — включите нужные ниже, чтобы демпинг начал работать.</div>
             )}
 
             <div className="space-y-3">
@@ -523,7 +561,7 @@ export default function KaspiShop() {
                     <motion.div key={p.id}
                       initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
                       transition={{ duration: 0.35, ease: EASE, delay: Math.min(i * 0.04, 0.3) }}
-                      className="bg-white rounded-2xl shadow-sm overflow-hidden">
+                      className={`nav-glass rounded-2xl overflow-hidden ${CARD_HOVER}`}>
                       <button onClick={() => {
                         const next = expanded ? null : p.id
                         setExpandedId(next)
@@ -537,18 +575,19 @@ export default function KaspiShop() {
                       }} className="w-full text-left p-4">
                         <div className="flex items-center justify-between gap-3 mb-3">
                           <div className="min-w-0">
-                            <div className="text-sm font-semibold text-gray-800 truncate">{p.product_name}</div>
-                            <div className="text-[11px] text-gray-400">
+                            <div className="text-sm font-semibold truncate" style={{ color: 'var(--nav-text-primary)' }}>{p.product_name}</div>
+                            <div className="text-[11px]" style={{ color: 'var(--nav-text-muted)' }}>
                               {STRATEGY_LABELS[p.demping_strategy] || p.demping_strategy} · проверка каждые {p.check_frequency_minutes} мин
                               {p.market_position !== null && p.market_offer_count !== null && (
-                                <> · <span className="font-medium text-gray-500" title="Место по цене среди всех продавцов на Kaspi. Kaspi может учитывать не только цену — это оценка.">#{p.market_position} из {p.market_offer_count}</span></>
+                                <> · <span className="font-medium" style={{ color: 'var(--nav-text-secondary)' }} title="Место по цене среди всех продавцов на Kaspi. Kaspi может учитывать не только цену — это оценка.">#{p.market_position} из {p.market_offer_count}</span></>
                               )}
                             </div>
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0">
-                            <span className="font-mono font-bold text-sm text-[#1C2056] tabular-nums">{p.own_current_price.toLocaleString('ru-KZ')} ₸</span>
+                            <span className="font-mono font-bold text-sm tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{p.own_current_price.toLocaleString('ru-KZ')} ₸</span>
                             <span onClick={e => { e.stopPropagation(); toggleProduct(p.id, p.enabled) }}
-                              className={`text-[11px] px-2 py-1 rounded-full cursor-pointer ${p.enabled ? 'bg-[#00C880]/10 text-[#00A468]' : 'bg-gray-100 text-gray-500'}`}>
+                              className="text-[11px] px-2 py-1 rounded-full cursor-pointer font-semibold"
+                              style={{ background: p.enabled ? 'var(--nav-success)' : 'var(--nav-text-muted)', color: '#fff' }}>
                               {p.enabled ? 'Активно' : 'Пауза'}
                             </span>
                           </div>
@@ -560,35 +599,35 @@ export default function KaspiShop() {
                         {expanded && (
                           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
                             transition={{ duration: 0.25, ease: EASE }} className="overflow-hidden">
-                            <div className="border-t border-gray-100 p-4 pt-3 bg-gray-50/50">
+                            <div className="p-4 pt-3" style={{ borderTop: '1px solid var(--nav-border-soft)', background: 'var(--nav-bg)' }}>
                               <div className="grid grid-cols-3 gap-2 mb-2">
                                 <label className="block">
-                                  <span className="text-[11px] text-gray-400 mb-1 block">Минимальная цена</span>
-                                  <input className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-mono" type="number"
+                                  <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Минимальная цена</span>
+                                  <input className={`${INPUT_CLS} font-mono px-2 py-1.5`} type="number" style={{ color: 'var(--nav-text-primary)' }}
                                     value={v.floorPrice} onChange={e => setEditValues(prev => ({ ...prev, [p.id]: { ...v, floorPrice: e.target.value } }))} />
                                 </label>
                                 <label className="block">
-                                  <span className="text-[11px] text-gray-400 mb-1 block">Максимальная цена</span>
-                                  <input className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-mono" type="number" placeholder="—"
+                                  <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Максимальная цена</span>
+                                  <input className={`${INPUT_CLS} font-mono px-2 py-1.5`} type="number" placeholder="—" style={{ color: 'var(--nav-text-primary)' }}
                                     value={v.maxPrice} onChange={e => setEditValues(prev => ({ ...prev, [p.id]: { ...v, maxPrice: e.target.value } }))} />
                                 </label>
                                 <label className="block">
-                                  <span className="text-[11px] text-gray-400 mb-1 block">Шаг, ₸</span>
-                                  <input className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-mono" type="number"
+                                  <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Шаг, ₸</span>
+                                  <input className={`${INPUT_CLS} font-mono px-2 py-1.5`} type="number" style={{ color: 'var(--nav-text-primary)' }}
                                     value={v.undercutStep} onChange={e => setEditValues(prev => ({ ...prev, [p.id]: { ...v, undercutStep: e.target.value } }))} />
                                 </label>
                               </div>
                               <label className="block mb-2">
-                                <span className="text-[11px] text-gray-400 mb-1 block">Стратегия</span>
-                                <select className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white"
+                                <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Стратегия</span>
+                                <select className={`${INPUT_CLS} px-2 py-1.5`} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-surface-chrome)' }}
                                   value={v.strategy} onChange={e => setEditValues(prev => ({ ...prev, [p.id]: { ...v, strategy: e.target.value } }))}>
                                   {Object.entries(STRATEGY_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
                                 </select>
                               </label>
                               <label className="block mb-2">
-                                <span className="text-[11px] text-gray-400 mb-1 block">Исключить города (для этого товара)</span>
+                                <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Исключить города (для этого товара)</span>
                                 <div className="flex flex-wrap gap-1.5">
-                                  {trackedCities.length === 0 && <span className="text-[11px] text-gray-400">Сначала выберите отслеживаемые города выше.</span>}
+                                  {trackedCities.length === 0 && <span className="text-[11px]" style={{ color: 'var(--nav-text-muted)' }}>Сначала выберите отслеживаемые города выше.</span>}
                                   {trackedCities.map(code => {
                                     const excluded = v.excludedCities.split(',').map(s => s.trim()).filter(Boolean).includes(code)
                                     const cityName = availableCities.find(c => c.code === code)?.name || code
@@ -599,7 +638,8 @@ export default function KaspiShop() {
                                           const next = excluded ? current.filter(c => c !== code) : [...current, code]
                                           setEditValues(prev => ({ ...prev, [p.id]: { ...v, excludedCities: next.join(', ') } }))
                                         }}
-                                        className={`text-[11px] px-2 py-1 rounded-full ${excluded ? 'bg-red-50 text-red-500' : 'bg-gray-100 text-gray-500'}`}>
+                                        className="text-[11px] px-2 py-1 rounded-full font-medium transition-colors"
+                                        style={excluded ? { background: 'var(--nav-critical)', color: '#fff' } : { background: 'var(--nav-surface-chrome)', color: 'var(--nav-text-secondary)', border: '1px solid var(--nav-border-soft)' }}>
                                         {cityName}
                                       </button>
                                     )
@@ -607,26 +647,26 @@ export default function KaspiShop() {
                                 </div>
                               </label>
                               <label className="block mb-3">
-                                <span className="text-[11px] text-gray-400 mb-1 block">Не конкурировать с продавцами (ID через запятую)</span>
-                                <input className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs"
+                                <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Не конкурировать с продавцами (ID через запятую)</span>
+                                <input className={`${INPUT_CLS} px-2 py-1.5`} style={{ color: 'var(--nav-text-primary)' }}
                                   value={v.excludedMerchants} onChange={e => setEditValues(prev => ({ ...prev, [p.id]: { ...v, excludedMerchants: e.target.value } }))} />
                               </label>
                               {trackedCities.length > 0 && (
                                 <div className="mb-3">
-                                  <span className="text-[11px] text-gray-400 mb-1 block">Цены по городам</span>
-                                  {!cityPrices[p.id] && <div className="text-[11px] text-gray-400">Загрузка…</div>}
+                                  <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Цены по городам</span>
+                                  {!cityPrices[p.id] && <div className="text-[11px]" style={{ color: 'var(--nav-text-muted)' }}>Загрузка…</div>}
                                   {cityPrices[p.id] && cityPrices[p.id].length === 0 && (
-                                    <div className="text-[11px] text-gray-400">Нет данных ещё — появятся после первой проверки цен по этому товару.</div>
+                                    <div className="text-[11px]" style={{ color: 'var(--nav-text-muted)' }}>Нет данных ещё — появятся после первой проверки цен по этому товару.</div>
                                   )}
                                   {cityPrices[p.id] && cityPrices[p.id].length > 0 && (
                                     <div className="space-y-1">
                                       {cityPrices[p.id].map(c => (
                                         <div key={c.cityCode} className="flex items-center justify-between text-[11px]">
-                                          <span className="text-gray-500">{c.cityName}</span>
+                                          <span style={{ color: 'var(--nav-text-secondary)' }}>{c.cityName}</span>
                                           <span className="font-mono">
-                                            <span className="text-[#1C2056] font-semibold">{c.ownPrice.toLocaleString('ru-KZ')} ₸</span>
-                                            {c.competitorPrice !== null && <span className="text-gray-400"> · конкурент {c.competitorPrice.toLocaleString('ru-KZ')} ₸</span>}
-                                            {c.marketPosition !== null && c.marketOfferCount !== null && <span className="text-gray-400"> · #{c.marketPosition} из {c.marketOfferCount}</span>}
+                                            <span className="font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{c.ownPrice.toLocaleString('ru-KZ')} ₸</span>
+                                            {c.competitorPrice !== null && <span style={{ color: 'var(--nav-text-muted)' }}> · конкурент {c.competitorPrice.toLocaleString('ru-KZ')} ₸</span>}
+                                            {c.marketPosition !== null && c.marketOfferCount !== null && <span style={{ color: 'var(--nav-text-muted)' }}> · #{c.marketPosition} из {c.marketOfferCount}</span>}
                                           </span>
                                         </div>
                                       ))}
@@ -636,15 +676,18 @@ export default function KaspiShop() {
                               )}
                               <div className="flex gap-2">
                                 <button onClick={() => suggestPricing(p.id)} disabled={suggestingFor === p.id}
-                                  className="flex-1 text-xs bg-white border border-gray-200 text-[#1C2056] rounded-lg px-3 py-2 font-medium">
-                                  {suggestingFor === p.id ? 'Думаем...' : '✨ ИИ-подбор цены'}
+                                  className="flex-1 text-xs nav-glass rounded-lg px-3 py-2 font-medium flex items-center justify-center gap-1.5 disabled:opacity-50" style={{ color: 'var(--nav-accent)' }}>
+                                  <SparkleIcon /> {suggestingFor === p.id ? 'Думаем...' : 'ИИ-подбор цены'}
                                 </button>
                                 <button onClick={() => saveProductSettings(p.id)}
-                                  className="flex-1 text-xs bg-[#1C2056] text-white rounded-lg px-3 py-2 font-medium">
+                                  className="flex-1 text-xs rounded-lg px-3 py-2 font-medium" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                                   Сохранить
                                 </button>
                               </div>
-                              <button onClick={() => deleteProduct(p.id)} className="text-[11px] text-gray-400 hover:text-red-500 mt-3">Удалить товар</button>
+                              <button onClick={() => deleteProduct(p.id)} className="text-[11px] mt-3 transition-colors" style={{ color: 'var(--nav-text-muted)' }}
+                                onMouseEnter={e => (e.currentTarget.style.color = 'var(--nav-critical)')} onMouseLeave={e => (e.currentTarget.style.color = 'var(--nav-text-muted)')}>
+                                Удалить товар
+                              </button>
                             </div>
                           </motion.div>
                         )}
@@ -655,9 +698,9 @@ export default function KaspiShop() {
               </AnimatePresence>
 
               {products.length === 0 && (
-                <div className="bg-white rounded-2xl shadow-sm p-8 text-center">
-                  <div className="text-sm text-gray-500">Каталог ещё импортируется или пуст.</div>
-                  <div className="text-xs text-gray-400 mt-1">Товары появятся здесь после подключения кабинета.</div>
+                <div className="nav-glass rounded-2xl p-8 text-center">
+                  <div className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>Каталог ещё импортируется или пуст.</div>
+                  <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>Товары появятся здесь после подключения кабинета.</div>
                 </div>
               )}
             </div>
@@ -668,48 +711,45 @@ export default function KaspiShop() {
       <AnimatePresence>
         {walletOpen && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/40 z-50 flex items-end lg:items-center justify-center p-0 lg:p-4"
+            className="fixed inset-0 bg-black/30 z-50 flex items-end lg:items-center justify-center p-0 lg:p-4"
             onClick={() => setWalletOpen(false)}>
             <motion.div initial={{ y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }}
               transition={{ duration: 0.3, ease: EASE }}
               onClick={e => e.stopPropagation()}
-              className="bg-white rounded-t-[28px] lg:rounded-[28px] w-full lg:max-w-sm p-5">
-              <div className="text-sm font-semibold text-[#1C2056] mb-1">Пополнить кошелёк</div>
-              <div className="text-xs text-gray-400 mb-4">Баланс: {balance.toLocaleString('ru-KZ')} ₸ · проверка цены — 5 ₸</div>
+              className="relative nav-glass rounded-t-[24px] lg:rounded-[24px] w-full lg:max-w-sm p-5"
+              style={{ boxShadow: '0 34px 80px -20px rgba(10,10,15,0.4), var(--nav-card-glow)' }}>
+              <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[24px]" style={{ background: 'linear-gradient(90deg, var(--nav-accent), var(--nav-teal))' }} />
+              <div className="text-sm font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>Пополнить кошелёк</div>
+              <div className="text-xs mb-4" style={{ color: 'var(--nav-text-muted)' }}>Баланс: {balance.toLocaleString('ru-KZ')} ₸ · проверка цены — 5 ₸</div>
               <div className="flex gap-2 flex-wrap mb-2">
                 {[1000, 5000, 10000].map(amount => (
                   <button key={amount} onClick={() => { setTopupAmount(amount); setTopupCustom('') }}
-                    className={`rounded-lg px-3 py-1.5 text-xs font-medium ${topupAmount === amount ? 'bg-[#1C2056] text-white' : 'bg-gray-100 text-[#1C2056]'}`}>
+                    className="rounded-lg px-3 py-1.5 text-xs font-medium transition-colors"
+                    style={topupAmount === amount ? { background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' } : { background: 'var(--nav-bg)', color: 'var(--nav-accent)' }}>
                     {amount.toLocaleString('ru-KZ')} ₸
                   </button>
                 ))}
               </div>
               <input value={topupCustom} onChange={e => { setTopupCustom(e.target.value.replace(/\D/g, '')); setTopupAmount(null) }}
                 placeholder="Своя сумма, ₸" type="text" inputMode="numeric"
-                className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-[#1C2056] mb-3" />
+                className="w-full border-b py-2 text-sm outline-none mb-3 bg-transparent"
+                style={{ borderColor: 'var(--nav-border-soft)', color: 'var(--nav-text-primary)' }} />
               <button onClick={() => startTopup((topupAmount ?? Number(topupCustom)) || 0)}
                 disabled={toppingUp || !((topupAmount ?? Number(topupCustom)) >= 500)}
-                className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium disabled:opacity-50">
+                className="w-full rounded-xl py-2.5 text-sm font-medium disabled:opacity-50" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                 {toppingUp ? 'Готовим QR...' : 'Пополнить'}
               </button>
               {topupPending && (
-                <div className="bg-blue-50 rounded-xl p-3 mt-3">
-                  <p className="text-xs text-gray-600 mb-2">Оплатите QR-код Kaspi — баланс пополнится автоматически.</p>
+                <div className="rounded-xl p-3 mt-3" style={{ background: 'var(--nav-accent-soft)' }}>
+                  <p className="text-xs mb-2" style={{ color: 'var(--nav-text-secondary)' }}>Оплатите QR-код Kaspi — баланс пополнится автоматически.</p>
                   <a href={topupPending.payment_link} target="_blank" rel="noopener noreferrer"
-                    className="w-full bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium block text-center">Оплатить</a>
+                    className="w-full rounded-xl py-2.5 text-sm font-medium block text-center" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>Оплатить</a>
                 </div>
               )}
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Mobile bottom bar: same tab set as the desktop sidebar, since the
-          floating sidebar is desktop-only. */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t px-4 py-2 flex items-center justify-between z-40">
-        <div className="text-xs font-semibold text-[#1C2056]">Демпинг</div>
-        <button onClick={() => setWalletOpen(true)} className="text-xs text-gray-400">{balance.toLocaleString('ru-KZ')} ₸</button>
-      </div>
     </main>
   )
 }

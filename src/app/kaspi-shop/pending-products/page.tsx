@@ -82,24 +82,25 @@ export default function KaspiShopPendingProducts() {
         {sessionExpired && <SessionExpiredBanner />}
 
         {loadError && (
-          <div className="bg-red-50 rounded-2xl p-4 flex items-center justify-between gap-3 mb-4">
-            <span className="text-sm text-red-600">{loadError}</span>
-            <button onClick={() => loadProducts(page)} className="text-xs bg-red-500 text-white rounded-lg px-3 py-1.5 flex-shrink-0">Повторить</button>
+          <div className="nav-glass rounded-2xl p-4 flex items-center justify-between gap-3 mb-4">
+            <span className="text-sm" style={{ color: 'var(--nav-critical)' }}>{loadError}</span>
+            <button onClick={() => loadProducts(page)} className="text-xs font-semibold rounded-lg px-3 py-1.5 flex-shrink-0" style={{ background: 'var(--nav-critical)', color: '#fff' }}>Повторить</button>
           </div>
         )}
 
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}
-          className="bg-[#12142E] rounded-[28px] p-6 lg:p-8 mb-4 text-white">
-          <div className="text-[11px] font-semibold tracking-wider text-white/40 uppercase mb-1">Товары</div>
-          <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight mb-6">
-            Нераспознанные товары {count > 0 && <span className="text-white/40">· {count}</span>}
+          className="nav-glass nav-card-accent rounded-[28px] p-6 lg:p-8 mb-4">
+          <div className="text-[11px] font-semibold tracking-wider uppercase mb-1" style={{ color: 'var(--nav-text-muted)' }}>Товары</div>
+          <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight mb-6" style={{ color: 'var(--nav-text-primary)' }}>
+            Нераспознанные товары {count > 0 && <span style={{ color: 'var(--nav-text-muted)' }}>· {count}</span>}
           </h1>
-          <div className="flex items-center gap-1 flex-wrap bg-white/10 rounded-full p-1 w-fit">
+          <div className="flex items-center gap-1 flex-wrap nav-glass rounded-full p-1 w-fit">
             {TABS.map(tab => (
               <button key={tab.key} disabled={!tab.enabled}
-                className={`text-xs font-medium rounded-full px-3 py-1.5 transition-colors ${
-                  tab.enabled ? 'bg-white text-[#12142E]' : 'text-white/30 cursor-not-allowed'
-                }`}>
+                className="text-xs font-medium rounded-full px-3 py-1.5 transition-colors"
+                style={tab.enabled
+                  ? { background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }
+                  : { color: 'var(--nav-text-muted)', opacity: 0.6, cursor: 'not-allowed' }}>
                 {tab.label}
               </button>
             ))}
@@ -107,23 +108,23 @@ export default function KaspiShopPendingProducts() {
         </motion.div>
 
         {listLoading ? (
-          <div className="bg-white rounded-2xl shadow-sm p-8 text-center text-sm text-gray-400">Загружаем товары...</div>
+          <div className="nav-glass rounded-2xl p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Загружаем товары...</div>
         ) : products.length === 0 ? (
-          <div className="bg-white rounded-2xl shadow-sm p-8 text-center">
-            <div className="text-sm text-gray-500">Нераспознанных товаров нет.</div>
+          <div className="nav-glass rounded-2xl p-8 text-center">
+            <div className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>Нераспознанных товаров нет.</div>
           </div>
         ) : (
           <div className="space-y-2">
             {products.map(p => (
-              <div key={p.code} className="bg-white rounded-2xl shadow-sm p-3 flex items-center gap-3">
+              <div key={p.code} className="nav-glass rounded-2xl p-3 flex items-center gap-3">
                 {p.imageUrl ? (
-                  <img src={p.imageUrl} alt={p.name} className="w-14 h-14 rounded-xl object-cover flex-shrink-0 bg-gray-100" />
+                  <img src={p.imageUrl} alt={p.name} className="w-14 h-14 rounded-xl object-cover flex-shrink-0" style={{ background: 'var(--nav-bg)' }} />
                 ) : (
-                  <div className="w-14 h-14 rounded-xl bg-gray-100 flex-shrink-0" />
+                  <div className="w-14 h-14 rounded-xl flex-shrink-0" style={{ background: 'var(--nav-bg)' }} />
                 )}
                 <div className="min-w-0 flex-1">
-                  <div className="text-sm font-semibold text-gray-800 truncate">{p.name}</div>
-                  <div className="text-[11px] text-gray-400 truncate">
+                  <div className="text-sm font-semibold truncate" style={{ color: 'var(--nav-text-primary)' }}>{p.name}</div>
+                  <div className="text-[11px] truncate" style={{ color: 'var(--nav-text-muted)' }}>
                     {p.brand && <span>{p.brand}</span>}
                     {p.categoryName && <span>{p.brand ? ' · ' : ''}Kaspi предлагает: {p.categoryName}</span>}
                   </div>
@@ -137,16 +138,12 @@ export default function KaspiShopPendingProducts() {
           <div className="flex items-center justify-end mt-4">
             <div className="flex gap-2">
               <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-                className="text-xs font-medium bg-white text-[#1C2056] rounded-lg px-3 py-1.5 disabled:opacity-40 shadow-sm">Назад</button>
+                className="nav-glass text-xs font-medium rounded-lg px-3 py-1.5 disabled:opacity-40" style={{ color: 'var(--nav-text-primary)' }}>Назад</button>
               <button onClick={() => setPage(p => p + 1)} disabled={!hasMore}
-                className="text-xs font-medium bg-white text-[#1C2056] rounded-lg px-3 py-1.5 disabled:opacity-40 shadow-sm">Дальше</button>
+                className="nav-glass text-xs font-medium rounded-lg px-3 py-1.5 disabled:opacity-40" style={{ color: 'var(--nav-text-primary)' }}>Дальше</button>
             </div>
           </div>
         )}
-      </div>
-
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t px-4 py-2 flex items-center justify-between z-40">
-        <div className="text-xs font-semibold text-[#1C2056]">Нераспознанные товары</div>
       </div>
     </main>
   )

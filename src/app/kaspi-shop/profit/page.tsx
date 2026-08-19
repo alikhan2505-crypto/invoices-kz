@@ -9,6 +9,24 @@ import SessionExpiredBanner from '@/components/kaspiShop/SessionExpiredBanner'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 const PERIODS = [7, 30, 90]
+const INPUT_CLS = 'rounded-lg px-2 py-1 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]'
+
+function CheckIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
+  )
+}
+
+function WarnIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+      <path d="M12 9v4M12 17h.01" />
+      <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
+    </svg>
+  )
+}
 
 type ProductProfit = {
   kaspiMasterSku: string
@@ -148,122 +166,132 @@ export default function KaspiShopProfit() {
         {summary?.sessionExpired && <SessionExpiredBanner />}
 
         {loadError && (
-          <div className="bg-red-50 rounded-2xl p-4 flex items-center justify-between gap-3 mb-4">
-            <span className="text-sm text-red-600">{loadError}</span>
-            <button onClick={() => loadSummary(days)} className="text-xs bg-red-500 text-white rounded-lg px-3 py-1.5 flex-shrink-0">Повторить</button>
+          <div className="nav-glass rounded-2xl p-4 flex items-center justify-between gap-3 mb-4">
+            <span className="text-sm" style={{ color: 'var(--nav-critical)' }}>{loadError}</span>
+            <button onClick={() => loadSummary(days)} className="text-xs font-semibold rounded-lg px-3 py-1.5 flex-shrink-0" style={{ background: 'var(--nav-critical)', color: '#fff' }}>Повторить</button>
           </div>
         )}
 
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}
-          className="bg-[#12142E] rounded-[28px] p-6 lg:p-8 mb-4 text-white">
-          <div className="flex items-start justify-between gap-4 mb-6">
+          className="nav-glass nav-card-accent rounded-[28px] p-6 lg:p-8 mb-4">
+          <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
             <div>
-              <div className="text-[11px] font-semibold tracking-wider text-white/40 uppercase mb-1">Прибыль</div>
-              <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight">Юнит-экономика</h1>
+              <div className="text-[11px] font-semibold tracking-wider uppercase mb-1" style={{ color: 'var(--nav-text-muted)' }}>Прибыль</div>
+              <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight" style={{ color: 'var(--nav-text-primary)' }}>Юнит-экономика</h1>
             </div>
-            <div className="flex items-center gap-1 flex-shrink-0 bg-white/10 rounded-full p-1">
-              {PERIODS.map(p => (
-                <button key={p} onClick={() => setDays(p)}
-                  className={`text-xs font-medium rounded-full px-3 py-1.5 transition-colors ${days === p ? 'bg-white text-[#12142E]' : 'text-white/60'}`}>
-                  {p} дн.
-                </button>
-              ))}
+            <div className="flex items-center gap-1 flex-shrink-0 nav-glass rounded-full p-1">
+              {PERIODS.map(p => {
+                const active = days === p
+                return (
+                  <button key={p} onClick={() => setDays(p)}
+                    className="relative text-xs font-medium rounded-full px-3 py-1.5 transition-colors"
+                    style={{ color: active ? 'var(--nav-accent-ink)' : 'var(--nav-text-secondary)' }}>
+                    {active && (
+                      <motion.span layoutId="profitPeriodPill" className="absolute inset-0 rounded-full" style={{ background: 'var(--nav-accent)', zIndex: 0 }}
+                        transition={{ type: 'spring', stiffness: 380, damping: 32 }} />
+                    )}
+                    <span className="relative" style={{ zIndex: 1 }}>{p} дн.</span>
+                  </button>
+                )
+              })}
             </div>
           </div>
 
-          <div className="text-4xl lg:text-5xl font-black font-mono tabular-nums mb-1">
-            {(summary?.netProfit ?? 0).toLocaleString('ru-KZ')} <span className="text-lg text-white/40">₸ прибыль</span>
+          <div className="text-4xl lg:text-5xl font-black font-mono tabular-nums mb-1" style={{ color: 'var(--nav-text-primary)' }}>
+            {(summary?.netProfit ?? 0).toLocaleString('ru-KZ')} <span className="text-lg" style={{ color: 'var(--nav-text-muted)' }}>₸ прибыль</span>
           </div>
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-6">
             <div>
-              <div className="text-lg font-bold font-mono tabular-nums">{(summary?.totalRevenue ?? 0).toLocaleString('ru-KZ')}</div>
-              <div className="text-xs text-white/40 mt-1">₸ выручка</div>
+              <div className="text-lg font-bold font-mono tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{(summary?.totalRevenue ?? 0).toLocaleString('ru-KZ')}</div>
+              <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>₸ выручка</div>
             </div>
             <div>
-              <div className="text-lg font-bold font-mono tabular-nums">{(summary?.totalCogsKnown ?? 0).toLocaleString('ru-KZ')}</div>
-              <div className="text-xs text-white/40 mt-1">₸ себестоимость</div>
+              <div className="text-lg font-bold font-mono tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{(summary?.totalCogsKnown ?? 0).toLocaleString('ru-KZ')}</div>
+              <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>₸ себестоимость</div>
             </div>
             <div>
               {summary?.adSpendConfigured ? (
                 <>
-                  <div className="text-lg font-bold font-mono tabular-nums">{summary.adSpend.toLocaleString('ru-KZ')}</div>
-                  <div className="text-xs text-white/40 mt-1">₸ реклама</div>
+                  <div className="text-lg font-bold font-mono tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{summary.adSpend.toLocaleString('ru-KZ')}</div>
+                  <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>₸ реклама</div>
                 </>
               ) : (
                 <div className="flex items-center gap-1.5">
                   <input value={adSpendInput} onChange={e => setAdSpendInput(e.target.value)} placeholder="0"
-                    className="w-20 rounded-lg bg-white/10 text-white placeholder-white/30 px-2 py-1 text-sm outline-none focus:bg-white/15" />
-                  <button onClick={saveAdSpend} className="text-xs font-medium bg-white text-[#12142E] rounded-lg px-2 py-1">✓</button>
+                    className={`w-20 ${INPUT_CLS}`} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
+                  <button onClick={saveAdSpend} className="text-xs font-medium rounded-lg px-2 py-1 flex items-center justify-center" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}><CheckIcon /></button>
                 </div>
               )}
-              <div className="text-xs text-white/40 mt-1">{summary?.adSpendConfigured ? '' : 'укажите расходы на рекламу'}</div>
+              <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>{summary?.adSpendConfigured ? '' : 'укажите расходы на рекламу'}</div>
             </div>
             <div>
               {summary?.commissionRatePercent !== null && summary?.commissionRatePercent !== undefined ? (
                 <>
-                  <div className="text-lg font-bold font-mono tabular-nums">{summary.commissionAmount.toLocaleString('ru-KZ')}</div>
-                  <div className="text-xs text-white/40 mt-1">₸ комиссия ({summary.commissionRatePercent}%)</div>
+                  <div className="text-lg font-bold font-mono tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{summary.commissionAmount.toLocaleString('ru-KZ')}</div>
+                  <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>₸ комиссия ({summary.commissionRatePercent}%)</div>
                 </>
               ) : (
                 <div className="flex items-center gap-1.5">
                   <input value={commissionInput} onChange={e => setCommissionInput(e.target.value)} placeholder="%"
-                    className="w-16 rounded-lg bg-white/10 text-white placeholder-white/30 px-2 py-1 text-sm outline-none focus:bg-white/15" />
-                  <button onClick={saveCommission} className="text-xs font-medium bg-white text-[#12142E] rounded-lg px-2 py-1">✓</button>
+                    className={`w-16 ${INPUT_CLS}`} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
+                  <button onClick={saveCommission} className="text-xs font-medium rounded-lg px-2 py-1 flex items-center justify-center" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}><CheckIcon /></button>
                 </div>
               )}
-              <div className="text-xs text-white/40 mt-1">{summary?.commissionRatePercent !== null && summary?.commissionRatePercent !== undefined ? '' : 'укажите комиссию Kaspi'}</div>
+              <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>{summary?.commissionRatePercent !== null && summary?.commissionRatePercent !== undefined ? '' : 'укажите комиссию Kaspi'}</div>
             </div>
           </div>
 
           {!!summary && summary.productsWithoutCogsCount > 0 && (
-            <div className="text-[11px] text-white/50 mt-4">⚠ {summary.productsWithoutCogsCount} {summary.productsWithoutCogsCount === 1 ? 'товар' : 'товаров'} без себестоимости — прибыль может быть занижена.</div>
+            <div className="text-[11px] mt-4 flex items-center gap-1.5" style={{ color: 'var(--nav-text-secondary)' }}>
+              <WarnIcon /> {summary.productsWithoutCogsCount} {summary.productsWithoutCogsCount === 1 ? 'товар' : 'товаров'} без себестоимости — прибыль может быть занижена.
+            </div>
           )}
           {summary?.truncated && (
-            <div className="text-[11px] text-white/40 mt-2">Учтены последние 200 заказов на статус — на большом объёме сумма может быть неполной.</div>
+            <div className="text-[11px] mt-2" style={{ color: 'var(--nav-text-muted)' }}>Учтены последние 200 заказов на статус — на большом объёме сумма может быть неполной.</div>
           )}
         </motion.div>
 
         {summaryLoading ? (
-          <div className="bg-white rounded-2xl shadow-sm p-8 text-center text-sm text-gray-400">Считаем...</div>
+          <div className="nav-glass rounded-2xl p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Считаем...</div>
         ) : !summary || summary.products.length === 0 ? (
-          <div className="bg-white rounded-2xl shadow-sm p-8 text-center">
-            <div className="text-sm text-gray-500">За этот период продаж нет.</div>
+          <div className="nav-glass rounded-2xl p-8 text-center">
+            <div className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>За этот период продаж нет.</div>
           </div>
         ) : (
           <>
-            <div className="text-[11px] text-gray-400 px-1 mb-2">Прибыль по товару — выручка минус себестоимость (без учёта рекламы и комиссии, которые не делятся по товарам)</div>
+            <div className="text-[11px] px-1 mb-2" style={{ color: 'var(--nav-text-muted)' }}>Прибыль по товару — выручка минус себестоимость (без учёта рекламы и комиссии, которые не делятся по товарам)</div>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
               {summary.products.map(p => (
-                <div key={p.kaspiMasterSku} className="bg-white rounded-2xl shadow-sm overflow-hidden flex flex-col">
+                <div key={p.kaspiMasterSku} className="nav-glass rounded-2xl overflow-hidden flex flex-col">
                   {p.imageUrl ? (
-                    <img src={p.imageUrl} alt={p.productName} className="w-full aspect-square object-cover bg-gray-100" />
+                    <img src={p.imageUrl} alt={p.productName} className="w-full aspect-square object-cover" style={{ background: 'var(--nav-bg)' }} />
                   ) : (
-                    <div className="w-full aspect-square bg-gray-100" />
+                    <div className="w-full aspect-square" style={{ background: 'var(--nav-bg)' }} />
                   )}
                   <div className="p-3 flex flex-col flex-1">
-                    <div className="text-xs font-semibold text-gray-800 line-clamp-2 min-h-[2.2em]">{p.productName || p.kaspiMasterSku}</div>
-                    <div className="text-[11px] text-gray-400 mt-1">{p.unitsSold} шт · {p.revenue.toLocaleString('ru-KZ')} ₸</div>
+                    <div className="text-xs font-semibold line-clamp-2 min-h-[2.2em]" style={{ color: 'var(--nav-text-primary)' }}>{p.productName || p.kaspiMasterSku}</div>
+                    <div className="text-[11px] mt-1" style={{ color: 'var(--nav-text-muted)' }}>{p.unitsSold} шт · {p.revenue.toLocaleString('ru-KZ')} ₸</div>
 
                     {p.trackedProductId && (
                       <label className="block mt-2">
-                        <span className="text-[10px] text-gray-400 mb-1 block">Себестоимость за шт.</span>
+                        <span className="text-[10px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Себестоимость за шт.</span>
                         <div className="flex items-center gap-1.5">
                           <input
                             value={cogsInputs[p.trackedProductId] ?? (p.cogsAmount !== null ? String(p.cogsAmount) : '')}
                             onChange={e => setCogsInputs(prev => ({ ...prev, [p.trackedProductId!]: e.target.value }))}
                             placeholder="₸"
-                            className="w-full min-w-0 rounded-lg bg-gray-50 text-gray-800 placeholder-gray-400 px-2 py-1.5 text-xs outline-none focus:bg-gray-100" />
+                            className={`w-full min-w-0 ${INPUT_CLS}`} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
                           <button onClick={() => saveCogs(p.trackedProductId!)} disabled={savingCogsFor === p.trackedProductId}
-                            className="flex-shrink-0 text-xs font-medium bg-[#1C2056] text-white rounded-lg px-2.5 py-1.5 disabled:opacity-50">✓</button>
+                            className="flex-shrink-0 text-xs font-medium rounded-lg px-2.5 py-1.5 flex items-center justify-center disabled:opacity-50" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}><CheckIcon /></button>
                         </div>
                       </label>
                     )}
 
                     <div className="mt-auto pt-2 flex items-baseline justify-between">
-                      <span className="text-[10px] text-gray-400">Прибыль</span>
-                      <span className="font-mono font-bold text-sm text-[#1C2056] tabular-nums">
-                        {p.profit !== null ? `${p.profit.toLocaleString('ru-KZ')} ₸` : <span className="text-gray-400 text-[11px] font-normal">укажите себест.</span>}
+                      <span className="text-[10px]" style={{ color: 'var(--nav-text-muted)' }}>Прибыль</span>
+                      <span className="font-mono font-bold text-sm tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>
+                        {p.profit !== null ? `${p.profit.toLocaleString('ru-KZ')} ₸` : <span className="text-[11px] font-normal" style={{ color: 'var(--nav-text-muted)' }}>укажите себест.</span>}
                       </span>
                     </div>
                   </div>
@@ -272,10 +300,6 @@ export default function KaspiShopProfit() {
             </div>
           </>
         )}
-      </div>
-
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t px-4 py-2 flex items-center justify-between z-40">
-        <div className="text-xs font-semibold text-[#1C2056]">Прибыль</div>
       </div>
     </main>
   )
