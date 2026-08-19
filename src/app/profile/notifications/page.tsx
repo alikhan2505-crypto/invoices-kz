@@ -1,16 +1,48 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { motion, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
-import LoadingSpinner from '@/components/LoadingSpinner'
 import { useLanguage } from '@/components/LanguageProvider'
 import { backLabel } from '@/lib/a11yLabels'
 import { profileAccountsDict } from '@/lib/i18n/profileAccounts'
+import SiteNav from '@/components/SiteNav'
+import DesktopShell from '@/components/DesktopShell'
+
+// Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
+// kept identical rather than inventing a second "house" ease.
+const EASE = [0.16, 1, 0.3, 1] as const
+
+function ChevronLeftIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m15 18-6-6 6-6" />
+    </svg>
+  )
+}
+function InfoIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 11v6" />
+      <path d="M12 7.5h.01" />
+    </svg>
+  )
+}
+function SendIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m3 11 18-8-8 18-2-8-8-2Z" />
+    </svg>
+  )
+}
 
 export default function Notifications() {
   const router = useRouter()
   const { lang } = useLanguage()
   const t = profileAccountsDict[lang]
+  const reduceMotionRaw = useReducedMotion()
+  const reduceMotion = !!reduceMotionRaw
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [telegramChatId, setTelegramChatId] = useState<string | null>(null)
@@ -94,87 +126,88 @@ export default function Notifications() {
   function Toggle({ value, onChange }: { value: boolean, onChange: (v: boolean) => void }) {
     return (
       <button onClick={() => onChange(!value)}
-        className={`w-12 h-6 rounded-full transition-colors relative flex-shrink-0 ${value ? 'bg-[#2DC48D]' : 'bg-gray-200'}`}>
-        <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${value ? 'left-7' : 'left-1'}`}></span>
+        className="w-12 h-6 rounded-full transition-colors relative flex-shrink-0"
+        style={{ background: value ? 'var(--nav-accent)' : 'var(--nav-border)' }}>
+        <span className="absolute top-1 w-4 h-4 rounded-full shadow transition-all"
+          style={{ background: 'var(--nav-surface-chrome)', left: value ? '1.75rem' : '0.25rem' }}></span>
       </button>
     )
   }
 
-  if (loading) return <LoadingSpinner />
+  const fadeIn = (i: number) => ({
+    initial: reduceMotion ? false : { opacity: 0, y: 12 },
+    animate: { opacity: 1, y: 0 },
+    transition: { delay: reduceMotion ? 0 : i * 0.05, duration: reduceMotion ? 0 : 0.4, ease: EASE },
+  })
 
   const groups = [
     {
       title: t.channelsGroupTitle,
       items: [
-        {
-          key: 'notify_email',
-          label: t.emailNotifyLabel,
-          desc: t.emailNotifyDesc
-        },
-        {
-          key: 'notify_telegram',
-          label: t.telegramNotifyLabel,
-          desc: t.telegramNotifyDesc
-        },
+        { key: 'notify_email', label: t.emailNotifyLabel, desc: t.emailNotifyDesc },
+        { key: 'notify_telegram', label: t.telegramNotifyLabel, desc: t.telegramNotifyDesc },
       ]
     },
     {
       title: t.eventsGroupTitle,
       items: [
-        {
-          key: 'notify_client_viewed',
-          label: t.clientViewedLabel,
-          desc: t.clientViewedDesc
-        },
-        {
-          key: 'notify_payment_reminder',
-          label: t.paymentReminderLabel,
-          desc: t.paymentReminderDesc
-        },
-        {
-          key: 'notify_overdue',
-          label: t.overdueLabel,
-          desc: t.overdueDesc
-        },
-        {
-          key: 'notify_weekly_report',
-          label: t.weeklyReportLabel,
-          desc: t.weeklyReportDesc
-        },
+        { key: 'notify_client_viewed', label: t.clientViewedLabel, desc: t.clientViewedDesc },
+        { key: 'notify_payment_reminder', label: t.paymentReminderLabel, desc: t.paymentReminderDesc },
+        { key: 'notify_overdue', label: t.overdueLabel, desc: t.overdueDesc },
+        { key: 'notify_weekly_report', label: t.weeklyReportLabel, desc: t.weeklyReportDesc },
       ]
     }
   ]
 
-  return (
-    <main className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b px-4 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <button onClick={() => router.push('/profile')} className="back-btn text-gray-400 text-xl" aria-label={backLabel(lang)}>‹</button>
-          <span className="font-semibold text-[#1C2056]">{t.notificationsHeaderLabel}</span>
-        </div>
-        {saving && <span className="text-xs text-gray-400">{t.savingLabel}</span>}
+  if (loading) return (
+    <DesktopShell>
+    <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
+      <SiteNav />
+      <div className="max-w-lg lg:max-w-2xl mx-auto p-4 flex items-center justify-center" style={{ minHeight: '50vh' }}>
+        <p style={{ color: 'var(--nav-text-muted)' }}>…</p>
       </div>
+    </main>
+    </DesktopShell>
+  )
 
-      <div className="max-w-lg mx-auto p-4 space-y-4">
+  return (
+    <DesktopShell>
+    <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
+      <SiteNav />
+      <div className="max-w-lg lg:max-w-2xl mx-auto p-4 space-y-4">
+
+        <motion.div {...fadeIn(0)} className="nav-glass rounded-2xl px-4 py-4 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <button onClick={() => router.push('/profile')} className="back-btn transition-colors flex-shrink-0" style={{ color: 'var(--nav-text-muted)' }} aria-label={backLabel(lang)}>
+              <ChevronLeftIcon />
+            </button>
+            <span className="font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{t.notificationsHeaderLabel}</span>
+          </div>
+          {saving && <span className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>{t.savingLabel}</span>}
+        </motion.div>
 
         {/* Инфо баннер */}
-        <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4">
-          <div className="text-sm font-medium text-[#1C2056] mb-1">{t.notificationsInfoTitle}</div>
-          <div className="text-xs text-gray-500 leading-relaxed">
-            {t.notificationsInfoBody}
+        <motion.div {...fadeIn(1)} className="nav-glass rounded-2xl p-4 flex items-start gap-2" style={{ background: 'var(--nav-accent-soft)' }}>
+          <span className="mt-0.5" style={{ color: 'var(--nav-accent)' }}><InfoIcon /></span>
+          <div>
+            <div className="text-sm font-medium mb-1" style={{ color: 'var(--nav-text-primary)' }}>{t.notificationsInfoTitle}</div>
+            <div className="text-xs leading-relaxed" style={{ color: 'var(--nav-text-secondary)' }}>
+              {t.notificationsInfoBody}
+            </div>
           </div>
-        </div>
+        </motion.div>
 
-        {groups.map(group => (
-          <div key={group.title}>
-            <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">{group.title}</div>
-            <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+        {groups.map((group, gi) => (
+          <motion.div key={group.title} {...fadeIn(2 + gi)}>
+            <div className="text-[11px] font-extrabold uppercase px-1 mb-2" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.09em' }}>{group.title}</div>
+            <div className="nav-glass rounded-2xl overflow-hidden">
               {group.items.map((item, i, arr) => (
                 <div key={item.key}
-                  className={`flex items-center justify-between px-4 py-3.5 ${i < arr.length - 1 ? 'border-b border-gray-100' : ''}`}>
+                  className="flex items-center justify-between px-4 py-3.5"
+                  style={{ borderBottom: i < arr.length - 1 ? '1px solid var(--nav-border-soft)' : 'none' }}>
                   <div className="flex-1 mr-4">
-                    <div className="text-sm text-gray-800">{item.label}</div>
-                    <div className="text-xs text-gray-400 mt-0.5">{item.desc}</div>
+                    <div className="text-sm" style={{ color: 'var(--nav-text-primary)' }}>{item.label}</div>
+                    <div className="text-xs mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{item.desc}</div>
                   </div>
                   <Toggle
                     value={(settings as any)[item.key]}
@@ -183,38 +216,45 @@ export default function Notifications() {
                 </div>
               ))}
             </div>
-          </div>
+          </motion.div>
         ))}
 
         {/* Telegram подключение */}
         {settings.notify_telegram && (
-          <div className="bg-white rounded-2xl shadow-sm p-4">
+          <motion.div {...fadeIn(2 + groups.length)} className="nav-glass rounded-2xl p-4">
             {telegramChatId ? (
               <>
-                <div className="text-sm font-medium text-[#1C2056] mb-1">{t.telegramConnectedLabel}</div>
-                <div className="text-xs text-gray-500 mb-3">{t.telegramConnectedHint}</div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span style={{ color: 'var(--nav-teal)' }}><SendIcon /></span>
+                  <div className="text-sm font-medium" style={{ color: 'var(--nav-text-primary)' }}>{t.telegramConnectedLabel}</div>
+                </div>
+                <div className="text-xs mb-3" style={{ color: 'var(--nav-text-muted)' }}>{t.telegramConnectedHint}</div>
                 <button onClick={disconnectTelegram} disabled={telegramDisconnecting}
-                  className="w-full bg-gray-100 text-gray-600 rounded-xl py-3 text-sm font-medium">
+                  className="w-full rounded-xl py-3 text-sm font-medium border transition-colors disabled:opacity-60"
+                  style={{ borderColor: 'var(--nav-critical)', color: 'var(--nav-critical)' }}>
                   {telegramDisconnecting ? t.disconnectingLabel : t.disconnectTelegramButton}
                 </button>
               </>
             ) : (
               <>
-                <div className="text-sm font-medium text-[#1C2056] mb-2">{t.connectTelegramTitle}</div>
-                <div className="text-xs text-gray-500 mb-3">
-                  {t.connectTelegramBodyBefore} <span className="font-mono bg-gray-100 px-1 rounded">/start</span> {t.connectTelegramBodyAfter}
+                <div className="text-sm font-medium mb-2" style={{ color: 'var(--nav-text-primary)' }}>{t.connectTelegramTitle}</div>
+                <div className="text-xs mb-3" style={{ color: 'var(--nav-text-secondary)' }}>
+                  {t.connectTelegramBodyBefore} <span className="font-mono px-1 rounded" style={{ background: 'var(--nav-border-soft)' }}>/start</span> {t.connectTelegramBodyAfter}
                 </div>
-                {telegramError && <p className="text-xs text-red-500 mb-2">{telegramError}</p>}
+                {telegramError && <p className="text-xs mb-2" style={{ color: 'var(--nav-critical)' }}>{telegramError}</p>}
                 <button onClick={connectTelegram} disabled={telegramConnecting}
-                  className="flex items-center justify-center gap-2 w-full bg-[#1C2056] text-white rounded-xl py-3 text-sm font-medium">
+                  className="flex items-center justify-center gap-2 w-full rounded-xl py-3 text-sm font-medium transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60"
+                  style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                  <SendIcon />
                   {telegramConnecting ? t.disconnectingLabel : t.connectTelegramBotButton}
                 </button>
               </>
             )}
-          </div>
+          </motion.div>
         )}
 
       </div>
     </main>
+    </DesktopShell>
   )
 }

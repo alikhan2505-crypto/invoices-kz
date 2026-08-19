@@ -1,16 +1,71 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { motion, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { resizeToFit } from '@/lib/imageResize'
 import { useLanguage } from '@/components/LanguageProvider'
 import { backLabel, closeLabel } from '@/lib/a11yLabels'
 import { profileCoreDict } from '@/lib/i18n/profileCore'
+import SiteNav from '@/components/SiteNav'
+import DesktopShell from '@/components/DesktopShell'
+
+// Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
+// kept identical rather than inventing a second "house" ease.
+const EASE = [0.16, 1, 0.3, 1] as const
+
+function ChevronLeftIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m15 18-6-6 6-6" />
+    </svg>
+  )
+}
+function XIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 6 6 18M6 6l12 12" />
+    </svg>
+  )
+}
+function PenIcon() {
+  return (
+    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m17 3 4 4L7 21H3v-4L17 3Z" />
+      <path d="m14.5 5.5 4 4" />
+    </svg>
+  )
+}
+function StampIcon() {
+  return (
+    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="10" r="7" />
+      <path d="m9 10 2 2 4-4" />
+      <path d="M8 21h8M9 21v-4M15 21v-4" />
+    </svg>
+  )
+}
+function BuildingIcon() {
+  return (
+    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 21V5a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v16" />
+      <path d="M14 10h5a1 1 0 0 1 1 1v10" />
+      <path d="M9 8h.01M9 12h.01M9 16h.01" />
+      <path d="M2 21h20" />
+    </svg>
+  )
+}
+
+// Same rounded-bordered field treatment used by src/app/create/page.tsx.
+const INPUT_CLS = 'w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]'
+const OUTLINE_BTN_CLS = 'flex-1 rounded-xl py-2.5 text-sm font-medium border transition-colors'
 
 export default function Signature() {
   const router = useRouter()
   const { lang } = useLanguage()
   const t = profileCoreDict[lang]
+  const reduceMotionRaw = useReducedMotion()
+  const reduceMotion = !!reduceMotionRaw
   const [saving, setSaving] = useState(false)
   const [signatureUrl, setSignatureUrl] = useState<string | null>(null)
   const [stampUrl, setStampUrl] = useState<string | null>(null)
@@ -425,44 +480,54 @@ export default function Signature() {
     setLogoUrl(null)
   }
 
-  return (
-    <main className="min-h-screen bg-gray-50 flex flex-col">
-      <div className="sticky top-0 z-10 bg-white border-b px-4 py-4 flex items-center gap-3">
-        <button onClick={() => router.push('/profile')} className="back-btn text-gray-400 text-xl" aria-label={backLabel(lang)}>‹</button>
-        <span className="font-semibold text-[#1C2056]">{t.signatureHeaderLabel}</span>
-      </div>
+  const fadeIn = (i: number) => ({
+    initial: reduceMotion ? false : { opacity: 0, y: 12 },
+    animate: { opacity: 1, y: 0 },
+    transition: { delay: reduceMotion ? 0 : i * 0.05, duration: reduceMotion ? 0 : 0.4, ease: EASE },
+  })
 
-      <div className="max-w-lg mx-auto p-4 space-y-4 w-full">
+  return (
+    <DesktopShell>
+    <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full flex flex-col">
+      <SiteNav />
+      <div className="max-w-lg lg:max-w-2xl mx-auto p-4 space-y-4 w-full">
+
+        <motion.div {...fadeIn(0)} className="nav-glass rounded-2xl px-4 py-4 flex items-center gap-3">
+          <button onClick={() => router.push('/profile')} className="back-btn transition-colors flex-shrink-0" style={{ color: 'var(--nav-text-muted)' }} aria-label={backLabel(lang)}>
+            <ChevronLeftIcon />
+          </button>
+          <span className="font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{t.signatureHeaderLabel}</span>
+        </motion.div>
 
         {/* Подпись */}
-        <div>
-          <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">{t.signatureSectionLabel}</div>
-          <div className="bg-white rounded-2xl shadow-sm p-4">
+        <motion.div {...fadeIn(1)}>
+          <div className="text-[11px] font-extrabold uppercase px-1 mb-2" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.09em' }}>{t.signatureSectionLabel}</div>
+          <div className="nav-glass rounded-2xl p-4">
             {signatureUrl && !showCanvas ? (
               <div>
-                <div className="border rounded-xl p-3 mb-3 bg-gray-50">
+                <div className="rounded-xl p-3 mb-3" style={{ border: '1px solid var(--nav-border-soft)', background: 'var(--nav-bg)' }}>
                   <img src={signatureUrl} alt={t.signatureAltText} className="h-20 object-contain" />
                 </div>
                 <div className="flex gap-2">
                   <button onClick={() => setShowCanvas(true)}
-                    className="flex-1 border border-[#1C2056] text-[#1C2056] rounded-xl py-2.5 text-sm font-medium">
+                    className={OUTLINE_BTN_CLS} style={{ borderColor: 'var(--nav-accent)', color: 'var(--nav-accent)' }}>
                     {t.redrawButton}
                   </button>
                   <button onClick={removeSignature}
-                    className="flex-1 border border-red-200 text-red-400 rounded-xl py-2.5 text-sm font-medium">
+                    className={OUTLINE_BTN_CLS} style={{ borderColor: 'var(--nav-critical)', color: 'var(--nav-critical)' }}>
                     {t.removeButton}
                   </button>
                 </div>
               </div>
             ) : showCanvas ? (
               <div>
-                <p className="text-xs text-gray-400 mb-2">{t.drawSignatureHint}</p>
+                <p className="text-xs mb-2" style={{ color: 'var(--nav-text-muted)' }}>{t.drawSignatureHint}</p>
                 <canvas
                   ref={canvasRef}
                   width={600}
                   height={200}
-                  className="border-2 border-dashed border-gray-200 rounded-xl w-full touch-none cursor-crosshair bg-white"
-                  style={{ touchAction: 'none' }}
+                  className="rounded-xl w-full touch-none cursor-crosshair"
+                  style={{ touchAction: 'none', border: '2px dashed var(--nav-border)', background: '#fff' }}
                   onMouseDown={startDraw}
                   onMouseMove={draw}
                   onMouseUp={stopDraw}
@@ -473,116 +538,127 @@ export default function Signature() {
                 />
                 <div className="flex gap-2 mt-3">
                   <button onClick={clearCanvas}
-                    className="flex-1 border border-gray-200 text-gray-500 rounded-xl py-2.5 text-sm">
+                    className={OUTLINE_BTN_CLS} style={{ borderColor: 'var(--nav-border)', color: 'var(--nav-text-secondary)' }}>
                     {t.clearButton}
                   </button>
                   <button onClick={() => setShowCanvas(false)}
-                    className="flex-1 border border-gray-200 text-gray-500 rounded-xl py-2.5 text-sm">
+                    className={OUTLINE_BTN_CLS} style={{ borderColor: 'var(--nav-border)', color: 'var(--nav-text-secondary)' }}>
                     {t.cancelButton}
                   </button>
                   <button onClick={saveSignature} disabled={saving}
-                    className="flex-1 bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium">
+                    className="flex-1 rounded-xl py-2.5 text-sm font-medium disabled:opacity-60"
+                    style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                     {saving ? t.savingEllipsis : t.saveButton}
                   </button>
                 </div>
               </div>
             ) : (
               <div className="text-center py-4">
-                <div className="text-4xl mb-3">✍️</div>
-                <p className="text-sm text-gray-400 mb-4">{t.noSignatureHint}</p>
+                <div className="w-14 h-14 mx-auto rounded-2xl flex items-center justify-center mb-3"
+                  style={{ background: 'linear-gradient(135deg, var(--nav-accent-soft), transparent)', color: 'var(--nav-accent)' }}>
+                  <PenIcon />
+                </div>
+                <p className="text-sm mb-4" style={{ color: 'var(--nav-text-muted)' }}>{t.noSignatureHint}</p>
                 <button onClick={() => setShowCanvas(true)}
-                  className="bg-[#1C2056] text-white px-6 py-2.5 rounded-xl text-sm font-medium">
+                  className="px-6 py-2.5 rounded-xl text-sm font-medium"
+                  style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                   {t.drawSignatureButton}
                 </button>
               </div>
             )}
           </div>
-        </div>
+        </motion.div>
 
         {/* Печать */}
-        <div>
-          <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">{t.stampSectionLabel}</div>
-          <div className="bg-white rounded-2xl shadow-sm p-4">
+        <motion.div {...fadeIn(2)}>
+          <div className="text-[11px] font-extrabold uppercase px-1 mb-2" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.09em' }}>{t.stampSectionLabel}</div>
+          <div className="nav-glass rounded-2xl p-4">
             {stampUrl ? (
               <div>
-                <div className="border rounded-xl p-3 mb-3 bg-gray-50 flex items-center justify-center">
+                <div className="rounded-xl p-3 mb-3 flex items-center justify-center" style={{ border: '1px solid var(--nav-border-soft)', background: 'var(--nav-bg)' }}>
                   <img src={stampUrl} alt={t.stampAltText} className="h-24 w-24 object-contain" />
                 </div>
                 <div className="flex gap-2">
-                  <label className="flex-1 border border-[#1C2056] text-[#1C2056] rounded-xl py-2.5 text-sm font-medium text-center cursor-pointer">
+                  <label className={`${OUTLINE_BTN_CLS} text-center cursor-pointer`} style={{ borderColor: 'var(--nav-accent)', color: 'var(--nav-accent)' }}>
                     {t.replaceButton}
                     <input type="file" accept="image/*" className="hidden" onChange={openCropModal} />
                   </label>
                   <button onClick={removeStamp}
-                    className="flex-1 border border-red-200 text-red-400 rounded-xl py-2.5 text-sm font-medium">
+                    className={OUTLINE_BTN_CLS} style={{ borderColor: 'var(--nav-critical)', color: 'var(--nav-critical)' }}>
                     {t.removeButton}
                   </button>
                 </div>
               </div>
             ) : (
               <div className="text-center py-4">
-                <div className="text-4xl mb-3">🔵</div>
-                <p className="text-sm text-gray-400 mb-4">{t.noStampHint}</p>
-                <label className="bg-[#1C2056] text-white px-6 py-2.5 rounded-xl text-sm font-medium cursor-pointer">
+                <div className="w-14 h-14 mx-auto rounded-2xl flex items-center justify-center mb-3"
+                  style={{ background: 'linear-gradient(135deg, var(--nav-teal-soft), transparent)', color: 'var(--nav-teal)' }}>
+                  <StampIcon />
+                </div>
+                <p className="text-sm mb-4" style={{ color: 'var(--nav-text-muted)' }}>{t.noStampHint}</p>
+                <label className="px-6 py-2.5 rounded-xl text-sm font-medium cursor-pointer" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                   {saving ? t.uploadingLabel : t.uploadPhotoButton}
                   <input type="file" accept="image/*" className="hidden" onChange={openCropModal} />
                 </label>
               </div>
             )}
           </div>
-        </div>
+        </motion.div>
 
         {/* Логотип */}
-        <div>
-          <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">{t.logoSectionLabel}</div>
-          <div className="bg-white rounded-2xl shadow-sm p-4">
+        <motion.div {...fadeIn(3)}>
+          <div className="text-[11px] font-extrabold uppercase px-1 mb-2" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.09em' }}>{t.logoSectionLabel}</div>
+          <div className="nav-glass rounded-2xl p-4">
             {logoUrl ? (
               <div>
-                <div className="border rounded-xl p-3 mb-3 bg-gray-50 flex items-center justify-center">
+                <div className="rounded-xl p-3 mb-3 flex items-center justify-center" style={{ border: '1px solid var(--nav-border-soft)', background: 'var(--nav-bg)' }}>
                   <img src={logoUrl} alt={t.logoAltText} className="h-16 object-contain" />
                 </div>
                 <div className="flex gap-2">
-                  <label className="flex-1 border border-[#1C2056] text-[#1C2056] rounded-xl py-2.5 text-sm font-medium text-center cursor-pointer">
+                  <label className={`${OUTLINE_BTN_CLS} text-center cursor-pointer`} style={{ borderColor: 'var(--nav-accent)', color: 'var(--nav-accent)' }}>
                     {t.replaceButton}
                     <input type="file" accept="image/*" className="hidden" onChange={uploadLogo} />
                   </label>
                   <button onClick={removeLogo}
-                    className="flex-1 border border-red-200 text-red-400 rounded-xl py-2.5 text-sm font-medium">
+                    className={OUTLINE_BTN_CLS} style={{ borderColor: 'var(--nav-critical)', color: 'var(--nav-critical)' }}>
                     {t.removeButton}
                   </button>
                 </div>
               </div>
             ) : (
               <div className="text-center py-4">
-                <div className="text-4xl mb-3">🏢</div>
-                <p className="text-sm text-gray-400 mb-4">{t.noLogoHint}</p>
-                <label className="bg-[#1C2056] text-white px-6 py-2.5 rounded-xl text-sm font-medium cursor-pointer">
+                <div className="w-14 h-14 mx-auto rounded-2xl flex items-center justify-center mb-3"
+                  style={{ background: 'linear-gradient(135deg, var(--nav-magenta-soft), transparent)', color: 'var(--nav-magenta)' }}>
+                  <BuildingIcon />
+                </div>
+                <p className="text-sm mb-4" style={{ color: 'var(--nav-text-muted)' }}>{t.noLogoHint}</p>
+                <label className="px-6 py-2.5 rounded-xl text-sm font-medium cursor-pointer" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                   {savingLogo ? t.uploadingLabel : t.uploadLogoButton}
                   <input type="file" accept="image/*" className="hidden" onChange={uploadLogo} />
                 </label>
               </div>
             )}
           </div>
-        </div>
+        </motion.div>
 
-        <div className="bg-[#1C2056]/5 rounded-2xl p-4">
-          <div className="text-xs text-[#1C2056] font-medium mb-1">{t.tipLabel}</div>
-          <div className="text-xs text-gray-500 leading-relaxed">
+        <motion.div {...fadeIn(4)} className="rounded-2xl p-4" style={{ background: 'var(--nav-accent-soft)' }}>
+          <div className="text-xs font-medium mb-1" style={{ color: 'var(--nav-accent)' }}>{t.tipLabel}</div>
+          <div className="text-xs leading-relaxed" style={{ color: 'var(--nav-text-secondary)' }}>
             {t.tipBodyText}
           </div>
-        </div>
+        </motion.div>
       </div>
 
       {/* Кроп модал */}
       {showCropModal && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-end">
-          <div className="bg-white w-full max-w-lg mx-auto rounded-t-3xl p-5">
+          <div className="w-full max-w-lg mx-auto rounded-t-3xl p-5" style={{ background: 'var(--nav-surface-chrome)' }}>
             <div className="flex items-center justify-between mb-3">
               <div>
-                <div className="font-semibold text-[#1C2056]">{t.cropModalTitle}</div>
-                <div className="text-xs text-gray-400 mt-0.5">{t.cropModalSubtitle}</div>
+                <div className="font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{t.cropModalTitle}</div>
+                <div className="text-xs mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{t.cropModalSubtitle}</div>
               </div>
-              <button onClick={() => setShowCropModal(false)} className="back-btn text-gray-400 text-xl" aria-label={closeLabel(lang)}>✕</button>
+              <button onClick={() => setShowCropModal(false)} className="back-btn transition-colors" style={{ color: 'var(--nav-text-muted)' }} aria-label={closeLabel(lang)}><XIcon /></button>
             </div>
 
             {/* Canvas кропа */}
@@ -603,7 +679,7 @@ export default function Signature() {
 
             {/* Ползунок размера */}
             <div className="mb-4">
-              <div className="flex justify-between text-xs text-gray-400 mb-1">
+              <div className="flex justify-between text-xs mb-1" style={{ color: 'var(--nav-text-muted)' }}>
                 <span>{t.cropSizeLabel}</span>
                 <span>{Math.round(cropSize)}px</span>
               </div>
@@ -620,17 +696,17 @@ export default function Signature() {
                   setCropY(newCy)
                   redraw(newCx, newCy, newSize)
                 }}
-                className="w-full accent-[#2DC48D]"
-              />
+                className="w-full accent-[color:var(--nav-accent)]" />
             </div>
 
             <div className="flex gap-2">
               <button onClick={() => setShowCropModal(false)}
-                className="flex-1 border border-gray-200 text-gray-500 rounded-xl py-3 text-sm">
+                className={OUTLINE_BTN_CLS} style={{ borderColor: 'var(--nav-border)', color: 'var(--nav-text-secondary)' }}>
                 {t.cancelButton}
               </button>
               <button onClick={applyCrop} disabled={saving}
-                className="flex-1 bg-[#2DC48D] text-white rounded-xl py-3 text-sm font-medium">
+                className="flex-1 rounded-xl py-3 text-sm font-medium disabled:opacity-60"
+                style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                 {saving ? t.savingEllipsis : t.saveStampButton}
               </button>
             </div>
@@ -638,5 +714,6 @@ export default function Signature() {
         </div>
       )}
     </main>
+    </DesktopShell>
   )
 }
