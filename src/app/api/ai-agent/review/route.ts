@@ -39,13 +39,21 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!(await isAdmin(user.id))) return NextResponse.json({ error: 'admin_only' }, { status: 403 })
 
-  const { data: agent } = await supabase.from('ai_agents').select('id').eq('user_id', user.id).maybeSingle()
-  if (!agent) return NextResponse.json({ items: [] })
+  // Multi-agent (2026-08-20): the review queue deliberately aggregates
+  // across ALL of the user's agents rather than taking an ?agentId= filter.
+  // Chosen as the least-invasive correct option: the old .maybeSingle()
+  // would error (data: null) as soon as a second agent existed, silently
+  // emptying the queue. One combined queue also matches how the user
+  // actually works it -- approve/skip everything pending, whichever agent
+  // it came from. POST needs no change: it resolves message -> conversation
+  // -> agent and ownership-checks that agent by user_id per item.
+  const { data: agents } = await supabase.from('ai_agents').select('id').eq('user_id', user.id)
+  if (!agents || agents.length === 0) return NextResponse.json({ items: [] })
 
   const { data: conversations } = await supabase
     .from('ai_agent_conversations')
     .select('id, customer_handle')
-    .eq('agent_id', agent.id)
+    .in('agent_id', agents.map(a => a.id))
   const conversationIds = (conversations || []).map(c => c.id)
   const handleByConversation: Record<string, string> = {}
   for (const c of conversations || []) handleByConversation[c.id] = c.customer_handle || 'клиент'

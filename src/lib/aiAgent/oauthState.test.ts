@@ -15,6 +15,11 @@ describe('createOAuthState / verifyOAuthState', () => {
     expect(verifyOAuthState(state)).toEqual({ userId: 'user-123' })
   })
 
+  it('round-trips an optional agent id alongside the user id (multi-agent)', () => {
+    const state = createOAuthState('user-123', 'agent-456')
+    expect(verifyOAuthState(state)).toEqual({ userId: 'user-123', agentId: 'agent-456' })
+  })
+
   it('rejects a tampered state', () => {
     const state = createOAuthState('user-123')
     const tampered = state.slice(0, -1) + (state.endsWith('a') ? 'b' : 'a')

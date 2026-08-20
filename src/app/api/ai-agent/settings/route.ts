@@ -43,7 +43,25 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!(await isAdmin(user.id))) return NextResponse.json({ error: 'admin_only' }, { status: 403 })
 
-  const { data: agent } = await supabase.from('ai_agents').select('*').eq('user_id', user.id).maybeSingle()
+  // Multi-agent (2026-08-20): ?agentId= loads a specific agent (404 if not
+  // owned); without it, fall back to the most recently created agent, which
+  // preserves the exact pre-multi-agent behavior for a single-agent user.
+  const agentId = req.nextUrl.searchParams.get('agentId')
+  let agent: any = null
+  if (agentId) {
+    const { data } = await supabase.from('ai_agents').select('*').eq('id', agentId).eq('user_id', user.id).maybeSingle()
+    if (!data) return NextResponse.json({ error: 'not_found' }, { status: 404 })
+    agent = data
+  } else {
+    const { data } = await supabase
+      .from('ai_agents')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    agent = data
+  }
   const { data: profile } = await supabase.from('profiles').select('company_name').eq('id', user.id).maybeSingle()
   const { data: connections } = agent
     ? await supabase.from('ai_agent_channel_connections').select('channel, external_account_name, status').eq('agent_id', agent.id)
@@ -66,12 +84,14 @@ export async function GET(req: NextRequest) {
   })
 }
 
-// Upsert on user_id. Deliberately omits status/training_started_at/
-// training_message_count from the payload -- Supabase's upsert only sets
-// the columns present in the object, so re-saving settings later (editing
+// Multi-agent (2026-08-20): an explicit `agentId` in the body means UPDATE
+// that agent (ownership-verified); no agentId means INSERT a new agent row.
+// The old upsert-on-user_id is gone along with the UNIQUE(user_id)
+// constraint. The payload still deliberately omits status/
+// training_started_at/training_message_count -- re-saving settings (editing
 // the business description, say) never resets an agent's training clock
 // back to defaults. Those three columns are only ever set by their own
-// defaults (first creation) or by Task 9's review-queue route (training
+// defaults (first creation) or by the review-queue route (training
 // progress).
 export async function POST(req: NextRequest) {
   const user = await requireUser(req)
@@ -79,7 +99,9 @@ export async function POST(req: NextRequest) {
   if (!(await isAdmin(user.id))) return NextResponse.json({ error: 'admin_only' }, { status: 403 })
 
   const body = await req.json()
-  const { name, tone, businessDescription, goal, collectFields, timezone, currency } = body
+  const { agentId, name, tone, businessDescription, goal, collectFields, timezone, currency } = body
+
+  if (agentId !== undefined && typeof agentId !== 'string') return NextResponse.json({ error: 'invalid agentId' }, { status: 400 })
 
   if (!name || typeof name !== 'string') return NextResponse.json({ error: 'name required' }, { status: 400 })
   if (!VALID_TONES.includes(tone)) return NextResponse.json({ error: 'invalid tone' }, { status: 400 })
@@ -98,25 +120,41 @@ export async function POST(req: NextRequest) {
         .slice(0, MAX_COLLECT_FIELDS)
     : []
 
-  const { data: agent, error } = await supabase
-    .from('ai_agents')
-    .upsert({
-      user_id: user.id,
-      name,
-      tone,
-      business_description: typeof businessDescription === 'string' ? businessDescription : '',
-      goal,
-      collect_fields: fields,
-      // Legacy booleans stay in sync for rollback safety (never-drop
-      // convention) -- nothing reads them anymore after 2026-08-20.
-      collect_name: fields.includes('name'),
-      collect_phone: fields.includes('phone'),
-      timezone: timezone || 'Asia/Almaty',
-      currency: currency || 'KZT',
-    }, { onConflict: 'user_id' })
-    .select()
-    .single()
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  const payload = {
+    name,
+    tone,
+    business_description: typeof businessDescription === 'string' ? businessDescription : '',
+    goal,
+    collect_fields: fields,
+    // Legacy booleans stay in sync for rollback safety (never-drop
+    // convention) -- nothing reads them anymore after 2026-08-20.
+    collect_name: fields.includes('name'),
+    collect_phone: fields.includes('phone'),
+    timezone: timezone || 'Asia/Almaty',
+    currency: currency || 'KZT',
+  }
+
+  let agent: any = null
+  if (agentId) {
+    const { data, error } = await supabase
+      .from('ai_agents')
+      .update(payload)
+      .eq('id', agentId)
+      .eq('user_id', user.id)
+      .select()
+      .maybeSingle()
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (!data) return NextResponse.json({ error: 'not_found' }, { status: 404 })
+    agent = data
+  } else {
+    const { data, error } = await supabase
+      .from('ai_agents')
+      .insert({ user_id: user.id, ...payload })
+      .select()
+      .single()
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    agent = data
+  }
 
   // No wallet row to seed since the 2026-08-18 unified-wallet merge: spend
   // now debits the shared profiles.kaspi_wallet_balance, which always exists

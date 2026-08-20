@@ -121,12 +121,21 @@ export default function AiAgentSettings() {
     // The Instagram OAuth callback redirects back here with a plain query
     // flag (no Authorization header exists on that server-side redirect to
     // report anything richer) -- read it once client-side and strip it from
-    // the URL so a page refresh doesn't keep re-showing the notice.
+    // the URL so a page refresh doesn't keep re-showing the notice. The
+    // ?agent= param survives the strip -- it's the multi-agent routing key,
+    // not a one-shot notice.
     const params = new URLSearchParams(window.location.search)
+    // Multi-agent routing: ?agent=<id> edits that agent, ?new=1 starts a
+    // blank form that CREATES on save, no param keeps the legacy behavior
+    // (most recent agent, or blank if none). Read via window.location like
+    // the notice flags above -- NOT useSearchParams, which would force a
+    // Suspense boundary around this whole client page.
+    const agentParam = params.get('agent')
+    const isNew = params.get('new') === '1'
     if (params.has('instagram_connected')) setOauthNotice('connected')
     else if (params.has('instagram_error')) setOauthNotice('error')
     if (params.has('instagram_connected') || params.has('instagram_error')) {
-      window.history.replaceState({}, '', window.location.pathname)
+      window.history.replaceState({}, '', agentParam ? `${window.location.pathname}?agent=${agentParam}` : window.location.pathname)
     }
 
     async function load() {
@@ -141,10 +150,18 @@ export default function AiAgentSettings() {
       const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', user.id).single()
       if (!profile?.is_admin) { setForbidden(true); setLoading(false); return }
       const headers = await authHeader()
-      const res = await fetch('/api/ai-agent/settings', { headers })
+      const res = await fetch(agentParam ? `/api/ai-agent/settings?agentId=${encodeURIComponent(agentParam)}` : '/api/ai-agent/settings', { headers })
+      if (res.status === 404) {
+        // ?agent= pointing at a deleted/foreign agent -- back to the list.
+        router.push('/ai-agent')
+        return
+      }
       if (res.ok) {
         const data = await res.json()
-        if (data.agent) {
+        // ?new=1 ignores the returned agent (it's just "most recent") and
+        // keeps the form blank so save() CREATES -- only the suggested name
+        // prefill is taken.
+        if (data.agent && !isNew) {
           setAgentId(data.agent.id)
           setName(data.agent.name)
           setTone(data.agent.tone)
@@ -153,10 +170,10 @@ export default function AiAgentSettings() {
           if (Array.isArray(data.agent.collectFields)) setCollectFields(data.agent.collectFields)
           if (data.agent.timezone) setTimezone(data.agent.timezone)
           if (data.agent.currency) setCurrency(data.agent.currency)
+          setConnections(data.connections || [])
         } else {
           setName(data.suggestedName || 'Ассистент')
         }
-        setConnections(data.connections || [])
       }
       setLoading(false)
     }
@@ -195,7 +212,8 @@ export default function AiAgentSettings() {
     const res = await fetch('/api/ai-agent/settings', {
       method: 'POST',
       headers,
-      body: JSON.stringify({ name, tone, businessDescription, goal, collectFields, timezone, currency }),
+      // agentId present -> UPDATE that agent; absent -> CREATE a new one.
+      body: JSON.stringify({ ...(agentId ? { agentId } : {}), name, tone, businessDescription, goal, collectFields, timezone, currency }),
     })
     if (res.ok) {
       const data = await res.json()
@@ -204,6 +222,13 @@ export default function AiAgentSettings() {
         await new Promise(resolve => setTimeout(resolve, remaining))
       }
       setAgentId(data.agent.id)
+      if (isFirstCreation) {
+        // Pin the URL to the created agent so a refresh EDITS it instead of
+        // re-creating (drops any ?new=1 too). history.replaceState, not
+        // router.replace -- router.replace is known-broken for query-only
+        // changes in this app (see src/app/create/page.tsx).
+        window.history.replaceState({}, '', `/ai-agent/settings?agent=${data.agent.id}`)
+      }
     }
     if (createTimerRef.current) { clearInterval(createTimerRef.current); createTimerRef.current = null }
     setCreating(false)
@@ -215,7 +240,9 @@ export default function AiAgentSettings() {
     setOauthNotice(null)
     try {
       const headers = await authHeader()
-      const res = await fetch('/api/ai-agent/instagram/connect', { headers })
+      // agentId rides along so the OAuth callback attaches the connection
+      // to THIS agent (it travels inside the signed state param).
+      const res = await fetch(`/api/ai-agent/instagram/connect${agentId ? `?agentId=${encodeURIComponent(agentId)}` : ''}`, { headers })
       if (res.ok) {
         const data = await res.json()
         window.location.href = data.authorizeUrl
@@ -259,6 +286,10 @@ export default function AiAgentSettings() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE }}
         >
+          <Link href="/ai-agent" className="inline-flex items-center gap-1 text-xs mb-2 transition-colors hover:text-[color:var(--nav-text-secondary)]" style={{ color: 'var(--nav-text-muted)' }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M11 18l-6-6 6-6" /></svg>
+            Все агенты
+          </Link>
           <h1 className="text-xl font-bold mb-1" style={{ color: 'var(--nav-text-primary)' }}>AI-агент</h1>
           <p className="text-sm mb-6" style={{ color: 'var(--nav-text-secondary)' }}>Настройте ассистента, который отвечает вашим клиентам в Instagram</p>
         </motion.div>

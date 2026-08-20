@@ -86,7 +86,16 @@ export async function GET(req: NextRequest) {
       throw new Error(subData.error?.message || 'failed to subscribe the account to webhooks')
     }
 
-    const { data: agent } = await supabase.from('ai_agents').select('id').eq('user_id', verified.userId).single()
+    // Multi-agent (2026-08-20): the signed state carries the target agent id
+    // (see connect/route.ts). Always scoped by user_id too -- the signature
+    // proves we issued the state, the user_id filter proves the agent is
+    // actually theirs. A legacy state without agentId (issued pre-deploy,
+    // 10-min TTL) falls back to the user's most recent agent, which is
+    // exactly the old single-agent behavior.
+    const agentQuery = supabase.from('ai_agents').select('id').eq('user_id', verified.userId)
+    const { data: agent } = verified.agentId
+      ? await agentQuery.eq('id', verified.agentId).maybeSingle()
+      : await agentQuery.order('created_at', { ascending: false }).limit(1).maybeSingle()
     if (!agent) throw new Error('no agent found for this user -- settings must be saved before connecting a channel')
 
     const encryptedToken = encryptAtRest(longLivedData.access_token, getKey())
@@ -100,7 +109,9 @@ export async function GET(req: NextRequest) {
     }, { onConflict: 'channel,external_account_id' })
     if (upsertError) throw new Error(upsertError.message)
 
-    return NextResponse.redirect(`${appUrl}/ai-agent/settings?instagram_connected=1`)
+    // Carry the agent id back so the settings page reopens the agent that
+    // was just connected (not the default most-recent one).
+    return NextResponse.redirect(`${appUrl}/ai-agent/settings?agent=${agent.id}&instagram_connected=1`)
   } catch (e: any) {
     console.error('ai-agent Instagram OAuth callback failed:', e.message)
     return NextResponse.redirect(`${appUrl}/ai-agent/settings?instagram_error=1`)

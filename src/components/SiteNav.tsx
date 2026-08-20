@@ -40,8 +40,10 @@ const kaspiShopLinks: { href: string; label: LocalizedLabel }[] = [
 ]
 
 const aiAgentLinks: { href: string; label: LocalizedLabel }[] = [
+  { href: '/ai-agent', label: { ru: 'Агенты', kk: 'Агенттер', en: 'Agents' } },
   { href: '/ai-agent/review', label: { ru: 'Диалоги', kk: 'Диалогтар', en: 'Conversations' } },
   { href: '/ai-agent/settings', label: { ru: 'Настройки', kk: 'Баптаулар', en: 'Settings' } },
+  { href: '/ai-agent/docs', label: { ru: 'Как настроить', kk: 'Қалай баптау керек', en: 'Setup guide' } },
 ]
 
 // Kaspi Pay's public payment API + webhooks, surfaced as its own standalone

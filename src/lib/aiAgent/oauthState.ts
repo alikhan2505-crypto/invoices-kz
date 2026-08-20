@@ -10,14 +10,21 @@ const STATE_TTL_MS = 10 * 60 * 1000 // 10 minutes -- generous for a user to comp
 // redirect instead, HMAC'd with the same AI_AGENT_ENCRYPTION_KEY so it
 // can't be forged (a forged state could otherwise let one user attach
 // their own Instagram OAuth grant to a DIFFERENT user's agent).
-export function createOAuthState(userId: string): string {
-  const payload = JSON.stringify({ userId, nonce: crypto.randomBytes(8).toString('hex'), exp: Date.now() + STATE_TTL_MS })
+//
+// Multi-agent (2026-08-20): the state optionally carries the agent id the
+// connection should attach to, so the callback no longer has to guess "the
+// user's single agent". agentId rides inside the same signed payload --
+// the signature covers it, so a caller can't rewrite the state to target a
+// different agent. Ownership (agent belongs to userId) is still verified
+// server-side in the callback; the signature only proves WE issued the pair.
+export function createOAuthState(userId: string, agentId?: string): string {
+  const payload = JSON.stringify({ userId, ...(agentId ? { agentId } : {}), nonce: crypto.randomBytes(8).toString('hex'), exp: Date.now() + STATE_TTL_MS })
   const payloadB64 = Buffer.from(payload).toString('base64url')
   const sig = crypto.createHmac('sha256', getKey()).update(payloadB64).digest('base64url')
   return `${payloadB64}.${sig}`
 }
 
-export function verifyOAuthState(state: string): { userId: string } | null {
+export function verifyOAuthState(state: string): { userId: string; agentId?: string } | null {
   const parts = state.split('.')
   if (parts.length !== 2) return null
   const [payloadB64, sig] = parts
@@ -25,12 +32,12 @@ export function verifyOAuthState(state: string): { userId: string } | null {
   const sigBuf = Buffer.from(sig)
   const expectedBuf = Buffer.from(expectedSig)
   if (sigBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(sigBuf, expectedBuf)) return null
-  let payload: { userId: string; exp: number }
+  let payload: { userId: string; agentId?: string; exp: number }
   try {
     payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString('utf8'))
   } catch {
     return null
   }
   if (Date.now() > payload.exp) return null
-  return { userId: payload.userId }
+  return { userId: payload.userId, ...(payload.agentId ? { agentId: payload.agentId } : {}) }
 }

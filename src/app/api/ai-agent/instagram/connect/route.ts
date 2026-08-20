@@ -23,7 +23,12 @@ export async function GET(req: NextRequest) {
   const appId = process.env.NEXT_PUBLIC_INSTAGRAM_APP_ID
   if (!appId) return NextResponse.json({ error: 'Instagram app not configured' }, { status: 500 })
 
-  const state = createOAuthState(user.id)
+  // Multi-agent (2026-08-20): the settings page passes which agent this
+  // connection is for; it rides inside the signed state so the callback
+  // attaches to the right agent. Ownership (agent belongs to this user) is
+  // verified in the callback, which queries ai_agents by id AND user_id.
+  const agentId = req.nextUrl.searchParams.get('agentId') || undefined
+  const state = createOAuthState(user.id, agentId)
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.invoices.kz'
   const redirectUri = `${appUrl}/api/ai-agent/instagram/callback`
   const scopes = 'instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments'
