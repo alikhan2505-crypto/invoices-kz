@@ -4,7 +4,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { motion, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { generateInvoicePDF } from '@/lib/generatePDF'
-import { formatDateTime, formatDate } from '@/lib/date'
+import { formatDateTime, formatDate, formatDateSafe } from '@/lib/date'
 import { generateKP } from '@/lib/generateKP'
 import { generateAVR } from '@/lib/generateAVR'
 import { generateNakladnaya } from '@/lib/generateNakladnaya'
@@ -456,9 +456,9 @@ export default function InvoicePage() {
       clientName: invoice.client_name || '', clientBin: invoice.client_bin || '',
       clientEmail: invoice.client_email || '', clientAddress: invoice.client_address || '',
       clientPhone: invoice.client_phone || '', contractNumber: invoice.contract_number || '',
-      contractDate: invoice.contract_date || '',
+      contractDate: displayContractDate,
       services: invoice.services || [],
-      total: Number(invoice.amount), note: invoice.note || profile?.default_note || '',
+      total: Number(invoice.amount), note: displayNote || '',
       autoPrint: false, vatType: profile?.vat_type,
       profile: buildProfile(withSignature),
       bank: bank ? { bank_name: bank.bank_name, iik: bank.iik, bik: bank.bik, kbe: bank.kbe } : undefined,
@@ -519,6 +519,13 @@ export default function InvoicePage() {
   const status = statusLabel[invoice.status] || statusLabel.draft
   const services = invoice.services || []
   const ap = getActivePlan(profile)
+  // Older invoices carry a static "Оплата в течение Nх дней" note from
+  // before due-date-based notes existed -- for display (and for regenerated
+  // PDFs), always show the due-date-derived sentence when a due date is on
+  // record, same as the create-page's live note. Falls back to whatever's
+  // actually stored only when there's no due date to derive from.
+  const displayNote = invoice.due_date ? t.paymentDueNote(formatDate(invoice.due_date)) : invoice.note
+  const displayContractDate = invoice.contract_date ? formatDateSafe(invoice.contract_date) : undefined
 
   const serviceTotal = calcServiceTotal(services)
   const productTotal = calcProductTotal(services)
@@ -702,9 +709,9 @@ export default function InvoicePage() {
             clientName: invoice.client_name || '', clientBin: invoice.client_bin || '',
             clientEmail: invoice.client_email || '', clientAddress: invoice.client_address || '',
             clientPhone: invoice.client_phone || '', contractNumber: invoice.contract_number || '',
-            contractDate: invoice.contract_date || '',
+            contractDate: displayContractDate,
             services: invoice.services || [],
-            total: Number(invoice.amount), note: invoice.note || profile?.default_note || '',
+            total: Number(invoice.amount), note: displayNote || '',
             autoPrint: true, vatType: profile?.vat_type,
             // No scanned signature/stamp image here — the document is about
             // to be cryptographically signed with a real ЭЦП, which would
@@ -774,7 +781,7 @@ export default function InvoicePage() {
           </motion.div>
         )}
 
-        {invoice.note && (
+        {displayNote && (
           <motion.div
             className={`nav-glass nav-card-accent rounded-2xl p-4 ${CARD_HOVER}`}
             initial={reduceMotion ? false : { opacity: 0, y: 14 }}
@@ -782,7 +789,7 @@ export default function InvoicePage() {
             transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE, delay: reduceMotion ? 0 : 0.14 }}
           >
             <div className="text-xs uppercase tracking-wide mb-2" style={{ color: 'var(--nav-text-muted)' }}>{t.noteHeader}</div>
-            <div className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>{invoice.note}</div>
+            <div className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>{displayNote}</div>
           </motion.div>
         )}
 
@@ -889,6 +896,17 @@ export default function InvoicePage() {
             className="w-full flex items-center justify-between px-4 py-3.5 text-sm border-b transition-colors hover:bg-[var(--nav-surface-glass)]"
             style={{ color: 'var(--nav-text-primary)', borderColor: 'var(--nav-border-soft)' }}>
             <span>{t.duplicateButtonLabel}</span>
+            <span style={{ color: 'var(--nav-text-muted)' }}><ChevronIcon /></span>
+          </button>
+
+          {/* Открывает /create предзаполненным этим счётом (клиент, услуги,
+              договор), но с сегодняшней датой и заново вычисленным сроком
+              оплаты -- в отличие от «Дублировать», даёт проверить/поправить
+              счёт перед созданием. */}
+          <button onClick={() => router.push('/create?repeat=' + id)}
+            className="w-full flex items-center justify-between px-4 py-3.5 text-sm border-b transition-colors hover:bg-[var(--nav-surface-glass)]"
+            style={{ color: 'var(--nav-text-primary)', borderColor: 'var(--nav-border-soft)' }}>
+            <span className="flex items-center gap-2"><RepeatIcon />{t.repeatInvoiceButtonLabel}</span>
             <span style={{ color: 'var(--nav-text-muted)' }}><ChevronIcon /></span>
           </button>
 
@@ -1094,7 +1112,7 @@ export default function InvoicePage() {
           clientName={invoice.client_name || ''}
           clientBin={invoice.client_bin || ''}
           services={invoice.services || []}
-          note={invoice.note || ''}
+          note={displayNote || ''}
           vatType={profile?.vat_type || 'no_vat'}
           total={Number(invoice.amount)}
         />
@@ -1154,8 +1172,8 @@ export default function InvoicePage() {
 
       {/* Модал подписи — здесь открываем window.open (прямой клик пользователя → iOS не блокирует) */}
       {showSignModal && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-end">
-          <div className="w-full max-w-lg mx-auto rounded-t-3xl p-6" style={{ background: 'var(--nav-surface-chrome)' }}>
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-3">
+          <div className="w-full max-w-lg rounded-3xl p-6" style={{ background: 'var(--nav-surface-chrome)' }}>
             <div className="text-center mb-5">
               <div className="w-11 h-11 rounded-full flex items-center justify-center mx-auto mb-2" style={{ background: 'var(--nav-accent-soft)', color: 'var(--nav-accent)' }}>
                 <PenIcon size={18} />

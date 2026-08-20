@@ -11,6 +11,8 @@ export interface HistoryContent {
   markOverdueButtonLabel: string
   exportButtonLabel: string
   searchPlaceholder: string
+  searchMinCharsHint: (min: number) => string
+  repeatInvoiceLabel: string
   dateFilterOptions: FilterOption[]
   statusFilterOptions: FilterOption[]
   statsAllLabel: string
@@ -84,9 +86,11 @@ export const historyDict: Record<'ru' | 'kk' | 'en', HistoryContent> = {
       cancelled: 'Аннулирован',
     },
 
-    markOverdueButtonLabel: '⏰ Просрочка',
+    markOverdueButtonLabel: '⏰ Обновить просрочку',
     exportButtonLabel: '📊 Экспорт',
     searchPlaceholder: 'Поиск по клиенту, сумме, примечанию...',
+    searchMinCharsHint: (min: number) => `Введите минимум ${min} символа для поиска`,
+    repeatInvoiceLabel: 'Повторить счёт',
     dateFilterOptions: [
       { key: 'all_time', label: 'Всё время' },
       { key: 'today', label: 'Сегодня' },
@@ -99,6 +103,8 @@ export const historyDict: Record<'ru' | 'kk' | 'en', HistoryContent> = {
       { key: 'paid', label: 'Оплачены' },
       { key: 'sent', label: 'Отправлены' },
       { key: 'draft', label: 'Черновики' },
+      { key: 'overdue', label: 'Просрочены' },
+      { key: 'cancelled', label: 'Аннулированы' },
     ],
     statsAllLabel: 'Всего',
     statsPaidLabel: 'Оплачено',
@@ -168,9 +174,11 @@ export const historyDict: Record<'ru' | 'kk' | 'en', HistoryContent> = {
       cancelled: 'Жойылған',
     },
 
-    markOverdueButtonLabel: '⏰ Мерзімі өткен',
+    markOverdueButtonLabel: '⏰ Мерзімін жаңарту',
     exportButtonLabel: '📊 Экспорт',
     searchPlaceholder: 'Клиент, сома, ескертпе бойынша іздеу...',
+    searchMinCharsHint: (min: number) => `Іздеу үшін кемінде ${min} таңба енгізіңіз`,
+    repeatInvoiceLabel: 'Шотты қайталау',
     dateFilterOptions: [
       { key: 'all_time', label: 'Барлық уақыт' },
       { key: 'today', label: 'Бүгін' },
@@ -183,6 +191,8 @@ export const historyDict: Record<'ru' | 'kk' | 'en', HistoryContent> = {
       { key: 'paid', label: 'Төленген' },
       { key: 'sent', label: 'Жіберілген' },
       { key: 'draft', label: 'Жобалар' },
+      { key: 'overdue', label: 'Мерзімі өткен' },
+      { key: 'cancelled', label: 'Жойылған' },
     ],
     statsAllLabel: 'Барлығы',
     statsPaidLabel: 'Төленді',
@@ -252,9 +262,11 @@ export const historyDict: Record<'ru' | 'kk' | 'en', HistoryContent> = {
       cancelled: 'Cancelled',
     },
 
-    markOverdueButtonLabel: '⏰ Overdue',
+    markOverdueButtonLabel: '⏰ Refresh overdue',
     exportButtonLabel: '📊 Export',
     searchPlaceholder: 'Search by client, amount, note...',
+    searchMinCharsHint: (min: number) => `Type at least ${min} characters to search`,
+    repeatInvoiceLabel: 'Repeat invoice',
     dateFilterOptions: [
       { key: 'all_time', label: 'All time' },
       { key: 'today', label: 'Today' },
@@ -267,6 +279,8 @@ export const historyDict: Record<'ru' | 'kk' | 'en', HistoryContent> = {
       { key: 'paid', label: 'Paid' },
       { key: 'sent', label: 'Sent' },
       { key: 'draft', label: 'Drafts' },
+      { key: 'overdue', label: 'Overdue' },
+      { key: 'cancelled', label: 'Cancelled' },
     ],
     statsAllLabel: 'Total',
     statsPaidLabel: 'Paid',

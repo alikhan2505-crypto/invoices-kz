@@ -31,6 +31,12 @@ const statusFill: Record<string, string> = {
 
 const CARD_HOVER = 'transition-all duration-200 ease-out hover:-translate-y-1 hover:shadow-[var(--nav-card-glow)]'
 
+// Below this, the search box doesn't filter -- a 1-2 char query against
+// client/number/amount/note text matches almost everything and hides more
+// than it helps. A hint under the input explains the threshold instead of
+// the list just silently not narrowing.
+const SEARCH_MIN_CHARS = 3
+
 function SearchIcon() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -44,6 +50,17 @@ function XIcon({ size = 13 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M18 6 6 18M6 6l12 12" />
+    </svg>
+  )
+}
+
+function RepeatIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 2.1 21 6l-4 3.9" />
+      <path d="M3 12.5a9 9 0 0 1 15-6.7l3-.1" />
+      <path d="m7 22-4-3.9L7 14" />
+      <path d="M21 11.5a9 9 0 0 1-15 6.7l-3 .1" />
     </svg>
   )
 }
@@ -180,7 +197,8 @@ export default function History() {
   const filtered = invoices.filter(inv => {
     const matchFilter = filter === 'all' || inv.status === filter
     const clientName = inv.client_name || inv.clients?.name || ''
-    const matchSearch = clientName.toLowerCase().includes(search.toLowerCase()) ||
+    const matchSearch = search.trim().length < SEARCH_MIN_CHARS ||
+      clientName.toLowerCase().includes(search.toLowerCase()) ||
       inv.number.toLowerCase().includes(search.toLowerCase()) ||
       String(inv.amount).includes(search) ||
       (inv.note || '').toLowerCase().includes(search.toLowerCase())
@@ -286,6 +304,11 @@ export default function History() {
               </button>
             )}
           </motion.div>
+          {search.trim().length > 0 && search.trim().length < SEARCH_MIN_CHARS && (
+            <div className="text-xs mb-3 px-1" style={{ color: 'var(--nav-text-muted)' }}>
+              {t.searchMinCharsHint(SEARCH_MIN_CHARS)}
+            </div>
+          )}
 
           {/* Date filter */}
           <motion.div
@@ -453,8 +476,17 @@ export default function History() {
                     </div>
                   </div>
                   <button
+                    onClick={(e) => { e.stopPropagation(); router.push('/create?repeat=' + inv.id) }}
+                    className="p-1 ml-4 flex-shrink-0 text-[color:var(--nav-text-muted)] hover:text-[color:var(--nav-accent)] transition-colors"
+                    aria-label={t.repeatInvoiceLabel}
+                    title={t.repeatInvoiceLabel}
+                  >
+                    <RepeatIcon />
+                  </button>
+                  <button
                     onClick={(e) => deleteInvoice(e, inv.id, inv.number)}
-                    className="p-1 ml-2 flex-shrink-0 text-[color:var(--nav-text-muted)] hover:text-[color:var(--nav-critical)] transition-colors"
+                    className="p-1 ml-4 flex-shrink-0 text-[color:var(--nav-text-muted)] hover:text-[color:var(--nav-critical)] transition-colors"
+                    aria-label={t.confirmCancelInvoice(inv.number)}
                   >
                     <XIcon size={15} />
                   </button>

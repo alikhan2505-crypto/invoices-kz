@@ -14,6 +14,15 @@ import { signatureDict } from '@/lib/i18n/signature'
 // signature is still genuinely possible on the phone side.
 const SIGNING_TIMEOUT_MS = 4 * 60 * 1000
 
+function CheckCircleIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9" />
+      <path d="m8.5 12.5 2.3 2.3L16 10" />
+    </svg>
+  )
+}
+
 type Row = {
   id: string
   status: 'awaiting_owner' | 'awaiting_client' | 'signed' | 'failed'
@@ -231,75 +240,80 @@ export default function SignatureSection(props: Props) {
 
   return (
     <div>
-      <div className="text-xs text-gray-400 uppercase tracking-wide px-1 mb-2">{t.sectionLabel}</div>
-      <div className="bg-white rounded-2xl shadow-sm p-4">
+      <div className="text-xs uppercase tracking-wide px-1 mb-2" style={{ color: 'var(--nav-text-muted)' }}>{t.sectionLabel}</div>
+      <div className="nav-glass nav-card-accent rounded-2xl p-4">
         {qr ? (
           <div className="text-center py-2">
             {qr.qrImage && (
-              <img src={`data:image/png;base64,${qr.qrImage}`} alt="QR" className="mx-auto w-48 h-48 mb-3" />
+              <img src={`data:image/png;base64,${qr.qrImage}`} alt="QR" className="mx-auto w-48 h-48 mb-3 rounded-xl" />
             )}
-            <p className="text-sm text-gray-500 mb-3">{t.scanQrHint}</p>
+            <p className="text-sm mb-3" style={{ color: 'var(--nav-text-secondary)' }}>{t.scanQrHint}</p>
             {qr.mobileLink && (
-              <a href={qr.mobileLink} className="inline-block text-xs text-[#1C2056] border border-[#1C2056] rounded-lg px-4 py-2 mb-2">
+              <a href={qr.mobileLink} className="inline-block text-xs rounded-lg px-4 py-2 mb-2 border"
+                style={{ color: 'var(--nav-accent)', borderColor: 'var(--nav-accent)' }}>
                 {t.openInEgovButton}
               </a>
             )}
-            <p className="text-xs text-gray-400 mb-2">{t.signingLabel}</p>
-            <button onClick={() => cancelRef.current?.()} className="text-xs text-gray-400 underline">
+            <p className="text-xs mb-2" style={{ color: 'var(--nav-text-muted)' }}>{t.signingLabel}</p>
+            <button onClick={() => cancelRef.current?.()} className="text-xs underline" style={{ color: 'var(--nav-text-muted)' }}>
               {t.cancelButton}
             </button>
           </div>
         ) : row?.status === 'signed' ? (
           <div>
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 rounded-full bg-[#2DC48D]/10 flex items-center justify-center text-xl">✅</div>
-              <div className="text-sm font-medium text-[#2DC48D]">
+              <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'var(--nav-success-soft)', color: 'var(--nav-success)' }}>
+                <CheckCircleIcon />
+              </div>
+              <div className="text-sm font-medium" style={{ color: 'var(--nav-success)' }}>
                 {row.client_signed_at ? t.signedBothStatus : t.signedOwnerOnlyStatus}
               </div>
             </div>
             {row.owner_signer_name && (
-              <div className="text-xs text-gray-600 mb-1">
-                <span className="text-gray-400">{t.signedByLabel}</span>{' '}
+              <div className="text-xs mb-1" style={{ color: 'var(--nav-text-secondary)' }}>
+                <span style={{ color: 'var(--nav-text-muted)' }}>{t.signedByLabel}</span>{' '}
                 <span className="font-medium">{row.owner_signer_name}</span>
                 {ownerCompanyName && <span>, {t.onBehalfOfPrefix(ownerCompanyName)}</span>}
-                {row.owner_signer_iin && <span className="text-gray-400"> · {t.iinPrefix(row.owner_signer_iin)}</span>}
+                {row.owner_signer_iin && <span style={{ color: 'var(--nav-text-muted)' }}> · {t.iinPrefix(row.owner_signer_iin)}</span>}
               </div>
             )}
             {row.owner_signed_at && (
-              <div className="text-xs text-gray-400">{t.signedOwnerDatePrefix(formatDateTime(row.owner_signed_at))}</div>
+              <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>{t.signedOwnerDatePrefix(formatDateTime(row.owner_signed_at))}</div>
             )}
             {row.client_signer_name && (
-              <div className="text-xs text-gray-600 mt-2 mb-1">
-                <span className="text-gray-400">{t.signedByLabel}</span>{' '}
+              <div className="text-xs mt-2 mb-1" style={{ color: 'var(--nav-text-secondary)' }}>
+                <span style={{ color: 'var(--nav-text-muted)' }}>{t.signedByLabel}</span>{' '}
                 <span className="font-medium">{row.client_signer_name}</span>
-                {row.client_signer_iin && <span className="text-gray-400"> · {t.iinPrefix(row.client_signer_iin)}</span>}
+                {row.client_signer_iin && <span style={{ color: 'var(--nav-text-muted)' }}> · {t.iinPrefix(row.client_signer_iin)}</span>}
               </div>
             )}
             {row.client_signed_at && (
-              <div className="text-xs text-gray-400 mb-3">{t.signedClientDatePrefix(formatDateTime(row.client_signed_at))}</div>
+              <div className="text-xs mb-3" style={{ color: 'var(--nav-text-muted)' }}>{t.signedClientDatePrefix(formatDateTime(row.client_signed_at))}</div>
             )}
             <div className="flex gap-2 mt-1">
               <a href={`/api/documents/${row.id}/document`} target="_blank" rel="noreferrer"
-                className="flex-1 text-center bg-[#1C2056] text-white rounded-xl py-2.5 text-sm font-medium">
+                className="flex-1 text-center rounded-xl py-2.5 text-sm font-medium transition-transform duration-150 hover:-translate-y-0.5"
+                style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                 {t.downloadDocumentButton}
               </a>
             </div>
             {row.ddc_pdf_url && (
               <a href={`/api/documents/${row.id}/card`} target="_blank" rel="noreferrer"
-                className="block text-center text-xs text-gray-400 underline mt-2">
+                className="block text-center text-xs underline mt-2" style={{ color: 'var(--nav-text-muted)' }}>
                 {t.downloadVerificationCardButton}
               </a>
             )}
           </div>
         ) : row?.status === 'awaiting_client' && mode === 'owner' ? (
-          <div className="text-center py-2 text-sm text-gray-500">{t.awaitingClientStatus}</div>
+          <div className="text-center py-2 text-sm" style={{ color: 'var(--nav-text-secondary)' }}>{t.awaitingClientStatus}</div>
         ) : (
           <button onClick={mode === 'owner' ? ownerSign : clientSign} disabled={signing}
-            className="w-full bg-[#1C2056] text-white rounded-xl py-3 text-sm font-medium">
+            className="w-full rounded-xl py-3 text-sm font-medium transition-transform duration-150 hover:-translate-y-0.5 disabled:hover:translate-y-0"
+            style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
             {signing ? t.signingLabel : t.signButton}
           </button>
         )}
-        {error && <p className="text-xs text-red-500 mt-2">{t.errorPrefix(error)}</p>}
+        {error && <p className="text-xs mt-2" style={{ color: 'var(--nav-critical)' }}>{t.errorPrefix(error)}</p>}
       </div>
     </div>
   )

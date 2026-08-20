@@ -11,6 +11,14 @@ export function formatDate(dateStr: string) {
   })
 }
 
+// contract_date is a free-text column: newer invoices store a real ISO date
+// (native date-picker input), older ones store whatever the user typed into
+// the old freeform text field (e.g. "20082026"). Format only when it parses
+// as a real date; otherwise show the raw stored text rather than "Invalid Date".
+export function formatDateSafe(dateStr: string) {
+  return isNaN(new Date(dateStr).getTime()) ? dateStr : formatDate(dateStr)
+}
+
 export function formatDateTime(dateStr: string) {
   return new Date(dateStr).toLocaleString('ru-KZ', {
     timeZone: userTimeZone,

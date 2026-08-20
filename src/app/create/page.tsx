@@ -9,7 +9,7 @@ import DesktopShell from '@/components/DesktopShell'
 import InvoiceLivePreview from '@/components/InvoiceLivePreview'
 import { cacheGet, cacheSet } from '@/lib/cache'
 import { getActivePlan } from '@/lib/plan'
-import { formatDate } from '@/lib/date'
+import { formatDate, formatDateSafe } from '@/lib/date'
 import { computeDefaultDueDate, todayDateString } from '@/lib/dueDate'
 import { useLanguage } from '@/components/LanguageProvider'
 import { closeLabel, deleteLabel } from '@/lib/a11yLabels'
@@ -191,6 +191,26 @@ export default function CreateInvoicePage() {
         if (tmpl.client_name) setClientSelected(true)
       }
     }
+
+    // "Повторить счёт" from history/the invoice detail page -- prefills this
+    // form from a past invoice's client+services+contract, same as a
+    // template, but due date/note stay on their own today-based defaults
+    // (already computed above) rather than copying the old invoice's dates.
+    const repeatId = params.get('repeat')
+    if (repeatId) {
+      const { data: src } = await supabase.from('invoices').select('*').eq('id', repeatId).eq('user_id', user.id).single()
+      if (src) {
+        setClientName(src.client_name || '')
+        setClientBin(src.client_bin || '')
+        setClientEmail(src.client_email || '')
+        setClientAddress(src.client_address || '')
+        setClientPhone(src.client_phone || '')
+        setContractNumber(src.contract_number || '')
+        setContractDate(src.contract_date || '')
+        if (src.services && src.services.length > 0) setServices(src.services)
+        if (src.client_name) setClientSelected(true)
+      }
+    }
   }, [router])
 
   useEffect(() => {
@@ -313,7 +333,7 @@ export default function CreateInvoicePage() {
       clientAddress: ca,
       clientPhone: cp,
       contractNumber: cn2,
-      contractDate: cd ? formatDate(cd) : undefined,
+      contractDate: cd ? formatDateSafe(cd) : undefined,
       knp,
       services: svcs,
       total: tot,
@@ -455,7 +475,7 @@ export default function CreateInvoicePage() {
     const html = await generateInvoicePDF({
       number: data.number, date: invoiceDate,
       clientName, clientBin, clientEmail, clientAddress, clientPhone,
-      contractNumber, contractDate: contractDate ? formatDate(contractDate) : undefined, knp: clientKnp, services, total,
+      contractNumber, contractDate: contractDate ? formatDateSafe(contractDate) : undefined, knp: clientKnp, services, total,
       note: note || '', autoPrint: false, vatType: profile?.vat_type || 'no_vat',
       profile: buildPDFProfile(),
       bank: {

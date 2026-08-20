@@ -3,16 +3,66 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import QRCode from 'qrcode'
 import { supabase } from '@/lib/supabase'
-import { formatDate } from '@/lib/date'
+import { formatDate, formatDateSafe } from '@/lib/date'
 import { generateInvoicePDF } from '@/lib/generatePDF'
 import { useLanguage } from '@/components/LanguageProvider'
 import { historyDict } from '@/lib/i18n/history'
+import { invoiceFlowDict } from '@/lib/i18n/invoiceFlow'
 import SignatureSection from '@/components/SignatureSection'
+
+// Flat solid-fill status badges -- same approved treatment used across the
+// app (dashboard/history/invoice-detail's statusFill), swapped in here for
+// the old soft-tint bg-x-100/text-x-700 map so a payer sees the same status
+// language as the invoice owner does.
+const statusFill: Record<string, string> = {
+  paid: 'var(--nav-success)',
+  sent: 'var(--nav-accent)',
+  viewed: 'var(--nav-teal)',
+  overdue: 'var(--nav-critical)',
+  draft: 'var(--nav-text-muted)',
+  cancelled: 'var(--nav-text-muted)',
+}
+
+function LogoMark() {
+  return (
+    <img src="/icon.svg" alt="" className="w-7 h-7 rounded-lg" style={{ boxShadow: '0 6px 14px -6px var(--nav-accent)' }} />
+  )
+}
+
+function DocIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M7 3h7l4 4v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" />
+      <path d="M14 3v4h4" />
+      <path d="M9 12h6M9 15.5h6M9 8.5h2" />
+    </svg>
+  )
+}
+
+function CheckCircleIcon() {
+  return (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9" />
+      <path d="m8.5 12.5 2.3 2.3L16 10" />
+    </svg>
+  )
+}
+
+function SadIcon() {
+  return (
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M8 15c1-1.3 2.5-2 4-2s3 .7 4 2" />
+      <path d="M9 9h.01M15 9h.01" />
+    </svg>
+  )
+}
 
 export default function PublicInvoice() {
   const { token } = useParams()
   const { lang } = useLanguage()
   const t = historyDict[lang]
+  const tFlow = invoiceFlowDict[lang]
   const [invoice, setInvoice] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
   const [bank, setBank] = useState<any>(null)
@@ -149,10 +199,12 @@ export default function PublicInvoice() {
       clientBin: invoice.client_bin || '',
       clientEmail: invoice.client_email || '',
       clientAddress: invoice.client_address || '',
+      contractNumber: invoice.contract_number || '',
+      contractDate: invoice.contract_date ? formatDateSafe(invoice.contract_date) : undefined,
       knp: invoice.knp || '849',
       services: invoiceServices,
       total: Number(invoice.amount),
-      note: invoice.note || '',
+      note: displayNote || '',
       profile: {
         company_name: profile?.company_name || '',
         bin_iin: profile?.bin_iin || '',
@@ -173,110 +225,108 @@ export default function PublicInvoice() {
   if (win) { win.document.write(html); win.document.close() }
 }
   if (loading) return (
-    <main className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <p className="text-gray-400">{t.loadingLabel}</p>
+    <main className="min-h-screen flex items-center justify-center" style={{ background: 'var(--nav-bg)' }}>
+      <p style={{ color: 'var(--nav-text-muted)' }}>{t.loadingLabel}</p>
     </main>
   )
 
   if (!invoice) return (
-    <main className="min-h-screen bg-gray-50 flex items-center justify-center">
+    <main className="min-h-screen flex items-center justify-center" style={{ background: 'var(--nav-bg)' }}>
       <div className="text-center">
-        <div className="text-4xl mb-3">😕</div>
-        <p className="text-gray-400">{t.invoiceNotFoundLabel}</p>
+        <div className="flex justify-center mb-3" style={{ color: 'var(--nav-text-muted)' }}><SadIcon /></div>
+        <p style={{ color: 'var(--nav-text-muted)' }}>{t.invoiceNotFoundLabel}</p>
       </div>
     </main>
   )
 
   const services = invoice.services || []
   const total = Number(invoice.amount)
-
-  const statusColors: Record<string, string> = {
-    paid: 'bg-green-100 text-green-700',
-    sent: 'bg-blue-100 text-blue-700',
-    overdue: 'bg-red-100 text-red-700',
-    draft: 'bg-gray-100 text-gray-600',
-    viewed: 'bg-purple-100 text-purple-700',
-    cancelled: 'bg-gray-100 text-gray-500',
-  }
   const statusLabels = t.statusLabels
+  // Older invoices carry a static "Оплата в течение Nх дней" note from before
+  // due-date-based notes existed -- always show the due-date-derived sentence
+  // when a due date is on record, same as the owner's own invoice-detail view.
+  const displayNote = invoice.due_date ? tFlow.paymentDueNote(formatDate(invoice.due_date)) : invoice.note
 
   return (
-    <main className="min-h-screen bg-gray-50 pb-8">
+    <main className="min-h-screen pb-8" style={{ background: 'var(--nav-bg)' }}>
       {/* Header */}
-      <div className="bg-[#1C2056] px-4 py-4 flex items-center justify-between">
-        <span className="font-bold text-white text-lg">INVOICES.KZ</span>
-        <span className={`text-xs px-2 py-1 rounded-full ${statusColors[invoice.status] || statusColors.draft}`}>
+      <div className="flex items-center justify-between px-4 py-4 max-w-lg mx-auto">
+        <div className="flex items-center gap-2">
+          <LogoMark />
+          <span className="font-semibold text-sm" style={{ color: 'var(--nav-text-primary)', letterSpacing: '-0.02em' }}>invoices.kz</span>
+        </div>
+        <span className="text-xs px-2.5 py-1 rounded-full font-semibold text-white" style={{ background: statusFill[invoice.status] || statusFill.draft }}>
           {statusLabels[invoice.status] || statusLabels.draft}
         </span>
       </div>
 
-      <div className="max-w-lg mx-auto p-4 space-y-4">
+      <div className="max-w-lg mx-auto p-4 pt-0 space-y-4">
 
         {/* Invoice header */}
-        <div className="bg-white rounded-2xl shadow-sm p-5">
+        <div className="nav-glass nav-card-accent rounded-2xl p-5">
           <div className="flex items-start justify-between mb-4">
             <div>
-              <div className="text-xs text-gray-400 mb-1">{t.invoiceForPaymentLabel}</div>
-              <div className="text-xl font-bold text-[#1C2056]">{invoice.number}</div>
-              <div className="text-xs text-gray-400 mt-1">{formatDate(invoice.created_at)}</div>
+              <div className="text-xs mb-1" style={{ color: 'var(--nav-text-muted)' }}>{t.invoiceForPaymentLabel}</div>
+              <div className="text-xl font-bold" style={{ color: 'var(--nav-text-primary)' }}>{invoice.number}</div>
+              <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>{formatDate(invoice.created_at)}</div>
               {invoice.due_date && (
-                <div className="text-xs text-gray-400 mt-1">{t.dueDateLabel}: {formatDate(invoice.due_date)}</div>
+                <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>{t.dueDateLabel}: {formatDate(invoice.due_date)}</div>
               )}
             </div>
             <div className="text-right">
-              <div className="text-2xl font-bold text-[#1C2056]">
+              <div className="text-2xl font-bold tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>
                 {total.toLocaleString('ru-KZ')} ₸
               </div>
             </div>
           </div>
 
           {/* From */}
-          <div className="border-t border-gray-100 pt-4 mb-3">
-            <div className="text-xs text-gray-400 mb-1">{t.fromLabel}</div>
-            <div className="text-sm font-medium text-[#1C2056]">{profile?.company_name}</div>
-            {profile?.bin_iin && <div className="text-xs text-gray-400">{t.binLabel(profile.bin_iin)}</div>}
-            {profile?.address && <div className="text-xs text-gray-400">{profile.address}</div>}
-            {profile?.phone && <div className="text-xs text-gray-400">{profile.phone}</div>}
+          <div className="pt-4 mb-3" style={{ borderTop: '1px solid var(--nav-border-soft)' }}>
+            <div className="text-xs mb-1" style={{ color: 'var(--nav-text-muted)' }}>{t.fromLabel}</div>
+            <div className="text-sm font-medium" style={{ color: 'var(--nav-text-primary)' }}>{profile?.company_name}</div>
+            {profile?.bin_iin && <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>{t.binLabel(profile.bin_iin)}</div>}
+            {profile?.address && <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>{profile.address}</div>}
+            {profile?.phone && <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>{profile.phone}</div>}
           </div>
 
           {/* To */}
-          <div className="border-t border-gray-100 pt-3">
-            <div className="text-xs text-gray-400 mb-1">{t.toLabel}</div>
-            <div className="text-sm font-medium text-[#1C2056]">{invoice.client_name}</div>
-            {invoice.client_bin && <div className="text-xs text-gray-400">{t.binLabel(invoice.client_bin)}</div>}
-            {invoice.client_email && <div className="text-xs text-gray-400">{invoice.client_email}</div>}
+          <div className="pt-3" style={{ borderTop: '1px solid var(--nav-border-soft)' }}>
+            <div className="text-xs mb-1" style={{ color: 'var(--nav-text-muted)' }}>{t.toLabel}</div>
+            <div className="text-sm font-medium" style={{ color: 'var(--nav-text-primary)' }}>{invoice.client_name}</div>
+            {invoice.client_bin && <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>{t.binLabel(invoice.client_bin)}</div>}
+            {invoice.client_email && <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>{invoice.client_email}</div>}
           </div>
         </div>
 
         {/* Services */}
         {services.length > 0 && (
-          <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-            <div className="px-4 pt-4 pb-2 text-xs text-gray-400 uppercase tracking-wide">{t.servicesHeaderLabel}</div>
+          <div className="nav-glass nav-card-accent rounded-2xl overflow-hidden">
+            <div className="px-4 pt-4 pb-2 text-xs uppercase tracking-wide" style={{ color: 'var(--nav-text-muted)' }}>{t.servicesHeaderLabel}</div>
             {services.map((s: any, i: number) => (
-              <div key={i} className={`flex justify-between px-4 py-3 ${i < services.length - 1 ? 'border-b border-gray-100' : ''}`}>
+              <div key={i} className="flex justify-between px-4 py-3" style={{ borderBottom: i < services.length - 1 ? '1px solid var(--nav-border-soft)' : 'none' }}>
                 <div>
-                  <div className="text-sm text-[#1C2056]">{s.name}</div>
-                  <div className="text-xs text-gray-400">
+                  <div className="text-sm" style={{ color: 'var(--nav-text-primary)' }}>{s.name}</div>
+                  <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>
                     {s.qty} {s.unit || t.defaultUnitLabel} × {Number(s.price).toLocaleString('ru-KZ')} ₸
                   </div>
                 </div>
-                <div className="text-sm font-medium text-[#1C2056]">
+                <div className="text-sm font-medium tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>
                   {(s.qty * s.price).toLocaleString('ru-KZ')} ₸
                 </div>
               </div>
             ))}
-            <div className="flex justify-between px-4 py-3 border-t border-gray-100 bg-gray-50">
-              <span className="text-sm font-bold text-[#1C2056]">{t.totalDueLabel}</span>
-              <span className="text-sm font-bold text-[#1C2056]">{total.toLocaleString('ru-KZ')} ₸</span>
+            <div className="flex justify-between px-4 py-3" style={{ borderTop: '1px solid var(--nav-border-soft)', background: 'var(--nav-surface-glass)' }}>
+              <span className="text-sm font-bold" style={{ color: 'var(--nav-text-primary)' }}>{t.totalDueLabel}</span>
+              <span className="text-sm font-bold tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{total.toLocaleString('ru-KZ')} ₸</span>
             </div>
           </div>
         )}
 
         {/* Note */}
-        {invoice.note && (
-          <div className="bg-white rounded-2xl shadow-sm p-4">
-            <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">{t.noteLabel}</div>
-            <div className="text-sm text-gray-600">{invoice.note}</div>
+        {displayNote && (
+          <div className="nav-glass nav-card-accent rounded-2xl p-4">
+            <div className="text-xs uppercase tracking-wide mb-2" style={{ color: 'var(--nav-text-muted)' }}>{t.noteLabel}</div>
+            <div className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>{displayNote}</div>
           </div>
         )}
 
@@ -284,24 +334,24 @@ export default function PublicInvoice() {
             minted against Kaspi's own API (the slowest thing on this page),
             so the gap doesn't read as "there's no Kaspi option here". */}
         {kaspiPaymentLoading && !kaspiPayment && invoice.status !== 'paid' && invoice.status !== 'cancelled' && (
-          <div className="bg-white rounded-2xl shadow-sm p-4 flex items-center gap-2">
-            <div className="w-4 h-4 border-2 border-gray-200 border-t-[#1C2056] rounded-full animate-spin flex-shrink-0" />
-            <span className="text-xs text-gray-400">Проверяем возможность оплаты через Kaspi...</span>
+          <div className="nav-glass nav-card-accent rounded-2xl p-4 flex items-center gap-2">
+            <div className="w-4 h-4 rounded-full animate-spin flex-shrink-0" style={{ border: '2px solid var(--nav-border-soft)', borderTopColor: 'var(--nav-accent)' }} />
+            <span className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>Проверяем возможность оплаты через Kaspi...</span>
           </div>
         )}
 
         {kaspiPayment && kaspiPayment.status === 'pending' && (
-          <div className="bg-white rounded-2xl shadow-sm p-5">
-            <div className="text-xs text-gray-400 uppercase tracking-wide mb-3">Оплата через Kaspi</div>
+          <div className="nav-glass nav-card-accent rounded-2xl p-5">
+            <div className="text-xs uppercase tracking-wide mb-3" style={{ color: 'var(--nav-text-muted)' }}>Оплата через Kaspi</div>
             <div className="flex items-center gap-4 mb-4">
               {kaspiQrDataUrl && (
                 <img
                   src={kaspiQrDataUrl}
                   alt="Kaspi QR"
-                  className="w-28 h-28 flex-shrink-0"
+                  className="w-28 h-28 flex-shrink-0 rounded-lg"
                 />
               )}
-              <div className="text-xs text-gray-500">
+              <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>
                 Отсканируйте QR-код камерой телефона или нажмите кнопку ниже, чтобы оплатить через приложение Kaspi.
               </div>
             </div>
@@ -309,11 +359,12 @@ export default function PublicInvoice() {
               href={kaspiPayment.payment_link}
               target="_blank"
               rel="noopener noreferrer"
-              className="w-full block text-center bg-[#E4171F] text-white rounded-xl py-3.5 font-medium text-sm"
+              className="w-full block text-center text-white rounded-xl py-3.5 font-medium text-sm transition-transform duration-150 hover:-translate-y-0.5"
+              style={{ background: '#E4171F' }}
             >
               Оплатить через Kaspi
             </a>
-            <div className="text-xs text-gray-400 text-center mt-3">
+            <div className="text-xs text-center mt-3" style={{ color: 'var(--nav-text-muted)' }}>
               Счёт подтвердится автоматически сразу после оплаты — обновлять страницу не нужно.
             </div>
           </div>
@@ -321,27 +372,27 @@ export default function PublicInvoice() {
 
         {/* Bank details */}
         {bank && (
-          <div className="bg-white rounded-2xl shadow-sm p-5">
-            <div className="text-xs text-gray-400 uppercase tracking-wide mb-3">{t.paymentDetailsHeader}</div>
+          <div className="nav-glass nav-card-accent rounded-2xl p-5">
+            <div className="text-xs uppercase tracking-wide mb-3" style={{ color: 'var(--nav-text-muted)' }}>{t.paymentDetailsHeader}</div>
             <div className="space-y-2">
               <div className="flex justify-between">
-                <span className="text-xs text-gray-400">{t.bankLabel}</span>
-                <span className="text-xs font-medium text-[#1C2056]">{bank.bank_name}</span>
+                <span className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>{t.bankLabel}</span>
+                <span className="text-xs font-medium" style={{ color: 'var(--nav-text-primary)' }}>{bank.bank_name}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-xs text-gray-400">{t.iikLabel}</span>
-                <span className="text-xs font-medium text-[#1C2056] font-mono">{bank.iik}</span>
+                <span className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>{t.iikLabel}</span>
+                <span className="text-xs font-medium font-mono" style={{ color: 'var(--nav-text-primary)' }}>{bank.iik}</span>
               </div>
               {bank.bik && (
                 <div className="flex justify-between">
-                  <span className="text-xs text-gray-400">{t.bikLabel}</span>
-                  <span className="text-xs font-medium text-[#1C2056] font-mono">{bank.bik}</span>
+                  <span className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>{t.bikLabel}</span>
+                  <span className="text-xs font-medium font-mono" style={{ color: 'var(--nav-text-primary)' }}>{bank.bik}</span>
                 </div>
               )}
               {bank.kbe && (
                 <div className="flex justify-between">
-                  <span className="text-xs text-gray-400">{t.kbeLabel}</span>
-                  <span className="text-xs font-medium text-[#1C2056]">{bank.kbe}</span>
+                  <span className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>{t.kbeLabel}</span>
+                  <span className="text-xs font-medium" style={{ color: 'var(--nav-text-primary)' }}>{bank.kbe}</span>
                 </div>
               )}
             </div>
@@ -350,8 +401,8 @@ export default function PublicInvoice() {
 
         {/* Инструкция */}
         {invoice.status !== 'paid' && invoice.status !== 'cancelled' && !marked && (
-          <div className="bg-blue-50 rounded-2xl p-4">
-            <div className="text-sm font-medium text-[#1C2056] mb-2">{t.howToPayHeader}</div>
+          <div className="nav-glass nav-card-accent rounded-2xl p-4">
+            <div className="text-sm font-medium mb-2" style={{ color: 'var(--nav-text-primary)' }}>{t.howToPayHeader}</div>
             <div className="space-y-2">
               {[
                 { step: '1', text: t.step1Text },
@@ -359,10 +410,10 @@ export default function PublicInvoice() {
                 { step: '3', text: t.step3Text },
               ].map(item => (
                 <div key={item.step} className="flex gap-2 items-start">
-                  <div className="w-5 h-5 rounded-full bg-[#1C2056] text-white text-xs flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <div className="w-5 h-5 rounded-full text-white text-xs flex items-center justify-center flex-shrink-0 mt-0.5 font-semibold" style={{ background: 'var(--nav-accent)' }}>
                     {item.step}
                   </div>
-                  <span className="text-xs text-gray-600">{item.text}</span>
+                  <span className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>{item.text}</span>
                 </div>
               ))}
             </div>
@@ -374,16 +425,18 @@ export default function PublicInvoice() {
             Cashier QR on this invoice, so the payer never sees two
             competing "pay via Kaspi" buttons. */}
         {(!(kaspiPayment && kaspiPayment.status === 'pending') && profile?.kaspi_pay_link || profile?.halyk_pay_link || profile?.website || profile?.social_links?.length > 0) && (
-          <div className="bg-white rounded-2xl shadow-sm p-4 space-y-3">
+          <div className="nav-glass nav-card-accent rounded-2xl p-4 space-y-3">
             {!(kaspiPayment && kaspiPayment.status === 'pending') && profile?.kaspi_pay_link && (
               <a href={profile.kaspi_pay_link} target="_blank" rel="noopener noreferrer"
-                className="w-full bg-amber-400 text-white rounded-xl py-3.5 font-medium text-sm flex items-center justify-center gap-2 block text-center">
+                className="w-full text-white rounded-xl py-3.5 font-medium text-sm flex items-center justify-center gap-2 block text-center transition-transform duration-150 hover:-translate-y-0.5"
+                style={{ background: '#F5A623' }}>
                 {t.payViaKaspiButton}
               </a>
             )}
             {profile?.halyk_pay_link && (
               <a href={profile.halyk_pay_link} target="_blank" rel="noopener noreferrer"
-                className="w-full bg-green-500 text-white rounded-xl py-3.5 font-medium text-sm flex items-center justify-center gap-2 block text-center">
+                className="w-full text-white rounded-xl py-3.5 font-medium text-sm flex items-center justify-center gap-2 block text-center transition-transform duration-150 hover:-translate-y-0.5"
+                style={{ background: 'var(--nav-success)' }}>
                 {t.payViaHalykButton}
               </a>
             )}
@@ -391,7 +444,7 @@ export default function PublicInvoice() {
               <div className="flex gap-2 flex-wrap pt-1">
                 {profile?.website && (
                    <a href={profile.website.startsWith('http') ? profile.website : 'https://' + profile.website} target="_blank"
-                    className="bg-gray-100 text-gray-600 rounded-lg px-3 py-1.5 text-xs">
+                    className="rounded-lg px-3 py-1.5 text-xs" style={{ background: 'var(--nav-surface-glass)', color: 'var(--nav-text-secondary)' }}>
                     {t.websiteLinkLabel}
                   </a>
                 )}
@@ -401,7 +454,7 @@ export default function PublicInvoice() {
                   const key = Object.keys(icons).find(k => link.includes(k)) || ''
                   return (
                     <a key={i} href={link} target="_blank" rel="noopener noreferrer"
-                      className="bg-gray-100 text-gray-600 rounded-lg px-3 py-1.5 text-xs">
+                      className="rounded-lg px-3 py-1.5 text-xs" style={{ background: 'var(--nav-surface-glass)', color: 'var(--nav-text-secondary)' }}>
                       {icons[key] || '🔗'} {names[key] || t.linkFallbackLabel}
                     </a>
                   )
@@ -415,25 +468,27 @@ export default function PublicInvoice() {
         {invoice.status !== 'paid' && invoice.status !== 'cancelled' && (
           <div className="space-y-3">
             {marked ? (
-              <div className="bg-green-50 rounded-2xl p-5 text-center">
-                <div className="text-3xl mb-2">✅</div>
-                <div className="text-sm font-medium text-green-700 mb-1">{t.paymentConfirmedThanksLabel}</div>
-                <div className="text-xs text-green-600">{t.supplierNotifiedLabel}</div>
+              <div className="nav-glass nav-card-accent rounded-2xl p-5 text-center">
+                <div className="flex justify-center mb-2" style={{ color: 'var(--nav-success)' }}><CheckCircleIcon /></div>
+                <div className="text-sm font-medium mb-1" style={{ color: 'var(--nav-success)' }}>{t.paymentConfirmedThanksLabel}</div>
+                <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>{t.supplierNotifiedLabel}</div>
               </div>
             ) : (
               <>
                 {/* Главная кнопка — открыть PDF */}
                 <button
                   onClick={openPDF}
-                  className="w-full bg-[#1C2056] text-white rounded-xl py-4 font-medium text-sm flex items-center justify-center gap-2">
-                  {t.openInvoicePdfButton}
+                  className="w-full rounded-xl py-4 font-medium text-sm flex items-center justify-center gap-2 transition-transform duration-150 hover:-translate-y-0.5"
+                  style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                  <DocIcon /> {t.openInvoicePdfButton}
                 </button>
 
                 {/* Вторая кнопка — подтвердить оплату */}
                 <button
                   onClick={markAsPaid}
                   disabled={marking}
-                  className="w-full bg-[#2DC48D] text-white rounded-xl py-4 font-medium text-sm">
+                  className="w-full rounded-xl py-4 font-medium text-sm transition-transform duration-150 hover:-translate-y-0.5 disabled:hover:translate-y-0"
+                  style={{ background: 'var(--nav-success)', color: '#fff' }}>
                   {marking ? t.processingButtonLabel : t.alreadyPaidButton}
                 </button>
               </>
@@ -442,12 +497,12 @@ export default function PublicInvoice() {
         )}
 
         {invoice.status === 'paid' && (
-          <div className="bg-green-50 rounded-2xl p-5 text-center">
-            <div className="text-3xl mb-2">✅</div>
-            <div className="text-sm font-medium text-green-700">{t.invoicePaidLabel}</div>
+          <div className="nav-glass nav-card-accent rounded-2xl p-5 text-center">
+            <div className="flex justify-center mb-2" style={{ color: 'var(--nav-success)' }}><CheckCircleIcon /></div>
+            <div className="text-sm font-medium" style={{ color: 'var(--nav-success)' }}>{t.invoicePaidLabel}</div>
             <button
               onClick={openPDF}
-              className="mt-3 text-xs text-[#1C2056] underline">
+              className="mt-3 text-xs underline" style={{ color: 'var(--nav-accent)' }}>
               {t.openPdfLinkLabel}
             </button>
           </div>
@@ -456,8 +511,8 @@ export default function PublicInvoice() {
         <SignatureSection mode="client" documentId={invoice.id} documentTitle={`Счёт №${invoice.number}`} ownerCompanyName={profile?.company_name} />
 
         <div className="text-center py-4">
-          <p className="text-xs text-gray-400">{t.createdViaLabel}</p>
-          <a href="https://invoices.kz" className="text-xs font-medium text-[#1C2056]">INVOICES.KZ</a>
+          <p className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>{t.createdViaLabel}</p>
+          <a href="https://invoices.kz" className="text-xs font-medium" style={{ color: 'var(--nav-accent)' }}>INVOICES.KZ</a>
         </div>
       </div>
     </main>

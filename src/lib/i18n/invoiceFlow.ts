@@ -132,6 +132,7 @@ export interface InvoiceFlowContent {
   changeStatusHeader: string
   editButtonLabel: string
   duplicateButtonLabel: string
+  repeatInvoiceButtonLabel: string
   kpDocLabel: string
   avrDocLabel: string
   nakladnayaDocLabel: string
@@ -334,6 +335,7 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     changeStatusHeader: 'Изменить статус',
     editButtonLabel: '📝 Редактировать',
     duplicateButtonLabel: '📋 Дублировать',
+    repeatInvoiceButtonLabel: 'Повторить счёт',
     kpDocLabel: 'Коммерческое предложение',
     avrDocLabel: 'Акт выполненных работ',
     nakladnayaDocLabel: 'Накладная на отпуск товара',
@@ -535,6 +537,7 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     changeStatusHeader: 'Мәртебені өзгерту',
     editButtonLabel: '📝 Өзгерту',
     duplicateButtonLabel: '📋 Көшірмесін жасау',
+    repeatInvoiceButtonLabel: 'Шотты қайталау',
     kpDocLabel: 'Коммерциялық ұсыныс',
     avrDocLabel: 'Орындалған жұмыстар актісі',
     nakladnayaDocLabel: 'Тауарды босатуға арналған жүкқұжат',
@@ -736,6 +739,7 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     changeStatusHeader: 'Change status',
     editButtonLabel: '📝 Edit',
     duplicateButtonLabel: '📋 Duplicate',
+    repeatInvoiceButtonLabel: 'Repeat invoice',
     kpDocLabel: 'Commercial proposal',
     avrDocLabel: 'Act of completed works',
     nakladnayaDocLabel: 'Goods delivery note',
