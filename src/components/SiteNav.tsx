@@ -36,13 +36,18 @@ const kaspiShopLinks: { href: string; label: LocalizedLabel }[] = [
   { href: '/kaspi-shop/profit', label: { ru: 'Прибыль', kk: 'Пайда', en: 'Profit' } },
 ]
 
+// /ai-agent/settings deliberately has no pill of its own here -- it only
+// ever makes sense scoped to one already-chosen agent (?agent=<id>, reached
+// by clicking an agent card on "Агенты"), so it's not a standalone
+// destination. Its path still falls under this section (prefix-matches
+// '/ai-agent'), so "Агенты" is what lights up while on it -- exactly the
+// parent it drills down from.
 const aiAgentLinks: { href: string; label: LocalizedLabel }[] = [
   { href: '/ai-agent', label: { ru: 'Агенты', kk: 'Агенттер', en: 'Agents' } },
   { href: '/ai-agent/review', label: { ru: 'Диалоги', kk: 'Диалогтар', en: 'Conversations' } },
   { href: '/ai-agent/test-chat', label: { ru: 'Тестовый чат', kk: 'Сынақ чаты', en: 'Test chat' } },
   { href: '/ai-agent/broadcasts', label: { ru: 'Рассылки', kk: 'Таратылымдар', en: 'Broadcasts' } },
   { href: '/ai-agent/analytics', label: { ru: 'Аналитика', kk: 'Аналитика', en: 'Analytics' } },
-  { href: '/ai-agent/settings', label: { ru: 'Настройки', kk: 'Баптаулар', en: 'Settings' } },
   { href: '/ai-agent/docs', label: { ru: 'Как настроить', kk: 'Қалай баптау керек', en: 'Setup guide' } },
 ]
 
