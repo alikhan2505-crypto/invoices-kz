@@ -79,6 +79,9 @@ export async function GET(req: NextRequest) {
       currency: agent.currency || 'KZT',
       customInstructions: agent.custom_instructions || '',
       historyPairs: typeof agent.history_pairs === 'number' ? agent.history_pairs : 5,
+      // Статус бота (Контроль tab). Column default is true; a null from a
+      // pre-column row still reads as enabled.
+      isEnabled: agent.is_enabled !== false,
       status: agent.status,
     } : null,
     suggestedName: profile?.company_name || '',
@@ -101,11 +104,14 @@ export async function POST(req: NextRequest) {
   if (!(await isAdmin(user.id))) return NextResponse.json({ error: 'admin_only' }, { status: 403 })
 
   const body = await req.json()
-  const { agentId, name, tone, businessDescription, goal, collectFields, timezone, currency, customInstructions, historyPairs } = body
+  const { agentId, name, tone, businessDescription, goal, collectFields, timezone, currency, customInstructions, historyPairs, isEnabled } = body
 
   if (agentId !== undefined && typeof agentId !== 'string') return NextResponse.json({ error: 'invalid agentId' }, { status: 400 })
   if (historyPairs !== undefined && (typeof historyPairs !== 'number' || historyPairs < 1 || historyPairs > 10)) {
     return NextResponse.json({ error: 'invalid historyPairs' }, { status: 400 })
+  }
+  if (isEnabled !== undefined && typeof isEnabled !== 'boolean') {
+    return NextResponse.json({ error: 'invalid isEnabled' }, { status: 400 })
   }
 
   if (!name || typeof name !== 'string') return NextResponse.json({ error: 'name required' }, { status: 400 })
@@ -141,6 +147,10 @@ export async function POST(req: NextRequest) {
     // every LLM call (longer text = higher per-reply token cost).
     custom_instructions: typeof customInstructions === 'string' ? customInstructions.slice(0, 2000) : '',
     history_pairs: typeof historyPairs === 'number' ? Math.round(historyPairs) : 5,
+    // Статус бота: only touch the column when the client sent an explicit
+    // boolean -- an older client omitting the field must never accidentally
+    // re-enable an agent the owner paused.
+    ...(typeof isEnabled === 'boolean' ? { is_enabled: isEnabled } : {}),
   }
 
   let agent: any = null

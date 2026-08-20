@@ -57,7 +57,9 @@ function parseDay(date: string): Date {
 function MessagesChart({ days, reduceMotion }: { days: AnalyticsDay[]; reduceMotion: boolean }) {
   const VIEW_W = 720
   const VIEW_H = 220
-  const PAD_LEFT = 8
+  // Left padding fits the y-axis value labels (0 / mid / max) -- without
+  // them the founder couldn't read any values off the chart at all.
+  const PAD_LEFT = 34
   const PAD_RIGHT = 8
   const PAD_TOP = 28
   const PAD_BOTTOM = 24
@@ -68,7 +70,10 @@ function MessagesChart({ days, reduceMotion }: { days: AnalyticsDay[]; reduceMot
 
   const maxValue = Math.max(...days.map(d => Math.max(d.inbound, d.outbound)), 1)
 
-  const x = (i: number) => PAD_LEFT + (i / (days.length - 1)) * chartW
+  // Guarded denominator: a single-day window would otherwise divide by zero
+  // and NaN every coordinate. With one day, the point sits at the left edge.
+  const denom = Math.max(days.length - 1, 1)
+  const x = (i: number) => PAD_LEFT + (i / denom) * chartW
   const y = (v: number) => PAD_TOP + chartH - (v / maxValue) * chartH
   const bottomY = PAD_TOP + chartH
 
@@ -81,6 +86,28 @@ function MessagesChart({ days, reduceMotion }: { days: AnalyticsDay[]; reduceMot
 
   const inboundLineD = linePath(d => d.inbound)
   const outboundLineD = linePath(d => d.outbound)
+
+  // Endpoint markers in the house RevenueAreaChart style (dashboard): a dot
+  // plus the value at the LAST NON-ZERO point of each series -- so even a
+  // single spike on the final day (the founder's screenshot problem) carries
+  // a readable number without hovering.
+  function lastNonZeroIndex(pick: (d: AnalyticsDay) => number): number {
+    for (let i = days.length - 1; i >= 0; i--) if (pick(days[i]) > 0) return i
+    return -1
+  }
+  const inboundEnd = lastNonZeroIndex(d => d.inbound)
+  const outboundEnd = lastNonZeroIndex(d => d.outbound)
+  const inEndY = inboundEnd >= 0 ? y(days[inboundEnd].inbound) : 0
+  const outEndY = outboundEnd >= 0 ? y(days[outboundEnd].outbound) : 0
+  let inLabelY = inEndY - 9
+  let outLabelY = outEndY - 9
+  // Both series ending on the same point with close values would overlap
+  // their labels -- the lower one moves below its dot instead.
+  if (inboundEnd >= 0 && outboundEnd >= 0 && inboundEnd === outboundEnd && Math.abs(inEndY - outEndY) < 18) {
+    if (inEndY <= outEndY) outLabelY = Math.min(outEndY + 16, bottomY - 4)
+    else inLabelY = Math.min(inEndY + 16, bottomY - 4)
+  }
+  const endLabelX = (i: number) => Math.max(x(i) - 7, PAD_LEFT + 22)
 
   const tickIdx = Array.from(new Set([0, Math.floor((days.length - 1) / 2), days.length - 1]))
 
@@ -134,7 +161,20 @@ function MessagesChart({ days, reduceMotion }: { days: AnalyticsDay[]; reduceMot
 
           {[0, 0.5, 1].map(f => {
             const gy = PAD_TOP + chartH - f * chartH
-            return <line key={f} x1={PAD_LEFT} y1={gy} x2={VIEW_W - PAD_RIGHT} y2={gy} stroke="var(--nav-text-muted)" strokeOpacity={0.12} strokeWidth={1} />
+            const value = Math.round(maxValue * f)
+            // On a tiny max (e.g. 1) the mid label rounds into a duplicate
+            // of 0 or max -- skip it rather than print the same number twice.
+            const showLabel = f !== 0.5 || (value !== 0 && value !== maxValue)
+            return (
+              <g key={f}>
+                <line x1={PAD_LEFT} y1={gy} x2={VIEW_W - PAD_RIGHT} y2={gy} stroke="var(--nav-text-muted)" strokeOpacity={0.12} strokeWidth={1} />
+                {showLabel && (
+                  <text x={PAD_LEFT - 7} y={gy + 3} textAnchor="end" fontSize="9" fill="var(--nav-text-muted)">
+                    {value.toLocaleString('ru-KZ')}
+                  </text>
+                )}
+              </g>
+            )
           })}
 
           <motion.path
@@ -176,6 +216,47 @@ function MessagesChart({ days, reduceMotion }: { days: AnalyticsDay[]; reduceMot
             animate={{ pathLength: 1 }}
             transition={{ duration: reduceMotion ? 0 : 0.9, delay: reduceMotion ? 0 : 0.12, ease: EASE }}
           />
+
+          {inboundEnd >= 0 && (
+            <>
+              <motion.circle
+                cx={x(inboundEnd)} cy={inEndY} r={4}
+                fill="var(--nav-accent)" stroke="var(--nav-bg)" strokeWidth={2.5}
+                initial={reduceMotion ? false : { opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: reduceMotion ? 0 : 0.3, delay: reduceMotion ? 0 : 0.9, ease: EASE }}
+              />
+              <motion.text
+                x={endLabelX(inboundEnd)} y={inLabelY} textAnchor="end"
+                fontSize="10.5" fontWeight={700} fill="var(--nav-accent)"
+                initial={reduceMotion ? false : { opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: reduceMotion ? 0 : 0.3, delay: reduceMotion ? 0 : 0.9, ease: EASE }}
+              >
+                {days[inboundEnd].inbound.toLocaleString('ru-KZ')}
+              </motion.text>
+            </>
+          )}
+          {outboundEnd >= 0 && (
+            <>
+              <motion.circle
+                cx={x(outboundEnd)} cy={outEndY} r={4}
+                fill="var(--nav-teal)" stroke="var(--nav-bg)" strokeWidth={2.5}
+                initial={reduceMotion ? false : { opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: reduceMotion ? 0 : 0.3, delay: reduceMotion ? 0 : 1, ease: EASE }}
+              />
+              <motion.text
+                x={endLabelX(outboundEnd)} y={outLabelY} textAnchor="end"
+                fontSize="10.5" fontWeight={700} fill="var(--nav-teal)"
+                initial={reduceMotion ? false : { opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: reduceMotion ? 0 : 0.3, delay: reduceMotion ? 0 : 1, ease: EASE }}
+              >
+                {days[outboundEnd].outbound.toLocaleString('ru-KZ')}
+              </motion.text>
+            </>
+          )}
 
           {tickIdx.map(i => {
             const d = parseDay(days[i].date)

@@ -4,6 +4,7 @@ import { decryptAtRest } from '@/lib/kaspiPay/crypto'
 import { getKey } from '@/lib/aiAgent/connection'
 import { replyToComment, sendDirectMessage, InstagramApiError } from '@/lib/instagram'
 import { sendTelegramBotMessage, TelegramApiError } from '@/lib/aiAgent/telegram'
+import { extractTriggerWords } from '@/lib/instagramAiReply'
 import { shouldExitTraining } from '@/lib/aiAgent/trainingStatus'
 import { debitAiAgentWallet, AI_AGENT_CREDITS_PER_AI_REPLY } from '@/lib/aiAgent/wallet'
 
@@ -49,34 +50,64 @@ export async function GET(req: NextRequest) {
   // it came from. POST needs no change: it resolves message -> conversation
   // -> agent and ownership-checks that agent by user_id per item.
   const { data: agents } = await supabase.from('ai_agents').select('id').eq('user_id', user.id)
-  if (!agents || agents.length === 0) return NextResponse.json({ items: [] })
+  if (!agents || agents.length === 0) return NextResponse.json({ items: [], pendingCount: 0 })
 
   const { data: conversations } = await supabase
     .from('ai_agent_conversations')
-    .select('id, customer_handle')
+    .select('id, customer_handle, channel')
     .in('agent_id', agents.map(a => a.id))
   const conversationIds = (conversations || []).map(c => c.id)
-  const handleByConversation: Record<string, string> = {}
-  for (const c of conversations || []) handleByConversation[c.id] = c.customer_handle || 'клиент'
+  const conversationMeta: Record<string, { handle: string; channel: string }> = {}
+  for (const c of conversations || []) conversationMeta[c.id] = { handle: c.customer_handle || 'клиент', channel: c.channel || 'instagram' }
 
-  if (conversationIds.length === 0) return NextResponse.json({ items: [] })
+  if (conversationIds.length === 0) return NextResponse.json({ items: [], pendingCount: 0 })
 
   const { data: messages } = await supabase
     .from('ai_agent_messages')
-    .select('id, conversation_id, text, urgent, created_at')
+    .select('id, conversation_id, text, urgent, regen_count, created_at')
     .in('conversation_id', conversationIds)
     .eq('status', 'pending_review')
     .order('created_at', { ascending: true })
 
-  return NextResponse.json({
-    items: (messages || []).map(m => ({
-      id: m.id,
-      customerHandle: handleByConversation[m.conversation_id] || 'клиент',
-      text: m.text,
-      urgent: m.urgent,
-      createdAt: m.created_at,
-    })),
-  })
+  // The customer question that triggered each draft: the latest inbound row
+  // in the same conversation at-or-before the draft's own created_at (the
+  // webhook pipeline always inserts the inbound row first, then the draft).
+  // One batched fetch over just the conversations that actually have pending
+  // drafts, walked in memory -- not a per-draft query.
+  const pendingConvIds = Array.from(new Set((messages || []).map(m => m.conversation_id)))
+  const inboundByConversation: Record<string, { text: string; created_at: string }[]> = {}
+  if (pendingConvIds.length > 0) {
+    const { data: inboundRows } = await supabase
+      .from('ai_agent_messages')
+      .select('conversation_id, text, created_at')
+      .in('conversation_id', pendingConvIds)
+      .eq('direction', 'inbound')
+      .order('created_at', { ascending: true })
+    for (const row of inboundRows || []) {
+      ;(inboundByConversation[row.conversation_id] ||= []).push({ text: row.text, created_at: row.created_at })
+    }
+  }
+  function questionFor(m: { conversation_id: string; created_at: string }): string {
+    const rows = inboundByConversation[m.conversation_id] || []
+    for (let i = rows.length - 1; i >= 0; i--) {
+      if (rows[i].created_at <= m.created_at) return rows[i].text
+    }
+    return ''
+  }
+
+  const items = (messages || []).map(m => ({
+    id: m.id,
+    customerHandle: conversationMeta[m.conversation_id]?.handle || 'клиент',
+    channel: conversationMeta[m.conversation_id]?.channel || 'instagram',
+    question: questionFor(m),
+    text: m.text,
+    urgent: m.urgent,
+    regenCount: m.regen_count ?? 0,
+    createdAt: m.created_at,
+  }))
+  // pendingCount duplicates items.length today, but it's a stable contract
+  // for other consumers (the settings page reads just the count).
+  return NextResponse.json({ items, pendingCount: items.length })
 }
 
 // One action endpoint, mirroring how this codebase's other approve-queue
@@ -95,7 +126,7 @@ export async function POST(req: NextRequest) {
 
   const { data: message } = await supabase
     .from('ai_agent_messages')
-    .select('id, conversation_id, text, status')
+    .select('id, conversation_id, text, status, is_ai_generated, created_at')
     .eq('id', messageId)
     .eq('status', 'pending_review')
     .maybeSingle()
@@ -112,6 +143,11 @@ export async function POST(req: NextRequest) {
   if (!agent) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const finalText = action === 'send' && typeof editedText === 'string' && editedText.trim() ? editedText.trim() : message.text
+
+  // Filled by the approve branch when a template actually gets created --
+  // returned to the UI so it can show «Триггеры для шаблона: …» honestly
+  // (only when they really exist, never as a promise).
+  let triggerWords: string[] = []
 
   if (action === 'send') {
     const { data: connection } = await supabase
@@ -163,6 +199,43 @@ export async function POST(req: NextRequest) {
     } catch (e: any) {
       console.error('ai-agent review: wallet debit failed for user', user.id, ':', e.message)
     }
+
+    // Turn the approved AI reply into a reusable per-agent template, exactly
+    // like the single-tenant bot's telegram-webhook approve handler does for
+    // instagram_reply_templates (2026-08-20: before this, NOTHING wrote
+    // ai_agent_reply_templates rows -- training mode never actually taught
+    // the agent anything). Scoped to 'dm': review-queue sends are DM-shaped
+    // on both channels (sendDirectMessage / sendTelegramBotMessage above),
+    // and the telegram pipeline matches dm-scoped templates too -- so the
+    // template can never fire on a public Instagram comment. Best-effort:
+    // a failure here must not affect the reply already sent to the customer.
+    if (message.is_ai_generated) {
+      const { data: questionRow } = await supabase
+        .from('ai_agent_messages')
+        .select('text')
+        .eq('conversation_id', conversation.id)
+        .eq('direction', 'inbound')
+        .lte('created_at', message.created_at)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (questionRow?.text) {
+        try {
+          triggerWords = await extractTriggerWords(questionRow.text)
+          if (triggerWords.length > 0) {
+            await supabase.from('ai_agent_reply_templates').insert({
+              agent_id: agent.id,
+              trigger_words: triggerWords,
+              reply_text: finalText,
+              channel: 'dm',
+            })
+          }
+        } catch (e: any) {
+          triggerWords = []
+          console.error('ai-agent review: failed to save approved reply as template for', messageId, ':', e.message)
+        }
+      }
+    }
   } else {
     await supabase.from('ai_agent_messages').update({ status: 'skipped' }).eq('id', messageId)
   }
@@ -177,5 +250,5 @@ export async function POST(req: NextRequest) {
     ...(exit ? { status: 'active' } : {}),
   }).eq('id', agent.id)
 
-  return NextResponse.json({ ok: true, exitedTraining: exit })
+  return NextResponse.json({ ok: true, exitedTraining: exit, triggerWords })
 }

@@ -76,6 +76,12 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
   const { data: agent } = await supabase.from('ai_agents').select('*').eq('id', conn.agentId).single()
   if (!agent) return
 
+  // Owner paused this agent (is_enabled toggle, Контроль tab) -- drop the
+  // event entirely: no conversation row, no logged message, no reply, no
+  // debit. Same rule and placement as the Telegram tenant path
+  // (telegramWebhookHandler.ts).
+  if (agent.is_enabled === false) return
+
   // Find or create the conversation thread for this sender.
   const { data: conversation } = await supabase
     .from('ai_agent_conversations')

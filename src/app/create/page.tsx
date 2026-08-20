@@ -909,7 +909,7 @@ export default function CreateInvoicePage() {
           initial={reduceMotion ? false : { opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ ease: EASE, duration: reduceMotion ? 0 : 0.4 }}
-          className="hidden lg:block lg:w-[400px] lg:flex-shrink-0 lg:sticky lg:top-[65px]"
+          className="hidden lg:block lg:w-[400px] lg:flex-shrink-0 lg:sticky lg:top-[110px]"
         >
           <InvoiceLivePreview
             invoiceNumber={!profileLoaded ? '' : (profile?.invoice_prefix || 'INV-') + (profile?.invoice_next_number || '0001')}

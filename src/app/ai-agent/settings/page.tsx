@@ -6,8 +6,27 @@ import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
+// promptContext is a pure, dependency-free module (no server-only imports,
+// no env access) -- safe to bundle client-side, so the Промптинг preview
+// shows the REAL assembled context line, not a hand-maintained copy.
+import { buildBusinessContextLine, AgentTone, AgentGoal } from '@/lib/aiAgent/promptContext'
 
 const EASE = [0.16, 1, 0.3, 1] as const
+
+// MoonAI-style tabbed settings (docs/superpowers/mooonai-research-findings.md
+// §1) -- tab state lives in ?tab= via history.replaceState (NOT
+// router.replace, which is known-broken for query-only changes in this app)
+// so a refresh keeps the tab. «Настройки» is the default and ?new=1 always
+// lands there.
+const TABS = [
+  { key: 'settings', label: 'Настройки' },
+  { key: 'prompting', label: 'Промптинг' },
+  { key: 'control', label: 'Контроль' },
+  { key: 'templates', label: 'Шаблоны' },
+  { key: 'channels', label: 'Каналы' },
+] as const
+type TabKey = typeof TABS[number]['key']
+const TAB_KEYS: string[] = TABS.map(t => t.key)
 
 const TONE_OPTIONS = [
   { value: 'friendly', label: 'Дружелюбный и тёплый' },
@@ -62,6 +81,16 @@ const CURRENCY_OPTIONS = [
 // reference product's real ~настройка pacing without overstaying.
 const CREATE_ANIMATION_MS = 7000
 
+const INPUT_CLS = 'w-full rounded-lg px-3 py-2 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]'
+
+interface ReplyTemplate {
+  id: string
+  triggerWords: string[]
+  replyText: string
+  channel: string | null
+  createdAt: string
+}
+
 function CheckCircleIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
@@ -88,12 +117,144 @@ function ArrowRightIcon() {
   )
 }
 
+function PencilIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21.2 6.4a2 2 0 0 0 0-2.8l-.8-.8a2 2 0 0 0-2.8 0L4 16.4 2.9 21l4.7-1L21.2 6.4Z" />
+      <path d="m15 5 4 4" />
+    </svg>
+  )
+}
+
+function TrashIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+    </svg>
+  )
+}
+
+function InstagramIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="2" width="20" height="20" rx="5" />
+      <circle cx="12" cy="12" r="4" />
+      <path d="M17.5 6.5h.01" />
+    </svg>
+  )
+}
+
+function TelegramIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M22 2 11 13" />
+      <path d="M22 2 15 22l-4-9-9-4 20-7Z" />
+    </svg>
+  )
+}
+
+function WhatsAppIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+    </svg>
+  )
+}
+
+function SiteChatIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  )
+}
+
+function ApiIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m16 18 6-6-6-6M8 6l-6 6 6 6" />
+    </svg>
+  )
+}
+
+function StatusChip({ kind, label }: { kind: 'ok' | 'off' | 'soon' | 'warn'; label: string }) {
+  const color = kind === 'ok' ? 'var(--nav-success)' : kind === 'warn' ? 'var(--nav-critical)' : 'var(--nav-text-muted)'
+  return (
+    <span className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-0.5 rounded-full" style={{ color, background: 'var(--nav-bg)' }}>
+      <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: color, opacity: kind === 'ok' || kind === 'warn' ? 1 : 0.5 }} aria-hidden />
+      <span className="truncate">{label}</span>
+    </span>
+  )
+}
+
+// MoonAI-style channel card (research §1.9): icon + name + status chip +
+// description + action area. Shared shell; each channel supplies its own
+// action buttons as children.
+function ChannelCard({ icon, name, chip, description, children }: {
+  icon: React.ReactNode
+  name: string
+  chip: React.ReactNode
+  description: string
+  children?: React.ReactNode
+}) {
+  return (
+    <div className="nav-glass nav-card-accent rounded-2xl p-4 flex flex-col">
+      <div className="flex items-center gap-2.5 mb-2">
+        <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'var(--nav-bg)', color: 'var(--nav-accent)' }}>
+          {icon}
+        </div>
+        <div className="min-w-0">
+          <div className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{name}</div>
+          <div className="mt-0.5">{chip}</div>
+        </div>
+      </div>
+      <p className="text-xs mb-3 flex-1" style={{ color: 'var(--nav-text-muted)' }}>{description}</p>
+      {children}
+    </div>
+  )
+}
+
+// Tag-style trigger-word editor: Enter adds, × removes -- same interaction
+// as MoonAI's phrase inputs («Нажмите Enter, чтобы добавить фразу», §1.5).
+function TriggerChipsEditor({ words, onChange }: { words: string[]; onChange: (words: string[]) => void }) {
+  const [draft, setDraft] = useState('')
+  function add() {
+    const trimmed = draft.trim()
+    if (!trimmed) return
+    if (!words.some(w => w.toLowerCase() === trimmed.toLowerCase())) onChange([...words, trimmed])
+    setDraft('')
+  }
+  return (
+    <div>
+      {words.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {words.map(w => (
+            <button key={w} type="button" onClick={() => onChange(words.filter(x => x !== w))}
+              className="text-xs pl-2.5 pr-2 py-1 rounded-full flex items-center gap-1.5"
+              style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+              {w}
+              <span aria-hidden>✕</span>
+            </button>
+          ))}
+        </div>
+      )}
+      <input value={draft} maxLength={80}
+        onChange={e => setDraft(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add() } }}
+        placeholder="Триггер — Enter, чтобы добавить (например: цена)"
+        className={INPUT_CLS}
+        style={{ color: 'var(--nav-text-primary)' }} />
+    </div>
+  )
+}
+
 export default function AiAgentSettings() {
   const router = useRouter()
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [tab, setTab] = useState<TabKey>('settings')
   const [name, setName] = useState('')
   const [tone, setTone] = useState('friendly')
   const [businessDescription, setBusinessDescription] = useState('')
@@ -105,21 +266,47 @@ export default function AiAgentSettings() {
   const [currency, setCurrency] = useState('KZT')
   const [customInstructions, setCustomInstructions] = useState('')
   const [historyPairs, setHistoryPairs] = useState(5)
+  const [isEnabled, setIsEnabled] = useState(true)
   const [creating, setCreating] = useState(false)
   const [createCountdown, setCreateCountdown] = useState(0)
   const createTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const [agentId, setAgentId] = useState<string | null>(null)
   const [connections, setConnections] = useState<{ channel: string; external_account_name: string | null; status: string }[]>([])
   const [connecting, setConnecting] = useState(false)
+  const [igBusy, setIgBusy] = useState(false)
+  const [igError, setIgError] = useState<string | null>(null)
   const [telegramToken, setTelegramToken] = useState('')
+  const [tgOpen, setTgOpen] = useState(false)
   const [tgBusy, setTgBusy] = useState(false)
   const [tgError, setTgError] = useState<string | null>(null)
   const [oauthNotice, setOauthNotice] = useState<'connected' | 'error' | null>(null)
   const [forbidden, setForbidden] = useState(false)
+  const [pendingCount, setPendingCount] = useState(0)
+  // Шаблоны tab state
+  const [templates, setTemplates] = useState<ReplyTemplate[]>([])
+  const [tplFormOpen, setTplFormOpen] = useState(false)
+  const [tplFormWords, setTplFormWords] = useState<string[]>([])
+  const [tplFormText, setTplFormText] = useState('')
+  const [tplEditId, setTplEditId] = useState<string | null>(null)
+  const [tplEditWords, setTplEditWords] = useState<string[]>([])
+  const [tplEditText, setTplEditText] = useState('')
+  const [tplBusy, setTplBusy] = useState(false)
+  const [tplError, setTplError] = useState<string | null>(null)
 
   async function authHeader() {
     const { data: { session } } = await supabase.auth.getSession()
     return { 'Authorization': `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' }
+  }
+
+  function switchTab(next: TabKey) {
+    setTab(next)
+    // ?tab= via history.replaceState so refresh keeps the tab; the default
+    // «Настройки» keeps the URL clean. ?agent= and other params survive.
+    const params = new URLSearchParams(window.location.search)
+    if (next === 'settings') params.delete('tab')
+    else params.set('tab', next)
+    const qs = params.toString()
+    window.history.replaceState({}, '', qs ? `${window.location.pathname}?${qs}` : window.location.pathname)
   }
 
   useEffect(() => {
@@ -137,10 +324,47 @@ export default function AiAgentSettings() {
     // Suspense boundary around this whole client page.
     const agentParam = params.get('agent')
     const isNew = params.get('new') === '1'
+    const hasNotice = params.has('instagram_connected') || params.has('instagram_error')
     if (params.has('instagram_connected')) setOauthNotice('connected')
     else if (params.has('instagram_error')) setOauthNotice('error')
-    if (params.has('instagram_connected') || params.has('instagram_error')) {
-      window.history.replaceState({}, '', agentParam ? `${window.location.pathname}?agent=${agentParam}` : window.location.pathname)
+
+    // Initial tab: ?new=1 always lands on «Настройки»; a fresh OAuth
+    // return without an explicit ?tab= opens «Каналы» so the just-connected
+    // card is what the user sees.
+    const tabParam = params.get('tab')
+    if (!isNew) {
+      if (tabParam && TAB_KEYS.includes(tabParam)) setTab(tabParam as TabKey)
+      else if (hasNotice) setTab('channels')
+    }
+
+    if (hasNotice) {
+      const clean = new URLSearchParams()
+      if (agentParam) clean.set('agent', agentParam)
+      if (!isNew) clean.set('tab', tabParam && TAB_KEYS.includes(tabParam) ? tabParam : 'channels')
+      const qs = clean.toString()
+      window.history.replaceState({}, '', qs ? `${window.location.pathname}?${qs}` : window.location.pathname)
+    }
+
+    async function loadReviewCount(headers: Record<string, string>) {
+      // Defensive shape: the review GET is gaining a pendingCount field --
+      // fall back to counting items until it ships everywhere.
+      try {
+        const res = await fetch('/api/ai-agent/review', { headers })
+        if (res.ok) {
+          const data = await res.json()
+          setPendingCount(data.pendingCount ?? data.items?.length ?? 0)
+        }
+      } catch { /* badge stays 0 -- the link still works */ }
+    }
+
+    async function loadTemplates(headers: Record<string, string>, id: string) {
+      try {
+        const res = await fetch(`/api/ai-agent/templates?agentId=${encodeURIComponent(id)}`, { headers })
+        if (res.ok) {
+          const data = await res.json()
+          setTemplates(Array.isArray(data.templates) ? data.templates : [])
+        }
+      } catch { /* empty list -- tab shows its empty state */ }
     }
 
     async function load() {
@@ -177,7 +401,12 @@ export default function AiAgentSettings() {
           if (data.agent.currency) setCurrency(data.agent.currency)
           if (typeof data.agent.customInstructions === 'string') setCustomInstructions(data.agent.customInstructions)
           if (typeof data.agent.historyPairs === 'number') setHistoryPairs(data.agent.historyPairs)
+          if (typeof data.agent.isEnabled === 'boolean') setIsEnabled(data.agent.isEnabled)
           setConnections(data.connections || [])
+          // Secondary data (badge count + saved templates) loads in the
+          // background -- neither should hold up first paint of the form.
+          loadReviewCount(headers)
+          loadTemplates(headers, data.agent.id)
         } else {
           setName(data.suggestedName || 'Ассистент')
         }
@@ -199,6 +428,8 @@ export default function AiAgentSettings() {
     setShowCustomInput(false)
   }
 
+  // One save() shared by every tab's Сохранить button -- the whole form is
+  // a single agent row, whichever tab the visible field lives on.
   async function save() {
     const isFirstCreation = !agentId
     setSaving(true)
@@ -220,7 +451,7 @@ export default function AiAgentSettings() {
       method: 'POST',
       headers,
       // agentId present -> UPDATE that agent; absent -> CREATE a new one.
-      body: JSON.stringify({ ...(agentId ? { agentId } : {}), name, tone, businessDescription, goal, collectFields, timezone, currency, customInstructions, historyPairs }),
+      body: JSON.stringify({ ...(agentId ? { agentId } : {}), name, tone, businessDescription, goal, collectFields, timezone, currency, customInstructions, historyPairs, isEnabled }),
     })
     if (res.ok) {
       const data = await res.json()
@@ -263,6 +494,30 @@ export default function AiAgentSettings() {
     }
   }
 
+  async function disconnectInstagram() {
+    if (!agentId) return
+    if (!window.confirm('Отключить Instagram? Агент перестанет отвечать клиентам в этом аккаунте.')) return
+    setIgBusy(true)
+    setIgError(null)
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/ai-agent/instagram/disconnect', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ agentId }),
+      })
+      if (res.ok) {
+        setConnections(prev => prev.filter(c => c.channel !== 'instagram'))
+        setOauthNotice(null)
+      } else {
+        setIgError('Не удалось отключить Instagram. Попробуйте ещё раз.')
+      }
+    } catch {
+      setIgError('Не удалось отключить Instagram. Попробуйте ещё раз.')
+    }
+    setIgBusy(false)
+  }
+
   // No OAuth dance for Telegram -- the pasted BotFather token IS the
   // credential, so connect is a plain authorized POST and the result can be
   // reflected in local state immediately (no redirect round-trip).
@@ -282,6 +537,7 @@ export default function AiAgentSettings() {
         const data = await res.json()
         setConnections(prev => [...prev.filter(c => c.channel !== 'telegram'), { channel: 'telegram', external_account_name: data.botUsername, status: 'active' }])
         setTelegramToken('')
+        setTgOpen(false)
       } else {
         const data = await res.json().catch(() => null)
         setTgError(data?.error === 'invalid_token'
@@ -316,6 +572,86 @@ export default function AiAgentSettings() {
     setTgBusy(false)
   }
 
+  async function createTemplate() {
+    if (!agentId || tplFormWords.length === 0 || !tplFormText.trim()) return
+    setTplBusy(true)
+    setTplError(null)
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/ai-agent/templates', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ agentId, triggerWords: tplFormWords, replyText: tplFormText.trim() }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setTemplates(prev => [...prev, data.template])
+        setTplFormOpen(false)
+        setTplFormWords([])
+        setTplFormText('')
+      } else {
+        setTplError('Не удалось сохранить шаблон. Попробуйте ещё раз.')
+      }
+    } catch {
+      setTplError('Не удалось сохранить шаблон. Попробуйте ещё раз.')
+    }
+    setTplBusy(false)
+  }
+
+  function startEditTemplate(t: ReplyTemplate) {
+    setTplEditId(t.id)
+    setTplEditWords(t.triggerWords)
+    setTplEditText(t.replyText)
+    setTplError(null)
+  }
+
+  async function saveEditTemplate() {
+    if (!tplEditId || tplEditWords.length === 0 || !tplEditText.trim()) return
+    setTplBusy(true)
+    setTplError(null)
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/ai-agent/templates', {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ id: tplEditId, triggerWords: tplEditWords, replyText: tplEditText.trim() }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setTemplates(prev => prev.map(t => t.id === data.template.id ? data.template : t))
+        setTplEditId(null)
+      } else {
+        setTplError('Не удалось сохранить изменения. Попробуйте ещё раз.')
+      }
+    } catch {
+      setTplError('Не удалось сохранить изменения. Попробуйте ещё раз.')
+    }
+    setTplBusy(false)
+  }
+
+  async function removeTemplate(id: string) {
+    if (!window.confirm('Удалить шаблон? Агент перестанет отвечать им автоматически.')) return
+    setTplBusy(true)
+    setTplError(null)
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/ai-agent/templates', {
+        method: 'DELETE',
+        headers,
+        body: JSON.stringify({ id }),
+      })
+      if (res.ok) {
+        setTemplates(prev => prev.filter(t => t.id !== id))
+        if (tplEditId === id) setTplEditId(null)
+      } else {
+        setTplError('Не удалось удалить шаблон. Попробуйте ещё раз.')
+      }
+    } catch {
+      setTplError('Не удалось удалить шаблон. Попробуйте ещё раз.')
+    }
+    setTplBusy(false)
+  }
+
   if (loading) return (
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
@@ -336,12 +672,44 @@ export default function AiAgentSettings() {
 
   const instagramConnection = connections.find(c => c.channel === 'instagram')
   const telegramConnection = connections.find(c => c.channel === 'telegram')
+  const tgExpanded = tgOpen || telegramConnection?.status === 'token_expired'
+
+  // The real server-side context line, assembled from the same visible
+  // field values (promptContext is pure/portable). Labeled «примерный»
+  // because the live prompt wraps additional system text around this line.
+  const promptPreview = buildBusinessContextLine({
+    name: name.trim() || 'Ваш бизнес',
+    tone: tone as AgentTone,
+    description: businessDescription,
+    goal: goal as AgentGoal,
+    collectFields,
+    timezone,
+    currency,
+    customInstructions,
+  })
+
+  const saveButton = (
+    <button onClick={save} disabled={saving}
+      className="w-full rounded-lg px-4 py-3 text-sm font-semibold transition-transform hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0"
+      style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)', boxShadow: '0 10px 24px -10px var(--nav-accent)' }}>
+      {saving ? 'Сохраняем…' : agentId ? 'Сохранить' : 'Создать агента'}
+    </button>
+  )
+
+  const needsAgentHint = (text: string) => (
+    <div className="nav-glass nav-card-accent rounded-2xl p-5 text-sm text-center" style={{ color: 'var(--nav-text-muted)' }}>
+      {text}{' '}
+      <button onClick={() => switchTab('settings')} className="font-medium underline-offset-2 hover:underline" style={{ color: 'var(--nav-accent)' }}>
+        Перейти к настройкам
+      </button>
+    </div>
+  )
 
   return (
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
       <SiteNav />
-      <div className="max-w-xl mx-auto p-4 lg:p-6 pb-24 lg:pb-6">
+      <div className="max-w-2xl mx-auto p-4 lg:p-6 pb-24 lg:pb-6">
         <motion.div
           initial={reduceMotion ? false : { opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
@@ -352,7 +720,7 @@ export default function AiAgentSettings() {
             Все агенты
           </Link>
           <h1 className="text-xl font-bold mb-1" style={{ color: 'var(--nav-text-primary)' }}>AI-агент</h1>
-          <p className="text-sm mb-6" style={{ color: 'var(--nav-text-secondary)' }}>Настройте ассистента, который отвечает вашим клиентам в Instagram</p>
+          <p className="text-sm mb-5" style={{ color: 'var(--nav-text-secondary)' }}>Настройте ассистента, который отвечает вашим клиентам в Instagram и Telegram</p>
         </motion.div>
 
         {oauthNotice === 'connected' && (
@@ -366,244 +734,505 @@ export default function AiAgentSettings() {
           </div>
         )}
 
+        {/* MoonAI-style horizontal tab bar (research §1): pill tabs, active
+            state on --nav-accent, layoutId slide between tabs. */}
         <motion.div
-          className="nav-glass nav-card-accent rounded-2xl p-5"
-          initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+          className="nav-glass rounded-xl p-1 mb-5 flex gap-1 overflow-x-auto"
+          role="tablist"
+          aria-label="Разделы настроек агента"
+          initial={reduceMotion ? false : { opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.06 }}
+          transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE, delay: reduceMotion ? 0 : 0.04 }}
         >
-          <label className="block mb-4">
-            <span className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>Название компании</span>
-            <input
-              className="w-full rounded-lg px-3 py-2 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
-              style={{ color: 'var(--nav-text-primary)' }}
-              value={name} onChange={e => setName(e.target.value)} />
-          </label>
-
-          <div className="mb-4">
-            <span className="text-xs mb-2 block" style={{ color: 'var(--nav-text-secondary)' }}>Формат общения</span>
-            <div className="grid grid-cols-2 gap-2">
-              {TONE_OPTIONS.map(t => {
-                const active = tone === t.value
-                return (
-                  <button key={t.value} onClick={() => setTone(t.value)}
-                    className="text-xs px-3 py-2 rounded-lg text-left transition-colors"
-                    style={active ? { background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' } : { background: 'var(--nav-bg)', color: 'var(--nav-text-secondary)' }}>
-                    {t.label}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          <label className="block mb-4">
-            <span className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>О бизнесе</span>
-            <textarea
-              className="w-full rounded-lg px-3 py-2 text-sm min-h-[100px] outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
-              style={{ color: 'var(--nav-text-primary)' }}
-              placeholder="Опишите подробнее что вы продаёте и как работаете"
-              value={businessDescription} onChange={e => setBusinessDescription(e.target.value)} />
-          </label>
-
-          <div className="mb-4">
-            <span className="text-xs mb-2 block" style={{ color: 'var(--nav-text-secondary)' }}>Основная цель</span>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              {GOAL_OPTIONS.map(g => {
-                const active = goal === g.value
-                return (
-                  <button key={g.value} onClick={() => setGoal(g.value)}
-                    className="text-xs px-3 py-2 rounded-lg transition-colors"
-                    style={active ? { background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' } : { background: 'var(--nav-bg)', color: 'var(--nav-text-secondary)' }}>
-                    {g.label}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          <div className="mb-4">
-            <span className="text-xs mb-2 block" style={{ color: 'var(--nav-text-secondary)' }}>Какие данные агент должен собрать у клиента</span>
-            <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 mb-2">
-              {COLLECT_FIELD_OPTIONS.map(f => (
-                <label key={f.value} className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--nav-text-primary)' }}>
-                  <input type="checkbox" checked={collectFields.includes(f.value)} onChange={() => toggleCollectField(f.value)}
-                    className="accent-[var(--nav-accent)] w-3.5 h-3.5 flex-shrink-0" />
-                  {f.label}
-                </label>
-              ))}
-            </div>
-            {/* Custom fields the user has added (anything not a preset key) */}
-            {collectFields.filter(f => !COLLECT_FIELD_OPTIONS.some(o => o.value === f)).length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mb-2">
-                {collectFields.filter(f => !COLLECT_FIELD_OPTIONS.some(o => o.value === f)).map(f => (
-                  <button key={f} onClick={() => toggleCollectField(f)}
-                    className="text-xs pl-2.5 pr-2 py-1 rounded-full flex items-center gap-1.5"
-                    style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-                    {f}
-                    <span aria-hidden>✕</span>
-                  </button>
-                ))}
-              </div>
-            )}
-            {showCustomInput ? (
-              <div className="flex gap-2">
-                <input autoFocus value={customField} maxLength={60}
-                  onChange={e => setCustomField(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') addCustomField(); if (e.key === 'Escape') { setShowCustomInput(false); setCustomField('') } }}
-                  placeholder="Например: размер обуви"
-                  className="flex-1 rounded-lg px-3 py-2 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
-                  style={{ color: 'var(--nav-text-primary)' }} />
-                <button onClick={addCustomField}
-                  className="text-xs px-3 py-2 rounded-lg font-semibold flex-shrink-0"
-                  style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-                  Добавить
-                </button>
-              </div>
-            ) : (
-              <button onClick={() => setShowCustomInput(true)}
-                className="text-xs px-3 py-1.5 rounded-lg font-medium"
-                style={{ background: 'var(--nav-bg)', color: 'var(--nav-accent)' }}>
-                ✨ Добавить своё
+          {TABS.map(t => {
+            const active = tab === t.key
+            return (
+              <button key={t.key} role="tab" aria-selected={active} onClick={() => switchTab(t.key)}
+                className="relative flex-shrink-0 text-xs font-medium px-3.5 py-2 rounded-lg transition-colors"
+                style={{ color: active ? 'var(--nav-accent-ink)' : 'var(--nav-text-secondary)' }}>
+                {active && (
+                  <motion.span
+                    layoutId="aiAgentSettingsTabPill"
+                    className="absolute inset-0 rounded-lg"
+                    style={{ background: 'var(--nav-accent)' }}
+                    transition={{ duration: reduceMotion ? 0 : 0.3, ease: EASE }}
+                  />
+                )}
+                <span className="relative z-[1]">{t.label}</span>
               </button>
-            )}
-          </div>
+            )
+          })}
+        </motion.div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
-            <label className="block">
-              <span className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>Часовой пояс</span>
-              <select value={timezone} onChange={e => setTimezone(e.target.value)}
-                className="w-full rounded-lg px-3 py-2 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
-                style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-surface-chrome)' }}>
-                {TIMEZONE_OPTIONS.map(tz => <option key={tz.value} value={tz.value}>{tz.label}</option>)}
-              </select>
-            </label>
-            <label className="block">
-              <span className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>Валюта</span>
-              <select value={currency} onChange={e => setCurrency(e.target.value)}
-                className="w-full rounded-lg px-3 py-2 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
-                style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-surface-chrome)' }}>
-                {CURRENCY_OPTIONS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-              </select>
-            </label>
-          </div>
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={tab}
+            initial={reduceMotion ? false : { opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={reduceMotion ? undefined : { opacity: 0, y: -6, transition: { duration: 0.15, ease: EASE } }}
+            transition={{ duration: reduceMotion ? 0 : 0.25, ease: EASE }}
+          >
+            {tab === 'settings' && (
+              <div className="nav-glass nav-card-accent rounded-2xl p-5">
+                <label className="block mb-4">
+                  <span className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>Название компании</span>
+                  <input
+                    className={INPUT_CLS}
+                    style={{ color: 'var(--nav-text-primary)' }}
+                    value={name} onChange={e => setName(e.target.value)} />
+                </label>
 
-          <label className="block mb-4">
-            <span className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>Дополнительные инструкции (необязательно)</span>
-            <textarea
-              className="w-full rounded-lg px-3 py-2 text-sm min-h-[70px] outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
-              style={{ color: 'var(--nav-text-primary)' }}
-              maxLength={2000}
-              placeholder="Например: не обещай скидки; доставка только по Алматы; рабочие часы 9:00–18:00"
-              value={customInstructions} onChange={e => setCustomInstructions(e.target.value)} />
-            <span className="text-[11px] mt-1 block" style={{ color: 'var(--nav-text-muted)' }}>
-              Агент будет следовать этим правилам в каждом ответе.
-            </span>
-          </label>
-
-          <label className="block mb-6">
-            <span className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>Глубина памяти диалога</span>
-            <select value={historyPairs} onChange={e => setHistoryPairs(Number(e.target.value))}
-              className="w-full rounded-lg px-3 py-2 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
-              style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-surface-chrome)' }}>
-              {[3, 5, 8, 10].map(n => <option key={n} value={n}>Последние {n} обменов</option>)}
-            </select>
-            <span className="text-[11px] mt-1 block" style={{ color: 'var(--nav-text-muted)' }}>
-              Сколько прошлых сообщений агент помнит. Больше — точнее контекст, но дороже каждый ответ.
-            </span>
-          </label>
-
-          <button onClick={save} disabled={saving}
-            className="w-full rounded-lg px-4 py-3 text-sm font-semibold transition-transform hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0"
-            style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)', boxShadow: '0 10px 24px -10px var(--nav-accent)' }}>
-            {saving ? 'Сохраняем…' : agentId ? 'Сохранить' : 'Создать агента'}
-          </button>
-
-          {agentId && (
-            <div className="mt-4 pt-4" style={{ borderTop: '1px solid var(--nav-border-soft)' }}>
-              <span className="text-xs mb-2 block" style={{ color: 'var(--nav-text-secondary)' }}>Instagram</span>
-              {instagramConnection?.status === 'active' && (
-                <>
-                  <div className="text-sm mb-3 flex items-center gap-1.5" style={{ color: 'var(--nav-success)' }}>
-                    <CheckCircleIcon /> Подключено: {instagramConnection.external_account_name || instagramConnection.channel}
+                <div className="mb-4">
+                  <span className="text-xs mb-2 block" style={{ color: 'var(--nav-text-secondary)' }}>Формат общения</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    {TONE_OPTIONS.map(t => {
+                      const active = tone === t.value
+                      return (
+                        <button key={t.value} onClick={() => setTone(t.value)}
+                          className="text-xs px-3 py-2 rounded-lg text-left transition-colors"
+                          style={active ? { background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' } : { background: 'var(--nav-bg)', color: 'var(--nav-text-secondary)' }}>
+                          {t.label}
+                        </button>
+                      )
+                    })}
                   </div>
-                  <Link href="/ai-agent/review"
-                    className="flex items-center justify-center gap-1.5 nav-glass rounded-lg px-4 py-2.5 text-sm font-medium transition-colors"
-                    style={{ color: 'var(--nav-text-primary)' }}>
-                    Диалоги на проверке <ArrowRightIcon />
-                  </Link>
-                </>
-              )}
-              {instagramConnection?.status === 'token_expired' && (
-                // Same sessionExpired-style reconnect banner this codebase
-                // already uses in Kaspi Shop -- set by Task 8/9's 401 handling,
-                // not guessed at here. Reconnecting reuses the same OAuth flow;
-                // Task 7's callback upserts on (channel, external_account_id)
-                // and always writes status: 'active', so a successful
-                // reconnect clears this automatically.
-                <div className="nav-glass rounded-lg p-3 mb-2">
-                  <div className="text-sm mb-2 flex items-center gap-1.5" style={{ color: 'var(--nav-critical)' }}>
-                    <WarnIcon /> Instagram отключился — переподключите аккаунт, чтобы агент снова отвечал
-                  </div>
-                  <button onClick={connectInstagram} disabled={connecting}
-                    className="w-full rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50"
-                    style={{ background: 'var(--nav-critical)', color: '#fff' }}>
-                    {connecting ? 'Открываем Instagram…' : 'Переподключить Instagram'}
-                  </button>
                 </div>
-              )}
-              {!instagramConnection && (
-                <button onClick={connectInstagram} disabled={connecting}
-                  className="w-full nav-glass rounded-lg px-4 py-3 text-sm font-medium disabled:opacity-50" style={{ color: 'var(--nav-text-primary)' }}>
-                  {connecting ? 'Открываем Instagram…' : 'Подключить Instagram'}
-                </button>
-              )}
-            </div>
-          )}
 
-          {agentId && (
-            <div className="mt-4 pt-4" style={{ borderTop: '1px solid var(--nav-border-soft)' }}>
-              <span className="text-xs mb-2 block" style={{ color: 'var(--nav-text-secondary)' }}>Telegram-бот</span>
-              {telegramConnection?.status === 'active' ? (
-                <>
-                  <div className="text-sm mb-3 flex items-center gap-1.5" style={{ color: 'var(--nav-success)' }}>
-                    <CheckCircleIcon /> Подключено: @{telegramConnection.external_account_name || 'бот'}
+                <label className="block mb-4">
+                  <span className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>О бизнесе</span>
+                  <textarea
+                    className={`${INPUT_CLS} min-h-[100px]`}
+                    style={{ color: 'var(--nav-text-primary)' }}
+                    placeholder="Опишите подробнее что вы продаёте и как работаете"
+                    value={businessDescription} onChange={e => setBusinessDescription(e.target.value)} />
+                </label>
+
+                <div className="mb-4">
+                  <span className="text-xs mb-2 block" style={{ color: 'var(--nav-text-secondary)' }}>Основная цель</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {GOAL_OPTIONS.map(g => {
+                      const active = goal === g.value
+                      return (
+                        <button key={g.value} onClick={() => setGoal(g.value)}
+                          className="text-xs px-3 py-2 rounded-lg transition-colors"
+                          style={active ? { background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' } : { background: 'var(--nav-bg)', color: 'var(--nav-text-secondary)' }}>
+                          {g.label}
+                        </button>
+                      )
+                    })}
                   </div>
-                  <button onClick={disconnectTelegram} disabled={tgBusy}
-                    className="w-full nav-glass rounded-lg px-4 py-2.5 text-sm font-medium disabled:opacity-50"
-                    style={{ color: 'var(--nav-text-primary)' }}>
-                    {tgBusy ? 'Отключаем…' : 'Отключить'}
-                  </button>
-                </>
-              ) : (
-                <>
-                  {telegramConnection?.status === 'token_expired' && (
-                    <div className="text-sm mb-2 flex items-center gap-1.5" style={{ color: 'var(--nav-critical)' }}>
-                      <WarnIcon /> Telegram-бот отключился — вставьте токен ещё раз, чтобы агент снова отвечал
+                </div>
+
+                <div className="mb-4">
+                  <span className="text-xs mb-2 block" style={{ color: 'var(--nav-text-secondary)' }}>Какие данные агент должен собрать у клиента</span>
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 mb-2">
+                    {COLLECT_FIELD_OPTIONS.map(f => (
+                      <label key={f.value} className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--nav-text-primary)' }}>
+                        <input type="checkbox" checked={collectFields.includes(f.value)} onChange={() => toggleCollectField(f.value)}
+                          className="accent-[var(--nav-accent)] w-3.5 h-3.5 flex-shrink-0" />
+                        {f.label}
+                      </label>
+                    ))}
+                  </div>
+                  {/* Custom fields the user has added (anything not a preset key) */}
+                  {collectFields.filter(f => !COLLECT_FIELD_OPTIONS.some(o => o.value === f)).length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {collectFields.filter(f => !COLLECT_FIELD_OPTIONS.some(o => o.value === f)).map(f => (
+                        <button key={f} onClick={() => toggleCollectField(f)}
+                          className="text-xs pl-2.5 pr-2 py-1 rounded-full flex items-center gap-1.5"
+                          style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                          {f}
+                          <span aria-hidden>✕</span>
+                        </button>
+                      ))}
                     </div>
                   )}
-                  <p className="text-xs mb-2" style={{ color: 'var(--nav-text-muted)' }}>
-                    Создайте бота через @BotFather и вставьте токен — агент начнёт отвечать на сообщения в этом боте
+                  {showCustomInput ? (
+                    <div className="flex gap-2">
+                      <input autoFocus value={customField} maxLength={60}
+                        onChange={e => setCustomField(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') addCustomField(); if (e.key === 'Escape') { setShowCustomInput(false); setCustomField('') } }}
+                        placeholder="Например: размер обуви"
+                        className={`flex-1 ${INPUT_CLS}`}
+                        style={{ color: 'var(--nav-text-primary)' }} />
+                      <button onClick={addCustomField}
+                        className="text-xs px-3 py-2 rounded-lg font-semibold flex-shrink-0"
+                        style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                        Добавить
+                      </button>
+                    </div>
+                  ) : (
+                    <button onClick={() => setShowCustomInput(true)}
+                      className="text-xs px-3 py-1.5 rounded-lg font-medium"
+                      style={{ background: 'var(--nav-bg)', color: 'var(--nav-accent)' }}>
+                      ✨ Добавить своё
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+                  <label className="block">
+                    <span className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>Часовой пояс</span>
+                    <select value={timezone} onChange={e => setTimezone(e.target.value)}
+                      className={INPUT_CLS}
+                      style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-surface-chrome)' }}>
+                      {TIMEZONE_OPTIONS.map(tz => <option key={tz.value} value={tz.value}>{tz.label}</option>)}
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>Валюта</span>
+                    <select value={currency} onChange={e => setCurrency(e.target.value)}
+                      className={INPUT_CLS}
+                      style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-surface-chrome)' }}>
+                      {CURRENCY_OPTIONS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                    </select>
+                  </label>
+                </div>
+
+                {saveButton}
+              </div>
+            )}
+
+            {tab === 'prompting' && (
+              <>
+                <div className="nav-glass nav-card-accent rounded-2xl p-5">
+                  <label className="block mb-6">
+                    <span className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>Дополнительные инструкции (необязательно)</span>
+                    <textarea
+                      className={`${INPUT_CLS} min-h-[120px]`}
+                      style={{ color: 'var(--nav-text-primary)' }}
+                      maxLength={2000}
+                      placeholder="Например: не обещай скидки; доставка только по Алматы; рабочие часы 9:00–18:00"
+                      value={customInstructions} onChange={e => setCustomInstructions(e.target.value)} />
+                    <span className="text-[11px] mt-1 block" style={{ color: 'var(--nav-text-muted)' }}>
+                      Агент будет следовать этим правилам в каждом ответе.
+                    </span>
+                  </label>
+                  {saveButton}
+                </div>
+
+                <div className="nav-glass nav-card-accent rounded-2xl p-5 mt-4">
+                  <div className="text-sm font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>Как агент видит инструкции</div>
+                  <p className="text-[11px] mb-3" style={{ color: 'var(--nav-text-muted)' }}>
+                    Примерный вид инструкций агента — собирается из полей выше; в реальном ответе к этой строке добавляется системный текст.
                   </p>
-                  <input
-                    className="w-full rounded-lg px-3 py-2 text-sm mb-2 outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
-                    style={{ color: 'var(--nav-text-primary)' }}
-                    placeholder="123456789:AAH3xk…"
-                    autoComplete="off"
-                    value={telegramToken}
-                    onChange={e => setTelegramToken(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') connectTelegram() }} />
-                  <button onClick={connectTelegram} disabled={tgBusy || !telegramToken.trim()}
-                    className="w-full nav-glass rounded-lg px-4 py-3 text-sm font-medium disabled:opacity-50" style={{ color: 'var(--nav-text-primary)' }}>
-                    {tgBusy ? 'Подключаем…' : 'Подключить Telegram'}
+                  <div className="rounded-lg p-3 text-xs leading-relaxed whitespace-pre-wrap" style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-secondary)' }}>
+                    {promptPreview}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {tab === 'control' && (
+              <div className="nav-glass nav-card-accent rounded-2xl p-5">
+                <div className="flex items-start justify-between gap-4 mb-1">
+                  <div>
+                    <span className="text-sm font-semibold block" style={{ color: 'var(--nav-text-primary)' }}>Статус бота</span>
+                    <span className="text-[11px] block mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>
+                      Выключенный агент не отвечает клиентам.
+                    </span>
+                  </div>
+                  <button role="switch" aria-checked={isEnabled} aria-label="Статус бота"
+                    onClick={() => setIsEnabled(v => !v)}
+                    className="relative w-10 h-6 rounded-full transition-colors flex-shrink-0 mt-0.5"
+                    style={{ background: isEnabled ? 'var(--nav-accent)' : 'var(--nav-border)' }}>
+                    <span className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all" style={{ left: isEnabled ? '18px' : '2px' }} />
                   </button>
-                </>
-              )}
-              {tgError && (
-                <div className="text-xs mt-2" style={{ color: 'var(--nav-critical)' }}>{tgError}</div>
-              )}
-            </div>
-          )}
-        </motion.div>
+                </div>
+
+                <div className="my-5" style={{ borderTop: '1px solid var(--nav-border-soft)' }} />
+
+                <label className="block mb-6">
+                  <span className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>Глубина памяти диалога</span>
+                  <select value={historyPairs} onChange={e => setHistoryPairs(Number(e.target.value))}
+                    className={INPUT_CLS}
+                    style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-surface-chrome)' }}>
+                    {[3, 5, 8, 10].map(n => <option key={n} value={n}>Последние {n} обменов</option>)}
+                  </select>
+                  <span className="text-[11px] mt-1 block" style={{ color: 'var(--nav-text-muted)' }}>
+                    Сколько прошлых сообщений агент помнит. Больше — точнее контекст, но дороже каждый ответ.
+                  </span>
+                </label>
+
+                {saveButton}
+              </div>
+            )}
+
+            {tab === 'templates' && (
+              !agentId ? needsAgentHint('Шаблоны появятся после создания агента.') : (
+                <div>
+                  <p className="text-xs mb-3" style={{ color: 'var(--nav-text-muted)' }}>
+                    Шаблоны отвечают мгновенно и бесплатно — если сообщение клиента содержит триггер, ИИ не вызывается.
+                  </p>
+
+                  {templates.length === 0 && !tplFormOpen && (
+                    <div className="nav-glass nav-card-accent rounded-2xl p-5 text-sm text-center mb-3" style={{ color: 'var(--nav-text-muted)' }}>
+                      Шаблонов пока нет. Они создаются автоматически, когда вы одобряете ответы в «Диалогах на проверке», — и их можно добавить вручную.
+                    </div>
+                  )}
+
+                  <div className="space-y-3">
+                    {templates.map(t => (
+                      <div key={t.id} className="nav-glass nav-card-accent rounded-2xl p-4">
+                        {tplEditId === t.id ? (
+                          <div>
+                            <span className="text-xs mb-1.5 block" style={{ color: 'var(--nav-text-secondary)' }}>Триггерные слова</span>
+                            <TriggerChipsEditor words={tplEditWords} onChange={setTplEditWords} />
+                            <span className="text-xs mt-3 mb-1.5 block" style={{ color: 'var(--nav-text-secondary)' }}>Текст ответа</span>
+                            <textarea
+                              className={`${INPUT_CLS} min-h-[80px]`}
+                              style={{ color: 'var(--nav-text-primary)' }}
+                              maxLength={2000}
+                              value={tplEditText} onChange={e => setTplEditText(e.target.value)} />
+                            <div className="flex gap-2 mt-3">
+                              <button onClick={saveEditTemplate} disabled={tplBusy || tplEditWords.length === 0 || !tplEditText.trim()}
+                                className="flex-1 rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50"
+                                style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                                {tplBusy ? 'Сохраняем…' : 'Сохранить'}
+                              </button>
+                              <button onClick={() => setTplEditId(null)} disabled={tplBusy}
+                                className="rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50"
+                                style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-secondary)' }}>
+                                Отмена
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div>
+                            <div className="flex items-start justify-between gap-3 mb-2">
+                              <div className="flex flex-wrap gap-1.5 min-w-0">
+                                {t.triggerWords.map(w => (
+                                  <span key={w} className="text-[11px] font-medium px-2 py-0.5 rounded-full" style={{ background: 'var(--nav-bg)', color: 'var(--nav-accent)' }}>
+                                    {w}
+                                  </span>
+                                ))}
+                              </div>
+                              <div className="flex gap-1 flex-shrink-0">
+                                <button onClick={() => startEditTemplate(t)} aria-label="Редактировать шаблон"
+                                  className="p-1.5 rounded-lg transition-colors hover:text-[color:var(--nav-accent)]"
+                                  style={{ color: 'var(--nav-text-muted)' }}>
+                                  <PencilIcon />
+                                </button>
+                                <button onClick={() => removeTemplate(t.id)} disabled={tplBusy} aria-label="Удалить шаблон"
+                                  className="p-1.5 rounded-lg transition-colors hover:text-[color:var(--nav-critical)] disabled:opacity-50"
+                                  style={{ color: 'var(--nav-text-muted)' }}>
+                                  <TrashIcon />
+                                </button>
+                              </div>
+                            </div>
+                            <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--nav-text-primary)' }}>{t.replyText}</p>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {tplFormOpen ? (
+                    <div className="nav-glass nav-card-accent rounded-2xl p-4 mt-3">
+                      <span className="text-xs mb-1.5 block" style={{ color: 'var(--nav-text-secondary)' }}>Триггерные слова</span>
+                      <TriggerChipsEditor words={tplFormWords} onChange={setTplFormWords} />
+                      <span className="text-xs mt-3 mb-1.5 block" style={{ color: 'var(--nav-text-secondary)' }}>Текст ответа</span>
+                      <textarea
+                        className={`${INPUT_CLS} min-h-[80px]`}
+                        style={{ color: 'var(--nav-text-primary)' }}
+                        maxLength={2000}
+                        placeholder="Ответ, который клиент получит мгновенно"
+                        value={tplFormText} onChange={e => setTplFormText(e.target.value)} />
+                      <div className="flex gap-2 mt-3">
+                        <button onClick={createTemplate} disabled={tplBusy || tplFormWords.length === 0 || !tplFormText.trim()}
+                          className="flex-1 rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50"
+                          style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                          {tplBusy ? 'Сохраняем…' : 'Добавить'}
+                        </button>
+                        <button onClick={() => { setTplFormOpen(false); setTplFormWords([]); setTplFormText('') }} disabled={tplBusy}
+                          className="rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50"
+                          style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-secondary)' }}>
+                          Отмена
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button onClick={() => { setTplFormOpen(true); setTplError(null) }}
+                      className="w-full nav-glass rounded-2xl px-4 py-3 text-sm font-medium mt-3 transition-transform hover:-translate-y-0.5"
+                      style={{ color: 'var(--nav-accent)' }}>
+                      + Добавить шаблон
+                    </button>
+                  )}
+
+                  {tplError && (
+                    <div className="text-xs mt-2" style={{ color: 'var(--nav-critical)' }}>{tplError}</div>
+                  )}
+                </div>
+              )
+            )}
+
+            {tab === 'channels' && (
+              !agentId ? needsAgentHint('Каналы можно подключить после создания агента.') : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <ChannelCard
+                    icon={<InstagramIcon />}
+                    name="Instagram"
+                    chip={instagramConnection?.status === 'active'
+                      ? <StatusChip kind="ok" label={`Подключено: ${instagramConnection.external_account_name || 'аккаунт'}`} />
+                      : instagramConnection?.status === 'token_expired'
+                        ? <StatusChip kind="warn" label="Требуется переподключение" />
+                        : <StatusChip kind="off" label="Не подключен" />}
+                    description="Агент отвечает на комментарии и сообщения в Директ вашего бизнес-аккаунта"
+                  >
+                    {instagramConnection?.status === 'active' && (
+                      <button onClick={disconnectInstagram} disabled={igBusy}
+                        className="w-full nav-glass rounded-lg px-4 py-2.5 text-sm font-medium disabled:opacity-50"
+                        style={{ color: 'var(--nav-text-primary)' }}>
+                        {igBusy ? 'Отключаем…' : 'Отключить'}
+                      </button>
+                    )}
+                    {instagramConnection?.status === 'token_expired' && (
+                      <>
+                        <div className="text-xs mb-2 flex items-center gap-1.5" style={{ color: 'var(--nav-critical)' }}>
+                          <WarnIcon /> Instagram отключился — переподключите аккаунт, чтобы агент снова отвечал
+                        </div>
+                        <button onClick={connectInstagram} disabled={connecting}
+                          className="w-full rounded-lg px-4 py-2.5 text-sm font-medium disabled:opacity-50"
+                          style={{ background: 'var(--nav-critical)', color: '#fff' }}>
+                          {connecting ? 'Открываем Instagram…' : 'Переподключить'}
+                        </button>
+                      </>
+                    )}
+                    {!instagramConnection && (
+                      <button onClick={connectInstagram} disabled={connecting}
+                        className="w-full rounded-lg px-4 py-2.5 text-sm font-semibold disabled:opacity-50"
+                        style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                        {connecting ? 'Открываем Instagram…' : 'Подключить'}
+                      </button>
+                    )}
+                    {igError && (
+                      <div className="text-xs mt-2" style={{ color: 'var(--nav-critical)' }}>{igError}</div>
+                    )}
+                  </ChannelCard>
+
+                  <ChannelCard
+                    icon={<TelegramIcon />}
+                    name="Telegram-бот"
+                    chip={telegramConnection?.status === 'active'
+                      ? <StatusChip kind="ok" label={`Подключено: @${telegramConnection.external_account_name || 'бот'}`} />
+                      : telegramConnection?.status === 'token_expired'
+                        ? <StatusChip kind="warn" label="Требуется переподключение" />
+                        : <StatusChip kind="off" label="Не подключен" />}
+                    description="Агент отвечает на сообщения в вашем Telegram-боте, созданном через @BotFather"
+                  >
+                    {telegramConnection?.status === 'active' ? (
+                      <button onClick={disconnectTelegram} disabled={tgBusy}
+                        className="w-full nav-glass rounded-lg px-4 py-2.5 text-sm font-medium disabled:opacity-50"
+                        style={{ color: 'var(--nav-text-primary)' }}>
+                        {tgBusy ? 'Отключаем…' : 'Отключить'}
+                      </button>
+                    ) : tgExpanded ? (
+                      <>
+                        {telegramConnection?.status === 'token_expired' && (
+                          <div className="text-xs mb-2 flex items-center gap-1.5" style={{ color: 'var(--nav-critical)' }}>
+                            <WarnIcon /> Telegram-бот отключился — вставьте токен ещё раз, чтобы агент снова отвечал
+                          </div>
+                        )}
+                        <p className="text-[11px] mb-2" style={{ color: 'var(--nav-text-muted)' }}>
+                          Создайте бота через @BotFather и вставьте токен — агент начнёт отвечать на сообщения в этом боте
+                        </p>
+                        <input
+                          className={`${INPUT_CLS} mb-2`}
+                          style={{ color: 'var(--nav-text-primary)' }}
+                          placeholder="123456789:AAH3xk…"
+                          autoComplete="off"
+                          value={telegramToken}
+                          onChange={e => setTelegramToken(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') connectTelegram() }} />
+                        <div className="flex gap-2">
+                          <button onClick={connectTelegram} disabled={tgBusy || !telegramToken.trim()}
+                            className="flex-1 rounded-lg px-4 py-2.5 text-sm font-semibold disabled:opacity-50"
+                            style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                            {tgBusy ? 'Подключаем…' : 'Подключить'}
+                          </button>
+                          {telegramConnection?.status !== 'token_expired' && (
+                            <button onClick={() => { setTgOpen(false); setTgError(null) }} disabled={tgBusy}
+                              className="rounded-lg px-3 py-2.5 text-sm font-medium disabled:opacity-50"
+                              style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-secondary)' }}>
+                              Отмена
+                            </button>
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      <button onClick={() => setTgOpen(true)}
+                        className="w-full rounded-lg px-4 py-2.5 text-sm font-semibold"
+                        style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                        Подключить
+                      </button>
+                    )}
+                    {tgError && (
+                      <div className="text-xs mt-2" style={{ color: 'var(--nav-critical)' }}>{tgError}</div>
+                    )}
+                  </ChannelCard>
+
+                  <ChannelCard
+                    icon={<WhatsAppIcon />}
+                    name="WhatsApp"
+                    chip={<StatusChip kind="soon" label="Скоро" />}
+                    description="Официальный WhatsApp Business API — в разработке"
+                  >
+                    <button disabled className="w-full nav-glass rounded-lg px-4 py-2.5 text-sm font-medium opacity-50 cursor-not-allowed" style={{ color: 'var(--nav-text-primary)' }}>
+                      Подключить
+                    </button>
+                  </ChannelCard>
+
+                  <ChannelCard
+                    icon={<SiteChatIcon />}
+                    name="Чат для сайта"
+                    chip={<StatusChip kind="soon" label="Скоро" />}
+                    description="Виджет чата на вашем сайте — агент отвечает посетителям в реальном времени"
+                  >
+                    <button disabled className="w-full nav-glass rounded-lg px-4 py-2.5 text-sm font-medium opacity-50 cursor-not-allowed" style={{ color: 'var(--nav-text-primary)' }}>
+                      Подключить
+                    </button>
+                  </ChannelCard>
+
+                  <ChannelCard
+                    icon={<ApiIcon />}
+                    name="API"
+                    chip={<StatusChip kind="soon" label="Скоро" />}
+                    description="Подключите свою систему — CRM, сайт или приложение — через HTTP API"
+                  >
+                    <button disabled className="w-full nav-glass rounded-lg px-4 py-2.5 text-sm font-medium opacity-50 cursor-not-allowed" style={{ color: 'var(--nav-text-primary)' }}>
+                      Подключить
+                    </button>
+                  </ChannelCard>
+                </div>
+              )
+            )}
+          </motion.div>
+        </AnimatePresence>
+
+        {/* Review-queue link -- pinned below every tab's content, with the
+            live pending-draft count. Only meaningful once an agent exists. */}
+        {agentId && (
+          <motion.div
+            className="mt-4"
+            initial={reduceMotion ? false : { opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: reduceMotion ? 0 : 0.3, ease: EASE, delay: reduceMotion ? 0 : 0.08 }}
+          >
+            <Link href="/ai-agent/review"
+              className="nav-glass nav-card-accent rounded-2xl px-4 py-3.5 flex items-center justify-between transition-transform hover:-translate-y-0.5">
+              <span className="flex items-center gap-2 text-sm font-medium" style={{ color: 'var(--nav-text-primary)' }}>
+                Диалоги на проверке
+                {pendingCount > 0 && (
+                  <span className="text-[11px] font-bold px-1.5 min-w-[20px] h-5 rounded-full inline-flex items-center justify-center"
+                    style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                    {pendingCount}
+                  </span>
+                )}
+              </span>
+              <span style={{ color: 'var(--nav-text-muted)' }}><ArrowRightIcon /></span>
+            </Link>
+          </motion.div>
+        )}
       </div>
 
       {/* First-creation overlay: the "magic" moment. A rotating gradient

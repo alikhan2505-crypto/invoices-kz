@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
@@ -7,12 +7,16 @@ import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 
 const EASE = [0.16, 1, 0.3, 1] as const
+const FREE_REGENS = 3
 
 interface ReviewItem {
   id: string
   customerHandle: string
+  channel: string
+  question: string
   text: string
   urgent: boolean
+  regenCount: number
   createdAt: string
 }
 
@@ -25,6 +29,47 @@ function AlertIcon() {
   )
 }
 
+function InstagramIcon() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+      <rect x="2" y="2" width="20" height="20" rx="5" />
+      <circle cx="12" cy="12" r="4" />
+      <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
+    </svg>
+  )
+}
+
+function TelegramIcon() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+      <path d="M22 2 11 13" />
+      <path d="M22 2 15 22l-4-9-9-4z" />
+    </svg>
+  )
+}
+
+function SparklesIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+      <path d="M12 3l1.9 5.7a2 2 0 0 0 1.4 1.4L21 12l-5.7 1.9a2 2 0 0 0-1.4 1.4L12 21l-1.9-5.7a2 2 0 0 0-1.4-1.4L3 12l5.7-1.9a2 2 0 0 0 1.4-1.4L12 3z" />
+    </svg>
+  )
+}
+
+function InfoIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 16v-4M12 8h.01" />
+    </svg>
+  )
+}
+
+const CHANNEL_META: Record<string, { label: string; icon: () => React.ReactElement }> = {
+  instagram: { label: 'Instagram', icon: InstagramIcon },
+  telegram: { label: 'Telegram', icon: TelegramIcon },
+}
+
 export default function AiAgentReview() {
   const router = useRouter()
   const reduceMotionRaw = useReducedMotion()
@@ -33,8 +78,16 @@ export default function AiAgentReview() {
   const [items, setItems] = useState<ReviewItem[]>([])
   const [edits, setEdits] = useState<Record<string, string>>({})
   const [acting, setActing] = useState<string | null>(null)
+  const [regening, setRegening] = useState<string | null>(null)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [forbidden, setForbidden] = useState(false)
+  // Which card's regen-price hint popover is open (id) -- same
+  // outside-click-to-close pattern as /create's showVatHint, generalized to
+  // one-popover-per-card via a ref map.
+  const [hintFor, setHintFor] = useState<string | null>(null)
+  const hintRefs = useRef<Record<string, HTMLSpanElement | null>>({})
+  const [toast, setToast] = useState<string | null>(null)
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   async function authHeader() {
     const { data: { session } } = await supabase.auth.getSession()
@@ -63,13 +116,39 @@ export default function AiAgentReview() {
 
   useEffect(() => { load() }, [])
 
-  async function act(id: string, action: 'send' | 'skip') {
-    setActing(id)
+  useEffect(() => {
+    if (!hintFor) return
+    function onOutsideClick(e: MouseEvent) {
+      const el = hintFor ? hintRefs.current[hintFor] : null
+      if (el && !el.contains(e.target as Node)) setHintFor(null)
+    }
+    document.addEventListener('click', onOutsideClick)
+    return () => document.removeEventListener('click', onOutsideClick)
+  }, [hintFor])
+
+  useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current) }, [])
+
+  function showToast(text: string) {
+    setToast(text)
+    if (toastTimer.current) clearTimeout(toastTimer.current)
+    toastTimer.current = setTimeout(() => setToast(null), 6000)
+  }
+
+  function setError(id: string, text: string) {
+    setErrors(prev => ({ ...prev, [id]: text }))
+  }
+
+  function clearError(id: string) {
     setErrors(prev => {
       const next = { ...prev }
       delete next[id]
       return next
     })
+  }
+
+  async function act(id: string, action: 'send' | 'skip') {
+    setActing(id)
+    clearError(id)
     try {
       const headers = await authHeader()
       const res = await fetch('/api/ai-agent/review', {
@@ -78,14 +157,52 @@ export default function AiAgentReview() {
         body: JSON.stringify({ messageId: id, action, editedText: edits[id] }),
       })
       if (!res.ok) {
-        setErrors(prev => ({ ...prev, [id]: 'Не удалось выполнить действие. Попробуйте ещё раз.' }))
+        setError(id, 'Не удалось выполнить действие. Попробуйте ещё раз.')
         return
+      }
+      const data = await res.json()
+      // The approve handler just saved this reply as a reusable template --
+      // show the real trigger words it extracted (only when a template was
+      // actually created; a failed extraction shows nothing).
+      if (action === 'send' && Array.isArray(data.triggerWords) && data.triggerWords.length > 0) {
+        showToast(`Шаблон сохранён. Триггеры: ${data.triggerWords.join(', ')}`)
       }
       setItems(prev => prev.filter(i => i.id !== id))
     } catch {
-      setErrors(prev => ({ ...prev, [id]: 'Ошибка сети. Проверьте соединение и попробуйте ещё раз.' }))
+      setError(id, 'Ошибка сети. Проверьте соединение и попробуйте ещё раз.')
     } finally {
       setActing(null)
+    }
+  }
+
+  async function regenerate(id: string) {
+    setRegening(id)
+    clearError(id)
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/ai-agent/review/regenerate', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ messageId: id }),
+      })
+      if (!res.ok) {
+        setError(id, 'Не удалось сгенерировать вариант. Попробуйте ещё раз.')
+        return
+      }
+      const data = await res.json()
+      setItems(prev => prev.map(i => i.id === id
+        ? { ...i, text: data.replyText, urgent: !!data.urgent, regenCount: i.regenCount + 1 }
+        : i))
+      // Drop any manual edit -- the point of «Другой вариант» is a fresh draft.
+      setEdits(prev => {
+        const next = { ...prev }
+        delete next[id]
+        return next
+      })
+    } catch {
+      setError(id, 'Ошибка сети. Проверьте соединение и попробуйте ещё раз.')
+    } finally {
+      setRegening(null)
     }
   }
 
@@ -111,13 +228,20 @@ export default function AiAgentReview() {
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
       <SiteNav />
-      <div className="max-w-xl mx-auto p-4 lg:p-6 pb-24 lg:pb-6">
+      <div className="max-w-7xl mx-auto p-4 lg:p-6 pb-24 lg:pb-6">
         <motion.div
           initial={reduceMotion ? false : { opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE }}
         >
-          <h1 className="text-xl font-bold mb-1" style={{ color: 'var(--nav-text-primary)' }}>Диалоги на проверке</h1>
+          <div className="flex items-center gap-2.5 mb-1 flex-wrap">
+            <h1 className="text-xl font-bold" style={{ color: 'var(--nav-text-primary)' }}>Диалоги на проверке</h1>
+            {items.length > 0 && (
+              <span className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                На проверке: {items.length}
+              </span>
+            )}
+          </div>
           <p className="text-sm mb-6" style={{ color: 'var(--nav-text-secondary)' }}>Агент ещё обучается — черновики ответов ждут вашего одобрения</p>
         </motion.div>
 
@@ -125,42 +249,103 @@ export default function AiAgentReview() {
           <div className="text-sm text-center py-8" style={{ color: 'var(--nav-text-muted)' }}>Пока нечего проверять</div>
         )}
 
-        <div className="space-y-4">
-          {items.map((item, i) => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {items.map((item, i) => {
+            const channel = CHANNEL_META[item.channel] || CHANNEL_META.instagram
+            const ChannelIcon = channel.icon
+            const freeLeft = Math.max(0, FREE_REGENS - item.regenCount)
+            return (
             <motion.div
               key={item.id}
               initial={reduceMotion ? false : { opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE, delay: reduceMotion ? 0 : Math.min(i * 0.05, 0.3) }}
-              className="nav-glass rounded-2xl p-4"
+              className="nav-glass nav-card-accent rounded-2xl p-4 flex flex-col"
             >
               {item.urgent && (
                 <div className="text-xs font-medium mb-2 flex items-center gap-1.5" style={{ color: 'var(--nav-critical)' }}>
                   <AlertIcon /> Похоже на срочное/негатив
                 </div>
               )}
-              <div className="text-xs mb-2" style={{ color: 'var(--nav-text-muted)' }}>Клиент: {item.customerHandle}</div>
+              <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+                <span className="inline-flex items-center gap-1.5 nav-glass rounded-full px-2 py-1 text-[10.5px] font-bold" style={{ color: 'var(--nav-text-secondary)' }}>
+                  <ChannelIcon /> {channel.label}
+                </span>
+                <span className="text-xs truncate" style={{ color: 'var(--nav-text-muted)' }}>{item.customerHandle}</span>
+              </div>
+              {item.question && (
+                <div className="rounded-lg px-3 py-2 mb-3" style={{ background: 'var(--nav-bg)' }}>
+                  <div className="text-[10px] font-bold uppercase tracking-wide mb-1" style={{ color: 'var(--nav-text-muted)' }}>Вопрос клиента</div>
+                  <div className="text-sm max-h-24 overflow-y-auto" style={{ color: 'var(--nav-text-secondary)' }}>{item.question}</div>
+                </div>
+              )}
               <textarea
-                className="w-full rounded-lg px-3 py-2 text-sm mb-3 min-h-[80px] outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
+                className="w-full rounded-lg px-3 py-2 text-sm mb-2 min-h-[80px] outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
                 style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }}
                 value={edits[item.id] ?? item.text}
                 onChange={e => setEdits(prev => ({ ...prev, [item.id]: e.target.value }))}
               />
+              <div className="flex items-center gap-2 mb-1">
+                <button
+                  onClick={() => regenerate(item.id)}
+                  disabled={regening === item.id || acting === item.id}
+                  className="flex-1 nav-glass rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
+                  style={{ color: 'var(--nav-accent)' }}
+                >
+                  <SparklesIcon /> {regening === item.id ? 'Генерация…' : 'Другой вариант'}
+                </button>
+                <span ref={el => { hintRefs.current[item.id] = el }} className="relative flex items-center">
+                  <button
+                    type="button"
+                    onClick={() => setHintFor(v => v === item.id ? null : item.id)}
+                    className="transition-colors"
+                    style={{ color: hintFor === item.id ? 'var(--nav-text-primary)' : 'var(--nav-text-muted)' }}
+                    aria-label="Сколько стоят варианты ответа"
+                  >
+                    <InfoIcon />
+                  </button>
+                  {hintFor === item.id && (
+                    <div className="absolute right-0 top-[calc(100%+8px)] z-10 w-60 rounded-xl p-3 text-xs leading-relaxed"
+                      style={{ background: 'var(--nav-surface-chrome)', color: 'var(--nav-text-secondary)', boxShadow: '0 20px 44px -18px rgba(10,10,15,0.35)' }}>
+                      Первые 3 варианта — бесплатно, дальше 5 ₸ за генерацию. Списывается с единого кошелька.
+                    </div>
+                  )}
+                </span>
+              </div>
+              <div className="text-[11px] mb-2" style={{ color: 'var(--nav-text-muted)' }}>
+                {freeLeft > 0 ? `осталось ${freeLeft} из ${FREE_REGENS} бесплатных` : 'бесплатные закончились — 5 ₸ за вариант'}
+              </div>
+              <div className="text-[11px] leading-relaxed mb-3" style={{ color: 'var(--nav-text-muted)' }}>
+                После отправки ответ станет шаблоном — похожие вопросы (по ключевым словам) получат его бесплатно и мгновенно
+              </div>
               {errors[item.id] && <div className="text-xs mb-2" style={{ color: 'var(--nav-critical)' }}>{errors[item.id]}</div>}
-              <div className="flex gap-2">
-                <button onClick={() => act(item.id, 'send')} disabled={acting === item.id}
+              <div className="flex gap-2 mt-auto">
+                <button onClick={() => act(item.id, 'send')} disabled={acting === item.id || regening === item.id}
                   className="flex-1 rounded-lg px-3 py-2 text-sm font-medium disabled:opacity-50" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                   Отправить
                 </button>
-                <button onClick={() => act(item.id, 'skip')} disabled={acting === item.id}
+                <button onClick={() => act(item.id, 'skip')} disabled={acting === item.id || regening === item.id}
                   className="flex-1 nav-glass rounded-lg px-3 py-2 text-sm font-medium disabled:opacity-50" style={{ color: 'var(--nav-text-secondary)' }}>
                   Пропустить
                 </button>
               </div>
             </motion.div>
-          ))}
+            )
+          })}
         </div>
       </div>
+
+      {toast && (
+        <motion.div
+          initial={reduceMotion ? false : { opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: reduceMotion ? 0 : 0.25, ease: EASE }}
+          className="fixed bottom-24 lg:bottom-6 left-1/2 -translate-x-1/2 z-50 nav-glass rounded-xl px-4 py-3 text-sm font-medium max-w-[90vw]"
+          style={{ color: 'var(--nav-text-primary)', boxShadow: 'var(--nav-card-glow)' }}
+        >
+          {toast}
+        </motion.div>
+      )}
     </main>
     </DesktopShell>
   )

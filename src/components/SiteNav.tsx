@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
+import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { useLanguage, type Lang } from './LanguageProvider'
 
@@ -18,7 +19,6 @@ const lockedMessages: Record<Lang, string> = {
   en: 'Coming soon for everyone',
 }
 
-type MenuKey = 'invoices' | 'kaspiShop' | 'aiAgent' | 'kaspiApi'
 type LocalizedLabel = Record<Lang, string>
 
 const invoicesLinks: { href: string; label: LocalizedLabel }[] = [
@@ -26,9 +26,6 @@ const invoicesLinks: { href: string; label: LocalizedLabel }[] = [
   { href: '/history', label: { ru: 'История', kk: 'Тарих', en: 'History' } },
   { href: '/profile/templates', label: { ru: 'Шаблоны', kk: 'Үлгілер', en: 'Templates' } },
 ]
-// /dashboard stays in the dropdown but doesn't light Счета's underline --
-// the top-level Главная button owns that route (both were underlining at once).
-const invoicesActiveLinks = invoicesLinks.filter(l => l.href !== '/dashboard')
 
 const kaspiShopLinks: { href: string; label: LocalizedLabel }[] = [
   { href: '/kaspi-shop', label: { ru: 'Демпинг', kk: 'Демпинг', en: 'Repricer' } },
@@ -43,6 +40,7 @@ const aiAgentLinks: { href: string; label: LocalizedLabel }[] = [
   { href: '/ai-agent', label: { ru: 'Агенты', kk: 'Агенттер', en: 'Agents' } },
   { href: '/ai-agent/review', label: { ru: 'Диалоги', kk: 'Диалогтар', en: 'Conversations' } },
   { href: '/ai-agent/test-chat', label: { ru: 'Тестовый чат', kk: 'Сынақ чаты', en: 'Test chat' } },
+  { href: '/ai-agent/broadcasts', label: { ru: 'Рассылки', kk: 'Таратылымдар', en: 'Broadcasts' } },
   { href: '/ai-agent/analytics', label: { ru: 'Аналитика', kk: 'Аналитика', en: 'Analytics' } },
   { href: '/ai-agent/settings', label: { ru: 'Настройки', kk: 'Баптаулар', en: 'Settings' } },
   { href: '/ai-agent/docs', label: { ru: 'Как настроить', kk: 'Қалай баптау керек', en: 'Setup guide' } },
@@ -54,6 +52,25 @@ const aiAgentLinks: { href: string; label: LocalizedLabel }[] = [
 const kaspiApiLinks: { href: string; label: LocalizedLabel }[] = [
   { href: '/kaspi-api', label: { ru: 'Подключение', kk: 'Қосылу', en: 'Setup' } },
   { href: '/kaspi-api/docs', label: { ru: 'Документация API', kk: 'API құжаттамасы', en: 'API docs' } },
+]
+
+// Second-row sub-navigation (2026-08-20, founder: dropdowns were "тяжело
+// выбирать" -- replaced with a persistent second tab row that stays open on
+// every page of the active section, MoonAI/NestedTabs-style). Each section:
+// a top-level button (click = go to the section's first page) + its links
+// rendered as pill tabs in a second bar whenever the current path belongs
+// to the section.
+type Section = {
+  key: 'invoices' | 'kaspiApi' | 'kaspiShop' | 'aiAgent'
+  links: { href: string; label: LocalizedLabel }[]
+  adminOnly: boolean
+}
+
+const SECTIONS: Section[] = [
+  { key: 'invoices', links: invoicesLinks, adminOnly: false },
+  { key: 'kaspiApi', links: kaspiApiLinks, adminOnly: false },
+  { key: 'kaspiShop', links: kaspiShopLinks, adminOnly: true },
+  { key: 'aiAgent', links: aiAgentLinks, adminOnly: true },
 ]
 
 function LockIcon({ size = 10 }: { size?: number }) {
@@ -69,100 +86,11 @@ function isActiveSection(links: { href: string }[], path: string) {
   return links.some(l => path === l.href || path.startsWith(l.href + '/'))
 }
 
-function Dropdown({
-  menuKey, label, links, dotColor, openMenu, setOpenMenu, router, path, lang,
-  locked = false, lockedHintOpen = false, onLockedClick, activeLinks,
-}: {
-  menuKey: MenuKey
-  label: string
-  links: { href: string; label: LocalizedLabel }[]
-  dotColor: string
-  openMenu: MenuKey | null
-  setOpenMenu: (key: MenuKey | null) => void
-  router: ReturnType<typeof useRouter>
-  path: string
-  lang: Lang
-  locked?: boolean
-  lockedHintOpen?: boolean
-  onLockedClick?: () => void
-  // Routes counted for the active underline; defaults to `links`. Lets a
-  // section list a route in its dropdown without claiming it as "its own"
-  // when a top-level button (Главная = /dashboard) already owns that route.
-  activeLinks?: { href: string }[]
-}) {
-  const active = !locked && isActiveSection(activeLinks ?? links, path)
-  const open = !locked && openMenu === menuKey
-  return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation()
-          if (locked) { onLockedClick?.(); return }
-          setOpenMenu(open ? null : menuKey)
-        }}
-        aria-expanded={open}
-        aria-disabled={locked}
-        className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-colors"
-        style={{
-          color: active ? 'var(--nav-text-primary)' : 'var(--nav-text-secondary)',
-          background: open ? 'var(--nav-surface-glass)' : 'transparent',
-          boxShadow: active ? `inset 0 -2px 0 var(--nav-accent)` : 'none',
-          opacity: locked ? 0.6 : 1,
-          cursor: locked ? 'not-allowed' : 'pointer',
-        }}
-      >
-        {label}
-        {locked ? (
-          <LockIcon />
-        ) : (
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s ease' }}>
-            <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        )}
-      </button>
-      {open && (
-        <div
-          className="nav-glass absolute top-[calc(100%+10px)] left-0 min-w-[210px] rounded-2xl p-1.5 z-20"
-          style={{ boxShadow: `0 20px 44px -18px rgba(10,10,15,0.3), var(--nav-card-glow)` }}
-        >
-          {links.map(l => {
-            const linkActive = path === l.href
-            return (
-              <button
-                key={l.href}
-                onClick={() => { setOpenMenu(null); router.push(l.href) }}
-                className="w-full text-left flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors"
-                style={{
-                  color: linkActive ? 'var(--nav-accent)' : 'var(--nav-text-secondary)',
-                  background: linkActive ? 'var(--nav-accent-soft)' : 'transparent',
-                }}
-              >
-                <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: linkActive ? dotColor : 'transparent' }} />
-                {l.label[lang]}
-              </button>
-            )
-          })}
-        </div>
-      )}
-      {locked && lockedHintOpen && (
-        <div
-          className="nav-glass absolute top-[calc(100%+10px)] left-0 whitespace-nowrap px-3 py-2 rounded-xl text-xs font-medium z-20"
-          style={{ color: 'var(--nav-text-primary)', boxShadow: `0 20px 44px -18px rgba(10,10,15,0.3), var(--nav-card-glow)` }}
-        >
-          {lockedMessages[lang]}
-        </div>
-      )}
-    </div>
-  )
-}
-
 export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean }) {
   const router = useRouter()
   const path = usePathname()
   const { lang } = useLanguage()
   const [isAdmin, setIsAdmin] = useState(false)
-  const [openMenu, setOpenMenu] = useState<MenuKey | null>(null)
   const [lockedHint, setLockedHint] = useState<string | null>(null)
   const navRef = useRef<HTMLElement>(null)
   const lockedHintTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -172,12 +100,6 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
     if (lockedHintTimeout.current) clearTimeout(lockedHintTimeout.current)
     lockedHintTimeout.current = setTimeout(() => setLockedHint(null), 2200)
   }
-
-  // Unpaid-invoice count used to live-query here and show as a permanent
-  // nav pill/badge. Replaced by the daily cron bell summary (see
-  // src/app/api/cron/notifications/route.ts) -- one source of truth,
-  // refreshed once a day, instead of a live count computed on every route
-  // change.
 
   useEffect(() => {
     async function loadAdmin() {
@@ -189,20 +111,10 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
     loadAdmin()
   }, [])
 
-  useEffect(() => {
-    function onOutsideClick(e: MouseEvent) {
-      if (navRef.current && !navRef.current.contains(e.target as Node)) setOpenMenu(null)
-    }
-    function onEscape(e: KeyboardEvent) {
-      if (e.key === 'Escape') setOpenMenu(null)
-    }
-    document.addEventListener('click', onOutsideClick)
-    document.addEventListener('keydown', onEscape)
-    return () => {
-      document.removeEventListener('click', onOutsideClick)
-      document.removeEventListener('keydown', onEscape)
-    }
-  }, [])
+  // The section the current path belongs to -- its links become the second
+  // tab row. /dashboard belongs to no section (top-level Дашборд owns it),
+  // so the second row simply doesn't render there.
+  const activeSection = SECTIONS.find(s => isActiveSection(s.links, path)) || null
 
   return (
     <>
@@ -262,56 +174,107 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
         </div>
       )}
 
-      {/* Desktop: sticky top bar */}
+      {/* Desktop: sticky top bar (row 1: sections, row 2: active section's pages) */}
       <nav
         ref={navRef}
-        className="hidden lg:flex items-center gap-1 sticky top-0 z-30 px-7 py-3.5 nav-glass"
+        className="hidden lg:block sticky top-0 z-30 nav-glass"
         style={{ borderLeft: 'none', borderRight: 'none', borderTop: 'none' }}
       >
-        {/* Always the invoices.kz brand mark here (2026-08-19, founder:
-            "тут надо поставить лого invoices.kz") -- the user's uploaded
-            company logo used to render in this slot, which read as the
-            wrong identity for the platform's own nav. /icon.svg is the
-            same IK mark used for the favicon/PWA icons. */}
-        <button onClick={() => router.push('/dashboard')} className="flex items-center gap-2 mr-5 flex-shrink-0">
-          <img
-            src="/icon.svg"
-            alt=""
-            className="w-6 h-6 rounded-lg"
-            style={{ boxShadow: '0 6px 14px -6px var(--nav-accent)' }}
-          />
-          <span className="font-semibold text-sm" style={{ color: 'var(--nav-text-primary)', letterSpacing: '-0.02em' }}>invoices.kz</span>
-        </button>
+        <div className="flex items-center gap-1 px-7 py-3.5">
+          {/* Always the invoices.kz brand mark here (2026-08-19, founder:
+              "тут надо поставить лого invoices.kz") -- /icon.svg is the
+              same IK mark used for the favicon/PWA icons. */}
+          <button onClick={() => router.push('/dashboard')} className="flex items-center gap-2 mr-5 flex-shrink-0">
+            <img
+              src="/icon.svg"
+              alt=""
+              className="w-6 h-6 rounded-lg"
+              style={{ boxShadow: '0 6px 14px -6px var(--nav-accent)' }}
+            />
+            <span className="font-semibold text-sm" style={{ color: 'var(--nav-text-primary)', letterSpacing: '-0.02em' }}>invoices.kz</span>
+          </button>
 
-        <button
-          onClick={() => router.push('/dashboard')}
-          className="px-3 py-2 rounded-lg text-sm font-semibold transition-colors"
-          style={{
-            color: path === '/dashboard' ? 'var(--nav-text-primary)' : 'var(--nav-text-secondary)',
-            boxShadow: path === '/dashboard' ? `inset 0 -2px 0 var(--nav-accent)` : 'none',
-          }}
-        >
-          {labels[lang].home}
-        </button>
+          <button
+            onClick={() => router.push('/dashboard')}
+            className="px-3 py-2 rounded-lg text-sm font-semibold transition-colors"
+            style={{
+              color: path === '/dashboard' ? 'var(--nav-text-primary)' : 'var(--nav-text-secondary)',
+              boxShadow: path === '/dashboard' ? `inset 0 -2px 0 var(--nav-accent)` : 'none',
+            }}
+          >
+            {labels[lang].home}
+          </button>
 
-        <Dropdown menuKey="invoices" label={labels[lang].invoices} links={invoicesLinks} activeLinks={invoicesActiveLinks} dotColor="var(--nav-accent)" openMenu={openMenu} setOpenMenu={setOpenMenu} router={router} path={path} lang={lang} />
-        <Dropdown menuKey="kaspiApi" label={labels[lang].kaspiApi} links={kaspiApiLinks} dotColor="var(--nav-accent)" openMenu={openMenu} setOpenMenu={setOpenMenu} router={router} path={path} lang={lang} />
-        <Dropdown
-          menuKey="kaspiShop" label={labels[lang].kaspiShop} links={kaspiShopLinks} dotColor="var(--nav-teal)"
-          openMenu={openMenu} setOpenMenu={setOpenMenu} router={router} path={path} lang={lang}
-          locked={!isAdmin} lockedHintOpen={lockedHint === 'desktop-kaspiShop'} onLockedClick={() => showLockedHint('desktop-kaspiShop')}
-        />
-        <Dropdown
-          menuKey="aiAgent" label={labels[lang].aiAgent} links={aiAgentLinks} dotColor="var(--nav-magenta)"
-          openMenu={openMenu} setOpenMenu={setOpenMenu} router={router} path={path} lang={lang}
-          locked={!isAdmin} lockedHintOpen={lockedHint === 'desktop-aiAgent'} onLockedClick={() => showLockedHint('desktop-aiAgent')}
-        />
+          {SECTIONS.map(s => {
+            const locked = s.adminOnly && !isAdmin
+            const active = !locked && activeSection?.key === s.key
+            return (
+              <div key={s.key} className="relative">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (locked) { showLockedHint(`desktop-${s.key}`); return }
+                    router.push(s.links[0].href)
+                  }}
+                  aria-disabled={locked}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-colors"
+                  style={{
+                    color: active ? 'var(--nav-text-primary)' : 'var(--nav-text-secondary)',
+                    boxShadow: active ? `inset 0 -2px 0 var(--nav-accent)` : 'none',
+                    opacity: locked ? 0.6 : 1,
+                    cursor: locked ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  {labels[lang][s.key]}
+                  {locked && <LockIcon />}
+                </button>
+                {locked && lockedHint === `desktop-${s.key}` && (
+                  <div
+                    className="nav-glass absolute top-[calc(100%+10px)] left-0 whitespace-nowrap px-3 py-2 rounded-xl text-xs font-medium z-20"
+                    style={{ color: 'var(--nav-text-primary)', boxShadow: `0 20px 44px -18px rgba(10,10,15,0.3), var(--nav-card-glow)` }}
+                  >
+                    {lockedMessages[lang]}
+                  </div>
+                )}
+              </div>
+            )
+          })}
 
-        <div className="flex-1" />
-        {/* TopUtilityBar renders its own wallet/notifications/account trigger buttons
-            fixed at lg:top-3 right-3 (see Task 5) — visually aligned with this bar's
-            height, intentionally not rendered inside this <nav> to avoid touching its
-            working fetch/panel logic in this phase. */}
+          <div className="flex-1" />
+          {/* TopUtilityBar renders its own wallet/notifications/account trigger
+              buttons fixed at lg:top-[21px] right-6 — aligned with THIS first
+              row's height; intentionally not rendered inside this <nav>. */}
+        </div>
+
+        {/* Row 2: the active section's pages as persistent pill tabs. Stays
+            visible on every page of the section (no dropdown to reopen). */}
+        {activeSection && (
+          <div className="flex items-center gap-1.5 px-7 pb-2.5 -mt-1 overflow-x-auto">
+            {activeSection.links.map(l => {
+              const linkActive = path === l.href || path.startsWith(l.href + '/')
+              return (
+                <button
+                  key={l.href}
+                  onClick={() => router.push(l.href)}
+                  className="relative px-3 py-1.5 rounded-full text-[13px] font-medium whitespace-nowrap flex-shrink-0 transition-colors"
+                  style={{
+                    color: linkActive ? 'var(--nav-accent-ink)' : 'var(--nav-text-secondary)',
+                  }}
+                >
+                  {linkActive && (
+                    <motion.span
+                      layoutId="siteNavSubTab"
+                      className="absolute inset-0 rounded-full"
+                      style={{ background: 'var(--nav-accent)' }}
+                      transition={{ type: 'spring', stiffness: 400, damping: 34 }}
+                    />
+                  )}
+                  <span className="relative">{l.label[lang]}</span>
+                </button>
+              )
+            })}
+          </div>
+        )}
       </nav>
     </>
   )
