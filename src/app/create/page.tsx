@@ -216,8 +216,11 @@ export default function CreateInvoicePage() {
     // client (clearClient) doesn't stick: browser back navigation, or even
     // just switching tabs and back (the focus listener below re-runs load()),
     // re-reads the same still-present query param and silently reapplies the
-    // prefill the user just removed.
-    if (templateId || repeatId) router.replace('/create')
+    // prefill the user just removed. router.replace() (next/navigation) was
+    // tried first but silently didn't touch window.location.search here --
+    // going straight to the History API instead, which is all this needs
+    // (no server re-fetch, just a client-side URL cleanup).
+    if (templateId || repeatId) window.history.replaceState(null, '', '/create')
   }, [router])
 
   useEffect(() => {
