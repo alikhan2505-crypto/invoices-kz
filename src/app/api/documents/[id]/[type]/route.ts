@@ -41,6 +41,8 @@ export async function GET(
     label = (contract?.title || id).replace(/[^a-zA-Z0-9-]/g, '_')
   }
   const filename = type === 'card' ? `Card-${label}.pdf` : `Schet-${label}.pdf`
+  const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+  const safeFilename = escapeHtml(filename)
 
   const fileRes = await fetch(sourceUrl)
   if (!fileRes.ok) return NextResponse.json({ error: 'Source fetch failed' }, { status: 502 })
@@ -56,12 +58,12 @@ export async function GET(
 <html>
 <head>
 <meta charset="utf-8">
-<title>${filename}</title>
+<title>${safeFilename}</title>
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
 <style>html,body{margin:0;height:100%;background:#525659}iframe{border:0;width:100%;height:100%}</style>
 </head>
 <body>
-<iframe src="data:application/pdf;base64,${base64}" title="${filename}"></iframe>
+<iframe src="data:application/pdf;base64,${base64}" title="${safeFilename}"></iframe>
 </body>
 </html>`
 
