@@ -103,12 +103,17 @@ export default function AiAgentSettings() {
   const [showCustomInput, setShowCustomInput] = useState(false)
   const [timezone, setTimezone] = useState('Asia/Almaty')
   const [currency, setCurrency] = useState('KZT')
+  const [customInstructions, setCustomInstructions] = useState('')
+  const [historyPairs, setHistoryPairs] = useState(5)
   const [creating, setCreating] = useState(false)
   const [createCountdown, setCreateCountdown] = useState(0)
   const createTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const [agentId, setAgentId] = useState<string | null>(null)
   const [connections, setConnections] = useState<{ channel: string; external_account_name: string | null; status: string }[]>([])
   const [connecting, setConnecting] = useState(false)
+  const [telegramToken, setTelegramToken] = useState('')
+  const [tgBusy, setTgBusy] = useState(false)
+  const [tgError, setTgError] = useState<string | null>(null)
   const [oauthNotice, setOauthNotice] = useState<'connected' | 'error' | null>(null)
   const [forbidden, setForbidden] = useState(false)
 
@@ -170,6 +175,8 @@ export default function AiAgentSettings() {
           if (Array.isArray(data.agent.collectFields)) setCollectFields(data.agent.collectFields)
           if (data.agent.timezone) setTimezone(data.agent.timezone)
           if (data.agent.currency) setCurrency(data.agent.currency)
+          if (typeof data.agent.customInstructions === 'string') setCustomInstructions(data.agent.customInstructions)
+          if (typeof data.agent.historyPairs === 'number') setHistoryPairs(data.agent.historyPairs)
           setConnections(data.connections || [])
         } else {
           setName(data.suggestedName || 'Ассистент')
@@ -213,7 +220,7 @@ export default function AiAgentSettings() {
       method: 'POST',
       headers,
       // agentId present -> UPDATE that agent; absent -> CREATE a new one.
-      body: JSON.stringify({ ...(agentId ? { agentId } : {}), name, tone, businessDescription, goal, collectFields, timezone, currency }),
+      body: JSON.stringify({ ...(agentId ? { agentId } : {}), name, tone, businessDescription, goal, collectFields, timezone, currency, customInstructions, historyPairs }),
     })
     if (res.ok) {
       const data = await res.json()
@@ -256,6 +263,59 @@ export default function AiAgentSettings() {
     }
   }
 
+  // No OAuth dance for Telegram -- the pasted BotFather token IS the
+  // credential, so connect is a plain authorized POST and the result can be
+  // reflected in local state immediately (no redirect round-trip).
+  async function connectTelegram() {
+    const token = telegramToken.trim()
+    if (!token || !agentId) return
+    setTgBusy(true)
+    setTgError(null)
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/ai-agent/telegram/connect', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ agentId, botToken: token }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setConnections(prev => [...prev.filter(c => c.channel !== 'telegram'), { channel: 'telegram', external_account_name: data.botUsername, status: 'active' }])
+        setTelegramToken('')
+      } else {
+        const data = await res.json().catch(() => null)
+        setTgError(data?.error === 'invalid_token'
+          ? 'Токен не подошёл — проверьте, что скопировали его из @BotFather целиком.'
+          : 'Не удалось подключить Telegram. Попробуйте ещё раз — если не получится снова, напишите в поддержку.')
+      }
+    } catch {
+      setTgError('Не удалось подключить Telegram. Попробуйте ещё раз — если не получится снова, напишите в поддержку.')
+    }
+    setTgBusy(false)
+  }
+
+  async function disconnectTelegram() {
+    if (!agentId) return
+    setTgBusy(true)
+    setTgError(null)
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/ai-agent/telegram/connect', {
+        method: 'DELETE',
+        headers,
+        body: JSON.stringify({ agentId }),
+      })
+      if (res.ok) {
+        setConnections(prev => prev.filter(c => c.channel !== 'telegram'))
+      } else {
+        setTgError('Не удалось отключить Telegram. Попробуйте ещё раз.')
+      }
+    } catch {
+      setTgError('Не удалось отключить Telegram. Попробуйте ещё раз.')
+    }
+    setTgBusy(false)
+  }
+
   if (loading) return (
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
@@ -275,6 +335,7 @@ export default function AiAgentSettings() {
   )
 
   const instagramConnection = connections.find(c => c.channel === 'instagram')
+  const telegramConnection = connections.find(c => c.channel === 'telegram')
 
   return (
     <DesktopShell>
@@ -426,6 +487,31 @@ export default function AiAgentSettings() {
             </label>
           </div>
 
+          <label className="block mb-4">
+            <span className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>Дополнительные инструкции (необязательно)</span>
+            <textarea
+              className="w-full rounded-lg px-3 py-2 text-sm min-h-[70px] outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
+              style={{ color: 'var(--nav-text-primary)' }}
+              maxLength={2000}
+              placeholder="Например: не обещай скидки; доставка только по Алматы; рабочие часы 9:00–18:00"
+              value={customInstructions} onChange={e => setCustomInstructions(e.target.value)} />
+            <span className="text-[11px] mt-1 block" style={{ color: 'var(--nav-text-muted)' }}>
+              Агент будет следовать этим правилам в каждом ответе.
+            </span>
+          </label>
+
+          <label className="block mb-6">
+            <span className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>Глубина памяти диалога</span>
+            <select value={historyPairs} onChange={e => setHistoryPairs(Number(e.target.value))}
+              className="w-full rounded-lg px-3 py-2 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
+              style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-surface-chrome)' }}>
+              {[3, 5, 8, 10].map(n => <option key={n} value={n}>Последние {n} обменов</option>)}
+            </select>
+            <span className="text-[11px] mt-1 block" style={{ color: 'var(--nav-text-muted)' }}>
+              Сколько прошлых сообщений агент помнит. Больше — точнее контекст, но дороже каждый ответ.
+            </span>
+          </label>
+
           <button onClick={save} disabled={saving}
             className="w-full rounded-lg px-4 py-3 text-sm font-semibold transition-transform hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0"
             style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)', boxShadow: '0 10px 24px -10px var(--nav-accent)' }}>
@@ -470,6 +556,50 @@ export default function AiAgentSettings() {
                   className="w-full nav-glass rounded-lg px-4 py-3 text-sm font-medium disabled:opacity-50" style={{ color: 'var(--nav-text-primary)' }}>
                   {connecting ? 'Открываем Instagram…' : 'Подключить Instagram'}
                 </button>
+              )}
+            </div>
+          )}
+
+          {agentId && (
+            <div className="mt-4 pt-4" style={{ borderTop: '1px solid var(--nav-border-soft)' }}>
+              <span className="text-xs mb-2 block" style={{ color: 'var(--nav-text-secondary)' }}>Telegram-бот</span>
+              {telegramConnection?.status === 'active' ? (
+                <>
+                  <div className="text-sm mb-3 flex items-center gap-1.5" style={{ color: 'var(--nav-success)' }}>
+                    <CheckCircleIcon /> Подключено: @{telegramConnection.external_account_name || 'бот'}
+                  </div>
+                  <button onClick={disconnectTelegram} disabled={tgBusy}
+                    className="w-full nav-glass rounded-lg px-4 py-2.5 text-sm font-medium disabled:opacity-50"
+                    style={{ color: 'var(--nav-text-primary)' }}>
+                    {tgBusy ? 'Отключаем…' : 'Отключить'}
+                  </button>
+                </>
+              ) : (
+                <>
+                  {telegramConnection?.status === 'token_expired' && (
+                    <div className="text-sm mb-2 flex items-center gap-1.5" style={{ color: 'var(--nav-critical)' }}>
+                      <WarnIcon /> Telegram-бот отключился — вставьте токен ещё раз, чтобы агент снова отвечал
+                    </div>
+                  )}
+                  <p className="text-xs mb-2" style={{ color: 'var(--nav-text-muted)' }}>
+                    Создайте бота через @BotFather и вставьте токен — агент начнёт отвечать на сообщения в этом боте
+                  </p>
+                  <input
+                    className="w-full rounded-lg px-3 py-2 text-sm mb-2 outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
+                    style={{ color: 'var(--nav-text-primary)' }}
+                    placeholder="123456789:AAH3xk…"
+                    autoComplete="off"
+                    value={telegramToken}
+                    onChange={e => setTelegramToken(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') connectTelegram() }} />
+                  <button onClick={connectTelegram} disabled={tgBusy || !telegramToken.trim()}
+                    className="w-full nav-glass rounded-lg px-4 py-3 text-sm font-medium disabled:opacity-50" style={{ color: 'var(--nav-text-primary)' }}>
+                    {tgBusy ? 'Подключаем…' : 'Подключить Telegram'}
+                  </button>
+                </>
+              )}
+              {tgError && (
+                <div className="text-xs mt-2" style={{ color: 'var(--nav-critical)' }}>{tgError}</div>
               )}
             </div>
           )}

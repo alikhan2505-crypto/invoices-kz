@@ -167,7 +167,11 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
         pendingIncoming = null
       }
     }
-    if (pairs.length > 0) conversationHistory = pairs.slice(-5)
+    // Depth is owner-configurable per agent (Контроль / "Глубина памяти
+    // диалога", ai_agents.history_pairs, default 5) -- more pairs = better
+    // context but a costlier prompt on every reply.
+    const historyPairs = typeof agent.history_pairs === 'number' && agent.history_pairs >= 1 ? agent.history_pairs : 5
+    if (pairs.length > 0) conversationHistory = pairs.slice(-historyPairs)
   }
 
   // No template -- generate an AI reply.
@@ -187,6 +191,7 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
         collectFields: Array.isArray(agent.collect_fields) ? agent.collect_fields : undefined,
         timezone: agent.timezone || undefined,
         currency: agent.currency || undefined,
+        customInstructions: typeof agent.custom_instructions === 'string' ? agent.custom_instructions : undefined,
       }),
     })
     draftReply = result.replyText
@@ -259,8 +264,9 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
 // instagram_reply_templates's row shape; this is the same algorithm
 // against ai_agent_reply_templates's identical trigger_words/reply_text
 // shape. If instagramReplyMatch.ts's matching logic ever changes, mirror
-// the change here too.
-function findTemplateMatch(text: string, templates: { id: string; trigger_words: string[]; reply_text: string }[]): { id: string; reply_text: string } | null {
+// the change here too. Exported (2026-08-20) so the Telegram tenant path
+// (telegramWebhookHandler.ts) matches templates with the exact same rule.
+export function findTemplateMatch(text: string, templates: { id: string; trigger_words: string[]; reply_text: string }[]): { id: string; reply_text: string } | null {
   const lower = text.toLowerCase()
   for (const t of templates) {
     if (t.trigger_words.some(w => lower.includes(w.toLowerCase()))) {

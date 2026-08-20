@@ -77,6 +77,8 @@ export async function GET(req: NextRequest) {
       collectFields: Array.isArray(agent.collect_fields) ? agent.collect_fields : [],
       timezone: agent.timezone || 'Asia/Almaty',
       currency: agent.currency || 'KZT',
+      customInstructions: agent.custom_instructions || '',
+      historyPairs: typeof agent.history_pairs === 'number' ? agent.history_pairs : 5,
       status: agent.status,
     } : null,
     suggestedName: profile?.company_name || '',
@@ -99,9 +101,12 @@ export async function POST(req: NextRequest) {
   if (!(await isAdmin(user.id))) return NextResponse.json({ error: 'admin_only' }, { status: 403 })
 
   const body = await req.json()
-  const { agentId, name, tone, businessDescription, goal, collectFields, timezone, currency } = body
+  const { agentId, name, tone, businessDescription, goal, collectFields, timezone, currency, customInstructions, historyPairs } = body
 
   if (agentId !== undefined && typeof agentId !== 'string') return NextResponse.json({ error: 'invalid agentId' }, { status: 400 })
+  if (historyPairs !== undefined && (typeof historyPairs !== 'number' || historyPairs < 1 || historyPairs > 10)) {
+    return NextResponse.json({ error: 'invalid historyPairs' }, { status: 400 })
+  }
 
   if (!name || typeof name !== 'string') return NextResponse.json({ error: 'name required' }, { status: 400 })
   if (!VALID_TONES.includes(tone)) return NextResponse.json({ error: 'invalid tone' }, { status: 400 })
@@ -132,6 +137,10 @@ export async function POST(req: NextRequest) {
     collect_phone: fields.includes('phone'),
     timezone: timezone || 'Asia/Almaty',
     currency: currency || 'KZT',
+    // Free-text prompt addendum -- capped hard since it's interpolated into
+    // every LLM call (longer text = higher per-reply token cost).
+    custom_instructions: typeof customInstructions === 'string' ? customInstructions.slice(0, 2000) : '',
+    history_pairs: typeof historyPairs === 'number' ? Math.round(historyPairs) : 5,
   }
 
   let agent: any = null

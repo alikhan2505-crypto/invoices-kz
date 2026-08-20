@@ -35,6 +35,13 @@ export interface BusinessContext {
   collectFields?: string[]
   timezone?: string
   currency?: string
+  // Which channel the agent is replying on. Optional with 'instagram' as
+  // the effective default so the LIVE Instagram tenant path (which does not
+  // pass it) keeps producing a byte-for-byte identical prompt line.
+  channel?: 'instagram' | 'telegram'
+  // Free-text owner instructions (ai_agents.custom_instructions), appended
+  // verbatim at the end of the line. Optional: absent/empty adds nothing.
+  customInstructions?: string
 }
 
 const TONE_LABELS: Record<AgentTone, string> = {
@@ -57,7 +64,8 @@ const GOAL_LABELS: Record<AgentGoal, string> = {
 // generateAiReply instead, so this function changing never affects it.
 export function buildBusinessContextLine(ctx: BusinessContext): string {
   const desc = ctx.description.trim()
-  let line = `Ты отвечаешь от имени бизнес-аккаунта в Instagram (${ctx.name}${desc ? ' — ' + desc : ''}). Твой стиль общения: ${TONE_LABELS[ctx.tone]}. Твоя основная задача: ${GOAL_LABELS[ctx.goal]}.`
+  const channelLabel = ctx.channel === 'telegram' ? 'Telegram' : 'Instagram'
+  let line = `Ты отвечаешь от имени бизнес-аккаунта в ${channelLabel} (${ctx.name}${desc ? ' — ' + desc : ''}). Твой стиль общения: ${TONE_LABELS[ctx.tone]}. Твоя основная задача: ${GOAL_LABELS[ctx.goal]}.`
 
   const fields = (ctx.collectFields || []).map(f => COLLECT_FIELD_LABELS[f] || f).filter(Boolean)
   if (fields.length > 0) {
@@ -68,6 +76,10 @@ export function buildBusinessContextLine(ctx: BusinessContext): string {
   }
   if (ctx.timezone) {
     line += ` Часовой пояс бизнеса: ${ctx.timezone}.`
+  }
+  const custom = ctx.customInstructions?.trim()
+  if (custom) {
+    line += ` Дополнительные инструкции от владельца бизнеса (следуй им): ${custom}`
   }
   return line
 }

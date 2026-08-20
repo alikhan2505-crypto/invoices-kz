@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { decryptAtRest } from '@/lib/kaspiPay/crypto'
 import { getKey } from '@/lib/aiAgent/connection'
 import { replyToComment, sendDirectMessage, InstagramApiError } from '@/lib/instagram'
+import { sendTelegramBotMessage, TelegramApiError } from '@/lib/aiAgent/telegram'
 import { shouldExitTraining } from '@/lib/aiAgent/trainingStatus'
 import { debitAiAgentWallet, AI_AGENT_CREDITS_PER_AI_REPLY } from '@/lib/aiAgent/wallet'
 
@@ -137,14 +138,20 @@ export async function POST(req: NextRequest) {
         // source column on ai_agent_conversations (or ai_agent_messages)
         // to pick the right send function.
         await sendDirectMessage(conversation.external_thread_id, finalText, { igUserId: connection.external_account_id, accessToken })
+      } else if (conversation.channel === 'telegram') {
+        // For telegram rows access_token_enc holds the encrypted BotFather
+        // token (same column, same encryption -- see telegram/connect) and
+        // external_thread_id is the Telegram chat.id.
+        await sendTelegramBotMessage(accessToken, conversation.external_thread_id, finalText)
       }
     } catch (e: any) {
       console.error('ai-agent review: send failed for message', messageId, ':', e.message)
       // Same 401 -> token_expired marker as the webhook path (Task 8) --
       // per the design spec's error-handling section, a dead token surfaces
       // as a reconnect banner on the settings page (Task 6), not a retry
-      // loop against a token that will never work again.
-      if (e instanceof InstagramApiError && e.status === 401) {
+      // loop against a token that will never work again. A Telegram 401
+      // means the bot token was revoked via BotFather -- same treatment.
+      if ((e instanceof InstagramApiError && e.status === 401) || (e instanceof TelegramApiError && e.status === 401)) {
         await supabase.from('ai_agent_channel_connections').update({ status: 'token_expired' }).eq('id', connection.id)
       }
       return NextResponse.json({ error: 'send_failed' }, { status: 502 })

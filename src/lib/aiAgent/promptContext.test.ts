@@ -57,4 +57,16 @@ describe('buildBusinessContextLine', () => {
   it('skips the currency sentence for an unknown currency code', () => {
     expect(buildBusinessContextLine({ name: 'X', tone: 'friendly', description: '', goal: 'answer_questions', currency: 'XYZ' })).not.toContain('валюте')
   })
+
+  it('defaults to the Instagram channel wording when channel is omitted (live Instagram path unchanged)', () => {
+    const line = buildBusinessContextLine({ name: 'X', tone: 'friendly', description: '', goal: 'answer_questions' })
+    expect(line).toContain('бизнес-аккаунта в Instagram')
+    expect(line).not.toContain('Telegram')
+  })
+
+  it('uses Telegram wording when channel is telegram', () => {
+    const line = buildBusinessContextLine({ name: 'X', tone: 'friendly', description: '', goal: 'answer_questions', channel: 'telegram' })
+    expect(line).toContain('бизнес-аккаунта в Telegram')
+    expect(line).not.toContain('Instagram')
+  })
 })

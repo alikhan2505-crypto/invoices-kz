@@ -42,6 +42,8 @@ const kaspiShopLinks: { href: string; label: LocalizedLabel }[] = [
 const aiAgentLinks: { href: string; label: LocalizedLabel }[] = [
   { href: '/ai-agent', label: { ru: 'Агенты', kk: 'Агенттер', en: 'Agents' } },
   { href: '/ai-agent/review', label: { ru: 'Диалоги', kk: 'Диалогтар', en: 'Conversations' } },
+  { href: '/ai-agent/test-chat', label: { ru: 'Тестовый чат', kk: 'Сынақ чаты', en: 'Test chat' } },
+  { href: '/ai-agent/analytics', label: { ru: 'Аналитика', kk: 'Аналитика', en: 'Analytics' } },
   { href: '/ai-agent/settings', label: { ru: 'Настройки', kk: 'Баптаулар', en: 'Settings' } },
   { href: '/ai-agent/docs', label: { ru: 'Как настроить', kk: 'Қалай баптау керек', en: 'Setup guide' } },
 ]
