@@ -66,6 +66,7 @@ export interface AcquiringContent {
   kaspiErrorInvalidOtp: string
   kaspiErrorInvalidAmount: (min: number) => string
   kaspiDocsLinkLabel: string
+  kaspiDocsHint: string
   kaspiWalletBalanceLabel: string
   kaspiTopupPresetsLabel: string
   kaspiTopupCustomPlaceholder: string
@@ -188,6 +189,7 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiErrorInvalidOtp: 'Неверный код из SMS. Попробуйте ещё раз.',
     kaspiErrorInvalidAmount: (min: number) => `Минимальная сумма пополнения — ${min.toLocaleString('ru-KZ')} ₸.`,
     kaspiDocsLinkLabel: 'Документация по API',
+    kaspiDocsHint: 'Есть вопросы по подключению или запросам? Ответы в документации.',
     kaspiWalletBalanceLabel: 'Баланс кошелька',
     kaspiTopupPresetsLabel: 'Пополнить на сумму',
     kaspiTopupCustomPlaceholder: 'Своя сумма, ₸',
@@ -308,6 +310,7 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiErrorInvalidOtp: 'SMS коды дұрыс емес. Қайталап көріңіз.',
     kaspiErrorInvalidAmount: (min: number) => `Ең аз толтыру сомасы — ${min.toLocaleString('ru-KZ')} ₸.`,
     kaspiDocsLinkLabel: 'API құжаттамасы',
+    kaspiDocsHint: 'Қосылу немесе сұраулар бойынша сұрақтарыңыз бар ма? Жауаптар құжаттамада.',
     kaspiWalletBalanceLabel: 'Әмиян балансы',
     kaspiTopupPresetsLabel: 'Мына сомаға толтыру',
     kaspiTopupCustomPlaceholder: 'Өз сомаңыз, ₸',
@@ -428,6 +431,7 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiErrorInvalidOtp: 'Invalid SMS code. Please try again.',
     kaspiErrorInvalidAmount: (min: number) => `The minimum top-up amount is ${min.toLocaleString('en-US')} ₸.`,
     kaspiDocsLinkLabel: 'API documentation',
+    kaspiDocsHint: 'Questions about connecting or making requests? The documentation has the answers.',
     kaspiWalletBalanceLabel: 'Wallet balance',
     kaspiTopupPresetsLabel: 'Top up by',
     kaspiTopupCustomPlaceholder: 'Custom amount, ₸',

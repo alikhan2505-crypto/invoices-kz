@@ -46,10 +46,28 @@ export async function GET(
   if (!fileRes.ok) return NextResponse.json({ error: 'Source fetch failed' }, { status: 502 })
   const bytes = await fileRes.arrayBuffer()
 
-  return new NextResponse(bytes, {
+  // A raw application/pdf response opens straight in the browser's native
+  // PDF viewer, which always shows its own generic file icon in the tab --
+  // there's no HTML <head> for a favicon to live in. Wrapping it in a
+  // minimal branded shell (invoices.kz icon/title, PDF embedded via a data
+  // URI) gives the tab the same identity as every other invoices.kz page.
+  const base64 = Buffer.from(bytes).toString('base64')
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>${filename}</title>
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<style>html,body{margin:0;height:100%;background:#525659}iframe{border:0;width:100%;height:100%}</style>
+</head>
+<body>
+<iframe src="data:application/pdf;base64,${base64}" title="${filename}"></iframe>
+</body>
+</html>`
+
+  return new NextResponse(html, {
     headers: {
-      'Content-Type': 'application/pdf',
-      'Content-Disposition': `inline; filename="${filename}"`,
+      'Content-Type': 'text/html; charset=utf-8',
       'Cache-Control': 'no-store',
     },
   })

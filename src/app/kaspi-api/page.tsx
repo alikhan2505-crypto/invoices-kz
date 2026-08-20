@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import SiteNav from '@/components/SiteNav'
+import DesktopShell from '@/components/DesktopShell'
 import { useLanguage } from '@/components/LanguageProvider'
 import { acquiringDict } from '@/lib/i18n/acquiring'
 
@@ -306,10 +307,12 @@ export default function KaspiApiPage() {
   }
 
   if (loading) return (
-    <main className="nav-surface-elevated min-h-screen">
+    <DesktopShell>
+    <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
       <SiteNav />
       <div className="p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Загрузка…</div>
     </main>
+    </DesktopShell>
   )
 
   // 2. Kaspi statement ("Выписка") — every transaction on the connected
@@ -408,12 +411,10 @@ export default function KaspiApiPage() {
   )
 
   return (
-    <main className="nav-surface-elevated min-h-screen">
+    <DesktopShell>
+    <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
       <SiteNav />
-      <div className="max-w-xl mx-auto p-6 pb-12">
-        <button onClick={() => router.push('/dashboard')} className="flex items-center gap-1 text-xs mb-3" style={{ color: 'var(--nav-text-muted)' }}>
-          <span className="text-lg leading-none">‹</span> Назад
-        </button>
+      <div className="max-w-3xl mx-auto p-6 pb-12">
         <h1 className="text-xl font-bold mb-1" style={{ color: 'var(--nav-text-primary)', letterSpacing: '-0.02em' }}>Kaspi API</h1>
         <p className="text-sm mb-6" style={{ color: 'var(--nav-text-muted)' }}>Приём оплат Kaspi Pay на вашем сайте — токен, вебхуки, документация</p>
 
@@ -593,20 +594,20 @@ export default function KaspiApiPage() {
             </>
           )}
 
+          <p className="text-xs text-center mt-3 mb-1" style={{ color: 'var(--nav-text-muted)' }}>{t.kaspiDocsHint}</p>
           <button onClick={() => router.push('/kaspi-api/docs')}
-            className="w-full text-xs underline text-center py-2 mt-2" style={{ color: 'var(--nav-accent)' }}>
+            className="w-full text-xs underline text-center py-2" style={{ color: 'var(--nav-accent)' }}>
             {t.kaspiDocsLinkLabel}
           </button>
         </div>
       </div>
 
-      {/* Breaks out to a wider column than the narrow connect card above --
-          a filterable transaction table needs the room. */}
       {kaspiStatementSection && (
         <div className="max-w-3xl mx-auto px-6 pb-16 space-y-3">
           {kaspiStatementSection}
         </div>
       )}
     </main>
+    </DesktopShell>
   )
 }

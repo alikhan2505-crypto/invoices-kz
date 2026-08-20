@@ -555,12 +555,14 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
   const [period, setPeriod] = useState<Period>(14)
+  const [kaspiApiStats, setKaspiApiStats] = useState<{ count: number; amount: number } | null>(null)
 
   useEffect(() => { load() }, [])
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
+    const { data: { session } } = await supabase.auth.getSession()
     const [{ data }, { data: profile }] = await Promise.all([
       supabase.from('invoices').select('*, clients(name)').eq('user_id', user.id).order('created_at', { ascending: false }),
       supabase.from('profiles').select('is_admin').eq('id', user.id).single(),
@@ -568,6 +570,20 @@ export default function DashboardPage() {
     setInvoices(data || [])
     setIsAdmin(!!profile?.is_admin)
     setLoading(false)
+
+    // Real usage for the Kaspi API tile (replaces the old static
+    // "Документация →" CTA) -- not plan-gated, so this is fetched
+    // unconditionally same as /kaspi-api's own dashboard. Stays null (tile
+    // falls back to its neutral intro text) when Cashier isn't connected yet.
+    try {
+      const res = await fetch('/api/kaspi/dashboard', { headers: { Authorization: `Bearer ${session?.access_token}` } })
+      if (res.ok) {
+        const kd = await res.json()
+        setKaspiApiStats(kd.connected && kd.stats ? { count: kd.stats.last30d.count, amount: kd.stats.last30d.amount } : null)
+      }
+    } catch {
+      // Best-effort — the tile just stays on its neutral state.
+    }
   }
 
   const now = new Date()
@@ -722,11 +738,10 @@ export default function DashboardPage() {
                     colorVar="--nav-accent"
                     softVar="--nav-accent-soft"
                     title="Kaspi API"
-                    state="neutral"
+                    state={kaspiApiStats ? 'data' : 'neutral'}
+                    subtitle={kaspiApiStats ? `${kaspiApiStats.count.toLocaleString('ru-KZ')} платежей · ${kaspiApiStats.amount.toLocaleString('ru-KZ')} ₸ за 30д` : undefined}
                     neutralText="Приём оплат Kaspi на вашем сайте"
-                    ctaLabel="Документация →"
                     onClick={() => router.push('/kaspi-api')}
-                    onCtaClick={() => router.push('/kaspi-api/docs')}
                   />
                   <ProductCard
                     index={2}

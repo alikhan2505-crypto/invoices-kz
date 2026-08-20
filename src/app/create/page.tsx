@@ -211,6 +211,13 @@ export default function CreateInvoicePage() {
         if (src.client_name) setClientSelected(true)
       }
     }
+
+    // Strip ?template=/?repeat= once consumed -- otherwise clearing the
+    // client (clearClient) doesn't stick: browser back navigation, or even
+    // just switching tabs and back (the focus listener below re-runs load()),
+    // re-reads the same still-present query param and silently reapplies the
+    // prefill the user just removed.
+    if (templateId || repeatId) router.replace('/create')
   }, [router])
 
   useEffect(() => {

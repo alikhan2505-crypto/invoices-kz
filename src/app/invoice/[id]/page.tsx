@@ -486,13 +486,13 @@ export default function InvoicePage() {
 
   if (loading) return (
     <DesktopShell>
-    <main className="page-surface-in-shell min-h-screen pb-8 lg:pb-6 lg:min-h-full">
-      <SiteNav desktopOnly />
-      <div className="nav-glass sticky top-0 lg:top-16 z-30 px-4 py-4 flex items-center gap-3 lg:h-16">
-        <button onClick={() => router.push('/history')} className="back-btn text-xl" style={{ color: 'var(--nav-text-muted)' }} aria-label={backLabel(lang)}>‹</button>
-        <Skeleton className="h-4 w-24" />
-      </div>
+    <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
+      <SiteNav />
       <div className="max-w-lg lg:max-w-5xl mx-auto p-4">
+      <div className="flex items-center gap-3 mb-5">
+        <button onClick={() => router.push('/history')} className="text-xl transition-colors" style={{ color: 'var(--nav-text-muted)' }} aria-label={backLabel(lang)}>‹</button>
+        <Skeleton className="h-6 w-32" />
+      </div>
       <div className="lg:flex lg:gap-6 lg:items-start">
       <div className="lg:flex-1 lg:min-w-0 space-y-4">
         <Skeleton className="h-28 rounded-2xl" />
@@ -601,14 +601,13 @@ export default function InvoicePage() {
 
   return (
     <DesktopShell>
-    <main className="page-surface-in-shell min-h-screen pb-8 lg:pb-6 lg:min-h-full">
-      <SiteNav desktopOnly />
-      <div className="nav-glass sticky top-0 lg:top-16 z-30 px-4 py-4 flex items-center gap-3 lg:h-16">
-        <button onClick={() => router.push('/history')} className="back-btn text-xl" style={{ color: 'var(--nav-text-muted)' }} aria-label={backLabel(lang)}>‹</button>
-        <span className="font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{t.invoiceHeaderTitle(invoice.number)}</span>
-      </div>
-
+    <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
+      <SiteNav />
       <div className="max-w-lg lg:max-w-5xl mx-auto p-4">
+      <div className="flex items-center gap-3 mb-5">
+        <button onClick={() => router.push('/history')} className="text-xl transition-colors text-[color:var(--nav-text-muted)] hover:text-[color:var(--nav-text-secondary)]" aria-label={backLabel(lang)}>‹</button>
+        <h2 className="text-xl font-bold" style={{ color: 'var(--nav-text-primary)' }}>{t.invoiceHeaderTitle(invoice.number)}</h2>
+      </div>
       <div className="lg:flex lg:gap-6 lg:items-start">
       <div className="lg:flex-1 lg:min-w-0 space-y-4">
 
@@ -1101,7 +1100,7 @@ export default function InvoicePage() {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ ease: [0.16, 1, 0.3, 1], duration: 0.4 }}
-        className="hidden lg:block lg:w-[380px] lg:sticky lg:top-[80px]"
+        className="hidden lg:block lg:w-[380px] lg:sticky lg:top-[65px]"
       >
         <InvoiceLivePreview
           invoiceNumber={invoice.number}

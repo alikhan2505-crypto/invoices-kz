@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import SiteNav from '@/components/SiteNav'
+import DesktopShell from '@/components/DesktopShell'
 
 function QuickStartStep({ n, title, children }: { n: number; title: string; children: ReactNode }) {
   return (
@@ -60,9 +61,10 @@ function Badge({ children }: { children: ReactNode }) {
 
 export default function KaspiApiDocsPage() {
   return (
-    <main className="nav-surface-elevated min-h-screen">
+    <DesktopShell>
+    <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
       <SiteNav />
-      <div className="max-w-4xl mx-auto px-4 lg:px-6 py-8 pb-24">
+      <div className="max-w-5xl mx-auto px-4 lg:px-6 py-8 pb-24">
         <h1 className="text-3xl font-bold mb-8" style={{ color: 'var(--nav-text-primary)', letterSpacing: '-0.02em' }}>
           API документация Kaspi API
         </h1>
@@ -370,11 +372,20 @@ const isValid = signature === req.headers['x-kaspi-pay-signature'];
 
         <section>
           <h2 className="text-2xl font-semibold mb-4" style={{ color: 'var(--nav-text-primary)' }}>Поддержка</h2>
-          <p style={{ color: 'var(--nav-text-secondary)' }}>
-            Если у вас возникли вопросы по использованию API, свяжитесь с нами через форму обратной связи в вашем аккаунте.
+          <p className="mb-3" style={{ color: 'var(--nav-text-secondary)' }}>
+            Если у вас возникли вопросы по использованию API, напишите нам:
           </p>
+          <div className="flex flex-wrap gap-3">
+            <a href="mailto:support@invoices.kz" className="rounded-lg px-3 py-1.5 text-sm font-medium" style={{ background: 'var(--nav-surface-glass)', color: 'var(--nav-accent)' }}>
+              support@invoices.kz
+            </a>
+            <a href="https://t.me/invoiceskz_support" target="_blank" rel="noopener noreferrer" className="rounded-lg px-3 py-1.5 text-sm font-medium" style={{ background: 'var(--nav-surface-glass)', color: 'var(--nav-accent)' }}>
+              Telegram
+            </a>
+          </div>
         </section>
       </div>
     </main>
+    </DesktopShell>
   )
 }
