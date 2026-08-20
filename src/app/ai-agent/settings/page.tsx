@@ -279,6 +279,14 @@ export default function AiAgentSettings() {
   const [tgOpen, setTgOpen] = useState(false)
   const [tgBusy, setTgBusy] = useState(false)
   const [tgError, setTgError] = useState<string | null>(null)
+  // WhatsApp Embedded Signup (ES v4) -- a JS SDK popup, not a redirect, so
+  // its result lands in refs (message-event listener + FB.login callback)
+  // rather than a query-param round trip like the Instagram OAuth notice.
+  const [waConnecting, setWaConnecting] = useState(false)
+  const [waBusy, setWaBusy] = useState(false)
+  const [waError, setWaError] = useState<string | null>(null)
+  const waPhoneNumberIdRef = useRef<string | null>(null)
+  const waWabaIdRef = useRef<string | null>(null)
   const [oauthNotice, setOauthNotice] = useState<'connected' | 'error' | null>(null)
   const [forbidden, setForbidden] = useState(false)
   const [pendingCount, setPendingCount] = useState(0)
@@ -308,6 +316,72 @@ export default function AiAgentSettings() {
     const qs = params.toString()
     window.history.replaceState({}, '', qs ? `${window.location.pathname}?${qs}` : window.location.pathname)
   }
+
+  // Loads Meta's JS SDK once (guarded against double-init across
+  // remounts/other pages via a window-level flag, same spirit as the
+  // Instagram OAuth notice's one-shot query-param strip). Unlike Instagram's
+  // redirect-based OAuth, WhatsApp Embedded Signup is a POPUP the SDK opens
+  // via FB.login -- nothing here navigates the page away.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const w = window as any
+    if (w.FB) return
+    if (w.__waFbSdkLoading) return
+    w.__waFbSdkLoading = true
+    w.fbAsyncInit = function () {
+      w.FB.init({
+        appId: process.env.NEXT_PUBLIC_WHATSAPP_APP_ID || '',
+        autoLogAppEvents: true,
+        xfbml: true,
+        version: 'v25.0',
+      })
+    }
+    const script = document.createElement('script')
+    script.src = 'https://connect.facebook.net/en_US/sdk.js'
+    script.async = true
+    script.defer = true
+    script.crossOrigin = 'anonymous'
+    document.body.appendChild(script)
+  }, [])
+
+  // The Embedded Signup popup posts session-logging events here as the user
+  // moves through the flow, ending with a 'FINISH' event carrying the
+  // phone_number_id/waba_id it just created -- captured into refs so
+  // connectWhatsApp's FB.login callback (which arrives separately, carrying
+  // the auth `code`) can read them once both are available.
+  useEffect(() => {
+    function onMessage(event: MessageEvent) {
+      // Anchored host check -- a bare endsWith('facebook.com') would also
+      // accept e.g. https://evilfacebook.com as a valid origin.
+      let originHost: string
+      try {
+        const o = new URL(event.origin)
+        if (o.protocol !== 'https:') return
+        originHost = o.hostname
+      } catch {
+        return
+      }
+      if (originHost !== 'facebook.com' && !originHost.endsWith('.facebook.com')) return
+      let data: any
+      try {
+        data = JSON.parse(event.data)
+      } catch {
+        return // the SDK also posts non-JSON messages -- not our concern
+      }
+      if (data?.type !== 'WA_EMBEDDED_SIGNUP') return
+      if (data.event === 'FINISH' && data.data) {
+        if (data.data.phone_number_id) waPhoneNumberIdRef.current = data.data.phone_number_id
+        if (data.data.waba_id) waWabaIdRef.current = data.data.waba_id
+      } else if (data.event === 'CANCEL') {
+        setWaConnecting(false)
+      } else if (data.event === 'ERROR') {
+        setWaConnecting(false)
+        setWaError('Ошибка при подключении WhatsApp. Попробуйте ещё раз.')
+      }
+    }
+    window.addEventListener('message', onMessage)
+    return () => window.removeEventListener('message', onMessage)
+  }, [])
 
   useEffect(() => {
     // The Instagram OAuth callback redirects back here with a plain query
@@ -572,6 +646,96 @@ export default function AiAgentSettings() {
     setTgBusy(false)
   }
 
+  // WhatsApp Embedded Signup: FB.login opens the popup; its callback fires
+  // once the popup closes, carrying an auth `code`. The phone_number_id and
+  // waba_id the user just created arrive separately via the message-event
+  // listener above, usually slightly BEFORE the callback -- so a short poll
+  // covers the rare race where the callback resolves first.
+  async function connectWhatsApp() {
+    if (!agentId) return
+    const FB = (window as any).FB
+    if (!FB) {
+      setWaError('WhatsApp SDK ещё загружается — подождите секунду и попробуйте снова.')
+      return
+    }
+    setWaError(null)
+    setWaConnecting(true)
+    waPhoneNumberIdRef.current = null
+    waWabaIdRef.current = null
+
+    FB.login((response: any) => {
+      const code = response?.authResponse?.code
+      if (!code) {
+        // Popup closed without completing the flow -- not necessarily an
+        // error (user may have just backed out), so no error banner.
+        setWaConnecting(false)
+        return
+      }
+      ;(async () => {
+        let attempts = 0
+        while ((!waPhoneNumberIdRef.current || !waWabaIdRef.current) && attempts < 20) {
+          await new Promise(resolve => setTimeout(resolve, 150))
+          attempts++
+        }
+        if (!waPhoneNumberIdRef.current || !waWabaIdRef.current) {
+          setWaConnecting(false)
+          setWaError('Не удалось получить данные номера WhatsApp. Попробуйте ещё раз.')
+          return
+        }
+        try {
+          const headers = await authHeader()
+          const res = await fetch('/api/ai-agent/whatsapp/callback', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              agentId,
+              code,
+              phoneNumberId: waPhoneNumberIdRef.current,
+              wabaId: waWabaIdRef.current,
+            }),
+          })
+          if (res.ok) {
+            const data = await res.json()
+            setConnections(prev => [...prev.filter(c => c.channel !== 'whatsapp'), { channel: 'whatsapp', external_account_name: data.displayPhoneNumber || null, status: 'active' }])
+          } else {
+            setWaError('Не удалось подключить WhatsApp. Попробуйте ещё раз — если не получится снова, напишите в поддержку.')
+          }
+        } catch {
+          setWaError('Не удалось подключить WhatsApp. Попробуйте ещё раз — если не получится снова, напишите в поддержку.')
+        }
+        setWaConnecting(false)
+      })()
+    }, {
+      config_id: process.env.NEXT_PUBLIC_WHATSAPP_CONFIG_ID || '',
+      response_type: 'code',
+      override_default_response_type: true,
+      extras: { setup: {} },
+    })
+  }
+
+  async function disconnectWhatsApp() {
+    if (!agentId) return
+    if (!window.confirm('Отключить WhatsApp? Агент перестанет отвечать клиентам в этом номере.')) return
+    setWaBusy(true)
+    setWaError(null)
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/ai-agent/whatsapp/disconnect', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ agentId }),
+      })
+      if (res.ok) {
+        setConnections(prev => prev.filter(c => c.channel !== 'whatsapp'))
+      } else {
+        setWaError('Не удалось отключить WhatsApp. Попробуйте ещё раз.')
+      }
+    } catch {
+      setWaError('Не удалось отключить WhatsApp. Попробуйте ещё раз.')
+    }
+    setWaBusy(false)
+  }
+
   async function createTemplate() {
     if (!agentId || tplFormWords.length === 0 || !tplFormText.trim()) return
     setTplBusy(true)
@@ -672,6 +836,7 @@ export default function AiAgentSettings() {
 
   const instagramConnection = connections.find(c => c.channel === 'instagram')
   const telegramConnection = connections.find(c => c.channel === 'telegram')
+  const whatsappConnection = connections.find(c => c.channel === 'whatsapp')
   const tgExpanded = tgOpen || telegramConnection?.status === 'token_expired'
 
   // The real server-side context line, assembled from the same visible
@@ -1174,12 +1339,42 @@ export default function AiAgentSettings() {
                   <ChannelCard
                     icon={<WhatsAppIcon />}
                     name="WhatsApp"
-                    chip={<StatusChip kind="soon" label="Скоро" />}
-                    description="Официальный WhatsApp Business API — в разработке"
+                    chip={whatsappConnection?.status === 'active'
+                      ? <StatusChip kind="ok" label={`Подключено: ${whatsappConnection.external_account_name || 'номер'}`} />
+                      : whatsappConnection?.status === 'token_expired'
+                        ? <StatusChip kind="warn" label="Требуется переподключение" />
+                        : <StatusChip kind="off" label="Не подключен" />}
+                    description="Агент отвечает на сообщения в вашем WhatsApp Business — официальный WhatsApp Cloud API"
                   >
-                    <button disabled className="w-full nav-glass rounded-lg px-4 py-2.5 text-sm font-medium opacity-50 cursor-not-allowed" style={{ color: 'var(--nav-text-primary)' }}>
-                      Подключить
-                    </button>
+                    {whatsappConnection?.status === 'active' && (
+                      <button onClick={disconnectWhatsApp} disabled={waBusy}
+                        className="w-full nav-glass rounded-lg px-4 py-2.5 text-sm font-medium disabled:opacity-50"
+                        style={{ color: 'var(--nav-text-primary)' }}>
+                        {waBusy ? 'Отключаем…' : 'Отключить'}
+                      </button>
+                    )}
+                    {whatsappConnection?.status === 'token_expired' && (
+                      <>
+                        <div className="text-xs mb-2 flex items-center gap-1.5" style={{ color: 'var(--nav-critical)' }}>
+                          <WarnIcon /> WhatsApp отключился — переподключите номер, чтобы агент снова отвечал
+                        </div>
+                        <button onClick={connectWhatsApp} disabled={waConnecting}
+                          className="w-full rounded-lg px-4 py-2.5 text-sm font-medium disabled:opacity-50"
+                          style={{ background: 'var(--nav-critical)', color: '#fff' }}>
+                          {waConnecting ? 'Открываем WhatsApp…' : 'Переподключить'}
+                        </button>
+                      </>
+                    )}
+                    {!whatsappConnection && (
+                      <button onClick={connectWhatsApp} disabled={waConnecting}
+                        className="w-full rounded-lg px-4 py-2.5 text-sm font-semibold disabled:opacity-50"
+                        style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                        {waConnecting ? 'Подключаем…' : 'Подключить'}
+                      </button>
+                    )}
+                    {waError && (
+                      <div className="text-xs mt-2" style={{ color: 'var(--nav-critical)' }}>{waError}</div>
+                    )}
                   </ChannelCard>
 
                   <ChannelCard

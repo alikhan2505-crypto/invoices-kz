@@ -69,4 +69,11 @@ describe('buildBusinessContextLine', () => {
     expect(line).toContain('бизнес-аккаунта в Telegram')
     expect(line).not.toContain('Instagram')
   })
+
+  it('uses WhatsApp wording when channel is whatsapp', () => {
+    const line = buildBusinessContextLine({ name: 'X', tone: 'friendly', description: '', goal: 'answer_questions', channel: 'whatsapp' })
+    expect(line).toContain('бизнес-аккаунта в WhatsApp')
+    expect(line).not.toContain('Instagram')
+    expect(line).not.toContain('Telegram')
+  })
 })

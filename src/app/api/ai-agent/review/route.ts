@@ -4,6 +4,7 @@ import { decryptAtRest } from '@/lib/kaspiPay/crypto'
 import { getKey } from '@/lib/aiAgent/connection'
 import { replyToComment, sendDirectMessage, InstagramApiError } from '@/lib/instagram'
 import { sendTelegramBotMessage, TelegramApiError } from '@/lib/aiAgent/telegram'
+import { sendWhatsAppMessage, WhatsAppApiError } from '@/lib/whatsapp'
 import { extractTriggerWords } from '@/lib/instagramAiReply'
 import { shouldExitTraining } from '@/lib/aiAgent/trainingStatus'
 import { debitAiAgentWallet, AI_AGENT_CREDITS_PER_AI_REPLY } from '@/lib/aiAgent/wallet'
@@ -179,6 +180,11 @@ export async function POST(req: NextRequest) {
         // token (same column, same encryption -- see telegram/connect) and
         // external_thread_id is the Telegram chat.id.
         await sendTelegramBotMessage(accessToken, conversation.external_thread_id, finalText)
+      } else if (conversation.channel === 'whatsapp') {
+        // connection.external_account_id is the Cloud API phone_number_id
+        // (see whatsapp/callback route); external_thread_id is the
+        // customer's WhatsApp phone number (wa_id).
+        await sendWhatsAppMessage(connection.external_account_id, conversation.external_thread_id, finalText, { accessToken })
       }
     } catch (e: any) {
       console.error('ai-agent review: send failed for message', messageId, ':', e.message)
@@ -186,8 +192,9 @@ export async function POST(req: NextRequest) {
       // per the design spec's error-handling section, a dead token surfaces
       // as a reconnect banner on the settings page (Task 6), not a retry
       // loop against a token that will never work again. A Telegram 401
-      // means the bot token was revoked via BotFather -- same treatment.
-      if ((e instanceof InstagramApiError && e.status === 401) || (e instanceof TelegramApiError && e.status === 401)) {
+      // means the bot token was revoked via BotFather; a WhatsApp 401 means
+      // the Embedded Signup token was revoked -- same treatment both ways.
+      if ((e instanceof InstagramApiError && e.status === 401) || (e instanceof TelegramApiError && e.status === 401) || (e instanceof WhatsAppApiError && e.status === 401)) {
         await supabase.from('ai_agent_channel_connections').update({ status: 'token_expired' }).eq('id', connection.id)
       }
       return NextResponse.json({ error: 'send_failed' }, { status: 502 })

@@ -84,11 +84,12 @@ export async function POST(req: NextRequest) {
   // that produced the draft (inbound paired with the next *sent* outbound --
   // the pending draft itself is not 'sent', so it's naturally excluded, and
   // the triggering inbound stays unpaired rather than leaking into history).
-  // Telegram mirrors telegramWebhookHandler.ts, Instagram mirrors
-  // webhookHandler.ts's dm branch -- review-queue drafts are DM-shaped on
-  // both channels (see ../route.ts's send handler).
+  // Telegram and WhatsApp mirror telegramWebhookHandler.ts /
+  // whatsappWebhookHandler.ts (same pairConversationHistory helper),
+  // Instagram mirrors webhookHandler.ts's dm branch -- review-queue drafts
+  // are DM-shaped on all three channels (see ../route.ts's send handler).
   let conversationHistory: { incoming: string; reply: string }[] | undefined
-  if (conversation.channel === 'telegram') {
+  if (conversation.channel === 'telegram' || conversation.channel === 'whatsapp') {
     const historyPairs = typeof agent.history_pairs === 'number' && agent.history_pairs >= 0 ? agent.history_pairs : 5
     if (historyPairs > 0) {
       const { data: historyRows } = await supabase
@@ -138,7 +139,7 @@ export async function POST(req: NextRequest) {
         timezone: agent.timezone || undefined,
         currency: agent.currency || undefined,
         customInstructions: typeof agent.custom_instructions === 'string' ? agent.custom_instructions : undefined,
-        channel: conversation.channel === 'telegram' ? 'telegram' : 'instagram',
+        channel: conversation.channel === 'telegram' ? 'telegram' : conversation.channel === 'whatsapp' ? 'whatsapp' : 'instagram',
       }),
     })
     replyText = result.replyText
