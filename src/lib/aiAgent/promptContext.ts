@@ -1,11 +1,40 @@
 export type AgentTone = 'friendly' | 'professional' | 'energetic' | 'caring'
-export type AgentGoal = 'answer_questions' | 'qualify_lead'
+export type AgentGoal = 'answer_questions' | 'qualify_lead' | 'book_appointment'
+
+// The 12 preset collect-field keys the settings UI offers (2026-08-20,
+// expanded from the original name/phone pair to match the founder-approved
+// competitor reference). Any string NOT in this map is treated as a
+// user-typed custom field and interpolated into the prompt verbatim.
+export const COLLECT_FIELD_LABELS: Record<string, string> = {
+  name: 'имя клиента',
+  phone: 'номер телефона',
+  booking: 'бронирование',
+  consultation: 'запись на консультацию',
+  address: 'адрес',
+  purpose: 'цель обращения',
+  budget: 'бюджет',
+  timeline: 'желаемые сроки',
+  people_count: 'количество человек',
+  city: 'город',
+  preferences: 'предпочтения',
+  past_experience: 'прошлый опыт клиента',
+}
+
+export const CURRENCY_LABELS: Record<string, string> = {
+  KZT: 'тенге (₸)',
+  USD: 'доллары США ($)',
+  EUR: 'евро (€)',
+  RUB: 'рубли (₽)',
+}
 
 export interface BusinessContext {
   name: string
   tone: AgentTone
   description: string
   goal: AgentGoal
+  collectFields?: string[]
+  timezone?: string
+  currency?: string
 }
 
 const TONE_LABELS: Record<AgentTone, string> = {
@@ -18,15 +47,27 @@ const TONE_LABELS: Record<AgentTone, string> = {
 const GOAL_LABELS: Record<AgentGoal, string> = {
   answer_questions: 'отвечать на вопросы клиентов',
   qualify_lead: 'квалифицировать заявку клиента -- понять, что ему нужно, и собрать контактные данные',
+  book_appointment: 'записать клиента на консультацию или приём -- предложить удобное время и собрать контакты для подтверждения записи',
 }
 
-// Builds the one-sentence business-context line generateAiReply interpolates
-// into its prompt (see instagramAiReply.ts's new businessContextLine param,
-// Task 2). Only the multi-tenant webhook path (Task 8) calls this -- the
-// existing single-tenant invoices.kz bot passes its own unchanged literal
-// string straight to generateAiReply instead, so this function changing
-// never affects it.
+// Builds the business-context line generateAiReply interpolates into its
+// prompt (see instagramAiReply.ts's businessContextLine param). Only the
+// multi-tenant webhook path calls this -- the existing single-tenant
+// invoices.kz bot passes its own unchanged literal string straight to
+// generateAiReply instead, so this function changing never affects it.
 export function buildBusinessContextLine(ctx: BusinessContext): string {
   const desc = ctx.description.trim()
-  return `Ты отвечаешь от имени бизнес-аккаунта в Instagram (${ctx.name}${desc ? ' — ' + desc : ''}). Твой стиль общения: ${TONE_LABELS[ctx.tone]}. Твоя основная задача: ${GOAL_LABELS[ctx.goal]}.`
+  let line = `Ты отвечаешь от имени бизнес-аккаунта в Instagram (${ctx.name}${desc ? ' — ' + desc : ''}). Твой стиль общения: ${TONE_LABELS[ctx.tone]}. Твоя основная задача: ${GOAL_LABELS[ctx.goal]}.`
+
+  const fields = (ctx.collectFields || []).map(f => COLLECT_FIELD_LABELS[f] || f).filter(Boolean)
+  if (fields.length > 0) {
+    line += ` В ходе диалога постарайся естественно узнать у клиента: ${fields.join(', ')}. Не спрашивай всё сразу -- по одному, в подходящий момент разговора.`
+  }
+  if (ctx.currency && CURRENCY_LABELS[ctx.currency]) {
+    line += ` Все цены называй в валюте: ${CURRENCY_LABELS[ctx.currency]}.`
+  }
+  if (ctx.timezone) {
+    line += ` Часовой пояс бизнеса: ${ctx.timezone}.`
+  }
+  return line
 }

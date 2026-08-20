@@ -184,6 +184,9 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
         tone: agent.tone as AgentTone,
         description: agent.business_description,
         goal: agent.goal as AgentGoal,
+        collectFields: Array.isArray(agent.collect_fields) ? agent.collect_fields : undefined,
+        timezone: agent.timezone || undefined,
+        currency: agent.currency || undefined,
       }),
     })
     draftReply = result.replyText

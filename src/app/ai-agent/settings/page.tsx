@@ -1,7 +1,7 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { motion, useReducedMotion } from 'framer-motion'
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import SiteNav from '@/components/SiteNav'
@@ -19,7 +19,48 @@ const TONE_OPTIONS = [
 const GOAL_OPTIONS = [
   { value: 'answer_questions', label: 'Отвечать на вопросы' },
   { value: 'qualify_lead', label: 'Квалифицировать заявку' },
+  { value: 'book_appointment', label: 'Записать на консультацию/приём' },
 ]
+
+// Preset collect-field keys -- mirror COLLECT_FIELD_LABELS in
+// src/lib/aiAgent/promptContext.ts (keys must match; labels here are the
+// UI-facing capitalized variants). Anything the user adds beyond these is a
+// custom free-text field stored verbatim in the same array.
+const COLLECT_FIELD_OPTIONS: { value: string; label: string }[] = [
+  { value: 'name', label: 'Имя клиента' },
+  { value: 'phone', label: 'Номер телефона' },
+  { value: 'booking', label: 'Бронирование' },
+  { value: 'consultation', label: 'Запись на консультацию' },
+  { value: 'address', label: 'Адрес' },
+  { value: 'purpose', label: 'Цель обращения' },
+  { value: 'budget', label: 'Бюджет' },
+  { value: 'timeline', label: 'Желаемые сроки' },
+  { value: 'people_count', label: 'Количество человек' },
+  { value: 'city', label: 'Город' },
+  { value: 'preferences', label: 'Предпочтения' },
+  { value: 'past_experience', label: 'Прошлый опыт клиента' },
+]
+
+const TIMEZONE_OPTIONS = [
+  { value: 'Asia/Almaty', label: 'Asia/Almaty (GMT+5) — Алматы, Астана' },
+  { value: 'Asia/Aqtobe', label: 'Asia/Aqtobe (GMT+5) — Актобе' },
+  { value: 'Asia/Atyrau', label: 'Asia/Atyrau (GMT+5) — Атырау' },
+  { value: 'Asia/Oral', label: 'Asia/Oral (GMT+5) — Уральск' },
+  { value: 'Asia/Aqtau', label: 'Asia/Aqtau (GMT+5) — Актау' },
+]
+
+const CURRENCY_OPTIONS = [
+  { value: 'KZT', label: 'Тенге (₸)' },
+  { value: 'USD', label: 'Доллар США ($)' },
+  { value: 'EUR', label: 'Евро (€)' },
+  { value: 'RUB', label: 'Рубль (₽)' },
+]
+
+// How long the "Создаём AI-сотрудника" overlay stays up on FIRST creation.
+// The upsert itself is near-instant; the countdown exists to give the
+// moment weight (founder: "создает эффект волшебства") and matches the
+// reference product's real ~настройка pacing without overstaying.
+const CREATE_ANIMATION_MS = 7000
 
 function CheckCircleIcon() {
   return (
@@ -57,8 +98,14 @@ export default function AiAgentSettings() {
   const [tone, setTone] = useState('friendly')
   const [businessDescription, setBusinessDescription] = useState('')
   const [goal, setGoal] = useState('answer_questions')
-  const [collectName, setCollectName] = useState(true)
-  const [collectPhone, setCollectPhone] = useState(true)
+  const [collectFields, setCollectFields] = useState<string[]>(['name', 'phone'])
+  const [customField, setCustomField] = useState('')
+  const [showCustomInput, setShowCustomInput] = useState(false)
+  const [timezone, setTimezone] = useState('Asia/Almaty')
+  const [currency, setCurrency] = useState('KZT')
+  const [creating, setCreating] = useState(false)
+  const [createCountdown, setCreateCountdown] = useState(0)
+  const createTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const [agentId, setAgentId] = useState<string | null>(null)
   const [connections, setConnections] = useState<{ channel: string; external_account_name: string | null; status: string }[]>([])
   const [connecting, setConnecting] = useState(false)
@@ -103,8 +150,9 @@ export default function AiAgentSettings() {
           setTone(data.agent.tone)
           setBusinessDescription(data.agent.businessDescription)
           setGoal(data.agent.goal)
-          setCollectName(data.agent.collectName)
-          setCollectPhone(data.agent.collectPhone)
+          if (Array.isArray(data.agent.collectFields)) setCollectFields(data.agent.collectFields)
+          if (data.agent.timezone) setTimezone(data.agent.timezone)
+          if (data.agent.currency) setCurrency(data.agent.currency)
         } else {
           setName(data.suggestedName || 'Ассистент')
         }
@@ -115,18 +163,50 @@ export default function AiAgentSettings() {
     load()
   }, [router])
 
+  function toggleCollectField(value: string) {
+    setCollectFields(prev => prev.includes(value) ? prev.filter(f => f !== value) : [...prev, value])
+  }
+
+  function addCustomField() {
+    const trimmed = customField.trim()
+    if (!trimmed) return
+    if (!collectFields.includes(trimmed)) setCollectFields(prev => [...prev, trimmed])
+    setCustomField('')
+    setShowCustomInput(false)
+  }
+
   async function save() {
+    const isFirstCreation = !agentId
     setSaving(true)
+
+    // First creation gets the full-screen "Создаём AI-сотрудника" moment --
+    // the upsert itself is instant, the countdown gives the step weight.
+    // Plain re-saves skip it.
+    if (isFirstCreation) {
+      setCreating(true)
+      setCreateCountdown(Math.round(CREATE_ANIMATION_MS / 1000))
+      createTimerRef.current = setInterval(() => {
+        setCreateCountdown(prev => (prev > 1 ? prev - 1 : 0))
+      }, 1000)
+    }
+    const startedAt = Date.now()
+
     const headers = await authHeader()
     const res = await fetch('/api/ai-agent/settings', {
       method: 'POST',
       headers,
-      body: JSON.stringify({ name, tone, businessDescription, goal, collectName, collectPhone }),
+      body: JSON.stringify({ name, tone, businessDescription, goal, collectFields, timezone, currency }),
     })
     if (res.ok) {
       const data = await res.json()
+      if (isFirstCreation) {
+        const remaining = Math.max(0, CREATE_ANIMATION_MS - (Date.now() - startedAt))
+        await new Promise(resolve => setTimeout(resolve, remaining))
+      }
       setAgentId(data.agent.id)
     }
+    if (createTimerRef.current) { clearInterval(createTimerRef.current); createTimerRef.current = null }
+    setCreating(false)
     setSaving(false)
   }
 
@@ -235,7 +315,7 @@ export default function AiAgentSettings() {
 
           <div className="mb-4">
             <span className="text-xs mb-2 block" style={{ color: 'var(--nav-text-secondary)' }}>Основная цель</span>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               {GOAL_OPTIONS.map(g => {
                 const active = goal === g.value
                 return (
@@ -249,20 +329,76 @@ export default function AiAgentSettings() {
             </div>
           </div>
 
-          <div className="mb-6">
-            <span className="text-xs mb-2 block" style={{ color: 'var(--nav-text-secondary)' }}>Что собирать у клиента</span>
-            <label className="flex items-center gap-2 text-sm mb-1.5" style={{ color: 'var(--nav-text-primary)' }}>
-              <input type="checkbox" checked={collectName} onChange={e => setCollectName(e.target.checked)} className="accent-[var(--nav-accent)] w-3.5 h-3.5" /> Имя
+          <div className="mb-4">
+            <span className="text-xs mb-2 block" style={{ color: 'var(--nav-text-secondary)' }}>Какие данные агент должен собрать у клиента</span>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 mb-2">
+              {COLLECT_FIELD_OPTIONS.map(f => (
+                <label key={f.value} className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--nav-text-primary)' }}>
+                  <input type="checkbox" checked={collectFields.includes(f.value)} onChange={() => toggleCollectField(f.value)}
+                    className="accent-[var(--nav-accent)] w-3.5 h-3.5 flex-shrink-0" />
+                  {f.label}
+                </label>
+              ))}
+            </div>
+            {/* Custom fields the user has added (anything not a preset key) */}
+            {collectFields.filter(f => !COLLECT_FIELD_OPTIONS.some(o => o.value === f)).length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {collectFields.filter(f => !COLLECT_FIELD_OPTIONS.some(o => o.value === f)).map(f => (
+                  <button key={f} onClick={() => toggleCollectField(f)}
+                    className="text-xs pl-2.5 pr-2 py-1 rounded-full flex items-center gap-1.5"
+                    style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                    {f}
+                    <span aria-hidden>✕</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {showCustomInput ? (
+              <div className="flex gap-2">
+                <input autoFocus value={customField} maxLength={60}
+                  onChange={e => setCustomField(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') addCustomField(); if (e.key === 'Escape') { setShowCustomInput(false); setCustomField('') } }}
+                  placeholder="Например: размер обуви"
+                  className="flex-1 rounded-lg px-3 py-2 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
+                  style={{ color: 'var(--nav-text-primary)' }} />
+                <button onClick={addCustomField}
+                  className="text-xs px-3 py-2 rounded-lg font-semibold flex-shrink-0"
+                  style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                  Добавить
+                </button>
+              </div>
+            ) : (
+              <button onClick={() => setShowCustomInput(true)}
+                className="text-xs px-3 py-1.5 rounded-lg font-medium"
+                style={{ background: 'var(--nav-bg)', color: 'var(--nav-accent)' }}>
+                ✨ Добавить своё
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+            <label className="block">
+              <span className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>Часовой пояс</span>
+              <select value={timezone} onChange={e => setTimezone(e.target.value)}
+                className="w-full rounded-lg px-3 py-2 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
+                style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-surface-chrome)' }}>
+                {TIMEZONE_OPTIONS.map(tz => <option key={tz.value} value={tz.value}>{tz.label}</option>)}
+              </select>
             </label>
-            <label className="flex items-center gap-2 text-sm" style={{ color: 'var(--nav-text-primary)' }}>
-              <input type="checkbox" checked={collectPhone} onChange={e => setCollectPhone(e.target.checked)} className="accent-[var(--nav-accent)] w-3.5 h-3.5" /> Телефон
+            <label className="block">
+              <span className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>Валюта</span>
+              <select value={currency} onChange={e => setCurrency(e.target.value)}
+                className="w-full rounded-lg px-3 py-2 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
+                style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-surface-chrome)' }}>
+                {CURRENCY_OPTIONS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+              </select>
             </label>
           </div>
 
           <button onClick={save} disabled={saving}
             className="w-full rounded-lg px-4 py-3 text-sm font-semibold transition-transform hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0"
             style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)', boxShadow: '0 10px 24px -10px var(--nav-accent)' }}>
-            {saving ? 'Сохраняем…' : 'Сохранить'}
+            {saving ? 'Сохраняем…' : agentId ? 'Сохранить' : 'Создать агента'}
           </button>
 
           {agentId && (
@@ -308,6 +444,58 @@ export default function AiAgentSettings() {
           )}
         </motion.div>
       </div>
+
+      {/* First-creation overlay: the "magic" moment. A rotating gradient
+          ring (SVG dashoffset spinner, same hand-rolled style as the app's
+          charts) + countdown, full-screen over everything. Skipped entirely
+          on re-saves and under prefers-reduced-motion the ring is static. */}
+      <AnimatePresence>
+        {creating && (
+          <motion.div
+            className="fixed inset-0 z-[60] flex items-center justify-center"
+            style={{ background: 'var(--nav-surface-chrome)' }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0, transition: { duration: 0.4, ease: EASE } }}
+          >
+            <div className="text-center px-6">
+              <motion.svg
+                width="72" height="72" viewBox="0 0 72 72" fill="none" className="mx-auto mb-6"
+                animate={reduceMotion ? undefined : { rotate: 360 }}
+                transition={reduceMotion ? undefined : { duration: 1.1, repeat: Infinity, ease: 'linear' }}
+              >
+                <defs>
+                  <linearGradient id="aiAgentSpinnerGradient" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stopColor="var(--nav-accent)" />
+                    <stop offset="100%" stopColor="var(--nav-teal)" />
+                  </linearGradient>
+                </defs>
+                <circle cx="36" cy="36" r="30" stroke="var(--nav-border-soft)" strokeWidth="5" />
+                <circle cx="36" cy="36" r="30" stroke="url(#aiAgentSpinnerGradient)" strokeWidth="5"
+                  strokeLinecap="round" strokeDasharray="188.5" strokeDashoffset="132" />
+              </motion.svg>
+              <motion.div
+                className="text-lg font-semibold mb-2"
+                style={{ color: 'var(--nav-text-primary)' }}
+                initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE, delay: reduceMotion ? 0 : 0.1 }}
+              >
+                Создаём AI-сотрудника…
+              </motion.div>
+              <motion.div
+                className="text-sm tabular-nums"
+                style={{ color: 'var(--nav-text-muted)' }}
+                initial={reduceMotion ? false : { opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE, delay: reduceMotion ? 0 : 0.2 }}
+              >
+                Агент создастся примерно через 0:{String(createCountdown).padStart(2, '0')}
+              </motion.div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </main>
     </DesktopShell>
   )

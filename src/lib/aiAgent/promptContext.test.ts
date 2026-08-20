@@ -24,4 +24,37 @@ describe('buildBusinessContextLine', () => {
   it('maps the qualify_lead goal to its own label', () => {
     expect(buildBusinessContextLine({ name: 'X', tone: 'friendly', description: '', goal: 'qualify_lead' })).toContain('квалифицировать заявку')
   })
+
+  it('maps the book_appointment goal to its own label', () => {
+    expect(buildBusinessContextLine({ name: 'X', tone: 'friendly', description: '', goal: 'book_appointment' })).toContain('записать клиента на консультацию')
+  })
+
+  it('lists preset collect fields by their Russian labels and custom fields verbatim', () => {
+    const line = buildBusinessContextLine({
+      name: 'X', tone: 'friendly', description: '', goal: 'qualify_lead',
+      collectFields: ['name', 'budget', 'Любимый цвет'],
+    })
+    expect(line).toContain('имя клиента')
+    expect(line).toContain('бюджет')
+    expect(line).toContain('Любимый цвет')
+    expect(line).toContain('по одному')
+  })
+
+  it('omits the collect-fields sentence when the list is empty or absent', () => {
+    expect(buildBusinessContextLine({ name: 'X', tone: 'friendly', description: '', goal: 'answer_questions' })).not.toContain('постарайся естественно узнать')
+    expect(buildBusinessContextLine({ name: 'X', tone: 'friendly', description: '', goal: 'answer_questions', collectFields: [] })).not.toContain('постарайся естественно узнать')
+  })
+
+  it('adds currency and timezone context when provided', () => {
+    const line = buildBusinessContextLine({
+      name: 'X', tone: 'friendly', description: '', goal: 'answer_questions',
+      currency: 'KZT', timezone: 'Asia/Almaty',
+    })
+    expect(line).toContain('тенге (₸)')
+    expect(line).toContain('Asia/Almaty')
+  })
+
+  it('skips the currency sentence for an unknown currency code', () => {
+    expect(buildBusinessContextLine({ name: 'X', tone: 'friendly', description: '', goal: 'answer_questions', currency: 'XYZ' })).not.toContain('валюте')
+  })
 })

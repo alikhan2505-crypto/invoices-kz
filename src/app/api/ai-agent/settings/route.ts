@@ -30,7 +30,13 @@ async function isAdmin(userId: string): Promise<boolean> {
 }
 
 const VALID_TONES = ['friendly', 'professional', 'energetic', 'caring']
-const VALID_GOALS = ['answer_questions', 'qualify_lead']
+const VALID_GOALS = ['answer_questions', 'qualify_lead', 'book_appointment']
+// Preset keys mirror COLLECT_FIELD_LABELS in src/lib/aiAgent/promptContext.ts;
+// anything else in the array is a user-typed custom field (free text, capped).
+const VALID_TIMEZONES = ['Asia/Almaty', 'Asia/Aqtobe', 'Asia/Atyrau', 'Asia/Oral', 'Asia/Aqtau']
+const VALID_CURRENCIES = ['KZT', 'USD', 'EUR', 'RUB']
+const MAX_COLLECT_FIELDS = 15
+const MAX_CUSTOM_FIELD_LEN = 60
 
 export async function GET(req: NextRequest) {
   const user = await requireUser(req)
@@ -50,8 +56,9 @@ export async function GET(req: NextRequest) {
       tone: agent.tone,
       businessDescription: agent.business_description,
       goal: agent.goal,
-      collectName: agent.collect_name,
-      collectPhone: agent.collect_phone,
+      collectFields: Array.isArray(agent.collect_fields) ? agent.collect_fields : [],
+      timezone: agent.timezone || 'Asia/Almaty',
+      currency: agent.currency || 'KZT',
       status: agent.status,
     } : null,
     suggestedName: profile?.company_name || '',
@@ -72,11 +79,24 @@ export async function POST(req: NextRequest) {
   if (!(await isAdmin(user.id))) return NextResponse.json({ error: 'admin_only' }, { status: 403 })
 
   const body = await req.json()
-  const { name, tone, businessDescription, goal, collectName, collectPhone } = body
+  const { name, tone, businessDescription, goal, collectFields, timezone, currency } = body
 
   if (!name || typeof name !== 'string') return NextResponse.json({ error: 'name required' }, { status: 400 })
   if (!VALID_TONES.includes(tone)) return NextResponse.json({ error: 'invalid tone' }, { status: 400 })
   if (!VALID_GOALS.includes(goal)) return NextResponse.json({ error: 'invalid goal' }, { status: 400 })
+  if (timezone !== undefined && !VALID_TIMEZONES.includes(timezone)) return NextResponse.json({ error: 'invalid timezone' }, { status: 400 })
+  if (currency !== undefined && !VALID_CURRENCIES.includes(currency)) return NextResponse.json({ error: 'invalid currency' }, { status: 400 })
+
+  // collectFields: preset keys pass through as-is, anything else is a
+  // user-typed custom field -- kept as trimmed free text with a length cap
+  // (it gets interpolated into the agent's prompt, promptContext.ts).
+  const fields: string[] = Array.isArray(collectFields)
+    ? collectFields
+        .filter((f: unknown): f is string => typeof f === 'string')
+        .map(f => f.trim().slice(0, MAX_CUSTOM_FIELD_LEN))
+        .filter(f => f.length > 0)
+        .slice(0, MAX_COLLECT_FIELDS)
+    : []
 
   const { data: agent, error } = await supabase
     .from('ai_agents')
@@ -86,8 +106,13 @@ export async function POST(req: NextRequest) {
       tone,
       business_description: typeof businessDescription === 'string' ? businessDescription : '',
       goal,
-      collect_name: !!collectName,
-      collect_phone: !!collectPhone,
+      collect_fields: fields,
+      // Legacy booleans stay in sync for rollback safety (never-drop
+      // convention) -- nothing reads them anymore after 2026-08-20.
+      collect_name: fields.includes('name'),
+      collect_phone: fields.includes('phone'),
+      timezone: timezone || 'Asia/Almaty',
+      currency: currency || 'KZT',
     }, { onConflict: 'user_id' })
     .select()
     .single()
