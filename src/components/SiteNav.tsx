@@ -250,8 +250,15 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
             visible on every page of the section (no dropdown to reopen). */}
         {activeSection && (
           <div className="flex items-center gap-1.5 px-7 pb-2.5 -mt-1 overflow-x-auto">
-            {activeSection.links.map(l => {
-              const linkActive = path === l.href || path.startsWith(l.href + '/')
+            {(() => {
+              // Longest matching href wins -- otherwise a section root like
+              // /ai-agent prefix-matches every page of the section and two
+              // pills light up at once.
+              const bestMatch = activeSection.links
+                .filter(l => path === l.href || path.startsWith(l.href + '/'))
+                .sort((a, b) => b.href.length - a.href.length)[0]?.href
+              return activeSection.links.map(l => {
+              const linkActive = l.href === bestMatch
               return (
                 <button
                   key={l.href}
@@ -272,7 +279,8 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
                   <span className="relative">{l.label[lang]}</span>
                 </button>
               )
-            })}
+            })
+            })()}
           </div>
         )}
       </nav>
