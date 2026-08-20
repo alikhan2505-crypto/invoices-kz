@@ -5,6 +5,7 @@ import { motion, useReducedMotion } from 'framer-motion'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import SiteNav from '@/components/SiteNav'
+import DesktopShell from '@/components/DesktopShell'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -19,14 +20,6 @@ const GOAL_OPTIONS = [
   { value: 'answer_questions', label: 'Отвечать на вопросы' },
   { value: 'qualify_lead', label: 'Квалифицировать заявку' },
 ]
-
-function BackIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="m15 18-6-6 6-6" />
-    </svg>
-  )
-}
 
 function CheckCircleIcon() {
   return (
@@ -157,23 +150,28 @@ export default function AiAgentSettings() {
   }
 
   if (loading) return (
-    <main className="nav-surface-elevated min-h-screen">
+    <DesktopShell>
+    <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
       <SiteNav />
       <div className="p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Загрузка…</div>
     </main>
+    </DesktopShell>
   )
 
   if (forbidden) return (
-    <main className="nav-surface-elevated min-h-screen">
+    <DesktopShell>
+    <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
       <SiteNav />
       <div className="p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Эта функция пока доступна только администраторам.</div>
     </main>
+    </DesktopShell>
   )
 
   const instagramConnection = connections.find(c => c.channel === 'instagram')
 
   return (
-    <main className="nav-surface-elevated min-h-screen">
+    <DesktopShell>
+    <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
       <SiteNav />
       <div className="max-w-xl mx-auto p-4 lg:p-6 pb-24 lg:pb-6">
         <motion.div
@@ -181,9 +179,6 @@ export default function AiAgentSettings() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE }}
         >
-          <button onClick={() => router.push('/dashboard')} className="flex items-center gap-1 text-xs mb-3 transition-colors" style={{ color: 'var(--nav-text-muted)' }}>
-            <BackIcon /> Назад
-          </button>
           <h1 className="text-xl font-bold mb-1" style={{ color: 'var(--nav-text-primary)' }}>AI-агент</h1>
           <p className="text-sm mb-6" style={{ color: 'var(--nav-text-secondary)' }}>Настройте ассистента, который отвечает вашим клиентам в Instagram</p>
         </motion.div>
@@ -314,5 +309,6 @@ export default function AiAgentSettings() {
         </motion.div>
       </div>
     </main>
+    </DesktopShell>
   )
 }

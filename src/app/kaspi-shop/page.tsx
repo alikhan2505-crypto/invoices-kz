@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import LoadingSpinner from '@/components/LoadingSpinner'
 import SiteNav from '@/components/SiteNav'
+import DesktopShell from '@/components/DesktopShell'
 
 type Product = {
   id: string
@@ -404,7 +405,8 @@ export default function KaspiShop() {
   const activeCount = products.filter(p => p.enabled).length
 
   return (
-    <main className="nav-surface-elevated min-h-screen">
+    <DesktopShell>
+    <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
       <SiteNav />
 
       <div className="flex-1 min-w-0 p-4 lg:p-6 pb-24 lg:pb-6">
@@ -423,45 +425,55 @@ export default function KaspiShop() {
         )}
 
         {!connected ? (
-          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}
-            className="nav-glass nav-card-accent rounded-[28px] p-6 lg:p-10 mb-4">
-            <div className="text-[11px] font-semibold tracking-wider uppercase mb-2" style={{ color: 'var(--nav-text-muted)' }}>Подключение</div>
-            <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight mb-6" style={{ color: 'var(--nav-text-primary)' }}>Подключите Kaspi Магазин</h1>
-            {connectError && <div className="text-sm mb-3" style={{ color: 'var(--nav-critical)' }}>{connectError}</div>}
+          /* Centered connect dialog (2026-08-20, founder): the connect form
+             used to render as a full-width inline card flush to the top-left,
+             which read as a broken/half-empty page. Now it floats as a true
+             centered modal over the page, same treatment as the app's other
+             dialogs (bank picker, wallet). Not dismissible -- without a
+             connection there is nothing else on this page to interact with. */
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/30">
+            <motion.div initial={{ opacity: 0, scale: 0.97, y: 6 }} animate={{ opacity: 1, scale: 1, y: 0 }} transition={{ duration: 0.25, ease: EASE }}
+              className="relative nav-glass rounded-[24px] w-full max-w-md p-6 lg:p-8 max-h-[84vh] overflow-y-auto"
+              style={{ boxShadow: '0 34px 80px -20px rgba(10,10,15,0.4), var(--nav-card-glow)' }}>
+              <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[24px]" style={{ background: 'linear-gradient(90deg, var(--nav-accent), var(--nav-teal))' }} />
+              <div className="text-[11px] font-semibold tracking-wider uppercase mb-2" style={{ color: 'var(--nav-text-muted)' }}>Подключение</div>
+              <h1 className="text-2xl font-extrabold tracking-tight mb-6" style={{ color: 'var(--nav-text-primary)' }}>Подключите Kaspi Магазин</h1>
+              {connectError && <div className="text-sm mb-3" style={{ color: 'var(--nav-critical)' }}>{connectError}</div>}
 
-            {merchantChoices ? (
-              <div className="flex flex-col gap-2 max-w-sm">
-                <div className="text-xs mb-1" style={{ color: 'var(--nav-text-muted)' }}>На этом номере найдено магазинов: {merchantChoices.length}. Выберите нужный.</div>
-                {merchantChoices.map(m => (
-                  <button key={m.id} onClick={() => selectMerchant(m.id)} disabled={connecting}
-                    className="w-full text-left nav-glass rounded-xl px-4 py-3 text-sm transition-colors hover:border-[color:var(--nav-accent)] disabled:opacity-50"
-                    style={{ color: 'var(--nav-text-primary)' }}>
-                    <div className="font-semibold">{m.name}</div>
-                    <div className="text-[11px] mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>ID {m.id}</div>
+              {merchantChoices ? (
+                <div className="flex flex-col gap-2">
+                  <div className="text-xs mb-1" style={{ color: 'var(--nav-text-muted)' }}>На этом номере найдено магазинов: {merchantChoices.length}. Выберите нужный.</div>
+                  {merchantChoices.map(m => (
+                    <button key={m.id} onClick={() => selectMerchant(m.id)} disabled={connecting}
+                      className="w-full text-left nav-glass rounded-xl px-4 py-3 text-sm transition-colors hover:border-[color:var(--nav-accent)] disabled:opacity-50"
+                      style={{ color: 'var(--nav-text-primary)' }}>
+                      <div className="font-semibold">{m.name}</div>
+                      <div className="text-[11px] mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>ID {m.id}</div>
+                    </button>
+                  ))}
+                </div>
+              ) : !otpToken ? (
+                <div className="flex flex-col gap-2">
+                  <input className={INPUT_CLS} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }}
+                    placeholder="Телефон (как при входе в Kaspi)" value={phone} onChange={e => setPhone(formatPhone(e.target.value))} />
+                  <button onClick={startConnect} disabled={connecting}
+                    className="mt-1 rounded-xl py-3 text-sm font-semibold disabled:opacity-50" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                    {connecting ? 'Отправляем код...' : 'Продолжить'}
                   </button>
-                ))}
-              </div>
-            ) : !otpToken ? (
-              <div className="flex flex-col gap-2 max-w-sm">
-                <input className={INPUT_CLS} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }}
-                  placeholder="Телефон (как при входе в Kaspi)" value={phone} onChange={e => setPhone(formatPhone(e.target.value))} />
-                <button onClick={startConnect} disabled={connecting}
-                  className="mt-1 rounded-xl py-3 text-sm font-semibold disabled:opacity-50" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-                  {connecting ? 'Отправляем код...' : 'Продолжить'}
-                </button>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-2 max-w-sm">
-                <div className="text-xs mb-1" style={{ color: 'var(--nav-text-muted)' }}>Код из SMS отправлен на {phone}</div>
-                <input className={`${INPUT_CLS} font-mono tracking-widest`} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }}
-                  placeholder="000000" value={otpCode} onChange={e => setOtpCode(e.target.value)} />
-                <button onClick={completeConnect} disabled={connecting}
-                  className="mt-1 rounded-xl py-3 text-sm font-semibold disabled:opacity-50" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-                  {connecting ? 'Проверяем...' : 'Подтвердить'}
-                </button>
-              </div>
-            )}
-          </motion.div>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <div className="text-xs mb-1" style={{ color: 'var(--nav-text-muted)' }}>Код из SMS отправлен на {phone}</div>
+                  <input className={`${INPUT_CLS} font-mono tracking-widest`} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }}
+                    placeholder="000000" value={otpCode} onChange={e => setOtpCode(e.target.value)} />
+                  <button onClick={completeConnect} disabled={connecting}
+                    className="mt-1 rounded-xl py-3 text-sm font-semibold disabled:opacity-50" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                    {connecting ? 'Проверяем...' : 'Подтвердить'}
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          </div>
         ) : (
           <>
             {/* Hero: the one question this page answers, stated as three
@@ -751,5 +763,6 @@ export default function KaspiShop() {
         )}
       </AnimatePresence>
     </main>
+    </DesktopShell>
   )
 }

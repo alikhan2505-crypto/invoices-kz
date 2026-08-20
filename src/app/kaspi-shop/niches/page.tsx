@@ -5,6 +5,7 @@ import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import LoadingSpinner from '@/components/LoadingSpinner'
 import SiteNav from '@/components/SiteNav'
+import DesktopShell from '@/components/DesktopShell'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 const CARD_HOVER = 'transition-all duration-200 ease-out hover:-translate-y-1 hover:shadow-[var(--nav-card-glow)]'
@@ -137,7 +138,8 @@ export default function KaspiShopNiches() {
   const isEmpty = !!summary && summary.total === 0 && summary.products.length === 0
 
   return (
-    <main className="nav-surface-elevated min-h-screen">
+    <DesktopShell>
+    <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
       <SiteNav />
 
       <div className="flex-1 min-w-0 p-4 lg:p-6 pb-24 lg:pb-6">
@@ -285,5 +287,6 @@ export default function KaspiShopNiches() {
         </div>
       )}
     </main>
+    </DesktopShell>
   )
 }

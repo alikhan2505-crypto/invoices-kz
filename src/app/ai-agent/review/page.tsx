@@ -2,9 +2,9 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, useReducedMotion } from 'framer-motion'
-import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import SiteNav from '@/components/SiteNav'
+import DesktopShell from '@/components/DesktopShell'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -90,21 +90,26 @@ export default function AiAgentReview() {
   }
 
   if (loading) return (
-    <main className="nav-surface-elevated min-h-screen">
+    <DesktopShell>
+    <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
       <SiteNav />
       <div className="p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Загрузка…</div>
     </main>
+    </DesktopShell>
   )
 
   if (forbidden) return (
-    <main className="nav-surface-elevated min-h-screen">
+    <DesktopShell>
+    <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
       <SiteNav />
       <div className="p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Эта функция пока доступна только администраторам.</div>
     </main>
+    </DesktopShell>
   )
 
   return (
-    <main className="nav-surface-elevated min-h-screen">
+    <DesktopShell>
+    <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
       <SiteNav />
       <div className="max-w-xl mx-auto p-4 lg:p-6 pb-24 lg:pb-6">
         <motion.div
@@ -112,7 +117,6 @@ export default function AiAgentReview() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE }}
         >
-          <Link href="/ai-agent/settings" className="text-xs mb-2 inline-block transition-colors" style={{ color: 'var(--nav-text-muted)' }}>← Настройки агента</Link>
           <h1 className="text-xl font-bold mb-1" style={{ color: 'var(--nav-text-primary)' }}>Диалоги на проверке</h1>
           <p className="text-sm mb-6" style={{ color: 'var(--nav-text-secondary)' }}>Агент ещё обучается — черновики ответов ждут вашего одобрения</p>
         </motion.div>
@@ -158,5 +162,6 @@ export default function AiAgentReview() {
         </div>
       </div>
     </main>
+    </DesktopShell>
   )
 }

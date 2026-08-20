@@ -5,6 +5,7 @@ import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import LoadingSpinner from '@/components/LoadingSpinner'
 import SiteNav from '@/components/SiteNav'
+import DesktopShell from '@/components/DesktopShell'
 import SessionExpiredBanner from '@/components/kaspiShop/SessionExpiredBanner'
 
 const EASE = [0.16, 1, 0.3, 1] as const
@@ -75,7 +76,8 @@ export default function KaspiShopPendingProducts() {
   if (loading) return <LoadingSpinner />
 
   return (
-    <main className="nav-surface-elevated min-h-screen">
+    <DesktopShell>
+    <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
       <SiteNav />
 
       <div className="flex-1 min-w-0 p-4 lg:p-6 pb-24 lg:pb-6">
@@ -146,5 +148,6 @@ export default function KaspiShopPendingProducts() {
         )}
       </div>
     </main>
+    </DesktopShell>
   )
 }
