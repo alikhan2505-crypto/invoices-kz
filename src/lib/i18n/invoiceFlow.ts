@@ -99,6 +99,11 @@ export interface InvoiceFlowContent {
   saveButtonLabel: string
   bankPickerTitle: string
   mainBankBadge: string
+  vatHintAriaLabel: string
+  vatHintText: string
+  vatHintLink: string
+  noContractLabel: string
+  noContractValue: string
 
   // invoice detail
   statusLabelPaid: string
@@ -183,6 +188,7 @@ export interface InvoiceFlowContent {
   contractNumberLabelEdit: string
   contractNumberPlaceholderEdit: string
   notePlaceholder: string
+  paymentDueNote: (date: string) => string
   enterBinIinAlert: string
   fillAllServicesAlert: string
   savingButtonLabel: string
@@ -288,8 +294,13 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     saveClientPrompt: (name: string) => `${name} будет добавлен в справочник`,
     skipButton: 'Пропустить',
     saveButtonLabel: 'Сохранить',
-    bankPickerTitle: 'Выберите счёт для PDF',
+    bankPickerTitle: 'Выберите счёт',
     mainBankBadge: '★ Основной',
+    vatHintAriaLabel: 'Что такое НДС 16%',
+    vatHintText: 'Ставка НДС задаётся в настройках профиля и применяется ко всем новым счетам.',
+    vatHintLink: 'Изменить в настройках →',
+    noContractLabel: 'Без договора',
+    noContractValue: 'Без договора',
 
     statusLabelPaid: 'Оплачен',
     statusLabelSent: 'Отправлен',
@@ -380,6 +391,7 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     contractNumberLabelEdit: 'Номер договора',
     contractNumberPlaceholderEdit: '№123',
     notePlaceholder: 'Оплата в течение 3х дней...',
+    paymentDueNote: (date: string) => `Принимается оплата до ${date}`,
     enterBinIinAlert: 'Введите БИН/ИИН',
     fillAllServicesAlert: 'Заполните все услуги',
     savingButtonLabel: 'Сохраняем...',
@@ -483,8 +495,13 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     saveClientPrompt: (name: string) => `${name} анықтамалыққа қосылады`,
     skipButton: 'Өткізіп жіберу',
     saveButtonLabel: 'Сақтау',
-    bankPickerTitle: 'PDF үшін шотты таңдаңыз',
+    bankPickerTitle: 'Шотты таңдаңыз',
     mainBankBadge: '★ Негізгі',
+    vatHintAriaLabel: 'ҚҚС 16% дегеніміз не',
+    vatHintText: 'ҚҚС мөлшерлемесі профиль баптауларында беріледі және барлық жаңа шоттарға қолданылады.',
+    vatHintLink: 'Баптауларда өзгерту →',
+    noContractLabel: 'Шартсыз',
+    noContractValue: 'Шартсыз',
 
     statusLabelPaid: 'Төленді',
     statusLabelSent: 'Жіберілді',
@@ -575,6 +592,7 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     contractNumberLabelEdit: 'Шарт нөмірі',
     contractNumberPlaceholderEdit: '№123',
     notePlaceholder: 'Төлем 3 күн ішінде...',
+    paymentDueNote: (date: string) => `Төлем ${date} дейін қабылданады`,
     enterBinIinAlert: 'БСН/ЖСН енгізіңіз',
     fillAllServicesAlert: 'Барлық қызметтерді толтырыңыз',
     savingButtonLabel: 'Сақталуда...',
@@ -678,8 +696,13 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     saveClientPrompt: (name: string) => `${name} will be added to your directory`,
     skipButton: 'Skip',
     saveButtonLabel: 'Save',
-    bankPickerTitle: 'Choose an account for the PDF',
+    bankPickerTitle: 'Choose an account',
     mainBankBadge: '★ Main',
+    vatHintAriaLabel: 'What is 16% VAT',
+    vatHintText: 'The VAT rate is set in your profile settings and applies to all new invoices.',
+    vatHintLink: 'Change in settings →',
+    noContractLabel: 'No contract',
+    noContractValue: 'No contract',
 
     statusLabelPaid: 'Paid',
     statusLabelSent: 'Sent',
@@ -770,6 +793,7 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     contractNumberLabelEdit: 'Contract number',
     contractNumberPlaceholderEdit: 'No. 123',
     notePlaceholder: 'Payment within 3 days...',
+    paymentDueNote: (date: string) => `Payment accepted until ${date}`,
     enterBinIinAlert: 'Enter the BIN/IIN',
     fillAllServicesAlert: 'Fill in all services',
     savingButtonLabel: 'Saving...',

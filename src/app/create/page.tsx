@@ -31,6 +31,16 @@ function XIcon({ size = 15 }: { size?: number }) {
   )
 }
 
+function InfoIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 11v6" />
+      <path d="M12 7.5h.01" />
+    </svg>
+  )
+}
+
 function ChevronRightIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -80,6 +90,8 @@ export default function CreateInvoicePage() {
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [bankAccounts, setBankAccounts] = useState<any[]>([])
   const [showBankPicker, setShowBankPicker] = useState(false)
+  const [showVatHint, setShowVatHint] = useState(false)
+  const vatHintRef = useRef<HTMLSpanElement>(null)
   const [pendingInvoiceData, setPendingInvoiceData] = useState<any>(null)
   // Ref для хранения открытого окна PDF
  
@@ -90,6 +102,7 @@ export default function CreateInvoicePage() {
   const [clientPhone, setClientPhone] = useState('')
   const [contractNumber, setContractNumber] = useState('')
   const [contractDate, setContractDate] = useState('')
+  const [noContract, setNoContract] = useState(false)
   const [dueDate, setDueDate] = useState('')
   const [dueDateTouched, setDueDateTouched] = useState(false)
   const [clientKnp, setClientKnp] = useState('849')
@@ -122,7 +135,6 @@ export default function CreateInvoicePage() {
     setProfile(p)
     setProfileLoaded(true)
     if (p) cacheSet('profile_' + user.id, p)
-    if (p?.default_note) setNote(p.default_note)
     if (!dueDateTouched) setDueDate(computeDefaultDueDate(todayDateString(), p?.default_due_days))
 
     supabase.from('profiles').update({ last_active_at: new Date().toISOString() }).eq('id', user.id).then(() => {})
@@ -188,6 +200,27 @@ export default function CreateInvoicePage() {
     return () => window.removeEventListener('focus', handleFocus)
   }, [load])
 
+  // Примечание всегда отражает выбранный срок оплаты -- вместо статичного
+  // "оплата в течение N дней" показываем конкретную дату (2026-08-20, founder request).
+  useEffect(() => {
+    if (dueDate) setNote(invoiceFlowDict[lang].paymentDueNote(formatDate(dueDate)))
+  }, [dueDate, lang])
+
+  useEffect(() => {
+    if (!showVatHint) return
+    function onOutsideClick(e: MouseEvent) {
+      if (vatHintRef.current && !vatHintRef.current.contains(e.target as Node)) setShowVatHint(false)
+    }
+    document.addEventListener('click', onOutsideClick)
+    return () => document.removeEventListener('click', onOutsideClick)
+  }, [showVatHint])
+
+  function toggleNoContract(checked: boolean) {
+    setNoContract(checked)
+    if (checked) { setContractNumber(t.noContractValue); setContractDate('') }
+    else { setContractNumber('') }
+  }
+
   function selectClient(client: any) {
     setClientName(client.name)
     setClientBin(client.bin_iin || '')
@@ -217,7 +250,6 @@ export default function CreateInvoicePage() {
     setContractDate('')
     setClientKnp('849')
     setClientSelected(false)
-    setNote('')
     setDueDate(computeDefaultDueDate(todayDateString(), profile?.default_due_days))
     setDueDateTouched(false)
   }
@@ -281,7 +313,7 @@ export default function CreateInvoicePage() {
       clientAddress: ca,
       clientPhone: cp,
       contractNumber: cn2,
-      contractDate: cd,
+      contractDate: cd ? formatDate(cd) : undefined,
       knp,
       services: svcs,
       total: tot,
@@ -423,7 +455,7 @@ export default function CreateInvoicePage() {
     const html = await generateInvoicePDF({
       number: data.number, date: invoiceDate,
       clientName, clientBin, clientEmail, clientAddress, clientPhone,
-      contractNumber, contractDate, knp: clientKnp, services, total,
+      contractNumber, contractDate: contractDate ? formatDate(contractDate) : undefined, knp: clientKnp, services, total,
       note: note || '', autoPrint: false, vatType: profile?.vat_type || 'no_vat',
       profile: buildPDFProfile(),
       bank: {
@@ -590,16 +622,21 @@ export default function CreateInvoicePage() {
                     placeholder={t.buyerPhonePlaceholderDashboard} value={clientPhone} type="tel" maxLength={16}
                     onChange={e => setClientPhone(formatPhone(e.target.value))} />
                 </div>
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input type="checkbox" checked={noContract} onChange={e => toggleNoContract(e.target.checked)}
+                    className="w-3.5 h-3.5 rounded" style={{ accentColor: 'var(--nav-accent)' }} />
+                  <span className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>{t.noContractLabel}</span>
+                </label>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.contractNumberLabelDashboard}</label>
-                    <input className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
+                    <input disabled={noContract} className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)] disabled:opacity-50"
                       placeholder={t.contractNumberPlaceholderDashboard} value={contractNumber} onChange={e => setContractNumber(e.target.value)} />
                   </div>
                   <div>
                     <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.contractDateLabel}</label>
-                    <input className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
-                      placeholder={t.contractDatePlaceholder} value={contractDate} onChange={e => setContractDate(e.target.value)} />
+                    <input type="date" disabled={noContract} className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)] disabled:opacity-50"
+                      value={contractDate} onChange={e => setContractDate(e.target.value)} />
                   </div>
                 </div>
                 <div>
@@ -651,16 +688,21 @@ export default function CreateInvoicePage() {
                     placeholder={t.buyerPhonePlaceholderDashboard} value={clientPhone} type="tel" maxLength={16}
                     onChange={e => setClientPhone(formatPhone(e.target.value))} />
                 </div>
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input type="checkbox" checked={noContract} onChange={e => toggleNoContract(e.target.checked)}
+                    className="w-3.5 h-3.5 rounded" style={{ accentColor: 'var(--nav-accent)' }} />
+                  <span className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>{t.noContractLabel}</span>
+                </label>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.contractNumberLabelDashboard}</label>
-                    <input className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
+                    <input disabled={noContract} className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)] disabled:opacity-50"
                       placeholder={t.contractNumberPlaceholderDashboard} value={contractNumber} onChange={e => setContractNumber(e.target.value)} />
                   </div>
                   <div>
                     <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.contractDateLabel}</label>
-                    <input className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
-                      placeholder={t.contractDatePlaceholder} value={contractDate} onChange={e => setContractDate(e.target.value)} />
+                    <input type="date" disabled={noContract} className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)] disabled:opacity-50"
+                      value={contractDate} onChange={e => setContractDate(e.target.value)} />
                   </div>
                 </div>
                 <div>
@@ -781,7 +823,23 @@ export default function CreateInvoicePage() {
                   <span>{t.amountWithoutVatLabel}</span><span>{totalWithoutVat.toLocaleString('ru-KZ')} ₸</span>
                 </div>
                 <div className="flex justify-between text-sm text-white/70 mb-3 tabular-nums">
-                  <span>{t.vat16Label}</span><span>{vatAmount.toLocaleString('ru-KZ')} ₸</span>
+                  <span ref={vatHintRef} className="relative flex items-center gap-1.5">
+                    {t.vat16Label}
+                    <button type="button" onClick={() => setShowVatHint(v => !v)} className="text-white/50 hover:text-white/90 transition-colors" aria-label={t.vatHintAriaLabel}>
+                      <InfoIcon />
+                    </button>
+                    {showVatHint && (
+                      <div className="absolute left-0 top-[calc(100%+8px)] z-10 w-60 rounded-xl p-3 text-xs leading-relaxed normal-case"
+                        style={{ background: 'var(--nav-surface-chrome)', color: 'var(--nav-text-secondary)', boxShadow: '0 20px 44px -18px rgba(10,10,15,0.35)' }}>
+                        {t.vatHintText}
+                        <button type="button" onClick={() => { setShowVatHint(false); router.push('/profile/settings') }}
+                          className="block mt-2 font-semibold text-left" style={{ color: 'var(--nav-accent)' }}>
+                          {t.vatHintLink}
+                        </button>
+                      </div>
+                    )}
+                  </span>
+                  <span>{vatAmount.toLocaleString('ru-KZ')} ₸</span>
                 </div>
               </>
             ) : vatType === 'vat_0' ? (
@@ -889,8 +947,8 @@ export default function CreateInvoicePage() {
 
       {/* Bank picker modal */}
       {showBankPicker && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-end">
-          <div className="w-full max-w-lg mx-auto rounded-t-3xl p-5" style={{ background: 'var(--nav-surface-chrome)' }}>
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-3">
+          <div className="w-full max-w-lg rounded-3xl p-5 max-h-[80vh] overflow-y-auto" style={{ background: 'var(--nav-surface-chrome)' }}>
             <div className="flex items-center justify-between mb-4">
               <span className="font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{t.bankPickerTitle}</span>
               <button onClick={() => {

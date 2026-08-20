@@ -391,7 +391,7 @@ export default function TopUtilityBar() {
               initial={reduceMotion ? false : { opacity: 0, scale: 0.97, y: 6 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               transition={{ duration: reduceMotion ? 0 : 0.22, ease: [0.16, 1, 0.3, 1] }}
-              className="relative nav-glass rounded-[24px] w-full max-w-md mb-32 lg:mb-0 max-h-[84vh] overflow-y-auto overflow-x-hidden"
+              className="relative nav-glass rounded-[24px] w-full max-w-lg mb-32 lg:mb-0 max-h-[84vh] overflow-y-auto overflow-x-hidden"
               style={{ boxShadow: '0 34px 80px -20px rgba(10,10,15,0.4), var(--nav-card-glow)' }}
               onClick={e => e.stopPropagation()}
             >
@@ -505,14 +505,14 @@ export default function TopUtilityBar() {
                   {historyLoading && <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>Загрузка…</div>}
                   {!historyLoading && history.length === 0 && <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>Пока нет операций</div>}
                   {!historyLoading && history.length > 0 && (
-                    <div className="space-y-0.5 max-h-40 overflow-y-auto">
+                    <div className="space-y-0.5 max-h-40 overflow-y-auto pr-2 -mr-2">
                       {history.slice(0, 8).map((h, i) => (
                         <motion.div
                           key={i}
                           initial={reduceMotion ? false : { opacity: 0, y: 6 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ duration: reduceMotion ? 0 : 0.2, delay: reduceMotion ? 0 : 0.05 + i * 0.03, ease: [0.16, 1, 0.3, 1] }}
-                          className="flex items-center justify-between gap-2 py-1.5"
+                          className="flex items-center justify-between gap-3 py-1.5"
                         >
                           <div className="flex items-center gap-2 min-w-0">
                             <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: walletDotColor(h) }} />

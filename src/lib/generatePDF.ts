@@ -162,8 +162,8 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<string> {
           font-size: 11px;
           color: #000;
           width: 794px;
-
-          margin: 20px auto;
+          min-height: 1123px;
+          margin: 40px auto;
           background: white;
           padding: 25mm 15mm 20mm;
           box-shadow: 0 0 20px rgba(0,0,0,0.3);
@@ -218,7 +218,6 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<string> {
       </table>
 
       <div class="title">Счет на оплату №${data.number} от ${data.date}</div>
-      ${data.dueDate ? `<div style="font-size:11px;color:#6b7280;margin-top:-8px;margin-bottom:10px;">Срок оплаты: ${data.dueDate}</div>` : ''}
 
       <table style="width:100%; border-collapse:collapse; margin-bottom:10px;">
         <tr>

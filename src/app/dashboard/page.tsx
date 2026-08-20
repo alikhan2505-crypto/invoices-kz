@@ -7,6 +7,7 @@ import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import { formatDateTime } from '@/lib/date'
 import Skeleton from '@/components/Skeleton'
+import Link from 'next/link'
 
 // Same easing curve used on the landing page (src/app/page.tsx) -- kept
 // identical across the app rather than inventing a second "house" ease.
@@ -687,7 +688,7 @@ export default function DashboardPage() {
             {/* Header button removed 2026-08-19 (founder) -- the full-width
                 «Создать счёт» under the recent-invoices list is the single
                 create entry point on this page now. */}
-            <h2 className="text-xl font-bold" style={{ color: 'var(--nav-text-primary)' }}>Главная</h2>
+            <h2 className="text-xl font-bold" style={{ color: 'var(--nav-text-primary)' }}>Дашборд</h2>
           </motion.div>
 
           {/* Продукты платформы */}
@@ -1025,6 +1026,27 @@ export default function DashboardPage() {
               </div>
             </motion.div>
           </div>
+
+          {/* Footer -- company details + legal/contact links, matching the
+              landing page's footer copy (src/app/page.tsx) so the same
+              entity/contacts appear once the user is inside the app too. */}
+          <footer className="mt-8 pt-5" style={{ borderTop: '1px solid var(--nav-border-soft)' }}>
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <span className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>
+                ИП First Project · БИН 890525350143 · г. Астана
+              </span>
+              <nav className="flex flex-wrap gap-4" aria-label="legal">
+                <Link href="/privacy" className="text-xs hover:underline" style={{ color: 'var(--nav-text-secondary)' }}>Политика</Link>
+                <Link href="/terms" className="text-xs hover:underline" style={{ color: 'var(--nav-text-secondary)' }}>Условия</Link>
+                <Link href="/data-deletion" className="text-xs hover:underline" style={{ color: 'var(--nav-text-secondary)' }}>Удаление данных</Link>
+              </nav>
+              <div className="flex flex-wrap gap-4">
+                <a href="https://wa.me/77763555177" target="_blank" rel="noopener noreferrer" className="text-xs hover:underline" style={{ color: 'var(--nav-text-secondary)' }}>WhatsApp</a>
+                <a href="mailto:support@invoices.kz" className="text-xs hover:underline" style={{ color: 'var(--nav-text-secondary)' }}>Email</a>
+                <a href="https://t.me/invoiceskz_support" target="_blank" rel="noopener noreferrer" className="text-xs hover:underline" style={{ color: 'var(--nav-text-secondary)' }}>Telegram</a>
+              </div>
+            </div>
+          </footer>
         </div>
       </main>
     </DesktopShell>
