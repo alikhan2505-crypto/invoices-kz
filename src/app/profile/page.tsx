@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { motion, useReducedMotion } from 'framer-motion'
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
@@ -272,6 +272,10 @@ export default function Profile() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [stats, setStats] = useState({ clients: 0, services: 0, income: 0, invoices: 0 })
   const [chartData, setChartData] = useState<{ month: string; income: number }[]>([])
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   useEffect(() => {
     async function load() {
@@ -327,6 +331,34 @@ export default function Profile() {
     if (user) cacheClear('profile_' + user.id)
     await supabase.auth.signOut()
     router.push('/login')
+  }
+
+  const DELETE_CONFIRM_PHRASE = 'INVOICES.KZ'
+
+  async function deleteAccount() {
+    if (deleteConfirmText !== DELETE_CONFIRM_PHRASE || deleting) return
+    setDeleting(true)
+    setDeleteError('')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/account/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ confirmText: deleteConfirmText }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setDeleteError(data.error || t.errorPrefix(''))
+        setDeleting(false)
+        return
+      }
+      if (profile?.id) cacheClear('profile_' + profile.id)
+      await supabase.auth.signOut()
+      router.push('/login')
+    } catch (e: any) {
+      setDeleteError(t.errorPrefix(e.message || ''))
+      setDeleting(false)
+    }
   }
 
 
@@ -648,6 +680,16 @@ export default function Profile() {
     </motion.button>
   )
 
+  // Deliberately quieter than signOutEl -- a rare, severe action shouldn't
+  // compete visually with the common one right above it.
+  const deleteAccountEl = (
+    <motion.button {...fadeIn(7)} onClick={() => setDeleteModalOpen(true)}
+      className="w-full rounded-xl py-2.5 text-xs font-medium transition-colors hover:underline"
+      style={{ color: 'var(--nav-text-muted)' }}>
+      {t.deleteAccountButton}
+    </motion.button>
+  )
+
   return (
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
@@ -661,6 +703,7 @@ export default function Profile() {
               {subscriptionEl}
               {themeEl}
               {signOutEl}
+              {deleteAccountEl}
             </div>
             <div className="flex flex-col gap-4 flex-1 min-w-0">
               {companyEl}
@@ -677,9 +720,54 @@ export default function Profile() {
             {subscriptionEl}
             {themeEl}
             {signOutEl}
+            {deleteAccountEl}
           </div>
         )}
       </div>
+
+      <AnimatePresence>
+        {deleteModalOpen && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-end lg:items-center justify-center p-3 bg-black/30"
+            onClick={() => { if (!deleting) { setDeleteModalOpen(false); setDeleteConfirmText(''); setDeleteError('') } }}>
+            <motion.div initial={{ opacity: 0, scale: 0.95, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.97, y: 10 }}
+              transition={{ duration: 0.25, ease: EASE }}
+              className="relative nav-glass rounded-[24px] w-full max-w-sm overflow-hidden"
+              style={{ boxShadow: '0 34px 80px -20px rgba(10,10,15,0.4), var(--nav-card-glow)' }}
+              onClick={e => e.stopPropagation()}>
+              <div className="absolute top-0 left-0 right-0 h-1" style={{ background: 'var(--nav-critical)' }} />
+              <div className="p-5">
+                <div className="text-base font-bold mb-2" style={{ color: 'var(--nav-text-primary)' }}>{t.deleteAccountModalTitle}</div>
+                <p className="text-sm mb-4 leading-relaxed" style={{ color: 'var(--nav-text-secondary)' }}>{t.deleteAccountModalBody}</p>
+                <label className="block mb-4">
+                  <span className="text-xs mb-1.5 block font-medium" style={{ color: 'var(--nav-text-muted)' }}>
+                    {t.deleteAccountModalConfirmLabel(DELETE_CONFIRM_PHRASE)}
+                  </span>
+                  <input value={deleteConfirmText} onChange={e => setDeleteConfirmText(e.target.value)}
+                    placeholder={DELETE_CONFIRM_PHRASE} disabled={deleting} autoFocus
+                    className="w-full rounded-xl px-3 py-2.5 text-sm outline-none"
+                    style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-primary)', border: '1px solid var(--nav-border-soft)' }} />
+                </label>
+                {deleteError && (
+                  <div className="text-xs mb-3" style={{ color: 'var(--nav-critical)' }}>{deleteError}</div>
+                )}
+                <div className="flex gap-2">
+                  <button onClick={() => { setDeleteModalOpen(false); setDeleteConfirmText(''); setDeleteError('') }} disabled={deleting}
+                    className="flex-1 rounded-xl py-2.5 text-sm font-semibold disabled:opacity-40"
+                    style={{ background: 'var(--nav-surface-glass)', color: 'var(--nav-text-primary)' }}>
+                    {t.deleteAccountModalCancelButton}
+                  </button>
+                  <button onClick={deleteAccount} disabled={deleteConfirmText !== DELETE_CONFIRM_PHRASE || deleting}
+                    className="flex-1 rounded-xl py-2.5 text-sm font-semibold text-white disabled:opacity-40"
+                    style={{ background: 'var(--nav-critical)' }}>
+                    {deleting ? t.deleteAccountModalDeletingLabel : t.deleteAccountModalConfirmButton}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
     </main>
     </DesktopShell>

@@ -51,6 +51,13 @@ export interface ProfileCoreContent {
   lightThemeLabel: string
   languageSectionLabel: string
   signOutButton: string
+  deleteAccountButton: string
+  deleteAccountModalTitle: string
+  deleteAccountModalBody: string
+  deleteAccountModalConfirmLabel: (phrase: string) => string
+  deleteAccountModalCancelButton: string
+  deleteAccountModalConfirmButton: string
+  deleteAccountModalDeletingLabel: string
 
   // requisites page (requisites/page.tsx)
   requisitesHeaderLabel: string
@@ -175,6 +182,13 @@ export const profileCoreDict: Record<'ru' | 'kk' | 'en', ProfileCoreContent> = {
     lightThemeLabel: 'Светлая тема',
     languageSectionLabel: 'Язык / Тіл',
     signOutButton: 'Выйти из аккаунта',
+    deleteAccountButton: 'Удалить аккаунт',
+    deleteAccountModalTitle: 'Удалить аккаунт?',
+    deleteAccountModalBody: 'Вы больше не сможете войти в этот аккаунт. Счета, клиенты и вся история сохранятся у нас на случай, если вы вернётесь, но доступ к ним будет закрыт.',
+    deleteAccountModalConfirmLabel: (phrase: string) => `Введите ${phrase}, чтобы подтвердить`,
+    deleteAccountModalCancelButton: 'Отмена',
+    deleteAccountModalConfirmButton: 'Удалить аккаунт',
+    deleteAccountModalDeletingLabel: 'Удаляем...',
 
     requisitesHeaderLabel: 'Реквизиты компании',
     companyNameFieldLabel: 'Название компании / ИП',
@@ -294,6 +308,13 @@ export const profileCoreDict: Record<'ru' | 'kk' | 'en', ProfileCoreContent> = {
     lightThemeLabel: 'Ашық тақырып',
     languageSectionLabel: 'Тіл',
     signOutButton: 'Аккаунттан шығу',
+    deleteAccountButton: 'Аккаунтты жою',
+    deleteAccountModalTitle: 'Аккаунтты жоясыз ба?',
+    deleteAccountModalBody: 'Бұл аккаунтқа енді кіре алмайсыз. Шоттар, клиенттер және барлық тарих сақталады — қайта оралсаңыз пайдалы болады, бірақ қазір оларға қол жеткізу жабылады.',
+    deleteAccountModalConfirmLabel: (phrase: string) => `Растау үшін ${phrase} деп жазыңыз`,
+    deleteAccountModalCancelButton: 'Бас тарту',
+    deleteAccountModalConfirmButton: 'Аккаунтты жою',
+    deleteAccountModalDeletingLabel: 'Жойылуда...',
 
     requisitesHeaderLabel: 'Компания деректемелері',
     companyNameFieldLabel: 'Компания / ЖК атауы',
@@ -413,6 +434,13 @@ export const profileCoreDict: Record<'ru' | 'kk' | 'en', ProfileCoreContent> = {
     lightThemeLabel: 'Light theme',
     languageSectionLabel: 'Language',
     signOutButton: 'Sign out',
+    deleteAccountButton: 'Delete account',
+    deleteAccountModalTitle: 'Delete your account?',
+    deleteAccountModalBody: "You won't be able to log into this account anymore. Invoices, clients and history stay on our side in case you come back, but access to them is closed.",
+    deleteAccountModalConfirmLabel: (phrase: string) => `Type ${phrase} to confirm`,
+    deleteAccountModalCancelButton: 'Cancel',
+    deleteAccountModalConfirmButton: 'Delete account',
+    deleteAccountModalDeletingLabel: 'Deleting...',
 
     requisitesHeaderLabel: 'Company details',
     companyNameFieldLabel: 'Company / sole proprietor name',

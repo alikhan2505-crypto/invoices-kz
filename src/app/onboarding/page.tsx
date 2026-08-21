@@ -17,6 +17,7 @@ export default function Onboarding() {
   const [accountType, setAccountType] = useState<'ИП' | 'ТОО' | 'Физлицо'>('ИП')
   const [form, setForm] = useState({ company_name: '', bin_iin: '', email: '' })
   const [bank, setBank] = useState({ bank_name: '', iik: '', bik: '', kbe: '19' })
+  const [returningUser, setReturningUser] = useState(false)
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -31,9 +32,17 @@ export default function Onboarding() {
     const promo = promoFromUrl || promoFromStorage || ''
     setPromoCode(promo)
 
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) router.push('/login')
-      else setUserId(user.id)
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) { router.push('/login'); return }
+      setUserId(user.id)
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        const res = await fetch('/api/account/check-returning', {
+          headers: { Authorization: `Bearer ${session?.access_token}` },
+        })
+        const data = await res.json().catch(() => null)
+        if (data?.returning) setReturningUser(true)
+      } catch {}
     })
 
   }, [])
@@ -169,6 +178,12 @@ export default function Onboarding() {
           <div>
             <h2 className="text-lg font-bold text-[#1C2056] mb-1">{t.step1Title}</h2>
             <p className="text-xs text-gray-400 mb-5">{t.step1Subtitle}</p>
+
+            {returningUser && (
+              <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-2.5 mb-4 text-center">
+                <span className="text-xs text-green-700">{t.returningUserBanner}</span>
+              </div>
+            )}
 
             {refCode && (
               <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-2.5 mb-4 text-center">

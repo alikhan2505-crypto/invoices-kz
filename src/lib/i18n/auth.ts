@@ -31,6 +31,7 @@ export interface AuthContent {
   referralBonusNotice: string
   promoCodeNoticePrefix: string
   promoCodeNoticeSuffix: string
+  returningUserBanner: string
   accountTypeLabel: string
   accountTypeName: (type: AccountType) => string
   companyNameFieldLabel: (type: AccountType) => string
@@ -97,6 +98,7 @@ export const authDict: Record<'ru' | 'kk' | 'en', AuthContent> = {
     referralBonusNotice: '🎁 Реферальный бонус будет начислен',
     promoCodeNoticePrefix: '🎁 Промокод',
     promoCodeNoticeSuffix: 'будет применён',
+    returningUserBanner: '👋 С возвращением! Рады видеть вас снова.',
     accountTypeLabel: 'Тип аккаунта',
     accountTypeName: (type: AccountType) => type,
     companyNameFieldLabel: (type: AccountType) =>
@@ -162,6 +164,7 @@ export const authDict: Record<'ru' | 'kk' | 'en', AuthContent> = {
     referralBonusNotice: '🎁 Реферал бонусы есептеледі',
     promoCodeNoticePrefix: '🎁',
     promoCodeNoticeSuffix: 'промокоды қолданылады',
+    returningUserBanner: '👋 Қайта оралғаныңызға қуаныштымыз!',
     accountTypeLabel: 'Аккаунт түрі',
     accountTypeName: (type: AccountType) =>
       type === 'ИП' ? 'ЖК' : type === 'ТОО' ? 'ЖШС' : 'Жеке тұлға',
@@ -228,6 +231,7 @@ export const authDict: Record<'ru' | 'kk' | 'en', AuthContent> = {
     referralBonusNotice: '🎁 A referral bonus will be credited',
     promoCodeNoticePrefix: '🎁 Promo code',
     promoCodeNoticeSuffix: 'will be applied',
+    returningUserBanner: '👋 Welcome back! Great to see you again.',
     accountTypeLabel: 'Account type',
     accountTypeName: (type: AccountType) =>
       type === 'ИП' ? 'Sole proprietor' : type === 'ТОО' ? 'LLP' : 'Individual',
