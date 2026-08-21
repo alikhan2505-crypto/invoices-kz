@@ -24,10 +24,29 @@ export async function GET(req: NextRequest) {
   const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  // Scoped to the ACTIVE connection, not user_id -- with multi-store
+  // support a user_id-wide query mixed both stores' products into one list
+  // (confirmed live 2026-08-21: Abil-Sisters products showing under the ИП
+  // FIRST PROJECT header right after the founder connected their 2nd store).
+  let connectionPaused = false
+  let connectionId: string | null = null
+  try {
+    const connection = await loadConnection(user.id)
+    connectionPaused = !!connection?.paused
+    connectionId = connection?.id ?? null
+  } catch {
+    // Stats are a best-effort summary, not the source of truth for whether
+    // the connection itself works -- the rest of the page already surfaces
+    // connection problems (loadError banner, session-expired banner).
+  }
+  if (!connectionId) {
+    return NextResponse.json({ products: [], stats: { totalRules: 0, activeCount: 0, readyToApply: 0, blockedAtFloor: 0 } })
+  }
+
   const { data, error } = await supabase
     .from('kaspi_shop_tracked_products')
     .select('*')
-    .eq('user_id', user.id)
+    .eq('connection_id', connectionId)
     .order('created_at', { ascending: false })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   const products = data || []
@@ -43,15 +62,6 @@ export async function GET(req: NextRequest) {
   // blockedAtFloor reads kaspi_shop_tracked_products.held_at_floor, written
   // by applyPriceCheckResult every cycle (see checkCycle.ts) -- no extra
   // query needed since '*' above already selects it.
-  let connectionPaused = false
-  try {
-    const connection = await loadConnection(user.id)
-    connectionPaused = !!connection?.paused
-  } catch {
-    // Stats are a best-effort summary, not the source of truth for whether
-    // the connection itself works -- the rest of the page already surfaces
-    // connection problems (loadError banner, session-expired banner).
-  }
   const now = Date.now()
   const stats = {
     totalRules: products.length,

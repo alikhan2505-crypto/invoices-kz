@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { suggestNktCodes } from '@/lib/kaspiShop/nkt'
+import { loadConnection } from '@/lib/kaspiShop/connection'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -29,10 +30,15 @@ export async function GET(req: NextRequest) {
   const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  // Scoped to the active connection -- a user_id-wide query mixed both
+  // stores' products once multi-store support landed (2026-08-21).
+  const connection = await loadConnection(user.id)
+  if (!connection) return NextResponse.json({ products: [] })
+
   const { data, error } = await supabase
     .from('kaspi_shop_tracked_products')
     .select('id, kaspi_sku, product_name, brand, kaspi_category, kaspi_shop_nkt_status(*)')
-    .eq('user_id', user.id)
+    .eq('connection_id', connection.id)
     .order('created_at', { ascending: false })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 

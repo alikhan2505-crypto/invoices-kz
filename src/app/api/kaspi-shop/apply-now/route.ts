@@ -62,15 +62,15 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({} as any))
   const productId: string | undefined = body?.productId
 
-  // Page-level button (no productId) targets ALL of the user's enabled
-  // tracked products, matching Northline's page-level "apply now" scope
-  // rather than a single row. A per-row trigger can still pass productId
-  // (scoped + ownership-checked via .eq('user_id', ...) below) -- the route
-  // supports both, the current UI only wires the page-level case.
+  // Page-level button (no productId) targets ALL of the ACTIVE store's
+  // enabled tracked products, matching Northline's page-level "apply now"
+  // scope rather than a single row. Scoped by connection_id, not user_id --
+  // with multi-store support a user-wide query would also reset the OTHER
+  // store's products. A per-row trigger can still pass productId.
   let query = supabase
     .from('kaspi_shop_tracked_products')
     .select('id')
-    .eq('user_id', user.id)
+    .eq('connection_id', connection.id)
     .eq('enabled', true)
   if (productId) query = query.eq('id', productId)
   const { data: targets, error: selectError } = await query

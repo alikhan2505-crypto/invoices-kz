@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { fetchProductReviews, computeReviewStats, filterByStars, RawReview } from '@/lib/kaspiShop/reviews'
+import { loadConnection } from '@/lib/kaspiShop/connection'
 
 // A refresh does one sequential, delayed fetch per tracked product (see
 // REFRESH_DELAY_MS below) -- same reasoning as
@@ -38,11 +39,17 @@ function sleep(ms: number) {
 
 type AggregatedReview = RawReview & { trackedProductId: string; productName: string }
 
+// Scoped to the user's ACTIVE connection -- a user_id-wide query mixed both
+// stores' products once multi-store support landed (2026-08-21).
 async function loadAggregatedReviews(userId: string) {
+  const connection = await loadConnection(userId)
+  if (!connection) {
+    return { aggregated: [] as AggregatedReview[], fetchedAtValues: [] as string[], errorCount: 0 }
+  }
   const { data: products, error: productsError } = await supabase
     .from('kaspi_shop_tracked_products')
     .select('id, product_name, kaspi_master_sku')
-    .eq('user_id', userId)
+    .eq('connection_id', connection.id)
   if (productsError) throw new Error(productsError.message)
 
   const productIds = (products || []).map(p => p.id)
@@ -108,10 +115,13 @@ export async function POST(req: NextRequest) {
   const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const connection = await loadConnection(user.id)
+  if (!connection) return NextResponse.json({ error: 'Kaspi Магазин не подключён' }, { status: 400 })
+
   const { data: products, error: productsError } = await supabase
     .from('kaspi_shop_tracked_products')
     .select('id, kaspi_master_sku')
-    .eq('user_id', user.id)
+    .eq('connection_id', connection.id)
   if (productsError) return NextResponse.json({ error: productsError.message }, { status: 500 })
 
   const withSku = (products || []).filter(p => !!p.kaspi_master_sku)
