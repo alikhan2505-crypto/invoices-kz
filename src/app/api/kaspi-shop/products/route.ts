@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { loadConnection } from '@/lib/kaspiShop/connection'
+import { loadConnection, loadConnectionById, markSessionExpired } from '@/lib/kaspiShop/connection'
 import { isCheckDue } from '@/lib/kaspiShop/checkCycle'
+import { updateOfferStock } from '@/lib/kaspiShop/cabinetPricePush'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -151,13 +152,73 @@ export async function PATCH(req: NextRequest) {
     }
   }
 
+  // Read the row's previous state BEFORE the update -- needed to know
+  // whether stock_count actually changed (the immediate Kaspi push below
+  // only fires on a real change) and for the push payload's identifiers.
+  const { data: row, error: rowError } = await supabase
+    .from('kaspi_shop_tracked_products')
+    .select('stock_count, connection_id, kaspi_sku, product_name, store_id, own_current_price')
+    .eq('id', id)
+    .eq('user_id', user.id)
+    .maybeSingle()
+  if (rowError) return NextResponse.json({ error: rowError.message }, { status: 500 })
+  if (!row) return NextResponse.json({ error: 'Товар не найден' }, { status: 404 })
+
   const { error } = await supabase
     .from('kaspi_shop_tracked_products')
     .update(patch)
     .eq('id', id)
     .eq('user_id', user.id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ ok: true })
+
+  // Immediate stock push (2026-08-21, founder request): a changed остаток
+  // goes to Kaspi right away instead of riding along with the next price
+  // change. Best-effort -- the settings save above must succeed regardless.
+  // Never pushes zero (that would flip the offer to «нет в наличии»), and
+  // sends the offer's current city prices unchanged alongside, in the same
+  // full-state MANUAL_CHANGES shape as restore. storeId carries the
+  // confirmed merchant prefix.
+  let stockPushed = false
+  let stockPushWarning: string | null = null
+  const newStock = Number(patch.stock_count)
+  if ('stock_count' in patch && Number.isFinite(newStock) && newStock > 0 && newStock !== Number(row.stock_count)) {
+    try {
+      const connection = await loadConnectionById(row.connection_id)
+      if (!connection?.sessionCookies) {
+        stockPushWarning = 'Остаток сохранён, но сессия кабинета Kaspi не активна — на Kaspi он уйдёт после переподключения.'
+      } else {
+        const { data: cityRows } = await supabase
+          .from('kaspi_shop_product_city_prices')
+          .select('city_code, own_current_price')
+          .eq('tracked_product_id', id)
+        const cityPrices = (cityRows || [])
+          .filter((c: any) => c.own_current_price !== null)
+          .map((c: any) => ({ cityId: c.city_code as string, value: Number(c.own_current_price) }))
+        const result = await updateOfferStock({
+          sessionCookies: connection.sessionCookies,
+          merchantUid: connection.merchantId,
+          sku: row.kaspi_sku,
+          model: row.product_name,
+          storeId: row.store_id ? `${connection.merchantId}_${row.store_id}` : '',
+          cityPrices: cityPrices.length > 0 ? cityPrices : [{ cityId: '750000000', value: Number(row.own_current_price) }],
+          stockCount: newStock,
+        })
+        if (result.success) {
+          stockPushed = true
+        } else if (result.reason === 'session_expired') {
+          await markSessionExpired(connection.id)
+          stockPushWarning = 'Остаток сохранён, но сессия кабинета Kaspi истекла — переподключитесь, чтобы он ушёл на Kaspi.'
+        } else {
+          stockPushWarning = `Остаток сохранён, но Kaspi не принял обновление: ${result.message}`
+        }
+      }
+    } catch (err: any) {
+      console.error('kaspi-shop products PATCH: stock push failed (non-fatal)', err.message)
+      stockPushWarning = 'Остаток сохранён, но отправить его на Kaspi сейчас не удалось.'
+    }
+  }
+
+  return NextResponse.json({ ok: true, stockPushed, stockPushWarning })
 }
 
 export async function DELETE(req: NextRequest) {

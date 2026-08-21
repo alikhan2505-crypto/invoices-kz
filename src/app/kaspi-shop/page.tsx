@@ -451,7 +451,7 @@ export default function KaspiShop() {
     const v = editValues[id]
     if (!v) return
     const headers = await authHeader()
-    await fetch('/api/kaspi-shop/products', {
+    const res = await fetch('/api/kaspi-shop/products', {
       method: 'PATCH', headers,
       body: JSON.stringify({
         id,
@@ -464,6 +464,9 @@ export default function KaspiShop() {
         stock_count: Number(v.stockCount) || 0,
       }),
     })
+    const data = await res.json().catch(() => ({}))
+    if (data.stockPushed) setApplyNowMessage('Остаток отправлен на Kaspi — применится в течение часа.')
+    else if (data.stockPushWarning) setApplyNowMessage(data.stockPushWarning)
     load()
   }
 

@@ -65,6 +65,9 @@ export type OfferAvailabilityParams = {
   model: string
   storeId: string
   cityPrices: { cityId: string; value: number }[]
+  // Omitted/null = "not managing stock via this upload" (the captured
+  // cabinet restore state); a positive number = the seller's real остаток.
+  stockCount?: number | null
 }
 
 // Shared MANUAL_CHANGES upload for toggling an offer on/off sale. The
@@ -96,7 +99,7 @@ async function pushOfferAvailability(params: OfferAvailabilityParams, available:
       body: JSON.stringify({
         merchantUid: params.merchantUid,
         availabilities: [
-          { available, storeId: params.storeId, stockCount: null },
+          { available, storeId: params.storeId, stockCount: params.stockCount ?? null },
         ],
         cityPrices: params.cityPrices,
         sku: params.sku,
@@ -124,4 +127,12 @@ export async function restoreOfferToSale(params: OfferAvailabilityParams): Promi
 
 export async function removeOfferFromSale(params: OfferAvailabilityParams): Promise<PricePushResult> {
   return pushOfferAvailability(params, 'no')
+}
+
+// Stock-only update (2026-08-21, founder request): the same available:"yes"
+// upload as a restore, carrying the seller's real остаток and the offer's
+// current city prices unchanged -- so a changed остаток reaches Kaspi
+// immediately on save instead of waiting for the next price change.
+export async function updateOfferStock(params: OfferAvailabilityParams): Promise<PricePushResult> {
+  return pushOfferAvailability(params, 'yes')
 }
