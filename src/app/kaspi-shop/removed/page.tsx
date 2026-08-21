@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import LoadingSpinner from '@/components/LoadingSpinner'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
+import { extractAttributes } from '@/lib/kaspiShop/salesAnalytics'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -78,6 +79,7 @@ export default function KaspiShopProductAvailability() {
   const [rowStates, setRowStates] = useState<Record<string, RowState>>({})
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({})
   const [stockModal, setStockModal] = useState<StockModalState | null>(null)
+  const [search, setSearch] = useState('')
 
   useEffect(() => { load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -188,7 +190,13 @@ export default function KaspiShopProductAvailability() {
 
   if (loading) return <LoadingSpinner />
 
-  const offers = tab === 'removed' ? removed : active
+  const tabOffers = tab === 'removed' ? removed : active
+  // Filter above the grid (founder request 2026-08-22): with 500+ removed
+  // offers, finding one specific product by scrolling was impractical.
+  const query = search.trim().toLowerCase()
+  const offers = query
+    ? tabOffers.filter(o => o.title.toLowerCase().includes(query) || o.sku.toLowerCase().includes(query))
+    : tabOffers
 
   return (
     <DesktopShell>
@@ -207,19 +215,27 @@ export default function KaspiShopProductAvailability() {
           </p>
         </motion.div>
 
-        <div className="flex items-center gap-1.5 mb-4">
-          {([['removed', `Сняты с продажи (${removed.length})`], ['active', `В продаже (${active.length})`]] as [Tab, string][]).map(([key, label]) => {
-            const selected = tab === key
-            return (
-              <button key={key} onClick={() => setTab(key)}
-                className="relative px-3.5 py-1.5 rounded-full text-[13px] font-medium transition-colors"
-                style={selected
-                  ? { background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }
-                  : { color: 'var(--nav-text-secondary)' }}>
-                {label}
-              </button>
-            )
-          })}
+        <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
+          <div className="flex items-center gap-1.5">
+            {([['removed', `Сняты с продажи (${removed.length})`], ['active', `В продаже (${active.length})`]] as [Tab, string][]).map(([key, label]) => {
+              const selected = tab === key
+              return (
+                <button key={key} onClick={() => setTab(key)}
+                  className="relative px-3.5 py-1.5 rounded-full text-[13px] font-medium transition-colors"
+                  style={selected
+                    ? { background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }
+                    : { color: 'var(--nav-text-secondary)' }}>
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+          {/* Search filter (founder request 2026-08-22) -- with 500+
+              removed offers, finding one product by name was impractical. */}
+          <input value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Поиск по названию или SKU..."
+            className="text-sm rounded-full px-4 py-1.5 outline-none w-full sm:w-64"
+            style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-primary)', border: '1px solid var(--nav-border-soft)' }} />
         </div>
 
         {loadError && (
@@ -253,9 +269,26 @@ export default function KaspiShopProductAvailability() {
                 transition={{ duration: 0.35, delay: i * 0.04, ease: EASE }}
                 className="nav-glass rounded-2xl p-4">
                 <div className="text-sm font-semibold truncate" title={offer.title} style={{ color: 'var(--nav-text-primary)' }}>{offer.title}</div>
-                <div className="text-[11px] mb-1" style={{ color: 'var(--nav-text-muted)' }}>
+                <div className="text-[11px] mb-1.5" style={{ color: 'var(--nav-text-muted)' }}>
                   {offer.brandName ? `${offer.brandName} · ` : ''}{offer.sku}
                 </div>
+                {/* Цвет/размер (founder request 2026-08-22): извлечены из
+                    названия товара, тем же способом, что и ABC-разрезы на
+                    Финансах -- Kaspi не отдаёт характеристики отдельно. */}
+                {(() => {
+                  const { color, size } = extractAttributes(offer.title)
+                  if (!color && !size) return null
+                  return (
+                    <div className="flex items-center gap-1.5 mb-2">
+                      {color && (
+                        <span className="text-[10px] font-medium rounded-full px-2 py-0.5" style={{ background: 'var(--nav-surface-glass)', color: 'var(--nav-text-secondary)' }}>{color}</span>
+                      )}
+                      {size && (
+                        <span className="text-[10px] font-medium rounded-full px-2 py-0.5" style={{ background: 'var(--nav-surface-glass)', color: 'var(--nav-text-secondary)' }}>Размер {size}</span>
+                      )}
+                    </div>
+                  )
+                })()}
                 {/* Город точки + остаток по ней (founder request 2026-08-21);
                     остаток «не указан» = безопасное состояние по формулировке
                     самого Kaspi. */}

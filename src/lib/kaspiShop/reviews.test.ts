@@ -2,17 +2,15 @@ import { describe, it, expect } from 'vitest'
 import { mapReviewsResponse, computeReviewStats, filterByStars, buildProductPageUrl, buildReviewsRequestUrl } from './reviews'
 
 describe('mapReviewsResponse', () => {
-  it('maps a well-formed response into a ProductReviewsPage', () => {
+  it('maps a well-formed response into a ProductReviewsPage (confirmed-live shape)', () => {
     const json = {
-      data: {
-        averageRating: 4.6,
-        totalCount: 3,
-        reviews: [
-          { rating: 5, text: 'Отличный товар!', authorName: 'Иван', date: '2026-08-01T10:00:00Z' },
-          { rating: 4, text: 'Хорошо, но доставка долгая', authorName: 'Мария', date: '2026-07-28T10:00:00Z' },
-          { rating: 3, text: '', authorName: null, date: null },
-        ],
-      },
+      data: [
+        { rating: 5, comment: { minus: '', plus: '', text: 'Хорошие плотные салфетки.' }, author: 'Айнагуль', date: '09.07.2026' },
+        { rating: 4, comment: { minus: '', plus: '', text: 'Неплохо.' }, author: 'Мария', date: '28.05.2026' },
+        { rating: 3, comment: { minus: '', plus: '', text: '' }, author: null, date: null },
+      ],
+      summary: { global: 4.6, statistic: [] },
+      groupSummary: [{ id: 'ALL', total: 3 }, { id: 'COMMENT', total: 2 }],
     }
 
     const result = mapReviewsResponse(json)
@@ -20,68 +18,48 @@ describe('mapReviewsResponse', () => {
     expect(result.avgRating).toBe(4.6)
     expect(result.totalCount).toBe(3)
     expect(result.reviews).toEqual([
-      { rating: 5, text: 'Отличный товар!', authorName: 'Иван', date: '2026-08-01T10:00:00.000Z' },
-      { rating: 4, text: 'Хорошо, но доставка долгая', authorName: 'Мария', date: '2026-07-28T10:00:00.000Z' },
+      { rating: 5, text: 'Хорошие плотные салфетки.', authorName: 'Айнагуль', date: '2026-07-09T00:00:00.000Z' },
+      { rating: 4, text: 'Неплохо.', authorName: 'Мария', date: '2026-05-28T00:00:00.000Z' },
       { rating: 3, text: '', authorName: null, date: null },
     ])
   })
 
-  it('falls back to alternate field names (grade/score, comment/reviewText, author/userName/clientName)', () => {
-    const json = {
-      data: {
-        content: [
-          { grade: 2, comment: 'so-so', author: 'A' },
-          { score: 1, reviewText: 'bad', userName: 'B' },
-          { rating: 5, text: 'great', clientName: 'C' },
-        ],
-      },
-    }
-    const result = mapReviewsResponse(json)
-    expect(result.reviews.map(r => r.rating)).toEqual([2, 1, 5])
-    expect(result.reviews.map(r => r.authorName)).toEqual(['A', 'B', 'C'])
-  })
-
-  it('supports a response with no top-level data wrapper', () => {
-    const result = mapReviewsResponse({ reviews: [{ rating: 5, text: 'ok' }] })
-    expect(result.reviews).toHaveLength(1)
-  })
-
-  it('supports items[] as an alternate list key', () => {
-    const result = mapReviewsResponse({ data: { items: [{ rating: 4, text: 'ok' }] } })
-    expect(result.reviews).toHaveLength(1)
+  it('parses Kaspi\'s DD.MM.YYYY date, not a generic Date() guess', () => {
+    const result = mapReviewsResponse({ data: [{ rating: 5, comment: { text: 'x' }, author: 'A', date: '01.02.2026' }] })
+    // If this were misread as MM.DD (a real risk with new Date() on this
+    // format) it would come out as March 2nd instead of February 1st.
+    expect(result.reviews[0].date).toBe('2026-02-01T00:00:00.000Z')
   })
 
   it('drops entries with a missing or out-of-range rating instead of throwing', () => {
     const json = {
-      data: {
-        reviews: [
-          { rating: 5, text: 'valid' },
-          { rating: 0, text: 'invalid low' },
-          { rating: 6, text: 'invalid high' },
-          { rating: 'not-a-number', text: 'invalid type' },
-          { text: 'missing rating entirely' },
-          null,
-        ],
-      },
+      data: [
+        { rating: 5, comment: { text: 'valid' }, author: null, date: null },
+        { rating: 0, comment: { text: 'invalid low' } },
+        { rating: 6, comment: { text: 'invalid high' } },
+        { rating: 'not-a-number', comment: { text: 'invalid type' } },
+        { comment: { text: 'missing rating entirely' } },
+        null,
+      ],
     }
     const result = mapReviewsResponse(json)
     expect(result.reviews).toEqual([{ rating: 5, text: 'valid', authorName: null, date: null }])
   })
 
   it('rounds a fractional individual review rating to the nearest star', () => {
-    const result = mapReviewsResponse({ data: { reviews: [{ rating: 4.6, text: 'x' }] } })
+    const result = mapReviewsResponse({ data: [{ rating: 4.6, comment: { text: 'x' } }] })
     expect(result.reviews[0].rating).toBe(5)
   })
 
   it('caps reviews at MAX_REVIEWS_PER_PRODUCT (50)', () => {
-    const reviews = Array.from({ length: 80 }, () => ({ rating: 5, text: 'x' }))
-    const result = mapReviewsResponse({ data: { reviews } })
+    const data = Array.from({ length: 80 }, () => ({ rating: 5, comment: { text: 'x' } }))
+    const result = mapReviewsResponse({ data })
     expect(result.reviews).toHaveLength(50)
   })
 
-  it('returns an empty page when the reviews list is missing entirely', () => {
-    const result = mapReviewsResponse({ data: { averageRating: 4.5 } })
-    expect(result).toEqual({ reviews: [], avgRating: null, totalCount: null })
+  it('returns an empty page when data is missing or not an array', () => {
+    expect(mapReviewsResponse({ summary: { global: 4.5 } })).toEqual({ reviews: [], avgRating: null, totalCount: null })
+    expect(mapReviewsResponse({ data: { reviews: [] } })).toEqual({ reviews: [], avgRating: null, totalCount: null })
   })
 
   it('returns an empty page for a null input', () => {
@@ -90,6 +68,14 @@ describe('mapReviewsResponse', () => {
 
   it('returns an empty page for a completely unrelated shape', () => {
     expect(mapReviewsResponse({ foo: 'bar' })).toEqual({ reviews: [], avgRating: null, totalCount: null })
+  })
+
+  it('reads totalCount from the ALL entry of groupSummary, not COMMENT', () => {
+    const json = {
+      data: [{ rating: 5, comment: { text: 'x' } }],
+      groupSummary: [{ id: 'ALL', total: 56 }, { id: 'COMMENT', total: 24 }],
+    }
+    expect(mapReviewsResponse(json).totalCount).toBe(56)
   })
 })
 
@@ -148,10 +134,12 @@ describe('buildProductPageUrl', () => {
 })
 
 describe('buildReviewsRequestUrl', () => {
-  it('builds a URL containing the sku, page, and size', () => {
-    const url = buildReviewsRequestUrl('114958921', 1, 10)
-    expect(url).toContain('114958921')
-    expect(url).toContain('page=1')
-    expect(url).toContain('size=10')
+  it('builds the confirmed-live URL shape: sku, filter=ALL, sort=POPULARITY, limit', () => {
+    const url = buildReviewsRequestUrl('114958921', 10)
+    expect(url).toBe('https://kaspi.kz/yml/review-view/api/v1/reviews/product/114958921?filter=ALL&sort=POPULARITY&limit=10&withAgg=true')
+  })
+
+  it('defaults the limit to MAX_REVIEWS_PER_PRODUCT', () => {
+    expect(buildReviewsRequestUrl('114958921')).toContain('limit=50')
   })
 })

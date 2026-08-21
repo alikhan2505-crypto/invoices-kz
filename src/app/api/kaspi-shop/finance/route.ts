@@ -16,14 +16,19 @@ async function requireUser(req: NextRequest) {
   return user
 }
 
-const VALID_DAYS = [7, 30, 90]
+// Custom period (founder request 2026-08-22): any whole day count is
+// accepted, not just the three presets -- computeFinanceSummary already
+// takes a plain sinceDays number with no assumption about which values are
+// "valid", so the only real constraint is a sane upper bound (a year) to
+// keep the underlying order-history fetch bounded.
+const MAX_CUSTOM_DAYS = 365
 
 export async function GET(req: NextRequest) {
   const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const daysParam = Number(req.nextUrl.searchParams.get('days')) || 30
-  const days = VALID_DAYS.includes(daysParam) ? daysParam : 30
+  const days = Number.isInteger(daysParam) && daysParam >= 1 && daysParam <= MAX_CUSTOM_DAYS ? daysParam : 30
 
   const connection = await loadConnection(user.id)
   if (!connection || !connection.sessionCookies) {

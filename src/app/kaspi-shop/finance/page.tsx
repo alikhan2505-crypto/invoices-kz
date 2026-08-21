@@ -88,13 +88,19 @@ const PERIODS = [7, 30, 90]
 function FinanceChart({ byDay }: { byDay: FinanceSummary['byDay'] }) {
   if (byDay.length === 0) return null
 
-  const width = Math.max(byDay.length * 34, 320)
-  const height = 180
+  // Left gutter for the revenue axis labels, bottom gutter for date labels
+  // (added per founder feedback 2026-08-22: the old chart had no axis at
+  // all, just two floating min/max numbers -- unreadable for any day that
+  // wasn't the single highest or lowest).
+  const padLeft = 54
+  const chartWidth = Math.max(byDay.length * 34, 320)
+  const width = chartWidth + padLeft
+  const height = 200
   const padTop = 24
-  const padBottom = 20
+  const padBottom = 34
   const plotHeight = height - padTop - padBottom
-  const barWidth = (width / byDay.length) * 0.6
-  const gap = (width / byDay.length) * 0.4
+  const barWidth = (chartWidth / byDay.length) * 0.6
+  const gap = (chartWidth / byDay.length) * 0.4
 
   const maxRevenue = Math.max(...byDay.map(d => d.revenue), 1)
   const maxOrders = Math.max(...byDay.map(d => d.orderCount), 1)
@@ -104,7 +110,17 @@ function FinanceChart({ byDay }: { byDay: FinanceSummary['byDay'] }) {
   const maxDay = byDay.reduce((a, b) => (b.revenue > a.revenue ? b : a), byDay[0])
   const minDay = byDay.reduce((a, b) => (b.revenue < a.revenue ? b : a), byDay[0])
 
-  const x = (i: number) => i * (barWidth + gap) + gap / 2
+  // Sparse date ticks -- one label roughly every 1/8th of the period so a
+  // 90-day view stays readable instead of jamming in 90 overlapping dates.
+  const tickEvery = Math.max(1, Math.ceil(byDay.length / 8))
+  const dateTickIndices = byDay.map((_, i) => i).filter(i => i % tickEvery === 0 || i === byDay.length - 1)
+  const formatTick = (isoDate: string) => {
+    const d = new Date(isoDate)
+    return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}`
+  }
+  const revenueGridSteps = [0, 0.25, 0.5, 0.75, 1]
+
+  const x = (i: number) => padLeft + i * (barWidth + gap) + gap / 2
   const barCenter = (i: number) => x(i) + barWidth / 2
   const yOrders = (i: number) => padTop + plotHeight - (byDay[i].orderCount / maxOrders) * plotHeight
   const yPrice = (i: number) => padTop + plotHeight - (pricePerUnit[i] / maxPricePerUnit) * plotHeight
@@ -126,8 +142,30 @@ function FinanceChart({ byDay }: { byDay: FinanceSummary['byDay'] }) {
     <div className="overflow-x-auto">
       <svg width={width} height={height} className="block">
         {monthBands.map((b, i) => (
-          <rect key={b.month} x={x(b.startI) - gap / 2} y={0} width={(b.endI - b.startI + 1) * (barWidth + gap)} height={height}
+          <rect key={b.month} x={x(b.startI) - gap / 2} y={padTop} width={(b.endI - b.startI + 1) * (barWidth + gap)} height={plotHeight}
             fill="var(--nav-bg)" opacity={i % 2 === 0 ? 1 : 0} />
+        ))}
+
+        {/* Revenue axis -- gridlines + ₸ labels, replacing the old "just two
+            floating numbers for the single highest/lowest day" approach. */}
+        {revenueGridSteps.map(step => {
+          const y = padTop + plotHeight - step * plotHeight
+          return (
+            <g key={step}>
+              <line x1={padLeft} y1={y} x2={width} y2={y} stroke="var(--nav-border-soft)" strokeWidth={1} />
+              <text x={padLeft - 8} y={y + 3} textAnchor="end" fontSize={9} fill="var(--nav-text-muted)">
+                {Math.round(step * maxRevenue).toLocaleString('ru-KZ')}
+              </text>
+            </g>
+          )
+        })}
+
+        {/* Date axis -- sparse ticks so a 90-day view stays legible. */}
+        {dateTickIndices.map(i => (
+          <text key={byDay[i].date} x={barCenter(i)} y={padTop + plotHeight + 16}
+            textAnchor="middle" fontSize={9} fill="var(--nav-text-muted)">
+            {formatTick(byDay[i].date)}
+          </text>
         ))}
 
         {byDay.map((d, i) => {
@@ -166,6 +204,8 @@ export default function KaspiShopFinance() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [days, setDays] = useState(30)
+  const [customDaysOpen, setCustomDaysOpen] = useState(false)
+  const [customDaysInput, setCustomDaysInput] = useState('')
   const [summary, setSummary] = useState<FinanceSummary | null>(null)
   const [summaryLoading, setSummaryLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
@@ -227,21 +267,46 @@ export default function KaspiShopFinance() {
               <div className="text-[11px] font-semibold tracking-wider uppercase mb-1" style={{ color: 'var(--nav-text-muted)' }}>Финансы</div>
               <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight" style={{ color: 'var(--nav-text-primary)' }}>Выручка</h1>
             </div>
-            <div className="flex items-center gap-1 flex-shrink-0 nav-glass rounded-full p-1">
-              {PERIODS.map(p => {
-                const active = days === p
-                return (
-                  <button key={p} onClick={() => setDays(p)}
-                    className="relative text-xs font-medium rounded-full px-3 py-1.5 transition-colors"
-                    style={{ color: active ? 'var(--nav-accent-ink)' : 'var(--nav-text-secondary)' }}>
-                    {active && (
-                      <motion.span layoutId="financePeriodPill" className="absolute inset-0 rounded-full" style={{ background: 'var(--nav-accent)', zIndex: 0 }}
-                        transition={{ type: 'spring', stiffness: 380, damping: 32 }} />
-                    )}
-                    <span className="relative" style={{ zIndex: 1 }}>{p} дн.</span>
+            <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
+              <div className="flex items-center gap-1 nav-glass rounded-full p-1">
+                {PERIODS.map(p => {
+                  const active = !customDaysOpen && days === p
+                  return (
+                    <button key={p} onClick={() => { setCustomDaysOpen(false); setDays(p) }}
+                      className="relative text-xs font-medium rounded-full px-3 py-1.5 transition-colors"
+                      style={{ color: active ? 'var(--nav-accent-ink)' : 'var(--nav-text-secondary)' }}>
+                      {active && (
+                        <motion.span layoutId="financePeriodPill" className="absolute inset-0 rounded-full" style={{ background: 'var(--nav-accent)', zIndex: 0 }}
+                          transition={{ type: 'spring', stiffness: 380, damping: 32 }} />
+                      )}
+                      <span className="relative" style={{ zIndex: 1 }}>{p} дн.</span>
+                    </button>
+                  )
+                })}
+                {/* Custom period (founder request 2026-08-22): any day count,
+                    not just the three presets -- the backend now accepts
+                    1-365 days regardless of whether it matches a preset. */}
+                <button onClick={() => { setCustomDaysInput(String(days)); setCustomDaysOpen(true) }}
+                  className="relative text-xs font-medium rounded-full px-3 py-1.5 transition-colors"
+                  style={{ color: customDaysOpen ? 'var(--nav-accent-ink)' : 'var(--nav-text-secondary)', background: customDaysOpen ? 'var(--nav-accent)' : 'transparent' }}>
+                  {customDaysOpen ? `${days} дн.` : 'Свой период'}
+                </button>
+              </div>
+              {customDaysOpen && (
+                <form className="flex items-center gap-1.5" onSubmit={e => {
+                  e.preventDefault()
+                  const n = Math.round(Number(customDaysInput))
+                  if (Number.isFinite(n) && n >= 1 && n <= 365) setDays(n)
+                }}>
+                  <input type="number" min={1} max={365} value={customDaysInput} onChange={e => setCustomDaysInput(e.target.value)}
+                    placeholder="дней" autoFocus
+                    className="w-20 text-xs rounded-full px-3 py-1.5 outline-none"
+                    style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-primary)', border: '1px solid var(--nav-border-soft)' }} />
+                  <button type="submit" className="text-xs font-semibold rounded-full px-3 py-1.5" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                    Применить
                   </button>
-                )
-              })}
+                </form>
+              )}
             </div>
           </div>
           <div className="grid grid-cols-3 gap-3 lg:gap-6">

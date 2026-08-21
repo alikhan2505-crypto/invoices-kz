@@ -11,33 +11,30 @@
 // persistent 403 (confirmed live for the sibling endpoints, same nginx-level
 // block class).
 //
-// IMPORTANT / UNCONFIRMED (unlike product-view and offer-view, which this
-// codebase's other kaspiShop modules explicitly mark "confirmed live"):
-// this dev sandbox had no network path to kaspi.kz to capture a real browser
-// request for the reviews endpoint -- a direct curl to kaspi.kz timed out
-// from here (TLS connects, then the connection just hangs -- same block
-// class the niches.ts comments describe), and a WebFetch probe reached the
-// product page's static HTML fine (confirmed real page, "Код товара:
-// 114958921") but reviews are loaded client-side via JS after page load, so
-// they're invisible to a non-JS fetch, and a raw guess at the JSON endpoint
-// below 403'd without the custom headers WebFetch has no way to set. The
-// product-page URL shape IS confirmed live (copied verbatim from
-// kaspi-shop-price-check.mjs's `https://kaspi.kz/shop/p/-${sku}/?c=${cityId}`,
-// which Kaspi accepts with no slug before the id). The reviews endpoint URL
-// below is a best-effort guess following the SAME yml/<x>-view/... family as
-// product-view (search) and offer-view (competitor offers), NOT a
-// captured-live shape. mapReviewsResponse is written defensively (returns an
-// empty page for any unrecognized response shape) so a wrong guess fails
-// safe -- reviews stay empty with a visible fetch_error surfaced to the
-// caller, never a crash or fabricated data. Verify against a real captured
-// browser request (same method used to confirm product-view/offer-view --
-// see docs/superpowers/specs/2026-08-14-kaspi-shop-niches-design.md) and
-// adjust the URL/field names here before trusting this in production. If
-// Kaspi blocks it the same way it blocked product-view from Vercel, the fix
-// is the same GitHub Actions relay pattern used for niches (see
-// kaspi-shop-niche-check.mjs + /api/kaspi-shop/niches/deliver) -- swap
-// fetchProductReviews's body for a relay call, mapReviewsResponse doesn't
-// need to change.
+// CONFIRMED LIVE 2026-08-21 (a real browser capture superseded the original
+// unconfirmed guess this module shipped with -- "не тянутся отзывы" turned
+// out to be exactly that guess being wrong, not a Kaspi-side block):
+//   GET /yml/review-view/api/v1/reviews/product/{masterSku}
+//       ?filter=ALL&sort=POPULARITY&limit={n}&withAgg=true
+// `sort` only accepts POPULARITY -- DATE_DESC (the original guess) gets a
+// flat HTTP 400 with no JSON body. `filter` accepts ALL/COMMENT/POSITIVE/
+// NEGATIVE/PICTURE (Kaspi's own review-page tabs); ALL is the one that
+// returns every rating, including star-only reviews with no written text
+// (COMMENT, what the original guess's captured example used, excludes those
+// -- 24 of the product's 56 real reviews). Response shape is FLAT, not the
+// nested {data:{reviews:[...]}} originally guessed:
+//   {data: RawKaspiReview[], summary: {global: number, statistic: [...]},
+//    groupSummary: [{id:'ALL', total}, {id:'COMMENT', total}, ...]}
+// and each review's text lives at comment.text (comment is an object with
+// minus/plus/text, not a flat string), its date is Kaspi's own DD.MM.YYYY
+// (not ISO -- new Date() cannot be trusted to parse it correctly). This
+// capture was done from a real browser, not Vercel, so whether Vercel's IP
+// gets the same block the sibling product-view/offer-view endpoints do
+// (which needed the GitHub Actions relay pattern -- see niches.ts +
+// kaspi-shop-niche-check.mjs) is still unconfirmed; check production
+// runtime logs after deploying this fix before assuming it's fine. If
+// Vercel is blocked, fetchProductReviews's body is where to swap in a relay
+// call -- mapReviewsResponse would not need to change.
 
 export type RawReview = {
   rating: number
@@ -59,9 +56,16 @@ const EMPTY_PAGE: ProductReviewsPage = { reviews: [], avgRating: null, totalCoun
 // cache payload growing forever.
 export const MAX_REVIEWS_PER_PRODUCT = 50
 
-function toIsoOrNull(raw: any): string | null {
-  if (raw === null || raw === undefined || raw === '') return null
-  const d = new Date(raw)
+// Kaspi's own review date format, confirmed live: "09.07.2026" (DD.MM.YYYY),
+// not ISO -- new Date("09.07.2026") is not reliably parsed as that format by
+// JS engines (some read it as MM.DD, some produce Invalid Date), so it needs
+// its own parse rather than a generic fallback.
+function parseKaspiReviewDate(raw: any): string | null {
+  if (typeof raw !== 'string') return null
+  const m = raw.match(/^(\d{2})\.(\d{2})\.(\d{4})$/)
+  if (!m) return null
+  const [, dd, mm, yyyy] = m
+  const d = new Date(`${yyyy}-${mm}-${dd}T00:00:00Z`)
   return Number.isNaN(d.getTime()) ? null : d.toISOString()
 }
 
@@ -70,36 +74,30 @@ function toFiniteOrNull(raw: any): number | null {
   return Number.isFinite(n) ? n : null
 }
 
-// Defensive by design (see module header): tries a handful of plausible
-// field-name variants per value since the real shape is unconfirmed, and
-// silently drops anything that doesn't look like a real review (no parsable
-// 1-5 rating) rather than guessing wrong data into the cache.
+// Confirmed live shape (see module header) -- json.data IS the review array
+// directly (not nested under reviews/content/items as originally guessed);
+// each item's text lives at comment.text and its author at the flat
+// `author` field.
 export function mapReviewsResponse(json: any): ProductReviewsPage {
-  const data = json?.data ?? json
-  if (!data || typeof data !== 'object') return EMPTY_PAGE
-
-  const rawList = Array.isArray(data.reviews) ? data.reviews
-    : Array.isArray(data.content) ? data.content
-    : Array.isArray(data.items) ? data.items
-    : null
+  const rawList = Array.isArray(json?.data) ? json.data : null
   if (!rawList) return EMPTY_PAGE
 
   const reviews: RawReview[] = rawList
     .map((r: any): RawReview | null => {
       if (!r || typeof r !== 'object') return null
-      const rating = Math.round(Number(r.rating ?? r.grade ?? r.score))
+      const rating = Math.round(Number(r.rating))
       if (!Number.isFinite(rating) || rating < 1 || rating > 5) return null
-      const text = String(r.text ?? r.comment ?? r.reviewText ?? '').trim()
-      const authorRaw = r.authorName ?? r.author ?? r.userName ?? r.clientName
-      const authorName = authorRaw ? (String(authorRaw).trim() || null) : null
-      const date = toIsoOrNull(r.date ?? r.creationDate ?? r.createDate ?? r.createdAt)
+      const text = String(r.comment?.text ?? '').trim()
+      const authorName = r.author ? (String(r.author).trim() || null) : null
+      const date = parseKaspiReviewDate(r.date)
       return { rating, text, authorName, date }
     })
     .filter((r: RawReview | null): r is RawReview => r !== null)
     .slice(0, MAX_REVIEWS_PER_PRODUCT)
 
-  const avgRating = toFiniteOrNull(data.averageRating ?? data.avgRating ?? data.rating)
-  const totalCount = toFiniteOrNull(data.totalCount ?? data.total ?? data.count)
+  const avgRating = toFiniteOrNull(json?.summary?.global)
+  const allGroup = Array.isArray(json?.groupSummary) ? json.groupSummary.find((g: any) => g?.id === 'ALL') : null
+  const totalCount = toFiniteOrNull(allGroup?.total)
 
   return { reviews, avgRating, totalCount }
 }
@@ -118,10 +116,13 @@ export function buildProductPageUrl(masterSku: string, cityId = DEFAULT_CITY_ID)
   return `https://kaspi.kz/shop/p/-${encodeURIComponent(masterSku)}/?c=${encodeURIComponent(cityId)}`
 }
 
-// Best-effort URL, see module header -- unconfirmed against a real captured
-// browser request.
-export function buildReviewsRequestUrl(masterSku: string, page = 0, size = 20): string {
-  return `https://kaspi.kz/yml/review-view/api/v1/reviews/product/${encodeURIComponent(masterSku)}?sort=DATE_DESC&page=${page}&size=${size}`
+// Confirmed live (see module header). filter=ALL is the one review-page tab
+// that returns every rating including star-only reviews with no written
+// text; sort=POPULARITY is the only value this endpoint accepts (DATE_DESC
+// 400s) -- final display order is by date regardless, since the caller
+// re-sorts the aggregated reviews itself.
+export function buildReviewsRequestUrl(masterSku: string, limit = MAX_REVIEWS_PER_PRODUCT): string {
+  return `https://kaspi.kz/yml/review-view/api/v1/reviews/product/${encodeURIComponent(masterSku)}?filter=ALL&sort=POPULARITY&limit=${limit}&withAgg=true`
 }
 
 export type FetchReviewsResult =
