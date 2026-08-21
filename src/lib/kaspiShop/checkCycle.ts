@@ -5,6 +5,31 @@ import { getKey } from './connection'
 import { decryptAtRest } from '@/lib/kaspiPay/crypto'
 import { isWithinBudget, KASPI_RATE_LIMIT_WINDOW_MS } from './rateLimitBudget'
 import { pushOfferState } from './cabinetPricePush'
+import { fetchOfferDetailsGet, fetchOfferDetails } from './cabinetApi'
+
+// All of the offer's bare point codes, read from the offer details (deep
+// scan for storeId-carrying objects -- no guessed key paths). Falls back to
+// the single store_id the tracked product row carries when nothing is
+// recognized: pushing with one point risks zeroing the others' наличие
+// (confirmed live 2026-08-21), but pushing with NONE is not an option.
+async function fetchOfferPointCodes(sessionCookies: string, merchantId: string, sku: string, fallback: string): Promise<string[]> {
+  const details = (await fetchOfferDetailsGet(sessionCookies, merchantId, sku)) || (await fetchOfferDetails(sessionCookies, merchantId, sku))
+  const codes = new Set<string>()
+  function walk(node: any) {
+    if (Array.isArray(node)) { for (const item of node) walk(item); return }
+    if (!node || typeof node !== 'object') return
+    const rawStoreId = node.storeId ?? node.pointId ?? null
+    if (typeof rawStoreId === 'string' && rawStoreId.length > 0) {
+      codes.add(rawStoreId.startsWith(`${merchantId}_`) ? rawStoreId.slice(merchantId.length + 1) : rawStoreId)
+    }
+    for (const value of Object.values(node)) {
+      if (value && typeof value === 'object') walk(value)
+    }
+  }
+  if (details) walk(details)
+  if (codes.size === 0 && fallback) codes.add(fallback)
+  return Array.from(codes)
+}
 import { sendTelegramNotification } from '@/lib/telegramNotify'
 
 const supabase = createClient(
@@ -96,17 +121,19 @@ async function pushProductPrices(params: {
   }
 
   // The EXACT captured cabinet batch item (see pushOfferState's comment):
-  // minimal fields, merchant-prefixed storeId, NO stockCount ever -- every
-  // upload of ours that carried stockCount was followed by Kaspi removing
-  // the offer with «Не указано наличие в прайс листе».
+  // minimal fields, merchant-prefixed storeIds for ALL points, NO
+  // stockCount ever -- every upload of ours that carried stockCount was
+  // followed by Kaspi removing the offer with «Не указано наличие в прайс
+  // листе», and listing only one of several points zeroed the others'
+  // остаток.
+  const storeCodes = await fetchOfferPointCodes(params.sessionCookies, params.merchantId, params.sku, params.storeId)
   const result = await pushOfferState({
     sessionCookies: params.sessionCookies,
     merchantUid: params.merchantId,
     sku: params.sku,
     masterSku: params.masterSku,
     model: params.model,
-    storeId: `${params.merchantId}_${params.storeId}`,
-    storeCode: params.storeId,
+    storeCodes,
     cityPrices: Object.entries(params.cityPrices).map(([cityId, value]) => ({ cityId, value })),
     available: 'yes',
   })

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { loadConnection, markSessionExpired } from '@/lib/kaspiShop/connection'
-import { fetchOfferDetails } from '@/lib/kaspiShop/cabinetApi'
+import { fetchOfferDetails, fetchOfferDetailsGet } from '@/lib/kaspiShop/cabinetApi'
 import { savePointStockPrice } from '@/lib/kaspiShop/cabinetPricePush'
 
 const supabase = createClient(
@@ -74,11 +74,17 @@ export async function GET(req: NextRequest) {
   const connection = await loadConnection(user.id)
   if (!connection?.sessionCookies) return NextResponse.json({ error: 'Kaspi Магазин не подключён' }, { status: 400 })
 
-  const details = await fetchOfferDetails(connection.sessionCookies, connection.merchantId, sku)
+  // The GET &s= variant is what the cabinet's own modal fetches (it carries
+  // the per-point city data the POST variant lacks); both are scanned so
+  // whichever knows more about a point wins field-by-field.
+  const detailsGet = await fetchOfferDetailsGet(connection.sessionCookies, connection.merchantId, sku)
+  const detailsPost = await fetchOfferDetails(connection.sessionCookies, connection.merchantId, sku)
+  const details = detailsGet || detailsPost
   if (!details) return NextResponse.json({ error: 'Не удалось получить карточку товара из Kaspi' }, { status: 502 })
 
   const entriesMap = new Map<string, PointEntry>()
-  collectPointEntries(details, connection.merchantId, entriesMap)
+  if (detailsGet) collectPointEntries(detailsGet, connection.merchantId, entriesMap)
+  if (detailsPost) collectPointEntries(detailsPost, connection.merchantId, entriesMap)
 
   const { data: connRow } = await supabase
     .from('kaspi_shop_connections')

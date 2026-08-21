@@ -76,11 +76,11 @@ export type OfferAvailabilityParams = {
   // skips validation rather than sending a wrong key.
   masterSku: string | null
   model: string
-  // MUST be merchant-prefixed ("30067228_PP2") -- captured verbatim.
-  storeId: string
-  // The bare point code ("PP2") -- validate/v2's availabilities use the
-  // UNPREFIXED form (captured), unlike the batch item's prefixed one.
-  storeCode: string
+  // ALL of the offer's bare point codes (["PP1","PP2"]) -- confirmed live
+  // 2026-08-21: an upload listing only ONE of a two-point offer's points
+  // left the other point's наличие "unspecified", which Kaspi materialized
+  // as остаток 0 on that point. Prefixing for the batch item happens here.
+  storeCodes: string[]
   cityPrices: { cityId: string; value: number }[]
 }
 
@@ -115,16 +115,17 @@ export async function pushOfferState(params: OfferAvailabilityParams & { availab
     'cookie': params.sessionCookies,
   }
 
+  const storeCodes = params.storeCodes.filter(Boolean)
   const item = {
     merchantUid: params.merchantUid,
     sku: params.sku,
-    availabilities: [{ available: params.available, storeId: params.storeId }],
+    availabilities: storeCodes.map(code => ({ available: params.available, storeId: `${params.merchantUid}_${code}` })),
     model: params.model,
     cityPrices: params.cityPrices,
   }
 
   try {
-    if (params.available === 'yes' && params.masterSku) {
+    if (params.available === 'yes' && params.masterSku && storeCodes.length > 0) {
       // Validate item shape captured in full 2026-08-21 («Посмотреть
       // источник» on the cabinet's own v2 request): keyed by masterSku,
       // availabilities carry UNPREFIXED storeId + cityId + available +
@@ -132,7 +133,7 @@ export async function pushOfferState(params: OfferAvailabilityParams & { availab
       const validateOffer = {
         masterSku: params.masterSku,
         availabilities: params.cityPrices.map(cp => ({
-          storeId: params.storeCode,
+          storeId: storeCodes[0],
           cityId: cp.cityId,
           available: params.available,
           price: cp.value,

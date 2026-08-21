@@ -122,6 +122,23 @@ export async function fetchOfferDetails(sessionCookies: string, merchantId: stri
   return item && typeof item === 'object' ? item : null
 }
 
+// GET variant of the details endpoint with an &s={sku} param -- the request
+// the cabinet's own «Цена и остатки» modal fires when opening (seen in the
+// founder's captured request list as `details?m=30067228&s=1332...`). Its
+// response is expected to carry the per-point data (city per склад) the
+// POST variant lacks; parsed defensively the same way.
+export async function fetchOfferDetailsGet(sessionCookies: string, merchantId: string, sku: string): Promise<Record<string, any> | null> {
+  const res = await fetch(`https://mc.shop.kaspi.kz/offers/api/v1/offer/details?m=${encodeURIComponent(merchantId)}&s=${encodeURIComponent(sku)}`, {
+    headers: authHeaders(sessionCookies),
+  })
+  if (!res.ok) return null
+  const json = await res.json().catch(() => null)
+  if (!json || typeof json !== 'object') return null
+  if (Array.isArray(json)) return json[0] && typeof json[0] === 'object' ? json[0] : null
+  if (Array.isArray(json.data)) return json.data[0] && typeof json.data[0] === 'object' ? json.data[0] : null
+  return json
+}
+
 // Reads the seller's own existing catalog -- the endpoint the official
 // public Merchant API has no equivalent for. Paginates internally (100 per
 // page, confirmed the real endpoint accepts an `l` limit param) until a
