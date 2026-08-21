@@ -4,7 +4,8 @@ import { debitKaspiShopWallet } from './wallet'
 import { getKey } from './connection'
 import { decryptAtRest } from '@/lib/kaspiPay/crypto'
 import { isWithinBudget, KASPI_RATE_LIMIT_WINDOW_MS } from './rateLimitBudget'
-import { pushPriceChange } from './cabinetPricePush'
+import { setOfferAvailabilityViaBatch } from './cabinetPricePush'
+import { fetchOfferDetails } from './cabinetApi'
 import { sendTelegramNotification } from '@/lib/telegramNotify'
 
 const supabase = createClient(
@@ -53,38 +54,36 @@ export async function getDueTrackedProducts(): Promise<DueTrackedProduct[]> {
     }))
 }
 
-// Pushes one city's recomputed price through the cabinet session, respecting
-// the rolling rate-limit budget. Returns the resulting action for that city
-// and whether the session turned out to be expired (caller stops the whole
-// batch for this connection when that happens, rather than retrying a dead
-// session city after city).
+// ONE full-state batch upload per product per cycle, carrying every changed
+// city price at once -- replaces the old per-city single-item pushes. Root
+// cause, confirmed live TWICE on 2026-08-21: the single-item process
+// endpoint got this account's offer REMOVED with «Не указано наличие в
+// прайс листе» (once after a restore attempt, again immediately after a
+// stock save), while the cabinet's own full-offer batch echo both restores
+// and updates cleanly. Side benefit: one upload per product instead of
+// up-to-~320 per-city uploads per cycle, which stops draining Kaspi's
+// 250-changes/30-min budget.
 //
 // `productIds` is the connection's product id list, hoisted up to
-// applyPriceCheckResult and passed in -- it's loop-invariant for the whole
-// product being processed (up to ~320 pushes on the live legacy path), so
-// re-fetching it on every single push was pure waste on the critical path
-// of one /cron/apply request (final-review finding I4).
-async function pushCityPrice(params: {
+// applyPriceCheckResult and passed in -- loop-invariant for the product
+// being processed (final-review finding I4).
+async function pushProductPrices(params: {
   connectionId: string
   merchantId: string
   sessionCookies: string
-  trackedProductId: string
   productIds: string[]
   sku: string
-  model: string
   storeId: string
   stockCount: number
-  cityCode: string
-  newPrice: number
+  cityPrices: Record<string, number>
 }): Promise<{ pushed: boolean; sessionExpired: boolean; message?: string }> {
   // Budget signal is last_pushed_at, not updated_at -- updated_at is also
   // set by finalizeConnection's bulk catalog-import insert (NOT NULL
   // DEFAULT now(), 43,840 rows in one shot on the live account), which
   // isn't a real push to Kaspi and must never count against the real
   // 250/30min ceiling. last_pushed_at is nullable and written ONLY on a
-  // confirmed successful push (right below, and in applyPriceCheckResult),
-  // so rows from catalog import never contribute here (final-review
-  // finding I1).
+  // confirmed successful push, so rows from catalog import never
+  // contribute here (final-review finding I1).
   const since = new Date(Date.now() - KASPI_RATE_LIMIT_WINDOW_MS).toISOString()
   const { data: recentPushes } = await supabase
     .from('kaspi_shop_product_city_prices')
@@ -96,18 +95,22 @@ async function pushCityPrice(params: {
     return { pushed: false, sessionExpired: false, message: 'rate limit budget exhausted for this 30-minute window' }
   }
 
-  const result = await pushPriceChange({
+  const details = await fetchOfferDetails(params.sessionCookies, params.merchantId, params.sku)
+  if (!details) {
+    return { pushed: false, sessionExpired: false, message: 'offer details unavailable -- push skipped (no safe payload without them)' }
+  }
+
+  const result = await setOfferAvailabilityViaBatch({
     sessionCookies: params.sessionCookies,
     merchantUid: params.merchantId,
-    sku: params.sku,
-    model: params.model,
-    storeId: `${params.merchantId}_${params.storeId}`,
-    // Real seller-entered остаток when set (2026-08-21, founder asked for
-    // stock tracking); the old hardcoded 1 stays as the fallback for 0 --
-    // pushing an explicit zero would flip the offer to «нет в наличии».
-    stockCount: params.stockCount > 0 ? params.stockCount : 1,
-    cityCode: params.cityCode,
-    newPrice: params.newPrice,
+    offerDetails: details,
+    available: 'yes',
+    fallbackStoreId: `${params.merchantId}_${params.storeId}`,
+    // Real остаток when the seller set one; otherwise the echoed details
+    // keep whatever stock state the offer already carries on Kaspi's side
+    // (never a fabricated number).
+    ...(params.stockCount > 0 ? { stockCount: params.stockCount } : {}),
+    cityPriceOverrides: params.cityPrices,
   })
 
   if (result.success) return { pushed: true, sessionExpired: false }
@@ -255,43 +258,40 @@ export async function applyPriceCheckResult(
           .select('id')
           .eq('connection_id', connection.id)
         const productIds = (connProducts || []).map((p: any) => p.id)
+        // Decide per city, not from the aggregate `action` above -- the
+        // aggregate can read "no_change" even when one city genuinely
+        // moved, if a different city happens to still hold the overall
+        // minimum. All changed cities ride ONE batch upload together.
+        const changedCityPrices: Record<string, number> = {}
         for (const result of results) {
-          // Decide per city, not from the aggregate `action` above -- the
-          // aggregate can read "no_change" even when one city genuinely
-          // moved, if a different city happens to still hold the overall
-          // minimum. The streak itself is written unconditionally above,
-          // regardless of push outcome -- this loop only decides whether a
-          // push to Kaspi is attempted at all.
           if (currentCityPrices[result.cityCode] !== undefined && result.price === currentCityPrices[result.cityCode]) {
             continue
           }
-          const pushResult = await pushCityPrice({
+          changedCityPrices[result.cityCode] = result.price
+        }
+        if (Object.keys(changedCityPrices).length > 0) {
+          const pushResult = await pushProductPrices({
             connectionId: connection.id,
             merchantId: connection.merchant_id,
             sessionCookies,
-            trackedProductId,
             productIds,
             sku: product.kaspi_sku,
-            model: product.product_name,
             storeId: product.store_id,
             stockCount: Number(product.stock_count) || 0,
-            cityCode: result.cityCode,
-            newPrice: result.price,
+            cityPrices: changedCityPrices,
           })
           if (pushResult.pushed) {
             const pushedAt = new Date().toISOString()
-            await supabase
-              .from('kaspi_shop_product_city_prices')
-              .update({ own_current_price: result.price, last_competitor_price: competitorPrice, updated_at: pushedAt, last_pushed_at: pushedAt })
-              .eq('tracked_product_id', trackedProductId)
-              .eq('city_code', result.cityCode)
+            for (const [cityCode, price] of Object.entries(changedCityPrices)) {
+              await supabase
+                .from('kaspi_shop_product_city_prices')
+                .update({ own_current_price: price, last_competitor_price: competitorPrice, updated_at: pushedAt, last_pushed_at: pushedAt })
+                .eq('tracked_product_id', trackedProductId)
+                .eq('city_code', cityCode)
+            }
           } else {
-            console.error('kaspi-shop checkCycle: price push skipped for product', trackedProductId, 'city', result.cityCode, '--', pushResult.message)
-            pushIssues.push(`${result.cityCode}: ${pushResult.message}`)
-          }
-          if (pushResult.sessionExpired) {
-            console.error('kaspi-shop checkCycle: session expired for connection', connection.id, '-- stopping city pushes for this product')
-            break
+            console.error('kaspi-shop checkCycle: batch price push skipped for product', trackedProductId, '--', pushResult.message)
+            pushIssues.push(pushResult.message || 'batch push failed')
           }
         }
       }
@@ -353,6 +353,7 @@ export async function applyPriceCheckResult(
           .select('id')
           .eq('connection_id', connection.id)
         const productIds = (connProducts || []).map((p: any) => p.id)
+        const legacyCityPrices: Record<string, number> = {}
         for (const city of citiesToPush) {
           const cityCandidate = computeRepriceCandidate({
             competitorPrices,
@@ -363,36 +364,32 @@ export async function applyPriceCheckResult(
             ownCurrentPrice: Number(city.own_current_price ?? ownPriceBefore),
             noCompetitorStreak,
           })
+          legacyCityPrices[city.city_code] = cityCandidate.price
+        }
 
-          const result = await pushCityPrice({
-            connectionId: connection.id,
-            merchantId: connection.merchant_id,
-            sessionCookies,
-            trackedProductId,
-            productIds,
-            sku: product.kaspi_sku,
-            model: product.product_name,
-            storeId: product.store_id,
-            stockCount: Number(product.stock_count) || 0,
-            cityCode: city.city_code,
-            newPrice: cityCandidate.price,
-          })
+        const result = await pushProductPrices({
+          connectionId: connection.id,
+          merchantId: connection.merchant_id,
+          sessionCookies,
+          productIds,
+          sku: product.kaspi_sku,
+          storeId: product.store_id,
+          stockCount: Number(product.stock_count) || 0,
+          cityPrices: legacyCityPrices,
+        })
 
-          if (result.pushed) {
-            const pushedAt = new Date().toISOString()
+        if (result.pushed) {
+          const pushedAt = new Date().toISOString()
+          for (const [cityCode, price] of Object.entries(legacyCityPrices)) {
             await supabase
               .from('kaspi_shop_product_city_prices')
-              .update({ own_current_price: cityCandidate.price, last_competitor_price: competitorPrice, updated_at: pushedAt, last_pushed_at: pushedAt })
+              .update({ own_current_price: price, last_competitor_price: competitorPrice, updated_at: pushedAt, last_pushed_at: pushedAt })
               .eq('tracked_product_id', trackedProductId)
-              .eq('city_code', city.city_code)
-          } else {
-            console.error('kaspi-shop checkCycle: price push skipped for product', trackedProductId, 'city', city.city_code, '--', result.message)
-            pushIssues.push(`${city.city_code}: ${result.message}`)
+              .eq('city_code', cityCode)
           }
-          if (result.sessionExpired) {
-            console.error('kaspi-shop checkCycle: session expired for connection', connection.id, '-- stopping city pushes for this product')
-            break
-          }
+        } else {
+          console.error('kaspi-shop checkCycle: batch price push skipped for product', trackedProductId, '--', result.message)
+          pushIssues.push(result.message || 'batch push failed')
         }
       }
     }

@@ -157,6 +157,15 @@ export async function setOfferAvailabilityViaBatch(params: {
   offerDetails: Record<string, any>
   available: 'yes' | 'no'
   fallbackStoreId: string
+  // When set, written onto every availability entry (the seller's real
+  // остаток). Omitted = each entry keeps whatever stockCount it already has.
+  stockCount?: number | null
+  // cityId -> new price. Applied onto the echoed details' cities array --
+  // this is how the repricer's price changes ride the same safe full-state
+  // upload instead of the single-item endpoint (which Kaspi answered with
+  // «Не указано наличие в прайс листе» removals for this account, confirmed
+  // live twice on 2026-08-21).
+  cityPriceOverrides?: Record<string, number>
 }): Promise<PricePushResult> {
   const headers = {
     'x-auth-version': '3',
@@ -168,9 +177,19 @@ export async function setOfferAvailabilityViaBatch(params: {
 
   const item: Record<string, any> = { ...params.offerDetails, merchantUid: params.merchantUid }
   if (Array.isArray(item.availabilities) && item.availabilities.length > 0) {
-    item.availabilities = item.availabilities.map((a: any) => ({ ...a, available: params.available }))
+    item.availabilities = item.availabilities.map((a: any) => ({
+      ...a,
+      available: params.available,
+      ...(params.stockCount !== undefined ? { stockCount: params.stockCount } : {}),
+    }))
   } else {
-    item.availabilities = [{ available: params.available, storeId: params.fallbackStoreId, stockCount: null }]
+    item.availabilities = [{ available: params.available, storeId: params.fallbackStoreId, stockCount: params.stockCount ?? null }]
+  }
+  if (params.cityPriceOverrides && Array.isArray(item.cities)) {
+    item.cities = item.cities.map((c: any) => {
+      const next = params.cityPriceOverrides![String(c.cityId)]
+      return next !== undefined ? { ...c, price: next } : c
+    })
   }
 
   try {

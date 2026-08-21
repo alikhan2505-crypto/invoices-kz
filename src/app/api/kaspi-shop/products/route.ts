@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { loadConnection, loadConnectionById, markSessionExpired } from '@/lib/kaspiShop/connection'
 import { isCheckDue } from '@/lib/kaspiShop/checkCycle'
-import { updateOfferStock } from '@/lib/kaspiShop/cabinetPricePush'
+import { setOfferAvailabilityViaBatch } from '@/lib/kaspiShop/cabinetPricePush'
+import { fetchOfferDetails } from '@/lib/kaspiShop/cabinetApi'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -187,20 +188,22 @@ export async function PATCH(req: NextRequest) {
       if (!connection?.sessionCookies) {
         stockPushWarning = 'Остаток сохранён, но сессия кабинета Kaspi не активна — на Kaspi он уйдёт после переподключения.'
       } else {
-        const { data: cityRows } = await supabase
-          .from('kaspi_shop_product_city_prices')
-          .select('city_code, own_current_price')
-          .eq('tracked_product_id', id)
-        const cityPrices = (cityRows || [])
-          .filter((c: any) => c.own_current_price !== null)
-          .map((c: any) => ({ cityId: c.city_code as string, value: Number(c.own_current_price) }))
-        const result = await updateOfferStock({
+        // Full-state batch echo ONLY -- the single-item process endpoint got
+        // this account's offer removed with «Не указано наличие в прайс
+        // листе» right after a stock save (confirmed live 2026-08-21). If
+        // the details fetch fails there is no safe way to push, so we say
+        // so instead of falling back to the harmful path.
+        const details = await fetchOfferDetails(connection.sessionCookies, connection.merchantId, row.kaspi_sku)
+        if (!details) {
+          stockPushWarning = 'Остаток сохранён у нас, но карточку товара получить не удалось — на Kaspi он уйдёт со следующим обновлением цены.'
+          return NextResponse.json({ ok: true, stockPushed, stockPushWarning })
+        }
+        const result = await setOfferAvailabilityViaBatch({
           sessionCookies: connection.sessionCookies,
           merchantUid: connection.merchantId,
-          sku: row.kaspi_sku,
-          model: row.product_name,
-          storeId: row.store_id ? `${connection.merchantId}_${row.store_id}` : '',
-          cityPrices: cityPrices.length > 0 ? cityPrices : [{ cityId: '750000000', value: Number(row.own_current_price) }],
+          offerDetails: details,
+          available: 'yes',
+          fallbackStoreId: row.store_id ? `${connection.merchantId}_${row.store_id}` : '',
           stockCount: newStock,
         })
         if (result.success) {
