@@ -397,21 +397,42 @@ export default function KaspiShopNiches() {
                   </div>
                 )
               }
+              // Compact horizontal cards (2026-08-21 founder request:
+              // "привести размеры в порядок" -- the old full-width
+              // aspect-square images made each card huge on desktop).
+              // Per-product seller counts are NOT in Kaspi's search payload,
+              // so the cards honestly show what IS there: brand, rating,
+              // reviews, price, the search city and a real Kaspi link.
+              // div+role, not <button>: carries a nested <a>.
               return (
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="grid sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3 items-start">
                   {filtered.map((p, i) => (
-                    <button key={i} onClick={() => setOpenProduct(p)} className={`nav-glass rounded-2xl p-3 text-left ${CARD_HOVER}`}>
+                    <div key={i} role="button" tabIndex={0} onClick={() => setOpenProduct(p)}
+                      className={`nav-glass rounded-2xl p-3 text-left cursor-pointer flex gap-3 ${CARD_HOVER}`}>
                       {p.imageUrl ? (
-                        <img src={p.imageUrl} alt={p.name} className="w-full aspect-square rounded-xl object-cover mb-2" style={{ background: 'var(--nav-bg)' }} />
+                        <img src={p.imageUrl} alt={p.name} className="w-16 h-16 rounded-xl object-cover flex-shrink-0" style={{ background: 'var(--nav-bg)' }} />
                       ) : (
-                        <div className="w-full aspect-square rounded-xl mb-2" style={{ background: 'var(--nav-bg)' }} />
+                        <div className="w-16 h-16 rounded-xl flex-shrink-0" style={{ background: 'var(--nav-bg)' }} />
                       )}
-                      <div className="text-xs font-semibold line-clamp-2 mb-1" style={{ color: 'var(--nav-text-primary)' }}>{p.name}</div>
-                      <div className="flex items-center justify-between">
-                        <span className="font-mono font-bold text-sm tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{p.price.toLocaleString('ru-KZ')} ₸</span>
-                        <span className="text-[11px] flex items-center gap-0.5" style={{ color: 'var(--nav-text-muted)' }}><StarIcon />{p.rating.toFixed(1)} ({p.reviewsCount})</span>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs font-semibold line-clamp-2" style={{ color: 'var(--nav-text-primary)' }}>{p.name}</div>
+                        <div className="text-[11px] mt-0.5 flex items-center gap-1 flex-wrap" style={{ color: 'var(--nav-text-muted)' }}>
+                          {p.brand && <span>{p.brand} ·</span>}
+                          <span className="flex items-center gap-0.5"><StarIcon />{p.rating.toFixed(1)}</span>
+                          <span>· {p.reviewsCount.toLocaleString('ru-KZ')} отзывов</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2 mt-1.5">
+                          <span className="font-mono font-bold text-sm tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{p.price.toLocaleString('ru-KZ')} ₸</span>
+                          <span className="text-[11px] flex items-center gap-2" style={{ color: 'var(--nav-text-muted)' }}>
+                            Алматы
+                            {p.shopUrl && (
+                              <a href={p.shopUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
+                                className="font-semibold" style={{ color: 'var(--nav-accent)' }}>Kaspi ↗</a>
+                            )}
+                          </span>
+                        </div>
                       </div>
-                    </button>
+                    </div>
                   ))}
                 </div>
               )

@@ -113,7 +113,7 @@ export default function KaspiShopProductAvailability() {
           className="nav-glass nav-card-accent rounded-[28px] p-6 lg:p-8 mb-4">
           <div className="text-[11px] font-semibold tracking-wider uppercase mb-1" style={{ color: 'var(--nav-text-muted)' }}>Kaspi Bot</div>
           <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight" style={{ color: 'var(--nav-text-primary)' }}>Управление товарами</h1>
-          <p className="text-sm mt-2 max-w-2xl" style={{ color: 'var(--nav-text-secondary)' }}>
+          <p className="text-sm mt-2" style={{ color: 'var(--nav-text-secondary)' }}>
             Снимайте товары с продажи и возвращайте обратно — как в кабинете Kaspi, но прямо отсюда. Обе операции Kaspi
             обрабатывает сам, обычно в течение часа. При снятии с продажи правило демпинга для товара автоматически
             выключается, чтобы репрайсер случайно не вернул его в продажу.
@@ -153,7 +153,9 @@ export default function KaspiShopProductAvailability() {
           </div>
         )}
 
-        <div className="flex flex-col gap-3">
+        {/* Same card grid as the Демпинг page (2026-08-21 founder request)
+            -- compact cards, up to 4 per row on wide screens. */}
+        <div className="grid lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 items-start">
           {offers.map((offer, i) => {
             const state = rowStates[offer.sku] || 'idle'
             const error = rowErrors[offer.sku]
@@ -162,38 +164,37 @@ export default function KaspiShopProductAvailability() {
               <motion.div key={offer.sku}
                 initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.35, delay: i * 0.04, ease: EASE }}
-                className="nav-glass rounded-2xl p-4 lg:p-5">
-                <div className="flex items-center justify-between gap-4 flex-wrap">
-                  <div className="min-w-0">
-                    <div className="text-sm font-semibold truncate" style={{ color: 'var(--nav-text-primary)' }}>{offer.title}</div>
-                    <div className="text-[11px] mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>
-                      {offer.brandName ? `${offer.brandName} · ` : ''}{offer.sku}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 flex-shrink-0">
-                    <div className="text-sm font-bold tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>
+                className="nav-glass rounded-2xl p-4">
+                <div className="text-sm font-semibold truncate" title={offer.title} style={{ color: 'var(--nav-text-primary)' }}>{offer.title}</div>
+                <div className="text-[11px] mb-3" style={{ color: 'var(--nav-text-muted)' }}>
+                  {offer.brandName ? `${offer.brandName} · ` : ''}{offer.sku}
+                </div>
+                <div className="flex items-end justify-between gap-3">
+                  <div>
+                    <div className="text-[10px] font-semibold tracking-wider uppercase" style={{ color: 'var(--nav-text-muted)' }}>Цена</div>
+                    <div className="font-mono font-bold text-xl tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>
                       {offer.minPrice.toLocaleString('ru-KZ')} ₸
                     </div>
-                    {state === 'sent' ? (
-                      <span className="text-xs font-semibold rounded-full px-3 py-2" style={{ background: 'var(--nav-success)', color: '#fff' }}>
-                        Отправлено — Kaspi обрабатывает
-                      </span>
-                    ) : action === 'restore' ? (
-                      <button onClick={() => toggle(offer.sku, 'restore')} disabled={state === 'busy'}
-                        className="text-xs font-semibold rounded-full px-3 py-2 flex items-center gap-1.5 transition-transform hover:-translate-y-0.5 disabled:opacity-60"
-                        style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-                        <RestoreIcon />
-                        {state === 'busy' ? 'Отправляем…' : 'Вернуть в продажу'}
-                      </button>
-                    ) : (
-                      <button onClick={() => toggle(offer.sku, 'remove')} disabled={state === 'busy'}
-                        className="nav-glass text-xs font-semibold rounded-full px-3 py-2 flex items-center gap-1.5 transition-transform hover:-translate-y-0.5 disabled:opacity-60"
-                        style={{ color: 'var(--nav-critical)' }}>
-                        <PauseIcon />
-                        {state === 'busy' ? 'Отправляем…' : 'Снять с продажи'}
-                      </button>
-                    )}
                   </div>
+                  {state === 'sent' ? (
+                    <span className="text-[11px] font-semibold rounded-full px-3 py-2 text-center" style={{ background: 'var(--nav-success)', color: '#fff' }}>
+                      Kaspi обрабатывает
+                    </span>
+                  ) : action === 'restore' ? (
+                    <button onClick={() => toggle(offer.sku, 'restore')} disabled={state === 'busy'}
+                      className="text-xs font-semibold rounded-full px-3 py-2 flex items-center gap-1.5 transition-transform hover:-translate-y-0.5 disabled:opacity-60"
+                      style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                      <RestoreIcon />
+                      {state === 'busy' ? 'Отправляем…' : 'Вернуть в продажу'}
+                    </button>
+                  ) : (
+                    <button onClick={() => toggle(offer.sku, 'remove')} disabled={state === 'busy'}
+                      className="nav-glass text-xs font-semibold rounded-full px-3 py-2 flex items-center gap-1.5 transition-transform hover:-translate-y-0.5 disabled:opacity-60"
+                      style={{ color: 'var(--nav-critical)' }}>
+                      <PauseIcon />
+                      {state === 'busy' ? 'Отправляем…' : 'Снять с продажи'}
+                    </button>
+                  )}
                 </div>
                 {error && <div className="text-xs mt-2" style={{ color: 'var(--nav-critical)' }}>{error}</div>}
               </motion.div>

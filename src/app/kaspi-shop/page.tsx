@@ -799,20 +799,20 @@ export default function KaspiShop() {
             <div className="grid lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 items-start">
               <AnimatePresence initial={false}>
                 {products.map((p, i) => {
-                  const v = editValues[p.id] || { floorPrice: String(p.floor_price), maxPrice: p.max_price !== null ? String(p.max_price) : '', undercutStep: String(p.undercut_step), strategy: p.demping_strategy, excludedCities: '', excludedMerchants: '' }
-                  const expanded = expandedId === p.id
                   const otherSellers = p.market_offer_count !== null ? Math.max(0, p.market_offer_count - 1) : null
                   return (
                     <motion.div key={p.id}
                       initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
                       transition={{ duration: 0.35, ease: EASE, delay: Math.min(i * 0.04, 0.3) }}
-                      className={`nav-glass rounded-2xl overflow-hidden ${CARD_HOVER} ${expanded ? 'col-span-full' : ''}`}>
+                      className={`nav-glass rounded-2xl overflow-hidden ${CARD_HOVER}`}>
                       {/* div, not <button>: the card carries a real nested <a>
-                          (Kaspi link), which is invalid inside a button. */}
+                          (Kaspi link), which is invalid inside a button.
+                          Clicking opens the settings as a centered modal
+                          (2026-08-21 founder request) instead of expanding
+                          the card inline to full width. */}
                       <div role="button" tabIndex={0} onClick={() => {
-                        const next = expanded ? null : p.id
-                        setExpandedId(next)
-                        if (next && !cityPrices[p.id] && trackedCities.length > 0) {
+                        setExpandedId(p.id)
+                        if (!cityPrices[p.id] && trackedCities.length > 0) {
                           authHeader().then(headers =>
                             fetch(`/api/kaspi-shop/products/city-prices?id=${p.id}`, { headers })
                               .then(res => res.ok ? res.json() : { cities: [] })
@@ -865,11 +865,46 @@ export default function KaspiShop() {
                         </div>
                       </div>
 
-                      <AnimatePresence initial={false}>
-                        {expanded && (
-                          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
-                            transition={{ duration: 0.25, ease: EASE }} className="overflow-hidden">
-                            <div className="p-4 pt-3" style={{ borderTop: '1px solid var(--nav-border-soft)', background: 'var(--nav-bg)' }}>
+                    </motion.div>
+                  )
+                })}
+              </AnimatePresence>
+
+              {products.length === 0 && (
+                <div className="nav-glass rounded-2xl p-8 text-center col-span-full">
+                  <div className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>Каталог ещё импортируется или пуст.</div>
+                  <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>Товары появятся здесь после подключения кабинета — или нажмите «Обновить каталог» выше.</div>
+                </div>
+              )}
+            </div>
+
+            {/* Product settings as a centered modal (2026-08-21 founder
+                request: "карточка плывёт в центр и открывается как модал"
+                instead of expanding inline). Same dialog treatment as the
+                app's other modals (connect, wallet, bank picker). */}
+            <AnimatePresence>
+              {(() => {
+                const p = products.find(x => x.id === expandedId)
+                if (!p) return null
+                const v = editValues[p.id] || { floorPrice: String(p.floor_price), maxPrice: p.max_price !== null ? String(p.max_price) : '', undercutStep: String(p.undercut_step), strategy: p.demping_strategy, excludedCities: '', excludedMerchants: '' }
+                return (
+                  <motion.div key="productSettings" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                    className="fixed inset-0 z-50 flex items-end lg:items-center justify-center p-3 bg-black/30"
+                    onClick={() => setExpandedId(null)}>
+                    <motion.div initial={{ opacity: 0, scale: 0.95, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.97, y: 10 }}
+                      transition={{ duration: 0.25, ease: EASE }}
+                      className="relative nav-glass rounded-[24px] w-full max-w-xl max-h-[86vh] overflow-y-auto"
+                      style={{ boxShadow: '0 34px 80px -20px rgba(10,10,15,0.4), var(--nav-card-glow)' }}
+                      onClick={e => e.stopPropagation()}>
+                      <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[24px]" style={{ background: 'linear-gradient(90deg, var(--nav-accent), var(--nav-teal))' }} />
+                      <div className="p-5 lg:p-6">
+                        <div className="flex items-start justify-between gap-3 mb-4">
+                          <div className="min-w-0">
+                            <div className="text-[11px] font-semibold tracking-wider uppercase mb-0.5" style={{ color: 'var(--nav-text-muted)' }}>Настройки демпинга</div>
+                            <div className="text-sm font-bold" style={{ color: 'var(--nav-text-primary)' }}>{p.product_name}</div>
+                          </div>
+                          <button onClick={() => setExpandedId(null)} className="text-lg leading-none flex-shrink-0" style={{ color: 'var(--nav-text-secondary)' }}>✕</button>
+                        </div>
                               <div className="grid grid-cols-3 gap-2 mb-2">
                                 <label className="block">
                                   <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Минимальная цена</span>
@@ -958,22 +993,12 @@ export default function KaspiShop() {
                                 onMouseEnter={e => (e.currentTarget.style.color = 'var(--nav-critical)')} onMouseLeave={e => (e.currentTarget.style.color = 'var(--nav-text-muted)')}>
                                 Удалить товар
                               </button>
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
+                      </div>
                     </motion.div>
-                  )
-                })}
-              </AnimatePresence>
-
-              {products.length === 0 && (
-                <div className="nav-glass rounded-2xl p-8 text-center col-span-full">
-                  <div className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>Каталог ещё импортируется или пуст.</div>
-                  <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>Товары появятся здесь после подключения кабинета — или нажмите «Обновить каталог» выше.</div>
-                </div>
-              )}
-            </div>
+                  </motion.div>
+                )
+              })()}
+            </AnimatePresence>
           </>
         )}
       </div>
