@@ -4,8 +4,7 @@ import { debitKaspiShopWallet } from './wallet'
 import { getKey } from './connection'
 import { decryptAtRest } from '@/lib/kaspiPay/crypto'
 import { isWithinBudget, KASPI_RATE_LIMIT_WINDOW_MS } from './rateLimitBudget'
-import { setOfferAvailabilityViaBatch } from './cabinetPricePush'
-import { fetchOfferDetails } from './cabinetApi'
+import { pushOfferState } from './cabinetPricePush'
 import { sendTelegramNotification } from '@/lib/telegramNotify'
 
 const supabase = createClient(
@@ -73,8 +72,8 @@ async function pushProductPrices(params: {
   sessionCookies: string
   productIds: string[]
   sku: string
+  model: string
   storeId: string
-  stockCount: number
   cityPrices: Record<string, number>
 }): Promise<{ pushed: boolean; sessionExpired: boolean; message?: string }> {
   // Budget signal is last_pushed_at, not updated_at -- updated_at is also
@@ -95,22 +94,18 @@ async function pushProductPrices(params: {
     return { pushed: false, sessionExpired: false, message: 'rate limit budget exhausted for this 30-minute window' }
   }
 
-  const details = await fetchOfferDetails(params.sessionCookies, params.merchantId, params.sku)
-  if (!details) {
-    return { pushed: false, sessionExpired: false, message: 'offer details unavailable -- push skipped (no safe payload without them)' }
-  }
-
-  const result = await setOfferAvailabilityViaBatch({
+  // The EXACT captured cabinet batch item (see pushOfferState's comment):
+  // minimal fields, merchant-prefixed storeId, NO stockCount ever -- every
+  // upload of ours that carried stockCount was followed by Kaspi removing
+  // the offer with «Не указано наличие в прайс листе».
+  const result = await pushOfferState({
     sessionCookies: params.sessionCookies,
     merchantUid: params.merchantId,
-    offerDetails: details,
+    sku: params.sku,
+    model: params.model,
+    storeId: `${params.merchantId}_${params.storeId}`,
+    cityPrices: Object.entries(params.cityPrices).map(([cityId, value]) => ({ cityId, value })),
     available: 'yes',
-    fallbackStoreId: `${params.merchantId}_${params.storeId}`,
-    // Real остаток when the seller set one; otherwise the echoed details
-    // keep whatever stock state the offer already carries on Kaspi's side
-    // (never a fabricated number).
-    ...(params.stockCount > 0 ? { stockCount: params.stockCount } : {}),
-    cityPriceOverrides: params.cityPrices,
   })
 
   if (result.success) return { pushed: true, sessionExpired: false }
@@ -276,8 +271,8 @@ export async function applyPriceCheckResult(
             sessionCookies,
             productIds,
             sku: product.kaspi_sku,
+            model: product.product_name,
             storeId: product.store_id,
-            stockCount: Number(product.stock_count) || 0,
             cityPrices: changedCityPrices,
           })
           if (pushResult.pushed) {
@@ -373,8 +368,8 @@ export async function applyPriceCheckResult(
           sessionCookies,
           productIds,
           sku: product.kaspi_sku,
+          model: product.product_name,
           storeId: product.store_id,
-          stockCount: Number(product.stock_count) || 0,
           cityPrices: legacyCityPrices,
         })
 

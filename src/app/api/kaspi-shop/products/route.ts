@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { loadConnection, loadConnectionById, markSessionExpired } from '@/lib/kaspiShop/connection'
+import { loadConnection } from '@/lib/kaspiShop/connection'
 import { isCheckDue } from '@/lib/kaspiShop/checkCycle'
-import { setOfferAvailabilityViaBatch } from '@/lib/kaspiShop/cabinetPricePush'
-import { fetchOfferDetails } from '@/lib/kaspiShop/cabinetApi'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -153,12 +151,11 @@ export async function PATCH(req: NextRequest) {
     }
   }
 
-  // Read the row's previous state BEFORE the update -- needed to know
-  // whether stock_count actually changed (the immediate Kaspi push below
-  // only fires on a real change) and for the push payload's identifiers.
+  // Previous state, to detect a real stock_count change for the honest
+  // notice below.
   const { data: row, error: rowError } = await supabase
     .from('kaspi_shop_tracked_products')
-    .select('stock_count, connection_id, kaspi_sku, product_name, store_id, own_current_price')
+    .select('stock_count')
     .eq('id', id)
     .eq('user_id', user.id)
     .maybeSingle()
@@ -172,56 +169,20 @@ export async function PATCH(req: NextRequest) {
     .eq('user_id', user.id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Immediate stock push (2026-08-21, founder request): a changed остаток
-  // goes to Kaspi right away instead of riding along with the next price
-  // change. Best-effort -- the settings save above must succeed regardless.
-  // Never pushes zero (that would flip the offer to «нет в наличии»), and
-  // sends the offer's current city prices unchanged alongside, in the same
-  // full-state MANUAL_CHANGES shape as restore. storeId carries the
-  // confirmed merchant prefix.
-  let stockPushed = false
+  // Остаток is OUR bookkeeping only -- it is deliberately NOT pushed to
+  // Kaspi. Confirmed live twice (2026-08-21): every upload that carried a
+  // stockCount field was followed by Kaspi removing the offer with «Не
+  // указано наличие в прайс листе», and the cabinet's own captured batch
+  // item carries no stockCount at all. Until a safe stock channel is
+  // captured from the cabinet's real «Изменить цену и остатки» flow,
+  // остатками управляет кабинет Kaspi, and the UI says so honestly.
   let stockPushWarning: string | null = null
   const newStock = Number(patch.stock_count)
-  if ('stock_count' in patch && Number.isFinite(newStock) && newStock > 0 && newStock !== Number(row.stock_count)) {
-    try {
-      const connection = await loadConnectionById(row.connection_id)
-      if (!connection?.sessionCookies) {
-        stockPushWarning = 'Остаток сохранён, но сессия кабинета Kaspi не активна — на Kaspi он уйдёт после переподключения.'
-      } else {
-        // Full-state batch echo ONLY -- the single-item process endpoint got
-        // this account's offer removed with «Не указано наличие в прайс
-        // листе» right after a stock save (confirmed live 2026-08-21). If
-        // the details fetch fails there is no safe way to push, so we say
-        // so instead of falling back to the harmful path.
-        const details = await fetchOfferDetails(connection.sessionCookies, connection.merchantId, row.kaspi_sku)
-        if (!details) {
-          stockPushWarning = 'Остаток сохранён у нас, но карточку товара получить не удалось — на Kaspi он уйдёт со следующим обновлением цены.'
-          return NextResponse.json({ ok: true, stockPushed, stockPushWarning })
-        }
-        const result = await setOfferAvailabilityViaBatch({
-          sessionCookies: connection.sessionCookies,
-          merchantUid: connection.merchantId,
-          offerDetails: details,
-          available: 'yes',
-          fallbackStoreId: row.store_id ? `${connection.merchantId}_${row.store_id}` : '',
-          stockCount: newStock,
-        })
-        if (result.success) {
-          stockPushed = true
-        } else if (result.reason === 'session_expired') {
-          await markSessionExpired(connection.id)
-          stockPushWarning = 'Остаток сохранён, но сессия кабинета Kaspi истекла — переподключитесь, чтобы он ушёл на Kaspi.'
-        } else {
-          stockPushWarning = `Остаток сохранён, но Kaspi не принял обновление: ${result.message}`
-        }
-      }
-    } catch (err: any) {
-      console.error('kaspi-shop products PATCH: stock push failed (non-fatal)', err.message)
-      stockPushWarning = 'Остаток сохранён, но отправить его на Kaspi сейчас не удалось.'
-    }
+  if ('stock_count' in patch && Number.isFinite(newStock) && newStock !== Number(row.stock_count)) {
+    stockPushWarning = 'Остаток сохранён у нас и виден на карточке. На Kaspi остатки безопасно передавать пока нельзя — управляйте ими в кабинете Kaspi.'
   }
 
-  return NextResponse.json({ ok: true, stockPushed, stockPushWarning })
+  return NextResponse.json({ ok: true, stockPushed: false, stockPushWarning })
 }
 
 export async function DELETE(req: NextRequest) {

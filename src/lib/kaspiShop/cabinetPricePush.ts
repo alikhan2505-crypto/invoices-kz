@@ -3,6 +3,15 @@
 // cabinet-api-findings.md) -- this is what the cabinet's own "Изменить цену
 // и остатки" UI calls. Response is an async job id, not the updated
 // resource; no polling of that id has been tested.
+//
+// ⚠️ DEPRECATED AND DANGEROUS (2026-08-21): every upload through this
+// single-item endpoint that carried a stockCount field was followed by
+// Kaspi REMOVING the offer with «Не указано наличие в прайс листе»
+// (confirmed live twice on the founder's real account). All live write
+// paths now use pushOfferState below (the captured batch shape, no
+// stockCount). Kept only as documentation of the captured shape -- do NOT
+// wire this back into any code path without a fresh live capture proving
+// it safe.
 const PRICE_PUSH_URL = 'https://mc.shop.kaspi.kz/pricefeed/upload/merchant/process'
 
 export type PricePushResult =
@@ -63,110 +72,34 @@ export type OfferAvailabilityParams = {
   merchantUid: string
   sku: string
   model: string
+  // MUST be merchant-prefixed ("30067228_PP2") -- captured verbatim.
   storeId: string
   cityPrices: { cityId: string; value: number }[]
-  // Omitted/null = "not managing stock via this upload" (the captured
-  // cabinet restore state); a positive number = the seller's real остаток.
-  stockCount?: number | null
 }
 
-// Shared MANUAL_CHANGES upload for toggling an offer on/off sale. The
-// available:"yes" (restore) direction was captured live 2026-08-21 from the
-// cabinet's own "Выставить на продажу" flow (founder's DevTools screenshots):
-// the cabinet validates via offer-validation-api/.../validate/v2 (action
-// ON_SALE__BATCH, returned valid:true) and then uploads MANUAL_CHANGES
-// through the same pricefeed/upload pipeline as pushPriceChange above -- an
-// offer row with availabilities available:"yes" (stockCount null in the
-// captured state) and the offer's city prices. We reuse the single-item
-// process endpoint whose payload shape has been confirmed since 2026-08-12,
-// rather than the batch variant whose full item shape wasn't fully expanded
-// in the capture. The available:"no" (remove-from-sale) direction is the
-// symmetric counterpart -- same field the cabinet's own state stores as
-// yes/no -- but has NOT been captured live yet; first real use should be
-// watched (a Kaspi rejection surfaces as the honest error message below).
-async function pushOfferAvailability(params: OfferAvailabilityParams, available: 'yes' | 'no'): Promise<PricePushResult> {
-  let res: Response
-  try {
-    res = await fetch(PRICE_PUSH_URL, {
-      method: 'POST',
-      headers: {
-        'x-auth-version': '3',
-        'referer': 'https://kaspi.kz/',
-        'origin': 'https://kaspi.kz',
-        'content-type': 'application/json',
-        'cookie': params.sessionCookies,
-      },
-      body: JSON.stringify({
-        merchantUid: params.merchantUid,
-        availabilities: [
-          { available, storeId: params.storeId, stockCount: params.stockCount ?? null },
-        ],
-        cityPrices: params.cityPrices,
-        sku: params.sku,
-        model: params.model,
-      }),
-    })
-  } catch (err: any) {
-    return { success: false, reason: 'other', message: `network error: ${err.message}` }
-  }
-
-  if (res.status === 401 || res.status === 403) {
-    return { success: false, reason: 'session_expired', message: `HTTP ${res.status}` }
-  }
-  if (!res.ok) {
-    const body = await res.text().catch(() => '')
-    return { success: false, reason: 'other', message: `HTTP ${res.status}: ${body.slice(0, 300)}` }
-  }
-
-  return { success: true }
-}
-
-export async function restoreOfferToSale(params: OfferAvailabilityParams): Promise<PricePushResult> {
-  return pushOfferAvailability(params, 'yes')
-}
-
-export async function removeOfferFromSale(params: OfferAvailabilityParams): Promise<PricePushResult> {
-  return pushOfferAvailability(params, 'no')
-}
-
-// Stock-only update (2026-08-21, founder request): the same available:"yes"
-// upload as a restore, carrying the seller's real остаток and the offer's
-// current city prices unchanged -- so a changed остаток reaches Kaspi
-// immediately on save instead of waiting for the next price change.
-export async function updateOfferStock(params: OfferAvailabilityParams): Promise<PricePushResult> {
-  return pushOfferAvailability(params, 'yes')
-}
-
-// The cabinet's REAL restore chain, captured live 2026-08-21 (founder's
-// DevTools): (1) offer details fetched, (2) validate v2 with action
-// ON_SALE__BATCH (returned {valid:true, errorOffers:null}), (3) the full
-// offer row uploaded via pricefeed/.../process/batch (returned [{id}]).
-// The single-item process endpoint (pushPriceChange above) turned out to
-// update price/stock on an ACTIVE offer but never re-activate a removed
-// one -- confirmed live: multiple accepted (HTTP 200) single-item restore
-// uploads never brought the offer back. This mirrors the cabinet's chain
-// instead: the details object is echoed back with only availabilities
-// flipped. Validation runs for the restore direction only (its captured
-// action name is ON_SALE__BATCH; the remove direction's action name was
-// never captured, so remove skips validation rather than guessing one) --
-// a validation rejection is surfaced verbatim so the UI can show the real
-// reason instead of a silent no-op.
-export async function setOfferAvailabilityViaBatch(params: {
-  sessionCookies: string
-  merchantUid: string
-  offerDetails: Record<string, any>
-  available: 'yes' | 'no'
-  fallbackStoreId: string
-  // When set, written onto every availability entry (the seller's real
-  // остаток). Omitted = each entry keeps whatever stockCount it already has.
-  stockCount?: number | null
-  // cityId -> new price. Applied onto the echoed details' cities array --
-  // this is how the repricer's price changes ride the same safe full-state
-  // upload instead of the single-item endpoint (which Kaspi answered with
-  // «Не указано наличие в прайс листе» removals for this account, confirmed
-  // live twice on 2026-08-21).
-  cityPriceOverrides?: Record<string, number>
-}): Promise<PricePushResult> {
+// THE canonical write path to Kaspi for an offer's state -- an EXACT copy
+// of the cabinet's own «Выставить на продажу» batch item, captured in FULL
+// (via «Посмотреть источник») from the founder's DevTools on 2026-08-21:
+//
+//   [{"merchantUid":"30067228","sku":"133206576_392235481",
+//     "availabilities":[{"available":"yes","storeId":"30067228_PP2"}],
+//     "model":"Влажные полотенца Sunlight 70шт XXL Universal 70 шт",
+//     "cityPrices":[{"cityId":"511010000","value":1120}]}]
+//
+// Three hard-won rules encoded here, each confirmed by a live removal:
+// 1. NO stockCount field AT ALL -- not even null. Every upload of ours that
+//    carried stockCount (null or 1) was followed by Kaspi removing the
+//    offer with «Не указано наличие в прайс листе»; the cabinet's own item
+//    simply omits the field.
+// 2. storeId is merchant-prefixed ("30067228_PP2").
+// 3. The BATCH endpoint takes an array of these minimal items -- no full
+//    offer echo, no master fields (an earlier details-echo attempt was also
+//    answered with removals).
+// Validation (validate/v2, action ON_SALE__BATCH) runs first for the
+// restore direction, matching the cabinet's order; an explicit
+// {valid:false} is surfaced verbatim, any other validation hiccup is
+// non-fatal since the batch upload is the operation that matters.
+export async function pushOfferState(params: OfferAvailabilityParams & { available: 'yes' | 'no' }): Promise<PricePushResult> {
   const headers = {
     'x-auth-version': '3',
     'referer': 'https://kaspi.kz/',
@@ -175,21 +108,12 @@ export async function setOfferAvailabilityViaBatch(params: {
     'cookie': params.sessionCookies,
   }
 
-  const item: Record<string, any> = { ...params.offerDetails, merchantUid: params.merchantUid }
-  if (Array.isArray(item.availabilities) && item.availabilities.length > 0) {
-    item.availabilities = item.availabilities.map((a: any) => ({
-      ...a,
-      available: params.available,
-      ...(params.stockCount !== undefined ? { stockCount: params.stockCount } : {}),
-    }))
-  } else {
-    item.availabilities = [{ available: params.available, storeId: params.fallbackStoreId, stockCount: params.stockCount ?? null }]
-  }
-  if (params.cityPriceOverrides && Array.isArray(item.cities)) {
-    item.cities = item.cities.map((c: any) => {
-      const next = params.cityPriceOverrides![String(c.cityId)]
-      return next !== undefined ? { ...c, price: next } : c
-    })
+  const item = {
+    merchantUid: params.merchantUid,
+    sku: params.sku,
+    availabilities: [{ available: params.available, storeId: params.storeId }],
+    model: params.model,
+    cityPrices: params.cityPrices,
   }
 
   try {
@@ -208,9 +132,6 @@ export async function setOfferAvailabilityViaBatch(params: {
           return { success: false, reason: 'other', message: `валидация Kaspi: ${JSON.stringify(vJson.errorOffers ?? vJson).slice(0, 400)}` }
         }
       }
-      // A non-ok validation response (other than auth) is not treated as
-      // fatal -- the batch upload below is the operation that matters, and
-      // the cabinet may gate validation behind params we don't know.
     }
 
     const bRes = await fetch('https://mc.shop.kaspi.kz/pricefeed/upload/merchant/process/process/batch', {
@@ -229,4 +150,12 @@ export async function setOfferAvailabilityViaBatch(params: {
   } catch (err: any) {
     return { success: false, reason: 'other', message: `network error: ${err.message}` }
   }
+}
+
+export async function restoreOfferToSale(params: OfferAvailabilityParams): Promise<PricePushResult> {
+  return pushOfferState({ ...params, available: 'yes' })
+}
+
+export async function removeOfferFromSale(params: OfferAvailabilityParams): Promise<PricePushResult> {
+  return pushOfferState({ ...params, available: 'no' })
 }
