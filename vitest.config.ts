@@ -19,6 +19,17 @@ if (fs.existsSync(envPath)) {
 }
 
 export default defineConfig({
+  resolve: {
+    // Mirrors tsconfig.json's "@/*": ["./src/*"] -- needed so a test can
+    // import a module that transitively pulls in an `@/...` import (e.g.
+    // checkCycle.test.ts -> checkCycle.ts -> wallet.ts ->
+    // '@/lib/kaspiPay/wallet'). No existing kaspiShop test previously
+    // exercised this path (none of them import a file with an `@/` import
+    // in its own dependency chain), so the gap went unnoticed until now.
+    alias: {
+      '@': path.resolve(__dirname, 'src'),
+    },
+  },
   test: {
     globals: true,
     environment: 'node',

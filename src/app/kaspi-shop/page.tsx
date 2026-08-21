@@ -72,6 +72,17 @@ function XIcon({ size = 12 }: { size?: number }) {
   )
 }
 
+// Same checkmark glyph as src/app/kaspi-shop/profit/page.tsx's CheckIcon --
+// not imported (that file is out of scope to touch) but replicated exactly
+// rather than reusing XIcon for a "selected" state, which read as "remove".
+function CheckIcon({ size = 12 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
+  )
+}
+
 function SparkleIcon() {
   return (
     <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="none">
@@ -132,6 +143,19 @@ function PriceLadder({ own, competitor, floor, maxPrice }: { own: number; compet
   )
 }
 
+// The four summary numbers Northline's equivalent page leads with, computed
+// from our own kaspi_shop_tracked_products (see GET /api/kaspi-shop/products'
+// `stats`) -- small cards in a row, same nav-glass/CARD_HOVER treatment as
+// the rest of this page rather than a second "hero" style.
+function StatCard({ label, value, accent }: { label: string; value: number; accent?: string }) {
+  return (
+    <div className={`nav-glass rounded-2xl p-4 ${CARD_HOVER}`}>
+      <div className="text-2xl font-black font-mono tabular-nums" style={{ color: accent || 'var(--nav-text-primary)' }}>{value}</div>
+      <div className="text-[11px] mt-1" style={{ color: 'var(--nav-text-muted)' }}>{label}</div>
+    </div>
+  )
+}
+
 export default function KaspiShop() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
@@ -158,6 +182,28 @@ export default function KaspiShop() {
   const [toppingUp, setToppingUp] = useState(false)
   const [topupPending, setTopupPending] = useState<{ topup_id: string, payment_link: string } | null>(null)
   const [walletOpen, setWalletOpen] = useState(false)
+
+  // Stats cards + "Применить сейчас" / "Добавить несколько" -- see
+  // GET /api/kaspi-shop/products for how stats is computed server-side, and
+  // /api/kaspi-shop/apply-now's route comment for why apply-now can't fetch
+  // fresh competitor prices synchronously here (Vercel's IPs are blocked by
+  // Kaspi -- the real fetch happens in GitHub Actions).
+  const [stats, setStats] = useState<{ totalRules: number; activeCount: number; readyToApply: number; blockedAtFloor: number } | null>(null)
+  const [applyingNow, setApplyingNow] = useState(false)
+  const [applyNowMessage, setApplyNowMessage] = useState('')
+
+  const MAX_BULK_ITEMS = 100
+  const [bulkOpen, setBulkOpen] = useState(false)
+  const [bulkStep, setBulkStep] = useState<'select' | 'config'>('select')
+  const [bulkSearch, setBulkSearch] = useState('')
+  const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set())
+  const [bulkFloorPrice, setBulkFloorPrice] = useState('')
+  const [bulkMaxPrice, setBulkMaxPrice] = useState('')
+  const [bulkUndercutStep, setBulkUndercutStep] = useState('100')
+  const [bulkStrategy, setBulkStrategy] = useState('undercut_leader')
+  const [bulkFrequency, setBulkFrequency] = useState('15')
+  const [bulkSubmitting, setBulkSubmitting] = useState(false)
+  const [bulkError, setBulkError] = useState('')
 
   const [suggestingFor, setSuggestingFor] = useState<string | null>(null)
   const [editValues, setEditValues] = useState<Record<string, { floorPrice: string; maxPrice: string; undercutStep: string; strategy: string; excludedCities: string; excludedMerchants: string }>>({})
@@ -205,6 +251,7 @@ export default function KaspiShop() {
         const data = await productsRes.json()
         const list: Product[] = data.products || []
         setProducts(list)
+        setStats(data.stats || null)
         setEditValues(prev => {
           const next = { ...prev }
           for (const p of list) {
@@ -398,6 +445,86 @@ export default function KaspiShop() {
     setEditValues(prev => ({ ...prev, [id]: { ...prev[id], floorPrice: String(data.floorPrice), undercutStep: String(data.undercutStep) } }))
   }
 
+  // Forces an immediate check-cycle run instead of waiting out each
+  // product's check_frequency_minutes schedule -- see
+  // /api/kaspi-shop/apply-now's route comment for why this can't complete
+  // synchronously (real Kaspi fetches only work from GitHub Actions, not
+  // Vercel). The route responds as soon as it has queued the run, so this
+  // polls the product list a couple of times afterwards rather than
+  // expecting fresh numbers in the response itself.
+  async function applyNow() {
+    if (applyingNow) return
+    setApplyingNow(true)
+    setApplyNowMessage('')
+    const headers = await authHeader()
+    const res = await fetch('/api/kaspi-shop/apply-now', { method: 'POST', headers, body: JSON.stringify({}) })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      setApplyNowMessage(data.error || 'Не удалось запустить проверку')
+      setApplyingNow(false)
+      return
+    }
+    setApplyNowMessage(`Запущено для ${data.queued} товар(ов) — цены обновятся в течение минуты`)
+    setTimeout(load, 15000)
+    setTimeout(() => { load(); setApplyingNow(false); setApplyNowMessage('') }, 35000)
+  }
+
+  function openBulkAdd() {
+    setBulkOpen(true)
+    setBulkStep('select')
+    setBulkSearch('')
+    setBulkSelected(new Set())
+    setBulkFloorPrice('')
+    setBulkMaxPrice('')
+    setBulkUndercutStep('100')
+    setBulkStrategy('undercut_leader')
+    setBulkFrequency('15')
+    setBulkError('')
+  }
+
+  function toggleBulkSelect(id: string) {
+    setBulkSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else if (next.size < MAX_BULK_ITEMS) next.add(id)
+      return next
+    })
+  }
+
+  // Searches the products already loaded on this page (GET
+  // /api/kaspi-shop/products already returns every one of the seller's
+  // tracked rows, which -- per finalizeConnection.ts -- already mirrors
+  // their whole Kaspi catalog, imported disabled by default) instead of a
+  // new catalog-search endpoint: no extra round trip, and no repeated
+  // authenticated Kaspi API calls just to power a search box.
+  const bulkFiltered = (() => {
+    const q = bulkSearch.trim().toLowerCase()
+    if (!q) return products
+    return products.filter(p => p.product_name.toLowerCase().includes(q) || p.kaspi_sku.toLowerCase().includes(q))
+  })()
+
+  async function submitBulkAdd() {
+    setBulkSubmitting(true)
+    setBulkError('')
+    const headers = await authHeader()
+    const res = await fetch('/api/kaspi-shop/products/bulk', {
+      method: 'POST', headers,
+      body: JSON.stringify({
+        productIds: Array.from(bulkSelected),
+        floorPrice: Number(bulkFloorPrice),
+        maxPrice: bulkMaxPrice.trim() === '' ? null : Number(bulkMaxPrice),
+        undercutStep: Number(bulkUndercutStep),
+        dempingStrategy: bulkStrategy,
+        checkFrequencyMinutes: Number(bulkFrequency),
+      }),
+    })
+    const data = await res.json().catch(() => ({}))
+    setBulkSubmitting(false)
+    if (!res.ok) { setBulkError(data.error || 'Не удалось применить настройки'); return }
+    setBulkOpen(false)
+    load()
+  }
+
   if (loading) return <LoadingSpinner />
 
   const winningCount = products.filter(p => p.last_competitor_price !== null && p.own_current_price <= p.last_competitor_price).length
@@ -562,6 +689,33 @@ export default function KaspiShop() {
 
             {companyName && activeCount === 0 && products.length > 0 && (
               <div className="text-xs mb-4 px-1" style={{ color: 'var(--nav-text-muted)' }}>{products.length} товаров импортировано и на паузе — включите нужные ниже, чтобы демпинг начал работать.</div>
+            )}
+
+            <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+              <div className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>Правила демпинга</div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button onClick={openBulkAdd}
+                  className="nav-glass text-xs font-semibold rounded-full px-4 py-2 transition-transform hover:-translate-y-0.5" style={{ color: 'var(--nav-accent)' }}>
+                  Добавить несколько
+                </button>
+                <button onClick={applyNow} disabled={applyingNow || !stats || stats.activeCount === 0}
+                  className="text-xs font-semibold rounded-full px-4 py-2 flex items-center gap-1.5 disabled:opacity-50 transition-transform hover:-translate-y-0.5"
+                  style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                  {applyingNow ? 'Проверяем...' : 'Применить сейчас'}
+                </button>
+              </div>
+            </div>
+            {applyNowMessage && (
+              <div className="text-[11px] mb-3 px-1" style={{ color: 'var(--nav-text-muted)' }}>{applyNowMessage}</div>
+            )}
+
+            {stats && (
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+                <StatCard label="Всего правил" value={stats.totalRules} />
+                <StatCard label="Активных" value={stats.activeCount} accent="var(--nav-success)" />
+                <StatCard label="Готовы применить" value={stats.readyToApply} accent="var(--nav-accent)" />
+                <StatCard label="Заблокировано порогом" value={stats.blockedAtFloor} accent="var(--nav-critical)" />
+              </div>
             )}
 
             <div className="space-y-3">
@@ -757,6 +911,120 @@ export default function KaspiShop() {
                   <a href={topupPending.payment_link} target="_blank" rel="noopener noreferrer"
                     className="w-full rounded-xl py-2.5 text-sm font-medium block text-center" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>Оплатить</a>
                 </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* "Добавить несколько" -- select N of the seller's own already-imported
+          products (search is client-side over the `products` array this page
+          already has loaded, see bulkFiltered/openBulkAdd above), then apply
+          one shared floor/max/step/strategy/frequency config to all of them
+          at once via POST /api/kaspi-shop/products/bulk. Same centered
+          nav-glass dialog treatment as the connect flow above, since this is
+          also a short multi-step flow, not a persistent panel. */}
+      <AnimatePresence>
+        {bulkOpen && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/30 z-50 flex items-end lg:items-center justify-center p-0 lg:p-4"
+            onClick={() => setBulkOpen(false)}>
+            <motion.div initial={{ y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }}
+              transition={{ duration: 0.3, ease: EASE }}
+              onClick={e => e.stopPropagation()}
+              className="relative nav-glass rounded-t-[24px] lg:rounded-[24px] w-full lg:max-w-lg p-5 max-h-[86vh] flex flex-col"
+              style={{ boxShadow: '0 34px 80px -20px rgba(10,10,15,0.4), var(--nav-card-glow)' }}>
+              <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[24px]" style={{ background: 'linear-gradient(90deg, var(--nav-accent), var(--nav-teal))' }} />
+
+              <div className="flex items-center justify-between gap-3 mb-1">
+                <div className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>
+                  {bulkStep === 'select' ? 'Добавить несколько' : 'Общие настройки'}
+                </div>
+                <button onClick={() => setBulkOpen(false)} style={{ color: 'var(--nav-text-muted)' }}><XIcon size={16} /></button>
+              </div>
+
+              {bulkStep === 'select' ? (
+                <>
+                  <div className="text-[11px] mb-3" style={{ color: 'var(--nav-text-muted)' }}>
+                    Выбрано: {bulkSelected.size} / {MAX_BULK_ITEMS}
+                  </div>
+                  <input value={bulkSearch} onChange={e => setBulkSearch(e.target.value)} placeholder="Найти по названию или SKU…"
+                    className={INPUT_CLS} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
+                  <div className="flex-1 overflow-y-auto mt-3 -mx-1 px-1 space-y-1.5">
+                    {bulkFiltered.length === 0 && (
+                      <div className="text-[11px] py-4 text-center" style={{ color: 'var(--nav-text-muted)' }}>Ничего не найдено.</div>
+                    )}
+                    {bulkFiltered.map(p => {
+                      const checked = bulkSelected.has(p.id)
+                      return (
+                        <button key={p.id} type="button" onClick={() => toggleBulkSelect(p.id)}
+                          className="w-full text-left nav-glass rounded-xl px-3 py-2.5 text-sm flex items-center gap-3 transition-colors"
+                          style={checked ? { borderColor: 'var(--nav-accent)', background: 'var(--nav-accent-soft)' } : undefined}>
+                          <span className="w-4 h-4 rounded flex-shrink-0 flex items-center justify-center"
+                            style={{ background: checked ? 'var(--nav-accent)' : 'transparent', border: `1.5px solid ${checked ? 'var(--nav-accent)' : 'var(--nav-border)'}` }}>
+                            {checked && <XIcon size={10} />}
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate font-medium" style={{ color: 'var(--nav-text-primary)' }}>{p.product_name}</span>
+                            <span className="block text-[11px]" style={{ color: 'var(--nav-text-muted)' }}>
+                              SKU {p.kaspi_sku} · {p.own_current_price.toLocaleString('ru-KZ')} ₸ {p.enabled && <span style={{ color: 'var(--nav-success)' }}>· уже активен</span>}
+                            </span>
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <button onClick={() => setBulkStep('config')} disabled={bulkSelected.size === 0}
+                    className="mt-3 rounded-xl py-3 text-sm font-semibold disabled:opacity-50" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                    Далее ({bulkSelected.size})
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div className="text-[11px] mb-3" style={{ color: 'var(--nav-text-muted)' }}>Применится ко всем {bulkSelected.size} выбранным товарам.</div>
+                  {bulkError && <div className="text-xs mb-3" style={{ color: 'var(--nav-critical)' }}>{bulkError}</div>}
+                  <div className="grid grid-cols-3 gap-2 mb-2">
+                    <label className="block">
+                      <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Минимальная цена</span>
+                      <input className={`${INPUT_CLS} font-mono px-2 py-1.5`} type="number" style={{ color: 'var(--nav-text-primary)' }}
+                        value={bulkFloorPrice} onChange={e => setBulkFloorPrice(e.target.value)} />
+                    </label>
+                    <label className="block">
+                      <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Максимальная цена</span>
+                      <input className={`${INPUT_CLS} font-mono px-2 py-1.5`} type="number" placeholder="—" style={{ color: 'var(--nav-text-primary)' }}
+                        value={bulkMaxPrice} onChange={e => setBulkMaxPrice(e.target.value)} />
+                    </label>
+                    <label className="block">
+                      <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Шаг, ₸</span>
+                      <input className={`${INPUT_CLS} font-mono px-2 py-1.5`} type="number" style={{ color: 'var(--nav-text-primary)' }}
+                        value={bulkUndercutStep} onChange={e => setBulkUndercutStep(e.target.value)} />
+                    </label>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 mb-3">
+                    <label className="block">
+                      <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Стратегия</span>
+                      <select className={`${INPUT_CLS} px-2 py-1.5`} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-surface-chrome)' }}
+                        value={bulkStrategy} onChange={e => setBulkStrategy(e.target.value)}>
+                        {Object.entries(STRATEGY_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+                      </select>
+                    </label>
+                    <label className="block">
+                      <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Частота проверки, мин</span>
+                      <input className={`${INPUT_CLS} font-mono px-2 py-1.5`} type="number" style={{ color: 'var(--nav-text-primary)' }}
+                        value={bulkFrequency} onChange={e => setBulkFrequency(e.target.value)} />
+                    </label>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => setBulkStep('select')}
+                      className="flex-1 text-xs nav-glass rounded-lg px-3 py-2.5 font-medium" style={{ color: 'var(--nav-text-secondary)' }}>
+                      Назад
+                    </button>
+                    <button onClick={submitBulkAdd} disabled={bulkSubmitting || !bulkFloorPrice || !bulkUndercutStep}
+                      className="flex-[2] text-sm rounded-lg px-3 py-2.5 font-semibold disabled:opacity-50" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                      {bulkSubmitting ? 'Применяем...' : `Применить к ${bulkSelected.size} товарам`}
+                    </button>
+                  </div>
+                </>
               )}
             </motion.div>
           </motion.div>

@@ -34,6 +34,9 @@ const kaspiShopLinks: { href: string; label: LocalizedLabel }[] = [
   { href: '/kaspi-shop/pending-products', label: { ru: 'Нераспознанные товары', kk: 'Танылмаған тауарлар', en: 'Unmatched products' } },
   { href: '/kaspi-shop/niches', label: { ru: 'Ниши', kk: 'Нишалар', en: 'Niches' } },
   { href: '/kaspi-shop/profit', label: { ru: 'Прибыль', kk: 'Пайда', en: 'Profit' } },
+  { href: '/kaspi-shop/margin', label: { ru: 'Калькулятор маржи', kk: 'Маржа калькуляторы', en: 'Margin calculator' } },
+  { href: '/kaspi-shop/reviews', label: { ru: 'Отзывы', kk: 'Пікірлер', en: 'Reviews' } },
+  { href: '/kaspi-shop/nkt', label: { ru: 'Каталог НКТ', kk: 'ҰТК каталогы', en: 'NKT catalog' } },
 ]
 
 // /ai-agent/settings deliberately has no pill of its own here -- it only

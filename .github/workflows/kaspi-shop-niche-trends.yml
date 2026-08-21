@@ -1,0 +1,36 @@
+name: Kaspi Shop niche trends
+
+on:
+  schedule:
+    # Owns the real 24h cadence itself (see the cron route's own comment
+    # for why -- Kaspi blocks Vercel's IPs, so Vercel can only ever
+    # dispatch this workflow, never fetch Kaspi directly). Arbitrary
+    # off-peak minute, same idea as kaspi-shop-price-check.yml's schedule.
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+    inputs:
+      triggeredBy:
+        required: false
+        type: string
+        default: manual
+
+# One run samples ~18 categories sequentially with a throttling sleep
+# between each Kaspi fetch (see the script) -- a run can take a couple of
+# minutes. This group name is unique to this workflow, so an overlapping
+# scheduled + manual run queues behind whichever is already in progress
+# instead of racing it (same reasoning as kaspi-shop-price-check.yml's
+# concurrency group).
+concurrency:
+  group: kaspi-shop-niche-trends
+  cancel-in-progress: false
+
+jobs:
+  refresh-trends:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refresh niche trends
+        env:
+          KASPI_SHOP_CRON_SECRET: ${{ secrets.KASPI_SHOP_CRON_SECRET }}
+        run: node .github/scripts/kaspi-shop-niche-trends.mjs

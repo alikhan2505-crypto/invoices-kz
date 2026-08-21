@@ -14,6 +14,17 @@ const supabase = createClient(
 
 export type DueTrackedProduct = { id: string; kaspiSku: string; targetCities: string[] }
 
+// Pure predicate, factored out of getDueTrackedProducts below so the
+// "Готовы применить" stat on /kaspi-shop (GET /api/kaspi-shop/products,
+// scoped to one user) can compute the exact same due/not-due answer instead
+// of a second, slightly different reimplementation of the elapsed-minutes
+// math that could silently drift from this one over time.
+export function isCheckDue(lastCheckedAt: string | null, checkFrequencyMinutes: number, now: number = Date.now()): boolean {
+  if (!lastCheckedAt) return true
+  const elapsedMinutes = (now - new Date(lastCheckedAt).getTime()) / 60000
+  return elapsedMinutes >= checkFrequencyMinutes
+}
+
 // Kaspi returns a persistent HTTP 429 to its public product pages from
 // Vercel's IP ranges (confirmed live 2026-08-12: identical block across 4
 // attempts spanning 3.5 hours, no Retry-After/rate-limit headers -- not a
@@ -33,9 +44,7 @@ export async function getDueTrackedProducts(): Promise<DueTrackedProduct[]> {
   return (due || [])
     .filter((p: any) => {
       if (p.kaspi_shop_connections?.paused) return false
-      if (!p.last_checked_at) return true
-      const elapsedMinutes = (now - new Date(p.last_checked_at).getTime()) / 60000
-      return elapsedMinutes >= p.check_frequency_minutes
+      return isCheckDue(p.last_checked_at, p.check_frequency_minutes, now)
     })
     .map((p: any) => ({
       id: p.id,
@@ -206,7 +215,7 @@ export async function applyPriceCheckResult(
 
       await supabase
         .from('kaspi_shop_tracked_products')
-        .update({ own_current_price: ownPriceAfter, last_checked_at: new Date().toISOString(), last_competitor_price: competitorPrice })
+        .update({ own_current_price: ownPriceAfter, last_checked_at: new Date().toISOString(), last_competitor_price: competitorPrice, held_at_floor: anyHeldAtFloor })
         .eq('id', trackedProductId)
 
       // Streak persistence runs unconditionally, independent of the
@@ -321,7 +330,7 @@ export async function applyPriceCheckResult(
 
     await supabase
       .from('kaspi_shop_tracked_products')
-      .update({ own_current_price: ownPriceAfter, last_checked_at: new Date().toISOString(), last_competitor_price: competitorPrice, no_competitor_streak: newStreak, market_position: position, market_offer_count: totalOffers })
+      .update({ own_current_price: ownPriceAfter, last_checked_at: new Date().toISOString(), last_competitor_price: competitorPrice, no_competitor_streak: newStreak, market_position: position, market_offer_count: totalOffers, held_at_floor: heldAtFloor })
       .eq('id', trackedProductId)
 
     if (action === 'updated' && connection?.session_cookies && connection.session_status === 'active') {
@@ -395,6 +404,11 @@ export async function applyPriceCheckResult(
     }
   } else {
     action = 'error'
+    // held_at_floor deliberately left untouched here -- a fetch error tells
+    // us nothing new about whether the floor is still binding, so clearing
+    // it would hide a real still-held product behind a transient upstream
+    // failure, and setting it would assert something this cycle never
+    // observed.
     await supabase
       .from('kaspi_shop_tracked_products')
       .update({ last_checked_at: new Date().toISOString() })

@@ -384,6 +384,27 @@ html {
   --nav-border: rgba(20, 22, 42, 0.09);
   --nav-border-soft: rgba(20, 22, 42, 0.07);
   --nav-card-glow: 0 20px 50px -22px rgba(30, 25, 90, 0.28);
+  /* 8-hue categorical palette for the Kaspi Shop "niche trends" donut
+     chart / demand-share visual (see /kaspi-shop/niches). Validated via
+     the dataviz skill's validate_palette.js against THIS app's actual
+     --nav-bg surfaces (not the skill's generic default surface) --
+     passes lightness band, chroma floor, CVD adjacent-pair separation
+     (worst 9.1 light / 8.4 dark, target >=8), and the normal-vision
+     floor (worst 19.6 light / 19.3 dark, floor >=15) in both modes.
+     Fixed slot order is the CVD-safety mechanism -- never reassign or
+     cycle past 8 series; fold a 9th category into "Other" instead. Three
+     light-mode slots sit below 3:1 contrast on this surface by design
+     (documented WARN, not a bug) -- always pair these with a direct
+     label (name + %), never color alone, which the donut's legend
+     already does. */
+  --nav-trend-1: #2a78d6;
+  --nav-trend-2: #eb6834;
+  --nav-trend-3: #1baf7a;
+  --nav-trend-4: #eda100;
+  --nav-trend-5: #e87ba4;
+  --nav-trend-6: #008300;
+  --nav-trend-7: #4a3aa7;
+  --nav-trend-8: #e34948;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -409,6 +430,16 @@ html {
     --nav-border: rgba(255, 255, 255, 0.14);
     --nav-border-soft: rgba(255, 255, 255, 0.10);
     --nav-card-glow: 0 26px 60px -20px rgba(0, 0, 0, 0.55);
+    /* Dark steps of the same 8-hue trend palette -- see the light :root
+       block above for the validation summary and the usage rule. */
+    --nav-trend-1: #3987e5;
+    --nav-trend-2: #d95926;
+    --nav-trend-3: #199e70;
+    --nav-trend-4: #c98500;
+    --nav-trend-5: #d55181;
+    --nav-trend-6: #008300;
+    --nav-trend-7: #9085e9;
+    --nav-trend-8: #e66767;
   }
 }
 
@@ -441,6 +472,16 @@ html {
   --nav-border: rgba(255, 255, 255, 0.14);
   --nav-border-soft: rgba(255, 255, 255, 0.10);
   --nav-card-glow: 0 26px 60px -20px rgba(0, 0, 0, 0.55);
+  /* Dark steps of the same 8-hue trend palette -- see the light :root
+     block above for the validation summary and the usage rule. */
+  --nav-trend-1: #3987e5;
+  --nav-trend-2: #d95926;
+  --nav-trend-3: #199e70;
+  --nav-trend-4: #c98500;
+  --nav-trend-5: #d55181;
+  --nav-trend-6: #008300;
+  --nav-trend-7: #9085e9;
+  --nav-trend-8: #e66767;
 }
 
 /* Same light values as the unconditional :root block above, but scoped to
@@ -471,6 +512,27 @@ html {
   --nav-border: rgba(20, 22, 42, 0.09);
   --nav-border-soft: rgba(20, 22, 42, 0.07);
   --nav-card-glow: 0 20px 50px -22px rgba(30, 25, 90, 0.28);
+  /* 8-hue categorical palette for the Kaspi Shop "niche trends" donut
+     chart / demand-share visual (see /kaspi-shop/niches). Validated via
+     the dataviz skill's validate_palette.js against THIS app's actual
+     --nav-bg surfaces (not the skill's generic default surface) --
+     passes lightness band, chroma floor, CVD adjacent-pair separation
+     (worst 9.1 light / 8.4 dark, target >=8), and the normal-vision
+     floor (worst 19.6 light / 19.3 dark, floor >=15) in both modes.
+     Fixed slot order is the CVD-safety mechanism -- never reassign or
+     cycle past 8 series; fold a 9th category into "Other" instead. Three
+     light-mode slots sit below 3:1 contrast on this surface by design
+     (documented WARN, not a bug) -- always pair these with a direct
+     label (name + %), never color alone, which the donut's legend
+     already does. */
+  --nav-trend-1: #2a78d6;
+  --nav-trend-2: #eb6834;
+  --nav-trend-3: #1baf7a;
+  --nav-trend-4: #eda100;
+  --nav-trend-5: #e87ba4;
+  --nav-trend-6: #008300;
+  --nav-trend-7: #4a3aa7;
+  --nav-trend-8: #e34948;
 }
 
 .nav-glass {

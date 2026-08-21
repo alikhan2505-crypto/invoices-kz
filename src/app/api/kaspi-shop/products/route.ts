@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { loadConnection } from '@/lib/kaspiShop/connection'
+import { isCheckDue } from '@/lib/kaspiShop/checkCycle'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -29,7 +30,39 @@ export async function GET(req: NextRequest) {
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ products: data || [] })
+  const products = data || []
+
+  // Stats for the summary cards row on /kaspi-shop. readyToApply reuses
+  // isCheckDue -- the exact same predicate getDueTrackedProducts (the
+  // cron/due route's global, cron-secret-gated version) uses -- rather than
+  // a second, per-user reimplementation of the elapsed-minutes math that
+  // could silently drift from it. While the connection is paused, nothing
+  // is actually "ready" (the scheduled check-cycle skips paused connections
+  // entirely, same as apply-now would), so readyToApply is forced to 0 in
+  // that case instead of reporting a number that can't actually be acted on.
+  // blockedAtFloor reads kaspi_shop_tracked_products.held_at_floor, written
+  // by applyPriceCheckResult every cycle (see checkCycle.ts) -- no extra
+  // query needed since '*' above already selects it.
+  let connectionPaused = false
+  try {
+    const connection = await loadConnection(user.id)
+    connectionPaused = !!connection?.paused
+  } catch {
+    // Stats are a best-effort summary, not the source of truth for whether
+    // the connection itself works -- the rest of the page already surfaces
+    // connection problems (loadError banner, session-expired banner).
+  }
+  const now = Date.now()
+  const stats = {
+    totalRules: products.length,
+    activeCount: products.filter((p: any) => p.enabled).length,
+    readyToApply: connectionPaused
+      ? 0
+      : products.filter((p: any) => p.enabled && isCheckDue(p.last_checked_at, p.check_frequency_minutes, now)).length,
+    blockedAtFloor: products.filter((p: any) => p.enabled && p.held_at_floor).length,
+  }
+
+  return NextResponse.json({ products, stats })
 }
 
 export async function POST(req: NextRequest) {
