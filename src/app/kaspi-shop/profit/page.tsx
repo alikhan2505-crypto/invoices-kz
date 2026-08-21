@@ -275,50 +275,41 @@ export default function KaspiShopProfit() {
         ) : (
           <>
             <div className="text-[11px] px-1 mb-2" style={{ color: 'var(--nav-text-muted)' }}>Прибыль по товару — выручка минус себестоимость (без учёта рекламы и комиссии, которые не делятся по товарам)</div>
-            {/* Card style unified with the rest of Kaspi Bot (founder,
-                2026-08-21): the product photo becomes a blurred, dimmed
-                BACKGROUND layer with the text on top, instead of a huge
-                square image above the text. Себестоимость is editable for
-                EVERY product (keyed by masterSku), tracked in демпинге or
-                not. */}
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3">
+            {/* Compact cards (founder 2026-08-21: no photo background, half
+                the width): small thumb + name + cogs input, dense grid.
+                Себестоимость is editable for EVERY product (keyed by
+                masterSku), tracked in демпинге or not. */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-2.5">
               {summary.products.map(p => (
-                <div key={p.kaspiMasterSku} className="nav-glass rounded-2xl overflow-hidden relative flex flex-col">
-                  {p.imageUrl && (
-                    <img src={p.imageUrl} alt="" aria-hidden
-                      className="absolute inset-0 w-full h-full object-cover scale-110 pointer-events-none"
-                      style={{ filter: 'blur(10px)', opacity: 0.18 }} />
-                  )}
-                  <div className="relative p-4 flex flex-col flex-1">
-                    <div className="flex items-start gap-3 mb-2">
-                      {p.imageUrl && (
-                        <img src={p.imageUrl} alt={p.productName} className="w-12 h-12 rounded-xl object-cover flex-shrink-0" style={{ background: 'var(--nav-bg)' }} />
-                      )}
-                      <div className="min-w-0">
-                        <div className="text-xs font-semibold line-clamp-2" style={{ color: 'var(--nav-text-primary)' }}>{p.productName || p.kaspiMasterSku}</div>
-                        <div className="text-[11px] mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{p.unitsSold} шт · {p.revenue.toLocaleString('ru-KZ')} ₸</div>
-                      </div>
+                <div key={p.kaspiMasterSku} className="nav-glass rounded-2xl p-3 flex flex-col">
+                  <div className="flex items-start gap-2 mb-2">
+                    {p.imageUrl && (
+                      <img src={p.imageUrl} alt={p.productName} className="w-9 h-9 rounded-lg object-cover flex-shrink-0" style={{ background: 'var(--nav-bg)' }} />
+                    )}
+                    <div className="min-w-0">
+                      <div className="text-[11px] font-semibold line-clamp-2" title={p.productName} style={{ color: 'var(--nav-text-primary)' }}>{p.productName || p.kaspiMasterSku}</div>
+                      <div className="text-[10px] mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{p.unitsSold} шт · {p.revenue.toLocaleString('ru-KZ')} ₸</div>
                     </div>
+                  </div>
 
-                    <label className="block mt-1">
-                      <span className="text-[10px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Себестоимость за шт.</span>
-                      <div className="flex items-center gap-1.5">
-                        <input
-                          value={cogsInputs[p.kaspiMasterSku] ?? (p.cogsAmount !== null ? String(p.cogsAmount) : '')}
-                          onChange={e => setCogsInputs(prev => ({ ...prev, [p.kaspiMasterSku]: e.target.value }))}
-                          placeholder="₸"
-                          className={`w-full min-w-0 ${INPUT_CLS}`} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
-                        <button onClick={() => saveCogs(p.kaspiMasterSku)} disabled={savingCogsFor === p.kaspiMasterSku}
-                          className="flex-shrink-0 text-xs font-medium rounded-lg px-2.5 py-1.5 flex items-center justify-center disabled:opacity-50" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}><CheckIcon /></button>
-                      </div>
-                    </label>
-
-                    <div className="mt-auto pt-2 flex items-baseline justify-between">
-                      <span className="text-[10px]" style={{ color: 'var(--nav-text-muted)' }}>Прибыль</span>
-                      <span className="font-mono font-bold text-sm tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>
-                        {p.profit !== null ? `${p.profit.toLocaleString('ru-KZ')} ₸` : <span className="text-[11px] font-normal" style={{ color: 'var(--nav-text-muted)' }}>укажите себест.</span>}
-                      </span>
+                  <label className="block mt-auto">
+                    <span className="text-[10px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Себестоимость за шт.</span>
+                    <div className="flex items-center gap-1">
+                      <input
+                        value={cogsInputs[p.kaspiMasterSku] ?? (p.cogsAmount !== null ? String(p.cogsAmount) : '')}
+                        onChange={e => setCogsInputs(prev => ({ ...prev, [p.kaspiMasterSku]: e.target.value }))}
+                        placeholder="₸"
+                        className={`w-full min-w-0 ${INPUT_CLS}`} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
+                      <button onClick={() => saveCogs(p.kaspiMasterSku)} disabled={savingCogsFor === p.kaspiMasterSku}
+                        className="flex-shrink-0 text-xs font-medium rounded-lg px-2 py-1.5 flex items-center justify-center disabled:opacity-50" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}><CheckIcon /></button>
                     </div>
+                  </label>
+
+                  <div className="pt-2 flex items-baseline justify-between gap-1">
+                    <span className="text-[10px]" style={{ color: 'var(--nav-text-muted)' }}>Прибыль</span>
+                    <span className="font-mono font-bold text-xs tabular-nums truncate" style={{ color: 'var(--nav-text-primary)' }}>
+                      {p.profit !== null ? `${p.profit.toLocaleString('ru-KZ')} ₸` : <span className="text-[10px] font-normal" style={{ color: 'var(--nav-text-muted)' }}>укажите себест.</span>}
+                    </span>
                   </div>
                 </div>
               ))}
