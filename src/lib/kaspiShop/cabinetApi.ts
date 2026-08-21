@@ -103,6 +103,25 @@ export type CatalogOffer = {
   points: string[]
 }
 
+// Full raw offer object for one sku -- the same call the cabinet's own
+// «Выставить на продажу» flow makes first (captured live 2026-08-21 from
+// the founder's DevTools: POST offers/api/v1/offer/details?m={merchantId}
+// with body {sku:["..."]}, response is a bare array of offer objects with
+// cities[], availabilities, master fields). Returned UNTYPED on purpose:
+// the restore/remove batch upload echoes this object back to Kaspi, and
+// retyping it would silently drop fields we don't know about.
+export async function fetchOfferDetails(sessionCookies: string, merchantId: string, sku: string): Promise<Record<string, any> | null> {
+  const res = await fetch(`https://mc.shop.kaspi.kz/offers/api/v1/offer/details?m=${encodeURIComponent(merchantId)}`, {
+    method: 'POST',
+    headers: authHeaders(sessionCookies),
+    body: JSON.stringify({ sku: [sku] }),
+  })
+  if (!res.ok) return null
+  const json = await res.json().catch(() => null)
+  const item = Array.isArray(json) ? json[0] : (Array.isArray(json?.data) ? json.data[0] : null)
+  return item && typeof item === 'object' ? item : null
+}
+
 // Reads the seller's own existing catalog -- the endpoint the official
 // public Merchant API has no equivalent for. Paginates internally (100 per
 // page, confirmed the real endpoint accepts an `l` limit param) until a

@@ -136,3 +136,78 @@ export async function removeOfferFromSale(params: OfferAvailabilityParams): Prom
 export async function updateOfferStock(params: OfferAvailabilityParams): Promise<PricePushResult> {
   return pushOfferAvailability(params, 'yes')
 }
+
+// The cabinet's REAL restore chain, captured live 2026-08-21 (founder's
+// DevTools): (1) offer details fetched, (2) validate v2 with action
+// ON_SALE__BATCH (returned {valid:true, errorOffers:null}), (3) the full
+// offer row uploaded via pricefeed/.../process/batch (returned [{id}]).
+// The single-item process endpoint (pushPriceChange above) turned out to
+// update price/stock on an ACTIVE offer but never re-activate a removed
+// one -- confirmed live: multiple accepted (HTTP 200) single-item restore
+// uploads never brought the offer back. This mirrors the cabinet's chain
+// instead: the details object is echoed back with only availabilities
+// flipped. Validation runs for the restore direction only (its captured
+// action name is ON_SALE__BATCH; the remove direction's action name was
+// never captured, so remove skips validation rather than guessing one) --
+// a validation rejection is surfaced verbatim so the UI can show the real
+// reason instead of a silent no-op.
+export async function setOfferAvailabilityViaBatch(params: {
+  sessionCookies: string
+  merchantUid: string
+  offerDetails: Record<string, any>
+  available: 'yes' | 'no'
+  fallbackStoreId: string
+}): Promise<PricePushResult> {
+  const headers = {
+    'x-auth-version': '3',
+    'referer': 'https://kaspi.kz/',
+    'origin': 'https://kaspi.kz',
+    'content-type': 'application/json',
+    'cookie': params.sessionCookies,
+  }
+
+  const item: Record<string, any> = { ...params.offerDetails, merchantUid: params.merchantUid }
+  if (Array.isArray(item.availabilities) && item.availabilities.length > 0) {
+    item.availabilities = item.availabilities.map((a: any) => ({ ...a, available: params.available }))
+  } else {
+    item.availabilities = [{ available: params.available, storeId: params.fallbackStoreId, stockCount: null }]
+  }
+
+  try {
+    if (params.available === 'yes') {
+      const vRes = await fetch('https://mc.shop.kaspi.kz/offer-validation-api/merchant/offer/validate/v2', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ merchantUid: params.merchantUid, action: 'ON_SALE__BATCH', offers: [item] }),
+      })
+      if (vRes.status === 401 || vRes.status === 403) {
+        return { success: false, reason: 'session_expired', message: `HTTP ${vRes.status}` }
+      }
+      if (vRes.ok) {
+        const vJson = await vRes.json().catch(() => null)
+        if (vJson && vJson.valid === false) {
+          return { success: false, reason: 'other', message: `валидация Kaspi: ${JSON.stringify(vJson.errorOffers ?? vJson).slice(0, 400)}` }
+        }
+      }
+      // A non-ok validation response (other than auth) is not treated as
+      // fatal -- the batch upload below is the operation that matters, and
+      // the cabinet may gate validation behind params we don't know.
+    }
+
+    const bRes = await fetch('https://mc.shop.kaspi.kz/pricefeed/upload/merchant/process/process/batch', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify([item]),
+    })
+    if (bRes.status === 401 || bRes.status === 403) {
+      return { success: false, reason: 'session_expired', message: `HTTP ${bRes.status}` }
+    }
+    if (!bRes.ok) {
+      const body = await bRes.text().catch(() => '')
+      return { success: false, reason: 'other', message: `HTTP ${bRes.status}: ${body.slice(0, 300)}` }
+    }
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, reason: 'other', message: `network error: ${err.message}` }
+  }
+}

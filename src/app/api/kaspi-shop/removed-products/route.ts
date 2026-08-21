@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { loadConnection, markSessionExpired } from '@/lib/kaspiShop/connection'
-import { listCatalog, CatalogOffer } from '@/lib/kaspiShop/cabinetApi'
-import { restoreOfferToSale, removeOfferFromSale } from '@/lib/kaspiShop/cabinetPricePush'
+import { listCatalog, CatalogOffer, fetchOfferDetails } from '@/lib/kaspiShop/cabinetApi'
+import { restoreOfferToSale, removeOfferFromSale, setOfferAvailabilityViaBatch } from '@/lib/kaspiShop/cabinetPricePush'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -86,21 +86,33 @@ export async function POST(req: NextRequest) {
     }, { status: 404 })
   }
 
-  // storeId MUST carry the merchant prefix ("30067228_PP2", the format both
-  // the captured cabinet payloads and checkCycle's own pushes use) -- the
-  // first live restore sent a bare "PP2" and Kaspi processed it as a store
-  // it couldn't match, then removed the offer with the real reason «Не
-  // указано наличие в прайс листе» (founder's cabinet screenshot,
-  // 2026-08-21). Confirmed root cause, not a guess.
-  const pushParams = {
-    sessionCookies: connection.sessionCookies,
-    merchantUid: connection.merchantId,
-    sku: offer.sku,
-    model: offer.title,
-    storeId: offer.points[0] ? `${connection.merchantId}_${offer.points[0]}` : '',
-    cityPrices: Object.entries(offer.allCityPrices).map(([cityId, entry]) => ({ cityId, value: entry.price })),
+  // Primary path: the cabinet's own restore chain (details -> validate ->
+  // batch upload of the full offer row) -- the single-item process endpoint
+  // proved unable to re-activate a removed offer (multiple accepted uploads,
+  // zero effect, confirmed live 2026-08-21). Falls back to the single-item
+  // shape only when the details fetch itself returns nothing.
+  const fallbackStoreId = offer.points[0] ? `${connection.merchantId}_${offer.points[0]}` : ''
+  const details = await fetchOfferDetails(connection.sessionCookies, connection.merchantId, offer.sku)
+  let result
+  if (details) {
+    result = await setOfferAvailabilityViaBatch({
+      sessionCookies: connection.sessionCookies,
+      merchantUid: connection.merchantId,
+      offerDetails: details,
+      available: action === 'restore' ? 'yes' : 'no',
+      fallbackStoreId,
+    })
+  } else {
+    const pushParams = {
+      sessionCookies: connection.sessionCookies,
+      merchantUid: connection.merchantId,
+      sku: offer.sku,
+      model: offer.title,
+      storeId: fallbackStoreId,
+      cityPrices: Object.entries(offer.allCityPrices).map(([cityId, entry]) => ({ cityId, value: entry.price })),
+    }
+    result = action === 'restore' ? await restoreOfferToSale(pushParams) : await removeOfferFromSale(pushParams)
   }
-  const result = action === 'restore' ? await restoreOfferToSale(pushParams) : await removeOfferFromSale(pushParams)
   if (!result.success) {
     if (result.reason === 'session_expired') {
       await markSessionExpired(connection.id)
