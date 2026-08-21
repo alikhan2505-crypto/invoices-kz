@@ -23,6 +23,7 @@ export async function GET(req: NextRequest) {
     .from('kaspi_shop_connections')
     .select('paused, session_status, company_name, tracked_city_codes, city_lookup_cache')
     .eq('user_id', user.id)
+    .eq('is_active', true)
     .maybeSingle()
   return NextResponse.json({
     balance,
