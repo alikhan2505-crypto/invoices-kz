@@ -28,8 +28,11 @@ export async function PATCH(req: NextRequest) {
   const body = await req.json().catch(() => null)
   const days = Number(body?.days)
   const amount = Number(body?.amount)
-  if (!VALID_DAYS.includes(days) || !(amount >= 0)) {
-    return NextResponse.json({ error: 'days (7/30/90) и корректная amount обязательны' }, { status: 400 })
+  // «Прочие расходы» периода (аренда, электроэнергия, упаковка…) --
+  // optional so the legacy ad-only callers keep working; omitted = 0.
+  const otherAmount = body?.otherAmount === undefined ? 0 : Number(body?.otherAmount)
+  if (!VALID_DAYS.includes(days) || !(amount >= 0) || !(otherAmount >= 0)) {
+    return NextResponse.json({ error: 'days (7/30/90) и корректные amount/otherAmount обязательны' }, { status: 400 })
   }
 
   const connection = await loadConnection(user.id)
@@ -37,8 +40,8 @@ export async function PATCH(req: NextRequest) {
 
   const { error } = await supabase
     .from('kaspi_shop_ad_spend')
-    .upsert({ connection_id: connection.id, days, amount, updated_at: new Date().toISOString() }, { onConflict: 'connection_id,days' })
-  if (error) return NextResponse.json({ error: 'Не удалось сохранить расходы на рекламу' }, { status: 500 })
+    .upsert({ connection_id: connection.id, days, amount, other_amount: otherAmount, updated_at: new Date().toISOString() }, { onConflict: 'connection_id,days' })
+  if (error) return NextResponse.json({ error: 'Не удалось сохранить расходы' }, { status: 500 })
 
   return NextResponse.json({ ok: true })
 }

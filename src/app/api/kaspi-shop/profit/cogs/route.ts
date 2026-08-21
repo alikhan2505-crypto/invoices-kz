@@ -25,35 +25,63 @@ export async function PATCH(req: NextRequest) {
   const body = await req.json().catch(() => null)
   const trackedProductId = body?.trackedProductId
   const cogsAmount = body?.cogsAmount === null ? null : Number(body?.cogsAmount)
-  if (!trackedProductId || (cogsAmount !== null && !(cogsAmount >= 0))) {
-    return NextResponse.json({ error: 'trackedProductId и корректная cogsAmount обязательны' }, { status: 400 })
+  if (cogsAmount !== null && !(cogsAmount >= 0)) {
+    return NextResponse.json({ error: 'Корректная cogsAmount обязательна' }, { status: 400 })
   }
 
-  const { data: productRow, error: lookupError } = await supabase
-    .from('kaspi_shop_tracked_products')
-    .select('kaspi_master_sku')
-    .eq('id', trackedProductId)
-    .eq('user_id', user.id)
-    .maybeSingle()
-  if (lookupError) return NextResponse.json({ error: 'Не удалось сохранить себестоимость' }, { status: 500 })
-  if (!productRow) return NextResponse.json({ error: 'Товар не найден' }, { status: 404 })
+  // Primary key for себестоимость is kaspi_master_sku (works for ANY sold
+  // product, tracked in демпинг or not -- founder 2026-08-21: «не везде
+  // могу поменять себестоимость»). Legacy callers passing only
+  // trackedProductId get their master sku resolved.
+  let kaspiMasterSku: string | null = typeof body?.kaspiMasterSku === 'string' && body.kaspiMasterSku ? body.kaspiMasterSku : null
+  if (!kaspiMasterSku && trackedProductId) {
+    const { data: productRow, error: lookupError } = await supabase
+      .from('kaspi_shop_tracked_products')
+      .select('kaspi_master_sku')
+      .eq('id', trackedProductId)
+      .eq('user_id', user.id)
+      .maybeSingle()
+    if (lookupError) return NextResponse.json({ error: 'Не удалось сохранить себестоимость' }, { status: 500 })
+    if (!productRow) return NextResponse.json({ error: 'Товар не найден' }, { status: 404 })
+    kaspiMasterSku = productRow.kaspi_master_sku
+  }
+  if (!kaspiMasterSku && !trackedProductId) {
+    return NextResponse.json({ error: 'kaspiMasterSku или trackedProductId обязателен' }, { status: 400 })
+  }
 
-  // Reconnecting can leave more than one row for the same real product
-  // (finalizeConnection.ts re-imports the catalog on every reconnect
-  // instead of upserting -- confirmed live 2026-08-14, 68 duplicated
-  // master SKUs on the connected account). Writing cogs_amount to every
-  // row sharing this master SKU, not just the one the seller is currently
-  // looking at, keeps the value from silently disappearing if a different
-  // duplicate gets picked as canonical on a future load (see
-  // src/app/api/kaspi-shop/profit/route.ts's canonical-row selection).
-  const updateQuery = supabase
-    .from('kaspi_shop_tracked_products')
-    .update({ cogs_amount: cogsAmount })
+  const { data: connRow } = await supabase
+    .from('kaspi_shop_connections')
+    .select('id')
     .eq('user_id', user.id)
-  const { error } = productRow.kaspi_master_sku
-    ? await updateQuery.eq('kaspi_master_sku', productRow.kaspi_master_sku)
-    : await updateQuery.eq('id', trackedProductId)
-  if (error) return NextResponse.json({ error: 'Не удалось сохранить себестоимость' }, { status: 500 })
+    .eq('is_active', true)
+    .maybeSingle()
+
+  if (kaspiMasterSku && connRow) {
+    const { error: costError } = await supabase
+      .from('kaspi_shop_product_costs')
+      .upsert(
+        { connection_id: connRow.id, kaspi_master_sku: kaspiMasterSku, cogs_amount: cogsAmount, updated_at: new Date().toISOString() },
+        { onConflict: 'connection_id,kaspi_master_sku' }
+      )
+    if (costError) return NextResponse.json({ error: 'Не удалось сохранить себестоимость' }, { status: 500 })
+  }
+
+  // Keep the tracked rows in sync too (they remain the fallback source and
+  // feed the margin/AI-pricing features). Reconnect-era duplicates share a
+  // master sku, so all of them get the value (see 2026-08-14 finding).
+  if (kaspiMasterSku) {
+    await supabase
+      .from('kaspi_shop_tracked_products')
+      .update({ cogs_amount: cogsAmount })
+      .eq('user_id', user.id)
+      .eq('kaspi_master_sku', kaspiMasterSku)
+  } else if (trackedProductId) {
+    await supabase
+      .from('kaspi_shop_tracked_products')
+      .update({ cogs_amount: cogsAmount })
+      .eq('user_id', user.id)
+      .eq('id', trackedProductId)
+  }
 
   return NextResponse.json({ ok: true })
 }

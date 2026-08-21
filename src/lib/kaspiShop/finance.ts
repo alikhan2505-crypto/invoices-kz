@@ -1,4 +1,5 @@
 import { listOrders, Order, PAGE_SIZE } from './cabinetApi'
+import { computeAbc, computeAttributeSlices, AbcRow, AttributeSlice } from './salesAnalytics'
 
 // Real Kaspi cabinet's own nav has no finance section (confirmed live
 // 2026-08-13 against two real accounts) -- this is a report WE compute
@@ -11,6 +12,12 @@ export type FinanceSummary = {
   averageOrderValue: number
   byDay: { date: string; revenue: number; orderCount: number; unitsSold: number }[]
   behavioral: BehavioralAnalytics
+  // ABC by revenue contribution + attribute slices. Color/size are
+  // extracted from product NAMES (Kaspi's order data carries no
+  // characteristics) -- the UI must say so.
+  abc: AbcRow[]
+  byColor: AttributeSlice[]
+  bySize: AttributeSlice[]
   truncated: boolean
   sessionExpired: boolean
 }
@@ -188,6 +195,8 @@ export async function computeFinanceSummary(
   const orderCount = inWindow.length
   const averageOrderValue = orderCount > 0 ? totalRevenue / orderCount : 0
   const behavioral = computeBehavioralAnalytics(inWindow)
+  const abc = computeAbc(inWindow)
+  const { byColor, bySize } = computeAttributeSlices(inWindow)
 
-  return { totalRevenue, orderCount, averageOrderValue, byDay, behavioral, truncated, sessionExpired }
+  return { totalRevenue, orderCount, averageOrderValue, byDay, behavioral, abc, byColor, bySize, truncated, sessionExpired }
 }

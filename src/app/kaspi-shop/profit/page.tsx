@@ -47,6 +47,7 @@ type ProfitSummary = {
   totalCogsKnown: number
   productsWithoutCogsCount: number
   adSpend: number
+  otherExpenses: number
   adSpendConfigured: boolean
   commissionRatePercent: number | null
   commissionAmount: number
@@ -63,9 +64,14 @@ export default function KaspiShopProfit() {
   const [summaryLoading, setSummaryLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
   const [commissionInput, setCommissionInput] = useState('')
-  const [adSpendInput, setAdSpendInput] = useState('')
   const [savingCogsFor, setSavingCogsFor] = useState<string | null>(null)
   const [cogsInputs, setCogsInputs] = useState<Record<string, string>>({})
+  // «Расходы периода» modal: реклама + прочие (аренда, электроэнергия…),
+  // one save per период-окно (founder request 2026-08-21).
+  const [expensesOpen, setExpensesOpen] = useState(false)
+  const [adInput, setAdInput] = useState('')
+  const [otherInput, setOtherInput] = useState('')
+  const [savingExpenses, setSavingExpenses] = useState(false)
 
   useEffect(() => { checkAccess() }, [])
   useEffect(() => { if (!loading) loadSummary(days) }, [days, loading])
@@ -93,7 +99,8 @@ export default function KaspiShopProfit() {
       if (!res.ok) { setLoadError(data.error || 'Не удалось загрузить прибыль'); setSummary(null); return }
       setSummary(data)
       setCommissionInput(data.commissionRatePercent !== null ? String(data.commissionRatePercent) : '')
-      setAdSpendInput(data.adSpendConfigured ? String(data.adSpend) : '')
+      setAdInput(data.adSpendConfigured ? String(data.adSpend) : '')
+      setOtherInput(data.adSpendConfigured ? String(data.otherExpenses ?? 0) : '')
     } catch {
       setLoadError('Не удалось загрузить прибыль. Проверьте соединение и попробуйте ещё раз.')
       setSummary(null)
@@ -119,31 +126,39 @@ export default function KaspiShopProfit() {
     }
   }
 
-  async function saveAdSpend() {
-    const value = Number(adSpendInput) || 0
+  async function saveExpenses() {
+    setSavingExpenses(true)
     setLoadError('')
     try {
       const headers = await authHeader()
-      const res = await fetch('/api/kaspi-shop/profit/ad-spend', { method: 'PATCH', headers, body: JSON.stringify({ days, amount: value }) })
+      const res = await fetch('/api/kaspi-shop/profit/ad-spend', {
+        method: 'PATCH', headers,
+        body: JSON.stringify({ days, amount: Number(adInput) || 0, otherAmount: Number(otherInput) || 0 }),
+      })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        setLoadError(data.error || 'Не удалось сохранить расходы на рекламу')
+        setLoadError(data.error || 'Не удалось сохранить расходы')
         return
       }
+      setExpensesOpen(false)
       await loadSummary(days)
     } catch {
-      setLoadError('Не удалось сохранить расходы на рекламу. Проверьте соединение и попробуйте ещё раз.')
+      setLoadError('Не удалось сохранить расходы. Проверьте соединение и попробуйте ещё раз.')
+    } finally {
+      setSavingExpenses(false)
     }
   }
 
-  async function saveCogs(trackedProductId: string) {
-    const raw = cogsInputs[trackedProductId]
+  // Keyed by kaspiMasterSku (works for ANY sold product, in демпинге or
+  // not) -- «не везде могу поменять себестоимость» closed 2026-08-21.
+  async function saveCogs(kaspiMasterSku: string) {
+    const raw = cogsInputs[kaspiMasterSku]
     const value = raw === undefined || raw.trim() === '' ? null : Number(raw)
-    setSavingCogsFor(trackedProductId)
+    setSavingCogsFor(kaspiMasterSku)
     setLoadError('')
     try {
       const headers = await authHeader()
-      const res = await fetch('/api/kaspi-shop/profit/cogs', { method: 'PATCH', headers, body: JSON.stringify({ trackedProductId, cogsAmount: value }) })
+      const res = await fetch('/api/kaspi-shop/profit/cogs', { method: 'PATCH', headers, body: JSON.stringify({ kaspiMasterSku, cogsAmount: value }) })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         setLoadError(data.error || 'Не удалось сохранить себестоимость')
@@ -203,7 +218,7 @@ export default function KaspiShopProfit() {
             {(summary?.netProfit ?? 0).toLocaleString('ru-KZ')} <span className="text-lg" style={{ color: 'var(--nav-text-muted)' }}>₸ прибыль</span>
           </div>
 
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-6">
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mt-6">
             <div>
               <div className="text-lg font-bold font-mono tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{(summary?.totalRevenue ?? 0).toLocaleString('ru-KZ')}</div>
               <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>₸ выручка</div>
@@ -213,19 +228,16 @@ export default function KaspiShopProfit() {
               <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>₸ себестоимость</div>
             </div>
             <div>
-              {summary?.adSpendConfigured ? (
-                <>
-                  <div className="text-lg font-bold font-mono tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{summary.adSpend.toLocaleString('ru-KZ')}</div>
-                  <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>₸ реклама</div>
-                </>
-              ) : (
-                <div className="flex items-center gap-1.5">
-                  <input value={adSpendInput} onChange={e => setAdSpendInput(e.target.value)} placeholder="0"
-                    className={`w-20 ${INPUT_CLS}`} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
-                  <button onClick={saveAdSpend} className="text-xs font-medium rounded-lg px-2 py-1 flex items-center justify-center" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}><CheckIcon /></button>
-                </div>
-              )}
-              <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>{summary?.adSpendConfigured ? '' : 'укажите расходы на рекламу'}</div>
+              <div className="text-lg font-bold font-mono tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{(summary?.adSpend ?? 0).toLocaleString('ru-KZ')}</div>
+              <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>
+                ₸ реклама · <button onClick={() => setExpensesOpen(true)} className="underline underline-offset-2" style={{ color: 'var(--nav-accent)' }}>изменить</button>
+              </div>
+            </div>
+            <div>
+              <div className="text-lg font-bold font-mono tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{(summary?.otherExpenses ?? 0).toLocaleString('ru-KZ')}</div>
+              <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>
+                ₸ прочие расходы · <button onClick={() => setExpensesOpen(true)} className="underline underline-offset-2" style={{ color: 'var(--nav-accent)' }}>изменить</button>
+              </div>
             </div>
             <div>
               {summary?.commissionRatePercent !== null && summary?.commissionRatePercent !== undefined ? (
@@ -263,32 +275,43 @@ export default function KaspiShopProfit() {
         ) : (
           <>
             <div className="text-[11px] px-1 mb-2" style={{ color: 'var(--nav-text-muted)' }}>Прибыль по товару — выручка минус себестоимость (без учёта рекламы и комиссии, которые не делятся по товарам)</div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+            {/* Card style unified with the rest of Kaspi Bot (founder,
+                2026-08-21): the product photo becomes a blurred, dimmed
+                BACKGROUND layer with the text on top, instead of a huge
+                square image above the text. Себестоимость is editable for
+                EVERY product (keyed by masterSku), tracked in демпинге or
+                not. */}
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3">
               {summary.products.map(p => (
-                <div key={p.kaspiMasterSku} className="nav-glass rounded-2xl overflow-hidden flex flex-col">
-                  {p.imageUrl ? (
-                    <img src={p.imageUrl} alt={p.productName} className="w-full aspect-square object-cover" style={{ background: 'var(--nav-bg)' }} />
-                  ) : (
-                    <div className="w-full aspect-square" style={{ background: 'var(--nav-bg)' }} />
+                <div key={p.kaspiMasterSku} className="nav-glass rounded-2xl overflow-hidden relative flex flex-col">
+                  {p.imageUrl && (
+                    <img src={p.imageUrl} alt="" aria-hidden
+                      className="absolute inset-0 w-full h-full object-cover scale-110 pointer-events-none"
+                      style={{ filter: 'blur(10px)', opacity: 0.18 }} />
                   )}
-                  <div className="p-3 flex flex-col flex-1">
-                    <div className="text-xs font-semibold line-clamp-2 min-h-[2.2em]" style={{ color: 'var(--nav-text-primary)' }}>{p.productName || p.kaspiMasterSku}</div>
-                    <div className="text-[11px] mt-1" style={{ color: 'var(--nav-text-muted)' }}>{p.unitsSold} шт · {p.revenue.toLocaleString('ru-KZ')} ₸</div>
+                  <div className="relative p-4 flex flex-col flex-1">
+                    <div className="flex items-start gap-3 mb-2">
+                      {p.imageUrl && (
+                        <img src={p.imageUrl} alt={p.productName} className="w-12 h-12 rounded-xl object-cover flex-shrink-0" style={{ background: 'var(--nav-bg)' }} />
+                      )}
+                      <div className="min-w-0">
+                        <div className="text-xs font-semibold line-clamp-2" style={{ color: 'var(--nav-text-primary)' }}>{p.productName || p.kaspiMasterSku}</div>
+                        <div className="text-[11px] mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{p.unitsSold} шт · {p.revenue.toLocaleString('ru-KZ')} ₸</div>
+                      </div>
+                    </div>
 
-                    {p.trackedProductId && (
-                      <label className="block mt-2">
-                        <span className="text-[10px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Себестоимость за шт.</span>
-                        <div className="flex items-center gap-1.5">
-                          <input
-                            value={cogsInputs[p.trackedProductId] ?? (p.cogsAmount !== null ? String(p.cogsAmount) : '')}
-                            onChange={e => setCogsInputs(prev => ({ ...prev, [p.trackedProductId!]: e.target.value }))}
-                            placeholder="₸"
-                            className={`w-full min-w-0 ${INPUT_CLS}`} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
-                          <button onClick={() => saveCogs(p.trackedProductId!)} disabled={savingCogsFor === p.trackedProductId}
-                            className="flex-shrink-0 text-xs font-medium rounded-lg px-2.5 py-1.5 flex items-center justify-center disabled:opacity-50" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}><CheckIcon /></button>
-                        </div>
-                      </label>
-                    )}
+                    <label className="block mt-1">
+                      <span className="text-[10px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Себестоимость за шт.</span>
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          value={cogsInputs[p.kaspiMasterSku] ?? (p.cogsAmount !== null ? String(p.cogsAmount) : '')}
+                          onChange={e => setCogsInputs(prev => ({ ...prev, [p.kaspiMasterSku]: e.target.value }))}
+                          placeholder="₸"
+                          className={`w-full min-w-0 ${INPUT_CLS}`} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
+                        <button onClick={() => saveCogs(p.kaspiMasterSku)} disabled={savingCogsFor === p.kaspiMasterSku}
+                          className="flex-shrink-0 text-xs font-medium rounded-lg px-2.5 py-1.5 flex items-center justify-center disabled:opacity-50" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}><CheckIcon /></button>
+                      </div>
+                    </label>
 
                     <div className="mt-auto pt-2 flex items-baseline justify-between">
                       <span className="text-[10px]" style={{ color: 'var(--nav-text-muted)' }}>Прибыль</span>
@@ -303,6 +326,44 @@ export default function KaspiShopProfit() {
           </>
         )}
       </div>
+
+      {/* «Расходы периода» -- реклама + прочие (аренда, электроэнергия,
+          упаковка…) за выбранное окно 7/30/90 дней. */}
+      {expensesOpen && (
+        <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center p-3 bg-black/30" onClick={() => setExpensesOpen(false)}>
+          <motion.div initial={{ opacity: 0, scale: 0.95, y: 14 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ duration: 0.22, ease: EASE }}
+            className="relative nav-glass rounded-[24px] w-full max-w-sm"
+            style={{ boxShadow: '0 34px 80px -20px rgba(10,10,15,0.4), var(--nav-card-glow)' }}
+            onClick={e => e.stopPropagation()}>
+            <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[24px]" style={{ background: 'linear-gradient(90deg, var(--nav-accent), var(--nav-teal))' }} />
+            <div className="p-5 lg:p-6">
+              <div className="flex items-start justify-between gap-3 mb-1">
+                <div className="text-sm font-bold" style={{ color: 'var(--nav-text-primary)' }}>Расходы за {days} дн.</div>
+                <button onClick={() => setExpensesOpen(false)} className="text-lg leading-none" style={{ color: 'var(--nav-text-secondary)' }}>✕</button>
+              </div>
+              <p className="text-[11px] mb-4" style={{ color: 'var(--nav-text-muted)' }}>
+                Вносятся вручную и вычитаются из прибыли за выбранный период.
+              </p>
+              <label className="block mb-3">
+                <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Реклама, ₸</span>
+                <input type="number" value={adInput} onChange={e => setAdInput(e.target.value)} placeholder="0"
+                  className={`w-full ${INPUT_CLS}`} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
+              </label>
+              <label className="block mb-4">
+                <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Прочие расходы, ₸ (аренда, электроэнергия, упаковка…)</span>
+                <input type="number" value={otherInput} onChange={e => setOtherInput(e.target.value)} placeholder="0"
+                  className={`w-full ${INPUT_CLS}`} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
+              </label>
+              <button onClick={saveExpenses} disabled={savingExpenses}
+                className="w-full rounded-xl py-2.5 text-sm font-semibold disabled:opacity-60"
+                style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                {savingExpenses ? 'Сохраняем…' : 'Сохранить'}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </main>
     </DesktopShell>
   )

@@ -27,6 +27,9 @@ export type ProfitSummary = {
   totalCogsKnown: number
   productsWithoutCogsCount: number
   adSpend: number
+  // «Прочие расходы» периода (аренда, электроэнергия, упаковка…) --
+  // manual seller input alongside рекламы, same honesty model.
+  otherExpenses: number
   adSpendConfigured: boolean
   commissionRatePercent: number | null
   commissionAmount: number
@@ -42,8 +45,8 @@ export async function computeProfitSummary(
   sessionCookies: string,
   merchantId: string,
   sinceDays: number,
-  catalog: { kaspiMasterSku: string; trackedProductId: string; cogsAmount: number | null }[],
-  adSpend: { amount: number; configured: boolean },
+  catalog: { kaspiMasterSku: string; trackedProductId: string | null; cogsAmount: number | null }[],
+  adSpend: { amount: number; otherAmount: number; configured: boolean },
   commissionRatePercent: number | null,
   listOrdersFn: typeof listOrders = listOrders
 ): Promise<ProfitSummary> {
@@ -112,7 +115,7 @@ export async function computeProfitSummary(
   // per-product breakdown shown below it in the UI.
   const totalRevenue = products.reduce((sum, p) => sum + p.revenue, 0)
   const commissionAmount = commissionRatePercent !== null ? totalRevenue * (commissionRatePercent / 100) : 0
-  const netProfit = totalRevenue - totalCogsKnown - adSpend.amount - commissionAmount
+  const netProfit = totalRevenue - totalCogsKnown - adSpend.amount - adSpend.otherAmount - commissionAmount
 
   return {
     products,
@@ -120,6 +123,7 @@ export async function computeProfitSummary(
     totalCogsKnown,
     productsWithoutCogsCount,
     adSpend: adSpend.amount,
+    otherExpenses: adSpend.otherAmount,
     adSpendConfigured: adSpend.configured,
     commissionRatePercent,
     commissionAmount,

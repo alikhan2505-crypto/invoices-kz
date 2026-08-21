@@ -79,15 +79,35 @@ export async function GET(req: NextRequest) {
       canonicalByMasterSku.set(p.kaspi_master_sku, candidate)
     }
   }
-  const catalog = Array.from(canonicalByMasterSku.entries()).map(([kaspiMasterSku, row]) => ({
-    kaspiMasterSku,
-    trackedProductId: row.id,
-    cogsAmount: row.cogsAmount,
-  }))
+  const catalog: { kaspiMasterSku: string; trackedProductId: string | null; cogsAmount: number | null }[] =
+    Array.from(canonicalByMasterSku.entries()).map(([kaspiMasterSku, row]) => ({
+      kaspiMasterSku,
+      trackedProductId: row.id,
+      cogsAmount: row.cogsAmount,
+    }))
+
+  // Себестоимость from the master-sku-keyed costs table (2026-08-21): it
+  // OVERRIDES the tracked-row value when both exist, and adds entries for
+  // sold products that were never added to демпинг -- those previously had
+  // no place to store cogs at all.
+  const { data: costRows } = await supabase
+    .from('kaspi_shop_product_costs')
+    .select('kaspi_master_sku, cogs_amount')
+    .eq('connection_id', connection.id)
+  const catalogBySkuIndex = new Map(catalog.map((c, i) => [c.kaspiMasterSku, i]))
+  for (const row of costRows || []) {
+    const idx = catalogBySkuIndex.get(row.kaspi_master_sku)
+    const cogs = row.cogs_amount !== null ? Number(row.cogs_amount) : null
+    if (idx !== undefined) {
+      if (cogs !== null) catalog[idx].cogsAmount = cogs
+    } else {
+      catalog.push({ kaspiMasterSku: row.kaspi_master_sku, trackedProductId: null, cogsAmount: cogs })
+    }
+  }
 
   const { data: adSpendRow, error: adSpendError } = await supabase
     .from('kaspi_shop_ad_spend')
-    .select('amount')
+    .select('amount, other_amount')
     .eq('connection_id', connection.id)
     .eq('days', days)
     .maybeSingle()
@@ -95,7 +115,7 @@ export async function GET(req: NextRequest) {
     console.error('kaspi-shop profit: failed to load ad spend', adSpendError.message)
     return NextResponse.json({ error: 'Не удалось загрузить прибыль' }, { status: 500 })
   }
-  const adSpend = { amount: Number(adSpendRow?.amount) || 0, configured: !!adSpendRow }
+  const adSpend = { amount: Number(adSpendRow?.amount) || 0, otherAmount: Number(adSpendRow?.other_amount) || 0, configured: !!adSpendRow }
 
   const summary = await computeProfitSummary(connection.sessionCookies, connection.merchantId, days, catalog, adSpend, commissionRatePercent)
   if (summary.sessionExpired) await markSessionExpired(connection.id)

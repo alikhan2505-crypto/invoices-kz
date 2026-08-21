@@ -19,14 +19,60 @@ type BehavioralAnalytics = {
   holidayOrders: { date: string; label: string; orderCount: number; revenue: number }[]
 }
 
+type AbcRow = {
+  code: string
+  name: string
+  imageUrl: string | null
+  unitsSold: number
+  revenue: number
+  share: number
+  cumulativeShare: number
+  abcClass: 'A' | 'B' | 'C'
+}
+
+type AttributeSlice = { value: string; unitsSold: number; revenue: number }
+
 type FinanceSummary = {
   totalRevenue: number
   orderCount: number
   averageOrderValue: number
   byDay: { date: string; revenue: number; orderCount: number; unitsSold: number }[]
   behavioral: BehavioralAnalytics
+  abc: AbcRow[]
+  byColor: AttributeSlice[]
+  bySize: AttributeSlice[]
   truncated: boolean
   sessionExpired: boolean
+}
+
+const ABC_COLORS: Record<'A' | 'B' | 'C', string> = {
+  A: 'var(--nav-success)',
+  B: 'var(--nav-accent)',
+  C: 'var(--nav-text-muted)',
+}
+
+// Bars + rows for one attribute slice («По цвету» / «По размеру»).
+function AttributeSliceCard({ title, slices }: { title: string; slices: AttributeSlice[] }) {
+  const maxRevenue = Math.max(...slices.map(s => s.revenue), 1)
+  return (
+    <div className="nav-glass rounded-2xl p-4">
+      <div className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--nav-text-muted)' }}>{title}</div>
+      {slices.length === 0 && <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>В названиях проданных товаров это не встречается.</div>}
+      <div className="space-y-2">
+        {slices.slice(0, 8).map(s => (
+          <div key={s.value}>
+            <div className="flex items-center justify-between text-xs mb-1">
+              <span style={{ color: 'var(--nav-text-primary)' }}>{s.value}</span>
+              <span className="tabular-nums" style={{ color: 'var(--nav-text-secondary)' }}>{s.unitsSold} шт · {s.revenue.toLocaleString('ru-KZ')} ₸</span>
+            </div>
+            <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--nav-border-soft)' }}>
+              <div className="h-full rounded-full" style={{ width: `${(s.revenue / maxRevenue) * 100}%`, background: 'var(--nav-accent)' }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 const PERIODS = [7, 30, 90]
@@ -332,6 +378,56 @@ export default function KaspiShopFinance() {
                 </div>
               )}
             </div>
+
+            {/* ABC-анализ + разрезы по атрибутам (founder request 2026-08-21).
+                Цвет/размер извлекаются из НАЗВАНИЙ товаров -- Kaspi не отдаёт
+                характеристики в данных заказов, и подпись говорит об этом
+                честно. */}
+            {(summary.abc || []).length > 0 && (
+              <div className="mt-6">
+                <div className="flex items-baseline justify-between gap-3 mb-3 flex-wrap px-1">
+                  <div className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>ABC-анализ по товарам</div>
+                  <div className="text-[11px]" style={{ color: 'var(--nav-text-muted)' }}>A — первые 80% выручки, B — следующие 15%, C — остальное</div>
+                </div>
+                <div className="nav-glass rounded-2xl overflow-x-auto">
+                  <table className="w-full text-sm" style={{ minWidth: 560 }}>
+                    <thead>
+                      <tr className="text-[11px] uppercase tracking-wider" style={{ color: 'var(--nav-text-muted)' }}>
+                        <th className="text-left font-semibold px-4 py-2.5">Класс</th>
+                        <th className="text-left font-semibold px-2 py-2.5">Товар</th>
+                        <th className="text-right font-semibold px-2 py-2.5">Шт</th>
+                        <th className="text-right font-semibold px-2 py-2.5">Выручка</th>
+                        <th className="text-right font-semibold px-2 py-2.5">Доля</th>
+                        <th className="text-right font-semibold px-4 py-2.5">Накопл.</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {summary.abc.map(row => (
+                        <tr key={row.code} style={{ borderTop: '1px solid var(--nav-border-soft)' }}>
+                          <td className="px-4 py-2.5">
+                            <span className="text-[11px] font-bold rounded-full px-2 py-0.5" style={{ background: ABC_COLORS[row.abcClass], color: '#fff' }}>{row.abcClass}</span>
+                          </td>
+                          <td className="px-2 py-2.5" style={{ color: 'var(--nav-text-primary)' }}>{row.name}</td>
+                          <td className="px-2 py-2.5 text-right tabular-nums" style={{ color: 'var(--nav-text-secondary)' }}>{row.unitsSold}</td>
+                          <td className="px-2 py-2.5 text-right tabular-nums font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{row.revenue.toLocaleString('ru-KZ')} ₸</td>
+                          <td className="px-2 py-2.5 text-right tabular-nums" style={{ color: 'var(--nav-text-secondary)' }}>{(row.share * 100).toFixed(1)}%</td>
+                          <td className="px-4 py-2.5 text-right tabular-nums" style={{ color: 'var(--nav-text-muted)' }}>{(row.cumulativeShare * 100).toFixed(1)}%</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="flex items-baseline justify-between gap-3 mt-6 mb-3 flex-wrap px-1">
+                  <div className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>Продажи по атрибутам</div>
+                  <div className="text-[11px]" style={{ color: 'var(--nav-text-muted)' }}>цвет и размер определены по названию товара — характеристики Kaspi не передаёт</div>
+                </div>
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <AttributeSliceCard title="По цвету" slices={summary.byColor || []} />
+                  <AttributeSliceCard title="По размеру" slices={summary.bySize || []} />
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>

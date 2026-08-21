@@ -38,7 +38,7 @@ describe('computeProfitSummary', () => {
       { kaspiMasterSku: 'SKU2', trackedProductId: 'tp-2', cogsAmount: null },
     ]
 
-    const summary = await computeProfitSummary('cookies', 'merchant1', 7, catalog, { amount: 0, configured: false }, null, fakeListOrders as any)
+    const summary = await computeProfitSummary('cookies', 'merchant1', 7, catalog, { amount: 0, otherAmount: 0, configured: false }, null, fakeListOrders as any)
 
     expect(summary.totalRevenue).toBe(2500)
     const sumOfProducts = summary.products.reduce((sum, p) => sum + p.revenue, 0)
@@ -66,7 +66,7 @@ describe('computeProfitSummary', () => {
       return { total: 0, sessionExpired: false, orders: [] }
     })
 
-    const summary = await computeProfitSummary('cookies', 'merchant1', 7, [], { amount: 0, configured: false }, null, fakeListOrders as any)
+    const summary = await computeProfitSummary('cookies', 'merchant1', 7, [], { amount: 0, otherAmount: 0, configured: false }, null, fakeListOrders as any)
 
     expect(summary.products).toHaveLength(1)
     expect(summary.products[0]).toMatchObject({ productName: 'Первое имя', imageUrl: 'https://cdn/first.jpg', unitsSold: 2, revenue: 1000 })
@@ -89,7 +89,7 @@ describe('computeProfitSummary', () => {
       return { total: 0, sessionExpired: false, orders: [] }
     })
 
-    const summary = await computeProfitSummary('cookies', 'merchant1', 7, [], { amount: 0, configured: false }, null, fakeListOrders as any)
+    const summary = await computeProfitSummary('cookies', 'merchant1', 7, [], { amount: 0, otherAmount: 0, configured: false }, null, fakeListOrders as any)
 
     expect(summary.products.map(p => p.kaspiMasterSku)).toEqual(['PRICEY', 'CHEAP'])
   })
@@ -108,7 +108,7 @@ describe('computeProfitSummary', () => {
       return { total: 0, sessionExpired: false, orders: [] }
     })
 
-    const summary = await computeProfitSummary('cookies', 'merchant1', 7, [], { amount: 0, configured: false }, null, fakeListOrders as any)
+    const summary = await computeProfitSummary('cookies', 'merchant1', 7, [], { amount: 0, otherAmount: 0, configured: false }, null, fakeListOrders as any)
 
     expect(summary.totalRevenue).toBe(1000)
     expect(summary.products[0]).toMatchObject({ trackedProductId: null, cogsAmount: null, cogsTotal: null, profit: null })
@@ -130,7 +130,7 @@ describe('computeProfitSummary', () => {
     })
     const catalog = [{ kaspiMasterSku: 'SKU1', trackedProductId: 'tp-1', cogsAmount: null }]
 
-    const summary = await computeProfitSummary('cookies', 'merchant1', 7, catalog, { amount: 0, configured: false }, null, fakeListOrders as any)
+    const summary = await computeProfitSummary('cookies', 'merchant1', 7, catalog, { amount: 0, otherAmount: 0, configured: false }, null, fakeListOrders as any)
 
     expect(summary.totalCogsKnown).toBe(0)
     expect(summary.productsWithoutCogsCount).toBe(1)
@@ -140,7 +140,7 @@ describe('computeProfitSummary', () => {
   it('missing commission rate results in commissionAmount 0, not a blocked netProfit', async () => {
     const fakeListOrders = vi.fn(async () => ({ total: 0, sessionExpired: false, orders: [] }))
 
-    const summary = await computeProfitSummary('cookies', 'merchant1', 7, [], { amount: 0, configured: false }, null, fakeListOrders as any)
+    const summary = await computeProfitSummary('cookies', 'merchant1', 7, [], { amount: 0, otherAmount: 0, configured: false }, null, fakeListOrders as any)
 
     expect(summary.commissionRatePercent).toBe(null)
     expect(summary.commissionAmount).toBe(0)
@@ -160,7 +160,7 @@ describe('computeProfitSummary', () => {
       return { total: 0, sessionExpired: false, orders: [] }
     })
 
-    const summary = await computeProfitSummary('cookies', 'merchant1', 7, [], { amount: 0, configured: false }, 10, fakeListOrders as any)
+    const summary = await computeProfitSummary('cookies', 'merchant1', 7, [], { amount: 0, otherAmount: 0, configured: false }, 10, fakeListOrders as any)
 
     expect(summary.commissionAmount).toBe(100)
     expect(summary.netProfit).toBe(900)
@@ -180,7 +180,7 @@ describe('computeProfitSummary', () => {
       return { total: 0, sessionExpired: false, orders: [] }
     })
 
-    const summary = await computeProfitSummary('cookies', 'merchant1', 7, [], { amount: 150, configured: true }, null, fakeListOrders as any)
+    const summary = await computeProfitSummary('cookies', 'merchant1', 7, [], { amount: 150, otherAmount: 0, configured: true }, null, fakeListOrders as any)
 
     expect(summary.adSpend).toBe(150)
     expect(summary.adSpendConfigured).toBe(true)
@@ -202,7 +202,7 @@ describe('computeProfitSummary', () => {
       return { total: 0, sessionExpired: false, orders: [] }
     })
 
-    const summary = await computeProfitSummary('cookies', 'merchant1', 7, [], { amount: 0, configured: false }, null, fakeListOrders as any)
+    const summary = await computeProfitSummary('cookies', 'merchant1', 7, [], { amount: 0, otherAmount: 0, configured: false }, null, fakeListOrders as any)
 
     expect(summary.totalRevenue).toBe(1000)
   })
@@ -210,7 +210,7 @@ describe('computeProfitSummary', () => {
   it('stops immediately and reports sessionExpired when the session is dead', async () => {
     const fakeListOrders = vi.fn(async () => ({ total: 0, sessionExpired: true, orders: [] }))
 
-    const summary = await computeProfitSummary('cookies', 'merchant1', 30, [], { amount: 0, configured: false }, null, fakeListOrders as any)
+    const summary = await computeProfitSummary('cookies', 'merchant1', 30, [], { amount: 0, otherAmount: 0, configured: false }, null, fakeListOrders as any)
 
     expect(summary.sessionExpired).toBe(true)
     expect(summary.totalRevenue).toBe(0)
