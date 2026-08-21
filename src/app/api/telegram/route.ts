@@ -30,7 +30,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Not configured' }, { status: 500 })
   }
 
-  await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+  // Previously discarded entirely -- a rejected send (bad chat_id, bot
+  // removed from the chat, unescaped HTML in the message breaking
+  // Telegram's parser) always reported {ok:true} back to the caller with
+  // no way to ever notice the admin never actually got the message.
+  const tgRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -39,6 +43,11 @@ export async function POST(req: NextRequest) {
       parse_mode: 'HTML',
     })
   })
+  if (!tgRes.ok) {
+    const body = await tgRes.text().catch(() => '')
+    console.error('telegram sendMessage failed:', tgRes.status, body)
+    return NextResponse.json({ error: 'Telegram delivery failed', telegramStatus: tgRes.status }, { status: 502 })
+  }
 
   return NextResponse.json({ ok: true })
 }

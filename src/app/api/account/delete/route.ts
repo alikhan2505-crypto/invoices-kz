@@ -22,6 +22,16 @@ async function requireUser(req: NextRequest) {
 // the founder's request ("наберёт название INVOICES.KZ").
 const CONFIRM_PHRASE = 'INVOICES.KZ'
 
+// The admin Telegram message below is sent with parse_mode: HTML. These
+// fields are free text the customer typed into their own profile -- an
+// unescaped "<" or "&" in a company name is enough for Telegram to reject
+// the ENTIRE message with a silent 400, which is exactly the shape of bug
+// that could explain a notification never arriving with no error visible
+// anywhere (found 2026-08-21 while investigating a real missed notice).
+function escapeHtml(text: string): string {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
 // Soft delete (founder-approved, 2026-08-21): the profile row is kept with
 // deleted_at set -- it's how a later signup with the same email gets
 // recognised as a returning customer (see onboarding/page.tsx) and how
@@ -84,13 +94,16 @@ export async function POST(req: NextRequest) {
     const statsLine = daysAsCustomer !== null
       ? `📅 Клиент ${daysAsCustomer} дн.\n🧾 Счетов: ${invoicesCount ?? 0}\n💰 Заработали: ${revenueTenge.toLocaleString('ru-KZ')} ₸`
       : `🧾 Счетов: ${invoicesCount ?? 0}\n💰 Заработали: ${revenueTenge.toLocaleString('ru-KZ')} ₸`
-    await fetch('https://invoices.kz/api/telegram', {
+    const tgRes = await fetch('https://invoices.kz/api/telegram', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-internal-secret': process.env.INTERNAL_API_SECRET! },
       body: JSON.stringify({
-        message: `🗑 <b>Удаление аккаунта</b>\n👤 ${profile.company_name || user.id}\n📧 ${profile.email || user.email}${profile.bin_iin ? '\n🔢 БИН: ' + profile.bin_iin : ''}\n${statsLine}`,
+        message: `🗑 <b>Удаление аккаунта</b>\n👤 ${escapeHtml(profile.company_name || user.id)}\n📧 ${escapeHtml(profile.email || user.email || '')}${profile.bin_iin ? '\n🔢 БИН: ' + escapeHtml(profile.bin_iin) : ''}\n${statsLine}`,
       }),
     })
+    if (!tgRes.ok) {
+      console.error('account delete: Telegram notification rejected for', user.id, ':', tgRes.status, await tgRes.text().catch(() => ''))
+    }
   } catch (e: any) {
     console.error('account delete: Telegram notification failed for', user.id, ':', e.message)
   }
