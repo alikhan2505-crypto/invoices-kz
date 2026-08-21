@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import { listCatalog, fetchCityNames } from './cabinetApi'
+import { listCatalog, fetchCityNames, fetchOffersDetails, extractOfferPointInfo } from './cabinetApi'
 import { saveConnection, loadConnectionByMerchant } from './connection'
 
 const supabase = createClient(
@@ -51,6 +51,28 @@ export async function importCatalogProducts(connectionId: string, userId: string
   let imported = 0
   try {
     const offers = await listCatalog(sessionCookies, merchantId, true)
+
+    // Point-city codes per sku, one batched details request for the whole
+    // catalog (the endpoint takes an sku array natively). Used as the
+    // automatic competitor-check cities when tracked cities aren't picked
+    // manually. Best-effort: a failed details fetch leaves the column
+    // empty and the check falls back to the legacy reference city.
+    const pointCitiesBySku = new Map<string, string[]>()
+    try {
+      const detailsItems = await fetchOffersDetails(sessionCookies, merchantId, offers.map(o => o.sku))
+      for (const item of detailsItems) {
+        if (typeof item.sku !== 'string') continue
+        const cityIds = Array.from(new Set(
+          extractOfferPointInfo(item, merchantId)
+            .map(i => i.cityId)
+            .filter((c): c is string => !!c)
+        ))
+        pointCitiesBySku.set(item.sku, cityIds)
+      }
+    } catch (err: any) {
+      console.error('kaspi-shop importCatalogProducts: details batch failed (non-fatal, point cities skipped)', err.message)
+    }
+
     for (const offer of offers) {
       // Reconnecting (e.g. after a session expiry) used to blind-INSERT a
       // fresh row per offer every time, producing real duplicate rows per
@@ -87,6 +109,7 @@ export async function importCatalogProducts(connectionId: string, userId: string
             store_id: offer.points[0] || '',
             kaspi_brand: offer.brandName || offer.brandCode || null,
             kaspi_category: offer.masterCategory,
+            point_city_codes: pointCitiesBySku.get(offer.sku) || [],
           })
           .eq('id', existing.id)
         if (updateError) {
@@ -115,6 +138,7 @@ export async function importCatalogProducts(connectionId: string, userId: string
           kaspi_master_sku: offer.masterSku,
           kaspi_brand: offer.brandName || offer.brandCode || null,
           kaspi_category: offer.masterCategory,
+          point_city_codes: pointCitiesBySku.get(offer.sku) || [],
         })
         .select('id')
         .single()

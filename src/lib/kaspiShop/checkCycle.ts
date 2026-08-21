@@ -62,7 +62,7 @@ export function isCheckDue(lastCheckedAt: string | null, checkFrequencyMinutes: 
 export async function getDueTrackedProducts(): Promise<DueTrackedProduct[]> {
   const { data: due } = await supabase
     .from('kaspi_shop_tracked_products')
-    .select('id, kaspi_sku, last_checked_at, check_frequency_minutes, enabled, excluded_city_codes, kaspi_shop_connections(paused, tracked_city_codes)')
+    .select('id, kaspi_sku, last_checked_at, check_frequency_minutes, enabled, excluded_city_codes, point_city_codes, kaspi_shop_connections(paused, tracked_city_codes)')
     .eq('enabled', true)
 
   const now = Date.now()
@@ -71,11 +71,23 @@ export async function getDueTrackedProducts(): Promise<DueTrackedProduct[]> {
       if (p.kaspi_shop_connections?.paused) return false
       return isCheckDue(p.last_checked_at, p.check_frequency_minutes, now)
     })
-    .map((p: any) => ({
-      id: p.id,
-      kaspiSku: p.kaspi_sku,
-      targetCities: resolveTargetCities(p.kaspi_shop_connections?.tracked_city_codes || [], p.excluded_city_codes || []),
-    }))
+    .map((p: any) => {
+      let targetCities = resolveTargetCities(p.kaspi_shop_connections?.tracked_city_codes || [], p.excluded_city_codes || [])
+      // Auto mode (2026-08-21): with no manually tracked cities, check the
+      // product's OWN point cities -- the old hardcoded-Almaty reference
+      // missed a real competitor visible only in the point's city
+      // (confirmed live: a Шымкент seller invisible to Almaty eyes).
+      // Manual selection always wins; products with no known point cities
+      // keep the legacy reference-city behavior.
+      if (targetCities.length === 0) {
+        targetCities = resolveTargetCities(p.point_city_codes || [], p.excluded_city_codes || [])
+      }
+      return {
+        id: p.id,
+        kaspiSku: p.kaspi_sku,
+        targetCities,
+      }
+    })
 }
 
 // ONE full-state batch upload per product per cycle, carrying every changed

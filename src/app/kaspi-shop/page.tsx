@@ -12,6 +12,7 @@ type Product = {
   id: string
   kaspi_sku: string
   kaspi_master_sku: string | null
+  point_city_codes: string[] | null
   product_name: string
   brand: string
   store_id: string
@@ -606,11 +607,17 @@ export default function KaspiShop() {
   const atFloorCount = products.filter(p => p.own_current_price <= p.floor_price + 0.01).length
   const activeCount = products.filter(p => p.enabled).length
 
-  // Which cities this product's demping actually covers (store-level tracked
-  // cities minus the product's own exclusions); no tracked cities configured
-  // means the legacy single-reference-competitor mode = «Все города».
+  // Which cities this product's demping actually covers: manually tracked
+  // cities win; with none picked, auto mode checks the product's own point
+  // cities («Авто: Шымкент»); no known point cities = the legacy
+  // single-reference mode («Все города»).
   function productRegionLabel(p: Product): string {
-    if (trackedCities.length === 0) return 'Все города'
+    if (trackedCities.length === 0) {
+      const auto = (p.point_city_codes || []).filter(code => !(p.excluded_city_codes || []).includes(code))
+      if (auto.length === 0) return 'Все города'
+      const names = auto.map(code => availableCities.find(c => c.code === code)?.name || code)
+      return `Авто: ${names.length <= 2 ? names.join(', ') : `${names.length} городов`}`
+    }
     const codes = trackedCities.filter(code => !(p.excluded_city_codes || []).includes(code))
     if (codes.length === 0) return 'Все города исключены'
     const names = codes.map(code => availableCities.find(c => c.code === code)?.name || code)
