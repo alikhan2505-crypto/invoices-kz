@@ -41,6 +41,27 @@ function PauseIcon() {
   )
 }
 
+type StockEntry = {
+  storeCode: string
+  cityId: string | null
+  cityName: string | null
+  price: number | null
+  stockCount: number | null
+  available: string | null
+}
+
+type StockModalState = {
+  offer: Offer
+  loading: boolean
+  error: string
+  masterSku: string | null
+  model: string
+  entries: StockEntry[]
+  edits: Record<string, { price: string; stockCount: string }>
+  saving: boolean
+  saved: boolean
+}
+
 export default function KaspiShopProductAvailability() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
@@ -50,6 +71,7 @@ export default function KaspiShopProductAvailability() {
   const [tab, setTab] = useState<Tab>('removed')
   const [rowStates, setRowStates] = useState<Record<string, RowState>>({})
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({})
+  const [stockModal, setStockModal] = useState<StockModalState | null>(null)
 
   useEffect(() => { load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -83,6 +105,61 @@ export default function KaspiShopProductAvailability() {
     } finally {
       setLoading(false)
     }
+  }
+
+  async function openStockModal(offer: Offer) {
+    setStockModal({ offer, loading: true, error: '', masterSku: null, model: '', entries: [], edits: {}, saving: false, saved: false })
+    const headers = await authHeader()
+    const res = await fetch(`/api/kaspi-shop/offer-stocks?sku=${encodeURIComponent(offer.sku)}`, { headers })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      setStockModal(prev => prev ? { ...prev, loading: false, error: data.error || 'Не удалось загрузить данные точек' } : prev)
+      return
+    }
+    const entries: StockEntry[] = data.entries || []
+    const edits: Record<string, { price: string; stockCount: string }> = {}
+    for (const e of entries) {
+      edits[e.storeCode] = {
+        price: e.price !== null ? String(e.price) : (data.minPrice !== null ? String(data.minPrice) : ''),
+        stockCount: e.stockCount !== null ? String(e.stockCount) : '',
+      }
+    }
+    setStockModal(prev => prev ? {
+      ...prev, loading: false,
+      masterSku: data.masterSku ?? null,
+      model: data.model || offer.title,
+      entries, edits,
+    } : prev)
+  }
+
+  async function saveStockModal() {
+    if (!stockModal || stockModal.saving) return
+    const payloadEntries = stockModal.entries
+      .filter(e => e.cityId)
+      .map(e => ({
+        storeCode: e.storeCode,
+        cityId: e.cityId,
+        price: Number(stockModal.edits[e.storeCode]?.price),
+        stockCount: stockModal.edits[e.storeCode]?.stockCount.trim() === '' ? null : Number(stockModal.edits[e.storeCode]?.stockCount),
+      }))
+      .filter(e => Number.isFinite(e.price) && e.price > 0)
+    if (payloadEntries.length === 0) {
+      setStockModal(prev => prev ? { ...prev, error: 'Нет точек с городом и ценой — сохранять нечего.' } : prev)
+      return
+    }
+    setStockModal(prev => prev ? { ...prev, saving: true, error: '' } : prev)
+    const headers = await authHeader()
+    const res = await fetch('/api/kaspi-shop/offer-stocks', {
+      method: 'POST', headers,
+      body: JSON.stringify({ sku: stockModal.offer.sku, masterSku: stockModal.masterSku, model: stockModal.model, entries: payloadEntries }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok || !data.ok) {
+      const failMsg = (data.results || []).filter((r: any) => !r.ok).map((r: any) => `${r.storeCode}: ${r.message}`).join('; ')
+      setStockModal(prev => prev ? { ...prev, saving: false, error: data.error || failMsg || 'Не удалось сохранить' } : prev)
+      return
+    }
+    setStockModal(prev => prev ? { ...prev, saving: false, saved: true } : prev)
   }
 
   async function toggle(sku: string, action: 'restore' | 'remove') {
@@ -196,12 +273,91 @@ export default function KaspiShopProductAvailability() {
                     </button>
                   )}
                 </div>
+                {tab === 'active' && state !== 'sent' && (
+                  <button onClick={() => openStockModal(offer)}
+                    className="mt-2 text-[11px] font-semibold" style={{ color: 'var(--nav-accent)' }}>
+                    Цена и остатки →
+                  </button>
+                )}
                 {error && <div className="text-xs mt-2" style={{ color: 'var(--nav-critical)' }}>{error}</div>}
               </motion.div>
             )
           })}
         </div>
       </div>
+
+      {/* «Цена и остатки» -- per-point (склад/город) price+stock editor,
+          mirroring the cabinet's own modal; saves go through the captured
+          ON_SALE__PRICE_SAVE chain, one save per point. */}
+      {stockModal && (
+        <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center p-3 bg-black/30" onClick={() => setStockModal(null)}>
+          <motion.div initial={{ opacity: 0, scale: 0.95, y: 14 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ duration: 0.22, ease: EASE }}
+            className="relative nav-glass rounded-[24px] w-full max-w-md max-h-[86vh] overflow-y-auto"
+            style={{ boxShadow: '0 34px 80px -20px rgba(10,10,15,0.4), var(--nav-card-glow)' }}
+            onClick={e => e.stopPropagation()}>
+            <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[24px]" style={{ background: 'linear-gradient(90deg, var(--nav-accent), var(--nav-teal))' }} />
+            <div className="p-5 lg:p-6">
+              <div className="flex items-start justify-between gap-3 mb-1">
+                <div className="min-w-0">
+                  <div className="text-[11px] font-semibold tracking-wider uppercase mb-0.5" style={{ color: 'var(--nav-text-muted)' }}>Цена и остатки</div>
+                  <div className="text-sm font-bold" style={{ color: 'var(--nav-text-primary)' }}>{stockModal.offer.title}</div>
+                </div>
+                <button onClick={() => setStockModal(null)} className="text-lg leading-none flex-shrink-0" style={{ color: 'var(--nav-text-secondary)' }}>✕</button>
+              </div>
+              <p className="text-[11px] mb-4" style={{ color: 'var(--nav-text-muted)' }}>
+                Как в кабинете Kaspi: цена и остаток по каждой точке. Остаток можно оставить пустым — товар останется в продаже без учёта остатков.
+              </p>
+
+              {stockModal.loading && <div className="text-xs py-6 text-center" style={{ color: 'var(--nav-text-secondary)' }}>Загружаем точки…</div>}
+
+              {!stockModal.loading && stockModal.entries.length === 0 && !stockModal.error && (
+                <div className="text-xs py-4" style={{ color: 'var(--nav-text-secondary)' }}>
+                  Не удалось распознать точки товара в данных Kaspi — управляйте ценой и остатками пока через кабинет Kaspi.
+                </div>
+              )}
+
+              {stockModal.entries.map(e => (
+                <div key={e.storeCode} className="rounded-xl p-3 mb-2" style={{ background: 'var(--nav-bg)' }}>
+                  <div className="text-xs font-semibold mb-2" style={{ color: 'var(--nav-text-primary)' }}>
+                    {e.cityName ? `${e.cityName} · ` : ''}{e.storeCode}
+                    {!e.cityId && <span className="font-normal" style={{ color: 'var(--nav-text-muted)' }}> — город не распознан, сохранение недоступно</span>}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="block">
+                      <span className="text-[10px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Цена, ₸</span>
+                      <input type="number" disabled={!e.cityId}
+                        className="w-full rounded-lg px-2 py-1.5 text-sm font-mono outline-none border"
+                        style={{ borderColor: 'var(--nav-border-soft)', background: 'var(--nav-surface-chrome)', color: 'var(--nav-text-primary)' }}
+                        value={stockModal.edits[e.storeCode]?.price ?? ''}
+                        onChange={ev => setStockModal(prev => prev ? { ...prev, saved: false, edits: { ...prev.edits, [e.storeCode]: { ...prev.edits[e.storeCode], price: ev.target.value } } } : prev)} />
+                    </label>
+                    <label className="block">
+                      <span className="text-[10px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Остаток, шт</span>
+                      <input type="number" placeholder="Не указан" disabled={!e.cityId}
+                        className="w-full rounded-lg px-2 py-1.5 text-sm font-mono outline-none border"
+                        style={{ borderColor: 'var(--nav-border-soft)', background: 'var(--nav-surface-chrome)', color: 'var(--nav-text-primary)' }}
+                        value={stockModal.edits[e.storeCode]?.stockCount ?? ''}
+                        onChange={ev => setStockModal(prev => prev ? { ...prev, saved: false, edits: { ...prev.edits, [e.storeCode]: { ...prev.edits[e.storeCode], stockCount: ev.target.value } } } : prev)} />
+                    </label>
+                  </div>
+                </div>
+              ))}
+
+              {stockModal.error && <div className="text-xs mt-2 mb-2" style={{ color: 'var(--nav-critical)' }}>{stockModal.error}</div>}
+              {stockModal.saved && <div className="text-xs mt-2 mb-2" style={{ color: 'var(--nav-success)' }}>Отправлено — Kaspi применит изменения в течение часа.</div>}
+
+              {stockModal.entries.some(e => e.cityId) && (
+                <button onClick={saveStockModal} disabled={stockModal.saving}
+                  className="w-full mt-2 rounded-xl py-2.5 text-sm font-semibold disabled:opacity-60"
+                  style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                  {stockModal.saving ? 'Сохраняем…' : 'Сохранить изменения'}
+                </button>
+              )}
+            </div>
+          </motion.div>
+        </div>
+      )}
     </main>
     </DesktopShell>
   )

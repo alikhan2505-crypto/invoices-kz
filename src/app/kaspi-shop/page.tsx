@@ -484,12 +484,9 @@ export default function KaspiShop() {
         demping_strategy: v.strategy,
         excluded_city_codes: v.excludedCities.split(',').map(s => s.trim()).filter(Boolean),
         excluded_merchant_ids: v.excludedMerchants.split(',').map(s => s.trim()).filter(Boolean),
-        stock_count: Number(v.stockCount) || 0,
       }),
     })
-    const data = await res.json().catch(() => ({}))
-    if (data.stockPushed) setApplyNowMessage('Остаток отправлен на Kaspi — применится в течение часа.')
-    else if (data.stockPushWarning) setApplyNowMessage(data.stockPushWarning)
+    await res.json().catch(() => ({}))
     setExpandedId(null)
     load()
   }
@@ -878,7 +875,6 @@ export default function KaspiShop() {
                         <div className="flex items-center justify-between gap-2 flex-wrap mt-2.5">
                           <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-[11px]" style={{ color: 'var(--nav-text-muted)' }}>
                             <span title="Города, по которым демпингуется этот товар">{productRegionLabel(p)}</span>
-                            {p.stock_count > 0 && <span title="Остаток, который отправляется на Kaspi вместе с ценой">Остаток: {p.stock_count} шт</span>}
                             {otherSellers !== null && (
                               <span title="Продавцы этого товара на Kaspi, кроме вас. Место по цене среди всех — это оценка.">
                                 {otherSellers} {pluralSellers(otherSellers)} кроме вас{p.market_position !== null ? ` · вы #${p.market_position}` : ''}
@@ -935,7 +931,7 @@ export default function KaspiShop() {
                           </div>
                           <button onClick={() => setExpandedId(null)} className="text-lg leading-none flex-shrink-0" style={{ color: 'var(--nav-text-secondary)' }}>✕</button>
                         </div>
-                              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-2">
+                              <div className="grid grid-cols-3 gap-2 mb-2">
                                 <label className="block">
                                   <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Минимальная цена</span>
                                   <input className={`${INPUT_CLS} font-mono px-2 py-1.5`} type="number" style={{ color: 'var(--nav-text-primary)' }}
@@ -951,11 +947,13 @@ export default function KaspiShop() {
                                   <input className={`${INPUT_CLS} font-mono px-2 py-1.5`} type="number" style={{ color: 'var(--nav-text-primary)' }}
                                     value={v.undercutStep} onChange={e => setEditValues(prev => ({ ...prev, [p.id]: { ...v, undercutStep: e.target.value } }))} />
                                 </label>
-                                <label className="block">
-                                  <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Остаток, шт</span>
-                                  <input className={`${INPUT_CLS} font-mono px-2 py-1.5`} type="number" placeholder="0" style={{ color: 'var(--nav-text-primary)' }}
-                                    value={v.stockCount} onChange={e => setEditValues(prev => ({ ...prev, [p.id]: { ...v, stockCount: e.target.value } }))} />
-                                </label>
+                              </div>
+                              {/* Остатки живут по складам/городам (founder,
+                                  2026-08-21) -- в «Управлении товарами», в
+                                  модалке «Цена и остатки», как у Kaspi. Тут
+                                  их поле только вводило в заблуждение. */}
+                              <div className="text-[11px] mb-2" style={{ color: 'var(--nav-text-muted)' }}>
+                                Остатки по складам — на странице <span className="font-semibold" style={{ color: 'var(--nav-accent)' }}>Управление товарами → Цена и остатки</span>.
                               </div>
                               <label className="block mb-2">
                                 <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Стратегия</span>
