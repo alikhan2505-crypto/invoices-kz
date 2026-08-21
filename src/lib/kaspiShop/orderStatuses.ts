@@ -18,3 +18,13 @@ export const ORDER_STATUS_TABS: { label: string; value: string }[] = [
 ]
 
 export const TRANSFER_STATUS = 'KASPI_DELIVERY_WAIT_FOR_COURIER'
+export const PACKING_STATUS = 'KASPI_DELIVERY_CARGO_ASSEMBLY'
+
+// Bulk "select orders, print all their waybills as one PDF" is available on
+// both statuses (founder request 2026-08-22, "у конкурентов в разделе
+// упаковка должно быть распечатка накладных все вместе" -- sellers print
+// the shipping label while physically packing the box, not only later at
+// the transfer-to-courier step). Kept as its own list rather than inlining
+// the OR at each call site, since a future status (e.g. self-pickup prep)
+// may need the same bulk-print affordance.
+export const BULK_PRINTABLE_STATUSES: string[] = [PACKING_STATUS, TRANSFER_STATUS]

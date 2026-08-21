@@ -194,9 +194,13 @@ export default function KaspiShopProductAvailability() {
   // Filter above the grid (founder request 2026-08-22): with 500+ removed
   // offers, finding one specific product by scrolling was impractical.
   const query = search.trim().toLowerCase()
-  const offers = query
-    ? tabOffers.filter(o => o.title.toLowerCase().includes(query) || o.sku.toLowerCase().includes(query))
-    : tabOffers
+  const matchesQuery = (o: Offer) => !query || o.title.toLowerCase().includes(query) || o.sku.toLowerCase().includes(query)
+  const offers = tabOffers.filter(matchesQuery)
+  // Tab pill counts reflect the active search filter too (founder request
+  // 2026-08-22) -- previously always showed the full unfiltered totals even
+  // while a query was narrowing the list below them.
+  const removedCount = removed.filter(matchesQuery).length
+  const activeCount = active.filter(matchesQuery).length
 
   return (
     <DesktopShell>
@@ -217,7 +221,7 @@ export default function KaspiShopProductAvailability() {
 
         <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
           <div className="flex items-center gap-1.5">
-            {([['removed', `Сняты с продажи (${removed.length})`], ['active', `В продаже (${active.length})`]] as [Tab, string][]).map(([key, label]) => {
+            {([['removed', `Сняты с продажи (${removedCount})`], ['active', `В продаже (${activeCount})`]] as [Tab, string][]).map(([key, label]) => {
               const selected = tab === key
               return (
                 <button key={key} onClick={() => setTab(key)}
@@ -263,11 +267,16 @@ export default function KaspiShopProductAvailability() {
             const state = rowStates[offer.sku] || 'idle'
             const error = rowErrors[offer.sku]
             const action = tab === 'removed' ? 'restore' : 'remove'
+            // Whole card opens «Цена и остатки» now (founder feedback
+            // 2026-08-22: "не могу зайти в карточку и изменить параметры" --
+            // only the small text link at the bottom was clickable before).
+            const cardOpensStockModal = tab === 'active' && state !== 'sent'
             return (
               <motion.div key={offer.sku}
                 initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.35, delay: i * 0.04, ease: EASE }}
-                className="nav-glass rounded-2xl p-4">
+                onClick={cardOpensStockModal ? () => openStockModal(offer) : undefined}
+                className={`nav-glass rounded-2xl p-4 ${cardOpensStockModal ? 'cursor-pointer transition-transform hover:-translate-y-0.5' : ''}`}>
                 <div className="text-sm font-semibold truncate" title={offer.title} style={{ color: 'var(--nav-text-primary)' }}>{offer.title}</div>
                 <div className="text-[11px] mb-1.5" style={{ color: 'var(--nav-text-muted)' }}>
                   {offer.brandName ? `${offer.brandName} · ` : ''}{offer.sku}
@@ -309,14 +318,14 @@ export default function KaspiShopProductAvailability() {
                       Kaspi обрабатывает
                     </span>
                   ) : action === 'restore' ? (
-                    <button onClick={() => toggle(offer.sku, 'restore')} disabled={state === 'busy'}
+                    <button onClick={e => { e.stopPropagation(); toggle(offer.sku, 'restore') }} disabled={state === 'busy'}
                       className="text-xs font-semibold rounded-full px-3 py-2 flex items-center gap-1.5 transition-transform hover:-translate-y-0.5 disabled:opacity-60"
                       style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                       <RestoreIcon />
                       {state === 'busy' ? 'Отправляем…' : 'Вернуть в продажу'}
                     </button>
                   ) : (
-                    <button onClick={() => toggle(offer.sku, 'remove')} disabled={state === 'busy'}
+                    <button onClick={e => { e.stopPropagation(); toggle(offer.sku, 'remove') }} disabled={state === 'busy'}
                       className="nav-glass text-xs font-semibold rounded-full px-3 py-2 flex items-center gap-1.5 transition-transform hover:-translate-y-0.5 disabled:opacity-60"
                       style={{ color: 'var(--nav-critical)' }}>
                       <PauseIcon />
@@ -324,11 +333,10 @@ export default function KaspiShopProductAvailability() {
                     </button>
                   )}
                 </div>
-                {tab === 'active' && state !== 'sent' && (
-                  <button onClick={() => openStockModal(offer)}
-                    className="mt-2 text-[11px] font-semibold" style={{ color: 'var(--nav-accent)' }}>
+                {cardOpensStockModal && (
+                  <div className="mt-2 text-[11px] font-semibold" style={{ color: 'var(--nav-accent)' }}>
                     Цена и остатки →
-                  </button>
+                  </div>
                 )}
                 {error && <div className="text-xs mt-2" style={{ color: 'var(--nav-critical)' }}>{error}</div>}
               </motion.div>

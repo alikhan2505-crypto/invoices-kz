@@ -205,7 +205,7 @@ export default function KaspiShopFinance() {
   const [loading, setLoading] = useState(true)
   const [days, setDays] = useState(30)
   const [customDaysOpen, setCustomDaysOpen] = useState(false)
-  const [customDaysInput, setCustomDaysInput] = useState('')
+  const [customSinceDate, setCustomSinceDate] = useState('')
   const [summary, setSummary] = useState<FinanceSummary | null>(null)
   const [summaryLoading, setSummaryLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
@@ -283,10 +283,17 @@ export default function KaspiShopFinance() {
                     </button>
                   )
                 })}
-                {/* Custom period (founder request 2026-08-22): any day count,
-                    not just the three presets -- the backend now accepts
-                    1-365 days regardless of whether it matches a preset. */}
-                <button onClick={() => { setCustomDaysInput(String(days)); setCustomDaysOpen(true) }}
+                {/* Custom period (founder request 2026-08-22, refined to a
+                    calendar date rather than a raw day count after founder
+                    feedback -- "лучше выбрать дату с какого периода
+                    считать"): pick a start date, days is computed from it.
+                    Backend still accepts any 1-365 day count. */}
+                <button onClick={() => {
+                  const d = new Date()
+                  d.setDate(d.getDate() - days)
+                  setCustomSinceDate(d.toISOString().slice(0, 10))
+                  setCustomDaysOpen(true)
+                }}
                   className="relative text-xs font-medium rounded-full px-3 py-1.5 transition-colors"
                   style={{ color: customDaysOpen ? 'var(--nav-accent-ink)' : 'var(--nav-text-secondary)', background: customDaysOpen ? 'var(--nav-accent)' : 'transparent' }}>
                   {customDaysOpen ? `${days} дн.` : 'Свой период'}
@@ -295,12 +302,17 @@ export default function KaspiShopFinance() {
               {customDaysOpen && (
                 <form className="flex items-center gap-1.5" onSubmit={e => {
                   e.preventDefault()
-                  const n = Math.round(Number(customDaysInput))
+                  if (!customSinceDate) return
+                  const since = new Date(customSinceDate + 'T00:00:00')
+                  const n = Math.round((Date.now() - since.getTime()) / 86400000)
                   if (Number.isFinite(n) && n >= 1 && n <= 365) setDays(n)
                 }}>
-                  <input type="number" min={1} max={365} value={customDaysInput} onChange={e => setCustomDaysInput(e.target.value)}
-                    placeholder="дней" autoFocus
-                    className="w-20 text-xs rounded-full px-3 py-1.5 outline-none"
+                  <span className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>с</span>
+                  <input type="date" value={customSinceDate} onChange={e => setCustomSinceDate(e.target.value)}
+                    max={new Date().toISOString().slice(0, 10)}
+                    min={new Date(Date.now() - 365 * 86400000).toISOString().slice(0, 10)}
+                    autoFocus
+                    className="text-xs rounded-full px-3 py-1.5 outline-none"
                     style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-primary)', border: '1px solid var(--nav-border-soft)' }} />
                   <button type="submit" className="text-xs font-semibold rounded-full px-3 py-1.5" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                     Применить

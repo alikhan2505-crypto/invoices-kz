@@ -115,23 +115,47 @@ export default function KaspiShopReviews() {
     }
   }
 
+function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+  // The actual per-product fetch now runs on a GitHub Actions relay (Kaspi
+  // 429s this endpoint from Vercel's IP -- confirmed live 2026-08-21), so
+  // POST here only dispatches the run and returns immediately; this polls
+  // the normal GET on an interval so the list fills in as ingest calls land
+  // instead of waiting for one long synchronous response the old direct-
+  // fetch version returned.
   async function doRefresh() {
     setRefreshing(true)
     setLoadError('')
     setRefreshNote('')
+    const dispatchedAt = new Date().toISOString()
     try {
       const headers = await authHeader()
       const res = await fetch('/api/kaspi-shop/reviews', { method: 'POST', headers })
       const json = await res.json()
       if (!res.ok) { setLoadError(json.error || 'Не удалось обновить отзывы'); return }
-      // The refresh response carries the FULL (unfiltered) list -- re-apply
-      // the currently active star pill client-side rather than firing a
-      // second request just to get the same data back filtered.
-      const filtered = activeStars !== null ? json.reviews.filter((r: Review) => r.rating === activeStars) : json.reviews
-      setData({ ...json, reviews: filtered })
-      if (json.refreshFailedCount > 0) {
-        setRefreshNote(`Не удалось обновить ${json.refreshFailedCount} из ${json.refreshedCount + json.refreshFailedCount} товаров — показаны последние сохранённые данные по ним.`)
+
+      setRefreshNote(`Проверяем ${json.dispatchedCount} товар(ов) на Kaspi — это может занять пару минут...`)
+
+      // Poll budget scales with how many products are being checked (~1s
+      // each on the relay side), capped so a stuck run doesn't poll forever.
+      const maxAttempts = Math.min(60, Math.ceil(json.dispatchedCount * 2 / 3) + 15)
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        await sleep(3000)
+        const pollHeaders = await authHeader()
+        const qs = activeStars !== null ? `?stars=${activeStars}` : ''
+        const pollRes = await fetch(`/api/kaspi-shop/reviews${qs}`, { headers: pollHeaders })
+        const pollJson = await pollRes.json().catch(() => null)
+        if (pollRes.ok && pollJson) {
+          setData(pollJson)
+          if (pollJson.lastFetchedAt && pollJson.lastFetchedAt >= dispatchedAt) {
+            setRefreshNote('')
+            return
+          }
+        }
       }
+      setRefreshNote('Обновление ещё идёт на стороне Kaspi — данные обновятся сами по мере поступления, попробуйте открыть страницу заново через минуту.')
     } catch {
       setLoadError('Не удалось обновить отзывы. Проверьте соединение и попробуйте ещё раз.')
     } finally {

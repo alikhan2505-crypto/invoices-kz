@@ -1,0 +1,25 @@
+name: Kaspi Shop reviews check
+
+on:
+  workflow_dispatch:
+    inputs:
+      products:
+        description: 'JSON array of [{trackedProductId, masterSku}]'
+        required: true
+        type: string
+
+jobs:
+  check-reviews:
+    runs-on: ubuntu-latest
+    # A seller's whole tracked catalog runs sequentially with a delay
+    # between each Kaspi call (see the script) -- bounded well under this so
+    # a stuck run self-terminates instead of hanging indefinitely.
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run reviews check
+        env:
+          BASE_URL: https://www.invoices.kz
+          KASPI_SHOP_CRON_SECRET: ${{ secrets.KASPI_SHOP_CRON_SECRET }}
+          PRODUCTS: ${{ inputs.products }}
+        run: node .github/scripts/kaspi-shop-reviews-check.mjs

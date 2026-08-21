@@ -1,13 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { fetchProductReviews, computeReviewStats, filterByStars, RawReview } from '@/lib/kaspiShop/reviews'
+import { computeReviewStats, filterByStars, RawReview } from '@/lib/kaspiShop/reviews'
 import { loadConnection } from '@/lib/kaspiShop/connection'
-
-// A refresh does one sequential, delayed fetch per tracked product (see
-// REFRESH_DELAY_MS below) -- same reasoning as
-// src/app/api/ai-agent/broadcasts/route.ts's maxDuration bump: the loop runs
-// inside the request, so the Vercel function budget needs to cover it.
-export const maxDuration = 300
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -24,17 +18,6 @@ async function requireUser(req: NextRequest) {
     ? await supabaseAuth.auth.getUser(accessToken)
     : { data: { user: null } }
   return user
-}
-
-// Sequential with a small gap rather than firing one request per SKU at
-// once -- matches the ~300ms gap .github/scripts/kaspi-shop-price-check.mjs
-// already uses between per-city offer fetches to the same Kaspi backend, so
-// a seller with many tracked products doesn't hammer Kaspi with a burst of
-// simultaneous requests on one click of "Обновить".
-const REFRESH_DELAY_MS = 300
-
-function sleep(ms: number) {
-  return new Promise(resolve => setTimeout(resolve, ms))
 }
 
 type AggregatedReview = RawReview & { trackedProductId: string; productName: string }
@@ -111,6 +94,21 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ stats, reviews, lastFetchedAt, productErrorCount: aggregation.errorCount })
 }
 
+// Static -- this repo never changes owner/name, matching niches/request's
+// own convention for the same GitHub Actions dispatch call.
+const GITHUB_OWNER = 'alikhan2505-crypto'
+const GITHUB_REPO = 'invoices-kz'
+const GITHUB_WORKFLOW = 'kaspi-shop-reviews-check.yml'
+
+// Kaspi's review-view endpoint 429s from Vercel's IP ranges (confirmed live
+// 2026-08-21 -- 61/61 products failed identically), the same block class as
+// offer-view/product-view elsewhere in this codebase. The actual per-product
+// fetch now happens on a GitHub Actions runner (kaspi-shop-reviews-check.mjs
+// + .yml), which relays each raw response to /api/kaspi-shop/reviews/ingest
+// for parsing/storage -- this endpoint's job is just to dispatch that run
+// and hand back immediately; the caller polls GET on this same route (whose
+// lastFetchedAt/stats improve as ingest calls land) instead of waiting for
+// one long synchronous response the way the old direct-fetch version did.
 export async function POST(req: NextRequest) {
   const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -124,63 +122,36 @@ export async function POST(req: NextRequest) {
     .eq('connection_id', connection.id)
   if (productsError) return NextResponse.json({ error: productsError.message }, { status: 500 })
 
-  const withSku = (products || []).filter(p => !!p.kaspi_master_sku)
-  let refreshed = 0
-  let failed = 0
+  const withSku = (products || [])
+    .filter((p): p is { id: string; kaspi_master_sku: string } => !!p.kaspi_master_sku)
+    .map(p => ({ trackedProductId: p.id, masterSku: p.kaspi_master_sku }))
 
-  for (let i = 0; i < withSku.length; i++) {
-    const product = withSku[i]
-    const fetchResult = await fetchProductReviews(product.kaspi_master_sku as string)
-    const fetchedAt = new Date().toISOString()
+  if (withSku.length === 0) {
+    return NextResponse.json({ error: 'Нет товаров с известным master SKU для проверки отзывов' }, { status: 400 })
+  }
 
-    if (fetchResult.ok) {
-      refreshed += 1
-      await supabase.from('kaspi_shop_product_reviews').upsert({
-        tracked_product_id: product.id,
-        reviews: fetchResult.page.reviews,
-        avg_rating: fetchResult.page.avgRating,
-        total_count: fetchResult.page.totalCount,
-        fetch_error: null,
-        fetched_at: fetchedAt,
-      }, { onConflict: 'tracked_product_id' })
-    } else {
-      failed += 1
-      console.error('kaspi-shop reviews refresh: fetch failed for product', product.id, '--', fetchResult.error)
-      // Keep whatever reviews are already cached (don't clobber good data
-      // with an empty list just because this refresh attempt failed) --
-      // only record the error and bump fetched_at so the UI can show a
-      // "last attempt failed" signal without losing the last successful
-      // snapshot.
-      await supabase.from('kaspi_shop_product_reviews').upsert({
-        tracked_product_id: product.id,
-        fetch_error: fetchResult.error,
-        fetched_at: fetchedAt,
-      }, { onConflict: 'tracked_product_id' })
+  const token = process.env.KASPI_SHOP_GITHUB_PAT
+  if (!token) {
+    console.error('kaspi-shop reviews: KASPI_SHOP_GITHUB_PAT is not configured')
+    return NextResponse.json({ error: 'Обновление отзывов временно недоступно' }, { status: 500 })
+  }
+
+  const dispatchRes = await fetch(
+    `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/workflows/${GITHUB_WORKFLOW}/dispatches`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/vnd.github+json',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ ref: 'main', inputs: { products: JSON.stringify(withSku) } }),
     }
-
-    if (i < withSku.length - 1) await sleep(REFRESH_DELAY_MS)
+  )
+  if (!dispatchRes.ok) {
+    console.error('kaspi-shop reviews: GitHub dispatch failed', dispatchRes.status, await dispatchRes.text().catch(() => ''))
+    return NextResponse.json({ error: 'Не удалось запустить обновление отзывов' }, { status: 500 })
   }
 
-  let aggregation
-  try {
-    aggregation = await loadAggregatedReviews(user.id)
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Не удалось загрузить отзывы' }, { status: 500 })
-  }
-
-  const stats = computeReviewStats(aggregation.aggregated.map(r => r.rating))
-  const reviews = aggregation.aggregated.sort((a, b) => (b.date || '').localeCompare(a.date || ''))
-  const lastFetchedAt = aggregation.fetchedAtValues.length > 0
-    ? aggregation.fetchedAtValues.reduce((max, v) => (v > max ? v : max))
-    : null
-
-  return NextResponse.json({
-    stats,
-    reviews,
-    lastFetchedAt,
-    productErrorCount: aggregation.errorCount,
-    refreshedCount: refreshed,
-    refreshFailedCount: failed,
-    skippedCount: (products || []).length - withSku.length,
-  })
+  return NextResponse.json({ ok: true, dispatchedCount: withSku.length, skippedCount: (products || []).length - withSku.length }, { status: 202 })
 }

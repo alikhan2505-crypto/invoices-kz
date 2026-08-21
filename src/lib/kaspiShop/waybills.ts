@@ -11,6 +11,17 @@ export async function fetchWaybillPdf(sessionCookies: string, orderCode: string)
   const res = await fetch(`https://mc.shop.kaspi.kz/mc/facade/orders/${encodeURIComponent(orderCode)}/waybill`, {
     headers: { 'x-auth-version': '3', 'cookie': sessionCookies, 'origin': 'https://kaspi.kz', 'referer': 'https://kaspi.kz/' },
   })
+  // TEMPORARY self-diagnosis (2026-08-22): this endpoint's shape was never
+  // observed live (see module header) -- log the real response so the next
+  // fix has real data instead of another guess, same pattern already used
+  // to fix offer-stocks' city parsing and the reviews endpoint. Remove once
+  // confirmed either way.
+  const contentType = res.headers.get('content-type') || ''
+  console.log(`kaspi-shop waybill DIAGNOSTIC: order=${orderCode} status=${res.status} content-type=${contentType}`)
+  if (!res.ok || !contentType.includes('pdf')) {
+    const preview = await res.clone().text().catch(() => '(binary/unreadable)')
+    console.log(`kaspi-shop waybill DIAGNOSTIC body preview: ${preview.slice(0, 1500)}`)
+  }
   if (!res.ok) throw new Error(`Waybill fetch failed for order ${orderCode}: HTTP ${res.status}`)
   const arrayBuffer = await res.arrayBuffer()
   return Buffer.from(arrayBuffer)

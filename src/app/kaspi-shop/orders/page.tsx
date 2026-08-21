@@ -7,7 +7,7 @@ import LoadingSpinner from '@/components/LoadingSpinner'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import SessionExpiredBanner from '@/components/kaspiShop/SessionExpiredBanner'
-import { ORDER_STATUS_TABS, TRANSFER_STATUS } from '@/lib/kaspiShop/orderStatuses'
+import { ORDER_STATUS_TABS, BULK_PRINTABLE_STATUSES } from '@/lib/kaspiShop/orderStatuses'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 const CARD_HOVER = 'transition-all duration-200 ease-out hover:-translate-y-1 hover:shadow-[var(--nav-card-glow)]'
@@ -200,7 +200,7 @@ function KaspiShopOrdersInner() {
           })}
         </div>
 
-        {status === TRANSFER_STATUS && selected.size > 0 && (
+        {BULK_PRINTABLE_STATUSES.includes(status) && selected.size > 0 && (
           <div className="rounded-2xl p-3 flex items-center justify-between gap-3 mb-4" style={{ background: 'var(--nav-accent)' }}>
             <span className="text-sm" style={{ color: 'var(--nav-accent-ink)' }}>Выбрано заказов: {selected.size}</span>
             <button onClick={printWaybills} disabled={printing}
@@ -222,7 +222,7 @@ function KaspiShopOrdersInner() {
           function renderCard(o: Order, i: number) {
             const firstItem = o.items[0]
             const extraCount = o.items.length - 1
-            const selectable = status === TRANSFER_STATUS
+            const selectable = BULK_PRINTABLE_STATUSES.includes(status)
             return (
               <motion.div key={o.code} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.25, ease: EASE, delay: Math.min(i * 0.02, 0.2) }}
