@@ -19,6 +19,35 @@ export async function finalizeConnection(userId: string, sessionCookies: string,
   const connection = await loadConnectionByMerchant(userId, merchantId)
   if (!connection) throw new Error('Подключение не удалось сохранить')
 
+  const imported = await importCatalogProducts(connection.id, userId, sessionCookies, merchantId)
+
+  // Best-effort seed of the city-name cache so the city picker on
+  // /kaspi-shop has real names to render right after connecting, instead
+  // of depending entirely on the lazy on-demand refresh in
+  // GET /api/kaspi-shop/settings/cities. There are no city chips to click
+  // until this cache has *something* in it (self-referential gap fixed as
+  // final-review finding C1) -- for a brand-new connection we already have
+  // valid session cookies right here, so there's no reason to wait.
+  // Independent try/catch from the catalog import above: a failure here
+  // must never affect catalog import or fail the connect itself.
+  try {
+    const cityNames = await fetchCityNames(sessionCookies, merchantId)
+    if (Object.keys(cityNames).length > 0) {
+      await supabase.from('kaspi_shop_connections').update({ city_lookup_cache: cityNames }).eq('id', connection.id)
+    }
+  } catch (err: any) {
+    console.error('kaspi-shop finalizeConnection: city name cache seed failed (non-fatal)', err.message)
+  }
+
+  return { importedProducts: imported }
+}
+
+// The catalog-import loop, shared by finalizeConnection (connect-time) and
+// the on-demand «Обновить каталог» sync (2026-08-21: a product restored to
+// sale AFTER connect-time import was otherwise invisible in Демпинг until a
+// full reconnect). Never throws -- the connection itself being valid is not
+// contingent on a clean import.
+export async function importCatalogProducts(connectionId: string, userId: string, sessionCookies: string, merchantId: string): Promise<number> {
   let imported = 0
   try {
     const offers = await listCatalog(sessionCookies, merchantId, true)
@@ -40,7 +69,7 @@ export async function finalizeConnection(userId: string, sessionCookies: string,
       const { data: existing, error: lookupError } = await supabase
         .from('kaspi_shop_tracked_products')
         .select('id')
-        .eq('connection_id', connection.id)
+        .eq('connection_id', connectionId)
         .eq('kaspi_master_sku', offer.masterSku)
         .maybeSingle()
       if (lookupError) {
@@ -71,7 +100,7 @@ export async function finalizeConnection(userId: string, sessionCookies: string,
       const { data: product, error: productError } = await supabase
         .from('kaspi_shop_tracked_products')
         .insert({
-          connection_id: connection.id,
+          connection_id: connectionId,
           user_id: userId,
           kaspi_sku: offer.sku,
           product_name: offer.title,
@@ -108,27 +137,9 @@ export async function finalizeConnection(userId: string, sessionCookies: string,
   } catch (err: any) {
     // The connection itself is already saved and valid -- a partial or
     // failed catalog import is a recoverable follow-up, not a reason to
-    // report the whole connect as failed.
-    console.error('kaspi-shop finalizeConnection: catalog import failed', err.message)
+    // report the whole import call as failed.
+    console.error('kaspi-shop importCatalogProducts: catalog import failed', err.message)
   }
 
-  // Best-effort seed of the city-name cache so the city picker on
-  // /kaspi-shop has real names to render right after connecting, instead
-  // of depending entirely on the lazy on-demand refresh in
-  // GET /api/kaspi-shop/settings/cities. There are no city chips to click
-  // until this cache has *something* in it (self-referential gap fixed as
-  // final-review finding C1) -- for a brand-new connection we already have
-  // valid session cookies right here, so there's no reason to wait.
-  // Independent try/catch from the catalog import above: a failure here
-  // must never affect catalog import or fail the connect itself.
-  try {
-    const cityNames = await fetchCityNames(sessionCookies, merchantId)
-    if (Object.keys(cityNames).length > 0) {
-      await supabase.from('kaspi_shop_connections').update({ city_lookup_cache: cityNames }).eq('id', connection.id)
-    }
-  } catch (err: any) {
-    console.error('kaspi-shop finalizeConnection: city name cache seed failed (non-fatal)', err.message)
-  }
-
-  return { importedProducts: imported }
+  return imported
 }

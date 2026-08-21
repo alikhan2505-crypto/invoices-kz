@@ -197,6 +197,7 @@ export default function KaspiShop() {
   const [stats, setStats] = useState<{ totalRules: number; activeCount: number; readyToApply: number; blockedAtFloor: number } | null>(null)
   const [applyingNow, setApplyingNow] = useState(false)
   const [applyNowMessage, setApplyNowMessage] = useState('')
+  const [syncingCatalog, setSyncingCatalog] = useState(false)
 
   const MAX_BULK_ITEMS = 100
   const [bulkOpen, setBulkOpen] = useState(false)
@@ -488,6 +489,25 @@ export default function KaspiShop() {
     setTimeout(() => { load(); setApplyingNow(false); setApplyNowMessage('') }, 35000)
   }
 
+  // On-demand catalog re-import -- same dedup-safe import as connect time,
+  // without a fresh phone/SMS login. Needed when a product is restored to
+  // sale (or added on Kaspi) after the connect-time import.
+  async function syncCatalog() {
+    if (syncingCatalog) return
+    setSyncingCatalog(true)
+    setApplyNowMessage('')
+    const headers = await authHeader()
+    const res = await fetch('/api/kaspi-shop/catalog/sync', { method: 'POST', headers })
+    const data = await res.json().catch(() => ({}))
+    setSyncingCatalog(false)
+    if (!res.ok) {
+      setApplyNowMessage(data.error || 'Не удалось обновить каталог')
+      return
+    }
+    setApplyNowMessage(`Каталог обновлён: ${data.imported} товар(ов)`)
+    load()
+  }
+
   function openBulkAdd() {
     setBulkOpen(true)
     setBulkStep('select')
@@ -718,6 +738,10 @@ export default function KaspiShop() {
             <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
               <div className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>Правила демпинга</div>
               <div className="flex items-center gap-2 flex-wrap">
+                <button onClick={syncCatalog} disabled={syncingCatalog}
+                  className="nav-glass text-xs font-semibold rounded-full px-4 py-2 transition-transform hover:-translate-y-0.5 disabled:opacity-60" style={{ color: 'var(--nav-text-secondary)' }}>
+                  {syncingCatalog ? 'Обновляем…' : 'Обновить каталог'}
+                </button>
                 <button onClick={openBulkAdd}
                   className="nav-glass text-xs font-semibold rounded-full px-4 py-2 transition-transform hover:-translate-y-0.5" style={{ color: 'var(--nav-accent)' }}>
                   Добавить несколько
