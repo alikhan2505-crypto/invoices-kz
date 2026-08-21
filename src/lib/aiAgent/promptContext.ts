@@ -83,3 +83,21 @@ export function buildBusinessContextLine(ctx: BusinessContext): string {
   }
   return line
 }
+
+// Maps an agent's raw collect_fields array (the same array
+// buildBusinessContextLine above flattens into prose) into the
+// {key,label}[] shape generateAiReply's collectFieldsToExtract param needs
+// to both ask the model for a structured extraction AND parse it back out
+// (instagramAiReply.ts's businessContextLine alone is just prose, with no
+// structured keys left in it to recover). Same preset-vs-custom rule as
+// buildBusinessContextLine: a preset key keeps its own key with the Russian
+// label; a custom (non-preset) field has no separate system key, so its own
+// text doubles as both key and label. Shared across all three tenant
+// pipelines (webhookHandler.ts and its Telegram/WhatsApp twins) since the
+// mapping itself is channel-agnostic -- only the pipeline skeletons around
+// it are deliberately kept parallel, not this pure helper.
+export function buildCollectFieldsToExtract(collectFields?: string[] | null): { key: string; label: string }[] {
+  return (collectFields || [])
+    .filter((f): f is string => typeof f === 'string' && f.trim().length > 0)
+    .map(f => ({ key: f, label: COLLECT_FIELD_LABELS[f] || f }))
+}

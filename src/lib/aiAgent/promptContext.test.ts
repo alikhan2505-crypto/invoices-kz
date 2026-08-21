@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildBusinessContextLine } from './promptContext'
+import { buildBusinessContextLine, buildCollectFieldsToExtract } from './promptContext'
 
 describe('buildBusinessContextLine', () => {
   it('includes the business name, description, tone label, and goal label', () => {
@@ -75,5 +75,30 @@ describe('buildBusinessContextLine', () => {
     expect(line).toContain('бизнес-аккаунта в WhatsApp')
     expect(line).not.toContain('Instagram')
     expect(line).not.toContain('Telegram')
+  })
+})
+
+describe('buildCollectFieldsToExtract', () => {
+  it('maps preset keys to their own key plus the Russian label', () => {
+    expect(buildCollectFieldsToExtract(['name', 'budget'])).toEqual([
+      { key: 'name', label: 'имя клиента' },
+      { key: 'budget', label: 'бюджет' },
+    ])
+  })
+
+  it('uses a custom (non-preset) field\'s own text as both key and label', () => {
+    expect(buildCollectFieldsToExtract(['Любимый цвет'])).toEqual([
+      { key: 'Любимый цвет', label: 'Любимый цвет' },
+    ])
+  })
+
+  it('returns an empty array for undefined, null, or an empty list', () => {
+    expect(buildCollectFieldsToExtract(undefined)).toEqual([])
+    expect(buildCollectFieldsToExtract(null)).toEqual([])
+    expect(buildCollectFieldsToExtract([])).toEqual([])
+  })
+
+  it('drops blank entries', () => {
+    expect(buildCollectFieldsToExtract(['name', '  ', ''])).toEqual([{ key: 'name', label: 'имя клиента' }])
   })
 })

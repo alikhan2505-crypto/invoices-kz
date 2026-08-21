@@ -27,9 +27,26 @@ type Broadcast = {
 type SendResult = { recipientsTotal: number; sentCount: number; failedCount: number }
 // compose -> confirm (inline swap, not a browser confirm) -> sending -> done
 type ModalStage = 'compose' | 'confirm' | 'sending' | 'done'
+type BroadcastChannel = 'telegram' | 'whatsapp'
 
 function hasActiveTelegram(agent: Agent): boolean {
   return agent.connections.some(c => c.channel === 'telegram' && c.status === 'active')
+}
+
+function hasActiveWhatsApp(agent: Agent): boolean {
+  return agent.connections.some(c => c.channel === 'whatsapp' && c.status === 'active')
+}
+
+// Channels this agent can broadcast on, in a stable preferred order --
+// used both to disable agents with neither channel connected and to decide
+// whether the compose modal needs a channel picker (only when there's more
+// than one).
+function availableChannels(agent: Agent | undefined): BroadcastChannel[] {
+  if (!agent) return []
+  const chans: BroadcastChannel[] = []
+  if (hasActiveTelegram(agent)) chans.push('telegram')
+  if (hasActiveWhatsApp(agent)) chans.push('whatsapp')
+  return chans
 }
 
 function formatDate(iso: string): string {
@@ -44,8 +61,32 @@ function MegaphoneIcon() {
   )
 }
 
-function TelegramDot({ ok }: { ok: boolean }) {
+function StatusDot({ ok }: { ok: boolean }) {
   return <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: ok ? 'var(--nav-teal)' : 'var(--nav-text-muted)' }} />
+}
+
+// Same inline-per-file icon convention as ai-agent/review/page.tsx and
+// ai-agent/settings/page.tsx (this codebase duplicates small icon
+// components per-file rather than importing them cross-file).
+function TelegramIcon() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+      <path d="M22 2 11 13" />
+      <path d="M22 2 15 22l-4-9-9-4z" />
+    </svg>
+  )
+}
+
+function WhatsAppIcon() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+    </svg>
+  )
+}
+
+function ChannelBadge({ channel }: { channel: string }) {
+  return channel === 'whatsapp' ? <WhatsAppIcon /> : <TelegramIcon />
 }
 
 export default function AiAgentBroadcasts() {
@@ -60,6 +101,7 @@ export default function AiAgentBroadcasts() {
   const [modalOpen, setModalOpen] = useState(false)
   const [stage, setStage] = useState<ModalStage>('compose')
   const [selectedAgentId, setSelectedAgentId] = useState<string>('')
+  const [channel, setChannel] = useState<BroadcastChannel>('telegram')
   const [message, setMessage] = useState('')
   const [recipientCount, setRecipientCount] = useState<number | null>(null)
   const [sendResult, setSendResult] = useState<SendResult | null>(null)
@@ -102,13 +144,16 @@ export default function AiAgentBroadcasts() {
     load()
   }, [router, authHeaders, loadBroadcasts])
 
-  const telegramAgents = agents.filter(hasActiveTelegram)
+  // An agent is selectable for broadcasts once it has AT LEAST ONE
+  // broadcastable channel connected (Telegram, WhatsApp, or both) -- which
+  // specific channel gets used is chosen per-broadcast below.
+  const broadcastableAgents = agents.filter(a => hasActiveTelegram(a) || hasActiveWhatsApp(a))
 
-  const loadPreview = useCallback(async (agentId: string) => {
+  const loadPreview = useCallback(async (agentId: string, ch: BroadcastChannel) => {
     setRecipientCount(null)
     if (!agentId) return
     const headers = await authHeaders()
-    const res = await fetch(`/api/ai-agent/broadcasts?agentId=${encodeURIComponent(agentId)}&preview=1`, { headers })
+    const res = await fetch(`/api/ai-agent/broadcasts?agentId=${encodeURIComponent(agentId)}&preview=1&channel=${ch}`, { headers })
     if (res.ok) {
       const payload = await res.json()
       setRecipientCount(typeof payload.recipients === 'number' ? payload.recipients : 0)
@@ -118,20 +163,28 @@ export default function AiAgentBroadcasts() {
   }, [authHeaders])
 
   function openModal() {
-    const first = telegramAgents[0]
+    const first = broadcastableAgents[0]
     setSelectedAgentId(first?.id || '')
     setMessage('')
     setStage('compose')
     setSendResult(null)
     setSendError(null)
     setModalOpen(true)
-    if (first) loadPreview(first.id)
-    else setRecipientCount(null)
+    if (first) {
+      // Both channels active -> default to Telegram and let the picker
+      // switch; only one active -> use it silently, no picker shown.
+      const initialChannel = availableChannels(first)[0] || 'telegram'
+      setChannel(initialChannel)
+      loadPreview(first.id, initialChannel)
+    } else {
+      setChannel('telegram')
+      setRecipientCount(null)
+    }
   }
 
   function closeModal() {
-    // Don't allow dismissing mid-send -- the POST is doing the actual
-    // Telegram sends and the summary is worth seeing.
+    // Don't allow dismissing mid-send -- the POST is doing the actual sends
+    // and the summary is worth seeing.
     if (stage === 'sending') return
     setModalOpen(false)
     if (stage === 'done') loadBroadcasts()
@@ -141,7 +194,16 @@ export default function AiAgentBroadcasts() {
     setSelectedAgentId(id)
     setStage('compose')
     setSendError(null)
-    loadPreview(id)
+    const nextChannel = availableChannels(agents.find(a => a.id === id))[0] || 'telegram'
+    setChannel(nextChannel)
+    loadPreview(id, nextChannel)
+  }
+
+  function changeChannel(c: BroadcastChannel) {
+    setChannel(c)
+    setStage('compose')
+    setSendError(null)
+    loadPreview(selectedAgentId, c)
   }
 
   async function sendBroadcast() {
@@ -152,12 +214,16 @@ export default function AiAgentBroadcasts() {
       const res = await fetch('/api/ai-agent/broadcasts', {
         method: 'POST',
         headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ agentId: selectedAgentId, message: message.trim() }),
+        body: JSON.stringify({ agentId: selectedAgentId, message: message.trim(), channel }),
       })
       const payload = await res.json().catch(() => null)
       if (!res.ok) {
-        if (payload?.error === 'no_recipients') setSendError('Вашему боту ещё никто не писал — рассылать пока некому.')
+        // no_recipients' server-side `detail` is already channel-aware
+        // (explains the WhatsApp 24h window honestly rather than implying
+        // nobody ever wrote in), so surface it directly.
+        if (payload?.error === 'no_recipients') setSendError(payload?.detail || 'Рассылать пока некому.')
         else if (payload?.error === 'telegram_not_connected') setSendError('У этого агента нет активного Telegram-бота.')
+        else if (payload?.error === 'whatsapp_not_connected') setSendError('У этого агента нет активного WhatsApp-номера.')
         else setSendError('Не удалось отправить рассылку. Попробуйте ещё раз.')
         setStage('compose')
         return
@@ -203,7 +269,7 @@ export default function AiAgentBroadcasts() {
         >
           <div>
             <h1 className="text-xl font-bold mb-1" style={{ color: 'var(--nav-text-primary)' }}>Рассылки</h1>
-            <p className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>Сообщение всем клиентам, которые писали вашему Telegram-боту</p>
+            <p className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>Сообщение всем клиентам, которые писали вашему агенту в Telegram или WhatsApp</p>
           </div>
           <button
             onClick={openModal}
@@ -228,14 +294,14 @@ export default function AiAgentBroadcasts() {
               Вы ещё не создали ни одной рассылки
             </div>
             <p className="text-xs mb-4 max-w-sm mx-auto" style={{ color: 'var(--nav-text-secondary)' }}>
-              Рассылки работают через канал Telegram-бот — сначала{' '}
+              Рассылки работают через подключённые каналы — сначала{' '}
               <Link href="/ai-agent/settings?tab=channels" className="font-semibold underline underline-offset-2" style={{ color: 'var(--nav-accent)' }}>
-                подключите бота
+                подключите Telegram-бота или WhatsApp
               </Link>
-              {' '}к вашему агенту. Получатели — все, кто уже писал боту.
+              {' '}к вашему агенту. Получатели — те, кто уже писал в этот канал.
             </p>
             <p className="text-[11px] max-w-sm mx-auto" style={{ color: 'var(--nav-text-muted)' }}>
-              Рассылки по WhatsApp появятся после подключения WhatsApp Business API.
+              Для WhatsApp это только клиенты, писавшие за последние 24 часа — таковы правила Meta.
             </p>
           </motion.div>
         ) : (
@@ -250,9 +316,11 @@ export default function AiAgentBroadcasts() {
               >
                 <div className="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
                   <div className="flex items-center gap-2 text-[11.5px] font-bold" style={{ color: 'var(--nav-text-secondary)' }}>
-                    <TelegramDot ok={b.failedCount === 0} />
+                    <StatusDot ok={b.failedCount === 0} />
                     {b.agentName}
-                    <span className="font-medium" style={{ color: 'var(--nav-text-muted)' }}>· Telegram</span>
+                    <span className="inline-flex items-center gap-1 font-medium" style={{ color: 'var(--nav-text-muted)' }}>
+                      · <ChannelBadge channel={b.channel} /> {b.channel === 'whatsapp' ? 'WhatsApp' : 'Telegram'}
+                    </span>
                   </div>
                   <div className="text-[11px]" style={{ color: 'var(--nav-text-muted)' }}>{formatDate(b.createdAt)}</div>
                 </div>
@@ -328,15 +396,36 @@ export default function AiAgentBroadcasts() {
                     >
                       {agents.length === 0 && <option value="">Нет агентов</option>}
                       {agents.map(a => {
-                        const ok = hasActiveTelegram(a)
+                        const ok = hasActiveTelegram(a) || hasActiveWhatsApp(a)
                         return (
                           <option key={a.id} value={a.id} disabled={!ok}>
-                            {a.name}{ok ? '' : ' — нужен Telegram-бот'}
+                            {a.name}{ok ? '' : ' — нужен канал (Telegram или WhatsApp)'}
                           </option>
                         )
                       })}
                     </select>
                   </label>
+
+                  {selectedAgentId && availableChannels(agents.find(a => a.id === selectedAgentId)).length > 1 && (
+                    <div className="flex gap-2 mb-3">
+                      {(['telegram', 'whatsapp'] as const).map(c => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => changeChannel(c)}
+                          disabled={stage === 'sending'}
+                          className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors disabled:opacity-50"
+                          style={{
+                            background: channel === c ? 'var(--nav-accent)' : 'var(--nav-bg)',
+                            color: channel === c ? 'var(--nav-accent-ink)' : 'var(--nav-text-secondary)',
+                          }}
+                        >
+                          <ChannelBadge channel={c} />
+                          {c === 'telegram' ? 'Telegram' : 'WhatsApp'}
+                        </button>
+                      ))}
+                    </div>
+                  )}
 
                   <label className="block mb-2">
                     <span className="text-xs mb-1 block font-medium" style={{ color: 'var(--nav-text-secondary)' }}>Сообщение</span>
@@ -351,15 +440,22 @@ export default function AiAgentBroadcasts() {
                       style={{ color: 'var(--nav-text-primary)', background: 'transparent' }}
                     />
                   </label>
-                  <div className="flex items-center justify-between mb-4 text-[11px]" style={{ color: 'var(--nav-text-muted)' }}>
-                    <span>
-                      {selectedAgentId
-                        ? recipientCount === null
-                          ? 'Считаем получателей…'
-                          : `Получателей: ${recipientCount}`
-                        : 'Выберите агента с Telegram-ботом'}
-                    </span>
-                    <span>{message.length}/{MAX_MESSAGE_LEN}</span>
+                  <div className="mb-4">
+                    <div className="flex items-center justify-between text-[11px]" style={{ color: 'var(--nav-text-muted)' }}>
+                      <span>
+                        {selectedAgentId
+                          ? recipientCount === null
+                            ? 'Считаем получателей…'
+                            : `Получателей: ${recipientCount}`
+                          : 'Выберите агента с подключённым каналом'}
+                      </span>
+                      <span>{message.length}/{MAX_MESSAGE_LEN}</span>
+                    </div>
+                    {selectedAgentId && channel === 'whatsapp' && (
+                      <p className="text-[11px] mt-1" style={{ color: 'var(--nav-text-muted)' }}>
+                        Только клиенты, которые писали за последние 24 часа (правило WhatsApp).
+                      </p>
+                    )}
                   </div>
 
                   {sendError && (

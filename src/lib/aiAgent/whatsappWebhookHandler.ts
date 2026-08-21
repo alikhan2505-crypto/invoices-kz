@@ -2,11 +2,11 @@ import { createClient } from '@supabase/supabase-js'
 import { decryptAtRest } from '@/lib/kaspiPay/crypto'
 import { getKey } from './connection'
 import { generateAiReply } from '@/lib/instagramAiReply'
-import { buildBusinessContextLine, AgentTone, AgentGoal } from './promptContext'
+import { buildBusinessContextLine, buildCollectFieldsToExtract, AgentTone, AgentGoal } from './promptContext'
 import { debitAiAgentWallet, AI_AGENT_CREDITS_PER_AI_REPLY } from './wallet'
 import { sendTelegramNotification } from '@/lib/telegramNotify'
 import { createNotification } from '@/lib/notifications'
-import { findTemplateMatch } from './webhookHandler'
+import { findTemplateMatch, mergeCollectedData } from './webhookHandler'
 import { pairConversationHistory } from './telegram'
 import { sendWhatsAppMessage, WhatsAppApiError } from '@/lib/whatsapp'
 
@@ -170,6 +170,7 @@ export async function handleWhatsAppIncoming(conn: WhatsAppTenantConnection, par
   // distinguishes (private, fuller answers allowed, history applies).
   let draftReply: string
   let urgent: boolean
+  let extractedFields: Record<string, string> | undefined
   try {
     const result = await generateAiReply({
       incomingText: params.incomingText,
@@ -187,12 +188,22 @@ export async function handleWhatsAppIncoming(conn: WhatsAppTenantConnection, par
         customInstructions: typeof agent.custom_instructions === 'string' ? agent.custom_instructions : undefined,
         channel: 'whatsapp',
       }),
+      collectFieldsToExtract: buildCollectFieldsToExtract(Array.isArray(agent.collect_fields) ? agent.collect_fields : undefined),
     })
     draftReply = result.replyText
     urgent = result.urgent
+    extractedFields = result.extractedFields
   } catch (err: any) {
     console.error('ai-agent whatsapp webhook: AI reply generation failed for', params.externalId, ':', err.message)
     return
+  }
+
+  // Persist whatever the model could confidently read off this turn (and
+  // prior turns) into collected_data -- unconditional on training vs active
+  // mode below, same rule as the Instagram tenant path (webhookHandler.ts).
+  // Best-effort: a merge failure must never block the reply handling below.
+  if (extractedFields && Object.keys(extractedFields).length > 0) {
+    await mergeCollectedData(conversation.id, extractedFields)
   }
 
   // Training mode mirrors the Telegram/Instagram paths exactly: the draft

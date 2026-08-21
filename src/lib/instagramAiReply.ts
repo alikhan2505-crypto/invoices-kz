@@ -15,11 +15,23 @@ export async function generateAiReply(params: {
   // isn't a continuous conversation the same way.
   conversationHistory?: { incoming: string; reply: string }[]
   businessContextLine: string
-}): Promise<{ replyText: string; urgent: boolean }> {
+  // Structured collect-field keys the multi-tenant tenant pipelines
+  // (webhookHandler.ts and its Telegram/WhatsApp twins) pass when the
+  // agent has ai_agents.collect_fields configured -- businessContextLine
+  // is just the flattened prose line the model reads, this is the
+  // structured {key,label} list needed to ask for AND parse a structured
+  // extraction back out in the SAME response (no second billable call).
+  // Absent or empty: the extraction instruction/format line is omitted
+  // entirely, so callers that don't opt in (the single-tenant invoices.kz
+  // Instagram bot, any test) get byte-for-byte the same prompt and cost as
+  // before this feature existed.
+  collectFieldsToExtract?: { key: string; label: string }[]
+}): Promise<{ replyText: string; urgent: boolean; extractedFields?: Record<string, string> }> {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured')
 
   const client = new Anthropic({ apiKey })
+  const hasExtraction = !!params.collectFieldsToExtract && params.collectFieldsToExtract.length > 0
 
   const contextLine = params.source === 'comment'
     ? (params.postCaption
@@ -40,22 +52,38 @@ export async function generateAiReply(params: {
     ? 'Это ПУБЛИЧНЫЙ комментарий под постом, его увидят все читающие пост. Ответь МАКСИМАЛЬНО коротко — одно короткое предложение, не длиннее ~12 слов. Не объясняй детали (цены, сроки, настройку) в комментарии — вместо этого вежливо предложи написать в личные сообщения (директ) для подробностей.'
     : 'Это личное сообщение — можно ответить чуть подробнее (2-3 предложения), но не растягивай текст.'
 
+  // Only built when the caller opted in (hasExtraction) -- an empty string
+  // otherwise, so it interpolates into the prompt as nothing and the
+  // request is byte-for-byte identical to before this feature existed.
+  const extractionAskLine = hasExtraction
+    ? `\n\nТакже постарайся извлечь данные клиента, которые нужно собрать: ${params.collectFieldsToExtract!.map(f => `${f.label} (ключ "${f.key}")`).join(', ')}. Включай поле в извлечение ТОЛЬКО если клиент явно и дословно (или почти дословно) сам назвал его значение -- в этом сообщении или раньше в этом же диалоге. Никогда не угадывай, не придумывай и не бери значение из своего собственного ответа -- источником может быть только то, что написал клиент. Если клиент не называл поле, не включай его вовсе.`
+    : ''
+  const extractedFormatLine = hasExtraction
+    ? `\n<<<EXTRACTED>>>{"ключ":"значение"}<<<END>>> -- JSON с извлечёнными полями по правилам выше (пустой объект {}, если клиент пока ничего из списка не сообщил)`
+    : ''
+
   const message = await client.messages.create({
     model: 'claude-haiku-4-5-20251001',
-    max_tokens: 300,
+    // max_tokens is a ceiling, not a cost -- billing is by tokens actually
+    // generated, so raising it here only when extraction is requested costs
+    // nothing extra for a normal-length reply. It exists so a reply near the
+    // old 300-token cap plus a multi-field <<<EXTRACTED>>> JSON block can't
+    // get cut off before its closing <<<END>>> delimiter, which would make
+    // parseExtractedFieldsBlock silently find no match at all.
+    max_tokens: hasExtraction ? 500 : 300,
     messages: [{
       role: 'user',
       content: `${params.businessContextLine} ${contextLine}${historyBlock}
 
 Пользователь ${params.fromUsername} написал: "${params.incomingText}"
 
-${lengthInstruction} Ответь на ТОМ ЖЕ ЯЗЫКЕ, на котором написал пользователь (например, казахский → отвечай на казахском, английский → на английском, русский → на русском). Пиши вежливо и дружелюбно. Не придумывай факты о ценах, сроках или функциях, которых ты не знаешь — в таком случае вежливо предложи написать в директ для уточнения деталей.
+${lengthInstruction} Ответь на ТОМ ЖЕ ЯЗЫКЕ, на котором написал пользователь (например, казахский → отвечай на казахском, английский → на английском, русский → на русском). Пиши вежливо и дружелюбно. Не придумывай факты о ценах, сроках или функциях, которых ты не знаешь — в таком случае вежливо предложи написать в директ для уточнения деталей.${extractionAskLine}
 
 Также оцени: сигнализирует ли сообщение о срочности или негативе (явно злой/раздражённый тон, жалоба, угроза уйти/оставить плохой отзыв, требование вернуть деньги, срочная просьба связаться с человеком) — обычный вопрос про цены/функции НЕ считается срочным.
 
 Верни ответ СТРОГО в этом формате, ничего больше:
 URGENT: yes ИЛИ no
-REPLY: текст ответа без кавычек и пояснений`,
+REPLY: текст ответа без кавычек и пояснений${extractedFormatLine}`,
     }],
   })
 
@@ -63,7 +91,11 @@ REPLY: текст ответа без кавычек и пояснений`,
   if (!textBlock || textBlock.type !== 'text') {
     throw new Error('AI reply generation returned no text')
   }
-  return parseUrgentReply(textBlock.text.trim())
+  const parsed = parseUrgentReply(textBlock.text.trim())
+  if (!hasExtraction) return parsed
+
+  const { cleanText, extractedFields } = parseExtractedFieldsBlock(parsed.replyText)
+  return { replyText: cleanText, urgent: parsed.urgent, extractedFields }
 }
 
 // Tolerant of the model not matching the requested format exactly -- if no
@@ -78,6 +110,37 @@ function parseUrgentReply(text: string): { replyText: string; urgent: boolean } 
   return {
     replyText: replyMatch[1].trim(),
     urgent: urgentMatch?.[1].toLowerCase() === 'yes',
+  }
+}
+
+// Parses out the <<<EXTRACTED>>>{...}<<<END>>> delimiter block
+// generateAiReply asks the model to append after REPLY: when
+// collectFieldsToExtract is non-empty (see extractedFormatLine above).
+// Defensive by design: a missing block, malformed JSON, or a non-object/
+// array payload all resolve to "no extraction" rather than throwing -- a
+// parsing hiccup must never break the reply itself (same tolerant spirit as
+// parseUrgentReply above). The delimited block is always stripped out of
+// cleanText when found, even on a parse failure, so the customer never sees
+// raw JSON in their reply either way. Exported for its own colocated test
+// (this module's network-calling exports stay untested, per this file's
+// documented convention -- see the top-of-file comment -- but this is pure
+// logic, the same exception parseStartToken gets in telegramNotify.ts).
+export function parseExtractedFieldsBlock(text: string): { cleanText: string; extractedFields?: Record<string, string> } {
+  const match = text.match(/<<<EXTRACTED>>>([\s\S]*?)<<<END>>>/)
+  if (!match) return { cleanText: text }
+  const cleanText = (text.slice(0, match.index) + text.slice(match.index! + match[0].length)).trim()
+
+  try {
+    const parsed = JSON.parse(match[1].trim())
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return { cleanText }
+    const extractedFields: Record<string, string> = {}
+    for (const [key, value] of Object.entries(parsed)) {
+      if (typeof value === 'string' && value.trim()) extractedFields[key] = value.trim()
+      else if (typeof value === 'number' || typeof value === 'boolean') extractedFields[key] = String(value)
+    }
+    return Object.keys(extractedFields).length > 0 ? { cleanText, extractedFields } : { cleanText }
+  } catch {
+    return { cleanText }
   }
 }
 

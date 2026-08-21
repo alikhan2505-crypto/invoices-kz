@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
+import TestChatPanel from '@/components/aiAgent/TestChatPanel'
 // promptContext is a pure, dependency-free module (no server-only imports,
 // no env access) -- safe to bundle client-side, so the Промптинг preview
 // shows the REAL assembled context line, not a hand-maintained copy.
@@ -177,6 +178,25 @@ function ApiIcon() {
   )
 }
 
+// Same chat-bubble glyph as the «Чат для сайта» channel card (SiteChatIcon
+// above) -- reused here for the persistent test-chat trigger and the
+// slide-over panel's header, at a size tuned for those spots.
+function TestChatBubbleIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  )
+}
+
+function CloseIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 6 6 18M6 6l12 12" />
+    </svg>
+  )
+}
+
 function StatusChip({ kind, label }: { kind: 'ok' | 'off' | 'soon' | 'warn'; label: string }) {
   const color = kind === 'ok' ? 'var(--nav-success)' : kind === 'warn' ? 'var(--nav-critical)' : 'var(--nav-text-muted)'
   return (
@@ -290,6 +310,12 @@ export default function AiAgentSettings() {
   const [oauthNotice, setOauthNotice] = useState<'connected' | 'error' | null>(null)
   const [forbidden, setForbidden] = useState(false)
   const [pendingCount, setPendingCount] = useState(0)
+  // Slide-over test chat (MoonAI-style persistent shortcut) -- visible
+  // across all five tabs, so it lives in page-level state rather than any
+  // single tab's block. Only openable once the agent has a real id (see
+  // openTestChat below) -- a brand-new ?new=1 agent isn't in the DB yet,
+  // and the API route this hits does an ownership lookup by id.
+  const [testChatOpen, setTestChatOpen] = useState(false)
   // Шаблоны tab state
   const [templates, setTemplates] = useState<ReplyTemplate[]>([])
   const [tplFormOpen, setTplFormOpen] = useState(false)
@@ -315,6 +341,15 @@ export default function AiAgentSettings() {
     else params.set('tab', next)
     const qs = params.toString()
     window.history.replaceState({}, '', qs ? `${window.location.pathname}?${qs}` : window.location.pathname)
+  }
+
+  // Guarded open -- the trigger button is already disabled without an
+  // agentId, but this is the actual gate: a brand-new unsaved agent (no id
+  // yet) must never open the panel, since TestChatPanel's API call needs a
+  // real agentId to look up.
+  function openTestChat() {
+    if (!agentId) return
+    setTestChatOpen(true)
   }
 
   // Loads Meta's JS SDK once (guarded against double-init across
@@ -876,16 +911,32 @@ export default function AiAgentSettings() {
       <SiteNav />
       <div className="max-w-2xl mx-auto p-4 lg:p-6 pb-24 lg:pb-6">
         <motion.div
+          className="flex items-start justify-between gap-3 flex-wrap"
           initial={reduceMotion ? false : { opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE }}
         >
-          <Link href="/ai-agent" className="inline-flex items-center gap-1 text-xs mb-2 transition-colors hover:text-[color:var(--nav-text-secondary)]" style={{ color: 'var(--nav-text-muted)' }}>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M11 18l-6-6 6-6" /></svg>
-            Все агенты
-          </Link>
-          <h1 className="text-xl font-bold mb-1" style={{ color: 'var(--nav-text-primary)' }}>AI-агент</h1>
-          <p className="text-sm mb-5" style={{ color: 'var(--nav-text-secondary)' }}>Настройте ассистента, который отвечает вашим клиентам в Instagram и Telegram</p>
+          <div>
+            <Link href="/ai-agent" className="inline-flex items-center gap-1 text-xs mb-2 transition-colors hover:text-[color:var(--nav-text-secondary)]" style={{ color: 'var(--nav-text-muted)' }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M11 18l-6-6 6-6" /></svg>
+              Все агенты
+            </Link>
+            <h1 className="text-xl font-bold mb-1" style={{ color: 'var(--nav-text-primary)' }}>AI-агент</h1>
+            <p className="text-sm mb-5" style={{ color: 'var(--nav-text-secondary)' }}>Настройте ассистента, который отвечает вашим клиентам в Instagram и Telegram</p>
+          </div>
+          {/* Persistent across all five tabs (MoonAI-style shortcut) --
+              disabled with a tooltip until the agent has a real id: a
+              ?new=1 agent isn't in the DB yet, so there's nothing for the
+              test-chat API to look up. */}
+          <button
+            onClick={openTestChat}
+            disabled={!agentId}
+            title={agentId ? undefined : 'Сохраните агента, чтобы протестировать'}
+            className="flex items-center gap-1.5 nav-glass rounded-lg px-3 py-2 text-sm font-medium flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed transition-colors hover:bg-[color:var(--nav-bg)]"
+            style={{ color: 'var(--nav-text-primary)' }}
+          >
+            <TestChatBubbleIcon /> Тестовый чат
+          </button>
         </motion.div>
 
         {oauthNotice === 'connected' && (
@@ -1429,6 +1480,57 @@ export default function AiAgentSettings() {
           </motion.div>
         )}
       </div>
+
+      {/* Slide-over test chat -- MoonAI-style persistent shortcut so the
+          founder can try a reply without leaving settings. Backdrop click
+          closes it; the panel itself stops that click from bubbling.
+          Scoped to whichever agent is currently being edited -- agentId is
+          re-read from page state, not re-derived. Guarded again here (not
+          just at the trigger button) so a stale open state can never
+          render TestChatPanel without a real id. */}
+      <AnimatePresence>
+        {testChatOpen && agentId && (
+          <motion.div
+            className="fixed inset-0 z-50 bg-black/30"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0, transition: { duration: 0.2, ease: EASE } }}
+            onClick={() => setTestChatOpen(false)}
+          >
+            <motion.div
+              className="nav-glass fixed right-0 top-0 bottom-0 w-full max-w-md flex flex-col"
+              initial={reduceMotion ? false : { x: '100%' }}
+              animate={{ x: 0 }}
+              exit={reduceMotion ? { opacity: 0 } : { x: '100%', transition: { duration: 0.28, ease: EASE } }}
+              transition={{ duration: reduceMotion ? 0 : 0.32, ease: EASE }}
+              onClick={e => e.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Тестовый чат"
+            >
+              <div className="flex items-center justify-between gap-3 px-4 lg:px-5 py-4 border-b border-[color:var(--nav-border)] flex-shrink-0">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'var(--nav-bg)', color: 'var(--nav-accent)' }}>
+                    <TestChatBubbleIcon size={16} />
+                  </span>
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold truncate" style={{ color: 'var(--nav-text-primary)' }}>Тестовый чат</div>
+                    <div className="text-[11px] truncate" style={{ color: 'var(--nav-text-muted)' }}>{name.trim() || 'Ваш агент'}</div>
+                  </div>
+                </div>
+                <button onClick={() => setTestChatOpen(false)} aria-label="Закрыть"
+                  className="p-1.5 rounded-lg flex-shrink-0 transition-colors hover:bg-[color:var(--nav-bg)]"
+                  style={{ color: 'var(--nav-text-muted)' }}>
+                  <CloseIcon />
+                </button>
+              </div>
+              <div className="flex-1 min-h-0 flex flex-col p-3 lg:p-4">
+                <TestChatPanel agentId={agentId} fill />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* First-creation overlay: the "magic" moment. A rotating gradient
           ring (SVG dashoffset spinner, same hand-rolled style as the app's

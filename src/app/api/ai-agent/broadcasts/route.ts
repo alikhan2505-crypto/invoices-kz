@@ -3,6 +3,9 @@ import { createClient } from '@supabase/supabase-js'
 import { decryptAtRest } from '@/lib/kaspiPay/crypto'
 import { getKey } from '@/lib/aiAgent/connection'
 import { sendTelegramBotMessage } from '@/lib/aiAgent/telegram'
+import { sendWhatsAppMessage } from '@/lib/whatsapp'
+
+type BroadcastChannel = 'telegram' | 'whatsapp'
 
 // Broadcasts run the send loop inside the request (sequential, ~50ms gap),
 // so a full 500-recipient batch takes ~2 minutes -- raise the Vercel
@@ -46,22 +49,65 @@ const MAX_RECIPIENTS = 500
 // (~20/sec) stays safely under that without a token-bucket.
 const SEND_DELAY_MS = 50
 
-// Recipient set = DISTINCT external_thread_id of the agent's telegram
-// conversations (ai_agent_conversations.external_thread_id is the Telegram
-// chat.id -- see telegramWebhookHandler.ts). These are exactly the people
-// who have already written to the bot, which is also exactly the LEGAL
-// recipient set: Telegram only lets a bot message users who started a chat
-// with it, so there is no way (and no need) to broadcast beyond this list.
-async function collectRecipients(agentId: string): Promise<string[]> {
+// Recipient set = DISTINCT external_thread_id of the agent's conversations on
+// the given channel (ai_agent_conversations.external_thread_id is the
+// Telegram chat.id or the WhatsApp wa_id -- see telegramWebhookHandler.ts /
+// whatsappWebhookHandler.ts). These are exactly the people who have already
+// written in, which for Telegram is also exactly the LEGAL recipient set:
+// Telegram only lets a bot message users who started a chat with it, so
+// there is no way (and no need) to broadcast beyond this list.
+//
+// WhatsApp has a STRICTER rule on top of that: Meta's Cloud API only allows
+// a business to send a free-form (non-template) message within 24h of the
+// customer's own most recent INBOUND message ("customer service window").
+// Outside that window sending requires an approved message template, and
+// this app has no programmatic template-send flow (templates are only ever
+// created manually in Meta's WhatsApp Manager) -- so any WhatsApp
+// conversation whose last inbound message is stale (or has none) must be
+// excluded here, not just rejected at send time.
+async function collectRecipients(agentId: string, channel: BroadcastChannel): Promise<string[]> {
   const { data } = await supabase
     .from('ai_agent_conversations')
-    .select('external_thread_id')
+    .select('id, external_thread_id')
     .eq('agent_id', agentId)
-    .eq('channel', 'telegram')
+    .eq('channel', channel)
     .order('created_at', { ascending: true })
+  const conversations = data || []
+
+  let withinWindow: Set<string> | null = null
+  if (channel === 'whatsapp') {
+    withinWindow = new Set<string>()
+    const conversationIds = conversations.map(c => c.id).filter(Boolean)
+    if (conversationIds.length > 0) {
+      // ONE query for all of this agent's WhatsApp conversations (not one
+      // per recipient): pull every inbound message's (conversation_id,
+      // created_at), newest first, then keep only the first (= newest) row
+      // seen per conversation_id in JS below. That's equivalent to
+      // `GROUP BY conversation_id HAVING MAX(created_at)` without needing a
+      // Postgres function/view (migrations are out of scope here).
+      const { data: inbound } = await supabase
+        .from('ai_agent_messages')
+        .select('conversation_id, created_at')
+        .in('conversation_id', conversationIds)
+        .eq('direction', 'inbound')
+        .order('created_at', { ascending: false })
+      const cutoffMs = Date.now() - 24 * 60 * 60 * 1000
+      const latestSeen = new Set<string>()
+      for (const row of inbound || []) {
+        if (latestSeen.has(row.conversation_id)) continue
+        latestSeen.add(row.conversation_id)
+        if (new Date(row.created_at).getTime() >= cutoffMs) {
+          withinWindow.add(row.conversation_id)
+        }
+      }
+    }
+  }
+
   const seen = new Set<string>()
-  for (const row of data || []) {
-    if (row.external_thread_id) seen.add(row.external_thread_id)
+  for (const row of conversations) {
+    if (!row.external_thread_id) continue
+    if (withinWindow && !withinWindow.has(row.id)) continue
+    seen.add(row.external_thread_id)
   }
   return Array.from(seen).slice(0, MAX_RECIPIENTS)
 }
@@ -71,14 +117,16 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!(await isAdmin(user.id))) return NextResponse.json({ error: 'admin_only' }, { status: 403 })
 
-  // ?agentId=…&preview=1 -- recipient-count preview for the compose modal
-  // ("Отправить N получателям?") without creating a broadcast row.
+  // ?agentId=…&preview=1&channel=… -- recipient-count preview for the
+  // compose modal ("Отправить N получателям?") without creating a broadcast
+  // row. channel defaults to 'telegram' for backward compatibility.
   const agentId = req.nextUrl.searchParams.get('agentId')
   const preview = req.nextUrl.searchParams.get('preview')
+  const previewChannel: BroadcastChannel = req.nextUrl.searchParams.get('channel') === 'whatsapp' ? 'whatsapp' : 'telegram'
   if (preview && agentId) {
     const { data: agent } = await supabase.from('ai_agents').select('id').eq('id', agentId).eq('user_id', user.id).maybeSingle()
     if (!agent) return NextResponse.json({ error: 'not_found' }, { status: 404 })
-    const recipients = await collectRecipients(agentId)
+    const recipients = await collectRecipients(agentId, previewChannel)
     return NextResponse.json({ recipients: recipients.length })
   }
 
@@ -123,6 +171,13 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null)
   const agentId = body?.agentId
   const message = typeof body?.message === 'string' ? body.message.trim() : ''
+  // channel defaults to 'telegram' for backward compatibility with any old
+  // client that doesn't send it yet.
+  const rawChannel = body?.channel
+  if (rawChannel !== undefined && rawChannel !== 'telegram' && rawChannel !== 'whatsapp') {
+    return NextResponse.json({ error: 'invalid channel' }, { status: 400 })
+  }
+  const channel: BroadcastChannel = rawChannel === 'whatsapp' ? 'whatsapp' : 'telegram'
   if (!agentId || typeof agentId !== 'string') return NextResponse.json({ error: 'agentId required' }, { status: 400 })
   if (!message) return NextResponse.json({ error: 'message required' }, { status: 400 })
   if (message.length > MAX_MESSAGE_LEN) return NextResponse.json({ error: 'message too long' }, { status: 400 })
@@ -132,19 +187,23 @@ export async function POST(req: NextRequest) {
 
   const { data: connection } = await supabase
     .from('ai_agent_channel_connections')
-    .select('id, access_token_enc')
+    .select('id, access_token_enc, external_account_id')
     .eq('agent_id', agentId)
-    .eq('channel', 'telegram')
+    .eq('channel', channel)
     .eq('status', 'active')
     .maybeSingle()
-  if (!connection) return NextResponse.json({ error: 'telegram_not_connected' }, { status: 404 })
-  const botToken = decryptAtRest(connection.access_token_enc, getKey()).toString('utf8')
+  if (!connection) {
+    return NextResponse.json({ error: channel === 'whatsapp' ? 'whatsapp_not_connected' : 'telegram_not_connected' }, { status: 404 })
+  }
+  const accessToken = decryptAtRest(connection.access_token_enc, getKey()).toString('utf8')
 
-  const recipients = await collectRecipients(agentId)
+  const recipients = await collectRecipients(agentId, channel)
   if (recipients.length === 0) {
     return NextResponse.json({
       error: 'no_recipients',
-      detail: 'Вашему Telegram-боту ещё никто не писал — рассылать пока некому.',
+      detail: channel === 'whatsapp'
+        ? 'За последние 24 часа вам никто не писал в WhatsApp — по правилам Meta бизнес может писать первым только в ответ на недавнее сообщение клиента.'
+        : 'Вашему Telegram-боту ещё никто не писал — рассылать пока некому.',
     }, { status: 400 })
   }
 
@@ -156,7 +215,7 @@ export async function POST(req: NextRequest) {
     .insert({
       user_id: user.id,
       agent_id: agentId,
-      channel: 'telegram',
+      channel,
       message,
       recipients_total: recipients.length,
     })
@@ -166,15 +225,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: insertError?.message || 'insert_failed' }, { status: 500 })
   }
 
+  const phoneNumberId = connection.external_account_id || ''
   let sent = 0
   let failed = 0
   for (let i = 0; i < recipients.length; i++) {
     try {
-      await sendTelegramBotMessage(botToken, recipients[i], message)
+      if (channel === 'whatsapp') {
+        await sendWhatsAppMessage(phoneNumberId, recipients[i], message, { accessToken })
+      } else {
+        await sendTelegramBotMessage(accessToken, recipients[i], message)
+      }
       sent++
     } catch {
-      // Per-recipient failures (user blocked the bot, deleted the chat) are
-      // expected -- count and continue rather than aborting the whole batch.
+      // Per-recipient failures (user blocked the bot, deleted the chat,
+      // WhatsApp window closed between preview and send) are expected --
+      // count and continue rather than aborting the whole batch.
       failed++
     }
     if (i < recipients.length - 1) {
