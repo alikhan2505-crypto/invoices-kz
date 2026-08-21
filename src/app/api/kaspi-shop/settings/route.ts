@@ -35,6 +35,7 @@ export async function POST(req: NextRequest) {
     .from('kaspi_shop_connections')
     .update({ paused })
     .eq('user_id', user.id)
+    .eq('is_active', true)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true })
 }
@@ -53,6 +54,7 @@ export async function DELETE(req: NextRequest) {
     .from('kaspi_shop_connections')
     .select('id')
     .eq('user_id', user.id)
+    .eq('is_active', true)
     .maybeSingle()
   if (!connection) return NextResponse.json({ ok: true })
 
@@ -68,5 +70,18 @@ export async function DELETE(req: NextRequest) {
   }
   const { error } = await supabase.from('kaspi_shop_connections').delete().eq('id', connection.id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Disconnecting the active store must not leave the user with zero active
+  // stores while another one of theirs still exists -- fall back to their
+  // oldest remaining connection rather than stranding them.
+  const { data: remaining } = await supabase
+    .from('kaspi_shop_connections')
+    .select('id')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+  if (remaining) await supabase.from('kaspi_shop_connections').update({ is_active: true }).eq('id', remaining.id)
+
   return NextResponse.json({ ok: true })
 }

@@ -1,11 +1,12 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import LoadingSpinner from '@/components/LoadingSpinner'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
+import { KASPI_SHOP_CONNECTIONS_CHANGED_EVENT } from '@/components/KaspiShopStoreSwitcher'
 
 type Product = {
   id: string
@@ -158,7 +159,12 @@ function StatCard({ label, value, accent }: { label: string; value: number; acce
 
 export default function KaspiShop() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [loading, setLoading] = useState(true)
+  // Opened from the store switcher's "+ Добавить магазин" (?addStore=1) --
+  // reuses the same connect flow as the mandatory first-connect dialog, just
+  // dismissible since the user already has at least one working store.
+  const [addingStore, setAddingStore] = useState(false)
   const [loadError, setLoadError] = useState('')
   const [connected, setConnected] = useState(false)
   const [paused, setPaused] = useState(false)
@@ -213,6 +219,14 @@ export default function KaspiShop() {
   const [citySearch, setCitySearch] = useState('')
 
   useEffect(() => { load() }, [])
+
+  useEffect(() => {
+    if (searchParams.get('addStore') === '1') {
+      setAddingStore(true)
+      window.history.replaceState(null, '', '/kaspi-shop')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   async function authHeader() {
     const { data: { session } } = await supabase.auth.getSession()
@@ -316,6 +330,8 @@ export default function KaspiShop() {
       return
     }
     setConnected(true)
+    setAddingStore(false)
+    window.dispatchEvent(new Event(KASPI_SHOP_CONNECTIONS_CHANGED_EVENT))
     load()
   }
 
@@ -331,6 +347,8 @@ export default function KaspiShop() {
     setSessionToken(null)
     setMerchantChoices(null)
     setConnected(true)
+    setAddingStore(false)
+    window.dispatchEvent(new Event(KASPI_SHOP_CONNECTIONS_CHANGED_EVENT))
     load()
   }
 
@@ -374,10 +392,11 @@ export default function KaspiShop() {
     if (!confirm('Отключить кабинет Kaspi? Отслеживаемые товары и их настройки будут удалены — при повторном подключении каталог импортируется заново.')) return
     const headers = await authHeader()
     await fetch('/api/kaspi-shop/settings', { method: 'DELETE', headers })
-    setConnected(false)
-    setProducts([])
-    setCompanyName(null)
-    setSessionStatus(null)
+    window.dispatchEvent(new Event(KASPI_SHOP_CONNECTIONS_CHANGED_EVENT))
+    // A remaining store (if any) auto-activates server-side on disconnect --
+    // reload so this page picks up its data instead of showing an empty
+    // "not connected" state while another store is actually now active.
+    window.location.href = '/kaspi-shop'
   }
 
   async function startTopup(amountTenge: number) {
@@ -551,20 +570,25 @@ export default function KaspiShop() {
           </div>
         )}
 
-        {!connected ? (
+        {(!connected || addingStore) ? (
           /* Centered connect dialog (2026-08-20, founder): the connect form
              used to render as a full-width inline card flush to the top-left,
              which read as a broken/half-empty page. Now it floats as a true
              centered modal over the page, same treatment as the app's other
-             dialogs (bank picker, wallet). Not dismissible -- without a
-             connection there is nothing else on this page to interact with. */
+             dialogs (bank picker, wallet). Dismissible only when reached via
+             "+ Добавить магазин" while already connected -- the mandatory
+             first-connect case has nothing else on the page to interact with. */
           <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/30">
             <motion.div initial={{ opacity: 0, scale: 0.97, y: 6 }} animate={{ opacity: 1, scale: 1, y: 0 }} transition={{ duration: 0.25, ease: EASE }}
               className="relative nav-glass rounded-[24px] w-full max-w-md p-6 lg:p-8 max-h-[84vh] overflow-y-auto"
               style={{ boxShadow: '0 34px 80px -20px rgba(10,10,15,0.4), var(--nav-card-glow)' }}>
               <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[24px]" style={{ background: 'linear-gradient(90deg, var(--nav-accent), var(--nav-teal))' }} />
+              {connected && (
+                <button onClick={() => { setAddingStore(false); setPhone(''); setOtpToken(null); setOtpCode(''); setMerchantChoices(null); setSessionToken(null); setConnectError('') }}
+                  className="absolute top-5 right-5 text-lg leading-none" style={{ color: 'var(--nav-text-secondary)' }}>✕</button>
+              )}
               <div className="text-[11px] font-semibold tracking-wider uppercase mb-2" style={{ color: 'var(--nav-text-muted)' }}>Подключение</div>
-              <h1 className="text-2xl font-extrabold tracking-tight mb-6" style={{ color: 'var(--nav-text-primary)' }}>Подключите Kaspi Магазин</h1>
+              <h1 className="text-2xl font-extrabold tracking-tight mb-6" style={{ color: 'var(--nav-text-primary)' }}>{connected ? 'Добавьте ещё один магазин' : 'Подключите Kaspi Магазин'}</h1>
               {connectError && <div className="text-sm mb-3" style={{ color: 'var(--nav-critical)' }}>{connectError}</div>}
 
               {merchantChoices ? (

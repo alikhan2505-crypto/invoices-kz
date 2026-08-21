@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { listCatalog, fetchCityNames } from './cabinetApi'
-import { saveConnection, loadConnection } from './connection'
+import { saveConnection, loadConnectionByMerchant } from './connection'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -13,7 +13,10 @@ const supabase = createClient(
 // before: the seller reviews and turns tracking on deliberately).
 export async function finalizeConnection(userId: string, sessionCookies: string, merchantId: string, companyName: string): Promise<{ importedProducts: number }> {
   await saveConnection({ userId, sessionCookies, merchantId, companyName })
-  const connection = await loadConnection(userId)
+  // Not loadConnection(userId): a 2nd+ store saves as inactive (see
+  // saveConnection), so "the active one" would resolve to a DIFFERENT,
+  // already-connected store instead of the one just finalized here.
+  const connection = await loadConnectionByMerchant(userId, merchantId)
   if (!connection) throw new Error('Подключение не удалось сохранить')
 
   let imported = 0

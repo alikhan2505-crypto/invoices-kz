@@ -4,6 +4,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { useLanguage, type Lang } from './LanguageProvider'
+import KaspiShopStoreSwitcher from './KaspiShopStoreSwitcher'
 
 const labels: Record<Lang, { home: string; invoices: string; kaspiShop: string; aiAgent: string; kaspiApi: string; profile: string; history: string }> = {
   ru: { home: 'Дашборд', invoices: 'Счета', kaspiShop: 'Kaspi Bot', aiAgent: 'AI-агент', kaspiApi: 'Kaspi API', profile: 'Профиль', history: 'История' },
@@ -290,6 +291,12 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
               )
             })
             })()}
+            {/* Founder, 2026-08-21: "какая компания" wasn't visible anywhere
+                on Kaspi Bot pages, plus a real need for switching between the
+                2 real Kaspi merchant accounts on one phone number -- placed
+                here (sub-nav row, right side) since it's directly under
+                TopUtilityBar's wallet pill in row 1. */}
+            {activeSection.key === 'kaspiShop' && <KaspiShopStoreSwitcher />}
           </div>
         )}
       </nav>
