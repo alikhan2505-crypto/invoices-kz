@@ -72,6 +72,7 @@ async function pushProductPrices(params: {
   sessionCookies: string
   productIds: string[]
   sku: string
+  masterSku: string | null
   model: string
   storeId: string
   cityPrices: Record<string, number>
@@ -102,8 +103,10 @@ async function pushProductPrices(params: {
     sessionCookies: params.sessionCookies,
     merchantUid: params.merchantId,
     sku: params.sku,
+    masterSku: params.masterSku,
     model: params.model,
     storeId: `${params.merchantId}_${params.storeId}`,
+    storeCode: params.storeId,
     cityPrices: Object.entries(params.cityPrices).map(([cityId, value]) => ({ cityId, value })),
     available: 'yes',
   })
@@ -271,6 +274,7 @@ export async function applyPriceCheckResult(
             sessionCookies,
             productIds,
             sku: product.kaspi_sku,
+            masterSku: product.kaspi_master_sku || null,
             model: product.product_name,
             storeId: product.store_id,
             cityPrices: changedCityPrices,
@@ -368,6 +372,7 @@ export async function applyPriceCheckResult(
           sessionCookies,
           productIds,
           sku: product.kaspi_sku,
+          masterSku: product.kaspi_master_sku || null,
           model: product.product_name,
           storeId: product.store_id,
           cityPrices: legacyCityPrices,

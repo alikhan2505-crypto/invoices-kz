@@ -71,9 +71,16 @@ export type OfferAvailabilityParams = {
   sessionCookies: string
   merchantUid: string
   sku: string
+  // Kaspi's master product id -- used by the validate/v2 step (captured
+  // 2026-08-21: its offers items are keyed by masterSku, not sku). null
+  // skips validation rather than sending a wrong key.
+  masterSku: string | null
   model: string
   // MUST be merchant-prefixed ("30067228_PP2") -- captured verbatim.
   storeId: string
+  // The bare point code ("PP2") -- validate/v2's availabilities use the
+  // UNPREFIXED form (captured), unlike the batch item's prefixed one.
+  storeCode: string
   cityPrices: { cityId: string; value: number }[]
 }
 
@@ -117,11 +124,24 @@ export async function pushOfferState(params: OfferAvailabilityParams & { availab
   }
 
   try {
-    if (params.available === 'yes') {
+    if (params.available === 'yes' && params.masterSku) {
+      // Validate item shape captured in full 2026-08-21 («Посмотреть
+      // источник» on the cabinet's own v2 request): keyed by masterSku,
+      // availabilities carry UNPREFIXED storeId + cityId + available +
+      // price per city -- a different structure from the batch item.
+      const validateOffer = {
+        masterSku: params.masterSku,
+        availabilities: params.cityPrices.map(cp => ({
+          storeId: params.storeCode,
+          cityId: cp.cityId,
+          available: params.available,
+          price: cp.value,
+        })),
+      }
       const vRes = await fetch('https://mc.shop.kaspi.kz/offer-validation-api/merchant/offer/validate/v2', {
         method: 'POST',
         headers,
-        body: JSON.stringify({ merchantUid: params.merchantUid, action: 'ON_SALE__BATCH', offers: [item] }),
+        body: JSON.stringify({ merchantUid: params.merchantUid, action: 'ON_SALE__BATCH', offers: [validateOffer] }),
       })
       if (vRes.status === 401 || vRes.status === 403) {
         return { success: false, reason: 'session_expired', message: `HTTP ${vRes.status}` }

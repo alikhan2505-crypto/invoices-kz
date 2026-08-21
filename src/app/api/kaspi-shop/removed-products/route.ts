@@ -93,8 +93,10 @@ export async function POST(req: NextRequest) {
     sessionCookies: connection.sessionCookies,
     merchantUid: connection.merchantId,
     sku: offer.sku,
+    masterSku: offer.masterSku,
     model: offer.title,
     storeId: offer.points[0] ? `${connection.merchantId}_${offer.points[0]}` : '',
+    storeCode: offer.points[0] || '',
     cityPrices: Object.entries(offer.allCityPrices).map(([cityId, entry]) => ({ cityId, value: entry.price })),
   }
   const result = action === 'restore' ? await restoreOfferToSale(pushParams) : await removeOfferFromSale(pushParams)
