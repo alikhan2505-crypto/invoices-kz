@@ -1,7 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { loadConnection } from '@/lib/kaspiShop/connection'
-import { listCatalog } from '@/lib/kaspiShop/cabinetApi'
+import { listCatalog, authHeaders } from '@/lib/kaspiShop/cabinetApi'
+
+// One-off introspection of the same authenticated GraphQL facade
+// getMerchant/getCities already use -- looking for a mutation to restore an
+// available=false offer (same technique as the earlier city-names
+// discovery). Read-only: introspection can't execute anything.
+async function findOfferMutations(sessionCookies: string): Promise<string[]> {
+  const res = await fetch('https://mc.shop.kaspi.kz/mc/facade/graphql', {
+    method: 'POST',
+    headers: authHeaders(sessionCookies),
+    body: JSON.stringify({
+      operationName: 'IntrospectionQuery',
+      variables: {},
+      query: `query IntrospectionQuery {
+        __schema {
+          mutationType {
+            fields { name args { name type { name kind ofType { name kind } } } }
+          }
+        }
+      }`,
+    }),
+  })
+  if (!res.ok) return [`introspection request failed: ${res.status}`]
+  const json = await res.json().catch(() => null)
+  const fields = json?.data?.__schema?.mutationType?.fields
+  if (!Array.isArray(fields)) return [`unexpected shape: ${JSON.stringify(json).slice(0, 500)}`]
+  return fields
+    .filter((f: any) => /offer|avail|activ|publish|stock/i.test(f.name))
+    .map((f: any) => `${f.name}(${(f.args || []).map((a: any) => a.name).join(', ')})`)
+}
 
 // TEMPORARY diagnostic route -- reuses the already-connected ABIL-SISTERS/
 // ИП FIRST PROJECT account's stored session to inspect its real
@@ -43,12 +72,14 @@ export async function GET(req: NextRequest) {
 
   const removed = await listCatalog(connection.sessionCookies, connection.merchantId, false)
   const active = await listCatalog(connection.sessionCookies, connection.merchantId, true)
+  const offerMutations = await findOfferMutations(connection.sessionCookies)
 
   return NextResponse.json({
     merchantId: connection.merchantId,
     companyName: connection.companyName,
     removedCount: removed.length,
     activeCount: active.length,
+    offerMutations,
     removed,
   })
 }
