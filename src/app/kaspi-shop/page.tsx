@@ -38,6 +38,19 @@ const STRATEGY_LABELS: Record<string, string> = {
   be_second: 'Быть 2-м',
 }
 
+// Plain-language explanation of each strategy, shown under the strategy
+// picker for whichever option is currently selected (works on mobile too,
+// unlike a hover tooltip). Wording verified against the real math in
+// pricing.ts computeRepriceCandidate -- keep the two in sync.
+const STRATEGY_DESCRIPTIONS: Record<string, string> = {
+  undercut_leader: 'Цена всегда на «Шаг» ₸ ниже самого дешёвого конкурента — вы первые по цене. Ниже минимальной цены не опускается.',
+  match_leader: 'Повторяет цену самого дешёвого конкурента один в один — вы наравне с лидером, не роняя цену дальше.',
+  stay_above_leader: 'Цена на «Шаг» ₸ выше самого дешёвого конкурента — вы рядом с лидером, но не участвуете в гонке вниз.',
+  be_second: 'Цена на «Шаг» ₸ выше второго по дешевизне конкурента — дешевле всех, кроме лидера. Если конкурент один — на «Шаг» выше него.',
+}
+
+const STRATEGY_COMMON_NOTE = 'Без конкурентов: цена сразу поднимается от минимума, а после 3 проверок подряд без конкурентов растёт на «Шаг» за проверку до максимальной.'
+
 // Russian plural for «продавец» (1 продавец / 2 продавца / 5 продавцов).
 function pluralSellers(n: number): string {
   const mod10 = n % 10
@@ -98,6 +111,14 @@ function SparkleIcon() {
   return (
     <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="none">
       <path d="M12 3l1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8L12 3z" />
+    </svg>
+  )
+}
+
+function TrashIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6" />
     </svg>
   )
 }
@@ -442,8 +463,10 @@ export default function KaspiShop() {
   }
 
   async function deleteProduct(id: string) {
+    if (!confirm('Удалить товар из демпинга? Правило и его настройки будут удалены у нас — сам товар на Kaspi это не трогает.')) return
     const headers = await authHeader()
     await fetch('/api/kaspi-shop/products', { method: 'DELETE', headers, body: JSON.stringify({ id }) })
+    setExpandedId(null)
     load()
   }
 
@@ -467,6 +490,7 @@ export default function KaspiShop() {
     const data = await res.json().catch(() => ({}))
     if (data.stockPushed) setApplyNowMessage('Остаток отправлен на Kaspi — применится в течение часа.')
     else if (data.stockPushWarning) setApplyNowMessage(data.stockPushWarning)
+    setExpandedId(null)
     load()
   }
 
@@ -937,9 +961,12 @@ export default function KaspiShop() {
                                 <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Стратегия</span>
                                 <select className={`${INPUT_CLS} px-2 py-1.5`} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-surface-chrome)' }}
                                   value={v.strategy} onChange={e => setEditValues(prev => ({ ...prev, [p.id]: { ...v, strategy: e.target.value } }))}>
-                                  {Object.entries(STRATEGY_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+                                  {Object.entries(STRATEGY_LABELS).map(([key, label]) => <option key={key} value={key} title={STRATEGY_DESCRIPTIONS[key]}>{label}</option>)}
                                 </select>
                               </label>
+                              <div className="rounded-lg px-3 py-2 mb-2 text-[11px] leading-relaxed" style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-secondary)' }}>
+                                {STRATEGY_DESCRIPTIONS[v.strategy] || ''} {STRATEGY_COMMON_NOTE}
+                              </div>
                               <label className="block mb-2">
                                 <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Исключить города (для этого товара)</span>
                                 <div className="flex flex-wrap gap-1.5">
@@ -1000,9 +1027,10 @@ export default function KaspiShop() {
                                   Сохранить
                                 </button>
                               </div>
-                              <button onClick={() => deleteProduct(p.id)} className="text-[11px] mt-3 transition-colors" style={{ color: 'var(--nav-text-muted)' }}
-                                onMouseEnter={e => (e.currentTarget.style.color = 'var(--nav-critical)')} onMouseLeave={e => (e.currentTarget.style.color = 'var(--nav-text-muted)')}>
-                                Удалить товар
+                              <button onClick={() => deleteProduct(p.id)}
+                                className="mt-3 text-[11px] font-semibold rounded-lg px-3 py-2 flex items-center gap-1.5 transition-colors"
+                                style={{ color: 'var(--nav-critical)', border: '1px solid var(--nav-critical)' }}>
+                                <TrashIcon /> Удалить товар
                               </button>
                       </div>
                     </motion.div>
@@ -1145,7 +1173,7 @@ export default function KaspiShop() {
                       <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Стратегия</span>
                       <select className={`${INPUT_CLS} px-2 py-1.5`} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-surface-chrome)' }}
                         value={bulkStrategy} onChange={e => setBulkStrategy(e.target.value)}>
-                        {Object.entries(STRATEGY_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+                        {Object.entries(STRATEGY_LABELS).map(([key, label]) => <option key={key} value={key} title={STRATEGY_DESCRIPTIONS[key]}>{label}</option>)}
                       </select>
                     </label>
                     <label className="block">
@@ -1153,6 +1181,9 @@ export default function KaspiShop() {
                       <input className={`${INPUT_CLS} font-mono px-2 py-1.5`} type="number" style={{ color: 'var(--nav-text-primary)' }}
                         value={bulkFrequency} onChange={e => setBulkFrequency(e.target.value)} />
                     </label>
+                    <div className="col-span-2 rounded-lg px-3 py-2 text-[11px] leading-relaxed" style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-secondary)' }}>
+                      {STRATEGY_DESCRIPTIONS[bulkStrategy] || ''} {STRATEGY_COMMON_NOTE}
+                    </div>
                   </div>
                   <div className="flex gap-2">
                     <button onClick={() => setBulkStep('select')}
