@@ -163,6 +163,12 @@ export default function KaspiShopProductAvailability() {
       return
     }
     setStockModal(prev => prev ? { ...prev, saving: false, saved: true } : prev)
+    // Auto-close shortly after the success notice (founder request) --
+    // unless the user already started editing again (any input resets
+    // `saved`), in which case the modal stays put.
+    setTimeout(() => {
+      setStockModal(prev => (prev && prev.saved && !prev.saving ? null : prev))
+    }, 2000)
   }
 
   async function toggle(sku: string, action: 'restore' | 'remove') {
