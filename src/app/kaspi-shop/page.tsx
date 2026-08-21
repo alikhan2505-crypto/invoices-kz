@@ -11,6 +11,7 @@ import { KASPI_SHOP_CONNECTIONS_CHANGED_EVENT } from '@/components/KaspiShopStor
 type Product = {
   id: string
   kaspi_sku: string
+  kaspi_master_sku: string | null
   product_name: string
   brand: string
   store_id: string
@@ -35,6 +36,15 @@ const STRATEGY_LABELS: Record<string, string> = {
   match_leader: 'Цена лидера',
   stay_above_leader: 'Держаться над лидером',
   be_second: 'Быть 2-м',
+}
+
+// Russian plural for «продавец» (1 продавец / 2 продавца / 5 продавцов).
+function pluralSellers(n: number): string {
+  const mod10 = n % 10
+  const mod100 = n % 100
+  if (mod10 === 1 && mod100 !== 11) return 'продавец'
+  if ([2, 3, 4].includes(mod10) && ![12, 13, 14].includes(mod100)) return 'продавца'
+  return 'продавцов'
 }
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
@@ -570,6 +580,17 @@ export default function KaspiShop() {
   const atFloorCount = products.filter(p => p.own_current_price <= p.floor_price + 0.01).length
   const activeCount = products.filter(p => p.enabled).length
 
+  // Which cities this product's demping actually covers (store-level tracked
+  // cities minus the product's own exclusions); no tracked cities configured
+  // means the legacy single-reference-competitor mode = «Все города».
+  function productRegionLabel(p: Product): string {
+    if (trackedCities.length === 0) return 'Все города'
+    const codes = trackedCities.filter(code => !(p.excluded_city_codes || []).includes(code))
+    if (codes.length === 0) return 'Все города исключены'
+    const names = codes.map(code => availableCities.find(c => c.code === code)?.name || code)
+    return names.length <= 2 ? names.join(', ') : `${names.length} городов`
+  }
+
   return (
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
@@ -647,10 +668,14 @@ export default function KaspiShop() {
           </div>
         ) : (
           <>
+            {/* Top row (2026-08-21 founder layout request: "скомпанованнее"):
+                hero on the left (2/3), city picker beside it on the right --
+                the stats row below stays full-width as the second line. */}
+            <div className="grid lg:grid-cols-3 gap-4 mb-4 items-stretch">
             {/* Hero: the one question this page answers, stated as three
                 numbers, not buried in per-product rows. */}
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}
-              className="nav-glass nav-card-accent rounded-[28px] p-6 lg:p-8 mb-4">
+              className="nav-glass nav-card-accent rounded-[28px] p-6 lg:p-8 lg:col-span-2">
               <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
                 <div>
                   <div className="text-[11px] font-semibold tracking-wider uppercase mb-1" style={{ color: 'var(--nav-text-muted)' }}>{companyName || 'Магазин подключён'}</div>
@@ -686,7 +711,7 @@ export default function KaspiShop() {
               </div>
             </motion.div>
 
-            <div className="nav-glass rounded-2xl p-4 mb-4">
+            <div className="nav-glass rounded-2xl p-4">
               <div className="text-sm font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>Города для отслеживания конкурентов</div>
               <div className="text-[11px] mb-3" style={{ color: 'var(--nav-text-muted)' }}>
                 {trackedCities.length === 0
@@ -730,6 +755,7 @@ export default function KaspiShop() {
                 </>
               )}
             </div>
+            </div>
 
             {companyName && activeCount === 0 && products.length > 0 && (
               <div className="text-xs mb-4 px-1" style={{ color: 'var(--nav-text-muted)' }}>{products.length} товаров импортировано и на паузе — включите нужные ниже, чтобы демпинг начал работать.</div>
@@ -766,17 +792,24 @@ export default function KaspiShop() {
               </div>
             )}
 
-            <div className="space-y-3">
+            {/* Card grid (2026-08-21 founder request): each product is a card
+                with the live price, competitor, region, seller count and a
+                real Kaspi link. An expanded card spans the full row so its
+                settings form keeps comfortable width. */}
+            <div className="grid lg:grid-cols-2 gap-3 items-start">
               <AnimatePresence initial={false}>
                 {products.map((p, i) => {
                   const v = editValues[p.id] || { floorPrice: String(p.floor_price), maxPrice: p.max_price !== null ? String(p.max_price) : '', undercutStep: String(p.undercut_step), strategy: p.demping_strategy, excludedCities: '', excludedMerchants: '' }
                   const expanded = expandedId === p.id
+                  const otherSellers = p.market_offer_count !== null ? Math.max(0, p.market_offer_count - 1) : null
                   return (
                     <motion.div key={p.id}
                       initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
                       transition={{ duration: 0.35, ease: EASE, delay: Math.min(i * 0.04, 0.3) }}
-                      className={`nav-glass rounded-2xl overflow-hidden ${CARD_HOVER}`}>
-                      <button onClick={() => {
+                      className={`nav-glass rounded-2xl overflow-hidden ${CARD_HOVER} ${expanded ? 'lg:col-span-2' : ''}`}>
+                      {/* div, not <button>: the card carries a real nested <a>
+                          (Kaspi link), which is invalid inside a button. */}
+                      <div role="button" tabIndex={0} onClick={() => {
                         const next = expanded ? null : p.id
                         setExpandedId(next)
                         if (next && !cityPrices[p.id] && trackedCities.length > 0) {
@@ -786,28 +819,51 @@ export default function KaspiShop() {
                               .then(data => setCityPrices(prev => ({ ...prev, [p.id]: data.cities || [] })))
                           )
                         }
-                      }} className="w-full text-left p-4">
-                        <div className="flex items-center justify-between gap-3 mb-3">
+                      }} className="w-full text-left p-4 cursor-pointer">
+                        <div className="flex items-start justify-between gap-3 mb-2.5">
                           <div className="min-w-0">
-                            <div className="text-sm font-semibold truncate" style={{ color: 'var(--nav-text-primary)' }}>{p.product_name}</div>
+                            <div className="text-sm font-semibold truncate" title={p.product_name} style={{ color: 'var(--nav-text-primary)' }}>{p.product_name}</div>
                             <div className="text-[11px]" style={{ color: 'var(--nav-text-muted)' }}>
                               {STRATEGY_LABELS[p.demping_strategy] || p.demping_strategy} · проверка каждые {p.check_frequency_minutes} мин
-                              {p.market_position !== null && p.market_offer_count !== null && (
-                                <> · <span className="font-medium" style={{ color: 'var(--nav-text-secondary)' }} title="Место по цене среди всех продавцов на Kaspi. Kaspi может учитывать не только цену — это оценка.">#{p.market_position} из {p.market_offer_count}</span></>
-                              )}
                             </div>
                           </div>
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            <span className="font-mono font-bold text-sm tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{p.own_current_price.toLocaleString('ru-KZ')} ₸</span>
-                            <span onClick={e => { e.stopPropagation(); toggleProduct(p.id, p.enabled) }}
-                              className="text-[11px] px-2 py-1 rounded-full cursor-pointer font-semibold"
-                              style={{ background: p.enabled ? 'var(--nav-success)' : 'var(--nav-text-muted)', color: '#fff' }}>
-                              {p.enabled ? 'Активно' : 'Пауза'}
-                            </span>
+                          <span onClick={e => { e.stopPropagation(); toggleProduct(p.id, p.enabled) }}
+                            className="text-[11px] px-2 py-1 rounded-full cursor-pointer font-semibold flex-shrink-0"
+                            style={{ background: p.enabled ? 'var(--nav-success)' : 'var(--nav-text-muted)', color: '#fff' }}>
+                            {p.enabled ? 'Активно' : 'Пауза'}
+                          </span>
+                        </div>
+                        <div className="flex items-end justify-between gap-3 mb-2">
+                          <div>
+                            <div className="text-[10px] font-semibold tracking-wider uppercase" style={{ color: 'var(--nav-text-muted)' }}>Наша цена на Kaspi</div>
+                            <div className="font-mono font-bold text-xl tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{p.own_current_price.toLocaleString('ru-KZ')} ₸</div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-[10px] font-semibold tracking-wider uppercase" style={{ color: 'var(--nav-text-muted)' }}>Конкурент</div>
+                            <div className="font-mono text-sm tabular-nums" style={{ color: 'var(--nav-text-secondary)' }}>
+                              {p.last_competitor_price !== null ? `${p.last_competitor_price.toLocaleString('ru-KZ')} ₸` : '—'}
+                            </div>
                           </div>
                         </div>
                         <PriceLadder own={p.own_current_price} competitor={p.last_competitor_price} floor={p.floor_price} maxPrice={p.max_price} />
-                      </button>
+                        <div className="flex items-center justify-between gap-2 flex-wrap mt-2.5">
+                          <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-[11px]" style={{ color: 'var(--nav-text-muted)' }}>
+                            <span title="Города, по которым демпингуется этот товар">{productRegionLabel(p)}</span>
+                            {otherSellers !== null && (
+                              <span title="Продавцы этого товара на Kaspi, кроме вас. Место по цене среди всех — это оценка.">
+                                {otherSellers} {pluralSellers(otherSellers)} кроме вас{p.market_position !== null ? ` · вы #${p.market_position}` : ''}
+                              </span>
+                            )}
+                          </div>
+                          {p.kaspi_master_sku && (
+                            <a href={`https://kaspi.kz/shop/p/-${p.kaspi_master_sku}/`} target="_blank" rel="noopener noreferrer"
+                              onClick={e => e.stopPropagation()}
+                              className="text-[11px] font-semibold flex-shrink-0" style={{ color: 'var(--nav-accent)' }}>
+                              Открыть на Kaspi ↗
+                            </a>
+                          )}
+                        </div>
+                      </div>
 
                       <AnimatePresence initial={false}>
                         {expanded && (
@@ -912,9 +968,9 @@ export default function KaspiShop() {
               </AnimatePresence>
 
               {products.length === 0 && (
-                <div className="nav-glass rounded-2xl p-8 text-center">
+                <div className="nav-glass rounded-2xl p-8 text-center lg:col-span-2">
                   <div className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>Каталог ещё импортируется или пуст.</div>
-                  <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>Товары появятся здесь после подключения кабинета.</div>
+                  <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>Товары появятся здесь после подключения кабинета — или нажмите «Обновить каталог» выше.</div>
                 </div>
               )}
             </div>
