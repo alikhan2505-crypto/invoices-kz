@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { loadConnection, markSessionExpired } from '@/lib/kaspiShop/connection'
-import { fetchOfferDetails, fetchOfferDetailsGet } from '@/lib/kaspiShop/cabinetApi'
+import { fetchOfferDetails } from '@/lib/kaspiShop/cabinetApi'
 import { savePointStockPrice } from '@/lib/kaspiShop/cabinetPricePush'
 
 const supabase = createClient(
@@ -67,20 +67,27 @@ function collectPointEntries(node: any, merchantId: string, out: Map<string, Poi
     if (typeof node.available === 'string') existing.available = node.available
   }
 
-  // Shape B: a city entry whose `points` array names the point codes served
-  // FROM that city (the details response's cities[] rows carry points: null
-  // for plain delivery cities and ["PP2"]-style arrays for the cities where
-  // the merchant's own points sit -- visible in the very first live capture
-  // of this endpoint). This is where point -> city is actually expressed;
-  // the point-city's own price rides along.
+  // Shape B: a city entry whose `points` array carries the point OBJECTS
+  // served from that city. Confirmed via runtime-log dump 2026-08-21:
+  //   {"cityId":"511010000","price":1120,"points":[{"pointId":
+  //    "30067228_PP2","name":null,"available":true}]}
+  // -- points is null for plain delivery cities; the point-city's own price
+  // rides on the city row, and `available` on the point object is a BOOLEAN.
   const cityIdVal = node.cityId ?? null
   if (cityIdVal !== null && cityIdVal !== undefined && Array.isArray(node.points) && node.points.length > 0) {
     for (const p of node.points) {
-      if (typeof p !== 'string' || !p) continue
-      const existing = upsertEntry(out, stripPrefix(p, merchantId))
+      const rawCode = typeof p === 'string' ? p : (p && typeof p === 'object' ? (p.pointId ?? p.storeId ?? null) : null)
+      if (typeof rawCode !== 'string' || !rawCode) continue
+      const existing = upsertEntry(out, stripPrefix(rawCode, merchantId))
       existing.cityId = String(cityIdVal)
       const price = node.price ?? null
       if (price !== null && price !== undefined && Number.isFinite(Number(price))) existing.price = Number(price)
+      if (p && typeof p === 'object') {
+        if (typeof p.available === 'boolean') existing.available = p.available ? 'yes' : 'no'
+        else if (typeof p.available === 'string') existing.available = p.available
+        const stock = p.stockCount ?? p.stockLevel ?? null
+        if (stock !== null && stock !== undefined && Number.isFinite(Number(stock))) existing.stockCount = Number(stock)
+      }
     }
   }
 
@@ -101,32 +108,21 @@ export async function GET(req: NextRequest) {
   const connection = await loadConnection(user.id)
   if (!connection?.sessionCookies) return NextResponse.json({ error: 'Kaspi Магазин не подключён' }, { status: 400 })
 
-  // The GET &s= variant is what the cabinet's own modal fetches (it carries
-  // the per-point city data the POST variant lacks); both are scanned so
-  // whichever knows more about a point wins field-by-field.
-  const detailsGet = await fetchOfferDetailsGet(connection.sessionCookies, connection.merchantId, sku)
-  const detailsPost = await fetchOfferDetails(connection.sessionCookies, connection.merchantId, sku)
-  const details = detailsGet || detailsPost
+  const details = await fetchOfferDetails(connection.sessionCookies, connection.merchantId, sku)
   if (!details) return NextResponse.json({ error: 'Не удалось получить карточку товара из Kaspi' }, { status: 502 })
 
   const entriesMap = new Map<string, PointEntry>()
-  if (detailsGet) collectPointEntries(detailsGet, connection.merchantId, entriesMap)
-  if (detailsPost) collectPointEntries(detailsPost, connection.merchantId, entriesMap)
+  collectPointEntries(details, connection.merchantId, entriesMap)
 
   // Self-diagnosis when the scan can't resolve cities: dump a truncated
   // structural sample to the runtime logs so the parsing can be fixed from
   // the server side without asking the founder for more DevTools captures.
   if (Array.from(entriesMap.values()).every(e => !e.cityId)) {
-    const sample = (label: string, d: Record<string, any> | null) => {
-      if (!d) { console.log(`offer-stocks debug ${label}: null`); return }
-      console.log(`offer-stocks debug ${label} keys:`, Object.keys(d).join(','))
-      const json = JSON.stringify(d)
-      for (let i = 0; i < Math.min(json.length, 12000); i += 3000) {
-        console.log(`offer-stocks debug ${label} [${i}]:`, json.slice(i, i + 3000))
-      }
+    console.log('offer-stocks debug keys:', Object.keys(details).join(','))
+    const json = JSON.stringify(details)
+    for (let i = 0; i < Math.min(json.length, 12000); i += 3000) {
+      console.log(`offer-stocks debug [${i}]:`, json.slice(i, i + 3000))
     }
-    sample('GET', detailsGet)
-    sample('POST', detailsPost)
   }
 
   const { data: connRow } = await supabase

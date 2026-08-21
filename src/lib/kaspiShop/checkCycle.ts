@@ -5,7 +5,7 @@ import { getKey } from './connection'
 import { decryptAtRest } from '@/lib/kaspiPay/crypto'
 import { isWithinBudget, KASPI_RATE_LIMIT_WINDOW_MS } from './rateLimitBudget'
 import { pushOfferState } from './cabinetPricePush'
-import { fetchOfferDetailsGet, fetchOfferDetails } from './cabinetApi'
+import { fetchOfferDetails } from './cabinetApi'
 
 // All of the offer's bare point codes, read from the offer details (deep
 // scan for storeId-carrying objects -- no guessed key paths). Falls back to
@@ -13,7 +13,7 @@ import { fetchOfferDetailsGet, fetchOfferDetails } from './cabinetApi'
 // recognized: pushing with one point risks zeroing the others' наличие
 // (confirmed live 2026-08-21), but pushing with NONE is not an option.
 async function fetchOfferPointCodes(sessionCookies: string, merchantId: string, sku: string, fallback: string): Promise<string[]> {
-  const details = (await fetchOfferDetailsGet(sessionCookies, merchantId, sku)) || (await fetchOfferDetails(sessionCookies, merchantId, sku))
+  const details = await fetchOfferDetails(sessionCookies, merchantId, sku)
   const codes = new Set<string>()
   function walk(node: any) {
     if (Array.isArray(node)) { for (const item of node) walk(item); return }
