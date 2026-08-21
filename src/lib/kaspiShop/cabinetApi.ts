@@ -125,14 +125,20 @@ export async function fetchOfferDetails(sessionCookies: string, merchantId: stri
 // Reads the seller's own existing catalog -- the endpoint the official
 // public Merchant API has no equivalent for. Paginates internally (100 per
 // page, confirmed the real endpoint accepts an `l` limit param) until a
-// page returns fewer than the limit.
-export async function listCatalog(sessionCookies: string, merchantId: string, available = true): Promise<CatalogOffer[]> {
+// page returns fewer than the limit. sessionExpired follows this module's
+// established 401 pattern (see getOrderCounters) -- previously a dead
+// session silently produced an EMPTY catalog, which read as "0 товаров"
+// in the UI instead of "переподключитесь" (bitten live 2026-08-21).
+export async function listCatalogWithStatus(sessionCookies: string, merchantId: string, available = true): Promise<{ offers: CatalogOffer[]; sessionExpired: boolean }> {
   const offers: CatalogOffer[] = []
   const pageSize = 100
   let page = 0
   while (true) {
     const url = `https://mc.shop.kaspi.kz/bff/offer-view/list?m=${encodeURIComponent(merchantId)}&p=${page}&l=${pageSize}&a=${available}`
     const res = await fetch(url, { headers: authHeaders(sessionCookies) })
+    if (res.status === 401 || res.status === 403) {
+      return { offers, sessionExpired: true }
+    }
     if (!res.ok) break
     const json = await res.json().catch(() => null)
     const data = json?.data
@@ -153,6 +159,11 @@ export async function listCatalog(sessionCookies: string, merchantId: string, av
     if (data.length < pageSize) break
     page += 1
   }
+  return { offers, sessionExpired: false }
+}
+
+export async function listCatalog(sessionCookies: string, merchantId: string, available = true): Promise<CatalogOffer[]> {
+  const { offers } = await listCatalogWithStatus(sessionCookies, merchantId, available)
   return offers
 }
 

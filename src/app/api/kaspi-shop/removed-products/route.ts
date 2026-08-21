@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { loadConnection, markSessionExpired } from '@/lib/kaspiShop/connection'
-import { listCatalog, CatalogOffer } from '@/lib/kaspiShop/cabinetApi'
+import { listCatalog, listCatalogWithStatus, CatalogOffer } from '@/lib/kaspiShop/cabinetApi'
 import { restoreOfferToSale, removeOfferFromSale } from '@/lib/kaspiShop/cabinetPricePush'
 
 const supabase = createClient(
@@ -43,13 +43,17 @@ export async function GET(req: NextRequest) {
   if (!connection) return NextResponse.json({ error: 'Kaspi Магазин не подключён' }, { status: 400 })
   if (!connection.sessionCookies) return NextResponse.json({ error: 'Сессия кабинета Kaspi не активна — переподключитесь' }, { status: 400 })
 
-  const [active, removed] = await Promise.all([
-    listCatalog(connection.sessionCookies, connection.merchantId, true),
-    listCatalog(connection.sessionCookies, connection.merchantId, false),
+  const [activeRes, removedRes] = await Promise.all([
+    listCatalogWithStatus(connection.sessionCookies, connection.merchantId, true),
+    listCatalogWithStatus(connection.sessionCookies, connection.merchantId, false),
   ])
+  if (activeRes.sessionExpired || removedRes.sessionExpired) {
+    await markSessionExpired(connection.id)
+    return NextResponse.json({ error: 'Сессия кабинета Kaspi истекла — переподключите магазин («+ Добавить магазин» → тот же магазин).' }, { status: 400 })
+  }
   return NextResponse.json({
-    active: active.map(toSummary),
-    removed: removed.map(toSummary),
+    active: activeRes.offers.map(toSummary),
+    removed: removedRes.offers.map(toSummary),
   })
 }
 
