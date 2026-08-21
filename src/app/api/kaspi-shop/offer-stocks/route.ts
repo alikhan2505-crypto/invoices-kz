@@ -36,6 +36,16 @@ type PointEntry = {
 // whatever cityId/stock/price fields sit beside it. Unrecognized
 // structures simply yield an empty list (surfaced honestly in the UI),
 // never a fabricated one.
+function upsertEntry(out: Map<string, PointEntry>, storeCode: string): PointEntry {
+  const existing = out.get(storeCode) || { storeCode, cityId: null, cityName: null, price: null, stockCount: null, available: null }
+  out.set(storeCode, existing)
+  return existing
+}
+
+function stripPrefix(raw: string, merchantId: string): string {
+  return raw.startsWith(`${merchantId}_`) ? raw.slice(merchantId.length + 1) : raw
+}
+
 function collectPointEntries(node: any, merchantId: string, out: Map<string, PointEntry>) {
   if (Array.isArray(node)) {
     for (const item of node) collectPointEntries(item, merchantId, out)
@@ -43,10 +53,11 @@ function collectPointEntries(node: any, merchantId: string, out: Map<string, Poi
   }
   if (!node || typeof node !== 'object') return
 
+  // Shape A: an object carrying storeId directly (availabilities entries) --
+  // stock/available live here.
   const rawStoreId = node.storeId ?? node.pointId ?? null
   if (typeof rawStoreId === 'string' && rawStoreId.length > 0) {
-    const storeCode = rawStoreId.startsWith(`${merchantId}_`) ? rawStoreId.slice(merchantId.length + 1) : rawStoreId
-    const existing = out.get(storeCode) || { storeCode, cityId: null, cityName: null, price: null, stockCount: null, available: null }
+    const existing = upsertEntry(out, stripPrefix(rawStoreId, merchantId))
     const cityId = node.cityId ?? node.city?.id ?? null
     if (cityId !== null && cityId !== undefined) existing.cityId = String(cityId)
     const stock = node.stockCount ?? node.stockLevel ?? null
@@ -54,7 +65,23 @@ function collectPointEntries(node: any, merchantId: string, out: Map<string, Poi
     const price = node.price ?? null
     if (price !== null && price !== undefined && Number.isFinite(Number(price))) existing.price = Number(price)
     if (typeof node.available === 'string') existing.available = node.available
-    out.set(storeCode, existing)
+  }
+
+  // Shape B: a city entry whose `points` array names the point codes served
+  // FROM that city (the details response's cities[] rows carry points: null
+  // for plain delivery cities and ["PP2"]-style arrays for the cities where
+  // the merchant's own points sit -- visible in the very first live capture
+  // of this endpoint). This is where point -> city is actually expressed;
+  // the point-city's own price rides along.
+  const cityIdVal = node.cityId ?? null
+  if (cityIdVal !== null && cityIdVal !== undefined && Array.isArray(node.points) && node.points.length > 0) {
+    for (const p of node.points) {
+      if (typeof p !== 'string' || !p) continue
+      const existing = upsertEntry(out, stripPrefix(p, merchantId))
+      existing.cityId = String(cityIdVal)
+      const price = node.price ?? null
+      if (price !== null && price !== undefined && Number.isFinite(Number(price))) existing.price = Number(price)
+    }
   }
 
   for (const value of Object.values(node)) {
@@ -85,6 +112,22 @@ export async function GET(req: NextRequest) {
   const entriesMap = new Map<string, PointEntry>()
   if (detailsGet) collectPointEntries(detailsGet, connection.merchantId, entriesMap)
   if (detailsPost) collectPointEntries(detailsPost, connection.merchantId, entriesMap)
+
+  // Self-diagnosis when the scan can't resolve cities: dump a truncated
+  // structural sample to the runtime logs so the parsing can be fixed from
+  // the server side without asking the founder for more DevTools captures.
+  if (Array.from(entriesMap.values()).every(e => !e.cityId)) {
+    const sample = (label: string, d: Record<string, any> | null) => {
+      if (!d) { console.log(`offer-stocks debug ${label}: null`); return }
+      console.log(`offer-stocks debug ${label} keys:`, Object.keys(d).join(','))
+      const json = JSON.stringify(d)
+      for (let i = 0; i < Math.min(json.length, 12000); i += 3000) {
+        console.log(`offer-stocks debug ${label} [${i}]:`, json.slice(i, i + 3000))
+      }
+    }
+    sample('GET', detailsGet)
+    sample('POST', detailsPost)
+  }
 
   const { data: connRow } = await supabase
     .from('kaspi_shop_connections')
