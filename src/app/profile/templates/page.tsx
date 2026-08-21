@@ -8,6 +8,7 @@ import DesktopShell from '@/components/DesktopShell'
 import { useLanguage } from '@/components/LanguageProvider'
 import { backLabel, deleteLabel } from '@/lib/a11yLabels'
 import { profileContentDict } from '@/lib/i18n/profileContent'
+import { getActivePlan } from '@/lib/plan'
 import Skeleton from '@/components/Skeleton'
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
@@ -63,7 +64,7 @@ export default function Templates() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
     const [{ data: p }, { data: tData }] = await Promise.all([
-      supabase.from('profiles').select('plan').eq('id', user.id).single(),
+      supabase.from('profiles').select('plan, plan_expires_at, trial_expires_at, bonus_expires_at').eq('id', user.id).single(),
       supabase.from('templates').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
     ])
     setProfile(p)
@@ -77,7 +78,13 @@ export default function Templates() {
     setTemplates(prev => prev.filter(tpl => tpl.id !== id))
   }
 
-  const isPro = profile?.plan === 'pro'
+  // Was reading the raw profiles.plan column directly, so an EXPIRED pro
+  // plan (plan_expires_at in the past, plan column left at 'pro' for
+  // historical record -- see getActivePlan's own comment) still unlocked
+  // this page's Pro-only template features (confirmed live 2026-08-21:
+  // ИП ВЕКТОР's plan expired 2026-07-12 but templates stayed unlocked).
+  // getActivePlan is the one source of truth for expiry everywhere else.
+  const isPro = getActivePlan(profile).canTemplates
 
   const header = (
     <motion.div
