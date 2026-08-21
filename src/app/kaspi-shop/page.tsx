@@ -796,7 +796,7 @@ export default function KaspiShop() {
                 with the live price, competitor, region, seller count and a
                 real Kaspi link. An expanded card spans the full row so its
                 settings form keeps comfortable width. */}
-            <div className="grid lg:grid-cols-2 gap-3 items-start">
+            <div className="grid lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 items-start">
               <AnimatePresence initial={false}>
                 {products.map((p, i) => {
                   const v = editValues[p.id] || { floorPrice: String(p.floor_price), maxPrice: p.max_price !== null ? String(p.max_price) : '', undercutStep: String(p.undercut_step), strategy: p.demping_strategy, excludedCities: '', excludedMerchants: '' }
@@ -806,7 +806,7 @@ export default function KaspiShop() {
                     <motion.div key={p.id}
                       initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
                       transition={{ duration: 0.35, ease: EASE, delay: Math.min(i * 0.04, 0.3) }}
-                      className={`nav-glass rounded-2xl overflow-hidden ${CARD_HOVER} ${expanded ? 'lg:col-span-2' : ''}`}>
+                      className={`nav-glass rounded-2xl overflow-hidden ${CARD_HOVER} ${expanded ? 'col-span-full' : ''}`}>
                       {/* div, not <button>: the card carries a real nested <a>
                           (Kaspi link), which is invalid inside a button. */}
                       <div role="button" tabIndex={0} onClick={() => {
@@ -968,7 +968,7 @@ export default function KaspiShop() {
               </AnimatePresence>
 
               {products.length === 0 && (
-                <div className="nav-glass rounded-2xl p-8 text-center lg:col-span-2">
+                <div className="nav-glass rounded-2xl p-8 text-center col-span-full">
                   <div className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>Каталог ещё импортируется или пуст.</div>
                   <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>Товары появятся здесь после подключения кабинета — или нажмите «Обновить каталог» выше.</div>
                 </div>
