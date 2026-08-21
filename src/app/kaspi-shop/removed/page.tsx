@@ -71,7 +71,10 @@ export default function KaspiShopProductAvailability() {
   const [loadError, setLoadError] = useState('')
   const [active, setActive] = useState<Offer[]>([])
   const [removed, setRemoved] = useState<Offer[]>([])
-  const [tab, setTab] = useState<Tab>('removed')
+  // «В продаже» first (founder request) -- these are the products being
+  // worked with; load() flips to the removed tab only when there is
+  // nothing on sale at all.
+  const [tab, setTab] = useState<Tab>('active')
   const [rowStates, setRowStates] = useState<Record<string, RowState>>({})
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({})
   const [stockModal, setStockModal] = useState<StockModalState | null>(null)
@@ -99,9 +102,7 @@ export default function KaspiShopProductAvailability() {
       } else {
         setActive(data.active || [])
         setRemoved(data.removed || [])
-        // Mirror the cabinet's own default: land on whichever side has items,
-        // preferring the removed side only when it's the one with content.
-        if ((data.removed || []).length === 0 && (data.active || []).length > 0) setTab('active')
+        if ((data.active || []).length === 0 && (data.removed || []).length > 0) setTab('removed')
       }
     } catch {
       setLoadError('Не удалось загрузить данные. Проверьте соединение и попробуйте ещё раз.')
