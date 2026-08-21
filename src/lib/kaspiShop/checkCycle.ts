@@ -37,7 +37,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-export type DueTrackedProduct = { id: string; kaspiSku: string; targetCities: string[] }
+export type DueTrackedProduct = { id: string; kaspiSku: string; kaspiMasterSku: string; targetCities: string[] }
 
 // Pure predicate, factored out of getDueTrackedProducts below so the
 // "Готовы применить" stat on /kaspi-shop (GET /api/kaspi-shop/products,
@@ -62,7 +62,7 @@ export function isCheckDue(lastCheckedAt: string | null, checkFrequencyMinutes: 
 export async function getDueTrackedProducts(): Promise<DueTrackedProduct[]> {
   const { data: due } = await supabase
     .from('kaspi_shop_tracked_products')
-    .select('id, kaspi_sku, last_checked_at, check_frequency_minutes, enabled, excluded_city_codes, point_city_codes, kaspi_shop_connections(paused, tracked_city_codes)')
+    .select('id, kaspi_sku, kaspi_master_sku, last_checked_at, check_frequency_minutes, enabled, excluded_city_codes, point_city_codes, kaspi_shop_connections(paused, tracked_city_codes)')
     .eq('enabled', true)
 
   const now = Date.now()
@@ -85,6 +85,18 @@ export async function getDueTrackedProducts(): Promise<DueTrackedProduct[]> {
       return {
         id: p.id,
         kaspiSku: p.kaspi_sku,
+        // Root cause of "конкуренты не обновляются" (found 2026-08-21 via a
+        // live browser capture of the real product page): Kaspi's public
+        // offer-view endpoint (kaspi.kz/yml/offer-view/offers/{id}) takes
+        // the MASTER product id ("133206576"), not the seller's combined
+        // kaspi_sku ("133206576_392235481" -- master + this seller's own
+        // merchantSku). Querying with the combined string returns a 200
+        // with an EMPTY offers array -- no error, so the price-check
+        // script silently saw "0 competitors" on every run since this
+        // field existed. Falls back to kaspi_sku only for pre-2026-08-13
+        // rows added through the manual /api/kaspi-shop/products POST
+        // route, which never captured a master sku.
+        kaspiMasterSku: p.kaspi_master_sku || p.kaspi_sku,
         targetCities,
       }
     })
@@ -242,7 +254,14 @@ export async function applyPriceCheckResult(
   const noCompetitorStreak = Number(product.no_competitor_streak) || 0
 
   if (!fetchError && offers && 'perCityOffers' in offers) {
-    const excludedMerchants: string[] = product.excluded_merchant_ids || []
+    // Own merchant is ALWAYS excluded from the competitor list, not just
+    // the seller's manual excluded_merchant_ids -- the public offer-view
+    // endpoint's response includes our own offer alongside real
+    // competitors. Before 2026-08-21 this branch never saw real offers at
+    // all (wrong sku bug, see getDueTrackedProducts), so this gap was
+    // latent; fixing the sku without this would have made the repricer spot
+    // its own price as a "competitor" and undercut itself every cycle.
+    const excludedMerchants: string[] = [...(product.excluded_merchant_ids || []), connection.merchant_id]
     const { data: cityRows } = await supabase
       .from('kaspi_shop_product_city_prices')
       .select('city_code, own_current_price, no_competitor_streak')
@@ -364,7 +383,9 @@ export async function applyPriceCheckResult(
     }
   } else if (!fetchError) {
     const competitorOffers = offers && 'competitorOffers' in offers ? offers.competitorOffers : null
-    const excludedMerchants: string[] = product.excluded_merchant_ids || []
+    // Same self-exclusion as the perCityOffers branch above -- see comment
+    // there.
+    const excludedMerchants: string[] = [...(product.excluded_merchant_ids || []), connection.merchant_id]
     const competitorPrices = (competitorOffers || [])
       .filter(o => !excludedMerchants.includes(o.merchantId))
       .map(o => o.price)

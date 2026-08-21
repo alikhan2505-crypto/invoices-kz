@@ -67,6 +67,13 @@ async function main() {
   console.log(`${due.length} product(s) due`)
 
   for (const product of due) {
+    // Kaspi's public offer-view endpoint wants the MASTER product id
+    // ("133206576"), not this seller's combined kaspi_sku
+    // ("133206576_392235481") -- confirmed 2026-08-21 via a live browser
+    // capture of the real product page's own network call. Querying with
+    // the combined string returns HTTP 200 with an empty offers array, so
+    // this silently reported "0 competitors" on every run until now.
+    const lookupSku = product.kaspiMasterSku || product.kaspiSku
     let competitorOffers = null
     let perCityOffers = null
     let fetchError = null
@@ -74,11 +81,11 @@ async function main() {
       if (product.targetCities && product.targetCities.length > 0) {
         perCityOffers = {}
         for (const cityCode of product.targetCities) {
-          perCityOffers[cityCode] = await fetchOffersForCity(product.kaspiSku, cityCode)
+          perCityOffers[cityCode] = await fetchOffersForCity(lookupSku, cityCode)
           await sleep(300)
         }
       } else {
-        competitorOffers = await fetchOffersForCity(product.kaspiSku, CITY_ID)
+        competitorOffers = await fetchOffersForCity(lookupSku, CITY_ID)
       }
     } catch (err) {
       fetchError = err.message
