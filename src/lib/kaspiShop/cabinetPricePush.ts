@@ -58,24 +58,30 @@ export async function pushPriceChange(params: {
   return { success: true }
 }
 
-// Returns a removed-from-sale (available=false) offer to sale. Captured live
-// 2026-08-21 from the cabinet's own "Выставить на продажу" flow (founder's
-// DevTools screenshots): the cabinet validates via
-// offer-validation-api/.../validate/v2 (action ON_SALE__BATCH, returned
-// valid:true) and then uploads MANUAL_CHANGES through the same
-// pricefeed/upload pipeline as pushPriceChange above -- an offer row with
-// availabilities available:"yes" (stockCount null in the captured state) and
-// the offer's city prices. We reuse the single-item process endpoint whose
-// payload shape has been confirmed since 2026-08-12, rather than the batch
-// variant whose full item shape wasn't fully expanded in the capture.
-export async function restoreOfferToSale(params: {
+export type OfferAvailabilityParams = {
   sessionCookies: string
   merchantUid: string
   sku: string
   model: string
   storeId: string
   cityPrices: { cityId: string; value: number }[]
-}): Promise<PricePushResult> {
+}
+
+// Shared MANUAL_CHANGES upload for toggling an offer on/off sale. The
+// available:"yes" (restore) direction was captured live 2026-08-21 from the
+// cabinet's own "Выставить на продажу" flow (founder's DevTools screenshots):
+// the cabinet validates via offer-validation-api/.../validate/v2 (action
+// ON_SALE__BATCH, returned valid:true) and then uploads MANUAL_CHANGES
+// through the same pricefeed/upload pipeline as pushPriceChange above -- an
+// offer row with availabilities available:"yes" (stockCount null in the
+// captured state) and the offer's city prices. We reuse the single-item
+// process endpoint whose payload shape has been confirmed since 2026-08-12,
+// rather than the batch variant whose full item shape wasn't fully expanded
+// in the capture. The available:"no" (remove-from-sale) direction is the
+// symmetric counterpart -- same field the cabinet's own state stores as
+// yes/no -- but has NOT been captured live yet; first real use should be
+// watched (a Kaspi rejection surfaces as the honest error message below).
+async function pushOfferAvailability(params: OfferAvailabilityParams, available: 'yes' | 'no'): Promise<PricePushResult> {
   let res: Response
   try {
     res = await fetch(PRICE_PUSH_URL, {
@@ -90,7 +96,7 @@ export async function restoreOfferToSale(params: {
       body: JSON.stringify({
         merchantUid: params.merchantUid,
         availabilities: [
-          { available: 'yes', storeId: params.storeId, stockCount: null },
+          { available, storeId: params.storeId, stockCount: null },
         ],
         cityPrices: params.cityPrices,
         sku: params.sku,
@@ -110,4 +116,12 @@ export async function restoreOfferToSale(params: {
   }
 
   return { success: true }
+}
+
+export async function restoreOfferToSale(params: OfferAvailabilityParams): Promise<PricePushResult> {
+  return pushOfferAvailability(params, 'yes')
+}
+
+export async function removeOfferFromSale(params: OfferAvailabilityParams): Promise<PricePushResult> {
+  return pushOfferAvailability(params, 'no')
 }

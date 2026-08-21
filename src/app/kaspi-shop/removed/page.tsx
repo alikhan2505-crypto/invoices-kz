@@ -9,7 +9,7 @@ import DesktopShell from '@/components/DesktopShell'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
-type RemovedOffer = {
+type Offer = {
   sku: string
   masterSku: string | null
   title: string
@@ -17,10 +17,12 @@ type RemovedOffer = {
   minPrice: number
 }
 
-// Per-row lifecycle: idle -> restoring (request in flight) -> sent (Kaspi
+type Tab = 'active' | 'removed'
+
+// Per-row lifecycle: idle -> busy (request in flight) -> sent (Kaspi
 // accepted, processes asynchronously -- the cabinet's own UI shows the same
 // «В обработке» state, usually done within the hour).
-type RowState = 'idle' | 'restoring' | 'sent'
+type RowState = 'idle' | 'busy' | 'sent'
 
 function RestoreIcon() {
   return (
@@ -31,11 +33,21 @@ function RestoreIcon() {
   )
 }
 
-export default function KaspiShopRemoved() {
+function PauseIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <path d="M10 5v14M15 5v14" />
+    </svg>
+  )
+}
+
+export default function KaspiShopProductAvailability() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
-  const [offers, setOffers] = useState<RemovedOffer[]>([])
+  const [active, setActive] = useState<Offer[]>([])
+  const [removed, setRemoved] = useState<Offer[]>([])
+  const [tab, setTab] = useState<Tab>('removed')
   const [rowStates, setRowStates] = useState<Record<string, RowState>>({})
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({})
 
@@ -58,9 +70,13 @@ export default function KaspiShopRemoved() {
       const res = await fetch('/api/kaspi-shop/removed-products', { headers })
       const data = await res.json()
       if (!res.ok) {
-        setLoadError(data.error || 'Не удалось загрузить снятые с продажи товары')
+        setLoadError(data.error || 'Не удалось загрузить товары')
       } else {
-        setOffers(data.offers || [])
+        setActive(data.active || [])
+        setRemoved(data.removed || [])
+        // Mirror the cabinet's own default: land on whichever side has items,
+        // preferring the removed side only when it's the one with content.
+        if ((data.removed || []).length === 0 && (data.active || []).length > 0) setTab('active')
       }
     } catch {
       setLoadError('Не удалось загрузить данные. Проверьте соединение и попробуйте ещё раз.')
@@ -69,21 +85,23 @@ export default function KaspiShopRemoved() {
     }
   }
 
-  async function restore(sku: string) {
-    setRowStates(prev => ({ ...prev, [sku]: 'restoring' }))
+  async function toggle(sku: string, action: 'restore' | 'remove') {
+    setRowStates(prev => ({ ...prev, [sku]: 'busy' }))
     setRowErrors(prev => ({ ...prev, [sku]: '' }))
     const headers = await authHeader()
-    const res = await fetch('/api/kaspi-shop/removed-products', { method: 'POST', headers, body: JSON.stringify({ sku }) })
+    const res = await fetch('/api/kaspi-shop/removed-products', { method: 'POST', headers, body: JSON.stringify({ sku, action }) })
     const data = await res.json()
     if (!res.ok) {
       setRowStates(prev => ({ ...prev, [sku]: 'idle' }))
-      setRowErrors(prev => ({ ...prev, [sku]: data.error || 'Не удалось вернуть товар в продажу' }))
+      setRowErrors(prev => ({ ...prev, [sku]: data.error || 'Не удалось выполнить операцию' }))
       return
     }
     setRowStates(prev => ({ ...prev, [sku]: 'sent' }))
   }
 
   if (loading) return <LoadingSpinner />
+
+  const offers = tab === 'removed' ? removed : active
 
   return (
     <DesktopShell>
@@ -94,12 +112,28 @@ export default function KaspiShopRemoved() {
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}
           className="nav-glass nav-card-accent rounded-[28px] p-6 lg:p-8 mb-4">
           <div className="text-[11px] font-semibold tracking-wider uppercase mb-1" style={{ color: 'var(--nav-text-muted)' }}>Kaspi Bot</div>
-          <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight" style={{ color: 'var(--nav-text-primary)' }}>Сняты с продажи</h1>
+          <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight" style={{ color: 'var(--nav-text-primary)' }}>Управление товарами</h1>
           <p className="text-sm mt-2 max-w-2xl" style={{ color: 'var(--nav-text-secondary)' }}>
-            Товары вашего магазина, которые сейчас не продаются на Kaspi. Возврат в продажу отправляется прямо в кабинет
-            Kaspi — после отправки Kaspi обрабатывает товар сам, обычно в течение часа.
+            Снимайте товары с продажи и возвращайте обратно — как в кабинете Kaspi, но прямо отсюда. Обе операции Kaspi
+            обрабатывает сам, обычно в течение часа. При снятии с продажи правило демпинга для товара автоматически
+            выключается, чтобы репрайсер случайно не вернул его в продажу.
           </p>
         </motion.div>
+
+        <div className="flex items-center gap-1.5 mb-4">
+          {([['removed', `Сняты с продажи (${removed.length})`], ['active', `В продаже (${active.length})`]] as [Tab, string][]).map(([key, label]) => {
+            const selected = tab === key
+            return (
+              <button key={key} onClick={() => setTab(key)}
+                className="relative px-3.5 py-1.5 rounded-full text-[13px] font-medium transition-colors"
+                style={selected
+                  ? { background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }
+                  : { color: 'var(--nav-text-secondary)' }}>
+                {label}
+              </button>
+            )
+          })}
+        </div>
 
         {loadError && (
           <div className="nav-glass rounded-2xl p-4 flex items-center justify-between gap-3 mb-4">
@@ -110,8 +144,12 @@ export default function KaspiShopRemoved() {
 
         {!loadError && offers.length === 0 && (
           <div className="nav-glass rounded-2xl p-8 text-center">
-            <div className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>Снятых с продажи товаров нет</div>
-            <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>Все товары активного магазина сейчас в продаже.</div>
+            <div className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>
+              {tab === 'removed' ? 'Снятых с продажи товаров нет' : 'Товаров в продаже нет'}
+            </div>
+            <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>
+              {tab === 'removed' ? 'Все товары активного магазина сейчас в продаже.' : 'Недавно отправленные товары Kaspi может ещё обрабатывать.'}
+            </div>
           </div>
         )}
 
@@ -119,6 +157,7 @@ export default function KaspiShopRemoved() {
           {offers.map((offer, i) => {
             const state = rowStates[offer.sku] || 'idle'
             const error = rowErrors[offer.sku]
+            const action = tab === 'removed' ? 'restore' : 'remove'
             return (
               <motion.div key={offer.sku}
                 initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
@@ -139,12 +178,19 @@ export default function KaspiShopRemoved() {
                       <span className="text-xs font-semibold rounded-full px-3 py-2" style={{ background: 'var(--nav-success)', color: '#fff' }}>
                         Отправлено — Kaspi обрабатывает
                       </span>
-                    ) : (
-                      <button onClick={() => restore(offer.sku)} disabled={state === 'restoring'}
+                    ) : action === 'restore' ? (
+                      <button onClick={() => toggle(offer.sku, 'restore')} disabled={state === 'busy'}
                         className="text-xs font-semibold rounded-full px-3 py-2 flex items-center gap-1.5 transition-transform hover:-translate-y-0.5 disabled:opacity-60"
                         style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                         <RestoreIcon />
-                        {state === 'restoring' ? 'Отправляем…' : 'Вернуть в продажу'}
+                        {state === 'busy' ? 'Отправляем…' : 'Вернуть в продажу'}
+                      </button>
+                    ) : (
+                      <button onClick={() => toggle(offer.sku, 'remove')} disabled={state === 'busy'}
+                        className="nav-glass text-xs font-semibold rounded-full px-3 py-2 flex items-center gap-1.5 transition-transform hover:-translate-y-0.5 disabled:opacity-60"
+                        style={{ color: 'var(--nav-critical)' }}>
+                        <PauseIcon />
+                        {state === 'busy' ? 'Отправляем…' : 'Снять с продажи'}
                       </button>
                     )}
                   </div>

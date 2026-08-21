@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { loadConnection, markSessionExpired } from '@/lib/kaspiShop/connection'
-import { listCatalog } from '@/lib/kaspiShop/cabinetApi'
-import { restoreOfferToSale } from '@/lib/kaspiShop/cabinetPricePush'
+import { listCatalog, CatalogOffer } from '@/lib/kaspiShop/cabinetApi'
+import { restoreOfferToSale, removeOfferFromSale } from '@/lib/kaspiShop/cabinetPricePush'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -21,10 +21,20 @@ async function requireUser(req: NextRequest) {
   return user
 }
 
-// The active store's removed-from-sale (available=false) offers -- the same
-// catalog list the import uses, just with the a=false flag. Born from a live
-// founder report (2026-08-21): 2 real removed products were invisible in our
-// cabinet because import only ever pulled available=true.
+function toSummary(o: CatalogOffer) {
+  return {
+    sku: o.sku,
+    masterSku: o.masterSku,
+    title: o.title,
+    brandName: o.brandName,
+    minPrice: o.minPrice,
+  }
+}
+
+// The active store's catalog split the way Kaspi's own «Управление товарами»
+// splits it: В продаже (available=true) / Сняты с продажи (available=false).
+// Born from a live founder report (2026-08-21): 2 real removed products were
+// invisible in our cabinet because import only ever pulled available=true.
 export async function GET(req: NextRequest) {
   const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -33,23 +43,20 @@ export async function GET(req: NextRequest) {
   if (!connection) return NextResponse.json({ error: 'Kaspi Магазин не подключён' }, { status: 400 })
   if (!connection.sessionCookies) return NextResponse.json({ error: 'Сессия кабинета Kaspi не активна — переподключитесь' }, { status: 400 })
 
-  const removed = await listCatalog(connection.sessionCookies, connection.merchantId, false)
+  const [active, removed] = await Promise.all([
+    listCatalog(connection.sessionCookies, connection.merchantId, true),
+    listCatalog(connection.sessionCookies, connection.merchantId, false),
+  ])
   return NextResponse.json({
-    offers: removed.map(o => ({
-      sku: o.sku,
-      masterSku: o.masterSku,
-      title: o.title,
-      brandName: o.brandName,
-      minPrice: o.minPrice,
-    })),
+    active: active.map(toSummary),
+    removed: removed.map(toSummary),
   })
 }
 
-// Restore one removed offer to sale. On success Kaspi processes it
-// asynchronously (the cabinet shows «В обработке», usually done within the
-// hour) -- we also import the offer into the repricer's tracked products
-// right away (disabled, same defaults as finalizeConnection's import) so it
-// shows up on the Демпинг page without needing a full reconnect.
+// Toggle one offer's availability. action 'restore' returns a removed offer
+// to sale; action 'remove' takes an active offer off sale ("в ожидание").
+// Kaspi processes both asynchronously (the cabinet shows «В обработке»,
+// usually done within the hour).
 export async function POST(req: NextRequest) {
   const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -60,31 +67,59 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: 'Некорректный JSON' }, { status: 400 })
   }
-  const { sku } = body
+  const { sku, action } = body
   if (!sku) return NextResponse.json({ error: 'sku обязателен' }, { status: 400 })
+  if (action !== 'restore' && action !== 'remove') {
+    return NextResponse.json({ error: "action должен быть 'restore' или 'remove'" }, { status: 400 })
+  }
 
   const connection = await loadConnection(user.id)
   if (!connection) return NextResponse.json({ error: 'Kaspi Магазин не подключён' }, { status: 400 })
   if (!connection.sessionCookies) return NextResponse.json({ error: 'Сессия кабинета Kaspi не активна — переподключитесь' }, { status: 400 })
 
-  const removed = await listCatalog(connection.sessionCookies, connection.merchantId, false)
-  const offer = removed.find(o => o.sku === sku)
-  if (!offer) return NextResponse.json({ error: 'Товар не найден среди снятых с продажи' }, { status: 404 })
+  // The offer must currently sit on the side the action moves it FROM.
+  const offers = await listCatalog(connection.sessionCookies, connection.merchantId, action === 'restore' ? false : true)
+  const offer = offers.find(o => o.sku === sku)
+  if (!offer) {
+    return NextResponse.json({
+      error: action === 'restore' ? 'Товар не найден среди снятых с продажи' : 'Товар не найден среди товаров в продаже',
+    }, { status: 404 })
+  }
 
-  const result = await restoreOfferToSale({
+  const pushParams = {
     sessionCookies: connection.sessionCookies,
     merchantUid: connection.merchantId,
     sku: offer.sku,
     model: offer.title,
     storeId: offer.points[0] || '',
     cityPrices: Object.entries(offer.allCityPrices).map(([cityId, entry]) => ({ cityId, value: entry.price })),
-  })
+  }
+  const result = action === 'restore' ? await restoreOfferToSale(pushParams) : await removeOfferFromSale(pushParams)
   if (!result.success) {
     if (result.reason === 'session_expired') {
       await markSessionExpired(connection.id)
       return NextResponse.json({ error: 'Сессия кабинета Kaspi истекла — переподключитесь' }, { status: 400 })
     }
-    return NextResponse.json({ error: `Kaspi отклонил восстановление: ${result.message}` }, { status: 502 })
+    return NextResponse.json({ error: `Kaspi отклонил операцию: ${result.message}` }, { status: 502 })
+  }
+
+  if (action === 'remove') {
+    // CRITICAL: the repricer's own price push always sends available:"yes"
+    // (pushPriceChange above in cabinetPricePush.ts) -- an enabled demping
+    // rule on a just-removed offer would silently resurrect it on the next
+    // check cycle. Disable the rule alongside the removal.
+    try {
+      if (offer.masterSku) {
+        await supabase
+          .from('kaspi_shop_tracked_products')
+          .update({ enabled: false })
+          .eq('connection_id', connection.id)
+          .eq('kaspi_master_sku', offer.masterSku)
+      }
+    } catch (err: any) {
+      console.error('kaspi-shop removed-products: post-remove rule disable failed (non-fatal)', err.message)
+    }
+    return NextResponse.json({ ok: true })
   }
 
   // Best-effort import into tracked products (disabled, same defaults as the
