@@ -292,9 +292,34 @@ export async function applyPriceCheckResult(
       const allCompetitorPrices = cityOffersList.flatMap(c => c.offers.filter(o => !excludedMerchants.includes(o.merchantId)).map(o => o.price))
       competitorPrice = allCompetitorPrices.length > 0 ? Math.min(...allCompetitorPrices) : null
 
+      // "Leader" city -- whichever city's result actually set ownPriceAfter
+      // (falls back to the first city if none matches, which can't happen
+      // in practice since ownPriceAfter is Math.min of these same results).
+      // Its raw offers back both the card's "N продавцов кроме вас" count
+      // (previously stuck reading the top-level market_offer_count column,
+      // which this branch never wrote -- confirmed live 2026-08-21: the
+      // card showed "0 продавцов" even after a real competitor was found)
+      // and a name+price snapshot for the card's hover tooltip.
+      const leaderCityCode = results.find(r => r.price === ownPriceAfter)?.cityCode ?? results[0].cityCode
+      const leaderOffers = cityOffersList.find(c => c.cityCode === leaderCityCode)?.offers || []
+      const { position: leaderPosition, totalOffers: leaderTotalOffers } = computeMarketPosition(leaderOffers, connection.merchant_id, ownPriceAfter)
+      const competitorSnapshot = leaderOffers
+        .filter(o => !excludedMerchants.includes(o.merchantId))
+        .sort((a, b) => a.price - b.price)
+        .slice(0, 10)
+        .map(o => ({ merchantName: o.merchantName || null, price: o.price }))
+
       await supabase
         .from('kaspi_shop_tracked_products')
-        .update({ own_current_price: ownPriceAfter, last_checked_at: new Date().toISOString(), last_competitor_price: competitorPrice, held_at_floor: anyHeldAtFloor })
+        .update({
+          own_current_price: ownPriceAfter,
+          last_checked_at: new Date().toISOString(),
+          last_competitor_price: competitorPrice,
+          held_at_floor: anyHeldAtFloor,
+          market_position: leaderPosition,
+          market_offer_count: leaderTotalOffers,
+          competitor_snapshot: competitorSnapshot,
+        })
         .eq('id', trackedProductId)
 
       // Streak persistence runs unconditionally, independent of the
@@ -407,10 +432,15 @@ export async function applyPriceCheckResult(
     // reflects real market reality, not this seller's own "ignore this
     // competitor" preference.
     const { position, totalOffers } = computeMarketPosition(competitorOffers || [], connection.merchant_id, ownPriceAfter)
+    const competitorSnapshot = (competitorOffers || [])
+      .filter(o => !excludedMerchants.includes(o.merchantId))
+      .sort((a, b) => a.price - b.price)
+      .slice(0, 10)
+      .map(o => ({ merchantName: o.merchantName || null, price: o.price }))
 
     await supabase
       .from('kaspi_shop_tracked_products')
-      .update({ own_current_price: ownPriceAfter, last_checked_at: new Date().toISOString(), last_competitor_price: competitorPrice, no_competitor_streak: newStreak, market_position: position, market_offer_count: totalOffers, held_at_floor: heldAtFloor })
+      .update({ own_current_price: ownPriceAfter, last_checked_at: new Date().toISOString(), last_competitor_price: competitorPrice, no_competitor_streak: newStreak, market_position: position, market_offer_count: totalOffers, held_at_floor: heldAtFloor, competitor_snapshot: competitorSnapshot })
       .eq('id', trackedProductId)
 
     if (action === 'updated' && connection?.session_cookies && connection.session_status === 'active') {

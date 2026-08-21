@@ -117,7 +117,7 @@ export function computeRepriceCandidate({
   return { price: candidate, heldAtFloor: false, newStreak: 0 }
 }
 
-export type CompetitorOffer = { merchantId: string; price: number }
+export type CompetitorOffer = { merchantId: string; price: number; merchantName?: string | null }
 export type CityOffers = { cityCode: string; offers: CompetitorOffer[] }
 export type CityRepriceResult = { cityCode: string; price: number; heldAtFloor: boolean; newStreak: number }
 

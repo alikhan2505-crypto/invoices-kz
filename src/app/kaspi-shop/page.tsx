@@ -30,6 +30,15 @@ type Product = {
   excluded_merchant_ids: string[]
   market_position: number | null
   market_offer_count: number | null
+  competitor_snapshot: { merchantName: string | null; price: number }[] | null
+}
+
+// Multi-line native tooltip text for the "Конкурент" price -- who, at what
+// price, from the same snapshot the price decision itself used (leader
+// city's offers, own merchant already excluded).
+function competitorTooltip(snapshot: Product['competitor_snapshot']): string | undefined {
+  if (!snapshot || snapshot.length === 0) return undefined
+  return snapshot.map(o => `${o.merchantName || 'Продавец'} — ${o.price.toLocaleString('ru-KZ')} ₸`).join('\n')
 }
 
 const STRATEGY_LABELS: Record<string, string> = {
@@ -871,9 +880,9 @@ export default function KaspiShop() {
                             <div className="text-[10px] font-semibold tracking-wider uppercase" style={{ color: 'var(--nav-text-muted)' }}>Наша цена на Kaspi</div>
                             <div className="font-mono font-bold text-xl tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{p.own_current_price.toLocaleString('ru-KZ')} ₸</div>
                           </div>
-                          <div className="text-right">
+                          <div className="text-right" title={competitorTooltip(p.competitor_snapshot)}>
                             <div className="text-[10px] font-semibold tracking-wider uppercase" style={{ color: 'var(--nav-text-muted)' }}>Конкурент</div>
-                            <div className="font-mono text-sm tabular-nums" style={{ color: 'var(--nav-text-secondary)' }}>
+                            <div className={`font-mono text-sm tabular-nums ${p.competitor_snapshot?.length ? 'underline decoration-dotted underline-offset-2' : ''}`} style={{ color: 'var(--nav-text-secondary)' }}>
                               {p.last_competitor_price !== null ? `${p.last_competitor_price.toLocaleString('ru-KZ')} ₸` : '—'}
                             </div>
                           </div>

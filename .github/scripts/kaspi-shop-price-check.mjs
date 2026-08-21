@@ -43,7 +43,7 @@ async function fetchOffersForCity(kaspiSku, cityId) {
   const offers = Array.isArray(json.offers) ? json.offers : []
   return offers
     .filter(o => o && o.merchantId != null && Number(o.price) > 0)
-    .map(o => ({ merchantId: String(o.merchantId), price: Number(o.price) }))
+    .map(o => ({ merchantId: String(o.merchantId), price: Number(o.price), merchantName: o.merchantName ? String(o.merchantName) : null }))
 }
 
 function sleep(ms) {
