@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { loadConnection, markSessionExpired } from '@/lib/kaspiShop/connection'
-import { fetchOfferDetails } from '@/lib/kaspiShop/cabinetApi'
+import { fetchOfferDetails, extractOfferPointInfo, listCatalogWithStatus } from '@/lib/kaspiShop/cabinetApi'
 import { savePointStockPrice } from '@/lib/kaspiShop/cabinetPricePush'
 
 const supabase = createClient(
@@ -30,74 +30,11 @@ type PointEntry = {
   available: string | null
 }
 
-// The offer-details response's exact schema for per-point data was never
-// fully captured -- rather than guessing key paths, walk the whole JSON
-// tree and collect every object that carries a storeId, merging in
-// whatever cityId/stock/price fields sit beside it. Unrecognized
-// structures simply yield an empty list (surfaced honestly in the UI),
-// never a fabricated one.
-function upsertEntry(out: Map<string, PointEntry>, storeCode: string): PointEntry {
-  const existing = out.get(storeCode) || { storeCode, cityId: null, cityName: null, price: null, stockCount: null, available: null }
-  out.set(storeCode, existing)
-  return existing
-}
-
-function stripPrefix(raw: string, merchantId: string): string {
-  return raw.startsWith(`${merchantId}_`) ? raw.slice(merchantId.length + 1) : raw
-}
-
-function collectPointEntries(node: any, merchantId: string, out: Map<string, PointEntry>) {
-  if (Array.isArray(node)) {
-    for (const item of node) collectPointEntries(item, merchantId, out)
-    return
-  }
-  if (!node || typeof node !== 'object') return
-
-  // Shape A: an object carrying storeId directly (availabilities entries) --
-  // stock/available live here.
-  const rawStoreId = node.storeId ?? node.pointId ?? null
-  if (typeof rawStoreId === 'string' && rawStoreId.length > 0) {
-    const existing = upsertEntry(out, stripPrefix(rawStoreId, merchantId))
-    const cityId = node.cityId ?? node.city?.id ?? null
-    if (cityId !== null && cityId !== undefined) existing.cityId = String(cityId)
-    const stock = node.stockCount ?? node.stockLevel ?? null
-    if (stock !== null && stock !== undefined && Number.isFinite(Number(stock))) existing.stockCount = Number(stock)
-    const price = node.price ?? null
-    if (price !== null && price !== undefined && Number.isFinite(Number(price))) existing.price = Number(price)
-    if (typeof node.available === 'string') existing.available = node.available
-  }
-
-  // Shape B: a city entry whose `points` array carries the point OBJECTS
-  // served from that city. Confirmed via runtime-log dump 2026-08-21:
-  //   {"cityId":"511010000","price":1120,"points":[{"pointId":
-  //    "30067228_PP2","name":null,"available":true}]}
-  // -- points is null for plain delivery cities; the point-city's own price
-  // rides on the city row, and `available` on the point object is a BOOLEAN.
-  const cityIdVal = node.cityId ?? null
-  if (cityIdVal !== null && cityIdVal !== undefined && Array.isArray(node.points) && node.points.length > 0) {
-    for (const p of node.points) {
-      const rawCode = typeof p === 'string' ? p : (p && typeof p === 'object' ? (p.pointId ?? p.storeId ?? null) : null)
-      if (typeof rawCode !== 'string' || !rawCode) continue
-      const existing = upsertEntry(out, stripPrefix(rawCode, merchantId))
-      existing.cityId = String(cityIdVal)
-      const price = node.price ?? null
-      if (price !== null && price !== undefined && Number.isFinite(Number(price))) existing.price = Number(price)
-      if (p && typeof p === 'object') {
-        if (typeof p.available === 'boolean') existing.available = p.available ? 'yes' : 'no'
-        else if (typeof p.available === 'string') existing.available = p.available
-        const stock = p.stockCount ?? p.stockLevel ?? null
-        if (stock !== null && stock !== undefined && Number.isFinite(Number(stock))) existing.stockCount = Number(stock)
-      }
-    }
-  }
-
-  for (const value of Object.values(node)) {
-    if (value && typeof value === 'object') collectPointEntries(value, merchantId, out)
-  }
-}
-
 // GET ?sku=... -- the offer's per-point (склад/город) price+stock state,
-// for the «Цена и остатки» modal.
+// for the «Цена и остатки» modal. City/price per point come from the
+// details response (shared extractOfferPointInfo); остаток comes from the
+// catalog LIST row's availabilities -- the details response carries no
+// остаток at all (confirmed via runtime-log dump 2026-08-21).
 export async function GET(req: NextRequest) {
   const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -112,7 +49,27 @@ export async function GET(req: NextRequest) {
   if (!details) return NextResponse.json({ error: 'Не удалось получить карточку товара из Kaspi' }, { status: 502 })
 
   const entriesMap = new Map<string, PointEntry>()
-  collectPointEntries(details, connection.merchantId, entriesMap)
+  for (const info of extractOfferPointInfo(details, connection.merchantId)) {
+    entriesMap.set(info.storeCode, { ...info, cityName: null })
+  }
+
+  // Остаток per point from the list row (searching the active side first,
+  // the removed side as a fallback -- the modal opens from either tab).
+  try {
+    const activeList = await listCatalogWithStatus(connection.sessionCookies, connection.merchantId, true)
+    let listOffer = activeList.offers.find(o => o.sku === sku)
+    if (!listOffer) {
+      const removedList = await listCatalogWithStatus(connection.sessionCookies, connection.merchantId, false)
+      listOffer = removedList.offers.find(o => o.sku === sku)
+    }
+    for (const a of listOffer?.availabilities || []) {
+      const code = a.storeId.startsWith(`${connection.merchantId}_`) ? a.storeId.slice(connection.merchantId.length + 1) : a.storeId
+      const entry = entriesMap.get(code)
+      if (entry && a.stockCount !== null) entry.stockCount = a.stockCount
+    }
+  } catch (err: any) {
+    console.error('offer-stocks: list stock merge failed (non-fatal)', err.message)
+  }
 
   // Self-diagnosis when the scan can't resolve cities: dump a truncated
   // structural sample to the runtime logs so the parsing can be fixed from

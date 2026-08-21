@@ -9,12 +9,15 @@ import DesktopShell from '@/components/DesktopShell'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
+type OfferPoint = { storeCode: string; cityName: string | null; stockCount: number | null }
+
 type Offer = {
   sku: string
   masterSku: string | null
   title: string
   brandName: string | null
   minPrice: number
+  points: OfferPoint[]
 }
 
 type Tab = 'active' | 'removed'
@@ -243,8 +246,16 @@ export default function KaspiShopProductAvailability() {
                 transition={{ duration: 0.35, delay: i * 0.04, ease: EASE }}
                 className="nav-glass rounded-2xl p-4">
                 <div className="text-sm font-semibold truncate" title={offer.title} style={{ color: 'var(--nav-text-primary)' }}>{offer.title}</div>
-                <div className="text-[11px] mb-3" style={{ color: 'var(--nav-text-muted)' }}>
+                <div className="text-[11px] mb-1" style={{ color: 'var(--nav-text-muted)' }}>
                   {offer.brandName ? `${offer.brandName} · ` : ''}{offer.sku}
+                </div>
+                {/* Город точки + остаток по ней (founder request 2026-08-21);
+                    остаток «не указан» = безопасное состояние по формулировке
+                    самого Kaspi. */}
+                <div className="text-[11px] mb-3" style={{ color: 'var(--nav-text-secondary)' }}>
+                  {(offer.points || []).length === 0
+                    ? 'Все города'
+                    : (offer.points || []).map(pt => `${pt.cityName || pt.storeCode}: ${pt.stockCount !== null ? `${pt.stockCount} шт` : 'остаток не указан'}`).join(' · ')}
                 </div>
                 <div className="flex items-end justify-between gap-3">
                   <div>

@@ -10,6 +10,7 @@ type Connection = {
   companyName: string
   status: string
   isActive: boolean
+  sessionStatus: string
 }
 
 // Fired by kaspi-shop/page.tsx after connect/disconnect so this switcher
@@ -96,6 +97,24 @@ export default function KaspiShopStoreSwitcher() {
 
   if (connections.length === 0) return null
   const active = connections.find(c => c.isActive) ?? connections[0]
+
+  // Dead cabinet session (founder request 2026-08-21): the whole pill
+  // becomes one clear reconnect button instead of a store name that no
+  // longer works -- clicking reuses the standard connect flow, which
+  // refreshes the session for the same merchant without duplicates.
+  if (active.sessionStatus === 'session_expired') {
+    return (
+      <div className="relative ml-auto flex-shrink-0">
+        <button
+          onClick={() => router.push('/kaspi-shop?addStore=1')}
+          className="text-[12px] font-semibold rounded-full px-3 py-1.5"
+          style={{ background: 'var(--nav-critical)', color: '#fff' }}
+        >
+          Подключить магазин
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div ref={rootRef} className="relative ml-auto flex-shrink-0">

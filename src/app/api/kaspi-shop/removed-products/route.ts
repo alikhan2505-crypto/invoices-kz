@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { loadConnection, markSessionExpired } from '@/lib/kaspiShop/connection'
-import { listCatalog, listCatalogWithStatus, CatalogOffer } from '@/lib/kaspiShop/cabinetApi'
+import { listCatalog, listCatalogWithStatus, fetchOffersDetails, extractOfferPointInfo, CatalogOffer } from '@/lib/kaspiShop/cabinetApi'
 import { restoreOfferToSale, removeOfferFromSale } from '@/lib/kaspiShop/cabinetPricePush'
 
 const supabase = createClient(
@@ -21,14 +21,51 @@ async function requireUser(req: NextRequest) {
   return user
 }
 
-function toSummary(o: CatalogOffer) {
+type PointSummary = { storeCode: string; cityName: string | null; stockCount: number | null }
+
+function toSummary(o: CatalogOffer, pointsBySku: Map<string, PointSummary[]>) {
   return {
     sku: o.sku,
     masterSku: o.masterSku,
     title: o.title,
     brandName: o.brandName,
     minPrice: o.minPrice,
+    points: pointsBySku.get(o.sku) || [],
   }
+}
+
+// City per point comes from the details batch (one request for the whole
+// page -- the endpoint takes an sku array natively); остаток per point
+// comes from the LIST row's own availabilities (details carry no остаток
+// at all, confirmed via runtime-log dump).
+function buildPointSummaries(
+  offers: CatalogOffer[],
+  detailsBySku: Map<string, Record<string, any>>,
+  merchantId: string,
+  cityNames: Record<string, string>
+): Map<string, PointSummary[]> {
+  const result = new Map<string, PointSummary[]>()
+  for (const offer of offers) {
+    const details = detailsBySku.get(offer.sku)
+    const infos = details ? extractOfferPointInfo(details, merchantId) : []
+    const cityByCode = new Map(infos.map(i => [i.storeCode, i.cityId]))
+    const codes = new Set<string>([...offer.points, ...infos.map(i => i.storeCode)])
+    const stockByCode = new Map(
+      offer.availabilities.map(a => [
+        a.storeId.startsWith(`${merchantId}_`) ? a.storeId.slice(merchantId.length + 1) : a.storeId,
+        a.stockCount,
+      ])
+    )
+    result.set(offer.sku, Array.from(codes).map(code => {
+      const cityId = cityByCode.get(code) || null
+      return {
+        storeCode: code,
+        cityName: cityId ? (cityNames[cityId] || null) : null,
+        stockCount: stockByCode.get(code) ?? null,
+      }
+    }))
+  }
+  return result
 }
 
 // The active store's catalog split the way Kaspi's own «Управление товарами»
@@ -51,9 +88,28 @@ export async function GET(req: NextRequest) {
     await markSessionExpired(connection.id)
     return NextResponse.json({ error: 'Сессия кабинета Kaspi истекла — переподключите магазин («+ Добавить магазин» → тот же магазин).' }, { status: 400 })
   }
+
+  const allOffers = [...activeRes.offers, ...removedRes.offers]
+  const detailsBySku = new Map<string, Record<string, any>>()
+  try {
+    const detailsItems = await fetchOffersDetails(connection.sessionCookies, connection.merchantId, allOffers.map(o => o.sku))
+    for (const item of detailsItems) {
+      if (typeof item.sku === 'string') detailsBySku.set(item.sku, item)
+    }
+  } catch (err: any) {
+    console.error('kaspi-shop removed-products: details batch failed (non-fatal, cards show no cities)', err.message)
+  }
+  const { data: connRow } = await supabase
+    .from('kaspi_shop_connections')
+    .select('city_lookup_cache')
+    .eq('id', connection.id)
+    .maybeSingle()
+  const cityNames: Record<string, string> = connRow?.city_lookup_cache || {}
+  const pointsBySku = buildPointSummaries(allOffers, detailsBySku, connection.merchantId, cityNames)
+
   return NextResponse.json({
-    active: activeRes.offers.map(toSummary),
-    removed: removedRes.offers.map(toSummary),
+    active: activeRes.offers.map(o => toSummary(o, pointsBySku)),
+    removed: removedRes.offers.map(o => toSummary(o, pointsBySku)),
   })
 }
 

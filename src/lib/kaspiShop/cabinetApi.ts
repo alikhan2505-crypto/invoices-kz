@@ -101,6 +101,10 @@ export type CatalogOffer = {
   minPrice: number
   allCityPrices: Record<string, { price: number }>
   points: string[]
+  // Per-point stock/availability straight from the list row -- the offer
+  // DETAILS endpoint carries no остаток at all (confirmed via runtime-log
+  // dump 2026-08-21), the list's availabilities is where it actually lives.
+  availabilities: { storeId: string; stockCount: number | null; available: string | null }[]
 }
 
 // Full raw offer object for one sku -- the same call the cabinet's own
@@ -111,15 +115,91 @@ export type CatalogOffer = {
 // the restore/remove batch upload echoes this object back to Kaspi, and
 // retyping it would silently drop fields we don't know about.
 export async function fetchOfferDetails(sessionCookies: string, merchantId: string, sku: string): Promise<Record<string, any> | null> {
+  const items = await fetchOffersDetails(sessionCookies, merchantId, [sku])
+  return items[0] ?? null
+}
+
+// Batch variant -- the endpoint's request body takes an sku ARRAY natively
+// (the very first capture posted {sku:["..."]}), so a whole page of offers
+// costs one request instead of one per product.
+export async function fetchOffersDetails(sessionCookies: string, merchantId: string, skus: string[]): Promise<Record<string, any>[]> {
+  if (skus.length === 0) return []
   const res = await fetch(`https://mc.shop.kaspi.kz/offers/api/v1/offer/details?m=${encodeURIComponent(merchantId)}`, {
     method: 'POST',
     headers: authHeaders(sessionCookies),
-    body: JSON.stringify({ sku: [sku] }),
+    body: JSON.stringify({ sku: skus }),
   })
-  if (!res.ok) return null
+  if (!res.ok) return []
   const json = await res.json().catch(() => null)
-  const item = Array.isArray(json) ? json[0] : (Array.isArray(json?.data) ? json.data[0] : null)
-  return item && typeof item === 'object' ? item : null
+  const arr = Array.isArray(json) ? json : (Array.isArray(json?.data) ? json.data : [])
+  return arr.filter((item: any) => item && typeof item === 'object')
+}
+
+export type OfferPointInfo = {
+  storeCode: string
+  cityId: string | null
+  price: number | null
+  stockCount: number | null
+  available: string | null
+}
+
+// Per-point (склад) info extracted from an offer details object. Two real
+// shapes handled (runtime-log dump 2026-08-21): objects carrying storeId/
+// pointId directly (stock/available live there), and cities[] rows whose
+// `points` array holds point OBJECTS ({pointId:"30067228_PP2", name:null,
+// available:true} -- boolean available, city+price on the parent row).
+// Unrecognized structures yield an empty list, never fabricated data.
+export function extractOfferPointInfo(details: any, merchantId: string): OfferPointInfo[] {
+  const out = new Map<string, OfferPointInfo>()
+  const strip = (raw: string) => (raw.startsWith(`${merchantId}_`) ? raw.slice(merchantId.length + 1) : raw)
+  const upsert = (code: string): OfferPointInfo => {
+    const existing = out.get(code) || { storeCode: code, cityId: null, price: null, stockCount: null, available: null }
+    out.set(code, existing)
+    return existing
+  }
+
+  function walk(node: any) {
+    if (Array.isArray(node)) { for (const item of node) walk(item); return }
+    if (!node || typeof node !== 'object') return
+
+    const rawStoreId = node.storeId ?? node.pointId ?? null
+    if (typeof rawStoreId === 'string' && rawStoreId.length > 0) {
+      const entry = upsert(strip(rawStoreId))
+      const cityId = node.cityId ?? node.city?.id ?? null
+      if (cityId !== null && cityId !== undefined) entry.cityId = String(cityId)
+      const stock = node.stockCount ?? node.stockLevel ?? null
+      if (stock !== null && stock !== undefined && Number.isFinite(Number(stock))) entry.stockCount = Number(stock)
+      const price = node.price ?? null
+      if (price !== null && price !== undefined && Number.isFinite(Number(price))) entry.price = Number(price)
+      if (typeof node.available === 'string') entry.available = node.available
+      else if (typeof node.available === 'boolean') entry.available = node.available ? 'yes' : 'no'
+    }
+
+    const cityIdVal = node.cityId ?? null
+    if (cityIdVal !== null && cityIdVal !== undefined && Array.isArray(node.points) && node.points.length > 0) {
+      for (const p of node.points) {
+        const rawCode = typeof p === 'string' ? p : (p && typeof p === 'object' ? (p.pointId ?? p.storeId ?? null) : null)
+        if (typeof rawCode !== 'string' || !rawCode) continue
+        const entry = upsert(strip(rawCode))
+        entry.cityId = String(cityIdVal)
+        const price = node.price ?? null
+        if (price !== null && price !== undefined && Number.isFinite(Number(price))) entry.price = Number(price)
+        if (p && typeof p === 'object') {
+          if (typeof p.available === 'boolean') entry.available = p.available ? 'yes' : 'no'
+          else if (typeof p.available === 'string') entry.available = p.available
+          const stock = p.stockCount ?? p.stockLevel ?? null
+          if (stock !== null && stock !== undefined && Number.isFinite(Number(stock))) entry.stockCount = Number(stock)
+        }
+      }
+    }
+
+    for (const value of Object.values(node)) {
+      if (value && typeof value === 'object') walk(value)
+    }
+  }
+
+  walk(details)
+  return Array.from(out.values())
 }
 
 // Reads the seller's own existing catalog -- the endpoint the official
@@ -154,6 +234,15 @@ export async function listCatalogWithStatus(sessionCookies: string, merchantId: 
         minPrice: Number(item.minPrice),
         allCityPrices: item.allCityPrices || {},
         points: item.points || [],
+        availabilities: Array.isArray(item.availabilities)
+          ? item.availabilities
+              .filter((a: any) => a && typeof a.storeId === 'string')
+              .map((a: any) => ({
+                storeId: a.storeId as string,
+                stockCount: a.stockCount !== null && a.stockCount !== undefined && Number.isFinite(Number(a.stockCount)) ? Number(a.stockCount) : null,
+                available: typeof a.available === 'string' ? a.available : (typeof a.available === 'boolean' ? (a.available ? 'yes' : 'no') : null),
+              }))
+          : [],
       })
     }
     if (data.length < pageSize) break

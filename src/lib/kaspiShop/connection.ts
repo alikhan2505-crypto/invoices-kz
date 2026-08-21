@@ -23,6 +23,7 @@ export interface KaspiShopConnectionSummary {
   companyName: string
   status: string
   isActive: boolean
+  sessionStatus: string
 }
 
 // A dedicated key, separate from KASPI_SESSION_ENCRYPTION_KEY (Kaspi Pay
@@ -93,7 +94,7 @@ export async function loadConnectionByMerchant(userId: string, merchantId: strin
 export async function listConnections(userId: string): Promise<KaspiShopConnectionSummary[]> {
   const { data, error } = await supabase
     .from('kaspi_shop_connections')
-    .select('id, merchant_id, company_name, status, is_active')
+    .select('id, merchant_id, company_name, status, is_active, session_status')
     .eq('user_id', userId)
     .order('created_at', { ascending: true })
   if (error) throw new Error(`kaspi_shop_connections list failed for user ${userId}: ${error.message}`)
@@ -103,6 +104,7 @@ export async function listConnections(userId: string): Promise<KaspiShopConnecti
     companyName: row.company_name,
     status: row.status,
     isActive: row.is_active,
+    sessionStatus: row.session_status || 'active',
   }))
 }
 
