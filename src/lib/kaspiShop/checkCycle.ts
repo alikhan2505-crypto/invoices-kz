@@ -73,6 +73,7 @@ async function pushCityPrice(params: {
   sku: string
   model: string
   storeId: string
+  stockCount: number
   cityCode: string
   newPrice: number
 }): Promise<{ pushed: boolean; sessionExpired: boolean; message?: string }> {
@@ -101,7 +102,10 @@ async function pushCityPrice(params: {
     sku: params.sku,
     model: params.model,
     storeId: `${params.merchantId}_${params.storeId}`,
-    stockCount: 1,
+    // Real seller-entered остаток when set (2026-08-21, founder asked for
+    // stock tracking); the old hardcoded 1 stays as the fallback for 0 --
+    // pushing an explicit zero would flip the offer to «нет в наличии».
+    stockCount: params.stockCount > 0 ? params.stockCount : 1,
     cityCode: params.cityCode,
     newPrice: params.newPrice,
   })
@@ -270,6 +274,7 @@ export async function applyPriceCheckResult(
             sku: product.kaspi_sku,
             model: product.product_name,
             storeId: product.store_id,
+            stockCount: Number(product.stock_count) || 0,
             cityCode: result.cityCode,
             newPrice: result.price,
           })
@@ -368,6 +373,7 @@ export async function applyPriceCheckResult(
             sku: product.kaspi_sku,
             model: product.product_name,
             storeId: product.store_id,
+            stockCount: Number(product.stock_count) || 0,
             cityCode: city.city_code,
             newPrice: cityCandidate.price,
           })

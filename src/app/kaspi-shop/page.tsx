@@ -223,7 +223,7 @@ export default function KaspiShop() {
   const [bulkError, setBulkError] = useState('')
 
   const [suggestingFor, setSuggestingFor] = useState<string | null>(null)
-  const [editValues, setEditValues] = useState<Record<string, { floorPrice: string; maxPrice: string; undercutStep: string; strategy: string; excludedCities: string; excludedMerchants: string }>>({})
+  const [editValues, setEditValues] = useState<Record<string, { floorPrice: string; maxPrice: string; undercutStep: string; strategy: string; excludedCities: string; excludedMerchants: string; stockCount: string }>>({})
   const [trackedCities, setTrackedCities] = useState<string[]>([])
   const [availableCities, setAvailableCities] = useState<{ code: string; name: string }[]>([])
   const [citiesSaving, setCitiesSaving] = useState(false)
@@ -288,6 +288,7 @@ export default function KaspiShop() {
                 strategy: p.demping_strategy || 'undercut_leader',
                 excludedCities: (p.excluded_city_codes || []).join(', '),
                 excludedMerchants: (p.excluded_merchant_ids || []).join(', '),
+                stockCount: String(p.stock_count ?? 0),
               }
             }
           }
@@ -460,6 +461,7 @@ export default function KaspiShop() {
         demping_strategy: v.strategy,
         excluded_city_codes: v.excludedCities.split(',').map(s => s.trim()).filter(Boolean),
         excluded_merchant_ids: v.excludedMerchants.split(',').map(s => s.trim()).filter(Boolean),
+        stock_count: Number(v.stockCount) || 0,
       }),
     })
     load()
@@ -849,6 +851,7 @@ export default function KaspiShop() {
                         <div className="flex items-center justify-between gap-2 flex-wrap mt-2.5">
                           <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-[11px]" style={{ color: 'var(--nav-text-muted)' }}>
                             <span title="Города, по которым демпингуется этот товар">{productRegionLabel(p)}</span>
+                            {p.stock_count > 0 && <span title="Остаток, который отправляется на Kaspi вместе с ценой">Остаток: {p.stock_count} шт</span>}
                             {otherSellers !== null && (
                               <span title="Продавцы этого товара на Kaspi, кроме вас. Место по цене среди всех — это оценка.">
                                 {otherSellers} {pluralSellers(otherSellers)} кроме вас{p.market_position !== null ? ` · вы #${p.market_position}` : ''}
@@ -886,7 +889,7 @@ export default function KaspiShop() {
               {(() => {
                 const p = products.find(x => x.id === expandedId)
                 if (!p) return null
-                const v = editValues[p.id] || { floorPrice: String(p.floor_price), maxPrice: p.max_price !== null ? String(p.max_price) : '', undercutStep: String(p.undercut_step), strategy: p.demping_strategy, excludedCities: '', excludedMerchants: '' }
+                const v = editValues[p.id] || { floorPrice: String(p.floor_price), maxPrice: p.max_price !== null ? String(p.max_price) : '', undercutStep: String(p.undercut_step), strategy: p.demping_strategy, excludedCities: '', excludedMerchants: '', stockCount: String(p.stock_count ?? 0) }
                 return (
                   <motion.div key="productSettings" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                     className="fixed inset-0 z-50 flex items-end lg:items-center justify-center p-3 bg-black/30"
@@ -905,7 +908,7 @@ export default function KaspiShop() {
                           </div>
                           <button onClick={() => setExpandedId(null)} className="text-lg leading-none flex-shrink-0" style={{ color: 'var(--nav-text-secondary)' }}>✕</button>
                         </div>
-                              <div className="grid grid-cols-3 gap-2 mb-2">
+                              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-2">
                                 <label className="block">
                                   <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Минимальная цена</span>
                                   <input className={`${INPUT_CLS} font-mono px-2 py-1.5`} type="number" style={{ color: 'var(--nav-text-primary)' }}
@@ -920,6 +923,11 @@ export default function KaspiShop() {
                                   <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Шаг, ₸</span>
                                   <input className={`${INPUT_CLS} font-mono px-2 py-1.5`} type="number" style={{ color: 'var(--nav-text-primary)' }}
                                     value={v.undercutStep} onChange={e => setEditValues(prev => ({ ...prev, [p.id]: { ...v, undercutStep: e.target.value } }))} />
+                                </label>
+                                <label className="block">
+                                  <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Остаток, шт</span>
+                                  <input className={`${INPUT_CLS} font-mono px-2 py-1.5`} type="number" placeholder="0" style={{ color: 'var(--nav-text-primary)' }}
+                                    value={v.stockCount} onChange={e => setEditValues(prev => ({ ...prev, [p.id]: { ...v, stockCount: e.target.value } }))} />
                                 </label>
                               </div>
                               <label className="block mb-2">

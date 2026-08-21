@@ -86,12 +86,18 @@ export async function POST(req: NextRequest) {
     }, { status: 404 })
   }
 
+  // storeId MUST carry the merchant prefix ("30067228_PP2", the format both
+  // the captured cabinet payloads and checkCycle's own pushes use) -- the
+  // first live restore sent a bare "PP2" and Kaspi processed it as a store
+  // it couldn't match, then removed the offer with the real reason «Не
+  // указано наличие в прайс листе» (founder's cabinet screenshot,
+  // 2026-08-21). Confirmed root cause, not a guess.
   const pushParams = {
     sessionCookies: connection.sessionCookies,
     merchantUid: connection.merchantId,
     sku: offer.sku,
     model: offer.title,
-    storeId: offer.points[0] || '',
+    storeId: offer.points[0] ? `${connection.merchantId}_${offer.points[0]}` : '',
     cityPrices: Object.entries(offer.allCityPrices).map(([cityId, entry]) => ({ cityId, value: entry.price })),
   }
   const result = action === 'restore' ? await restoreOfferToSale(pushParams) : await removeOfferFromSale(pushParams)
