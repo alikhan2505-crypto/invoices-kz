@@ -82,6 +82,14 @@ export type OfferAvailabilityParams = {
   // as остаток 0 on that point. Prefixing for the batch item happens here.
   storeCodes: string[]
   cityPrices: { cityId: string; value: number }[]
+  // EXPERIMENT (founder-approved 2026-08-21): seller-entered остаток per
+  // bare store code, re-attached to price pushes so Kaspi's pipeline
+  // (which wipes остаток to «Не указан» on every price-list change) keeps
+  // it. Only positive values are ever emitted; points absent from the map
+  // stay stockless exactly as the captured cabinet item. batch+stockCount
+  // is otherwise unproven -- if it ever triggers a removal, clearing the
+  // остаток in the «Цена и остатки» modal turns this off per point.
+  stockByStore?: Record<string, number>
 }
 
 // THE canonical write path to Kaspi for an offer's state -- an EXACT copy
@@ -119,7 +127,14 @@ export async function pushOfferState(params: OfferAvailabilityParams & { availab
   const item = {
     merchantUid: params.merchantUid,
     sku: params.sku,
-    availabilities: storeCodes.map(code => ({ available: params.available, storeId: `${params.merchantUid}_${code}` })),
+    availabilities: storeCodes.map(code => {
+      const stock = params.stockByStore?.[code]
+      return {
+        available: params.available,
+        storeId: `${params.merchantUid}_${code}`,
+        ...(Number.isFinite(stock) && (stock as number) > 0 ? { stockCount: stock } : {}),
+      }
+    }),
     model: params.model,
     cityPrices: params.cityPrices,
   }

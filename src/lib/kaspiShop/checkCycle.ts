@@ -127,6 +127,21 @@ async function pushProductPrices(params: {
   // листе», and listing only one of several points zeroed the others'
   // остаток.
   const storeCodes = await fetchOfferPointCodes(params.sessionCookies, params.merchantId, params.sku, params.storeId)
+
+  // Seller-entered остаток per point (kaspi_shop_point_stocks, saved from
+  // the «Цена и остатки» modal) rides along so Kaspi's pipeline doesn't
+  // wipe it to «Не указан» on every price change -- founder-approved
+  // experiment 2026-08-21. Points without a stored value stay stockless.
+  const { data: stockRows } = await supabase
+    .from('kaspi_shop_point_stocks')
+    .select('store_code, stock_count')
+    .eq('connection_id', params.connectionId)
+    .eq('sku', params.sku)
+  const stockByStore: Record<string, number> = {}
+  for (const row of stockRows || []) {
+    if (Number.isFinite(Number(row.stock_count)) && Number(row.stock_count) > 0) stockByStore[row.store_code] = Number(row.stock_count)
+  }
+
   const result = await pushOfferState({
     sessionCookies: params.sessionCookies,
     merchantUid: params.merchantId,
@@ -136,6 +151,7 @@ async function pushProductPrices(params: {
     storeCodes,
     cityPrices: Object.entries(params.cityPrices).map(([cityId, value]) => ({ cityId, value })),
     available: 'yes',
+    stockByStore,
   })
 
   if (result.success) return { pushed: true, sessionExpired: false }

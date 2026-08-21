@@ -152,6 +152,32 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Сессия кабинета Kaspi истекла — переподключитесь' }, { status: 400 })
     }
     results.push({ storeCode, ok: result.success, message: result.success ? undefined : result.message })
+
+    // Founder-approved experiment (2026-08-21): remember the seller's
+    // остаток per point so the repricer re-attaches it to price pushes
+    // (Kaspi's own pipeline wipes остаток on every price-list change).
+    // Clearing the field deletes the row = experiment off for that point.
+    if (result.success) {
+      try {
+        if (stockCount !== null && Number.isFinite(stockCount) && stockCount > 0) {
+          await supabase
+            .from('kaspi_shop_point_stocks')
+            .upsert(
+              { connection_id: connection.id, sku, store_code: storeCode, stock_count: stockCount, updated_at: new Date().toISOString() },
+              { onConflict: 'connection_id,sku,store_code' }
+            )
+        } else {
+          await supabase
+            .from('kaspi_shop_point_stocks')
+            .delete()
+            .eq('connection_id', connection.id)
+            .eq('sku', sku)
+            .eq('store_code', storeCode)
+        }
+      } catch (err: any) {
+        console.error('offer-stocks: point stock persistence failed (non-fatal)', err.message)
+      }
+    }
   }
 
   const failed = results.filter(r => !r.ok)
