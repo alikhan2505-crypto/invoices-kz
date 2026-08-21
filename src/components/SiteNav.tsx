@@ -259,7 +259,14 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
         {/* Row 2: the active section's pages as persistent pill tabs. Stays
             visible on every page of the section (no dropdown to reopen). */}
         {activeSection && (
-          <div className="flex items-center gap-1.5 px-7 pb-2.5 -mt-1 overflow-x-auto">
+          <div className="flex items-center gap-1.5 px-7 pb-2.5 -mt-1">
+            {/* overflow-x-auto lives on this inner wrapper, not the row --
+                setting it on the row clipped KaspiShopStoreSwitcher's dropdown
+                too (an ancestor with overflow-x set implicitly gets
+                overflow-y: auto/clipped as well per the CSS spec), cutting it
+                off instead of letting it float over the page (founder,
+                screenshot 2026-08-21: dropdown showed clipped inside the row). */}
+            <div className="flex items-center gap-1.5 overflow-x-auto min-w-0">
             {(() => {
               // Longest matching href wins -- otherwise a section root like
               // /ai-agent prefix-matches every page of the section and two
@@ -291,6 +298,7 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
               )
             })
             })()}
+            </div>
             {/* Founder, 2026-08-21: "какая компания" wasn't visible anywhere
                 on Kaspi Bot pages, plus a real need for switching between the
                 2 real Kaspi merchant accounts on one phone number -- placed
