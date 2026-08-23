@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { loadConnection } from '@/lib/kaspiShop/connection'
-import { fetchWaybillPdf, mergeWaybillPdfs } from '@/lib/kaspiShop/waybills'
+import { fetchWaybillPdfs, mergeWaybillPdfs } from '@/lib/kaspiShop/waybills'
 
 const supabaseAuth = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -36,13 +36,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Кабинет не подключён' }, { status: 400 })
   }
 
-  const pdfs: Buffer[] = []
-  for (const orderCode of orderCodes) {
-    try {
-      pdfs.push(await fetchWaybillPdf(connection.sessionCookies, orderCode))
-    } catch (err: any) {
-      return NextResponse.json({ error: `Не удалось получить накладную для заказа ${orderCode}: ${err.message}` }, { status: 502 })
-    }
+  let pdfs: Buffer[]
+  try {
+    pdfs = await fetchWaybillPdfs(connection.sessionCookies, connection.merchantId, orderCodes)
+  } catch (err: any) {
+    return NextResponse.json({ error: `Не удалось получить накладную: ${err.message}` }, { status: 502 })
   }
 
   const merged = await mergeWaybillPdfs(pdfs)
