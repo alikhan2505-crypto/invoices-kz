@@ -5,6 +5,8 @@ import { findMatchingTemplate } from '@/lib/instagramReplyMatch'
 import { replyToComment, sendDirectMessage } from '@/lib/instagram'
 import { generateAiReply } from '@/lib/instagramAiReply'
 import { loadTenantConnection, handleTenantIncoming } from '@/lib/aiAgent/webhookHandler'
+import { transcribeAudio } from '@/lib/openaiWhisper'
+import { isImageWithinLimits, isAudioWithinLimits, sniffImageMimeType, UNSUPPORTED_MEDIA_REPLY_TEXT } from '@/lib/aiAgent/mediaLimits'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -288,23 +290,93 @@ export async function POST(req: NextRequest) {
 
     for (const messaging of entry.messaging || []) {
       const msg = messaging.message
-      if (!msg?.mid || !msg?.text || msg.is_echo) continue
+      if (!msg?.mid || msg.is_echo) continue
+
+      const fromUsername = messaging.sender?.id || 'unknown'
+      const replyTarget = messaging.sender?.id
+
       if (isLegacyAccount) {
+        // Legacy single-tenant bot -- explicitly out of scope for photo/
+        // voice support (see the design spec's "Явно не входит в объём").
+        // Text-only, unchanged from before this change.
+        if (!msg.text) continue
         await handleIncoming({
           source: 'dm',
           externalId: msg.mid,
-          fromUsername: messaging.sender?.id || 'unknown',
+          fromUsername,
           incomingText: msg.text,
-          replyTarget: messaging.sender?.id,
+          replyTarget,
         })
-      } else {
+        continue
+      }
+
+      if (typeof msg.text === 'string' && msg.text) {
         await handleTenantIncoming(tenantConnection!, {
           source: 'dm',
           externalId: msg.mid,
-          fromUsername: messaging.sender?.id || 'unknown',
+          fromUsername,
           incomingText: msg.text,
-          replyTarget: messaging.sender?.id,
+          replyTarget,
         })
+        continue
+      }
+
+      // No text -- check for a photo/audio attachment. Can't reply without
+      // a sender id or a fetchable attachment url -- defensive skip.
+      const attachment = Array.isArray(msg.attachments) ? msg.attachments[0] : undefined
+      if (!replyTarget || !attachment?.payload?.url) continue
+
+      try {
+        if (attachment.type === 'image') {
+          const res = await fetch(attachment.payload.url)
+          if (!res.ok) throw new Error(`attachment fetch failed (HTTP ${res.status})`)
+          const buffer = Buffer.from(await res.arrayBuffer())
+          const mimeType = sniffImageMimeType(buffer)
+          if (!mimeType || !isImageWithinLimits(buffer.byteLength, mimeType)) {
+            await sendDirectMessage(replyTarget, UNSUPPORTED_MEDIA_REPLY_TEXT, { igUserId: tenantConnection!.externalAccountId, accessToken: tenantConnection!.accessToken })
+          } else {
+            await handleTenantIncoming(tenantConnection!, {
+              source: 'dm',
+              externalId: msg.mid,
+              fromUsername,
+              incomingText: '[Фото]',
+              replyTarget,
+              media: { kind: 'image', base64: buffer.toString('base64'), mediaType: mimeType },
+            })
+          }
+        } else if (attachment.type === 'audio') {
+          const res = await fetch(attachment.payload.url)
+          if (!res.ok) throw new Error(`attachment fetch failed (HTTP ${res.status})`)
+          const buffer = Buffer.from(await res.arrayBuffer())
+          if (!isAudioWithinLimits(buffer.byteLength)) {
+            await sendDirectMessage(replyTarget, UNSUPPORTED_MEDIA_REPLY_TEXT, { igUserId: tenantConnection!.externalAccountId, accessToken: tenantConnection!.accessToken })
+          } else {
+            // Instagram's own audio-attachment container format isn't
+            // documented -- 'audio/mp4' is a best-effort guess, same
+            // honesty-over-fabrication spirit as this codebase's other
+            // unverified-external-format notes (see e.g.
+            // kaspi_shop_repricer_invoices_kz's dbcrfl flag). Whisper
+            // generally decodes by content, not strictly by this hint.
+            const transcribedText = await transcribeAudio(buffer, 'audio/mp4')
+            await handleTenantIncoming(tenantConnection!, {
+              source: 'dm',
+              externalId: msg.mid,
+              fromUsername,
+              incomingText: transcribedText,
+              replyTarget,
+            })
+          }
+        } else {
+          // Any other attachment type (video, file, story reply, etc.)
+          await sendDirectMessage(replyTarget, UNSUPPORTED_MEDIA_REPLY_TEXT, { igUserId: tenantConnection!.externalAccountId, accessToken: tenantConnection!.accessToken })
+        }
+      } catch (err: any) {
+        // A thrown error anywhere above must not abort the rest of this
+        // webhook delivery's batch (other messages in the same payload).
+        // The fallback send itself is best-effort: if it also fails (e.g.
+        // a dead token), swallow it rather than throw.
+        console.error('instagram webhook: attachment processing failed for', msg.mid, ':', err.message)
+        await sendDirectMessage(replyTarget, UNSUPPORTED_MEDIA_REPLY_TEXT, { igUserId: tenantConnection!.externalAccountId, accessToken: tenantConnection!.accessToken }).catch(() => {})
       }
     }
   }
