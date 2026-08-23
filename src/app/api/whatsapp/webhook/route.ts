@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { loadWhatsAppConnection, handleWhatsAppIncoming } from '@/lib/aiAgent/whatsappWebhookHandler'
+import { downloadWhatsAppMedia, sendWhatsAppMessage } from '@/lib/whatsapp'
+import { transcribeAudio } from '@/lib/openaiWhisper'
+import { isImageWithinLimits, isAudioWithinLimits, UNSUPPORTED_MEDIA_REPLY_TEXT } from '@/lib/aiAgent/mediaLimits'
 
 // Inbound WhatsApp Cloud API webhook for every connected customer number --
 // mirrors src/app/api/instagram/webhook/route.ts's exact shape (GET verify
@@ -41,7 +44,15 @@ interface WhatsAppValue {
   messaging_product?: string
   metadata?: { display_phone_number?: string; phone_number_id?: string }
   contacts?: { profile?: { name?: string }; wa_id?: string }[]
-  messages?: { from?: string; id?: string; timestamp?: string; type?: string; text?: { body?: string } }[]
+  messages?: {
+    from?: string
+    id?: string
+    timestamp?: string
+    type?: string
+    text?: { body?: string }
+    image?: { id?: string; mime_type?: string; caption?: string }
+    audio?: { id?: string; mime_type?: string }
+  }[]
   statuses?: unknown[]
 }
 
@@ -77,24 +88,68 @@ export async function POST(req: NextRequest) {
       }
 
       for (const msg of value.messages) {
-        // Phase 1: text messages only -- media/location/interactive/etc.
-        // are silently skipped, same as non-text Telegram updates.
-        if (msg.type !== 'text' || !msg.text?.body || !msg.from || !msg.id) continue
+        // Can't reply without knowing who to reply to -- defensive skip,
+        // same as before this change.
+        if (!msg.from || !msg.id) continue
 
         const contact = value.contacts?.find(c => c.wa_id === msg.from)
         const customerHandle = contact?.profile?.name || msg.from
 
         try {
-          await handleWhatsAppIncoming(conn, {
-            externalId: msg.id,
-            from: msg.from,
-            customerHandle,
-            incomingText: msg.text.body,
-          })
+          if (msg.type === 'text' && msg.text?.body) {
+            await handleWhatsAppIncoming(conn, {
+              externalId: msg.id,
+              from: msg.from,
+              customerHandle,
+              incomingText: msg.text.body,
+            })
+            continue
+          }
+
+          if (msg.type === 'image' && msg.image?.id) {
+            const { buffer, mimeType } = await downloadWhatsAppMedia(msg.image.id, conn.accessToken)
+            if (!isImageWithinLimits(buffer.byteLength, mimeType)) {
+              await sendWhatsAppMessage(conn.phoneNumberId, msg.from, UNSUPPORTED_MEDIA_REPLY_TEXT, { accessToken: conn.accessToken })
+              continue
+            }
+            await handleWhatsAppIncoming(conn, {
+              externalId: msg.id,
+              from: msg.from,
+              customerHandle,
+              incomingText: msg.image.caption?.trim() || '[Фото]',
+              media: { kind: 'image', base64: buffer.toString('base64'), mediaType: mimeType.split(';')[0].trim().toLowerCase() },
+            })
+            continue
+          }
+
+          if (msg.type === 'audio' && msg.audio?.id) {
+            const { buffer, mimeType } = await downloadWhatsAppMedia(msg.audio.id, conn.accessToken)
+            if (!isAudioWithinLimits(buffer.byteLength)) {
+              await sendWhatsAppMessage(conn.phoneNumberId, msg.from, UNSUPPORTED_MEDIA_REPLY_TEXT, { accessToken: conn.accessToken })
+              continue
+            }
+            const transcribedText = await transcribeAudio(buffer, mimeType)
+            await handleWhatsAppIncoming(conn, {
+              externalId: msg.id,
+              from: msg.from,
+              customerHandle,
+              incomingText: transcribedText,
+            })
+            continue
+          }
+
+          // Any other type (video, document, sticker, location, interactive,
+          // etc.), or a text/image/audio message missing the field it needs.
+          await sendWhatsAppMessage(conn.phoneNumberId, msg.from, UNSUPPORTED_MEDIA_REPLY_TEXT, { accessToken: conn.accessToken })
         } catch (err: any) {
-          // A thrown error here must not abort the rest of this webhook
-          // delivery's batch (other messages in the same payload).
+          // A thrown error anywhere above (download, transcription, AI
+          // reply, send) must not abort the rest of this webhook delivery's
+          // batch (other messages in the same payload) -- log it and try to
+          // leave the customer with the same polite fallback rather than
+          // silence. The fallback send itself is best-effort: if it also
+          // fails (e.g. a dead token), swallow it rather than throw.
           console.error('whatsapp webhook: processing failed for', msg.id, ':', err.message)
+          await sendWhatsAppMessage(conn.phoneNumberId, msg.from, UNSUPPORTED_MEDIA_REPLY_TEXT, { accessToken: conn.accessToken }).catch(() => {})
         }
       }
     }
