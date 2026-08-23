@@ -74,6 +74,9 @@ interface TelegramIncomingParams {
   chatId: string
   fromHandle: string
   incomingText: string
+  // Present only for an image message -- template matching is skipped and
+  // this goes straight to generateAiReply's `image` param instead.
+  media?: { kind: 'image'; base64: string; mediaType: string }
 }
 
 export async function handleTelegramIncoming(conn: TelegramTenantConnection, params: TelegramIncomingParams): Promise<void> {
@@ -125,17 +128,20 @@ export async function handleTelegramIncoming(conn: TelegramTenantConnection, par
     return
   }
 
-  // Template match first. Telegram messages are private-chat messages, the
-  // same conversational shape as Instagram DMs -- so dm-scoped (and
-  // unscoped) templates apply, comment-scoped ones don't.
-  const { data: templates } = await supabase
-    .from('ai_agent_reply_templates')
-    .select('id, trigger_words, reply_text')
-    .eq('agent_id', conn.agentId)
-    .or('channel.is.null,channel.eq.dm')
-    .order('created_at', { ascending: true })
-
-  const match = findTemplateMatch(params.incomingText, templates || [])
+  // Template match first -- skipped entirely for a photo message, same
+  // reasoning as the WhatsApp tenant path. Telegram messages are private-
+  // chat messages, the same conversational shape as Instagram DMs -- so
+  // dm-scoped (and unscoped) templates apply, comment-scoped ones don't.
+  let match: { id: string; reply_text: string } | null = null
+  if (!params.media) {
+    const { data: templates } = await supabase
+      .from('ai_agent_reply_templates')
+      .select('id, trigger_words, reply_text')
+      .eq('agent_id', conn.agentId)
+      .or('channel.is.null,channel.eq.dm')
+      .order('created_at', { ascending: true })
+    match = findTemplateMatch(params.incomingText, templates || [])
+  }
 
   if (match) {
     try {
@@ -183,6 +189,7 @@ export async function handleTelegramIncoming(conn: TelegramTenantConnection, par
       fromUsername: params.fromHandle,
       source: 'dm',
       conversationHistory,
+      image: params.media?.kind === 'image' ? { base64: params.media.base64, mediaType: params.media.mediaType } : undefined,
       businessContextLine: buildBusinessContextLine({
         name: agent.name,
         tone: agent.tone as AgentTone,
