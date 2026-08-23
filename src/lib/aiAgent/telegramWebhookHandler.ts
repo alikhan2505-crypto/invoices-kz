@@ -7,8 +7,9 @@ import { debitAiAgentWallet, AI_AGENT_CREDITS_PER_AI_REPLY } from './wallet'
 import { sendTelegramNotification } from '@/lib/telegramNotify'
 import { createNotification } from '@/lib/notifications'
 import { findTemplateMatch, mergeCollectedData } from './webhookHandler'
-import { sendTelegramBotMessage, pairConversationHistory, TelegramApiError } from './telegram'
+import { sendTelegramBotMessage, sendTelegramFlowStep, answerTelegramCallbackQuery, pairConversationHistory, TelegramApiError } from './telegram'
 import { UNSUPPORTED_MEDIA_REPLY_TEXT } from '@/lib/aiAgent/mediaLimits'
+import { parseFlowDefinition, isTerminalStep, findStepById, firstStep, findFlowTriggerMatch } from './flow'
 
 // The Telegram twin of webhookHandler.ts's Instagram tenant pipeline.
 // Deliberately a PARALLEL handler rather than a channel parameter threaded
@@ -108,9 +109,17 @@ export async function handleTelegramIncoming(conn: TelegramTenantConnection, par
       external_thread_id: params.chatId,
       customer_handle: params.fromHandle,
     }, { onConflict: 'agent_id,channel,external_thread_id', ignoreDuplicates: false })
-    .select('id')
+    .select('id, active_flow_id')
     .single()
   if (!conversation) return
+
+  // The customer was mid-flow but sent free text instead of tapping a
+  // button -- exit the flow silently rather than nudge them back to it:
+  // someone who prefers typing should get a real answer (template/AI
+  // below), not be stuck in a menu.
+  if (conversation.active_flow_id) {
+    await supabase.from('ai_agent_conversations').update({ active_flow_id: null, active_step_id: null }).eq('id', conversation.id)
+  }
 
   // Log the inbound message. If two concurrent deliveries of the same
   // update both pass the SELECT-based dedup above, the unique index on
@@ -159,6 +168,23 @@ export async function handleTelegramIncoming(conn: TelegramTenantConnection, par
       await markTelegramTokenExpiredIfUnauthorized(conn.connectionId, err)
     }
     return
+  }
+
+  // No template -- check whether a flow's trigger words match before
+  // falling to paid AI. Flows are free, like templates -- this tier sits
+  // between template matching and the AI fallback below.
+  if (!params.media) {
+    const { data: flows } = await supabase
+      .from('ai_agent_flows')
+      .select('id, trigger_words, definition')
+      .eq('agent_id', conn.agentId)
+      .order('created_at', { ascending: true })
+    const matchedFlowId = findFlowTriggerMatch(params.incomingText, flows || [])
+    const matchedFlow = matchedFlowId ? (flows || []).find(f => f.id === matchedFlowId) : undefined
+    if (matchedFlow) {
+      await startTelegramFlow(conn, conversation.id, params.chatId, matchedFlow)
+      return
+    }
   }
 
   // Prior exchanges with this chat, so the model doesn't re-greet someone
@@ -282,5 +308,156 @@ export async function handleTelegramIncoming(conn: TelegramTenantConnection, par
   } catch (err: any) {
     console.error('ai-agent telegram webhook: AI reply send failed for', params.externalId, ':', err.message)
     await markTelegramTokenExpiredIfUnauthorized(conn.connectionId, err)
+  }
+}
+
+// Starts a flow for an ALREADY-loaded conversation -- used by
+// handleTelegramIncoming's flow-trigger tier above. handleTelegramStart
+// (below) is the /start-specific twin that creates/loads the conversation
+// itself.
+async function startTelegramFlow(
+  conn: TelegramTenantConnection,
+  conversationId: string,
+  chatId: string,
+  flow: { id: string; definition: unknown }
+): Promise<void> {
+  const definition = parseFlowDefinition(flow.definition)
+  const entryStep = definition ? firstStep(definition) : undefined
+  if (!definition || !entryStep) return // corrupted saved flow -- shouldn't happen, defensive no-op
+
+  await supabase.from('ai_agent_conversations').update({ active_flow_id: flow.id, active_step_id: entryStep.id }).eq('id', conversationId)
+
+  try {
+    await sendTelegramFlowStep(conn.botToken, chatId, entryStep)
+  } catch (err: any) {
+    console.error('ai-agent telegram webhook: flow trigger send failed:', err.message)
+    await markTelegramTokenExpiredIfUnauthorized(conn.connectionId, err)
+  }
+
+  // A one-step flow with no buttons is immediately terminal -- don't leave
+  // the conversation waiting for a click that will never come.
+  if (isTerminalStep(entryStep)) {
+    await supabase.from('ai_agent_conversations').update({ active_flow_id: null, active_step_id: null }).eq('id', conversationId)
+  }
+}
+
+// Called by the webhook route for a /start update, BEFORE any of the usual
+// dedup/conversation/billing machinery in handleTelegramIncoming -- mirrors
+// the route's existing treatment of /start as a handshake, not a billable
+// turn. If the agent has a flow marked is_start, that flow's first step
+// replaces the old static greeting; otherwise the greeting is unchanged.
+export async function handleTelegramStart(conn: TelegramTenantConnection, params: { chatId: string; fromHandle: string }): Promise<void> {
+  const { data: startFlow } = await supabase
+    .from('ai_agent_flows')
+    .select('id, definition')
+    .eq('agent_id', conn.agentId)
+    .eq('is_start', true)
+    .maybeSingle()
+
+  if (!startFlow) {
+    await sendTelegramBotMessage(conn.botToken, params.chatId, 'Здравствуйте! Напишите ваш вопрос — я на связи.')
+    return
+  }
+
+  const definition = parseFlowDefinition(startFlow.definition)
+  const entryStep = definition ? firstStep(definition) : undefined
+  if (!definition || !entryStep) {
+    // A saved-but-corrupted flow (shouldn't happen -- the save route
+    // validates before writing) -- fall back to the static greeting rather
+    // than send nothing.
+    await sendTelegramBotMessage(conn.botToken, params.chatId, 'Здравствуйте! Напишите ваш вопрос — я на связи.')
+    return
+  }
+
+  const { data: conversation } = await supabase
+    .from('ai_agent_conversations')
+    .upsert({
+      agent_id: conn.agentId,
+      channel: 'telegram',
+      external_thread_id: params.chatId,
+      customer_handle: params.fromHandle,
+      active_flow_id: startFlow.id,
+      active_step_id: entryStep.id,
+    }, { onConflict: 'agent_id,channel,external_thread_id', ignoreDuplicates: false })
+    .select('id')
+    .single()
+  if (!conversation) return
+
+  try {
+    await sendTelegramFlowStep(conn.botToken, params.chatId, entryStep)
+  } catch (err: any) {
+    console.error('ai-agent telegram webhook: flow start send failed:', err.message)
+    await markTelegramTokenExpiredIfUnauthorized(conn.connectionId, err)
+  }
+
+  if (isTerminalStep(entryStep)) {
+    await supabase.from('ai_agent_conversations').update({ active_flow_id: null, active_step_id: null }).eq('id', conversation.id)
+  }
+}
+
+// Handles a callback_query update (an inline-keyboard button tap) for a
+// customer currently inside a flow. Always answers the callback query
+// first, regardless of outcome, so Telegram clears the button's loading
+// spinner on the customer's client even for a stale/invalid click.
+export async function handleTelegramFlowCallback(
+  conn: TelegramTenantConnection,
+  params: { chatId: string; data: string; callbackQueryId: string }
+): Promise<void> {
+  const answered = answerTelegramCallbackQuery(conn.botToken, params.callbackQueryId).catch((err: any) => {
+    console.error('ai-agent telegram webhook: answerCallbackQuery failed:', err.message)
+  })
+
+  const { data: conversation } = await supabase
+    .from('ai_agent_conversations')
+    .select('id, active_flow_id, active_step_id')
+    .eq('agent_id', conn.agentId)
+    .eq('channel', 'telegram')
+    .eq('external_thread_id', params.chatId)
+    .maybeSingle()
+  await answered
+
+  if (!conversation?.active_flow_id || !conversation.active_step_id) return // no active flow -- stale click, nothing to do
+
+  const { data: flow } = await supabase.from('ai_agent_flows').select('id, definition').eq('id', conversation.active_flow_id).maybeSingle()
+  const definition = flow ? parseFlowDefinition(flow.definition) : null
+  const currentStep = definition ? findStepById(definition, conversation.active_step_id) : undefined
+
+  const match = params.data.match(/^btn:(\d+)$/)
+  const buttonIndex = match ? Number(match[1]) : NaN
+  const button = currentStep?.buttons[buttonIndex]
+
+  if (!definition || !currentStep || !button) {
+    // Stale click (flow/step changed since this message was sent) or a
+    // corrupted saved flow -- clear any dangling state and stop. The toast
+    // from answerCallbackQuery above is feedback enough, no chat message.
+    await supabase.from('ai_agent_conversations').update({ active_flow_id: null, active_step_id: null }).eq('id', conversation.id)
+    return
+  }
+
+  if (button.nextStepId === null) {
+    // "Конец сценария" -- ends immediately, no further message (the
+    // button's own label was the final word).
+    await supabase.from('ai_agent_conversations').update({ active_flow_id: null, active_step_id: null }).eq('id', conversation.id)
+    return
+  }
+
+  const nextStep = findStepById(definition, button.nextStepId)
+  if (!nextStep) {
+    // Dangling reference -- shouldn't happen (the save route validates
+    // this), defensive: end the flow rather than send nothing.
+    await supabase.from('ai_agent_conversations').update({ active_flow_id: null, active_step_id: null }).eq('id', conversation.id)
+    return
+  }
+
+  await supabase.from('ai_agent_conversations').update({ active_step_id: nextStep.id }).eq('id', conversation.id)
+  try {
+    await sendTelegramFlowStep(conn.botToken, params.chatId, nextStep)
+  } catch (err: any) {
+    console.error('ai-agent telegram webhook: flow step send failed:', err.message)
+    await markTelegramTokenExpiredIfUnauthorized(conn.connectionId, err)
+  }
+
+  if (isTerminalStep(nextStep)) {
+    await supabase.from('ai_agent_conversations').update({ active_flow_id: null, active_step_id: null }).eq('id', conversation.id)
   }
 }
