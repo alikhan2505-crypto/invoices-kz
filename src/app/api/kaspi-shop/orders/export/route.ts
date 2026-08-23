@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { loadConnection, markSessionExpired } from '@/lib/kaspiShop/connection'
 import { listOrders } from '@/lib/kaspiShop/cabinetApi'
 import { buildOrdersWorkbookBuffer } from '@/lib/kaspiShop/ordersExport'
+import { ORDER_STATUS_TABS } from '@/lib/kaspiShop/orderStatuses'
 
 const supabaseAuth = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -21,11 +22,19 @@ async function requireUser(req: NextRequest) {
 // (docs/superpowers/specs/2026-08-23-kaspi-orders-filters-excel-design.md).
 const MAX_EXPORT_ORDERS = 500
 
+// Up to 50 sequential Kaspi page fetches (500 / PAGE_SIZE=10) plus one
+// terminating call comfortably exceed Vercel's 15s default function
+// budget -- same pattern as api/cron/kaspi-poll/route.ts.
+export const maxDuration = 60
+
 export async function GET(req: NextRequest) {
   const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const status = req.nextUrl.searchParams.get('status') || 'NEW'
+  if (!ORDER_STATUS_TABS.some(t => t.value === status)) {
+    return NextResponse.json({ error: 'Некорректный статус' }, { status: 400 })
+  }
   const cityId = req.nextUrl.searchParams.get('cityId') || ''
 
   const connection = await loadConnection(user.id)

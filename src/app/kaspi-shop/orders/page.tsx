@@ -51,6 +51,7 @@ function KaspiShopOrdersInner() {
   const prevStatus = useRef(status)
 
   const prevCityId = useRef(cityId)
+  const cityOptionsCache = useRef<Map<string, { cityId: string; cityName: string }[]>>(new Map())
 
   useEffect(() => { checkAccess() }, [])
   useEffect(() => {
@@ -71,7 +72,18 @@ function KaspiShopOrdersInner() {
       setPage(0)
       setDateMode('all')
       loadCityOptions(status)
-      if (page === 0) { loadOrders(status, 0, cityId); loadCounts() }
+      loadCounts()
+      if (cityId !== '') {
+        // Resetting cityId itself changes this effect's dependency array,
+        // which re-triggers this effect once city+page have settled -- the
+        // cityChanged branch below then does the single actual fetch with
+        // cityId='' once React has committed the reset. Don't also fetch
+        // here, or the reset and this call would both fire (a real,
+        // avoidable duplicate request).
+        setCityId('')
+      } else if (page === 0) {
+        loadOrders(status, 0, cityId)
+      }
       return
     }
     if (cityChanged) {
@@ -97,12 +109,16 @@ function KaspiShopOrdersInner() {
   }
 
   async function loadCityOptions(forStatus: string) {
+    const cached = cityOptionsCache.current.get(forStatus)
+    if (cached) { setCityOptions(cached); return }
     try {
       const headers = await authHeader()
       const res = await fetch(`/api/kaspi-shop/orders/cities?status=${encodeURIComponent(forStatus)}`, { headers })
       if (!res.ok) { setCityOptions([]); return }
       const data = await res.json()
-      setCityOptions(data.cities || [])
+      const cities = data.cities || []
+      cityOptionsCache.current.set(forStatus, cities)
+      setCityOptions(cities)
     } catch {
       setCityOptions([])
     }
@@ -181,6 +197,7 @@ function KaspiShopOrdersInner() {
 
   async function exportExcel() {
     setExporting(true)
+    setLoadError('')
     try {
       const headers = await authHeader()
       const cityParam = cityId ? `&cityId=${encodeURIComponent(cityId)}` : ''
@@ -197,11 +214,13 @@ function KaspiShopOrdersInner() {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `zakazy_${status}.xlsx`
+      a.download = `zakazy_${status}_${new Date().toISOString().slice(0, 10)}.xlsx`
       document.body.appendChild(a)
       a.click()
       a.remove()
       URL.revokeObjectURL(url)
+    } catch {
+      setLoadError('Не удалось выгрузить заказы. Проверьте соединение и попробуйте ещё раз.')
     } finally {
       setExporting(false)
     }
@@ -253,7 +272,7 @@ function KaspiShopOrdersInner() {
         {loadError && (
           <div className="nav-glass rounded-2xl p-4 flex items-center justify-between gap-3 mb-4">
             <span className="text-sm" style={{ color: 'var(--nav-critical)' }}>{loadError}</span>
-            <button onClick={() => loadOrders(status, page)} className="text-xs font-semibold rounded-lg px-3 py-1.5 flex-shrink-0" style={{ background: 'var(--nav-critical)', color: '#fff' }}>Повторить</button>
+            <button onClick={() => loadOrders(status, page, cityId)} className="text-xs font-semibold rounded-lg px-3 py-1.5 flex-shrink-0" style={{ background: 'var(--nav-critical)', color: '#fff' }}>Повторить</button>
           </div>
         )}
 
@@ -308,7 +327,9 @@ function KaspiShopOrdersInner() {
           <div className="nav-glass rounded-2xl p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Загружаем заказы...</div>
         ) : visibleOrders.length === 0 ? (
           <div className="nav-glass rounded-2xl p-8 text-center">
-            <div className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>Заказов в этом статусе нет.</div>
+            <div className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
+              {orders.length > 0 && dateMode === 'tomorrow' ? 'На этой странице нет заказов на завтра до 20:00.' : 'Заказов в этом статусе нет.'}
+            </div>
           </div>
         ) : (() => {
           const CARD_GRID = 'grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-2.5'
