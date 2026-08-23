@@ -42,9 +42,9 @@ export async function GET(req: NextRequest) {
       await markSessionExpired(connection.id)
       return NextResponse.json({ error: 'Сессия истекла — переподключите кабинет' }, { status: 400 })
     }
+    total = result.total
     if (result.orders.length === 0) break
     orders.push(...result.orders)
-    total = result.total
     page++
   }
 
