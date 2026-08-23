@@ -4,7 +4,7 @@ import type { Order } from './cabinetApi'
 
 function makeOrder(code: string, creationTime: string, items: { code: string; name: string; imageUrl: string | null; quantity: number; totalPrice: number }[]): Order {
   const totalPrice = items.reduce((sum, i) => sum + i.totalPrice, 0)
-  return { code, status: 'TRANSMITTED', customerFirstName: 'Test', customerLastName: 'T', totalPrice, creationTime, items }
+  return { code, status: 'TRANSMITTED', customerFirstName: 'Test', customerLastName: 'T', totalPrice, creationTime, cityId: null, cityName: null, plannedDeliveryDate: null, items }
 }
 
 describe('computeProfitSummary', () => {

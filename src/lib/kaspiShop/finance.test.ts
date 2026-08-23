@@ -3,7 +3,7 @@ import { computeFinanceSummary, computeBehavioralAnalytics, estimateGender } fro
 import type { Order } from './cabinetApi'
 
 function makeOrder(code: string, totalPrice: number, creationTime: string, customerFirstName = 'Test'): Order {
-  return { code, status: 'TRANSMITTED', customerFirstName, customerLastName: 'T', totalPrice, creationTime, items: [] }
+  return { code, status: 'TRANSMITTED', customerFirstName, customerLastName: 'T', totalPrice, creationTime, cityId: null, cityName: null, plannedDeliveryDate: null, items: [] }
 }
 
 describe('computeFinanceSummary', () => {
@@ -113,6 +113,7 @@ describe('computeFinanceSummary', () => {
     const orderWithItems: Order = {
       code: '1', status: 'TRANSMITTED', customerFirstName: 'Test', customerLastName: 'T',
       totalPrice: 900, creationTime: '2026-08-12T10:00:00.000Z',
+      cityId: null, cityName: null, plannedDeliveryDate: null,
       items: [
         { code: 'a', name: 'A', imageUrl: null, quantity: 2, totalPrice: 600 },
         { code: 'b', name: 'B', imageUrl: null, quantity: 3, totalPrice: 300 },
@@ -168,7 +169,7 @@ describe('computeBehavioralAnalytics', () => {
     // at 01:30 the NEXT day (Thursday) -- the real point of this test:
     // confirms the function shifts by the fixed KZ offset before reading
     // weekday/hour, not whatever timezone the process happens to run in.
-    const order = { code: '1', status: 'TRANSMITTED', customerFirstName: 'Ерлан', customerLastName: 'T', totalPrice: 1000, creationTime: '2026-08-12T20:30:00.000Z', items: [] } as Order
+    const order = { code: '1', status: 'TRANSMITTED', customerFirstName: 'Ерлан', customerLastName: 'T', totalPrice: 1000, creationTime: '2026-08-12T20:30:00.000Z', cityId: null, cityName: null, plannedDeliveryDate: null, items: [] } as Order
     const result = computeBehavioralAnalytics([order])
 
     const thursday = result.byWeekday.find(w => w.label === 'Чт')!

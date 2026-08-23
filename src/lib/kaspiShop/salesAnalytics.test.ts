@@ -10,6 +10,9 @@ function order(items: { code: string; name: string; quantity: number; totalPrice
     customerLastName: 'Тестов',
     totalPrice: items.reduce((s, i) => s + i.totalPrice, 0),
     creationTime: '2026-08-01T10:00:00Z',
+    cityId: null,
+    cityName: null,
+    plannedDeliveryDate: null,
     items: items.map(i => ({ ...i, imageUrl: null })),
   }
 }
