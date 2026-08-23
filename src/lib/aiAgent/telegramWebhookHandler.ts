@@ -444,7 +444,6 @@ export async function handleTelegramFlowCallback(
 
   if (!conversation?.active_flow_id || !conversation.active_step_id || clickedStepId !== conversation.active_step_id) {
     toastText = STALE_TOAST
-    if (conversation?.active_flow_id) clearState = true
   } else {
     const { data: flow } = await supabase.from('ai_agent_flows').select('id, definition').eq('id', conversation.active_flow_id).maybeSingle()
     const definition = flow ? parseFlowDefinition(flow.definition) : null
