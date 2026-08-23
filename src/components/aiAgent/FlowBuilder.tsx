@@ -41,16 +41,25 @@ export default function FlowBuilder({ agentId, authHeader }: { agentId: string; 
   const [draftSteps, setDraftSteps] = useState<FlowStepDraft[]>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [listError, setListError] = useState<string | null>(null)
 
   async function load() {
     setLoading(true)
-    const headers = await authHeader()
-    const res = await fetch(`/api/ai-agent/flows?agentId=${encodeURIComponent(agentId)}`, { headers })
-    if (res.ok) {
-      const data = await res.json()
-      setFlows(Array.isArray(data.flows) ? data.flows : [])
+    try {
+      const headers = await authHeader()
+      const res = await fetch(`/api/ai-agent/flows?agentId=${encodeURIComponent(agentId)}`, { headers })
+      if (res.ok) {
+        const data = await res.json()
+        setFlows(Array.isArray(data.flows) ? data.flows : [])
+        setListError(null)
+      } else {
+        setListError('Не удалось загрузить сценарии')
+      }
+    } catch {
+      setListError('Не удалось загрузить сценарии — проверьте соединение и попробуйте снова')
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   useEffect(() => { load() }, [agentId])
@@ -111,33 +120,46 @@ export default function FlowBuilder({ agentId, authHeader }: { agentId: string; 
   async function save() {
     setSaving(true)
     setError(null)
-    const headers = await authHeader()
-    const res = await fetch('/api/ai-agent/flows', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        ...(editingId && editingId !== 'new' ? { id: editingId } : { agentId }),
-        name: draftName,
-        triggerWords: draftTriggerWords,
-        isStart: draftIsStart,
-        definition: { steps: draftSteps },
-      }),
-    })
-    setSaving(false)
-    if (!res.ok) {
-      const data = await res.json().catch(() => null)
-      setError(data?.error === 'invalid definition' ? 'Проверьте шаги — у каждого должен быть текст, у каждой кнопки — название' : 'Не удалось сохранить сценарий')
-      return
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/ai-agent/flows', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          ...(editingId && editingId !== 'new' ? { id: editingId } : { agentId }),
+          name: draftName,
+          triggerWords: draftTriggerWords,
+          isStart: draftIsStart,
+          definition: { steps: draftSteps },
+        }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        setError(data?.error === 'invalid definition' ? 'Проверьте шаги — у каждого должен быть текст, у каждой кнопки — название' : 'Не удалось сохранить сценарий')
+        return
+      }
+      setEditingId(null)
+      load()
+    } catch {
+      setError('Не удалось сохранить сценарий — проверьте соединение и попробуйте снова')
+    } finally {
+      setSaving(false)
     }
-    setEditingId(null)
-    load()
   }
 
   async function removeFlow(id: string) {
     if (!confirm('Удалить сценарий?')) return
-    const headers = await authHeader()
-    await fetch('/api/ai-agent/flows', { method: 'DELETE', headers, body: JSON.stringify({ id }) })
-    load()
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/ai-agent/flows', { method: 'DELETE', headers, body: JSON.stringify({ id }) })
+      if (!res.ok) {
+        alert('Не удалось удалить сценарий — попробуйте снова')
+        return
+      }
+      load()
+    } catch {
+      alert('Не удалось удалить сценарий — проверьте соединение и попробуйте снова')
+    }
   }
 
   if (loading) return <div className="text-sm" style={{ color: 'var(--nav-text-muted)' }}>Загрузка…</div>
@@ -233,7 +255,13 @@ export default function FlowBuilder({ agentId, authHeader }: { agentId: string; 
         Сценарии отвечают мгновенно и бесплатно, как шаблоны — но ведут клиента по заранее прописанным шагам с кнопками, без ИИ.
       </p>
 
-      {flows.length === 0 && (
+      {listError && (
+        <div className="nav-glass nav-card-accent rounded-2xl p-4 text-xs mb-3" style={{ color: 'var(--nav-critical)' }}>
+          {listError}
+        </div>
+      )}
+
+      {flows.length === 0 && !listError && (
         <div className="nav-glass nav-card-accent rounded-2xl p-5 text-sm text-center mb-3" style={{ color: 'var(--nav-text-muted)' }}>
           Сценариев пока нет.
         </div>
