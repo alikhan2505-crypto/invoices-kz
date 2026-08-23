@@ -40,6 +40,18 @@ function verifySignature(rawBody: string, signatureHeader: string | null): boole
   return crypto.timingSafeEqual(expectedBuf, actualBuf)
 }
 
+// Genuine CONTENT message types this pipeline is meant to eventually handle
+// or explicitly decline with the polite fallback. Deliberately NOT a true
+// else/catch-all: WhatsApp Cloud API delivers several non-content platform
+// event kinds inside the same messages[] array with a real `from`/`id`
+// (reaction, system, request_welcome, order, button, interactive, its own
+// `unsupported` type, etc.) -- most commonly a customer reacting 👍 to the
+// bot's own reply. None of those are a message a human is waiting on an
+// answer to, so they're silently ignored below rather than answered with
+// "can't handle this", matching how Telegram/Instagram already ignore their
+// own equivalent non-content event shapes.
+const WHATSAPP_CONTENT_TYPES = ['video', 'document', 'sticker', 'location', 'contacts']
+
 interface WhatsAppValue {
   messaging_product?: string
   metadata?: { display_phone_number?: string; phone_number_id?: string }
@@ -138,9 +150,17 @@ export async function POST(req: NextRequest) {
             continue
           }
 
-          // Any other type (video, document, sticker, location, interactive,
-          // etc.), or a text/image/audio message missing the field it needs.
-          await sendWhatsAppMessage(conn.phoneNumberId, msg.from, UNSUPPORTED_MEDIA_REPLY_TEXT, { accessToken: conn.accessToken })
+          // A genuine content type this pipeline doesn't handle yet (video,
+          // document, sticker, location, contacts), or a text/image/audio
+          // message missing the field it needs -- reply with the polite
+          // fallback. Anything else (reaction, system, order, button,
+          // interactive, unsupported, or any other event WhatsApp adds
+          // later) is a non-content platform event, not a message a human
+          // customer is waiting on an answer to -- silently ignored, see
+          // WHATSAPP_CONTENT_TYPES above.
+          if (msg.type && WHATSAPP_CONTENT_TYPES.includes(msg.type)) {
+            await sendWhatsAppMessage(conn.phoneNumberId, msg.from, UNSUPPORTED_MEDIA_REPLY_TEXT, { accessToken: conn.accessToken })
+          }
         } catch (err: any) {
           // A thrown error anywhere above (download, transcription, AI
           // reply, send) must not abort the rest of this webhook delivery's
