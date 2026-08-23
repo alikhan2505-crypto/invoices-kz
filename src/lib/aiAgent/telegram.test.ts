@@ -40,10 +40,10 @@ describe('parseTelegramUpdate', () => {
     expect(noFrom.kind === 'text' && noFrom.fromHandle).toBe('unknown')
   })
 
-  it('treats /start (bare, with deep-link payload, or @-suffixed) as start', () => {
-    expect(parseTelegramUpdate(textUpdate({}, { text: '/start' }))).toEqual({ kind: 'start', chatId: '111' })
-    expect(parseTelegramUpdate(textUpdate({}, { text: '/start ref123' }))).toEqual({ kind: 'start', chatId: '111' })
-    expect(parseTelegramUpdate(textUpdate({}, { text: '/start@MyBot' }))).toEqual({ kind: 'start', chatId: '111' })
+  it('treats /start (bare, with deep-link payload, or @-suffixed) as start, carrying fromHandle', () => {
+    expect(parseTelegramUpdate(textUpdate({}, { text: '/start' }))).toEqual({ kind: 'start', chatId: '111', fromHandle: 'aigerim_a' })
+    expect(parseTelegramUpdate(textUpdate({}, { text: '/start ref123' }))).toEqual({ kind: 'start', chatId: '111', fromHandle: 'aigerim_a' })
+    expect(parseTelegramUpdate(textUpdate({}, { text: '/start@MyBot' }))).toEqual({ kind: 'start', chatId: '111', fromHandle: 'aigerim_a' })
   })
 
   it('ignores other slash-commands', () => {
@@ -114,6 +114,44 @@ describe('parseTelegramUpdate', () => {
     expect(parseTelegramUpdate('garbage')).toEqual({ kind: 'ignore' })
     expect(parseTelegramUpdate(textUpdate({ update_id: 'not-a-number' }))).toEqual({ kind: 'ignore' })
     expect(parseTelegramUpdate(textUpdate({}, { chat: {} }))).toEqual({ kind: 'ignore' })
+  })
+})
+
+describe('parseTelegramUpdate: callback_query', () => {
+  it('parses a valid callback_query', () => {
+    const parsed = parseTelegramUpdate({
+      update_id: 50,
+      callback_query: { id: 'cbq123', data: 'btn:1', from: { id: 111, is_bot: false, username: 'aigerim_a' } },
+    })
+    expect(parsed).toEqual({ kind: 'callback_query', chatId: '111', fromHandle: 'aigerim_a', data: 'btn:1', callbackQueryId: 'cbq123' })
+  })
+
+  it('falls back to first_name then unknown when username is missing', () => {
+    const withFirstName = parseTelegramUpdate({
+      update_id: 50,
+      callback_query: { id: 'cbq1', data: 'btn:0', from: { id: 111, first_name: 'Айгерим' } },
+    })
+    expect(withFirstName.kind === 'callback_query' && withFirstName.fromHandle).toBe('Айгерим')
+    const noName = parseTelegramUpdate({
+      update_id: 50,
+      callback_query: { id: 'cbq1', data: 'btn:0', from: { id: 111 } },
+    })
+    expect(noName.kind === 'callback_query' && noName.fromHandle).toBe('unknown')
+  })
+
+  it('ignores a malformed callback_query missing id, data, or from.id', () => {
+    expect(parseTelegramUpdate({ update_id: 50, callback_query: {} })).toEqual({ kind: 'ignore' })
+    expect(parseTelegramUpdate({ update_id: 50, callback_query: { id: 'cbq1', from: { id: 111 } } })).toEqual({ kind: 'ignore' })
+    expect(parseTelegramUpdate({ update_id: 50, callback_query: { id: 'cbq1', data: 'btn:0' } })).toEqual({ kind: 'ignore' })
+  })
+
+  it('callback_query takes priority over any message field on the same update', () => {
+    const parsed = parseTelegramUpdate({
+      update_id: 50,
+      callback_query: { id: 'cbq1', data: 'btn:0', from: { id: 111 } },
+      message: { text: 'irrelevant', chat: { id: 999 }, from: { is_bot: false } },
+    })
+    expect(parsed.kind).toBe('callback_query')
   })
 })
 

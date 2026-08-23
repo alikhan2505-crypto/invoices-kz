@@ -5,6 +5,8 @@
 // calls and stay untested per codebase convention (see the note atop
 // instagramAiReply.ts).
 
+import type { FlowStep } from './flow'
+
 // Mirrors InstagramApiError in src/lib/instagram.ts -- a 401 on a send
 // means the bot token is dead (revoked via BotFather), which the callers
 // translate into the connection's token_expired status.
@@ -27,7 +29,7 @@ export function telegramDedupKey(botId: string, updateId: number): string {
 
 export type ParsedTelegramUpdate =
   | { kind: 'ignore' }
-  | { kind: 'start'; chatId: string }
+  | { kind: 'start'; chatId: string; fromHandle: string }
   | { kind: 'text'; chatId: string; text: string; fromHandle: string; updateId: number }
   | { kind: 'photo'; chatId: string; fromHandle: string; updateId: number; fileId: string; caption: string }
   | { kind: 'voice'; chatId: string; fromHandle: string; updateId: number; fileId: string }
@@ -35,10 +37,13 @@ export type ParsedTelegramUpdate =
   // start -- video, document, sticker, location, contact, poll, or a
   // malformed photo/voice missing a usable file_id/update_id.
   | { kind: 'unsupported'; chatId: string }
+  | { kind: 'callback_query'; chatId: string; fromHandle: string; data: string; callbackQueryId: string }
 
-// Classifies a raw Telegram Update. Only fresh `message` updates count --
-// edited_message, channel_post, callback_query etc. arrive under different
-// keys and fall through to 'ignore', as do messages from other bots and
+// Classifies a raw Telegram Update. callback_query (flow-builder button
+// taps) is checked first and, when present, takes priority over any
+// message field on the same update. Otherwise only fresh `message` updates
+// count -- edited_message, channel_post etc. arrive under different keys
+// and fall through to 'ignore', as do messages from other bots and
 // slash-commands other than /start. Text, photo, and voice messages get
 // their own kind; anything else with a real chat gets 'unsupported' (the
 // webhook route replies with a polite static message instead of silence).
@@ -53,7 +58,23 @@ export function parseTelegramUpdate(update: unknown): ParsedTelegramUpdate {
       photo?: { file_id?: unknown }[]
       voice?: { file_id?: unknown }
     } | null
+    callback_query?: {
+      id?: unknown
+      data?: unknown
+      from?: { id?: unknown; username?: string; first_name?: string }
+    } | null
   } | null
+
+  const cq = u?.callback_query
+  if (cq) {
+    const callbackQueryId = typeof cq.id === 'string' ? cq.id : undefined
+    const data = typeof cq.data === 'string' ? cq.data : undefined
+    const fromIdRaw = cq.from?.id
+    if (!callbackQueryId || !data || (typeof fromIdRaw !== 'number' && typeof fromIdRaw !== 'string')) return { kind: 'ignore' }
+    const fromHandle = cq.from?.username || cq.from?.first_name || 'unknown'
+    return { kind: 'callback_query', chatId: String(fromIdRaw), fromHandle, data, callbackQueryId }
+  }
+
   const msg = u?.message
   if (!msg) return { kind: 'ignore' }
   if (msg.from?.is_bot) return { kind: 'ignore' }
@@ -84,7 +105,7 @@ export function parseTelegramUpdate(update: unknown): ParsedTelegramUpdate {
   const text = msg.text.trim()
   // "/start", "/start ref123" (deep-link payload), "/start@MyBot" all greet.
   if (text === '/start' || text.startsWith('/start ') || text.startsWith('/start@')) {
-    return { kind: 'start', chatId }
+    return { kind: 'start', chatId, fromHandle }
   }
   if (text.startsWith('/')) return { kind: 'ignore' }
   if (updateId === undefined) return { kind: 'ignore' }
@@ -176,4 +197,31 @@ export async function downloadTelegramMedia(fileId: string, botToken: string): P
   }
   const arrayBuffer = await res.arrayBuffer()
   return Buffer.from(arrayBuffer)
+}
+
+// Sends a flow step's message with its buttons as a Telegram inline
+// keyboard -- one row per button (simplest layout for v1). callback_data is
+// just the button's index within THIS step ("btn:0", "btn:1", ...) -- the
+// server already knows which flow/step the customer is on from
+// ai_agent_conversations.active_flow_id/active_step_id, so nothing else
+// needs to round-trip through Telegram's 64-byte callback_data limit.
+export async function sendTelegramFlowStep(botToken: string, chatId: string, step: FlowStep): Promise<void> {
+  const inline_keyboard = step.buttons.map((b, i) => [{ text: b.label, callback_data: `btn:${i}` }])
+  await callTelegram(botToken, 'sendMessage', {
+    chat_id: chatId,
+    text: step.text,
+    ...(inline_keyboard.length > 0 ? { reply_markup: { inline_keyboard } } : {}),
+  })
+}
+
+// Must be called for every callback_query update, even a stale/invalid one
+// -- otherwise the customer's tapped button shows a loading spinner until
+// Telegram's own client-side timeout. `text`, if given, shows as a small
+// toast over the chat (not a new message) -- used for "this scenario is no
+// longer active" on a stale click.
+export async function answerTelegramCallbackQuery(botToken: string, callbackQueryId: string, text?: string): Promise<void> {
+  await callTelegram(botToken, 'answerCallbackQuery', {
+    callback_query_id: callbackQueryId,
+    ...(text ? { text } : {}),
+  })
 }
