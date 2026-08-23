@@ -282,6 +282,9 @@ export type Order = {
   customerLastName: string
   totalPrice: number
   creationTime: string
+  cityId: string | null
+  cityName: string | null
+  plannedDeliveryDate: string | null
   items: OrderItem[]
 }
 
@@ -295,6 +298,12 @@ function mapOrderItems(entries: any[] | undefined): OrderItem[] {
     quantity: Number(e.quantity) || 1,
     totalPrice: Number(e.totalPrice) || 0,
   }))
+}
+
+export function extractDestinationCity(destination: any): { cityId: string | null; cityName: string | null } {
+  const city = destination?.city
+  if (!city || city.id == null) return { cityId: null, cityName: null }
+  return { cityId: String(city.id), cityName: city.name ?? null }
 }
 
 const GET_ORDERS_QUERY = `query getOrders($merchantUid: String!, $input: MerchantOrderInput!, $advancedInput: MerchantOrderAdvancedInput!, $withAdvancedOrders: Boolean!, $page: Int!, $size: Int, $sort: [String!]) {
@@ -320,6 +329,12 @@ fragment OrdersPageFragment on Order {
   creationTime
   modificationTime
   status
+  destination {
+    ... on Point { city { id name } }
+    ... on OrderAddress { city { id name } }
+    ... on Postomat { city { id name } }
+  }
+  delivery { plannedDeliveryDate }
   entries {
     quantity
     totalPrice
@@ -456,7 +471,7 @@ export type OrdersPage = { orders: Order[]; total: number; sessionExpired: boole
 // because of this limit -- any status with more than 10 orders needs it.
 export const PAGE_SIZE = 10
 
-export async function listOrders(sessionCookies: string, merchantId: string, status: string, page = 0): Promise<OrdersPage> {
+export async function listOrders(sessionCookies: string, merchantId: string, status: string, page = 0, cityId = ''): Promise<OrdersPage> {
   const res = await fetch('https://mc.shop.kaspi.kz/mc/facade/graphql?opName=getOrders', {
     method: 'POST',
     headers: authHeaders(sessionCookies),
@@ -466,7 +481,7 @@ export async function listOrders(sessionCookies: string, merchantId: string, sta
         merchantUid: merchantId,
         size: PAGE_SIZE,
         page,
-        input: { presetFilter: status, orderCode: '', cityId: '' },
+        input: { presetFilter: status, orderCode: '', cityId },
         advancedInput: { orderCode: '', phoneNumber: '', productCode: '' },
         withAdvancedOrders: false,
       },
@@ -495,6 +510,8 @@ export async function listOrders(sessionCookies: string, merchantId: string, sta
       customerLastName: o.customer?.lastName ?? '',
       totalPrice: Number(o.totalPrice) || 0,
       creationTime: o.creationTime,
+      ...extractDestinationCity(o.destination),
+      plannedDeliveryDate: o.delivery?.plannedDeliveryDate ?? null,
       items: mapOrderItems(o.entries),
     })),
   }
