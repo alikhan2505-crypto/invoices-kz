@@ -8,6 +8,7 @@ import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import SessionExpiredBanner from '@/components/kaspiShop/SessionExpiredBanner'
 import { ORDER_STATUS_TABS, BULK_PRINTABLE_STATUSES } from '@/lib/kaspiShop/orderStatuses'
+import { filterByDeliveryCutoff, type DeliveryDateMode } from '@/lib/kaspiShop/ordersFilters'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 const CARD_HOVER = 'transition-all duration-200 ease-out hover:-translate-y-1 hover:shadow-[var(--nav-card-glow)]'
@@ -19,6 +20,9 @@ type Order = {
   customerLastName: string
   totalPrice: number
   creationTime: string
+  cityId: string | null
+  cityName: string | null
+  plannedDeliveryDate: string | null
   items: { code: string; name: string; imageUrl: string | null; quantity: number }[]
 }
 
@@ -38,25 +42,46 @@ function KaspiShopOrdersInner() {
   const [printing, setPrinting] = useState(false)
   const [sessionExpired, setSessionExpired] = useState(false)
   const [groupBy, setGroupBy] = useState<'type' | 'date' | null>(null)
+  const [cityId, setCityId] = useState('')
+  const [cityOptions, setCityOptions] = useState<{ cityId: string; cityName: string }[]>([])
+  const [dateMode, setDateMode] = useState<DeliveryDateMode>('all')
+  const [exporting, setExporting] = useState(false)
 
   const PAGE_SIZE = 10
   const prevStatus = useRef(status)
 
+  const prevCityId = useRef(cityId)
+
   useEffect(() => { checkAccess() }, [])
   useEffect(() => {
     if (loading) return
-    // A status switch resets to page 0 -- skip this render's fetch (it'd
-    // use the stale page from the previous status) and let the resulting
-    // setPage(0) re-trigger this effect with the right value instead.
-    if (prevStatus.current !== status) {
-      prevStatus.current = status
+    loadCityOptions(status)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading])
+  useEffect(() => {
+    if (loading) return
+    // A status or city switch resets to page 0 -- skip this render's fetch
+    // (it'd use the stale page from before the switch) and let the
+    // resulting setPage(0) re-trigger this effect with the right value.
+    const statusChanged = prevStatus.current !== status
+    const cityChanged = prevCityId.current !== cityId
+    prevStatus.current = status
+    prevCityId.current = cityId
+    if (statusChanged) {
       setPage(0)
-      if (page === 0) { loadOrders(status, 0); loadCounts() }
+      setDateMode('all')
+      loadCityOptions(status)
+      if (page === 0) { loadOrders(status, 0, cityId); loadCounts() }
       return
     }
-    loadOrders(status, page)
+    if (cityChanged) {
+      setPage(0)
+      if (page === 0) loadOrders(status, 0, cityId)
+      return
+    }
+    loadOrders(status, page, cityId)
     loadCounts()
-  }, [status, page, loading])
+  }, [status, page, cityId, loading])
 
   async function authHeader() {
     const { data: { session } } = await supabase.auth.getSession()
@@ -71,13 +96,26 @@ function KaspiShopOrdersInner() {
     setLoading(false)
   }
 
-  async function loadOrders(forStatus: string, forPage: number) {
+  async function loadCityOptions(forStatus: string) {
+    try {
+      const headers = await authHeader()
+      const res = await fetch(`/api/kaspi-shop/orders/cities?status=${encodeURIComponent(forStatus)}`, { headers })
+      if (!res.ok) { setCityOptions([]); return }
+      const data = await res.json()
+      setCityOptions(data.cities || [])
+    } catch {
+      setCityOptions([])
+    }
+  }
+
+  async function loadOrders(forStatus: string, forPage: number, forCityId: string = '') {
     setOrdersLoading(true)
     setLoadError('')
     setSelected(new Set())
     try {
       const headers = await authHeader()
-      const res = await fetch(`/api/kaspi-shop/orders?status=${encodeURIComponent(forStatus)}&page=${forPage}`, { headers })
+      const cityParam = forCityId ? `&cityId=${encodeURIComponent(forCityId)}` : ''
+      const res = await fetch(`/api/kaspi-shop/orders?status=${encodeURIComponent(forStatus)}&page=${forPage}${cityParam}`, { headers })
       const data = await res.json()
       if (!res.ok) { setLoadError(data.error || 'Не удалось загрузить заказы'); setOrders([]); setTotal(0); return }
       setOrders(data.orders || [])
@@ -141,6 +179,36 @@ function KaspiShopOrdersInner() {
     }
   }
 
+  async function exportExcel() {
+    setExporting(true)
+    try {
+      const headers = await authHeader()
+      const cityParam = cityId ? `&cityId=${encodeURIComponent(cityId)}` : ''
+      const res = await fetch(`/api/kaspi-shop/orders/export?status=${encodeURIComponent(status)}${cityParam}`, { headers })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setLoadError(data.error || 'Не удалось выгрузить заказы')
+        return
+      }
+      if (res.headers.get('x-truncated') === 'true') {
+        setLoadError('Выгружены первые 500 заказов — список обрезан')
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `zakazy_${status}.xlsx`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const visibleOrders = BULK_PRINTABLE_STATUSES.includes(status) ? filterByDeliveryCutoff(orders, dateMode) : orders
+
   if (loading) return <LoadingSpinner />
 
   return (
@@ -153,21 +221,32 @@ function KaspiShopOrdersInner() {
 
         <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
           <h1 className="text-2xl font-extrabold" style={{ color: 'var(--nav-text-primary)' }}>Заказы</h1>
-          <div className="relative flex items-center gap-0.5 nav-glass rounded-full p-[3px]">
-            {([['type', 'По виду'], ['date', 'По дате']] as const).map(([value, label]) => {
-              const active = groupBy === value
-              return (
-                <button key={value} onClick={() => setGroupBy(g => g === value ? null : value)}
-                  className="relative px-3 py-1.5 rounded-full text-xs font-medium transition-colors"
-                  style={{ color: active ? 'var(--nav-accent-ink)' : 'var(--nav-text-secondary)' }}>
-                  {active && (
-                    <motion.span layoutId="groupByPill" className="absolute inset-0 rounded-full" style={{ background: 'var(--nav-accent)', zIndex: 0 }}
-                      transition={{ type: 'spring', stiffness: 380, damping: 32 }} />
-                  )}
-                  <span className="relative" style={{ zIndex: 1 }}>{label}</span>
-                </button>
-              )
-            })}
+          <div className="flex items-center gap-2 flex-wrap">
+            <select value={cityId} onChange={e => setCityId(e.target.value)}
+              className="nav-glass rounded-full px-3 py-1.5 text-xs font-medium" style={{ color: 'var(--nav-text-primary)' }}>
+              <option value="">Все города</option>
+              {cityOptions.map(c => <option key={c.cityId} value={c.cityId}>{c.cityName}</option>)}
+            </select>
+            <button onClick={exportExcel} disabled={exporting}
+              className="nav-glass text-xs font-semibold rounded-full px-3 py-1.5 disabled:opacity-50" style={{ color: 'var(--nav-text-primary)' }}>
+              {exporting ? 'Экспорт...' : 'Выгрузить в Excel'}
+            </button>
+            <div className="relative flex items-center gap-0.5 nav-glass rounded-full p-[3px]">
+              {([['type', 'По виду'], ['date', 'По дате']] as const).map(([value, label]) => {
+                const active = groupBy === value
+                return (
+                  <button key={value} onClick={() => setGroupBy(g => g === value ? null : value)}
+                    className="relative px-3 py-1.5 rounded-full text-xs font-medium transition-colors"
+                    style={{ color: active ? 'var(--nav-accent-ink)' : 'var(--nav-text-secondary)' }}>
+                    {active && (
+                      <motion.span layoutId="groupByPill" className="absolute inset-0 rounded-full" style={{ background: 'var(--nav-accent)', zIndex: 0 }}
+                        transition={{ type: 'spring', stiffness: 380, damping: 32 }} />
+                    )}
+                    <span className="relative" style={{ zIndex: 1 }}>{label}</span>
+                  </button>
+                )
+              })}
+            </div>
           </div>
         </div>
 
@@ -200,6 +279,21 @@ function KaspiShopOrdersInner() {
           })}
         </div>
 
+        {BULK_PRINTABLE_STATUSES.includes(status) && (
+          <div className="flex gap-2 mb-4">
+            {([['all', 'Все'], ['tomorrow', 'Завтра до 20:00']] as const).map(([value, label]) => {
+              const active = dateMode === value
+              return (
+                <button key={value} onClick={() => setDateMode(value)}
+                  className="rounded-full px-3 py-1.5 text-xs font-semibold transition-colors"
+                  style={{ color: active ? 'var(--nav-accent-ink)' : 'var(--nav-text-secondary)', background: active ? 'var(--nav-accent)' : 'var(--nav-surface-glass)' }}>
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+        )}
+
         {BULK_PRINTABLE_STATUSES.includes(status) && selected.size > 0 && (
           <div className="rounded-2xl p-3 flex items-center justify-between gap-3 mb-4" style={{ background: 'var(--nav-accent)' }}>
             <span className="text-sm" style={{ color: 'var(--nav-accent-ink)' }}>Выбрано заказов: {selected.size}</span>
@@ -212,7 +306,7 @@ function KaspiShopOrdersInner() {
 
         {ordersLoading ? (
           <div className="nav-glass rounded-2xl p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Загружаем заказы...</div>
-        ) : orders.length === 0 ? (
+        ) : visibleOrders.length === 0 ? (
           <div className="nav-glass rounded-2xl p-8 text-center">
             <div className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>Заказов в этом статусе нет.</div>
           </div>
@@ -252,11 +346,11 @@ function KaspiShopOrdersInner() {
           }
 
           if (!groupBy) {
-            return <div className={CARD_GRID}>{orders.map((o, i) => renderCard(o, i))}</div>
+            return <div className={CARD_GRID}>{visibleOrders.map((o, i) => renderCard(o, i))}</div>
           }
 
           const groups = new Map<string, Order[]>()
-          for (const o of orders) {
+          for (const o of visibleOrders) {
             const key = groupBy === 'type'
               ? (o.items[0]?.name || 'Без названия')
               : new Date(o.creationTime).toLocaleDateString('ru-KZ')
