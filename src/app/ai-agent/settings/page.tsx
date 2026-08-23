@@ -14,6 +14,13 @@ import { buildBusinessContextLine, AgentTone, AgentGoal } from '@/lib/aiAgent/pr
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
+// = AI_AGENT_CREDIT_PRICE_TENGE × AI_AGENT_CREDITS_PER_AI_REPLY from
+// src/lib/aiAgent/wallet.ts -- not imported: that module (via
+// kaspiPay/wallet.ts) constructs a service-role Supabase client at module
+// scope, which must never end up in a client bundle. Keep in sync manually.
+// Same value/pattern as TestChatPanel.tsx's REPLY_PRICE_TENGE.
+const REPLY_PRICE_TENGE = 5
+
 // MoonAI-style tabbed settings (docs/superpowers/mooonai-research-findings.md
 // §1) -- tab state lives in ?tab= via history.replaceState (NOT
 // router.replace, which is known-broken for query-only changes in this app)
@@ -326,6 +333,7 @@ export default function AiAgentSettings() {
   const [tplEditText, setTplEditText] = useState('')
   const [tplBusy, setTplBusy] = useState(false)
   const [tplError, setTplError] = useState<string | null>(null)
+  const [walletBalance, setWalletBalance] = useState<number | null>(null)
 
   async function authHeader() {
     const { data: { session } } = await supabase.auth.getSession()
@@ -476,6 +484,18 @@ export default function AiAgentSettings() {
       } catch { /* empty list -- tab shows its empty state */ }
     }
 
+    // Balance is per-user, not per-agent -- fetched regardless of whether an
+    // agent exists yet, unlike loadReviewCount/loadTemplates above.
+    async function loadWalletBalance(headers: Record<string, string>) {
+      try {
+        const res = await fetch('/api/ai-agent/wallet', { headers })
+        if (res.ok) {
+          const data = await res.json()
+          if (typeof data.balance === 'number') setWalletBalance(data.balance)
+        }
+      } catch { /* card just hides the estimate line */ }
+    }
+
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
@@ -488,6 +508,7 @@ export default function AiAgentSettings() {
       const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', user.id).single()
       if (!profile?.is_admin) { setForbidden(true); setLoading(false); return }
       const headers = await authHeader()
+      loadWalletBalance(headers)
       const res = await fetch(agentParam ? `/api/ai-agent/settings?agentId=${encodeURIComponent(agentParam)}` : '/api/ai-agent/settings', { headers })
       if (res.status === 404) {
         // ?agent= pointing at a deleted/foreign agent -- back to the list.
@@ -1171,6 +1192,22 @@ export default function AiAgentSettings() {
                 </label>
 
                 {saveButton}
+              </div>
+            )}
+
+            {tab === 'control' && (
+              <div className="nav-glass nav-card-accent rounded-2xl p-5 mt-4">
+                <div className="text-sm font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>Стоимость ИИ-ответов</div>
+                <p className="text-[11px] mb-3" style={{ color: 'var(--nav-text-muted)' }}>
+                  Ответ по совпадению с шаблоном — бесплатно. Ответ, который сгенерировал ИИ — {REPLY_PRICE_TENGE} ₸.
+                </p>
+                {walletBalance !== null && (
+                  <div className="rounded-lg p-3 text-xs leading-relaxed" style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-secondary)' }}>
+                    Баланс кошелька: <b style={{ color: 'var(--nav-text-primary)' }}>{walletBalance.toLocaleString('ru-KZ')} ₸</b>
+                    {' '}— хватит примерно на <b style={{ color: 'var(--nav-text-primary)' }}>{Math.max(0, Math.floor(walletBalance / REPLY_PRICE_TENGE)).toLocaleString('ru-KZ')}</b> ИИ-ответов.
+                    <span className="block mt-1" style={{ color: 'var(--nav-text-muted)' }}>Кошелёк общий для Счетов, Kaspi Bot и AI-агента — пополнить можно значком кошелька в правом верхнем углу.</span>
+                  </div>
+                )}
               </div>
             )}
 
