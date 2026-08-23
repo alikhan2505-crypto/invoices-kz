@@ -5,6 +5,7 @@ import QRCode from 'qrcode'
 import { supabase } from '@/lib/supabase'
 import { formatDate, formatDateSafe } from '@/lib/date'
 import { generateInvoicePDF } from '@/lib/generatePDF'
+import { getActivePlan } from '@/lib/plan'
 import { useLanguage } from '@/components/LanguageProvider'
 import { historyDict } from '@/lib/i18n/history'
 import { invoiceFlowDict } from '@/lib/i18n/invoiceFlow'
@@ -112,7 +113,7 @@ export default function PublicInvoice() {
       // Загружаем полный профиль включая подпись и печать
       const { data: p } = await supabase
         .from('profiles')
-        .select('company_name, bin_iin, address, phone, email, director_name, signature_url, stamp_url, kaspi_pay_link, halyk_pay_link, website, social_links')
+        .select('company_name, bin_iin, address, phone, email, director_name, signature_url, stamp_url, kaspi_pay_link, halyk_pay_link, website, social_links, plan, plan_expires_at, bonus_expires_at, trial_expires_at')
         .eq('id', inv.user_id)
         .single()
       setProfile(p)
@@ -220,6 +221,7 @@ export default function PublicInvoice() {
         kbe: bank.kbe,
       } : undefined,
       dueDate: invoice.due_date ? formatDate(invoice.due_date) : undefined,
+      showWatermark: !getActivePlan(profile).isActive,
       autoPrint: false,
     })
   if (win) { win.document.write(html); win.document.close() }
