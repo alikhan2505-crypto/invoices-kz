@@ -22,13 +22,14 @@ export async function GET(req: NextRequest) {
 
   const status = req.nextUrl.searchParams.get('status') || 'NEW'
   const page = Number(req.nextUrl.searchParams.get('page')) || 0
+  const cityId = req.nextUrl.searchParams.get('cityId') || ''
 
   const connection = await loadConnection(user.id)
   if (!connection || !connection.sessionCookies) {
     return NextResponse.json({ error: 'Кабинет не подключён — подключите его через Kaspi Магазин' }, { status: 400 })
   }
 
-  const { orders, total, sessionExpired } = await listOrders(connection.sessionCookies, connection.merchantId, status, page)
+  const { orders, total, sessionExpired } = await listOrders(connection.sessionCookies, connection.merchantId, status, page, cityId)
   if (sessionExpired) await markSessionExpired(connection.id)
   return NextResponse.json({ orders, total, sessionExpired })
 }
