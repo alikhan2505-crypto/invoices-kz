@@ -151,13 +151,12 @@ export async function POST(req: NextRequest) {
           }
 
           // A genuine content type this pipeline doesn't handle yet (video,
-          // document, sticker, location, contacts), or a text/image/audio
-          // message missing the field it needs -- reply with the polite
+          // document, sticker, location, contacts) -- reply with the polite
           // fallback. Anything else (reaction, system, order, button,
-          // interactive, unsupported, or any other event WhatsApp adds
-          // later) is a non-content platform event, not a message a human
-          // customer is waiting on an answer to -- silently ignored, see
-          // WHATSAPP_CONTENT_TYPES above.
+          // interactive, unsupported, a text/image/audio message missing
+          // the field it needs, or any other event WhatsApp adds later) is
+          // either a non-content platform event or too malformed to safely
+          // classify -- silently ignored, see WHATSAPP_CONTENT_TYPES above.
           if (msg.type && WHATSAPP_CONTENT_TYPES.includes(msg.type)) {
             await sendWhatsAppMessage(conn.phoneNumberId, msg.from, UNSUPPORTED_MEDIA_REPLY_TEXT, { accessToken: conn.accessToken })
           }
