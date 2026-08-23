@@ -78,7 +78,7 @@ export default function FlowBuilder({ agentId, authHeader }: { agentId: string; 
     setDraftName(flow.name)
     setDraftTriggerWords(flow.triggerWords)
     setDraftIsStart(flow.isStart)
-    setDraftSteps(flow.definition.steps.length > 0 ? flow.definition.steps : [emptyStep()])
+    setDraftSteps(flow.definition?.steps?.length ? flow.definition.steps : [emptyStep()])
     setError(null)
   }
 

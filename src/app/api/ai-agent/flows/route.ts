@@ -173,6 +173,12 @@ export async function DELETE(req: NextRequest) {
   const flow = await loadOwnedFlow(user.id, id)
   if (!flow) return NextResponse.json({ error: 'not_found' }, { status: 404 })
 
+  // Clear conversations pointing at this flow BEFORE deleting it -- the
+  // DB's own "on delete set null" FK behavior only nulls active_flow_id,
+  // leaving active_step_id populated as orphaned data. Doing it explicitly
+  // here means the row is never left half-cleared.
+  await supabase.from('ai_agent_conversations').update({ active_flow_id: null, active_step_id: null }).eq('active_flow_id', flow.id)
+
   const { error } = await supabase.from('ai_agent_flows').delete().eq('id', flow.id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 

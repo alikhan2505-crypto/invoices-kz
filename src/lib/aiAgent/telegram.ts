@@ -62,6 +62,7 @@ export function parseTelegramUpdate(update: unknown): ParsedTelegramUpdate {
       id?: unknown
       data?: unknown
       from?: { id?: unknown; username?: string; first_name?: string }
+      message?: { chat?: { id?: unknown } }
     } | null
   } | null
 
@@ -69,10 +70,15 @@ export function parseTelegramUpdate(update: unknown): ParsedTelegramUpdate {
   if (cq) {
     const callbackQueryId = typeof cq.id === 'string' ? cq.id : undefined
     const data = typeof cq.data === 'string' ? cq.data : undefined
-    const fromIdRaw = cq.from?.id
-    if (!callbackQueryId || !data || (typeof fromIdRaw !== 'number' && typeof fromIdRaw !== 'string')) return { kind: 'ignore' }
+    // Prefer the chat the button's own message lives in -- correct even in
+    // a (currently unsupported, but not filtered-out) group chat, where
+    // from.id is the tapping user, not the chat. Telegram omits `message`
+    // for very old messages, so fall back to from.id (which IS correct for
+    // this product's private-chat-only use case) when it's missing.
+    const chatIdRaw = cq.message?.chat?.id ?? cq.from?.id
+    if (!callbackQueryId || !data || (typeof chatIdRaw !== 'number' && typeof chatIdRaw !== 'string')) return { kind: 'ignore' }
     const fromHandle = cq.from?.username || cq.from?.first_name || 'unknown'
-    return { kind: 'callback_query', chatId: String(fromIdRaw), fromHandle, data, callbackQueryId }
+    return { kind: 'callback_query', chatId: String(chatIdRaw), fromHandle, data, callbackQueryId }
   }
 
   const msg = u?.message
@@ -165,7 +171,7 @@ export async function setTelegramWebhook(botToken: string, url: string, secret: 
   await callTelegram(botToken, 'setWebhook', {
     url,
     secret_token: secret,
-    allowed_updates: ['message'],
+    allowed_updates: ['message', 'callback_query'],
     drop_pending_updates: true,
   })
 }
@@ -200,13 +206,15 @@ export async function downloadTelegramMedia(fileId: string, botToken: string): P
 }
 
 // Sends a flow step's message with its buttons as a Telegram inline
-// keyboard -- one row per button (simplest layout for v1). callback_data is
-// just the button's index within THIS step ("btn:0", "btn:1", ...) -- the
-// server already knows which flow/step the customer is on from
-// ai_agent_conversations.active_flow_id/active_step_id, so nothing else
-// needs to round-trip through Telegram's 64-byte callback_data limit.
+// keyboard -- one row per button (simplest layout for v1). callback_data
+// encodes the step id too, not just the button index -- Telegram never
+// removes old inline keyboards from chat history, so a customer scrolling
+// up and tapping a PREVIOUS step's button must be detectable as stale
+// rather than silently resolved against whatever button currently sits at
+// that array index on the CURRENT step. A UUID step id (36 chars) plus this
+// prefix/suffix stays well under Telegram's 64-byte callback_data limit.
 export async function sendTelegramFlowStep(botToken: string, chatId: string, step: FlowStep): Promise<void> {
-  const inline_keyboard = step.buttons.map((b, i) => [{ text: b.label, callback_data: `btn:${i}` }])
+  const inline_keyboard = step.buttons.map((b, i) => [{ text: b.label, callback_data: `btn:${step.id}:${i}` }])
   await callTelegram(botToken, 'sendMessage', {
     chat_id: chatId,
     text: step.text,

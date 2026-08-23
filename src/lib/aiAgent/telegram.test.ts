@@ -118,37 +118,49 @@ describe('parseTelegramUpdate', () => {
 })
 
 describe('parseTelegramUpdate: callback_query', () => {
-  it('parses a valid callback_query', () => {
+  it('parses a valid callback_query, falling back to from.id when message is absent', () => {
     const parsed = parseTelegramUpdate({
       update_id: 50,
-      callback_query: { id: 'cbq123', data: 'btn:1', from: { id: 111, is_bot: false, username: 'aigerim_a' } },
+      callback_query: { id: 'cbq123', data: 'btn:s1:1', from: { id: 111, is_bot: false, username: 'aigerim_a' } },
     })
-    expect(parsed).toEqual({ kind: 'callback_query', chatId: '111', fromHandle: 'aigerim_a', data: 'btn:1', callbackQueryId: 'cbq123' })
+    expect(parsed).toEqual({ kind: 'callback_query', chatId: '111', fromHandle: 'aigerim_a', data: 'btn:s1:1', callbackQueryId: 'cbq123' })
+  })
+
+  it('prefers callback_query.message.chat.id over from.id when both are present', () => {
+    const parsed = parseTelegramUpdate({
+      update_id: 50,
+      callback_query: {
+        id: 'cbq1', data: 'btn:s1:0',
+        from: { id: 111, username: 'aigerim_a' },
+        message: { chat: { id: 999 } },
+      },
+    })
+    expect(parsed).toEqual({ kind: 'callback_query', chatId: '999', fromHandle: 'aigerim_a', data: 'btn:s1:0', callbackQueryId: 'cbq1' })
   })
 
   it('falls back to first_name then unknown when username is missing', () => {
     const withFirstName = parseTelegramUpdate({
       update_id: 50,
-      callback_query: { id: 'cbq1', data: 'btn:0', from: { id: 111, first_name: 'Айгерим' } },
+      callback_query: { id: 'cbq1', data: 'btn:s1:0', from: { id: 111, first_name: 'Айгерим' } },
     })
     expect(withFirstName.kind === 'callback_query' && withFirstName.fromHandle).toBe('Айгерим')
     const noName = parseTelegramUpdate({
       update_id: 50,
-      callback_query: { id: 'cbq1', data: 'btn:0', from: { id: 111 } },
+      callback_query: { id: 'cbq1', data: 'btn:s1:0', from: { id: 111 } },
     })
     expect(noName.kind === 'callback_query' && noName.fromHandle).toBe('unknown')
   })
 
-  it('ignores a malformed callback_query missing id, data, or from.id', () => {
+  it('ignores a malformed callback_query missing id, data, or from.id/message.chat.id', () => {
     expect(parseTelegramUpdate({ update_id: 50, callback_query: {} })).toEqual({ kind: 'ignore' })
     expect(parseTelegramUpdate({ update_id: 50, callback_query: { id: 'cbq1', from: { id: 111 } } })).toEqual({ kind: 'ignore' })
-    expect(parseTelegramUpdate({ update_id: 50, callback_query: { id: 'cbq1', data: 'btn:0' } })).toEqual({ kind: 'ignore' })
+    expect(parseTelegramUpdate({ update_id: 50, callback_query: { id: 'cbq1', data: 'btn:s1:0' } })).toEqual({ kind: 'ignore' })
   })
 
   it('callback_query takes priority over any message field on the same update', () => {
     const parsed = parseTelegramUpdate({
       update_id: 50,
-      callback_query: { id: 'cbq1', data: 'btn:0', from: { id: 111 } },
+      callback_query: { id: 'cbq1', data: 'btn:s1:0', from: { id: 111 } },
       message: { text: 'irrelevant', chat: { id: 999 }, from: { is_bot: false } },
     })
     expect(parsed.kind).toBe('callback_query')

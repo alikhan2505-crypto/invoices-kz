@@ -9,7 +9,7 @@ import { createNotification } from '@/lib/notifications'
 import { findTemplateMatch, mergeCollectedData } from './webhookHandler'
 import { sendTelegramBotMessage, sendTelegramFlowStep, answerTelegramCallbackQuery, pairConversationHistory, TelegramApiError } from './telegram'
 import { UNSUPPORTED_MEDIA_REPLY_TEXT } from '@/lib/aiAgent/mediaLimits'
-import { parseFlowDefinition, isTerminalStep, findStepById, firstStep, findFlowTriggerMatch } from './flow'
+import { parseFlowDefinition, isTerminalStep, findStepById, firstStep, findFlowTriggerMatch, type FlowStep } from './flow'
 
 // The Telegram twin of webhookHandler.ts's Instagram tenant pipeline.
 // Deliberately a PARALLEL handler rather than a channel parameter threaded
@@ -113,14 +113,6 @@ export async function handleTelegramIncoming(conn: TelegramTenantConnection, par
     .single()
   if (!conversation) return
 
-  // The customer was mid-flow but sent free text instead of tapping a
-  // button -- exit the flow silently rather than nudge them back to it:
-  // someone who prefers typing should get a real answer (template/AI
-  // below), not be stuck in a menu.
-  if (conversation.active_flow_id) {
-    await supabase.from('ai_agent_conversations').update({ active_flow_id: null, active_step_id: null }).eq('id', conversation.id)
-  }
-
   // Log the inbound message. If two concurrent deliveries of the same
   // update both pass the SELECT-based dedup above, the unique index on
   // external_id catches the race here -- a 23505 means another call already
@@ -136,6 +128,16 @@ export async function handleTelegramIncoming(conn: TelegramTenantConnection, par
       console.error('ai-agent telegram webhook: failed to log inbound message for', params.externalId, ':', insertError.message)
     }
     return
+  }
+
+  // The customer was mid-flow but sent free text instead of tapping a
+  // button -- exit the flow silently rather than nudge them back to it:
+  // someone who prefers typing should get a real answer (template/AI
+  // below), not be stuck in a menu. Runs only after the inbound insert
+  // above succeeds, so a failed insert (for a non-dedup reason) never
+  // clears the customer's flow state without the message being logged.
+  if (conversation.active_flow_id) {
+    await supabase.from('ai_agent_conversations').update({ active_flow_id: null, active_step_id: null }).eq('id', conversation.id)
   }
 
   // Template match first -- skipped entirely for a photo message, same
@@ -347,6 +349,9 @@ async function startTelegramFlow(
 // turn. If the agent has a flow marked is_start, that flow's first step
 // replaces the old static greeting; otherwise the greeting is unchanged.
 export async function handleTelegramStart(conn: TelegramTenantConnection, params: { chatId: string; fromHandle: string }): Promise<void> {
+  const { data: agent } = await supabase.from('ai_agents').select('is_enabled').eq('id', conn.agentId).single()
+  if (!agent || agent.is_enabled === false) return // owner paused the agent -- stay silent, matching handleTelegramIncoming's own pause behavior
+
   const { data: startFlow } = await supabase
     .from('ai_agent_flows')
     .select('id, definition')
@@ -396,16 +401,24 @@ export async function handleTelegramStart(conn: TelegramTenantConnection, params
 }
 
 // Handles a callback_query update (an inline-keyboard button tap) for a
-// customer currently inside a flow. Always answers the callback query
-// first, regardless of outcome, so Telegram clears the button's loading
-// spinner on the customer's client even for a stale/invalid click.
+// customer currently inside a flow. Resolves the click's outcome FIRST,
+// then answers the callback query exactly once with outcome-appropriate
+// text -- Telegram allows only one answerCallbackQuery call per callback
+// query id, so answering eagerly (before knowing the outcome) would
+// foreclose ever attaching a toast message to a stale/invalid click.
 export async function handleTelegramFlowCallback(
   conn: TelegramTenantConnection,
   params: { chatId: string; data: string; callbackQueryId: string }
 ): Promise<void> {
-  const answered = answerTelegramCallbackQuery(conn.botToken, params.callbackQueryId).catch((err: any) => {
-    console.error('ai-agent telegram webhook: answerCallbackQuery failed:', err.message)
-  })
+  const { data: agent } = await supabase.from('ai_agents').select('is_enabled').eq('id', conn.agentId).single()
+  if (!agent || agent.is_enabled === false) {
+    // Owner paused the agent -- still clear the customer's spinner, but
+    // otherwise stay silent, matching handleTelegramIncoming's own pause behavior.
+    await answerTelegramCallbackQuery(conn.botToken, params.callbackQueryId).catch((err: any) => {
+      console.error('ai-agent telegram webhook: answerCallbackQuery failed:', err.message)
+    })
+    return
+  }
 
   const { data: conversation } = await supabase
     .from('ai_agent_conversations')
@@ -414,50 +427,73 @@ export async function handleTelegramFlowCallback(
     .eq('channel', 'telegram')
     .eq('external_thread_id', params.chatId)
     .maybeSingle()
-  await answered
 
-  if (!conversation?.active_flow_id || !conversation.active_step_id) return // no active flow -- stale click, nothing to do
+  // callback_data is "btn:<stepId>:<index>" -- the step id lets a click on
+  // an OLD step's still-visible inline keyboard (Telegram never removes
+  // old keyboards from chat history) be detected as stale instead of
+  // silently resolved against whatever button currently sits at that
+  // array index on the CURRENT step.
+  const match = params.data.match(/^btn:([^:]+):(\d+)$/)
+  const clickedStepId = match ? match[1] : undefined
+  const buttonIndex = match ? Number(match[2]) : NaN
 
-  const { data: flow } = await supabase.from('ai_agent_flows').select('id, definition').eq('id', conversation.active_flow_id).maybeSingle()
-  const definition = flow ? parseFlowDefinition(flow.definition) : null
-  const currentStep = definition ? findStepById(definition, conversation.active_step_id) : undefined
+  const STALE_TOAST = 'Этот сценарий уже неактуален'
+  let toastText: string | undefined
+  let clearState = false
+  let nextStepToSend: FlowStep | undefined
 
-  const match = params.data.match(/^btn:(\d+)$/)
-  const buttonIndex = match ? Number(match[1]) : NaN
-  const button = currentStep?.buttons[buttonIndex]
+  if (!conversation?.active_flow_id || !conversation.active_step_id || clickedStepId !== conversation.active_step_id) {
+    toastText = STALE_TOAST
+    if (conversation?.active_flow_id) clearState = true
+  } else {
+    const { data: flow } = await supabase.from('ai_agent_flows').select('id, definition').eq('id', conversation.active_flow_id).maybeSingle()
+    const definition = flow ? parseFlowDefinition(flow.definition) : null
+    const currentStep = definition ? findStepById(definition, conversation.active_step_id) : undefined
+    const button = currentStep?.buttons[buttonIndex]
 
-  if (!definition || !currentStep || !button) {
-    // Stale click (flow/step changed since this message was sent) or a
-    // corrupted saved flow -- clear any dangling state and stop. The toast
-    // from answerCallbackQuery above is feedback enough, no chat message.
-    await supabase.from('ai_agent_conversations').update({ active_flow_id: null, active_step_id: null }).eq('id', conversation.id)
-    return
+    if (!definition || !currentStep || !button) {
+      toastText = STALE_TOAST
+      clearState = true
+    } else if (button.nextStepId === null) {
+      // "Конец сценария" -- ends immediately, no further message (the
+      // button's own label was the final word).
+      clearState = true
+    } else {
+      const nextStep = findStepById(definition, button.nextStepId)
+      if (!nextStep) {
+        // Dangling reference -- shouldn't happen (the save route validates
+        // this), defensive: end the flow rather than send nothing.
+        toastText = STALE_TOAST
+        clearState = true
+      } else {
+        nextStepToSend = nextStep
+      }
+    }
   }
 
-  if (button.nextStepId === null) {
-    // "Конец сценария" -- ends immediately, no further message (the
-    // button's own label was the final word).
-    await supabase.from('ai_agent_conversations').update({ active_flow_id: null, active_step_id: null }).eq('id', conversation.id)
-    return
-  }
-
-  const nextStep = findStepById(definition, button.nextStepId)
-  if (!nextStep) {
-    // Dangling reference -- shouldn't happen (the save route validates
-    // this), defensive: end the flow rather than send nothing.
-    await supabase.from('ai_agent_conversations').update({ active_flow_id: null, active_step_id: null }).eq('id', conversation.id)
-    return
-  }
-
-  await supabase.from('ai_agent_conversations').update({ active_step_id: nextStep.id }).eq('id', conversation.id)
   try {
-    await sendTelegramFlowStep(conn.botToken, params.chatId, nextStep)
+    await answerTelegramCallbackQuery(conn.botToken, params.callbackQueryId, toastText)
   } catch (err: any) {
-    console.error('ai-agent telegram webhook: flow step send failed:', err.message)
-    await markTelegramTokenExpiredIfUnauthorized(conn.connectionId, err)
+    console.error('ai-agent telegram webhook: answerCallbackQuery failed:', err.message)
   }
 
-  if (isTerminalStep(nextStep)) {
+  if (!conversation) return
+
+  if (clearState) {
     await supabase.from('ai_agent_conversations').update({ active_flow_id: null, active_step_id: null }).eq('id', conversation.id)
+    return
+  }
+
+  if (nextStepToSend) {
+    await supabase.from('ai_agent_conversations').update({ active_step_id: nextStepToSend.id }).eq('id', conversation.id)
+    try {
+      await sendTelegramFlowStep(conn.botToken, params.chatId, nextStepToSend)
+    } catch (err: any) {
+      console.error('ai-agent telegram webhook: flow step send failed:', err.message)
+      await markTelegramTokenExpiredIfUnauthorized(conn.connectionId, err)
+    }
+    if (isTerminalStep(nextStepToSend)) {
+      await supabase.from('ai_agent_conversations').update({ active_flow_id: null, active_step_id: null }).eq('id', conversation.id)
+    }
   }
 }
