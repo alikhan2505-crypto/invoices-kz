@@ -49,6 +49,9 @@ next-env.d.ts
 # playwright mcp scratch screenshots
 .playwright-mcp/
 
+# graphify scratch output (regenerated locally, not source of truth)
+graphify-out/
+
 .vercel
 .env*
 
