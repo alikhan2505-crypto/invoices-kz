@@ -107,6 +107,30 @@ export async function getWhatsAppDisplayPhoneNumber(phoneNumberId: string, acces
   }
 }
 
+// Downloads a WhatsApp media object (image/audio) for the AI-агент
+// photo/voice pipeline. Two-step Cloud API dance: (1) GET the media id to
+// get a short-lived CDN url + declared mime_type, (2) GET that url with the
+// SAME bearer token (WhatsApp's media CDN requires it, unlike a public
+// image-page url).
+export async function downloadWhatsAppMedia(mediaId: string, accessToken: string): Promise<{ buffer: Buffer; mimeType: string }> {
+  const metaRes = await fetch(`${GRAPH_API}/${mediaId}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
+  const meta = await metaRes.json().catch(() => null)
+  if (!metaRes.ok || !meta?.url) {
+    throw new WhatsAppApiError(metaRes.status, meta?.error?.message || 'media lookup failed')
+  }
+
+  const fileRes = await fetch(meta.url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
+  if (!fileRes.ok) {
+    throw new WhatsAppApiError(fileRes.status, 'media download failed')
+  }
+  const arrayBuffer = await fileRes.arrayBuffer()
+  return { buffer: Buffer.from(arrayBuffer), mimeType: meta.mime_type || 'application/octet-stream' }
+}
+
 // Sends a plain-text WhatsApp message. `to` is the customer's WhatsApp
 // phone number (E.164-ish digits, no '+', e.g. "77771234567") from the
 // inbound webhook's `messages[].from`.
