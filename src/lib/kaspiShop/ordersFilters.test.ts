@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { filterByDeliveryCutoff, collectDistinctCities } from './ordersFilters'
+import { filterByDeliveryCutoff, collectDistinctCityNames } from './ordersFilters'
 
 describe('filterByDeliveryCutoff', () => {
   const NOW = new Date('2026-08-23T10:00:00.000Z') // 15:00 Almaty time
@@ -28,25 +28,22 @@ describe('filterByDeliveryCutoff', () => {
   })
 })
 
-describe('collectDistinctCities', () => {
-  it('dedupes by cityId and sorts by name (ru locale)', () => {
+describe('collectDistinctCityNames', () => {
+  it('dedupes by name and sorts (ru locale)', () => {
     const orders = [
-      { cityId: '2', cityName: 'Шымкент' },
-      { cityId: '1', cityName: 'Алматы' },
-      { cityId: '2', cityName: 'Шымкент' },
+      { cityName: 'Шымкент' },
+      { cityName: 'Алматы' },
+      { cityName: 'Шымкент' },
     ]
-    expect(collectDistinctCities(orders)).toEqual([
-      { cityId: '1', cityName: 'Алматы' },
-      { cityId: '2', cityName: 'Шымкент' },
-    ])
+    expect(collectDistinctCityNames(orders)).toEqual(['Алматы', 'Шымкент'])
   })
 
-  it('skips orders with a missing city', () => {
-    const orders = [{ cityId: null, cityName: null }, { cityId: '1', cityName: 'Алматы' }]
-    expect(collectDistinctCities(orders)).toEqual([{ cityId: '1', cityName: 'Алматы' }])
+  it('skips orders with a missing city name', () => {
+    const orders = [{ cityName: null }, { cityName: 'Алматы' }]
+    expect(collectDistinctCityNames(orders)).toEqual(['Алматы'])
   })
 
   it('returns an empty array for no orders', () => {
-    expect(collectDistinctCities([])).toEqual([])
+    expect(collectDistinctCityNames([])).toEqual([])
   })
 })

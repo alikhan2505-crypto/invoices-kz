@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { loadConnection, markSessionExpired } from '@/lib/kaspiShop/connection'
-import { listOrders } from '@/lib/kaspiShop/cabinetApi'
-import { collectDistinctCities } from '@/lib/kaspiShop/ordersFilters'
+import { listOrders, fetchCityNames } from '@/lib/kaspiShop/cabinetApi'
+import { collectDistinctCityNames } from '@/lib/kaspiShop/ordersFilters'
 
 const supabaseAuth = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Кабинет не подключён — подключите его через Kaspi Магазин' }, { status: 400 })
   }
 
-  const sampled: { cityId: string | null; cityName: string | null }[] = []
+  const sampled: { cityName: string | null }[] = []
   let fetched = 0
   for (let page = 0; page < CITY_SAMPLE_PAGES; page++) {
     const result = await listOrders(connection.sessionCookies, connection.merchantId, status, page)
@@ -49,5 +49,21 @@ export async function GET(req: NextRequest) {
     if (fetched >= result.total) break
   }
 
-  return NextResponse.json({ cities: collectDistinctCities(sampled) })
+  const names = collectDistinctCityNames(sampled)
+  if (names.length === 0) return NextResponse.json({ cities: [] })
+
+  // Confirmed live 2026-08-23: an order's own warehouse.city.id is NOT the
+  // same id space as the KATO-style cityId Kaspi's real city filter expects
+  // (e.g. "511010000" for Шымкент) -- resolve each sampled city NAME against
+  // the confirmed-working getCities catalog instead of trusting the order's
+  // own id.
+  const catalog = await fetchCityNames(connection.sessionCookies, connection.merchantId)
+  const idByName = new Map<string, string>()
+  for (const [id, name] of Object.entries(catalog)) idByName.set(name, id)
+
+  const cities = names
+    .map(cityName => ({ cityId: idByName.get(cityName), cityName }))
+    .filter((c): c is { cityId: string; cityName: string } => !!c.cityId)
+
+  return NextResponse.json({ cities })
 }

@@ -300,8 +300,16 @@ function mapOrderItems(entries: any[] | undefined): OrderItem[] {
   }))
 }
 
-export function extractDestinationCity(destination: any): { cityId: string | null; cityName: string | null } {
-  const city = destination?.city
+// Confirmed live 2026-08-23: the real cabinet's own "Выберите город" filter
+// on the orders page lists the MERCHANT's own warehouse/point cities (this
+// account has exactly 2: Астана, Шымкент), not the customer's delivery
+// destination -- and it sends a KATO-style cityId (e.g. "511010000" for
+// Шымкент) that does NOT match this field's own `city.id` (a much smaller
+// Kaspi-internal id). Use this only to read the city NAME for display/
+// options; resolve the real filterable id via fetchCityNames's catalog
+// (see orders/cities/route.ts), never this function's `id`.
+export function extractPointCity(point: any): { cityId: string | null; cityName: string | null } {
+  const city = point?.city
   if (!city || city.id == null) return { cityId: null, cityName: null }
   return { cityId: String(city.id), cityName: city.name ?? null }
 }
@@ -329,7 +337,7 @@ fragment OrdersPageFragment on Order {
   creationTime
   modificationTime
   status
-  destination {
+  warehouse {
     ... on Point { city { id name } }
     ... on OrderAddress { city { id name } }
     ... on Postomat { city { id name } }
@@ -510,7 +518,7 @@ export async function listOrders(sessionCookies: string, merchantId: string, sta
       customerLastName: o.customer?.lastName ?? '',
       totalPrice: Number(o.totalPrice) || 0,
       creationTime: o.creationTime,
-      ...extractDestinationCity(o.destination),
+      ...extractPointCity(o.warehouse),
       plannedDeliveryDate: o.delivery?.plannedDeliveryDate ?? null,
       items: mapOrderItems(o.entries),
     })),

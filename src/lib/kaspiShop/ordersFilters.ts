@@ -28,14 +28,16 @@ export function filterByDeliveryCutoff<T extends { plannedDeliveryDate: string |
   })
 }
 
-export function collectDistinctCities<T extends { cityId: string | null; cityName: string | null }>(
-  orders: T[]
-): { cityId: string; cityName: string }[] {
-  const map = new Map<string, string>()
+// Name-only: confirmed live 2026-08-23 that an order's own `warehouse.city.id`
+// is a different, smaller id space than the KATO-style cityId Kaspi's real
+// "Выберите город" filter actually expects (e.g. "511010000" for Шымкент) --
+// the raw id on an order is not safe to send back as a filter value. Collect
+// distinct NAMES only; the caller resolves each name to its real filterable
+// id via the confirmed getCities catalog (see orders/cities/route.ts).
+export function collectDistinctCityNames<T extends { cityName: string | null }>(orders: T[]): string[] {
+  const names = new Set<string>()
   for (const o of orders) {
-    if (o.cityId && o.cityName && !map.has(o.cityId)) map.set(o.cityId, o.cityName)
+    if (o.cityName) names.add(o.cityName)
   }
-  return Array.from(map.entries())
-    .map(([cityId, cityName]) => ({ cityId, cityName }))
-    .sort((a, b) => a.cityName.localeCompare(b.cityName, 'ru'))
+  return Array.from(names).sort((a, b) => a.localeCompare(b, 'ru'))
 }

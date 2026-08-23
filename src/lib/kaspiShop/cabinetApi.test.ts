@@ -1,22 +1,22 @@
 import { describe, it, expect } from 'vitest'
-import { extractDestinationCity } from './cabinetApi'
+import { extractPointCity } from './cabinetApi'
 
-describe('extractDestinationCity', () => {
-  it('extracts city id/name from a destination with a city', () => {
-    expect(extractDestinationCity({ city: { id: 366, name: 'Алматы' } })).toEqual({ cityId: '366', cityName: 'Алматы' })
+describe('extractPointCity', () => {
+  it('extracts city id/name from a point (warehouse/destination) with a city', () => {
+    expect(extractPointCity({ city: { id: 366, name: 'Алматы' } })).toEqual({ cityId: '366', cityName: 'Алматы' })
   })
 
-  it('returns nulls when destination has no city', () => {
-    expect(extractDestinationCity({})).toEqual({ cityId: null, cityName: null })
+  it('returns nulls when the point has no city', () => {
+    expect(extractPointCity({})).toEqual({ cityId: null, cityName: null })
   })
 
-  it('returns nulls for a null or undefined destination', () => {
-    expect(extractDestinationCity(null)).toEqual({ cityId: null, cityName: null })
-    expect(extractDestinationCity(undefined)).toEqual({ cityId: null, cityName: null })
+  it('returns nulls for a null or undefined point', () => {
+    expect(extractPointCity(null)).toEqual({ cityId: null, cityName: null })
+    expect(extractPointCity(undefined)).toEqual({ cityId: null, cityName: null })
   })
 
   it('coerces a numeric city id to a string', () => {
-    const result = extractDestinationCity({ city: { id: 30067228, name: 'Шымкент' } })
+    const result = extractPointCity({ city: { id: 30067228, name: 'Шымкент' } })
     expect(result.cityId).toBe('30067228')
     expect(typeof result.cityId).toBe('string')
   })
