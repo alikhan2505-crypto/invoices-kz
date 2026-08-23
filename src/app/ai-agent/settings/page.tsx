@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import TestChatPanel from '@/components/aiAgent/TestChatPanel'
+import TriggerChipsEditor from '@/components/aiAgent/TriggerChipsEditor'
 // promptContext is a pure, dependency-free module (no server-only imports,
 // no env access) -- safe to bundle client-side, so the Промптинг preview
 // shows the REAL assembled context line, not a hand-maintained copy.
@@ -237,40 +238,6 @@ function ChannelCard({ icon, name, chip, description, children }: {
       </div>
       <p className="text-xs mb-3 flex-1" style={{ color: 'var(--nav-text-muted)' }}>{description}</p>
       {children}
-    </div>
-  )
-}
-
-// Tag-style trigger-word editor: Enter adds, × removes -- same interaction
-// as MoonAI's phrase inputs («Нажмите Enter, чтобы добавить фразу», §1.5).
-function TriggerChipsEditor({ words, onChange }: { words: string[]; onChange: (words: string[]) => void }) {
-  const [draft, setDraft] = useState('')
-  function add() {
-    const trimmed = draft.trim()
-    if (!trimmed) return
-    if (!words.some(w => w.toLowerCase() === trimmed.toLowerCase())) onChange([...words, trimmed])
-    setDraft('')
-  }
-  return (
-    <div>
-      {words.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mb-2">
-          {words.map(w => (
-            <button key={w} type="button" onClick={() => onChange(words.filter(x => x !== w))}
-              className="text-xs pl-2.5 pr-2 py-1 rounded-full flex items-center gap-1.5"
-              style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-              {w}
-              <span aria-hidden>✕</span>
-            </button>
-          ))}
-        </div>
-      )}
-      <input value={draft} maxLength={80}
-        onChange={e => setDraft(e.target.value)}
-        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add() } }}
-        placeholder="Триггер — Enter, чтобы добавить (например: цена)"
-        className={INPUT_CLS}
-        style={{ color: 'var(--nav-text-primary)' }} />
     </div>
   )
 }
