@@ -61,6 +61,11 @@ interface TenantIncomingParams {
   fromUsername: string
   incomingText: string
   replyTarget: string
+  // Present only for an image DM -- template matching is skipped and this
+  // is passed straight to generateAiReply's `image` param instead. Never
+  // set for source: 'comment' (a comment can't carry an attachment from the
+  // commenter).
+  media?: { kind: 'image'; base64: string; mediaType: string }
 }
 
 export async function handleTenantIncoming(conn: TenantConnection, params: TenantIncomingParams): Promise<void> {
@@ -114,15 +119,19 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
     return
   }
 
-  // Template match first, same channel-scoping rule as instagram_reply_templates.
-  const { data: templates } = await supabase
-    .from('ai_agent_reply_templates')
-    .select('id, trigger_words, reply_text')
-    .eq('agent_id', conn.agentId)
-    .or(`channel.is.null,channel.eq.${params.source}`)
-    .order('created_at', { ascending: true })
-
-  const match = findTemplateMatch(params.incomingText, templates || [])
+  // Template match first -- skipped entirely for a photo message, same
+  // reasoning as the WhatsApp/Telegram tenant paths. Same channel-scoping
+  // rule as instagram_reply_templates otherwise.
+  let match: { id: string; reply_text: string } | null = null
+  if (!params.media) {
+    const { data: templates } = await supabase
+      .from('ai_agent_reply_templates')
+      .select('id, trigger_words, reply_text')
+      .eq('agent_id', conn.agentId)
+      .or(`channel.is.null,channel.eq.${params.source}`)
+      .order('created_at', { ascending: true })
+    match = findTemplateMatch(params.incomingText, templates || [])
+  }
 
   if (match) {
     try {
@@ -190,6 +199,7 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
       fromUsername: params.fromUsername,
       source: params.source,
       conversationHistory,
+      image: params.media?.kind === 'image' ? { base64: params.media.base64, mediaType: params.media.mediaType } : undefined,
       businessContextLine: buildBusinessContextLine({
         name: agent.name,
         tone: agent.tone as AgentTone,
