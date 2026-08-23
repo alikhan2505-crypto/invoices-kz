@@ -36,28 +36,27 @@ export async function GET(req: NextRequest) {
   const orders: Awaited<ReturnType<typeof listOrders>>['orders'] = []
   let total = 0
   let page = 0
-  let truncated = false
   while (orders.length < MAX_EXPORT_ORDERS) {
     const result = await listOrders(connection.sessionCookies, connection.merchantId, status, page, cityId)
     if (result.sessionExpired) {
       await markSessionExpired(connection.id)
       return NextResponse.json({ error: 'Сессия истекла — переподключите кабинет' }, { status: 400 })
     }
-    if (result.orders.length === 0) {
-      // A page after the first coming back empty before we've reached the
-      // previously-reported total means listOrders hit its own defensive
-      // error fallback (same {orders:[],total:0} shape as a genuinely
-      // empty page -- see cabinetApi.ts's `if (!res.ok)` branch) rather
-      // than truly running out of orders. Flag the export as incomplete
-      // instead of silently claiming it's the full list.
-      if (page > 0 && orders.length < total) truncated = true
-      break
-    }
+    if (result.orders.length === 0) break
     orders.push(...result.orders)
     total = result.total
     page++
   }
-  if (orders.length >= MAX_EXPORT_ORDERS) truncated = true
+  // `total` only ever advances past 0 on a successful page fetch, so this
+  // comparison also correctly flags an upstream error mid-pagination as
+  // truncated (the loop breaks with `total` still at its last confirmed
+  // value, which is now greater than `orders.length`). The one case this
+  // cannot distinguish from a genuinely empty result is an error on page 0
+  // itself, before any total is ever confirmed -- the same ambiguity every
+  // listOrders() caller in this codebase already has, since listOrders
+  // returns an identical {orders:[],total:0} shape for both. Not solved
+  // here; would require listOrders itself to report failures explicitly.
+  const truncated = orders.length < total
   const buffer = buildOrdersWorkbookBuffer(orders.slice(0, MAX_EXPORT_ORDERS))
   const filename = `zakazy_${status}_${new Date().toISOString().slice(0, 10)}.xlsx`
   return new NextResponse(new Uint8Array(buffer), {
