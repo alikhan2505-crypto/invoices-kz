@@ -26,6 +26,11 @@ export async function generateAiReply(params: {
   // Instagram bot, any test) get byte-for-byte the same prompt and cost as
   // before this feature existed.
   collectFieldsToExtract?: { key: string; label: string }[]
+  // Present only for a photo message -- Claude's vision handles it, and
+  // template matching is skipped upstream (callers never look for a
+  // template match when this is set). Absent for every existing caller, so
+  // the Anthropic request stays byte-for-byte the string it is today.
+  image?: { base64: string; mediaType: string }
 }): Promise<{ replyText: string; urgent: boolean; extractedFields?: Record<string, string> }> {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured')
@@ -62,6 +67,28 @@ export async function generateAiReply(params: {
     ? `\n<<<EXTRACTED>>>{"ключ":"значение"}<<<END>>> -- JSON с извлечёнными полями по правилам выше (пустой объект {}, если клиент пока ничего из списка не сообщил)`
     : ''
 
+  // Photos have no meaningful "написал: ..." line (incomingText is a
+  // caption or the '[Фото]' placeholder the caller sets when there's none)
+  // -- phrase it as what actually happened so the model isn't confused by
+  // a placeholder string sitting where a real quote usually goes.
+  const messageLine = params.image
+    ? (params.incomingText && params.incomingText !== '[Фото]'
+        ? `Пользователь ${params.fromUsername} прислал(а) фото с подписью: "${params.incomingText}"`
+        : `Пользователь ${params.fromUsername} прислал(а) фото без подписи.`)
+    : `Пользователь ${params.fromUsername} написал: "${params.incomingText}"`
+
+  const textContent = `${params.businessContextLine} ${contextLine}${historyBlock}
+
+${messageLine}
+
+${lengthInstruction} Ответь на ТОМ ЖЕ ЯЗЫКЕ, на котором написал пользователь (например, казахский → отвечай на казахском, английский → на английском, русский → на русском). Пиши вежливо и дружелюбно. Не придумывай факты о ценах, сроках или функциях, которых ты не знаешь — в таком случае вежливо предложи написать в директ для уточнения деталей.${extractionAskLine}
+
+Также оцени: сигнализирует ли сообщение о срочности или негативе (явно злой/раздражённый тон, жалоба, угроза уйти/оставить плохой отзыв, требование вернуть деньги, срочная просьба связаться с человеком) — обычный вопрос про цены/функции НЕ считается срочным.
+
+Верни ответ СТРОГО в этом формате, ничего больше:
+URGENT: yes ИЛИ no
+REPLY: текст ответа без кавычек и пояснений${extractedFormatLine}`
+
   const message = await client.messages.create({
     model: 'claude-haiku-4-5-20251001',
     // max_tokens is a ceiling, not a cost -- billing is by tokens actually
@@ -73,17 +100,24 @@ export async function generateAiReply(params: {
     max_tokens: hasExtraction ? 500 : 300,
     messages: [{
       role: 'user',
-      content: `${params.businessContextLine} ${contextLine}${historyBlock}
-
-Пользователь ${params.fromUsername} написал: "${params.incomingText}"
-
-${lengthInstruction} Ответь на ТОМ ЖЕ ЯЗЫКЕ, на котором написал пользователь (например, казахский → отвечай на казахском, английский → на английском, русский → на русском). Пиши вежливо и дружелюбно. Не придумывай факты о ценах, сроках или функциях, которых ты не знаешь — в таком случае вежливо предложи написать в директ для уточнения деталей.${extractionAskLine}
-
-Также оцени: сигнализирует ли сообщение о срочности или негативе (явно злой/раздражённый тон, жалоба, угроза уйти/оставить плохой отзыв, требование вернуть деньги, срочная просьба связаться с человеком) — обычный вопрос про цены/функции НЕ считается срочным.
-
-Верни ответ СТРОГО в этом формате, ничего больше:
-URGENT: yes ИЛИ no
-REPLY: текст ответа без кавычек и пояснений${extractedFormatLine}`,
+      // A caller that never passes `image` gets the exact same plain-string
+      // content this request has sent since before this feature existed.
+      content: params.image
+        ? [
+            {
+              type: 'image' as const,
+              source: {
+                type: 'base64' as const,
+                // Validated by the caller (mediaLimits.ts's
+                // isImageWithinLimits) before this function is ever called
+                // with an image -- safe to narrow here.
+                media_type: params.image.mediaType as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
+                data: params.image.base64,
+              },
+            },
+            { type: 'text' as const, text: textContent },
+          ]
+        : textContent,
     }],
   })
 
