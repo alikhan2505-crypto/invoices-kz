@@ -51,9 +51,51 @@ describe('parseTelegramUpdate', () => {
     expect(parseTelegramUpdate(textUpdate({}, { text: '/settings now' }))).toEqual({ kind: 'ignore' })
   })
 
-  it('ignores non-text messages (photo, sticker: no text field)', () => {
-    expect(parseTelegramUpdate(textUpdate({}, { text: undefined, photo: [{}] }))).toEqual({ kind: 'ignore' })
-    expect(parseTelegramUpdate(textUpdate({}, { text: '   ' }))).toEqual({ kind: 'ignore' })
+  it('treats a message with only whitespace text as unsupported (not ignore) -- it still has a real chat/from', () => {
+    expect(parseTelegramUpdate(textUpdate({}, { text: '   ' }))).toEqual({ kind: 'unsupported', chatId: '111' })
+  })
+
+  it('parses a photo message, picking the largest (last) size and an optional caption', () => {
+    const parsed = parseTelegramUpdate(textUpdate({}, {
+      text: undefined,
+      caption: 'Вот такой стол',
+      photo: [{ file_id: 'small123' }, { file_id: 'large456' }],
+    }))
+    expect(parsed).toEqual({
+      kind: 'photo',
+      chatId: '111',
+      fromHandle: 'aigerim_a',
+      updateId: 42,
+      fileId: 'large456',
+      caption: 'Вот такой стол',
+    })
+  })
+
+  it('parses a photo message with no caption as an empty string', () => {
+    const parsed = parseTelegramUpdate(textUpdate({}, { text: undefined, photo: [{ file_id: 'only1' }] }))
+    expect(parsed.kind === 'photo' && parsed.caption).toBe('')
+  })
+
+  it('parses a voice message', () => {
+    const parsed = parseTelegramUpdate(textUpdate({}, { text: undefined, voice: { file_id: 'voice789' } }))
+    expect(parsed).toEqual({
+      kind: 'voice',
+      chatId: '111',
+      fromHandle: 'aigerim_a',
+      updateId: 42,
+      fileId: 'voice789',
+    })
+  })
+
+  it('treats video/document/sticker/location and any other non-text, non-photo, non-voice message as unsupported', () => {
+    expect(parseTelegramUpdate(textUpdate({}, { text: undefined, video: { file_id: 'v1' } }))).toEqual({ kind: 'unsupported', chatId: '111' })
+    expect(parseTelegramUpdate(textUpdate({}, { text: undefined, sticker: { file_id: 's1' } }))).toEqual({ kind: 'unsupported', chatId: '111' })
+    expect(parseTelegramUpdate(textUpdate({}, { text: undefined }))).toEqual({ kind: 'unsupported', chatId: '111' })
+  })
+
+  it('falls back to unsupported for a photo/voice missing a usable file_id or update_id', () => {
+    expect(parseTelegramUpdate(textUpdate({}, { text: undefined, photo: [{}] }))).toEqual({ kind: 'unsupported', chatId: '111' })
+    expect(parseTelegramUpdate(textUpdate({ update_id: 'not-a-number' }, { text: undefined, voice: { file_id: 'v1' } }))).toEqual({ kind: 'unsupported', chatId: '111' })
   })
 
   it('ignores edited messages and every other non-message update type', () => {

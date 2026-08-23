@@ -29,35 +29,66 @@ export type ParsedTelegramUpdate =
   | { kind: 'ignore' }
   | { kind: 'start'; chatId: string }
   | { kind: 'text'; chatId: string; text: string; fromHandle: string; updateId: number }
+  | { kind: 'photo'; chatId: string; fromHandle: string; updateId: number; fileId: string; caption: string }
+  | { kind: 'voice'; chatId: string; fromHandle: string; updateId: number; fileId: string }
+  // A real message (has chat + non-bot from) that isn't text/photo/voice/
+  // start -- video, document, sticker, location, contact, poll, or a
+  // malformed photo/voice missing a usable file_id/update_id.
+  | { kind: 'unsupported'; chatId: string }
 
 // Classifies a raw Telegram Update. Only fresh `message` updates count --
 // edited_message, channel_post, callback_query etc. arrive under different
-// keys and fall through to 'ignore', as do non-text messages (photos,
-// stickers, voice), messages from other bots, and slash-commands. /start is
-// the one command that gets a response (a short static greeting, sent by
-// the webhook route without touching the AI pipeline).
+// keys and fall through to 'ignore', as do messages from other bots and
+// slash-commands other than /start. Text, photo, and voice messages get
+// their own kind; anything else with a real chat gets 'unsupported' (the
+// webhook route replies with a polite static message instead of silence).
 export function parseTelegramUpdate(update: unknown): ParsedTelegramUpdate {
-  const u = update as { update_id?: unknown; message?: { text?: unknown; from?: { is_bot?: boolean; username?: string; first_name?: string }; chat?: { id?: unknown } } } | null
+  const u = update as {
+    update_id?: unknown
+    message?: {
+      text?: unknown
+      caption?: unknown
+      from?: { is_bot?: boolean; username?: string; first_name?: string }
+      chat?: { id?: unknown }
+      photo?: { file_id?: unknown }[]
+      voice?: { file_id?: unknown }
+    } | null
+  } | null
   const msg = u?.message
-  if (!msg || typeof msg.text !== 'string' || !msg.text.trim()) return { kind: 'ignore' }
+  if (!msg) return { kind: 'ignore' }
   if (msg.from?.is_bot) return { kind: 'ignore' }
   const chatIdRaw = msg.chat?.id
   if (typeof chatIdRaw !== 'number' && typeof chatIdRaw !== 'string') return { kind: 'ignore' }
   const chatId = String(chatIdRaw)
+  const fromHandle = msg.from?.username || msg.from?.first_name || 'unknown'
+  const updateId = typeof u?.update_id === 'number' ? u.update_id : undefined
+
+  if (Array.isArray(msg.photo) && msg.photo.length > 0) {
+    // Telegram sends multiple resolutions of the same photo -- the last
+    // entry is the largest.
+    const largest = msg.photo[msg.photo.length - 1]
+    const fileId = typeof largest?.file_id === 'string' ? largest.file_id : undefined
+    if (!fileId || updateId === undefined) return { kind: 'unsupported', chatId }
+    const caption = typeof msg.caption === 'string' ? msg.caption.trim() : ''
+    return { kind: 'photo', chatId, fromHandle, updateId, fileId, caption }
+  }
+  if (msg.voice && typeof msg.voice.file_id === 'string') {
+    if (updateId === undefined) return { kind: 'unsupported', chatId }
+    return { kind: 'voice', chatId, fromHandle, updateId, fileId: msg.voice.file_id }
+  }
+
+  if (typeof msg.text !== 'string' || !msg.text.trim()) {
+    // No text, no photo, no voice -- video/document/sticker/location/etc.
+    return { kind: 'unsupported', chatId }
+  }
   const text = msg.text.trim()
   // "/start", "/start ref123" (deep-link payload), "/start@MyBot" all greet.
   if (text === '/start' || text.startsWith('/start ') || text.startsWith('/start@')) {
     return { kind: 'start', chatId }
   }
   if (text.startsWith('/')) return { kind: 'ignore' }
-  if (typeof u?.update_id !== 'number') return { kind: 'ignore' }
-  return {
-    kind: 'text',
-    chatId,
-    text,
-    fromHandle: msg.from?.username || msg.from?.first_name || 'unknown',
-    updateId: u.update_id,
-  }
+  if (updateId === undefined) return { kind: 'ignore' }
+  return { kind: 'text', chatId, text, fromHandle, updateId }
 }
 
 // Pairs raw ai_agent_messages rows (ascending by created_at) into
@@ -127,4 +158,22 @@ export async function deleteTelegramWebhook(botToken: string): Promise<void> {
 // and get the whole sendMessage rejected.
 export async function sendTelegramBotMessage(botToken: string, chatId: string, text: string): Promise<void> {
   await callTelegram(botToken, 'sendMessage', { chat_id: chatId, text })
+}
+
+// Downloads a Telegram file (photo or voice note) for the AI-агент
+// photo/voice pipeline. Telegram's getFile doesn't return a mime type --
+// callers already know it from which ParsedTelegramUpdate kind they're
+// handling (photo is always re-encoded JPEG by Telegram; voice is always
+// ogg/opus), so this returns bytes only.
+export async function downloadTelegramMedia(fileId: string, botToken: string): Promise<Buffer> {
+  const file = await callTelegram(botToken, 'getFile', { file_id: fileId }) as { file_path?: string }
+  if (!file?.file_path) {
+    throw new TelegramApiError(502, 'getFile returned no file_path')
+  }
+  const res = await fetch(`https://api.telegram.org/file/bot${botToken}/${file.file_path}`)
+  if (!res.ok) {
+    throw new TelegramApiError(res.status, 'file download failed')
+  }
+  const arrayBuffer = await res.arrayBuffer()
+  return Buffer.from(arrayBuffer)
 }
