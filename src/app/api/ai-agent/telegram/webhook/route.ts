@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
-import { parseTelegramUpdate, telegramDedupKey, sendTelegramBotMessage } from '@/lib/aiAgent/telegram'
+import { parseTelegramUpdate, telegramDedupKey, sendTelegramBotMessage, downloadTelegramMedia } from '@/lib/aiAgent/telegram'
 import { loadTelegramConnectionBySecret, handleTelegramIncoming } from '@/lib/aiAgent/telegramWebhookHandler'
+import { transcribeAudio } from '@/lib/openaiWhisper'
+import { isImageWithinLimits, isAudioWithinLimits, UNSUPPORTED_MEDIA_REPLY_TEXT } from '@/lib/aiAgent/mediaLimits'
 
 // Inbound Telegram updates for every connected customer bot. Authenticity
 // is verified TWO ways, both against the per-connection webhook_secret
@@ -59,8 +61,48 @@ export async function POST(req: NextRequest) {
         fromHandle: parsed.fromHandle,
         incomingText: parsed.text,
       })
+    } else if (parsed.kind === 'photo') {
+      try {
+        const buffer = await downloadTelegramMedia(parsed.fileId, conn.botToken)
+        // Telegram Bot API always re-encodes photos as JPEG.
+        if (!isImageWithinLimits(buffer.byteLength, 'image/jpeg')) {
+          await sendTelegramBotMessage(conn.botToken, parsed.chatId, UNSUPPORTED_MEDIA_REPLY_TEXT)
+        } else {
+          await handleTelegramIncoming(conn, {
+            externalId: telegramDedupKey(conn.botId, parsed.updateId),
+            chatId: parsed.chatId,
+            fromHandle: parsed.fromHandle,
+            incomingText: parsed.caption || '[Фото]',
+            media: { kind: 'image', base64: buffer.toString('base64'), mediaType: 'image/jpeg' },
+          })
+        }
+      } catch (mediaErr: any) {
+        console.error('ai-agent telegram webhook: photo processing failed:', mediaErr.message)
+        await sendTelegramBotMessage(conn.botToken, parsed.chatId, UNSUPPORTED_MEDIA_REPLY_TEXT).catch(() => {})
+      }
+    } else if (parsed.kind === 'voice') {
+      try {
+        const buffer = await downloadTelegramMedia(parsed.fileId, conn.botToken)
+        if (!isAudioWithinLimits(buffer.byteLength)) {
+          await sendTelegramBotMessage(conn.botToken, parsed.chatId, UNSUPPORTED_MEDIA_REPLY_TEXT)
+        } else {
+          // Telegram voice notes are always ogg/opus.
+          const transcribedText = await transcribeAudio(buffer, 'audio/ogg')
+          await handleTelegramIncoming(conn, {
+            externalId: telegramDedupKey(conn.botId, parsed.updateId),
+            chatId: parsed.chatId,
+            fromHandle: parsed.fromHandle,
+            incomingText: transcribedText,
+          })
+        }
+      } catch (mediaErr: any) {
+        console.error('ai-agent telegram webhook: voice processing failed:', mediaErr.message)
+        await sendTelegramBotMessage(conn.botToken, parsed.chatId, UNSUPPORTED_MEDIA_REPLY_TEXT).catch(() => {})
+      }
+    } else if (parsed.kind === 'unsupported') {
+      await sendTelegramBotMessage(conn.botToken, parsed.chatId, UNSUPPORTED_MEDIA_REPLY_TEXT)
     }
-    // kind 'ignore' (non-text, edits, other bots, other commands): no-op.
+    // kind 'ignore' (edits, other bots, other commands): no-op, unchanged.
   } catch (err: any) {
     console.error('ai-agent telegram webhook: processing failed:', err.message)
   }
