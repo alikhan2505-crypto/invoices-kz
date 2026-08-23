@@ -8,6 +8,7 @@ import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import TestChatPanel from '@/components/aiAgent/TestChatPanel'
 import TriggerChipsEditor from '@/components/aiAgent/TriggerChipsEditor'
+import FlowBuilder from '@/components/aiAgent/FlowBuilder'
 // promptContext is a pure, dependency-free module (no server-only imports,
 // no env access) -- safe to bundle client-side, so the Промптинг preview
 // shows the REAL assembled context line, not a hand-maintained copy.
@@ -32,6 +33,7 @@ const TABS = [
   { key: 'prompting', label: 'Промптинг' },
   { key: 'control', label: 'Контроль' },
   { key: 'templates', label: 'Шаблоны' },
+  { key: 'flows', label: 'Сценарии' },
   { key: 'channels', label: 'Каналы' },
 ] as const
 type TabKey = typeof TABS[number]['key']
@@ -1283,6 +1285,12 @@ export default function AiAgentSettings() {
                     <div className="text-xs mt-2" style={{ color: 'var(--nav-critical)' }}>{tplError}</div>
                   )}
                 </div>
+              )
+            )}
+
+            {tab === 'flows' && (
+              !agentId ? needsAgentHint('Сценарии появятся после создания агента.') : (
+                <FlowBuilder agentId={agentId} authHeader={authHeader} />
               )
             )}
 
