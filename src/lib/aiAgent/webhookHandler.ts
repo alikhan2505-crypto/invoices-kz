@@ -8,6 +8,7 @@ import { shouldExitTraining } from './trainingStatus'
 import { debitAiAgentWallet, AI_AGENT_CREDITS_PER_AI_REPLY } from './wallet'
 import { sendTelegramNotification } from '@/lib/telegramNotify'
 import { createNotification } from '@/lib/notifications'
+import { UNSUPPORTED_MEDIA_REPLY_TEXT } from '@/lib/aiAgent/mediaLimits'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -217,6 +218,17 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
     extractedFields = result.extractedFields
   } catch (err: any) {
     console.error('ai-agent webhook: AI reply generation failed for', params.externalId, ':', err.message)
+    if (params.media) {
+      // The inbound row is already claimed (dedup'd), so a platform
+      // redelivery will never retry this -- without a fallback here, a
+      // failed AI call on a photo would silently swallow the customer's
+      // message forever, which is exactly the failure this feature exists
+      // to eliminate. Plain text/voice messages keep the pre-existing
+      // silent-return behavior; that's out of scope for this fix. A photo
+      // is always source: 'dm' (see TenantIncomingParams.media), never
+      // 'comment', so sendDirectMessage is always the right send here.
+      await sendDirectMessage(params.replyTarget, UNSUPPORTED_MEDIA_REPLY_TEXT, { igUserId: conn.externalAccountId, accessToken: conn.accessToken }).catch(() => {})
+    }
     return
   }
 

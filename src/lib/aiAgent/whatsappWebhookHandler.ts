@@ -9,6 +9,7 @@ import { createNotification } from '@/lib/notifications'
 import { findTemplateMatch, mergeCollectedData } from './webhookHandler'
 import { pairConversationHistory } from './telegram'
 import { sendWhatsAppMessage, WhatsAppApiError } from '@/lib/whatsapp'
+import { UNSUPPORTED_MEDIA_REPLY_TEXT } from '@/lib/aiAgent/mediaLimits'
 
 // The WhatsApp twin of telegramWebhookHandler.ts's Telegram tenant pipeline
 // (itself the twin of webhookHandler.ts's Instagram pipeline) -- same
@@ -204,6 +205,15 @@ export async function handleWhatsAppIncoming(conn: WhatsAppTenantConnection, par
     extractedFields = result.extractedFields
   } catch (err: any) {
     console.error('ai-agent whatsapp webhook: AI reply generation failed for', params.externalId, ':', err.message)
+    if (params.media) {
+      // The inbound row is already claimed (dedup'd), so a platform
+      // redelivery will never retry this -- without a fallback here, a
+      // failed AI call on a photo would silently swallow the customer's
+      // message forever, which is exactly the failure this feature exists
+      // to eliminate. Plain text/voice messages keep the pre-existing
+      // silent-return behavior; that's out of scope for this fix.
+      await sendWhatsAppMessage(conn.phoneNumberId, params.from, UNSUPPORTED_MEDIA_REPLY_TEXT, { accessToken: conn.accessToken }).catch(() => {})
+    }
     return
   }
 

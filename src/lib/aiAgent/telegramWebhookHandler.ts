@@ -8,6 +8,7 @@ import { sendTelegramNotification } from '@/lib/telegramNotify'
 import { createNotification } from '@/lib/notifications'
 import { findTemplateMatch, mergeCollectedData } from './webhookHandler'
 import { sendTelegramBotMessage, pairConversationHistory, TelegramApiError } from './telegram'
+import { UNSUPPORTED_MEDIA_REPLY_TEXT } from '@/lib/aiAgent/mediaLimits'
 
 // The Telegram twin of webhookHandler.ts's Instagram tenant pipeline.
 // Deliberately a PARALLEL handler rather than a channel parameter threaded
@@ -208,6 +209,15 @@ export async function handleTelegramIncoming(conn: TelegramTenantConnection, par
     extractedFields = result.extractedFields
   } catch (err: any) {
     console.error('ai-agent telegram webhook: AI reply generation failed for', params.externalId, ':', err.message)
+    if (params.media) {
+      // The inbound row is already claimed (dedup'd), so a platform
+      // redelivery will never retry this -- without a fallback here, a
+      // failed AI call on a photo would silently swallow the customer's
+      // message forever, which is exactly the failure this feature exists
+      // to eliminate. Plain text/voice messages keep the pre-existing
+      // silent-return behavior; that's out of scope for this fix.
+      await sendTelegramBotMessage(conn.botToken, params.chatId, UNSUPPORTED_MEDIA_REPLY_TEXT).catch(() => {})
+    }
     return
   }
 
