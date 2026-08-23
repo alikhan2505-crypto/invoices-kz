@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { parseTelegramUpdate, telegramDedupKey, sendTelegramBotMessage, downloadTelegramMedia } from '@/lib/aiAgent/telegram'
-import { loadTelegramConnectionBySecret, handleTelegramIncoming } from '@/lib/aiAgent/telegramWebhookHandler'
+import { loadTelegramConnectionBySecret, handleTelegramIncoming, handleTelegramStart, handleTelegramFlowCallback } from '@/lib/aiAgent/telegramWebhookHandler'
 import { transcribeAudio } from '@/lib/openaiWhisper'
 import { isImageWithinLimits, isAudioWithinLimits, UNSUPPORTED_MEDIA_REPLY_TEXT } from '@/lib/aiAgent/mediaLimits'
 
@@ -50,10 +50,13 @@ export async function POST(req: NextRequest) {
   const parsed = parseTelegramUpdate(update)
   try {
     if (parsed.kind === 'start') {
-      // /start is a chat-opening handshake, not a question -- a short
-      // static greeting, no AI call, no logging, no debit. The agent's real
-      // business greeting comes from the AI on the first actual message.
-      await sendTelegramBotMessage(conn.botToken, parsed.chatId, 'Здравствуйте! Напишите ваш вопрос — я на связи.')
+      // /start is a chat-opening handshake -- if the agent has a flow
+      // marked as its main scenario, its first step replaces the old
+      // static greeting; otherwise handleTelegramStart sends that same
+      // greeting itself, unchanged.
+      await handleTelegramStart(conn, { chatId: parsed.chatId, fromHandle: parsed.fromHandle })
+    } else if (parsed.kind === 'callback_query') {
+      await handleTelegramFlowCallback(conn, { chatId: parsed.chatId, data: parsed.data, callbackQueryId: parsed.callbackQueryId })
     } else if (parsed.kind === 'text') {
       await handleTelegramIncoming(conn, {
         externalId: telegramDedupKey(conn.botId, parsed.updateId),
