@@ -1,4 +1,4 @@
-import { PDFDocument } from 'pdf-lib'
+import { PDFDocument, PageSizes } from 'pdf-lib'
 import JSZip from 'jszip'
 
 // CONFIRMED live 2026-08-23 (real order in "Передача" on merchant 30067228):
@@ -28,15 +28,58 @@ export async function fetchWaybillPdfs(sessionCookies: string, merchantId: strin
   return pdfs
 }
 
-// Pure -- no network, no Kaspi-specific assumptions beyond "these are all
-// valid PDF byte buffers". Combines every page of every input PDF, in the
-// order given, into one PDF.
-export async function mergeWaybillPdfs(pdfBuffers: Buffer[]): Promise<Buffer> {
-  const merged = await PDFDocument.create()
-  for (const buf of pdfBuffers) {
-    const doc = await PDFDocument.load(buf)
-    const pages = await merged.copyPages(doc, doc.getPageIndices())
-    pages.forEach(p => merged.addPage(p))
+const CELL_MARGIN = 10
+
+// Pure -- no network. Packs each input PDF's first page (every Kaspi label
+// is confirmed single-page, "1/1") into a grid of cols x rows cells per
+// output page, scaled uniformly (never distorted independently per axis --
+// barcodes/QR codes must stay scannable) to fit each cell and centered.
+// cols=1,rows=1 puts one label per page (А6 mode); cols=2,rows=2 puts up
+// to 4 per page (А4 mode), filled left-to-right then top-to-bottom.
+export async function packWaybillsToPages(
+  pdfBuffers: Buffer[],
+  pageSize: [number, number],
+  cols: number,
+  rows: number
+): Promise<Buffer> {
+  const output = await PDFDocument.create()
+  const [pageWidth, pageHeight] = pageSize
+  const cellWidth = pageWidth / cols
+  const cellHeight = pageHeight / rows
+  const perPage = cols * rows
+
+  for (let i = 0; i < pdfBuffers.length; i += perPage) {
+    const page = output.addPage(pageSize)
+    const batch = pdfBuffers.slice(i, i + perPage)
+    for (let j = 0; j < batch.length; j++) {
+      const [embeddedPage] = await output.embedPdf(batch[j])
+      const col = j % cols
+      const row = Math.floor(j / cols)
+      const cellX = col * cellWidth
+      const cellY = pageHeight - (row + 1) * cellHeight
+      const availableWidth = cellWidth - CELL_MARGIN * 2
+      const availableHeight = cellHeight - CELL_MARGIN * 2
+      const scale = Math.min(availableWidth / embeddedPage.width, availableHeight / embeddedPage.height)
+      const drawnWidth = embeddedPage.width * scale
+      const drawnHeight = embeddedPage.height * scale
+      page.drawPage(embeddedPage, {
+        x: cellX + (cellWidth - drawnWidth) / 2,
+        y: cellY + (cellHeight - drawnHeight) / 2,
+        width: drawnWidth,
+        height: drawnHeight,
+      })
+    }
   }
-  return Buffer.from(await merged.save())
+
+  return Buffer.from(await output.save())
+}
+
+export type WaybillFormat = 'a4' | 'a6'
+
+// А6 mode normalizes every label to true А6 dimensions (105x148mm) rather
+// than whatever raw page size Kaspi's own generated PDF happens to use --
+// that raw size has never been directly confirmed live.
+export async function buildWaybillsPdf(pdfBuffers: Buffer[], format: WaybillFormat): Promise<Buffer> {
+  if (format === 'a4') return packWaybillsToPages(pdfBuffers, PageSizes.A4, 2, 2)
+  return packWaybillsToPages(pdfBuffers, PageSizes.A6, 1, 1)
 }
