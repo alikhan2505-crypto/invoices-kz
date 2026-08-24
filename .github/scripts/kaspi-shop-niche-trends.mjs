@@ -2,29 +2,39 @@
 // Runs from the GitHub Actions runner, not Vercel -- same reason as
 // kaspi-shop-niche-check.mjs: Kaspi returns a persistent HTTP 403 (nginx)
 // to /yml/product-view/pl/filters from both Vercel's and a bare GitHub
-// Actions fetch's IP ranges. The header set below (Referer + the
-// sec-fetch-* triad) is copied verbatim from that same script -- it's
-// the proven-working way past the block, reused as-is rather than
-// re-derived.
+// Actions fetch's IP ranges. The header sets below are copied verbatim
+// from the proven-working niche-check (search) and price-check (offers)
+// scripts -- reused as-is rather than re-derived.
 //
-// Unlike the on-demand single-keyword check (one query -> one checkId ->
-// one deliver call), this script samples EVERY category in
-// KASPI_TRENDING_CATEGORIES in one run, throttled with a sleep between
-// requests, and reports all of them back to the trends deliver endpoint
-// in a single batched POST.
+// One run now does THREE passes:
+//   1. Search: every category in KASPI_TRENDING_CATEGORIES x 3 pages
+//      (deeper sampling for the «Витрина ниш» collections; page 0 alone
+//      keeps feeding the trends math server-side).
+//   2. Deliver search results in chunks of 18 page-results per POST --
+//      54 raw bodies in one POST would blow Vercel's ~4.5MB body limit.
+//   3. Sellers: for every unique SKU seen, one offer-view call (the
+//      repricer's proven per-SKU offers endpoint) -> sellers count,
+//      delivered as final offerCounts POSTs. Always sends at least one
+//      offerCounts POST (even empty) so the server-side retention
+//      delete runs daily.
 //
 // KASPI_TRENDING_CATEGORIES here is a duplicate of the list in
 // src/lib/kaspiShop/nicheTrends.ts -- GitHub Actions scripts are plain
 // .mjs and not part of the Next.js/TS build, so they can't import that
 // file directly (same precedent as CITY_ID being duplicated across the
-// niche-check/price-check scripts instead of shared). Keep both lists in
-// sync if categories are ever added or renamed.
+// niche-check/price-check scripts). Keep both lists in sync.
 
 const baseUrl = process.env.BASE_URL || 'https://www.invoices.kz'
 const secret = process.env.KASPI_SHOP_CRON_SECRET
 
-const CITY_ID = '750000000' // Almaty -- same as the other Kaspi Shop scripts, no city picker in v1
-const REQUEST_DELAY_MS = 500 // throttle between category fetches, same spirit as price-check.mjs's per-offer sleep
+const CITY_ID = '750000000' // Almaty -- same as the other Kaspi Shop scripts, no city picker
+const REQUEST_DELAY_MS = 500 // throttle between search fetches
+const OFFERS_DELAY_MS = 300 // throttle between offer-view fetches (~650 SKUs -> ~8 min pass)
+const OFFERS_LIMIT = 50 // covers every real product observed live (max seen: 30 offers)
+const PAGES_PER_CATEGORY = 3
+const DELIVER_CHUNK_SIZE = 18 // page-results per deliver POST, keeps bodies well under Vercel's limit
+const OFFER_COUNTS_CHUNK_SIZE = 150 // sellers counts per POST, matches the route's maxDuration budget
+const MAX_OFFER_SKUS = 800 // hard safety cap on the sellers pass
 
 const KASPI_TRENDING_CATEGORIES = [
   { key: 'beauty-health', label: 'Красота и здоровье' },
@@ -51,8 +61,8 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
-async function fetchCategory(label) {
-  const url = `https://kaspi.kz/yml/product-view/pl/filters?text=${encodeURIComponent(label)}&page=0&all=false&fl=true&ui=d&c=${CITY_ID}`
+async function fetchCategoryPage(label, page) {
+  const url = `https://kaspi.kz/yml/product-view/pl/filters?text=${encodeURIComponent(label)}&page=${page}&all=false&fl=true&ui=d&c=${CITY_ID}`
   const searchPageUrl = `https://kaspi.kz/shop/search/?text=${encodeURIComponent(label)}`
   try {
     const res = await fetch(url, {
@@ -73,31 +83,116 @@ async function fetchCategory(label) {
   }
 }
 
+// Card ids from a raw search body -- same fields the server-side parser
+// (mapNicheResponse) keys products on, extracted here only to know which
+// SKUs the sellers pass should visit.
+function extractSkus(bodyText) {
+  try {
+    const json = JSON.parse(bodyText)
+    const cards = Array.isArray(json?.data?.cards) ? json.data.cards : []
+    return cards.map(c => String(c.id ?? c.configSku ?? '')).filter(Boolean)
+  } catch {
+    return []
+  }
+}
+
+// Sellers count for one SKU via kaspi.kz/yml/offer-view/offers/{sku} --
+// endpoint, headers and offer-validity filter copied verbatim from
+// kaspi-shop-price-check.mjs (the proven-working repricer path). Returns
+// null on any failure: the SKU then simply carries no sellers count
+// today and drops out of the «Мало продавцов» collection only.
+async function fetchSellersCount(sku) {
+  const productPageUrl = `https://kaspi.kz/shop/p/-${encodeURIComponent(sku)}/?c=${CITY_ID}`
+  try {
+    const res = await fetch(`https://kaspi.kz/yml/offer-view/offers/${encodeURIComponent(sku)}`, {
+      method: 'POST',
+      headers: {
+        accept: 'application/json, text/*',
+        'content-type': 'application/json; charset=UTF-8',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36',
+        'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
+        'Accept-Encoding': 'gzip, deflate, br, zstd',
+        Referer: productPageUrl,
+        Origin: 'https://kaspi.kz',
+        'sec-fetch-dest': 'empty',
+        'sec-fetch-mode': 'cors',
+        'sec-fetch-site': 'same-origin',
+      },
+      body: JSON.stringify({ cityId: CITY_ID, id: sku, merchantUID: [], limit: OFFERS_LIMIT, page: 0, sortOption: 'PRICE' }),
+    })
+    if (!res.ok) return null
+    const json = await res.json()
+    const offers = Array.isArray(json.offers) ? json.offers : []
+    return offers.filter(o => o && o.merchantId != null && Number(o.price) > 0).length
+  } catch {
+    return null
+  }
+}
+
+async function deliver(payload) {
+  const res = await fetch(`${baseUrl}/api/kaspi-shop/niches/trends/deliver`, {
+    method: 'POST',
+    headers: { 'x-kaspi-shop-cron-secret': secret, 'content-type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) throw new Error(`deliver failed: HTTP ${res.status}`)
+  return res.json().catch(() => ({}))
+}
+
 async function main() {
   if (!secret) {
     console.error('KASPI_SHOP_CRON_SECRET is not set')
     process.exit(1)
   }
 
+  // Pass 1: search, 3 pages per category.
   const results = []
+  const skuSet = new Set()
   for (const category of KASPI_TRENDING_CATEGORIES) {
-    const { upstreamStatus, upstreamBodyText } = await fetchCategory(category.label)
-    results.push({ categoryKey: category.key, categoryLabel: category.label, upstreamStatus, upstreamBodyText })
-    console.log(`${category.key}: upstreamStatus=${upstreamStatus}`)
-    await sleep(REQUEST_DELAY_MS)
+    for (let page = 0; page < PAGES_PER_CATEGORY; page++) {
+      const { upstreamStatus, upstreamBodyText } = await fetchCategoryPage(category.label, page)
+      results.push({ categoryKey: category.key, categoryLabel: category.label, page, upstreamStatus, upstreamBodyText })
+      if (upstreamStatus >= 200 && upstreamStatus < 300) {
+        for (const sku of extractSkus(upstreamBodyText)) skuSet.add(sku)
+      }
+      console.log(`${category.key} p${page}: upstreamStatus=${upstreamStatus}`)
+      await sleep(REQUEST_DELAY_MS)
+    }
   }
 
-  const deliverRes = await fetch(`${baseUrl}/api/kaspi-shop/niches/trends/deliver`, {
-    method: 'POST',
-    headers: { 'x-kaspi-shop-cron-secret': secret, 'content-type': 'application/json' },
-    body: JSON.stringify({ results }),
-  })
-  if (!deliverRes.ok) {
-    console.error(`deliver failed: HTTP ${deliverRes.status}`)
-    process.exit(1)
+  // Pass 2: deliver search results in chunks.
+  let upserted = 0
+  let failed = 0
+  for (let i = 0; i < results.length; i += DELIVER_CHUNK_SIZE) {
+    const summary = await deliver({ results: results.slice(i, i + DELIVER_CHUNK_SIZE) })
+    upserted += summary.upserted || 0
+    failed += summary.failed || 0
   }
-  const summary = await deliverRes.json().catch(() => ({}))
-  console.log(`delivered ${results.length} categor(y/ies): upserted=${summary.upserted} failed=${summary.failed}`)
+  console.log(`search delivered: pages=${results.length} upserted=${upserted} failed=${failed}`)
+
+  // Pass 3: sellers counts.
+  const skus = [...skuSet].slice(0, MAX_OFFER_SKUS)
+  const offerCounts = []
+  let offersFailed = 0
+  for (const sku of skus) {
+    const sellersCount = await fetchSellersCount(sku)
+    if (sellersCount === null) offersFailed++
+    else offerCounts.push({ sku, sellersCount })
+    await sleep(OFFERS_DELAY_MS)
+  }
+  console.log(`offers: skus=${skus.length} ok=${offerCounts.length} failed=${offersFailed}`)
+
+  // Always at least one offerCounts POST -- it also triggers the
+  // server-side retention delete.
+  if (offerCounts.length === 0) {
+    await deliver({ offerCounts: [] })
+    console.log('offerCounts delivered: empty (offers pass produced nothing)')
+  } else {
+    for (let i = 0; i < offerCounts.length; i += OFFER_COUNTS_CHUNK_SIZE) {
+      const summary = await deliver({ offerCounts: offerCounts.slice(i, i + OFFER_COUNTS_CHUNK_SIZE) })
+      console.log(`offerCounts chunk delivered: updated=${summary.updated} updateFailed=${summary.updateFailed}`)
+    }
+  }
 }
 
 main().catch(err => {

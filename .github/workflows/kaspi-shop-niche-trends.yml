@@ -14,9 +14,9 @@ on:
         type: string
         default: manual
 
-# One run samples ~18 categories sequentially with a throttling sleep
-# between each Kaspi fetch (see the script) -- a run can take a couple of
-# minutes. This group name is unique to this workflow, so an overlapping
+# One run samples ~18 categories x 3 pages plus a per-SKU sellers pass,
+# each with a throttling sleep between Kaspi fetches (see the script) --
+# a run can take ~10 minutes. This group name is unique to this workflow, so an overlapping
 # scheduled + manual run queues behind whichever is already in progress
 # instead of racing it (same reasoning as kaspi-shop-price-check.yml's
 # concurrency group).
@@ -27,7 +27,10 @@ concurrency:
 jobs:
   refresh-trends:
     runs-on: ubuntu-latest
-    timeout-minutes: 9
+    # Search pass (~54 throttled fetches) + sellers pass (~650 throttled
+    # offer-view fetches) -- ~10-11 min worst case observed math, 20 for
+    # slack.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - name: Refresh niche trends
