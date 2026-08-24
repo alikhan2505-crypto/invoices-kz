@@ -39,7 +39,10 @@ const DELIVER_TIMEOUT_MS = 60000 // deliver POSTs hit our own route (maxDuration
 const REQUEST_DELAY_MS = 500 // throttle between search fetches
 const OFFERS_DELAY_MS = 300 // throttle between offer-view fetches (~650 SKUs -> ~8 min pass)
 const OFFERS_LIMIT = 50 // covers every real product observed live (max seen: 30 offers)
-const PAGES_PER_CATEGORY = 3
+// Confirmed live 2026-08-24 (run 32722161713): this endpoint 400s on
+// page=2 for every category -- only pages 0 and 1 exist for its
+// free-text search shape. 2 pages x 18 categories ~= 407 unique SKUs.
+const PAGES_PER_CATEGORY = 2
 const DELIVER_CHUNK_SIZE = 18 // page-results per deliver POST, keeps bodies well under Vercel's limit
 const OFFER_COUNTS_CHUNK_SIZE = 150 // sellers counts per POST, matches the route's maxDuration budget
 const MAX_OFFER_SKUS = 800 // hard safety cap on the sellers pass
