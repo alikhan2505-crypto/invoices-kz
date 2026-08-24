@@ -44,27 +44,44 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => null)
 
-  // ---- Offers branch: sellers counts for today's snapshot rows. ----
+  // The script captures ONE snapshot date at process start and sends it
+  // with every POST -- without this, a run crossing UTC midnight would
+  // write snapshots under date D while the (minutes-later) sellers
+  // updates look for D+1 and match nothing. Server-today stays as the
+  // fallback for the rollout window / older script versions.
+  const snapshotDate = typeof body?.snapshotDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.snapshotDate)
+    ? body.snapshotDate
+    : new Date().toISOString().slice(0, 10)
+
+  // ---- Offers branch: sellers counts for the run's snapshot rows. ----
   // An empty array is legal -- the script always sends at least one
   // offerCounts POST so the retention delete below runs daily even when
   // the whole offers pass failed.
   if (Array.isArray(body?.offerCounts)) {
-    const today = new Date().toISOString().slice(0, 10)
     let updated = 0
     let updateFailed = 0
+    let unmatched = 0
     for (const oc of body.offerCounts as OfferCount[]) {
       if (!oc?.sku || typeof oc.sellersCount !== 'number' || oc.sellersCount < 0) { updateFailed++; continue }
-      const { error } = await supabase
+      // .select('sku') so a 0-row match is visible -- supabase-js reports
+      // no error on updates that matched nothing.
+      const { data: updatedRows, error } = await supabase
         .from('kaspi_shop_niche_product_snapshots')
         .update({ sellers_count: Math.floor(oc.sellersCount) })
         .eq('sku', String(oc.sku))
-        .eq('snapshot_date', today)
+        .eq('snapshot_date', snapshotDate)
+        .select('sku')
       if (error) {
         console.error(`kaspi-shop niche-trends deliver: sellers update failed for sku=${oc.sku}:`, error.message)
         updateFailed++
+      } else if (!updatedRows || updatedRows.length === 0) {
+        unmatched++
       } else {
         updated++
       }
+    }
+    if (unmatched > 0) {
+      console.error(`kaspi-shop niche-trends deliver: ${unmatched} sellers update(s) matched no snapshot row for date=${snapshotDate}`)
     }
 
     const cutoff = new Date(Date.now() - SNAPSHOT_RETENTION_DAYS * 86400000).toISOString().slice(0, 10)
@@ -76,14 +93,13 @@ export async function POST(req: NextRequest) {
       console.error('kaspi-shop niche-trends deliver: retention delete failed:', retentionError.message)
     }
 
-    return NextResponse.json({ ok: true, updated, updateFailed })
+    return NextResponse.json({ ok: true, updated, updateFailed, unmatched })
   }
 
   // ---- Search-results branch (chunked). ----
   const results = Array.isArray(body?.results) ? (body.results as CategoryResult[]) : []
   if (results.length === 0) return NextResponse.json({ error: 'results обязателен' }, { status: 400 })
 
-  const snapshotDate = new Date().toISOString().slice(0, 10)
   let upserted = 0
   let failed = 0
 

@@ -309,7 +309,7 @@ export default function KaspiShopNiches() {
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}
           className="nav-glass nav-card-accent rounded-[28px] p-6 lg:p-8 mb-4">
           <div className="text-[11px] font-semibold tracking-wider uppercase mb-1" style={{ color: 'var(--nav-text-muted)' }}>Проверка идеи</div>
-          <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight mb-6" style={{ color: 'var(--nav-text-primary)' }}>Проверить идею товара</h1>
+          <h2 className="text-2xl lg:text-3xl font-extrabold tracking-tight mb-6" style={{ color: 'var(--nav-text-primary)' }}>Проверить идею товара</h2>
           <form onSubmit={e => { e.preventDefault(); doSearch() }} className="flex gap-2">
             <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Например: термокружка"
               className={`flex-1 ${INPUT_CLS}`} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />

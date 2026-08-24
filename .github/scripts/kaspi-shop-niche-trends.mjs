@@ -28,6 +28,14 @@ const baseUrl = process.env.BASE_URL || 'https://www.invoices.kz'
 const secret = process.env.KASPI_SHOP_CRON_SECRET
 
 const CITY_ID = '750000000' // Almaty -- same as the other Kaspi Shop scripts, no city picker
+// Captured ONCE at process start and sent with every deliver POST: the
+// offers pass runs ~8-15 min after the search pass, so a run started
+// near UTC midnight would otherwise write snapshots under date D while
+// the sellers updates look for date D+1 and silently match nothing
+// (final-review finding, 2026-08-24).
+const SNAPSHOT_DATE = new Date().toISOString().slice(0, 10)
+const FETCH_TIMEOUT_MS = 15000 // per Kaspi request -- a stalled socket must not eat the workflow budget
+const DELIVER_TIMEOUT_MS = 60000 // deliver POSTs hit our own route (maxDuration 60)
 const REQUEST_DELAY_MS = 500 // throttle between search fetches
 const OFFERS_DELAY_MS = 300 // throttle between offer-view fetches (~650 SKUs -> ~8 min pass)
 const OFFERS_LIMIT = 50 // covers every real product observed live (max seen: 30 offers)
@@ -76,6 +84,7 @@ async function fetchCategoryPage(label, page) {
         'sec-fetch-mode': 'cors',
         'sec-fetch-site': 'same-origin',
       },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     })
     return { upstreamStatus: res.status, upstreamBodyText: await res.text() }
   } catch (err) {
@@ -90,7 +99,9 @@ function extractSkus(bodyText) {
   try {
     const json = JSON.parse(bodyText)
     const cards = Array.isArray(json?.data?.cards) ? json.data.cards : []
-    return cards.map(c => String(c.id ?? c.configSku ?? '')).filter(Boolean)
+    // .slice(0, 12) mirrors mapNicheResponse's server-side cap -- SKUs
+    // beyond it would get sellers counts with no snapshot row to update.
+    return cards.slice(0, 12).map(c => String(c.id ?? c.configSku ?? '')).filter(Boolean)
   } catch {
     return []
   }
@@ -119,6 +130,7 @@ async function fetchSellersCount(sku) {
         'sec-fetch-site': 'same-origin',
       },
       body: JSON.stringify({ cityId: CITY_ID, id: sku, merchantUID: [], limit: OFFERS_LIMIT, page: 0, sortOption: 'PRICE' }),
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     })
     if (!res.ok) return null
     const json = await res.json()
@@ -133,7 +145,8 @@ async function deliver(payload) {
   const res = await fetch(`${baseUrl}/api/kaspi-shop/niches/trends/deliver`, {
     method: 'POST',
     headers: { 'x-kaspi-shop-cron-secret': secret, 'content-type': 'application/json' },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ ...payload, snapshotDate: SNAPSHOT_DATE }),
+    signal: AbortSignal.timeout(DELIVER_TIMEOUT_MS),
   })
   if (!res.ok) throw new Error(`deliver failed: HTTP ${res.status}`)
   return res.json().catch(() => ({}))
@@ -190,7 +203,7 @@ async function main() {
   } else {
     for (let i = 0; i < offerCounts.length; i += OFFER_COUNTS_CHUNK_SIZE) {
       const summary = await deliver({ offerCounts: offerCounts.slice(i, i + OFFER_COUNTS_CHUNK_SIZE) })
-      console.log(`offerCounts chunk delivered: updated=${summary.updated} updateFailed=${summary.updateFailed}`)
+      console.log(`offerCounts chunk delivered: updated=${summary.updated} updateFailed=${summary.updateFailed} unmatched=${summary.unmatched}`)
     }
   }
 }

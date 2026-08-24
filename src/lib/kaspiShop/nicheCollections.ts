@@ -134,13 +134,18 @@ export function buildCollections(
   const byScore = [...scored].sort((a, b) => b.score - a.score)
 
   // Per-SKU baseline: the snapshot closest to latest−7d within whatever
-  // window the caller queried (6–8 days by the collections route).
+  // window the caller queried (6–8 days by the collections route). Equal
+  // distance (e.g. −6 vs −8 with no −7) breaks toward the OLDER date --
+  // without a deterministic tie-break the displayed delta would depend
+  // on unspecified DB row order and could differ between requests.
   const target = addDays(latestDate, -7)
-  const baseline = new Map<string, { reviews: number; dist: number }>()
+  const baseline = new Map<string, { reviews: number; dist: number; date: string }>()
   for (const b of baselineRows) {
     const dist = Math.abs(dayDiff(b.snapshot_date, target))
     const cur = baseline.get(b.sku)
-    if (!cur || dist < cur.dist) baseline.set(b.sku, { reviews: b.reviews_count, dist })
+    if (!cur || dist < cur.dist || (dist === cur.dist && b.snapshot_date < cur.date)) {
+      baseline.set(b.sku, { reviews: b.reviews_count, dist, date: b.snapshot_date })
+    }
   }
 
   function spike(): Collection {

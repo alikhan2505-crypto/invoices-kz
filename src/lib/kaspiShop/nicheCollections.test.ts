@@ -123,6 +123,22 @@ describe('buildCollections', () => {
     expect(c.products).toEqual([])
   })
 
+  it('demand-spike breaks an equal-distance baseline tie toward the older date, deterministically', () => {
+    const latest = [row({ sku: 's', reviews_count: 300 })]
+    // -8d and -6d are both dist 1 from the -7d target; the older (-8d,
+    // reviews 100) must win regardless of input order -> Δ200 qualifies.
+    const tieA = [
+      { sku: 's', reviews_count: 100, snapshot_date: '2026-08-16' },
+      { sku: 's', reviews_count: 295, snapshot_date: '2026-08-18' },
+    ]
+    const tieB = [...tieA].reverse()
+    for (const baseline of [tieA, tieB]) {
+      const c = get(buildCollections(latest, baseline, '2026-08-24', true), 'demand-spike')
+      expect(c.products.map(p => p.sku)).toEqual(['s'])
+      expect(c.products[0].reviewsDelta7d).toBe(200)
+    }
+  })
+
   it('reviewsDelta7d is null outside demand-spike', () => {
     const c = get(buildCollections([row()], [], '2026-08-24', false), 'high-demand')
     expect(c.products[0].reviewsDelta7d).toBeNull()

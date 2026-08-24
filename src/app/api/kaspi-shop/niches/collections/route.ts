@@ -62,31 +62,37 @@ export async function GET(req: NextRequest) {
 
   // Spike baseline: snapshots 6-8 days older than the latest one; the
   // lib picks, per SKU, whichever is closest to exactly 7 days back.
-  const { data: baseline, error: baselineError } = await supabase
-    .from('kaspi_shop_niche_product_snapshots')
-    .select('sku, reviews_count, snapshot_date')
-    .gte('snapshot_date', addDays(latestDate, -8))
-    .lte('snapshot_date', addDays(latestDate, -6))
-    .limit(5000)
-
-  if (baselineError) {
-    console.error('kaspi-shop niches collections: baseline fetch failed:', baselineError.message)
-    return NextResponse.json({ error: 'Не удалось загрузить данные' }, { status: 502 })
+  // Fetched as three per-date queries, NOT one range query: a full
+  // 3-day window is ~1,500-1,950 rows, and PostgREST silently truncates
+  // every response at the project's "Max Rows" setting (default 1000)
+  // regardless of .limit() -- a range query would drop an arbitrary
+  // subset of SKUs (final-review finding, 2026-08-24). One day is ~650
+  // rows, safely under any cap.
+  const baseline: Pick<NicheSnapshotRow, 'sku' | 'reviews_count' | 'snapshot_date'>[] = []
+  for (const offset of [-8, -7, -6]) {
+    const { data: dayRows, error: baselineError } = await supabase
+      .from('kaspi_shop_niche_product_snapshots')
+      .select('sku, reviews_count, snapshot_date')
+      .eq('snapshot_date', addDays(latestDate, offset))
+      .limit(2000)
+    if (baselineError) {
+      console.error('kaspi-shop niches collections: baseline fetch failed:', baselineError.message)
+      return NextResponse.json({ error: 'Не удалось загрузить данные' }, { status: 502 })
+    }
+    baseline.push(...((dayRows || []) as Pick<NicheSnapshotRow, 'sku' | 'reviews_count' | 'snapshot_date'>[]))
   }
 
   // «Всплеск спроса» stays in its honest "копим данные" pending state
-  // until history reaches at least 6 days back from the latest snapshot.
-  const { data: historyProbe } = await supabase
-    .from('kaspi_shop_niche_product_snapshots')
-    .select('id')
-    .lte('snapshot_date', addDays(latestDate, -6))
-    .limit(1)
-
+  // until the 6-8-day baseline window actually has rows. Keying pending
+  // on the WINDOW (not "any history older than 6 days") also covers the
+  // cron-was-down case where history exists only >8 days back -- there
+  // is nothing valid to diff against, so "копим данные" is the truthful
+  // state, not an active-but-empty collection.
   const collections = buildCollections(
     (latest || []) as NicheSnapshotRow[],
-    (baseline || []) as Pick<NicheSnapshotRow, 'sku' | 'reviews_count' | 'snapshot_date'>[],
+    baseline,
     latestDate,
-    (historyProbe || []).length > 0,
+    baseline.length > 0,
   )
 
   return NextResponse.json({ computedAt: latestDate, collections })
