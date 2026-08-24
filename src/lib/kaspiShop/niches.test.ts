@@ -42,9 +42,16 @@ describe('mapNicheResponse', () => {
       { name: 'B', count: 2 },
     ])
     expect(result.products).toEqual([
-      { sku: '114958921', name: 'Термокружка 1', price: 1102, rating: 4.8, reviewsCount: 619, brand: 'Без бренда', imageUrl: 'https://cdn/1.jpg', shopUrl: 'https://kaspi.kz/p/termokruzhka-1-114958921/?c=750000000' },
+      { sku: '114958921', name: 'Термокружка 1', price: 1102, rating: 4.8, reviewsCount: 619, brand: 'Без бренда', imageUrl: 'https://cdn/1.jpg', shopUrl: 'https://kaspi.kz/shop/p/termokruzhka-1-114958921/?c=750000000' },
       { sku: '103109291', name: 'Термокружка 2', price: 1535, rating: 4.8, reviewsCount: 296, brand: 'RedFox', imageUrl: null, shopUrl: null },
     ])
+  })
+
+  it('keeps an already /shop-prefixed shopLink unduplicated', () => {
+    const result = mapNicheResponse({ data: { total: 1, filters: [], cards: [
+      { id: '1', title: 'X', unitSalePrice: 1, rating: 5, reviewsQuantity: 1, brand: '', previewImages: [], shopLink: '/shop/p/x-1/?c=750000000' },
+    ] } })
+    expect(result.products[0].shopUrl).toBe('https://kaspi.kz/shop/p/x-1/?c=750000000')
   })
 
   it('caps products at 12 even if more cards are returned', () => {

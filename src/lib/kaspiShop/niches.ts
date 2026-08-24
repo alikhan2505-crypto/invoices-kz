@@ -39,11 +39,15 @@ export function mapNicheResponse(json: any): NicheSummary {
     reviewsCount: Number(c.reviewsQuantity) || 0,
     brand: c.brand ?? '',
     imageUrl: c.previewImages?.[0]?.medium ?? null,
-    // Real per-product page link, confirmed live in the raw card object
-    // (`shopLink`, a relative path like "/p/slug-114958921/?c=750000000")
-    // -- lets the seller open the real Kaspi listing straight from the
-    // quick-look modal instead of having to search for it themselves.
-    shopUrl: c.shopLink ? `https://kaspi.kz${c.shopLink}` : null,
+    // Real per-product page link. `shopLink` is a relative path like
+    // "/p/slug-114958921/?c=750000000" -- relative to the /shop SECTION,
+    // not the site root: kaspi.kz/p/... 404s to /errorpage while
+    // kaspi.kz/shop/p/... is the live product page (confirmed by curl
+    // A/B 2026-08-24 after a founder bug report; the missing /shop had
+    // been latent here since 2026-08-14).
+    shopUrl: c.shopLink
+      ? `https://kaspi.kz${String(c.shopLink).startsWith('/shop') ? '' : '/shop'}${c.shopLink}`
+      : null,
   }))
 
   return { total: Number(data.total) || 0, priceRanges, topBrands, products }

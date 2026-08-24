@@ -65,7 +65,7 @@ describe('mapCategorySample', () => {
     expect(result.products).toHaveLength(2)
     expect(result.products[0]).toEqual({
       sku: '1', name: 'Товар 1', price: 5000, rating: 4.9, reviewsCount: 300, brand: 'X',
-      imageUrl: 'https://cdn/1.jpg', shopUrl: 'https://kaspi.kz/p/tovar-1-1/?c=750000000',
+      imageUrl: 'https://cdn/1.jpg', shopUrl: 'https://kaspi.kz/shop/p/tovar-1-1/?c=750000000',
     })
   })
 
