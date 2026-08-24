@@ -154,6 +154,7 @@ function KaspiShopOrdersInner() {
   async function printWaybills(format: 'a4' | 'a6') {
     if (selected.size === 0) return
     setPrinting(true)
+    setLoadError('')
     try {
       const headers = await authHeader()
       const res = await fetch('/api/kaspi-shop/orders/waybills', {
@@ -173,6 +174,8 @@ function KaspiShopOrdersInner() {
       a.click()
       a.remove()
       URL.revokeObjectURL(url)
+    } catch {
+      setLoadError('Не удалось получить накладные. Проверьте соединение и попробуйте ещё раз.')
     } finally {
       setPrinting(false)
     }

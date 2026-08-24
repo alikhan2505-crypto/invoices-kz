@@ -47,7 +47,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Не удалось получить накладную: ${err.message}` }, { status: 502 })
   }
 
-  const merged = await buildWaybillsPdf(pdfs, format)
+  let merged: Buffer
+  try {
+    merged = await buildWaybillsPdf(pdfs, format)
+  } catch (err: any) {
+    return NextResponse.json({ error: `Не удалось собрать PDF накладных: ${err.message}` }, { status: 500 })
+  }
   return new NextResponse(new Uint8Array(merged), {
     status: 200,
     headers: { 'content-type': 'application/pdf', 'content-disposition': `attachment; filename="nakladnye_${format}.pdf"` },

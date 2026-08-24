@@ -1,4 +1,4 @@
-import { PDFDocument, PageSizes } from 'pdf-lib'
+import { PDFDocument, PageSizes, degrees } from 'pdf-lib'
 import JSZip from 'jszip'
 
 // CONFIRMED live 2026-08-23 (real order in "Передача" on merchant 30067228):
@@ -52,22 +52,49 @@ export async function packWaybillsToPages(
     const page = output.addPage(pageSize)
     const batch = pdfBuffers.slice(i, i + perPage)
     for (let j = 0; j < batch.length; j++) {
-      const [embeddedPage] = await output.embedPdf(batch[j])
+      const sourceDoc = await PDFDocument.load(batch[j])
+      const sourcePage = sourceDoc.getPage(0)
+      // Kaspi's label PDF may carry a /Rotate entry (e.g. a landscape-
+      // authored page meant to be VIEWED as portrait) -- embedPage/drawPage
+      // read the raw MediaBox only and ignore /Rotate entirely (confirmed
+      // against the installed pdf-lib: PDFPageEmbedder's fullPageBoundingBox
+      // uses only MediaBox), so it must be compensated for explicitly or a
+      // rotated label would render sideways and undersized.
+      const rotation = ((sourcePage.getRotation().angle % 360) + 360) % 360
+      const embeddedPage = await output.embedPage(sourcePage)
+      const swapped = rotation === 90 || rotation === 270
+      const visualWidth = swapped ? embeddedPage.height : embeddedPage.width
+      const visualHeight = swapped ? embeddedPage.width : embeddedPage.height
+
       const col = j % cols
       const row = Math.floor(j / cols)
       const cellX = col * cellWidth
       const cellY = pageHeight - (row + 1) * cellHeight
       const availableWidth = cellWidth - CELL_MARGIN * 2
       const availableHeight = cellHeight - CELL_MARGIN * 2
-      const scale = Math.min(availableWidth / embeddedPage.width, availableHeight / embeddedPage.height)
-      const drawnWidth = embeddedPage.width * scale
-      const drawnHeight = embeddedPage.height * scale
-      page.drawPage(embeddedPage, {
-        x: cellX + (cellWidth - drawnWidth) / 2,
-        y: cellY + (cellHeight - drawnHeight) / 2,
-        width: drawnWidth,
-        height: drawnHeight,
-      })
+      const scale = Math.min(availableWidth / visualWidth, availableHeight / visualHeight)
+      const drawnWidth = visualWidth * scale
+      const drawnHeight = visualHeight * scale
+      const originX = cellX + (cellWidth - drawnWidth) / 2
+      const originY = cellY + (cellHeight - drawnHeight) / 2
+
+      // Compensating (x, y, pdf-lib rotate angle) per source /Rotate value --
+      // verified by explicit CTM matrix derivation (translate . rotate . scale
+      // applied to the source page's 4 corners lands exactly on
+      // [originX, originX+drawnWidth] x [originY, originY+drawnHeight] in
+      // every case; pdf-lib's `rotate` option is a CCW rotation for a
+      // positive angle, while a PDF /Rotate value is the CW display
+      // rotation, hence the sign flip between source rotation 90 <->
+      // pdf-lib rotate -90, and source rotation 270 <-> pdf-lib rotate 90).
+      if (rotation === 0) {
+        page.drawPage(embeddedPage, { x: originX, y: originY, width: drawnWidth, height: drawnHeight })
+      } else if (rotation === 90) {
+        page.drawPage(embeddedPage, { x: originX, y: originY + drawnHeight, xScale: scale, yScale: scale, rotate: degrees(-90) })
+      } else if (rotation === 180) {
+        page.drawPage(embeddedPage, { x: originX + drawnWidth, y: originY + drawnHeight, xScale: scale, yScale: scale, rotate: degrees(180) })
+      } else {
+        page.drawPage(embeddedPage, { x: originX + drawnWidth, y: originY, xScale: scale, yScale: scale, rotate: degrees(90) })
+      }
     }
   }
 
