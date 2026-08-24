@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { loadConnection } from '@/lib/kaspiShop/connection'
-import { fetchWaybillPdfs, mergeWaybillPdfs } from '@/lib/kaspiShop/waybills'
+import { fetchWaybillPdfs, buildWaybillsPdf, type WaybillFormat } from '@/lib/kaspiShop/waybills'
 
 const supabaseAuth = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -30,6 +30,10 @@ export async function POST(req: NextRequest) {
   if (!Array.isArray(orderCodes) || orderCodes.length === 0) {
     return NextResponse.json({ error: 'orderCodes обязателен и не должен быть пустым' }, { status: 400 })
   }
+  const format: WaybillFormat = body?.format
+  if (format !== 'a4' && format !== 'a6') {
+    return NextResponse.json({ error: "format обязателен и должен быть 'a4' или 'a6'" }, { status: 400 })
+  }
 
   const connection = await loadConnection(user.id)
   if (!connection || !connection.sessionCookies) {
@@ -43,9 +47,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Не удалось получить накладную: ${err.message}` }, { status: 502 })
   }
 
-  const merged = await mergeWaybillPdfs(pdfs)
+  const merged = await buildWaybillsPdf(pdfs, format)
   return new NextResponse(new Uint8Array(merged), {
     status: 200,
-    headers: { 'content-type': 'application/pdf', 'content-disposition': 'attachment; filename="nakladnye.pdf"' },
+    headers: { 'content-type': 'application/pdf', 'content-disposition': `attachment; filename="nakladnye_${format}.pdf"` },
   })
 }
