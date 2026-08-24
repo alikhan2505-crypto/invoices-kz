@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import LoadingSpinner from '@/components/LoadingSpinner'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
+import NicheCollections from '@/components/kaspiShop/NicheCollections'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 const CARD_HOVER = 'transition-all duration-200 ease-out hover:-translate-y-1 hover:shadow-[var(--nav-card-glow)]'
@@ -300,9 +301,14 @@ export default function KaspiShopNiches() {
       <SiteNav />
 
       <div className="flex-1 min-w-0 p-4 lg:p-6 pb-24 lg:pb-6">
+        {/* Витрина подборок -- the page's face (2026-08-23 founder
+            decision); the keyword search below stays as the secondary
+            "проверить свою идею" tool. */}
+        <NicheCollections />
+
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}
           className="nav-glass nav-card-accent rounded-[28px] p-6 lg:p-8 mb-4">
-          <div className="text-[11px] font-semibold tracking-wider uppercase mb-1" style={{ color: 'var(--nav-text-muted)' }}>Ниши</div>
+          <div className="text-[11px] font-semibold tracking-wider uppercase mb-1" style={{ color: 'var(--nav-text-muted)' }}>Проверка идеи</div>
           <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight mb-6" style={{ color: 'var(--nav-text-primary)' }}>Проверить идею товара</h1>
           <form onSubmit={e => { e.preventDefault(); doSearch() }} className="flex gap-2">
             <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Например: термокружка"
