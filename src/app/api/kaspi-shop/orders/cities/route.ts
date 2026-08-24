@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { loadConnection, markSessionExpired } from '@/lib/kaspiShop/connection'
-import { listOrders, fetchCityNames } from '@/lib/kaspiShop/cabinetApi'
-import { collectDistinctCityNames } from '@/lib/kaspiShop/ordersFilters'
+import { loadConnection } from '@/lib/kaspiShop/connection'
+import { getCachedMerchantPoints } from '@/lib/kaspiShop/merchantPoints'
 
 const supabaseAuth = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -17,53 +16,30 @@ async function requireUser(req: NextRequest) {
   return user
 }
 
-// Kaspi's getOrders has no "list distinct cities" endpoint of its own, and
-// guessing a new one is exactly what caused накладная to 404 for real (see
-// docs/superpowers/specs/2026-08-13-kaspi-orders-api-findings.md section 5
-// and the 2026-08-23 waybill fix). Sampling existing pages needs no new
-// confirmed-live shape.
-const CITY_SAMPLE_PAGES = 5
-
+// Confirmed live 2026-08-24: the real cabinet's "Выберите город" filter on
+// the orders page lists the MERCHANT's own pickup-point cities (this
+// account has 2: Астана, Шымкент) -- a static, status-independent concept,
+// not something to sample per status from live orders. See
+// getMerchantPoints's comment for the KATO-id confirmation.
 export async function GET(req: NextRequest) {
   const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const status = req.nextUrl.searchParams.get('status') || 'NEW'
 
   const connection = await loadConnection(user.id)
   if (!connection || !connection.sessionCookies) {
     return NextResponse.json({ error: 'Кабинет не подключён — подключите его через Kaspi Магазин' }, { status: 400 })
   }
 
-  const sampled: { cityName: string | null }[] = []
-  let fetched = 0
-  for (let page = 0; page < CITY_SAMPLE_PAGES; page++) {
-    const result = await listOrders(connection.sessionCookies, connection.merchantId, status, page)
-    if (result.sessionExpired) {
-      await markSessionExpired(connection.id)
-      return NextResponse.json({ error: 'Сессия истекла — переподключите кабинет' }, { status: 400 })
-    }
-    if (result.orders.length === 0) break
-    sampled.push(...result.orders)
-    fetched += result.orders.length
-    if (fetched >= result.total) break
+  const points = await getCachedMerchantPoints(connection.id, connection.sessionCookies, connection.merchantId)
+
+  const cities = new Map<string, string>()
+  for (const p of points) {
+    if (p.cityId && p.cityName) cities.set(p.cityId, p.cityName)
   }
 
-  const names = collectDistinctCityNames(sampled)
-  if (names.length === 0) return NextResponse.json({ cities: [] })
-
-  // Confirmed live 2026-08-23: an order's own warehouse.city.id is NOT the
-  // same id space as the KATO-style cityId Kaspi's real city filter expects
-  // (e.g. "511010000" for Шымкент) -- resolve each sampled city NAME against
-  // the confirmed-working getCities catalog instead of trusting the order's
-  // own id.
-  const catalog = await fetchCityNames(connection.sessionCookies, connection.merchantId)
-  const idByName = new Map<string, string>()
-  for (const [id, name] of Object.entries(catalog)) idByName.set(name, id)
-
-  const cities = names
-    .map(cityName => ({ cityId: idByName.get(cityName), cityName }))
-    .filter((c): c is { cityId: string; cityName: string } => !!c.cityId)
-
-  return NextResponse.json({ cities })
+  return NextResponse.json({
+    cities: Array.from(cities.entries())
+      .map(([cityId, cityName]) => ({ cityId, cityName }))
+      .sort((a, b) => a.cityName.localeCompare(b.cityName, 'ru')),
+  })
 }

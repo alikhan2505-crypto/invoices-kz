@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { loadConnection, markSessionExpired } from '@/lib/kaspiShop/connection'
 import { fetchOfferDetails, extractOfferPointInfo, listCatalogWithStatus } from '@/lib/kaspiShop/cabinetApi'
 import { savePointStockPrice } from '@/lib/kaspiShop/cabinetPricePush'
+import { getCachedMerchantPoints } from '@/lib/kaspiShop/merchantPoints'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -51,6 +52,23 @@ export async function GET(req: NextRequest) {
   const entriesMap = new Map<string, PointEntry>()
   for (const info of extractOfferPointInfo(details, connection.merchantId)) {
     entriesMap.set(info.storeCode, { ...info, cityName: null })
+  }
+
+  // Show every point the merchant has, not just the ones this specific SKU
+  // already has price/stock data for -- founder request 2026-08-24: a
+  // product listed only at one point (e.g. Шымкент) should still show the
+  // merchant's other points (e.g. Астана, empty) so a value can be added
+  // there. cityName is resolved below along with the entries this SKU
+  // already has, from the same city_lookup_cache.
+  try {
+    const merchantPoints = await getCachedMerchantPoints(connection.id, connection.sessionCookies, connection.merchantId)
+    for (const p of merchantPoints) {
+      if (!entriesMap.has(p.storeCode)) {
+        entriesMap.set(p.storeCode, { storeCode: p.storeCode, cityId: p.cityId, cityName: null, price: null, stockCount: null, available: null })
+      }
+    }
+  } catch (err: any) {
+    console.error('offer-stocks: merchant points merge failed (non-fatal, only this SKU\'s own points show)', err.message)
   }
 
   // Остаток per point from the list row (searching the active side first,

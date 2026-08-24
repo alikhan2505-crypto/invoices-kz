@@ -49,14 +49,12 @@ function KaspiShopOrdersInner() {
 
   const PAGE_SIZE = 10
   const prevStatus = useRef(status)
-
   const prevCityId = useRef(cityId)
-  const cityOptionsCache = useRef<Map<string, { cityId: string; cityName: string }[]>>(new Map())
 
   useEffect(() => { checkAccess() }, [])
   useEffect(() => {
     if (loading) return
-    loadCityOptions(status)
+    loadCityOptions()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading])
   useEffect(() => {
@@ -71,19 +69,8 @@ function KaspiShopOrdersInner() {
     if (statusChanged) {
       setPage(0)
       setDateMode('all')
-      loadCityOptions(status)
       loadCounts()
-      if (cityId !== '') {
-        // Resetting cityId itself changes this effect's dependency array,
-        // which re-triggers this effect once city+page have settled -- the
-        // cityChanged branch below then does the single actual fetch with
-        // cityId='' once React has committed the reset. Don't also fetch
-        // here, or the reset and this call would both fire (a real,
-        // avoidable duplicate request).
-        setCityId('')
-      } else if (page === 0) {
-        loadOrders(status, 0, cityId)
-      }
+      if (page === 0) loadOrders(status, 0, cityId)
       return
     }
     if (cityChanged) {
@@ -108,17 +95,13 @@ function KaspiShopOrdersInner() {
     setLoading(false)
   }
 
-  async function loadCityOptions(forStatus: string) {
-    const cached = cityOptionsCache.current.get(forStatus)
-    if (cached) { setCityOptions(cached); return }
+  async function loadCityOptions() {
     try {
       const headers = await authHeader()
-      const res = await fetch(`/api/kaspi-shop/orders/cities?status=${encodeURIComponent(forStatus)}`, { headers })
+      const res = await fetch('/api/kaspi-shop/orders/cities', { headers })
       if (!res.ok) { setCityOptions([]); return }
       const data = await res.json()
-      const cities = data.cities || []
-      cityOptionsCache.current.set(forStatus, cities)
-      setCityOptions(cities)
+      setCityOptions(data.cities || [])
     } catch {
       setCityOptions([])
     }

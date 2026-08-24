@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { filterByDeliveryCutoff, collectDistinctCityNames } from './ordersFilters'
+import { filterByDeliveryCutoff } from './ordersFilters'
 
 describe('filterByDeliveryCutoff', () => {
   const NOW = new Date('2026-08-23T10:00:00.000Z') // 15:00 Almaty time
@@ -25,25 +25,5 @@ describe('filterByDeliveryCutoff', () => {
 
   it("mode 'tomorrow' drops orders with no planned delivery date", () => {
     expect(filterByDeliveryCutoff([{ plannedDeliveryDate: null }], 'tomorrow', NOW)).toEqual([])
-  })
-})
-
-describe('collectDistinctCityNames', () => {
-  it('dedupes by name and sorts (ru locale)', () => {
-    const orders = [
-      { cityName: 'Шымкент' },
-      { cityName: 'Алматы' },
-      { cityName: 'Шымкент' },
-    ]
-    expect(collectDistinctCityNames(orders)).toEqual(['Алматы', 'Шымкент'])
-  })
-
-  it('skips orders with a missing city name', () => {
-    const orders = [{ cityName: null }, { cityName: 'Алматы' }]
-    expect(collectDistinctCityNames(orders)).toEqual(['Алматы'])
-  })
-
-  it('returns an empty array for no orders', () => {
-    expect(collectDistinctCityNames([])).toEqual([])
   })
 })

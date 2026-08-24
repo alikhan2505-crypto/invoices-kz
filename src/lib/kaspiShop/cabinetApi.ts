@@ -256,6 +256,49 @@ export async function listCatalog(sessionCookies: string, merchantId: string, av
   return offers
 }
 
+export type MerchantPoint = { storeCode: string; cityId: string | null; cityName: string | null }
+
+// Confirmed live 2026-08-23: neither the orders page's city filter nor the
+// «Цена и остатки» modal has any way to show a pickup point with zero
+// current orders/stock, because both previously derived "known points" from
+// a single product's or a sampled page's own data. This scans the FULL
+// catalog (active + removed) once -- offer.points is free on the list
+// response, extractOfferPointInfo(details) adds any point only visible in
+// the details batch -- to build the merchant's complete point set, then
+// resolves each point's city via the confirmed-working getCities catalog
+// (same KATO-style id space as the real cabinet's own city filter, see
+// extractPointCity's comment). Callers should cache this (it scans the
+// whole catalog) -- see merchantPoints.ts's getCachedMerchantPoints.
+export async function getMerchantPoints(sessionCookies: string, merchantId: string): Promise<MerchantPoint[]> {
+  const [activeRes, removedRes] = await Promise.all([
+    listCatalogWithStatus(sessionCookies, merchantId, true),
+    listCatalogWithStatus(sessionCookies, merchantId, false),
+  ])
+  const allOffers = [...activeRes.offers, ...removedRes.offers]
+
+  const codes = new Set<string>()
+  for (const offer of allOffers) for (const code of offer.points) codes.add(code)
+
+  const cityByCode = new Map<string, string>()
+  try {
+    const detailsItems = await fetchOffersDetails(sessionCookies, merchantId, allOffers.map(o => o.sku))
+    for (const item of detailsItems) {
+      for (const info of extractOfferPointInfo(item, merchantId)) {
+        codes.add(info.storeCode)
+        if (info.cityId) cityByCode.set(info.storeCode, info.cityId)
+      }
+    }
+  } catch (err: any) {
+    console.error('kaspi-shop getMerchantPoints: details batch failed (non-fatal, points show no city)', err.message)
+  }
+
+  const cityCatalog = await fetchCityNames(sessionCookies, merchantId)
+  return Array.from(codes).map(storeCode => {
+    const cityId = cityByCode.get(storeCode) || null
+    return { storeCode, cityId, cityName: cityId ? (cityCatalog[cityId] || null) : null }
+  })
+}
+
 // Real query/variables/response shape confirmed live 2026-08-13 (see
 // docs/superpowers/specs/2026-08-13-kaspi-orders-api-findings.md) --
 // presetFilter uses the SAME status codes as the cabinet's own sidebar nav

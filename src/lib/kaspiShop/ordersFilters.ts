@@ -27,17 +27,3 @@ export function filterByDeliveryCutoff<T extends { plannedDeliveryDate: string |
     return !Number.isNaN(t) && t <= cutoffUtc
   })
 }
-
-// Name-only: confirmed live 2026-08-23 that an order's own `warehouse.city.id`
-// is a different, smaller id space than the KATO-style cityId Kaspi's real
-// "Выберите город" filter actually expects (e.g. "511010000" for Шымкент) --
-// the raw id on an order is not safe to send back as a filter value. Collect
-// distinct NAMES only; the caller resolves each name to its real filterable
-// id via the confirmed getCities catalog (see orders/cities/route.ts).
-export function collectDistinctCityNames<T extends { cityName: string | null }>(orders: T[]): string[] {
-  const names = new Set<string>()
-  for (const o of orders) {
-    if (o.cityName) names.add(o.cityName)
-  }
-  return Array.from(names).sort((a, b) => a.localeCompare(b, 'ru'))
-}
