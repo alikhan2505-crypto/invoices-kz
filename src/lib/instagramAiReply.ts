@@ -1,5 +1,36 @@
 import Anthropic from '@anthropic-ai/sdk'
 
+// Phase 3 «счёт из чата»: the one tool the multi-tenant agent pipelines
+// may enable (see the invoiceTool param below). Schema mirrors
+// invoiceDrafts.ts's validateDraftInput expectations (snake_case
+// unit_price on the wire); the executor re-validates everything -- this
+// schema is guidance for the model, not a trust boundary.
+const INVOICE_TOOL_DEF: Anthropic.Tool = {
+  name: 'create_invoice_draft',
+  description: 'Создать счёт на оплату для клиента, когда он ЯВНО согласился купить и известны конкретные позиции. Цены бери из каталога в контексте или из слов клиента — не выдумывай.',
+  input_schema: {
+    type: 'object' as const,
+    properties: {
+      items: {
+        type: 'array',
+        description: 'Позиции счёта',
+        items: {
+          type: 'object',
+          properties: {
+            name: { type: 'string', description: 'Название товара/услуги' },
+            qty: { type: 'integer', minimum: 1, description: 'Количество' },
+            unit_price: { type: 'number', description: 'Цена за единицу в тенге' },
+          },
+          required: ['name', 'qty', 'unit_price'],
+        },
+      },
+      customer_name: { type: 'string', description: 'Имя клиента, если известно из диалога' },
+      customer_phone: { type: 'string', description: 'Телефон клиента, если известен из диалога' },
+    },
+    required: ['items'],
+  },
+}
+
 // No test file: this is a live network call to a paid API, matching this
 // codebase's existing convention (e.g. sendTelegramNotification in
 // telegramNotify.ts is likewise untested — only pure logic like
@@ -31,6 +62,21 @@ export async function generateAiReply(params: {
   // template match when this is set). Absent for every existing caller, so
   // the Anthropic request stays byte-for-byte the string it is today.
   image?: { base64: string; mediaType: string }
+  // Phase 3 «счёт из чата»: when present, the model gets the
+  // create_invoice_draft tool and ONE tool round is allowed (model ->
+  // tool_use -> tool_result -> final text). Only the multi-tenant agent
+  // pipelines pass this -- the legacy single-tenant Instagram bot never
+  // does, keeping its requests byte-for-byte unchanged. The executor owns
+  // ALL side effects (validation, draft row, autonomy, sending); this
+  // function only relays its outcome back to the model.
+  invoiceTool?: {
+    execute: (input: { items?: unknown; customer_name?: unknown; customer_phone?: unknown }) => Promise<{
+      outcome: 'draft_pending' | 'sent'
+      total?: number
+      missing?: ('customer_name' | 'customer_phone')[]
+      error?: string
+    }>
+  }
 }): Promise<{ replyText: string; urgent: boolean; extractedFields?: Record<string, string> }> {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured')
@@ -67,6 +113,12 @@ export async function generateAiReply(params: {
     ? `\n<<<EXTRACTED>>>{"ключ":"значение"}<<<END>>> -- JSON с извлечёнными полями по правилам выше (пустой объект {}, если клиент пока ничего из списка не сообщил)`
     : ''
 
+  // Only when the caller wires the invoice tool -- '' otherwise, so
+  // non-tool callers keep the exact prompt they had before Phase 3.
+  const invoiceToolLine = params.invoiceTool
+    ? `\n\nЕсли клиент ЯВНО согласился купить/заказать и известны конкретные позиции с ценами — вызови инструмент create_invoice_draft (цены бери ТОЛЬКО из каталога в контексте или из слов клиента, не выдумывай). После результата инструмента: «sent» — коротко подтверди, что счёт отправлен отдельным сообщением; «draft_pending» без missing — скажи, что счёт готовится и скоро придёт; missing содержит customer_name/customer_phone — вежливо спроси недостающее у клиента; error — извинись и предложи продолжить диалог.`
+    : ''
+
   // Photos have no meaningful "написал: ..." line (incomingText is a
   // caption or the '[Фото]' placeholder the caller sets when there's none)
   // -- phrase it as what actually happened so the model isn't confused by
@@ -81,7 +133,7 @@ export async function generateAiReply(params: {
 
 ${messageLine}
 
-${lengthInstruction} Ответь на ТОМ ЖЕ ЯЗЫКЕ, на котором написал пользователь (например, казахский → отвечай на казахском, английский → на английском, русский → на русском). Пиши вежливо и дружелюбно. Не придумывай факты о ценах, сроках или функциях, которых ты не знаешь — в таком случае вежливо предложи написать в директ для уточнения деталей.${extractionAskLine}
+${lengthInstruction} Ответь на ТОМ ЖЕ ЯЗЫКЕ, на котором написал пользователь (например, казахский → отвечай на казахском, английский → на английском, русский → на русском). Пиши вежливо и дружелюбно. Не придумывай факты о ценах, сроках или функциях, которых ты не знаешь — в таком случае вежливо предложи написать в директ для уточнения деталей.${extractionAskLine}${invoiceToolLine}
 
 Также оцени: сигнализирует ли сообщение о срочности или негативе (явно злой/раздражённый тон, жалоба, угроза уйти/оставить плохой отзыв, требование вернуть деньги, срочная просьба связаться с человеком) — обычный вопрос про цены/функции НЕ считается срочным.
 
@@ -89,37 +141,73 @@ ${lengthInstruction} Ответь на ТОМ ЖЕ ЯЗЫКЕ, на которо
 URGENT: yes ИЛИ no
 REPLY: текст ответа без кавычек и пояснений${extractedFormatLine}`
 
-  const message = await client.messages.create({
+  // A caller that never passes `image` gets the exact same plain-string
+  // content this request has sent since before this feature existed.
+  const userContent = params.image
+    ? [
+        {
+          type: 'image' as const,
+          source: {
+            type: 'base64' as const,
+            // Validated by the caller (mediaLimits.ts's
+            // isImageWithinLimits) before this function is ever called
+            // with an image -- safe to narrow here.
+            media_type: params.image.mediaType as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
+            data: params.image.base64,
+          },
+        },
+        { type: 'text' as const, text: textContent },
+      ]
+    : textContent
+
+  // max_tokens is a ceiling, not a cost -- billing is by tokens actually
+  // generated, so raising it here only when extraction is requested costs
+  // nothing extra for a normal-length reply. It exists so a reply near the
+  // old 300-token cap plus a multi-field <<<EXTRACTED>>> JSON block can't
+  // get cut off before its closing <<<END>>> delimiter, which would make
+  // parseExtractedFieldsBlock silently find no match at all.
+  const requestBase = {
     model: 'claude-haiku-4-5-20251001',
-    // max_tokens is a ceiling, not a cost -- billing is by tokens actually
-    // generated, so raising it here only when extraction is requested costs
-    // nothing extra for a normal-length reply. It exists so a reply near the
-    // old 300-token cap plus a multi-field <<<EXTRACTED>>> JSON block can't
-    // get cut off before its closing <<<END>>> delimiter, which would make
-    // parseExtractedFieldsBlock silently find no match at all.
     max_tokens: hasExtraction ? 500 : 300,
-    messages: [{
-      role: 'user',
-      // A caller that never passes `image` gets the exact same plain-string
-      // content this request has sent since before this feature existed.
-      content: params.image
-        ? [
-            {
-              type: 'image' as const,
-              source: {
-                type: 'base64' as const,
-                // Validated by the caller (mediaLimits.ts's
-                // isImageWithinLimits) before this function is ever called
-                // with an image -- safe to narrow here.
-                media_type: params.image.mediaType as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
-                data: params.image.base64,
-              },
-            },
-            { type: 'text' as const, text: textContent },
-          ]
-        : textContent,
-    }],
+  }
+  const tools = params.invoiceTool ? [INVOICE_TOOL_DEF] : undefined
+  const baseMessages: Anthropic.MessageParam[] = [{ role: 'user', content: userContent }]
+
+  let message = await client.messages.create({
+    ...requestBase,
+    ...(tools ? { tools } : {}),
+    messages: baseMessages,
   })
+
+  // Phase 3: exactly ONE tool round. The executor owns all side effects;
+  // its outcome (or a caught failure, downgraded to an error payload the
+  // model can apologize about) goes back as the tool_result, and the
+  // SECOND response's text is the reply. A second tool_use attempt in
+  // that response is not honored -- the no-text error below surfaces it.
+  if (params.invoiceTool && message.stop_reason === 'tool_use') {
+    const toolBlock = message.content.find(block => block.type === 'tool_use')
+    if (toolBlock && toolBlock.type === 'tool_use' && toolBlock.name === 'create_invoice_draft') {
+      let outcome: unknown
+      try {
+        outcome = await params.invoiceTool.execute(toolBlock.input as any)
+      } catch (err: any) {
+        console.error('generateAiReply: invoice tool executor failed:', err?.message || err)
+        outcome = { outcome: 'draft_pending', error: 'внутренняя ошибка при создании счёта' }
+      }
+      message = await client.messages.create({
+        ...requestBase,
+        tools: [INVOICE_TOOL_DEF],
+        messages: [
+          ...baseMessages,
+          { role: 'assistant', content: message.content },
+          {
+            role: 'user',
+            content: [{ type: 'tool_result' as const, tool_use_id: toolBlock.id, content: JSON.stringify(outcome) }],
+          },
+        ],
+      })
+    }
+  }
 
   const textBlock = message.content.find(block => block.type === 'text')
   if (!textBlock || textBlock.type !== 'text') {
