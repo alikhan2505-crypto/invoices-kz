@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildBusinessContextLine, buildCollectFieldsToExtract } from './promptContext'
+import { buildBusinessContextLine, buildCollectFieldsToExtract, buildCatalogBlock } from './promptContext'
 
 describe('buildBusinessContextLine', () => {
   it('includes the business name, description, tone label, and goal label', () => {
@@ -100,5 +100,22 @@ describe('buildCollectFieldsToExtract', () => {
 
   it('drops blank entries', () => {
     expect(buildCollectFieldsToExtract(['name', '  ', ''])).toEqual([{ key: 'name', label: 'имя клиента' }])
+  })
+})
+
+describe('buildCatalogBlock', () => {
+  it('returns empty string for no products', () => {
+    expect(buildCatalogBlock([])).toBe('')
+  })
+  it('lists products with prices and the no-invent instruction', () => {
+    const block = buildCatalogBlock([{ name: 'Термокружка', price: 1200 }])
+    expect(block).toContain('Термокружка — 1 200 ₸')
+    expect(block).toContain('каталог')
+  })
+  it('caps at 50 products', () => {
+    const many = Array.from({ length: 60 }, (_, i) => ({ name: `Товар ${i}`, price: 100 }))
+    const block = buildCatalogBlock(many)
+    expect(block).toContain('Товар 49')
+    expect(block).not.toContain('Товар 50 —')
   })
 })

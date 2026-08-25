@@ -84,6 +84,21 @@ export function buildBusinessContextLine(ctx: BusinessContext): string {
   return line
 }
 
+// «Каталог и цены» -- appended by tenant callers to businessContextLine
+// when the agent owner has an ACTIVE Kaspi Shop connection, so answers
+// about prices (and invoice-draft items) use real catalog numbers
+// instead of free-text guesses. Pure: the Supabase load lives in
+// catalogContext.ts.
+export const CATALOG_MAX_PRODUCTS = 50
+
+export function buildCatalogBlock(products: { name: string; price: number }[]): string {
+  if (products.length === 0) return ''
+  const lines = products.slice(0, CATALOG_MAX_PRODUCTS)
+    .map(p => `${p.name} — ${p.price.toLocaleString('ru-KZ')} ₸`)
+    .join('\n')
+  return ` Актуальный каталог товаров и цен этого бизнеса (используй ТОЛЬКО эти цены, не выдумывай другие; если товара нет в каталоге — скажи, что уточнишь):\n${lines}`
+}
+
 // Maps an agent's raw collect_fields array (the same array
 // buildBusinessContextLine above flattens into prose) into the
 // {key,label}[] shape generateAiReply's collectFieldsToExtract param needs
