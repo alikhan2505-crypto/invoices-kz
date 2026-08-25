@@ -109,7 +109,10 @@ describe('buildCatalogBlock', () => {
   })
   it('lists products with prices and the no-invent instruction', () => {
     const block = buildCatalogBlock([{ name: 'Термокружка', price: 1200 }])
-    expect(block).toContain('Термокружка — 1 200 ₸')
+    // toLocaleString('ru-KZ') separates thousands with a non-breaking
+    // space -- build the expectation with the same formatter instead of
+    // hardcoding a visually identical regular space.
+    expect(block).toContain(`Термокружка — ${(1200).toLocaleString('ru-KZ')} ₸`)
     expect(block).toContain('каталог')
   })
   it('caps at 50 products', () => {
