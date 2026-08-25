@@ -85,3 +85,26 @@ describe('findFlowTriggerMatch', () => {
     expect(findFlowTriggerMatch('привет', flows)).toBeNull()
   })
 })
+
+describe('invoice flow steps', () => {
+  it('accepts an invoice step with a valid invoiceItem and no buttons', () => {
+    const def = parseFlowDefinition({ steps: [
+      { id: 's1', text: 'Оформляю счёт', buttons: [], kind: 'invoice', invoiceItem: { name: 'Кружка', unitPrice: 1200 } },
+    ] })
+    expect(def?.steps[0].kind).toBe('invoice')
+    expect(def?.steps[0].invoiceItem).toEqual({ name: 'Кружка', unitPrice: 1200 })
+  })
+  it('rejects an invoice step with missing/invalid invoiceItem or with buttons', () => {
+    expect(parseFlowDefinition({ steps: [{ id: 's1', text: 'x', buttons: [], kind: 'invoice' }] })).toBeNull()
+    expect(parseFlowDefinition({ steps: [{ id: 's1', text: 'x', kind: 'invoice', invoiceItem: { name: '', unitPrice: 5 }, buttons: [] }] })).toBeNull()
+    expect(parseFlowDefinition({ steps: [{ id: 's1', text: 'x', kind: 'invoice', invoiceItem: { name: 'A', unitPrice: 0 }, buttons: [] }] })).toBeNull()
+    expect(parseFlowDefinition({ steps: [{ id: 's1', text: 'x', kind: 'invoice', invoiceItem: { name: 'A', unitPrice: 5 }, buttons: [{ label: 'B', nextStepId: null }] }] })).toBeNull()
+  })
+  it('rejects an unknown kind value', () => {
+    expect(parseFlowDefinition({ steps: [{ id: 's1', text: 'x', buttons: [], kind: 'weird' }] })).toBeNull()
+  })
+  it('legacy steps without kind still parse as message steps', () => {
+    const def = parseFlowDefinition({ steps: [{ id: 's1', text: 'Привет', buttons: [] }] })
+    expect(def?.steps[0].kind ?? 'message').toBe('message')
+  })
+})

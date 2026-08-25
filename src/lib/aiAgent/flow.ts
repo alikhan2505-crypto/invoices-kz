@@ -18,6 +18,14 @@ export interface FlowStep {
   // some other button's nextStepId pointed here), the flow ends -- no
   // further click is expected.
   buttons: FlowButton[]
+  // Phase 3 «счёт из чата»: absent/'message' = ordinary text step (full
+  // backward compat with every stored flow); 'invoice' = after this
+  // step's text is sent, the engine creates an invoice draft from
+  // invoiceItem + the conversation's collected name/phone. Invoice steps
+  // are terminal-shaped (buttons must be empty) -- the customer's next
+  // message goes through the normal pipeline.
+  kind?: 'message' | 'invoice'
+  invoiceItem?: { name: string; unitPrice: number }
 }
 
 export interface FlowDefinition {
@@ -68,8 +76,31 @@ export function parseFlowDefinition(raw: unknown): FlowDefinition | null {
       if (nextStepId !== null && typeof nextStepId !== 'string') return null
       buttons.push({ label: label.trim(), nextStepId })
     }
+    // kind/invoiceItem (Phase 3): tolerate absence (legacy message
+    // steps), reject unknown kinds and structurally invalid invoice
+    // steps at save time -- exactly like the dangling-nextStepId check
+    // below, a bad invoice step must fail here, not strand a customer
+    // at message-handling time.
+    const kindRaw = (s as any).kind
+    if (kindRaw !== undefined && kindRaw !== 'message' && kindRaw !== 'invoice') return null
+    let invoiceItem: { name: string; unitPrice: number } | undefined
+    if (kindRaw === 'invoice') {
+      if (buttons.length > 0) return null
+      const itemRaw = (s as any).invoiceItem
+      const itemName = itemRaw && typeof itemRaw === 'object' && typeof itemRaw.name === 'string' ? itemRaw.name.trim() : ''
+      const unitPrice = itemRaw && typeof itemRaw === 'object' ? Number(itemRaw.unitPrice) : NaN
+      if (!itemName || !Number.isFinite(unitPrice) || unitPrice <= 0) return null
+      invoiceItem = { name: itemName, unitPrice }
+    }
+
     seenIds.add(id)
-    steps.push({ id, text: text.trim(), buttons })
+    steps.push({
+      id,
+      text: text.trim(),
+      buttons,
+      ...(kindRaw !== undefined ? { kind: kindRaw as 'message' | 'invoice' } : {}),
+      ...(invoiceItem ? { invoiceItem } : {}),
+    })
   }
 
   // Every non-null nextStepId must point at a step that actually exists in

@@ -13,6 +13,11 @@ interface FlowStepDraft {
   id: string
   text: string
   buttons: FlowButtonDraft[]
+  // Phase 3: 'invoice' steps issue a счёт after their text is sent --
+  // fixed item from invoiceItem, client data from the dialog. Kept
+  // optional so existing saved flows round-trip untouched.
+  kind?: 'message' | 'invoice'
+  invoiceItem?: { name: string; unitPrice: number }
 }
 
 interface FlowListItem {
@@ -101,6 +106,24 @@ export default function FlowBuilder({ agentId, authHeader }: { agentId: string; 
 
   function updateStepText(stepId: string, text: string) {
     setDraftSteps(prev => prev.map(s => s.id === stepId ? { ...s, text } : s))
+  }
+
+  // Switching to «Выставить счёт» drops the buttons (invoice steps are
+  // terminal by design -- the server-side parser enforces it too);
+  // switching back to a message step drops the invoice fields.
+  function setStepKind(stepId: string, kind: 'message' | 'invoice') {
+    setDraftSteps(prev => prev.map(s => {
+      if (s.id !== stepId) return s
+      return kind === 'invoice'
+        ? { ...s, kind, buttons: [], invoiceItem: s.invoiceItem ?? { name: '', unitPrice: 0 } }
+        : { id: s.id, text: s.text, buttons: s.buttons }
+    }))
+  }
+
+  function updateInvoiceItem(stepId: string, patch: Partial<{ name: string; unitPrice: number }>) {
+    setDraftSteps(prev => prev.map(s => s.id === stepId
+      ? { ...s, invoiceItem: { name: '', unitPrice: 0, ...s.invoiceItem, ...patch } }
+      : s))
   }
 
   function addButton(stepId: string) {
@@ -193,10 +216,39 @@ export default function FlowBuilder({ agentId, authHeader }: { agentId: string; 
                   <button onClick={() => removeStep(step.id)} className="text-xs" style={{ color: 'var(--nav-critical)' }}>Удалить шаг</button>
                 )}
               </div>
+              <div className="mb-2">
+                <span className="text-xs mb-1.5 block" style={{ color: 'var(--nav-text-secondary)' }}>Тип шага</span>
+                <select value={step.kind === 'invoice' ? 'invoice' : 'message'}
+                  onChange={e => setStepKind(step.id, e.target.value as 'message' | 'invoice')}
+                  className={INPUT_CLS} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-surface-chrome)' }}>
+                  <option value="message">Сообщение (текст + кнопки)</option>
+                  <option value="invoice">Выставить счёт</option>
+                </select>
+              </div>
+
               <textarea value={step.text} onChange={e => updateStepText(step.id, e.target.value)}
-                maxLength={2000} placeholder="Текст сообщения на этом шаге"
+                maxLength={2000} placeholder={step.kind === 'invoice' ? 'Текст перед счётом, например: Оформляю счёт, секунду…' : 'Текст сообщения на этом шаге'}
                 className={`${INPUT_CLS} min-h-[70px]`} style={{ color: 'var(--nav-text-primary)' }} />
 
+              {step.kind === 'invoice' && (
+                <div className="mt-3">
+                  <div className="flex gap-2">
+                    <input value={step.invoiceItem?.name ?? ''} onChange={e => updateInvoiceItem(step.id, { name: e.target.value })}
+                      maxLength={120} placeholder="Название позиции (товар/услуга)"
+                      className={`${INPUT_CLS} flex-1`} style={{ color: 'var(--nav-text-primary)' }} />
+                    <input type="number" min={1} value={step.invoiceItem?.unitPrice || ''}
+                      onChange={e => updateInvoiceItem(step.id, { unitPrice: Number(e.target.value) })}
+                      placeholder="Цена, ₸"
+                      className={INPUT_CLS} style={{ color: 'var(--nav-text-primary)', width: '120px' }} />
+                  </div>
+                  <p className="text-[11px] mt-2 leading-relaxed" style={{ color: 'var(--nav-text-muted)' }}>
+                    На этом шаге агент выставит настоящий счёт invoices.kz на эту позицию. Имя и телефон клиента берутся из диалога; пока агент обучается, счёт сначала попадёт к вам на подтверждение. Кнопок у этого шага нет — он завершает сценарий.
+                  </p>
+                </div>
+              )}
+
+              {step.kind !== 'invoice' && (
+              <>
               <div className="mt-3 space-y-2">
                 {step.buttons.map((button, buttonIndex) => (
                   <div key={buttonIndex} className="flex gap-2 items-center">
@@ -219,6 +271,8 @@ export default function FlowBuilder({ agentId, authHeader }: { agentId: string; 
                 <button onClick={() => addButton(step.id)}
                   className="text-xs mt-2" style={{ color: 'var(--nav-accent)' }}>+ Добавить кнопку</button>
               )}
+              </>
+              )}
             </div>
           ))}
         </div>
@@ -234,7 +288,7 @@ export default function FlowBuilder({ agentId, authHeader }: { agentId: string; 
         {error && <div className="text-xs mt-2" style={{ color: 'var(--nav-critical)' }}>{error}</div>}
 
         <div className="flex gap-2 mt-4">
-          <button onClick={save} disabled={saving || !draftName.trim() || draftTriggerWords.length === 0 || draftSteps.some(s => !s.text.trim())}
+          <button onClick={save} disabled={saving || !draftName.trim() || draftTriggerWords.length === 0 || draftSteps.some(s => !s.text.trim()) || draftSteps.some(s => s.kind === 'invoice' && (!s.invoiceItem?.name?.trim() || !(Number(s.invoiceItem?.unitPrice) > 0)))}
             className="flex-1 rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50"
             style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
             {saving ? 'Сохраняем…' : 'Сохранить сценарий'}
