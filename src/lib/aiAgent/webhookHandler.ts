@@ -3,7 +3,9 @@ import { decryptAtRest } from '@/lib/kaspiPay/crypto'
 import { getKey } from './connection'
 import { replyToComment, sendDirectMessage, InstagramApiError } from '@/lib/instagram'
 import { generateAiReply } from '@/lib/instagramAiReply'
-import { buildBusinessContextLine, buildCollectFieldsToExtract, AgentTone, AgentGoal } from './promptContext'
+import { buildBusinessContextLine, buildCollectFieldsToExtract, buildCatalogBlock, AgentTone, AgentGoal } from './promptContext'
+import { loadAgentCatalog } from './catalogContext'
+import { buildInvoiceToolExecutor } from './invoiceSend'
 import { shouldExitTraining } from './trainingStatus'
 import { debitAiAgentWallet, AI_AGENT_CREDITS_PER_AI_REPLY } from './wallet'
 import { sendTelegramNotification } from '@/lib/telegramNotify'
@@ -195,6 +197,10 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
   let urgent: boolean
   let extractedFields: Record<string, string> | undefined
   try {
+    // Phase 3: real catalog prices in context + the invoice tool. The
+    // tool is DM-only -- a public comment thread is no place to collect
+    // a phone number or drop a personal invoice link.
+    const catalogBlock = buildCatalogBlock(await loadAgentCatalog(supabase, agent.user_id))
     const result = await generateAiReply({
       incomingText: params.incomingText,
       fromUsername: params.fromUsername,
@@ -210,8 +216,11 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
         timezone: agent.timezone || undefined,
         currency: agent.currency || undefined,
         customInstructions: typeof agent.custom_instructions === 'string' ? agent.custom_instructions : undefined,
-      }),
+      }) + catalogBlock,
       collectFieldsToExtract: buildCollectFieldsToExtract(Array.isArray(agent.collect_fields) ? agent.collect_fields : undefined),
+      ...(params.source === 'dm'
+        ? { invoiceTool: buildInvoiceToolExecutor(supabase, { id: agent.id, status: agent.status }, conversation.id) }
+        : {}),
     })
     draftReply = result.replyText
     urgent = result.urgent

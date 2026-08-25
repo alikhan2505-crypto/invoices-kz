@@ -4,7 +4,7 @@ import { getKey } from './connection'
 import { sendTelegramBotMessage } from './telegram'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
 import { sendDirectMessage } from '@/lib/instagram'
-import type { DraftItem } from './invoiceDrafts'
+import { validateDraftInput, normalizeToolInput, canAutoSend, type DraftItem, type InvoiceToolInput } from './invoiceDrafts'
 
 // Phase 3 «счёт из чата» core: turns an approved (or auto-approved)
 // draft into a REAL invoices.kz счёт and sends the /view link into the
@@ -14,6 +14,52 @@ import type { DraftItem } from './invoiceDrafts'
 // /view/[token] page then does the rest on its own: Kaspi payment link
 // auto-mint for Pro owners with a connected Кассир, live paid-polling --
 // zero payment code here by design (see the spec).
+
+// The create_invoice_draft executor all three tenant handlers pass to
+// generateAiReply's invoiceTool param -- one shared implementation so
+// the channels can't drift. Validation errors and missing name/phone go
+// back to the model as structured outcomes (it asks the customer);
+// a complete input becomes a draft, auto-sent only per canAutoSend
+// (active agent + 5 human-approved drafts -- in training everything
+// waits in the review queue alongside the reply itself).
+export function buildInvoiceToolExecutor(
+  supabase: SupabaseClient,
+  agent: { id: string; status: string },
+  conversationId: string,
+) {
+  return {
+    execute: async (raw: InvoiceToolInput) => {
+      const { data: conv } = await supabase.from('ai_agent_conversations')
+        .select('collected_name, collected_phone')
+        .eq('id', conversationId).single()
+      const norm = normalizeToolInput(raw, { name: conv?.collected_name, phone: conv?.collected_phone })
+      const validated = validateDraftInput(norm.items)
+      if (!validated.ok) return { outcome: 'draft_pending' as const, error: validated.error }
+      const missing: ('customer_name' | 'customer_phone')[] = []
+      if (!norm.customerName) missing.push('customer_name')
+      if (!norm.customerPhone) missing.push('customer_phone')
+      if (missing.length > 0) return { outcome: 'draft_pending' as const, missing }
+      const { count } = await supabase.from('ai_agent_invoice_drafts')
+        .select('id', { count: 'exact', head: true })
+        .eq('agent_id', agent.id)
+        .eq('status', 'approved_sent')
+      const auto = canAutoSend(agent.status, count || 0)
+      const created = await createDraft(supabase, {
+        agentId: agent.id,
+        conversationId,
+        customerName: norm.customerName,
+        customerPhone: norm.customerPhone,
+        items: validated.items,
+        total: validated.total,
+        source: 'ai_tool',
+        autoSend: auto,
+      })
+      return created.sent
+        ? { outcome: 'sent' as const, total: validated.total }
+        : { outcome: 'draft_pending' as const, total: validated.total }
+    },
+  }
+}
 
 // Creates the draft row; when autoSend, immediately issues+sends the
 // invoice. Split so the review route can approve a pending draft later

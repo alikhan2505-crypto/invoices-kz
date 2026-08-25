@@ -2,7 +2,9 @@ import { createClient } from '@supabase/supabase-js'
 import { decryptAtRest } from '@/lib/kaspiPay/crypto'
 import { getKey } from './connection'
 import { generateAiReply } from '@/lib/instagramAiReply'
-import { buildBusinessContextLine, buildCollectFieldsToExtract, AgentTone, AgentGoal } from './promptContext'
+import { buildBusinessContextLine, buildCollectFieldsToExtract, buildCatalogBlock, AgentTone, AgentGoal } from './promptContext'
+import { loadAgentCatalog } from './catalogContext'
+import { buildInvoiceToolExecutor } from './invoiceSend'
 import { debitAiAgentWallet, AI_AGENT_CREDITS_PER_AI_REPLY } from './wallet'
 import { sendTelegramNotification } from '@/lib/telegramNotify'
 import { createNotification } from '@/lib/notifications'
@@ -181,6 +183,8 @@ export async function handleWhatsAppIncoming(conn: WhatsAppTenantConnection, par
   let urgent: boolean
   let extractedFields: Record<string, string> | undefined
   try {
+    // Phase 3: real catalog prices in context + the invoice tool.
+    const catalogBlock = buildCatalogBlock(await loadAgentCatalog(supabase, agent.user_id))
     const result = await generateAiReply({
       incomingText: params.incomingText,
       fromUsername: params.customerHandle,
@@ -197,8 +201,9 @@ export async function handleWhatsAppIncoming(conn: WhatsAppTenantConnection, par
         currency: agent.currency || undefined,
         customInstructions: typeof agent.custom_instructions === 'string' ? agent.custom_instructions : undefined,
         channel: 'whatsapp',
-      }),
+      }) + catalogBlock,
       collectFieldsToExtract: buildCollectFieldsToExtract(Array.isArray(agent.collect_fields) ? agent.collect_fields : undefined),
+      invoiceTool: buildInvoiceToolExecutor(supabase, { id: agent.id, status: agent.status }, conversation.id),
     })
     draftReply = result.replyText
     urgent = result.urgent
