@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { PDFDocument, PageSizes, rgb } from 'pdf-lib'
-import { packWaybillsToPages, buildWaybillsPdf } from './waybills'
+import JSZip from 'jszip'
+import { packWaybillsToPages, buildWaybillsPdf, parseWaybillsZip } from './waybills'
 
 // A real label PDF page always has a drawn content stream (barcode, text,
 // QR) -- pdf-lib's embedPdf refuses to embed a page with no Contents, so
@@ -13,6 +14,25 @@ async function makeLabel(width: number, height: number): Promise<Buffer> {
   page.drawRectangle({ x: 0, y: 0, width, height, color: rgb(0, 0, 0) })
   return Buffer.from(await doc.save())
 }
+
+describe('parseWaybillsZip', () => {
+  it('translates a 0-byte body into a readable "ещё не готовы" error instead of a JSZip crash', async () => {
+    await expect(parseWaybillsZip(new ArrayBuffer(0))).rejects.toThrow(/ещё не готовы/)
+  })
+
+  it('translates a non-zip body into a readable error instead of "Corrupted zip"', async () => {
+    const html = new TextEncoder().encode('<html>login page</html>')
+    await expect(parseWaybillsZip(html.buffer as ArrayBuffer)).rejects.toThrow(/неожиданный ответ/)
+  })
+
+  it('parses a real zip and keeps its entries readable', async () => {
+    const zip = new JSZip()
+    zip.file('KASPI_SHOP-123456.pdf', 'pdf-bytes')
+    const buf = await zip.generateAsync({ type: 'arraybuffer' })
+    const parsed = await parseWaybillsZip(buf)
+    expect(Object.keys(parsed.files)).toContain('KASPI_SHOP-123456.pdf')
+  })
+})
 
 describe('packWaybillsToPages', () => {
   it('packs 2 labels onto one page for a 2x2 grid, sized exactly to pageSize', async () => {

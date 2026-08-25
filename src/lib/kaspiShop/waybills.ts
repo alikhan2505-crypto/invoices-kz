@@ -8,13 +8,30 @@ import JSZip from 'jszip'
 // entries -- there is no per-order query param. Replaces the earlier
 // unconfirmed `.../orders/{orderId}/waybill` guess (404'd for real, see
 // docs/superpowers/specs/2026-08-13-kaspi-orders-api-findings.md section 5).
+// Kaspi answers HTTP 200 with a 0-byte body when the merchant has no
+// print-ready waybills at all (seen live 2026-08-25: merchant with orders
+// only in Упаковка/Переданы на доставку got an empty 200, while the same
+// endpoint returned a real ZIP on 2026-08-23 with an order in Передача).
+// Fed straight to JSZip that surfaced as the cryptic "End of data reached
+// (data length = 0, asked index = 4). Corrupted zip ?" -- translate the
+// empty and non-zip cases into actionable Russian before JSZip speaks.
+export async function parseWaybillsZip(data: ArrayBuffer): Promise<JSZip> {
+  if (data.byteLength === 0) {
+    throw new Error('Kaspi вернул пустой архив — накладные для выбранных заказов ещё не готовы. Накладная появляется после завершения упаковки, когда заказ переходит в «Передачу».')
+  }
+  try {
+    return await JSZip.loadAsync(data)
+  } catch {
+    throw new Error('Kaspi вернул неожиданный ответ вместо архива накладных. Попробуйте ещё раз, а если повторится — переподключите кабинет.')
+  }
+}
+
 async function fetchWaybillsZip(sessionCookies: string, merchantId: string): Promise<JSZip> {
   const res = await fetch(`https://mc.shop.kaspi.kz/order/view/mc/order/waybill?merchantId=${encodeURIComponent(merchantId)}`, {
     headers: { 'x-auth-version': '3', 'cookie': sessionCookies, 'origin': 'https://kaspi.kz', 'referer': 'https://kaspi.kz/' },
   })
   if (!res.ok) throw new Error(`Waybill fetch failed for merchant ${merchantId}: HTTP ${res.status}`)
-  const arrayBuffer = await res.arrayBuffer()
-  return JSZip.loadAsync(arrayBuffer)
+  return parseWaybillsZip(await res.arrayBuffer())
 }
 
 export async function fetchWaybillPdfs(sessionCookies: string, merchantId: string, orderCodes: string[]): Promise<Buffer[]> {

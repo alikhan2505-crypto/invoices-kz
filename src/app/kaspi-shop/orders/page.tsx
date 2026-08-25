@@ -39,7 +39,7 @@ function KaspiShopOrdersInner() {
   const [ordersLoading, setOrdersLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [printing, setPrinting] = useState(false)
+  const [printing, setPrinting] = useState<'a4' | 'a6' | null>(null)
   const [sessionExpired, setSessionExpired] = useState(false)
   const [groupBy, setGroupBy] = useState<'type' | 'date' | null>(null)
   const [cityId, setCityId] = useState('')
@@ -152,8 +152,8 @@ function KaspiShopOrdersInner() {
   }
 
   async function printWaybills(format: 'a4' | 'a6') {
-    if (selected.size === 0) return
-    setPrinting(true)
+    if (selected.size === 0 || printing) return
+    setPrinting(format)
     setLoadError('')
     try {
       const headers = await authHeader()
@@ -177,7 +177,7 @@ function KaspiShopOrdersInner() {
     } catch {
       setLoadError('Не удалось получить накладные. Проверьте соединение и попробуйте ещё раз.')
     } finally {
-      setPrinting(false)
+      setPrinting(null)
     }
   }
 
@@ -303,13 +303,13 @@ function KaspiShopOrdersInner() {
           <div className="rounded-2xl p-3 flex items-center justify-between gap-3 mb-4" style={{ background: 'var(--nav-accent)' }}>
             <span className="text-sm" style={{ color: 'var(--nav-accent-ink)' }}>Выбрано заказов: {selected.size}</span>
             <div className="flex gap-2">
-              <button onClick={() => printWaybills('a4')} disabled={printing}
+              <button onClick={() => printWaybills('a4')} disabled={printing !== null}
                 className="text-xs font-medium rounded-lg px-3 py-2 disabled:opacity-50" style={{ background: 'var(--nav-accent-ink)', color: 'var(--nav-accent)' }}>
-                {printing ? 'Готовим PDF...' : 'Скачать А4'}
+                {printing === 'a4' ? 'Готовим PDF...' : 'Скачать накладные в формате А4'}
               </button>
-              <button onClick={() => printWaybills('a6')} disabled={printing}
+              <button onClick={() => printWaybills('a6')} disabled={printing !== null}
                 className="text-xs font-medium rounded-lg px-3 py-2 disabled:opacity-50" style={{ background: 'var(--nav-accent-ink)', color: 'var(--nav-accent)' }}>
-                {printing ? 'Готовим PDF...' : 'Скачать А6'}
+                {printing === 'a6' ? 'Готовим PDF...' : 'Скачать накладные в формате А6'}
               </button>
             </div>
           </div>
