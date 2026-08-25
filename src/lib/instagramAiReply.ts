@@ -166,18 +166,31 @@ REPLY: текст ответа без кавычек и пояснений${extr
   // old 300-token cap plus a multi-field <<<EXTRACTED>>> JSON block can't
   // get cut off before its closing <<<END>>> delimiter, which would make
   // parseExtractedFieldsBlock silently find no match at all.
+  // Tool-enabled calls get a much higher ceiling (finding I2): the reply
+  // text plus the full tool_use JSON must fit, or the tool call is
+  // silently truncated away while the surviving text still promises an
+  // invoice. A ceiling costs nothing for normal-length replies.
   const requestBase = {
     model: 'claude-haiku-4-5-20251001',
-    max_tokens: hasExtraction ? 500 : 300,
+    max_tokens: params.invoiceTool ? 1000 : hasExtraction ? 500 : 300,
   }
   const tools = params.invoiceTool ? [INVOICE_TOOL_DEF] : undefined
+  // disable_parallel_tool_use (finding I1): the follow-up call must echo
+  // a tool_result for EVERY tool_use block -- this code handles exactly
+  // one, so two parallel calls would 400 the follow-up after the draft's
+  // side effects already happened.
+  const toolChoice: Anthropic.ToolChoiceAuto = { type: 'auto', disable_parallel_tool_use: true }
   const baseMessages: Anthropic.MessageParam[] = [{ role: 'user', content: userContent }]
 
   let message = await client.messages.create({
     ...requestBase,
-    ...(tools ? { tools } : {}),
+    ...(tools ? { tools, tool_choice: toolChoice } : {}),
     messages: baseMessages,
   })
+
+  if (tools && message.stop_reason === 'max_tokens') {
+    console.error('generateAiReply: tool-enabled call hit max_tokens -- a tool call may have been truncated away')
+  }
 
   // Phase 3: exactly ONE tool round. The executor owns all side effects;
   // its outcome (or a caught failure, downgraded to an error payload the
@@ -197,6 +210,7 @@ REPLY: текст ответа без кавычек и пояснений${extr
       message = await client.messages.create({
         ...requestBase,
         tools: [INVOICE_TOOL_DEF],
+        tool_choice: toolChoice,
         messages: [
           ...baseMessages,
           { role: 'assistant', content: message.content },

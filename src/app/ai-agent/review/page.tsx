@@ -29,7 +29,7 @@ interface InvoiceDraft {
   items: { name: string; qty: number; unitPrice: number }[]
   total: number
   source: 'ai_tool' | 'flow_step'
-  status: 'pending_approval' | 'error'
+  status: 'pending_approval' | 'error' | 'sending'
   error_message: string | null
   customerHandle: string
   channel: string
@@ -353,11 +353,11 @@ export default function AiAgentReview() {
                     )}
                     {draftErrors[d.id] && <div className="text-xs mb-2" style={{ color: 'var(--nav-critical)' }}>{draftErrors[d.id]}</div>}
                     <div className="flex gap-2 mt-auto">
-                      <button onClick={() => draftAct(d.id, 'approve')} disabled={draftActing === d.id}
+                      <button onClick={() => draftAct(d.id, 'approve')} disabled={draftActing === d.id || d.status === 'sending'}
                         className="flex-1 rounded-lg px-3 py-2 text-sm font-medium disabled:opacity-50" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-                        {d.status === 'error' ? 'Повторить' : 'Отправить'}
+                        {d.status === 'sending' ? 'Отправляется…' : d.status === 'error' ? 'Повторить' : 'Отправить'}
                       </button>
-                      <button onClick={() => draftAct(d.id, 'reject')} disabled={draftActing === d.id}
+                      <button onClick={() => draftAct(d.id, 'reject')} disabled={draftActing === d.id || d.status === 'sending'}
                         className="flex-1 nav-glass rounded-lg px-3 py-2 text-sm font-medium disabled:opacity-50" style={{ color: 'var(--nav-text-secondary)' }}>
                         Отклонить
                       </button>

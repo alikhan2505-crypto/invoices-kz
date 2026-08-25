@@ -6,6 +6,10 @@ describe('validateDraftInput', () => {
     const r = validateDraftInput([{ name: ' Термокружка ', qty: 2, unit_price: 1200 }])
     expect(r).toEqual({ ok: true, items: [{ name: 'Термокружка', qty: 2, unitPrice: 1200 }], total: 2400 })
   })
+  it('caps item names at 200 chars', () => {
+    const r = validateDraftInput([{ name: 'x'.repeat(500), qty: 1, unit_price: 1 }])
+    expect(r.ok && r.items[0].name.length === 200).toBe(true)
+  })
   it('accepts camelCase unitPrice too (flow-step path uses it)', () => {
     const r = validateDraftInput([{ name: 'X', qty: 1, unitPrice: 500 }])
     expect(r.ok && r.total === 500).toBe(true)

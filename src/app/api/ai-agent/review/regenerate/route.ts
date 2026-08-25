@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { generateAiReply } from '@/lib/instagramAiReply'
-import { buildBusinessContextLine, AgentTone, AgentGoal } from '@/lib/aiAgent/promptContext'
+import { buildBusinessContextLine, buildCatalogBlock, AgentTone, AgentGoal } from '@/lib/aiAgent/promptContext'
+import { loadAgentCatalog } from '@/lib/aiAgent/catalogContext'
 import { pairConversationHistory } from '@/lib/aiAgent/telegram'
 import { debitAiAgentWallet } from '@/lib/aiAgent/wallet'
 
@@ -125,6 +126,11 @@ export async function POST(req: NextRequest) {
   let replyText: string
   let urgent: boolean
   try {
+    // Same catalog context the live webhook pipelines use -- without it a
+    // regenerated variant of a price question loses the real prices the
+    // original draft had (final-review finding M2). No invoiceTool here:
+    // «Другой вариант» regenerates TEXT, it must not create drafts.
+    const catalogBlock = buildCatalogBlock(await loadAgentCatalog(supabase, agent.user_id))
     const result = await generateAiReply({
       incomingText: questionRow.text,
       fromUsername: conversation.customer_handle || 'клиент',
@@ -140,7 +146,7 @@ export async function POST(req: NextRequest) {
         currency: agent.currency || undefined,
         customInstructions: typeof agent.custom_instructions === 'string' ? agent.custom_instructions : undefined,
         channel: conversation.channel === 'telegram' ? 'telegram' : conversation.channel === 'whatsapp' ? 'whatsapp' : 'instagram',
-      }),
+      }) + catalogBlock,
     })
     replyText = result.replyText
     urgent = result.urgent

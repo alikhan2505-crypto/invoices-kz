@@ -19,7 +19,9 @@ export function validateDraftInput(itemsRaw: unknown): DraftValidation {
   const items: DraftItem[] = []
   for (const it of itemsRaw) {
     if (!it || typeof it !== 'object') return { ok: false, error: 'Некорректная позиция' }
-    const name = typeof (it as any).name === 'string' ? (it as any).name.trim() : ''
+    // 200-char cap: a pathological model output must not flow an
+    // arbitrarily long name into the draft card and the real invoice.
+    const name = typeof (it as any).name === 'string' ? (it as any).name.trim().slice(0, 200) : ''
     const qty = Number((it as any).qty)
     const unitPrice = Number((it as any).unit_price ?? (it as any).unitPrice)
     if (!name) return { ok: false, error: 'У позиции нет названия' }

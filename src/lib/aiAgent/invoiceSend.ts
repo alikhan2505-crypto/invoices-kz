@@ -5,6 +5,7 @@ import { sendTelegramBotMessage } from './telegram'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
 import { sendDirectMessage } from '@/lib/instagram'
 import { validateDraftInput, normalizeToolInput, canAutoSend, type DraftItem, type InvoiceToolInput } from './invoiceDrafts'
+import { createNotification } from '@/lib/notifications'
 
 // Phase 3 «счёт из чата» core: turns an approved (or auto-approved)
 // draft into a REAL invoices.kz счёт and sends the /view link into the
@@ -85,7 +86,22 @@ export async function createDraft(supabase: SupabaseClient, args: {
     status: 'pending_approval',
   }).select('id').single()
   if (error || !draft) throw new Error(`draft insert failed: ${error?.message}`)
-  if (!args.autoSend) return { draftId: draft.id, sent: false }
+  if (!args.autoSend) {
+    // Best-effort owner nudge (final-review finding I4: without this a
+    // customer is told «счёт готовится» while the owner has zero signal
+    // until they happen to open the review page). Failure never blocks
+    // the draft itself.
+    try {
+      const { data: agent } = await supabase.from('ai_agents').select('user_id').eq('id', args.agentId).single()
+      if (agent) {
+        await createNotification(agent.user_id, 'Черновик счёта ждёт подтверждения',
+          `${args.customerName || 'Клиент'} — ${args.total.toLocaleString('ru-KZ')} ₸`, '/ai-agent/review')
+      }
+    } catch (err: any) {
+      console.error('ai-agent invoice draft: owner notification failed:', err?.message || err)
+    }
+    return { draftId: draft.id, sent: false }
+  }
   const sent = await sendInvoiceForDraft(supabase, draft.id, { auto: true })
   return { draftId: draft.id, sent: sent.ok }
 }
@@ -106,6 +122,20 @@ export async function sendInvoiceForDraft(
     return { ok: false, error: msg }
   }
   try {
+    // Atomic claim (final-review finding C1): two concurrent approves --
+    // or an approve racing a reject -- must never both proceed. Only the
+    // request that flips the row to 'sending' does the work; everyone
+    // else sees zero claimed rows and backs off. reject's own
+    // conditional update can't touch a 'sending' row either.
+    const { data: claimed } = await supabase.from('ai_agent_invoice_drafts')
+      .update({ status: 'sending' })
+      .eq('id', draftId)
+      .in('status', ['pending_approval', 'error'])
+      .select('id')
+    if (!claimed || claimed.length === 0) {
+      return { ok: false, error: 'draft already claimed' }
+    }
+
     const { data: draft } = await supabase.from('ai_agent_invoice_drafts').select('*').eq('id', draftId).single()
     if (!draft) return { ok: false, error: 'draft not found' }
 
@@ -146,7 +176,13 @@ export async function sendInvoiceForDraft(
       invoiceId = invoice.id
       publicToken = invoice.public_token
       invoiceNumber = invoice.number
-      await supabase.from('ai_agent_invoice_drafts').update({ invoice_id: invoiceId }).eq('id', draftId)
+      // Persist BEFORE sending and fail hard if it doesn't stick
+      // (final-review finding I3): without invoice_id on the draft, a
+      // later «Повторить» would claim a new number and create a
+      // duplicate real invoice instead of re-sending this one.
+      const { error: persistError } = await supabase.from('ai_agent_invoice_drafts')
+        .update({ invoice_id: invoiceId }).eq('id', draftId)
+      if (persistError) return fail(`сохранение ссылки на счёт: ${persistError.message}`)
     }
 
     const link = `https://www.invoices.kz/view/${publicToken}`
@@ -154,10 +190,17 @@ export async function sendInvoiceForDraft(
     const sendError = await sendIntoConversation(supabase, conversation, text)
     if (sendError) return fail(`отправка в чат: ${sendError}`)
 
-    await supabase.from('ai_agent_invoice_drafts').update({
+    const { error: finalError } = await supabase.from('ai_agent_invoice_drafts').update({
       status: opts.auto ? 'auto_sent' : 'approved_sent',
       decided_at: new Date().toISOString(),
     }).eq('id', draftId)
+    if (finalError) {
+      // The link already reached the customer -- returning ok would leave
+      // the card pending and invite a second (double-sending) click, so
+      // surface the failure instead (finding I3).
+      console.error('ai-agent invoice draft: final status update failed:', finalError.message)
+      return fail('счёт отправлен клиенту, но статус черновика не сохранился — не отправляйте повторно без проверки')
+    }
     return { ok: true }
   } catch (err: any) {
     return fail(String(err?.message || err))

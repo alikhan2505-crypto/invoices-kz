@@ -48,7 +48,9 @@ export async function GET(req: NextRequest) {
     .from('ai_agent_invoice_drafts')
     .select('id, agent_id, conversation_id, customer_name, customer_phone, items, total, source, status, error_message, created_at')
     .in('agent_id', agentIds)
-  query = id ? query.eq('id', id) : query.in('status', ['pending_approval', 'error']).order('created_at', { ascending: false })
+  // 'sending' rows appear too (rendered as a disabled "Отправляется…"
+  // card): a hard crash mid-send must not make a claimed draft invisible.
+  query = id ? query.eq('id', id) : query.in('status', ['pending_approval', 'error', 'sending']).order('created_at', { ascending: false })
 
   const { data: drafts, error } = await query
   if (error) {
@@ -113,6 +115,11 @@ export async function POST(req: NextRequest) {
   }
 
   const result = await sendInvoiceForDraft(supabase, draftId)
-  if (!result.ok) return NextResponse.json({ error: result.error || 'Не удалось отправить счёт' }, { status: 502 })
+  if (!result.ok) {
+    // 'already claimed' = a concurrent approve won the atomic claim --
+    // not a failure of THIS draft, just a duplicate click.
+    const status = result.error === 'draft already claimed' ? 409 : 502
+    return NextResponse.json({ error: status === 409 ? 'Черновик уже обрабатывается' : (result.error || 'Не удалось отправить счёт') }, { status })
+  }
   return NextResponse.json({ ok: true, status: 'approved_sent' })
 }

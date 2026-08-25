@@ -108,7 +108,17 @@ export async function GET(req: NextRequest) {
   }))
   // pendingCount duplicates items.length today, but it's a stable contract
   // for other consumers (the settings page reads just the count).
-  return NextResponse.json({ items, pendingCount: items.length })
+  // Invoice drafts count toward the badge too (spec: «the existing
+  // pending-count badge includes invoice drafts») -- the settings page
+  // consumes this number, so without it a pending draft is invisible
+  // everywhere except the review page itself.
+  const { count: draftCount } = await supabase
+    .from('ai_agent_invoice_drafts')
+    .select('id', { count: 'exact', head: true })
+    .in('agent_id', agents.map(a => a.id))
+    .in('status', ['pending_approval', 'error'])
+
+  return NextResponse.json({ items, pendingCount: items.length + (draftCount || 0) })
 }
 
 // One action endpoint, mirroring how this codebase's other approve-queue

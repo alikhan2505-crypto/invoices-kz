@@ -388,14 +388,18 @@ async function startTelegramFlow(
 
   await supabase.from('ai_agent_conversations').update({ active_flow_id: flow.id, active_step_id: entryStep.id }).eq('id', conversationId)
 
+  let stepDelivered = true
   try {
     await sendTelegramFlowStep(conn.botToken, chatId, entryStep)
   } catch (err: any) {
+    stepDelivered = false
     console.error('ai-agent telegram webhook: flow trigger send failed:', err.message)
     await markTelegramTokenExpiredIfUnauthorized(conn.connectionId, err)
   }
 
-  await maybeExecuteInvoiceStep(conn, conversationId, chatId, entryStep)
+  // Never issue an invoice whose introductory step text failed to reach
+  // the customer -- a bare payment link with no context (finding M5).
+  if (stepDelivered) await maybeExecuteInvoiceStep(conn, conversationId, chatId, entryStep)
 
   // A one-step flow with no buttons is immediately terminal -- don't leave
   // the conversation waiting for a click that will never come.
@@ -449,14 +453,16 @@ export async function handleTelegramStart(conn: TelegramTenantConnection, params
     .single()
   if (!conversation) return
 
+  let stepDelivered = true
   try {
     await sendTelegramFlowStep(conn.botToken, params.chatId, entryStep)
   } catch (err: any) {
+    stepDelivered = false
     console.error('ai-agent telegram webhook: flow start send failed:', err.message)
     await markTelegramTokenExpiredIfUnauthorized(conn.connectionId, err)
   }
 
-  await maybeExecuteInvoiceStep(conn, conversation.id, params.chatId, entryStep)
+  if (stepDelivered) await maybeExecuteInvoiceStep(conn, conversation.id, params.chatId, entryStep)
 
   if (isTerminalStep(entryStep)) {
     await supabase.from('ai_agent_conversations').update({ active_flow_id: null, active_step_id: null }).eq('id', conversation.id)
@@ -548,13 +554,15 @@ export async function handleTelegramFlowCallback(
 
   if (nextStepToSend) {
     await supabase.from('ai_agent_conversations').update({ active_step_id: nextStepToSend.id }).eq('id', conversation.id)
+    let stepDelivered = true
     try {
       await sendTelegramFlowStep(conn.botToken, params.chatId, nextStepToSend)
     } catch (err: any) {
+      stepDelivered = false
       console.error('ai-agent telegram webhook: flow step send failed:', err.message)
       await markTelegramTokenExpiredIfUnauthorized(conn.connectionId, err)
     }
-    await maybeExecuteInvoiceStep(conn, conversation.id, params.chatId, nextStepToSend)
+    if (stepDelivered) await maybeExecuteInvoiceStep(conn, conversation.id, params.chatId, nextStepToSend)
     if (isTerminalStep(nextStepToSend)) {
       await supabase.from('ai_agent_conversations').update({ active_flow_id: null, active_step_id: null }).eq('id', conversation.id)
     }
