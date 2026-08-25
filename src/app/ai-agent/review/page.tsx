@@ -20,6 +20,21 @@ interface ReviewItem {
   createdAt: string
 }
 
+// Phase 3 «счёт из чата»: a pending invoice draft awaiting the owner's
+// approve/reject (or showing a send error with retry).
+interface InvoiceDraft {
+  id: string
+  customer_name: string
+  customer_phone: string
+  items: { name: string; qty: number; unitPrice: number }[]
+  total: number
+  source: 'ai_tool' | 'flow_step'
+  status: 'pending_approval' | 'error'
+  error_message: string | null
+  customerHandle: string
+  channel: string
+}
+
 function AlertIcon() {
   return (
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
@@ -85,6 +100,9 @@ export default function AiAgentReview() {
   const reduceMotion = !!reduceMotionRaw
   const [loading, setLoading] = useState(true)
   const [items, setItems] = useState<ReviewItem[]>([])
+  const [drafts, setDrafts] = useState<InvoiceDraft[]>([])
+  const [draftActing, setDraftActing] = useState<string | null>(null)
+  const [draftErrors, setDraftErrors] = useState<Record<string, string>>({})
   const [edits, setEdits] = useState<Record<string, string>>({})
   const [acting, setActing] = useState<string | null>(null)
   const [regening, setRegening] = useState<string | null>(null)
@@ -115,12 +133,43 @@ export default function AiAgentReview() {
     const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', user.id).single()
     if (!profile?.is_admin) { setForbidden(true); setLoading(false); return }
     const headers = await authHeader()
-    const res = await fetch('/api/ai-agent/review', { headers })
+    const [res, draftsRes] = await Promise.all([
+      fetch('/api/ai-agent/review', { headers }),
+      fetch('/api/ai-agent/invoice-drafts', { headers }),
+    ])
     if (res.ok) {
       const data = await res.json()
       setItems(data.items || [])
     }
+    if (draftsRes.ok) {
+      const data = await draftsRes.json()
+      setDrafts(data.drafts || [])
+    }
     setLoading(false)
+  }
+
+  async function draftAct(id: string, action: 'approve' | 'reject') {
+    setDraftActing(id)
+    setDraftErrors(prev => { const next = { ...prev }; delete next[id]; return next })
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/ai-agent/invoice-drafts', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ draftId: id, action }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setDraftErrors(prev => ({ ...prev, [id]: data.error || 'Не удалось выполнить действие. Попробуйте ещё раз.' }))
+        return
+      }
+      if (action === 'approve') showToast('Счёт создан и отправлен клиенту в чат')
+      setDrafts(prev => prev.filter(d => d.id !== id))
+    } catch {
+      setDraftErrors(prev => ({ ...prev, [id]: 'Ошибка сети. Проверьте соединение и попробуйте ещё раз.' }))
+    } finally {
+      setDraftActing(null)
+    }
   }
 
   useEffect(() => { load() }, [])
@@ -245,17 +294,84 @@ export default function AiAgentReview() {
         >
           <div className="flex items-center gap-2.5 mb-1 flex-wrap">
             <h1 className="text-xl font-bold" style={{ color: 'var(--nav-text-primary)' }}>Диалоги на проверке</h1>
-            {items.length > 0 && (
+            {items.length + drafts.length > 0 && (
               <span className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-                На проверке: {items.length}
+                На проверке: {items.length + drafts.length}
               </span>
             )}
           </div>
           <p className="text-sm mb-6" style={{ color: 'var(--nav-text-secondary)' }}>Агент ещё обучается — черновики ответов ждут вашего одобрения</p>
         </motion.div>
 
-        {items.length === 0 && (
+        {items.length === 0 && drafts.length === 0 && (
           <div className="text-sm text-center py-8" style={{ color: 'var(--nav-text-muted)' }}>Пока нечего проверять</div>
+        )}
+
+        {drafts.length > 0 && (
+          <>
+            <div className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--nav-text-muted)' }}>Черновики счетов</div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+              {drafts.map((d, i) => {
+                const channel = CHANNEL_META[d.channel] || CHANNEL_META.instagram
+                const ChannelIcon = channel.icon
+                return (
+                  <motion.div
+                    key={d.id}
+                    initial={reduceMotion ? false : { opacity: 0, y: 14 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE, delay: reduceMotion ? 0 : Math.min(i * 0.05, 0.3) }}
+                    className="nav-glass nav-card-accent rounded-2xl p-4 flex flex-col"
+                  >
+                    <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+                      <span className="inline-flex items-center gap-1.5 nav-glass rounded-full px-2 py-1 text-[10.5px] font-bold" style={{ color: 'var(--nav-text-secondary)' }}>
+                        <ChannelIcon /> {channel.label}
+                      </span>
+                      <span className="inline-flex items-center rounded-full px-2 py-1 text-[10.5px] font-bold nav-glass" style={{ color: 'var(--nav-accent)' }}>
+                        {d.source === 'flow_step' ? 'Сценарий' : 'ИИ'}
+                      </span>
+                    </div>
+                    <div className="text-sm font-semibold mb-0.5" style={{ color: 'var(--nav-text-primary)' }}>{d.customer_name || d.customerHandle}</div>
+                    {d.customer_phone && (
+                      <div className="text-xs mb-2" style={{ color: 'var(--nav-text-muted)' }}>{d.customer_phone}</div>
+                    )}
+                    <div className="rounded-lg px-3 py-2 mb-2" style={{ background: 'var(--nav-bg)' }}>
+                      {d.items.map((it, j) => (
+                        <div key={j} className="flex items-baseline justify-between gap-2 text-xs py-0.5" style={{ color: 'var(--nav-text-secondary)' }}>
+                          <span className="truncate">{it.name} × {it.qty}</span>
+                          <span className="font-mono tabular-nums flex-shrink-0">{(it.qty * it.unitPrice).toLocaleString('ru-KZ')} ₸</span>
+                        </div>
+                      ))}
+                      <div className="flex items-baseline justify-between gap-2 text-sm font-bold pt-1.5 mt-1" style={{ color: 'var(--nav-text-primary)', borderTop: '1px solid var(--nav-border-soft)' }}>
+                        <span>Итого</span>
+                        <span className="font-mono tabular-nums">{Number(d.total).toLocaleString('ru-KZ')} ₸</span>
+                      </div>
+                    </div>
+                    {d.status === 'error' && d.error_message && (
+                      <div className="text-xs mb-2 flex items-start gap-1.5" style={{ color: 'var(--nav-critical)' }}>
+                        <AlertIcon /> Ошибка отправки: {d.error_message}
+                      </div>
+                    )}
+                    {draftErrors[d.id] && <div className="text-xs mb-2" style={{ color: 'var(--nav-critical)' }}>{draftErrors[d.id]}</div>}
+                    <div className="flex gap-2 mt-auto">
+                      <button onClick={() => draftAct(d.id, 'approve')} disabled={draftActing === d.id}
+                        className="flex-1 rounded-lg px-3 py-2 text-sm font-medium disabled:opacity-50" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                        {d.status === 'error' ? 'Повторить' : 'Отправить'}
+                      </button>
+                      <button onClick={() => draftAct(d.id, 'reject')} disabled={draftActing === d.id}
+                        className="flex-1 nav-glass rounded-lg px-3 py-2 text-sm font-medium disabled:opacity-50" style={{ color: 'var(--nav-text-secondary)' }}>
+                        Отклонить
+                      </button>
+                    </div>
+                    {/* Ручная правка: /create предзаполнится из черновика; сам
+                        черновик после ручного выставления отклоните здесь. */}
+                    <a href={`/create?agentDraft=${d.id}`} className="text-[11px] mt-2 text-center underline underline-offset-2" style={{ color: 'var(--nav-text-muted)' }}>
+                      Открыть в конструкторе счёта ↗
+                    </a>
+                  </motion.div>
+                )
+              })}
+            </div>
+          </>
         )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

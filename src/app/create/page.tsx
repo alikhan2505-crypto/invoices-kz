@@ -212,15 +212,47 @@ export default function CreateInvoicePage() {
       }
     }
 
-    // Strip ?template=/?repeat= once consumed -- otherwise clearing the
-    // client (clearClient) doesn't stick: browser back navigation, or even
-    // just switching tabs and back (the focus listener below re-runs load()),
-    // re-reads the same still-present query param and silently reapplies the
-    // prefill the user just removed. router.replace() (next/navigation) was
-    // tried first but silently didn't touch window.location.search here --
-    // going straight to the History API instead, which is all this needs
-    // (no server re-fetch, just a client-side URL cleanup).
-    if (templateId || repeatId) window.history.replaceState(null, '', '/create')
+    // «Открыть в конструкторе» from an AI-agent invoice draft
+    // (/ai-agent/review) -- prefills client + positions from the draft
+    // for manual correction. Fire-and-forget: issuing from here does NOT
+    // touch the draft's status (the owner rejects the draft card
+    // themselves, as its own hint says).
+    const agentDraftId = params.get('agentDraft')
+    if (agentDraftId) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        const res = await fetch(`/api/ai-agent/invoice-drafts?id=${encodeURIComponent(agentDraftId)}`, {
+          headers: { 'Authorization': `Bearer ${session?.access_token}` },
+        })
+        if (res.ok) {
+          const data = await res.json()
+          const draft = (data.drafts || [])[0]
+          if (draft) {
+            setClientName(draft.customer_name || '')
+            setClientPhone(draft.customer_phone || '')
+            if (Array.isArray(draft.items) && draft.items.length > 0) {
+              setServices(draft.items.map((i: any) => ({
+                name: i.name, qty: i.qty, price: i.unitPrice, unit: 'шт', code: '', type: 'service',
+              })))
+            }
+            if (draft.customer_name) setClientSelected(true)
+          }
+        }
+      } catch {
+        // Prefill is best-effort -- a fetch failure just leaves the empty form.
+      }
+    }
+
+    // Strip ?template=/?repeat=/?agentDraft= once consumed -- otherwise
+    // clearing the client (clearClient) doesn't stick: browser back
+    // navigation, or even just switching tabs and back (the focus listener
+    // below re-runs load()), re-reads the same still-present query param and
+    // silently reapplies the prefill the user just removed. router.replace()
+    // (next/navigation) was tried first but silently didn't touch
+    // window.location.search here -- going straight to the History API
+    // instead, which is all this needs (no server re-fetch, just a
+    // client-side URL cleanup).
+    if (templateId || repeatId || agentDraftId) window.history.replaceState(null, '', '/create')
   }, [router])
 
   useEffect(() => {
