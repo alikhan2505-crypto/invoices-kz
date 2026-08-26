@@ -286,6 +286,10 @@ export default function AiAgentSettings() {
   const [oauthNotice, setOauthNotice] = useState<'connected' | 'error' | null>(null)
   const [forbidden, setForbidden] = useState(false)
   const [pendingCount, setPendingCount] = useState(0)
+  // Whether the owner has an active Kaspi Shop connection -- drives the
+  // «Подключите Kaspi Shop» hint on Промптинг. null = not checked yet
+  // (hint stays hidden until we actually know, rather than flashing).
+  const [hasKaspiShop, setHasKaspiShop] = useState<boolean | null>(null)
   // Slide-over test chat (MoonAI-style persistent shortcut) -- visible
   // across all five tabs, so it lives in page-level state rather than any
   // single tab's block. Only openable once the agent has a real id (see
@@ -443,6 +447,19 @@ export default function AiAgentSettings() {
       } catch { /* badge stays 0 -- the link still works */ }
     }
 
+    // Real catalog prices only reach the agent's prompt when an active
+    // store connection exists (invoiceSend.ts's Kaspi Shop rule) -- this
+    // just informs the Промптинг hint, best-effort like the sibling loaders.
+    async function loadKaspiShopStatus(headers: Record<string, string>) {
+      try {
+        const res = await fetch('/api/kaspi-shop/connections', { headers })
+        if (res.ok) {
+          const data = await res.json()
+          setHasKaspiShop(Array.isArray(data.connections) && data.connections.some((c: any) => c.isActive))
+        }
+      } catch { /* hint stays hidden -- not worth a broken-looking banner */ }
+    }
+
     async function loadTemplates(headers: Record<string, string>, id: string) {
       try {
         const res = await fetch(`/api/ai-agent/templates?agentId=${encodeURIComponent(id)}`, { headers })
@@ -478,6 +495,7 @@ export default function AiAgentSettings() {
       if (!profile?.is_admin) { setForbidden(true); setLoading(false); return }
       const headers = await authHeader()
       loadWalletBalance(headers)
+      loadKaspiShopStatus(headers)
       const res = await fetch(agentParam ? `/api/ai-agent/settings?agentId=${encodeURIComponent(agentParam)}` : '/api/ai-agent/settings', { headers })
       if (res.status === 404) {
         // ?agent= pointing at a deleted/foreign agent -- back to the list.
@@ -1116,6 +1134,16 @@ export default function AiAgentSettings() {
                   </label>
                   {saveButton}
                 </div>
+
+                {hasKaspiShop === false && (
+                  <div className="nav-glass nav-card-accent rounded-2xl p-5 mt-4">
+                    <div className="text-sm font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>Подключите Kaspi Shop — агент будет знать реальные цены</div>
+                    <p className="text-[11px] mb-3" style={{ color: 'var(--nav-text-muted)' }}>
+                      Сейчас агент отвечает про цены только из описания бизнеса выше — без магазина он не знает точный каталог и может ошибиться. С подключённым Kaspi Shop он сам подтягивает актуальные цены (до 50 товаров) и не выдумывает то, чего нет в каталоге — это же касается сумм в счетах, которые агент выставляет из переписки.
+                    </p>
+                    <Link href="/kaspi-shop" className="text-xs font-semibold" style={{ color: 'var(--nav-accent)' }}>Подключить Kaspi Shop →</Link>
+                  </div>
+                )}
 
                 <div className="nav-glass nav-card-accent rounded-2xl p-5 mt-4">
                   <div className="text-sm font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>Как агент видит инструкции</div>
