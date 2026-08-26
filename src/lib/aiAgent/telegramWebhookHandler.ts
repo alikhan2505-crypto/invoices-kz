@@ -153,7 +153,14 @@ export async function handleTelegramIncoming(conn: TelegramTenantConnection, par
   // matching, so a customer asking for a human can't accidentally match
   // a template/flow trigger word first.
   if (findStopPhraseMatch(params.incomingText, Array.isArray(agent.stop_phrases) ? agent.stop_phrases : [])) {
-    await supabase.from('ai_agent_conversations').update({ paused_for_human: true }).eq('id', conversation.id)
+    // Conditional claim (final-review finding): two near-simultaneous
+    // messages both matching a stop-phrase must not both send the
+    // acknowledgement + fire the owner notification. Only the request
+    // that actually flips false->true proceeds; the loser just returns
+    // (the winner's ack already covers the customer).
+    const { data: claimed } = await supabase.from('ai_agent_conversations')
+      .update({ paused_for_human: true }).eq('id', conversation.id).eq('paused_for_human', false).select('id')
+    if (!claimed || claimed.length === 0) return
     const ackText = 'Передаю ваш вопрос менеджеру, он ответит здесь в ближайшее время.'
     try {
       await sendTelegramBotMessage(conn.botToken, params.chatId, ackText)

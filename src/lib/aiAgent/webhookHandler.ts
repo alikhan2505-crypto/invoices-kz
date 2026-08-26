@@ -128,7 +128,10 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
   if (conversation.paused_for_human) return
 
   if (findStopPhraseMatch(params.incomingText, Array.isArray(agent.stop_phrases) ? agent.stop_phrases : [])) {
-    await supabase.from('ai_agent_conversations').update({ paused_for_human: true }).eq('id', conversation.id)
+    // Conditional claim -- see telegramWebhookHandler.ts's identical block for rationale.
+    const { data: claimed } = await supabase.from('ai_agent_conversations')
+      .update({ paused_for_human: true }).eq('id', conversation.id).eq('paused_for_human', false).select('id')
+    if (!claimed || claimed.length === 0) return
     const ackText = 'Передаю ваш вопрос менеджеру, он ответит здесь в ближайшее время.'
     try {
       if (params.source === 'comment') {

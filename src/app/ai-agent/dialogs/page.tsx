@@ -95,6 +95,10 @@ export default function AiAgentDialogs() {
     setSelectedId(id)
     setMessagesLoading(true)
     setError(null)
+    // Clear any unsent draft from the previously selected conversation --
+    // otherwise a half-typed reply to customer A can silently get sent to
+    // customer B after switching (final-review finding).
+    setReplyText('')
     const headers = await authHeader()
     const res = await fetch(`/api/ai-agent/dialogs/messages?conversationId=${encodeURIComponent(id)}`, { headers })
     if (res.ok) {
