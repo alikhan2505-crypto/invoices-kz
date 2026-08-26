@@ -9,7 +9,7 @@ import { validateDraftInput, canAutoSend } from './invoiceDrafts'
 import { debitAiAgentWallet, AI_AGENT_CREDITS_PER_AI_REPLY } from './wallet'
 import { sendTelegramNotification } from '@/lib/telegramNotify'
 import { createNotification } from '@/lib/notifications'
-import { findTemplateMatch, mergeCollectedData, findStopPhraseMatch } from './webhookHandler'
+import { findTemplateMatch, mergeCollectedData, findStopPhraseMatch, STOP_PHRASE_ACK_TEXT } from './webhookHandler'
 import { sendTelegramBotMessage, sendTelegramFlowStep, answerTelegramCallbackQuery, pairConversationHistory, TelegramApiError } from './telegram'
 import { UNSUPPORTED_MEDIA_REPLY_TEXT } from '@/lib/aiAgent/mediaLimits'
 import { parseFlowDefinition, isTerminalStep, findStepById, firstStep, findFlowTriggerMatch, type FlowStep } from './flow'
@@ -161,7 +161,7 @@ export async function handleTelegramIncoming(conn: TelegramTenantConnection, par
     const { data: claimed } = await supabase.from('ai_agent_conversations')
       .update({ paused_for_human: true }).eq('id', conversation.id).eq('paused_for_human', false).select('id')
     if (!claimed || claimed.length === 0) return
-    const ackText = 'Передаю ваш вопрос менеджеру, он ответит здесь в ближайшее время.'
+    const ackText = STOP_PHRASE_ACK_TEXT
     try {
       await sendTelegramBotMessage(conn.botToken, params.chatId, ackText)
       await supabase.from('ai_agent_messages').insert({

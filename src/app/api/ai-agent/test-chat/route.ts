@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { generateAiReply } from '@/lib/instagramAiReply'
 import { buildBusinessContextLine, AgentTone, AgentGoal } from '@/lib/aiAgent/promptContext'
 import { debitAiAgentWallet, AI_AGENT_CREDITS_PER_AI_REPLY } from '@/lib/aiAgent/wallet'
+import { findStopPhraseMatch, STOP_PHRASE_ACK_TEXT } from '@/lib/aiAgent/webhookHandler'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -93,6 +94,19 @@ export async function POST(req: NextRequest) {
     ? agent.history_pairs
     : DEFAULT_HISTORY_PAIRS
   const conversationHistory = pairs.slice(-pairsCap)
+
+  // Stop-phrase preview: test-chat has no ai_agent_conversations row (the
+  // transcript is browser-only), so there's nothing to persist paused
+  // state onto -- but the CUSTOMER-facing effect of a stop-phrase match
+  // (the fixed handoff text instead of an AI reply) is exactly the kind
+  // of setting this tool exists to preview, same as tone/goal/custom
+  // instructions already are. Checked per-message, statelessly: unlike a
+  // real channel, test-chat never "stays paused" across messages -- there
+  // is no owner-side inbox conversation here to hand off to. Free, like
+  // the real ack (no Anthropic call, no wallet debit).
+  if (findStopPhraseMatch(message, Array.isArray(agent.stop_phrases) ? agent.stop_phrases : [])) {
+    return NextResponse.json({ replyText: STOP_PHRASE_ACK_TEXT })
+  }
 
   const businessContextLine = buildBusinessContextLine({
     name: agent.name,

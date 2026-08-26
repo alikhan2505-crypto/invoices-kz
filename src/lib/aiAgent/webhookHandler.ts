@@ -132,7 +132,7 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
     const { data: claimed } = await supabase.from('ai_agent_conversations')
       .update({ paused_for_human: true }).eq('id', conversation.id).eq('paused_for_human', false).select('id')
     if (!claimed || claimed.length === 0) return
-    const ackText = 'Передаю ваш вопрос менеджеру, он ответит здесь в ближайшее время.'
+    const ackText = STOP_PHRASE_ACK_TEXT
     try {
       if (params.source === 'comment') {
         await replyToComment(params.replyTarget, ackText, { accessToken: conn.accessToken })
@@ -416,3 +416,8 @@ export function findStopPhraseMatch(text: string, phrases: string[]): boolean {
   const lower = text.toLowerCase()
   return phrases.some(p => lower.includes(p.toLowerCase()))
 }
+
+// Shared fixed acknowledgement sent (or, in test-chat's stateless preview,
+// shown) on a stop-phrase match -- one copy instead of four, now that all
+// three tenant handlers plus test-chat/route.ts use it.
+export const STOP_PHRASE_ACK_TEXT = 'Передаю ваш вопрос менеджеру, он ответит здесь в ближайшее время.'
