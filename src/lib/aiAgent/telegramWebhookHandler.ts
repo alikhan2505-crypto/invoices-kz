@@ -9,7 +9,7 @@ import { validateDraftInput, canAutoSend } from './invoiceDrafts'
 import { debitAiAgentWallet, AI_AGENT_CREDITS_PER_AI_REPLY } from './wallet'
 import { sendTelegramNotification } from '@/lib/telegramNotify'
 import { createNotification } from '@/lib/notifications'
-import { findTemplateMatch, mergeCollectedData } from './webhookHandler'
+import { findTemplateMatch, mergeCollectedData, findStopPhraseMatch } from './webhookHandler'
 import { sendTelegramBotMessage, sendTelegramFlowStep, answerTelegramCallbackQuery, pairConversationHistory, TelegramApiError } from './telegram'
 import { UNSUPPORTED_MEDIA_REPLY_TEXT } from '@/lib/aiAgent/mediaLimits'
 import { parseFlowDefinition, isTerminalStep, findStepById, firstStep, findFlowTriggerMatch, type FlowStep } from './flow'
@@ -112,7 +112,7 @@ export async function handleTelegramIncoming(conn: TelegramTenantConnection, par
       external_thread_id: params.chatId,
       customer_handle: params.fromHandle,
     }, { onConflict: 'agent_id,channel,external_thread_id', ignoreDuplicates: false })
-    .select('id, active_flow_id')
+    .select('id, active_flow_id, paused_for_human')
     .single()
   if (!conversation) return
 
@@ -141,6 +141,35 @@ export async function handleTelegramIncoming(conn: TelegramTenantConnection, par
   // clears the customer's flow state without the message being logged.
   if (conversation.active_flow_id) {
     await supabase.from('ai_agent_conversations').update({ active_flow_id: null, active_step_id: null }).eq('id', conversation.id)
+  }
+
+  // Operator-takeover gate: already-paused conversations get NOTHING
+  // beyond the inbound log above -- no template, no flow, no AI, no
+  // repeated acknowledgement. The owner is already handling it in
+  // /ai-agent/dialogs.
+  if (conversation.paused_for_human) return
+
+  // Not yet paused -- check for a stop-phrase BEFORE template/flow
+  // matching, so a customer asking for a human can't accidentally match
+  // a template/flow trigger word first.
+  if (findStopPhraseMatch(params.incomingText, Array.isArray(agent.stop_phrases) ? agent.stop_phrases : [])) {
+    await supabase.from('ai_agent_conversations').update({ paused_for_human: true }).eq('id', conversation.id)
+    const ackText = 'Передаю ваш вопрос менеджеру, он ответит здесь в ближайшее время.'
+    try {
+      await sendTelegramBotMessage(conn.botToken, params.chatId, ackText)
+      await supabase.from('ai_agent_messages').insert({
+        conversation_id: conversation.id,
+        direction: 'outbound',
+        text: ackText,
+        is_ai_generated: false,
+        status: 'sent',
+      })
+    } catch (err: any) {
+      console.error('ai-agent telegram webhook: stop-phrase ack send failed for', params.externalId, ':', err.message)
+      await markTelegramTokenExpiredIfUnauthorized(conn.connectionId, err)
+    }
+    await createNotification(agent.user_id, 'Клиент попросил оператора', params.incomingText.slice(0, 120), '/ai-agent/dialogs')
+    return
   }
 
   // Template match first -- skipped entirely for a photo message, same

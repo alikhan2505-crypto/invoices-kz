@@ -8,7 +8,7 @@ import { buildInvoiceToolExecutor } from './invoiceSend'
 import { debitAiAgentWallet, AI_AGENT_CREDITS_PER_AI_REPLY } from './wallet'
 import { sendTelegramNotification } from '@/lib/telegramNotify'
 import { createNotification } from '@/lib/notifications'
-import { findTemplateMatch, mergeCollectedData } from './webhookHandler'
+import { findTemplateMatch, mergeCollectedData, findStopPhraseMatch } from './webhookHandler'
 import { pairConversationHistory } from './telegram'
 import { sendWhatsAppMessage, WhatsAppApiError } from '@/lib/whatsapp'
 import { UNSUPPORTED_MEDIA_REPLY_TEXT } from '@/lib/aiAgent/mediaLimits'
@@ -109,7 +109,7 @@ export async function handleWhatsAppIncoming(conn: WhatsAppTenantConnection, par
       external_thread_id: params.from,
       customer_handle: params.customerHandle,
     }, { onConflict: 'agent_id,channel,external_thread_id', ignoreDuplicates: false })
-    .select('id')
+    .select('id, paused_for_human')
     .single()
   if (!conversation) return
 
@@ -126,6 +126,29 @@ export async function handleWhatsAppIncoming(conn: WhatsAppTenantConnection, par
     if (insertError.code !== '23505') {
       console.error('ai-agent whatsapp webhook: failed to log inbound message for', params.externalId, ':', insertError.message)
     }
+    return
+  }
+
+  // Operator-takeover gate -- see telegramWebhookHandler.ts's identical block for rationale.
+  if (conversation.paused_for_human) return
+
+  if (findStopPhraseMatch(params.incomingText, Array.isArray(agent.stop_phrases) ? agent.stop_phrases : [])) {
+    await supabase.from('ai_agent_conversations').update({ paused_for_human: true }).eq('id', conversation.id)
+    const ackText = 'Передаю ваш вопрос менеджеру, он ответит здесь в ближайшее время.'
+    try {
+      await sendWhatsAppMessage(conn.phoneNumberId, params.from, ackText, { accessToken: conn.accessToken })
+      await supabase.from('ai_agent_messages').insert({
+        conversation_id: conversation.id,
+        direction: 'outbound',
+        text: ackText,
+        is_ai_generated: false,
+        status: 'sent',
+      })
+    } catch (err: any) {
+      console.error('ai-agent whatsapp webhook: stop-phrase ack send failed for', params.externalId, ':', err.message)
+      await markWhatsAppTokenExpiredIfUnauthorized(conn.connectionId, err)
+    }
+    await createNotification(agent.user_id, 'Клиент попросил оператора', params.incomingText.slice(0, 120), '/ai-agent/dialogs')
     return
   }
 

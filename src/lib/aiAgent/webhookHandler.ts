@@ -99,7 +99,7 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
       external_thread_id: params.replyTarget,
       customer_handle: params.fromUsername,
     }, { onConflict: 'agent_id,channel,external_thread_id', ignoreDuplicates: false })
-    .select('id')
+    .select('id, paused_for_human')
     .single()
   if (!conversation) return
 
@@ -119,6 +119,35 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
     if (insertError.code !== '23505') {
       console.error('ai-agent webhook: failed to log inbound message for', params.externalId, ':', insertError.message)
     }
+    return
+  }
+
+  // Operator-takeover gate. Applies to BOTH comment and dm sources --
+  // unlike the invoice tool, a stop-phrase request is legitimate under a
+  // public comment too.
+  if (conversation.paused_for_human) return
+
+  if (findStopPhraseMatch(params.incomingText, Array.isArray(agent.stop_phrases) ? agent.stop_phrases : [])) {
+    await supabase.from('ai_agent_conversations').update({ paused_for_human: true }).eq('id', conversation.id)
+    const ackText = 'Передаю ваш вопрос менеджеру, он ответит здесь в ближайшее время.'
+    try {
+      if (params.source === 'comment') {
+        await replyToComment(params.replyTarget, ackText, { accessToken: conn.accessToken })
+      } else {
+        await sendDirectMessage(params.replyTarget, ackText, { igUserId: conn.externalAccountId, accessToken: conn.accessToken })
+      }
+      await supabase.from('ai_agent_messages').insert({
+        conversation_id: conversation.id,
+        direction: 'outbound',
+        text: ackText,
+        is_ai_generated: false,
+        status: 'sent',
+      })
+    } catch (err: any) {
+      console.error('ai-agent webhook: stop-phrase ack send failed for', params.externalId, ':', err.message)
+      await markTokenExpiredIfUnauthorized(conn.connectionId, err)
+    }
+    await createNotification(agent.user_id, 'Клиент попросил оператора', params.incomingText.slice(0, 120), '/ai-agent/dialogs')
     return
   }
 
