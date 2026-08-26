@@ -567,3 +567,35 @@ export async function listOrders(sessionCookies: string, merchantId: string, sta
     })),
   }
 }
+
+// The cabinet's real «Я упаковал, сформировать накладные» action, captured
+// live 2026-08-26 (see docs/superpowers/specs/2026-08-26-kaspi-packing-
+// confirm-api-findings.md): накладные do NOT exist for an order sitting in
+// Упаковка -- Kaspi only generates them once this action fires, which ALSO
+// immediately moves the order from Упаковка to Передача (confirmed: the
+// order disappeared from the Упаковка tab count the instant this call
+// returned). Kaspi's own UI response is an async promise ("в течение 5
+// минут"), not the накладная itself -- callers must wait and print from
+// Передача afterwards, exactly like the real cabinet does.
+export type ConfirmPackingResult = { success: boolean; sessionExpired: boolean; message?: string }
+
+export async function confirmPacking(
+  sessionCookies: string,
+  merchantId: string,
+  orders: { orderCode: string; quantity: number }[],
+  fetchFn: typeof fetch = fetch
+): Promise<ConfirmPackingResult> {
+  const res = await fetchFn(`https://mc.shop.kaspi.kz/mc/api/order/cargo/assembled?_m=${encodeURIComponent(merchantId)}`, {
+    method: 'POST',
+    headers: authHeaders(sessionCookies),
+    body: JSON.stringify({
+      cargos: orders.map(o => ({ orderCode: o.orderCode, newCargoSpace: 1, quantity: o.quantity })),
+    }),
+  })
+  if (res.status === 401 || res.status === 403) return { success: false, sessionExpired: true }
+  if (!res.ok) {
+    const bodyText = await res.text().catch(() => '')
+    return { success: false, sessionExpired: false, message: `HTTP ${res.status}: ${bodyText.slice(0, 300)}` }
+  }
+  return { success: true, sessionExpired: false }
+}

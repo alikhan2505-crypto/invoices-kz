@@ -7,7 +7,7 @@ import LoadingSpinner from '@/components/LoadingSpinner'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import SessionExpiredBanner from '@/components/kaspiShop/SessionExpiredBanner'
-import { ORDER_STATUS_TABS, BULK_PRINTABLE_STATUSES } from '@/lib/kaspiShop/orderStatuses'
+import { ORDER_STATUS_TABS, BULK_SELECTABLE_STATUSES, WAYBILL_PRINTABLE_STATUSES, PACKING_STATUS } from '@/lib/kaspiShop/orderStatuses'
 import { filterByDeliveryCutoff, type DeliveryDateMode } from '@/lib/kaspiShop/ordersFilters'
 
 const EASE = [0.16, 1, 0.3, 1] as const
@@ -40,6 +40,8 @@ function KaspiShopOrdersInner() {
   const [loadError, setLoadError] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [printing, setPrinting] = useState<'a4' | 'a6' | null>(null)
+  const [confirmingPacking, setConfirmingPacking] = useState(false)
+  const [packingConfirmedMessage, setPackingConfirmedMessage] = useState('')
   const [sessionExpired, setSessionExpired] = useState(false)
   const [groupBy, setGroupBy] = useState<'type' | 'date' | null>(null)
   const [cityId, setCityId] = useState('')
@@ -111,6 +113,7 @@ function KaspiShopOrdersInner() {
     setOrdersLoading(true)
     setLoadError('')
     setSelected(new Set())
+    setPackingConfirmedMessage('')
     try {
       const headers = await authHeader()
       const cityParam = forCityId ? `&cityId=${encodeURIComponent(forCityId)}` : ''
@@ -181,6 +184,37 @@ function KaspiShopOrdersInner() {
     }
   }
 
+  // The real cabinet's «Я упаковал, сформировать накладные» -- накладные
+  // don't exist until this fires, and Kaspi moves the order to Передача the
+  // instant it succeeds (confirmed live 2026-08-26), so a full reload of
+  // both the list and the sidebar-style counts is exactly what's needed.
+  async function confirmPackingAction() {
+    if (selected.size === 0 || confirmingPacking) return
+    setConfirmingPacking(true)
+    setLoadError('')
+    setPackingConfirmedMessage('')
+    try {
+      const headers = await authHeader()
+      const selectedOrders = orders
+        .filter(o => selected.has(o.code))
+        .map(o => ({ orderCode: o.code, quantity: o.items.reduce((sum, it) => sum + it.quantity, 0) }))
+      const res = await fetch('/api/kaspi-shop/orders/confirm-packing', {
+        method: 'POST', headers, body: JSON.stringify({ orders: selectedOrders }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setLoadError(data.error || 'Не удалось подтвердить упаковку')
+        return
+      }
+      await Promise.all([loadOrders(status, page, cityId), loadCounts()])
+      setPackingConfirmedMessage('Накладные появятся на вкладке «Передача» в течение 5 минут.')
+    } catch {
+      setLoadError('Не удалось подтвердить упаковку. Проверьте соединение и попробуйте ещё раз.')
+    } finally {
+      setConfirmingPacking(false)
+    }
+  }
+
   async function exportExcel() {
     setExporting(true)
     setLoadError('')
@@ -212,7 +246,7 @@ function KaspiShopOrdersInner() {
     }
   }
 
-  const visibleOrders = BULK_PRINTABLE_STATUSES.includes(status) ? filterByDeliveryCutoff(orders, dateMode) : orders
+  const visibleOrders = BULK_SELECTABLE_STATUSES.includes(status) ? filterByDeliveryCutoff(orders, dateMode) : orders
 
   if (loading) return <LoadingSpinner />
 
@@ -284,7 +318,7 @@ function KaspiShopOrdersInner() {
           })}
         </div>
 
-        {BULK_PRINTABLE_STATUSES.includes(status) && (
+        {BULK_SELECTABLE_STATUSES.includes(status) && (
           <div className="flex gap-2 mb-4">
             {([['all', 'Все'], ['tomorrow', 'Завтра до 20:00']] as const).map(([value, label]) => {
               const active = dateMode === value
@@ -299,7 +333,21 @@ function KaspiShopOrdersInner() {
           </div>
         )}
 
-        {BULK_PRINTABLE_STATUSES.includes(status) && selected.size > 0 && (
+        {status === PACKING_STATUS && selected.size > 0 && (
+          <div className="rounded-2xl p-3 flex items-center justify-between gap-3 mb-4" style={{ background: 'var(--nav-accent)' }}>
+            <span className="text-sm" style={{ color: 'var(--nav-accent-ink)' }}>Выбрано заказов: {selected.size}</span>
+            <button onClick={confirmPackingAction} disabled={confirmingPacking}
+              className="text-xs font-medium rounded-lg px-3 py-2 disabled:opacity-50" style={{ background: 'var(--nav-accent-ink)', color: 'var(--nav-accent)' }}>
+              {confirmingPacking ? 'Подтверждаем...' : 'Я упаковал, сформировать накладные'}
+            </button>
+          </div>
+        )}
+
+        {packingConfirmedMessage && (
+          <div className="rounded-2xl p-3 mb-4 text-sm" style={{ background: 'var(--nav-success)', color: '#fff' }}>{packingConfirmedMessage}</div>
+        )}
+
+        {WAYBILL_PRINTABLE_STATUSES.includes(status) && selected.size > 0 && (
           <div className="rounded-2xl p-3 flex items-center justify-between gap-3 mb-4" style={{ background: 'var(--nav-accent)' }}>
             <span className="text-sm" style={{ color: 'var(--nav-accent-ink)' }}>Выбрано заказов: {selected.size}</span>
             <div className="flex gap-2">
@@ -329,7 +377,7 @@ function KaspiShopOrdersInner() {
           function renderCard(o: Order, i: number) {
             const firstItem = o.items[0]
             const extraCount = o.items.length - 1
-            const selectable = BULK_PRINTABLE_STATUSES.includes(status)
+            const selectable = BULK_SELECTABLE_STATUSES.includes(status)
             return (
               <motion.div key={o.code} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.25, ease: EASE, delay: Math.min(i * 0.02, 0.2) }}

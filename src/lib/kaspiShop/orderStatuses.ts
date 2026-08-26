@@ -20,11 +20,18 @@ export const ORDER_STATUS_TABS: { label: string; value: string }[] = [
 export const TRANSFER_STATUS = 'KASPI_DELIVERY_WAIT_FOR_COURIER'
 export const PACKING_STATUS = 'KASPI_DELIVERY_CARGO_ASSEMBLY'
 
-// Bulk "select orders, print all their waybills as one PDF" is available on
-// both statuses (founder request 2026-08-22, "у конкурентов в разделе
-// упаковка должно быть распечатка накладных все вместе" -- sellers print
-// the shipping label while physically packing the box, not only later at
-// the transfer-to-courier step). Kept as its own list rather than inlining
-// the OR at each call site, since a future status (e.g. self-pickup prep)
-// may need the same bulk-print affordance.
-export const BULK_PRINTABLE_STATUSES: string[] = [PACKING_STATUS, TRANSFER_STATUS]
+// CORRECTED 2026-08-26 (founder caught this live, confirmed against the
+// real cabinet + mobile app): an order sitting in Упаковка has NO накладная
+// yet -- Kaspi only generates one once the seller confirms packing via «Я
+// упаковал, сформировать накладные», which is itself the action that moves
+// the order to Передача (captured live: POST .../order/cargo/assembled,
+// see docs/superpowers/specs/2026-08-26-kaspi-packing-confirm-api-findings.md).
+// Printing накладные straight from Упаковка (the previous BULK_PRINTABLE_STATUSES
+// bug) always failed with Kaspi's empty-ZIP response for exactly this reason.
+// Both statuses still support checkbox-selection + a bulk action -- they
+// just take DIFFERENT actions now, so this list only gates the shared
+// selection UI (date filter, checkbox bar), not which button renders.
+export const BULK_SELECTABLE_STATUSES: string[] = [PACKING_STATUS, TRANSFER_STATUS]
+// Waybill printing (Скачать А4/А6) is valid ONLY on Передача -- накладные
+// exist there and nowhere else in the order lifecycle.
+export const WAYBILL_PRINTABLE_STATUSES: string[] = [TRANSFER_STATUS]
