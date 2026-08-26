@@ -51,7 +51,9 @@ Fixed acknowledgement text (not configurable in v1, per the design's explicit ou
 
 `sendIntoConversation` moves from `invoiceSend.ts` to a new `src/lib/aiAgent/channelSend.ts` (pure re-export point, same signature: `(supabase, conversation: {id, channel, external_thread_id, agent_id}, text) => Promise<string | null>`). `invoiceSend.ts` imports it from the new location; the new dialogs-reply route imports it too. No behavior change — this is a straight extraction, not a rewrite, so `invoiceSend.test.ts`-equivalent behavior (there is none — network function, untested per convention) has nothing to break.
 
-## New page: `/ai-agent/dialogs`
+## New page: `/ai-agent/dialogs`, nav label «Переписка»
+
+**Naming note:** the nav already has `/ai-agent/review` labeled «Диалоги» in Russian (its page heading is «Диалоги на проверке» — the approval queue). Naming this new live-inbox page «Диалоги» too would collide with that existing, unrelated nav entry. This page is called «Переписка» instead; the route slug stays English (`/ai-agent/dialogs`) same as every other AI-агент route (`/leads` is labeled «Заявки», `/review` is labeled «Диалоги» — slug and label already diverge everywhere in this section).
 
 New nav entry, admin-gated like every other AI-агент page. Two-pane layout (list left, thread right — collapses to list-then-thread on mobile, same responsive pattern `/ai-agent/review`'s card grid already uses at the breakpoint level, adapted to a master-detail split here since a thread view doesn't fit a card grid).
 
