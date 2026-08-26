@@ -9,9 +9,20 @@ import DesktopShell from '@/components/DesktopShell'
 import SessionExpiredBanner from '@/components/kaspiShop/SessionExpiredBanner'
 import { ORDER_STATUS_TABS, BULK_SELECTABLE_STATUSES, WAYBILL_PRINTABLE_STATUSES, PACKING_STATUS } from '@/lib/kaspiShop/orderStatuses'
 import { filterByDeliveryCutoff, type DeliveryDateMode } from '@/lib/kaspiShop/ordersFilters'
+import { normalizeKzPhone } from '@/lib/kaspiPay/phone'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 const CARD_HOVER = 'transition-all duration-200 ease-out hover:-translate-y-1 hover:shadow-[var(--nav-card-glow)]'
+
+// Same glyph as SiteNav.tsx/review page's WhatsAppIcon -- this codebase's
+// established per-file inline-SVG convention rather than a shared import.
+function WhatsAppIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+    </svg>
+  )
+}
 
 type Order = {
   code: string
@@ -42,6 +53,11 @@ function KaspiShopOrdersInner() {
   const [printing, setPrinting] = useState<'a4' | 'a6' | null>(null)
   const [confirmingPacking, setConfirmingPacking] = useState(false)
   const [packingConfirmedMessage, setPackingConfirmedMessage] = useState('')
+  // «Запросить отзыв» -- fully client-side, nothing persisted (Kaspi masks
+  // the real customer phone in every order API response we can read, so
+  // the seller types the number they already see in Kaspi's own cabinet).
+  // See docs/superpowers/specs/2026-08-26-kaspi-orders-review-request-design.md.
+  const [reviewModal, setReviewModal] = useState<{ orderCode: string; phone: string; text: string } | null>(null)
   const [sessionExpired, setSessionExpired] = useState(false)
   const [groupBy, setGroupBy] = useState<'type' | 'date' | null>(null)
   const [cityId, setCityId] = useState('')
@@ -400,7 +416,22 @@ function KaspiShopOrdersInner() {
                     {extraCount > 0 && <span style={{ color: 'var(--nav-text-muted)', fontWeight: 400 }}> +{extraCount}</span>}
                   </div>
                   <div className="text-[10px] mt-0.5 truncate" style={{ color: 'var(--nav-text-muted)' }}>{o.customerFirstName} {o.customerLastName}</div>
-                  <div className="font-mono font-bold text-xs tabular-nums mt-1" style={{ color: 'var(--nav-text-primary)' }}>{o.totalPrice.toLocaleString('ru-KZ')} ₸</div>
+                  <div className="flex items-center justify-between gap-1 mt-1">
+                    <div className="font-mono font-bold text-xs tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{o.totalPrice.toLocaleString('ru-KZ')} ₸</div>
+                    <button type="button" aria-label="Запросить отзыв в WhatsApp"
+                      onClick={e => {
+                        e.stopPropagation()
+                        const name = firstItem?.name || `Заказ №${o.code}`
+                        setReviewModal({
+                          orderCode: o.code,
+                          phone: '',
+                          text: `Здравствуйте! Спасибо за заказ «${name}» 🙏 Будем очень благодарны, если оставите отзыв на Kaspi — это помогает нам и другим покупателям.`,
+                        })
+                      }}
+                      className="flex-shrink-0 rounded-full p-1 transition-colors hover:opacity-70" style={{ color: 'var(--nav-success)' }}>
+                      <WhatsAppIcon />
+                    </button>
+                  </div>
                 </div>
               </motion.div>
             )
@@ -449,6 +480,63 @@ function KaspiShopOrdersInner() {
           </div>
         )}
       </div>
+
+      {/* «Запросить отзыв» -- pure client-side wa.me deep link, no send on
+          our side (see the design doc's header comment above the state
+          declaration). Same modal shell as removed/page.tsx's «Цена и
+          остатки». */}
+      {reviewModal && (() => {
+        const normalized = normalizeKzPhone(reviewModal.phone)
+        const phoneInvalid = reviewModal.phone.trim().length > 0 && !normalized
+        return (
+          <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center p-3 bg-black/30" onClick={() => setReviewModal(null)}>
+            <motion.div initial={{ opacity: 0, scale: 0.95, y: 14 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+              transition={{ duration: 0.22, ease: EASE }}
+              className="relative nav-glass rounded-[24px] w-full max-w-md max-h-[86vh] overflow-y-auto"
+              style={{ boxShadow: '0 34px 80px -20px rgba(10,10,15,0.4), var(--nav-card-glow)' }}
+              onClick={e => e.stopPropagation()}>
+              <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[24px]" style={{ background: 'linear-gradient(90deg, var(--nav-success), var(--nav-teal))' }} />
+              <div className="p-5 lg:p-6">
+                <div className="flex items-start justify-between gap-3 mb-1">
+                  <div className="text-[11px] font-semibold tracking-wider uppercase" style={{ color: 'var(--nav-text-muted)' }}>Запросить отзыв</div>
+                  <button onClick={() => setReviewModal(null)} className="text-lg leading-none flex-shrink-0" style={{ color: 'var(--nav-text-secondary)' }}>✕</button>
+                </div>
+                <p className="text-[11px] mb-4" style={{ color: 'var(--nav-text-muted)' }}>
+                  Kaspi скрывает телефон клиента в своём API — введите номер, который видите в кабинете Kaspi. Откроется WhatsApp с готовым текстом, отправляете вы сами.
+                </p>
+
+                <label className="block mb-3">
+                  <span className="text-[10px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Телефон клиента</span>
+                  <input type="tel" placeholder="+7 707 123 45 67" value={reviewModal.phone}
+                    onChange={e => setReviewModal(prev => prev ? { ...prev, phone: e.target.value } : prev)}
+                    className="w-full rounded-lg px-3 py-2 text-sm outline-none border"
+                    style={{ borderColor: phoneInvalid ? 'var(--nav-critical)' : 'var(--nav-border-soft)', background: 'var(--nav-surface-chrome)', color: 'var(--nav-text-primary)' }} />
+                  {phoneInvalid && (
+                    <span className="text-[10px] mt-1 block" style={{ color: 'var(--nav-critical)' }}>Похоже, это не казахстанский номер</span>
+                  )}
+                </label>
+
+                <label className="block mb-4">
+                  <span className="text-[10px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Текст сообщения</span>
+                  <textarea value={reviewModal.text} rows={4}
+                    onChange={e => setReviewModal(prev => prev ? { ...prev, text: e.target.value } : prev)}
+                    className="w-full rounded-lg px-3 py-2 text-sm outline-none border resize-none"
+                    style={{ borderColor: 'var(--nav-border-soft)', background: 'var(--nav-surface-chrome)', color: 'var(--nav-text-primary)' }} />
+                </label>
+
+                <a href={normalized ? `https://wa.me/${normalized}?text=${encodeURIComponent(reviewModal.text)}` : undefined}
+                  target="_blank" rel="noopener noreferrer"
+                  aria-disabled={!normalized}
+                  onClick={e => { if (!normalized) e.preventDefault(); else setReviewModal(null) }}
+                  className="block text-center w-full rounded-xl py-2.5 text-sm font-semibold"
+                  style={{ background: normalized ? 'var(--nav-success)' : 'var(--nav-border-soft)', color: normalized ? '#fff' : 'var(--nav-text-muted)', cursor: normalized ? 'pointer' : 'not-allowed' }}>
+                  Открыть WhatsApp
+                </a>
+              </div>
+            </motion.div>
+          </div>
+        )
+      })()}
     </main>
     </DesktopShell>
   )
