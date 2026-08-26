@@ -261,6 +261,7 @@ export default function AiAgentSettings() {
   const [timezone, setTimezone] = useState('Asia/Almaty')
   const [currency, setCurrency] = useState('KZT')
   const [customInstructions, setCustomInstructions] = useState('')
+  const [stopPhrases, setStopPhrases] = useState<string[]>(['оператор', 'человек', 'менеджер', 'позовите', 'поговорить с человеком'])
   const [historyPairs, setHistoryPairs] = useState(5)
   const [isEnabled, setIsEnabled] = useState(true)
   const [creating, setCreating] = useState(false)
@@ -517,6 +518,7 @@ export default function AiAgentSettings() {
           if (data.agent.timezone) setTimezone(data.agent.timezone)
           if (data.agent.currency) setCurrency(data.agent.currency)
           if (typeof data.agent.customInstructions === 'string') setCustomInstructions(data.agent.customInstructions)
+          if (Array.isArray(data.agent.stopPhrases)) setStopPhrases(data.agent.stopPhrases)
           if (typeof data.agent.historyPairs === 'number') setHistoryPairs(data.agent.historyPairs)
           if (typeof data.agent.isEnabled === 'boolean') setIsEnabled(data.agent.isEnabled)
           setConnections(data.connections || [])
@@ -568,7 +570,7 @@ export default function AiAgentSettings() {
       method: 'POST',
       headers,
       // agentId present -> UPDATE that agent; absent -> CREATE a new one.
-      body: JSON.stringify({ ...(agentId ? { agentId } : {}), name, tone, businessDescription, goal, collectFields, timezone, currency, customInstructions, historyPairs, isEnabled }),
+      body: JSON.stringify({ ...(agentId ? { agentId } : {}), name, tone, businessDescription, goal, collectFields, timezone, currency, customInstructions, historyPairs, isEnabled, stopPhrases }),
     })
     if (res.ok) {
       const data = await res.json()
@@ -1132,6 +1134,15 @@ export default function AiAgentSettings() {
                       Агент будет следовать этим правилам в каждом ответе.
                     </span>
                   </label>
+
+                  <label className="block mb-6">
+                    <span className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>Стоп-фразы (передают диалог вам)</span>
+                    <TriggerChipsEditor words={stopPhrases} onChange={setStopPhrases} />
+                    <span className="text-[11px] mt-1 block" style={{ color: 'var(--nav-text-muted)' }}>
+                      Если клиент напишет одну из этих фраз, агент замолчит в этом диалоге и пришлёт вам уведомление — отвечайте в «Переписке».
+                    </span>
+                  </label>
+
                   {saveButton}
                 </div>
 

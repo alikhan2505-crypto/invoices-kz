@@ -78,6 +78,7 @@ export async function GET(req: NextRequest) {
       timezone: agent.timezone || 'Asia/Almaty',
       currency: agent.currency || 'KZT',
       customInstructions: agent.custom_instructions || '',
+      stopPhrases: Array.isArray(agent.stop_phrases) ? agent.stop_phrases : [],
       historyPairs: typeof agent.history_pairs === 'number' ? agent.history_pairs : 5,
       // Статус бота (Контроль tab). Column default is true; a null from a
       // pre-column row still reads as enabled.
@@ -104,7 +105,7 @@ export async function POST(req: NextRequest) {
   if (!(await isAdmin(user.id))) return NextResponse.json({ error: 'admin_only' }, { status: 403 })
 
   const body = await req.json()
-  const { agentId, name, tone, businessDescription, goal, collectFields, timezone, currency, customInstructions, historyPairs, isEnabled } = body
+  const { agentId, name, tone, businessDescription, goal, collectFields, timezone, currency, customInstructions, historyPairs, isEnabled, stopPhrases } = body
 
   if (agentId !== undefined && typeof agentId !== 'string') return NextResponse.json({ error: 'invalid agentId' }, { status: 400 })
   if (historyPairs !== undefined && (typeof historyPairs !== 'number' || historyPairs < 1 || historyPairs > 10)) {
@@ -131,6 +132,17 @@ export async function POST(req: NextRequest) {
         .slice(0, MAX_COLLECT_FIELDS)
     : []
 
+  // stopPhrases: free-text list, same trim+cap shape as collectFields'
+  // custom-field path -- these are interpolated into no prompt (matched
+  // literally in code, not sent to the model), so the cap is generous.
+  const phrases: string[] = Array.isArray(stopPhrases)
+    ? stopPhrases
+        .filter((p: unknown): p is string => typeof p === 'string')
+        .map(p => p.trim().slice(0, 80))
+        .filter(p => p.length > 0)
+        .slice(0, 20)
+    : ['оператор', 'человек', 'менеджер', 'позовите', 'поговорить с человеком']
+
   const payload = {
     name,
     tone,
@@ -146,6 +158,7 @@ export async function POST(req: NextRequest) {
     // Free-text prompt addendum -- capped hard since it's interpolated into
     // every LLM call (longer text = higher per-reply token cost).
     custom_instructions: typeof customInstructions === 'string' ? customInstructions.slice(0, 2000) : '',
+    stop_phrases: phrases,
     history_pairs: typeof historyPairs === 'number' ? Math.round(historyPairs) : 5,
     // Статус бота: only touch the column when the client sent an explicit
     // boolean -- an older client omitting the field must never accidentally
