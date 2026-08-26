@@ -1,15 +1,15 @@
 'use client'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { useLanguage, type Lang } from './LanguageProvider'
 import KaspiShopStoreSwitcher from './KaspiShopStoreSwitcher'
 
-const labels: Record<Lang, { home: string; invoices: string; kaspiShop: string; aiAgent: string; kaspiApi: string; profile: string; history: string }> = {
-  ru: { home: 'Дашборд', invoices: 'Счета', kaspiShop: 'Kaspi Bot', aiAgent: 'AI-агент', kaspiApi: 'Kaspi API', profile: 'Профиль', history: 'История' },
-  kk: { home: 'Дашборд', invoices: 'Шоттар', kaspiShop: 'Kaspi Bot', aiAgent: 'AI-агент', kaspiApi: 'Kaspi API', profile: 'Профиль', history: 'Тарих' },
-  en: { home: 'Dashboard', invoices: 'Invoices', kaspiShop: 'Kaspi Bot', aiAgent: 'AI Agent', kaspiApi: 'Kaspi API', profile: 'Profile', history: 'History' },
+const labels: Record<Lang, { home: string; invoices: string; kaspiShop: string; aiAgent: string; kaspiApi: string; profile: string; history: string; menu: string; close: string }> = {
+  ru: { home: 'Дашборд', invoices: 'Счета', kaspiShop: 'Kaspi Bot', aiAgent: 'AI-агент', kaspiApi: 'Kaspi API', profile: 'Профиль', history: 'История', menu: 'Меню', close: 'Закрыть' },
+  kk: { home: 'Дашборд', invoices: 'Шоттар', kaspiShop: 'Kaspi Bot', aiAgent: 'AI-агент', kaspiApi: 'Kaspi API', profile: 'Профиль', history: 'Тарих', menu: 'Мәзір', close: 'Жабу' },
+  en: { home: 'Dashboard', invoices: 'Invoices', kaspiShop: 'Kaspi Bot', aiAgent: 'AI Agent', kaspiApi: 'Kaspi API', profile: 'Profile', history: 'History', menu: 'Menu', close: 'Close' },
 }
 
 // Copy shown to non-admins when they interact with an admin-gated section
@@ -50,6 +50,7 @@ const kaspiShopLinks: { href: string; label: LocalizedLabel }[] = [
 const aiAgentLinks: { href: string; label: LocalizedLabel }[] = [
   { href: '/ai-agent', label: { ru: 'Агенты', kk: 'Агенттер', en: 'Agents' } },
   { href: '/ai-agent/review', label: { ru: 'Диалоги', kk: 'Диалогтар', en: 'Conversations' } },
+  { href: '/ai-agent/dialogs', label: { ru: 'Переписка', kk: 'Хат алмасу', en: 'Correspondence' } },
   { href: '/ai-agent/test-chat', label: { ru: 'Тестовый чат', kk: 'Сынақ чаты', en: 'Test chat' } },
   { href: '/ai-agent/broadcasts', label: { ru: 'Рассылки', kk: 'Таратылымдар', en: 'Broadcasts' } },
   { href: '/ai-agent/leads', label: { ru: 'Заявки', kk: 'Өтінімдер', en: 'Leads' } },
@@ -93,6 +94,22 @@ function LockIcon({ size = 10 }: { size?: number }) {
   )
 }
 
+function MenuIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
+      <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function CloseIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
+      <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 function isActiveSection(links: { href: string }[], path: string) {
   return links.some(l => path === l.href || path.startsWith(l.href + '/'))
 }
@@ -103,6 +120,7 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
   const { lang } = useLanguage()
   const [isAdmin, setIsAdmin] = useState(false)
   const [lockedHint, setLockedHint] = useState<string | null>(null)
+  const [drawerOpen, setDrawerOpen] = useState(false)
   const navRef = useRef<HTMLElement>(null)
   const lockedHintTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -122,6 +140,22 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
     loadAdmin()
   }, [])
 
+  // Drawer follows navigation: any route change closes it.
+  useEffect(() => { setDrawerOpen(false) }, [path])
+
+  // While the drawer is open the page behind must not scroll, and Escape closes.
+  useEffect(() => {
+    if (!drawerOpen) return
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setDrawerOpen(false) }
+    window.addEventListener('keydown', onKey)
+    return () => {
+      document.body.style.overflow = prevOverflow
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [drawerOpen])
+
   // The section the current path belongs to -- its links become the second
   // tab row. /dashboard belongs to no section (top-level Дашборд owns it),
   // so the second row simply doesn't render there.
@@ -129,6 +163,126 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
 
   return (
     <>
+      {/* Mobile: floating menu trigger, bottom-left — mirrors TopUtilityBar's
+          wallet pill (fixed bottom-20 right-3) so both thumb corners carry one
+          control each. Opens the left drawer with every section's subpages,
+          which the desktop-only second tab row otherwise leaves unreachable
+          on mobile. */}
+      {!desktopOnly && (
+        <button
+          onClick={() => setDrawerOpen(true)}
+          aria-label={labels[lang].menu}
+          className="lg:hidden fixed bottom-20 left-3 z-50 w-11 h-11 flex items-center justify-center nav-glass rounded-full"
+          style={{ color: 'var(--nav-text-primary)' }}
+        >
+          <MenuIcon />
+        </button>
+      )}
+
+      {/* Mobile: left slide-in drawer with the full section tree */}
+      {!desktopOnly && (
+        <AnimatePresence>
+          {drawerOpen && (
+            <div className="lg:hidden fixed inset-0 z-[60]">
+              <motion.div
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                transition={{ duration: 0.18 }}
+                className="absolute inset-0 bg-black/30"
+                onClick={() => setDrawerOpen(false)}
+              />
+              <motion.div
+                role="dialog" aria-modal="true" aria-label={labels[lang].menu}
+                initial={{ x: -320 }} animate={{ x: 0 }} exit={{ x: -320 }}
+                transition={{ type: 'spring', stiffness: 380, damping: 36 }}
+                className="absolute top-0 bottom-0 left-0 w-[290px] max-w-[85vw] nav-glass flex flex-col"
+                style={{ borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}
+              >
+                <div className="flex items-center gap-2 px-4 pt-4 pb-2 flex-shrink-0">
+                  <img src="/icon.svg" alt="" className="w-6 h-6 rounded-lg" style={{ boxShadow: '0 6px 14px -6px var(--nav-accent)' }} />
+                  <span className="font-semibold text-sm flex-1" style={{ color: 'var(--nav-text-primary)', letterSpacing: '-0.02em' }}>invoices.kz</span>
+                  <button
+                    onClick={() => setDrawerOpen(false)}
+                    aria-label={labels[lang].close}
+                    className="w-11 h-11 -mr-2 flex items-center justify-center rounded-lg"
+                    style={{ color: 'var(--nav-text-secondary)' }}
+                  >
+                    <CloseIcon />
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto px-2 pb-6">
+                  {([
+                    { href: '/dashboard', label: labels[lang].home },
+                    { href: '/profile', label: labels[lang].profile },
+                  ]).map(item => {
+                    const active = path === item.href || path.startsWith(item.href + '/')
+                    return (
+                      <button
+                        key={item.href}
+                        onClick={() => { setDrawerOpen(false); router.push(item.href) }}
+                        className="w-full min-h-[44px] flex items-center px-3 rounded-xl text-sm font-semibold text-left"
+                        style={{
+                          color: active ? 'var(--nav-text-primary)' : 'var(--nav-text-secondary)',
+                          background: active ? 'var(--nav-surface-glass)' : 'transparent',
+                        }}
+                      >
+                        {item.label}
+                      </button>
+                    )
+                  })}
+
+                  {SECTIONS.map(s => {
+                    const locked = s.adminOnly && !isAdmin
+                    return (
+                      <div key={s.key} className="mt-3">
+                        <button
+                          type="button"
+                          onClick={() => { if (locked) showLockedHint(`drawer-${s.key}`) }}
+                          aria-disabled={locked}
+                          className="w-full min-h-[36px] flex items-center gap-1.5 px-3 text-[11px] font-semibold tracking-wider uppercase text-left"
+                          style={{ color: 'var(--nav-text-muted)', cursor: locked ? 'not-allowed' : 'default' }}
+                        >
+                          {labels[lang][s.key]}
+                          {locked && <LockIcon size={11} />}
+                        </button>
+                        {locked ? (
+                          lockedHint === `drawer-${s.key}` && (
+                            <div className="px-3 pb-1.5 text-xs font-medium" style={{ color: 'var(--nav-text-secondary)' }}>
+                              {lockedMessages[lang]}
+                            </div>
+                          )
+                        ) : (
+                          s.links.map(l => {
+                            const bestMatch = s.links
+                              .filter(x => path === x.href || path.startsWith(x.href + '/'))
+                              .sort((a, b) => b.href.length - a.href.length)[0]?.href
+                            const linkActive = l.href === bestMatch
+                            return (
+                              <button
+                                key={l.href}
+                                onClick={() => { setDrawerOpen(false); router.push(l.href) }}
+                                className="w-full min-h-[44px] flex items-center px-3 rounded-xl text-sm text-left"
+                                style={{
+                                  color: linkActive ? 'var(--nav-accent-ink)' : 'var(--nav-text-secondary)',
+                                  background: linkActive ? 'var(--nav-accent)' : 'transparent',
+                                  fontWeight: linkActive ? 600 : 400,
+                                }}
+                              >
+                                {l.label[lang]}
+                              </button>
+                            )
+                          })
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+      )}
+
       {/* Mobile: bottom icon bar — same fixed position/behavior as the old AppNav bottom bar, restyled */}
       {!desktopOnly && (
         <div
