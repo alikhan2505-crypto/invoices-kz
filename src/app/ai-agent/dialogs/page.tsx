@@ -202,7 +202,13 @@ export default function AiAgentDialogs() {
               return (
                 <button key={item.id} onClick={() => openConversation(item.id)}
                   className="w-full text-left nav-glass rounded-2xl p-3 transition-colors"
-                  style={{ outline: active ? '2px solid var(--nav-accent)' : 'none', outlineOffset: -2 }}>
+                  style={{
+                    // Needs-attention (paused_for_human) wins over the plain
+                    // selection ring -- a founder request after the small
+                    // corner badge alone proved too easy to miss in the list.
+                    outline: item.pausedForHuman ? '2px solid var(--nav-critical)' : active ? '2px solid var(--nav-accent)' : 'none',
+                    outlineOffset: -2,
+                  }}>
                   <div className="flex items-center justify-between gap-2 mb-1">
                     <span className="inline-flex items-center gap-1.5 text-[10.5px] font-bold" style={{ color: 'var(--nav-text-secondary)' }}>
                       <ChannelIcon /> {channel.label}
