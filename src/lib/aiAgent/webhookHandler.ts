@@ -373,3 +373,14 @@ export function findTemplateMatch(text: string, templates: { id: string; trigger
   }
   return null
 }
+
+// Same case-insensitive substring rule as findTemplateMatch/
+// findFlowTriggerMatch, applied to the agent's configurable stop-phrase
+// list (ai_agents.stop_phrases) instead of templates/flows. Checked
+// BEFORE template/flow matching in every tenant handler -- a customer
+// asking for a human must never accidentally match a template or flow
+// trigger word first.
+export function findStopPhraseMatch(text: string, phrases: string[]): boolean {
+  const lower = text.toLowerCase()
+  return phrases.some(p => lower.includes(p.toLowerCase()))
+}
