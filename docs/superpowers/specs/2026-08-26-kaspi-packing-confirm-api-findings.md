@@ -62,3 +62,34 @@ waybill printing) split into:
 (`POST /api/kaspi-shop/orders/confirm-packing` → `confirmPacking()` in
 `cabinetApi.ts`) instead of the А4/А6 print buttons it never should have
 had.
+
+## Bonus finding: the А4/А6 grid-imposition bug it uncovered
+
+While confirming накладные became available under Передача, a REAL
+накладная was captured (order 1050124508, via the merchant-wide waybill ZIP
+endpoint) and inspected directly -- this immediately explained a second,
+independent bug the founder had already flagged from a screenshot ("А4 и
+А6 совсем что-то не то"):
+
+Kaspi's real накладная PDF page is **595.275 × 841.875 pt — a full А4
+canvas** — but decoding its content stream (FlateDecode-compressed, 1479
+raw / 7125 decoded bytes) showed every single drawn operator (barcodes,
+text, the QR code's Form XObject placement) stays within **x:[11,286] of
+595, y:[429,831] of 842** — i.e. the real label content occupies exactly
+the **top-left quarter** of the page (≈ one А6-sized cell with ~11pt
+margins), and the rest of the canvas is blank. `packWaybillsToPages()`
+(`src/lib/kaspiShop/waybills.ts`) was embedding the page's FULL MediaBox,
+so its scaling math shrank that blank canvas right along with the real
+content — the actual label ended up a tiny box in one corner of each
+target cell instead of filling it.
+
+Fix: crop to `{ left: 0, bottom: mediaHeight/2, right: mediaWidth/2, top:
+mediaHeight }` via pdf-lib's `embedPage(page, boundingBox)` (its
+`PDFEmbeddedPage.width/height` are derived from the passed boundingBox, so
+the rest of the scale/position math needed no changes). Verified two ways:
+(1) a new unit test asserts the embedded XObject's own `/BBox` in the
+output PDF equals the cropped quarter, not the full page; (2) the real
+captured накладная was run through the fixed code and screenshotted in
+Chrome — А6 now fills the whole page edge-to-edge, and А4 tiles 4 full,
+legible labels (2 top + 2 bottom), matching the cabinet's own layout
+exactly.

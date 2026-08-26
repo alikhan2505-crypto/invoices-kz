@@ -34,6 +34,35 @@ describe('parseWaybillsZip', () => {
   })
 })
 
+// Kaspi's real накладная wraps its actual label content inside just the
+// top-left quarter of a full-А4-sized MediaBox (confirmed live 2026-08-26 by
+// decoding a real captured накладная's content stream); everything below
+// and to the right of that quarter is blank canvas. packWaybillsToPages
+// must crop to that quarter before scaling, or the real label ends up tiny
+// in the corner of each output cell -- exactly the founder-reported bug
+// ("А4 и А6 совсем что-то не то").
+async function getEmbeddedXObjectBBox(pdfBuf: Buffer): Promise<number[] | undefined> {
+  const { PDFName } = await import('pdf-lib')
+  const doc = await PDFDocument.load(pdfBuf)
+  const page = doc.getPage(0)
+  const resources = doc.context.lookup(page.node.get(PDFName.of('Resources'))) as any
+  const xobjects = doc.context.lookup(resources.get(PDFName.of('XObject'))) as any
+  const firstKey = xobjects.keys()[0]
+  const xobj = doc.context.lookup(xobjects.get(firstKey)) as any
+  const bbox = xobj.dict.get(PDFName.of('BBox'))
+  return bbox?.asArray?.().map((n: any) => n.asNumber())
+}
+
+describe('packWaybillsToPages crops to the real накладная content quarter', () => {
+  it('embeds only the top-left quarter of a full-page source label, not the whole MediaBox', async () => {
+    const fullPageLabel = await makeLabel(400, 600)
+    const buf = await packWaybillsToPages([fullPageLabel], PageSizes.A6, 1, 1)
+    const bbox = await getEmbeddedXObjectBBox(buf)
+    // left, bottom, right, top -- half width, half height, anchored top-left
+    expect(bbox).toEqual([0, 300, 200, 600])
+  })
+})
+
 describe('packWaybillsToPages', () => {
   it('packs 2 labels onto one page for a 2x2 grid, sized exactly to pageSize', async () => {
     const labels = [await makeLabel(288, 432), await makeLabel(288, 432)]

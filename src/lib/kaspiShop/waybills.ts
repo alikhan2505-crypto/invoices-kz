@@ -71,6 +71,20 @@ export async function packWaybillsToPages(
     for (let j = 0; j < batch.length; j++) {
       const sourceDoc = await PDFDocument.load(batch[j])
       const sourcePage = sourceDoc.getPage(0)
+      // Kaspi's own накладная PDF wraps its actual label content (barcode,
+      // addresses, QR) inside just the TOP-LEFT QUARTER of a full-А4-sized
+      // MediaBox -- confirmed live 2026-08-26 by decoding a real captured
+      // накладная's content stream: every drawn operator's coordinates
+      // stayed within x:[11,286] of 595 and y:[429,831] of 842, i.e. one
+      // А6-sized cell with ~11pt margins: the rest of the page is blank
+      // canvas. Embedding the FULL MediaBox (the previous bug, caught live
+      // by the founder -- both А4 and А6 output looked "совсем не то")
+      // scaled that blank canvas down too, shrinking the actual label into
+      // a tiny corner of each output cell. Cropping to this quarter before
+      // measuring/scaling is what makes А6 fill the whole page and А4 tile
+      // 4 real labels per sheet, exactly as Kaspi's own cabinet does.
+      const { width: mediaWidth, height: mediaHeight } = sourcePage.getSize()
+      const contentBox = { left: 0, bottom: mediaHeight / 2, right: mediaWidth / 2, top: mediaHeight }
       // Kaspi's label PDF may carry a /Rotate entry (e.g. a landscape-
       // authored page meant to be VIEWED as portrait) -- embedPage/drawPage
       // read the raw MediaBox only and ignore /Rotate entirely (confirmed
@@ -78,7 +92,7 @@ export async function packWaybillsToPages(
       // uses only MediaBox), so it must be compensated for explicitly or a
       // rotated label would render sideways and undersized.
       const rotation = ((sourcePage.getRotation().angle % 360) + 360) % 360
-      const embeddedPage = await output.embedPage(sourcePage)
+      const embeddedPage = await output.embedPage(sourcePage, contentBox)
       const swapped = rotation === 90 || rotation === 270
       const visualWidth = swapped ? embeddedPage.height : embeddedPage.width
       const visualHeight = swapped ? embeddedPage.width : embeddedPage.height
