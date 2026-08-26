@@ -66,6 +66,35 @@ type StockModalState = {
   saved: boolean
 }
 
+type CatalogProduct = {
+  id: string
+  title: string
+  categoryName: string | null
+  imageUrl: string | null
+  shopLink: string | null
+}
+
+type AddCity = { cityId: string; cityName: string; points: { storeCode: string; displayName: string }[] }
+
+// Add-product wizard, mirroring the cabinet's «Присоединиться к существующей
+// карточке» flow: search step -> price/stock step -> async success.
+type AddModalState = {
+  step: 'search' | 'form'
+  query: string
+  searching: boolean
+  results: CatalogProduct[]
+  total: number
+  selected: CatalogProduct | null
+  infoLoading: boolean
+  suggestedSku: string
+  lowestPrice: number | null
+  cities: AddCity[]
+  edits: Record<string, { price: string; stocks: Record<string, string> }>
+  error: string
+  saving: boolean
+  saved: boolean
+}
+
 export default function KaspiShopProductAvailability() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
@@ -80,6 +109,7 @@ export default function KaspiShopProductAvailability() {
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({})
   const [stockModal, setStockModal] = useState<StockModalState | null>(null)
   const [search, setSearch] = useState('')
+  const [addModal, setAddModal] = useState<AddModalState | null>(null)
 
   useEffect(() => { load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -174,6 +204,104 @@ export default function KaspiShopProductAvailability() {
     }, 2000)
   }
 
+  function openAddModal() {
+    setAddModal({
+      step: 'search', query: '', searching: false, results: [], total: 0,
+      selected: null, infoLoading: false, suggestedSku: '', lowestPrice: null,
+      cities: [], edits: {}, error: '', saving: false, saved: false,
+    })
+  }
+
+  async function runAddSearch() {
+    if (!addModal || !addModal.query.trim() || addModal.searching) return
+    setAddModal(prev => prev ? { ...prev, searching: true, error: '' } : prev)
+    try {
+      const headers = await authHeader()
+      const res = await fetch(`/api/kaspi-shop/products/search?text=${encodeURIComponent(addModal.query.trim())}`, { headers })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setAddModal(prev => prev ? { ...prev, searching: false, error: data.error || 'Не удалось выполнить поиск' } : prev)
+        return
+      }
+      setAddModal(prev => prev ? { ...prev, searching: false, results: data.products || [], total: data.total || 0 } : prev)
+    } catch {
+      setAddModal(prev => prev ? { ...prev, searching: false, error: 'Не удалось выполнить поиск. Проверьте соединение.' } : prev)
+    }
+  }
+
+  async function selectAddProduct(product: CatalogProduct) {
+    setAddModal(prev => prev ? { ...prev, step: 'form', selected: product, infoLoading: true, error: '' } : prev)
+    try {
+      const headers = await authHeader()
+      const res = await fetch(`/api/kaspi-shop/products/add-info?code=${encodeURIComponent(product.id)}`, { headers })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setAddModal(prev => prev ? { ...prev, infoLoading: false, error: data.error || 'Не удалось загрузить данные для добавления' } : prev)
+        return
+      }
+      const cities: AddCity[] = data.cities || []
+      const edits: AddModalState['edits'] = {}
+      for (const c of cities) edits[c.cityId] = { price: '', stocks: {} }
+      setAddModal(prev => prev ? {
+        ...prev, infoLoading: false,
+        suggestedSku: data.suggestedSku || '',
+        lowestPrice: data.lowestPrice ?? null,
+        cities, edits,
+      } : prev)
+    } catch {
+      setAddModal(prev => prev ? { ...prev, infoLoading: false, error: 'Не удалось загрузить данные. Проверьте соединение.' } : prev)
+    }
+  }
+
+  async function submitAdd() {
+    if (!addModal || !addModal.selected || addModal.saving) return
+    const entries = addModal.cities
+      .map(c => {
+        const price = Number(addModal.edits[c.cityId]?.price)
+        if (!Number.isFinite(price) || price <= 0) return null
+        return {
+          cityId: c.cityId,
+          price,
+          points: c.points.map(p => ({
+            storeCode: p.storeCode,
+            stockCount: addModal.edits[c.cityId]?.stocks[p.storeCode]?.trim() ? Number(addModal.edits[c.cityId].stocks[p.storeCode]) : null,
+          })),
+        }
+      })
+      .filter(Boolean)
+    if (entries.length === 0) {
+      setAddModal(prev => prev ? { ...prev, error: 'Укажите цену хотя бы для одного города.' } : prev)
+      return
+    }
+    setAddModal(prev => prev ? { ...prev, saving: true, error: '' } : prev)
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/kaspi-shop/products/add', {
+        method: 'POST', headers,
+        body: JSON.stringify({
+          masterProductCode: addModal.selected.id,
+          sku: addModal.suggestedSku,
+          model: addModal.selected.title,
+          entries,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.ok) {
+        setAddModal(prev => prev ? { ...prev, saving: false, error: data.error || 'Не удалось добавить товар' } : prev)
+        return
+      }
+      setAddModal(prev => prev ? { ...prev, saving: false, saved: true } : prev)
+      // Same auto-close pattern as the stock modal; the fresh offer shows up
+      // through the regular list reload once Kaspi processes it.
+      setTimeout(() => {
+        setAddModal(prev => (prev && prev.saved && !prev.saving ? null : prev))
+        load()
+      }, 2500)
+    } catch {
+      setAddModal(prev => prev ? { ...prev, saving: false, error: 'Не удалось добавить товар. Проверьте соединение.' } : prev)
+    }
+  }
+
   async function toggle(sku: string, action: 'restore' | 'remove') {
     setRowStates(prev => ({ ...prev, [sku]: 'busy' }))
     setRowErrors(prev => ({ ...prev, [sku]: '' }))
@@ -234,12 +362,19 @@ export default function KaspiShopProductAvailability() {
               )
             })}
           </div>
-          {/* Search filter (founder request 2026-08-22) -- with 500+
-              removed offers, finding one product by name was impractical. */}
-          <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Поиск по названию или SKU..."
-            className="text-sm rounded-full px-4 py-1.5 outline-none w-full sm:w-64"
-            style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-primary)', border: '1px solid var(--nav-border-soft)' }} />
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Search filter (founder request 2026-08-22) -- with 500+
+                removed offers, finding one product by name was impractical. */}
+            <input value={search} onChange={e => setSearch(e.target.value)}
+              placeholder="Поиск по названию или SKU..."
+              className="text-sm rounded-full px-4 py-1.5 outline-none w-full sm:w-64"
+              style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-primary)', border: '1px solid var(--nav-border-soft)' }} />
+            <button onClick={openAddModal}
+              className="text-xs font-semibold rounded-full px-3.5 py-2 transition-transform hover:-translate-y-0.5"
+              style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+              + Добавить товар
+            </button>
+          </div>
         </div>
 
         {loadError && (
@@ -412,6 +547,135 @@ export default function KaspiShopProductAvailability() {
                   style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                   {stockModal.saving ? 'Сохраняем…' : 'Сохранить изменения'}
                 </button>
+              )}
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* «Добавить товар» -- присоединение к существующей карточке Kaspi:
+          поиск по каталогу -> цена и остатки по городам -> Kaspi выставляет
+          на продажу асинхронно, как и в кабинете. */}
+      {addModal && (
+        <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center p-3 bg-black/30" onClick={() => setAddModal(null)}>
+          <motion.div initial={{ opacity: 0, scale: 0.95, y: 14 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ duration: 0.22, ease: EASE }}
+            className="relative nav-glass rounded-[24px] w-full max-w-md max-h-[86vh] overflow-y-auto"
+            style={{ boxShadow: '0 34px 80px -20px rgba(10,10,15,0.4), var(--nav-card-glow)' }}
+            onClick={e => e.stopPropagation()}>
+            <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[24px]" style={{ background: 'linear-gradient(90deg, var(--nav-accent), var(--nav-teal))' }} />
+            <div className="p-5 lg:p-6">
+              <div className="flex items-start justify-between gap-3 mb-1">
+                <div className="min-w-0">
+                  <div className="text-[11px] font-semibold tracking-wider uppercase mb-0.5" style={{ color: 'var(--nav-text-muted)' }}>Добавить товар</div>
+                  <div className="text-sm font-bold" style={{ color: 'var(--nav-text-primary)' }}>
+                    {addModal.step === 'search' ? 'Найдите товар в каталоге Kaspi' : addModal.selected?.title}
+                  </div>
+                </div>
+                <button onClick={() => setAddModal(null)} className="text-lg leading-none flex-shrink-0" style={{ color: 'var(--nav-text-secondary)' }}>✕</button>
+              </div>
+
+              {addModal.step === 'search' ? (
+                <>
+                  <p className="text-[11px] mb-4" style={{ color: 'var(--nav-text-muted)' }}>
+                    Как в кабинете Kaspi: найдите товар, который уже продаётся на Kaspi.kz, и присоединитесь к его карточке.
+                  </p>
+                  <div className="flex gap-2 mb-3">
+                    <input value={addModal.query}
+                      onChange={ev => setAddModal(prev => prev ? { ...prev, query: ev.target.value } : prev)}
+                      onKeyDown={ev => { if (ev.key === 'Enter') runAddSearch() }}
+                      placeholder="Название или артикул..."
+                      className="flex-1 text-sm rounded-lg px-3 py-2 outline-none border"
+                      style={{ borderColor: 'var(--nav-border-soft)', background: 'var(--nav-surface-chrome)', color: 'var(--nav-text-primary)' }} />
+                    <button onClick={runAddSearch} disabled={addModal.searching || !addModal.query.trim()}
+                      className="text-xs font-semibold rounded-lg px-3.5 disabled:opacity-60"
+                      style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                      {addModal.searching ? '...' : 'Найти'}
+                    </button>
+                  </div>
+
+                  {addModal.error && <div className="text-xs mb-2" style={{ color: 'var(--nav-critical)' }}>{addModal.error}</div>}
+
+                  {addModal.results.map(p => (
+                    <button key={p.id} onClick={() => selectAddProduct(p)}
+                      className="w-full flex items-center gap-3 rounded-xl p-2.5 mb-2 text-left transition-transform hover:-translate-y-0.5"
+                      style={{ background: 'var(--nav-bg)' }}>
+                      {p.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={p.imageUrl} alt="" className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
+                      ) : (
+                        <div className="w-10 h-10 rounded-lg flex-shrink-0" style={{ background: 'var(--nav-surface-glass)' }} />
+                      )}
+                      <div className="min-w-0">
+                        <div className="text-xs font-semibold truncate" style={{ color: 'var(--nav-text-primary)' }}>{p.title}</div>
+                        <div className="text-[10px] truncate" style={{ color: 'var(--nav-text-muted)' }}>{p.categoryName || p.id}</div>
+                      </div>
+                    </button>
+                  ))}
+
+                  {!addModal.searching && addModal.results.length === 0 && !addModal.error && addModal.query.trim() && (
+                    <div className="text-xs py-2" style={{ color: 'var(--nav-text-secondary)' }}>Нажмите «Найти», чтобы начать поиск.</div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <p className="text-[11px] mb-4" style={{ color: 'var(--nav-text-muted)' }}>
+                    Цена и остаток по каждому городу. Остаток можно оставить пустым — Kaspi выставит товар без учёта остатков.
+                  </p>
+
+                  {addModal.infoLoading && <div className="text-xs py-6 text-center" style={{ color: 'var(--nav-text-secondary)' }}>Загружаем точки продаж…</div>}
+
+                  {!addModal.infoLoading && addModal.suggestedSku && (
+                    <div className="text-[11px] mb-3" style={{ color: 'var(--nav-text-muted)' }}>
+                      Артикул: <span className="font-mono">{addModal.suggestedSku}</span>
+                      {addModal.lowestPrice !== null && <> · Самая низкая цена на Kaspi: {addModal.lowestPrice.toLocaleString('ru-KZ')} ₸</>}
+                    </div>
+                  )}
+
+                  {!addModal.infoLoading && addModal.cities.length === 0 && !addModal.error && (
+                    <div className="text-xs py-4" style={{ color: 'var(--nav-text-secondary)' }}>
+                      Не удалось загрузить точки продаж — добавьте товар пока через кабинет Kaspi.
+                    </div>
+                  )}
+
+                  {addModal.cities.map(c => (
+                    <div key={c.cityId} className="rounded-xl p-3 mb-2" style={{ background: 'var(--nav-bg)' }}>
+                      <div className="text-xs font-semibold mb-2" style={{ color: 'var(--nav-text-primary)' }}>{c.cityName}</div>
+                      <label className="block mb-2">
+                        <span className="text-[10px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Цена, ₸</span>
+                        <input type="number"
+                          className="w-full rounded-lg px-2 py-1.5 text-sm font-mono outline-none border"
+                          style={{ borderColor: 'var(--nav-border-soft)', background: 'var(--nav-surface-chrome)', color: 'var(--nav-text-primary)' }}
+                          value={addModal.edits[c.cityId]?.price ?? ''}
+                          onChange={ev => setAddModal(prev => prev ? { ...prev, saved: false, edits: { ...prev.edits, [c.cityId]: { ...prev.edits[c.cityId], price: ev.target.value } } } : prev)} />
+                      </label>
+                      {c.points.map(p => (
+                        <label key={p.storeCode} className="block mb-1.5">
+                          <span className="text-[10px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Остаток, {p.displayName}</span>
+                          <input type="number" placeholder="Не указан"
+                            className="w-full rounded-lg px-2 py-1.5 text-sm font-mono outline-none border"
+                            style={{ borderColor: 'var(--nav-border-soft)', background: 'var(--nav-surface-chrome)', color: 'var(--nav-text-primary)' }}
+                            value={addModal.edits[c.cityId]?.stocks[p.storeCode] ?? ''}
+                            onChange={ev => setAddModal(prev => prev ? {
+                              ...prev, saved: false,
+                              edits: { ...prev.edits, [c.cityId]: { ...prev.edits[c.cityId], stocks: { ...prev.edits[c.cityId]?.stocks, [p.storeCode]: ev.target.value } } },
+                            } : prev)} />
+                        </label>
+                      ))}
+                    </div>
+                  ))}
+
+                  {addModal.error && <div className="text-xs mt-2 mb-2" style={{ color: 'var(--nav-critical)' }}>{addModal.error}</div>}
+                  {addModal.saved && <div className="text-xs mt-2 mb-2" style={{ color: 'var(--nav-success)' }}>Отправлено — Kaspi выставит товар на продажу в течение часа.</div>}
+
+                  {!addModal.infoLoading && addModal.cities.length > 0 && (
+                    <button onClick={submitAdd} disabled={addModal.saving}
+                      className="w-full mt-2 rounded-xl py-2.5 text-sm font-semibold disabled:opacity-60"
+                      style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                      {addModal.saving ? 'Добавляем…' : 'Добавить товар'}
+                    </button>
+                  )}
+                </>
               )}
             </div>
           </motion.div>
