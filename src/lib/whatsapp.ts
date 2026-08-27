@@ -108,6 +108,23 @@ export async function getWhatsAppDisplayPhoneNumber(phoneNumberId: string, acces
   }
 }
 
+// Independent check used ONLY to decide whether a registerWhatsAppPhoneNumber
+// failure is safe to ignore (Embedded Signup v4 already registers the number
+// inside its own popup flow for most connect attempts, making our own
+// /register call a redundant no-op that Meta rejects) -- never trust the
+// register() error message alone, always re-confirm against Meta directly.
+export async function isWhatsAppPhoneNumberVerified(phoneNumberId: string, accessToken: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${GRAPH_API}/${phoneNumberId}?fields=code_verification_status`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+    const data = await res.json().catch(() => null)
+    return res.ok && data?.code_verification_status === 'VERIFIED'
+  } catch {
+    return false
+  }
+}
+
 // Downloads a WhatsApp media object (image/audio) for the AI-агент
 // photo/voice pipeline. Two-step Cloud API dance: (1) GET the media id to
 // get a short-lived CDN url + declared mime_type, (2) GET that url with the

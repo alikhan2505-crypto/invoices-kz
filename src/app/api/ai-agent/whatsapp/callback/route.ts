@@ -7,6 +7,7 @@ import {
   registerWhatsAppPhoneNumber,
   subscribeWhatsAppWebhooks,
   getWhatsAppDisplayPhoneNumber,
+  isWhatsAppPhoneNumberVerified,
   WhatsAppApiError,
 } from '@/lib/whatsapp'
 
@@ -69,8 +70,23 @@ export async function POST(req: NextRequest) {
     const { accessToken } = await exchangeWhatsAppCode(code, appId, appSecret)
 
     // 2. Register the number for Cloud API messaging -- without this the
-    // number can't send/receive through the API at all.
-    await registerWhatsAppPhoneNumber(phoneNumberId, accessToken)
+    // number can't send/receive through the API at all. Embedded Signup v4
+    // already completes this INSIDE its own popup for most connect
+    // attempts (the phone-verification screen the customer sees), making
+    // our own call here redundant -- Meta then rejects it with a generic
+    // "(#10) Application does not have permission for this action" that
+    // looks identical to a genuine permission failure. Never assume that
+    // generic message means "already done, safe to ignore" -- independently
+    // re-check the number's real verification status with Meta before
+    // deciding, and only then continue; otherwise let the original error
+    // propagate and fail the connect attempt honestly.
+    try {
+      await registerWhatsAppPhoneNumber(phoneNumberId, accessToken)
+    } catch (registerError: any) {
+      const verified = await isWhatsAppPhoneNumberVerified(phoneNumberId, accessToken)
+      if (!verified) throw registerError
+      console.error('ai-agent WhatsApp register call failed but number is independently confirmed VERIFIED -- continuing:', registerError instanceof WhatsAppApiError ? `[${registerError.status}] ${registerError.message}` : registerError.message)
+    }
 
     // 3. Subscribe OUR app to this WABA's webhooks -- required, not
     // best-effort: an unsubscribed connection looks connected but never
