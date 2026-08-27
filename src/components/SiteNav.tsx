@@ -31,6 +31,8 @@ const invoicesLinks: { href: string; label: LocalizedLabel }[] = [
 const kaspiShopLinks: { href: string; label: LocalizedLabel }[] = [
   { href: '/kaspi-shop', label: { ru: 'Демпинг', kk: 'Демпинг', en: 'Repricer' } },
   { href: '/kaspi-shop/orders', label: { ru: 'Заказы', kk: 'Тапсырыстар', en: 'Orders' } },
+  { href: '/kaspi-shop/storefront', label: { ru: 'Витрина', kk: 'Витрина', en: 'Storefront' } },
+  { href: '/kaspi-shop/storefront-orders', label: { ru: 'Заказы витрины', kk: 'Витрина тапсырыстары', en: 'Storefront orders' } },
   { href: '/kaspi-shop/refunds', label: { ru: 'Возвраты', kk: 'Қайтарулар', en: 'Refunds' } },
   { href: '/kaspi-shop/finance', label: { ru: 'Финансы', kk: 'Қаржы', en: 'Finance' } },
   { href: '/kaspi-shop/pending-products', label: { ru: 'Нераспознанные товары', kk: 'Танылмаған тауарлар', en: 'Unmatched products' } },
