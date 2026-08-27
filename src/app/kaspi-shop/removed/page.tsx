@@ -76,6 +76,43 @@ type CatalogProduct = {
 
 type AddCity = { cityId: string; cityName: string; points: { storeCode: string; displayName: string }[] }
 
+// «Добавить товар → Создать новую карточку»: category tree -> brand -> photo
+// -> dynamic attribute form (schema-driven, generic across every Kaspi
+// category) -> price/stock -> submit to Kaspi moderation. See
+// docs/superpowers/specs/2026-08-27-kaspi-add-product-phase2-design.md.
+type NewCardCategory = { code: string; name: string; hasChildren: boolean; closed: boolean; imageUrl: string | null }
+type NewCardBrandOpt = { code: string; name: string; restricted: boolean }
+type AttributeOptionUI = { code: string; name: string }
+type AttributeFieldUI = { name: string; attributeCode: string; mandatory: boolean; type: string; multiValued: boolean; options: AttributeOptionUI[] }
+type ClassificationGroupUI = { code: string; name: string; features: AttributeFieldUI[] }
+
+type NewCardModalState = {
+  step: 'category' | 'brand' | 'photo' | 'attributes'
+  breadcrumb: { code: string; name: string }[]
+  categories: NewCardCategory[]
+  categoriesLoading: boolean
+  selectedCategoryCode: string | null
+  selectedCategoryName: string | null
+  brandQuery: string
+  brands: NewCardBrandOpt[]
+  brandsLoading: boolean
+  selectedBrand: { code: string; name: string } | null
+  photoPreviewUrl: string | null
+  photoUploading: boolean
+  imageId: string | null
+  imageUrls: { large: string; medium: string; small: string } | null
+  youtubeLink: string
+  schema: ClassificationGroupUI[]
+  schemaLoading: boolean
+  suggestedSku: string
+  attributeValues: Record<string, string[]>
+  cities: AddCity[]
+  priceEdits: Record<string, { price: string; stocks: Record<string, string> }>
+  error: string
+  saving: boolean
+  saved: boolean
+}
+
 // Add-product wizard, mirroring the cabinet's «Присоединиться к существующей
 // карточке» flow: search step -> price/stock step -> async success.
 type AddModalState = {
@@ -110,6 +147,7 @@ export default function KaspiShopProductAvailability() {
   const [stockModal, setStockModal] = useState<StockModalState | null>(null)
   const [search, setSearch] = useState('')
   const [addModal, setAddModal] = useState<AddModalState | null>(null)
+  const [newCardModal, setNewCardModal] = useState<NewCardModalState | null>(null)
 
   useEffect(() => { load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -302,6 +340,199 @@ export default function KaspiShopProductAvailability() {
     }
   }
 
+  async function loadCategoryLevel(parentCode: string | null, breadcrumb: { code: string; name: string }[]) {
+    setNewCardModal(prev => prev ? { ...prev, categoriesLoading: true, breadcrumb, error: '' } : prev)
+    try {
+      const headers = await authHeader()
+      const url = parentCode
+        ? `/api/kaspi-shop/products/new-card/categories?parent=${encodeURIComponent(parentCode)}`
+        : '/api/kaspi-shop/products/new-card/categories'
+      const res = await fetch(url, { headers })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setNewCardModal(prev => prev ? { ...prev, categoriesLoading: false, error: data.error || 'Не удалось загрузить категории' } : prev)
+        return
+      }
+      setNewCardModal(prev => prev ? { ...prev, categoriesLoading: false, categories: data.categories || [] } : prev)
+    } catch {
+      setNewCardModal(prev => prev ? { ...prev, categoriesLoading: false, error: 'Не удалось загрузить категории. Проверьте соединение.' } : prev)
+    }
+  }
+
+  function openNewCardModal() {
+    setNewCardModal({
+      step: 'category', breadcrumb: [], categories: [], categoriesLoading: true,
+      selectedCategoryCode: null, selectedCategoryName: null,
+      brandQuery: '', brands: [], brandsLoading: false, selectedBrand: null,
+      photoPreviewUrl: null, photoUploading: false, imageId: null, imageUrls: null, youtubeLink: '',
+      schema: [], schemaLoading: false, suggestedSku: '', attributeValues: {},
+      cities: [], priceEdits: {}, error: '', saving: false, saved: false,
+    })
+    loadCategoryLevel(null, [])
+  }
+
+  async function searchNewCardBrands(categoryCode: string, prefix: string) {
+    setNewCardModal(prev => prev ? { ...prev, brandsLoading: true, error: '' } : prev)
+    try {
+      const headers = await authHeader()
+      const res = await fetch(`/api/kaspi-shop/products/new-card/brands?category=${encodeURIComponent(categoryCode)}&prefix=${encodeURIComponent(prefix)}`, { headers })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setNewCardModal(prev => prev ? { ...prev, brandsLoading: false, error: data.error || 'Не удалось загрузить бренды' } : prev)
+        return
+      }
+      const brands: NewCardBrandOpt[] = data.brands || []
+      setNewCardModal(prev => {
+        if (!prev) return prev
+        // Pre-select «Без бренда» the first time brands load (empty prefix) --
+        // resolved by exact name, never a hardcoded/guessed code. The founder
+        // can still pick a real brand afterward.
+        const noBrand = brands.find(b => b.name === 'Без бренда') || null
+        return { ...prev, brandsLoading: false, brands, selectedBrand: prev.selectedBrand ?? noBrand }
+      })
+    } catch {
+      setNewCardModal(prev => prev ? { ...prev, brandsLoading: false, error: 'Не удалось загрузить бренды. Проверьте соединение.' } : prev)
+    }
+  }
+
+  function clickCategory(cat: NewCardCategory) {
+    if (cat.closed || !newCardModal) return
+    if (cat.hasChildren) {
+      loadCategoryLevel(cat.code, [...newCardModal.breadcrumb, { code: cat.code, name: cat.name }])
+    } else {
+      setNewCardModal(prev => prev ? { ...prev, step: 'brand', selectedCategoryCode: cat.code, selectedCategoryName: cat.name } : prev)
+      searchNewCardBrands(cat.code, '')
+    }
+  }
+
+  function categoryBack() {
+    if (!newCardModal || newCardModal.breadcrumb.length === 0) return
+    const nextCrumb = newCardModal.breadcrumb.slice(0, -1)
+    const parent = nextCrumb.length > 0 ? nextCrumb[nextCrumb.length - 1].code : null
+    loadCategoryLevel(parent, nextCrumb)
+  }
+
+  function selectBrand(b: NewCardBrandOpt) {
+    if (b.restricted) return
+    setNewCardModal(prev => prev ? { ...prev, selectedBrand: { code: b.code, name: b.name }, step: 'photo' } : prev)
+  }
+
+  async function uploadNewCardPhoto(file: File) {
+    setNewCardModal(prev => prev ? { ...prev, photoUploading: true, error: '' } : prev)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const form = new FormData()
+      form.append('file', file, file.name)
+      const res = await fetch('/api/kaspi-shop/products/new-card/photo', {
+        method: 'POST',
+        // No Content-Type here on purpose -- the browser derives the
+        // multipart boundary from the FormData body itself.
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+        body: form,
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setNewCardModal(prev => prev ? { ...prev, photoUploading: false, error: data.error || 'Не удалось загрузить фото' } : prev)
+        return
+      }
+      setNewCardModal(prev => prev ? {
+        ...prev, photoUploading: false, imageId: data.imageId, imageUrls: data.urls,
+        photoPreviewUrl: URL.createObjectURL(file),
+      } : prev)
+    } catch {
+      setNewCardModal(prev => prev ? { ...prev, photoUploading: false, error: 'Не удалось загрузить фото. Проверьте соединение.' } : prev)
+    }
+  }
+
+  async function proceedToAttributes() {
+    if (!newCardModal || !newCardModal.selectedCategoryCode) return
+    setNewCardModal(prev => prev ? { ...prev, step: 'attributes', schemaLoading: true, error: '' } : prev)
+    try {
+      const headers = await authHeader()
+      const res = await fetch(`/api/kaspi-shop/products/new-card/attribute-schema?category=${encodeURIComponent(newCardModal.selectedCategoryCode)}`, { headers })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setNewCardModal(prev => prev ? { ...prev, schemaLoading: false, error: data.error || 'Не удалось загрузить характеристики' } : prev)
+        return
+      }
+      const cities: AddCity[] = data.cities || []
+      const priceEdits: NewCardModalState['priceEdits'] = {}
+      for (const c of cities) priceEdits[c.cityId] = { price: '', stocks: {} }
+      setNewCardModal(prev => prev ? {
+        ...prev, schemaLoading: false,
+        schema: data.classifications || [], suggestedSku: data.suggestedSku || '',
+        cities, priceEdits,
+      } : prev)
+    } catch {
+      setNewCardModal(prev => prev ? { ...prev, schemaLoading: false, error: 'Не удалось загрузить характеристики. Проверьте соединение.' } : prev)
+    }
+  }
+
+  function setAttributeValue(attributeCode: string, values: string[]) {
+    setNewCardModal(prev => prev ? { ...prev, saved: false, attributeValues: { ...prev.attributeValues, [attributeCode]: values } } : prev)
+  }
+
+  function toggleMultiEnumValue(attributeCode: string, code: string) {
+    const current = newCardModal?.attributeValues[attributeCode] || []
+    setAttributeValue(attributeCode, current.includes(code) ? current.filter(c => c !== code) : [...current, code])
+  }
+
+  function missingMandatoryFields(m: NewCardModalState): string[] {
+    return m.schema.flatMap(g => g.features)
+      .filter(f => f.mandatory && (m.attributeValues[f.attributeCode] ?? []).length === 0)
+      .map(f => f.name)
+  }
+
+  async function submitNewCard() {
+    if (!newCardModal || newCardModal.saving) return
+    if (!newCardModal.selectedCategoryCode || !newCardModal.selectedBrand || !newCardModal.imageId || !newCardModal.imageUrls) return
+    if (missingMandatoryFields(newCardModal).length > 0) return
+    const entries = newCardModal.cities
+      .map(c => {
+        const price = Number(newCardModal.priceEdits[c.cityId]?.price)
+        if (!Number.isFinite(price) || price <= 0) return null
+        return {
+          cityId: c.cityId,
+          price,
+          points: c.points.map(p => ({
+            storeCode: p.storeCode,
+            stockCount: newCardModal.priceEdits[c.cityId]?.stocks[p.storeCode]?.trim() ? Number(newCardModal.priceEdits[c.cityId].stocks[p.storeCode]) : null,
+          })),
+        }
+      })
+      .filter(Boolean)
+    setNewCardModal(prev => prev ? { ...prev, saving: true, error: '' } : prev)
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/kaspi-shop/products/new-card/create', {
+        method: 'POST', headers,
+        body: JSON.stringify({
+          categoryCode: newCardModal.selectedCategoryCode,
+          categoryName: newCardModal.selectedCategoryName,
+          brand: newCardModal.selectedBrand,
+          sku: newCardModal.suggestedSku,
+          attributes: newCardModal.attributeValues,
+          imageId: newCardModal.imageId,
+          imageUrls: newCardModal.imageUrls,
+          youtubeLink: newCardModal.youtubeLink || undefined,
+          entries,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.ok) {
+        setNewCardModal(prev => prev ? { ...prev, saving: false, error: data.error || 'Не удалось создать карточку' } : prev)
+        return
+      }
+      setNewCardModal(prev => prev ? { ...prev, saving: false, saved: true } : prev)
+      setTimeout(() => {
+        setNewCardModal(prev => (prev && prev.saved && !prev.saving ? null : prev))
+        load()
+      }, 3000)
+    } catch {
+      setNewCardModal(prev => prev ? { ...prev, saving: false, error: 'Не удалось создать карточку. Проверьте соединение.' } : prev)
+    }
+  }
+
   async function toggle(sku: string, action: 'restore' | 'remove') {
     setRowStates(prev => ({ ...prev, [sku]: 'busy' }))
     setRowErrors(prev => ({ ...prev, [sku]: '' }))
@@ -373,6 +604,11 @@ export default function KaspiShopProductAvailability() {
               className="text-xs font-semibold rounded-full px-3.5 py-2 transition-transform hover:-translate-y-0.5"
               style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
               + Добавить товар
+            </button>
+            <button onClick={openNewCardModal}
+              className="nav-glass text-xs font-semibold rounded-full px-3.5 py-2 transition-transform hover:-translate-y-0.5"
+              style={{ color: 'var(--nav-text-primary)' }}>
+              + Новая карточка
             </button>
           </div>
         </div>
@@ -674,6 +910,229 @@ export default function KaspiShopProductAvailability() {
                       style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                       {addModal.saving ? 'Добавляем…' : 'Добавить товар'}
                     </button>
+                  )}
+                </>
+              )}
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* «Добавить товар → Создать новую карточку» -- category tree -> brand
+          -> photo -> dynamic attribute form (schema-driven, works for any
+          Kaspi category) -> price/stock -> submit to moderation. */}
+      {newCardModal && (
+        <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center p-3 bg-black/30" onClick={() => setNewCardModal(null)}>
+          <motion.div initial={{ opacity: 0, scale: 0.95, y: 14 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ duration: 0.22, ease: EASE }}
+            className="relative nav-glass rounded-[24px] w-full max-w-lg max-h-[86vh] overflow-y-auto"
+            style={{ boxShadow: '0 34px 80px -20px rgba(10,10,15,0.4), var(--nav-card-glow)' }}
+            onClick={e => e.stopPropagation()}>
+            <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[24px]" style={{ background: 'linear-gradient(90deg, var(--nav-accent), var(--nav-teal))' }} />
+            <div className="p-5 lg:p-6">
+              <div className="flex items-start justify-between gap-3 mb-1">
+                <div className="min-w-0">
+                  <div className="text-[11px] font-semibold tracking-wider uppercase mb-0.5" style={{ color: 'var(--nav-text-muted)' }}>Новая карточка</div>
+                  <div className="text-sm font-bold" style={{ color: 'var(--nav-text-primary)' }}>
+                    {newCardModal.step === 'category' && 'Выберите категорию'}
+                    {newCardModal.step === 'brand' && 'Выберите бренд'}
+                    {newCardModal.step === 'photo' && 'Фото товара'}
+                    {newCardModal.step === 'attributes' && 'Характеристики'}
+                  </div>
+                </div>
+                <button onClick={() => setNewCardModal(null)} className="text-lg leading-none flex-shrink-0" style={{ color: 'var(--nav-text-secondary)' }}>✕</button>
+              </div>
+
+              {newCardModal.step === 'category' && (
+                <>
+                  <div className="flex items-center flex-wrap gap-1 mb-3 text-[11px]" style={{ color: 'var(--nav-text-muted)' }}>
+                    <button onClick={() => loadCategoryLevel(null, [])} className="hover:underline">Все категории</button>
+                    {newCardModal.breadcrumb.map((c, i) => (
+                      <span key={c.code} className="flex items-center gap-1">
+                        <span>/</span>
+                        <button onClick={() => loadCategoryLevel(c.code, newCardModal.breadcrumb.slice(0, i + 1))} className="hover:underline">{c.name}</button>
+                      </span>
+                    ))}
+                  </div>
+                  {newCardModal.breadcrumb.length > 0 && (
+                    <button onClick={categoryBack} className="text-xs font-semibold mb-2" style={{ color: 'var(--nav-accent)' }}>← Назад</button>
+                  )}
+                  {newCardModal.categoriesLoading && <div className="text-xs py-6 text-center" style={{ color: 'var(--nav-text-secondary)' }}>Загружаем категории…</div>}
+                  {!newCardModal.categoriesLoading && newCardModal.categories.map(cat => (
+                    <button key={cat.code} onClick={() => clickCategory(cat)} disabled={cat.closed}
+                      className="w-full flex items-center justify-between gap-3 rounded-xl p-2.5 mb-1.5 text-left transition-transform hover:-translate-y-0.5 disabled:opacity-50"
+                      style={{ background: 'var(--nav-bg)' }}>
+                      <span className="text-xs font-semibold truncate" style={{ color: 'var(--nav-text-primary)' }}>
+                        {cat.name}{cat.closed && ' — категория ограничена'}
+                      </span>
+                      {cat.hasChildren && <span style={{ color: 'var(--nav-text-muted)' }}>›</span>}
+                    </button>
+                  ))}
+                </>
+              )}
+
+              {newCardModal.step === 'brand' && (
+                <>
+                  <p className="text-[11px] mb-3" style={{ color: 'var(--nav-text-muted)' }}>Категория: {newCardModal.selectedCategoryName}</p>
+                  <input value={newCardModal.brandQuery}
+                    onChange={ev => {
+                      const q = ev.target.value
+                      setNewCardModal(prev => prev ? { ...prev, brandQuery: q } : prev)
+                      if (newCardModal.selectedCategoryCode) searchNewCardBrands(newCardModal.selectedCategoryCode, q)
+                    }}
+                    placeholder="Поиск бренда..."
+                    className="w-full text-sm rounded-lg px-3 py-2 outline-none border mb-3"
+                    style={{ borderColor: 'var(--nav-border-soft)', background: 'var(--nav-surface-chrome)', color: 'var(--nav-text-primary)' }} />
+                  {newCardModal.brandsLoading && <div className="text-xs py-4 text-center" style={{ color: 'var(--nav-text-secondary)' }}>Загружаем бренды…</div>}
+                  {!newCardModal.brandsLoading && newCardModal.brands.map(b => (
+                    <button key={b.code} onClick={() => selectBrand(b)} disabled={b.restricted}
+                      className="w-full flex items-center justify-between gap-3 rounded-xl p-2.5 mb-1.5 text-left transition-transform hover:-translate-y-0.5 disabled:opacity-50"
+                      style={{ background: newCardModal.selectedBrand?.code === b.code ? 'var(--nav-accent)' : 'var(--nav-bg)' }}>
+                      <span className="text-xs font-semibold truncate" style={{ color: newCardModal.selectedBrand?.code === b.code ? 'var(--nav-accent-ink)' : 'var(--nav-text-primary)' }}>
+                        {b.name}{b.restricted && ' — бренд ограничен'}
+                      </span>
+                    </button>
+                  ))}
+                </>
+              )}
+
+              {newCardModal.step === 'photo' && (
+                <>
+                  <p className="text-[11px] mb-3" style={{ color: 'var(--nav-text-muted)' }}>
+                    Минимум одно фото — как в кабинете Kaspi. Требования: реальное фото товара, без чужих логотипов и водяных знаков.
+                  </p>
+                  <label className="flex flex-col items-center justify-center gap-2 rounded-xl p-6 mb-3 cursor-pointer" style={{ background: 'var(--nav-bg)', border: '1px dashed var(--nav-border-soft)' }}>
+                    {newCardModal.photoPreviewUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={newCardModal.photoPreviewUrl} alt="" className="w-24 h-24 rounded-lg object-cover" />
+                    ) : (
+                      <span className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>
+                        {newCardModal.photoUploading ? 'Загружаем…' : 'Нажмите, чтобы выбрать фото'}
+                      </span>
+                    )}
+                    <input type="file" accept="image/*" className="hidden" disabled={newCardModal.photoUploading}
+                      onChange={ev => { const f = ev.target.files?.[0]; if (f) uploadNewCardPhoto(f) }} />
+                  </label>
+                  <label className="block mb-3">
+                    <span className="text-[10px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Ссылка на Youtube (необязательно)</span>
+                    <input value={newCardModal.youtubeLink}
+                      onChange={ev => setNewCardModal(prev => prev ? { ...prev, youtubeLink: ev.target.value } : prev)}
+                      className="w-full text-sm rounded-lg px-3 py-2 outline-none border"
+                      style={{ borderColor: 'var(--nav-border-soft)', background: 'var(--nav-surface-chrome)', color: 'var(--nav-text-primary)' }} />
+                  </label>
+                  {newCardModal.error && <div className="text-xs mb-2" style={{ color: 'var(--nav-critical)' }}>{newCardModal.error}</div>}
+                  {newCardModal.imageId && (
+                    <button onClick={proceedToAttributes}
+                      className="w-full rounded-xl py-2.5 text-sm font-semibold"
+                      style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                      Продолжить
+                    </button>
+                  )}
+                </>
+              )}
+
+              {newCardModal.step === 'attributes' && (
+                <>
+                  {newCardModal.schemaLoading && <div className="text-xs py-6 text-center" style={{ color: 'var(--nav-text-secondary)' }}>Загружаем характеристики…</div>}
+                  {!newCardModal.schemaLoading && (
+                    <>
+                      <div className="text-[11px] mb-3" style={{ color: 'var(--nav-text-muted)' }}>
+                        Артикул: <span className="font-mono">{newCardModal.suggestedSku}</span>
+                      </div>
+                      {newCardModal.schema.filter(g => g.features.length > 0).map(group => (
+                        <div key={group.code} className="rounded-xl p-3 mb-2" style={{ background: 'var(--nav-bg)' }}>
+                          <div className="text-xs font-semibold mb-2" style={{ color: 'var(--nav-text-primary)' }}>{group.name}</div>
+                          {group.features.map(f => {
+                            const values = newCardModal.attributeValues[f.attributeCode] ?? []
+                            return (
+                              <div key={f.attributeCode} className="mb-2.5">
+                                <span className="text-[10px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>
+                                  {f.name}{f.mandatory && ' *'}
+                                </span>
+                                {f.type === 'enum' && f.multiValued && (
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {f.options.map(o => (
+                                      <button key={o.code} onClick={() => toggleMultiEnumValue(f.attributeCode, o.code)}
+                                        className="text-[11px] font-medium rounded-full px-2.5 py-1"
+                                        style={values.includes(o.code)
+                                          ? { background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }
+                                          : { background: 'var(--nav-surface-chrome)', color: 'var(--nav-text-secondary)', border: '1px solid var(--nav-border-soft)' }}>
+                                        {o.name}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                                {f.type === 'enum' && !f.multiValued && (
+                                  <select value={values[0] ?? ''} onChange={ev => setAttributeValue(f.attributeCode, ev.target.value ? [ev.target.value] : [])}
+                                    className="w-full text-sm rounded-lg px-2 py-1.5 outline-none border"
+                                    style={{ borderColor: 'var(--nav-border-soft)', background: 'var(--nav-surface-chrome)', color: 'var(--nav-text-primary)' }}>
+                                    <option value="">— не выбрано —</option>
+                                    {f.options.map(o => <option key={o.code} value={o.code}>{o.name}</option>)}
+                                  </select>
+                                )}
+                                {(f.type === 'string' || f.type === 'number') && (
+                                  <input type={f.type === 'number' ? 'number' : 'text'} value={values[0] ?? ''}
+                                    onChange={ev => setAttributeValue(f.attributeCode, ev.target.value ? [ev.target.value] : [])}
+                                    className="w-full text-sm rounded-lg px-2 py-1.5 outline-none border"
+                                    style={{ borderColor: 'var(--nav-border-soft)', background: 'var(--nav-surface-chrome)', color: 'var(--nav-text-primary)' }} />
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      ))}
+
+                      {newCardModal.cities.map(c => (
+                        <div key={c.cityId} className="rounded-xl p-3 mb-2" style={{ background: 'var(--nav-bg)' }}>
+                          <div className="text-xs font-semibold mb-2" style={{ color: 'var(--nav-text-primary)' }}>{c.cityName}</div>
+                          <label className="block mb-2">
+                            <span className="text-[10px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Цена, ₸</span>
+                            <input type="number"
+                              className="w-full rounded-lg px-2 py-1.5 text-sm font-mono outline-none border"
+                              style={{ borderColor: 'var(--nav-border-soft)', background: 'var(--nav-surface-chrome)', color: 'var(--nav-text-primary)' }}
+                              value={newCardModal.priceEdits[c.cityId]?.price ?? ''}
+                              onChange={ev => setNewCardModal(prev => prev ? { ...prev, saved: false, priceEdits: { ...prev.priceEdits, [c.cityId]: { ...prev.priceEdits[c.cityId], price: ev.target.value } } } : prev)} />
+                          </label>
+                          {c.points.map(p => (
+                            <label key={p.storeCode} className="block mb-1.5">
+                              <span className="text-[10px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Остаток, {p.displayName}</span>
+                              <input type="number" placeholder="Не указан"
+                                className="w-full rounded-lg px-2 py-1.5 text-sm font-mono outline-none border"
+                                style={{ borderColor: 'var(--nav-border-soft)', background: 'var(--nav-surface-chrome)', color: 'var(--nav-text-primary)' }}
+                                value={newCardModal.priceEdits[c.cityId]?.stocks[p.storeCode] ?? ''}
+                                onChange={ev => setNewCardModal(prev => prev ? {
+                                  ...prev, saved: false,
+                                  priceEdits: { ...prev.priceEdits, [c.cityId]: { ...prev.priceEdits[c.cityId], stocks: { ...prev.priceEdits[c.cityId]?.stocks, [p.storeCode]: ev.target.value } } },
+                                } : prev)} />
+                            </label>
+                          ))}
+                        </div>
+                      ))}
+                      <p className="text-[11px] mb-2" style={{ color: 'var(--nav-text-muted)' }}>
+                        Если не указать цену и остатки, товар попадёт в «Сняты с продажи» — заполнить можно позже.
+                      </p>
+
+                      {newCardModal.error && <div className="text-xs mt-2 mb-2" style={{ color: 'var(--nav-critical)' }}>{newCardModal.error}</div>}
+                      {newCardModal.saved && <div className="text-xs mt-2 mb-2" style={{ color: 'var(--nav-success)' }}>Товар отправлен на проверку. Kaspi проверит его в течение 3 дней.</div>}
+
+                      {(() => {
+                        const missing = missingMandatoryFields(newCardModal)
+                        return (
+                          <>
+                            {missing.length > 0 && (
+                              <div className="text-[11px] mb-2" style={{ color: 'var(--nav-text-muted)' }}>
+                                Заполните: {missing.join(', ')}
+                              </div>
+                            )}
+                            <button onClick={submitNewCard} disabled={newCardModal.saving || missing.length > 0}
+                              className="w-full rounded-xl py-2.5 text-sm font-semibold disabled:opacity-60"
+                              style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                              {newCardModal.saving ? 'Отправляем…' : 'Отправить на модерацию'}
+                            </button>
+                          </>
+                        )
+                      })()}
+                    </>
                   )}
                 </>
               )}

@@ -121,13 +121,142 @@ Form fields seen for Wipes: Тип (enum, mandatory), Количество в у
 Назначение (enum), Антибактериальные (boolean radio); optional: Особенности,
 Состав, Дополнительно, Вес для логистики, Описание (≤7000 chars).
 
-### 2.5 NOT captured (deliberately)
-The **final create-card POST** (after «Заполнить цену и остатки») was not
-fired — submitting would have sent a junk «Без бренда» card to Kaspi's human
-moderation on the real account. Wizard was exited via its «Выйти без
-сохранения?» dialog. Likely a `POST` under `/content/pending/mc/product/...`
-(same service as link-to-master and new-code). Capture it the first time a
-real new card is genuinely needed.
+### 2.5 Шаг 4 → submit — captured live 2026-08-27 (real card, real moderation)
+
+Captured for real on merchant **30067228** while adding a genuine product:
+«Сортер Набор «Паста»» (children's sorting toy, Без бренда, category
+Детские товары → Игрушки → Развивающие игрушки). Photo was a placeholder
+(swapped for the real photo by the founder afterward in the cabinet); all
+other fields are real. Result: `status: "SUCCESS"`, card shown to the user as
+«Товар отправлен на проверку. Мы проверим ваш товар в течение 3 дней.» — a
+genuine pending-moderation card, not a dry run.
+
+**Attribute schema for this category** (`Master - Educational toys`), same
+shape as the Wipes schema in 2.4 — `attributeCode` values differ per
+category but the wrapper (`code`/`name`/`features[]`, each feature carrying
+`name`, `attributeCode`, `mandatory`, `attributeType: {code, multiValued}`,
+`values`) is identical:
+
+```
+Educational toys*Type              (enum, single)   — mandatory  e.g. "сортер"
+Educational toys*Educational function (enum, multi) — mandatory  e.g. "логика и мышление"
+Educational toys*Size              (string)         — mandatory  e.g. "20x15x8"
+Educational toys*Vendor code       (string)         — mandatory  "Артикул производителя (указан на коробке, пример: WT007)"
+Educational toys*Model             (string)         — mandatory, manufacturerSku:true, "Тема\модель"
+Educational toys*Number of elements(number)         — optional
+Educational toys*Character         (enum, single)   — optional
+Educational toys*Features          (string)         — optional
+Toys*Age                           (enum, multi)    — mandatory  e.g. "с 18 месяцев"
+Toys*Gender                        (enum, single)   — mandatory  "мальчик"/"девочка"/"универсальный"
+Toys*Color                         (enum, multi)    — mandatory  e.g. ["желтый","зеленый"]
+Toys*Material                      (enum, multi)    — mandatory  e.g. "пластик"
+```
+Note the two-namespace split: category-specific attrs live under
+`Educational toys*...`, cross-category "Toys" attrs (age/gender/color/
+material) live under `Toys*...` — both appear as separate `classifications[]`
+entries in the create payload (see below). Expect an analogous split for
+other categories (e.g. `Wipes*...` + some shared parent namespace).
+
+**Client-side validation is real and blocking**: leaving `Vendor code`
+(Артикул производителя) empty shows an inline error "Это поле должно быть
+заполнено" and blocks progression — confirmed live, this field is not
+optional despite having no natural placeholder value for a no-name-brand
+product (real box code is required for a real submission; a stand-in value
+can be corrected in the cabinet after creation, same as the photo).
+
+**Auto-generate display name** (called right before create, uses the
+already-filled attributes):
+```
+POST /content/pending/mc/product/name/generate?merchantCode={merchantId}
+     {"brand":{"code":"china-toys","name":"Без бренда","restricted":false,
+       "closed":false,"personal":false,"blocked":false},
+      "masterCategoryCode":"Master - Educational toys",
+      "productCode":"{sku}",
+      "features":[{"attributeCode":"Educational toys*Type","values":["сортер"]},
+        {"attributeCode":"Educational toys*Educational function","values":["логика и мышление"]},
+        {"attributeCode":"Educational toys*Size","values":["20x15x8"]},
+        {"attributeCode":"Educational toys*Vendor code","values":["{sku}"]},
+        {"attributeCode":"Educational toys*Model","values":[""]},
+        {"attributeCode":"Educational toys*Number of elements","values":[]},
+        {"attributeCode":"Educational toys*Character","values":[]},
+        {"attributeCode":"Educational toys*Features","values":[""]},
+        {"attributeCode":"Toys*Age","values":["с 18 месяцев"]},
+        {"attributeCode":"Toys*Gender","values":["универсальный"]},
+        {"attributeCode":"Toys*Color","values":["желтый","зеленый"]},
+        {"attributeCode":"Toys*Material","values":["пластик"]}]}
+     → 200, response body is a plain string: "Сортер пластик"
+```
+Brand code for «Без бренда» is the literal string `"china-toys"` (not e.g.
+`"no-brand"` — worth hardcoding a constant with a comment, it's not
+guessable). `productCode` here is Kaspi's own auto-suggested SKU
+(`/content/pending/mc/product/{merchantId}/new-code` from step 2.4), used
+verbatim as the merchant's article number unless the seller overrides it.
+
+**Final create call:**
+```
+POST /content/pending/mc/product/create?isMobileApp=false
+     {"classifications":[
+        {"code":"Educational toys*General","name":"Характеристики","features":[
+           {"name":"Тип","attributeCode":"Educational toys*Type","mandatory":true,
+            "manufacturerSku":false,"attributeType":{"code":"enum","multiValued":false},
+            "values":[{"name":"сортер","code":"сортер"}]},
+           ... one entry per feature, `values` as [{name,code}] for enums or
+           plain scalars/[] for string/number types, `manufacturerSku:true`
+           flag preserved on Model ...
+        ]},
+        {"code":"Toys*Dopolnitelno","name":"Дополнительно","features":[
+           ... Age/Gender/Color/Material, same shape ...
+        ]},
+        {"code":"24*Harakteristiki","name":"Глобальные характеристики","features":[]},
+        {"code":"54*Harakteristiki","name":"Характеристики","features":[]}
+      ],
+      "requestInfoList":[],
+      "code":"{sku}","merchantCode":"{merchantId}",
+      "name":"{generated name}","displayName":"{generated name}",
+      "description":"","descriptionCreation":"PARTNER_WRITTEN",
+      "category":{"code":"Master - Educational toys","name":"Развивающие игрушки",
+        "restricted":false,"closed":false,"blocked":false,"image":"",
+        "hasContentChild":false},
+      "brand":{"code":"china-toys","name":"Без бренда","restricted":false,
+        "closed":false,"personal":false,"blocked":false},
+      "images":[{"large":".../format=gallery_large","medium":".../format=gallery_medium",
+        "small":".../format=thumbnail","width":0,"height":0,
+        "location":"{image uuid from upload}","bucketName":"temp-merchant-product-images",
+        "generatedByAI":false,"visualType":""}],
+      "videos":[],"teasers":[],"shopLink":"","videoId":"","unitAmount":0,
+      "moderationDeadline":"","modifications":[],"createdFromMaster":false,
+      "requestCodes":[]}
+     → 200 [{"code":"{sku}","name":"{generated name}","status":"SUCCESS","errorReason":null}]
+```
+The two always-empty trailing `classifications[]` entries
+(`24*Harakteristiki`, `54*Harakteristiki`) appeared with empty `features:[]`
+even for this category — likely generic/global classification slots Kaspi
+attaches to every product regardless of category; safe to always include
+verbatim/empty unless a future capture shows them populated.
+
+**Price/stock registration** (fires immediately after create, even when the
+seller leaves price/stock blank in the wizard's last panel — "Если не
+указать цену и остатки, товар попадёт в 'Сняты с продажи', вы сможете
+заполнить их позже"):
+```
+POST /pricefeed/upload/merchant/process
+     {"merchantUid":"{merchantId}","sku":"{sku}","model":"{generated name}",
+      "brand":"china-toys"}
+     → 200 {"id":"<async process id>"}
+```
+This is the SKU-registration-only shape (no `cityPrices`/`availabilities`)
+— compare to Flow A §1.3 call 3, which includes those keys when price/stock
+were actually filled in. Confirms `cityPrices`/`availabilities` are
+optional keys on this same endpoint, omitted entirely rather than sent
+empty when skipped.
+
+**Photo upload → create is one continuous flow**: the uploaded image's
+`location` (the upload response's `images[].id`) is threaded directly into
+the create payload's `images[0].location` and into the three CDN URLs
+(`gallery_large`/`gallery_medium`/`thumbnail`, same `mc.shop.kaspi.kz/image/
+processor/merchant/img/cnt/mct/i/{id}` path, differing only in `?format=`).
+No separate "attach photo to draft" call — the create POST is what actually
+associates them.
 
 ## 3. Управление товарами page (`/mc/#/products`) — full function survey
 
