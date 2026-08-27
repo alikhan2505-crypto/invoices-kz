@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { decryptAtRest } from '@/lib/kaspiPay/crypto'
 import { getKey } from './connection'
-import { replyToComment, sendDirectMessage, InstagramApiError } from '@/lib/instagram'
+import { replyToComment, sendDirectMessage, sendInstagramFlowStep, InstagramApiError } from '@/lib/instagram'
 import { generateAiReply } from '@/lib/instagramAiReply'
 import { buildBusinessContextLine, buildCollectFieldsToExtract, buildCatalogBlock, AgentTone, AgentGoal } from './promptContext'
 import { loadAgentCatalog } from './catalogContext'
@@ -11,6 +11,8 @@ import { debitAiAgentWallet, AI_AGENT_CREDITS_PER_AI_REPLY } from './wallet'
 import { sendTelegramNotification } from '@/lib/telegramNotify'
 import { createNotification } from '@/lib/notifications'
 import { UNSUPPORTED_MEDIA_REPLY_TEXT } from '@/lib/aiAgent/mediaLimits'
+import { findFlowTriggerMatch, type FlowStep } from './flow'
+import { startFlow, handleFlowButtonClick, FLOW_STALE_TEXT, type FlowStepSender } from './flowEngine'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -34,6 +36,22 @@ export interface TenantConnection {
 async function markTokenExpiredIfUnauthorized(connectionId: string, err: unknown): Promise<void> {
   if (err instanceof InstagramApiError && err.status === 401) {
     await supabase.from('ai_agent_channel_connections').update({ status: 'token_expired' }).eq('id', connectionId)
+  }
+}
+
+// Shared by every flow entry point below -- wraps this connection's own
+// sendInstagramFlowStep with the same error-handling shape this file's
+// other send call sites use.
+function makeInstagramFlowSender(conn: TenantConnection, recipientId: string): FlowStepSender {
+  return async (step: FlowStep) => {
+    try {
+      await sendInstagramFlowStep(recipientId, step, { igUserId: conn.externalAccountId, accessToken: conn.accessToken })
+      return true
+    } catch (err: any) {
+      console.error('ai-agent webhook: flow step send failed:', err.message)
+      await markTokenExpiredIfUnauthorized(conn.connectionId, err)
+      return false
+    }
   }
 }
 
@@ -103,6 +121,18 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
     .single()
   if (!conversation) return
 
+  // Instagram has no /start-equivalent command -- a DM start-flow fires on
+  // the customer's very first-ever message instead. Comments never trigger
+  // this (no interactive-button mechanism exists for a comment reply).
+  let isFirstMessage = false
+  if (params.source === 'dm') {
+    const { count } = await supabase
+      .from('ai_agent_messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('conversation_id', conversation.id)
+    isFirstMessage = (count ?? 0) === 0
+  }
+
   // Log the inbound message. If two concurrent deliveries of the same event
   // both pass the SELECT-based dedup check above, the unique index on
   // external_id (ai_agent_messages_external_id_idx) catches the race here --
@@ -120,6 +150,24 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
       console.error('ai-agent webhook: failed to log inbound message for', params.externalId, ':', insertError.message)
     }
     return
+  }
+
+  if (isFirstMessage) {
+    const { data: startFlowRow } = await supabase
+      .from('ai_agent_flows')
+      .select('id, definition')
+      .eq('agent_id', conn.agentId)
+      .eq('is_start', true)
+      .maybeSingle()
+    if (startFlowRow) {
+      await startFlow(
+        supabase,
+        { id: conversation.id, agent_id: conn.agentId, channel: 'instagram', external_thread_id: params.replyTarget },
+        startFlowRow,
+        makeInstagramFlowSender(conn, params.replyTarget),
+      )
+      return
+    }
   }
 
   // Operator-takeover gate. Applies to BOTH comment and dm sources --
@@ -187,6 +235,28 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
       await markTokenExpiredIfUnauthorized(conn.connectionId, err)
     }
     return
+  }
+
+  // No template -- check whether a flow's trigger words match before
+  // falling to paid AI. DM only -- a comment has no interactive-button
+  // mechanism to run a flow through. Flows are free, like templates.
+  if (!params.media && params.source === 'dm') {
+    const { data: flows } = await supabase
+      .from('ai_agent_flows')
+      .select('id, trigger_words, definition')
+      .eq('agent_id', conn.agentId)
+      .order('created_at', { ascending: true })
+    const matchedFlowId = findFlowTriggerMatch(params.incomingText, flows || [])
+    const matchedFlow = matchedFlowId ? (flows || []).find(f => f.id === matchedFlowId) : undefined
+    if (matchedFlow) {
+      await startFlow(
+        supabase,
+        { id: conversation.id, agent_id: conn.agentId, channel: 'instagram', external_thread_id: params.replyTarget },
+        matchedFlow,
+        makeInstagramFlowSender(conn, params.replyTarget),
+      )
+      return
+    }
   }
 
   // For DMs, pull prior exchanges with this same conversation so the model
@@ -421,3 +491,54 @@ export function findStopPhraseMatch(text: string, phrases: string[]): boolean {
 // shown) on a stop-phrase match -- one copy instead of four, now that all
 // three tenant handlers plus test-chat/route.ts use it.
 export const STOP_PHRASE_ACK_TEXT = 'Передаю ваш вопрос менеджеру, он ответит здесь в ближайшее время.'
+
+interface InstagramFlowClickParams {
+  externalId: string
+  replyTarget: string
+  clickedPayload: string
+}
+
+// Handles a quick-reply tap -- the Instagram twin of
+// telegramWebhookHandler.ts's handleTelegramFlowCallback, minus the
+// spinner-clear step Telegram has and Instagram doesn't. DM only, same
+// restriction as everywhere else flows touch this channel.
+export async function handleInstagramFlowButtonClick(conn: TenantConnection, params: InstagramFlowClickParams): Promise<void> {
+  const { data: existingMsg } = await supabase
+    .from('ai_agent_messages')
+    .select('id')
+    .eq('external_id', params.externalId)
+    .maybeSingle()
+  if (existingMsg) return
+
+  const { data: agent } = await supabase.from('ai_agents').select('is_enabled').eq('id', conn.agentId).single()
+  if (!agent || agent.is_enabled === false) return
+
+  const { data: conversation } = await supabase
+    .from('ai_agent_conversations')
+    .select('id, paused_for_human')
+    .eq('agent_id', conn.agentId)
+    .eq('channel', 'instagram')
+    .eq('external_thread_id', params.replyTarget)
+    .maybeSingle()
+  if (!conversation) return
+
+  const { error: insertError } = await supabase.from('ai_agent_messages').insert({
+    conversation_id: conversation.id,
+    direction: 'inbound',
+    text: `[кнопка] ${params.clickedPayload}`,
+    external_id: params.externalId,
+  })
+  if (insertError && insertError.code !== '23505') {
+    console.error('ai-agent webhook: failed to log flow button click for', params.externalId, ':', insertError.message)
+  }
+
+  if (conversation.paused_for_human) return
+
+  const conversationRef = { id: conversation.id, agent_id: conn.agentId, channel: 'instagram', external_thread_id: params.replyTarget }
+  const result = await handleFlowButtonClick(supabase, conversationRef, params.clickedPayload, makeInstagramFlowSender(conn, params.replyTarget))
+  if (result.outcome === 'stale') {
+    await sendDirectMessage(params.replyTarget, FLOW_STALE_TEXT, { igUserId: conn.externalAccountId, accessToken: conn.accessToken }).catch((err: any) => {
+      console.error('ai-agent webhook: stale-click reply failed:', err.message)
+    })
+  }
+}

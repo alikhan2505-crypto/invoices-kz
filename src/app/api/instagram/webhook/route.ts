@@ -4,7 +4,7 @@ import crypto from 'crypto'
 import { findMatchingTemplate } from '@/lib/instagramReplyMatch'
 import { replyToComment, sendDirectMessage } from '@/lib/instagram'
 import { generateAiReply } from '@/lib/instagramAiReply'
-import { loadTenantConnection, handleTenantIncoming } from '@/lib/aiAgent/webhookHandler'
+import { loadTenantConnection, handleTenantIncoming, handleInstagramFlowButtonClick } from '@/lib/aiAgent/webhookHandler'
 import { transcribeAudio } from '@/lib/openaiWhisper'
 import { isImageWithinLimits, isAudioWithinLimits, sniffImageMimeType, UNSUPPORTED_MEDIA_REPLY_TEXT } from '@/lib/aiAgent/mediaLimits'
 
@@ -294,6 +294,12 @@ export async function POST(req: NextRequest) {
 
       const fromUsername = messaging.sender?.id || 'unknown'
       const replyTarget = messaging.sender?.id
+
+      const quickReplyPayload = msg.quick_reply?.payload
+      if (quickReplyPayload && replyTarget && !isLegacyAccount) {
+        await handleInstagramFlowButtonClick(tenantConnection!, { externalId: msg.mid, replyTarget, clickedPayload: quickReplyPayload })
+        continue
+      }
 
       if (isLegacyAccount) {
         // Legacy single-tenant bot -- explicitly out of scope for photo/
