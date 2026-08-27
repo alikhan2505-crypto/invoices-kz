@@ -67,12 +67,18 @@ export default function WildberriesOrdersPage() {
       if (!res.ok) { setError('Не удалось получить этикетки.'); return }
       const data = await res.json()
       const stickers: string[] = Array.isArray(data.stickers) ? data.stickers : []
-      stickers.forEach((base64, i) => {
-        const link = document.createElement('a')
-        link.href = `data:image/png;base64,${base64}`
-        link.download = `wb-sticker-${i + 1}.png`
-        link.click()
-      })
+      // Chromium silently blocks most downloads past the first few when many
+      // are triggered in the same tick (its "multiple downloads" guard) --
+      // staggering with a small delay per file keeps every one of them from
+      // being dropped without any error shown to the seller.
+      for (let i = 0; i < stickers.length; i++) {
+        setTimeout(() => {
+          const link = document.createElement('a')
+          link.href = `data:image/png;base64,${stickers[i]}`
+          link.download = `wb-sticker-${i + 1}.png`
+          link.click()
+        }, i * 300)
+      }
     } catch {
       setError('Ошибка сети. Проверьте соединение и попробуйте ещё раз.')
     }

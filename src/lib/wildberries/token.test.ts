@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { decodeWbToken } from './token'
+import { decodeWbToken, daysUntil } from './token'
 
 // A JWT's middle segment is base64url(JSON payload) -- no signing key needed
 // to build one for this pure-decode test, only a well-formed 3-part shape.
@@ -31,5 +31,25 @@ describe('decodeWbToken', () => {
   it('returns null when the payload has no exp claim', () => {
     const token = fakeJwt({ sid: 'abc123' })
     expect(decodeWbToken(token)).toBeNull()
+  })
+
+  it('returns null when the decoded payload is not a plain object (array or null)', () => {
+    const arrayPayload = Buffer.from(JSON.stringify(['not', 'an', 'object'])).toString('base64url')
+    const nullPayload = Buffer.from(JSON.stringify(null)).toString('base64url')
+    const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url')
+    expect(decodeWbToken(`${header}.${arrayPayload}.sig`)).toBeNull()
+    expect(decodeWbToken(`${header}.${nullPayload}.sig`)).toBeNull()
+  })
+})
+
+describe('daysUntil', () => {
+  it('rounds up the number of days remaining until a future timestamp', () => {
+    const future = new Date(Date.now() + 5.2 * 24 * 60 * 60 * 1000).toISOString()
+    expect(daysUntil(future)).toBe(6)
+  })
+
+  it('returns a negative number for a timestamp already in the past', () => {
+    const past = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
+    expect(daysUntil(past)).toBeLessThan(0)
   })
 })

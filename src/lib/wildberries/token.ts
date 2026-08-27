@@ -25,3 +25,7 @@ export function decodeWbToken(token: string): { expiresAt: string; claims: Recor
 
   return { expiresAt: new Date(exp * 1000).toISOString(), claims }
 }
+
+export function daysUntil(iso: string): number {
+  return Math.ceil((new Date(iso).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+}

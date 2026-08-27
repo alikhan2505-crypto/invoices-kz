@@ -5,14 +5,11 @@ import { motion, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
+import { daysUntil } from '@/lib/wildberries/token'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
 type Status = { connected: boolean; tokenExpiresAt?: string; status?: string }
-
-function daysUntil(iso: string): number {
-  return Math.ceil((new Date(iso).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-}
 
 export default function WildberriesPage() {
   const router = useRouter()
