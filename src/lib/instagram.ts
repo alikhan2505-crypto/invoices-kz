@@ -176,6 +176,9 @@ interface InstagramFlowMessage {
 // branch below is defensive (unreachable via the UI today).
 export function buildInstagramFlowMessage(step: FlowStep): InstagramFlowMessage {
   if (step.buttons.length === 0) return { text: step.text }
+  if (step.buttons.length > INSTAGRAM_QUICK_REPLY_MAX) {
+    console.error('ai-agent flow: step', step.id, 'has', step.buttons.length, 'buttons -- Instagram quick replies cap at', INSTAGRAM_QUICK_REPLY_MAX, ', truncating')
+  }
   const quick_replies = step.buttons.slice(0, INSTAGRAM_QUICK_REPLY_MAX).map((b, i) => ({
     content_type: 'text' as const,
     title: b.label.slice(0, INSTAGRAM_QUICK_REPLY_TITLE_MAX),

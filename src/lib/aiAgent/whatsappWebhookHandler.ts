@@ -133,13 +133,16 @@ export async function handleWhatsAppIncoming(conn: WhatsAppTenantConnection, par
 
   // WhatsApp has no /start-equivalent command -- a start-flow fires on the
   // customer's very first-ever message instead, mirroring how Telegram's
-  // /start already replaces the static greeting. Checked BEFORE inserting
-  // this turn's own inbound row, so "first message" means "zero prior rows".
-  const { count: priorMessageCount } = await supabase
-    .from('ai_agent_messages')
-    .select('id', { count: 'exact', head: true })
-    .eq('conversation_id', conversation.id)
-  const isFirstMessage = (priorMessageCount ?? 0) === 0
+  // /start already replaces the static greeting. Conditional claim (same
+  // idiom as the paused_for_human claim below): a plain "count prior
+  // messages" check isn't atomic against two genuinely distinct messages
+  // from a fast-typing new customer both landing before either one's own
+  // insert completes, which could double-fire the start flow (and, for an
+  // invoice-kind entry step, create two separate drafts). Only the request
+  // that actually flips false->true proceeds.
+  const { data: startClaim } = await supabase.from('ai_agent_conversations')
+    .update({ start_flow_triggered: true }).eq('id', conversation.id).eq('start_flow_triggered', false).select('id')
+  const isFirstMessage = !!(startClaim && startClaim.length > 0)
 
   // Log the inbound message. If two concurrent deliveries of the same
   // message both pass the SELECT-based dedup above, the unique index on

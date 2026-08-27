@@ -173,6 +173,9 @@ export function buildWhatsAppFlowMessage(step: FlowStep): Record<string, unknown
       },
     }
   }
+  if (step.buttons.length > WHATSAPP_LIST_MAX_ROWS) {
+    console.error('ai-agent flow: step', step.id, 'has', step.buttons.length, 'buttons -- WhatsApp List Message caps at', WHATSAPP_LIST_MAX_ROWS, ', truncating')
+  }
   const rows = step.buttons.slice(0, WHATSAPP_LIST_MAX_ROWS).map((b, i) => ({
     id: `btn:${step.id}:${i}`,
     title: b.label.slice(0, WHATSAPP_LIST_ROW_TITLE_MAX),
