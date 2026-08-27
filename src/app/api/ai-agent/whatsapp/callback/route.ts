@@ -69,8 +69,20 @@ export async function POST(req: NextRequest) {
     const { accessToken } = await exchangeWhatsAppCode(code, appId, appSecret)
 
     // 2. Register the number for Cloud API messaging -- without this the
-    // number can't send/receive through the API at all.
-    await registerWhatsAppPhoneNumber(phoneNumberId, accessToken)
+    // number can't send/receive through the API at all. Not idempotent on
+    // Meta's side: a number that already completed registration (Embedded
+    // Signup's own in-popup phone verification already does this for most
+    // flows, and a retried connect attempt can hit an already-registered
+    // number) makes this call fail with a generic "(#10) Application does
+    // not have permission for this action" -- not a real permission gap.
+    // Tolerate that failure and continue; if the token genuinely lacks the
+    // right permission, the webhook subscription call right after will fail
+    // too and the whole connect attempt still correctly aborts.
+    try {
+      await registerWhatsAppPhoneNumber(phoneNumberId, accessToken)
+    } catch (registerError: any) {
+      console.error('ai-agent WhatsApp register skipped (likely already registered):', registerError instanceof WhatsAppApiError ? `[${registerError.status}] ${registerError.message}` : registerError.message)
+    }
 
     // 3. Subscribe OUR app to this WABA's webhooks -- required, not
     // best-effort: an unsubscribed connection looks connected but never
