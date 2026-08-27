@@ -10,8 +10,10 @@ import { sendTelegramNotification } from '@/lib/telegramNotify'
 import { createNotification } from '@/lib/notifications'
 import { findTemplateMatch, mergeCollectedData, findStopPhraseMatch, STOP_PHRASE_ACK_TEXT } from './webhookHandler'
 import { pairConversationHistory } from './telegram'
-import { sendWhatsAppMessage, WhatsAppApiError } from '@/lib/whatsapp'
+import { sendWhatsAppMessage, sendWhatsAppFlowStep, WhatsAppApiError } from '@/lib/whatsapp'
 import { UNSUPPORTED_MEDIA_REPLY_TEXT } from '@/lib/aiAgent/mediaLimits'
+import { findFlowTriggerMatch, type FlowStep } from './flow'
+import { startFlow, handleFlowButtonClick, FLOW_STALE_TEXT, type FlowStepSender } from './flowEngine'
 
 // The WhatsApp twin of telegramWebhookHandler.ts's Telegram tenant pipeline
 // (itself the twin of webhookHandler.ts's Instagram pipeline) -- same
@@ -41,6 +43,22 @@ export interface WhatsAppTenantConnection {
 async function markWhatsAppTokenExpiredIfUnauthorized(connectionId: string, err: unknown): Promise<void> {
   if (err instanceof WhatsAppApiError && err.status === 401) {
     await supabase.from('ai_agent_channel_connections').update({ status: 'token_expired' }).eq('id', connectionId)
+  }
+}
+
+// Shared by every flow entry point below (start / trigger-match / button
+// click) -- wraps this connection's own sendWhatsAppFlowStep with the same
+// error-handling shape handleWhatsAppIncoming's other send call sites use.
+function makeWhatsAppFlowSender(conn: WhatsAppTenantConnection, to: string): FlowStepSender {
+  return async (step: FlowStep) => {
+    try {
+      await sendWhatsAppFlowStep(conn.phoneNumberId, to, step, conn.accessToken)
+      return true
+    } catch (err: any) {
+      console.error('ai-agent whatsapp webhook: flow step send failed:', err.message)
+      await markWhatsAppTokenExpiredIfUnauthorized(conn.connectionId, err)
+      return false
+    }
   }
 }
 
@@ -113,6 +131,16 @@ export async function handleWhatsAppIncoming(conn: WhatsAppTenantConnection, par
     .single()
   if (!conversation) return
 
+  // WhatsApp has no /start-equivalent command -- a start-flow fires on the
+  // customer's very first-ever message instead, mirroring how Telegram's
+  // /start already replaces the static greeting. Checked BEFORE inserting
+  // this turn's own inbound row, so "first message" means "zero prior rows".
+  const { count: priorMessageCount } = await supabase
+    .from('ai_agent_messages')
+    .select('id', { count: 'exact', head: true })
+    .eq('conversation_id', conversation.id)
+  const isFirstMessage = (priorMessageCount ?? 0) === 0
+
   // Log the inbound message. If two concurrent deliveries of the same
   // message both pass the SELECT-based dedup above, the unique index on
   // external_id catches the race here.
@@ -127,6 +155,24 @@ export async function handleWhatsAppIncoming(conn: WhatsAppTenantConnection, par
       console.error('ai-agent whatsapp webhook: failed to log inbound message for', params.externalId, ':', insertError.message)
     }
     return
+  }
+
+  if (isFirstMessage) {
+    const { data: startFlowRow } = await supabase
+      .from('ai_agent_flows')
+      .select('id, definition')
+      .eq('agent_id', conn.agentId)
+      .eq('is_start', true)
+      .maybeSingle()
+    if (startFlowRow) {
+      await startFlow(
+        supabase,
+        { id: conversation.id, agent_id: conn.agentId, channel: 'whatsapp', external_thread_id: params.from },
+        startFlowRow,
+        makeWhatsAppFlowSender(conn, params.from),
+      )
+      return
+    }
   }
 
   // Operator-takeover gate -- see telegramWebhookHandler.ts's identical block for rationale.
@@ -185,6 +231,28 @@ export async function handleWhatsAppIncoming(conn: WhatsAppTenantConnection, par
       await markWhatsAppTokenExpiredIfUnauthorized(conn.connectionId, err)
     }
     return
+  }
+
+  // No template -- check whether a flow's trigger words match before
+  // falling to paid AI. Flows are free, like templates -- same tier
+  // ordering as the Telegram tenant path.
+  if (!params.media) {
+    const { data: flows } = await supabase
+      .from('ai_agent_flows')
+      .select('id, trigger_words, definition')
+      .eq('agent_id', conn.agentId)
+      .order('created_at', { ascending: true })
+    const matchedFlowId = findFlowTriggerMatch(params.incomingText, flows || [])
+    const matchedFlow = matchedFlowId ? (flows || []).find(f => f.id === matchedFlowId) : undefined
+    if (matchedFlow) {
+      await startFlow(
+        supabase,
+        { id: conversation.id, agent_id: conn.agentId, channel: 'whatsapp', external_thread_id: params.from },
+        matchedFlow,
+        makeWhatsAppFlowSender(conn, params.from),
+      )
+      return
+    }
   }
 
   // Prior exchanges with this number, so the model doesn't re-greet someone
@@ -310,5 +378,58 @@ export async function handleWhatsAppIncoming(conn: WhatsAppTenantConnection, par
   } catch (err: any) {
     console.error('ai-agent whatsapp webhook: AI reply send failed for', params.externalId, ':', err.message)
     await markWhatsAppTokenExpiredIfUnauthorized(conn.connectionId, err)
+  }
+}
+
+interface WhatsAppFlowClickParams {
+  externalId: string
+  from: string
+  clickedPayload: string
+}
+
+// Handles an interactive reply/list-reply message -- the WhatsApp twin of
+// telegramWebhookHandler.ts's handleTelegramFlowCallback, minus the
+// spinner-clear step Telegram has and WhatsApp doesn't. A stale click gets
+// FLOW_STALE_TEXT as a normal reply (there's no toast mechanism here).
+export async function handleWhatsAppFlowButtonClick(conn: WhatsAppTenantConnection, params: WhatsAppFlowClickParams): Promise<void> {
+  const { data: existingMsg } = await supabase
+    .from('ai_agent_messages')
+    .select('id')
+    .eq('external_id', params.externalId)
+    .maybeSingle()
+  if (existingMsg) return
+
+  const { data: agent } = await supabase.from('ai_agents').select('is_enabled').eq('id', conn.agentId).single()
+  if (!agent || agent.is_enabled === false) return
+
+  const { data: conversation } = await supabase
+    .from('ai_agent_conversations')
+    .select('id, paused_for_human')
+    .eq('agent_id', conn.agentId)
+    .eq('channel', 'whatsapp')
+    .eq('external_thread_id', params.from)
+    .maybeSingle()
+  if (!conversation) return
+
+  // Logged as an inbound message like any other turn, same dedup/history
+  // shape -- a button tap is still a real turn in the conversation.
+  const { error: insertError } = await supabase.from('ai_agent_messages').insert({
+    conversation_id: conversation.id,
+    direction: 'inbound',
+    text: `[кнопка] ${params.clickedPayload}`,
+    external_id: params.externalId,
+  })
+  if (insertError && insertError.code !== '23505') {
+    console.error('ai-agent whatsapp webhook: failed to log flow button click for', params.externalId, ':', insertError.message)
+  }
+
+  if (conversation.paused_for_human) return
+
+  const conversationRef = { id: conversation.id, agent_id: conn.agentId, channel: 'whatsapp', external_thread_id: params.from }
+  const result = await handleFlowButtonClick(supabase, conversationRef, params.clickedPayload, makeWhatsAppFlowSender(conn, params.from))
+  if (result.outcome === 'stale') {
+    await sendWhatsAppMessage(conn.phoneNumberId, params.from, FLOW_STALE_TEXT, { accessToken: conn.accessToken }).catch((err: any) => {
+      console.error('ai-agent whatsapp webhook: stale-click reply failed:', err.message)
+    })
   }
 }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
-import { loadWhatsAppConnection, handleWhatsAppIncoming } from '@/lib/aiAgent/whatsappWebhookHandler'
+import { loadWhatsAppConnection, handleWhatsAppIncoming, handleWhatsAppFlowButtonClick } from '@/lib/aiAgent/whatsappWebhookHandler'
 import { downloadWhatsAppMedia, sendWhatsAppMessage } from '@/lib/whatsapp'
 import { transcribeAudio } from '@/lib/openaiWhisper'
 import { isImageWithinLimits, isAudioWithinLimits, UNSUPPORTED_MEDIA_REPLY_TEXT } from '@/lib/aiAgent/mediaLimits'
@@ -64,6 +64,11 @@ interface WhatsAppValue {
     text?: { body?: string }
     image?: { id?: string; mime_type?: string; caption?: string }
     audio?: { id?: string; mime_type?: string }
+    interactive?: {
+      type?: string
+      button_reply?: { id?: string; title?: string }
+      list_reply?: { id?: string; title?: string }
+    }
   }[]
   statuses?: unknown[]
 }
@@ -108,6 +113,14 @@ export async function POST(req: NextRequest) {
         const customerHandle = contact?.profile?.name || msg.from
 
         try {
+          if (msg.type === 'interactive') {
+            const clickedPayload = msg.interactive?.button_reply?.id || msg.interactive?.list_reply?.id
+            if (clickedPayload) {
+              await handleWhatsAppFlowButtonClick(conn, { externalId: msg.id, from: msg.from, clickedPayload })
+            }
+            continue
+          }
+
           if (msg.type === 'text' && msg.text?.body) {
             await handleWhatsAppIncoming(conn, {
               externalId: msg.id,
