@@ -76,6 +76,14 @@ describe('buildBusinessContextLine', () => {
     expect(line).not.toContain('Instagram')
     expect(line).not.toContain('Telegram')
   })
+
+  it('uses website wording when channel is website', () => {
+    const line = buildBusinessContextLine({ name: 'X', tone: 'friendly', description: '', goal: 'answer_questions', channel: 'website' })
+    expect(line).toContain('бизнес-аккаунта в чате на сайте')
+    expect(line).not.toContain('Instagram')
+    expect(line).not.toContain('Telegram')
+    expect(line).not.toContain('WhatsApp')
+  })
 })
 
 describe('buildCollectFieldsToExtract', () => {
