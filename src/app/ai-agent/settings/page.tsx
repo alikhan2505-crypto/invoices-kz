@@ -389,7 +389,14 @@ export default function AiAgentSettings() {
         return // the SDK also posts non-JSON messages -- not our concern
       }
       if (data?.type !== 'WA_EMBEDDED_SIGNUP') return
-      if (data.event === 'FINISH' && data.data) {
+      // Meta's own docs list several completion event names beyond plain
+      // FINISH -- FINISH_ONLY_WABA, FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING
+      // (coexistence-linked numbers), FINISH_OBO_MIGRATION,
+      // FINISH_GRANT_ONLY_API_ACCESS -- all carrying the same data shape.
+      // Matching only the exact string 'FINISH' silently dropped every one
+      // of these: phoneNumberIdRef/wabaIdRef never got set, so our own
+      // connect callback was never even called.
+      if (typeof data.event === 'string' && data.event.startsWith('FINISH') && data.data) {
         if (data.data.phone_number_id) waPhoneNumberIdRef.current = data.data.phone_number_id
         if (data.data.waba_id) waWabaIdRef.current = data.data.waba_id
       } else if (data.event === 'CANCEL') {
