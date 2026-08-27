@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
 
   const { data: reqRow, error: fetchError } = await supabase
     .from('kaspi_payment_requests')
-    .select('id, user_id, invoice_id, order_id, amount, kaspi_operation_id, callback_url, expires_at, status')
+    .select('id, user_id, invoice_id, order_id, shop_order_id, amount, kaspi_operation_id, callback_url, expires_at, status')
     .eq('kaspi_operation_id', operationId)
     .eq('user_id', found.userId)
     .maybeSingle()

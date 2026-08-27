@@ -19,6 +19,7 @@ export interface SettleableRequest {
   user_id: string
   invoice_id: string | null
   order_id: string | null
+  shop_order_id: string | null
   amount: number | string
   kaspi_operation_id: string
   callback_url: string | null
@@ -79,6 +80,14 @@ export async function checkAndSettleKaspiPayment(reqRow: SettleableRequest): Pro
   if (reqRow.invoice_id) {
     await supabase.from('invoices').update({ status: 'paid' }).eq('id', reqRow.invoice_id)
     await supabase.from('invoice_logs').insert({ invoice_id: reqRow.invoice_id, status: 'paid' })
+  }
+
+  // Parallel to the invoice branch above -- a payment request can settle
+  // either an invoice OR a storefront order, never both. The two id columns
+  // are mutually exclusive by construction (each mint path only ever sets
+  // one of them).
+  if (reqRow.shop_order_id) {
+    await supabase.from('kaspi_shop_orders').update({ status: 'paid' }).eq('id', reqRow.shop_order_id)
   }
 
   // Commission is charged exactly once, here — the moment a payment is
