@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
 import { loadWebsiteConnection, handleWebsiteIncoming } from '@/lib/aiAgent/websiteWebhookHandler'
-import { isValidWidgetKeyFormat, exceedsRateLimit, WIDGET_MESSAGE_RATE_WINDOW_MS } from '@/lib/aiAgent/widget'
+import { isValidWidgetKeyFormat, exceedsRateLimit, exceedsAgentRateLimit, WIDGET_MESSAGE_RATE_WINDOW_MS } from '@/lib/aiAgent/widget'
 import { corsJson, corsPreflight } from '@/lib/aiAgent/corsJson'
 
 const supabase = createClient(
@@ -32,6 +32,8 @@ export async function POST(req: NextRequest) {
   const conn = await loadWebsiteConnection(widgetKey)
   if (!conn) return corsJson({ error: 'not_found' }, 404)
 
+  const rateWindowStart = new Date(Date.now() - WIDGET_MESSAGE_RATE_WINDOW_MS).toISOString()
+
   // Rate limit scoped to (agent, visitor) -- counts messages this visitor's
   // conversation has received in the last minute, regardless of whether it
   // already exists yet (a brand-new visitor's first message always passes).
@@ -48,8 +50,31 @@ export async function POST(req: NextRequest) {
       .select('id', { count: 'exact', head: true })
       .eq('conversation_id', conversation.id)
       .eq('direction', 'inbound')
-      .gte('created_at', new Date(Date.now() - WIDGET_MESSAGE_RATE_WINDOW_MS).toISOString())
+      .gte('created_at', rateWindowStart)
     if (exceedsRateLimit(count ?? 0)) {
+      return corsJson({ error: 'rate_limited' }, 429)
+    }
+  }
+
+  // Second limit scoped to the whole agent, not just this visitor --
+  // visitorId is entirely client-supplied and free to fabricate, so a
+  // script can trivially dodge the per-visitor limit above by rotating it
+  // on every request. This aggregate cap is the actual backstop against
+  // that (final review finding), not a redundant check.
+  const { data: agentConversations } = await supabase
+    .from('ai_agent_conversations')
+    .select('id')
+    .eq('agent_id', conn.agentId)
+    .eq('channel', 'website')
+  const agentConversationIds = (agentConversations || []).map(c => c.id)
+  if (agentConversationIds.length > 0) {
+    const { count: agentCount } = await supabase
+      .from('ai_agent_messages')
+      .select('id', { count: 'exact', head: true })
+      .in('conversation_id', agentConversationIds)
+      .eq('direction', 'inbound')
+      .gte('created_at', rateWindowStart)
+    if (exceedsAgentRateLimit(agentCount ?? 0)) {
       return corsJson({ error: 'rate_limited' }, 429)
     }
   }

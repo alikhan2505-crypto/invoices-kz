@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { generateWidgetKey, isValidWidgetKeyFormat, exceedsRateLimit, WIDGET_MESSAGE_RATE_LIMIT } from './widget'
+import { generateWidgetKey, isValidWidgetKeyFormat, exceedsRateLimit, WIDGET_MESSAGE_RATE_LIMIT, exceedsAgentRateLimit, WIDGET_AGENT_MESSAGE_RATE_LIMIT } from './widget'
 
 describe('generateWidgetKey', () => {
   it('produces a key matching the expected format', () => {
@@ -30,5 +30,13 @@ describe('exceedsRateLimit', () => {
     expect(exceedsRateLimit(WIDGET_MESSAGE_RATE_LIMIT - 1)).toBe(false)
     expect(exceedsRateLimit(WIDGET_MESSAGE_RATE_LIMIT)).toBe(true)
     expect(exceedsRateLimit(WIDGET_MESSAGE_RATE_LIMIT + 1)).toBe(true)
+  })
+})
+
+describe('exceedsAgentRateLimit', () => {
+  it('is false below the limit, true at and above it', () => {
+    expect(exceedsAgentRateLimit(WIDGET_AGENT_MESSAGE_RATE_LIMIT - 1)).toBe(false)
+    expect(exceedsAgentRateLimit(WIDGET_AGENT_MESSAGE_RATE_LIMIT)).toBe(true)
+    expect(exceedsAgentRateLimit(WIDGET_AGENT_MESSAGE_RATE_LIMIT + 1)).toBe(true)
   })
 })

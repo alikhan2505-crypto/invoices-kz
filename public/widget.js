@@ -12,13 +12,23 @@
   var STORAGE_KEY = 'invoiceskz_widget_visitor_id';
   var POLL_INTERVAL_MS = 5000;
 
+  function generateId() {
+    return (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : (String(Date.now()) + Math.random().toString(16).slice(2));
+  }
+
   function getVisitorId() {
-    var id = localStorage.getItem(STORAGE_KEY);
-    if (!id) {
-      id = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2));
-      localStorage.setItem(STORAGE_KEY, id);
+    try {
+      var id = localStorage.getItem(STORAGE_KEY);
+      if (!id) {
+        id = generateId();
+        localStorage.setItem(STORAGE_KEY, id);
+      }
+      return id;
+    } catch (e) {
+      // Sandboxed iframe, strict privacy mode, etc. -- degrade to a
+      // session-only id rather than breaking the whole widget.
+      return generateId();
     }
-    return id;
   }
 
   var visitorId = getVisitorId();
@@ -108,8 +118,8 @@
     if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
   }
 
-  function send(text, isButtonClick) {
-    if (!text) return;
+  function send(text, isButtonClick, onDone) {
+    if (!text) { if (onDone) onDone(); return; }
     if (!isButtonClick) {
       renderMessage({ direction: 'inbound', text: text, buttons: null });
     }
@@ -117,14 +127,29 @@
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ widgetKey: widgetKey, visitorId: visitorId, text: text, isButtonClick: !!isButtonClick }),
-    }).then(function () { poll(); }).catch(function () { /* the next scheduled poll still runs */ });
+    }).then(function () { poll(); }).catch(function () { /* the next scheduled poll still runs */ }).then(function () {
+      if (onDone) onDone();
+    });
   }
 
+  var sending = false;
   sendBtn.onclick = function () {
+    // Guards the free-text path specifically -- a flow button click is
+    // already self-guarding (a second tap on the same button resolves as
+    // stale once the first click has advanced the conversation's own
+    // active_step_id), but a plain typed message triggering a real,
+    // billable AI reply has no such natural protection against a double
+    // click or an accidental double-tap.
+    if (sending) return;
     var text = inputEl.value.trim();
     if (!text) return;
     inputEl.value = '';
-    send(text, false);
+    sending = true;
+    sendBtn.disabled = true;
+    send(text, false, function () {
+      sending = false;
+      sendBtn.disabled = false;
+    });
   };
   inputEl.addEventListener('keydown', function (e) {
     if (e.key === 'Enter') sendBtn.onclick();
