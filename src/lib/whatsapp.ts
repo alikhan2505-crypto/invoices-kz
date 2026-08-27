@@ -1,4 +1,5 @@
 import crypto from 'crypto'
+import type { FlowStep } from './aiAgent/flow'
 
 // WhatsApp Cloud API helpers for the multi-tenant AI-агент WhatsApp channel --
 // fills the same role src/lib/instagram.ts fills for Instagram and
@@ -141,5 +142,60 @@ export async function sendWhatsAppMessage(phoneNumberId: string, to: string, tex
     to,
     type: 'text',
     text: { body: text },
+  })
+}
+
+const WHATSAPP_BUTTON_TITLE_MAX = 20
+const WHATSAPP_LIST_ROW_TITLE_MAX = 24
+const WHATSAPP_LIST_BUTTON_LABEL = 'Выбрать'
+const WHATSAPP_LIST_MAX_ROWS = 10
+
+// Pure -- decides WhatsApp's native interactive shape for a flow step's
+// button count. FlowBuilder.tsx already caps a step at 8 buttons, so the
+// >10 truncation branch below is defensive (unreachable via the UI today),
+// not a real UX for that case.
+export function buildWhatsAppFlowMessage(step: FlowStep): Record<string, unknown> {
+  if (step.buttons.length === 0) {
+    return { type: 'text', text: { body: step.text } }
+  }
+  if (step.buttons.length <= 3) {
+    return {
+      type: 'interactive',
+      interactive: {
+        type: 'button',
+        body: { text: step.text },
+        action: {
+          buttons: step.buttons.map((b, i) => ({
+            type: 'reply',
+            reply: { id: `btn:${step.id}:${i}`, title: b.label.slice(0, WHATSAPP_BUTTON_TITLE_MAX) },
+          })),
+        },
+      },
+    }
+  }
+  const rows = step.buttons.slice(0, WHATSAPP_LIST_MAX_ROWS).map((b, i) => ({
+    id: `btn:${step.id}:${i}`,
+    title: b.label.slice(0, WHATSAPP_LIST_ROW_TITLE_MAX),
+  }))
+  return {
+    type: 'interactive',
+    interactive: {
+      type: 'list',
+      body: { text: step.text },
+      action: { button: WHATSAPP_LIST_BUTTON_LABEL, sections: [{ rows }] },
+    },
+  }
+}
+
+// Sends one flow step -- text, Reply Buttons, or a List Message depending
+// on button count (buildWhatsAppFlowMessage). All three are session
+// messages, allowed within the same 24h customer-service window as
+// sendWhatsAppMessage's plain text, no template approval needed.
+export async function sendWhatsAppFlowStep(phoneNumberId: string, to: string, step: FlowStep, accessToken: string): Promise<void> {
+  await callGraphApi(`${GRAPH_API}/${phoneNumberId}/messages`, accessToken, {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to,
+    ...buildWhatsAppFlowMessage(step),
   })
 }
