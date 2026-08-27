@@ -10,6 +10,7 @@ import { COLLECT_FIELD_LABELS } from '@/lib/aiAgent/promptContext'
 const EASE = [0.16, 1, 0.3, 1] as const
 
 type AgentListItem = { id: string; name: string }
+type LeadStatus = 'new' | 'in_progress' | 'closed'
 type LeadItem = {
   id: string
   agentId: string
@@ -17,6 +18,7 @@ type LeadItem = {
   channel: string
   customerHandle: string
   collectedData: Record<string, string>
+  leadStatus: LeadStatus
   lastActivityAt: string
   createdAt: string
 }
@@ -57,6 +59,16 @@ const CHANNEL_META: Record<string, { label: string; icon: () => React.ReactEleme
   whatsapp: { label: 'WhatsApp', icon: WhatsAppIcon },
 }
 
+// One entry per Kanban column, in left-to-right order. `next` is the
+// forward-one-step target the card's button offers; 'closed' instead
+// offers the single reopen action back to 'new' (the only backward
+// transition in the whole UI).
+const COLUMNS: { status: LeadStatus; label: string; buttonLabel: string; next: LeadStatus }[] = [
+  { status: 'new', label: 'Новый', buttonLabel: 'В работу →', next: 'in_progress' },
+  { status: 'in_progress', label: 'В работе', buttonLabel: 'Закрыть →', next: 'closed' },
+  { status: 'closed', label: 'Закрыт', buttonLabel: 'Открыть заново ↺', next: 'new' },
+]
+
 function formatDate(iso: string): string {
   const d = new Date(iso)
   return d.toLocaleDateString('ru-KZ', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -72,11 +84,16 @@ export default function AiAgentLeads() {
   const [agentFilter, setAgentFilter] = useState<string>('all')
   const [items, setItems] = useState<LeadItem[]>([])
   const [fetching, setFetching] = useState(false)
+  const [movingId, setMovingId] = useState<string | null>(null)
+
+  async function authHeader() {
+    const { data: { session } } = await supabase.auth.getSession()
+    return { 'Authorization': `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' }
+  }
 
   const loadLeads = useCallback(async (agent: string) => {
     setFetching(true)
-    const { data: { session } } = await supabase.auth.getSession()
-    const headers = { 'Authorization': `Bearer ${session?.access_token}` }
+    const headers = await authHeader()
     const params = new URLSearchParams()
     if (agent !== 'all') params.set('agentId', agent)
     const qs = params.toString()
@@ -113,6 +130,25 @@ export default function AiAgentLeads() {
   function changeAgent(id: string) {
     setAgentFilter(id)
     loadLeads(id)
+  }
+
+  async function moveStatus(id: string, status: LeadStatus) {
+    setMovingId(id)
+    // Optimistic -- the board should feel instant; a failure just reverts
+    // to the pre-move snapshot.
+    const previous = items
+    setItems(prev => prev.map(i => i.id === id ? { ...i, leadStatus: status } : i))
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/ai-agent/leads/status', {
+        method: 'POST', headers, body: JSON.stringify({ conversationId: id, status }),
+      })
+      if (!res.ok) setItems(previous)
+    } catch {
+      setItems(previous)
+    } finally {
+      setMovingId(null)
+    }
   }
 
   if (loading) return (
@@ -153,7 +189,7 @@ export default function AiAgentLeads() {
                 </span>
               )}
             </div>
-            <p className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>Данные, которые агент собрал у клиентов в переписке</p>
+            <p className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>Каждый диалог становится заявкой с первого сообщения — двигайте её по воронке</p>
           </div>
           {agents.length > 0 && (
             <select
@@ -169,58 +205,88 @@ export default function AiAgentLeads() {
           )}
         </motion.div>
 
-        {items.length === 0 && !fetching && (
+        {items.length === 0 && !fetching ? (
           <div className="text-sm text-center py-16" style={{ color: 'var(--nav-text-muted)' }}>
-            Пока никто из клиентов не оставил данные — как только агент соберёт что-то в переписке (например, номер телефона), заявка появится здесь
+            Пока нет ни одного диалога — как только клиент напишет агенту, здесь появится заявка
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4" style={{ opacity: fetching ? 0.6 : 1 }}>
+            {COLUMNS.map(col => {
+              const columnItems = items.filter(i => i.leadStatus === col.status)
+              return (
+                <div key={col.status}>
+                  <div className="flex items-center justify-between mb-3 px-1">
+                    <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--nav-text-muted)' }}>{col.label}</span>
+                    <span className="text-[11px] font-semibold" style={{ color: 'var(--nav-text-muted)' }}>{columnItems.length}</span>
+                  </div>
+
+                  {columnItems.length === 0 ? (
+                    <div className="nav-glass rounded-2xl p-4 text-center text-xs" style={{ color: 'var(--nav-text-muted)' }}>Пока пусто</div>
+                  ) : (
+                    <div className="space-y-2">
+                      {columnItems.map((item, i) => {
+                        const channel = CHANNEL_META[item.channel] || CHANNEL_META.instagram
+                        const ChannelIcon = channel.icon
+                        const fieldEntries = Object.entries(item.collectedData)
+                        return (
+                          <motion.div
+                            key={item.id}
+                            initial={reduceMotion ? false : { opacity: 0, y: 14 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE, delay: reduceMotion ? 0 : Math.min(i * 0.04, 0.3) }}
+                            onClick={() => router.push(`/ai-agent/dialogs?conversation=${item.id}`)}
+                            className="nav-glass nav-card-accent rounded-2xl p-3 flex flex-col cursor-pointer transition-transform hover:-translate-y-0.5"
+                          >
+                            <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+                              <span className="inline-flex items-center gap-1.5 nav-glass rounded-full px-2 py-1 text-[10.5px] font-bold" style={{ color: 'var(--nav-text-secondary)' }}>
+                                <ChannelIcon /> {channel.label}
+                              </span>
+                              <span className="text-xs truncate" style={{ color: 'var(--nav-text-muted)' }}>{item.customerHandle}</span>
+                            </div>
+
+                            {agentFilter === 'all' && agents.length > 1 && (
+                              <div className="text-[11px] font-medium mb-2 truncate" style={{ color: 'var(--nav-text-muted)' }}>{item.agentName}</div>
+                            )}
+
+                            {fieldEntries.length > 0 && (
+                              <div className="flex flex-wrap gap-1.5 mb-2">
+                                {fieldEntries.map(([key, value]) => {
+                                  const label = COLLECT_FIELD_LABELS[key] || key
+                                  return (
+                                    <span
+                                      key={key}
+                                      className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px]"
+                                      style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-secondary)' }}
+                                    >
+                                      <span style={{ fontWeight: 700, color: 'var(--nav-text-primary)', textTransform: 'capitalize' }}>{label}:</span> {value}
+                                    </span>
+                                  )
+                                })}
+                              </div>
+                            )}
+
+                            <div className="text-[11px] mb-2" style={{ color: 'var(--nav-text-muted)' }}>
+                              Обновлено: {formatDate(item.lastActivityAt)}
+                            </div>
+
+                            <button
+                              onClick={e => { e.stopPropagation(); moveStatus(item.id, col.next) }}
+                              disabled={movingId === item.id}
+                              className="mt-auto text-xs font-semibold nav-glass rounded-lg px-3 py-1.5 disabled:opacity-50"
+                              style={{ color: 'var(--nav-accent)' }}
+                            >
+                              {col.buttonLabel}
+                            </button>
+                          </motion.div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         )}
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" style={{ opacity: fetching ? 0.6 : 1 }}>
-          {items.map((item, i) => {
-            const channel = CHANNEL_META[item.channel] || CHANNEL_META.instagram
-            const ChannelIcon = channel.icon
-            const fieldEntries = Object.entries(item.collectedData)
-            return (
-              <motion.div
-                key={item.id}
-                initial={reduceMotion ? false : { opacity: 0, y: 14 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE, delay: reduceMotion ? 0 : Math.min(i * 0.04, 0.3) }}
-                className="nav-glass nav-card-accent rounded-2xl p-4 flex flex-col"
-              >
-                <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
-                  <span className="inline-flex items-center gap-1.5 nav-glass rounded-full px-2 py-1 text-[10.5px] font-bold" style={{ color: 'var(--nav-text-secondary)' }}>
-                    <ChannelIcon /> {channel.label}
-                  </span>
-                  <span className="text-xs truncate" style={{ color: 'var(--nav-text-muted)' }}>{item.customerHandle}</span>
-                </div>
-
-                {agentFilter === 'all' && agents.length > 1 && (
-                  <div className="text-[11px] font-medium mb-2 truncate" style={{ color: 'var(--nav-text-muted)' }}>{item.agentName}</div>
-                )}
-
-                <div className="flex flex-wrap gap-1.5 mb-3">
-                  {fieldEntries.map(([key, value]) => {
-                    const label = COLLECT_FIELD_LABELS[key] || key
-                    return (
-                      <span
-                        key={key}
-                        className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px]"
-                        style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-secondary)' }}
-                      >
-                        <span style={{ fontWeight: 700, color: 'var(--nav-text-primary)', textTransform: 'capitalize' }}>{label}:</span> {value}
-                      </span>
-                    )
-                  })}
-                </div>
-
-                <div className="text-[11px] mt-auto pt-1" style={{ color: 'var(--nav-text-muted)' }}>
-                  Обновлено: {formatDate(item.lastActivityAt)}
-                </div>
-              </motion.div>
-            )
-          })}
-        </div>
       </div>
     </main>
     </DesktopShell>
