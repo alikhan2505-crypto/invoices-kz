@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isTerminalStep, findStepById, firstStep, parseFlowDefinition, findFlowTriggerMatch, type FlowDefinition } from './flow'
+import { isTerminalStep, findStepById, firstStep, parseFlowDefinition, findFlowTriggerMatch, resolveFlowButtonClick, type FlowDefinition } from './flow'
 
 const sample: FlowDefinition = {
   steps: [
@@ -106,5 +106,35 @@ describe('invoice flow steps', () => {
   it('legacy steps without kind still parse as message steps', () => {
     const def = parseFlowDefinition({ steps: [{ id: 's1', text: 'Привет', buttons: [] }] })
     expect(def?.steps[0].kind ?? 'message').toBe('message')
+  })
+})
+
+describe('resolveFlowButtonClick', () => {
+  const def: FlowDefinition = {
+    steps: [
+      { id: 's1', text: 'Что вас интересует?', buttons: [{ label: 'Цены', nextStepId: 's2' }, { label: 'Готово', nextStepId: null }] },
+      { id: 's2', text: 'Актуальные цены на сайте.', buttons: [] },
+    ],
+  }
+
+  it('advances to the next step when the button has a real nextStepId', () => {
+    expect(resolveFlowButtonClick(def, 's1', 0)).toEqual({ outcome: 'advanced', nextStep: def.steps[1] })
+  })
+
+  it('ends the flow when the button has nextStepId: null', () => {
+    expect(resolveFlowButtonClick(def, 's1', 1)).toEqual({ outcome: 'ended' })
+  })
+
+  it('is stale when the active step id does not exist in the definition', () => {
+    expect(resolveFlowButtonClick(def, 'ghost-step', 0)).toEqual({ outcome: 'stale' })
+  })
+
+  it('is stale when the button index does not exist on the current step', () => {
+    expect(resolveFlowButtonClick(def, 's1', 5)).toEqual({ outcome: 'stale' })
+  })
+
+  it('is stale when nextStepId points at a step that no longer exists (defensive, save-time validation should prevent this)', () => {
+    const corrupted: FlowDefinition = { steps: [{ id: 's1', text: 'x', buttons: [{ label: 'A', nextStepId: 'ghost' }] }] }
+    expect(resolveFlowButtonClick(corrupted, 's1', 0)).toEqual({ outcome: 'stale' })
   })
 })

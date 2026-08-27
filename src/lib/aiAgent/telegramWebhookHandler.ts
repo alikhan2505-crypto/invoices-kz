@@ -12,7 +12,7 @@ import { createNotification } from '@/lib/notifications'
 import { findTemplateMatch, mergeCollectedData, findStopPhraseMatch, STOP_PHRASE_ACK_TEXT } from './webhookHandler'
 import { sendTelegramBotMessage, sendTelegramFlowStep, answerTelegramCallbackQuery, pairConversationHistory, TelegramApiError } from './telegram'
 import { UNSUPPORTED_MEDIA_REPLY_TEXT } from '@/lib/aiAgent/mediaLimits'
-import { parseFlowDefinition, isTerminalStep, findStepById, firstStep, findFlowTriggerMatch, type FlowStep } from './flow'
+import { parseFlowDefinition, isTerminalStep, firstStep, findFlowTriggerMatch, resolveFlowButtonClick, type FlowStep } from './flow'
 
 // The Telegram twin of webhookHandler.ts's Instagram tenant pipeline.
 // Deliberately a PARALLEL handler rather than a channel parameter threaded
@@ -552,26 +552,17 @@ export async function handleTelegramFlowCallback(
   } else {
     const { data: flow } = await supabase.from('ai_agent_flows').select('id, definition').eq('id', conversation.active_flow_id).maybeSingle()
     const definition = flow ? parseFlowDefinition(flow.definition) : null
-    const currentStep = definition ? findStepById(definition, conversation.active_step_id) : undefined
-    const button = currentStep?.buttons[buttonIndex]
+    const resolution = definition ? resolveFlowButtonClick(definition, conversation.active_step_id, buttonIndex) : { outcome: 'stale' as const }
 
-    if (!definition || !currentStep || !button) {
+    if (resolution.outcome === 'stale') {
       toastText = STALE_TOAST
       clearState = true
-    } else if (button.nextStepId === null) {
+    } else if (resolution.outcome === 'ended') {
       // "Конец сценария" -- ends immediately, no further message (the
       // button's own label was the final word).
       clearState = true
     } else {
-      const nextStep = findStepById(definition, button.nextStepId)
-      if (!nextStep) {
-        // Dangling reference -- shouldn't happen (the save route validates
-        // this), defensive: end the flow rather than send nothing.
-        toastText = STALE_TOAST
-        clearState = true
-      } else {
-        nextStepToSend = nextStep
-      }
+      nextStepToSend = resolution.nextStep
     }
   }
 

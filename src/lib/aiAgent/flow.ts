@@ -115,6 +115,27 @@ export function parseFlowDefinition(raw: unknown): FlowDefinition | null {
   return { steps }
 }
 
+export type FlowButtonClickResolution =
+  | { outcome: 'stale' }
+  | { outcome: 'ended' }
+  | { outcome: 'advanced'; nextStep: FlowStep }
+
+// Pure decision core of "a customer tapped a flow button, what happens
+// next" -- shared by every channel's own click handler. 'stale' covers both
+// a step id that no longer matches the conversation's real active step
+// (customer tapped an OLD, still-visible interactive message) and a
+// dangling nextStepId reference (shouldn't happen -- parseFlowDefinition
+// validates this at save time -- but resolved defensively the same way).
+export function resolveFlowButtonClick(definition: FlowDefinition, activeStepId: string, buttonIndex: number): FlowButtonClickResolution {
+  const currentStep = findStepById(definition, activeStepId)
+  const button = currentStep?.buttons[buttonIndex]
+  if (!currentStep || !button) return { outcome: 'stale' }
+  if (button.nextStepId === null) return { outcome: 'ended' }
+  const nextStep = findStepById(definition, button.nextStepId)
+  if (!nextStep) return { outcome: 'stale' }
+  return { outcome: 'advanced', nextStep }
+}
+
 // Same case-insensitive substring rule as findTemplateMatch
 // (webhookHandler.ts) applied to flows instead of templates -- kept as its
 // own small function rather than forcing templates and flows to share one
