@@ -6,10 +6,10 @@ import { supabase } from '@/lib/supabase'
 import { useLanguage, type Lang } from './LanguageProvider'
 import KaspiShopStoreSwitcher from './KaspiShopStoreSwitcher'
 
-const labels: Record<Lang, { home: string; invoices: string; kaspiShop: string; aiAgent: string; kaspiApi: string; profile: string; history: string; menu: string; close: string }> = {
-  ru: { home: 'Дашборд', invoices: 'Счета', kaspiShop: 'Kaspi Bot', aiAgent: 'AI-агент', kaspiApi: 'Kaspi API', profile: 'Профиль', history: 'История', menu: 'Меню', close: 'Закрыть' },
-  kk: { home: 'Дашборд', invoices: 'Шоттар', kaspiShop: 'Kaspi Bot', aiAgent: 'AI-агент', kaspiApi: 'Kaspi API', profile: 'Профиль', history: 'Тарих', menu: 'Мәзір', close: 'Жабу' },
-  en: { home: 'Dashboard', invoices: 'Invoices', kaspiShop: 'Kaspi Bot', aiAgent: 'AI Agent', kaspiApi: 'Kaspi API', profile: 'Profile', history: 'History', menu: 'Menu', close: 'Close' },
+const labels: Record<Lang, { home: string; invoices: string; kaspiShop: string; aiAgent: string; kaspiApi: string; wildberries: string; profile: string; history: string; menu: string; close: string }> = {
+  ru: { home: 'Дашборд', invoices: 'Счета', kaspiShop: 'Kaspi Bot', aiAgent: 'AI-агент', kaspiApi: 'Kaspi API', wildberries: 'Wildberries', profile: 'Профиль', history: 'История', menu: 'Меню', close: 'Закрыть' },
+  kk: { home: 'Дашборд', invoices: 'Шоттар', kaspiShop: 'Kaspi Bot', aiAgent: 'AI-агент', kaspiApi: 'Kaspi API', wildberries: 'Wildberries', profile: 'Профиль', history: 'Тарих', menu: 'Мәзір', close: 'Жабу' },
+  en: { home: 'Dashboard', invoices: 'Invoices', kaspiShop: 'Kaspi Bot', aiAgent: 'AI Agent', kaspiApi: 'Kaspi API', wildberries: 'Wildberries', profile: 'Profile', history: 'History', menu: 'Menu', close: 'Close' },
 }
 
 // Copy shown to non-admins when they interact with an admin-gated section
@@ -70,6 +70,12 @@ const kaspiApiLinks: { href: string; label: LocalizedLabel }[] = [
   { href: '/kaspi-api/docs', label: { ru: 'Документация API', kk: 'API құжаттамасы', en: 'API docs' } },
 ]
 
+const wbLinks: { href: string; label: LocalizedLabel }[] = [
+  { href: '/wildberries', label: { ru: 'Подключение', kk: 'Қосылу', en: 'Connect' } },
+  { href: '/wildberries/products', label: { ru: 'Товары', kk: 'Тауарлар', en: 'Products' } },
+  { href: '/wildberries/orders', label: { ru: 'Заказы', kk: 'Тапсырыстар', en: 'Orders' } },
+]
+
 // Second-row sub-navigation (2026-08-20, founder: dropdowns were "тяжело
 // выбирать" -- replaced with a persistent second tab row that stays open on
 // every page of the active section, MoonAI/NestedTabs-style). Each section:
@@ -77,7 +83,7 @@ const kaspiApiLinks: { href: string; label: LocalizedLabel }[] = [
 // rendered as pill tabs in a second bar whenever the current path belongs
 // to the section.
 type Section = {
-  key: 'invoices' | 'kaspiApi' | 'kaspiShop' | 'aiAgent'
+  key: 'invoices' | 'kaspiApi' | 'kaspiShop' | 'aiAgent' | 'wildberries'
   links: { href: string; label: LocalizedLabel }[]
   adminOnly: boolean
 }
@@ -87,6 +93,7 @@ const SECTIONS: Section[] = [
   { key: 'kaspiApi', links: kaspiApiLinks, adminOnly: false },
   { key: 'kaspiShop', links: kaspiShopLinks, adminOnly: true },
   { key: 'aiAgent', links: aiAgentLinks, adminOnly: true },
+  { key: 'wildberries', links: wbLinks, adminOnly: true },
 ]
 
 function LockIcon({ size = 10 }: { size?: number }) {
@@ -299,6 +306,7 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
             { href: '/profile', label: labels[lang].profile },
             { href: '/kaspi-shop', label: labels[lang].kaspiShop, locked: !isAdmin, hintId: 'mobile-kaspiShop' },
             { href: '/ai-agent/settings', label: labels[lang].aiAgent, locked: !isAdmin, hintId: 'mobile-aiAgent' },
+            { href: '/wildberries', label: labels[lang].wildberries, locked: !isAdmin, hintId: 'mobile-wildberries' },
           ] as { href: string; label: string; badge?: number; locked?: boolean; hintId?: string }[]).map(item => {
             const active = !item.locked && (path === item.href || path.startsWith(item.href + '/'))
             return (
