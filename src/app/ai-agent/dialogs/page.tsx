@@ -1,10 +1,11 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useCallback, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { motion, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
+import LoadingSpinner from '@/components/LoadingSpinner'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -48,8 +49,9 @@ function formatRelative(iso: string): string {
   return new Date(iso).toLocaleString('ru-KZ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 }
 
-export default function AiAgentDialogs() {
+function AiAgentDialogsInner() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw
   const [loading, setLoading] = useState(true)
@@ -68,15 +70,18 @@ export default function AiAgentDialogs() {
     return { 'Authorization': `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' }
   }
 
-  const loadItems = useCallback(async () => {
+  const loadItems = useCallback(async (): Promise<DialogItem[]> => {
     setFetching(true)
     const headers = await authHeader()
     const res = await fetch('/api/ai-agent/dialogs', { headers })
+    let fetched: DialogItem[] = []
     if (res.ok) {
       const data = await res.json()
-      setItems(Array.isArray(data.items) ? data.items : [])
+      fetched = Array.isArray(data.items) ? data.items : []
+      setItems(fetched)
     }
     setFetching(false)
+    return fetched
   }, [])
 
   useEffect(() => {
@@ -85,11 +90,18 @@ export default function AiAgentDialogs() {
       if (!user) { router.push('/login'); return }
       const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', user.id).single()
       if (!profile?.is_admin) { setForbidden(true); setLoading(false); return }
-      await loadItems()
+      const fetched = await loadItems()
+      // Deep link from a «Заявки» lead card -- only auto-open when the id
+      // genuinely belongs to one of the caller's own conversations (a
+      // stale/foreign id is silently ignored).
+      const conversationParam = searchParams.get('conversation')
+      if (conversationParam && fetched.some(i => i.id === conversationParam)) {
+        openConversation(conversationParam)
+      }
       setLoading(false)
     }
     load()
-  }, [router, loadItems])
+  }, [router, loadItems, searchParams])
 
   async function openConversation(id: string) {
     setSelectedId(id)
@@ -279,5 +291,13 @@ export default function AiAgentDialogs() {
       </div>
     </main>
     </DesktopShell>
+  )
+}
+
+export default function AiAgentDialogs() {
+  return (
+    <Suspense fallback={<LoadingSpinner />}>
+      <AiAgentDialogsInner />
+    </Suspense>
   )
 }
