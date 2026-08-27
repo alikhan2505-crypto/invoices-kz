@@ -268,7 +268,7 @@ export default function AiAgentSettings() {
   const [createCountdown, setCreateCountdown] = useState(0)
   const createTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const [agentId, setAgentId] = useState<string | null>(null)
-  const [connections, setConnections] = useState<{ channel: string; external_account_name: string | null; status: string }[]>([])
+  const [connections, setConnections] = useState<{ channel: string; external_account_id: string; external_account_name: string | null; status: string }[]>([])
   const [connecting, setConnecting] = useState(false)
   const [igBusy, setIgBusy] = useState(false)
   const [igError, setIgError] = useState<string | null>(null)
@@ -276,6 +276,9 @@ export default function AiAgentSettings() {
   const [tgOpen, setTgOpen] = useState(false)
   const [tgBusy, setTgBusy] = useState(false)
   const [tgError, setTgError] = useState<string | null>(null)
+  const [websiteBusy, setWebsiteBusy] = useState(false)
+  const [websiteError, setWebsiteError] = useState<string | null>(null)
+  const [websiteCopied, setWebsiteCopied] = useState(false)
   // WhatsApp Embedded Signup (ES v4) -- a JS SDK popup, not a redirect, so
   // its result lands in refs (message-event listener + FB.login callback)
   // rather than a query-param round trip like the Instagram OAuth notice.
@@ -654,7 +657,7 @@ export default function AiAgentSettings() {
       })
       if (res.ok) {
         const data = await res.json()
-        setConnections(prev => [...prev.filter(c => c.channel !== 'telegram'), { channel: 'telegram', external_account_name: data.botUsername, status: 'active' }])
+        setConnections(prev => [...prev.filter(c => c.channel !== 'telegram'), { channel: 'telegram', external_account_id: '', external_account_name: data.botUsername, status: 'active' }])
         setTelegramToken('')
         setTgOpen(false)
       } else {
@@ -689,6 +692,55 @@ export default function AiAgentSettings() {
       setTgError('Не удалось отключить Telegram. Попробуйте ещё раз.')
     }
     setTgBusy(false)
+  }
+
+  async function connectWebsite() {
+    if (!agentId) return
+    setWebsiteBusy(true)
+    setWebsiteError(null)
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/ai-agent/website/connect', {
+        method: 'POST', headers, body: JSON.stringify({ agentId }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setConnections(prev => [...prev.filter(c => c.channel !== 'website'), { channel: 'website', external_account_id: data.widgetKey, external_account_name: null, status: 'active' }])
+      } else {
+        setWebsiteError('Не удалось подключить чат-виджет. Попробуйте ещё раз.')
+      }
+    } catch {
+      setWebsiteError('Не удалось подключить чат-виджет. Попробуйте ещё раз.')
+    }
+    setWebsiteBusy(false)
+  }
+
+  async function disconnectWebsite() {
+    if (!agentId) return
+    setWebsiteBusy(true)
+    setWebsiteError(null)
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/ai-agent/website/connect', {
+        method: 'DELETE', headers, body: JSON.stringify({ agentId }),
+      })
+      if (res.ok) {
+        setConnections(prev => prev.filter(c => c.channel !== 'website'))
+      } else {
+        setWebsiteError('Не удалось отключить чат-виджет. Попробуйте ещё раз.')
+      }
+    } catch {
+      setWebsiteError('Не удалось отключить чат-виджет. Попробуйте ещё раз.')
+    }
+    setWebsiteBusy(false)
+  }
+
+  function copyWidgetSnippet() {
+    if (!websiteConnection) return
+    const snippet = `<script src="https://www.invoices.kz/widget.js" data-key="${websiteConnection.external_account_id}" async></script>`
+    navigator.clipboard.writeText(snippet)
+    setWebsiteCopied(true)
+    setTimeout(() => setWebsiteCopied(false), 2000)
   }
 
   // WhatsApp Embedded Signup: FB.login opens the popup; its callback fires
@@ -741,7 +793,7 @@ export default function AiAgentSettings() {
           })
           if (res.ok) {
             const data = await res.json()
-            setConnections(prev => [...prev.filter(c => c.channel !== 'whatsapp'), { channel: 'whatsapp', external_account_name: data.displayPhoneNumber || null, status: 'active' }])
+            setConnections(prev => [...prev.filter(c => c.channel !== 'whatsapp'), { channel: 'whatsapp', external_account_id: '', external_account_name: data.displayPhoneNumber || null, status: 'active' }])
           } else {
             setWaError('Не удалось подключить WhatsApp. Попробуйте ещё раз — если не получится снова, напишите в поддержку.')
           }
@@ -882,6 +934,7 @@ export default function AiAgentSettings() {
   const instagramConnection = connections.find(c => c.channel === 'instagram')
   const telegramConnection = connections.find(c => c.channel === 'telegram')
   const whatsappConnection = connections.find(c => c.channel === 'whatsapp')
+  const websiteConnection = connections.find(c => c.channel === 'website')
   const tgExpanded = tgOpen || telegramConnection?.status === 'token_expired'
 
   // The real server-side context line, assembled from the same visible
@@ -1482,12 +1535,40 @@ export default function AiAgentSettings() {
                   <ChannelCard
                     icon={<SiteChatIcon />}
                     name="Чат для сайта"
-                    chip={<StatusChip kind="soon" label="Скоро" />}
+                    chip={websiteConnection
+                      ? <StatusChip kind="ok" label="Подключено" />
+                      : <StatusChip kind="off" label="Не подключен" />}
                     description="Виджет чата на вашем сайте — агент отвечает посетителям в реальном времени"
                   >
-                    <button disabled className="w-full nav-glass rounded-lg px-4 py-2.5 text-sm font-medium opacity-50 cursor-not-allowed" style={{ color: 'var(--nav-text-primary)' }}>
-                      Подключить
-                    </button>
+                    {websiteConnection ? (
+                      <>
+                        <p className="text-[11px] mb-2" style={{ color: 'var(--nav-text-muted)' }}>
+                          Вставьте перед `&lt;/body&gt;` на вашем сайте:
+                        </p>
+                        <code className="block text-[10px] mb-2 p-2 rounded-lg break-all" style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-secondary)' }}>
+                          {`<script src="https://www.invoices.kz/widget.js" data-key="${websiteConnection.external_account_id}" async></script>`}
+                        </code>
+                        <div className="flex gap-2">
+                          <button onClick={copyWidgetSnippet}
+                            className="flex-1 text-xs font-semibold nav-glass rounded-lg px-3 py-2" style={{ color: 'var(--nav-accent)' }}>
+                            {websiteCopied ? 'Скопировано ✓' : 'Скопировать код'}
+                          </button>
+                          <button onClick={disconnectWebsite} disabled={websiteBusy}
+                            className="nav-glass rounded-lg px-3 py-2 text-xs font-medium disabled:opacity-50" style={{ color: 'var(--nav-text-primary)' }}>
+                            {websiteBusy ? '…' : 'Отключить'}
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <button onClick={connectWebsite} disabled={websiteBusy}
+                        className="w-full rounded-lg px-4 py-2.5 text-sm font-semibold disabled:opacity-50"
+                        style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                        {websiteBusy ? 'Подключаем…' : 'Подключить'}
+                      </button>
+                    )}
+                    {websiteError && (
+                      <div className="text-xs mt-2" style={{ color: 'var(--nav-critical)' }}>{websiteError}</div>
+                    )}
                   </ChannelCard>
 
                   <ChannelCard

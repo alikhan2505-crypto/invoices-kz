@@ -47,14 +47,14 @@ export async function GET(req: NextRequest) {
   const { data: connections } = agentIds.length > 0
     ? await supabase
         .from('ai_agent_channel_connections')
-        .select('agent_id, channel, external_account_name, status')
+        .select('agent_id, channel, external_account_id, external_account_name, status')
         .in('agent_id', agentIds)
     : { data: [] }
 
-  const connectionsByAgent: Record<string, { channel: string; external_account_name: string | null; status: string }[]> = {}
+  const connectionsByAgent: Record<string, { channel: string; external_account_id: string; external_account_name: string | null; status: string }[]> = {}
   for (const c of connections || []) {
     if (!connectionsByAgent[c.agent_id]) connectionsByAgent[c.agent_id] = []
-    connectionsByAgent[c.agent_id].push({ channel: c.channel, external_account_name: c.external_account_name, status: c.status })
+    connectionsByAgent[c.agent_id].push({ channel: c.channel, external_account_id: c.external_account_id, external_account_name: c.external_account_name, status: c.status })
   }
 
   return NextResponse.json({

@@ -53,10 +53,19 @@ function WhatsAppIcon() {
   )
 }
 
+function WebsiteIcon() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  )
+}
+
 const CHANNEL_META: Record<string, { label: string; icon: () => React.ReactElement }> = {
   instagram: { label: 'Instagram', icon: InstagramIcon },
   telegram: { label: 'Telegram', icon: TelegramIcon },
   whatsapp: { label: 'WhatsApp', icon: WhatsAppIcon },
+  website: { label: 'Сайт', icon: WebsiteIcon },
 }
 
 // One entry per Kanban column, in left-to-right order. `next` is the
