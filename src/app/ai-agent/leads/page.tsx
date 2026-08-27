@@ -134,18 +134,25 @@ export default function AiAgentLeads() {
 
   async function moveStatus(id: string, status: LeadStatus) {
     setMovingId(id)
-    // Optimistic -- the board should feel instant; a failure just reverts
-    // to the pre-move snapshot.
-    const previous = items
+    // Optimistic -- the board should feel instant. On failure, revert only
+    // this card's own status via a functional update rather than restoring
+    // a whole-array snapshot -- a snapshot would clobber any other change
+    // (another card's move, a fresh agent-filter fetch) that landed while
+    // this request was in flight.
+    const originalStatus = items.find(i => i.id === id)?.leadStatus
     setItems(prev => prev.map(i => i.id === id ? { ...i, leadStatus: status } : i))
     try {
       const headers = await authHeader()
       const res = await fetch('/api/ai-agent/leads/status', {
         method: 'POST', headers, body: JSON.stringify({ conversationId: id, status }),
       })
-      if (!res.ok) setItems(previous)
+      if (!res.ok && originalStatus) {
+        setItems(prev => prev.map(i => i.id === id ? { ...i, leadStatus: originalStatus } : i))
+      }
     } catch {
-      setItems(previous)
+      if (originalStatus) {
+        setItems(prev => prev.map(i => i.id === id ? { ...i, leadStatus: originalStatus } : i))
+      }
     } finally {
       setMovingId(null)
     }
