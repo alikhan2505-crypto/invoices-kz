@@ -271,6 +271,11 @@ export default function FlowBuilder({ agentId, authHeader }: { agentId: string; 
                 <button onClick={() => addButton(step.id)}
                   className="text-xs mt-2" style={{ color: 'var(--nav-accent)' }}>+ Добавить кнопку</button>
               )}
+              {step.buttons.length > 0 && (
+                <div className="text-[11px] mt-2" style={{ color: 'var(--nav-text-muted)' }}>
+                  Один и тот же сценарий работает на всех каналах — на WhatsApp/Instagram кнопки автоматически подстраиваются под их формат
+                </div>
+              )}
               </>
               )}
             </div>
