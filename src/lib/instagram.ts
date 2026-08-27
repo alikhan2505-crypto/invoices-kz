@@ -1,3 +1,5 @@
+import type { FlowStep } from './aiAgent/flow'
+
 // "Instagram API with Instagram Login" tokens (prefixed IGAA...) are only
 // valid against graph.instagram.com — the classic graph.facebook.com host
 // (used by the older Facebook-Login flavor of this API) can't parse them
@@ -158,5 +160,45 @@ export async function sendDirectMessage(recipientId: string, message: string, cr
   const data = await res.json()
   if (!res.ok) {
     throw new InstagramApiError(data.error?.message || 'Failed to send direct message', res.status)
+  }
+}
+
+const INSTAGRAM_QUICK_REPLY_TITLE_MAX = 20
+const INSTAGRAM_QUICK_REPLY_MAX = 13
+
+interface InstagramFlowMessage {
+  text: string
+  quick_replies?: { content_type: 'text'; title: string; payload: string }[]
+}
+
+// Pure -- decides Instagram's native quick-reply shape for a flow step.
+// FlowBuilder.tsx already caps a step at 8 buttons, so the >13 truncation
+// branch below is defensive (unreachable via the UI today).
+export function buildInstagramFlowMessage(step: FlowStep): InstagramFlowMessage {
+  if (step.buttons.length === 0) return { text: step.text }
+  const quick_replies = step.buttons.slice(0, INSTAGRAM_QUICK_REPLY_MAX).map((b, i) => ({
+    content_type: 'text' as const,
+    title: b.label.slice(0, INSTAGRAM_QUICK_REPLY_TITLE_MAX),
+    payload: `btn:${step.id}:${i}`,
+  }))
+  return { text: step.text, quick_replies }
+}
+
+// Sends one flow step as a DM -- text or quick replies depending on button
+// count (buildInstagramFlowMessage). Same send shape as sendDirectMessage,
+// just with a richer `message` object.
+export async function sendInstagramFlowStep(recipientId: string, step: FlowStep, credentials: { igUserId: string; accessToken: string }): Promise<void> {
+  const res = await fetch(`${GRAPH_API}/${credentials.igUserId}/messages`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      recipient: { id: recipientId },
+      message: buildInstagramFlowMessage(step),
+      access_token: credentials.accessToken,
+    }),
+  })
+  const data = await res.json()
+  if (!res.ok) {
+    throw new InstagramApiError(data.error?.message || 'Failed to send flow step', res.status)
   }
 }
