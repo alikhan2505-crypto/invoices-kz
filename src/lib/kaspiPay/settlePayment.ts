@@ -151,5 +151,15 @@ async function tryExpire(reqRow: SettleableRequest): Promise<boolean> {
     console.error('Kaspi settle: failed to expire request', reqRow.id, error.message)
     return false
   }
-  return !!(data && data.length > 0)
+  const expired = !!(data && data.length > 0)
+  // Unlike an invoice (which has its own independent lifecycle -- a payer
+  // can just get a fresh QR minted next poll, or pay by bank transfer
+  // instead), a storefront order has no other path to completion in v1:
+  // Kaspi Pay is the only checkout method. Without this, an abandoned
+  // checkout stays stuck at 'pending_payment' forever in Заказы витрины,
+  // indistinguishable from one still genuinely in progress.
+  if (expired && reqRow.shop_order_id) {
+    await supabase.from('kaspi_shop_orders').update({ status: 'expired' }).eq('id', reqRow.shop_order_id).eq('status', 'pending_payment')
+  }
+  return expired
 }

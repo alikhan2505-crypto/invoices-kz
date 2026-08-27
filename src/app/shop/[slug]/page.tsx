@@ -90,8 +90,13 @@ export default function StorefrontPage() {
       })
       const data = await res.json()
       if (!res.ok) { setError(data.error || 'Не удалось оформить заказ'); return }
+      // A created order with no payment (Kaspi mint failed, wallet balance
+      // too low, etc.) must not silently fall back to showing the form
+      // again with orderId already set -- the buyer would see nothing wrong
+      // and resubmit, creating a duplicate order for the same purchase.
+      if (!data.payment) { setError('Не удалось создать оплату. Попробуйте ещё раз чуть позже.'); return }
       setOrderId(data.orderId)
-      setPayment(data.payment || null)
+      setPayment(data.payment)
     } catch {
       setError('Ошибка сети. Проверьте соединение и попробуйте ещё раз.')
     } finally {
