@@ -307,7 +307,7 @@ export async function applyPriceCheckResult(
         .filter(o => !excludedMerchants.includes(o.merchantId))
         .sort((a, b) => a.price - b.price)
         .slice(0, 10)
-        .map(o => ({ merchantName: o.merchantName || null, price: o.price }))
+        .map(o => ({ merchantName: o.merchantName || null, price: o.price, merchantId: o.merchantId }))
 
       await supabase
         .from('kaspi_shop_tracked_products')
@@ -436,7 +436,7 @@ export async function applyPriceCheckResult(
       .filter(o => !excludedMerchants.includes(o.merchantId))
       .sort((a, b) => a.price - b.price)
       .slice(0, 10)
-      .map(o => ({ merchantName: o.merchantName || null, price: o.price }))
+      .map(o => ({ merchantName: o.merchantName || null, price: o.price, merchantId: o.merchantId }))
 
     await supabase
       .from('kaspi_shop_tracked_products')

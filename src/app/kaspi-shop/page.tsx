@@ -30,7 +30,7 @@ type Product = {
   excluded_merchant_ids: string[]
   market_position: number | null
   market_offer_count: number | null
-  competitor_snapshot: { merchantName: string | null; price: number }[] | null
+  competitor_snapshot: { merchantName: string | null; price: number; merchantId?: string }[] | null
 }
 
 // Multi-line native tooltip text for the "Конкурент" price -- who, at what
@@ -38,7 +38,9 @@ type Product = {
 // city's offers, own merchant already excluded).
 function competitorTooltip(snapshot: Product['competitor_snapshot']): string | undefined {
   if (!snapshot || snapshot.length === 0) return undefined
-  return snapshot.map(o => `${o.merchantName || 'Продавец'} — ${o.price.toLocaleString('ru-KZ')} ₸`).join('\n')
+  return snapshot
+    .map(o => `${o.merchantName || 'Продавец'} — ${o.price.toLocaleString('ru-KZ')} ₸${o.merchantId ? ` (ID ${o.merchantId})` : ''}`)
+    .join('\n')
 }
 
 const STRATEGY_LABELS: Record<string, string> = {
