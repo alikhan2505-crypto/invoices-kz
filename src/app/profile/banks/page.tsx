@@ -198,7 +198,7 @@ export default function Banks() {
                     <div className="flex items-center gap-1 flex-shrink-0">
                       {!acc.is_main && (
                         <button onClick={() => setMain(acc.id)} title={t.setMainTitle}
-                          className="w-8 h-8 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--nav-surface-glass)]"
+                          className="w-11 h-11 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--nav-surface-glass)]"
                           style={{ color: 'var(--nav-text-muted)' }}>
                           <StarIcon filled={false} />
                         </button>
@@ -209,12 +209,12 @@ export default function Banks() {
                         </span>
                       )}
                       <button onClick={() => startEdit(acc)} title={t.editTitle} aria-label={editLabel(lang)}
-                        className="w-8 h-8 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--nav-surface-glass)]"
+                        className="w-11 h-11 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--nav-surface-glass)]"
                         style={{ color: 'var(--nav-text-muted)' }}>
                         <PencilIcon />
                       </button>
                       <button onClick={() => deleteAccount(acc.id)} title={t.deleteTitle} aria-label={deleteLabel(lang)}
-                        className="w-8 h-8 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--nav-surface-glass)] hover:text-[color:var(--nav-critical)]"
+                        className="w-11 h-11 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--nav-surface-glass)] hover:text-[color:var(--nav-critical)]"
                         style={{ color: 'var(--nav-text-muted)' }}>
                         <XIcon />
                       </button>

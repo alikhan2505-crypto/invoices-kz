@@ -178,7 +178,7 @@ export default function Templates() {
                     <button
                       onClick={() => deleteTemplate(tpl.id)}
                       aria-label={deleteLabel(lang)}
-                      className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0 transition-colors hover:bg-[var(--nav-surface-glass)] hover:text-[color:var(--nav-critical)]"
+                      className="w-11 h-11 flex items-center justify-center rounded-lg flex-shrink-0 transition-colors hover:bg-[var(--nav-surface-glass)] hover:text-[color:var(--nav-critical)]"
                       style={{ color: 'var(--nav-text-muted)' }}>
                       <XIcon />
                     </button>

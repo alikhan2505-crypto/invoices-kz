@@ -333,12 +333,12 @@ export default function Clients() {
                   </div>
                   <div className="flex items-center gap-1 ml-3 flex-shrink-0">
                     <button onClick={() => startEdit(client)} aria-label="Изменить"
-                      className="w-8 h-8 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--nav-surface-glass)]"
+                      className="w-11 h-11 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--nav-surface-glass)]"
                       style={{ color: 'var(--nav-text-muted)' }}>
                       <PencilIcon />
                     </button>
                     <button onClick={() => deleteClient(client.id)} aria-label="Удалить"
-                      className="w-8 h-8 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--nav-surface-glass)] hover:text-[color:var(--nav-critical)]"
+                      className="w-11 h-11 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--nav-surface-glass)] hover:text-[color:var(--nav-critical)]"
                       style={{ color: 'var(--nav-text-muted)' }}>
                       <XIcon />
                     </button>

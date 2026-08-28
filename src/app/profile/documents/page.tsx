@@ -299,7 +299,7 @@ export default function Documents() {
                           disabled={busyDocId === doc.id}
                           aria-label={t.openNakladnayaAriaLabel}
                           title={t.openTitleLabel}
-                          className="w-8 h-8 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--nav-surface-glass)] disabled:opacity-40"
+                          className="w-11 h-11 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--nav-surface-glass)] disabled:opacity-40"
                           style={{ color: 'var(--nav-accent)' }}>
                           <EyeIcon />
                         </button>
@@ -309,7 +309,7 @@ export default function Documents() {
                         disabled={busyDocId === doc.id}
                         aria-label={deleteLabel(lang)}
                         title={t.deleteTitleLabel}
-                        className="w-8 h-8 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--nav-surface-glass)] hover:text-[color:var(--nav-critical)] disabled:opacity-40"
+                        className="w-11 h-11 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--nav-surface-glass)] hover:text-[color:var(--nav-critical)] disabled:opacity-40"
                         style={{ color: 'var(--nav-text-muted)' }}>
                         <XIcon />
                       </button>

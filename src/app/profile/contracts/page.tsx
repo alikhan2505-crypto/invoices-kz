@@ -300,7 +300,7 @@ export default function Contracts() {
                       onClick={e => { e.stopPropagation(); deleteContract(c.id) }}
                       aria-label={deleteLabel(lang)}
                       title={t.deleteButton}
-                      className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0 ml-2 transition-colors hover:bg-[var(--nav-surface-glass)] hover:text-[color:var(--nav-critical)]"
+                      className="w-11 h-11 flex items-center justify-center rounded-lg flex-shrink-0 ml-2 transition-colors hover:bg-[var(--nav-surface-glass)] hover:text-[color:var(--nav-critical)]"
                       style={{ color: 'var(--nav-text-muted)' }}>
                       <XIcon />
                     </button>

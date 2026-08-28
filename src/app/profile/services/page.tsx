@@ -175,12 +175,12 @@ export default function Services() {
             {Number(svc.price).toLocaleString('ru-KZ')} ₸
           </span>
           <button onClick={() => startEdit(svc)} aria-label={editLabel(lang)}
-            className="w-8 h-8 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--nav-surface-glass)]"
+            className="w-11 h-11 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--nav-surface-glass)]"
             style={{ color: 'var(--nav-text-muted)' }}>
             <PencilIcon />
           </button>
           <button onClick={() => deleteService(svc.id)} aria-label={deleteLabel(lang)}
-            className="w-8 h-8 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--nav-surface-glass)] hover:text-[color:var(--nav-critical)]"
+            className="w-11 h-11 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--nav-surface-glass)] hover:text-[color:var(--nav-critical)]"
             style={{ color: 'var(--nav-text-muted)' }}>
             <XIcon />
           </button>
