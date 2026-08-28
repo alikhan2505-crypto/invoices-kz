@@ -475,9 +475,12 @@ export default function History() {
                       </span>
                     </div>
                   </div>
+                  {/* 44x44 hit area (PRODUCT.md tap-zone baseline) around the
+                      small icon; ml-1 instead of ml-4 keeps the previous
+                      visual gap since the icon now floats centered in 44px. */}
                   <button
                     onClick={(e) => { e.stopPropagation(); router.push('/create?repeat=' + inv.id) }}
-                    className="p-1 ml-4 flex-shrink-0 text-[color:var(--nav-text-muted)] hover:text-[color:var(--nav-accent)] transition-colors"
+                    className="w-11 h-11 ml-1 flex items-center justify-center rounded-lg flex-shrink-0 text-[color:var(--nav-text-muted)] hover:text-[color:var(--nav-accent)] hover:bg-[var(--nav-surface-glass)] transition-colors"
                     aria-label={t.repeatInvoiceLabel}
                     title={t.repeatInvoiceLabel}
                   >
@@ -485,7 +488,7 @@ export default function History() {
                   </button>
                   <button
                     onClick={(e) => deleteInvoice(e, inv.id, inv.number)}
-                    className="p-1 ml-4 flex-shrink-0 text-[color:var(--nav-text-muted)] hover:text-[color:var(--nav-critical)] transition-colors"
+                    className="w-11 h-11 flex items-center justify-center rounded-lg flex-shrink-0 text-[color:var(--nav-text-muted)] hover:text-[color:var(--nav-critical)] hover:bg-[var(--nav-surface-glass)] transition-colors"
                     aria-label={t.confirmCancelInvoice(inv.number)}
                   >
                     <XIcon size={15} />
