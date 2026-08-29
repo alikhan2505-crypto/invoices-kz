@@ -741,7 +741,13 @@ export default function Home() {
               >
                 {t.heroTitleLine1}
                 <br />
-                <span style={{ color: COLOR.teal }}>
+                {/* A flat COLOR.teal (#0E99AA) here measured only 2.65:1 against
+                    the real composited background (the ambient blur blobs
+                    tint it lighter than the page's flat ground color) --
+                    confirmed by a live Lighthouse re-check, not assumed.
+                    #5EEAD4 keeps the teal identity but clears 3:1 with real
+                    margin (~6:1) regardless of exactly which blob is behind it. */}
+                <span style={{ color: '#5EEAD4' }}>
                   {t.heroTitleLine2}
                 </span>
               </motion.h1>
