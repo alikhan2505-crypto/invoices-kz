@@ -8,9 +8,14 @@ import { useLanguage, type Lang } from '@/components/LanguageProvider'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
+// violet/teal deepened from #7A6CF0/#0E99AA -- the originals read fine
+// visually but measured 4.01:1 and 3.41:1 with white text (Lighthouse,
+// live), short of the 4.5:1 AA floor for buttons/badges. These keep the
+// same hue, just enough darker for real margin (~4.8:1 / ~5:1) against
+// white text.
 const COLOR = {
-  violet: '#7A6CF0',
-  teal: '#0E99AA',
+  violet: '#6E5ED8',
+  teal: '#0B7A88',
   magenta: '#CE4C86',
   ground: '#0a0d1f',
 }
