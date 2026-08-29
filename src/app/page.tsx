@@ -558,21 +558,21 @@ function HeroMockupCard() {
           <span className="h-2.5 w-2.5 rounded-full" style={{ background: COLOR.magenta, opacity: 0.7 }} />
           <span className="h-2.5 w-2.5 rounded-full" style={{ background: COLOR.violet, opacity: 0.7 }} />
           <span className="h-2.5 w-2.5 rounded-full" style={{ background: COLOR.teal, opacity: 0.7 }} />
-          <span className="ml-2 truncate text-[11px]" style={{ color: 'rgba(255,255,255,0.4)' }}>
+          <span className="ml-2 truncate text-[11px]" style={{ color: 'rgba(255,255,255,0.68)' }}>
             {t.url}
           </span>
         </div>
         <div className="p-5">
           <div className="flex items-start justify-between">
             <div>
-              <div className="text-[11px]" style={{ color: 'rgba(255,255,255,0.4)' }}>{t.number}</div>
+              <div className="text-[11px]" style={{ color: 'rgba(255,255,255,0.68)' }}>{t.number}</div>
               <div className="mt-0.5 text-[16px] font-semibold">{t.client}</div>
             </div>
             <span className="rounded-lg px-2.5 py-1 text-[10px] font-bold text-white" style={{ background: COLOR.teal }}>
               {t.paid}
             </span>
           </div>
-          <div className="mt-4 space-y-2 text-[12px]" style={{ color: 'rgba(255,255,255,0.55)' }}>
+          <div className="mt-4 space-y-2 text-[12px]" style={{ color: 'rgba(255,255,255,0.82)' }}>
             <div className="flex justify-between">
               <span>{t.service}</span>
               <span>150 000 ₸</span>
@@ -583,7 +583,7 @@ function HeroMockupCard() {
             </div>
           </div>
           <div className="mt-4 flex items-center justify-between border-t pt-4" style={{ borderColor: BORDER }}>
-            <span className="text-[12px]" style={{ color: 'rgba(255,255,255,0.5)' }}>{t.total}</span>
+            <span className="text-[12px]" style={{ color: 'rgba(255,255,255,0.82)' }}>{t.total}</span>
             <span className="text-[20px] font-bold" style={{ color: COLOR.teal }}>168 000 ₸</span>
           </div>
         </div>
@@ -714,6 +714,7 @@ export default function Home() {
         </div>
       </header>
 
+      <main>
       {/* --------------------------------------------------------- hero */}
       <section className="relative overflow-hidden pt-32 pb-20 sm:pt-40 sm:pb-28">
         <AmbientBlobs reduce={!!reduce} />
@@ -740,14 +741,7 @@ export default function Home() {
               >
                 {t.heroTitleLine1}
                 <br />
-                <span
-                  style={{
-                    background: `linear-gradient(120deg, ${COLOR.violet}, ${COLOR.teal})`,
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                    backgroundClip: 'text',
-                  }}
-                >
+                <span style={{ color: COLOR.teal }}>
                   {t.heroTitleLine2}
                 </span>
               </motion.h1>
@@ -757,7 +751,7 @@ export default function Home() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: reduce ? 0 : 0.6, ease: EASE, delay: reduce ? 0 : 0.14 }}
                 className="mt-6 max-w-xl text-[16px] leading-relaxed"
-                style={{ color: 'rgba(255,255,255,0.64)' }}
+                style={{ color: 'rgba(255,255,255,0.82)' }}
               >
                 {t.heroSubtitle}
               </motion.p>
@@ -789,7 +783,7 @@ export default function Home() {
                 animate={{ opacity: 1 }}
                 transition={{ duration: reduce ? 0 : 0.6, ease: EASE, delay: reduce ? 0 : 0.28 }}
                 className="mt-4 text-[12px]"
-                style={{ color: 'rgba(255,255,255,0.4)' }}
+                style={{ color: 'rgba(255,255,255,0.68)' }}
               >
                 {t.heroNote}
               </motion.p>
@@ -848,7 +842,7 @@ export default function Home() {
                 <div className="text-[clamp(2rem,4vw,2.75rem)] font-bold tracking-[-0.02em]" style={{ color: COLOR.violet }}>
                   <CountUp value={s.value} suffix={s.suffix} reduce={!!reduce} />
                 </div>
-                <div className="mt-2 text-[13px]" style={{ color: 'rgba(255,255,255,0.5)' }}>{s.label}</div>
+                <div className="mt-2 text-[13px]" style={{ color: 'rgba(255,255,255,0.82)' }}>{s.label}</div>
               </div>
             ))}
           </div>
@@ -877,7 +871,7 @@ export default function Home() {
                 </div>
                 <div>
                   <h3 className="text-[16px] font-semibold">{s.title}</h3>
-                  <p className="mt-1.5 text-[13.5px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.55)' }}>{s.desc}</p>
+                  <p className="mt-1.5 text-[13.5px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.82)' }}>{s.desc}</p>
                 </div>
               </div>
             </Reveal>
@@ -890,7 +884,7 @@ export default function Home() {
         <Reveal className="max-w-xl">
           <Eyebrow color={COLOR.violet}>{t.featuresEyebrow}</Eyebrow>
           <h2 className="mt-4 text-[clamp(1.9rem,4vw,2.75rem)] font-semibold leading-[1.08] tracking-[-0.02em]">{t.featuresTitle}</h2>
-          <p className="mt-4 text-[15px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.5)' }}>{t.featuresSubtitle}</p>
+          <p className="mt-4 text-[15px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.82)' }}>{t.featuresSubtitle}</p>
         </Reveal>
 
         <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -917,7 +911,7 @@ export default function Home() {
                     <FIcon className="h-5 w-5" />
                   </div>
                   <h3 className="mt-4 text-[16px] font-semibold">{f.title}</h3>
-                  <p className="mt-2 text-[13.5px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.55)' }}>{f.desc}</p>
+                  <p className="mt-2 text-[13.5px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.82)' }}>{f.desc}</p>
                 </div>
               </Reveal>
             )
@@ -952,7 +946,7 @@ export default function Home() {
                     </span>
                   </div>
                   <h3 className="mt-4 text-[16px] font-semibold">{s.title}</h3>
-                  <p className="mt-2 text-[13.5px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.5)' }}>{s.desc}</p>
+                  <p className="mt-2 text-[13.5px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.82)' }}>{s.desc}</p>
                 </div>
               </Reveal>
             )
@@ -965,7 +959,7 @@ export default function Home() {
         <Reveal className="text-center">
           <Eyebrow color={COLOR.teal}>{t.authEyebrow}</Eyebrow>
           <h2 className="mt-4 text-[clamp(1.7rem,3.4vw,2.25rem)] font-semibold tracking-[-0.02em]">{t.authTitle}</h2>
-          <p className="mx-auto mt-3 max-w-md text-[14px]" style={{ color: 'rgba(255,255,255,0.5)' }}>{t.authSubtitle}</p>
+          <p className="mx-auto mt-3 max-w-md text-[14px]" style={{ color: 'rgba(255,255,255,0.82)' }}>{t.authSubtitle}</p>
         </Reveal>
 
         <div className="mt-9 flex flex-wrap justify-center gap-3">
@@ -998,7 +992,7 @@ export default function Home() {
                   <span style={{ color: COLOR.violet }}>
                     <EIcon className="h-4.5 w-4.5" />
                   </span>
-                  <span className="text-[13px]" style={{ color: 'rgba(255,255,255,0.6)' }}>{e.label}</span>
+                  <span className="text-[13px]" style={{ color: 'rgba(255,255,255,0.82)' }}>{e.label}</span>
                 </div>
               </Reveal>
             )
@@ -1019,7 +1013,7 @@ export default function Home() {
               style={{ background: `radial-gradient(circle, ${COLOR.violet}40, transparent 70%)`, filter: 'blur(10px)' }}
             />
             <h2 className="relative text-[clamp(1.8rem,4vw,2.5rem)] font-semibold tracking-[-0.02em]">{t.ctaTitle}</h2>
-            <p className="relative mx-auto mt-3 max-w-sm text-[14.5px]" style={{ color: 'rgba(255,255,255,0.6)' }}>{t.ctaSubtitle}</p>
+            <p className="relative mx-auto mt-3 max-w-sm text-[14.5px]" style={{ color: 'rgba(255,255,255,0.82)' }}>{t.ctaSubtitle}</p>
             <button
               onClick={goLogin}
               className="motion-safe:transition-all motion-safe:duration-200 motion-safe:hover:-translate-y-0.5 motion-safe:active:scale-[0.97] relative mt-8 inline-flex items-center gap-2 rounded-2xl px-8 py-3.5 text-[15px] font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
@@ -1028,10 +1022,11 @@ export default function Home() {
               {t.ctaButton}
               <ArrowRightIcon className="h-4 w-4" />
             </button>
-            <p className="relative mt-4 text-[12px]" style={{ color: 'rgba(255,255,255,0.35)' }}>{t.ctaNote}</p>
+            <p className="relative mt-4 text-[12px]" style={{ color: 'rgba(255,255,255,0.68)' }}>{t.ctaNote}</p>
           </div>
         </Reveal>
       </section>
+      </main>
 
       {/* ------------------------------------------------------- footer */}
       <footer className="relative z-10 mx-auto max-w-6xl px-5 py-10 sm:px-8" style={{ borderTop: `1px solid ${border}` }}>
@@ -1045,7 +1040,7 @@ export default function Home() {
                 key={l.label}
                 href={l.href}
                 className="text-[12px] transition-colors hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-                style={{ color: 'rgba(255,255,255,0.4)' }}
+                style={{ color: 'rgba(255,255,255,0.68)' }}
               >
                 {l.label}
               </a>
@@ -1059,14 +1054,14 @@ export default function Home() {
                 target={l.href.startsWith('http') ? '_blank' : undefined}
                 rel={l.href.startsWith('http') ? 'noopener noreferrer' : undefined}
                 className="text-[12px] transition-colors hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-                style={{ color: 'rgba(255,255,255,0.4)' }}
+                style={{ color: 'rgba(255,255,255,0.68)' }}
               >
                 {l.label}
               </a>
             ))}
           </div>
         </div>
-        <div className="mt-6 text-center text-[11px]" style={{ color: 'rgba(255,255,255,0.25)' }}>
+        <div className="mt-6 text-center text-[11px]" style={{ color: 'rgba(255,255,255,0.68)' }}>
           {t.footerBottom}
         </div>
       </footer>
