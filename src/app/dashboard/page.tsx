@@ -691,7 +691,7 @@ export default function DashboardPage() {
 
   return (
     <DesktopShell>
-      <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
+      <main className="page-surface-in-shell min-h-screen pb-32 lg:pb-6 lg:min-h-full">
         <SiteNav />
         <div className="max-w-lg lg:max-w-5xl mx-auto p-4">
           {/* Header row */}
@@ -1046,7 +1046,7 @@ export default function DashboardPage() {
               landing page's footer copy (src/app/page.tsx) so the same
               entity/contacts appear once the user is inside the app too. */}
           <footer className="mt-8 pt-5" style={{ borderTop: '1px solid var(--nav-border-soft)' }}>
-            <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
               <span className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>
                 ИП First Project · БИН 890525350143 · г. Астана
               </span>
