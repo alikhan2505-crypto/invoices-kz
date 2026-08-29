@@ -83,6 +83,19 @@ select {
   -webkit-text-fill-color: #111827;
 }
 
+/* Floors form-control font-size at 16px on mobile only -- iOS Safari
+   auto-zooms the page on focus for any input below 16px, and removing
+   viewport's maximumScale (to restore pinch-zoom for accessibility)
+   re-enabled that behavior site-wide. Scoped to mobile so desktop's
+   deliberate text-sm sizing is untouched. */
+@media (max-width: 640px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
+
 /* Smooth page transitions only */
 main {
   animation: pageFade 0.2s ease-out;

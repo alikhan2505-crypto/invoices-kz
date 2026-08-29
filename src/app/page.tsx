@@ -695,7 +695,7 @@ export default function Home() {
                   className="rounded-full px-2.5 py-1.5 text-[11px] font-semibold uppercase transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
                   style={{
                     background: lang === l ? COLOR.violet : 'transparent',
-                    color: lang === l ? '#fff' : 'rgba(255,255,255,0.55)',
+                    color: lang === l ? '#fff' : 'rgba(255,255,255,0.68)',
                   }}
                   aria-pressed={lang === l}
                 >
