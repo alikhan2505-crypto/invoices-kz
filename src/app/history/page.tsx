@@ -312,7 +312,7 @@ export default function History() {
 
           {/* Date filter */}
           <motion.div
-            className="flex gap-2 mb-3 overflow-x-auto pb-1"
+            className="flex gap-2 mb-3 overflow-x-auto pb-1 hide-scrollbar"
             initial={reduceMotion ? false : { opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE, delay: reduceMotion ? 0 : 0.08 }}
@@ -343,7 +343,7 @@ export default function History() {
 
           {/* Status filter */}
           <motion.div
-            className="flex gap-2 mb-4 overflow-x-auto pb-1"
+            className="flex gap-2 mb-4 overflow-x-auto pb-1 hide-scrollbar"
             initial={reduceMotion ? false : { opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE, delay: reduceMotion ? 0 : 0.11 }}

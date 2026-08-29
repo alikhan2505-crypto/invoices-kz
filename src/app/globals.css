@@ -320,6 +320,17 @@ html {
   scrollbar-width: none;
 }
 
+/* Generic version of the rule above for any horizontally-scrolling row
+   (e.g. /history's filter pills) that wants touch-scroll without the
+   native scrollbar bar drawn on top of its content. */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.hide-scrollbar {
+  scrollbar-width: none;
+}
+
 /* Desktop hover micro-interaction for primary/secondary buttons — gated to
    real mouse-hover on a desktop-width viewport so it never sticks after a
    tap on touch devices. No `transform: scale()` here on purpose — scaling
