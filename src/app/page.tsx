@@ -3,7 +3,7 @@
 import { Component, useEffect, useRef, useState, type ComponentType, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
-import { motion, useInView, useReducedMotion } from 'framer-motion'
+import { AnimatePresence, motion, useInView, useReducedMotion } from 'framer-motion'
 import { useLanguage, type Lang } from '@/components/LanguageProvider'
 
 const EASE = [0.16, 1, 0.3, 1] as const
@@ -81,28 +81,6 @@ function ContractIcon({ className }: { className?: string }) {
       <path d="M8 3h6l4 4v12.5A1.5 1.5 0 0 1 16.5 21h-8A1.5 1.5 0 0 1 7 19.5V4.5A1.5 1.5 0 0 1 8.5 3Z" />
       <path d="M14 3v4h4" />
       <path d="M9.5 13.7l1.9 1.9L15.5 11" />
-    </svg>
-  )
-}
-
-function StoreIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} aria-hidden="true" {...ICON_PROPS}>
-      <path d="M4.5 9 5.7 4.5h12.6L19.5 9" />
-      <path d="M4.5 9a2 2 0 0 0 4 .1 2 2 0 0 0 4-.1 2 2 0 0 0 4 .1 2 2 0 0 0 4-.1" />
-      <path d="M5.5 9.3V20h13V9.3" />
-      <path d="M10 20v-5.5h4V20" />
-    </svg>
-  )
-}
-
-function BotIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} aria-hidden="true" {...ICON_PROPS}>
-      <rect x="4" y="5" width="16" height="11" rx="3.5" />
-      <path d="M9 20.5 11.2 16h1.6L15 20.5" />
-      <circle cx="9.2" cy="10.5" r="1" fill="currentColor" stroke="none" />
-      <circle cx="14.8" cy="10.5" r="1" fill="currentColor" stroke="none" />
     </svg>
   )
 }
@@ -193,7 +171,7 @@ function ArrowRightIcon({ className }: { className?: string }) {
 /* -------------------------------------------------------------- content */
 
 type FeatureKey = 'invoice' | 'kaspi' | 'api' | 'esign' | 'contract'
-type SoonKey = 'store' | 'bot'
+type BotTabKey = 'kaspibot' | 'aiagent'
 type AuthKey = 'google' | 'facebook' | 'faceid' | 'mail'
 type ExtraKey = 'globe' | 'wallet' | 'gift'
 
@@ -203,10 +181,6 @@ const FEATURE_ICONS: Record<FeatureKey, ComponentType<{ className?: string }>> =
   api: ApiIcon,
   esign: PenIcon,
   contract: ContractIcon,
-}
-const SOON_ICONS: Record<SoonKey, ComponentType<{ className?: string }>> = {
-  store: StoreIcon,
-  bot: BotIcon,
 }
 const AUTH_ICONS: Record<AuthKey, ComponentType<{ className?: string }>> = {
   google: GoogleIcon,
@@ -240,9 +214,11 @@ interface Copy {
   featuresTitle: string
   featuresSubtitle: string
   features: { icon: FeatureKey; title: string; desc: string; badge?: string }[]
-  soonEyebrow: string
-  soonTitle: string
-  soon: { icon: SoonKey; title: string; desc: string; badge: string }[]
+  botTitle: string
+  botSubtitle: string
+  botTabs: { key: BotTabKey; label: string }[]
+  botKaspi: { stat: string; statCaption: string; yourPriceLabel: string; yourPrice: string; competitorLabel: string; competitorPrice: string; statusText: string }
+  botAgent: { stat: string; statCaption: string; incomingMessage: string; replyMessage: string; typingLabel: string }
   authEyebrow: string
   authTitle: string
   authSubtitle: string
@@ -292,12 +268,28 @@ const COPY: Record<Lang, Copy> = {
       { icon: 'esign', title: 'ЭЦП-подписание', desc: 'Подписывайте счета и договоры ЭЦП через QR или eGov mobile (SIGEX) — юридически значимо, без визита в офис.', badge: 'Pro' },
       { icon: 'contract', title: 'Договоры', desc: 'Создавайте договоры и подписывайте их онлайн обеими сторонами — без бумаги и личных встреч.' },
     ],
-    soonEyebrow: 'В разработке',
-    soonTitle: 'Скоро',
-    soon: [
-      { icon: 'store', title: 'Kaspi Bot', desc: 'Автоматическое управление ценами на Kaspi Магазине: демпинг-бот, заказы, финансы и прибыль магазина, аналитика ниш, цены по городам.', badge: 'Скоро для всех' },
-      { icon: 'bot', title: 'AI-агент для Instagram', desc: 'Авто-ответы на комментарии и сообщения Direct от ИИ, обученного на вашем бизнесе.', badge: 'Скоро' },
+    botTitle: 'Ещё два сотрудника, которым не нужна зарплата',
+    botSubtitle: 'Kaspi Bot держит цены под контролем, AI-агент отвечает клиентам — 24/7, без вашего участия.',
+    botTabs: [
+      { key: 'kaspibot', label: 'Kaspi Bot' },
+      { key: 'aiagent', label: 'AI-агент' },
     ],
+    botKaspi: {
+      stat: '10 мин',
+      statCaption: 'между проверками цен конкурентов — Kaspi Bot держит вас на первой позиции без ручной работы',
+      yourPriceLabel: 'Ваша цена',
+      yourPrice: '15 000 ₸',
+      competitorLabel: 'Конкурент',
+      competitorPrice: '14 500 ₸ ↓',
+      statusText: 'Проверка каждые 10 минут, без вашего участия',
+    },
+    botAgent: {
+      stat: '5₸',
+      statCaption: 'за автоответ клиенту в WhatsApp, Instagram, Telegram и на сайте',
+      incomingMessage: 'Здравствуйте, работаете завтра?',
+      replyMessage: 'Да, с 9:00 до 19:00 🙂',
+      typingLabel: 'печатает',
+    },
     authEyebrow: 'Доступ',
     authTitle: 'Вход без паролей',
     authSubtitle: 'Google, Facebook, Face ID / Touch ID или ссылка на email — заходите за секунду.',
@@ -362,12 +354,28 @@ const COPY: Record<Lang, Copy> = {
       { icon: 'esign', title: 'ЭЦҚ қолтаңба', desc: 'Шоттар мен келісімшарттарға QR немесе eGov mobile (SIGEX) арқылы ЭЦҚ қойыңыз — заңды күші бар, кеңсеге барудың қажеті жоқ.', badge: 'Pro' },
       { icon: 'contract', title: 'Келісімшарттар', desc: 'Келісімшарт жасаңыз және екі тарап та онлайн қол қойсын — қағазсыз, кездесусіз.' },
     ],
-    soonEyebrow: 'Әзірленуде',
-    soonTitle: 'Жақында',
-    soon: [
-      { icon: 'store', title: 'Kaspi Bot', desc: 'Kaspi Дүкеніндегі бағаларды автоматты басқару: демпинг-бот, тапсырыстар, дүкен қаржысы мен пайдасы, ниша аналитикасы, қала бойынша бағалар.', badge: 'Жақында бәріне' },
-      { icon: 'bot', title: 'Instagram үшін AI-агент', desc: 'Бизнесіңізге оқытылған ЖИ-ден пікірлер мен Direct хабарламаларына автоматты жауап.', badge: 'Жақында' },
+    botTitle: 'Жалақы сұрамайтын тағы екі қызметкер',
+    botSubtitle: 'Kaspi Bot бағаны бақылауда ұстайды, AI-агент клиенттерге жауап береді — 24/7, сіздің қатысуыңызсыз.',
+    botTabs: [
+      { key: 'kaspibot', label: 'Kaspi Bot' },
+      { key: 'aiagent', label: 'AI-агент' },
     ],
+    botKaspi: {
+      stat: '10 мин',
+      statCaption: 'бәсекелестердің бағасын тексеру аралығы — Kaspi Bot сізді қолмен әрекетсіз бірінші орында ұстайды',
+      yourPriceLabel: 'Сіздің бағаңыз',
+      yourPrice: '15 000 ₸',
+      competitorLabel: 'Бәсекелес',
+      competitorPrice: '14 500 ₸ ↓',
+      statusText: 'Әр 10 минут сайын тексеріледі, сіздің қатысуыңызсыз',
+    },
+    botAgent: {
+      stat: '5₸',
+      statCaption: 'WhatsApp, Instagram, Telegram және сайттағы бір автожауап үшін',
+      incomingMessage: 'Сәлеметсіз бе, ертең жұмыс істейсіздер ме?',
+      replyMessage: 'Иә, 9:00-ден 19:00-ге дейін 🙂',
+      typingLabel: 'жазып жатыр',
+    },
     authEyebrow: 'Кіру',
     authTitle: 'Құпия сөзсіз кіру',
     authSubtitle: 'Google, Facebook, Face ID / Touch ID немесе email сілтемесі — бір секундта кіріңіз.',
@@ -432,12 +440,28 @@ const COPY: Record<Lang, Copy> = {
       { icon: 'esign', title: 'Digital signature', desc: 'Sign invoices and contracts with a digital signature via QR or eGov mobile (SIGEX) — legally binding, no office visit needed.', badge: 'Pro' },
       { icon: 'contract', title: 'Contracts', desc: 'Create contracts and have both parties sign them online — no paper, no meetings.' },
     ],
-    soonEyebrow: 'In progress',
-    soonTitle: 'Coming soon',
-    soon: [
-      { icon: 'store', title: 'Kaspi Bot', desc: 'Automatic price management on Kaspi Shop: a price-matching bot, orders, store finances and profit, niche analytics, and per-city pricing.', badge: 'Coming soon for everyone' },
-      { icon: 'bot', title: 'AI agent for Instagram', desc: 'Automatic replies to comments and Direct messages from an AI trained on your business.', badge: 'Coming soon' },
+    botTitle: 'Two more employees who never ask for a salary',
+    botSubtitle: 'Kaspi Bot keeps your prices in check, the AI agent replies to customers — 24/7, with no effort from you.',
+    botTabs: [
+      { key: 'kaspibot', label: 'Kaspi Bot' },
+      { key: 'aiagent', label: 'AI Agent' },
     ],
+    botKaspi: {
+      stat: '10 min',
+      statCaption: 'between competitor price checks — Kaspi Bot keeps you in first place with zero manual work',
+      yourPriceLabel: 'Your price',
+      yourPrice: '15 000 ₸',
+      competitorLabel: 'Competitor',
+      competitorPrice: '14 500 ₸ ↓',
+      statusText: 'Checked every 10 minutes, with no effort from you',
+    },
+    botAgent: {
+      stat: '5₸',
+      statCaption: 'per automatic reply on WhatsApp, Instagram, Telegram, and your website',
+      incomingMessage: 'Hi, are you open tomorrow?',
+      replyMessage: 'Yes, from 9:00 AM to 7:00 PM 🙂',
+      typingLabel: 'typing',
+    },
     authEyebrow: 'Access',
     authTitle: 'Sign in without passwords',
     authSubtitle: 'Google, Facebook, Face ID / Touch ID, or an email link — sign in in seconds.',
@@ -930,40 +954,8 @@ export default function Home() {
         </div>
       </section>
 
-      {/* --------------------------------------------------------- soon */}
-      <section className="relative z-10 mx-auto max-w-6xl px-5 py-16 sm:px-8 sm:py-20">
-        <Reveal>
-          <Eyebrow color={COLOR.magenta}>{t.soonEyebrow}</Eyebrow>
-          <h2 className="mt-4 text-[clamp(1.7rem,3.4vw,2.25rem)] font-semibold tracking-[-0.02em]">{t.soonTitle}</h2>
-        </Reveal>
-        <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {t.soon.map((s, i) => {
-            const SIcon = SOON_ICONS[s.icon]
-            return (
-              <Reveal key={s.title} delay={i * 0.05}>
-                <div
-                  className="motion-safe:transition-all motion-safe:duration-200 motion-safe:hover:-translate-y-1 flex h-full flex-col rounded-2xl p-6"
-                  style={{ background: 'rgba(20,23,46,0.55)', border: `1px dashed ${border}` }}
-                >
-                  <div className="flex items-center justify-between">
-                    <div
-                      className="flex h-11 w-11 items-center justify-center rounded-xl"
-                      style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.8)' }}
-                    >
-                      <SIcon className="h-5 w-5" />
-                    </div>
-                    <span className="rounded-md px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white" style={{ background: COLOR.violet }}>
-                      {s.badge}
-                    </span>
-                  </div>
-                  <h3 className="mt-4 text-[16px] font-semibold">{s.title}</h3>
-                  <p className="mt-2 text-[13.5px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.82)' }}>{s.desc}</p>
-                </div>
-              </Reveal>
-            )
-          })}
-        </div>
-      </section>
+      {/* ---------------------------------------------- kaspi bot / ai agent */}
+      <BotShowcase t={t} />
 
       {/* ---------------------------------------------------------- auth */}
       <section className="relative z-10 mx-auto max-w-5xl px-5 py-16 sm:px-8 sm:py-20">
@@ -1113,5 +1105,159 @@ function AmbientBlobs({ reduce }: { reduce: boolean }) {
         animate={drift(40, -35, 1.1, 24)}
       />
     </div>
+  )
+}
+
+/* Replaces the old static "soon" placeholder cards for Kaspi Bot and the
+   AI agent -- both are live products now, so this shows an honest demo
+   instead of a "coming soon" badge. Tab switch uses framer-motion's
+   AnimatePresence for a fade-swap (not the raw CSS @keyframes strings
+   from the throwaway brainstorm mockup) so the whole file stays on one
+   animation system. "10 min" is the product's real competitor-price
+   check interval; the AI agent's price mirrors AI_AGENT_CREDIT_PRICE_TENGE
+   from src/lib/aiAgent/wallet.ts -- both are real numbers, not marketing
+   stats. The only looping animation is the functional status-pulse dot
+   (motion-safe:animate-ping) -- no decorative infinite glow. */
+function BotShowcase({ t }: { t: Copy }) {
+  const reduce = useReducedMotion()
+  const [active, setActive] = useState<BotTabKey>('kaspibot')
+  const [showReply, setShowReply] = useState(reduce ? true : false)
+
+  useEffect(() => {
+    if (active !== 'aiagent') return
+    if (reduce) {
+      setShowReply(true)
+      return
+    }
+    setShowReply(false)
+    const timer = setTimeout(() => setShowReply(true), 1400)
+    return () => clearTimeout(timer)
+  }, [active, reduce])
+
+  return (
+    <section id="bot-showcase" className="relative z-10 mx-auto max-w-6xl px-5 py-20 sm:px-8 sm:py-28">
+      <Reveal className="max-w-2xl">
+        <h2 className="text-[clamp(1.9rem,4vw,2.75rem)] font-semibold leading-[1.08] tracking-[-0.02em]">{t.botTitle}</h2>
+        <p className="mt-4 text-[15px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.82)' }}>{t.botSubtitle}</p>
+      </Reveal>
+
+      <Reveal delay={0.08} className="mt-8">
+        <div
+          className="inline-flex gap-2 rounded-2xl p-1.5"
+          style={{ background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORDER}` }}
+        >
+          {t.botTabs.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActive(tab.key)}
+              aria-pressed={active === tab.key}
+              className="flex min-h-[44px] items-center justify-center rounded-xl px-5 text-[13px] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+              style={{
+                background: active === tab.key ? COLOR.violet : 'transparent',
+                color: active === tab.key ? '#fff' : 'rgba(255,255,255,0.68)',
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </Reveal>
+
+      <Reveal delay={0.14} className="mt-6">
+        <div className="overflow-hidden rounded-3xl p-6 sm:p-10" style={{ background: SURFACE, border: `1px solid ${BORDER}` }}>
+          <AnimatePresence mode="wait">
+            {active === 'kaspibot' ? (
+              <motion.div
+                key="kaspibot"
+                initial={reduce ? false : { opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={reduce ? { opacity: 1 } : { opacity: 0, y: -8 }}
+                transition={{ duration: reduce ? 0 : 0.35, ease: EASE }}
+                className="grid grid-cols-1 gap-8 lg:grid-cols-2 lg:items-center"
+              >
+                <div>
+                  <div className="text-[clamp(2.75rem,6vw,4rem)] font-bold tracking-tight" style={{ color: '#5EEAD4' }}>
+                    {t.botKaspi.stat}
+                  </div>
+                  <p className="mt-3 max-w-sm text-[14.5px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.82)' }}>
+                    {t.botKaspi.statCaption}
+                  </p>
+                </div>
+                <div className="rounded-2xl p-5" style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORDER}` }}>
+                  <div className="flex items-center justify-between text-[13px]" style={{ color: 'rgba(255,255,255,0.68)' }}>
+                    <span>{t.botKaspi.yourPriceLabel}</span>
+                    <span className="text-[15px] font-semibold text-white">{t.botKaspi.yourPrice}</span>
+                  </div>
+                  <div className="mt-3 flex items-center justify-between text-[13px]" style={{ color: 'rgba(255,255,255,0.68)' }}>
+                    <span>{t.botKaspi.competitorLabel}</span>
+                    <span className="text-[15px] font-semibold" style={{ color: COLOR.magenta }}>{t.botKaspi.competitorPrice}</span>
+                  </div>
+                  <div className="mt-5 flex items-center gap-2 border-t pt-4 text-[12px]" style={{ borderColor: BORDER, color: 'rgba(255,255,255,0.68)' }}>
+                    <span className="relative flex h-2 w-2">
+                      <span
+                        className="motion-safe:animate-ping absolute inline-flex h-full w-full rounded-full"
+                        style={{ background: '#5EEAD4', opacity: 0.6 }}
+                      />
+                      <span className="relative inline-flex h-2 w-2 rounded-full" style={{ background: '#5EEAD4' }} />
+                    </span>
+                    {t.botKaspi.statusText}
+                  </div>
+                </div>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="aiagent"
+                initial={reduce ? false : { opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={reduce ? { opacity: 1 } : { opacity: 0, y: -8 }}
+                transition={{ duration: reduce ? 0 : 0.35, ease: EASE }}
+                className="grid grid-cols-1 gap-8 lg:grid-cols-2 lg:items-center"
+              >
+                <div>
+                  <div className="text-[clamp(2.75rem,6vw,4rem)] font-bold tracking-tight" style={{ color: '#5EEAD4' }}>
+                    {t.botAgent.stat}
+                  </div>
+                  <p className="mt-3 max-w-sm text-[14.5px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.82)' }}>
+                    {t.botAgent.statCaption}
+                  </p>
+                </div>
+                <div className="rounded-2xl p-5" style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORDER}` }}>
+                  <div className="flex justify-start">
+                    <div
+                      className="max-w-[80%] rounded-2xl rounded-bl-sm px-3.5 py-2.5 text-[13px]"
+                      style={{ background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.9)' }}
+                    >
+                      {t.botAgent.incomingMessage}
+                    </div>
+                  </div>
+                  <div className="mt-3 flex justify-end">
+                    {showReply ? (
+                      <div
+                        className="max-w-[80%] rounded-2xl rounded-br-sm px-3.5 py-2.5 text-[13px] text-white"
+                        style={{ background: COLOR.violet }}
+                      >
+                        {t.botAgent.replyMessage}
+                      </div>
+                    ) : (
+                      <div
+                        role="status"
+                        aria-label={t.botAgent.typingLabel}
+                        className="flex items-center gap-1 rounded-2xl rounded-br-sm px-3.5 py-3"
+                        style={{ background: COLOR.violet }}
+                      >
+                        <span className="h-1.5 w-1.5 rounded-full bg-white motion-safe:animate-bounce" style={{ animationDelay: '0ms' }} />
+                        <span className="h-1.5 w-1.5 rounded-full bg-white motion-safe:animate-bounce" style={{ animationDelay: '150ms' }} />
+                        <span className="h-1.5 w-1.5 rounded-full bg-white motion-safe:animate-bounce" style={{ animationDelay: '300ms' }} />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </Reveal>
+    </section>
   )
 }
