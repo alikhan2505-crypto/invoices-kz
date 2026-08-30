@@ -1,0 +1,179 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Kaspi Cashier API",
+    "version": "1.0.0",
+    "description": "Accept Kaspi Pay payments on your own site or app: create a payment, get a payment link/QR code, and track payment status — without integrating with the bank directly. This is not an official Kaspi merchant API — the integration works the same way the Kaspi Pay Cashier mobile app does. We maintain compatibility and will notify you if Kaspi changes their side.\n\n## Quick start\n1. **Connect the Cashier role** — on the `/kaspi-api` page, enter the phone number that already has the Kaspi Pay app's \"Cashier\" role, and confirm the SMS code.\n2. **Save your API token and webhook secret** — right after connecting, two values are shown once: an API token (for API requests) and a separate webhook secret (for verifying webhook signatures, see the Webhooks section below). Copy and save both — they are not shown again (you can only disconnect Cashier and reconnect it, which issues new ones).\n3. **Hand them to your developer or wire them into your site** — if you're not building the site yourself, send these two values and a link to this page to your developer.\n4. **Create a payment** — send the request from the `POST /api/kaspi/pay` example below with an amount and your own order id. The response contains a link/QR — show it to the customer.\n5. **Learn about the payment automatically** — the simplest way is to poll the status endpoint (`GET /api/kaspi/pay/status`) while the customer is on the payment page, or set up a webhook instead (see the Webhooks section below).\n\n## Pricing\nConnecting and accepting payments is free on any plan. A 2% commission is debited from your wallet balance only for confirmed payments — e.g. a ₸10,000 payment debits ₸200. Top up your balance in advance on the `/kaspi-api` page.",
+    "contact": {
+      "name": "invoices.kz support",
+      "email": "support@invoices.kz",
+      "url": "https://t.me/invoiceskz_support"
+    }
+  },
+  "servers": [
+    { "url": "https://www.invoices.kz", "description": "Production — the only environment; there is no test/sandbox mode" }
+  ],
+  "tags": [
+    { "name": "Kaspi Cashier API", "description": "Accepting and tracking Kaspi Pay payments" }
+  ],
+  "security": [{ "bearerAuth": [] }],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Your Kaspi Cashier connection's API token. Issued once on the /kaspi-api page when you connect the \"Cashier\" role — save it immediately, it is not shown again (if it's lost or leaked, disconnect and reconnect Cashier to get a new one). It belongs only to your connection — never reused by anyone else."
+      }
+    },
+    "schemas": {
+      "PayRequest": {
+        "type": "object",
+        "required": ["amount", "order_id"],
+        "properties": {
+          "amount": { "type": "number", "description": "Payment amount in tenge", "example": 10000 },
+          "order_id": { "type": "string", "description": "A unique order identifier on your side", "example": "order_12345" },
+          "callback_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "Your webhook URL for the payment-success notification. Must start with https:// and must not point at localhost or a private network (192.168.x.x, 10.x.x.x, 172.16-31.x.x) — otherwise the webhook is simply not sent.",
+            "example": "https://example.com/webhook/kaspi"
+          }
+        }
+      },
+      "PayResponse": {
+        "type": "object",
+        "properties": {
+          "qr_token": { "type": "string", "description": "Token used to render the payment's QR code", "example": "eyJhbGc..." },
+          "payment_link": { "type": "string", "format": "uri", "description": "Payment link — can be handed to the customer directly", "example": "https://kaspi.kz/pay/..." },
+          "operation_id": { "type": "string", "description": "Unique operation id on Kaspi's side", "example": "op_123456789" },
+          "expire_date": { "type": "string", "format": "date-time", "description": "Date and time the QR code expires", "example": "2024-12-31T23:59:59Z" }
+        }
+      },
+      "StatusResponse": {
+        "type": "object",
+        "properties": {
+          "operation_id": { "type": "string", "example": "op_123456789" },
+          "order_id": { "type": "string", "example": "order_12345" },
+          "amount": { "type": "number", "example": 10000 },
+          "status": { "type": "string", "enum": ["pending", "paid", "expired"], "description": "pending — awaiting payment, paid — paid, expired — the QR code expired unpaid", "example": "paid" },
+          "paid": { "type": "boolean", "example": true }
+        }
+      },
+      "ErrorUnauthorized": { "type": "object", "properties": { "error": { "type": "string", "example": "Unauthorized" } } },
+      "ErrorBadRequestPay": { "type": "object", "properties": { "error": { "type": "string", "example": "amount and order_id required" } } },
+      "ErrorBadRequestStatus": { "type": "object", "properties": { "error": { "type": "string", "example": "operation_id required" } } },
+      "ErrorInsufficientBalance": {
+        "type": "object",
+        "properties": {
+          "error": { "type": "string", "example": "insufficient_balance" },
+          "required": { "type": "number", "description": "The commission amount (2% of amount) your balance needs to cover", "example": 200 },
+          "balance": { "type": "number", "description": "Your current wallet balance in tenge", "example": 50 }
+        }
+      },
+      "ErrorNotFound": { "type": "object", "properties": { "error": { "type": "string", "example": "not_found" } } },
+      "ErrorRateLimited": { "type": "object", "properties": { "error": { "type": "string", "example": "rate_limited" } } },
+      "ErrorKaspiUnavailable": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "enum": ["kaspi_unavailable", "tracking_failed"],
+            "description": "kaspi_unavailable — the request to Kaspi itself failed; tracking_failed — the payment was created on Kaspi's side but we failed to save it for tracking on ours (rare) — contact support",
+            "example": "kaspi_unavailable"
+          }
+        }
+      },
+      "ErrorKaspiUnavailableStatus": {
+        "type": "object",
+        "properties": {
+          "error": { "type": "string", "description": "A failure talking to Kaspi while checking the status", "example": "kaspi_unavailable" }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/api/kaspi/pay": {
+      "post": {
+        "tags": ["Kaspi Cashier API"],
+        "summary": "Create a payment",
+        "description": "Creates a Kaspi Pay payment and returns a link/QR for the customer. Limit: 20 requests per 60 seconds per connection. A 2% commission is debited from your wallet balance only once the payment is confirmed.",
+        "operationId": "createPayment",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PayRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "Payment created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PayResponse" } } } },
+          "400": { "description": "Bad Request — a required field is missing", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorBadRequestPay" } } } },
+          "401": { "description": "Unauthorized — the token is missing or invalid", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorUnauthorized" } } } },
+          "402": { "description": "Payment Required — insufficient wallet balance to cover the commission; top up on the /kaspi-api page", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorInsufficientBalance" } } } },
+          "429": { "description": "Too Many Requests — the 20-requests-per-minute-per-connection limit was exceeded", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorRateLimited" } } } },
+          "502": { "description": "Bad Gateway — a failure talking to Kaspi, or the payment was created but couldn't be saved for tracking", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorKaspiUnavailable" } } } }
+        }
+      }
+    },
+    "/api/kaspi/pay/status": {
+      "get": {
+        "tags": ["Kaspi Cashier API"],
+        "summary": "Check payment status",
+        "description": "Every call genuinely re-checks the status with Kaspi (it does not just read our database) — safe to poll every few seconds while the customer waits on the payment page.",
+        "operationId": "getPaymentStatus",
+        "parameters": [
+          {
+            "name": "operation_id",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "The operation_id returned when the payment was created",
+            "example": "op_123456789"
+          }
+        ],
+        "responses": {
+          "200": { "description": "Payment status", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/StatusResponse" } } } },
+          "400": { "description": "Bad Request — operation_id was not provided", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorBadRequestStatus" } } } },
+          "401": { "description": "Unauthorized — the token is missing or invalid", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorUnauthorized" } } } },
+          "404": { "description": "Not Found — no payment with that operation_id exists", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorNotFound" } } } },
+          "502": { "description": "Bad Gateway — a failure talking to Kaspi", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorKaspiUnavailableStatus" } } } }
+        }
+      }
+    }
+  },
+  "webhooks": {
+    "paymentSuccess": {
+      "post": {
+        "tags": ["Kaspi Cashier API"],
+        "summary": "Payment-success notification",
+        "description": "If a callback_url was provided when creating the payment, invoices.kz sends it a POST request the moment the payment is confirmed. Signed with an X-Kaspi-Pay-Signature header (hex HMAC-SHA256 of the raw request body, keyed with your webhook secret). The webhook secret is unique per connection — other invoices.kz customers' webhooks are signed with a different key, and vice versa. This is not the only signal of payment — it fires either when you call GET /api/kaspi/pay/status yourself, or when our internal cron discovers the payment (on the hosting plan's free tier, that cron runs no more than once a day).",
+        "security": [],
+        "parameters": [
+          {
+            "name": "X-Kaspi-Pay-Signature",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "hex-encoded HMAC-SHA256 of the raw JSON body, signed with this connection's webhook secret"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "event": { "type": "string", "const": "payment.success" },
+                  "order_id": { "type": "string", "example": "order_12345" },
+                  "amount": { "type": "number", "example": 10000 },
+                  "operation_id": { "type": "string", "example": "op_123456789" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Acknowledged — return 200 once the webhook has been processed successfully" }
+        }
+      }
+    }
+  }
+}
