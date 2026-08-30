@@ -298,6 +298,7 @@ export default function TopUtilityBar() {
     pathname === '/terms' ||
     pathname === '/data-deletion' ||
     pathname === '/cashier-api' ||
+    pathname === '/kaspi-api/docs' ||
     pathname.startsWith('/view/') ||
     pathname.startsWith('/contract-view/') ||
     pathname.startsWith('/verify/') ||

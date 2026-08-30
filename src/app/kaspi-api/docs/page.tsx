@@ -1,301 +1,44 @@
-import type { ReactNode } from 'react'
-import SiteNav from '@/components/SiteNav'
-import DesktopShell from '@/components/DesktopShell'
+'use client'
 
-function QuickStartStep({ n, title, children }: { n: number; title: string; children: ReactNode }) {
-  return (
-    <div className="flex gap-4">
-      <div
-        className="w-8 h-8 rounded-full text-sm font-bold flex items-center justify-center flex-shrink-0"
-        style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}
-      >
-        {n}
-      </div>
-      <div className="flex-1 pb-6">
-        <div className="font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>{title}</div>
-        <div className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>{children}</div>
-      </div>
-    </div>
-  )
+import { useEffect, useState, type ReactNode } from 'react'
+import { useRouter } from 'next/navigation'
+import { supabase } from '@/lib/supabase'
+import { useLanguage } from '@/components/LanguageProvider'
+import ApiDocsViewer from '@/components/ApiDocsViewer'
+import { CASHIER_API_COLOR as C, CASHIER_API_FONT_SANS as FONT_SANS, CASHIER_API_FONT_MONO as FONT_MONO } from '@/lib/kaspiCashierApi/theme'
+
+interface DocsCopy {
+  loading: string
+  backLabel: string
+  title: string
+  liveWarning: string
+  i18nNote: string
+  webhookTitle: string
+  webhookIntro: string
+  webhookPayloadLabel: string
+  webhookHeaderLabel: string
+  webhookVerifyTitle: string
+  webhookVerifyIntro: string
+  webhookVerifyCode: string
+  disclosureTitle: string
+  disclosureBody: string
+  supportTitle: string
 }
 
-// Inline code chip -- used throughout for endpoint paths, field names, route
-// references. One shared style instead of ad-hoc bg-gray-100 per instance.
-function Code({ children }: { children: ReactNode }) {
-  return (
-    <code className="px-1.5 py-0.5 rounded" style={{ background: 'var(--nav-border-soft)', color: 'var(--nav-text-primary)' }}>
-      {children}
-    </code>
-  )
-}
-
-function CodeBlock({ children }: { children: ReactNode }) {
-  return (
-    <pre
-      className="nav-glass rounded-xl p-3 overflow-x-auto text-sm"
-      style={{ color: 'var(--nav-text-primary)' }}
-    >
-      {children}
-    </pre>
-  )
-}
-
-function InfoBlock({ children }: { children: ReactNode }) {
-  return (
-    <div className="rounded-xl p-4 mb-4" style={{ background: 'var(--nav-surface-glass)' }}>
-      {children}
-    </div>
-  )
-}
-
-function Badge({ children }: { children: ReactNode }) {
-  return (
-    <span
-      className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full mb-2"
-      style={{ background: 'var(--nav-critical)', color: '#fff' }}
-    >
-      {children}
-    </span>
-  )
-}
-
-export default function KaspiApiDocsPage() {
-  return (
-    <DesktopShell>
-    <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
-      <SiteNav />
-      <div className="max-w-5xl mx-auto px-4 lg:px-6 py-8 pb-24">
-        <h1 className="text-3xl font-bold mb-8" style={{ color: 'var(--nav-text-primary)', letterSpacing: '-0.02em' }}>
-          API документация Kaspi API
-        </h1>
-
-        <section className="mb-10 nav-glass nav-card-accent rounded-2xl p-6">
-          <h2 className="text-2xl font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>
-            Быстрый старт: приём оплаты на вашем сайте
-          </h2>
-          <p className="text-sm mb-6" style={{ color: 'var(--nav-text-secondary)' }}>
-            Эти шаги нужно пройти один раз, чтобы ваш сайт, приложение или бот сами создавали ссылки на оплату Kaspi
-            и узнавали, когда клиент оплатил — без вашего участия в каждой оплате.
-          </p>
-
-          <div>
-            <QuickStartStep n={1} title="Подключите роль «Кассир»">
-              На странице <Code>/kaspi-api</Code> введите номер
-              телефона, на котором в приложении Kaspi Pay уже выдана роль «Кассир», и подтвердите код из SMS.
-            </QuickStartStep>
-            <QuickStartStep n={2} title="Сохраните API-токен и webhook-секрет">
-              Сразу после подключения на этой же странице один раз покажутся два значения: API-токен (для запросов к
-              API) и отдельный webhook-секрет (для проверки подписи вебхуков, см. ниже). Скопируйте и сохраните оба —
-              второй раз они не показываются (можно только отключить кассира и подключить заново, тогда выдадутся новые).
-            </QuickStartStep>
-            <QuickStartStep n={3} title="Передайте их разработчику или вставьте в свой сайт">
-              Если сайт делаете не вы сами — отправьте эти два значения и ссылку на этот документ вашему разработчику.
-              Всё, что нужно на вашей стороне — один HTTP-запрос ниже.
-            </QuickStartStep>
-            <QuickStartStep n={4} title="Создайте платёж">
-              Ваш сайт отправляет запрос из раздела «Пример запроса (curl)» ниже, указав сумму и свой номер заказа.
-              В ответе придёт ссылка/QR — покажите её клиенту.
-            </QuickStartStep>
-            <QuickStartStep n={5} title="Узнайте об оплате автоматически">
-              Проще всего — periодически спрашивать статус (раздел «Проверка статуса платежа» ниже), пока клиент на
-              странице оплаты. Если у вас есть свой сервер — можно вместо этого настроить вебхук (раздел «Вебхуки» ниже),
-              и мы сами пришлём уведомление.
-            </QuickStartStep>
-          </div>
-
-          <div className="rounded-xl p-4 mt-2" style={{ background: 'var(--nav-surface-glass)' }}>
-            <p className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
-              <strong style={{ color: 'var(--nav-text-primary)' }}>Сколько это стоит:</strong> подключение и приём платежей — бесплатно на
-              любом тарифе. Комиссия 2% списывается с баланса вашего кошелька только с подтверждённых оплат — например,
-              с платежа на 10 000 ₸ спишется 200 ₸. Баланс пополняется заранее на той же странице подключения; пока на
-              балансе достаточно средств, оплату можно принимать без ограничений.
-            </p>
-          </div>
-        </section>
-
-        <section className="mb-8">
-          <h2 className="text-2xl font-semibold mb-4" style={{ color: 'var(--nav-text-primary)' }}>Получение API токена и webhook-секрета</h2>
-          <p className="mb-4" style={{ color: 'var(--nav-text-secondary)' }}>
-            При подключении Kaspi Pay к вашему аккаунту на invoices.kz вам будет выдан уникальный API токен и отдельный
-            webhook-секрет. Оба отображаются один раз при подключении в разделе{' '}
-            <Code>/kaspi-api</Code>.
-            Сохраните оба в безопасном месте — токен понадобится для всех запросов к API, секрет — для проверки подписи
-            входящих вебхуков (см. ниже). Они принадлежат только вашему подключению — ни с кем не переиспользуются.
-          </p>
-        </section>
-
-        <section className="mb-8">
-          <h2 className="text-2xl font-semibold mb-4" style={{ color: 'var(--nav-text-primary)' }}>Создание платежа</h2>
-          <p className="mb-4" style={{ color: 'var(--nav-text-secondary)' }}>
-            Для создания платежа выполните POST запрос к нашему API:
-          </p>
-
-          <InfoBlock>
-            <p className="font-semibold mb-2" style={{ color: 'var(--nav-text-primary)' }}>Endpoint:</p>
-            <code style={{ color: 'var(--nav-accent)' }}>POST https://www.invoices.kz/api/kaspi/pay</code>
-          </InfoBlock>
-
-          <InfoBlock>
-            <p className="font-semibold mb-2" style={{ color: 'var(--nav-text-primary)' }}>Заголовок аутентификации:</p>
-            <code className="text-sm" style={{ color: 'var(--nav-text-primary)' }}>Authorization: Bearer &lt;ваш_api_токен&gt;</code>
-          </InfoBlock>
-
-          <InfoBlock>
-            <p className="font-semibold mb-2" style={{ color: 'var(--nav-text-primary)' }}>Тело запроса (JSON):</p>
-            <CodeBlock>
-{`{
-  "amount": 10000,
-  "order_id": "order_12345",
-  "callback_url": "https://example.com/webhook/kaspi"
-}`}
-            </CodeBlock>
-            <div className="mt-4 text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
-              <p className="font-semibold mb-2" style={{ color: 'var(--nav-text-primary)' }}>Параметры:</p>
-              <ul className="list-disc list-inside space-y-1">
-                <li><Code>amount</Code> (обязательно) — сумма платежа в тенге (число)</li>
-                <li><Code>order_id</Code> (обязательно) — уникальный идентификатор заказа (строка)</li>
-                <li>
-                  <Code>callback_url</Code> (опционально) — URL вашего вебхука для уведомлений об успешном платеже
-                </li>
-              </ul>
-            </div>
-          </InfoBlock>
-        </section>
-
-        <section className="mb-8">
-          <h2 className="text-2xl font-semibold mb-4" style={{ color: 'var(--nav-text-primary)' }}>Ответ API</h2>
-          <p className="mb-4" style={{ color: 'var(--nav-text-secondary)' }}>
-            При успешном запросе вы получите ответ со статусом 200:
-          </p>
-
-          <InfoBlock>
-            <CodeBlock>
-{`{
-  "qr_token": "eyJhbGc...",
-  "payment_link": "https://kaspi.kz/pay/...",
-  "operation_id": "op_123456789",
-  "expire_date": "2024-12-31T23:59:59Z"
-}`}
-            </CodeBlock>
-            <div className="mt-4 text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
-              <p className="font-semibold mb-2" style={{ color: 'var(--nav-text-primary)' }}>Поля ответа:</p>
-              <ul className="list-disc list-inside space-y-1">
-                <li><Code>qr_token</Code> — токен для отображения QR кода платежа</li>
-                <li><Code>payment_link</Code> — ссылка для платежа (может быть передана клиентам)</li>
-                <li><Code>operation_id</Code> — уникальный идентификатор операции на стороне Kaspi</li>
-                <li><Code>expire_date</Code> — дата и время истечения QR кода</li>
-              </ul>
-            </div>
-          </InfoBlock>
-        </section>
-
-        <section className="mb-8">
-          <h2 className="text-2xl font-semibold mb-4" style={{ color: 'var(--nav-text-primary)' }}>Проверка статуса платежа</h2>
-          <p className="mb-4" style={{ color: 'var(--nav-text-secondary)' }}>
-            Kaspi не присылает нам уведомление о том, что QR оплачен — мы сами должны спросить у Kaspi.
-            Самый быстрый способ узнать, что платёж прошёл — спросить у нас напрямую, пока клиент ещё на странице оплаты:
-          </p>
-
-          <InfoBlock>
-            <p className="font-semibold mb-2" style={{ color: 'var(--nav-text-primary)' }}>Endpoint:</p>
-            <code style={{ color: 'var(--nav-accent)' }}>GET https://www.invoices.kz/api/kaspi/pay/status?operation_id=op_123456789</code>
-          </InfoBlock>
-
-          <InfoBlock>
-            <p className="font-semibold mb-2" style={{ color: 'var(--nav-text-primary)' }}>Заголовок аутентификации:</p>
-            <code className="text-sm" style={{ color: 'var(--nav-text-primary)' }}>Authorization: Bearer &lt;ваш_api_токен&gt;</code>
-          </InfoBlock>
-
-          <InfoBlock>
-            <p className="font-semibold mb-2" style={{ color: 'var(--nav-text-primary)' }}>Ответ (JSON):</p>
-            <CodeBlock>
-{`{
-  "operation_id": "op_123456789",
-  "order_id": "order_12345",
-  "amount": 10000,
-  "status": "paid",
-  "paid": true
-}`}
-            </CodeBlock>
-            <div className="mt-4 text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
-              <p className="font-semibold mb-2" style={{ color: 'var(--nav-text-primary)' }}>Значения <Code>status</Code>:</p>
-              <ul className="list-disc list-inside space-y-1">
-                <li><Code>pending</Code> — ожидает оплаты</li>
-                <li><Code>paid</Code> — оплачен</li>
-                <li><Code>expired</Code> — QR истёк без оплаты</li>
-              </ul>
-            </div>
-          </InfoBlock>
-
-          <p className="mb-4" style={{ color: 'var(--nav-text-secondary)' }}>
-            Каждый вызов этого эндпоинта запускает реальную проверку у Kaspi (не просто читает нашу базу), поэтому
-            опрашивать его можно, например, раз в несколько секунд, пока клиент ждёт оплаты на вашей странице —
-            так же делает и наша собственная страница счёта.
-          </p>
-        </section>
-
-        <section className="mb-8">
-          <h2 className="text-2xl font-semibold mb-4" style={{ color: 'var(--nav-text-primary)' }}>Вебхуки (webhook)</h2>
-          <p className="mb-4" style={{ color: 'var(--nav-text-secondary)' }}>
-            Если вы указали <Code>callback_url</Code> при создании платежа,
-            мы отправим уведомление об успешном платеже POST запросом на этот URL.
-          </p>
-
-          <div className="nav-glass rounded-xl p-4 mb-4">
-            <Badge>⚠️ Важно</Badge>
-            <ul className="text-sm space-y-2" style={{ color: 'var(--nav-text-secondary)' }}>
-              <li>
-                <strong style={{ color: 'var(--nav-text-primary)' }}>HTTPS обязателен:</strong> callback_url должен начинаться с <Code>https://</Code>
-              </li>
-              <li>
-                <strong style={{ color: 'var(--nav-text-primary)' }}>Не localhost/частные сети:</strong> URL не должен указывать на localhost, 192.168.x.x, 10.x.x.x, 172.16–31.x.x или другие приватные адреса.
-                Это необходимо для безопасности. Если callback_url не пройдет проверку, вебхук будет пропущен.
-              </li>
-              <li>
-                <strong style={{ color: 'var(--nav-text-primary)' }}>Вебхук — не единственный сигнал:</strong> он отправляется в момент, когда платёж проверяется и
-                оказывается успешным — либо когда вы сами вызываете <Code>GET /api/kaspi/pay/status</Code> выше,
-                либо (если вы этого не делаете) когда его обнаружит наш внутренний крон, который на бесплатном тарифе
-                нашего хостинга запускается не чаще раза в сутки. Если вам важна скорость подтверждения — опрашивайте
-                статус-эндпоинт сами, не полагайтесь только на вебхук.
-              </li>
-            </ul>
-          </div>
-
-          <p className="mb-4" style={{ color: 'var(--nav-text-secondary)' }}>Тело вебхука (JSON):</p>
-          <InfoBlock>
-            <CodeBlock>
-{`{
-  "event": "payment.success",
-  "order_id": "order_12345",
-  "amount": 10000,
-  "operation_id": "op_123456789"
-}`}
-            </CodeBlock>
-          </InfoBlock>
-
-          <p className="mb-4" style={{ color: 'var(--nav-text-secondary)' }}>Заголовок вебхука:</p>
-          <InfoBlock>
-            <CodeBlock>
-X-Kaspi-Pay-Signature: &lt;hex-encoded HMAC-SHA256&gt;
-            </CodeBlock>
-          </InfoBlock>
-        </section>
-
-        <section className="mb-8">
-          <h2 className="text-2xl font-semibold mb-4" style={{ color: 'var(--nav-text-primary)' }}>Верификация подписи вебхука</h2>
-          <p className="mb-4" style={{ color: 'var(--nav-text-secondary)' }}>
-            Вебхуки подписаны HMAC-SHA256 подписью в заголовке <Code>X-Kaspi-Pay-Signature</Code>.
-            Это позволяет вам убедиться, что вебхук действительно от invoices.kz.
-          </p>
-
-          <p className="mb-4" style={{ color: 'var(--nav-text-secondary)' }}>
-            Для верификации подписи вычислите HMAC-SHA256 от сырого JSON тела вебхука, используя секретный ключ,
-            и сравните результат с заголовком. Вот пример на Node.js:
-          </p>
-
-          <InfoBlock>
-            <CodeBlock>
-{`const crypto = require('crypto');
+const DOCS_COPY: Record<'ru' | 'en', DocsCopy> = {
+  ru: {
+    loading: 'Загрузка…',
+    backLabel: 'invoices.kz',
+    title: 'Kaspi Cashier API — документация',
+    liveWarning: 'Все запросы «Try it» ниже выполняются к реальному продакшн-API — у Kaspi Pay нет тестового режима. Успешный вызов создания платежа спишет комиссию 2% с вашего баланса при оплате.',
+    i18nNote: 'Часть элементов интерфейса самого проводника (например, кнопки Authorize и Send Request) отображается на английском независимо от выбранного языка — это ограничение библиотеки Scalar, не наших переводов.',
+    webhookTitle: 'Вебхуки (webhook)',
+    webhookIntro: 'Если при создании платежа указан callback_url, invoices.kz отправит на него POST-запрос в момент подтверждения оплаты.',
+    webhookPayloadLabel: 'Тело вебхука (JSON):',
+    webhookHeaderLabel: 'Заголовок подписи:',
+    webhookVerifyTitle: 'Верификация подписи',
+    webhookVerifyIntro: 'Вычислите HMAC-SHA256 от сырого JSON тела запроса, используя ваш webhook-секрет, и сравните результат с заголовком X-Kaspi-Pay-Signature. Пример на Node.js:',
+    webhookVerifyCode: `const crypto = require('crypto');
 
 // rawBody — это точная строка JSON, полученная из тела запроса
 // secret — ваш webhook-секрет, показанный один раз при подключении
@@ -304,88 +47,183 @@ const signature = crypto
   .update(rawBody)
   .digest('hex');
 
-const isValid = signature === req.headers['x-kaspi-pay-signature'];
-`}
-            </CodeBlock>
-          </InfoBlock>
+const isValid = signature === req.headers['x-kaspi-pay-signature'];`,
+    disclosureTitle: 'Важно знать',
+    disclosureBody: 'Это не официальный Kaspi merchant API — интеграция сделана по тому же принципу, что и мобильное приложение Kaspi Pay Cashier. Мы поддерживаем совместимость и уведомим вас, если Kaspi изменит свою сторону.',
+    supportTitle: 'Поддержка',
+  },
+  en: {
+    loading: 'Loading…',
+    backLabel: 'invoices.kz',
+    title: 'Kaspi Cashier API — documentation',
+    liveWarning: 'Every "Try it" request below hits the real production API — Kaspi Pay has no test/sandbox mode. A successful payment-creation call will debit a 2% commission from your balance once the customer pays.',
+    i18nNote: "Some of the reference tool's own interface labels (e.g. the Authorize and Send Request buttons) stay in English regardless of the selected language — that's a limitation of the Scalar library itself, not of our translations.",
+    webhookTitle: 'Webhooks',
+    webhookIntro: 'If a callback_url was provided when creating the payment, invoices.kz sends a POST request to it the moment the payment is confirmed.',
+    webhookPayloadLabel: 'Webhook body (JSON):',
+    webhookHeaderLabel: 'Signature header:',
+    webhookVerifyTitle: 'Verifying the signature',
+    webhookVerifyIntro: 'Compute an HMAC-SHA256 of the raw JSON request body using your webhook secret, and compare it to the X-Kaspi-Pay-Signature header. Node.js example:',
+    webhookVerifyCode: `const crypto = require('crypto');
 
-          <div className="nav-glass rounded-xl p-4">
-            <p className="font-semibold mb-2" style={{ color: 'var(--nav-text-primary)' }}>Где взять секрет:</p>
-            <p className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
-              Ваш webhook-секрет показывается один раз при подключении Кассира, рядом с API-токеном (раздел{' '}
-              <Code>/kaspi-api</Code>). Он свой у каждого подключения — вебхуки
-              других клиентов invoices.kz подписываются другим ключом, и наоборот. Если секрет потеряли или он
-              попал не в те руки — отключите и снова подключите Кассира, будет выдан новый.
-            </p>
+// rawBody -- the exact JSON string received in the request body
+// secret  -- your webhook secret, shown once when connecting Cashier
+const signature = crypto
+  .createHmac('sha256', secret)
+  .update(rawBody)
+  .digest('hex');
+
+const isValid = signature === req.headers['x-kaspi-pay-signature'];`,
+    disclosureTitle: 'Good to know',
+    disclosureBody: 'This is not an official Kaspi merchant API — the integration works the same way the Kaspi Pay Cashier mobile app does. We maintain compatibility and will notify you if Kaspi changes their side.',
+    supportTitle: 'Support',
+  },
+}
+
+const WEBHOOK_BODY_EXAMPLE = `{
+  "event": "payment.success",
+  "order_id": "order_12345",
+  "amount": 10000,
+  "operation_id": "op_123456789"
+}`
+
+// WEBHOOK_VERIFY_EXAMPLE is intentionally NOT a single hardcoded constant:
+// its comments are natural-language prose ("rawBody -- exact JSON string
+// received..."), unlike WEBHOOK_BODY_EXAMPLE above (pure JSON field names,
+// already language-neutral), so it must be bilingual like every other
+// DOCS_COPY string -- see DocsCopy.webhookVerifyCode (DOCS_COPY.ru /
+// DOCS_COPY.en above), rendered below as `<Pre>{d.webhookVerifyCode}</Pre>`.
+
+function Panel({ children }: { children: ReactNode }) {
+  return (
+    <div className="rounded-xl p-4" style={{ background: C.bg1, border: `1px solid ${C.border}` }}>
+      {children}
+    </div>
+  )
+}
+
+function Pre({ children }: { children: string }) {
+  return (
+    <pre
+      className="overflow-x-auto rounded-lg p-3 text-[12.5px] leading-relaxed"
+      style={{ background: C.bg0, border: `1px solid ${C.border}`, color: C.text, fontFamily: FONT_MONO }}
+    >
+      {children}
+    </pre>
+  )
+}
+
+export default function KaspiApiDocsPage() {
+  const router = useRouter()
+  const { lang, setLang } = useLanguage()
+  const activeLang: 'ru' | 'en' = lang === 'en' ? 'en' : 'ru'
+  const d = DOCS_COPY[activeLang]
+
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  async function load() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { router.push('/login'); return }
+    setLoading(false)
+  }
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center" style={{ background: C.bg0, color: C.muted, fontFamily: FONT_SANS }}>
+        {d.loading}
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen" style={{ background: C.bg0, color: C.text, fontFamily: FONT_SANS }}>
+      <header className="sticky top-0 z-20" style={{ background: 'rgba(10,12,16,0.92)', borderBottom: `1px solid ${C.border}` }}>
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-3 sm:px-8">
+          <a href="/" className="flex min-h-11 items-center text-[14px] font-bold tracking-[0.06em]" style={{ color: C.text }}>
+            {d.backLabel}
+          </a>
+          <div className="flex items-center gap-3">
+            <span className="hidden text-[12px] sm:inline" style={{ color: C.muted, fontFamily: FONT_MONO }}>
+              {d.title}
+            </span>
+            <div className="flex overflow-hidden rounded-lg" style={{ border: `1px solid ${C.border}` }}>
+              {(['ru', 'en'] as const).map((l) => (
+                <button
+                  key={l}
+                  onClick={() => setLang(l)}
+                  className="min-h-11 min-w-11 px-2 text-[11px] font-semibold uppercase transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                  style={{ background: activeLang === l ? C.bg2 : 'transparent', color: activeLang === l ? C.accent : C.muted }}
+                  aria-pressed={activeLang === l}
+                >
+                  {l}
+                </button>
+              ))}
+            </div>
           </div>
+        </div>
+        <div className="mx-auto max-w-6xl px-5 pb-2 text-[11px] sm:px-8" style={{ color: C.muted }}>
+          {d.i18nNote}
+        </div>
+      </header>
+
+      <div className="mx-auto max-w-6xl px-5 py-6 sm:px-8">
+        <Panel>
+          <p className="text-[13px] leading-relaxed" style={{ color: C.accent }}>{d.liveWarning}</p>
+        </Panel>
+      </div>
+
+      <div className="mx-auto max-w-6xl sm:px-8">
+        <ApiDocsViewer lang={activeLang} />
+      </div>
+
+      <div className="mx-auto max-w-6xl space-y-8 px-5 py-10 sm:px-8">
+        <section>
+          <h2 className="text-[20px] font-semibold">{d.webhookTitle}</h2>
+          <p className="mt-2 text-[13.5px] leading-relaxed" style={{ color: C.muted }}>{d.webhookIntro}</p>
+
+          <p className="mb-2 mt-4 text-[13px] font-semibold">{d.webhookPayloadLabel}</p>
+          <Pre>{WEBHOOK_BODY_EXAMPLE}</Pre>
+
+          <p className="mb-2 mt-4 text-[13px] font-semibold">{d.webhookHeaderLabel}</p>
+          <Pre>{'X-Kaspi-Pay-Signature: <hex-encoded HMAC-SHA256>'}</Pre>
+
+          <h3 className="mt-6 text-[15px] font-semibold">{d.webhookVerifyTitle}</h3>
+          <p className="mb-2 mt-2 text-[13.5px] leading-relaxed" style={{ color: C.muted }}>{d.webhookVerifyIntro}</p>
+          <Pre>{d.webhookVerifyCode}</Pre>
         </section>
 
-        <section className="mb-8">
-          <h2 className="text-2xl font-semibold mb-4" style={{ color: 'var(--nav-text-primary)' }}>Пример запроса (curl)</h2>
-          <p className="mb-4" style={{ color: 'var(--nav-text-secondary)' }}>
-            Вот полный пример создания платежа через curl:
-          </p>
-
-          <InfoBlock>
-            <CodeBlock>
-{`curl -X POST https://www.invoices.kz/api/kaspi/pay \\
-  -H "Authorization: Bearer YOUR_API_TOKEN" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "amount": 10000,
-    "order_id": "order_12345",
-    "callback_url": "https://example.com/webhook/kaspi"
-  }'
-`}
-            </CodeBlock>
-          </InfoBlock>
-        </section>
-
-        <section className="mb-8">
-          <h2 className="text-2xl font-semibold mb-4" style={{ color: 'var(--nav-text-primary)' }}>Коды ошибок</h2>
-          <InfoBlock>
-            <table className="w-full text-sm">
-              <thead>
-                <tr style={{ borderBottom: '1px solid var(--nav-border-soft)' }}>
-                  <th className="text-left p-2" style={{ color: 'var(--nav-text-primary)' }}>Код</th>
-                  <th className="text-left p-2" style={{ color: 'var(--nav-text-primary)' }}>Описание</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[
-                  ['401', 'Unauthorized — токен отсутствует или некорректен'],
-                  ['400', 'Bad Request — отсутствуют обязательные параметры (только для создания платежа)'],
-                  ['402', 'Payment Required — недостаточно средств на балансе кошелька для комиссии (только для создания платежа); пополните баланс на странице подключения'],
-                  ['404', 'Not Found — платёж с таким operation_id не найден (только для проверки статуса)'],
-                  ['429', 'Too Many Requests — превышен лимит запросов (20 в минуту на одно подключение, только для создания платежа)'],
-                  ['502', 'Bad Gateway — ошибка при обращении к Kaspi'],
-                ].map(([code, desc], i, arr) => (
-                  <tr key={code} style={{ borderBottom: i < arr.length - 1 ? '1px solid var(--nav-border-soft)' : 'none' }}>
-                    <td className="p-2"><Code>{code}</Code></td>
-                    <td className="p-2" style={{ color: 'var(--nav-text-secondary)' }}>{desc}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </InfoBlock>
+        <section className="rounded-xl p-5" style={{ background: C.bg1, border: `1px solid ${C.border}` }}>
+          <h2 className="text-[15px] font-semibold" style={{ color: C.accent }}>{d.disclosureTitle}</h2>
+          <p className="mt-2 text-[13.5px] leading-relaxed" style={{ color: C.muted }}>{d.disclosureBody}</p>
         </section>
 
         <section>
-          <h2 className="text-2xl font-semibold mb-4" style={{ color: 'var(--nav-text-primary)' }}>Поддержка</h2>
-          <p className="mb-3" style={{ color: 'var(--nav-text-secondary)' }}>
-            Если у вас возникли вопросы по использованию API, напишите нам:
-          </p>
-          <div className="flex flex-wrap gap-3">
-            <a href="mailto:support@invoices.kz" className="rounded-lg px-3 py-1.5 text-sm font-medium" style={{ background: 'var(--nav-surface-glass)', color: 'var(--nav-accent)' }}>
+          <h2 className="text-[15px] font-semibold">{d.supportTitle}</h2>
+          <div className="mt-3 flex flex-wrap gap-3">
+            <a
+              href="mailto:support@invoices.kz"
+              className="flex min-h-11 items-center rounded-lg px-3 text-[13px] font-medium"
+              style={{ background: C.bg1, border: `1px solid ${C.border}`, color: C.accent }}
+            >
               support@invoices.kz
             </a>
-            <a href="https://t.me/invoiceskz_support" target="_blank" rel="noopener noreferrer" className="rounded-lg px-3 py-1.5 text-sm font-medium" style={{ background: 'var(--nav-surface-glass)', color: 'var(--nav-accent)' }}>
+            <a
+              href="https://t.me/invoiceskz_support"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex min-h-11 items-center rounded-lg px-3 text-[13px] font-medium"
+              style={{ background: C.bg1, border: `1px solid ${C.border}`, color: C.accent }}
+            >
               Telegram
             </a>
           </div>
         </section>
       </div>
-    </main>
-    </DesktopShell>
+    </div>
   )
 }
