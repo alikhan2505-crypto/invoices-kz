@@ -196,7 +196,6 @@ const EXTRA_ICONS: Record<ExtraKey, ComponentType<{ className?: string }>> = {
 
 interface Copy {
   navCta: string
-  heroBadge: string
   heroTitleLine1: string
   heroTitleLine2: string
   heroSubtitle: string
@@ -235,10 +234,9 @@ interface Copy {
 const COPY: Record<Lang, Copy> = {
   ru: {
     navCta: 'Войти',
-    heroBadge: 'Экосистема для бизнеса в Казахстане',
-    heroTitleLine1: 'От счёта до оплаты',
-    heroTitleLine2: 'и автоматизации',
-    heroSubtitle: 'Счета с подписью и печатью, оплата через Kaspi, ЭЦП, договоры и Kaspi-бот для магазина — всё в одном месте.',
+    heroTitleLine1: 'Не только счета.',
+    heroTitleLine2: 'Вся автоматизация бизнеса',
+    heroSubtitle: 'Счета с оплатой Kaspi, демпинг-бот для Kaspi Магазина, AI-агент для клиентов и ЭЦП для любых документов — одна платформа, один кошелёк.',
     heroPrimaryCta: 'Начать бесплатно',
     heroSecondaryCta: 'Как это работает',
     heroNote: '7 дней бесплатно на тарифе Базовый',
@@ -298,7 +296,7 @@ const COPY: Record<Lang, Copy> = {
       { icon: 'mail', label: 'Ссылка на email' },
     ],
     extras: [
-      { icon: 'globe', label: '3 языка: русский, қазақша, English' },
+      { icon: 'globe', label: '3 языка: русский, казахский, английский' },
       { icon: 'wallet', label: 'Единый кошелёк в ₸ для всех сервисов' },
       { icon: 'gift', label: 'Реферальная программа' },
     ],
@@ -313,7 +311,6 @@ const COPY: Record<Lang, Copy> = {
       { label: 'Для разработчиков → Cashier API', href: '/cashier-api' },
     ],
     footerContact: [
-      { label: 'WhatsApp', href: 'https://wa.me/77763555177' },
       { label: 'Email', href: 'mailto:support@invoices.kz' },
       { label: 'Telegram', href: 'https://t.me/invoiceskz_support' },
     ],
@@ -321,10 +318,9 @@ const COPY: Record<Lang, Copy> = {
   },
   kk: {
     navCta: 'Кіру',
-    heroBadge: 'Қазақстандағы бизнеске арналған экожүйе',
-    heroTitleLine1: 'Шоттан төлемге',
-    heroTitleLine2: 'және автоматтандыруға дейін',
-    heroSubtitle: 'Қолтаңба мен мөрі бар шоттар, Kaspi арқылы төлем, ЭЦҚ, келісімшарттар және дүкенге арналған Kaspi-бот — бәрі бір жерде.',
+    heroTitleLine1: 'Тек шоттар емес.',
+    heroTitleLine2: 'Бизнесті толық автоматтандыру',
+    heroSubtitle: 'Kaspi арқылы төленетін шоттар, Kaspi Магазинге арналған демпинг-бот, клиенттерге жауап беретін AI-агент және кез келген құжатқа ЭЦҚ — бір платформа, бір әмиян.',
     heroPrimaryCta: 'Тегін бастау',
     heroSecondaryCta: 'Бұл қалай жұмыс істейді',
     heroNote: 'Тіркелгенде 7 күн тегін (Негізгі тариф)',
@@ -384,7 +380,7 @@ const COPY: Record<Lang, Copy> = {
       { icon: 'mail', label: 'Email сілтемесі' },
     ],
     extras: [
-      { icon: 'globe', label: '3 тіл: орыс, қазақ, ағылшын' },
+      { icon: 'globe', label: '3 тіл: орысша, қазақша, ағылшынша' },
       { icon: 'wallet', label: 'Барлық қызметтерге ортақ ₸ әмиян' },
       { icon: 'gift', label: 'Реферал бағдарламасы' },
     ],
@@ -399,7 +395,6 @@ const COPY: Record<Lang, Copy> = {
       { label: 'Әзірлеушілерге → Cashier API', href: '/cashier-api' },
     ],
     footerContact: [
-      { label: 'WhatsApp', href: 'https://wa.me/77763555177' },
       { label: 'Email', href: 'mailto:support@invoices.kz' },
       { label: 'Telegram', href: 'https://t.me/invoiceskz_support' },
     ],
@@ -407,10 +402,9 @@ const COPY: Record<Lang, Copy> = {
   },
   en: {
     navCta: 'Log in',
-    heroBadge: 'An ecosystem for business in Kazakhstan',
-    heroTitleLine1: 'From invoice to payment',
-    heroTitleLine2: 'to automation',
-    heroSubtitle: 'Signed and stamped invoices, Kaspi payments, digital signatures, contracts, and a Kaspi price bot for your store — all in one place.',
+    heroTitleLine1: 'More than invoicing.',
+    heroTitleLine2: 'Your whole business, automated',
+    heroSubtitle: 'Invoices with Kaspi payments, a repricing bot for Kaspi Shop, an AI agent for your customers, and digital signatures for any document — one platform, one wallet.',
     heroPrimaryCta: 'Start for free',
     heroSecondaryCta: 'How it works',
     heroNote: '7 days free on the Basic plan',
@@ -485,7 +479,6 @@ const COPY: Record<Lang, Copy> = {
       { label: 'For Developers → Cashier API', href: '/cashier-api' },
     ],
     footerContact: [
-      { label: 'WhatsApp', href: 'https://wa.me/77763555177' },
       { label: 'Email', href: 'mailto:support@invoices.kz' },
       { label: 'Telegram', href: 'https://t.me/invoiceskz_support' },
     ],
@@ -750,17 +743,6 @@ export default function Home() {
         <div className="relative z-10 mx-auto max-w-6xl px-5 sm:px-8">
           <div className="flex flex-col items-center text-center lg:flex-row lg:items-center lg:gap-14 lg:text-left">
             <div className="flex w-full flex-col items-center lg:w-1/2 lg:items-start">
-              <motion.div
-                initial={reduce ? false : { opacity: 0, y: 14 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: reduce ? 0 : 0.5, ease: EASE }}
-                className="mb-7 inline-flex items-center gap-2 rounded-full px-4 py-2 text-[12px] font-semibold"
-                style={{ background: surface, border: `1px solid ${border}`, color: 'rgba(255,255,255,0.85)' }}
-              >
-                <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: COLOR.teal }} />
-                {t.heroBadge}
-              </motion.div>
-
               <motion.h1
                 initial={reduce ? false : { opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -861,7 +843,7 @@ export default function Home() {
           {/* mockup — mobile/tablet hero visual; on lg+ the 3D scene above
               takes over (this card only reappears there as its load/error
               fallback) */}
-          <div className="mt-16 lg:hidden">
+          <div className="mt-10 lg:hidden">
             <HeroMockupCard />
           </div>
         </div>
@@ -914,7 +896,7 @@ export default function Home() {
       </section>
 
       {/* ------------------------------------------------------ features */}
-      <section id="features" className="relative z-10 mx-auto max-w-6xl px-5 py-20 sm:px-8 sm:py-28">
+      <section id="features" className="relative z-10 mx-auto max-w-6xl px-5 py-14 sm:px-8 sm:py-20">
         <Reveal className="max-w-xl">
           <h2 className="text-[clamp(1.9rem,4vw,2.75rem)] font-semibold leading-[1.08] tracking-[-0.02em]">{t.featuresTitle}</h2>
           <p className="mt-4 text-[15px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.82)' }}>{t.featuresSubtitle}</p>
@@ -994,7 +976,7 @@ export default function Home() {
       <BotShowcase t={t} />
 
       {/* ---------------------------------------------------------- auth */}
-      <section className="relative z-10 mx-auto max-w-5xl px-5 py-16 sm:px-8 sm:py-20">
+      <section className="relative z-10 mx-auto max-w-5xl px-5 py-12 sm:px-8 sm:py-16">
         <Reveal className="text-center">
           <Eyebrow color={COLOR.teal}>{t.authEyebrow}</Eyebrow>
           <h2 className="mt-4 text-[clamp(1.7rem,3.4vw,2.25rem)] font-semibold tracking-[-0.02em]">{t.authTitle}</h2>
@@ -1040,7 +1022,7 @@ export default function Home() {
       </section>
 
       {/* ----------------------------------------------------- final cta */}
-      <section className="relative z-10 mx-auto max-w-4xl px-5 py-20 sm:px-8 sm:py-24">
+      <section className="relative z-10 mx-auto max-w-4xl px-5 py-14 sm:px-8 sm:py-16">
         <Reveal>
           <div
             className="relative overflow-hidden rounded-[28px] px-6 py-14 text-center sm:px-14"
@@ -1171,7 +1153,7 @@ function BotShowcase({ t }: { t: Copy }) {
   }, [active, reduce])
 
   return (
-    <section id="bot-showcase" className="relative z-10 mx-auto max-w-6xl px-5 py-20 sm:px-8 sm:py-28">
+    <section id="bot-showcase" className="relative z-10 mx-auto max-w-6xl px-5 py-14 sm:px-8 sm:py-20">
       <Reveal className="max-w-2xl">
         <h2 className="text-[clamp(1.9rem,4vw,2.75rem)] font-semibold leading-[1.08] tracking-[-0.02em]">{t.botTitle}</h2>
         <p className="mt-4 text-[15px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.82)' }}>{t.botSubtitle}</p>
