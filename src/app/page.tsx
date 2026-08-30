@@ -1227,7 +1227,10 @@ function BotShowcase({ t }: { t: Copy }) {
                   </div>
                   <div className="mt-3 flex items-center justify-between text-[13px]" style={{ color: 'rgba(255,255,255,0.68)' }}>
                     <span>{t.botKaspi.competitorLabel}</span>
-                    <span className="text-[15px] font-semibold" style={{ color: COLOR.magenta }}>{t.botKaspi.competitorPrice}</span>
+                    {/* #F07FA8, not COLOR.magenta (#CE4C86): magenta measures 3.86:1 on this
+                        card's rgb(28,31,52) ground, below the 4.5:1 AA floor for 15px text.
+                        This lighter tint (6.41:1) is the only foreground use of the hue. */}
+                    <span className="text-[15px] font-semibold" style={{ color: '#F07FA8' }}>{t.botKaspi.competitorPrice}</span>
                   </div>
                   <div className="mt-5 flex items-center gap-2 border-t pt-4 text-[12px]" style={{ borderColor: BORDER, color: 'rgba(255,255,255,0.68)' }}>
                     <span className="relative flex h-2 w-2">
