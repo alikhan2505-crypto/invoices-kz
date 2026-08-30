@@ -85,10 +85,14 @@ export default function ApiDocsViewer({ lang }: { lang: 'ru' | 'en' }) {
         // tsc without touching runtime behavior; the JSON itself is
         // still validated against the real API contract in Task 2.
         content: content as any,
-        // Never set proxyUrl -- leaving it unset is what keeps every
-        // "Try it" request going straight from the visitor's browser to
-        // invoices.kz's own API, never through any Scalar-hosted proxy
-        // (hard requirement, see the design spec's "Библиотека-рендерер").
+        // proxyUrl is EXPLICITLY the empty string, not merely unset: Scalar
+        // defaults to its own proxy.scalar.com in some layouts when this is
+        // undefined, and only the embedded reference layout happens to skip
+        // it today. '' short-circuits shouldUseProxy and forces every
+        // "Try it" request to go straight from the visitor's browser to
+        // invoices.kz's own API -- a hard requirement, since these requests
+        // carry the customer's real production Cashier token.
+        proxyUrl: '',
         theme: 'none',
         darkMode: true,
         forceDarkModeState: 'dark',

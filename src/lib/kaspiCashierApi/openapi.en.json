@@ -143,7 +143,7 @@
       "post": {
         "tags": ["Kaspi Cashier API"],
         "summary": "Payment-success notification",
-        "description": "If a callback_url was provided when creating the payment, invoices.kz sends it a POST request the moment the payment is confirmed. Signed with an X-Kaspi-Pay-Signature header (hex HMAC-SHA256 of the raw request body, keyed with your webhook secret). The webhook secret is unique per connection — other invoices.kz customers' webhooks are signed with a different key, and vice versa. This is not the only signal of payment — it fires either when you call GET /api/kaspi/pay/status yourself, or when our internal cron discovers the payment (on the hosting plan's free tier, that cron runs no more than once a day).",
+        "description": "If a callback_url was provided when creating the payment, invoices.kz sends it a POST request the moment the payment is confirmed. Signed with an X-Kaspi-Pay-Signature header (hex HMAC-SHA256 of the raw request body, keyed with your webhook secret). The webhook secret is unique per connection — other invoices.kz customers' webhooks are signed with a different key, and vice versa. This is not the only signal of payment — it fires either when you call GET /api/kaspi/pay/status yourself, or when our internal cron discovers the payment (that cron runs once a day).",
         "security": [],
         "parameters": [
           {

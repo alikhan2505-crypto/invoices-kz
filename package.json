@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.116.0",
-    "@scalar/api-reference-react": "^0.9.66",
+    "@scalar/api-reference-react": "0.9.66",
     "@simplewebauthn/browser": "^13.3.0",
     "@simplewebauthn/server": "^13.3.2",
     "@splinetool/react-spline": "^4.1.0",
