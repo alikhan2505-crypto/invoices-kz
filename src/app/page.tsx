@@ -210,10 +210,9 @@ interface Copy {
   stepsEyebrow: string
   stepsTitle: string
   steps: { title: string; desc: string }[]
-  featuresEyebrow: string
   featuresTitle: string
   featuresSubtitle: string
-  features: { icon: FeatureKey; title: string; desc: string; badge?: string }[]
+  features: { icon: FeatureKey; title: string; desc: string; badge?: string; href?: string }[]
   botTitle: string
   botSubtitle: string
   botTabs: { key: BotTabKey; label: string }[]
@@ -258,13 +257,12 @@ const COPY: Record<Lang, Copy> = {
       { title: 'Клиент оплачивает через Kaspi', desc: 'Отправьте ссылку — клиент платит по Kaspi QR прямо со страницы счёта, без регистрации.' },
       { title: 'Оплата подтверждается сама', desc: 'Платформа сама видит оплату и помечает счёт оплаченным — сверять вручную ничего не нужно.' },
     ],
-    featuresEyebrow: 'Возможности',
     featuresTitle: 'Главное, что вы получаете',
     featuresSubtitle: 'Реальные инструменты, которыми уже пользуется бизнес в Казахстане.',
     features: [
       { icon: 'invoice', title: 'Счета за 1 минуту', desc: 'Конструктор счетов, PDF с подписью и печатью, НДС, шаблоны. Отправка на email или публичной ссылкой, статусы оплат и история.' },
       { icon: 'kaspi', title: 'Оплата через Kaspi', desc: 'Платёжная ссылка и QR Kaspi Pay прямо в счёте. Платформа сама подтверждает оплату. Комиссия 2% — только с реально оплаченных счетов. Есть импорт выписки из Excel с автосопоставлением.' },
-      { icon: 'api', title: 'Kaspi API и вебхуки', desc: 'Принимайте оплаты Kaspi на своём сайте: создание платежа по API, вебхук об оплате, документация — в разделе «Kaspi API».' },
+      { icon: 'api', title: 'Kaspi API и вебхуки', desc: 'Принимайте оплаты Kaspi на своём сайте: создание платежа по API, вебхук об оплате, подробности и тарифы — на странице Cashier API.', href: '/cashier-api' },
       { icon: 'esign', title: 'ЭЦП-подписание', desc: 'Подписывайте счета и договоры ЭЦП через QR или eGov mobile (SIGEX) — юридически значимо, без визита в офис.', badge: 'Pro' },
       { icon: 'contract', title: 'Договоры', desc: 'Создавайте договоры и подписывайте их онлайн обеими сторонами — без бумаги и личных встреч.' },
     ],
@@ -344,13 +342,12 @@ const COPY: Record<Lang, Copy> = {
       { title: 'Клиент Kaspi арқылы төлейді', desc: 'Сілтемені жіберіңіз — клиент тіркелусіз, тікелей шот бетінен Kaspi QR арқылы төлейді.' },
       { title: 'Төлем өздігінен расталады', desc: 'Платформа төлемді өзі көріп, шотты төленді деп белгілейді — қолмен тексерудің қажеті жоқ.' },
     ],
-    featuresEyebrow: 'Мүмкіндіктер',
     featuresTitle: 'Сіз алатын негізгі нәрселер',
     featuresSubtitle: 'Қазақстандағы бизнес қазірдің өзінде пайдаланатын нақты құралдар.',
     features: [
       { icon: 'invoice', title: 'Бір минутта шот', desc: 'Шот конструкторы, қолтаңба мен мөрі бар PDF, ҚҚС, үлгілер. Email арқылы немесе жария сілтемемен жіберу, төлем мәртебелері мен тарихы.' },
       { icon: 'kaspi', title: 'Kaspi арқылы төлем', desc: 'Шоттың өзінде Kaspi Pay сілтемесі мен QR коды. Платформа төлемді өзі растайды. Комиссия 2% — тек нақты төленген шоттан. Excel үзінді-көшірмесін автоматты салыстырумен жүктеуге болады.' },
-      { icon: 'api', title: 'Kaspi API және вебхук', desc: 'Kaspi төлемдерін өз сайтыңызда қабылдаңыз: API арқылы төлем жасау, төлем вебхугі, құжаттама — «Kaspi API» бөлімінде.' },
+      { icon: 'api', title: 'Kaspi API және вебхук', desc: 'Kaspi төлемдерін өз сайтыңызда қабылдаңыз: API арқылы төлем жасау, төлем вебхугі, толық ақпарат пен тарифтер — Cashier API бетінде.', href: '/cashier-api' },
       { icon: 'esign', title: 'ЭЦҚ қолтаңба', desc: 'Шоттар мен келісімшарттарға QR немесе eGov mobile (SIGEX) арқылы ЭЦҚ қойыңыз — заңды күші бар, кеңсеге барудың қажеті жоқ.', badge: 'Pro' },
       { icon: 'contract', title: 'Келісімшарттар', desc: 'Келісімшарт жасаңыз және екі тарап та онлайн қол қойсын — қағазсыз, кездесусіз.' },
     ],
@@ -430,13 +427,12 @@ const COPY: Record<Lang, Copy> = {
       { title: 'Client pays via Kaspi', desc: 'Send the link — the client pays with a Kaspi QR code right from the invoice page, no signup required.' },
       { title: 'Payment confirms itself', desc: 'The platform detects the payment and marks the invoice paid automatically — nothing to reconcile by hand.' },
     ],
-    featuresEyebrow: 'Features',
     featuresTitle: 'What you actually get',
     featuresSubtitle: 'Real tools that businesses in Kazakhstan already use.',
     features: [
       { icon: 'invoice', title: 'Invoices in 1 minute', desc: 'An invoice builder, PDF with your signature and stamp, VAT, templates. Send by email or a public link, track payment status and history.' },
       { icon: 'kaspi', title: 'Payment via Kaspi', desc: 'A Kaspi Pay link and QR code right inside the invoice. The platform confirms payment on its own. A 2% fee applies only to invoices actually paid via Kaspi. You can also import an Excel bank statement with automatic matching.' },
-      { icon: 'api', title: 'Kaspi API & webhooks', desc: "Accept Kaspi payments on your own site: create a payment via the API, get a payment webhook, and read the docs — all in the platform's “Kaspi API” section." },
+      { icon: 'api', title: 'Kaspi API & webhooks', desc: 'Accept Kaspi payments on your own site: create a payment via the API, get a payment webhook — full details and pricing are on the Cashier API page.', href: '/cashier-api' },
       { icon: 'esign', title: 'Digital signature', desc: 'Sign invoices and contracts with a digital signature via QR or eGov mobile (SIGEX) — legally binding, no office visit needed.', badge: 'Pro' },
       { icon: 'contract', title: 'Contracts', desc: 'Create contracts and have both parties sign them online — no paper, no meetings.' },
     ],
@@ -560,7 +556,7 @@ function CountUp({ value, suffix, reduce }: { value: number; suffix: string; red
    standalone component that fetches its own copy via useLanguage() rather
    than a prop, since next/dynamic's `loading` option and a class-based
    error boundary can't easily be handed Home()'s local `t`. */
-function HeroMockupCard() {
+function HeroMockupCard({ compact = false }: { compact?: boolean } = {}) {
   const { lang } = useLanguage()
   const t = COPY[lang].mock
   const reduce = useReducedMotion()
@@ -570,12 +566,12 @@ function HeroMockupCard() {
       initial={reduce ? false : { opacity: 0, y: 30, scale: 0.97 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: reduce ? 0 : 0.7, ease: EASE }}
-      className="relative mx-auto w-full max-w-md"
+      className={compact ? 'relative mx-auto w-full max-w-[260px]' : 'relative mx-auto w-full max-w-md'}
     >
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute -inset-16 rounded-full"
-        style={{ background: `radial-gradient(closest-side, ${COLOR.violet}33, transparent 72%)`, filter: 'blur(30px)' }}
+        className={compact ? 'pointer-events-none absolute -inset-8 rounded-full' : 'pointer-events-none absolute -inset-16 rounded-full'}
+        style={{ background: `radial-gradient(closest-side, ${COLOR.violet}33, transparent 72%)`, filter: compact ? 'blur(18px)' : 'blur(30px)' }}
       />
       <motion.div
         animate={reduce ? undefined : { y: [0, -10, 0] }}
@@ -583,7 +579,7 @@ function HeroMockupCard() {
         className="relative overflow-hidden rounded-3xl text-left"
         style={{ background: SURFACE, border: `1px solid ${BORDER}`, boxShadow: '0 40px 80px rgba(0,0,0,0.55)' }}
       >
-        <div className="flex items-center gap-2 px-5 py-3" style={{ borderBottom: `1px solid ${BORDER}` }}>
+        <div className={compact ? 'flex items-center gap-1.5 px-4 py-2.5' : 'flex items-center gap-2 px-5 py-3'} style={{ borderBottom: `1px solid ${BORDER}` }}>
           <span className="h-2.5 w-2.5 rounded-full" style={{ background: COLOR.magenta, opacity: 0.7 }} />
           <span className="h-2.5 w-2.5 rounded-full" style={{ background: COLOR.violet, opacity: 0.7 }} />
           <span className="h-2.5 w-2.5 rounded-full" style={{ background: COLOR.teal, opacity: 0.7 }} />
@@ -591,17 +587,17 @@ function HeroMockupCard() {
             {t.url}
           </span>
         </div>
-        <div className="p-5">
+        <div className={compact ? 'p-4' : 'p-5'}>
           <div className="flex items-start justify-between">
             <div>
-              <div className="text-[11px]" style={{ color: 'rgba(255,255,255,0.68)' }}>{t.number}</div>
-              <div className="mt-0.5 text-[16px] font-semibold">{t.client}</div>
+              <div className={compact ? 'text-[10px]' : 'text-[11px]'} style={{ color: 'rgba(255,255,255,0.68)' }}>{t.number}</div>
+              <div className={compact ? 'mt-0.5 text-[14px] font-semibold' : 'mt-0.5 text-[16px] font-semibold'}>{t.client}</div>
             </div>
-            <span className="rounded-lg px-2.5 py-1 text-[10px] font-bold text-white" style={{ background: COLOR.teal }}>
+            <span className={compact ? 'rounded-lg px-2 py-0.5 text-[9px] font-bold text-white' : 'rounded-lg px-2.5 py-1 text-[10px] font-bold text-white'} style={{ background: COLOR.teal }}>
               {t.paid}
             </span>
           </div>
-          <div className="mt-4 space-y-2 text-[12px]" style={{ color: 'rgba(255,255,255,0.82)' }}>
+          <div className={compact ? 'mt-3 space-y-1.5 text-[11px]' : 'mt-4 space-y-2 text-[12px]'} style={{ color: 'rgba(255,255,255,0.82)' }}>
             <div className="flex justify-between">
               <span>{t.service}</span>
               <span>150 000 ₸</span>
@@ -611,9 +607,9 @@ function HeroMockupCard() {
               <span>18 000 ₸</span>
             </div>
           </div>
-          <div className="mt-4 flex items-center justify-between border-t pt-4" style={{ borderColor: BORDER }}>
-            <span className="text-[12px]" style={{ color: 'rgba(255,255,255,0.82)' }}>{t.total}</span>
-            <span className="text-[20px] font-bold" style={{ color: COLOR.teal }}>168 000 ₸</span>
+          <div className={compact ? 'mt-3 flex items-center justify-between border-t pt-3' : 'mt-4 flex items-center justify-between border-t pt-4'} style={{ borderColor: BORDER }}>
+            <span className={compact ? 'text-[11px]' : 'text-[12px]'} style={{ color: 'rgba(255,255,255,0.82)' }}>{t.total}</span>
+            <span className={compact ? 'text-[17px] font-bold' : 'text-[20px] font-bold'} style={{ color: COLOR.teal }}>168 000 ₸</span>
           </div>
         </div>
       </motion.div>
@@ -917,36 +913,73 @@ export default function Home() {
       {/* ------------------------------------------------------ features */}
       <section id="features" className="relative z-10 mx-auto max-w-6xl px-5 py-20 sm:px-8 sm:py-28">
         <Reveal className="max-w-xl">
-          <Eyebrow color={COLOR.violet}>{t.featuresEyebrow}</Eyebrow>
-          <h2 className="mt-4 text-[clamp(1.9rem,4vw,2.75rem)] font-semibold leading-[1.08] tracking-[-0.02em]">{t.featuresTitle}</h2>
+          <h2 className="text-[clamp(1.9rem,4vw,2.75rem)] font-semibold leading-[1.08] tracking-[-0.02em]">{t.featuresTitle}</h2>
           <p className="mt-4 text-[15px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.82)' }}>{t.featuresSubtitle}</p>
         </Reveal>
 
-        <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {t.features.map((f, i) => {
-            const FIcon = FEATURE_ICONS[f.icon]
-            return (
-              <Reveal key={f.title} delay={Math.min(i * 0.045, 0.27)}>
-                <div
-                  className="motion-safe:transition-all motion-safe:duration-200 motion-safe:hover:-translate-y-1 relative h-full rounded-2xl p-6"
-                  style={{ background: surface, border: `1px solid ${border}` }}
-                >
-                  {f.badge && (
-                    <span
-                      className="absolute right-5 top-5 rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white"
-                      style={{ background: COLOR.magenta }}
-                    >
-                      {f.badge}
-                    </span>
-                  )}
+        <div className="mt-12 grid grid-cols-1 gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-center lg:gap-14">
+          <div className="space-y-8">
+            {t.features.slice(0, 2).map((f, i) => {
+              const FIcon = FEATURE_ICONS[f.icon]
+              return (
+                <Reveal key={f.title} delay={i * 0.06} className="flex gap-4">
                   <div
-                    className="flex h-11 w-11 items-center justify-center rounded-xl"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
                     style={{ background: 'rgba(122,108,240,0.16)', color: COLOR.violet }}
                   >
                     <FIcon className="h-5 w-5" />
                   </div>
-                  <h3 className="mt-4 text-[16px] font-semibold">{f.title}</h3>
-                  <p className="mt-2 text-[13.5px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.82)' }}>{f.desc}</p>
+                  <div>
+                    <h3 className="text-[18px] font-semibold">{f.title}</h3>
+                    <p className="mt-1.5 text-[14px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.82)' }}>{f.desc}</p>
+                  </div>
+                </Reveal>
+              )
+            })}
+          </div>
+
+          <Reveal delay={0.12}>
+            <HeroMockupCard compact />
+          </Reveal>
+        </div>
+
+        <div className="mt-14 border-t sm:mt-16" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+          {t.features.slice(2).map((f, i) => {
+            const FIcon = FEATURE_ICONS[f.icon]
+            return (
+              <Reveal key={f.title} delay={i * 0.05}>
+                <div className="flex items-start gap-4 border-b py-5" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+                  <div
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
+                    style={{ background: 'rgba(122,108,240,0.12)', color: COLOR.violet }}
+                  >
+                    <FIcon className="h-4.5 w-4.5" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="text-[15px] font-semibold">
+                        {f.href ? (
+                          <a
+                            href={f.href}
+                            className="underline decoration-1 underline-offset-2 transition-opacity hover:opacity-75 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                          >
+                            {f.title}
+                          </a>
+                        ) : (
+                          f.title
+                        )}
+                      </h3>
+                      {f.badge && (
+                        <span
+                          className="rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white"
+                          style={{ background: COLOR.magenta }}
+                        >
+                          {f.badge}
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-1 text-[13.5px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.82)' }}>{f.desc}</p>
+                  </div>
                 </div>
               </Reveal>
             )
