@@ -310,6 +310,7 @@ const COPY: Record<Lang, Copy> = {
       { label: 'Политика', href: '/privacy' },
       { label: 'Условия', href: '/terms' },
       { label: 'Удаление данных', href: '/data-deletion' },
+      { label: 'Для разработчиков → Cashier API', href: '/cashier-api' },
     ],
     footerContact: [
       { label: 'WhatsApp', href: 'https://wa.me/77763555177' },
@@ -395,6 +396,7 @@ const COPY: Record<Lang, Copy> = {
       { label: 'Құпиялылық', href: '/privacy' },
       { label: 'Шарттар', href: '/terms' },
       { label: 'Деректерді жою', href: '/data-deletion' },
+      { label: 'Әзірлеушілерге → Cashier API', href: '/cashier-api' },
     ],
     footerContact: [
       { label: 'WhatsApp', href: 'https://wa.me/77763555177' },
@@ -480,6 +482,7 @@ const COPY: Record<Lang, Copy> = {
       { label: 'Privacy', href: '/privacy' },
       { label: 'Terms', href: '/terms' },
       { label: 'Data Deletion', href: '/data-deletion' },
+      { label: 'For Developers → Cashier API', href: '/cashier-api' },
     ],
     footerContact: [
       { label: 'WhatsApp', href: 'https://wa.me/77763555177' },
