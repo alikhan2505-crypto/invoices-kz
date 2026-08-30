@@ -297,6 +297,7 @@ export default function TopUtilityBar() {
     pathname === '/privacy' ||
     pathname === '/terms' ||
     pathname === '/data-deletion' ||
+    pathname === '/cashier-api' ||
     pathname.startsWith('/view/') ||
     pathname.startsWith('/contract-view/') ||
     pathname.startsWith('/verify/') ||
