@@ -3,6 +3,8 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import SiteNav from '@/components/SiteNav'
+import DesktopShell from '@/components/DesktopShell'
 import { useLanguage } from '@/components/LanguageProvider'
 import { setPostLoginRedirect } from '@/lib/postLoginRedirect'
 import ApiDocsViewer from '@/components/ApiDocsViewer'
@@ -10,7 +12,6 @@ import { CASHIER_API_COLOR as C, CASHIER_API_FONT_SANS as FONT_SANS, CASHIER_API
 
 interface DocsCopy {
   loading: string
-  backLabel: string
   title: string
   liveWarning: string
   i18nNote: string
@@ -29,7 +30,6 @@ interface DocsCopy {
 const DOCS_COPY: Record<'ru' | 'en', DocsCopy> = {
   ru: {
     loading: 'Загрузка…',
-    backLabel: 'invoices.kz',
     title: 'Kaspi Cashier API — документация',
     liveWarning: 'Все запросы «Try it» ниже выполняются к реальному продакшн-API — у Kaspi Pay нет тестового режима. Успешный вызов создания платежа спишет комиссию 2% с вашего баланса при оплате.',
     i18nNote: 'Часть элементов интерфейса самого проводника (например, кнопки Authorize и Send Request) отображается на английском независимо от выбранного языка — это ограничение библиотеки Scalar, не наших переводов.',
@@ -55,7 +55,6 @@ const isValid = signature === req.headers['x-kaspi-pay-signature'];`,
   },
   en: {
     loading: 'Loading…',
-    backLabel: 'invoices.kz',
     title: 'Kaspi Cashier API — documentation',
     liveWarning: 'Every "Try it" request below hits the real production API — Kaspi Pay has no test/sandbox mode. A successful payment-creation call will debit a 2% commission from your balance once the customer pays.',
     i18nNote: "Some of the reference tool's own interface labels (e.g. the Authorize and Send Request buttons) stay in English regardless of the selected language — that's a limitation of the Scalar library itself, not of our translations.",
@@ -155,24 +154,45 @@ export default function KaspiApiDocsPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center" style={{ background: C.bg0, color: C.muted, fontFamily: FONT_SANS }}>
-        {d.loading}
-      </div>
+      <DesktopShell>
+      <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
+        <SiteNav />
+        {/* cashier-dev-theme (see globals.css): same dark developer palette
+            as /kaspi-api's Connection tab -- only this inner content area
+            goes dark, DesktopShell's card and SiteNav's menu strip above
+            keep the normal light app chrome. */}
+        <div className="cashier-dev-theme flex min-h-screen items-center justify-center lg:min-h-full" style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-muted)', fontFamily: FONT_SANS }}>
+          {d.loading}
+        </div>
+      </main>
+      </DesktopShell>
     )
   }
 
   return (
-    <div className="min-h-screen" style={{ background: C.bg0, color: C.text, fontFamily: FONT_SANS }}>
-      <header className="sticky top-0 z-20" style={{ background: 'rgba(10,12,16,0.92)', borderBottom: `1px solid ${C.border}` }}>
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-3 sm:px-8">
-          <a href="/" className="flex min-h-11 items-center text-[14px] font-bold tracking-[0.06em]" style={{ color: C.text }}>
-            {d.backLabel}
-          </a>
-          <div className="flex items-center gap-3">
-            <span className="hidden text-[12px] sm:inline" style={{ color: C.muted, fontFamily: FONT_MONO }}>
+    <DesktopShell>
+    <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
+      <SiteNav />
+      {/* cashier-dev-theme (see globals.css): scopes --nav-* to the dark
+          developer palette shared with /kaspi-api's Connection tab and the
+          public /cashier-api landing, so both pages under the
+          «Подключение | Документация API» menu strip above (rendered by
+          SiteNav, outside this dark wrapper) read as one product. Replaces
+          this page's old standalone header (own back-link, own sticky bar)
+          now that SiteNav provides the app chrome and the section tabs. */}
+      <div className="cashier-dev-theme min-h-screen lg:min-h-full" style={{ background: 'var(--nav-bg)', color: C.text, fontFamily: FONT_SANS }}>
+        {/* RU/EN toggle + the Scalar-limitation caption that used to live in
+            the standalone header's sticky bar. setLang is the app-wide
+            language (LanguageProvider) -- now that this page renders inside
+            SiteNav, switching it here also updates the menu labels, which is
+            the point: this is a normal in-app page, not an isolated surface
+            anymore. */}
+        <div className="mx-auto max-w-6xl px-5 pt-6 sm:px-8">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-[12px]" style={{ color: C.muted, fontFamily: FONT_MONO }}>
               {d.title}
             </span>
-            <div className="flex overflow-hidden rounded-lg" style={{ border: `1px solid ${C.border}` }}>
+            <div className="flex overflow-hidden rounded-lg flex-shrink-0" style={{ border: `1px solid ${C.border}` }}>
               {(['ru', 'en'] as const).map((l) => (
                 <button
                   key={l}
@@ -186,65 +206,66 @@ export default function KaspiApiDocsPage() {
               ))}
             </div>
           </div>
+          <p className="mt-2 text-[11px]" style={{ color: C.muted }}>
+            {d.i18nNote}
+          </p>
         </div>
-        <div className="mx-auto max-w-6xl px-5 pb-2 text-[11px] sm:px-8" style={{ color: C.muted }}>
-          {d.i18nNote}
+
+        <div className="mx-auto max-w-6xl px-5 py-6 sm:px-8">
+          <Panel>
+            <p className="text-[13px] leading-relaxed" style={{ color: C.accent }}>{d.liveWarning}</p>
+          </Panel>
         </div>
-      </header>
 
-      <div className="mx-auto max-w-6xl px-5 py-6 sm:px-8">
-        <Panel>
-          <p className="text-[13px] leading-relaxed" style={{ color: C.accent }}>{d.liveWarning}</p>
-        </Panel>
+        <div className="mx-auto max-w-6xl sm:px-8">
+          <ApiDocsViewer lang={activeLang} />
+        </div>
+
+        <div className="mx-auto max-w-6xl space-y-8 px-5 py-10 sm:px-8">
+          <section>
+            <h2 className="text-[20px] font-semibold">{d.webhookTitle}</h2>
+            <p className="mt-2 text-[13.5px] leading-relaxed" style={{ color: C.muted }}>{d.webhookIntro}</p>
+
+            <p className="mb-2 mt-4 text-[13px] font-semibold">{d.webhookPayloadLabel}</p>
+            <Pre>{WEBHOOK_BODY_EXAMPLE}</Pre>
+
+            <p className="mb-2 mt-4 text-[13px] font-semibold">{d.webhookHeaderLabel}</p>
+            <Pre>{'X-Kaspi-Pay-Signature: <hex-encoded HMAC-SHA256>'}</Pre>
+
+            <h3 className="mt-6 text-[15px] font-semibold">{d.webhookVerifyTitle}</h3>
+            <p className="mb-2 mt-2 text-[13.5px] leading-relaxed" style={{ color: C.muted }}>{d.webhookVerifyIntro}</p>
+            <Pre>{d.webhookVerifyCode}</Pre>
+          </section>
+
+          <section className="rounded-xl p-5" style={{ background: C.bg1, border: `1px solid ${C.border}` }}>
+            <h2 className="text-[15px] font-semibold" style={{ color: C.accent }}>{d.disclosureTitle}</h2>
+            <p className="mt-2 text-[13.5px] leading-relaxed" style={{ color: C.muted }}>{d.disclosureBody}</p>
+          </section>
+
+          <section>
+            <h2 className="text-[15px] font-semibold">{d.supportTitle}</h2>
+            <div className="mt-3 flex flex-wrap gap-3">
+              <a
+                href="mailto:support@invoices.kz"
+                className="flex min-h-11 items-center rounded-lg px-3 text-[13px] font-medium"
+                style={{ background: C.bg1, border: `1px solid ${C.border}`, color: C.accent }}
+              >
+                support@invoices.kz
+              </a>
+              <a
+                href="https://t.me/invoiceskz_support"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex min-h-11 items-center rounded-lg px-3 text-[13px] font-medium"
+                style={{ background: C.bg1, border: `1px solid ${C.border}`, color: C.accent }}
+              >
+                Telegram
+              </a>
+            </div>
+          </section>
+        </div>
       </div>
-
-      <div className="mx-auto max-w-6xl sm:px-8">
-        <ApiDocsViewer lang={activeLang} />
-      </div>
-
-      <div className="mx-auto max-w-6xl space-y-8 px-5 py-10 sm:px-8">
-        <section>
-          <h2 className="text-[20px] font-semibold">{d.webhookTitle}</h2>
-          <p className="mt-2 text-[13.5px] leading-relaxed" style={{ color: C.muted }}>{d.webhookIntro}</p>
-
-          <p className="mb-2 mt-4 text-[13px] font-semibold">{d.webhookPayloadLabel}</p>
-          <Pre>{WEBHOOK_BODY_EXAMPLE}</Pre>
-
-          <p className="mb-2 mt-4 text-[13px] font-semibold">{d.webhookHeaderLabel}</p>
-          <Pre>{'X-Kaspi-Pay-Signature: <hex-encoded HMAC-SHA256>'}</Pre>
-
-          <h3 className="mt-6 text-[15px] font-semibold">{d.webhookVerifyTitle}</h3>
-          <p className="mb-2 mt-2 text-[13.5px] leading-relaxed" style={{ color: C.muted }}>{d.webhookVerifyIntro}</p>
-          <Pre>{d.webhookVerifyCode}</Pre>
-        </section>
-
-        <section className="rounded-xl p-5" style={{ background: C.bg1, border: `1px solid ${C.border}` }}>
-          <h2 className="text-[15px] font-semibold" style={{ color: C.accent }}>{d.disclosureTitle}</h2>
-          <p className="mt-2 text-[13.5px] leading-relaxed" style={{ color: C.muted }}>{d.disclosureBody}</p>
-        </section>
-
-        <section>
-          <h2 className="text-[15px] font-semibold">{d.supportTitle}</h2>
-          <div className="mt-3 flex flex-wrap gap-3">
-            <a
-              href="mailto:support@invoices.kz"
-              className="flex min-h-11 items-center rounded-lg px-3 text-[13px] font-medium"
-              style={{ background: C.bg1, border: `1px solid ${C.border}`, color: C.accent }}
-            >
-              support@invoices.kz
-            </a>
-            <a
-              href="https://t.me/invoiceskz_support"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex min-h-11 items-center rounded-lg px-3 text-[13px] font-medium"
-              style={{ background: C.bg1, border: `1px solid ${C.border}`, color: C.accent }}
-            >
-              Telegram
-            </a>
-          </div>
-        </section>
-      </div>
-    </div>
+    </main>
+    </DesktopShell>
   )
 }

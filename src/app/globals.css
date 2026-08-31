@@ -675,3 +675,65 @@ html {
   .nav-blob { animation: none !important; }
 }
 
+/* Dark developer-style theme for the Kaspi Cashier API pages (Connection
+   at /kaspi-api and Documentation at /kaspi-api/docs) -- founder feedback:
+   the two pages sit under one SiteNav menu item («Подключение» / «Документация
+   API») but looked like two different products, since /kaspi-api/docs was
+   built as its own standalone dark developer surface (own header, no
+   DesktopShell/SiteNav) while /kaspi-api stayed on the light app chrome.
+   Scoped override of the --nav-* tokens both pages already style against
+   (see src/app/kaspi-api/page.tsx / src/app/kaspi-api/docs/page.tsx) with
+   the palette from src/lib/kaspiCashierApi/theme.ts's CASHIER_API_COLOR
+   (GitHub Dark / Stripe-docs derived) -- so both pages, and /cashier-api's
+   public landing, read as one consistent developer product. Deliberately
+   scoped to a class (applied to the pages' inner content wrapper, NOT to
+   DesktopShell's outer card or SiteNav) rather than redefining --nav-*
+   globally or under [data-theme], so every other unified-nav page keeps
+   its normal light/dark app look untouched.
+   Repeated under both theme selectors (not just bare .cashier-dev-theme)
+   so this wins regardless of the user's light/dark app theme -- the two
+   [data-theme] blocks above (~line 438 and ~line 480) each redefine every
+   --nav-* token this class also sets, and a later same-specificity rule
+   only wins by source order, which a future edit could easily invert. */
+.cashier-dev-theme,
+[data-theme="dark"] .cashier-dev-theme,
+[data-theme="light"] .cashier-dev-theme {
+  --nav-bg: #0a0c10;
+  --nav-surface-glass: #161b22;
+  --nav-surface-elevated: #0a0c10;
+  --nav-surface-chrome: #0d1117;
+  /* Single --nav-accent token doubles as link/text color AND button fill
+     across both pages (e.g. kaspi-api/page.tsx's CTA buttons vs. its
+     underlined "docs" link) -- #7ee787 (theme.ts's accent TEXT color, not
+     the darker #238636 button green) is used for both roles here since it
+     reads clearly in either: as text straight on the dark ground, and as a
+     button fill under --nav-accent-ink's near-black ink. */
+  --nav-accent: #7ee787;
+  --nav-accent-ink: #0a0c10;
+  --nav-accent-soft: rgba(126, 231, 135, 0.14);
+  --nav-accent-track: rgba(126, 231, 135, 0.22);
+  /* --nav-teal reuses theme.ts's #238636 button green -- gives
+     .nav-card-accent's top-edge gradient (accent -> teal) a real two-tone
+     look instead of a flat bar, and keeps existing --nav-teal warning-hint
+     usages (e.g. kaspiTokenShownOnceWarning) readable on the dark ground. */
+  --nav-teal: #238636;
+  --nav-teal-soft: rgba(35, 134, 54, 0.24);
+  --nav-magenta: #db61a2;
+  --nav-magenta-soft: rgba(219, 97, 162, 0.18);
+  --nav-success: #3fb950;
+  --nav-success-soft: rgba(63, 185, 80, 0.16);
+  /* Readable red on the near-black ground (GitHub Dark's danger fg) --
+     the base theme's --nav-critical reds (#DC2626 / #F87171) are tuned for
+     the light/dark app backgrounds, not this much darker bg0. */
+  --nav-critical: #f85149;
+  --nav-text-primary: #c9d1d9;
+  --nav-text-secondary: #8b949e;
+  /* theme.ts only defines two text tiers (text/muted) -- this third,
+     dimmer tier is derived for this scope only, for the --nav-text-muted
+     usages (timestamps, hint labels) that want to sit below --nav-text-secondary. */
+  --nav-text-muted: #6e7681;
+  --nav-border: #30363d;
+  --nav-border-soft: #21262d;
+  --nav-card-glow: 0 20px 50px -22px rgba(0, 0, 0, 0.7);
+}
+
