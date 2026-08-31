@@ -7,9 +7,9 @@ import { useLanguage, type Lang } from './LanguageProvider'
 import KaspiShopStoreSwitcher from './KaspiShopStoreSwitcher'
 
 const labels: Record<Lang, { home: string; invoices: string; kaspiShop: string; aiAgent: string; kaspiApi: string; wildberries: string; profile: string; history: string; menu: string; close: string }> = {
-  ru: { home: 'Дашборд', invoices: 'Счета', kaspiShop: 'Kaspi Bot', aiAgent: 'AI-агент', kaspiApi: 'Kaspi API', wildberries: 'Wildberries', profile: 'Профиль', history: 'История', menu: 'Меню', close: 'Закрыть' },
-  kk: { home: 'Дашборд', invoices: 'Шоттар', kaspiShop: 'Kaspi Bot', aiAgent: 'AI-агент', kaspiApi: 'Kaspi API', wildberries: 'Wildberries', profile: 'Профиль', history: 'Тарих', menu: 'Мәзір', close: 'Жабу' },
-  en: { home: 'Dashboard', invoices: 'Invoices', kaspiShop: 'Kaspi Bot', aiAgent: 'AI Agent', kaspiApi: 'Kaspi API', wildberries: 'Wildberries', profile: 'Profile', history: 'History', menu: 'Menu', close: 'Close' },
+  ru: { home: 'Дашборд', invoices: 'Счета', kaspiShop: 'Kaspi Bot', aiAgent: 'AI-агент', kaspiApi: 'Kaspi Cashier API', wildberries: 'WB Bot', profile: 'Профиль', history: 'История', menu: 'Меню', close: 'Закрыть' },
+  kk: { home: 'Дашборд', invoices: 'Шоттар', kaspiShop: 'Kaspi Bot', aiAgent: 'AI-агент', kaspiApi: 'Kaspi Cashier API', wildberries: 'WB Bot', profile: 'Профиль', history: 'Тарих', menu: 'Мәзір', close: 'Жабу' },
+  en: { home: 'Dashboard', invoices: 'Invoices', kaspiShop: 'Kaspi Bot', aiAgent: 'AI Agent', kaspiApi: 'Kaspi Cashier API', wildberries: 'WB Bot', profile: 'Profile', history: 'History', menu: 'Menu', close: 'Close' },
 }
 
 // Copy shown to non-admins when they interact with an admin-gated section
@@ -91,8 +91,8 @@ type Section = {
 const SECTIONS: Section[] = [
   { key: 'invoices', links: invoicesLinks, adminOnly: false },
   { key: 'kaspiApi', links: kaspiApiLinks, adminOnly: false },
-  { key: 'kaspiShop', links: kaspiShopLinks, adminOnly: true },
   { key: 'aiAgent', links: aiAgentLinks, adminOnly: true },
+  { key: 'kaspiShop', links: kaspiShopLinks, adminOnly: true },
   { key: 'wildberries', links: wbLinks, adminOnly: true },
 ]
 
@@ -304,8 +304,8 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
             { href: '/dashboard', label: labels[lang].home },
             { href: '/history', label: labels[lang].history },
             { href: '/profile', label: labels[lang].profile },
-            { href: '/kaspi-shop', label: labels[lang].kaspiShop, locked: !isAdmin, hintId: 'mobile-kaspiShop' },
             { href: '/ai-agent/settings', label: labels[lang].aiAgent, locked: !isAdmin, hintId: 'mobile-aiAgent' },
+            { href: '/kaspi-shop', label: labels[lang].kaspiShop, locked: !isAdmin, hintId: 'mobile-kaspiShop' },
             { href: '/wildberries', label: labels[lang].wildberries, locked: !isAdmin, hintId: 'mobile-wildberries' },
           ] as { href: string; label: string; badge?: number; locked?: boolean; hintId?: string }[]).map(item => {
             const active = !item.locked && (path === item.href || path.startsWith(item.href + '/'))

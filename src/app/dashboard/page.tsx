@@ -747,7 +747,7 @@ export default function DashboardPage() {
                     icon={<ApiIcon />}
                     colorVar="--nav-accent"
                     softVar="--nav-accent-soft"
-                    title="Kaspi API"
+                    title="Kaspi Cashier API"
                     state={kaspiApiStats ? 'data' : 'neutral'}
                     subtitle={kaspiApiStats ? `${kaspiApiStats.count.toLocaleString('ru-KZ')} платежей · ${kaspiApiStats.amount.toLocaleString('ru-KZ')} ₸ за 30д` : undefined}
                     neutralText="Приём оплат Kaspi на вашем сайте"
@@ -756,17 +756,6 @@ export default function DashboardPage() {
                   <ProductCard
                     index={2}
                     reduceMotion={reduceMotion}
-                    icon={<ShopIcon />}
-                    colorVar="--nav-teal"
-                    softVar="--nav-teal-soft"
-                    title="Kaspi Bot"
-                    state={kaspiState}
-                    neutralText="Показатели появятся здесь"
-                    onClick={isAdmin ? () => router.push('/kaspi-shop') : undefined}
-                  />
-                  <ProductCard
-                    index={3}
-                    reduceMotion={reduceMotion}
                     icon={<AgentIcon />}
                     colorVar="--nav-magenta"
                     softVar="--nav-magenta-soft"
@@ -774,6 +763,17 @@ export default function DashboardPage() {
                     state={agentState}
                     neutralText="Диалоги появятся здесь"
                     onClick={isAdmin ? () => router.push('/ai-agent/settings') : undefined}
+                  />
+                  <ProductCard
+                    index={3}
+                    reduceMotion={reduceMotion}
+                    icon={<ShopIcon />}
+                    colorVar="--nav-teal"
+                    softVar="--nav-teal-soft"
+                    title="Kaspi Bot"
+                    state={kaspiState}
+                    neutralText="Показатели появятся здесь"
+                    onClick={isAdmin ? () => router.push('/kaspi-shop') : undefined}
                   />
                 </>
               )}
