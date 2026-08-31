@@ -52,28 +52,28 @@ export async function POST(req: NextRequest) {
 
   referrerBonusBase.setDate(referrerBonusBase.getDate() + 7)
 
-  // НЕ меняем plan если у него уже pro или basic — только бонус и счётчик
+  // НЕ меняем plan — бонусные дни сами дают Базовый через getActivePlan's
+  // bonus_expires_at branch (см. src/lib/plan.ts). Раньше здесь писали
+  // plan: 'basic' без plan_expires_at, что getActivePlan трактует как
+  // платный план БЕЗ срока — т.е. Базовый навсегда и бесплатно. Только
+  // бонус и счётчик.
   const referrerUpdate: any = {
     referral_count: (referrer.referral_count || 0) + 1,
     bonus_expires_at: referrerBonusBase.toISOString(),
-  }
-  // Если free — даём basic через бонус
-  if (!referrer.plan || referrer.plan === 'free') {
-    referrerUpdate.plan = 'basic'
   }
 
   await supabase.from('profiles')
     .update(referrerUpdate)
     .eq('id', referrer.id)
 
-  // +7 дней новому пользователю (бонус начинается с сегодня)
+  // +7 дней новому пользователю (бонус начинается с сегодня). plan
+  // намеренно не трогаем — та же причина, что и выше для referrerUpdate.
   const newUserExpiry = new Date()
   newUserExpiry.setDate(newUserExpiry.getDate() + 7)
 
   await supabase.from('profiles').update({
     referred_by: referralCode,
     bonus_expires_at: newUserExpiry.toISOString(),
-    plan: 'basic'
   }).eq('id', userId)
 
   return NextResponse.json({ success: true })
