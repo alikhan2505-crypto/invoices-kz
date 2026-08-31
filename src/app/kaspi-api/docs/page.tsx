@@ -164,8 +164,12 @@ export default function KaspiApiDocsPage() {
         {/* cashier-dev-theme (see globals.css): same dark developer palette
             as /kaspi-api's Connection tab -- only this inner content area
             goes dark, DesktopShell's card and SiteNav's menu strip above
-            keep the normal light app chrome. */}
-        <div className="cashier-dev-theme flex min-h-screen items-center justify-center lg:min-h-full" style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-muted)', fontFamily: FONT_SANS }}>
+            keep the normal light app chrome. Unconditional min-h-screen (not
+            lg:min-h-full) -- <main> above only has min-height, not a
+            definite height, so min-h-full's percentage resolves to 0 at the
+            lg breakpoint and collapses this div, leaving the light ambient
+            background showing below it (same bug fixed on /kaspi-api). */}
+        <div className="cashier-dev-theme flex min-h-screen items-center justify-center" style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-muted)', fontFamily: FONT_SANS }}>
           {d.loading}
         </div>
       </main>

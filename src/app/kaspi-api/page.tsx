@@ -368,11 +368,13 @@ export default function KaspiApiPage() {
       {/* cashier-dev-theme scopes the --nav-* tokens below to the dark
           developer palette (see globals.css) -- only this inner content
           area goes dark; DesktopShell's card and SiteNav's menu strip
-          above stay on the normal light app chrome. min-h-screen here
-          matches the loaded content's wrapper below so the dark background
-          fills the whole page instead of leaving the light page-surface
-          showing around a small dark loading box. */}
-      <div className="cashier-dev-theme min-h-screen lg:min-h-full" style={{ background: 'var(--nav-bg)' }}>
+          above stay on the normal light app chrome. Unconditional
+          min-h-screen (not lg:min-h-full) -- <main> above only has its own
+          min-height, not a definite height, so a percentage-based min-h-full
+          resolves to 0 at the lg breakpoint per CSS's percentage-height
+          rules, collapsing this div to its text's intrinsic height and
+          leaving the app's light ambient background showing below it. */}
+      <div className="cashier-dev-theme min-h-screen" style={{ background: 'var(--nav-bg)' }}>
         <div className="p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Загрузка…</div>
       </div>
     </main>
