@@ -6,6 +6,7 @@ import { useLanguage } from '@/components/LanguageProvider'
 import { backLabel, closeLabel } from '@/lib/a11yLabels'
 import { miscDict } from '@/lib/i18n/misc'
 import { getActivePlan } from '@/lib/plan'
+import { PLAN_PRICES, type BillingPeriod } from '@/lib/plans/pricing'
 
 export default function Upgrade() {
   const router = useRouter()
@@ -17,8 +18,9 @@ export default function Upgrade() {
   const [promoError, setPromoError] = useState('')
   const [plan, setPlan] = useState('free')
   const [userId, setUserId] = useState('')
+  const [period, setPeriod] = useState<BillingPeriod>('monthly')
   const [showModal, setShowModal] = useState(false)
-  const [selectedPlan, setSelectedPlan] = useState<{ name: string; amount: number; plan: string } | null>(null)
+  const [selectedPlan, setSelectedPlan] = useState<{ name: string; amount: number; plan: string; period: BillingPeriod } | null>(null)
   const [step, setStep] = useState<'pending' | 'success'>('pending')
   const [submitting, setSubmitting] = useState(false)
   const [qrToken, setQrToken] = useState('')
@@ -90,8 +92,8 @@ export default function Upgrade() {
     return result
   }
 
-  async function openModal(planName: string, amount: number, planKey: string) {
-    setSelectedPlan({ name: planName, amount, plan: planKey })
+  async function openModal(planName: string, amount: number, planKey: string, billingPeriod: BillingPeriod) {
+    setSelectedPlan({ name: planName, amount, plan: planKey, period: billingPeriod })
     setQrToken('')
     setExtTranId('')
     setStep('pending')
@@ -106,7 +108,7 @@ export default function Upgrade() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session?.access_token}`,
         },
-        body: JSON.stringify({ userId, plan: planKey })
+        body: JSON.stringify({ userId, plan: planKey, period: billingPeriod })
       })
 
       const data = await res.json()
@@ -170,6 +172,7 @@ export default function Upgrade() {
           userId,
           plan: selectedPlan?.plan,
           phone: payPhone.replace(/\s/g, ''),
+          period: selectedPlan?.period,
         })
       })
       const data = await res.json()
@@ -223,13 +226,14 @@ export default function Upgrade() {
   function ConnectButton({ planName, amount, planKey, dark }: {
     planName: string; amount: number; planKey: string; dark?: boolean
   }) {
+    const suffix = period === 'annual' ? t.perYearSuffix : t.perMonthSuffix
     return (
-      <button onClick={() => openModal(planName, amount, planKey)}
+      <button onClick={() => openModal(planName, amount, planKey, period)}
         className={`w-full rounded-xl py-3.5 font-medium text-sm ${dark
           ? 'bg-[#2DC48D] text-white'
           : 'border-2 border-[#1C2056] text-[#1C2056]'
         }`}>
-        {t.connectButtonLabel(amount.toLocaleString('ru-KZ'))}
+        {t.connectButtonLabel(amount.toLocaleString('ru-KZ'), suffix)}
       </button>
     )
   }
@@ -267,6 +271,33 @@ export default function Upgrade() {
           {promoSuccess && <p className="text-xs text-[#2DC48D] mt-2 font-medium">{promoSuccess}</p>}
         </div>
 
+        {/* Billing period toggle */}
+        <div className="bg-gray-100 rounded-2xl p-1 flex gap-1 mb-6">
+          <button
+            type="button"
+            onClick={() => setPeriod('monthly')}
+            aria-pressed={period === 'monthly'}
+            className={`flex-1 min-h-[44px] rounded-xl text-sm font-semibold transition-colors ${
+              period === 'monthly' ? 'bg-white text-[#1C2056] shadow-sm' : 'text-gray-500'
+            }`}
+          >
+            {t.monthlyToggleLabel}
+          </button>
+          <button
+            type="button"
+            onClick={() => setPeriod('annual')}
+            aria-pressed={period === 'annual'}
+            className={`flex-1 min-h-[44px] rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2 ${
+              period === 'annual' ? 'bg-white text-[#1C2056] shadow-sm' : 'text-gray-500'
+            }`}
+          >
+            {t.annualToggleLabel}
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-[#2DC48D] text-white whitespace-nowrap">
+              {t.annualBadgeLabel}
+            </span>
+          </button>
+        </div>
+
         {/* Free */}
         <div className={`bg-white border-2 rounded-2xl p-6 mb-4 ${plan === 'free' ? 'border-[#1C2056]' : 'border-gray-100'}`}>
           <div className="flex items-center justify-between mb-3">
@@ -292,7 +323,7 @@ export default function Upgrade() {
               : <span className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded-full">{t.popularBadge}</span>}
           </div>
           <div className="text-3xl font-bold text-[#1C2056] mb-4">
-            2 990 ₸<span className="text-sm font-normal text-gray-400">{t.perMonthSuffix}</span>
+            {PLAN_PRICES.basic[period].toLocaleString('ru-KZ')} ₸<span className="text-sm font-normal text-gray-400">{period === 'annual' ? t.perYearSuffix : t.perMonthSuffix}</span>
           </div>
           <ul className="space-y-2 mb-5">
             {t.basicFeatures.map(f => (
@@ -301,7 +332,7 @@ export default function Upgrade() {
               </li>
             ))}
           </ul>
-          {plan !== 'basic' && plan !== 'pro' && <ConnectButton planName={t.basicPlanName} amount={2990} planKey="basic" />}
+          {plan !== 'basic' && plan !== 'pro' && <ConnectButton planName={t.basicPlanName} amount={PLAN_PRICES.basic[period]} planKey="basic" />}
           {plan === 'basic' && <div className="text-center text-sm text-gray-400 py-2">{t.activeLabel}</div>}
           {plan === 'pro' && <div className="text-center text-sm text-gray-400 py-2">{t.higherPlanNotice}</div>}
         </div>
@@ -315,7 +346,7 @@ export default function Upgrade() {
               : <span className="text-xs bg-[#2DC48D] text-white px-2 py-1 rounded-full">{t.maxBadge}</span>}
           </div>
           <div className="text-3xl font-bold text-white mb-4">
-            5 990 ₸<span className="text-sm font-normal text-white/60">{t.perMonthSuffix}</span>
+            {PLAN_PRICES.pro[period].toLocaleString('ru-KZ')} ₸<span className="text-sm font-normal text-white/60">{period === 'annual' ? t.perYearSuffix : t.perMonthSuffix}</span>
           </div>
           <ul className="space-y-2 mb-5">
             {t.proFeatures.map(f => (
@@ -324,7 +355,7 @@ export default function Upgrade() {
               </li>
             ))}
           </ul>
-          {plan !== 'pro' && <ConnectButton planName={t.proPlanName} amount={5990} planKey="pro" dark />}
+          {plan !== 'pro' && <ConnectButton planName={t.proPlanName} amount={PLAN_PRICES.pro[period]} planKey="pro" dark />}
           {plan === 'pro' && <div className="text-center text-sm text-white/60 py-2">{t.activeLabel}</div>}
         </div>
 
@@ -415,7 +446,7 @@ export default function Upgrade() {
 
                 <div className="bg-gray-50 rounded-xl px-4 py-3 mt-4 mb-3 flex items-center justify-between">
                   <span className="text-sm text-gray-500">{t.toPayLabel}</span>
-                  <span className="text-sm font-bold text-[#1C2056]">{selectedPlan?.amount.toLocaleString('ru-KZ')} ₸{t.perMonthSuffix}</span>
+                  <span className="text-sm font-bold text-[#1C2056]">{selectedPlan?.amount.toLocaleString('ru-KZ')} ₸{selectedPlan?.period === 'annual' ? t.perYearSuffix : t.perMonthSuffix}</span>
                 </div>
 
                 <div className="flex items-center justify-center gap-2 text-xs text-gray-400 mb-3">
@@ -481,7 +512,7 @@ export default function Upgrade() {
 
             <div className="bg-gray-50 rounded-xl px-4 py-3 mb-4 flex items-center justify-between">
               <span className="text-sm text-gray-500">{t.toPayLabel}</span>
-              <span className="text-sm font-bold text-[#1C2056]">{selectedPlan?.amount.toLocaleString('ru-KZ')} ₸{t.perMonthSuffix}</span>
+              <span className="text-sm font-bold text-[#1C2056]">{selectedPlan?.amount.toLocaleString('ru-KZ')} ₸{selectedPlan?.period === 'annual' ? t.perYearSuffix : t.perMonthSuffix}</span>
             </div>
 
             <button onClick={createPhonePayment} disabled={phoneSubmitting}

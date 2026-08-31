@@ -24,6 +24,9 @@ export interface MiscContent {
   promoNotFoundError: string
   promoAlreadyUsedError: string
   promoActivatedMessage: (planLabel: string, days: number) => string
+  monthlyToggleLabel: string
+  annualToggleLabel: string
+  annualBadgeLabel: string
   freePlanName: string
   currentBadge: string
   freeFeatures: string[]
@@ -31,12 +34,13 @@ export interface MiscContent {
   popularBadge: string
   basicFeatures: string[]
   perMonthSuffix: string
+  perYearSuffix: string
   proPlanName: string
   maxBadge: string
   proFeatures: string[]
   activeLabel: string
   higherPlanNotice: string
-  connectButtonLabel: (amount: string) => string
+  connectButtonLabel: (amount: string, suffix: string) => string
   questionsText: string
   telegramLinkLabel: string
   creatingPaymentLabel: string
@@ -154,19 +158,23 @@ export const miscDict: Record<'ru' | 'kk' | 'en', MiscContent> = {
     promoNotFoundError: 'Промокод не найден или недействителен',
     promoAlreadyUsedError: 'Промокод уже использован',
     promoActivatedMessage: (planLabel, days) => `🎉 Промокод активирован! ${planLabel} тариф на ${days} дней`,
+    monthlyToggleLabel: 'Месяц',
+    annualToggleLabel: 'Год',
+    annualBadgeLabel: '2 месяца в подарок',
     freePlanName: 'Бесплатно',
     currentBadge: 'Текущий',
-    freeFeatures: ['3 счета в месяц', 'PDF без подписи', 'WhatsApp отправка', 'Публичная ссылка', 'История счетов'],
+    freeFeatures: ['3 счета в месяц', 'PDF без подписи', 'Публичная ссылка на счёт', 'История счетов'],
     basicPlanName: 'Базовый',
     popularBadge: 'Популярный',
-    basicFeatures: ['30 счетов в месяц', 'PDF с подписью и печатью', 'Email отправка', 'Справочник клиентов', 'Услуги и товары', 'Отправка через WhatsApp', 'Поддержка в Telegram'],
+    basicFeatures: ['30 счетов в месяц', 'PDF с подписью и печатью', 'Отправка на email и ссылкой', 'Справочник клиентов', 'Услуги и товары', 'Поддержка в Telegram'],
     perMonthSuffix: '/мес',
+    perYearSuffix: '/год',
     proPlanName: 'Про',
     maxBadge: 'Максимум',
-    proFeatures: ['Безлимитные счета', 'КП, АВР, Накладная', 'Документы для налоговой', 'Шаблоны счетов', 'PDF с подписью и печатью', 'Email и WhatsApp отправка', 'ЭЦП НУЦ РК (скоро)', 'Приоритетная поддержка 24/7'],
+    proFeatures: ['Безлимитные счета', 'КП, АВР и накладные', 'Kaspi Bot — весь кабинет магазина', 'AI-агент для клиентов', 'Wildberries-интеграция', 'ЭЦП и договоры (SIGEX)', 'Kaspi Cashier API', 'Приоритетная поддержка'],
     activeLabel: '✓ Активен',
     higherPlanNotice: 'У вас более высокий тариф',
-    connectButtonLabel: (amount) => `Подключить за ${amount} ₸/мес`,
+    connectButtonLabel: (amount, suffix) => `Подключить за ${amount} ₸${suffix}`,
     questionsText: 'Вопросы?',
     telegramLinkLabel: 'Написать в Telegram',
     creatingPaymentLabel: 'Создаём платёж...',
@@ -281,19 +289,23 @@ export const miscDict: Record<'ru' | 'kk' | 'en', MiscContent> = {
     promoNotFoundError: 'Промокод табылмады немесе жарамсыз',
     promoAlreadyUsedError: 'Промокод бұрын қолданылған',
     promoActivatedMessage: (planLabel, days) => `🎉 Промокод белсендірілді! ${planLabel} тарифі ${days} күнге`,
+    monthlyToggleLabel: 'Ай',
+    annualToggleLabel: 'Жыл',
+    annualBadgeLabel: '2 ай сыйлыққа',
     freePlanName: 'Тегін',
     currentBadge: 'Ағымдағы',
-    freeFeatures: ['Айына 3 шот', 'Қолтаңбасыз PDF', 'WhatsApp арқылы жіберу', 'Жария сілтеме', 'Шоттар тарихы'],
+    freeFeatures: ['Айына 3 шот', 'Қолтаңбасыз PDF', 'Шотқа ортақ сілтеме', 'Шоттар тарихы'],
     basicPlanName: 'Базалық',
     popularBadge: 'Танымал',
-    basicFeatures: ['Айына 30 шот', 'Қолтаңба мен мөрі бар PDF', 'Email арқылы жіберу', 'Клиенттер анықтамалығы', 'Қызметтер мен тауарлар', 'WhatsApp арқылы жіберу', 'Telegram арқылы қолдау'],
+    basicFeatures: ['Айына 30 шот', 'Қолтаңба мен мөрі бар PDF', 'Email және сілтеме арқылы жіберу', 'Клиенттер анықтамалығы', 'Қызметтер мен тауарлар', 'Telegram арқылы қолдау'],
     perMonthSuffix: '/ай',
+    perYearSuffix: '/жыл',
     proPlanName: 'Про',
     maxBadge: 'Максимум',
-    proFeatures: ['Шексіз шоттар', 'КҰ, ОҚА, Жүкқұжат', 'Салық үшін құжаттар', 'Шот үлгілері', 'Қолтаңба мен мөрі бар PDF', 'Email және WhatsApp арқылы жіберу', 'ҚР ҰКО ЭЦҚ (жақында)', 'Басым қолдау 24/7'],
+    proFeatures: ['Шексіз шоттар', 'КҰ, ОҚА және жүкқұжаттар', 'Kaspi Bot — дүкен кабинетінің барлығы', 'Клиенттерге арналған AI-агент', 'Wildberries интеграциясы', 'ЭЦҚ және шарттар (SIGEX)', 'Kaspi Cashier API', 'Басым қолдау'],
     activeLabel: '✓ Белсенді',
     higherPlanNotice: 'Сізде жоғарырақ тариф бар',
-    connectButtonLabel: (amount) => `${amount} ₸/айға қосылу`,
+    connectButtonLabel: (amount, suffix) => `${amount} ₸${suffix} — қосылу`,
     questionsText: 'Сұрақтар бар ма?',
     telegramLinkLabel: 'Telegram-ға жазу',
     creatingPaymentLabel: 'Төлем құрылуда...',
@@ -408,19 +420,23 @@ export const miscDict: Record<'ru' | 'kk' | 'en', MiscContent> = {
     promoNotFoundError: 'Promo code not found or invalid',
     promoAlreadyUsedError: 'Promo code already used',
     promoActivatedMessage: (planLabel, days) => `🎉 Promo code activated! ${planLabel} plan for ${days} days`,
+    monthlyToggleLabel: 'Month',
+    annualToggleLabel: 'Year',
+    annualBadgeLabel: '2 months free',
     freePlanName: 'Free',
     currentBadge: 'Current',
-    freeFeatures: ['3 invoices per month', 'PDF without signature', 'Send via WhatsApp', 'Public link', 'Invoice history'],
+    freeFeatures: ['3 invoices per month', 'PDF without signature', 'Public invoice link', 'Invoice history'],
     basicPlanName: 'Basic',
     popularBadge: 'Popular',
-    basicFeatures: ['30 invoices per month', 'Signed & stamped PDF', 'Send via email', 'Client directory', 'Services & products', 'Send via WhatsApp', 'Telegram support'],
+    basicFeatures: ['30 invoices per month', 'Signed & stamped PDF', 'Send via email and link', 'Client directory', 'Services & products', 'Telegram support'],
     perMonthSuffix: '/mo',
+    perYearSuffix: '/yr',
     proPlanName: 'Pro',
     maxBadge: 'Maximum',
-    proFeatures: ['Unlimited invoices', 'Quotes, Acts, Delivery notes', 'Documents for tax reporting', 'Invoice templates', 'Signed & stamped PDF', 'Email + WhatsApp sending', 'NCA RK digital signature (soon)', 'Priority 24/7 support'],
+    proFeatures: ['Unlimited invoices', 'Quotes, acts & delivery notes', 'Kaspi Bot — full shop dashboard', 'AI agent for customers', 'Wildberries integration', 'e-signature & contracts (SIGEX)', 'Kaspi Cashier API', 'Priority support'],
     activeLabel: '✓ Active',
     higherPlanNotice: 'You already have a higher plan',
-    connectButtonLabel: (amount) => `Subscribe for ${amount} ₸/mo`,
+    connectButtonLabel: (amount, suffix) => `Subscribe for ${amount} ₸${suffix}`,
     questionsText: 'Questions?',
     telegramLinkLabel: 'Message us on Telegram',
     creatingPaymentLabel: 'Creating payment...',
