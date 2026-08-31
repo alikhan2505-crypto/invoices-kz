@@ -52,18 +52,24 @@ export async function loadConnectionByUserId(userId: string): Promise<KaspiConne
 
 // invoices.kz's own Kaspi Cashier connection, used to collect money FROM
 // users (plan payments, wallet top-ups) -- not a new connection type, just
-// whichever kaspi_connections row belongs to the one admin profile. Looked
-// up dynamically rather than a hardcoded user id so this keeps working if
-// the admin account ever changes.
+// whichever kaspi_connections row belongs to an admin profile. Looked up
+// dynamically rather than a hardcoded user id so this keeps working if the
+// admin account ever changes. `is_admin` is shared with feature-gating
+// (multiple accounts can be flagged admin to test admin-only sections), so
+// this can no longer assume exactly one admin profile exists -- it checks
+// every admin profile for the one that actually holds the active platform
+// connection instead of failing outright on 2+ admin rows.
 export async function loadPlatformConnection(): Promise<KaspiConnection | null> {
-  const { data: admin, error: adminError } = await supabase
+  const { data: admins, error: adminError } = await supabase
     .from('profiles')
     .select('id')
     .eq('is_admin', true)
-    .maybeSingle()
   if (adminError) throw new Error(`admin profile lookup failed: ${adminError.message}`)
-  if (!admin) return null
-  return loadConnectionByUserId(admin.id)
+  for (const admin of admins ?? []) {
+    const connection = await loadConnectionByUserId(admin.id)
+    if (connection) return connection
+  }
+  return null
 }
 
 // A dedicated lookup rather than folding this onto loadConnectionByUserId's
