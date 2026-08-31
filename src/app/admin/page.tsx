@@ -152,9 +152,15 @@ export default function Admin() {
   }
 
   async function activatePayment(payment: any) {
+    // Annual plan payments (29 900 ₸ basic / 59 900 ₸ pro) must activate
+    // the plan for 365 days, not 30 -- mirrors the day-count logic in
+    // settlePlanPayment.ts's checkAndSettlePlanPayment. Rows without
+    // billing_period (pre-annual rows, or the free-text default) fall
+    // back to the historical monthly behavior.
+    const days = payment.billing_period === 'annual' ? 365 : 30
     const { error } = await supabase.from('profiles').update({
       plan: payment.plan,
-      plan_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      plan_expires_at: new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString(),
     }).eq('id', payment.user_id)
 
     if (error) { alert(t.errorPrefix(error.message)); return }
@@ -323,8 +329,11 @@ export default function Admin() {
                         )}
                       </div>
                       <div className="text-sm font-medium mt-1">{payment.source === 'webhook' ? '👤' : '📱'} {payment.email}</div>
-                      <div className="text-xs text-gray-400 mt-0.5">
-                        {t.amountPrefixLabel}<b>{payment.amount?.toLocaleString('ru-KZ')} ₸</b>
+                      <div className="text-xs text-gray-400 mt-0.5 flex items-center gap-1.5">
+                        <span>{t.amountPrefixLabel}<b>{payment.amount?.toLocaleString('ru-KZ')} ₸</b></span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-700 text-gray-300">
+                          {payment.billing_period === 'annual' ? 'Год' : 'Месяц'}
+                        </span>
                       </div>
                       <div className="text-xs text-gray-500 mt-0.5">
                         {t.submittedLabel(formatDateTime(payment.created_at))}
