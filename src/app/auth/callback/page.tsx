@@ -66,6 +66,14 @@ export default function AuthCallback() {
           .eq('id', session.user.id)
           .single()
 
+        // Consume the stored postLoginRedirect exactly once, unconditionally,
+        // regardless of which branch below ultimately fires -- otherwise a
+        // stale key left behind by an untaken branch (e.g. onboarding or
+        // hasPendingUpgrade() winning this time) could hijack a completely
+        // unrelated later sign-in that never went through the guard that set
+        // it. See src/lib/postLoginRedirect.ts.
+        const postLoginRedirect = consumePostLoginRedirect()
+
         if (!profile?.bin_iin) {
           // New/incomplete profile: must finish onboarding first, so a
           // pending upgrade is left untouched for /upgrade to pick up
@@ -80,14 +88,13 @@ export default function AuthCallback() {
           // carries a plan+period payload /upgrade's own mount effect still
           // needs to consume -- no regression from adding the generic path.
           router.replace('/upgrade')
-        } else {
+        } else if (postLoginRedirect) {
           // Generic "return to the page that sent the user to /login" --
           // e.g. /kaspi-api/docs's auth guard (see
-          // src/lib/postLoginRedirect.ts). Falls back to the unchanged
-          // default (/dashboard) when nothing was recorded.
-          const redirect = consumePostLoginRedirect()
-          if (redirect) router.replace(redirect)
-          else router.push('/dashboard')
+          // src/lib/postLoginRedirect.ts).
+          router.replace(postLoginRedirect)
+        } else {
+          router.push('/dashboard')
         }
 
       } catch (err) {

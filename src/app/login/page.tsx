@@ -45,6 +45,14 @@ export default function Login() {
       const { error } = await supabase.auth.verifyOtp({ token_hash: verifyJson.tokenHash, type: 'email' })
       if (error) { alert(t.errorPrefix(error.message)); return }
 
+      // Consume the stored postLoginRedirect exactly once, unconditionally,
+      // regardless of which branch below ultimately fires -- otherwise a
+      // stale key left behind by an untaken branch (e.g. hasPendingUpgrade()
+      // winning this time) could hijack a completely unrelated later sign-in
+      // that never went through the guard that set it. See
+      // src/lib/postLoginRedirect.ts.
+      const postLoginRedirect = consumePostLoginRedirect()
+
       // A passkey login only ever exists for an already-registered,
       // already-onboarded account, so there is no onboarding branch to
       // preserve here -- safe to send straight to /upgrade when the landing
@@ -52,15 +60,12 @@ export default function Login() {
       // pendingUpgrade is checked first and unchanged from before -- it
       // carries a plan+period payload that /upgrade's own mount effect
       // still needs to consume, so it must keep taking priority over the
-      // generic postLoginRedirect (see src/lib/postLoginRedirect.ts), which
-      // only ever holds a bare path. Default destination unchanged
-      // (router.push('/dashboard')) when neither is set.
+      // generic postLoginRedirect, which only ever holds a bare path.
+      // Default destination unchanged (router.push('/dashboard')) when
+      // neither is set.
       if (hasPendingUpgrade()) router.replace('/upgrade')
-      else {
-        const redirect = consumePostLoginRedirect()
-        if (redirect) router.replace(redirect)
-        else router.push('/dashboard')
-      }
+      else if (postLoginRedirect) router.replace(postLoginRedirect)
+      else router.push('/dashboard')
     } catch (e: any) {
       if (e?.name !== 'NotAllowedError') alert(t.errorPrefix(e?.message || String(e)))
     } finally {

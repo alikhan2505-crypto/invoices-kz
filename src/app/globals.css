@@ -712,11 +712,13 @@ html {
   --nav-accent-ink: #0a0c10;
   --nav-accent-soft: rgba(126, 231, 135, 0.14);
   --nav-accent-track: rgba(126, 231, 135, 0.22);
-  /* --nav-teal reuses theme.ts's #238636 button green -- gives
-     .nav-card-accent's top-edge gradient (accent -> teal) a real two-tone
-     look instead of a flat bar, and keeps existing --nav-teal warning-hint
-     usages (e.g. kaspiTokenShownOnceWarning) readable on the dark ground. */
-  --nav-teal: #238636;
+  /* --nav-teal reuses theme.ts's button green -- gives .nav-card-accent's
+     top-edge gradient (accent -> teal) a real two-tone look instead of a
+     flat bar, and keeps existing --nav-teal warning-hint usages (e.g.
+     kaspiTokenShownOnceWarning) readable on the dark ground. #3fb950 (not
+     theme.ts's darker #238636 button fill, which is only 4.18:1 on #0a0c10
+     and narrowly misses WCAG AA for text) -- 7.6:1 on #0a0c10. */
+  --nav-teal: #3fb950;
   --nav-teal-soft: rgba(35, 134, 54, 0.24);
   --nav-magenta: #db61a2;
   --nav-magenta-soft: rgba(219, 97, 162, 0.18);
@@ -730,8 +732,10 @@ html {
   --nav-text-secondary: #8b949e;
   /* theme.ts only defines two text tiers (text/muted) -- this third,
      dimmer tier is derived for this scope only, for the --nav-text-muted
-     usages (timestamps, hint labels) that want to sit below --nav-text-secondary. */
-  --nav-text-muted: #6e7681;
+     usages (timestamps, hint labels) that want to sit below --nav-text-secondary.
+     #8b949e (not the initially-picked #6e7681, which is only 4.20:1 on
+     #0a0c10 and narrowly misses WCAG AA) -- 6.4:1 on #0a0c10. */
+  --nav-text-muted: #8b949e;
   --nav-border: #30363d;
   --nav-border-soft: #21262d;
   --nav-card-glow: 0 20px 50px -22px rgba(0, 0, 0, 0.7);

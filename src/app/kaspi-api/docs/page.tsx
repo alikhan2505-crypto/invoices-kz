@@ -115,9 +115,15 @@ function Pre({ children }: { children: string }) {
 
 export default function KaspiApiDocsPage() {
   const router = useRouter()
-  const { lang, setLang } = useLanguage()
-  const activeLang: 'ru' | 'en' = lang === 'en' ? 'en' : 'ru'
-  const d = DOCS_COPY[activeLang]
+  const { lang } = useLanguage()
+  // Local to this page, seeded once from the app-wide language but never
+  // written back to it -- the docs body only ever has a RU/EN copy (see
+  // DOCS_COPY above), so a kk user's global preference must not be silently
+  // collapsed to "ru" just by visiting this page, and switching languages
+  // here must not relabel SiteNav/the rest of the app (see useLanguage()
+  // usage there, which stays driven by the real global `lang`).
+  const [docsLang, setDocsLang] = useState<'ru' | 'en'>(lang === 'en' ? 'en' : 'ru')
+  const d = DOCS_COPY[docsLang]
 
   const [loading, setLoading] = useState(true)
 
@@ -128,14 +134,15 @@ export default function KaspiApiDocsPage() {
 
   async function load() {
     // getSession() first: a local, no-network check. If it already finds a
-    // session, render immediately instead of waiting on a round trip -- this
-    // is what the founder's «Документация API» click needed: hitting this
-    // guard right after arriving from a fresh /login redirect used to lose a
-    // beat here and occasionally lands with a stale in-memory client before
-    // getUser() alone would resolve. getUser() below is still awaited and
-    // remains the sole authority on whether to redirect -- a session existing
-    // locally never skips it, so a genuinely dead/revoked session still gets
-    // caught and sent to /login exactly as before.
+    // session, drop the loading state immediately instead of waiting on
+    // getUser()'s round trip -- this just removes a brief loading-spinner
+    // flash for an already-valid session. It renders no user-specific or
+    // credential data before getUser() confirms (the page below still only
+    // paints once `loading` is false via the render below, and that content
+    // doesn't depend on this early setLoading(false) call), so this is not a
+    // security gate: getUser() remains the sole authority on whether to
+    // redirect, and a genuinely dead/revoked session is still caught and
+    // sent to /login exactly as before.
     const { data: { session } } = await supabase.auth.getSession()
     if (session) setLoading(false)
 
@@ -182,11 +189,11 @@ export default function KaspiApiDocsPage() {
           now that SiteNav provides the app chrome and the section tabs. */}
       <div className="cashier-dev-theme min-h-screen lg:min-h-full" style={{ background: 'var(--nav-bg)', color: C.text, fontFamily: FONT_SANS }}>
         {/* RU/EN toggle + the Scalar-limitation caption that used to live in
-            the standalone header's sticky bar. setLang is the app-wide
-            language (LanguageProvider) -- now that this page renders inside
-            SiteNav, switching it here also updates the menu labels, which is
-            the point: this is a normal in-app page, not an isolated surface
-            anymore. */}
+            the standalone header's sticky bar. This toggle is local to the
+            docs body (docsLang above) -- it does NOT touch the app-wide
+            language (LanguageProvider), so switching it here never relabels
+            SiteNav's menu, and a kk user's global preference is never
+            silently discarded just because the doc body only speaks ru/en. */}
         <div className="mx-auto max-w-6xl px-5 pt-6 sm:px-8">
           <div className="flex items-center justify-between gap-3">
             <span className="text-[12px]" style={{ color: C.muted, fontFamily: FONT_MONO }}>
@@ -196,10 +203,10 @@ export default function KaspiApiDocsPage() {
               {(['ru', 'en'] as const).map((l) => (
                 <button
                   key={l}
-                  onClick={() => setLang(l)}
+                  onClick={() => setDocsLang(l)}
                   className="min-h-11 min-w-11 px-2 text-[11px] font-semibold uppercase transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-                  style={{ background: activeLang === l ? C.bg2 : 'transparent', color: activeLang === l ? C.accent : C.muted }}
-                  aria-pressed={activeLang === l}
+                  style={{ background: docsLang === l ? C.bg2 : 'transparent', color: docsLang === l ? C.accent : C.muted }}
+                  aria-pressed={docsLang === l}
                 >
                   {l}
                 </button>
@@ -218,7 +225,7 @@ export default function KaspiApiDocsPage() {
         </div>
 
         <div className="mx-auto max-w-6xl sm:px-8">
-          <ApiDocsViewer lang={activeLang} />
+          <ApiDocsViewer lang={docsLang} />
         </div>
 
         <div className="mx-auto max-w-6xl space-y-8 px-5 py-10 sm:px-8">

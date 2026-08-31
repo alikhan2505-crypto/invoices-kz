@@ -6,6 +6,7 @@ import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import { useLanguage } from '@/components/LanguageProvider'
 import { acquiringDict } from '@/lib/i18n/acquiring'
+import { setPostLoginRedirect } from '@/lib/postLoginRedirect'
 
 // Matches MIN_TOPUP in src/app/api/kaspi/wallet/topup/route.ts — kept here
 // too so the button can refuse an obviously-too-small amount before ever
@@ -95,7 +96,15 @@ export default function KaspiApiPage() {
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { router.push('/login'); return }
+    if (!user) {
+      // Remember this page so /login (or /auth/callback, for the OAuth/
+      // magic-link paths) can send the user back here instead of defaulting
+      // to /dashboard -- same mechanism as /kaspi-api/docs's own guard, see
+      // src/lib/postLoginRedirect.ts.
+      setPostLoginRedirect('/kaspi-api')
+      router.push('/login')
+      return
+    }
 
     const { data: p } = await supabase.from('profiles').select('*').eq('id', user.id).single()
     setProfile(p)
