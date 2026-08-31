@@ -6,6 +6,8 @@ import dynamic from 'next/dynamic'
 import { AnimatePresence, motion, useInView, useReducedMotion } from 'framer-motion'
 import { useLanguage, type Lang } from '@/components/LanguageProvider'
 import { BentoCard, BentoGrid, type BentoItem } from '@/components/ui/bento-grid'
+import { PLAN_PRICES, type BillingPeriod } from '@/lib/plans/pricing'
+import { miscDict } from '@/lib/i18n/misc'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -185,6 +187,14 @@ function ArrowRightIcon({ className }: { className?: string }) {
   )
 }
 
+function CheckIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} aria-hidden="true" {...ICON_PROPS}>
+      <path d="M5 12.5l4.5 4.5L19 7" />
+    </svg>
+  )
+}
+
 /* -------------------------------------------------------------- content */
 
 type BentoKey = 'invoice' | 'kaspi' | 'kaspibot' | 'aiagent' | 'esign' | 'api'
@@ -248,6 +258,19 @@ interface Copy {
     leadPhoneLabel: string
     leadPhone: string
     leadCaption: string
+  }
+  pricing: {
+    title: string
+    subtitle: string
+    toggleMonth: string
+    toggleYear: string
+    toggleYearBadge: string
+    suffixMonth: string
+    suffixYear: string
+    free: { name: string; cta: string }
+    basic: { name: string; cta: string }
+    pro: { name: string; badge: string; cta: string }
+    footnote: string
   }
   authEyebrow: string
   authTitle: string
@@ -331,6 +354,19 @@ const COPY: Record<Lang, Copy> = {
       leadPhoneLabel: 'Телефон',
       leadPhone: '8 701 *** 45 67',
       leadCaption: 'Каждый диалог сам превращается в заявку в вашей базе',
+    },
+    pricing: {
+      title: 'Прозрачные цены',
+      subtitle: 'Начните бесплатно — растите, когда будете готовы.',
+      toggleMonth: 'Месяц',
+      toggleYear: 'Год',
+      toggleYearBadge: '2 месяца в подарок',
+      suffixMonth: '/мес',
+      suffixYear: '/год',
+      free: { name: 'Бесплатно', cta: 'Начать бесплатно' },
+      basic: { name: 'Базовый', cta: 'Подключить' },
+      pro: { name: 'Про', badge: 'Максимум', cta: 'Подключить' },
+      footnote: 'Kaspi Bot и AI-агент оплачиваются с предоплаченного кошелька по факту использования — 5 ₸ за ответ ИИ, проверки цен каждые 15 минут.',
     },
     authEyebrow: 'Доступ',
     authTitle: 'Вход без паролей',
@@ -430,6 +466,19 @@ const COPY: Record<Lang, Copy> = {
       leadPhone: '8 701 *** 45 67',
       leadCaption: 'Әр диалог дерекқорыңызда өтінімге өздігінен айналады',
     },
+    pricing: {
+      title: 'Ашық бағалар',
+      subtitle: 'Тегін бастаңыз — дайын болған кезде өсіңіз.',
+      toggleMonth: 'Ай',
+      toggleYear: 'Жыл',
+      toggleYearBadge: '2 ай сыйлыққа',
+      suffixMonth: '/ай',
+      suffixYear: '/жыл',
+      free: { name: 'Тегін', cta: 'Тегін бастау' },
+      basic: { name: 'Базалық', cta: 'Қосылу' },
+      pro: { name: 'Про', badge: 'Максимум', cta: 'Қосылу' },
+      footnote: 'Kaspi Bot және AI-агент пайдалану бойынша алдын ала толтырылған әмияннан төленеді — AI жауабы үшін 5 ₸, бағаларды әр 15 минут сайын тексереді.',
+    },
     authEyebrow: 'Кіру',
     authTitle: 'Құпия сөзсіз кіру',
     authSubtitle: 'Google, Facebook, Face ID / Touch ID немесе email сілтемесі — бір секундта кіріңіз.',
@@ -527,6 +576,19 @@ const COPY: Record<Lang, Copy> = {
       leadPhoneLabel: 'Phone',
       leadPhone: '8 701 *** 45 67',
       leadCaption: 'Every conversation turns itself into a lead in your database',
+    },
+    pricing: {
+      title: 'Transparent pricing',
+      subtitle: "Start for free — grow when you're ready.",
+      toggleMonth: 'Month',
+      toggleYear: 'Year',
+      toggleYearBadge: '2 months free',
+      suffixMonth: '/mo',
+      suffixYear: '/yr',
+      free: { name: 'Free', cta: 'Start for free' },
+      basic: { name: 'Basic', cta: 'Subscribe' },
+      pro: { name: 'Pro', badge: 'Maximum', cta: 'Subscribe' },
+      footnote: 'Kaspi Bot and the AI agent are billed from your prepaid wallet based on actual usage — ₸5 per AI reply, price checks every 15 minutes.',
     },
     authEyebrow: 'Access',
     authTitle: 'Sign in without passwords',
@@ -1010,6 +1072,9 @@ export default function Home() {
       {/* ---------------------------------------------- kaspi bot / ai agent */}
       <BotShowcase t={t} />
 
+      {/* -------------------------------------------------------- pricing */}
+      <PricingSection t={t} lang={lang} goLogin={goLogin} />
+
       {/* ---------------------------------------------------------- auth */}
       <section className="relative z-10 mx-auto max-w-5xl px-5 py-12 sm:px-8 sm:py-16">
         <Reveal className="text-center">
@@ -1391,6 +1456,209 @@ function BotShowcase({ t }: { t: Copy }) {
             )}
           </AnimatePresence>
         </div>
+      </Reveal>
+    </section>
+  )
+}
+
+/* A single check-list row shared by all three plan cards -- the inline
+   SVG CheckIcon (same stroke-based style as every other icon in this
+   file) wrapped in a colored span, matching how authMethods/extras above
+   apply color to their icons rather than passing a style prop into the
+   icon component itself. */
+function FeatureRow({ label, emphasized }: { label: string; emphasized?: boolean }) {
+  return (
+    <li
+      className="flex items-start gap-2.5 text-[13.5px] leading-relaxed"
+      style={{ color: emphasized ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.82)' }}
+    >
+      <span className="mt-0.5 shrink-0" style={{ color: '#5EEAD4' }}>
+        <CheckIcon className="h-4 w-4" />
+      </span>
+      {label}
+    </li>
+  )
+}
+
+/* Section 3 of the pricing/annual-billing spec (docs/superpowers/specs/
+   2026-08-30-pricing-section-annual-billing-design.md) -- the landing's
+   own pricing table, placed between the Kaspi Bot/AI-agent showcase and
+   the passwordless-auth section. Prices come from PLAN_PRICES (the same
+   server-side source of truth /upgrade and the payment routes use) so a
+   price change never needs to touch this file; feature lists come from
+   miscDict so they never drift from /upgrade's lists. Everything else
+   (title, toggle labels, plan names, suffixes, CTAs, footnote) is local
+   COPY, since none of that text exists anywhere else to reuse.
+
+   The three cards are deliberately not identical: Free is the plainest
+   (transparent background, outlined CTA), Basic sits on the standard
+   surface, and Pro gets a violet border + glow + "Maximum" chip, extra
+   padding, and a solid violet CTA -- avoiding the generic identical-card-
+   grid look the spec calls out. Pro also naturally reads taller since it
+   lists more features (8 vs 6 vs 4), with no layout hacks needed for that. */
+function PricingSection({ t, lang, goLogin }: { t: Copy; lang: Lang; goLogin: () => void }) {
+  const reduce = useReducedMotion()
+  const [period, setPeriod] = useState<BillingPeriod>('monthly')
+  const misc = miscDict[lang]
+  const suffix = period === 'monthly' ? t.pricing.suffixMonth : t.pricing.suffixYear
+  const formatPrice = (plan: 'basic' | 'pro') => `${PLAN_PRICES[plan][period].toLocaleString('ru-KZ')} ₸`
+
+  const priceTransition = {
+    initial: reduce ? false : { opacity: 0, y: 4 },
+    animate: { opacity: 1, y: 0 },
+    exit: reduce ? { opacity: 1 } : { opacity: 0, y: -4 },
+    transition: { duration: reduce ? 0 : 0.2, ease: EASE },
+  } as const
+
+  return (
+    <section id="pricing" className="relative z-10 mx-auto max-w-6xl px-5 py-14 sm:px-8 sm:py-20">
+      <Reveal className="text-center">
+        <h2 className="text-[clamp(1.9rem,4vw,2.75rem)] font-semibold tracking-[-0.02em]">{t.pricing.title}</h2>
+        <p className="mx-auto mt-4 max-w-md text-[15px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.82)' }}>
+          {t.pricing.subtitle}
+        </p>
+      </Reveal>
+
+      <Reveal delay={0.08} className="mt-8 flex justify-center">
+        <div className="inline-flex gap-2 rounded-2xl p-1.5" style={{ background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORDER}` }}>
+          <button
+            type="button"
+            onClick={() => setPeriod('monthly')}
+            aria-pressed={period === 'monthly'}
+            className="flex min-h-[44px] items-center justify-center rounded-xl px-5 text-[13px] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+            style={{
+              background: period === 'monthly' ? COLOR.violet : 'transparent',
+              color: period === 'monthly' ? '#fff' : 'rgba(255,255,255,0.68)',
+            }}
+          >
+            {t.pricing.toggleMonth}
+          </button>
+          <button
+            type="button"
+            onClick={() => setPeriod('annual')}
+            aria-pressed={period === 'annual'}
+            className="flex min-h-[44px] items-center gap-2 rounded-xl px-5 text-[13px] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+            style={{
+              background: period === 'annual' ? COLOR.violet : 'transparent',
+              color: period === 'annual' ? '#fff' : 'rgba(255,255,255,0.68)',
+            }}
+          >
+            {t.pricing.toggleYear}
+            <span
+              className="rounded-full px-2 py-0.5 text-[10px] font-bold"
+              style={{
+                background: period === 'annual' ? 'rgba(255,255,255,0.2)' : 'rgba(94,234,212,0.16)',
+                color: period === 'annual' ? '#fff' : '#5EEAD4',
+              }}
+            >
+              {t.pricing.toggleYearBadge}
+            </span>
+          </button>
+        </div>
+      </Reveal>
+
+      <div className="mt-12 grid grid-cols-1 gap-6 lg:grid-cols-3 lg:items-start">
+        {/* Free -- plainest treatment on purpose */}
+        <Reveal delay={0.1}>
+          <div className="flex h-full flex-col rounded-3xl p-7" style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${BORDER}` }}>
+            <div className="text-[14px] font-semibold" style={{ color: 'rgba(255,255,255,0.82)' }}>
+              {t.pricing.free.name}
+            </div>
+            <div className="mt-4 text-[2.25rem] font-bold tracking-tight">0 ₸</div>
+            <ul className="mt-6 flex-1 space-y-3">
+              {misc.freeFeatures.map((f) => (
+                <FeatureRow key={f} label={f} />
+              ))}
+            </ul>
+            <button
+              onClick={goLogin}
+              className="motion-safe:transition-all motion-safe:duration-200 motion-safe:hover:-translate-y-0.5 motion-safe:active:scale-[0.97] mt-8 flex min-h-[44px] items-center justify-center rounded-xl px-5 text-[14px] font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+              style={{ background: 'transparent', border: `1px solid ${BORDER}`, color: 'rgba(255,255,255,0.9)' }}
+            >
+              {t.pricing.free.cta}
+            </button>
+          </div>
+        </Reveal>
+
+        {/* Basic -- standard surface, mid-weight CTA */}
+        <Reveal delay={0.16}>
+          <div className="flex h-full flex-col rounded-3xl p-7" style={{ background: SURFACE, border: `1px solid ${BORDER}` }}>
+            <div className="text-[14px] font-semibold" style={{ color: 'rgba(255,255,255,0.82)' }}>
+              {t.pricing.basic.name}
+            </div>
+            <div className="mt-4 flex items-baseline gap-1.5">
+              <AnimatePresence mode="wait">
+                <motion.span key={period} className="text-[2.25rem] font-bold tracking-tight" {...priceTransition}>
+                  {formatPrice('basic')}
+                </motion.span>
+              </AnimatePresence>
+              <span className="text-[14px] font-normal" style={{ color: 'rgba(255,255,255,0.6)' }}>
+                {suffix}
+              </span>
+            </div>
+            <ul className="mt-6 flex-1 space-y-3">
+              {misc.basicFeatures.map((f) => (
+                <FeatureRow key={f} label={f} />
+              ))}
+            </ul>
+            <button
+              onClick={goLogin}
+              className="motion-safe:transition-all motion-safe:duration-200 motion-safe:hover:-translate-y-0.5 motion-safe:active:scale-[0.97] mt-8 flex min-h-[44px] items-center justify-center rounded-xl px-5 text-[14px] font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+              style={{ background: COLOR.violet }}
+            >
+              {t.pricing.basic.cta}
+            </button>
+          </div>
+        </Reveal>
+
+        {/* Pro -- visually emphasized: violet border/glow, "Maximum" chip,
+            extra padding, solid CTA with shadow. Naturally the tallest card
+            since it has the most features -- no negative-margin layout
+            trick needed to make it "pop". */}
+        <Reveal delay={0.22}>
+          <div
+            className="relative flex h-full flex-col rounded-3xl p-8"
+            style={{ background: SURFACE, border: `1.5px solid ${COLOR.violet}`, boxShadow: `0 28px 70px -28px ${COLOR.violet}` }}
+          >
+            <span
+              className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full px-3 py-1 text-[11px] font-bold text-white"
+              style={{ background: COLOR.violet }}
+            >
+              {t.pricing.pro.badge}
+            </span>
+            <div className="text-[14px] font-semibold" style={{ color: 'rgba(255,255,255,0.82)' }}>
+              {t.pricing.pro.name}
+            </div>
+            <div className="mt-4 flex items-baseline gap-1.5">
+              <AnimatePresence mode="wait">
+                <motion.span key={period} className="text-[2.5rem] font-bold tracking-tight" style={{ color: '#5EEAD4' }} {...priceTransition}>
+                  {formatPrice('pro')}
+                </motion.span>
+              </AnimatePresence>
+              <span className="text-[14px] font-normal" style={{ color: 'rgba(255,255,255,0.6)' }}>
+                {suffix}
+              </span>
+            </div>
+            <ul className="mt-6 flex-1 space-y-3">
+              {misc.proFeatures.map((f) => (
+                <FeatureRow key={f} label={f} emphasized />
+              ))}
+            </ul>
+            <button
+              onClick={goLogin}
+              className="motion-safe:transition-all motion-safe:duration-200 motion-safe:hover:-translate-y-0.5 motion-safe:active:scale-[0.97] mt-8 flex min-h-[44px] items-center justify-center rounded-xl px-5 text-[14px] font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+              style={{ background: COLOR.violet, boxShadow: `0 14px 34px -12px ${COLOR.violet}` }}
+            >
+              {t.pricing.pro.cta}
+            </button>
+          </div>
+        </Reveal>
+      </div>
+
+      <Reveal delay={0.3} className="mt-8">
+        <p className="mx-auto max-w-2xl text-center text-[12px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.6)' }}>
+          {t.pricing.footnote}
+        </p>
       </Reveal>
     </section>
   )
