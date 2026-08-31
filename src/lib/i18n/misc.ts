@@ -62,7 +62,7 @@ export interface MiscContent {
   paymentSuccessTitle: string
   planActivatedPrefixLabel: string
   planActivatedSuffixLabel: string
-  subscriptionActiveLabel: string
+  subscriptionActiveLabel: (period: 'monthly' | 'annual') => string
   goToWorkButton: string
   phonePaymentTitle: string
   phoneInstructionText: string
@@ -196,7 +196,7 @@ export const miscDict: Record<'ru' | 'kk' | 'en', MiscContent> = {
     paymentSuccessTitle: 'Оплата прошла!',
     planActivatedPrefixLabel: 'Тариф ',
     planActivatedSuffixLabel: ' активирован',
-    subscriptionActiveLabel: '✅ Подписка активна на 30 дней',
+    subscriptionActiveLabel: (period) => period === 'annual' ? '✅ Подписка активна на 365 дней' : '✅ Подписка активна на 30 дней',
     goToWorkButton: 'Перейти к работе →',
     phonePaymentTitle: 'Оплата по номеру телефона',
     phoneInstructionText: 'Введите номер телефона привязанный к Kaspi. На него придёт уведомление с запросом на оплату.',
@@ -327,7 +327,7 @@ export const miscDict: Record<'ru' | 'kk' | 'en', MiscContent> = {
     paymentSuccessTitle: 'Төлем өтті!',
     planActivatedPrefixLabel: '',
     planActivatedSuffixLabel: ' тарифі белсендірілді',
-    subscriptionActiveLabel: '✅ Жазылым 30 күнге белсенді',
+    subscriptionActiveLabel: (period) => period === 'annual' ? '✅ Жазылым 365 күнге (бір жылға) белсенді' : '✅ Жазылым 30 күнге белсенді',
     goToWorkButton: 'Жұмысқа өту →',
     phonePaymentTitle: 'Телефон нөмірі арқылы төлем',
     phoneInstructionText: 'Kaspi-ге байланысты телефон нөмірін енгізіңіз. Оған төлем сұрауы туралы хабарлама келеді.',
@@ -458,7 +458,7 @@ export const miscDict: Record<'ru' | 'kk' | 'en', MiscContent> = {
     paymentSuccessTitle: 'Payment successful!',
     planActivatedPrefixLabel: 'The ',
     planActivatedSuffixLabel: ' plan has been activated',
-    subscriptionActiveLabel: '✅ Subscription active for 30 days',
+    subscriptionActiveLabel: (period) => period === 'annual' ? '✅ Subscription active for 365 days' : '✅ Subscription active for 30 days',
     goToWorkButton: 'Get started →',
     phonePaymentTitle: 'Pay by phone number',
     phoneInstructionText: "Enter the phone number linked to Kaspi. You'll receive a payment request notification.",

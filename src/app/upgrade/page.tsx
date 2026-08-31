@@ -469,7 +469,7 @@ export default function Upgrade() {
                   {t.planActivatedPrefixLabel}<strong>{selectedPlan?.name}</strong>{t.planActivatedSuffixLabel}
                 </div>
                 <div className="bg-green-50 rounded-2xl p-4 mb-6">
-                  <div className="text-sm text-green-700">{t.subscriptionActiveLabel}</div>
+                  <div className="text-sm text-green-700">{t.subscriptionActiveLabel(selectedPlan?.period ?? 'monthly')}</div>
                 </div>
                 <button onClick={() => {
                   setShowModal(false)
