@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { useLanguage } from '@/components/LanguageProvider'
 import { authDict } from '@/lib/i18n/auth'
 import { hasPendingUpgrade } from '@/lib/pendingUpgrade'
+import { consumePostLoginRedirect } from '@/lib/postLoginRedirect'
 
 export default function Login() {
   const router = useRouter()
@@ -48,9 +49,18 @@ export default function Login() {
       // already-onboarded account, so there is no onboarding branch to
       // preserve here -- safe to send straight to /upgrade when the landing
       // page's pricing CTA left one pending (see src/lib/pendingUpgrade.ts).
-      // Default destination unchanged (router.push('/dashboard')).
+      // pendingUpgrade is checked first and unchanged from before -- it
+      // carries a plan+period payload that /upgrade's own mount effect
+      // still needs to consume, so it must keep taking priority over the
+      // generic postLoginRedirect (see src/lib/postLoginRedirect.ts), which
+      // only ever holds a bare path. Default destination unchanged
+      // (router.push('/dashboard')) when neither is set.
       if (hasPendingUpgrade()) router.replace('/upgrade')
-      else router.push('/dashboard')
+      else {
+        const redirect = consumePostLoginRedirect()
+        if (redirect) router.replace(redirect)
+        else router.push('/dashboard')
+      }
     } catch (e: any) {
       if (e?.name !== 'NotAllowedError') alert(t.errorPrefix(e?.message || String(e)))
     } finally {

@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useLanguage } from '@/components/LanguageProvider'
+import { setPostLoginRedirect } from '@/lib/postLoginRedirect'
 import ApiDocsViewer from '@/components/ApiDocsViewer'
 import { CASHIER_API_COLOR as C, CASHIER_API_FONT_SANS as FONT_SANS, CASHIER_API_FONT_MONO as FONT_MONO } from '@/lib/kaspiCashierApi/theme'
 
@@ -127,8 +128,28 @@ export default function KaspiApiDocsPage() {
   }, [])
 
   async function load() {
+    // getSession() first: a local, no-network check. If it already finds a
+    // session, render immediately instead of waiting on a round trip -- this
+    // is what the founder's «Документация API» click needed: hitting this
+    // guard right after arriving from a fresh /login redirect used to lose a
+    // beat here and occasionally lands with a stale in-memory client before
+    // getUser() alone would resolve. getUser() below is still awaited and
+    // remains the sole authority on whether to redirect -- a session existing
+    // locally never skips it, so a genuinely dead/revoked session still gets
+    // caught and sent to /login exactly as before.
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session) setLoading(false)
+
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { router.push('/login'); return }
+    if (!user) {
+      // Remember where the user was trying to go so /login (or
+      // /auth/callback, for the OAuth/magic-link paths) can send them back
+      // here instead of defaulting to /dashboard -- see
+      // src/lib/postLoginRedirect.ts.
+      setPostLoginRedirect('/kaspi-api/docs')
+      router.push('/login')
+      return
+    }
     setLoading(false)
   }
 

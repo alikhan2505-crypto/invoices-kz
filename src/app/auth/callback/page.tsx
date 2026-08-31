@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useLanguage } from '@/components/LanguageProvider'
 import { authDict } from '@/lib/i18n/auth'
 import { hasPendingUpgrade } from '@/lib/pendingUpgrade'
+import { consumePostLoginRedirect } from '@/lib/postLoginRedirect'
 
 export default function AuthCallback() {
   const router = useRouter()
@@ -75,9 +76,18 @@ export default function AuthCallback() {
           // Already-onboarded account signing back in via magic link/Google/
           // Facebook -- safe to send straight to /upgrade when the landing
           // page's pricing CTA left one pending (see src/lib/pendingUpgrade.ts).
+          // Checked before the generic postLoginRedirect below since it
+          // carries a plan+period payload /upgrade's own mount effect still
+          // needs to consume -- no regression from adding the generic path.
           router.replace('/upgrade')
         } else {
-          router.push('/dashboard')
+          // Generic "return to the page that sent the user to /login" --
+          // e.g. /kaspi-api/docs's auth guard (see
+          // src/lib/postLoginRedirect.ts). Falls back to the unchanged
+          // default (/dashboard) when nothing was recorded.
+          const redirect = consumePostLoginRedirect()
+          if (redirect) router.replace(redirect)
+          else router.push('/dashboard')
         }
 
       } catch (err) {
