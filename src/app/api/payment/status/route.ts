@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
 
   const { data: row } = await supabase
     .from('payment_requests')
-    .select('id, user_id, plan, amount, qr_operation_id, status, created_at')
+    .select('id, user_id, plan, amount, qr_operation_id, status, created_at, billing_period')
     .eq('order_id', orderId)
     .eq('user_id', user.id)
     .maybeSingle()

@@ -119,7 +119,7 @@ export async function GET(request: Request) {
 
   const { data: pendingPlans } = await supabase
     .from('payment_requests')
-    .select('id, user_id, plan, amount, qr_operation_id, created_at')
+    .select('id, user_id, plan, amount, qr_operation_id, created_at, billing_period')
     .eq('status', 'pending')
   let plansPaid = 0
   let plansExpired = 0

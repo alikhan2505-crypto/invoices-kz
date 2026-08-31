@@ -14,6 +14,7 @@ export interface PlanPaymentRow {
   amount: number
   qr_operation_id: string
   created_at?: string
+  billing_period?: string
 }
 
 // payment_requests has no expires_at column (unlike kaspi_payment_requests/
@@ -63,7 +64,7 @@ export async function checkAndSettlePlanPayment(row: PlanPaymentRow): Promise<'p
   if (!claimed || claimed.length === 0) return 'paid' // already settled by another caller
 
   const expiresAt = new Date()
-  expiresAt.setDate(expiresAt.getDate() + 30)
+  expiresAt.setDate(expiresAt.getDate() + (row.billing_period === 'annual' ? 365 : 30))
 
   const { data: profile } = await supabase
     .from('profiles')
@@ -94,11 +95,13 @@ export async function checkAndSettlePlanPayment(row: PlanPaymentRow): Promise<'p
   // must not affect billing.
   try {
     const { data: prof } = await supabase.from('profiles').select('company_name').eq('id', row.user_id).single()
+    const planLabel = row.plan === 'pro' ? 'Pro' : row.plan === 'basic' ? 'Basic' : row.plan
+    const periodLabel = row.billing_period === 'annual' ? ' (год)' : ''
     await fetch('https://invoices.kz/api/telegram', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-internal-secret': process.env.INTERNAL_API_SECRET! },
       body: JSON.stringify({
-        message: `💳 <b>Оплата!</b>\n👤 ${prof?.company_name || row.user_id}\n📦 ${row.plan === 'pro' ? 'Pro 5 990 ₸' : 'Basic 2 990 ₸'}\n📅 до ${expiresAt.toLocaleDateString('ru-KZ')}`,
+        message: `💳 <b>Оплата!</b>\n👤 ${prof?.company_name || row.user_id}\n📦 ${planLabel} ${row.amount.toLocaleString('ru-KZ')} ₸${periodLabel}\n📅 до ${expiresAt.toLocaleDateString('ru-KZ')}`,
       }),
     })
   } catch (e: any) {
