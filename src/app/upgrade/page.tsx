@@ -31,6 +31,11 @@ export default function Upgrade() {
   const [showPhoneModal, setShowPhoneModal] = useState(false)
   const [payPhone, setPayPhone] = useState('')
   const [phoneSubmitting, setPhoneSubmitting] = useState(false)
+  // True once a phone payment request has been sent for the CURRENT QR
+  // modal session -- swaps the QR/"open Kaspi" UI for a short status note
+  // while the same extTranId poll below keeps checking (create-phone reuses
+  // it as the new payment_id, so the poll doesn't need to change).
+  const [phoneRequested, setPhoneRequested] = useState(false)
   const statusInterval = useRef<any>(null)
   // Snapshot of the renewer's plan_expires_at (ms) taken right before a
   // payment is created. For a renewer, p.plan === planKey && p.plan_expires_at
@@ -117,6 +122,7 @@ export default function Upgrade() {
     setQrToken('')
     setExtTranId('')
     setStep('pending')
+    setPhoneRequested(false)
     setShowModal(true)
     setSubmitting(true)
 
@@ -208,12 +214,23 @@ export default function Upgrade() {
       })
       const data = await res.json()
       if (!res.ok || data.error) {
+        if (data.error === 'already_paid') {
+          // The pending QR this button superseded had already been paid by
+          // the time the server checked -- the plan is active now, so this
+          // is a success, not a failure to retry.
+          clearInterval(statusInterval.current)
+          setShowPhoneModal(false)
+          await reloadPlan()
+          setStep('success')
+          setPhoneSubmitting(false)
+          return
+        }
         alert(data.error === 'already_pending' ? t.alreadyPendingAlert : t.errorPrefix(data.error || t.tryAgainDefault))
         setPhoneSubmitting(false)
         return
       }
       setShowPhoneModal(false)
-      alert(t.phoneRequestSentAlert)
+      setPhoneRequested(true)
       // Without this, the phone-push path never started the same live poll
       // the QR path gets (data.payment_id is the same value the create-phone
       // route stored as payment_requests.order_id) -- it would otherwise
@@ -471,7 +488,12 @@ export default function Upgrade() {
                   }} className="back-btn text-gray-400 text-xl" aria-label={closeLabel(lang)}>✕</button>
                 </div>
 
-                {isMobile ? (
+                {phoneRequested ? (
+                  <div className="text-center py-6">
+                    <div className="text-4xl mb-3">📲</div>
+                    <div className="text-sm text-gray-500">{t.phoneRequestPendingNote}</div>
+                  </div>
+                ) : isMobile ? (
                   <div className="text-center py-4">
                     <div className="text-5xl mb-4">📱</div>
                     <div className="font-semibold text-[#1C2056] mb-2">{t.redirectingKaspiLabel}</div>

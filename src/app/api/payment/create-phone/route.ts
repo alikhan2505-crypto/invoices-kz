@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { loadPlatformConnection } from '@/lib/kaspiPay/connection'
 import { createInvoiceByPhone } from '@/lib/kaspiPay/client'
 import { getPlanAmount, type BillingPeriod } from '@/lib/plans/pricing'
+import { checkAndSettlePlanPayment, type PlanPaymentRow } from '@/lib/kaspiPay/settlePlanPayment'
 
 const supabaseAuth = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -49,21 +50,38 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'rate_limited' }, { status: 429 })
     }
 
-    // The rate limit above only catches rapid spam within one minute -- it
-    // did nothing for a real report of two separate real Kaspi operations
-    // created ~67s apart because the first attempt's confirmation wasn't
-    // obviously visible. A customer with any still-unresolved pending
-    // request (from either this route or the QR-based create/route.ts) must
-    // resolve it first -- the daily cron already expires stale ones, so this
-    // never permanently locks a customer out.
-    const { count: pendingCount, error: pendingError } = await supabase
+    // A customer with any still-unresolved pending request (from either this
+    // route or the QR-based create/route.ts) used to hard-block here -- in
+    // practice that made the QR modal's own "Отправить запрос на телефон"
+    // button dead on arrival, since openModal() in /upgrade already creates
+    // a pending row before the modal (and this button) is even shown. Settle
+    // each pending row first (checkAndSettlePlanPayment activates the plan
+    // and claims the row 'paid' as a side effect, same as the daily cron
+    // does) so a payment that already completed is never silently dropped,
+    // then supersede whatever is left -- the customer is choosing the phone
+    // flow instead of finishing the QR, not adding a second parallel charge.
+    const { data: pendingRows, error: pendingError } = await supabase
       .from('payment_requests')
-      .select('id', { count: 'exact', head: true })
+      .select('id, user_id, plan, amount, qr_operation_id, created_at, billing_period')
       .eq('user_id', userId)
       .eq('status', 'pending')
-    if (pendingError) console.error('Phone payment: pending-check failed, allowing request:', pendingError.message)
-    else if ((pendingCount ?? 0) > 0) {
-      return NextResponse.json({ error: 'already_pending' }, { status: 409 })
+    if (pendingError) {
+      console.error('Phone payment: pending-check failed, allowing request:', pendingError.message)
+    } else if (pendingRows && pendingRows.length > 0) {
+      for (const row of pendingRows as PlanPaymentRow[]) {
+        const result = await checkAndSettlePlanPayment(row)
+        if (result === 'paid') {
+          // The plan just activated from the pending QR -- treat this as a
+          // successful outcome for the caller, not a failure to retry.
+          return NextResponse.json({ error: 'already_paid' }, { status: 409 })
+        }
+      }
+      const { error: supersedeError } = await supabase
+        .from('payment_requests')
+        .update({ status: 'expired' })
+        .eq('user_id', userId)
+        .eq('status', 'pending')
+      if (supersedeError) console.error('Phone payment: failed to supersede pending rows, allowing request:', supersedeError.message)
     }
 
     const connection = await loadPlatformConnection()
