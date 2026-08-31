@@ -240,11 +240,23 @@ interface Copy {
   steps: { title: string; desc: string }[]
   bentoTitle: string
   bentoSubtitle: string
-  bento: { icon: BentoKey; title: string; desc: string; chip: string; colSpan?: 2; hasPersistentHover?: boolean; href?: string }[]
+  bento: { icon: BentoKey; title: string; desc: string; chip: string; href?: string }[]
   botTitle: string
   botSubtitle: string
   botTabs: { key: BotTabKey; label: string }[]
-  botKaspi: { stat: string; statCaption: string; yourPriceLabel: string; yourPrice: string; competitorLabel: string; competitorPrice: string; statusText: string }
+  botKaspi: {
+    stat: string
+    statCaption: string
+    yourPriceLabel: string
+    yourPrice: string
+    yourPriceDropped: string
+    competitorLabel: string
+    competitorPrice: string
+    competitorPriceDropped: string
+    statusText: string
+    statusCompetitorDropped: string
+    statusBotResponded: string
+  }
   botAgent: {
     stat: string
     statCaption: string
@@ -307,18 +319,18 @@ const COPY: Record<Lang, Copy> = {
     stepsEyebrow: 'Как это работает',
     stepsTitle: 'Три шага до оплаты',
     steps: [
-      { title: 'Создайте счёт', desc: 'Заполните данные клиента, добавьте услуги — PDF с подписью и печатью готов за минуту.' },
+      { title: 'Создайте счёт', desc: 'Заполните данные клиента, добавьте услуги и/или товары — PDF с подписью и печатью готов за минуту.' },
       { title: 'Клиент оплачивает через Kaspi', desc: 'Отправьте ссылку — клиент платит по Kaspi QR прямо со страницы счёта, без регистрации.' },
       { title: 'Оплата подтверждается сама', desc: 'Платформа сама видит оплату и помечает счёт оплаченным — сверять вручную ничего не нужно.' },
     ],
     bentoTitle: 'Вся платформа',
     bentoSubtitle: 'Каждый модуль работает сам по себе — и ещё лучше вместе, на одном кошельке.',
     bento: [
-      { icon: 'invoice', title: 'Счета и документы', desc: 'Счета, АВР, КП и накладные за минуту — PDF с подписью и печатью, НДС, отправка ссылкой или на email.', chip: '1 минута', colSpan: 2, hasPersistentHover: true },
+      { icon: 'invoice', title: 'Счета и документы', desc: 'Счета, АВР, КП и накладные за минуту — PDF с подписью и печатью, НДС, отправка ссылкой или на email.', chip: '1 минута' },
       { icon: 'kaspi', title: 'Оплата через Kaspi', desc: 'Ссылка и QR Kaspi Pay прямо в счёте, платформа сама подтверждает оплату.', chip: '2% только с оплаченных' },
-      { icon: 'kaspibot', title: 'Kaspi Bot', desc: 'Демпинг-бот держит цены в топе, плюс заказы, накладные, финансы, аналитика ниш и качество магазина — весь кабинет Kaspi в одном месте.', chip: 'проверка каждые 15 мин', colSpan: 2 },
+      { icon: 'kaspibot', title: 'Kaspi Bot', desc: 'Демпинг-бот держит цены в топе, плюс заказы, накладные, финансы, аналитика ниш и качество магазина — весь кабинет Kaspi в одном месте.', chip: 'проверка каждые 15 мин' },
       { icon: 'aiagent', title: 'AI-агент', desc: 'Отвечает клиентам в Instagram, Telegram и на сайте, собирает заявки в базу.', chip: '5₸ за ответ' },
-      { icon: 'esign', title: 'ЭЦП и договоры', desc: 'Подписывайте любые документы ЭЦП — счета, договоры, АВР, КП и накладные — через QR или eGov mobile (SIGEX). Юридически значимо, без визита в офис. Обе стороны подписывают онлайн.', chip: 'SIGEX / eGov' },
+      { icon: 'esign', title: 'ЭЦП и договоры', desc: 'Подписывайте любые документы ЭЦП — счета, договоры, АВР, КП и накладные — через QR или eGov mobile. Юридически значимо, без визита в офис. Обе стороны подписывают онлайн.', chip: 'eGov mobile / QR' },
       { icon: 'api', title: 'Cashier API', desc: 'Принимайте Kaspi Pay на своём сайте по API — для разработчиков.', chip: '2%, без абонплаты', href: '/cashier-api' },
     ],
     botTitle: 'Ещё два сотрудника, которым не нужна зарплата',
@@ -332,9 +344,13 @@ const COPY: Record<Lang, Copy> = {
       statCaption: 'между проверками цен конкурентов — Kaspi Bot держит вас на первой позиции без ручной работы',
       yourPriceLabel: 'Ваша цена',
       yourPrice: '14 900 ₸ ↓',
+      yourPriceDropped: '14 800 ₸ ↓',
       competitorLabel: 'Конкурент',
       competitorPrice: '15 000 ₸',
+      competitorPriceDropped: '14 900 ₸',
       statusText: 'Проверка каждые 15 минут, без вашего участия',
+      statusCompetitorDropped: 'Конкурент снизил цену',
+      statusBotResponded: 'Kaspi Bot снизил цену — вы снова первые',
     },
     botAgent: {
       stat: '5₸',
@@ -367,7 +383,7 @@ const COPY: Record<Lang, Copy> = {
       free: { name: 'Бесплатно', cta: 'Начать бесплатно' },
       basic: { name: 'Базовый', cta: 'Подключить' },
       pro: { name: 'Про', badge: 'Максимум', cta: 'Подключить' },
-      footnote: 'Kaspi Bot и AI-агент оплачиваются с предоплаченного кошелька по факту использования — 5 ₸ за ответ ИИ, проверки цен каждые 15 минут — после открытия для всех Pro.',
+      footnote: 'Kaspi Bot и AI-агент оплачиваются с предоплаченного кошелька по факту использования — 5 ₸ за ответ ИИ, проверки цен каждые 15 минут — после открытия для всех Pro. Kaspi Cashier API доступен на любом тарифе — 2% с платежа, без абонплаты.',
     },
     authEyebrow: 'Доступ',
     authTitle: 'Вход без паролей',
@@ -395,7 +411,6 @@ const COPY: Record<Lang, Copy> = {
     ],
     footerContact: [
       { label: 'Email', href: 'mailto:support@invoices.kz' },
-      { label: 'Telegram', href: 'https://t.me/invoiceskz_support' },
     ],
     footerBottom: '© 2026 INVOICES.KZ · ИП First Project · БИН 890525350143 · г. Астана',
   },
@@ -418,18 +433,18 @@ const COPY: Record<Lang, Copy> = {
     stepsEyebrow: 'Қалай жұмыс істейді',
     stepsTitle: 'Төлемге дейін үш қадам',
     steps: [
-      { title: 'Шот жасаңыз', desc: 'Клиент деректерін толтырып, қызметтерді қосыңыз — қолтаңба мен мөрі бар PDF бір минутта дайын.' },
+      { title: 'Шот жасаңыз', desc: 'Клиент деректерін толтырып, қызметтер мен/немесе тауарларды қосыңыз — қолтаңба мен мөрі бар PDF бір минутта дайын.' },
       { title: 'Клиент Kaspi арқылы төлейді', desc: 'Сілтемені жіберіңіз — клиент тіркелусіз, тікелей шот бетінен Kaspi QR арқылы төлейді.' },
       { title: 'Төлем өздігінен расталады', desc: 'Платформа төлемді өзі көріп, шотты төленді деп белгілейді — қолмен тексерудің қажеті жоқ.' },
     ],
     bentoTitle: 'Толық платформа',
     bentoSubtitle: 'Әр модуль өз алдына жұмыс істейді — ал бірге, бір әмиянмен, одан да жақсы.',
     bento: [
-      { icon: 'invoice', title: 'Шоттар мен құжаттар', desc: 'Шот, ОҚА, КҰ және жүкқұжат бір минутта — қолтаңба мен мөрі бар PDF, ҚҚС, сілтемемен немесе email арқылы жіберу.', chip: '1 минут', colSpan: 2, hasPersistentHover: true },
+      { icon: 'invoice', title: 'Шоттар мен құжаттар', desc: 'Шот, ОҚА, КҰ және жүкқұжат бір минутта — қолтаңба мен мөрі бар PDF, ҚҚС, сілтемемен немесе email арқылы жіберу.', chip: '1 минут' },
       { icon: 'kaspi', title: 'Kaspi арқылы төлем', desc: 'Шоттың өзінде Kaspi Pay сілтемесі мен QR коды, платформа төлемді өзі растайды.', chip: 'тек төленгеннен 2%' },
-      { icon: 'kaspibot', title: 'Kaspi Bot', desc: 'Демпинг-бот бағаны топта ұстайды, әрі тапсырыстар, жүкқұжаттар, қаржы, ниша аналитикасы және дүкен сапасы — Kaspi кабинетінің бәрі бір жерде.', chip: 'әр 15 минут сайын тексеру', colSpan: 2 },
+      { icon: 'kaspibot', title: 'Kaspi Bot', desc: 'Демпинг-бот бағаны топта ұстайды, әрі тапсырыстар, жүкқұжаттар, қаржы, ниша аналитикасы және дүкен сапасы — Kaspi кабинетінің бәрі бір жерде.', chip: 'әр 15 минут сайын тексеру' },
       { icon: 'aiagent', title: 'AI-агент', desc: 'Instagram, Telegram және сайтта клиенттерге жауап береді, өтінімдерді дерекқорға жинайды.', chip: 'жауап үшін 5₸' },
-      { icon: 'esign', title: 'ЭЦҚ және келісімшарттар', desc: 'Кез келген құжатқа ЭЦҚ қойыңыз — шоттар, келісімшарттар, ОҚА, КҰ және жүкқұжаттар — QR немесе eGov mobile (SIGEX) арқылы. Заңды күші бар, кеңсеге барудың қажеті жоқ. Екі тарап та онлайн қол қояды.', chip: 'SIGEX / eGov' },
+      { icon: 'esign', title: 'ЭЦҚ және келісімшарттар', desc: 'Кез келген құжатқа ЭЦҚ қойыңыз — шоттар, келісімшарттар, ОҚА, КҰ және жүкқұжаттар — QR немесе eGov mobile арқылы. Заңды күші бар, кеңсеге барудың қажеті жоқ. Екі тарап та онлайн қол қояды.', chip: 'eGov mobile / QR' },
       { icon: 'api', title: 'Cashier API', desc: 'Kaspi Pay төлемдерін өз сайтыңызда API арқылы қабылдаңыз — әзірлеушілерге арналған.', chip: '2%, абонплатасыз', href: '/cashier-api' },
     ],
     botTitle: 'Жалақы сұрамайтын тағы екі қызметкер',
@@ -443,9 +458,13 @@ const COPY: Record<Lang, Copy> = {
       statCaption: 'бәсекелестердің бағасын тексеру аралығы — Kaspi Bot сізді қолмен әрекетсіз бірінші орында ұстайды',
       yourPriceLabel: 'Сіздің бағаңыз',
       yourPrice: '14 900 ₸ ↓',
+      yourPriceDropped: '14 800 ₸ ↓',
       competitorLabel: 'Бәсекелес',
       competitorPrice: '15 000 ₸',
+      competitorPriceDropped: '14 900 ₸',
       statusText: 'Әр 15 минут сайын тексеріледі, сіздің қатысуыңызсыз',
+      statusCompetitorDropped: 'Бәсекелес бағаны төмендетті',
+      statusBotResponded: 'Kaspi Bot бағаны төмендетті — сіз қайта бірінші орындасыз',
     },
     botAgent: {
       stat: '5₸',
@@ -478,7 +497,7 @@ const COPY: Record<Lang, Copy> = {
       free: { name: 'Тегін', cta: 'Тегін бастау' },
       basic: { name: 'Базалық', cta: 'Қосылу' },
       pro: { name: 'Про', badge: 'Максимум', cta: 'Қосылу' },
-      footnote: 'Kaspi Bot және AI-агент пайдалану бойынша алдын ала толтырылған әмияннан төленеді — AI жауабы үшін 5 ₸, бағаларды әр 15 минут сайын тексереді — барлық Pro үшін ашылғаннан кейін.',
+      footnote: 'Kaspi Bot және AI-агент пайдалану бойынша алдын ала толтырылған әмияннан төленеді — AI жауабы үшін 5 ₸, бағаларды әр 15 минут сайын тексереді — барлық Pro үшін ашылғаннан кейін. Kaspi Cashier API кез келген тарифте қолжетімді — төлемнен 2%, абонплатасыз.',
     },
     authEyebrow: 'Кіру',
     authTitle: 'Құпия сөзсіз кіру',
@@ -506,7 +525,6 @@ const COPY: Record<Lang, Copy> = {
     ],
     footerContact: [
       { label: 'Email', href: 'mailto:support@invoices.kz' },
-      { label: 'Telegram', href: 'https://t.me/invoiceskz_support' },
     ],
     footerBottom: '© 2026 INVOICES.KZ · «First Project» ЖК · БСН 890525350143 · Астана қ.',
   },
@@ -529,18 +547,18 @@ const COPY: Record<Lang, Copy> = {
     stepsEyebrow: 'How it works',
     stepsTitle: 'Three steps to get paid',
     steps: [
-      { title: 'Create an invoice', desc: "Fill in the client's details, add services — a signed and stamped PDF is ready in a minute." },
+      { title: 'Create an invoice', desc: "Fill in the client's details, add services and/or goods — a signed and stamped PDF is ready in a minute." },
       { title: 'Client pays via Kaspi', desc: 'Send the link — the client pays with a Kaspi QR code right from the invoice page, no signup required.' },
       { title: 'Payment confirms itself', desc: 'The platform detects the payment and marks the invoice paid automatically — nothing to reconcile by hand.' },
     ],
     bentoTitle: 'The whole platform',
     bentoSubtitle: 'Every module works on its own — and even better together, on one wallet.',
     bento: [
-      { icon: 'invoice', title: 'Invoices & documents', desc: 'Invoices, acts, quotes, and delivery notes in a minute — a signed and stamped PDF, VAT, sent by link or email.', chip: '1 minute', colSpan: 2, hasPersistentHover: true },
+      { icon: 'invoice', title: 'Invoices & documents', desc: 'Invoices, acts, quotes, and delivery notes in a minute — a signed and stamped PDF, VAT, sent by link or email.', chip: '1 minute' },
       { icon: 'kaspi', title: 'Payment via Kaspi', desc: 'A Kaspi Pay link and QR code right in the invoice — the platform confirms payment on its own.', chip: '2% on paid invoices only' },
-      { icon: 'kaspibot', title: 'Kaspi Bot', desc: 'A repricing bot keeps your prices on top, plus orders, waybills, finances, niche analytics, and shop quality — your whole Kaspi cabinet in one place.', chip: 'checks every 15 min', colSpan: 2 },
+      { icon: 'kaspibot', title: 'Kaspi Bot', desc: 'A repricing bot keeps your prices on top, plus orders, waybills, finances, niche analytics, and shop quality — your whole Kaspi cabinet in one place.', chip: 'checks every 15 min' },
       { icon: 'aiagent', title: 'AI Agent', desc: 'Replies to customers on Instagram, Telegram, and your website, and collects leads into your database.', chip: '₸5 per reply' },
-      { icon: 'esign', title: 'Digital signatures & contracts', desc: 'Sign any document with a digital signature — invoices, contracts, acts, quotes, and delivery notes — via QR or eGov mobile (SIGEX). Legally binding, no office visit needed. Both sides sign online.', chip: 'SIGEX / eGov' },
+      { icon: 'esign', title: 'Digital signatures & contracts', desc: 'Sign any document with a digital signature — invoices, contracts, acts, quotes, and delivery notes — via QR or eGov mobile. Legally binding, no office visit needed. Both sides sign online.', chip: 'eGov mobile / QR' },
       { icon: 'api', title: 'Cashier API', desc: 'Accept Kaspi Pay payments on your own website via API — built for developers.', chip: '2%, no subscription fee', href: '/cashier-api' },
     ],
     botTitle: 'Two more employees who never ask for a salary',
@@ -554,9 +572,13 @@ const COPY: Record<Lang, Copy> = {
       statCaption: 'between competitor price checks — Kaspi Bot keeps you in first place with zero manual work',
       yourPriceLabel: 'Your price',
       yourPrice: '14 900 ₸ ↓',
+      yourPriceDropped: '14 800 ₸ ↓',
       competitorLabel: 'Competitor',
       competitorPrice: '15 000 ₸',
+      competitorPriceDropped: '14 900 ₸',
       statusText: 'Checked every 15 minutes, with no effort from you',
+      statusCompetitorDropped: 'Competitor dropped their price',
+      statusBotResponded: 'Kaspi Bot dropped the price — you’re back in first place',
     },
     botAgent: {
       stat: '5₸',
@@ -589,7 +611,7 @@ const COPY: Record<Lang, Copy> = {
       free: { name: 'Free', cta: 'Start for free' },
       basic: { name: 'Basic', cta: 'Subscribe' },
       pro: { name: 'Pro', badge: 'Maximum', cta: 'Subscribe' },
-      footnote: 'Kaspi Bot and the AI agent are billed from your prepaid wallet based on actual usage — ₸5 per AI reply, price checks every 15 minutes — once opened to all Pro plans.',
+      footnote: 'Kaspi Bot and the AI agent are billed from your prepaid wallet based on actual usage — ₸5 per AI reply, price checks every 15 minutes — once opened to all Pro plans. Kaspi Cashier API is available on any plan — 2% per payment, no subscription fee.',
     },
     authEyebrow: 'Access',
     authTitle: 'Sign in without passwords',
@@ -617,7 +639,6 @@ const COPY: Record<Lang, Copy> = {
     ],
     footerContact: [
       { label: 'Email', href: 'mailto:support@invoices.kz' },
-      { label: 'Telegram', href: 'https://t.me/invoiceskz_support' },
     ],
     footerBottom: '© 2026 INVOICES.KZ · First Project Sole Proprietorship · BIN 890525350143 · Astana, Kazakhstan',
   },
@@ -1056,12 +1077,11 @@ export default function Home() {
                 title: item.title,
                 description: item.desc,
                 chip: item.chip,
-                hasPersistentHover: item.hasPersistentHover,
                 href: item.href,
                 icon: <Icon className="h-5 w-5" />,
               }
               return (
-                <Reveal key={item.title} delay={Math.min(i * 0.06, 0.3)} className={item.colSpan === 2 ? 'h-full sm:col-span-2' : 'h-full'}>
+                <Reveal key={item.title} delay={Math.min(i * 0.06, 0.3)} className="h-full">
                   <BentoCard item={card} />
                 </Reveal>
               )
@@ -1246,6 +1266,48 @@ function LeadField({ label, value, show, reduce }: { label: string; value: strin
   )
 }
 
+/* One price/value in the Kaspi Bot demo card -- crossfades or slides
+   between values as `value` changes (driven by BotShowcase's `kaspiPhase`).
+   `mode: 'wipe'` is the left-to-right repricing move: the incoming value
+   enters from the left, the outgoing one exits to the right, both via a
+   plain x-transform inside an `overflow-hidden` box so it reads as the
+   number wiping across the card. `mode: 'fade'` is the loop's soft reset
+   back to the initial state -- opacity only, no slide. The CSS-grid
+   stacking trick (`grid` + every child on `col/row-start-1`) overlaps the
+   entering/exiting spans without absolute positioning so the box sizes
+   itself to whichever value is currently widest. */
+function SlidingValue({
+  value,
+  mode,
+  reduce,
+  color,
+  className,
+}: {
+  value: string
+  mode: 'wipe' | 'fade'
+  reduce: boolean
+  color?: string
+  className?: string
+}) {
+  return (
+    <span className="relative inline-grid overflow-hidden">
+      <AnimatePresence mode="popLayout" initial={false}>
+        <motion.span
+          key={value}
+          initial={reduce ? false : mode === 'wipe' ? { x: '-100%', opacity: 0 } : { opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          exit={reduce ? { opacity: 1 } : mode === 'wipe' ? { x: '100%', opacity: 0 } : { opacity: 0 }}
+          transition={{ duration: reduce ? 0 : 0.5, ease: EASE }}
+          className={`col-start-1 row-start-1 whitespace-nowrap text-[15px] font-semibold${className ? ` ${className}` : ''}`}
+          style={color ? { color } : undefined}
+        >
+          {value}
+        </motion.span>
+      </AnimatePresence>
+    </span>
+  )
+}
+
 /* Replaces the old static "soon" placeholder cards for Kaspi Bot and the
    AI agent -- both are live products now, so this shows an honest demo
    instead of a "coming soon" badge. Tab switch uses framer-motion's
@@ -1274,6 +1336,60 @@ function BotShowcase({ t }: { t: Copy }) {
   const [typing, setTyping] = useState(false)
   const [leadStage, setLeadStage] = useState<0 | 1 | 2>(0)
   const messageCount = t.botAgent.messages.length
+
+  // Kaspi Bot repricing demo: 0 = idle (competitor 15 000 / us 14 900),
+  // 1 = competitor just matched us at 14 900, 2 = we've dropped to 14 800
+  // and are back in the lead. `kaspiMode` picks which transition the
+  // *next* phase change plays: 'wipe' for the two live repricing moves
+  // (left-to-right slide, see SlidingValue below), 'fade' for the loop's
+  // reset back to phase 0 (a soft crossfade, not a wipe, per spec).
+  const [kaspiPhase, setKaspiPhase] = useState<0 | 1 | 2>(0)
+  const [kaspiMode, setKaspiMode] = useState<'wipe' | 'fade'>('wipe')
+
+  useEffect(() => {
+    if (active !== 'kaspibot') {
+      setKaspiPhase(0)
+      setKaspiMode('wipe')
+      return
+    }
+    if (reduce) {
+      // Final state, statically -- no timers at all for reduced motion.
+      setKaspiPhase(2)
+      setKaspiMode('wipe')
+      return
+    }
+    setKaspiPhase(0)
+    setKaspiMode('wipe')
+
+    let cancelled = false
+    let timeoutId: ReturnType<typeof setTimeout>
+    const schedule = (fn: () => void, delay: number) => {
+      timeoutId = setTimeout(() => {
+        if (!cancelled) fn()
+      }, delay)
+    }
+    const runCycle = () => {
+      schedule(() => {
+        setKaspiMode('wipe')
+        setKaspiPhase(1) // competitor drops to 14 900
+        schedule(() => {
+          setKaspiMode('wipe')
+          setKaspiPhase(2) // we drop to 14 800, back in the lead
+          schedule(() => {
+            setKaspiMode('fade')
+            setKaspiPhase(0) // soft crossfade back to the initial state
+            schedule(runCycle, 600)
+          }, 3000)
+        }, 1200)
+      }, 2500)
+    }
+    runCycle()
+
+    return () => {
+      cancelled = true
+      clearTimeout(timeoutId)
+    }
+  }, [active, reduce])
 
   useEffect(() => {
     if (active !== 'aiagent') {
@@ -1359,7 +1475,12 @@ function BotShowcase({ t }: { t: Copy }) {
                 <div className="rounded-2xl p-5" style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORDER}` }}>
                   <div className="flex items-center justify-between text-[13px]" style={{ color: 'rgba(255,255,255,0.68)' }}>
                     <span>{t.botKaspi.competitorLabel}</span>
-                    <span className="text-[15px] font-semibold text-white">{t.botKaspi.competitorPrice}</span>
+                    <SlidingValue
+                      value={kaspiPhase === 0 ? t.botKaspi.competitorPrice : t.botKaspi.competitorPriceDropped}
+                      mode={kaspiMode}
+                      reduce={!!reduce}
+                      className="text-white"
+                    />
                   </div>
                   {/* Competitor on top, your (lower) price below it, in the accent
                       teal -- reads as "the bot just answered and took the lead",
@@ -1367,7 +1488,12 @@ function BotShowcase({ t }: { t: Copy }) {
                       elsewhere in this card (the stat figure, the status dot). */}
                   <div className="mt-3 flex items-center justify-between text-[13px]" style={{ color: 'rgba(255,255,255,0.68)' }}>
                     <span>{t.botKaspi.yourPriceLabel}</span>
-                    <span className="text-[15px] font-semibold" style={{ color: '#5EEAD4' }}>{t.botKaspi.yourPrice}</span>
+                    <SlidingValue
+                      value={kaspiPhase === 2 ? t.botKaspi.yourPriceDropped : t.botKaspi.yourPrice}
+                      mode={kaspiMode}
+                      reduce={!!reduce}
+                      color="#5EEAD4"
+                    />
                   </div>
                   <div className="mt-5 flex items-center gap-2 border-t pt-4 text-[12px]" style={{ borderColor: BORDER, color: 'rgba(255,255,255,0.68)' }}>
                     <span className="relative flex h-2 w-2">
@@ -1377,7 +1503,29 @@ function BotShowcase({ t }: { t: Copy }) {
                       />
                       <span className="relative inline-flex h-2 w-2 rounded-full" style={{ background: '#5EEAD4' }} />
                     </span>
-                    {t.botKaspi.statusText}
+                    {/* Simultaneous crossfade (no `mode="wait"`) -- the outgoing and
+                        incoming status lines overlap in time so there's no blank
+                        gap, and the grid-stack trick (as in SlidingValue above)
+                        keeps them from stacking as two separate flow lines while
+                        both are mounted. */}
+                    <span className="relative inline-grid overflow-hidden">
+                      <AnimatePresence initial={false}>
+                        <motion.span
+                          key={kaspiPhase}
+                          initial={reduce ? false : { opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={reduce ? { opacity: 1 } : { opacity: 0 }}
+                          transition={{ duration: reduce ? 0 : 0.3, ease: EASE }}
+                          className="col-start-1 row-start-1 whitespace-nowrap"
+                        >
+                          {kaspiPhase === 0
+                            ? t.botKaspi.statusText
+                            : kaspiPhase === 1
+                              ? t.botKaspi.statusCompetitorDropped
+                              : t.botKaspi.statusBotResponded}
+                        </motion.span>
+                      </AnimatePresence>
+                    </span>
                   </div>
                 </div>
               </motion.div>

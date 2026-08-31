@@ -27,14 +27,26 @@
 //  - split upstream's one `BentoGrid(items)` component into a `BentoGrid`
 //    grid container (takes `children`) and a standalone `BentoCard`, so the
 //    call site can wrap each card in its own `<Reveal>` scroll-entrance
-//    (with a staggered delay) and apply the column-span there -- matching
-//    how every other section of page.tsx already uses `Reveal` per item
-//  - hover lift and the icon-glow are `motion-safe:`-gated per this repo's
-//    reduced-motion convention; the dot-pattern's opacity fade is a plain
-//    CSS transition (this file follows page.tsx's own convention of only
-//    gating actual transform/movement, not opacity/color fades, behind
-//    motion-safe -- see e.g. its header's transition-shadow)
-
+//    (with a staggered delay) -- matching how every other section of
+//    page.tsx already uses `Reveal` per item
+//  - 2x3 grid, every tile the SAME size (2026-08-31 founder call): no more
+//    colSpan asymmetry or a permanently-highlighted "hero" tile -- the grid
+//    is a flat `grid-cols-1 md:grid-cols-2` (one column under md, two above)
+//    with `md:auto-rows-fr` so the two cards sharing a row always match
+//    height (the CSS-grid "equal fr tracks size to the tallest content"
+//    behaviour, no JS measuring needed); `h-full` on BentoCard plus the
+//    `Reveal` wrapper's own `h-full` (set at the page.tsx call site) then
+//    stretches each card to fill its track
+//  - the border/glow highlight upstream (and this file, pre-2026-08-31)
+//    only put on one "hero" card via a `hasPersistentHover` flag is now
+//    universal and hover-only, on every tile, via plain Tailwind `hover:`
+//    utilities on the card itself (`group` is still needed so the
+//    dot-pattern -- a separate absolutely-positioned child -- can react
+//    to the same hover through `group-hover:`). Border-color/box-shadow
+//    aren't gated behind `motion-safe:` -- consistent with this file's own
+//    convention below of only gating actual transform/movement, not
+//    color/opacity fades, behind reduced-motion; only the hover-lift
+//    `-translate-y-1` (real movement) is `motion-safe:`-gated
 import type { ReactNode } from 'react'
 
 export interface BentoItem {
@@ -42,12 +54,10 @@ export interface BentoItem {
   description: string
   icon: ReactNode
   chip?: string
-  hasPersistentHover?: boolean
   href?: string
 }
 
 const SURFACE = 'rgba(20,23,46,0.86)'
-const BORDER = 'rgba(255,255,255,0.12)'
 const ACCENT = '#5EEAD4'
 
 function cx(...parts: Array<string | false | undefined>) {
@@ -55,35 +65,30 @@ function cx(...parts: Array<string | false | undefined>) {
 }
 
 export function BentoGrid({ children }: { children: ReactNode }) {
-  return <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">{children}</div>
+  return <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:auto-rows-fr">{children}</div>
 }
 
 export function BentoCard({ item, className }: { item: BentoItem; className?: string }) {
   const cardClassName = cx(
-    'group relative flex h-full flex-col gap-4 overflow-hidden rounded-2xl p-6 text-left',
-    'motion-safe:transition-transform motion-safe:duration-300 motion-safe:hover:-translate-y-1 will-change-transform',
+    'group relative flex h-full flex-col gap-4 overflow-hidden rounded-2xl border border-[rgba(255,255,255,0.12)] p-6 text-left',
+    // transform is listed here too (unconditionally) so the property is
+    // always ready to transition -- only the *value* change on hover
+    // (-translate-y-1, below) is motion-safe-gated, not the transition
+    // itself, keeping this one declaration from clobbering another.
+    'transition-[transform,border-color,box-shadow] duration-300 will-change-transform',
+    'hover:border-[#5EEAD459] hover:shadow-[0_24px_48px_-24px_#5EEAD466]',
+    'motion-safe:hover:-translate-y-1',
     item.href && 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2',
     className
   )
-  const style = {
-    // hex + 2-digit-alpha suffix on the ACCENT literal, matching page.tsx's
-    // own convention for translucent brand color (e.g. `${COLOR.violet}33`)
-    // rather than an rgba() triple, so this stays visibly "the #5EEAD4
-    // accent, just faded" rather than reading as a new arbitrary color.
-    background: SURFACE,
-    border: `1px solid ${item.hasPersistentHover ? `${ACCENT}59` : BORDER}`,
-    boxShadow: item.hasPersistentHover ? `0 24px 48px -24px ${ACCENT}66` : undefined,
-  }
+  const style = { background: SURFACE }
 
   const content = (
     <>
       {/* subtle dot-pattern overlay -- dark-ground only, no light variant needed */}
       <div
         aria-hidden="true"
-        className={cx(
-          'pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.07)_1px,transparent_1px)] bg-[length:16px_16px] transition-opacity duration-300',
-          item.hasPersistentHover ? 'opacity-100' : 'opacity-0 group-hover:opacity-60'
-        )}
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.07)_1px,transparent_1px)] bg-[length:16px_16px] opacity-0 transition-opacity duration-300 group-hover:opacity-60"
       />
 
       <div className="relative flex items-center justify-between">
