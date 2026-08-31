@@ -218,26 +218,38 @@ export default function Upgrade() {
     setPromoError('')
     setPromoSuccess('')
 
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { router.push('/login'); return }
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) { router.push('/login'); return }
 
-    const { data: promo } = await supabase
-      .from('promo_codes').select('*')
-      .eq('code', promoCode.toUpperCase())
-      .eq('is_active', true).single()
+    // Server-side: `plan`/`plan_expires_at` are guarded by the
+    // protect_profile_privileged_columns DB trigger, which silently reverts
+    // writes from the browser client for any non-admin user -- redemption
+    // must happen with the service-role client, see api/plan/promo/route.ts.
+    try {
+      const res = await fetch('/api/plan/promo', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ code: promoCode.toUpperCase() }),
+      })
+      const data = await res.json().catch(() => ({}))
 
-    if (!promo) { setPromoError(t.promoNotFoundError); setPromoLoading(false); return }
-    if (promo.used_count >= promo.max_uses) { setPromoError(t.promoAlreadyUsedError); setPromoLoading(false); return }
+      if (!res.ok) {
+        if (res.status === 401) { router.push('/login'); return }
+        setPromoError(res.status === 409 ? t.promoAlreadyUsedError : t.promoNotFoundError)
+        setPromoLoading(false)
+        return
+      }
 
-    const expiresAt = new Date()
-    expiresAt.setDate(expiresAt.getDate() + promo.days)
-    await supabase.from('profiles').update({ plan: promo.plan, plan_expires_at: expiresAt.toISOString() }).eq('id', user.id)
-    await supabase.from('promo_codes').update({ used_count: promo.used_count + 1 }).eq('id', promo.id)
-
-    setPromoSuccess(t.promoActivatedMessage(promo.plan === 'pro' ? t.proPlanName : t.basicPlanName, promo.days))
-    setPromoCode('')
+      setPromoSuccess(t.promoActivatedMessage(data.plan === 'pro' ? t.proPlanName : t.basicPlanName, data.days))
+      setPromoCode('')
+      await reloadPlan()
+    } catch {
+      setPromoError(t.promoNotFoundError)
+    }
     setPromoLoading(false)
-    await reloadPlan()
   }
 
   function ConnectButton({ planName, amount, planKey, dark }: {

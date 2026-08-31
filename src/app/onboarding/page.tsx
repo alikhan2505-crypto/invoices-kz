@@ -53,20 +53,23 @@ export default function Onboarding() {
     setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
-    const trialExpires = new Date()
-    trialExpires.setDate(trialExpires.getDate() + 7)
+    // Non-privileged fields only -- trial_expires_at/bonus_expires_at are
+    // guarded by the protect_profile_privileged_columns DB trigger and must
+    // be granted server-side via /api/onboarding/grant below, which relies
+    // on this upsert having already created the profile row.
     const { error } = await supabase.from('profiles').upsert({
       id: user.id,
       company_name: form.company_name,
       bin_iin: form.bin_iin,
       email: form.email || user.email,
       account_type: accountType,
-      trial_expires_at: trialExpires.toISOString(),
     })
     if (error) { alert(t.errorPrefix(error.message)); setSaving(false); return }
+
+    const { data: { session } } = await supabase.auth.getSession()
+
     if (refCode) {
       try {
-        const { data: { session } } = await supabase.auth.getSession()
         await fetch('/api/referral', {
           method: 'POST',
           headers: {
@@ -79,28 +82,19 @@ export default function Onboarding() {
       localStorage.removeItem('referral_code')
     }
 
-    if (promoCode) {
-      try {
-        const { data: promo } = await supabase
-          .from('promo_codes')
-          .select('*')
-          .eq('code', promoCode.toUpperCase())
-          .eq('is_active', true)
-          .single()
-        if (promo) {
-          const bonusExpires = new Date()
-          bonusExpires.setDate(bonusExpires.getDate() + (promo.bonus_days || 14))
-          await supabase.from('profiles').update({
-            bonus_expires_at: bonusExpires.toISOString(),
-          }).eq('id', user.id)
-        }
-      } catch {}
-      localStorage.removeItem('promo_code')
-    }   
-
+    try {
+      await fetch('/api/onboarding/grant', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({ promoCode: promoCode || undefined })
+      })
+    } catch {}
+    if (promoCode) localStorage.removeItem('promo_code')
 
     try {
-      const { data: { session } } = await supabase.auth.getSession()
       await fetch('/api/telegram', {
         method: 'POST',
         headers: {
