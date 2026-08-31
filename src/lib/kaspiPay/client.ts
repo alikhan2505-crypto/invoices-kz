@@ -430,11 +430,20 @@ const QR_FAILED = new Set([
   'IrisDestBlockCode3', 'IrisDestBlockCode5', 'IrisDestBlockCode7', 'IrisDestBlockCode10',
 ])
 const QR_EXPIRED = new Set(['QrTokenDiscarded', 'Expired'])
+// 'Wait' is Kaspi's own signal that the customer has already opened/scanned
+// the QR and is now looking at the confirmation screen in their app --
+// distinct from 'QrTokenCreated' (nobody has touched it yet), confirmed via
+// the reference project this module was ported from (src/polling.js there
+// groups both under one "intermediate" bucket, but tracks them as separate
+// literal status strings). Surfacing this separately lets callers show a
+// live "customer is confirming" state and, crucially, avoid ever treating a
+// QR as safe to replace while a real confirmation might be in flight.
+const QR_SCANNING = new Set(['Wait'])
 
 export async function checkStatus(
   connection: KaspiConnection,
   operationId: string
-): Promise<{ status: 'pending' | 'paid' | 'expired' | 'failed' }> {
+): Promise<{ status: 'pending' | 'paid' | 'expired' | 'failed' | 'scanning' }> {
   const url = `${KASPI_QRPAY_URL}/v02/kaspi-qr/status?qrOperationId=${operationId}`
   const res = await fetch(url, { headers: buildSignedHeaders(url, connection) })
 
@@ -456,5 +465,6 @@ export async function checkStatus(
   if (QR_PAID.has(status)) return { status: 'paid' }
   if (QR_EXPIRED.has(status)) return { status: 'expired' }
   if (QR_FAILED.has(status)) return { status: 'failed' }
-  return { status: 'pending' } // QrTokenCreated, Wait, or any other in-flight status
+  if (QR_SCANNING.has(status)) return { status: 'scanning' }
+  return { status: 'pending' } // QrTokenCreated or any other in-flight status
 }

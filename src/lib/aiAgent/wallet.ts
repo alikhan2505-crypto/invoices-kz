@@ -19,6 +19,6 @@ export async function debitAiAgentWallet(userId: string, credits: number, note: 
 
 export type AiAgentWalletTopupRow = WalletTopupRow
 
-export async function checkAndSettleAiAgentWalletTopup(row: WalletTopupRow): Promise<'paid' | 'not_paid' | 'expired'> {
+export async function checkAndSettleAiAgentWalletTopup(row: WalletTopupRow): Promise<'paid' | 'not_paid' | 'expired' | 'scanning'> {
   return checkAndSettleWalletTopup(row)
 }

@@ -129,12 +129,16 @@ async function tryExpireTopup(row: WalletTopupRow): Promise<boolean> {
 // row that's dead on Kaspi's side (QR expired unpaid) doesn't accumulate
 // forever in the cron's pending sweep -- without this, every abandoned
 // top-up attempt cost one Kaspi round-trip on every single daily run,
-// indefinitely.
-export async function checkAndSettleWalletTopup(row: WalletTopupRow): Promise<'paid' | 'not_paid' | 'expired'> {
+// indefinitely. 'scanning' is additive (checkStatus's 'Wait' status) so the
+// caller-facing page can show "customer is confirming" instead of a generic
+// pending state; every existing `!== 'paid'` / `=== 'expired'` check on the
+// return value here is unaffected since 'scanning' falls under neither.
+export async function checkAndSettleWalletTopup(row: WalletTopupRow): Promise<'paid' | 'not_paid' | 'expired' | 'scanning'> {
   const connection = await loadPlatformConnection()
   if (!connection) return 'not_paid'
 
   const result = await checkStatus(connection, row.kaspi_operation_id)
+  if (result.status === 'scanning') return 'scanning'
   if (result.status !== 'paid') {
     const expiredOnKaspi = result.status === 'expired'
     if ((expiredOnKaspi || isPastExpiry(row)) && (await tryExpireTopup(row))) return 'expired'
