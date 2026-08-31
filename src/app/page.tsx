@@ -886,7 +886,11 @@ export default function Home() {
             {isDesktop && (
               <div className="relative h-[420px] w-full shrink-0 lg:h-[480px] lg:w-1/2">
                 <SplineErrorBoundary>
-                  <Spline3D scene="https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode" className="h-full w-full" />
+                  <Spline3D
+                    scene="https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode"
+                    className="h-full w-full"
+                    globalMouseTracking
+                  />
                 </SplineErrorBoundary>
 
                 {/* real-data chips, tying the demo scene back to the product */}
