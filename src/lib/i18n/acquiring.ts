@@ -98,6 +98,7 @@ export interface AcquiringContent {
   kaspiSourceApi: string
   kaspiTopupSecondsLeftLabel: (seconds: number) => string
   kaspiTopupScanningLabel: string
+  kaspiTopupCancelButton: string
   kaspiTopupHistoryTitle: string
   kaspiPendingMatchesTitle: string
   kaspiPendingMatchCandidate: string
@@ -222,6 +223,7 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiSourceApi: 'API',
     kaspiTopupSecondsLeftLabel: (seconds: number) => `QR действителен ещё ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`,
     kaspiTopupScanningLabel: 'Клиент сканирует QR — ждём подтверждения в приложении Kaspi...',
+    kaspiTopupCancelButton: 'Отменить, выбрать другую сумму',
     kaspiTopupHistoryTitle: 'История пополнений баланса',
     kaspiPendingMatchesTitle: 'Требуют подтверждения',
     kaspiPendingMatchCandidate: 'вероятный счёт',
@@ -344,6 +346,7 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiSourceApi: 'API',
     kaspiTopupSecondsLeftLabel: (seconds: number) => `QR тағы ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')} жарамды`,
     kaspiTopupScanningLabel: 'Клиент QR-ды сканерлеп жатыр — Kaspi қосымшасында растауды күтудеміз...',
+    kaspiTopupCancelButton: 'Бас тарту, басқа соманы таңдау',
     kaspiTopupHistoryTitle: 'Әмиян толтыру тарихы',
     kaspiPendingMatchesTitle: 'Растауды қажет етеді',
     kaspiPendingMatchCandidate: 'ықтимал шот',
@@ -466,6 +469,7 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiSourceApi: 'API',
     kaspiTopupSecondsLeftLabel: (seconds: number) => `QR valid for ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')} more`,
     kaspiTopupScanningLabel: 'Customer is scanning the QR — waiting for confirmation in the Kaspi app...',
+    kaspiTopupCancelButton: 'Cancel, pick a different amount',
     kaspiTopupHistoryTitle: 'Top-up history',
     kaspiPendingMatchesTitle: 'Needs confirmation',
     kaspiPendingMatchCandidate: 'likely invoice',

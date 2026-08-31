@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import QRCode from 'qrcode'
 import { supabase } from '@/lib/supabase'
@@ -51,6 +51,20 @@ export default function KaspiApiPage() {
   // anything -- it just lets the UI say "confirming" instead of a generic
   // countdown while a real payment attempt may be in progress.
   const [kaspiTopupScanning, setKaspiTopupScanning] = useState(false)
+  // Always mirrors kaspiTopupScanning -- read from the 60s idle-refresh
+  // timeout below, which needs the LIVE value at fire time, not whatever
+  // kaspiTopupScanning was when that effect was set up (its dependency
+  // array can't include kaspiTopupScanning without also resetting the
+  // 60s clock every time scanning flips).
+  const kaspiTopupScanningRef = useRef(false)
+  // Incremented on every startTopup() call; a call whose async work
+  // resolves after a newer one has already started drops its own result
+  // instead of overwriting it -- closes a real race where an auto-refresh
+  // triggered by the status poll and a manual "Пополнить" click (or the
+  // idle-refresh below) could land in either order and silently show the
+  // wrong amount as pending (founder's exact repro: expected 10 000,
+  // history showed a leftover 87 777 from an overlapping auto-refresh).
+  const kaspiTopupGeneration = useRef(0)
   const [kaspiSending, setKaspiSending] = useState(false)
   const [kaspiVerifying, setKaspiVerifying] = useState(false)
   const [kaspiDisconnecting, setKaspiDisconnecting] = useState(false)
@@ -113,9 +127,12 @@ export default function KaspiApiPage() {
         // was already just as dead as an expired one. Either way Kaspi's own
         // scanner would show a raw "QR-код не распознан" on any re-scan, so
         // silently request a fresh QR for the same amount the instant Kaspi
-        // confirms the old one is gone -- deliberately NOT on a blind timer
-        // (e.g. every 60s), which could yank a QR out from under a customer
-        // who's genuinely still mid-scan on it.
+        // confirms the old one is gone. This is a terminal-status refresh,
+        // not a blind timer -- it only ever fires once Kaspi itself has
+        // said the old QR is dead, so it can never yank a QR out from under
+        // a customer who's genuinely still mid-scan on it. (The separate
+        // idle-refresh effect below DOES use a timer, but only while
+        // scanning has never started -- see its own comment.)
         clearInterval(interval)
         setKaspiTopupPending(null)
         setKaspiTopupScanning(false)
@@ -125,6 +142,32 @@ export default function KaspiApiPage() {
       }
     }, 5000)
     return () => clearInterval(interval)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kaspiTopupPending?.topup_id])
+
+  useEffect(() => {
+    kaspiTopupScanningRef.current = kaspiTopupScanning
+  }, [kaspiTopupScanning])
+
+  // Shortens the effective wait on an UNSCANNED QR from Kaspi's own ~5-minute
+  // expiry down to ~1 minute of visible inactivity (founder's explicit ask:
+  // "время ожидания давай не 5 минут, а 1 минуту"). Reads
+  // kaspiTopupScanningRef (not the kaspiTopupScanning state) so this timer
+  // doesn't need scanning in its dependency array -- adding it would reset
+  // the 60s clock every time scanning flips, which is the opposite of what
+  // this needs. Safety: exactly like the terminal-status refresh above,
+  // this NEVER fires once scanning has been seen for this topup, even if it
+  // later flips back to not-scanning (e.g. a cancelled attempt, which the
+  // 5s poll above already catches near-instantly via 'failed') -- a QR
+  // someone has genuinely engaged with is never proactively replaced here.
+  useEffect(() => {
+    if (!kaspiTopupPending) return
+    const timeout = setTimeout(() => {
+      if (kaspiTopupScanningRef.current) return
+      setKaspiTopupPending(null)
+      startTopup(kaspiLastTopupAmount ?? 0)
+    }, 60000)
+    return () => clearTimeout(timeout)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kaspiTopupPending?.topup_id])
 
@@ -355,8 +398,15 @@ export default function KaspiApiPage() {
   }
 
   async function startTopup(amount: number) {
+    // Claim this as the current attempt before the first await -- any
+    // earlier call (a stale auto/idle-refresh, a doubled click) whose
+    // response lands after this one is now stale and must not overwrite
+    // what this call is about to set. See kaspiTopupGeneration's own
+    // comment for the bug this closes.
+    const myGeneration = ++kaspiTopupGeneration.current
     setKaspiError('')
     setKaspiLastTopupAmount(amount)
+    setKaspiTopupScanning(false)
     setKaspiToppingUp(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
@@ -366,6 +416,7 @@ export default function KaspiApiPage() {
         body: JSON.stringify({ amount }),
       })
       const data = await res.json()
+      if (myGeneration !== kaspiTopupGeneration.current) return
       if (res.ok) {
         setKaspiTopupPending({ topup_id: data.topup_id, payment_link: data.payment_link, expires_at: data.expires_at })
       } else if (data.error === 'invalid_amount') {
@@ -374,8 +425,19 @@ export default function KaspiApiPage() {
         setKaspiError(t.kaspiErrorGeneric)
       }
     } finally {
-      setKaspiToppingUp(false)
+      if (myGeneration === kaspiTopupGeneration.current) setKaspiToppingUp(false)
     }
+  }
+
+  // Explicit escape hatch for the amount picker being hidden while a topup
+  // is pending (see the render below) -- lets the founder back out of an
+  // amount he didn't mean to start instead of waiting out the up-to-60s
+  // idle-refresh. Bumping the generation here also discards any in-flight
+  // startTopup() response for the cancelled attempt.
+  function cancelTopup() {
+    kaspiTopupGeneration.current++
+    setKaspiTopupPending(null)
+    setKaspiTopupScanning(false)
   }
 
   if (loading) return (
@@ -581,33 +643,37 @@ export default function KaspiApiPage() {
                 </div>
               )}
 
-              <div className="text-xs mb-1 mt-2" style={{ color: 'var(--nav-text-muted)' }}>{t.kaspiTopupPresetsLabel}</div>
-              <div className="flex gap-2 flex-wrap mb-2">
-                {[1000, 5000, 10000, 50000].map(amount => (
-                  <button key={amount}
-                    onClick={() => { setKaspiTopupAmount(amount); setKaspiTopupCustom('') }}
-                    className="rounded-lg px-3 py-1.5 text-xs font-semibold"
-                    style={kaspiTopupAmount === amount
-                      ? { background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }
-                      : { background: 'var(--nav-surface-glass)', color: 'var(--nav-text-primary)' }}>
-                    {amount.toLocaleString('ru-KZ')} ₸
+              {!kaspiTopupPending && (
+                <>
+                  <div className="text-xs mb-1 mt-2" style={{ color: 'var(--nav-text-muted)' }}>{t.kaspiTopupPresetsLabel}</div>
+                  <div className="flex gap-2 flex-wrap mb-2">
+                    {[1000, 5000, 10000, 50000].map(amount => (
+                      <button key={amount}
+                        onClick={() => { setKaspiTopupAmount(amount); setKaspiTopupCustom('') }}
+                        className="rounded-lg px-3 py-1.5 text-xs font-semibold"
+                        style={kaspiTopupAmount === amount
+                          ? { background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }
+                          : { background: 'var(--nav-surface-glass)', color: 'var(--nav-text-primary)' }}>
+                        {amount.toLocaleString('ru-KZ')} ₸
+                      </button>
+                    ))}
+                  </div>
+                  <input value={kaspiTopupCustom}
+                    onChange={e => { setKaspiTopupCustom(e.target.value.replace(/\D/g, '')); setKaspiTopupAmount(null) }}
+                    placeholder={t.kaspiTopupCustomPlaceholder} type="text" inputMode="numeric"
+                    className="w-full py-2 text-sm outline-none mb-1 bg-transparent"
+                    style={{ borderBottom: '1px solid var(--nav-border)', color: 'var(--nav-text-primary)' }} />
+                  {kaspiTopupCustom !== '' && Number(kaspiTopupCustom) < MIN_TOPUP_AMOUNT && (
+                    <div className="text-xs mb-2" style={{ color: 'var(--nav-teal)' }}>{t.kaspiErrorInvalidAmount(MIN_TOPUP_AMOUNT)}</div>
+                  )}
+                  <button onClick={() => startTopup((kaspiTopupAmount ?? Number(kaspiTopupCustom)) || 0)}
+                    disabled={kaspiToppingUp || !((kaspiTopupAmount ?? Number(kaspiTopupCustom)) >= MIN_TOPUP_AMOUNT)}
+                    className="w-full rounded-xl py-2.5 text-sm font-semibold mb-3 disabled:opacity-50"
+                    style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                    {kaspiToppingUp ? t.kaspiTopupStartingLabel : t.kaspiTopupButton}
                   </button>
-                ))}
-              </div>
-              <input value={kaspiTopupCustom}
-                onChange={e => { setKaspiTopupCustom(e.target.value.replace(/\D/g, '')); setKaspiTopupAmount(null) }}
-                placeholder={t.kaspiTopupCustomPlaceholder} type="text" inputMode="numeric"
-                className="w-full py-2 text-sm outline-none mb-1 bg-transparent"
-                style={{ borderBottom: '1px solid var(--nav-border)', color: 'var(--nav-text-primary)' }} />
-              {kaspiTopupCustom !== '' && Number(kaspiTopupCustom) < MIN_TOPUP_AMOUNT && (
-                <div className="text-xs mb-2" style={{ color: 'var(--nav-teal)' }}>{t.kaspiErrorInvalidAmount(MIN_TOPUP_AMOUNT)}</div>
+                </>
               )}
-              <button onClick={() => startTopup((kaspiTopupAmount ?? Number(kaspiTopupCustom)) || 0)}
-                disabled={kaspiToppingUp || !((kaspiTopupAmount ?? Number(kaspiTopupCustom)) >= MIN_TOPUP_AMOUNT)}
-                className="w-full rounded-xl py-2.5 text-sm font-semibold mb-3 disabled:opacity-50"
-                style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-                {kaspiToppingUp ? t.kaspiTopupStartingLabel : t.kaspiTopupButton}
-              </button>
 
               {kaspiTopupPending && (
                 <div className="rounded-xl p-3 mb-3" style={{ background: 'var(--nav-accent-soft)' }}>
@@ -628,6 +694,13 @@ export default function KaspiApiPage() {
                     <p className="text-[11px] text-center mt-2" style={{ color: 'var(--nav-text-muted)' }}>
                       {t.kaspiTopupSecondsLeftLabel(kaspiTopupSecondsLeft)}
                     </p>
+                  )}
+                  {!kaspiTopupScanning && (
+                    <button onClick={cancelTopup}
+                      className="w-full text-center text-[11px] mt-2 underline"
+                      style={{ color: 'var(--nav-text-muted)' }}>
+                      {t.kaspiTopupCancelButton}
+                    </button>
                   )}
                 </div>
               )}
