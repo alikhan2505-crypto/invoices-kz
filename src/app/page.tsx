@@ -234,7 +234,21 @@ interface Copy {
   botSubtitle: string
   botTabs: { key: BotTabKey; label: string }[]
   botKaspi: { stat: string; statCaption: string; yourPriceLabel: string; yourPrice: string; competitorLabel: string; competitorPrice: string; statusText: string }
-  botAgent: { stat: string; statCaption: string; incomingMessage: string; replyMessage: string; typingLabel: string }
+  botAgent: {
+    stat: string
+    statCaption: string
+    messages: { from: 'customer' | 'agent'; text: string }[]
+    typingLabel: string
+    leadTitle: string
+    leadStatus: string
+    leadRequestLabel: string
+    leadRequest: string
+    leadNameLabel: string
+    leadName: string
+    leadPhoneLabel: string
+    leadPhone: string
+    leadCaption: string
+  }
   authEyebrow: string
   authTitle: string
   authSubtitle: string
@@ -290,20 +304,33 @@ const COPY: Record<Lang, Copy> = {
       { key: 'aiagent', label: 'AI-агент' },
     ],
     botKaspi: {
-      stat: '10 мин',
+      stat: '15 мин',
       statCaption: 'между проверками цен конкурентов — Kaspi Bot держит вас на первой позиции без ручной работы',
       yourPriceLabel: 'Ваша цена',
-      yourPrice: '15 000 ₸',
+      yourPrice: '14 900 ₸ ↓',
       competitorLabel: 'Конкурент',
-      competitorPrice: '14 500 ₸ ↓',
-      statusText: 'Проверка каждые 10 минут, без вашего участия',
+      competitorPrice: '15 000 ₸',
+      statusText: 'Проверка каждые 15 минут, без вашего участия',
     },
     botAgent: {
       stat: '5₸',
-      statCaption: 'за автоответ клиенту в WhatsApp, Instagram, Telegram и на сайте',
-      incomingMessage: 'Здравствуйте, работаете завтра?',
-      replyMessage: 'Да, с 9:00 до 19:00 🙂',
+      statCaption: 'за автоответ клиенту в Instagram, Telegram и на сайте',
+      messages: [
+        { from: 'customer', text: 'Здравствуйте, сколько стоит доставка до Астаны?' },
+        { from: 'agent', text: 'Добрый день! Доставка по Астане — бесплатно от 10 000 ₸, иначе 1 500 ₸. Хотите оформить заказ?' },
+        { from: 'customer', text: 'Да, давайте. Я Айгерим, 8 701 *** 45 67' },
+        { from: 'agent', text: 'Записал! Менеджер свяжется с вами в течение 10 минут 🙂' },
+      ],
       typingLabel: 'печатает',
+      leadTitle: 'Новая заявка',
+      leadStatus: 'В работе',
+      leadRequestLabel: 'Запрос',
+      leadRequest: 'доставка, оформление заказа',
+      leadNameLabel: 'Имя',
+      leadName: 'Айгерим',
+      leadPhoneLabel: 'Телефон',
+      leadPhone: '8 701 *** 45 67',
+      leadCaption: 'Каждый диалог сам превращается в заявку в вашей базе',
     },
     authEyebrow: 'Доступ',
     authTitle: 'Вход без паролей',
@@ -375,20 +402,33 @@ const COPY: Record<Lang, Copy> = {
       { key: 'aiagent', label: 'AI-агент' },
     ],
     botKaspi: {
-      stat: '10 мин',
+      stat: '15 мин',
       statCaption: 'бәсекелестердің бағасын тексеру аралығы — Kaspi Bot сізді қолмен әрекетсіз бірінші орында ұстайды',
       yourPriceLabel: 'Сіздің бағаңыз',
-      yourPrice: '15 000 ₸',
+      yourPrice: '14 900 ₸ ↓',
       competitorLabel: 'Бәсекелес',
-      competitorPrice: '14 500 ₸ ↓',
-      statusText: 'Әр 10 минут сайын тексеріледі, сіздің қатысуыңызсыз',
+      competitorPrice: '15 000 ₸',
+      statusText: 'Әр 15 минут сайын тексеріледі, сіздің қатысуыңызсыз',
     },
     botAgent: {
       stat: '5₸',
-      statCaption: 'WhatsApp, Instagram, Telegram және сайттағы бір автожауап үшін',
-      incomingMessage: 'Сәлеметсіз бе, ертең жұмыс істейсіздер ме?',
-      replyMessage: 'Иә, 9:00-ден 19:00-ге дейін 🙂',
+      statCaption: 'Instagram, Telegram және сайттағы бір автожауап үшін',
+      messages: [
+        { from: 'customer', text: 'Сәлеметсіз бе, Астанаға дейінгі жеткізу қанша тұрады?' },
+        { from: 'agent', text: 'Қайырлы күн! Астана бойынша жеткізу 10 000 ₸-ден бастап тегін, болмаса 1 500 ₸. Тапсырыс рәсімдегіңіз келе ме?' },
+        { from: 'customer', text: 'Иә, келісемін. Мен Айгеріммін, 8 701 *** 45 67' },
+        { from: 'agent', text: 'Жаздым! Менеджер 10 минут ішінде сізге хабарласады 🙂' },
+      ],
       typingLabel: 'жазып жатыр',
+      leadTitle: 'Жаңа өтінім',
+      leadStatus: 'Жұмыста',
+      leadRequestLabel: 'Сұраныс',
+      leadRequest: 'жеткізу, тапсырысты рәсімдеу',
+      leadNameLabel: 'Аты',
+      leadName: 'Айгерім',
+      leadPhoneLabel: 'Телефон',
+      leadPhone: '8 701 *** 45 67',
+      leadCaption: 'Әр диалог дерекқорыңызда өтінімге өздігінен айналады',
     },
     authEyebrow: 'Кіру',
     authTitle: 'Құпия сөзсіз кіру',
@@ -460,20 +500,33 @@ const COPY: Record<Lang, Copy> = {
       { key: 'aiagent', label: 'AI Agent' },
     ],
     botKaspi: {
-      stat: '10 min',
+      stat: '15 min',
       statCaption: 'between competitor price checks — Kaspi Bot keeps you in first place with zero manual work',
       yourPriceLabel: 'Your price',
-      yourPrice: '15 000 ₸',
+      yourPrice: '14 900 ₸ ↓',
       competitorLabel: 'Competitor',
-      competitorPrice: '14 500 ₸ ↓',
-      statusText: 'Checked every 10 minutes, with no effort from you',
+      competitorPrice: '15 000 ₸',
+      statusText: 'Checked every 15 minutes, with no effort from you',
     },
     botAgent: {
       stat: '5₸',
-      statCaption: 'per automatic reply on WhatsApp, Instagram, Telegram, and your website',
-      incomingMessage: 'Hi, are you open tomorrow?',
-      replyMessage: 'Yes, from 9:00 AM to 7:00 PM 🙂',
+      statCaption: 'per automatic reply on Instagram, Telegram, and your website',
+      messages: [
+        { from: 'customer', text: 'Hi, how much does delivery to Astana cost?' },
+        { from: 'agent', text: 'Hello! Delivery within Astana is free from ₸10,000, otherwise ₸1,500. Would you like to place an order?' },
+        { from: 'customer', text: "Yes, let's do it. I'm Aigerim, 8 701 *** 45 67" },
+        { from: 'agent', text: 'Got it! A manager will call you within 10 minutes 🙂' },
+      ],
       typingLabel: 'typing',
+      leadTitle: 'New lead',
+      leadStatus: 'In progress',
+      leadRequestLabel: 'Request',
+      leadRequest: 'delivery, placing an order',
+      leadNameLabel: 'Name',
+      leadName: 'Aigerim',
+      leadPhoneLabel: 'Phone',
+      leadPhone: '8 701 *** 45 67',
+      leadCaption: 'Every conversation turns itself into a lead in your database',
     },
     authEyebrow: 'Access',
     authTitle: 'Sign in without passwords',
@@ -1104,31 +1157,84 @@ function AmbientBlobs({ reduce }: { reduce: boolean }) {
   )
 }
 
+/* A single AI-agent lead-card row: label + value, fading in once `show`
+   flips true (see the reveal timeline in BotShowcase below). Renders
+   nothing beforehand rather than an empty/skeleton row -- the card grows
+   as the "заявка" fills in, which is the point being demonstrated. */
+function LeadField({ label, value, show, reduce }: { label: string; value: string; show: boolean; reduce: boolean }) {
+  if (!show) return null
+  return (
+    <motion.div
+      initial={reduce ? false : { opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: reduce ? 0 : 0.3, ease: EASE }}
+      className="flex items-center justify-between gap-3 text-[12.5px]"
+    >
+      <span style={{ color: 'rgba(255,255,255,0.6)' }}>{label}</span>
+      <span className="text-right font-medium text-white">{value}</span>
+    </motion.div>
+  )
+}
+
 /* Replaces the old static "soon" placeholder cards for Kaspi Bot and the
    AI agent -- both are live products now, so this shows an honest demo
    instead of a "coming soon" badge. Tab switch uses framer-motion's
    AnimatePresence for a fade-swap (not the raw CSS @keyframes strings
    from the throwaway brainstorm mockup) so the whole file stays on one
-   animation system. "10 min" is the product's real competitor-price
-   check interval; the AI agent's price mirrors AI_AGENT_CREDIT_PRICE_TENGE
-   from src/lib/aiAgent/wallet.ts -- both are real numbers, not marketing
-   stats. The only looping animation is the functional status-pulse dot
-   (motion-safe:animate-ping) -- no decorative infinite glow. */
+   animation system. "15 min" is the product's real competitor-price
+   check interval (matches the /kaspi-shop UI); the AI agent's price
+   mirrors AI_AGENT_CREDIT_PRICE_TENGE from src/lib/aiAgent/wallet.ts --
+   both are real numbers, not marketing stats. The only looping animation
+   is the functional status-pulse dot (motion-safe:animate-ping) -- no
+   decorative infinite glow.
+
+   The AI-agent tab plays a 4-message dialog plus a "Новая заявка" lead
+   card that fills in as the conversation progresses -- the real "Заявки"
+   (Kanban) feature the demo is illustrating. `visibleMessages`/`typing`/
+   `leadStage` drive that timeline; every timer is collected in one array
+   and cleared by the effect's cleanup, which fires both on unmount and on
+   every dependency change (i.e. switching tabs), and the same cleanup
+   path resets state to 0 so re-entering the tab always replays from the
+   start. Reduced motion short-circuits straight to the end state. */
 function BotShowcase({ t }: { t: Copy }) {
   const reduce = useReducedMotion()
   const [active, setActive] = useState<BotTabKey>('kaspibot')
-  const [showReply, setShowReply] = useState(reduce ? true : false)
+
+  const [visibleMessages, setVisibleMessages] = useState(0)
+  const [typing, setTyping] = useState(false)
+  const [leadStage, setLeadStage] = useState<0 | 1 | 2>(0)
+  const messageCount = t.botAgent.messages.length
 
   useEffect(() => {
-    if (active !== 'aiagent') return
-    if (reduce) {
-      setShowReply(true)
+    if (active !== 'aiagent') {
+      setVisibleMessages(0)
+      setTyping(false)
+      setLeadStage(0)
       return
     }
-    setShowReply(false)
-    const timer = setTimeout(() => setShowReply(true), 1400)
-    return () => clearTimeout(timer)
-  }, [active, reduce])
+    if (reduce) {
+      setVisibleMessages(messageCount)
+      setTyping(false)
+      setLeadStage(2)
+      return
+    }
+    setVisibleMessages(0)
+    setTyping(false)
+    setLeadStage(0)
+    const timers = [
+      setTimeout(() => setVisibleMessages(1), 200), // customer asks about delivery
+      setTimeout(() => setLeadStage(1), 500), // "Запрос" known from the first message
+      setTimeout(() => setVisibleMessages(2), 800), // agent answers
+      setTimeout(() => setVisibleMessages(3), 1400), // customer agrees, gives name + phone
+      setTimeout(() => setLeadStage(2), 1700), // "Имя"/"Телефон" known
+      setTimeout(() => setTyping(true), 2000),
+      setTimeout(() => {
+        setTyping(false)
+        setVisibleMessages(4) // agent confirms
+      }, 3400), // ~1.4s of typing
+    ]
+    return () => timers.forEach(clearTimeout)
+  }, [active, reduce, messageCount])
 
   return (
     <section id="bot-showcase" className="relative z-10 mx-auto max-w-6xl px-5 py-14 sm:px-8 sm:py-20">
@@ -1182,15 +1288,16 @@ function BotShowcase({ t }: { t: Copy }) {
                 </div>
                 <div className="rounded-2xl p-5" style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORDER}` }}>
                   <div className="flex items-center justify-between text-[13px]" style={{ color: 'rgba(255,255,255,0.68)' }}>
-                    <span>{t.botKaspi.yourPriceLabel}</span>
-                    <span className="text-[15px] font-semibold text-white">{t.botKaspi.yourPrice}</span>
-                  </div>
-                  <div className="mt-3 flex items-center justify-between text-[13px]" style={{ color: 'rgba(255,255,255,0.68)' }}>
                     <span>{t.botKaspi.competitorLabel}</span>
-                    {/* #F07FA8, not COLOR.magenta (#CE4C86): magenta measures 3.86:1 on this
-                        card's rgb(28,31,52) ground, below the 4.5:1 AA floor for 15px text.
-                        This lighter tint (6.41:1) is the only foreground use of the hue. */}
-                    <span className="text-[15px] font-semibold" style={{ color: '#F07FA8' }}>{t.botKaspi.competitorPrice}</span>
+                    <span className="text-[15px] font-semibold text-white">{t.botKaspi.competitorPrice}</span>
+                  </div>
+                  {/* Competitor on top, your (lower) price below it, in the accent
+                      teal -- reads as "the bot just answered and took the lead",
+                      not a warning. #5EEAD4 already carries that positive meaning
+                      elsewhere in this card (the stat figure, the status dot). */}
+                  <div className="mt-3 flex items-center justify-between text-[13px]" style={{ color: 'rgba(255,255,255,0.68)' }}>
+                    <span>{t.botKaspi.yourPriceLabel}</span>
+                    <span className="text-[15px] font-semibold" style={{ color: '#5EEAD4' }}>{t.botKaspi.yourPrice}</span>
                   </div>
                   <div className="mt-5 flex items-center gap-2 border-t pt-4 text-[12px]" style={{ borderColor: BORDER, color: 'rgba(255,255,255,0.68)' }}>
                     <span className="relative flex h-2 w-2">
@@ -1211,7 +1318,7 @@ function BotShowcase({ t }: { t: Copy }) {
                 animate={{ opacity: 1, y: 0 }}
                 exit={reduce ? { opacity: 1 } : { opacity: 0, y: -8 }}
                 transition={{ duration: reduce ? 0 : 0.35, ease: EASE }}
-                className="grid grid-cols-1 gap-8 lg:grid-cols-2 lg:items-center"
+                className="grid grid-cols-1 gap-8 lg:grid-cols-2 lg:items-start"
               >
                 <div>
                   <div className="text-[clamp(2.75rem,6vw,4rem)] font-bold tracking-tight" style={{ color: '#5EEAD4' }}>
@@ -1221,35 +1328,59 @@ function BotShowcase({ t }: { t: Copy }) {
                     {t.botAgent.statCaption}
                   </p>
                 </div>
-                <div className="rounded-2xl p-5" style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORDER}` }}>
-                  <div className="flex justify-start">
-                    <div
-                      className="max-w-[80%] rounded-2xl rounded-bl-sm px-3.5 py-2.5 text-[13px]"
-                      style={{ background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.9)' }}
-                    >
-                      {t.botAgent.incomingMessage}
-                    </div>
+                {/* Chat stacks above the lead card by default; side-by-side only
+                    once there's real room for both (xl:), never squeezed at lg. */}
+                <div className="flex flex-col gap-4 xl:flex-row xl:items-start">
+                  <div className="min-w-0 flex-1 space-y-3 rounded-2xl p-5" style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORDER}` }}>
+                    {t.botAgent.messages.slice(0, visibleMessages).map((msg, i) => (
+                      <div key={i} className={msg.from === 'customer' ? 'flex justify-start' : 'flex justify-end'}>
+                        <motion.div
+                          initial={reduce ? false : { opacity: 0, y: 6 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: reduce ? 0 : 0.3, ease: EASE }}
+                          className={
+                            msg.from === 'customer'
+                              ? 'max-w-[85%] rounded-2xl rounded-bl-sm px-3.5 py-2.5 text-[13px]'
+                              : 'max-w-[85%] rounded-2xl rounded-br-sm px-3.5 py-2.5 text-[13px] text-white'
+                          }
+                          style={msg.from === 'customer' ? { background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.9)' } : { background: COLOR.violet }}
+                        >
+                          {msg.text}
+                        </motion.div>
+                      </div>
+                    ))}
+                    {typing ? (
+                      <div className="flex justify-end">
+                        <div
+                          role="status"
+                          aria-label={t.botAgent.typingLabel}
+                          className="flex items-center gap-1 rounded-2xl rounded-br-sm px-3.5 py-3"
+                          style={{ background: COLOR.violet }}
+                        >
+                          <span className="h-1.5 w-1.5 rounded-full bg-white motion-safe:animate-bounce" style={{ animationDelay: '0ms' }} />
+                          <span className="h-1.5 w-1.5 rounded-full bg-white motion-safe:animate-bounce" style={{ animationDelay: '150ms' }} />
+                          <span className="h-1.5 w-1.5 rounded-full bg-white motion-safe:animate-bounce" style={{ animationDelay: '300ms' }} />
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
-                  <div className="mt-3 flex justify-end">
-                    {showReply ? (
-                      <div
-                        className="max-w-[80%] rounded-2xl rounded-br-sm px-3.5 py-2.5 text-[13px] text-white"
-                        style={{ background: COLOR.violet }}
-                      >
-                        {t.botAgent.replyMessage}
+                  <div className="w-full xl:w-[240px] xl:flex-shrink-0">
+                    <div className="rounded-2xl p-4" style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORDER}` }}>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[12px] font-semibold text-white">{t.botAgent.leadTitle}</span>
+                        <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ background: 'rgba(94,234,212,0.16)', color: '#5EEAD4' }}>
+                          {t.botAgent.leadStatus}
+                        </span>
                       </div>
-                    ) : (
-                      <div
-                        role="status"
-                        aria-label={t.botAgent.typingLabel}
-                        className="flex items-center gap-1 rounded-2xl rounded-br-sm px-3.5 py-3"
-                        style={{ background: COLOR.violet }}
-                      >
-                        <span className="h-1.5 w-1.5 rounded-full bg-white motion-safe:animate-bounce" style={{ animationDelay: '0ms' }} />
-                        <span className="h-1.5 w-1.5 rounded-full bg-white motion-safe:animate-bounce" style={{ animationDelay: '150ms' }} />
-                        <span className="h-1.5 w-1.5 rounded-full bg-white motion-safe:animate-bounce" style={{ animationDelay: '300ms' }} />
+                      <div className="mt-3 space-y-2">
+                        <LeadField label={t.botAgent.leadRequestLabel} value={t.botAgent.leadRequest} show={leadStage >= 1} reduce={!!reduce} />
+                        <LeadField label={t.botAgent.leadNameLabel} value={t.botAgent.leadName} show={leadStage >= 2} reduce={!!reduce} />
+                        <LeadField label={t.botAgent.leadPhoneLabel} value={t.botAgent.leadPhone} show={leadStage >= 2} reduce={!!reduce} />
                       </div>
-                    )}
+                    </div>
+                    <p className="mt-3 text-[12px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.6)' }}>
+                      {t.botAgent.leadCaption}
+                    </p>
                   </div>
                 </div>
               </motion.div>
