@@ -116,13 +116,21 @@ function Pre({ children }: { children: string }) {
 export default function KaspiApiDocsPage() {
   const router = useRouter()
   const { lang } = useLanguage()
-  // Local to this page, seeded once from the app-wide language but never
-  // written back to it -- the docs body only ever has a RU/EN copy (see
-  // DOCS_COPY above), so a kk user's global preference must not be silently
-  // collapsed to "ru" just by visiting this page, and switching languages
-  // here must not relabel SiteNav/the rest of the app (see useLanguage()
-  // usage there, which stays driven by the real global `lang`).
-  const [docsLang, setDocsLang] = useState<'ru' | 'en'>(lang === 'en' ? 'en' : 'ru')
+  // Tracks the live app-wide language until the user makes an explicit choice
+  // on this page, then pins to that choice -- never written back to the
+  // global language. LanguageProvider mounts with lang='ru' and only applies
+  // the saved localStorage value inside a useEffect that lands AFTER first
+  // commit, so a plain seed-once useState here would freeze at 'ru' forever
+  // on any full page load (reload, bookmark, direct link) for an EN user.
+  // Deriving docsLang from the live `lang` instead means it picks up the
+  // provider's effect once it lands, with no click required. The docs body
+  // only ever has a RU/EN copy (see DOCS_COPY above), so a kk user's global
+  // preference must not be silently collapsed to "ru" just by visiting this
+  // page, and switching languages here must not relabel SiteNav/the rest of
+  // the app (see useLanguage() usage there, which stays driven by the real
+  // global `lang`).
+  const [docsLangOverride, setDocsLangOverride] = useState<'ru' | 'en' | null>(null)
+  const docsLang: 'ru' | 'en' = docsLangOverride ?? (lang === 'en' ? 'en' : 'ru')
   const d = DOCS_COPY[docsLang]
 
   const [loading, setLoading] = useState(true)
@@ -189,11 +197,13 @@ export default function KaspiApiDocsPage() {
           now that SiteNav provides the app chrome and the section tabs. */}
       <div className="cashier-dev-theme min-h-screen lg:min-h-full" style={{ background: 'var(--nav-bg)', color: C.text, fontFamily: FONT_SANS }}>
         {/* RU/EN toggle + the Scalar-limitation caption that used to live in
-            the standalone header's sticky bar. This toggle is local to the
-            docs body (docsLang above) -- it does NOT touch the app-wide
-            language (LanguageProvider), so switching it here never relabels
-            SiteNav's menu, and a kk user's global preference is never
-            silently discarded just because the doc body only speaks ru/en. */}
+            the standalone header's sticky bar. This toggle only sets
+            docsLangOverride (docsLang above) -- it does NOT touch the
+            app-wide language (LanguageProvider), so switching it here never
+            relabels SiteNav's menu, and a kk user's global preference is
+            never silently discarded just because the doc body only speaks
+            ru/en. Once set, the override sticks for the rest of this page's
+            session even if the global language changes elsewhere. */}
         <div className="mx-auto max-w-6xl px-5 pt-6 sm:px-8">
           <div className="flex items-center justify-between gap-3">
             <span className="text-[12px]" style={{ color: C.muted, fontFamily: FONT_MONO }}>
@@ -203,7 +213,7 @@ export default function KaspiApiDocsPage() {
               {(['ru', 'en'] as const).map((l) => (
                 <button
                   key={l}
-                  onClick={() => setDocsLang(l)}
+                  onClick={() => setDocsLangOverride(l)}
                   className="min-h-11 min-w-11 px-2 text-[11px] font-semibold uppercase transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
                   style={{ background: docsLang === l ? C.bg2 : 'transparent', color: docsLang === l ? C.accent : C.muted }}
                   aria-pressed={docsLang === l}
