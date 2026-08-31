@@ -97,6 +97,8 @@ export interface AcquiringContent {
   kaspiSourceInvoice: string
   kaspiSourceApi: string
   kaspiTopupExpiredError: string
+  kaspiTopupSecondsLeftLabel: (seconds: number) => string
+  kaspiTopupRetryButton: string
   kaspiTopupHistoryTitle: string
   kaspiPendingMatchesTitle: string
   kaspiPendingMatchCandidate: string
@@ -195,7 +197,7 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiTopupCustomPlaceholder: 'Своя сумма, ₸',
     kaspiTopupButton: 'Пополнить',
     kaspiTopupStartingLabel: 'Готовим оплату...',
-    kaspiTopupPendingHint: 'Ссылка на пополнение готова — оплатите через Kaspi, баланс обновится автоматически.',
+    kaspiTopupPendingHint: 'QR-код готов — отсканируйте камерой телефона или нажмите кнопку ниже, чтобы оплатить через Kaspi. Баланс обновится автоматически.',
     kaspiTopupPayLinkLabel: 'Перейти к оплате',
     kaspiInsufficientBalanceHint: 'Баланс кошелька слишком низкий — при нехватке средств новые ссылки на оплату через Kaspi для ваших счетов создаваться не будут. Пополните баланс.',
     kaspiCommissionHint: 'Подключение и приём платежей через Kaspi — бесплатно. С каждого успешного платежа списывается комиссия 2% с баланса кошелька (пополняется заранее).',
@@ -220,6 +222,8 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiSourceInvoice: 'счёт',
     kaspiSourceApi: 'API',
     kaspiTopupExpiredError: 'Ссылка на оплату истекла (действует несколько минут, как любой QR Kaspi) — попробуйте пополнить ещё раз.',
+    kaspiTopupSecondsLeftLabel: (seconds: number) => `QR действителен ещё ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`,
+    kaspiTopupRetryButton: 'Получить новый QR',
     kaspiTopupHistoryTitle: 'История пополнений баланса',
     kaspiPendingMatchesTitle: 'Требуют подтверждения',
     kaspiPendingMatchCandidate: 'вероятный счёт',
@@ -316,7 +320,7 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiTopupCustomPlaceholder: 'Өз сомаңыз, ₸',
     kaspiTopupButton: 'Толтыру',
     kaspiTopupStartingLabel: 'Төлем дайындалуда...',
-    kaspiTopupPendingHint: 'Толтыру сілтемесі дайын — Kaspi арқылы төлеңіз, баланс автоматты түрде жаңарады.',
+    kaspiTopupPendingHint: 'QR-код дайын — телефон камерасымен сканерлеңіз немесе Kaspi арқылы төлеу үшін төмендегі батырманы басыңыз. Баланс автоматты түрде жаңарады.',
     kaspiTopupPayLinkLabel: 'Төлеуге өту',
     kaspiInsufficientBalanceHint: 'Әмиян балансы тым төмен — қаражат жеткіліксіз болса, шоттарыңыз үшін Kaspi арқылы жаңа төлем сілтемелері жасалмайды. Балансты толтырыңыз.',
     kaspiCommissionHint: 'Kaspi арқылы қосылу және төлемдерді қабылдау — тегін. Әрбір сәтті төлемнен әмиян балансынан 2% комиссия алынады (алдын ала толтырылады).',
@@ -341,6 +345,8 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiSourceInvoice: 'шот',
     kaspiSourceApi: 'API',
     kaspiTopupExpiredError: 'Төлем сілтемесінің мерзімі өтті (бірнеше минут жарамды, кез келген Kaspi QR сияқты) — қайта толтырып көріңіз.',
+    kaspiTopupSecondsLeftLabel: (seconds: number) => `QR тағы ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')} жарамды`,
+    kaspiTopupRetryButton: 'Жаңа QR алу',
     kaspiTopupHistoryTitle: 'Әмиян толтыру тарихы',
     kaspiPendingMatchesTitle: 'Растауды қажет етеді',
     kaspiPendingMatchCandidate: 'ықтимал шот',
@@ -462,6 +468,8 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiSourceInvoice: 'invoice',
     kaspiSourceApi: 'API',
     kaspiTopupExpiredError: 'The payment link expired (valid for a few minutes, like any Kaspi QR) — please try topping up again.',
+    kaspiTopupSecondsLeftLabel: (seconds: number) => `QR valid for ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')} more`,
+    kaspiTopupRetryButton: 'Get a new QR',
     kaspiTopupHistoryTitle: 'Top-up history',
     kaspiPendingMatchesTitle: 'Needs confirmation',
     kaspiPendingMatchCandidate: 'likely invoice',

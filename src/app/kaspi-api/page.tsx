@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import QRCode from 'qrcode'
 import { supabase } from '@/lib/supabase'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
@@ -35,7 +36,13 @@ export default function KaspiApiPage() {
   const [kaspiWalletBalance, setKaspiWalletBalance] = useState(0)
   const [kaspiTopupAmount, setKaspiTopupAmount] = useState<number | null>(null)
   const [kaspiTopupCustom, setKaspiTopupCustom] = useState('')
-  const [kaspiTopupPending, setKaspiTopupPending] = useState<{ topup_id: string, payment_link: string } | null>(null)
+  const [kaspiTopupPending, setKaspiTopupPending] = useState<{ topup_id: string, payment_link: string, expires_at: string } | null>(null)
+  const [kaspiTopupQrDataUrl, setKaspiTopupQrDataUrl] = useState<string | null>(null)
+  const [kaspiTopupSecondsLeft, setKaspiTopupSecondsLeft] = useState<number | null>(null)
+  // Kept so an expired/discarded QR can be replaced with one click for the
+  // same amount, instead of sending the founder back up to re-pick a preset.
+  const [kaspiLastTopupAmount, setKaspiLastTopupAmount] = useState<number | null>(null)
+  const [kaspiTopupJustExpired, setKaspiTopupJustExpired] = useState(false)
   const [kaspiSending, setKaspiSending] = useState(false)
   const [kaspiVerifying, setKaspiVerifying] = useState(false)
   const [kaspiDisconnecting, setKaspiDisconnecting] = useState(false)
@@ -81,18 +88,55 @@ export default function KaspiApiPage() {
         setKaspiTopupPending(null)
         load()
       } else if (data.status === 'expired') {
-        // A Kaspi payment QR is only valid for a few minutes (the same as
-        // scanning one generated directly in the Kaspi Pay app) — without
-        // this, closing the sheet and coming back later left the UI silently
-        // polling a dead link forever with no feedback at all.
+        // A Kaspi payment QR is only valid a few minutes (Kaspi's own
+        // ExpireDate, confirmed ~5 min live) AND Kaspi can discard it earlier
+        // on its own side (QrTokenDiscarded, mapped to 'expired' the same as
+        // a time-out in checkStatus()) -- e.g. after an incomplete scan/open
+        // attempt. Either way Kaspi's own scanner then shows a raw "QR-код не
+        // распознан" with no way back to us, so surface a clear local retry
+        // instead of leaving a dead QR on screen with only the generic error
+        // banner at the top of the card.
         clearInterval(interval)
         setKaspiTopupPending(null)
-        setKaspiError(t.kaspiTopupExpiredError)
+        setKaspiTopupJustExpired(true)
       }
     }, 5000)
     return () => clearInterval(interval)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kaspiTopupPending?.topup_id])
+
+  // Live countdown shown under the QR so the founder knows up front when it
+  // will go stale, instead of finding out only after Kaspi's own scanner
+  // rejects it. Purely informational -- expiry is still decided by the
+  // 5s status poll above (Kaspi's real clock, not this tab's), but reaching
+  // 0 here also flips the local retry prompt immediately rather than
+  // waiting up to 5s more for the next poll.
+  useEffect(() => {
+    if (!kaspiTopupPending?.expires_at) { setKaspiTopupSecondsLeft(null); return }
+    const expiresAtMs = new Date(kaspiTopupPending.expires_at).getTime()
+    const tick = () => {
+      const secondsLeft = Math.round((expiresAtMs - Date.now()) / 1000)
+      setKaspiTopupSecondsLeft(Math.max(0, secondsLeft))
+      if (secondsLeft <= 0) setKaspiTopupJustExpired(true)
+    }
+    tick()
+    const interval = setInterval(tick, 1000)
+    return () => clearInterval(interval)
+  }, [kaspiTopupPending?.expires_at])
+
+  // Generated client-side (same 'qrcode' package already used for /view/[token]'s
+  // Kaspi QR and the ЭЦП verification QR) so the founder can scan and pay
+  // without leaving this page for pay.kaspi.kz -- the plain link below still
+  // works as a fallback (and is the only option on the same device that's
+  // trying to scan its own screen).
+  useEffect(() => {
+    if (!kaspiTopupPending?.payment_link) { setKaspiTopupQrDataUrl(null); return }
+    let cancelled = false
+    QRCode.toDataURL(kaspiTopupPending.payment_link, { width: 160, margin: 1 })
+      .then((url) => { if (!cancelled) setKaspiTopupQrDataUrl(url) })
+      .catch(() => {}) // No QR image -- the plain link still works.
+    return () => { cancelled = true }
+  }, [kaspiTopupPending?.payment_link])
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
@@ -294,6 +338,8 @@ export default function KaspiApiPage() {
 
   async function startTopup(amount: number) {
     setKaspiError('')
+    setKaspiTopupJustExpired(false)
+    setKaspiLastTopupAmount(amount)
     setKaspiToppingUp(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
@@ -304,7 +350,7 @@ export default function KaspiApiPage() {
       })
       const data = await res.json()
       if (res.ok) {
-        setKaspiTopupPending({ topup_id: data.topup_id, payment_link: data.payment_link })
+        setKaspiTopupPending({ topup_id: data.topup_id, payment_link: data.payment_link, expires_at: data.expires_at })
       } else if (data.error === 'invalid_amount') {
         setKaspiError(t.kaspiErrorInvalidAmount(data.min || MIN_TOPUP_AMOUNT))
       } else {
@@ -546,12 +592,34 @@ export default function KaspiApiPage() {
 
               {kaspiTopupPending && (
                 <div className="rounded-xl p-3 mb-3" style={{ background: 'var(--nav-accent-soft)' }}>
-                  <p className="text-xs mb-2" style={{ color: 'var(--nav-text-secondary)' }}>{t.kaspiTopupPendingHint}</p>
+                  <p className="text-xs mb-3" style={{ color: 'var(--nav-text-secondary)' }}>{t.kaspiTopupPendingHint}</p>
+                  {kaspiTopupQrDataUrl && (
+                    <div className="flex justify-center mb-3">
+                      <img src={kaspiTopupQrDataUrl} alt="Kaspi QR" className="w-40 h-40 rounded-lg" style={{ background: '#fff', padding: 8 }} />
+                    </div>
+                  )}
                   <a href={kaspiTopupPending.payment_link} target="_blank" rel="noopener noreferrer"
                     className="w-full rounded-xl py-2.5 text-sm font-semibold block text-center"
                     style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                     {t.kaspiTopupPayLinkLabel}
                   </a>
+                  {kaspiTopupSecondsLeft !== null && (
+                    <p className="text-[11px] text-center mt-2" style={{ color: 'var(--nav-text-muted)' }}>
+                      {t.kaspiTopupSecondsLeftLabel(kaspiTopupSecondsLeft)}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {kaspiTopupJustExpired && (
+                <div className="rounded-xl p-3 mb-3" style={{ background: 'var(--nav-surface-glass)', border: '1px solid var(--nav-border)' }}>
+                  <p className="text-xs mb-2" style={{ color: 'var(--nav-teal)' }}>{t.kaspiTopupExpiredError}</p>
+                  <button onClick={() => startTopup(kaspiLastTopupAmount ?? 0)}
+                    disabled={kaspiToppingUp}
+                    className="w-full rounded-xl py-2.5 text-sm font-semibold disabled:opacity-50"
+                    style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                    {kaspiToppingUp ? t.kaspiTopupStartingLabel : t.kaspiTopupRetryButton}
+                  </button>
                 </div>
               )}
 
