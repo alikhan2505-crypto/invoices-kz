@@ -158,9 +158,23 @@ export default function Admin() {
     // billing_period (pre-annual rows, or the free-text default) fall
     // back to the historical monthly behavior.
     const days = payment.billing_period === 'annual' ? 365 : 30
+
+    // Renewal stacking rule (mirrors checkAndSettlePlanPayment in
+    // settlePlanPayment.ts): a same-plan renewal while that plan is still
+    // currently active extends from the EXISTING plan_expires_at instead of
+    // "now", so remaining days are not lost. An upgrade/downgrade (a
+    // different plan), an expired plan, or no plan yet all start fresh from
+    // "now", same as a first-time purchase. `users` is already loaded
+    // full-profile from load(), so no extra query is needed here.
+    const currentProfile = users.find(u => u.id === payment.user_id)
+    const currentExpiry = currentProfile?.plan_expires_at ? new Date(currentProfile.plan_expires_at) : null
+    const isSamePlanStillActive = currentProfile?.plan === payment.plan && !!currentExpiry && currentExpiry > new Date()
+    const expiresAt = isSamePlanStillActive ? new Date(currentExpiry!) : new Date()
+    expiresAt.setDate(expiresAt.getDate() + days)
+
     const { error } = await supabase.from('profiles').update({
       plan: payment.plan,
-      plan_expires_at: new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString(),
+      plan_expires_at: expiresAt.toISOString(),
     }).eq('id', payment.user_id)
 
     if (error) { alert(t.errorPrefix(error.message)); return }

@@ -40,6 +40,7 @@ export interface MiscContent {
   proFeatures: string[]
   activeLabel: string
   higherPlanNotice: string
+  renewButtonLabel: (period: 'monthly' | 'annual') => string
   connectButtonLabel: (amount: string, suffix: string) => string
   questionsText: string
   telegramLinkLabel: string
@@ -171,9 +172,10 @@ export const miscDict: Record<'ru' | 'kk' | 'en', MiscContent> = {
     perYearSuffix: '/год',
     proPlanName: 'Про',
     maxBadge: 'Максимум',
-    proFeatures: ['Безлимитные счета', 'КП, АВР и накладные', 'Kaspi Bot — весь кабинет магазина', 'AI-агент для клиентов', 'Wildberries-интеграция', 'ЭЦП и договоры (SIGEX)', 'Kaspi Cashier API', 'Приоритетная поддержка'],
+    proFeatures: ['Безлимитные счета', 'КП, АВР и накладные', 'Kaspi Bot — весь кабинет магазина (скоро)', 'AI-агент для клиентов (скоро)', 'Wildberries-интеграция (скоро)', 'ЭЦП и договоры (SIGEX)', 'Kaspi Cashier API', 'Приоритетная поддержка'],
     activeLabel: '✓ Активен',
     higherPlanNotice: 'У вас более высокий тариф',
+    renewButtonLabel: (period) => period === 'annual' ? 'Продлить на год' : 'Продлить на месяц',
     connectButtonLabel: (amount, suffix) => `Подключить за ${amount} ₸${suffix}`,
     questionsText: 'Вопросы?',
     telegramLinkLabel: 'Написать в Telegram',
@@ -302,9 +304,10 @@ export const miscDict: Record<'ru' | 'kk' | 'en', MiscContent> = {
     perYearSuffix: '/жыл',
     proPlanName: 'Про',
     maxBadge: 'Максимум',
-    proFeatures: ['Шексіз шоттар', 'КҰ, ОҚА және жүкқұжаттар', 'Kaspi Bot — дүкен кабинетінің барлығы', 'Клиенттерге арналған AI-агент', 'Wildberries интеграциясы', 'ЭЦҚ және шарттар (SIGEX)', 'Kaspi Cashier API', 'Басым қолдау'],
+    proFeatures: ['Шексіз шоттар', 'КҰ, ОҚА және жүкқұжаттар', 'Kaspi Bot — дүкен кабинетінің барлығы (жақында)', 'Клиенттерге арналған AI-агент (жақында)', 'Wildberries интеграциясы (жақында)', 'ЭЦҚ және шарттар (SIGEX)', 'Kaspi Cashier API', 'Басым қолдау'],
     activeLabel: '✓ Белсенді',
     higherPlanNotice: 'Сізде жоғарырақ тариф бар',
+    renewButtonLabel: (period) => period === 'annual' ? 'Бір жылға ұзарту' : 'Бір айға ұзарту',
     connectButtonLabel: (amount, suffix) => `${amount} ₸${suffix} — қосылу`,
     questionsText: 'Сұрақтар бар ма?',
     telegramLinkLabel: 'Telegram-ға жазу',
@@ -433,9 +436,10 @@ export const miscDict: Record<'ru' | 'kk' | 'en', MiscContent> = {
     perYearSuffix: '/yr',
     proPlanName: 'Pro',
     maxBadge: 'Maximum',
-    proFeatures: ['Unlimited invoices', 'Quotes, acts & delivery notes', 'Kaspi Bot — full shop dashboard', 'AI agent for customers', 'Wildberries integration', 'e-signature & contracts (SIGEX)', 'Kaspi Cashier API', 'Priority support'],
+    proFeatures: ['Unlimited invoices', 'Quotes, acts & delivery notes', 'Kaspi Bot — full shop dashboard (coming soon)', 'AI agent for customers (coming soon)', 'Wildberries integration (coming soon)', 'e-signature & contracts (SIGEX)', 'Kaspi Cashier API', 'Priority support'],
     activeLabel: '✓ Active',
     higherPlanNotice: 'You already have a higher plan',
+    renewButtonLabel: (period) => period === 'annual' ? 'Extend by a year' : 'Extend by a month',
     connectButtonLabel: (amount, suffix) => `Subscribe for ${amount} ₸${suffix}`,
     questionsText: 'Questions?',
     telegramLinkLabel: 'Message us on Telegram',

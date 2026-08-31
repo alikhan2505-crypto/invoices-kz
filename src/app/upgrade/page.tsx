@@ -238,6 +238,26 @@ export default function Upgrade() {
     )
   }
 
+  // Shown instead of ConnectButton when the user's active plan already
+  // equals this card's plan -- Kaspi Pay has no auto-renewal, so an active
+  // subscriber's only way to add more time is to pay again. Reuses the same
+  // openModal/period flow as a fresh purchase; settlePlanPayment.ts and
+  // admin/page.tsx's activatePayment stack the new period on top of the
+  // remaining days rather than restarting from today.
+  function RenewButton({ planName, amount, planKey, dark }: {
+    planName: string; amount: number; planKey: string; dark?: boolean
+  }) {
+    return (
+      <button onClick={() => openModal(planName, amount, planKey, period)}
+        className={`w-full rounded-xl py-3 font-medium text-sm ${dark
+          ? 'bg-white/10 text-white border border-white/20'
+          : 'border-2 border-[#1C2056] text-[#1C2056]'
+        }`}>
+        {t.renewButtonLabel(period)}
+      </button>
+    )
+  }
+
   return (
     <main className="min-h-screen bg-gray-50 flex flex-col">
       <div className="bg-white border-b px-4 py-3 flex items-center gap-3">
@@ -333,7 +353,12 @@ export default function Upgrade() {
             ))}
           </ul>
           {plan !== 'basic' && plan !== 'pro' && <ConnectButton planName={t.basicPlanName} amount={PLAN_PRICES.basic[period]} planKey="basic" />}
-          {plan === 'basic' && <div className="text-center text-sm text-gray-400 py-2">{t.activeLabel}</div>}
+          {plan === 'basic' && (
+            <div>
+              <div className="text-center text-sm text-gray-400 py-1">{t.activeLabel}</div>
+              <RenewButton planName={t.basicPlanName} amount={PLAN_PRICES.basic[period]} planKey="basic" />
+            </div>
+          )}
           {plan === 'pro' && <div className="text-center text-sm text-gray-400 py-2">{t.higherPlanNotice}</div>}
         </div>
 
@@ -356,7 +381,12 @@ export default function Upgrade() {
             ))}
           </ul>
           {plan !== 'pro' && <ConnectButton planName={t.proPlanName} amount={PLAN_PRICES.pro[period]} planKey="pro" dark />}
-          {plan === 'pro' && <div className="text-center text-sm text-white/60 py-2">{t.activeLabel}</div>}
+          {plan === 'pro' && (
+            <div>
+              <div className="text-center text-sm text-white/60 py-1">{t.activeLabel}</div>
+              <RenewButton planName={t.proPlanName} amount={PLAN_PRICES.pro[period]} planKey="pro" dark />
+            </div>
+          )}
         </div>
 
         <p className="text-center text-xs text-gray-400">

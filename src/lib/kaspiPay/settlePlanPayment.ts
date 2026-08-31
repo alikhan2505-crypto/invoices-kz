@@ -63,14 +63,23 @@ export async function checkAndSettlePlanPayment(row: PlanPaymentRow): Promise<'p
   if (claimError) throw new Error(`failed to claim paid plan payment: ${claimError.message}`)
   if (!claimed || claimed.length === 0) return 'paid' // already settled by another caller
 
-  const expiresAt = new Date()
-  expiresAt.setDate(expiresAt.getDate() + (row.billing_period === 'annual' ? 365 : 30))
-
   const { data: profile } = await supabase
     .from('profiles')
-    .select('bonus_expires_at')
+    .select('plan, plan_expires_at, bonus_expires_at')
     .eq('id', row.user_id)
     .single()
+
+  // Renewal stacking rule: a same-plan renewal (or repeat purchase) while
+  // that plan is still currently active should extend from the EXISTING
+  // plan_expires_at, not from "now" -- otherwise a Pro user with, say, 12
+  // days left who pays for another year would lose those 12 days. A
+  // different plan (upgrade/downgrade), an expired plan, or no plan at all
+  // all start fresh from "now", same as a first-time purchase.
+  const currentExpiry = profile?.plan_expires_at ? new Date(profile.plan_expires_at) : null
+  const isSamePlanStillActive = profile?.plan === row.plan && !!currentExpiry && currentExpiry > new Date()
+  const expiresAt = isSamePlanStillActive ? new Date(currentExpiry!) : new Date()
+  expiresAt.setDate(expiresAt.getDate() + (row.billing_period === 'annual' ? 365 : 30))
+
   if (profile?.bonus_expires_at) {
     const bonusEnd = new Date(profile.bonus_expires_at)
     if (bonusEnd > new Date()) {
