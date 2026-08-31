@@ -99,17 +99,23 @@ export default function KaspiApiPage() {
         // Kaspi's 'Wait' status -- the customer already opened the QR and is
         // looking at the confirmation screen. Never treat this as expired.
         setKaspiTopupScanning(true)
-      } else if (data.status === 'expired') {
+      } else if (data.status === 'expired' || data.status === 'failed') {
         // A Kaspi payment QR is only valid a few minutes (Kaspi's own
         // ExpireDate, confirmed ~5 min live) AND Kaspi can discard it earlier
         // on its own side (QrTokenDiscarded, mapped to 'expired' the same as
         // a time-out in checkStatus()) -- e.g. after an incomplete scan/open
-        // attempt. Either way Kaspi's own scanner then shows a raw "QR-код не
-        // распознан" with no way back to us. Silently request a fresh QR for
-        // the same amount the instant Kaspi itself confirms the old one is
-        // dead -- deliberately NOT on a blind timer (e.g. every 60s), which
-        // could yank a QR out from under a customer who's mid-scan on it;
-        // this only fires once Kaspi has already said the old one is gone.
+        // attempt. 'failed' covers the sibling case: the customer scanned
+        // (status went 'scanning') and then cancelled/backed out or the
+        // payment was rejected (Kaspi's CancelledByUser/NotConfirmedByUser/
+        // InsufficientFunds/etc) -- founder's own repro: scanning, then
+        // closing the confirmation screen, left the page showing the exact
+        // same "QR-код готов" text as if nothing had happened, on a QR that
+        // was already just as dead as an expired one. Either way Kaspi's own
+        // scanner would show a raw "QR-код не распознан" on any re-scan, so
+        // silently request a fresh QR for the same amount the instant Kaspi
+        // confirms the old one is gone -- deliberately NOT on a blind timer
+        // (e.g. every 60s), which could yank a QR out from under a customer
+        // who's genuinely still mid-scan on it.
         clearInterval(interval)
         setKaspiTopupPending(null)
         setKaspiTopupScanning(false)

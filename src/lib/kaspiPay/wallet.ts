@@ -111,15 +111,15 @@ function isPastExpiry(row: WalletTopupRow): boolean {
   return !!row.expires_at && new Date(row.expires_at) <= new Date()
 }
 
-async function tryExpireTopup(row: WalletTopupRow): Promise<boolean> {
+async function tryTerminateTopup(row: WalletTopupRow, status: 'expired' | 'failed'): Promise<boolean> {
   const { data, error } = await supabase
     .from('kaspi_wallet_topups')
-    .update({ status: 'expired' })
+    .update({ status })
     .eq('id', row.id)
     .eq('status', 'pending')
     .select('id')
   if (error) {
-    console.error('Wallet topup: failed to expire', row.id, error.message)
+    console.error(`Wallet topup: failed to mark ${status}`, row.id, error.message)
     return false
   }
   return !!(data && data.length > 0)
@@ -133,15 +133,26 @@ async function tryExpireTopup(row: WalletTopupRow): Promise<boolean> {
 // caller-facing page can show "customer is confirming" instead of a generic
 // pending state; every existing `!== 'paid'` / `=== 'expired'` check on the
 // return value here is unaffected since 'scanning' falls under neither.
-export async function checkAndSettleWalletTopup(row: WalletTopupRow): Promise<'paid' | 'not_paid' | 'expired' | 'scanning'> {
+// 'failed' is likewise additive and distinct from 'expired': it covers a
+// scanned-then-cancelled/rejected/insufficient-funds attempt (Kaspi's
+// CancelledByUser/NotConfirmedByUser/InsufficientFunds/etc, see
+// checkStatus's QR_FAILED set) -- previously this fell through to
+// 'not_paid' and the row just sat 'pending' forever showing a QR that was
+// already dead on Kaspi's side (the founder's exact repro: cancel a scan,
+// the page falls back to "QR готов" instead of ever refreshing it).
+export async function checkAndSettleWalletTopup(row: WalletTopupRow): Promise<'paid' | 'not_paid' | 'expired' | 'scanning' | 'failed'> {
   const connection = await loadPlatformConnection()
   if (!connection) return 'not_paid'
 
   const result = await checkStatus(connection, row.kaspi_operation_id)
   if (result.status === 'scanning') return 'scanning'
+  if (result.status === 'failed') {
+    if (await tryTerminateTopup(row, 'failed')) return 'failed'
+    return 'not_paid'
+  }
   if (result.status !== 'paid') {
     const expiredOnKaspi = result.status === 'expired'
-    if ((expiredOnKaspi || isPastExpiry(row)) && (await tryExpireTopup(row))) return 'expired'
+    if ((expiredOnKaspi || isPastExpiry(row)) && (await tryTerminateTopup(row, 'expired'))) return 'expired'
     return 'not_paid'
   }
 

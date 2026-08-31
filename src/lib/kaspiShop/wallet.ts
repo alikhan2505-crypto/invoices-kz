@@ -21,6 +21,6 @@ export async function debitKaspiShopWallet(userId: string, credits: number, note
 
 export type KaspiShopWalletTopupRow = WalletTopupRow
 
-export async function checkAndSettleKaspiShopWalletTopup(row: WalletTopupRow): Promise<'paid' | 'not_paid' | 'expired' | 'scanning'> {
+export async function checkAndSettleKaspiShopWalletTopup(row: WalletTopupRow): Promise<'paid' | 'not_paid' | 'expired' | 'scanning' | 'failed'> {
   return checkAndSettleWalletTopup(row)
 }
