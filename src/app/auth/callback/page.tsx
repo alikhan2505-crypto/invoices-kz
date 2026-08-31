@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useLanguage } from '@/components/LanguageProvider'
 import { authDict } from '@/lib/i18n/auth'
+import { hasPendingUpgrade } from '@/lib/pendingUpgrade'
 
 export default function AuthCallback() {
   const router = useRouter()
@@ -65,8 +66,16 @@ export default function AuthCallback() {
           .single()
 
         if (!profile?.bin_iin) {
+          // New/incomplete profile: must finish onboarding first, so a
+          // pending upgrade is left untouched for /upgrade to pick up
+          // whenever the user gets there later -- never skip onboarding.
           const ref = localStorage.getItem('referral_code')
           router.push(ref ? `/onboarding?ref=${ref}` : '/onboarding')
+        } else if (hasPendingUpgrade()) {
+          // Already-onboarded account signing back in via magic link/Google/
+          // Facebook -- safe to send straight to /upgrade when the landing
+          // page's pricing CTA left one pending (see src/lib/pendingUpgrade.ts).
+          router.replace('/upgrade')
         } else {
           router.push('/dashboard')
         }

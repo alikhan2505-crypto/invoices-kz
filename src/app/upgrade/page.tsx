@@ -7,6 +7,7 @@ import { backLabel, closeLabel } from '@/lib/a11yLabels'
 import { miscDict } from '@/lib/i18n/misc'
 import { getActivePlan } from '@/lib/plan'
 import { PLAN_PRICES, type BillingPeriod } from '@/lib/plans/pricing'
+import { consumePendingUpgrade } from '@/lib/pendingUpgrade'
 
 export default function Upgrade() {
   const router = useRouter()
@@ -42,6 +43,19 @@ export default function Upgrade() {
     loadData()
     setIsMobile(/iPhone|iPad|iPod|Android/i.test(navigator.userAgent))
     return () => { if (statusInterval.current) clearInterval(statusInterval.current) }
+  }, [])
+
+  // Restores the period/plan the visitor picked on the landing page's
+  // pricing CTA before /login sent them here with `period` defaulted back
+  // to 'monthly'. Consumed (read + removed) exactly once so a stale value
+  // can never be replayed on a later, unrelated visit.
+  useEffect(() => {
+    const pending = consumePendingUpgrade()
+    if (!pending) return
+    setPeriod(pending.period)
+    requestAnimationFrame(() => {
+      document.getElementById(`plan-${pending.plan}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    })
   }, [])
 
   // Live-polls the in-house Kaspi rail's own settlement status by order_id,
@@ -372,7 +386,7 @@ export default function Upgrade() {
         </div>
 
         {/* Basic */}
-        <div className={`bg-white border-2 rounded-2xl p-6 mb-4 ${plan === 'basic' ? 'border-[#1C2056]' : 'border-[#1C2056]/20'}`}>
+        <div id="plan-basic" className={`bg-white border-2 rounded-2xl p-6 mb-4 ${plan === 'basic' ? 'border-[#1C2056]' : 'border-[#1C2056]/20'}`}>
           <div className="flex items-center justify-between mb-3">
             <div className="font-bold text-[#1C2056] text-lg">{t.basicPlanName}</div>
             {plan === 'basic'
@@ -400,7 +414,7 @@ export default function Upgrade() {
         </div>
 
         {/* Pro */}
-        <div className={`rounded-2xl p-6 mb-6 bg-[#1C2056] ${plan === 'pro' ? 'ring-2 ring-[#2DC48D]' : ''}`}>
+        <div id="plan-pro" className={`rounded-2xl p-6 mb-6 bg-[#1C2056] ${plan === 'pro' ? 'ring-2 ring-[#2DC48D]' : ''}`}>
           <div className="flex items-center justify-between mb-3">
             <div className="font-bold text-white text-lg">{t.proPlanName}</div>
             {plan === 'pro'

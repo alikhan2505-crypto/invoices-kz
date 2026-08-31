@@ -5,6 +5,7 @@ import { startAuthentication } from '@simplewebauthn/browser'
 import { supabase } from '@/lib/supabase'
 import { useLanguage } from '@/components/LanguageProvider'
 import { authDict } from '@/lib/i18n/auth'
+import { hasPendingUpgrade } from '@/lib/pendingUpgrade'
 
 export default function Login() {
   const router = useRouter()
@@ -43,7 +44,13 @@ export default function Login() {
       const { error } = await supabase.auth.verifyOtp({ token_hash: verifyJson.tokenHash, type: 'email' })
       if (error) { alert(t.errorPrefix(error.message)); return }
 
-      router.push('/dashboard')
+      // A passkey login only ever exists for an already-registered,
+      // already-onboarded account, so there is no onboarding branch to
+      // preserve here -- safe to send straight to /upgrade when the landing
+      // page's pricing CTA left one pending (see src/lib/pendingUpgrade.ts).
+      // Default destination unchanged (router.push('/dashboard')).
+      if (hasPendingUpgrade()) router.replace('/upgrade')
+      else router.push('/dashboard')
     } catch (e: any) {
       if (e?.name !== 'NotAllowedError') alert(t.errorPrefix(e?.message || String(e)))
     } finally {

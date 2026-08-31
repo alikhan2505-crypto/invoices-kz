@@ -8,6 +8,7 @@ import { useLanguage, type Lang } from '@/components/LanguageProvider'
 import { BentoCard, BentoGrid, type BentoItem } from '@/components/ui/bento-grid'
 import { PLAN_PRICES, type BillingPeriod } from '@/lib/plans/pricing'
 import { miscDict } from '@/lib/i18n/misc'
+import { setPendingUpgrade } from '@/lib/pendingUpgrade'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -1582,7 +1583,7 @@ function PricingSection({ t, lang, goLogin }: { t: Copy; lang: Lang; goLogin: ()
 
         {/* Basic -- standard surface, mid-weight CTA */}
         <Reveal delay={0.16}>
-          <div className="flex h-full flex-col rounded-3xl p-7" style={{ background: SURFACE, border: `1px solid ${BORDER}` }}>
+          <div id="plan-basic" className="flex h-full flex-col rounded-3xl p-7" style={{ background: SURFACE, border: `1px solid ${BORDER}` }}>
             <div className="text-[14px] font-semibold" style={{ color: 'rgba(255,255,255,0.82)' }}>
               {t.pricing.basic.name}
             </div>
@@ -1602,7 +1603,7 @@ function PricingSection({ t, lang, goLogin }: { t: Copy; lang: Lang; goLogin: ()
               ))}
             </ul>
             <button
-              onClick={goLogin}
+              onClick={() => { setPendingUpgrade('basic', period); goLogin() }}
               className="motion-safe:transition-all motion-safe:duration-200 motion-safe:hover:-translate-y-0.5 motion-safe:active:scale-[0.97] mt-8 flex min-h-[44px] items-center justify-center rounded-xl px-5 text-[14px] font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
               style={{ background: COLOR.violet }}
             >
@@ -1617,6 +1618,7 @@ function PricingSection({ t, lang, goLogin }: { t: Copy; lang: Lang; goLogin: ()
             trick needed to make it "pop". */}
         <Reveal delay={0.22}>
           <div
+            id="plan-pro"
             className="relative flex h-full flex-col rounded-3xl p-8"
             style={{ background: SURFACE, border: `1.5px solid ${COLOR.violet}`, boxShadow: `0 28px 70px -28px ${COLOR.violet}` }}
           >
@@ -1645,7 +1647,7 @@ function PricingSection({ t, lang, goLogin }: { t: Copy; lang: Lang; goLogin: ()
               ))}
             </ul>
             <button
-              onClick={goLogin}
+              onClick={() => { setPendingUpgrade('pro', period); goLogin() }}
               className="motion-safe:transition-all motion-safe:duration-200 motion-safe:hover:-translate-y-0.5 motion-safe:active:scale-[0.97] mt-8 flex min-h-[44px] items-center justify-center rounded-xl px-5 text-[14px] font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
               style={{ background: COLOR.violet, boxShadow: `0 14px 34px -12px ${COLOR.violet}` }}
             >
