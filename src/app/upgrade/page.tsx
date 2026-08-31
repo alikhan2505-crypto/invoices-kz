@@ -31,6 +31,12 @@ export default function Upgrade() {
   const [payPhone, setPayPhone] = useState('')
   const [phoneSubmitting, setPhoneSubmitting] = useState(false)
   const statusInterval = useRef<any>(null)
+  // Snapshot of the renewer's plan_expires_at (ms) taken right before a
+  // payment is created. For a renewer, p.plan === planKey && p.plan_expires_at
+  // > now is ALREADY true at t=0 -- without this baseline, checkPaymentStatus
+  // below would declare success 5s after opening the QR, before anything was
+  // actually paid. 0 for a fresh purchase (no current plan_expires_at to beat).
+  const baselineExpiresRef = useRef<number>(0)
 
   useEffect(() => {
     loadData()
@@ -101,6 +107,12 @@ export default function Upgrade() {
     setSubmitting(true)
 
     try {
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data: p } = user
+        ? await supabase.from('profiles').select('plan, plan_expires_at').eq('id', user.id).single()
+        : { data: null }
+      baselineExpiresRef.current = p?.plan === planKey && p?.plan_expires_at ? new Date(p.plan_expires_at).getTime() : 0
+
       const { data: { session } } = await supabase.auth.getSession()
       const res = await fetch('/api/payment/create', {
         method: 'POST',
@@ -144,7 +156,12 @@ export default function Upgrade() {
       const { data: p } = await supabase.from('profiles').select('plan, plan_expires_at').eq('id', user.id).single()
       if (p?.plan === planKey && p?.plan_expires_at) {
         const expiresAt = new Date(p.plan_expires_at)
-        if (expiresAt > new Date()) {
+        // Strictly-greater-than-baseline check: for a renewer, expiresAt was
+        // already in the future before this payment existed, so "in the
+        // future" alone can't tell a completed renewal apart from an
+        // untouched, still-active plan. Only a plan_expires_at that moved
+        // PAST the pre-payment snapshot proves this payment actually settled.
+        if (expiresAt > new Date() && expiresAt.getTime() > baselineExpiresRef.current) {
           clearInterval(statusInterval.current)
           setPlan(p.plan)
           setStep('success')

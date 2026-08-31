@@ -63,11 +63,16 @@ export async function checkAndSettlePlanPayment(row: PlanPaymentRow): Promise<'p
   if (claimError) throw new Error(`failed to claim paid plan payment: ${claimError.message}`)
   if (!claimed || claimed.length === 0) return 'paid' // already settled by another caller
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('plan, plan_expires_at, bonus_expires_at')
     .eq('id', row.user_id)
     .single()
+  // Fail closed to "now": if the read fails, profile stays undefined below,
+  // so isSamePlanStillActive is false and expiresAt starts fresh from today
+  // rather than risking a stale/garbage stacking base. Logged loudly since a
+  // silent fallback here would quietly shrink a paying renewer's stacked days.
+  if (profileError) console.error('CRITICAL: plan payment', row.id, 'for user', row.user_id, ': profile read failed, falling back to base=now:', profileError.message)
 
   // Renewal stacking rule: a same-plan renewal (or repeat purchase) while
   // that plan is still currently active should extend from the EXISTING
@@ -80,11 +85,20 @@ export async function checkAndSettlePlanPayment(row: PlanPaymentRow): Promise<'p
   const expiresAt = isSamePlanStillActive ? new Date(currentExpiry!) : new Date()
   expiresAt.setDate(expiresAt.getDate() + (row.billing_period === 'annual' ? 365 : 30))
 
+  // Bonus days are folded into expiresAt at most ONCE: their remaining
+  // value now lives inside plan_expires_at, so bonus_expires_at must be
+  // cleared in the same update below. Without this, every future renewal
+  // would re-read the still-set bonus_expires_at and re-add the SAME full
+  // bonus on top of the already-stacked expiry -- e.g. a 35-day bonus would
+  // grant 30+35 on the first renewal, then another +35 on the second, and
+  // so on forever.
+  let bonusConsumed = false
   if (profile?.bonus_expires_at) {
     const bonusEnd = new Date(profile.bonus_expires_at)
     if (bonusEnd > new Date()) {
       const bonusDays = Math.ceil((bonusEnd.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
       expiresAt.setDate(expiresAt.getDate() + bonusDays)
+      bonusConsumed = true
     }
   }
 
@@ -95,7 +109,11 @@ export async function checkAndSettlePlanPayment(row: PlanPaymentRow): Promise<'p
   // silently discarding the failure.
   const { error: planError } = await supabase
     .from('profiles')
-    .update({ plan: row.plan, plan_expires_at: expiresAt.toISOString() })
+    .update({
+      plan: row.plan,
+      plan_expires_at: expiresAt.toISOString(),
+      ...(bonusConsumed ? { bonus_expires_at: null } : {}),
+    })
     .eq('id', row.user_id)
   if (planError) console.error('CRITICAL: plan payment', row.id, 'for user', row.user_id, 'confirmed paid but plan activation failed:', planError.message)
 
