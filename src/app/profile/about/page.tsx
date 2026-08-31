@@ -1,9 +1,14 @@
 'use client'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { motion, useReducedMotion } from 'framer-motion'
 import { useLanguage } from '@/components/LanguageProvider'
 import { backLabel } from '@/lib/a11yLabels'
 import { profileContentDict } from '@/lib/i18n/profileContent'
+import { supportDict } from '@/lib/i18n/support'
+import { supabase } from '@/lib/supabase'
+import { getActivePlan } from '@/lib/plan'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 
@@ -70,8 +75,26 @@ export default function About() {
   const router = useRouter()
   const { lang } = useLanguage()
   const t = profileContentDict[lang]
+  const s = supportDict[lang]
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw
+  // Telegram support is included from the Basic plan up (see src/lib/plan.ts);
+  // free users (incl. before the profile loads) see an /upgrade notice instead.
+  const [canTelegramSupport, setCanTelegramSupport] = useState(false)
+
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('plan, plan_expires_at, bonus_expires_at, trial_expires_at')
+        .eq('id', user.id)
+        .single()
+      const { plan, isActive } = getActivePlan(profile)
+      setCanTelegramSupport(isActive && plan !== 'free')
+    })()
+  }, [])
 
   const fadeIn = (i: number) => ({
     initial: reduceMotion ? false : { opacity: 0, y: 12 },
@@ -81,7 +104,9 @@ export default function About() {
 
   const contactItems = [
     { icon: <GlobeIcon />, colorVar: '--nav-accent', label: t.websiteLabel, value: 'invoices.kz', action: () => window.open('https://invoices.kz', '_blank') },
-    { icon: <SendIcon />, colorVar: '--nav-teal', label: t.supportLabel, value: 'Telegram', action: () => window.open('https://t.me/invoiceskz_support', '_blank') },
+    ...(canTelegramSupport
+      ? [{ icon: <SendIcon />, colorVar: '--nav-teal', label: t.supportLabel, value: 'Telegram', action: () => window.open('https://t.me/invoiceskz_support', '_blank') }]
+      : []),
     { icon: <MailIcon />, colorVar: '--nav-magenta', label: t.emailLabel, value: 'support@invoices.kz', action: () => window.open('mailto:support@invoices.kz') },
   ]
 
@@ -133,6 +158,13 @@ export default function About() {
             </div>
           ))}
         </motion.div>
+
+        {!canTelegramSupport && (
+          <motion.p {...fadeIn(2)} className="text-xs px-1" style={{ color: 'var(--nav-text-muted)' }}>
+            {s.telegramGatedNotice}{' '}
+            <Link href="/upgrade" className="underline" style={{ color: 'var(--nav-accent)' }}>{s.upgradeLinkLabel}</Link>
+          </motion.p>
+        )}
 
         <motion.div {...fadeIn(3)} className="nav-glass rounded-2xl overflow-hidden">
           <div className="px-4 pt-4 pb-2 text-[11px] font-extrabold uppercase" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.09em' }}>{t.documentsSectionLabel}</div>

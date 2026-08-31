@@ -1,9 +1,14 @@
 'use client'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { motion, useReducedMotion } from 'framer-motion'
 import { useLanguage } from '@/components/LanguageProvider'
 import { backLabel } from '@/lib/a11yLabels'
 import { profileContentDict } from '@/lib/i18n/profileContent'
+import { supportDict } from '@/lib/i18n/support'
+import { supabase } from '@/lib/supabase'
+import { getActivePlan } from '@/lib/plan'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 
@@ -47,8 +52,26 @@ export default function Support() {
   const router = useRouter()
   const { lang } = useLanguage()
   const t = profileContentDict[lang]
+  const s = supportDict[lang]
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw
+  // Telegram support is included from the Basic plan up (see src/lib/plan.ts);
+  // free users (incl. before the profile loads) see an /upgrade notice instead.
+  const [canTelegramSupport, setCanTelegramSupport] = useState(false)
+
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('plan, plan_expires_at, bonus_expires_at, trial_expires_at')
+        .eq('id', user.id)
+        .single()
+      const { plan, isActive } = getActivePlan(profile)
+      setCanTelegramSupport(isActive && plan !== 'free')
+    })()
+  }, [])
 
   const fadeIn = (i: number) => ({
     initial: reduceMotion ? false : { opacity: 0, y: 12 },
@@ -74,22 +97,40 @@ export default function Support() {
         </motion.p>
 
         <motion.div {...fadeIn(2)} className={`nav-glass rounded-2xl overflow-hidden ${CARD_HOVER}`}>
-          <a href="https://t.me/invoiceskz_support"
-            target="_blank"
-            className="flex items-center justify-between px-4 py-4 transition-colors hover:bg-[var(--nav-surface-glass)]"
-            style={{ borderBottom: '1px solid var(--nav-border-soft)' }}>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
-                style={{ background: 'linear-gradient(135deg, var(--nav-teal-soft), transparent)', color: 'var(--nav-teal)' }}>
-                <SendIcon />
+          {canTelegramSupport ? (
+            <a href="https://t.me/invoiceskz_support"
+              target="_blank"
+              className="flex items-center justify-between px-4 py-4 transition-colors hover:bg-[var(--nav-surface-glass)]"
+              style={{ borderBottom: '1px solid var(--nav-border-soft)' }}>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+                  style={{ background: 'linear-gradient(135deg, var(--nav-teal-soft), transparent)', color: 'var(--nav-teal)' }}>
+                  <SendIcon />
+                </div>
+                <div>
+                  <div className="text-sm font-medium" style={{ color: 'var(--nav-text-primary)' }}>{t.telegramContactLabel}</div>
+                  <div className="text-xs" style={{ color: 'var(--nav-success)' }}>{t.telegramResponseTimeLabel}</div>
+                </div>
               </div>
-              <div>
-                <div className="text-sm font-medium" style={{ color: 'var(--nav-text-primary)' }}>{t.telegramContactLabel}</div>
-                <div className="text-xs" style={{ color: 'var(--nav-success)' }}>{t.telegramResponseTimeLabel}</div>
+              <span style={{ color: 'var(--nav-text-muted)' }}><ChevronRightIcon /></span>
+            </a>
+          ) : (
+            <div className="flex items-center px-4 py-4" style={{ borderBottom: '1px solid var(--nav-border-soft)' }}>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+                  style={{ background: 'var(--nav-border-soft)', color: 'var(--nav-text-muted)' }}>
+                  <SendIcon />
+                </div>
+                <div>
+                  <div className="text-sm font-medium" style={{ color: 'var(--nav-text-primary)' }}>{t.telegramContactLabel}</div>
+                  <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>
+                    {s.telegramGatedNotice}{' '}
+                    <Link href="/upgrade" className="underline" style={{ color: 'var(--nav-accent)' }}>{s.upgradeLinkLabel}</Link>
+                  </div>
+                </div>
               </div>
             </div>
-            <span style={{ color: 'var(--nav-text-muted)' }}><ChevronRightIcon /></span>
-          </a>
+          )}
 
           <a href="mailto:support@invoices.kz"
             className="flex items-center justify-between px-4 py-4 transition-colors hover:bg-[var(--nav-surface-glass)]">

@@ -8,6 +8,9 @@ import DesktopShell from '@/components/DesktopShell'
 import { formatDateTime } from '@/lib/date'
 import Skeleton from '@/components/Skeleton'
 import Link from 'next/link'
+import { useLanguage } from '@/components/LanguageProvider'
+import { getActivePlan } from '@/lib/plan'
+import { supportDict } from '@/lib/i18n/support'
 
 // Same easing curve used on the landing page (src/app/page.tsx) -- kept
 // identical across the app rather than inventing a second "house" ease.
@@ -549,6 +552,8 @@ type Period = typeof PERIODS[number]
 
 export default function DashboardPage() {
   const router = useRouter()
+  const { lang } = useLanguage()
+  const s = supportDict[lang]
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw
   const [invoices, setInvoices] = useState<any[]>([])
@@ -556,6 +561,9 @@ export default function DashboardPage() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [period, setPeriod] = useState<Period>(14)
   const [kaspiApiStats, setKaspiApiStats] = useState<{ count: number; amount: number } | null>(null)
+  // Telegram support is included from the Basic plan up (see src/lib/plan.ts);
+  // free users (incl. before the profile loads) don't get the link, only Email.
+  const [canTelegramSupport, setCanTelegramSupport] = useState(false)
 
   useEffect(() => { load() }, [])
 
@@ -565,10 +573,12 @@ export default function DashboardPage() {
     const { data: { session } } = await supabase.auth.getSession()
     const [{ data }, { data: profile }] = await Promise.all([
       supabase.from('invoices').select('*, clients(name)').eq('user_id', user.id).order('created_at', { ascending: false }),
-      supabase.from('profiles').select('is_admin').eq('id', user.id).single(),
+      supabase.from('profiles').select('is_admin, plan, plan_expires_at, bonus_expires_at, trial_expires_at').eq('id', user.id).single(),
     ])
     setInvoices(data || [])
     setIsAdmin(!!profile?.is_admin)
+    const { plan, isActive } = getActivePlan(profile)
+    setCanTelegramSupport(isActive && plan !== 'free')
     setLoading(false)
 
     // Real usage for the Kaspi API tile (replaces the old static
@@ -1055,10 +1065,17 @@ export default function DashboardPage() {
                 <Link href="/terms" className="text-xs hover:underline" style={{ color: 'var(--nav-text-secondary)' }}>Условия</Link>
                 <Link href="/data-deletion" className="text-xs hover:underline" style={{ color: 'var(--nav-text-secondary)' }}>Удаление данных</Link>
               </nav>
-              <div className="flex flex-wrap gap-4">
+              <div className="flex flex-wrap items-center gap-4">
                 <a href="https://wa.me/77763555177" target="_blank" rel="noopener noreferrer" className="text-xs hover:underline" style={{ color: 'var(--nav-text-secondary)' }}>WhatsApp</a>
                 <a href="mailto:support@invoices.kz" className="text-xs hover:underline" style={{ color: 'var(--nav-text-secondary)' }}>Email</a>
-                <a href="https://t.me/invoiceskz_support" target="_blank" rel="noopener noreferrer" className="text-xs hover:underline" style={{ color: 'var(--nav-text-secondary)' }}>Telegram</a>
+                {canTelegramSupport ? (
+                  <a href="https://t.me/invoiceskz_support" target="_blank" rel="noopener noreferrer" className="text-xs hover:underline" style={{ color: 'var(--nav-text-secondary)' }}>Telegram</a>
+                ) : (
+                  <span className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>
+                    {s.telegramGatedNotice}{' '}
+                    <Link href="/upgrade" className="hover:underline" style={{ color: 'var(--nav-text-secondary)' }}>{s.upgradeLinkLabel}</Link>
+                  </span>
+                )}
               </div>
             </div>
           </footer>

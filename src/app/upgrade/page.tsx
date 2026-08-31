@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useLanguage } from '@/components/LanguageProvider'
 import { backLabel, closeLabel } from '@/lib/a11yLabels'
 import { miscDict } from '@/lib/i18n/misc'
+import { supportDict } from '@/lib/i18n/support'
 import { getActivePlan } from '@/lib/plan'
 import { PLAN_PRICES, type BillingPeriod } from '@/lib/plans/pricing'
 import { consumePendingUpgrade } from '@/lib/pendingUpgrade'
@@ -13,6 +14,7 @@ export default function Upgrade() {
   const router = useRouter()
   const { lang } = useLanguage()
   const t = miscDict[lang]
+  const s = supportDict[lang]
   const [promoCode, setPromoCode] = useState('')
   const [promoLoading, setPromoLoading] = useState(false)
   const [promoSuccess, setPromoSuccess] = useState('')
@@ -465,10 +467,21 @@ export default function Upgrade() {
         </div>
 
         <p className="text-center text-xs text-gray-400">
-          {t.questionsText}{' '}
-          <a href="https://t.me/invoiceskz_support" target="_blank" className="text-[#1C2056] underline">
-            {t.telegramLinkLabel}
-          </a>
+          {plan !== 'free' ? (
+            <>
+              {t.questionsText}{' '}
+              <a href="https://t.me/invoiceskz_support" target="_blank" className="text-[#1C2056] underline">
+                {t.telegramLinkLabel}
+              </a>
+            </>
+          ) : (
+            <>
+              {s.upgradeFooterEmailPrefix}
+              <a href="mailto:support@invoices.kz" className="text-[#1C2056] underline">
+                support@invoices.kz
+              </a>
+            </>
+          )}
         </p>
       </div>
 
