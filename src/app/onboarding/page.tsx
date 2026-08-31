@@ -67,6 +67,15 @@ export default function Onboarding() {
     if (error) { alert(t.errorPrefix(error.message)); setSaving(false); return }
 
     const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.access_token) {
+      // Without a real access token, /api/onboarding/grant below would be
+      // called with a literal "Bearer undefined" header, get a 401, and
+      // (previously) fail silently -- costing the user their 7-day trial
+      // with no visible error and no chance to retry.
+      alert(t.errorPrefix('Missing session, please try again'))
+      setSaving(false)
+      return
+    }
 
     if (refCode) {
       try {
@@ -74,7 +83,7 @@ export default function Onboarding() {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session?.access_token}`,
+            'Authorization': `Bearer ${session.access_token}`,
           },
           body: JSON.stringify({ userId: user.id, referralCode: refCode })
         })
@@ -82,16 +91,39 @@ export default function Onboarding() {
       localStorage.removeItem('referral_code')
     }
 
+    // Grants the 7-day trial (and promo bonus, if any) -- must succeed
+    // before advancing to step 2. The previous fire-and-forget try/catch
+    // swallowed every failure (network error, 401, 500) and always advanced
+    // the step regardless, so a user could lose the trial silently.
+    const requestGrant = () => fetch('/api/onboarding/grant', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ promoCode: promoCode || undefined })
+    })
+
+    let grantRes: Response
     try {
-      await fetch('/api/onboarding/grant', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token}`,
-        },
-        body: JSON.stringify({ promoCode: promoCode || undefined })
-      })
-    } catch {}
+      grantRes = await requestGrant()
+    } catch {
+      // Transient network hiccup -- retry once before giving up.
+      try {
+        grantRes = await requestGrant()
+      } catch (e: any) {
+        alert(t.errorPrefix(e?.message || 'Network error'))
+        setSaving(false)
+        return
+      }
+    }
+
+    if (!grantRes.ok) {
+      const data = await grantRes.json().catch(() => ({}) as any)
+      alert(t.errorPrefix(data.error || `HTTP ${grantRes.status}`))
+      setSaving(false)
+      return
+    }
     if (promoCode) localStorage.removeItem('promo_code')
 
     try {
@@ -99,7 +131,7 @@ export default function Onboarding() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token}`,
+          'Authorization': `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
           message: `🆕 <b>Новый пользователь!</b>\n👤 ${form.company_name}\n🔢 БИН: ${form.bin_iin}\n📧 ${user?.email}${refCode ? '\n🎁 Реферал: ' + refCode : ''}`

@@ -238,7 +238,15 @@ export default function Upgrade() {
 
       if (!res.ok) {
         if (res.status === 401) { router.push('/login'); return }
-        setPromoError(res.status === 409 ? t.promoAlreadyUsedError : t.promoNotFoundError)
+        if (res.status === 409) {
+          // Two distinct 409s share the status code: the code's own
+          // used_count/max_uses is exhausted, or the caller already has an
+          // active paid plan (refuse-if-active guard) -- distinguish them
+          // by the `error` field, not the status alone.
+          setPromoError(data.error === 'plan_active' ? t.promoPlanActiveError : t.promoAlreadyUsedError)
+        } else {
+          setPromoError(t.promoNotFoundError)
+        }
         setPromoLoading(false)
         return
       }

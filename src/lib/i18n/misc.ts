@@ -23,6 +23,7 @@ export interface MiscContent {
   enterPromoCodeError: string
   promoNotFoundError: string
   promoAlreadyUsedError: string
+  promoPlanActiveError: string
   promoActivatedMessage: (planLabel: string, days: number) => string
   monthlyToggleLabel: string
   annualToggleLabel: string
@@ -158,6 +159,7 @@ export const miscDict: Record<'ru' | 'kk' | 'en', MiscContent> = {
     enterPromoCodeError: 'Введите промокод',
     promoNotFoundError: 'Промокод не найден или недействителен',
     promoAlreadyUsedError: 'Промокод уже использован',
+    promoPlanActiveError: 'Промокод можно применить только без активного платного тарифа',
     promoActivatedMessage: (planLabel, days) => `🎉 Промокод активирован! ${planLabel} тариф на ${days} дней`,
     monthlyToggleLabel: 'Месяц',
     annualToggleLabel: 'Год',
@@ -290,6 +292,7 @@ export const miscDict: Record<'ru' | 'kk' | 'en', MiscContent> = {
     enterPromoCodeError: 'Промокодты енгізіңіз',
     promoNotFoundError: 'Промокод табылмады немесе жарамсыз',
     promoAlreadyUsedError: 'Промокод бұрын қолданылған',
+    promoPlanActiveError: 'Промокодты тек ақылы тарифіңіз белсенді болмаған жағдайда ғана қолдануға болады',
     promoActivatedMessage: (planLabel, days) => `🎉 Промокод белсендірілді! ${planLabel} тарифі ${days} күнге`,
     monthlyToggleLabel: 'Ай',
     annualToggleLabel: 'Жыл',
@@ -422,6 +425,7 @@ export const miscDict: Record<'ru' | 'kk' | 'en', MiscContent> = {
     enterPromoCodeError: 'Enter a promo code',
     promoNotFoundError: 'Promo code not found or invalid',
     promoAlreadyUsedError: 'Promo code already used',
+    promoPlanActiveError: "Promo codes can only be applied when you don't have an active paid plan",
     promoActivatedMessage: (planLabel, days) => `🎉 Promo code activated! ${planLabel} plan for ${days} days`,
     monthlyToggleLabel: 'Month',
     annualToggleLabel: 'Year',

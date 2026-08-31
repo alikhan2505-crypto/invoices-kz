@@ -43,7 +43,32 @@ export async function POST(req: NextRequest) {
   if (!promo) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
-  if (promo.used_count >= promo.max_uses) {
+
+  // Refuse-if-active guard: a promo sets `plan`/`plan_expires_at` outright
+  // (not additively), so redeeming one while an unrelated paid plan is
+  // still active would silently overwrite/downgrade it -- e.g. a Pro
+  // subscriber with 300 days left typing a Basic-30-day code would become
+  // Basic for 30 days. Checking this before touching promo_codes.used_count
+  // (below) also closes a second hole: without it, the same user could
+  // repeat this call indefinitely while their own plan stays active,
+  // draining used_count without the redemption ever actually applying.
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('plan, plan_expires_at')
+    .eq('id', user.id)
+    .single()
+
+  const planActive = !!profile?.plan && profile.plan !== 'free' &&
+    !!profile.plan_expires_at && new Date(profile.plan_expires_at) > new Date()
+  if (planActive) {
+    return NextResponse.json({ error: 'plan_active' }, { status: 409 })
+  }
+
+  // NULL max_uses means unlimited. Without this guard, `used_count >=
+  // max_uses` coerces a NULL max_uses to 0 in the numeric comparison, so
+  // any used_count (starting at 0) trips it and every "unlimited" code
+  // returns 409 on its very first redemption.
+  if (promo.max_uses != null && promo.used_count >= promo.max_uses) {
     return NextResponse.json({ error: 'Exhausted' }, { status: 409 })
   }
 
