@@ -31,8 +31,7 @@ interface Copy {
   pricingCaption: string
   pricingUsLabel: string
   pricingUsValue: string
-  pricingCompetitorLabel: string
-  pricingCompetitorValue: string
+  pricingExamples: FeatureRow[]
   featuresEyebrow: string
   featuresTitle: string
   features: FeatureRow[]
@@ -62,8 +61,10 @@ const COPY: Record<'ru' | 'en', Copy> = {
     pricingCaption: 'с суммы каждого оплаченного платежа. Ничего — если платежа не было.',
     pricingUsLabel: 'invoices.kz Kaspi Cashier API',
     pricingUsValue: '2% с оплаченного, без абонплаты и минимального оборота',
-    pricingCompetitorLabel: 'ApiPay.kz',
-    pricingCompetitorValue: '10 000–60 000 ₸/мес по лимиту объёма',
+    pricingExamples: [
+      { label: '50 оплаченных счетов по 3 000 ₸', value: '× 2% = 3 000 ₸' },
+      { label: '300 оплаченных счетов по 2 000 ₸', value: '× 2% = 12 000 ₸' },
+    ],
     featuresEyebrow: 'Возможности',
     featuresTitle: 'Что входит в API',
     features: [
@@ -96,8 +97,10 @@ const COPY: Record<'ru' | 'en', Copy> = {
     pricingCaption: 'of the amount of every payment actually paid. Nothing if there was no payment.',
     pricingUsLabel: 'invoices.kz Kaspi Cashier API',
     pricingUsValue: '2% of what is paid, no subscription, no minimum volume',
-    pricingCompetitorLabel: 'ApiPay.kz',
-    pricingCompetitorValue: '₸10,000–60,000/mo by volume tier',
+    pricingExamples: [
+      { label: '50 paid invoices of ₸3,000', value: '× 2% = ₸3,000' },
+      { label: '300 paid invoices of ₸2,000', value: '× 2% = ₸12,000' },
+    ],
     featuresEyebrow: 'Capabilities',
     featuresTitle: "What's in the API",
     features: [
@@ -330,10 +333,16 @@ export default function CashierApiPage() {
                 <span className="text-[13.5px] font-semibold">{t.pricingUsLabel}</span>
                 <span className="text-[13px]" style={{ color: C.accent, fontFamily: FONT_MONO }}>{t.pricingUsValue}</span>
               </div>
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg px-4 py-3" style={{ border: `1px dashed ${C.border}` }}>
-                <span className="text-[13.5px]" style={{ color: C.muted }}>{t.pricingCompetitorLabel}</span>
-                <span className="text-[13px]" style={{ color: C.muted, fontFamily: FONT_MONO }}>{t.pricingCompetitorValue}</span>
-              </div>
+              {t.pricingExamples.map((ex) => (
+                <div
+                  key={ex.label}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg px-4 py-3"
+                  style={{ border: `1px solid ${C.border}` }}
+                >
+                  <span className="text-[13.5px]" style={{ color: C.muted }}>{ex.label}</span>
+                  <span className="text-[13px]" style={{ color: C.text, fontFamily: FONT_MONO, fontVariantNumeric: 'tabular-nums' }}>{ex.value}</span>
+                </div>
+              ))}
             </div>
           </div>
         </section>
