@@ -51,15 +51,22 @@ export async function POST(req: NextRequest) {
     }
 
     // A customer with any still-unresolved pending request (from either this
-    // route or the QR-based create/route.ts) used to hard-block here -- in
-    // practice that made the QR modal's own "Отправить запрос на телефон"
-    // button dead on arrival, since openModal() in /upgrade already creates
-    // a pending row before the modal (and this button) is even shown. Settle
-    // each pending row first (checkAndSettlePlanPayment activates the plan
-    // and claims the row 'paid' as a side effect, same as the daily cron
-    // does) so a payment that already completed is never silently dropped,
-    // then supersede whatever is left -- the customer is choosing the phone
-    // flow instead of finishing the QR, not adding a second parallel charge.
+    // route or the QR-based create/route.ts) used to hard-block here, then
+    // (in the previous version of this route) got auto-superseded to
+    // 'expired' once settled -- but both settlement sweepers (the daily cron
+    // and /api/payment/status) only ever process 'pending' rows, so expiring
+    // a QR the customer goes on to pay in the Kaspi app afterward would
+    // silently drop that charge: money taken, plan never activated, nothing
+    // left to retry it. So instead: settle each pending row first
+    // (checkAndSettlePlanPayment activates the plan and claims the row
+    // 'paid' as a side effect, same as the daily cron does) so a payment
+    // that already completed is never silently dropped, then just proceed
+    // to create the phone invoice -- any pending QR row(s) left over are
+    // deliberately left alive rather than expired. Both the QR and the new
+    // phone invoice stay independently settleable, and if the customer ends
+    // up paying both, checkAndSettlePlanPayment's renewal-stacking logic in
+    // settlePlanPayment.ts adds them on top of each other correctly instead
+    // of one silently losing out.
     const { data: pendingRows, error: pendingError } = await supabase
       .from('payment_requests')
       .select('id, user_id, plan, amount, qr_operation_id, created_at, billing_period')
@@ -69,19 +76,21 @@ export async function POST(req: NextRequest) {
       console.error('Phone payment: pending-check failed, allowing request:', pendingError.message)
     } else if (pendingRows && pendingRows.length > 0) {
       for (const row of pendingRows as PlanPaymentRow[]) {
-        const result = await checkAndSettlePlanPayment(row)
-        if (result === 'paid') {
-          // The plan just activated from the pending QR -- treat this as a
-          // successful outcome for the caller, not a failure to retry.
-          return NextResponse.json({ error: 'already_paid' }, { status: 409 })
+        try {
+          const result = await checkAndSettlePlanPayment(row)
+          if (result === 'paid') {
+            // The plan just activated from the pending QR -- treat this as a
+            // successful outcome for the caller, not a failure to retry.
+            return NextResponse.json({ error: 'already_paid' }, { status: 409 })
+          }
+        } catch (e: any) {
+          // Same as the cron's per-row handling -- a throwing settle check
+          // (e.g. a degraded, non-throwing-turned-thrown Kaspi response) must
+          // never be fatal to this request. The row stays 'pending' and gets
+          // picked up by the next cron/status-poll sweep.
+          console.error('Phone payment: settle check failed for pending row', row.id, '— leaving it pending for the next sweep:', e.message)
         }
       }
-      const { error: supersedeError } = await supabase
-        .from('payment_requests')
-        .update({ status: 'expired' })
-        .eq('user_id', userId)
-        .eq('status', 'pending')
-      if (supersedeError) console.error('Phone payment: failed to supersede pending rows, allowing request:', supersedeError.message)
     }
 
     const connection = await loadPlatformConnection()

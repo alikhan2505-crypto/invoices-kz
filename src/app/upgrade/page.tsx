@@ -215,10 +215,17 @@ export default function Upgrade() {
       const data = await res.json()
       if (!res.ok || data.error) {
         if (data.error === 'already_paid') {
-          // The pending QR this button superseded had already been paid by
-          // the time the server checked -- the plan is active now, so this
-          // is a success, not a failure to retry.
+          // The pending QR had already been paid by the time the server
+          // checked -- the plan is active now, so this is a success, not a
+          // failure to retry. Both polls tied to the old QR must stop here:
+          // clearInterval only kills the profile-based poll, while the
+          // separate extTranId-keyed effect above keeps hitting
+          // /api/payment/status for the OLD order_id and would find it
+          // 'paid' ~5s later, calling router.push('/profile?upgraded=1')
+          // right over this success screen. Resetting extTranId lets that
+          // effect's cleanup stop it instead.
           clearInterval(statusInterval.current)
+          setExtTranId('')
           setShowPhoneModal(false)
           await reloadPlan()
           setStep('success')
