@@ -944,7 +944,7 @@ export default function Home() {
       </Reveal>
 
       {/* ----------------------------------------------------------- how */}
-      <section id="how" className="relative z-10 mx-auto max-w-4xl px-5 py-20 sm:px-8 sm:py-28">
+      <section id="how" className="relative z-10 mx-auto max-w-4xl px-5 py-14 sm:px-8 sm:py-20">
         <Reveal className="text-center">
           <Eyebrow color={COLOR.teal}>{t.stepsEyebrow}</Eyebrow>
           <h2 className="mt-4 text-[clamp(1.9rem,4vw,2.75rem)] font-semibold tracking-[-0.02em]">{t.stepsTitle}</h2>
