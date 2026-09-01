@@ -32,7 +32,7 @@ export async function fetchKaspiOperations(userId: string, opts: {
 
   let query = supabase
     .from('kaspi_operations')
-    .select('id, order_number, amount, direction, category, client_name, matched_invoice_id, operation_date, invoices(number, client_name)')
+    .select('id, kaspi_operation_id, order_number, amount, direction, category, client_name, matched_invoice_id, operation_date, invoices(number, client_name)')
     .eq('user_id', userId)
     .order('operation_date', { ascending: false })
     .limit(limit)
@@ -49,9 +49,14 @@ export async function fetchKaspiOperations(userId: string, opts: {
   // 2% commission per successful incoming payment is debited from the same
   // wallet this connection funds (see wallet.ts's debitWalletForCommission),
   // but wallet_ledger has no FK back to kaspi_operations -- historySync.ts
-  // links them by convention via note = 'kaspi_operation:<id>' instead. One
-  // batched lookup for the current result set rather than N+1.
-  const incomingOpIds = (ops || []).filter((o: any) => o.direction === 'in').map((o: any) => o.id)
+  // links them by convention via note = 'kaspi_operation:<id>' instead, where
+  // <id> is the Kaspi-side kaspi_operation_id, NOT this table's own `id`
+  // primary key (a founder repro on 2026-09-01 -- a real commission debit
+  // visible in the wallet's own recent-activity list -- traced this join
+  // back to matching on the wrong column, so it could never find a row no
+  // matter how correctly the debit's note was written). One batched lookup
+  // for the current result set rather than N+1.
+  const incomingOpIds = (ops || []).filter((o: any) => o.direction === 'in').map((o: any) => o.kaspi_operation_id)
   const commissionByOpId = new Map<string, number>()
   if (incomingOpIds.length > 0) {
     const { data: ledgerRows } = await supabase
@@ -78,6 +83,6 @@ export async function fetchKaspiOperations(userId: string, opts: {
     matchedInvoiceId: o.matched_invoice_id,
     matchedInvoiceNumber: o.invoices?.number ?? null,
     operationDate: o.operation_date,
-    commissionAmount: o.direction === 'in' ? (commissionByOpId.get(o.id) ?? null) : null,
+    commissionAmount: o.direction === 'in' ? (commissionByOpId.get(o.kaspi_operation_id) ?? null) : null,
   }))
 }
