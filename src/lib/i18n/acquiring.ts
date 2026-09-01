@@ -69,6 +69,7 @@ export interface AcquiringContent {
   kaspiDocsHint: string
   kaspiWalletBalanceLabel: string
   kaspiTopupPresetsLabel: string
+  kaspiTopupNoFeeHint: string
   kaspiTopupCustomPlaceholder: string
   kaspiTopupButton: string
   kaspiTopupStartingLabel: string
@@ -90,6 +91,7 @@ export interface AcquiringContent {
   kaspiStatsMonthLabel: string
   kaspiStatsAllTimeLabel: string
   kaspiConversionStatsTitle: string
+  kaspiConversionStatsHint: string
   kaspiConversionRateLabel: string
   kaspiConversionNoDataLabel: string
   kaspiStatusPaid: string
@@ -202,6 +204,7 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiDocsHint: 'Есть вопросы по подключению или запросам? Ответы в документации.',
     kaspiWalletBalanceLabel: 'Баланс кошелька',
     kaspiTopupPresetsLabel: 'Пополнить на сумму',
+    kaspiTopupNoFeeHint: 'Зачисляется на баланс полностью, без комиссии. Комиссия 2% списывается отдельно, позже — только когда клиент оплачивает ваш счёт, заказ или API-платёж.',
     kaspiTopupCustomPlaceholder: 'Своя сумма, ₸',
     kaspiTopupButton: 'Пополнить',
     kaspiTopupStartingLabel: 'Готовим оплату...',
@@ -223,6 +226,7 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiStatsMonthLabel: 'За 30 дней',
     kaspiStatsAllTimeLabel: 'Всего',
     kaspiConversionStatsTitle: 'Статистика приёма платежей',
+    kaspiConversionStatsHint: 'Процент — доля оплаченных клиентами ссылок от всех созданных за период (счета + API). Пополнения своего баланса сюда не входят.',
     kaspiConversionRateLabel: 'Конверсия',
     kaspiConversionNoDataLabel: 'Нет данных',
     kaspiStatusPaid: 'Оплачен',
@@ -333,6 +337,7 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiDocsHint: 'Қосылу немесе сұраулар бойынша сұрақтарыңыз бар ма? Жауаптар құжаттамада.',
     kaspiWalletBalanceLabel: 'Әмиян балансы',
     kaspiTopupPresetsLabel: 'Мына сомаға толтыру',
+    kaspiTopupNoFeeHint: 'Балансқа толығымен, комиссиясыз есептеледі. 2% комиссия бөлек, кейінірек — тек клиент шотыңызды, тапсырысыңызды немесе API-төлемді төлегенде ғана алынады.',
     kaspiTopupCustomPlaceholder: 'Өз сомаңыз, ₸',
     kaspiTopupButton: 'Толтыру',
     kaspiTopupStartingLabel: 'Төлем дайындалуда...',
@@ -354,6 +359,7 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiStatsMonthLabel: '30 күн ішінде',
     kaspiStatsAllTimeLabel: 'Барлығы',
     kaspiConversionStatsTitle: 'Төлемдерді қабылдау статистикасы',
+    kaspiConversionStatsHint: 'Пайыз — кезең ішінде жасалған барлық сілтемелерден (шоттар + API) клиенттер төлеген сілтемелердің үлесі. Өз балансын толтырулар мұнда кірмейді.',
     kaspiConversionRateLabel: 'Конверсия',
     kaspiConversionNoDataLabel: 'Деректер жоқ',
     kaspiStatusPaid: 'Төленді',
@@ -464,6 +470,7 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiDocsHint: 'Questions about connecting or making requests? The documentation has the answers.',
     kaspiWalletBalanceLabel: 'Wallet balance',
     kaspiTopupPresetsLabel: 'Top up by',
+    kaspiTopupNoFeeHint: 'Credited to your balance in full, no fee. The 2% commission is charged separately, later — only when a customer pays your invoice, order, or an API payment.',
     kaspiTopupCustomPlaceholder: 'Custom amount, ₸',
     kaspiTopupButton: 'Top up',
     kaspiTopupStartingLabel: 'Preparing payment...',
@@ -485,6 +492,7 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiStatsMonthLabel: 'Last 30 days',
     kaspiStatsAllTimeLabel: 'All time',
     kaspiConversionStatsTitle: 'Payment acceptance stats',
+    kaspiConversionStatsHint: 'The percentage is the share of links customers actually paid, out of all links created in the period (invoices + API). Topping up your own balance isn\'t counted here.',
     kaspiConversionRateLabel: 'Conversion',
     kaspiConversionNoDataLabel: 'No data',
     kaspiStatusPaid: 'Paid',

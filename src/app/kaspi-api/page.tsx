@@ -796,7 +796,15 @@ export default function KaspiApiPage() {
 
               {kaspiStats && (
                 <div className="rounded-xl p-3 mb-3 mt-2" style={{ background: 'var(--nav-surface-glass)' }}>
-                  <div className="text-xs font-semibold mb-2" style={{ color: 'var(--nav-text-primary)' }}>{t.kaspiConversionStatsTitle}</div>
+                  <div className="text-xs font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>{t.kaspiConversionStatsTitle}</div>
+                  {/* Founder feedback (2026-09-01): "не понял, за 24ч было 2
+                      платежа а тут нет данных" -- this counts ONLY
+                      kaspi_payment_requests (customer paid an invoice/API
+                      link), deliberately excluding kaspi_wallet_topups (see
+                      /api/kaspi/dashboard's rollup()) -- the founder's 2
+                      recent "payments" were both wallet top-ups, so 0 here is
+                      correct, just unexplained without this line. */}
+                  <p className="text-[11px] mb-2" style={{ color: 'var(--nav-text-muted)' }}>{t.kaspiConversionStatsHint}</p>
                   <div className="grid grid-cols-3 gap-2">
                     {([
                       [t.kaspiStatsTodayLabel, kaspiStats.last24h],
@@ -819,6 +827,15 @@ export default function KaspiApiPage() {
 
               {!kaspiTopupPending && (
                 <>
+                  {/* Founder feedback (2026-09-01), 3rd recurrence of the same
+                      confusion (Выписка commission column, wallet widget
+                      history, now here): a top-up itself is never
+                      commission-bearing (creditWallet in wallet.ts credits
+                      the full amount) -- only a REAL customer payment settled
+                      via checkAndSettleKaspiPayment debits the 2%. Spelled
+                      out explicitly right where the amount is chosen, not
+                      just implied by kaspiCommissionHint above. */}
+                  <p className="text-[11px] mb-2" style={{ color: 'var(--nav-text-muted)' }}>{t.kaspiTopupNoFeeHint}</p>
                   <div className="text-xs mb-1 mt-2" style={{ color: 'var(--nav-text-muted)' }}>{t.kaspiTopupPresetsLabel}</div>
                   <div className="flex gap-2 flex-wrap mb-2">
                     {[1000, 5000, 10000, 50000].map(amount => (
