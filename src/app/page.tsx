@@ -243,6 +243,7 @@ interface Copy {
   bento: { icon: BentoKey; title: string; desc: string; chip: string; href?: string }[]
   botTitle: string
   botSubtitle: string
+  botAvailabilityNote: string
   botTabs: { key: BotTabKey; label: string }[]
   botKaspi: {
     stat: string
@@ -280,6 +281,7 @@ interface Copy {
     toggleYearBadge: string
     suffixMonth: string
     suffixYear: string
+    annualSavingsLabel: (amount: string) => string
     free: { name: string; cta: string }
     basic: { name: string; cta: string }
     pro: { name: string; badge: string; cta: string }
@@ -335,6 +337,7 @@ const COPY: Record<Lang, Copy> = {
     ],
     botTitle: 'Ещё два сотрудника, которым не нужна зарплата',
     botSubtitle: 'Kaspi Bot держит цены под контролем, AI-агент отвечает клиентам — 24/7, без вашего участия.',
+    botAvailabilityNote: 'Сейчас в раннем доступе, открываем для всех на тарифе Про постепенно',
     botTabs: [
       { key: 'kaspibot', label: 'Kaspi Bot' },
       { key: 'aiagent', label: 'AI-агент' },
@@ -380,6 +383,7 @@ const COPY: Record<Lang, Copy> = {
       toggleYearBadge: '2 месяца в подарок',
       suffixMonth: '/мес',
       suffixYear: '/год',
+      annualSavingsLabel: (amount) => `Экономия ${amount} ₸/год`,
       free: { name: 'Бесплатно', cta: 'Начать бесплатно' },
       basic: { name: 'Базовый', cta: 'Подключить' },
       pro: { name: 'Про', badge: 'Максимум', cta: 'Подключить' },
@@ -449,6 +453,7 @@ const COPY: Record<Lang, Copy> = {
     ],
     botTitle: 'Жалақы сұрамайтын тағы екі қызметкер',
     botSubtitle: 'Kaspi Bot бағаны бақылауда ұстайды, AI-агент клиенттерге жауап береді — 24/7, сіздің қатысуыңызсыз.',
+    botAvailabilityNote: 'Қазір ерте қолжетімділікте, Про тарифіндегі барлығына бірте-бірте ашамыз',
     botTabs: [
       { key: 'kaspibot', label: 'Kaspi Bot' },
       { key: 'aiagent', label: 'AI-агент' },
@@ -494,6 +499,7 @@ const COPY: Record<Lang, Copy> = {
       toggleYearBadge: '2 ай сыйлыққа',
       suffixMonth: '/ай',
       suffixYear: '/жыл',
+      annualSavingsLabel: (amount) => `Үнемдеу ${amount} ₸/жыл`,
       free: { name: 'Тегін', cta: 'Тегін бастау' },
       basic: { name: 'Базалық', cta: 'Қосылу' },
       pro: { name: 'Про', badge: 'Максимум', cta: 'Қосылу' },
@@ -563,6 +569,7 @@ const COPY: Record<Lang, Copy> = {
     ],
     botTitle: 'Two more employees who never ask for a salary',
     botSubtitle: 'Kaspi Bot keeps your prices in check, the AI agent replies to customers — 24/7, with no effort from you.',
+    botAvailabilityNote: 'Currently in early access — rolling out to all Pro plans gradually',
     botTabs: [
       { key: 'kaspibot', label: 'Kaspi Bot' },
       { key: 'aiagent', label: 'AI Agent' },
@@ -608,6 +615,7 @@ const COPY: Record<Lang, Copy> = {
       toggleYearBadge: '2 months free',
       suffixMonth: '/mo',
       suffixYear: '/yr',
+      annualSavingsLabel: (amount) => `Save ${amount} ₸/yr`,
       free: { name: 'Free', cta: 'Start for free' },
       basic: { name: 'Basic', cta: 'Subscribe' },
       pro: { name: 'Pro', badge: 'Maximum', cta: 'Subscribe' },
@@ -1427,6 +1435,12 @@ function BotShowcase({ t }: { t: Copy }) {
       <Reveal className="max-w-2xl">
         <h2 className="text-[clamp(1.9rem,4vw,2.75rem)] font-semibold leading-[1.08] tracking-[-0.02em]">{t.botTitle}</h2>
         <p className="mt-4 text-[15px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.82)' }}>{t.botSubtitle}</p>
+        <span
+          className="mt-4 inline-flex items-center rounded-full px-3 py-1 text-[12px] font-medium"
+          style={{ background: 'rgba(94,234,212,0.12)', color: '#5EEAD4', border: '1px solid rgba(94,234,212,0.28)' }}
+        >
+          {t.botAvailabilityNote}
+        </span>
       </Reveal>
 
       <Reveal delay={0.08} className="mt-8">
@@ -1651,6 +1665,8 @@ function PricingSection({ t, lang, goLogin }: { t: Copy; lang: Lang; goLogin: ()
   const misc = miscDict[lang]
   const suffix = period === 'monthly' ? t.pricing.suffixMonth : t.pricing.suffixYear
   const formatPrice = (plan: 'basic' | 'pro') => `${PLAN_PRICES[plan][period].toLocaleString('ru-KZ')} ₸`
+  const annualSavings = (plan: 'basic' | 'pro') =>
+    (PLAN_PRICES[plan].monthly * 12 - PLAN_PRICES[plan].annual).toLocaleString('ru-KZ')
 
   const priceTransition = {
     initial: reduce ? false : { opacity: 0, y: 4 },
@@ -1745,6 +1761,11 @@ function PricingSection({ t, lang, goLogin }: { t: Copy; lang: Lang; goLogin: ()
                 {suffix}
               </span>
             </div>
+            {period === 'annual' && (
+              <div className="mt-1 text-[12px] font-medium" style={{ color: '#5EEAD4' }}>
+                {t.pricing.annualSavingsLabel(annualSavings('basic'))}
+              </div>
+            )}
             <ul className="mt-6 flex-1 space-y-3">
               {misc.basicFeatures.map((f) => (
                 <FeatureRow key={f} label={f} />
@@ -1789,6 +1810,11 @@ function PricingSection({ t, lang, goLogin }: { t: Copy; lang: Lang; goLogin: ()
                 {suffix}
               </span>
             </div>
+            {period === 'annual' && (
+              <div className="mt-1 text-[12px] font-medium" style={{ color: '#5EEAD4' }}>
+                {t.pricing.annualSavingsLabel(annualSavings('pro'))}
+              </div>
+            )}
             <ul className="mt-6 flex-1 space-y-3">
               {misc.proFeatures.map((f) => (
                 <FeatureRow key={f} label={f} emphasized />
