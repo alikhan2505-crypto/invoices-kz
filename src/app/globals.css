@@ -752,3 +752,32 @@ html {
   opacity: 1 !important;
 }
 
+/* The REAL reason the typed text itself (not just the placeholder) read as
+   invisible: the site-wide `input { color: #111827; -webkit-text-fill-color:
+   #111827 }` rule near the top of this file (a near-black color, meant for
+   the light app theme) sets -webkit-text-fill-color -- a WebKit/Blink-only
+   property that overrides `color` for the actual rendered glyph fill on
+   Chrome/Safari regardless of what `color` (inline or otherwise) says. Every
+   input on this page set `color` via inline style, which beat the global
+   rule's `color` fine, but never touched -webkit-text-fill-color, so the
+   near-black glyphs rendered anyway on this dark background (the custom
+   top-up amount input, and the period-picker's two date inputs). Scoped
+   here instead of patched per input so any input added to this theme later
+   doesn't reintroduce the same bug. No !important needed against light-
+   theme users (higher selector specificity than the plain `input` rule is
+   enough); a dark-app-theme user instead gets caught by
+   [data-theme="dark"] input's own !important override to white, which is
+   coincidentally already visible on this scope's near-black background. */
+.cashier-dev-theme input {
+  -webkit-text-fill-color: var(--nav-text-primary);
+}
+
+/* Tells the browser to render NATIVE form-control chrome (the type="date"
+   calendar-picker-indicator icon, its popup calendar, spin buttons) in dark
+   colors instead of its default light-UI assumption -- otherwise the date
+   inputs' own icon is a dark glyph that all but disappears against this
+   scope's near-black background, on top of the text-fill-color bug above. */
+.cashier-dev-theme input[type="date"] {
+  color-scheme: dark;
+}
+
