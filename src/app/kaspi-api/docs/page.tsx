@@ -25,6 +25,8 @@ interface DocsCopy {
   disclosureTitle: string
   disclosureBody: string
   supportTitle: string
+  quickStartTitle: string
+  quickStartSteps: string[]
 }
 
 const DOCS_COPY: Record<'ru' | 'en', DocsCopy> = {
@@ -52,6 +54,13 @@ const isValid = signature === req.headers['x-kaspi-pay-signature'];`,
     disclosureTitle: 'Важно знать',
     disclosureBody: 'Это не официальный Kaspi merchant API — интеграция сделана по тому же принципу, что и мобильное приложение Kaspi Pay Cashier. Мы поддерживаем совместимость и уведомим вас, если Kaspi изменит свою сторону.',
     supportTitle: 'Поддержка',
+    quickStartTitle: 'Как отправить первый запрос',
+    quickStartSteps: [
+      'В блоке «Authentication» вставьте в поле Bearer Token свой API-токен Kaspi Cashier (выдаётся один раз на странице /kaspi-api при подключении роли «Кассир»).',
+      'В блоке «Request Body» замените example-значения на свои: amount — сумма в тенге, order_id — ваш уникальный ID заказа, callback_url — необязательно.',
+      'Блоки Cookies, Headers и Query Parameters трогать не нужно — для этого запроса они не используются, оставьте как есть.',
+      'Нажмите зелёную кнопку Send — в панели Response справа появится ссылка/QR для оплаты клиентом.',
+    ],
   },
   en: {
     loading: 'Loading…',
@@ -77,6 +86,13 @@ const isValid = signature === req.headers['x-kaspi-pay-signature'];`,
     disclosureTitle: 'Good to know',
     disclosureBody: 'This is not an official Kaspi merchant API — the integration works the same way the Kaspi Pay Cashier mobile app does. We maintain compatibility and will notify you if Kaspi changes their side.',
     supportTitle: 'Support',
+    quickStartTitle: 'How to send your first request',
+    quickStartSteps: [
+      'In the "Authentication" block, paste your Kaspi Cashier API token into the Bearer Token field (issued once on /kaspi-api when you connect the "Cashier" role).',
+      'In the "Request Body" block, replace the example values with your own: amount — the amount in tenge, order_id — your own unique order ID, callback_url — optional.',
+      'Leave the Cookies, Headers, and Query Parameters blocks alone — this request doesn\'t use them.',
+      'Click the green Send button — the Response panel on the right will show the payment link/QR for the customer.',
+    ],
   },
 }
 
@@ -206,6 +222,28 @@ export default function KaspiApiDocsPage() {
           <Panel>
             <p className="text-[13px] leading-relaxed" style={{ color: C.accent }}>{d.liveWarning}</p>
           </Panel>
+        </div>
+
+        {/* Scalar's own "Try it" panel below always renders the full generic
+            HTTP-client scaffolding (Authentication, Cookies, Headers, Query
+            Parameters, Request Body) for every operation regardless of
+            whether a given endpoint uses them -- there's no Scalar config to
+            hide the unused sections, and its React wrapper exposes no slot
+            to inject text inside the panel itself. Founder feedback
+            (2026-09-01): compared to xPayment's simpler form, this reads as
+            "too many empty cells" with no clear indication of which two
+            actually matter. This callout sits immediately above the widget
+            instead, naming the exact fields to fill (Bearer Token, Request
+            Body) and explicitly telling the reader to ignore the rest. */}
+        <div className="mx-auto max-w-6xl px-5 pb-6 sm:px-8">
+          <div className="rounded-xl p-4" style={{ background: C.bg1, border: `1px solid ${C.borderStrong}` }}>
+            <h3 className="text-[13px] font-semibold" style={{ color: C.accent }}>{d.quickStartTitle}</h3>
+            <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-[13px] leading-relaxed" style={{ color: C.text }}>
+              {d.quickStartSteps.map((step, i) => (
+                <li key={i}>{step}</li>
+              ))}
+            </ol>
+          </div>
         </div>
 
         <div className="mx-auto max-w-6xl sm:px-8">
