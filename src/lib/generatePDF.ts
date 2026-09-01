@@ -303,8 +303,13 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<string> {
           <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(data.viewUrl || data.kaspiPayLink)}"
             style="width:100px;height:100px;flex-shrink:0;" />
           <div>
-            <div style="font-weight:bold;font-size:12px;color:#1C2056;margin-bottom:4px;">Оплатить через Kaspi Pay</div>
-            <div style="font-size:10px;color:#6b7280;">${data.viewUrl ? 'Отсканируйте QR-код — откроется страница счёта с оплатой' : 'Отсканируйте QR-код камерой телефона'}</div>
+            ${data.viewUrl ? `
+              <div style="font-weight:bold;font-size:12px;color:#1C2056;margin-bottom:4px;">Оплата счёта онлайн</div>
+              <div style="font-size:10px;color:#6b7280;">Наведите камеру телефона (не приложение Kaspi — оно этот QR не распознаёт) — откроется страница счёта с оплатой Kaspi Pay</div>
+            ` : `
+              <div style="font-weight:bold;font-size:12px;color:#1C2056;margin-bottom:4px;">Оплатить через Kaspi Pay</div>
+              <div style="font-size:10px;color:#6b7280;">Отсканируйте QR-код камерой телефона</div>
+            `}
           </div>
         </div>
       ` : ''}
