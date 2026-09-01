@@ -94,8 +94,18 @@ export async function checkAndSettleKaspiPayment(reqRow: SettleableRequest): Pro
   // confirmed paid, never at link-creation time and never for anything that
   // expires unpaid. This applies uniformly whether the payment came from an
   // invoice auto-mint link or the external API — one rule, no special cases.
+  //
+  // The note is the SAME 'kaspi_operation:<id>' convention historySync.ts and
+  // the pending-match confirm route use (see wallet_ledger's lack of a real
+  // FK to kaspi_operations) -- without it, this call site's commission debit
+  // was invisible to the Выписка statement's commission-column join
+  // (operationsQuery.ts matches on this exact note string), even though the
+  // balance itself was correctly debited. This is the path EVERY real
+  // Kaspi Cashier payment settles through (invoice, external API, Kaspi
+  // Shop order), so the gap meant the statement's "Комиссия 2%" column
+  // silently showed "—" for the large majority of real commission charges.
   try {
-    await debitWalletForCommission(reqRow.user_id, Number(reqRow.amount), reqRow.id)
+    await debitWalletForCommission(reqRow.user_id, Number(reqRow.amount), reqRow.id, `kaspi_operation:${reqRow.kaspi_operation_id}`)
   } catch (e: any) {
     // A failed debit must never un-confirm a real payment the customer
     // already received — logged for manual reconciliation, not retried

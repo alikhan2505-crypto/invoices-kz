@@ -405,7 +405,7 @@ export default function AcquiringPage() {
                   <ApiIcon />
                 </span>
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>Kaspi API</div>
+                  <div className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>Kaspi Cashier API</div>
                   <p className="text-xs mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>Подключение Kaspi Pay Cashier, API-токен, вебхуки и выписка теперь в своём разделе.</p>
                 </div>
                 <span className="flex-shrink-0" style={{ color: 'var(--nav-text-muted)' }}><ChevronRightIcon /></span>

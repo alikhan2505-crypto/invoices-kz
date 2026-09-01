@@ -91,6 +91,9 @@ export default function CreateInvoicePage() {
   const [bankAccounts, setBankAccounts] = useState<any[]>([])
   const [showBankPicker, setShowBankPicker] = useState(false)
   const [showVatHint, setShowVatHint] = useState(false)
+  // null while unknown (fetch pending) so the hint below never flashes on
+  // for an already-connected founder before the check resolves.
+  const [kaspiCashierConnected, setKaspiCashierConnected] = useState<boolean | null>(null)
   const vatHintRef = useRef<HTMLSpanElement>(null)
   const [pendingInvoiceData, setPendingInvoiceData] = useState<any>(null)
   // Ref для хранения открытого окна PDF
@@ -142,6 +145,19 @@ export default function CreateInvoicePage() {
     const { data: banks } = await supabase
       .from('bank_accounts').select('*').eq('user_id', user.id).order('is_main', { ascending: false })
     setBankAccounts(banks || [])
+
+    // Kaspi Cashier connection status, for the "connect for exact-amount
+    // tracked payments" hint next to the live preview (desktop only, per
+    // founder request) -- fire-and-forget, doesn't block the rest of the
+    // form loading. kaspi_connections has no client-facing RLS policy, so
+    // this goes through the same /api/kaspi/status route /kaspi-api itself
+    // uses rather than querying the table directly.
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      fetch('/api/kaspi/status', { headers: { Authorization: `Bearer ${session?.access_token}` } })
+        .then(res => (res.ok ? res.json() : null))
+        .then(data => setKaspiCashierConnected(!!data?.connected))
+        .catch(() => setKaspiCashierConnected(false))
+    })
 
     const monthStart = new Date()
     monthStart.setDate(1)
@@ -956,6 +972,14 @@ export default function CreateInvoicePage() {
             vatType={vatType}
             total={total}
           />
+          {kaspiCashierConnected === false && (
+            <div className="mt-4 rounded-xl p-4 text-xs leading-relaxed" style={{ background: 'var(--nav-surface-glass)', border: '1px solid var(--nav-border-soft)', color: 'var(--nav-text-secondary)' }}>
+              {t.kaspiCashierHintText}
+              <button type="button" onClick={() => router.push('/kaspi-api')} className="block mt-2 font-semibold text-left" style={{ color: 'var(--nav-accent)' }}>
+                {t.kaspiCashierHintLink}
+              </button>
+            </div>
+          )}
         </motion.div>
         </div>
       </div>

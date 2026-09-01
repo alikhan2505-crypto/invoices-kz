@@ -740,7 +740,17 @@ export default function KaspiApiPage() {
         <div className="nav-glass nav-card-accent rounded-2xl p-5">
           <div className="text-sm font-semibold mb-2" style={{ color: 'var(--nav-text-primary)' }}>{t.kaspiSectionTitle}</div>
           {!kaspiConnected && <p className="text-xs mb-2" style={{ color: 'var(--nav-text-muted)' }}>{t.kaspiIntroText}</p>}
-          <p className="text-xs mb-3" style={{ color: 'var(--nav-text-muted)' }}>{t.kaspiCommissionHint}</p>
+          <p className="text-xs mb-2" style={{ color: 'var(--nav-text-muted)' }}>{t.kaspiCommissionHint}</p>
+          {/* Founder feedback (2026-09-01): after connecting, kaspiIntroText's
+              own "автоматически получать ссылки на оплату для своих счетов"
+              disappears (it's gated on !kaspiConnected above), leaving no
+              visible confirmation that Счета already auto-uses this
+              connection -- getOrCreateKaspiPaymentForInvoice (invoicePayment.ts)
+              mints a Kaspi Pay link for every invoice purely off this
+              connection existing, no per-invoice toggle. Shown unconditionally
+              (not gated on kaspiConnected) so it answers the question before
+              connecting too. */}
+          <p className="text-xs mb-3" style={{ color: 'var(--nav-text-muted)' }}>{t.kaspiInvoiceAutoNote}</p>
           {profile?.is_admin && (
             <p className="text-xs rounded-lg px-3 py-2 mb-3" style={{ background: 'var(--nav-accent-soft)', color: 'var(--nav-accent)' }}>{t.kaspiPlatformConnectionNote}</p>
           )}

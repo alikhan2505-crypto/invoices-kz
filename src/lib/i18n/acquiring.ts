@@ -77,6 +77,7 @@ export interface AcquiringContent {
   kaspiTopupPayLinkHint: string
   kaspiInsufficientBalanceHint: string
   kaspiCommissionHint: string
+  kaspiInvoiceAutoNote: string
   kaspiPlatformConnectionNote: string
   kaspiHistoryTitle: string
   kaspiHistoryEmptyLabel: string
@@ -209,6 +210,7 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiTopupPayLinkHint: 'Нажмите эту кнопку, только если открыли страницу на том же телефоне, где установлен Kaspi.kz — она откроет приложение Kaspi для оплаты в один тап. Если платите с компьютера, отсканируйте QR-код выше камерой телефона.',
     kaspiInsufficientBalanceHint: 'Баланс кошелька слишком низкий — при нехватке средств новые ссылки на оплату через Kaspi для ваших счетов создаваться не будут. Пополните баланс.',
     kaspiCommissionHint: 'Подключение и приём платежей через Kaspi — бесплатно. С каждого успешного платежа списывается комиссия 2% с баланса кошелька (пополняется заранее).',
+    kaspiInvoiceAutoNote: 'После подключения каждый счёт, который вы выставляете в разделе «Счета», автоматически получает оплату через Kaspi Pay — QR-код и ссылку на точную сумму счёта, без отдельной настройки для каждого счёта.',
     kaspiPlatformConnectionNote: 'Это подключение также используется для приёма оплаты тарифов и пополнений баланса от других пользователей invoices.kz — как административное подключение платформы.',
     kaspiHistoryTitle: 'Выписка Kaspi',
     kaspiHistoryEmptyLabel: 'Операций пока нет — нажмите «Обновить», чтобы загрузить выписку',
@@ -339,6 +341,7 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiTopupPayLinkHint: 'Бұл түймені тек Kaspi.kz орнатылған сол телефонда ашқан болсаңыз ғана басыңыз — ол Kaspi қосымшасын бір түртумен төлеу үшін ашады. Компьютерден төлесеңіз, жоғарыдағы QR-кодты телефон камерасымен сканерлеңіз.',
     kaspiInsufficientBalanceHint: 'Әмиян балансы тым төмен — қаражат жеткіліксіз болса, шоттарыңыз үшін Kaspi арқылы жаңа төлем сілтемелері жасалмайды. Балансты толтырыңыз.',
     kaspiCommissionHint: 'Kaspi арқылы қосылу және төлемдерді қабылдау — тегін. Әрбір сәтті төлемнен әмиян балансынан 2% комиссия алынады (алдын ала толтырылады).',
+    kaspiInvoiceAutoNote: 'Қосылғаннан кейін «Шоттар» бөлімінде шығарған әрбір шот автоматты түрде Kaspi Pay арқылы төлеуге болатын болады — шоттың нақты сомасына QR-код пен сілтеме, әрбір шот үшін бөлек баптаусыз.',
     kaspiPlatformConnectionNote: 'Бұл қосылым invoices.kz-тің басқа пайдаланушыларынан тариф пен әмиян толтыруларын қабылдау үшін де қолданылады — платформаның әкімшілік қосылымы ретінде.',
     kaspiHistoryTitle: 'Kaspi үзінді көшірмесі',
     kaspiHistoryEmptyLabel: 'Әзірге операциялар жоқ — үзінді көшірмені жүктеу үшін «Жаңарту» басыңыз',
@@ -469,6 +472,7 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiTopupPayLinkHint: "Only tap this if you opened this page on the same phone that has Kaspi.kz installed — it opens the Kaspi app for a one-tap payment. Paying from a computer? Scan the QR code above with your phone's camera instead.",
     kaspiInsufficientBalanceHint: 'Your wallet balance is too low — new Kaspi payment links for your invoices won\'t be created if funds run out. Top up your balance.',
     kaspiCommissionHint: 'Connecting and accepting Kaspi payments is free. A 2% commission is charged from your wallet balance (topped up in advance) on every successful payment.',
+    kaspiInvoiceAutoNote: 'Once connected, every invoice you issue in the "Invoices" section automatically gets a Kaspi Pay payment option — a QR code and link for the invoice\'s exact amount, no per-invoice setup needed.',
     kaspiPlatformConnectionNote: 'This connection is also used to accept plan payments and wallet top-ups from other invoices.kz users — as the platform\'s admin connection.',
     kaspiHistoryTitle: 'Kaspi statement',
     kaspiHistoryEmptyLabel: 'No transactions yet — press "Refresh" to load your statement',
