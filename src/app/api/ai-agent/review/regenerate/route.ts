@@ -4,7 +4,7 @@ import { generateAiReply } from '@/lib/instagramAiReply'
 import { buildBusinessContextLine, buildCatalogBlock, AgentTone, AgentGoal } from '@/lib/aiAgent/promptContext'
 import { loadAgentCatalog } from '@/lib/aiAgent/catalogContext'
 import { pairConversationHistory } from '@/lib/aiAgent/telegram'
-import { debitAiAgentWallet } from '@/lib/aiAgent/wallet'
+import { debitAiAgentWallet, hasAiAgentBudget } from '@/lib/aiAgent/wallet'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -81,6 +81,19 @@ export async function POST(req: NextRequest) {
     .maybeSingle()
   if (!questionRow?.text) return NextResponse.json({ error: 'question_not_found' }, { status: 400 })
 
+  const priorCount = typeof message.regen_count === 'number' ? message.regen_count : 0
+
+  // Checked before the AI call (not just before the debit further down) so
+  // a depleted wallet also skips the real Anthropic cost of a regeneration
+  // that could never be billed -- founder's explicit ask to extend the
+  // Kaspi Cashier mint-time gate to every unified-wallet spend, including
+  // this one (previously it always regenerated and just logged a failed
+  // debit, per the now-superseded "gating happens at top-up time" note
+  // below).
+  if (priorCount >= FREE_REGENS && !(await hasAiAgentBudget(user.id))) {
+    return NextResponse.json({ error: 'insufficient_balance' }, { status: 402 })
+  }
+
   // Conversation history, rebuilt with the SAME pairing rule as the pipeline
   // that produced the draft (inbound paired with the next *sent* outbound --
   // the pending draft itself is not 'sent', so it's naturally excluded, and
@@ -155,7 +168,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'generation_failed' }, { status: 502 })
   }
 
-  const priorCount = typeof message.regen_count === 'number' ? message.regen_count : 0
   const newCount = priorCount + 1
 
   // Guarded update: .eq('regen_count', priorCount) makes two concurrent
@@ -170,10 +182,10 @@ export async function POST(req: NextRequest) {
     .select('id')
   if (!updated || updated.length === 0) return NextResponse.json({ error: 'conflict' }, { status: 409 })
 
-  // Paid regen: same best-effort debit contract as every send path -- the
-  // regenerated text is already saved, a failed debit is logged, never
-  // rolled back. (debit_wallet_balance may go negative by design; gating
-  // happens at top-up time, same as all other unified-wallet spend.)
+  // Paid regen: the balance was already confirmed sufficient above before
+  // any AI call was made, so this debit itself stays best-effort (same
+  // contract as every send path) -- the regenerated text is already saved,
+  // a failed debit here is a transient DB issue, logged, never rolled back.
   if (priorCount >= FREE_REGENS) {
     try {
       await debitAiAgentWallet(user.id, 1, 'Перегенерация ответа')

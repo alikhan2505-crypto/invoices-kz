@@ -244,7 +244,11 @@ export default function AiAgentReview() {
         body: JSON.stringify({ messageId: id }),
       })
       if (!res.ok) {
-        setError(id, 'Не удалось сгенерировать вариант. Попробуйте ещё раз.')
+        if (res.status === 402) {
+          setError(id, 'Недостаточно баланса кошелька для платной перегенерации. Пополните баланс на странице Kaspi Cashier API.')
+        } else {
+          setError(id, 'Не удалось сгенерировать вариант. Попробуйте ещё раз.')
+        }
         return
       }
       const data = await res.json()

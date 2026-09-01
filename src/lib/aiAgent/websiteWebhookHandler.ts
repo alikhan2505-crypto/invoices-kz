@@ -3,7 +3,7 @@ import { generateAiReply } from '@/lib/instagramAiReply'
 import { buildBusinessContextLine, buildCollectFieldsToExtract, buildCatalogBlock, AgentTone, AgentGoal } from './promptContext'
 import { loadAgentCatalog } from './catalogContext'
 import { buildInvoiceToolExecutor } from './invoiceSend'
-import { debitAiAgentWallet, AI_AGENT_CREDITS_PER_AI_REPLY } from './wallet'
+import { debitAiAgentWallet, AI_AGENT_CREDITS_PER_AI_REPLY, hasAiAgentBudget, AI_AGENT_BUDGET_DEPLETED_REPLY } from './wallet'
 import { sendTelegramNotification } from '@/lib/telegramNotify'
 import { createNotification } from '@/lib/notifications'
 import { findTemplateMatch, mergeCollectedData, findStopPhraseMatch, STOP_PHRASE_ACK_TEXT } from './webhookHandler'
@@ -199,7 +199,14 @@ export async function handleWebsiteIncoming(conn: WebsiteTenantConnection, param
   let draftReply: string
   let urgent: boolean
   let extractedFields: Record<string, string> | undefined
-  try {
+  // Checked before the AI call (not just before the debit below) so a
+  // depleted wallet also skips the real Anthropic cost of a reply that was
+  // never going to be billed -- see hasAiAgentBudget's own comment.
+  const budgetDepleted = !(await hasAiAgentBudget(agent.user_id))
+  if (budgetDepleted) {
+    draftReply = AI_AGENT_BUDGET_DEPLETED_REPLY
+    urgent = false
+  } else try {
     const catalogBlock = buildCatalogBlock(await loadAgentCatalog(supabase, agent.user_id))
     const result = await generateAiReply({
       incomingText: params.text,
@@ -237,7 +244,7 @@ export async function handleWebsiteIncoming(conn: WebsiteTenantConnection, param
       conversation_id: conversation.id,
       direction: 'outbound',
       text: draftReply,
-      is_ai_generated: true,
+      is_ai_generated: !budgetDepleted,
       status: 'pending_review',
       urgent,
     }).select('id').single()
@@ -261,13 +268,17 @@ export async function handleWebsiteIncoming(conn: WebsiteTenantConnection, param
     conversation_id: conversation.id,
     direction: 'outbound',
     text: draftReply,
-    is_ai_generated: true,
+    is_ai_generated: !budgetDepleted,
     status: 'sent',
     urgent,
   })
-  try {
-    await debitAiAgentWallet(agent.user_id, AI_AGENT_CREDITS_PER_AI_REPLY, 'ИИ-ответ: Сайт')
-  } catch (walletErr: any) {
-    console.error('ai-agent website widget: wallet debit failed for user', agent.user_id, ':', walletErr.message)
+  // The canned budget-depleted reply is never billed -- there is nothing to
+  // debit for a message the AI never actually generated.
+  if (!budgetDepleted) {
+    try {
+      await debitAiAgentWallet(agent.user_id, AI_AGENT_CREDITS_PER_AI_REPLY, 'ИИ-ответ: Сайт')
+    } catch (walletErr: any) {
+      console.error('ai-agent website widget: wallet debit failed for user', agent.user_id, ':', walletErr.message)
+    }
   }
 }

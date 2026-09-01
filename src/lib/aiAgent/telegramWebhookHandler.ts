@@ -6,7 +6,7 @@ import { buildBusinessContextLine, buildCollectFieldsToExtract, buildCatalogBloc
 import { loadAgentCatalog } from './catalogContext'
 import { buildInvoiceToolExecutor, createDraft } from './invoiceSend'
 import { validateDraftInput, canAutoSend } from './invoiceDrafts'
-import { debitAiAgentWallet, AI_AGENT_CREDITS_PER_AI_REPLY } from './wallet'
+import { debitAiAgentWallet, AI_AGENT_CREDITS_PER_AI_REPLY, hasAiAgentBudget, AI_AGENT_BUDGET_DEPLETED_REPLY } from './wallet'
 import { sendTelegramNotification } from '@/lib/telegramNotify'
 import { createNotification } from '@/lib/notifications'
 import { findTemplateMatch, mergeCollectedData, findStopPhraseMatch, STOP_PHRASE_ACK_TEXT } from './webhookHandler'
@@ -251,7 +251,14 @@ export async function handleTelegramIncoming(conn: TelegramTenantConnection, par
   let draftReply: string
   let urgent: boolean
   let extractedFields: Record<string, string> | undefined
-  try {
+  // Checked before the AI call (not just before the debit below) so a
+  // depleted wallet also skips the real Anthropic cost of a reply that was
+  // never going to be billed -- see hasAiAgentBudget's own comment.
+  const budgetDepleted = !(await hasAiAgentBudget(agent.user_id))
+  if (budgetDepleted) {
+    draftReply = AI_AGENT_BUDGET_DEPLETED_REPLY
+    urgent = false
+  } else try {
     // Phase 3: real catalog prices in context + the invoice tool.
     const catalogBlock = buildCatalogBlock(await loadAgentCatalog(supabase, agent.user_id))
     const result = await generateAiReply({
@@ -307,7 +314,7 @@ export async function handleTelegramIncoming(conn: TelegramTenantConnection, par
       conversation_id: conversation.id,
       direction: 'outbound',
       text: draftReply,
-      is_ai_generated: true,
+      is_ai_generated: !budgetDepleted,
       status: 'pending_review',
       urgent,
     }).select('id').single()
@@ -340,14 +347,18 @@ export async function handleTelegramIncoming(conn: TelegramTenantConnection, par
       conversation_id: conversation.id,
       direction: 'outbound',
       text: draftReply,
-      is_ai_generated: true,
+      is_ai_generated: !budgetDepleted,
       status: 'sent',
       urgent,
     })
-    try {
-      await debitAiAgentWallet(agent.user_id, AI_AGENT_CREDITS_PER_AI_REPLY, 'ИИ-ответ: Telegram')
-    } catch (walletErr: any) {
-      console.error('ai-agent telegram webhook: wallet debit failed for user', agent.user_id, ':', walletErr.message)
+    // The canned budget-depleted reply is never billed -- there is nothing
+    // to debit for a message the AI never actually generated.
+    if (!budgetDepleted) {
+      try {
+        await debitAiAgentWallet(agent.user_id, AI_AGENT_CREDITS_PER_AI_REPLY, 'ИИ-ответ: Telegram')
+      } catch (walletErr: any) {
+        console.error('ai-agent telegram webhook: wallet debit failed for user', agent.user_id, ':', walletErr.message)
+      }
     }
   } catch (err: any) {
     console.error('ai-agent telegram webhook: AI reply send failed for', params.externalId, ':', err.message)

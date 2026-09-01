@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { computeRepriceCandidate, DempingStrategy, resolveTargetCities, computePerCityReprice, computeMarketPosition, CompetitorOffer, CityOffers } from './pricing'
-import { debitKaspiShopWallet } from './wallet'
+import { debitKaspiShopWallet, getKaspiShopWalletBalance, KASPI_SHOP_CREDIT_PRICE_TENGE } from './wallet'
 import { getKey } from './connection'
 import { decryptAtRest } from '@/lib/kaspiPay/crypto'
 import { isWithinBudget, KASPI_RATE_LIMIT_WINDOW_MS } from './rateLimitBudget'
@@ -234,6 +234,17 @@ export async function applyPriceCheckResult(
   if (connection?.paused) return
 
   const userId = product.user_id
+
+  // Founder's explicit ask: extend the same negative-balance protection
+  // Kaspi Cashier's invoice-payment path already had to every unified-
+  // wallet spend, including this one -- a price check previously always
+  // ran (and always attempted its 1-credit debit, best-effort, letting the
+  // balance drift arbitrarily negative) regardless of whether the user
+  // could actually afford it. Checked before any of the repricing work or
+  // Kaspi cabinet writes below, so a depleted wallet also means no product
+  // gets touched -- its price simply stays as last set until topped up.
+  if ((await getKaspiShopWalletBalance(userId)) < KASPI_SHOP_CREDIT_PRICE_TENGE) return
+
   const ownPriceBefore = Number(product.own_current_price)
   let action: 'updated' | 'held_at_floor' | 'no_change' | 'error' = 'no_change'
   let ownPriceAfter = ownPriceBefore
