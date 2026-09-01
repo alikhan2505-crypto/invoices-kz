@@ -74,6 +74,7 @@ export interface AcquiringContent {
   kaspiTopupStartingLabel: string
   kaspiTopupPendingHint: string
   kaspiTopupPayLinkLabel: string
+  kaspiTopupPayLinkHint: string
   kaspiInsufficientBalanceHint: string
   kaspiCommissionHint: string
   kaspiPlatformConnectionNote: string
@@ -113,7 +114,13 @@ export interface AcquiringContent {
   kaspiColAmount: string
   kaspiColDirection: string
   kaspiColInvoice: string
+  kaspiColClient: string
+  kaspiColCommission: string
   kaspiColCategory: string
+  kaspiPeriodResetButton: string
+  kaspiExportExcelButton: string
+  kaspiExportPdfButton: string
+  kaspiExportingLabel: string
 }
 
 export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
@@ -198,7 +205,8 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiTopupButton: 'Пополнить',
     kaspiTopupStartingLabel: 'Готовим оплату...',
     kaspiTopupPendingHint: 'QR-код готов — отсканируйте камерой телефона или нажмите кнопку ниже, чтобы оплатить через Kaspi. Баланс обновится автоматически.',
-    kaspiTopupPayLinkLabel: 'Перейти к оплате',
+    kaspiTopupPayLinkLabel: 'Оплатить с этого телефона',
+    kaspiTopupPayLinkHint: 'Нажмите эту кнопку, только если открыли страницу на том же телефоне, где установлен Kaspi.kz — она откроет приложение Kaspi для оплаты в один тап. Если платите с компьютера, отсканируйте QR-код выше камерой телефона.',
     kaspiInsufficientBalanceHint: 'Баланс кошелька слишком низкий — при нехватке средств новые ссылки на оплату через Kaspi для ваших счетов создаваться не будут. Пополните баланс.',
     kaspiCommissionHint: 'Подключение и приём платежей через Kaspi — бесплатно. С каждого успешного платежа списывается комиссия 2% с баланса кошелька (пополняется заранее).',
     kaspiPlatformConnectionNote: 'Это подключение также используется для приёма оплаты тарифов и пополнений баланса от других пользователей invoices.kz — как административное подключение платформы.',
@@ -232,12 +240,18 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiFilterAll: 'Все',
     kaspiFilterIn: 'Входящие',
     kaspiFilterOut: 'Исходящие',
-    kaspiFilterPlatform: 'По счетам',
-    kaspiFilterOther: 'Прочие',
+    kaspiFilterPlatform: 'Счета',
+    kaspiFilterOther: 'Платформа',
     kaspiColDate: 'Дата',
     kaspiColAmount: 'Сумма',
     kaspiColDirection: 'Направление',
-    kaspiColInvoice: 'Счёт / клиент',
+    kaspiColInvoice: 'Счёт',
+    kaspiColClient: 'Клиент',
+    kaspiColCommission: 'Комиссия 2%',
+    kaspiPeriodResetButton: 'Сбросить период',
+    kaspiExportExcelButton: 'Excel',
+    kaspiExportPdfButton: 'PDF',
+    kaspiExportingLabel: 'Формируем...',
     kaspiColCategory: 'Категория',
   },
   kk: {
@@ -321,7 +335,8 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiTopupButton: 'Толтыру',
     kaspiTopupStartingLabel: 'Төлем дайындалуда...',
     kaspiTopupPendingHint: 'QR-код дайын — телефон камерасымен сканерлеңіз немесе Kaspi арқылы төлеу үшін төмендегі батырманы басыңыз. Баланс автоматты түрде жаңарады.',
-    kaspiTopupPayLinkLabel: 'Төлеуге өту',
+    kaspiTopupPayLinkLabel: 'Осы телефоннан төлеу',
+    kaspiTopupPayLinkHint: 'Бұл түймені тек Kaspi.kz орнатылған сол телефонда ашқан болсаңыз ғана басыңыз — ол Kaspi қосымшасын бір түртумен төлеу үшін ашады. Компьютерден төлесеңіз, жоғарыдағы QR-кодты телефон камерасымен сканерлеңіз.',
     kaspiInsufficientBalanceHint: 'Әмиян балансы тым төмен — қаражат жеткіліксіз болса, шоттарыңыз үшін Kaspi арқылы жаңа төлем сілтемелері жасалмайды. Балансты толтырыңыз.',
     kaspiCommissionHint: 'Kaspi арқылы қосылу және төлемдерді қабылдау — тегін. Әрбір сәтті төлемнен әмиян балансынан 2% комиссия алынады (алдын ала толтырылады).',
     kaspiPlatformConnectionNote: 'Бұл қосылым invoices.kz-тің басқа пайдаланушыларынан тариф пен әмиян толтыруларын қабылдау үшін де қолданылады — платформаның әкімшілік қосылымы ретінде.',
@@ -355,12 +370,18 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiFilterAll: 'Барлығы',
     kaspiFilterIn: 'Кіріс',
     kaspiFilterOut: 'Шығыс',
-    kaspiFilterPlatform: 'Шоттар бойынша',
-    kaspiFilterOther: 'Басқа',
+    kaspiFilterPlatform: 'Шоттар',
+    kaspiFilterOther: 'Платформа',
     kaspiColDate: 'Күні',
     kaspiColAmount: 'Сома',
     kaspiColDirection: 'Бағыты',
-    kaspiColInvoice: 'Шот / клиент',
+    kaspiColInvoice: 'Шот',
+    kaspiColClient: 'Клиент',
+    kaspiColCommission: '2% комиссия',
+    kaspiPeriodResetButton: 'Кезеңді тазалау',
+    kaspiExportExcelButton: 'Excel',
+    kaspiExportPdfButton: 'PDF',
+    kaspiExportingLabel: 'Дайындалуда...',
     kaspiColCategory: 'Санаты',
   },
   en: {
@@ -444,7 +465,8 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiTopupButton: 'Top up',
     kaspiTopupStartingLabel: 'Preparing payment...',
     kaspiTopupPendingHint: 'Your top-up payment link is ready — pay via Kaspi and the balance will update automatically.',
-    kaspiTopupPayLinkLabel: 'Go to payment',
+    kaspiTopupPayLinkLabel: 'Pay from this phone',
+    kaspiTopupPayLinkHint: "Only tap this if you opened this page on the same phone that has Kaspi.kz installed — it opens the Kaspi app for a one-tap payment. Paying from a computer? Scan the QR code above with your phone's camera instead.",
     kaspiInsufficientBalanceHint: 'Your wallet balance is too low — new Kaspi payment links for your invoices won\'t be created if funds run out. Top up your balance.',
     kaspiCommissionHint: 'Connecting and accepting Kaspi payments is free. A 2% commission is charged from your wallet balance (topped up in advance) on every successful payment.',
     kaspiPlatformConnectionNote: 'This connection is also used to accept plan payments and wallet top-ups from other invoices.kz users — as the platform\'s admin connection.',
@@ -478,12 +500,18 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiFilterAll: 'All',
     kaspiFilterIn: 'Incoming',
     kaspiFilterOut: 'Outgoing',
-    kaspiFilterPlatform: 'Invoice payments',
-    kaspiFilterOther: 'Other',
+    kaspiFilterPlatform: 'Invoices',
+    kaspiFilterOther: 'Platform',
     kaspiColDate: 'Date',
     kaspiColAmount: 'Amount',
     kaspiColDirection: 'Direction',
-    kaspiColInvoice: 'Invoice / client',
+    kaspiColInvoice: 'Invoice',
+    kaspiColClient: 'Client',
+    kaspiColCommission: '2% commission',
+    kaspiPeriodResetButton: 'Reset period',
+    kaspiExportExcelButton: 'Excel',
+    kaspiExportPdfButton: 'PDF',
+    kaspiExportingLabel: 'Generating...',
     kaspiColCategory: 'Category',
   },
 }

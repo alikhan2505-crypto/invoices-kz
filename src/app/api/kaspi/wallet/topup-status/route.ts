@@ -31,7 +31,8 @@ export async function GET(req: NextRequest) {
 
   if (row.status === 'pending') {
     try {
-      const outcome = await checkAndSettleWalletTopup(row as any)
+      const force = req.nextUrl.searchParams.get('force') === 'true'
+      const outcome = await checkAndSettleWalletTopup(row as any, { force })
       return NextResponse.json({ status: outcome === 'not_paid' ? 'pending' : outcome })
     } catch (e: any) {
       console.error('Wallet topup status check failed for', topupId, ':', e.message)

@@ -17,6 +17,19 @@ import { setPostLoginRedirect } from '@/lib/postLoginRedirect'
 // standalone section, same as Kaspi Bot and AI-агент).
 const MIN_TOPUP_AMOUNT = 1000
 
+// The PDF statement export below builds an HTML string it hands to
+// html2pdf.js -- op.clientName is the PAYER's own display name on Kaspi's
+// side (not something invoices.kz controls), so it must be escaped before
+// interpolation the same as any other untrusted string reaching innerHTML.
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
 export default function KaspiApiPage() {
   const router = useRouter()
   const { lang } = useLanguage()
@@ -65,6 +78,11 @@ export default function KaspiApiPage() {
   // wrong amount as pending (founder's exact repro: expected 10 000,
   // history showed a leftover 87 777 from an overlapping auto-refresh).
   const kaspiTopupGeneration = useRef(0)
+  // When the current kaspiTopupPending was created, for the countdown
+  // below to cap its displayed number at the ~60s idle-refresh boundary
+  // instead of Kaspi's real (and much longer) ExpireDate -- see that
+  // effect's own comment for why showing the real ~5 min was confusing.
+  const kaspiTopupCreatedAtRef = useRef(0)
   const [kaspiSending, setKaspiSending] = useState(false)
   const [kaspiVerifying, setKaspiVerifying] = useState(false)
   const [kaspiDisconnecting, setKaspiDisconnecting] = useState(false)
@@ -73,10 +91,15 @@ export default function KaspiApiPage() {
   const [kaspiRecentTopups, setKaspiRecentTopups] = useState<{ amount: number, status: string, createdAt: string }[]>([])
   type KaspiPeriodStat = { count: number, amount: number, total: number, conversionRate: number | null }
   const [kaspiStats, setKaspiStats] = useState<{ last24h: KaspiPeriodStat, last30d: KaspiPeriodStat, allTime: KaspiPeriodStat } | null>(null)
-  const [kaspiOperations, setKaspiOperations] = useState<{ id: string, orderNumber: string, amount: number, direction: string, category: string, clientName: string | null, matchedInvoiceNumber: string | null, operationDate: string }[]>([])
+  const [kaspiOperations, setKaspiOperations] = useState<{ id: string, orderNumber: string, amount: number, direction: string, category: string, clientName: string | null, matchedInvoiceNumber: string | null, operationDate: string, commissionAmount: number | null }[]>([])
   const [kaspiPendingMatches, setKaspiPendingMatches] = useState<{ id: string, invoiceNumber: string | null, clientName: string | null, invoiceClientName: string | null, matchedAmount: number, matchedDate: string }[]>([])
   const [kaspiDirectionFilter, setKaspiDirectionFilter] = useState<'all' | 'in' | 'out'>('all')
   const [kaspiCategoryFilter, setKaspiCategoryFilter] = useState<'all' | 'platform' | 'other'>('all')
+  // Period picker for the statement -- empty means "no lower/upper bound"
+  // (today's default view, unchanged from before this feature existed).
+  const [kaspiPeriodFrom, setKaspiPeriodFrom] = useState('')
+  const [kaspiPeriodTo, setKaspiPeriodTo] = useState('')
+  const [kaspiExporting, setKaspiExporting] = useState<'xlsx' | 'pdf' | null>(null)
   const [kaspiConfirmingMatchId, setKaspiConfirmingMatchId] = useState<string | null>(null)
   const [kaspiSyncing, setKaspiSyncing] = useState(false)
   const [kaspiSyncError, setKaspiSyncError] = useState('')
@@ -162,8 +185,32 @@ export default function KaspiApiPage() {
   // someone has genuinely engaged with is never proactively replaced here.
   useEffect(() => {
     if (!kaspiTopupPending) return
-    const timeout = setTimeout(() => {
+    const topupId = kaspiTopupPending.topup_id
+    const timeout = setTimeout(async () => {
       if (kaspiTopupScanningRef.current) return
+      // force=true settles this row NOW instead of leaving it 'pending' in
+      // the DB for up to 24h until the next daily cron sweep -- without
+      // this, every idle-refresh cycle orphaned a 'pending' history row
+      // that never visibly resolved to "Истёк" (founder's own repro: a
+      // history list full of "Ожидает" rows that "should" have expired by
+      // now). Still checks the REAL Kaspi status first (never just assumes
+      // dead) so a payment that completes in this exact instant is still
+      // credited instead of being discarded.
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch(`/api/kaspi/wallet/topup-status?topup_id=${topupId}&force=true`, {
+        headers: { 'Authorization': `Bearer ${session?.access_token}` },
+      })
+      const data = await res.json()
+      if (data.status === 'paid') {
+        setKaspiTopupPending(null)
+        load()
+        return
+      }
+      // 'scanning' can in principle land here too (the customer started
+      // scanning in the exact instant this timeout fired, just ahead of the
+      // scanning ref) -- leave the QR alone and let the normal 5s poll
+      // above keep driving it, exactly like the ref check does.
+      if (data.status === 'scanning') { setKaspiTopupScanning(true); return }
       setKaspiTopupPending(null)
       startTopup(kaspiLastTopupAmount ?? 0)
     }, 60000)
@@ -175,11 +222,21 @@ export default function KaspiApiPage() {
   // will go stale, instead of finding out only after Kaspi's own scanner
   // rejects it. Purely informational -- expiry (and the automatic refresh
   // above) is decided solely by the 5s status poll, i.e. Kaspi's own real
-  // clock, never by this countdown reaching 0.
+  // clock, never by this countdown reaching 0. Capped at the ~60s
+  // idle-refresh boundary (not Kaspi's real ~5min ExpireDate): showing the
+  // longer real number was confusing since the idle-refresh silently
+  // replaces an unscanned QR well before it, so the countdown used to read
+  // "4:56" right as the page was about to swap in a new QR at 0:01 -- the
+  // founder's own "время стоит опять 5 мин" report.
   useEffect(() => {
     if (!kaspiTopupPending?.expires_at) { setKaspiTopupSecondsLeft(null); return }
     const expiresAtMs = new Date(kaspiTopupPending.expires_at).getTime()
-    const tick = () => setKaspiTopupSecondsLeft(Math.max(0, Math.round((expiresAtMs - Date.now()) / 1000)))
+    const idleDeadlineMs = kaspiTopupCreatedAtRef.current + 60000
+    const tick = () => {
+      const kaspiSecondsLeft = Math.round((expiresAtMs - Date.now()) / 1000)
+      const idleSecondsLeft = Math.round((idleDeadlineMs - Date.now()) / 1000)
+      setKaspiTopupSecondsLeft(Math.max(0, Math.min(kaspiSecondsLeft, idleSecondsLeft)))
+    }
     tick()
     const interval = setInterval(tick, 1000)
     return () => clearInterval(interval)
@@ -241,9 +298,12 @@ export default function KaspiApiPage() {
     setLoading(false)
   }
 
-  async function loadKaspiOperations(direction = kaspiDirectionFilter, category = kaspiCategoryFilter) {
+  async function loadKaspiOperations(direction = kaspiDirectionFilter, category = kaspiCategoryFilter, from = kaspiPeriodFrom, to = kaspiPeriodTo) {
     const { data: { session } } = await supabase.auth.getSession()
-    const res = await fetch(`/api/kaspi/operations?direction=${direction}&category=${category}`, {
+    const params = new URLSearchParams({ direction, category })
+    if (from) params.set('from', from)
+    if (to) params.set('to', to)
+    const res = await fetch(`/api/kaspi/operations?${params.toString()}`, {
       headers: { 'Authorization': `Bearer ${session?.access_token}` },
     })
     if (res.ok) {
@@ -275,6 +335,76 @@ export default function KaspiApiPage() {
       setKaspiSyncError(t.kaspiSyncErrorHint)
     } finally {
       setKaspiSyncing(false)
+    }
+  }
+
+  // Excel goes through a server route (fetchKaspiOperations there has no
+  // 200-row cap, so a wide period export isn't limited to what's currently
+  // on screen). PDF is generated client-side instead, from the currently
+  // loaded/filtered kaspiOperations -- html2pdf.js (already this codebase's
+  // one established HTML->PDF path, see signDocument.ts) needs a real DOM
+  // element to render, which is simplest to build from data already in the
+  // page rather than adding a second, unproven server-side PDF pipeline.
+  async function exportKaspiStatement(format: 'xlsx' | 'pdf') {
+    setKaspiExporting(format)
+    try {
+      if (format === 'xlsx') {
+        const { data: { session } } = await supabase.auth.getSession()
+        const params = new URLSearchParams({ direction: kaspiDirectionFilter, category: kaspiCategoryFilter })
+        if (kaspiPeriodFrom) params.set('from', kaspiPeriodFrom)
+        if (kaspiPeriodTo) params.set('to', kaspiPeriodTo)
+        const res = await fetch(`/api/kaspi/operations/export?${params.toString()}`, {
+          headers: { 'Authorization': `Bearer ${session?.access_token}` },
+        })
+        if (!res.ok) return
+        const blob = await res.blob()
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `kaspi_vypiska_${new Date().toISOString().slice(0, 10)}.xlsx`
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+        URL.revokeObjectURL(url)
+      } else {
+        const html2pdf = (await import('html2pdf.js')).default
+        const rows = kaspiOperations.map(op => `
+          <tr>
+            <td style="padding:4px 8px;border-bottom:1px solid #ddd;">${new Date(op.operationDate).toLocaleString('ru-KZ')}</td>
+            <td style="padding:4px 8px;border-bottom:1px solid #ddd;">${op.amount.toLocaleString('ru-KZ')} ₸</td>
+            <td style="padding:4px 8px;border-bottom:1px solid #ddd;">${op.direction === 'in' ? t.kaspiFilterIn : t.kaspiFilterOut}</td>
+            <td style="padding:4px 8px;border-bottom:1px solid #ddd;">${op.matchedInvoiceNumber ? escapeHtml(op.matchedInvoiceNumber) : '—'}</td>
+            <td style="padding:4px 8px;border-bottom:1px solid #ddd;">${op.clientName ? escapeHtml(op.clientName) : '—'}</td>
+            <td style="padding:4px 8px;border-bottom:1px solid #ddd;">${op.commissionAmount !== null ? `${op.commissionAmount.toLocaleString('ru-KZ')} ₸` : '—'}</td>
+            <td style="padding:4px 8px;border-bottom:1px solid #ddd;">${op.category === 'platform' ? t.kaspiFilterPlatform : t.kaspiFilterOther}</td>
+          </tr>`).join('')
+        const html = `
+          <div style="font-family:Arial,sans-serif;color:#111;padding:16px;">
+            <h2 style="margin:0 0 12px;">${t.kaspiHistoryTitle}</h2>
+            <table style="width:100%;border-collapse:collapse;font-size:11px;">
+              <thead>
+                <tr style="text-align:left;background:#f3f4f6;">
+                  <th style="padding:4px 8px;">${t.kaspiColDate}</th>
+                  <th style="padding:4px 8px;">${t.kaspiColAmount}</th>
+                  <th style="padding:4px 8px;">${t.kaspiColDirection}</th>
+                  <th style="padding:4px 8px;">${t.kaspiColInvoice}</th>
+                  <th style="padding:4px 8px;">${t.kaspiColClient}</th>
+                  <th style="padding:4px 8px;">${t.kaspiColCommission}</th>
+                  <th style="padding:4px 8px;">${t.kaspiColCategory}</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>`
+        const root = document.createElement('div')
+        root.innerHTML = html
+        await html2pdf()
+          .set({ margin: 8, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' } })
+          .from(root)
+          .save(`kaspi_vypiska_${new Date().toISOString().slice(0, 10)}.pdf`)
+      }
+    } finally {
+      setKaspiExporting(null)
     }
   }
 
@@ -418,6 +548,7 @@ export default function KaspiApiPage() {
       const data = await res.json()
       if (myGeneration !== kaspiTopupGeneration.current) return
       if (res.ok) {
+        kaspiTopupCreatedAtRef.current = Date.now()
         setKaspiTopupPending({ topup_id: data.topup_id, payment_link: data.payment_link, expires_at: data.expires_at })
       } else if (data.error === 'invalid_amount') {
         setKaspiError(t.kaspiErrorInvalidAmount(data.min || MIN_TOPUP_AMOUNT))
@@ -523,6 +654,35 @@ export default function KaspiApiPage() {
           ))}
         </div>
 
+        <div className="flex items-center gap-2 mb-3 flex-wrap">
+          <input type="date" value={kaspiPeriodFrom} max={kaspiPeriodTo || undefined}
+            onChange={e => { setKaspiPeriodFrom(e.target.value); loadKaspiOperations(kaspiDirectionFilter, kaspiCategoryFilter, e.target.value, kaspiPeriodTo) }}
+            className="rounded-lg px-2 py-1.5 text-xs"
+            style={{ background: 'var(--nav-surface-glass)', color: 'var(--nav-text-primary)', border: '1px solid var(--nav-border)' }} />
+          <span className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>—</span>
+          <input type="date" value={kaspiPeriodTo} min={kaspiPeriodFrom || undefined}
+            onChange={e => { setKaspiPeriodTo(e.target.value); loadKaspiOperations(kaspiDirectionFilter, kaspiCategoryFilter, kaspiPeriodFrom, e.target.value) }}
+            className="rounded-lg px-2 py-1.5 text-xs"
+            style={{ background: 'var(--nav-surface-glass)', color: 'var(--nav-text-primary)', border: '1px solid var(--nav-border)' }} />
+          {(kaspiPeriodFrom || kaspiPeriodTo) && (
+            <button onClick={() => { setKaspiPeriodFrom(''); setKaspiPeriodTo(''); loadKaspiOperations(kaspiDirectionFilter, kaspiCategoryFilter, '', '') }}
+              className="text-xs underline flex-shrink-0" style={{ color: 'var(--nav-text-muted)' }}>
+              {t.kaspiPeriodResetButton}
+            </button>
+          )}
+          <div className="flex-1" />
+          <button onClick={() => exportKaspiStatement('xlsx')} disabled={kaspiExporting !== null || kaspiOperations.length === 0}
+            className="rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-50 flex-shrink-0"
+            style={{ background: 'var(--nav-surface-glass)', color: 'var(--nav-text-primary)' }}>
+            {kaspiExporting === 'xlsx' ? t.kaspiExportingLabel : t.kaspiExportExcelButton}
+          </button>
+          <button onClick={() => exportKaspiStatement('pdf')} disabled={kaspiExporting !== null || kaspiOperations.length === 0}
+            className="rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-50 flex-shrink-0"
+            style={{ background: 'var(--nav-surface-glass)', color: 'var(--nav-text-primary)' }}>
+            {kaspiExporting === 'pdf' ? t.kaspiExportingLabel : t.kaspiExportPdfButton}
+          </button>
+        </div>
+
         {kaspiOperations.length === 0 ? (
           <p className="text-xs text-center py-3" style={{ color: 'var(--nav-text-muted)' }}>{t.kaspiHistoryEmptyLabel}</p>
         ) : (
@@ -534,6 +694,8 @@ export default function KaspiApiPage() {
                   <th className="py-2 pr-3 font-normal">{t.kaspiColAmount}</th>
                   <th className="py-2 pr-3 font-normal">{t.kaspiColDirection}</th>
                   <th className="py-2 pr-3 font-normal">{t.kaspiColInvoice}</th>
+                  <th className="py-2 pr-3 font-normal">{t.kaspiColClient}</th>
+                  <th className="py-2 pr-3 font-normal">{t.kaspiColCommission}</th>
                   <th className="py-2 font-normal">{t.kaspiColCategory}</th>
                 </tr>
               </thead>
@@ -543,7 +705,9 @@ export default function KaspiApiPage() {
                     <td className="py-2 pr-3" style={{ color: 'var(--nav-text-secondary)' }}>{new Date(op.operationDate).toLocaleString('ru-KZ')}</td>
                     <td className="py-2 pr-3 font-medium" style={{ color: 'var(--nav-text-primary)' }}>{op.amount.toLocaleString('ru-KZ')} ₸</td>
                     <td className="py-2 pr-3" style={{ color: 'var(--nav-text-secondary)' }}>{op.direction === 'in' ? t.kaspiFilterIn : t.kaspiFilterOut}</td>
-                    <td className="py-2 pr-3" style={{ color: 'var(--nav-text-secondary)' }}>{op.matchedInvoiceNumber || op.clientName || '—'}</td>
+                    <td className="py-2 pr-3" style={{ color: 'var(--nav-text-secondary)' }}>{op.matchedInvoiceNumber || '—'}</td>
+                    <td className="py-2 pr-3" style={{ color: 'var(--nav-text-secondary)' }}>{op.clientName || '—'}</td>
+                    <td className="py-2 pr-3" style={{ color: 'var(--nav-text-secondary)' }}>{op.commissionAmount !== null ? `${op.commissionAmount.toLocaleString('ru-KZ')} ₸` : '—'}</td>
                     <td className="py-2" style={{ color: 'var(--nav-text-secondary)' }}>{op.category === 'platform' ? t.kaspiFilterPlatform : t.kaspiFilterOther}</td>
                   </tr>
                 ))}
@@ -690,6 +854,7 @@ export default function KaspiApiPage() {
                     style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                     {t.kaspiTopupPayLinkLabel}
                   </a>
+                  <p className="text-[10px] mt-2" style={{ color: 'var(--nav-text-muted)' }}>{t.kaspiTopupPayLinkHint}</p>
                   {kaspiTopupSecondsLeft !== null && !kaspiTopupScanning && (
                     <p className="text-[11px] text-center mt-2" style={{ color: 'var(--nav-text-muted)' }}>
                       {t.kaspiTopupSecondsLeftLabel(kaspiTopupSecondsLeft)}

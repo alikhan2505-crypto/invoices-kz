@@ -140,7 +140,10 @@ async function tryTerminateTopup(row: WalletTopupRow, status: 'expired' | 'faile
 // 'not_paid' and the row just sat 'pending' forever showing a QR that was
 // already dead on Kaspi's side (the founder's exact repro: cancel a scan,
 // the page falls back to "QR готов" instead of ever refreshing it).
-export async function checkAndSettleWalletTopup(row: WalletTopupRow): Promise<'paid' | 'not_paid' | 'expired' | 'scanning' | 'failed'> {
+export async function checkAndSettleWalletTopup(
+  row: WalletTopupRow,
+  opts: { force?: boolean } = {}
+): Promise<'paid' | 'not_paid' | 'expired' | 'scanning' | 'failed'> {
   const connection = await loadPlatformConnection()
   if (!connection) return 'not_paid'
 
@@ -151,8 +154,14 @@ export async function checkAndSettleWalletTopup(row: WalletTopupRow): Promise<'p
     return 'not_paid'
   }
   if (result.status !== 'paid') {
+    // force=true is the caller deciding NOT to wait for Kaspi's own
+    // ExpireDate (still ~5 min away) or isPastExpiry's local clock -- used
+    // when the caller is abandoning this specific attempt on its own
+    // timeline (the /kaspi-api page's 60s idle-refresh) and wants the row
+    // settled now instead of sitting 'pending' until the next daily cron
+    // sweep finally notices it's stale.
     const expiredOnKaspi = result.status === 'expired'
-    if ((expiredOnKaspi || isPastExpiry(row)) && (await tryTerminateTopup(row, 'expired'))) return 'expired'
+    if ((opts.force || expiredOnKaspi || isPastExpiry(row)) && (await tryTerminateTopup(row, 'expired'))) return 'expired'
     return 'not_paid'
   }
 

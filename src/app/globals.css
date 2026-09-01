@@ -741,3 +741,14 @@ html {
   --nav-card-glow: 0 20px 50px -22px rgba(0, 0, 0, 0.7);
 }
 
+/* The dashboard-wide [data-theme="dark"] input::placeholder rule (~line 158)
+   uses !important and would otherwise win over this scope's own tokens for
+   any dark-app-theme user -- explicit !important here to actually apply
+   --nav-text-secondary (6.4:1 on this class's #0a0c10) regardless of the
+   app's own light/dark setting. Founder reported the "Своя сумма" custom
+   top-up input reading as empty/invisible on /kaspi-api. */
+.cashier-dev-theme input::placeholder {
+  color: var(--nav-text-secondary) !important;
+  opacity: 1 !important;
+}
+
