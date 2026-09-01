@@ -200,6 +200,16 @@ export async function syncKaspiHistory(userId: string): Promise<{ synced: number
 
     // Never seen before.
     if (ownQrOperations.has(op.id)) {
+      // The founder's own spec for this column: 'platform' (shown as "Счета")
+      // only when the payment is actually tied to one of OUR invoices;
+      // everything else -- a Kaspi Shop order, or a bare API/webhook payment
+      // with no invoice_id -- must fall back to 'other' ("Платформа"). This
+      // used to be unconditionally 'platform' for every kaspi_payment_requests
+      // row regardless of invoice_id, which showed "Счета" (with an empty
+      // Счёт column) for exactly the two cases the founder's spec calls
+      // "Платформа" -- caught while walking through how a founder's own
+      // Cashier-API test payment (no invoice) would categorize.
+      const invoiceId = ownQrOperations.get(op.id)
       const { error: insertError } = await supabase.from('kaspi_operations').insert({
         user_id: userId,
         kaspi_operation_id: op.id,
@@ -208,8 +218,8 @@ export async function syncKaspiHistory(userId: string): Promise<{ synced: number
         direction: op.direction,
         operation_type: op.operationType,
         client_name: op.clientName,
-        matched_invoice_id: ownQrOperations.get(op.id),
-        category: 'platform',
+        matched_invoice_id: invoiceId,
+        category: invoiceId ? 'platform' : 'other',
         operation_date: op.regDate,
         settled_at: new Date().toISOString(), // already settled by Phase 1, nothing more to do
       })
