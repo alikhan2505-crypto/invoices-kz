@@ -44,8 +44,14 @@ export async function GET(req: NextRequest) {
   if (!(await isAdmin(user.id))) return NextResponse.json({ error: 'admin_only' }, { status: 403 })
 
   // Multi-agent (2026-08-20): ?agentId= loads a specific agent (404 if not
-  // owned); without it, fall back to the most recently created agent, which
-  // preserves the exact pre-multi-agent behavior for a single-agent user.
+  // owned). Without it: exactly one agent is unambiguous, so keep loading
+  // it directly (preserves the exact pre-multi-agent behavior for a
+  // single-agent user). Two or more agents used to silently fall back to
+  // the most recently created one -- a real bug found in the 2026-09-02
+  // usability audit: any link elsewhere that forgot ?agentId= would
+  // silently open/edit the wrong agent with no on-screen sign anything was
+  // wrong. Now it's a loud 400 instead, so a missed call site fails
+  // immediately in testing rather than quietly misconfiguring an agent.
   const agentId = req.nextUrl.searchParams.get('agentId')
   let agent: any = null
   if (agentId) {
@@ -53,6 +59,10 @@ export async function GET(req: NextRequest) {
     if (!data) return NextResponse.json({ error: 'not_found' }, { status: 404 })
     agent = data
   } else {
+    const { data: ownedAgents } = await supabase.from('ai_agents').select('id').eq('user_id', user.id)
+    if (ownedAgents && ownedAgents.length > 1) {
+      return NextResponse.json({ error: 'ambiguous_agent' }, { status: 400 })
+    }
     const { data } = await supabase
       .from('ai_agents')
       .select('*')
