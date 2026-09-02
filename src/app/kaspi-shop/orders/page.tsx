@@ -24,6 +24,19 @@ function WhatsAppIcon() {
   )
 }
 
+// Audit finding (2026-09-02): orders/[code]/page.tsx was fully built but no
+// card ever linked to it -- the only click handler on a card toggles bulk
+// selection. This icon gives cards an explicit second affordance instead of
+// overloading the same click for both, so selection keeps working exactly
+// as before.
+function ChevronRightIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+      <path d="M9 6l6 6-6 6" />
+    </svg>
+  )
+}
+
 type Order = {
   code: string
   status: string
@@ -418,6 +431,11 @@ function KaspiShopOrdersInner() {
                   <div className="text-[10px] mt-0.5 truncate" style={{ color: 'var(--nav-text-muted)' }}>{o.customerFirstName} {o.customerLastName}</div>
                   <div className="flex items-center justify-between gap-1 mt-1">
                     <div className="font-mono font-bold text-xs tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{o.totalPrice.toLocaleString('ru-KZ')} ₸</div>
+                    <button type="button" aria-label="Подробнее о заказе"
+                      onClick={e => { e.stopPropagation(); router.push(`/kaspi-shop/orders/${o.code}`) }}
+                      className="flex-shrink-0 rounded-full p-1 transition-colors hover:opacity-70" style={{ color: 'var(--nav-text-muted)' }}>
+                      <ChevronRightIcon />
+                    </button>
                     <button type="button" aria-label="Запросить отзыв в WhatsApp"
                       onClick={e => {
                         e.stopPropagation()
