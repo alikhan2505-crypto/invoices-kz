@@ -35,9 +35,10 @@ export async function sendIntoConversation(
         igUserId: connection.external_account_id,
         accessToken,
       })
-    } else if (conversation.channel === 'website') {
-      // No external send API for this channel -- the outbound row inserted
-      // below IS the delivery mechanism (the widget's own poll picks it up).
+    } else if (conversation.channel === 'website' || conversation.channel === 'api') {
+      // No external send API for either channel -- the outbound row inserted
+      // below IS the delivery mechanism (the widget's poll / the caller's
+      // own poll of GET external/messages picks it up).
     } else {
       return `неизвестный канал ${conversation.channel}`
     }

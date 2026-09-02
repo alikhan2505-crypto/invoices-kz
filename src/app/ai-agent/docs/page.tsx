@@ -53,7 +53,7 @@ function Hint({ children }: { children: ReactNode }) {
 // actual Каналы tab in /ai-agent/settings — Instagram OAuth, Telegram
 // bot-token, WhatsApp Embedded Signup, website <script> snippet). Kept as
 // data rather than inline JSX so the tile switcher below stays a plain map.
-type ChannelKey = 'instagram' | 'telegram' | 'whatsapp' | 'website'
+type ChannelKey = 'instagram' | 'telegram' | 'whatsapp' | 'website' | 'api'
 const CHANNELS: { key: ChannelKey; label: string; steps: { title: string; body: string }[]; hint: string }[] = [
   {
     key: 'instagram',
@@ -95,6 +95,16 @@ const CHANNELS: { key: ChannelKey; label: string; steps: { title: string; body: 
     ],
     hint: 'Виджет работает на любом сайте — не важно, на чём он сделан. Обновлять код при изменении настроек агента не нужно.',
   },
+  {
+    key: 'api',
+    label: 'API',
+    steps: [
+      { title: 'Сгенерируйте ключ API', body: 'На вкладке «Каналы» → «API» нажмите «Подключить» — ключ покажется один раз, сразу скопируйте его.' },
+      { title: 'Отправляйте сообщения клиента', body: 'POST-запрос на /api/ai-agent/external/message с заголовком Authorization: Bearer <ключ> — так ваша система передаёт агенту, что написал клиент.' },
+      { title: 'Забирайте ответы агента', body: 'GET-запрос на /api/ai-agent/external/messages с тем же ключом — ваша система опрашивает его и показывает ответ клиенту в своём интерфейсе.' },
+    ],
+    hint: 'Для своей CRM, приложения или самописного сайта — когда встроенный виджет или готовые каналы не подходят. Ключ — как пароль: если он попал не в те руки, перегенерируйте его в настройках, старый сразу перестанет работать.',
+  },
 ]
 
 function ChannelSwitcher() {
@@ -102,7 +112,7 @@ function ChannelSwitcher() {
   const channel = CHANNELS.find(c => c.key === active)!
   return (
     <div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-6">
+      <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 mb-6">
         {CHANNELS.map(c => {
           const isActive = c.key === active
           return (
@@ -134,13 +144,14 @@ export default function AiAgentDocsPage() {
           Как настроить AI-агента
         </h1>
         <p className="text-sm mb-8" style={{ color: 'var(--nav-text-secondary)' }}>
-          Пошаговый курс: от создания агента до первых автоматических ответов вашим клиентам в Instagram, Telegram, WhatsApp и на сайте.
+          Пошаговый курс: от создания агента до первых автоматических ответов вашим клиентам в Instagram, Telegram, WhatsApp, на сайте и через API.
         </p>
 
         <Lesson n={1} title="Что умеет AI-агент">
           <P>
             AI-агент — это ваш виртуальный сотрудник, который отвечает клиентам в Instagram (Direct и комментарии),
-            Telegram, WhatsApp и в чат-виджете на вашем сайте — от имени вашего бизнеса. Он работает круглосуточно,
+            Telegram, WhatsApp, в чат-виджете на вашем сайте или через API в вашей собственной системе — от имени
+            вашего бизнеса. Он работает круглосуточно,
             отвечает на языке клиента (русский, казахский, английский) и умеет:
           </P>
           <ul className="list-disc list-inside text-sm space-y-1 mb-3" style={{ color: 'var(--nav-text-secondary)' }}>
@@ -178,7 +189,7 @@ export default function AiAgentDocsPage() {
 
         <Lesson n={3} title="Подключение каналов">
           <P>
-            У агента четыре канала — подключите любой из них или все сразу, каждый настраивается отдельно на
+            У агента пять каналов — подключите любой из них или все сразу, каждый настраивается отдельно на
             вкладке «Каналы».
           </P>
           <ChannelSwitcher />

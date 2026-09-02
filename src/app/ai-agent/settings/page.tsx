@@ -279,6 +279,13 @@ export default function AiAgentSettings() {
   const [websiteBusy, setWebsiteBusy] = useState(false)
   const [websiteError, setWebsiteError] = useState<string | null>(null)
   const [websiteCopied, setWebsiteCopied] = useState(false)
+  const [apiBusy, setApiBusy] = useState(false)
+  const [apiError, setApiError] = useState<string | null>(null)
+  const [apiCopied, setApiCopied] = useState(false)
+  // The raw key only ever exists in memory, right after a (re)generate call --
+  // it's never stored anywhere retrievable, so a page reload always loses it
+  // even though the connection itself (apiConnection below) survives.
+  const [apiKeyReveal, setApiKeyReveal] = useState<string | null>(null)
   // WhatsApp Embedded Signup (ES v4) -- a JS SDK popup, not a redirect, so
   // its result lands in refs (message-event listener + FB.login callback)
   // rather than a query-param round trip like the Instagram OAuth notice.
@@ -771,6 +778,60 @@ export default function AiAgentSettings() {
     setTimeout(() => setWebsiteCopied(false), 2000)
   }
 
+  // Generates a fresh key on every call (no "existing key" concept -- see
+  // external/connect/route.ts) -- used both for the first connect and for
+  // the «Перегенерировать» button once already connected.
+  async function connectApi() {
+    if (!agentId) return
+    setApiBusy(true)
+    setApiError(null)
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/ai-agent/external/connect', {
+        method: 'POST', headers, body: JSON.stringify({ agentId }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setConnections(prev => [...prev.filter(c => c.channel !== 'api'), { channel: 'api', external_account_id: 'api', external_account_name: null, status: 'active' }])
+        setApiKeyReveal(data.apiKey)
+        setApiCopied(false)
+      } else {
+        setApiError('Не удалось подключить API. Попробуйте ещё раз.')
+      }
+    } catch {
+      setApiError('Не удалось подключить API. Попробуйте ещё раз.')
+    }
+    setApiBusy(false)
+  }
+
+  async function disconnectApi() {
+    if (!agentId) return
+    setApiBusy(true)
+    setApiError(null)
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/ai-agent/external/connect', {
+        method: 'DELETE', headers, body: JSON.stringify({ agentId }),
+      })
+      if (res.ok) {
+        setConnections(prev => prev.filter(c => c.channel !== 'api'))
+        setApiKeyReveal(null)
+      } else {
+        setApiError('Не удалось отключить API. Попробуйте ещё раз.')
+      }
+    } catch {
+      setApiError('Не удалось отключить API. Попробуйте ещё раз.')
+    }
+    setApiBusy(false)
+  }
+
+  function copyApiKey() {
+    if (!apiKeyReveal) return
+    navigator.clipboard.writeText(apiKeyReveal)
+    setApiCopied(true)
+    setTimeout(() => setApiCopied(false), 2000)
+  }
+
   // WhatsApp Embedded Signup: FB.login opens the popup; its callback fires
   // once the popup closes, carrying an auth `code`. The phone_number_id and
   // waba_id the user just created arrive separately via the message-event
@@ -988,6 +1049,7 @@ export default function AiAgentSettings() {
   const telegramConnection = connections.find(c => c.channel === 'telegram')
   const whatsappConnection = connections.find(c => c.channel === 'whatsapp')
   const websiteConnection = connections.find(c => c.channel === 'website')
+  const apiConnection = connections.find(c => c.channel === 'api')
   const tgExpanded = tgOpen || telegramConnection?.status === 'token_expired'
 
   // The real server-side context line, assembled from the same visible
@@ -1632,12 +1694,49 @@ export default function AiAgentSettings() {
                   <ChannelCard
                     icon={<ApiIcon />}
                     name="API"
-                    chip={<StatusChip kind="soon" label="Скоро" />}
+                    chip={apiConnection
+                      ? <StatusChip kind="ok" label="Подключено" />
+                      : <StatusChip kind="off" label="Не подключен" />}
                     description="Подключите свою систему — CRM, сайт или приложение — через HTTP API"
                   >
-                    <button disabled className="w-full nav-glass rounded-lg px-4 py-2.5 text-sm font-medium opacity-50 cursor-not-allowed" style={{ color: 'var(--nav-text-primary)' }}>
-                      Подключить
-                    </button>
+                    {apiKeyReveal && (
+                      <>
+                        <p className="text-[11px] mb-2" style={{ color: 'var(--nav-critical)' }}>
+                          Сохраните ключ сейчас — второй раз мы его не покажем:
+                        </p>
+                        <code className="block text-[10px] mb-2 p-2 rounded-lg break-all" style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-secondary)' }}>
+                          {apiKeyReveal}
+                        </code>
+                        <button onClick={copyApiKey}
+                          className="w-full mb-2 text-xs font-semibold nav-glass rounded-lg px-3 py-2" style={{ color: 'var(--nav-accent)' }}>
+                          {apiCopied ? 'Скопировано ✓' : 'Скопировать ключ'}
+                        </button>
+                        <p className="text-[11px] mb-2" style={{ color: 'var(--nav-text-muted)' }}>
+                          Отправляйте сообщения клиента: <code>POST /api/ai-agent/external/message</code> с заголовком <code>Authorization: Bearer {'<ключ>'}</code>. Получайте ответы агента: <code>GET /api/ai-agent/external/messages</code>.
+                        </p>
+                      </>
+                    )}
+                    {apiConnection ? (
+                      <div className="flex gap-2">
+                        <button onClick={connectApi} disabled={apiBusy}
+                          className="flex-1 text-xs font-semibold nav-glass rounded-lg px-3 py-2 disabled:opacity-50" style={{ color: 'var(--nav-accent)' }}>
+                          {apiBusy ? '…' : 'Перегенерировать ключ'}
+                        </button>
+                        <button onClick={disconnectApi} disabled={apiBusy}
+                          className="nav-glass rounded-lg px-3 py-2 text-xs font-medium disabled:opacity-50" style={{ color: 'var(--nav-text-primary)' }}>
+                          {apiBusy ? '…' : 'Отключить'}
+                        </button>
+                      </div>
+                    ) : (
+                      <button onClick={connectApi} disabled={apiBusy}
+                        className="w-full rounded-lg px-4 py-2.5 text-sm font-semibold disabled:opacity-50"
+                        style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                        {apiBusy ? 'Подключаем…' : 'Подключить'}
+                      </button>
+                    )}
+                    {apiError && (
+                      <div className="text-xs mt-2" style={{ color: 'var(--nav-critical)' }}>{apiError}</div>
+                    )}
                   </ChannelCard>
                 </div>
               )

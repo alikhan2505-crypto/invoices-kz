@@ -38,7 +38,7 @@ export interface BusinessContext {
   // Which channel the agent is replying on. Optional with 'instagram' as
   // the effective default so the LIVE Instagram tenant path (which does not
   // pass it) keeps producing a byte-for-byte identical prompt line.
-  channel?: 'instagram' | 'telegram' | 'whatsapp' | 'website'
+  channel?: 'instagram' | 'telegram' | 'whatsapp' | 'website' | 'api'
   // Free-text owner instructions (ai_agents.custom_instructions), appended
   // verbatim at the end of the line. Optional: absent/empty adds nothing.
   customInstructions?: string
@@ -64,7 +64,7 @@ const GOAL_LABELS: Record<AgentGoal, string> = {
 // generateAiReply instead, so this function changing never affects it.
 export function buildBusinessContextLine(ctx: BusinessContext): string {
   const desc = ctx.description.trim()
-  const channelLabel = ctx.channel === 'telegram' ? 'Telegram' : ctx.channel === 'whatsapp' ? 'WhatsApp' : ctx.channel === 'website' ? 'чате на сайте' : 'Instagram'
+  const channelLabel = ctx.channel === 'telegram' ? 'Telegram' : ctx.channel === 'whatsapp' ? 'WhatsApp' : ctx.channel === 'website' ? 'чате на сайте' : ctx.channel === 'api' ? 'чате' : 'Instagram'
   let line = `Ты отвечаешь от имени бизнес-аккаунта в ${channelLabel} (${ctx.name}${desc ? ' — ' + desc : ''}). Твой стиль общения: ${TONE_LABELS[ctx.tone]}. Твоя основная задача: ${GOAL_LABELS[ctx.goal]}.`
 
   const fields = (ctx.collectFields || []).map(f => COLLECT_FIELD_LABELS[f] || f).filter(Boolean)
