@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react'
+'use client'
+import { useState, type ReactNode } from 'react'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 
@@ -48,6 +49,81 @@ function Hint({ children }: { children: ReactNode }) {
   )
 }
 
+// Урок 3 content, one entry per real connectable channel (mirrors the
+// actual Каналы tab in /ai-agent/settings — Instagram OAuth, Telegram
+// bot-token, WhatsApp Embedded Signup, website <script> snippet). Kept as
+// data rather than inline JSX so the tile switcher below stays a plain map.
+type ChannelKey = 'instagram' | 'telegram' | 'whatsapp' | 'website'
+const CHANNELS: { key: ChannelKey; label: string; steps: { title: string; body: string }[]; hint: string }[] = [
+  {
+    key: 'instagram',
+    label: 'Instagram',
+    steps: [
+      { title: 'Нужен бизнес-аккаунт Instagram', body: 'Личный профиль не подойдёт — переключите его на бизнес-аккаунт в настройках Instagram (это бесплатно).' },
+      { title: 'Нажмите «Подключить Instagram» в настройках агента', body: 'Откроется официальное окно входа Meta — мы не видим и не храним ваш пароль.' },
+      { title: 'Разрешите доступ к сообщениям', body: 'Подтвердите разрешения — после этого агент начнёт получать новые сообщения и комментарии.' },
+    ],
+    hint: 'Если подключение слетело (пароль менялся, доступ отозван) — в настройках появится кнопка «Переподключить Instagram». Диалоги и настройки при этом не теряются.',
+  },
+  {
+    key: 'telegram',
+    label: 'Telegram',
+    steps: [
+      { title: 'Создайте бота через @BotFather', body: 'В Telegram напишите @BotFather, отправьте команду /newbot, придумайте имя и юзернейм — в ответ придёт токен бота.' },
+      { title: 'Вставьте токен в настройках агента', body: 'На вкладке «Каналы» нажмите «Подключить Telegram» и вставьте скопированный токен целиком.' },
+      { title: 'Готово — агент отвечает сразу', body: 'Как только токен принят, бот начинает получать сообщения от ваших клиентов в Telegram.' },
+    ],
+    hint: 'Токен — это пароль от бота, никому его не показывайте. Если он всё же попал не в те руки — создайте нового бота через @BotFather и подключите заново.',
+  },
+  {
+    key: 'whatsapp',
+    label: 'WhatsApp',
+    steps: [
+      { title: 'Нужен номер WhatsApp Business', body: 'Подойдёт как совсем новый номер, так и уже используемый в обычном приложении WhatsApp Business.' },
+      { title: 'Нажмите «Подключить WhatsApp» в настройках агента', body: 'Откроется официальное окно Meta — привяжете свой аккаунт Meta Business и выберете номер.' },
+      { title: 'Подтвердите номер и разрешения', body: 'После подтверждения агент начнёт отвечать через официальный WhatsApp Cloud API.' },
+    ],
+    hint: 'Если номер уже установлен в обычном приложении WhatsApp Business — это правило Meta, не наше ограничение.',
+  },
+  {
+    key: 'website',
+    label: 'Сайт',
+    steps: [
+      { title: 'Скопируйте код виджета', body: 'На вкладке «Каналы» → «Чат для сайта» скопируйте готовый <script>-тег.' },
+      { title: 'Вставьте его на свой сайт', body: 'Перед закрывающим тегом </body> на любой странице, где хотите видеть чат.' },
+      { title: 'Готово — на сайте появится кнопка чата', body: 'Посетители смогут писать агенту прямо с вашего сайта, без установки приложений.' },
+    ],
+    hint: 'Виджет работает на любом сайте — не важно, на чём он сделан. Обновлять код при изменении настроек агента не нужно.',
+  },
+]
+
+function ChannelSwitcher() {
+  const [active, setActive] = useState<ChannelKey>('instagram')
+  const channel = CHANNELS.find(c => c.key === active)!
+  return (
+    <div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-6">
+        {CHANNELS.map(c => {
+          const isActive = c.key === active
+          return (
+            <button key={c.key} onClick={() => setActive(c.key)}
+              className="text-sm px-3 py-2.5 rounded-lg font-medium transition-colors"
+              style={isActive
+                ? { background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }
+                : { background: 'var(--nav-bg)', color: 'var(--nav-text-secondary)' }}>
+              {c.label}
+            </button>
+          )
+        })}
+      </div>
+      {channel.steps.map((step, i) => (
+        <LessonStep key={step.title} n={i + 1} title={step.title}>{step.body}</LessonStep>
+      ))}
+      <Hint>{channel.hint}</Hint>
+    </div>
+  )
+}
+
 export default function AiAgentDocsPage() {
   return (
     <DesktopShell>
@@ -58,14 +134,14 @@ export default function AiAgentDocsPage() {
           Как настроить AI-агента
         </h1>
         <p className="text-sm mb-8" style={{ color: 'var(--nav-text-secondary)' }}>
-          Пошаговый курс: от создания агента до первых автоматических ответов вашим клиентам в Instagram.
+          Пошаговый курс: от создания агента до первых автоматических ответов вашим клиентам в Instagram, Telegram, WhatsApp и на сайте.
         </p>
 
         <Lesson n={1} title="Что умеет AI-агент">
           <P>
-            AI-агент — это ваш виртуальный сотрудник, который отвечает клиентам в Instagram Direct и на комментарии
-            под постами от имени вашего бизнеса. Он работает круглосуточно, отвечает на языке клиента
-            (русский, казахский, английский) и умеет:
+            AI-агент — это ваш виртуальный сотрудник, который отвечает клиентам в Instagram (Direct и комментарии),
+            Telegram, WhatsApp и в чат-виджете на вашем сайте — от имени вашего бизнеса. Он работает круглосуточно,
+            отвечает на языке клиента (русский, казахский, английский) и умеет:
           </P>
           <ul className="list-disc list-inside text-sm space-y-1 mb-3" style={{ color: 'var(--nav-text-secondary)' }}>
             <li>отвечать на вопросы о ваших товарах и услугах;</li>
@@ -100,20 +176,12 @@ export default function AiAgentDocsPage() {
           </LessonStep>
         </Lesson>
 
-        <Lesson n={3} title="Подключение Instagram">
-          <LessonStep n={1} title="Нужен бизнес-аккаунт Instagram">
-            Личный профиль не подойдёт — переключите его на бизнес-аккаунт в настройках Instagram (это бесплатно).
-          </LessonStep>
-          <LessonStep n={2} title="Нажмите «Подключить Instagram» в настройках агента">
-            Откроется официальное окно входа Meta — мы не видим и не храним ваш пароль.
-          </LessonStep>
-          <LessonStep n={3} title="Разрешите доступ к сообщениям">
-            Подтвердите разрешения — после этого агент начнёт получать новые сообщения и комментарии.
-          </LessonStep>
-          <Hint>
-            Если подключение слетело (пароль менялся, доступ отозван) — в настройках появится кнопка
-            «Переподключить Instagram». Диалоги и настройки при этом не теряются.
-          </Hint>
+        <Lesson n={3} title="Подключение каналов">
+          <P>
+            У агента четыре канала — подключите любой из них или все сразу, каждый настраивается отдельно на
+            вкладке «Каналы».
+          </P>
+          <ChannelSwitcher />
         </Lesson>
 
         <Lesson n={4} title="Режим обучения: проверяйте ответы перед отправкой">
@@ -133,8 +201,8 @@ export default function AiAgentDocsPage() {
 
         <Lesson n={5} title="Несколько агентов и удаление">
           <P>
-            На странице «Агенты» можно создать несколько агентов — например, отдельного под каждый
-            Instagram-аккаунт или направление бизнеса. У каждого свои настройки, подключения и диалоги.
+            На странице «Агенты» можно создать несколько агентов — например, отдельного под каждое направление
+            бизнеса или под каждый подключённый канал. У каждого свои настройки, подключения и диалоги.
           </P>
           <P>
             Удаление агента — безвозвратное: стираются его настройки, подключения и вся история диалогов.

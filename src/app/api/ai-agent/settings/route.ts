@@ -131,7 +131,7 @@ export async function POST(req: NextRequest) {
   const { agentId, name, tone, businessDescription, goal, collectFields, timezone, currency, customInstructions, historyPairs, isEnabled, stopPhrases } = body
 
   if (agentId !== undefined && typeof agentId !== 'string') return NextResponse.json({ error: 'invalid agentId' }, { status: 400 })
-  if (historyPairs !== undefined && (typeof historyPairs !== 'number' || historyPairs < 1 || historyPairs > 10)) {
+  if (historyPairs !== undefined && (typeof historyPairs !== 'number' || historyPairs < 1 || historyPairs > 20)) {
     return NextResponse.json({ error: 'invalid historyPairs' }, { status: 400 })
   }
   if (isEnabled !== undefined && typeof isEnabled !== 'boolean') {

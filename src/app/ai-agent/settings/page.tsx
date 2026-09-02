@@ -86,7 +86,7 @@ const CURRENCY_OPTIONS = [
   { value: 'RUB', label: 'Рубль (₽)' },
 ]
 
-// How long the "Создаём AI-сотрудника" overlay stays up on FIRST creation.
+// How long the "Создаём AI-агента" overlay stays up on FIRST creation.
 // The upsert itself is near-instant; the countdown exists to give the
 // moment weight (founder: "создает эффект волшебства") and matches the
 // reference product's real ~настройка pacing without overstaying.
@@ -1250,7 +1250,7 @@ export default function AiAgentSettings() {
                     <span className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>Стоп-фразы (передают диалог вам)</span>
                     <TriggerChipsEditor words={stopPhrases} onChange={setStopPhrases} />
                     <span className="text-[11px] mt-1 block" style={{ color: 'var(--nav-text-muted)' }}>
-                      Если клиент напишет одну из этих фраз, агент замолчит в этом диалоге и пришлёт вам уведомление — отвечайте в «Переписке».
+                      Если клиент напишет одну из этих фраз, агент замолчит в этом диалоге и пришлёт вам уведомление (и в Telegram, если он подключён в Профиле → Уведомления) — отвечайте в «Переписке».
                     </span>
                   </label>
 
@@ -1303,7 +1303,7 @@ export default function AiAgentSettings() {
                   <select value={historyPairs} onChange={e => setHistoryPairs(Number(e.target.value))}
                     className={INPUT_CLS}
                     style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-surface-chrome)' }}>
-                    {[3, 5, 8, 10].map(n => <option key={n} value={n}>Последние {n} обменов</option>)}
+                    {[3, 5, 8, 10, 20].map(n => <option key={n} value={n}>Последние {n} обменов</option>)}
                   </select>
                   <span className="text-[11px] mt-1 block" style={{ color: 'var(--nav-text-muted)' }}>
                     Сколько прошлых сообщений агент помнит. Больше — точнее контекст, но дороже каждый ответ.
@@ -1758,7 +1758,7 @@ export default function AiAgentSettings() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE, delay: reduceMotion ? 0 : 0.1 }}
               >
-                Создаём AI-сотрудника…
+                Создаём AI-агента…
               </motion.div>
               <motion.div
                 className="text-sm tabular-nums"

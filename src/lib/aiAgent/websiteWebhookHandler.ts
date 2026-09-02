@@ -156,6 +156,18 @@ export async function handleWebsiteIncoming(conn: WebsiteTenantConnection, param
     if (!claimed || claimed.length === 0) return
     await sendIntoConversation(supabase, conversationRef, STOP_PHRASE_ACK_TEXT)
     await createNotification(agent.user_id, 'Клиент попросил оператора', params.text.slice(0, 120), '/ai-agent/dialogs')
+    // Best-effort Telegram nudge to the OWNER's personal chat (same opt-in
+    // this codebase already uses for the training-mode draft nudge below) --
+    // a stop-phrase is time-sensitive (a real customer waiting for a human),
+    // so it shouldn't rely on the owner happening to check the in-app bell.
+    const { data: ownerProfile } = await supabase.from('profiles').select('telegram_chat_id, notify_telegram').eq('id', agent.user_id).single()
+    if (ownerProfile?.notify_telegram && ownerProfile.telegram_chat_id) {
+      try {
+        await sendTelegramNotification(ownerProfile.telegram_chat_id, `Клиент попросил оператора: «${params.text.slice(0, 120)}» — https://www.invoices.kz/ai-agent/dialogs`)
+      } catch (telegramErr: any) {
+        console.error('ai-agent website webhook: stop-phrase Telegram nudge failed for user', agent.user_id, ':', telegramErr.message)
+      }
+    }
     return
   }
 

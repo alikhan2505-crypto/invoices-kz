@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
+import QRCode from 'qrcode'
 import { supabase } from '@/lib/supabase'
 import { getActivePlan } from '@/lib/plan'
 
@@ -116,6 +117,7 @@ export default function TopUtilityBar() {
   const [toppingUp, setToppingUp] = useState(false)
   const [topupError, setTopupError] = useState('')
   const [topupPending, setTopupPending] = useState<{ topup_id: string; payment_link: string } | null>(null)
+  const [topupQrDataUrl, setTopupQrDataUrl] = useState<string | null>(null)
   const [showTopup, setShowTopup] = useState(false)
   // "Заработано через Kaspi" (paid invoices, last 30 days) and the tariff
   // row's "used this month" count -- both real, fetched only when the
@@ -193,6 +195,19 @@ export default function TopUtilityBar() {
     setKaspiEarned30d((paidInvoices || []).reduce((sum, inv: any) => sum + Number(inv.amount), 0))
     setMonthInvoiceCount(count || 0)
   }
+
+  // Generated client-side (same 'qrcode' package already used on /kaspi-api's
+  // own wallet top-up) so a payment can be scanned right in this popup --
+  // previously the only way to pay was the "Открыть оплату" link, which sent
+  // the founder to a new tab just to see a QR.
+  useEffect(() => {
+    if (!topupPending?.payment_link) { setTopupQrDataUrl(null); return }
+    let cancelled = false
+    QRCode.toDataURL(topupPending.payment_link, { width: 160, margin: 1 })
+      .then(url => { if (!cancelled) setTopupQrDataUrl(url) })
+      .catch(() => {}) // No QR image -- the plain link below still works.
+    return () => { cancelled = true }
+  }, [topupPending?.payment_link])
 
   async function selectWallet(key: WalletKey) {
     setActiveWallet(key)
@@ -456,7 +471,12 @@ export default function TopUtilityBar() {
                   <div className="mt-3 pt-4" style={{ borderTop: '1px solid var(--nav-border-soft)' }}>
                     {topupPending ? (
                       <div>
-                        <p className="text-xs mb-2" style={{ color: 'var(--nav-text-secondary)' }}>Оплатите QR-код Kaspi — баланс пополнится автоматически.</p>
+                        <p className="text-xs mb-2" style={{ color: 'var(--nav-text-secondary)' }}>Отсканируйте QR-код Kaspi — баланс пополнится автоматически.</p>
+                        {topupQrDataUrl && (
+                          <div className="flex justify-center mb-2">
+                            <img src={topupQrDataUrl} alt="Kaspi QR" className="w-40 h-40 rounded-lg" style={{ background: '#fff', padding: 8 }} />
+                          </div>
+                        )}
                         <a href={topupPending.payment_link} target="_blank" rel="noopener noreferrer"
                           className="block text-center rounded-lg px-3 py-2 text-xs font-medium"
                           style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
