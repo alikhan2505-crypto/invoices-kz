@@ -11,6 +11,8 @@ const FREE_REGENS = 3
 
 interface ReviewItem {
   id: string
+  agentId: string
+  agentName: string
   customerHandle: string
   channel: string
   question: string
@@ -99,7 +101,10 @@ export default function AiAgentReview() {
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw
   const [loading, setLoading] = useState(true)
+  const [agents, setAgents] = useState<{ id: string; name: string }[]>([])
+  const [agentFilter, setAgentFilter] = useState<string>('all')
   const [items, setItems] = useState<ReviewItem[]>([])
+  const [fetching, setFetching] = useState(false)
   const [drafts, setDrafts] = useState<InvoiceDraft[]>([])
   const [draftActing, setDraftActing] = useState<string | null>(null)
   const [draftErrors, setDraftErrors] = useState<Record<string, string>>({})
@@ -121,6 +126,20 @@ export default function AiAgentReview() {
     return { 'Authorization': `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' }
   }
 
+  async function loadItems(agent: string) {
+    setFetching(true)
+    const headers = await authHeader()
+    const params = new URLSearchParams()
+    if (agent !== 'all') params.set('agentId', agent)
+    const qs = params.toString()
+    const res = await fetch(`/api/ai-agent/review${qs ? `?${qs}` : ''}`, { headers })
+    if (res.ok) {
+      const data = await res.json()
+      setItems(data.items || [])
+    }
+    setFetching(false)
+  }
+
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
@@ -133,19 +152,29 @@ export default function AiAgentReview() {
     const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', user.id).single()
     if (!profile?.is_admin) { setForbidden(true); setLoading(false); return }
     const headers = await authHeader()
-    const [res, draftsRes] = await Promise.all([
-      fetch('/api/ai-agent/review', { headers }),
+    // loadItems folded into the same Promise.all as the other two initial
+    // fetches (final-review finding) -- it doesn't need to wait for the
+    // agents/drafts responses to be handled first, so serializing it after
+    // them was a needless extra round-trip on first paint.
+    const [agentsRes, draftsRes] = await Promise.all([
+      fetch('/api/ai-agent/agents', { headers }),
       fetch('/api/ai-agent/invoice-drafts', { headers }),
+      loadItems('all'),
     ])
-    if (res.ok) {
-      const data = await res.json()
-      setItems(data.items || [])
+    if (agentsRes.ok) {
+      const data = await agentsRes.json()
+      setAgents(Array.isArray(data.agents) ? data.agents.map((a: any) => ({ id: a.id, name: a.name })) : [])
     }
     if (draftsRes.ok) {
       const data = await draftsRes.json()
       setDrafts(data.drafts || [])
     }
     setLoading(false)
+  }
+
+  function changeAgent(id: string) {
+    setAgentFilter(id)
+    loadItems(id)
   }
 
   async function draftAct(id: string, action: 'approve' | 'reject') {
@@ -292,26 +321,41 @@ export default function AiAgentReview() {
       <SiteNav />
       <div className="max-w-7xl mx-auto p-4 lg:p-6 pb-24 lg:pb-6">
         <motion.div
+          className="flex items-start justify-between gap-3 mb-6 flex-wrap"
           initial={reduceMotion ? false : { opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE }}
         >
-          <div className="flex items-center gap-2.5 mb-1 flex-wrap">
-            <h1 className="text-xl font-bold" style={{ color: 'var(--nav-text-primary)' }}>Диалоги на проверке</h1>
-            {items.length + drafts.length > 0 && (
-              <span className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-                На проверке: {items.length + drafts.length}
-              </span>
-            )}
+          <div>
+            <div className="flex items-center gap-2.5 mb-1 flex-wrap">
+              <h1 className="text-xl font-bold" style={{ color: 'var(--nav-text-primary)' }}>Диалоги на проверке</h1>
+              {(agentFilter === 'all' ? items.length + drafts.length : items.length) > 0 && (
+                <span className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                  На проверке: {agentFilter === 'all' ? items.length + drafts.length : items.length}
+                </span>
+              )}
+            </div>
+            <p className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>Черновики ответов ждут вашего одобрения</p>
           </div>
-          <p className="text-sm mb-6" style={{ color: 'var(--nav-text-secondary)' }}>Агент ещё обучается — черновики ответов ждут вашего одобрения</p>
+          {agents.length > 0 && (
+            <select
+              value={agentFilter}
+              onChange={e => changeAgent(e.target.value)}
+              aria-label="Выбор агента"
+              className="nav-glass rounded-lg px-3 py-2 text-sm font-medium outline-none cursor-pointer flex-shrink-0"
+              style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }}
+            >
+              <option value="all">Все агенты</option>
+              {agents.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+            </select>
+          )}
         </motion.div>
 
-        {items.length === 0 && drafts.length === 0 && (
+        {(agentFilter === 'all' ? items.length === 0 && drafts.length === 0 : items.length === 0) && (
           <div className="text-sm text-center py-8" style={{ color: 'var(--nav-text-muted)' }}>Пока нечего проверять</div>
         )}
 
-        {drafts.length > 0 && (
+        {agentFilter === 'all' && drafts.length > 0 && (
           <>
             <div className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--nav-text-muted)' }}>Черновики счетов</div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -378,7 +422,7 @@ export default function AiAgentReview() {
           </>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" style={{ opacity: fetching ? 0.6 : 1 }}>
           {items.map((item, i) => {
             const channel = CHANNEL_META[item.channel] || CHANNEL_META.instagram
             const ChannelIcon = channel.icon
@@ -402,6 +446,9 @@ export default function AiAgentReview() {
                 </span>
                 <span className="text-xs truncate" style={{ color: 'var(--nav-text-muted)' }}>{item.customerHandle}</span>
               </div>
+              {agentFilter === 'all' && agents.length > 1 && (
+                <div className="text-[11px] font-medium mb-2 truncate" style={{ color: 'var(--nav-text-muted)' }}>{item.agentName}</div>
+              )}
               {item.question && (
                 <div className="rounded-lg px-3 py-2 mb-3" style={{ background: 'var(--nav-bg)' }}>
                   <div className="text-[10px] font-bold uppercase tracking-wide mb-1" style={{ color: 'var(--nav-text-muted)' }}>Вопрос клиента</div>

@@ -44,25 +44,48 @@ export async function GET(req: NextRequest) {
   if (!(await isAdmin(user.id))) return NextResponse.json({ error: 'admin_only' }, { status: 403 })
 
   // Multi-agent (2026-08-20): ?agentId= loads a specific agent (404 if not
-  // owned); without it, fall back to the most recently created agent, which
-  // preserves the exact pre-multi-agent behavior for a single-agent user.
+  // owned). Without it: exactly one agent is unambiguous, so keep loading
+  // it directly (preserves the exact pre-multi-agent behavior for a
+  // single-agent user). Two or more agents used to silently fall back to
+  // the most recently created one -- a real bug found in the 2026-09-02
+  // usability audit: any link elsewhere that forgot ?agentId= would
+  // silently open/edit the wrong agent with no on-screen sign anything was
+  // wrong. Now it's a loud 400 instead, so a missed call site fails
+  // immediately in testing rather than quietly misconfiguring an agent.
+  //
+  // ?new=1 (whole-branch review, 2026-09-02): the «Создать агента» flow
+  // always wants a blank form regardless of how many agents the account
+  // already owns -- there's no agent to load and thus no ambiguity to
+  // detect, so this skips the lookups entirely rather than tripping the
+  // 400 above for exactly the multi-agent accounts this feature targets.
   const agentId = req.nextUrl.searchParams.get('agentId')
+  const isNew = req.nextUrl.searchParams.get('new') === '1'
   let agent: any = null
-  if (agentId) {
-    const { data } = await supabase.from('ai_agents').select('*').eq('id', agentId).eq('user_id', user.id).maybeSingle()
-    if (!data) return NextResponse.json({ error: 'not_found' }, { status: 404 })
-    agent = data
-  } else {
-    const { data } = await supabase
-      .from('ai_agents')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-    agent = data
+  if (!isNew) {
+    if (agentId) {
+      const { data } = await supabase.from('ai_agents').select('*').eq('id', agentId).eq('user_id', user.id).maybeSingle()
+      if (!data) return NextResponse.json({ error: 'not_found' }, { status: 404 })
+      agent = data
+    } else {
+      const { data: ownedAgents, error: ownedAgentsError } = await supabase.from('ai_agents').select('id').eq('user_id', user.id)
+      if (ownedAgentsError) return NextResponse.json({ error: ownedAgentsError.message }, { status: 500 })
+      if (ownedAgents.length > 1) {
+        return NextResponse.json({ error: 'ambiguous_agent' }, { status: 400 })
+      }
+      const { data } = await supabase
+        .from('ai_agents')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      agent = data
+    }
   }
   const { data: profile } = await supabase.from('profiles').select('company_name').eq('id', user.id).maybeSingle()
+  if (isNew) {
+    return NextResponse.json({ agent: null, suggestedName: profile?.company_name || '', connections: [] })
+  }
   const { data: connections } = agent
     ? await supabase.from('ai_agent_channel_connections').select('channel, external_account_name, status').eq('agent_id', agent.id)
     : { data: [] }

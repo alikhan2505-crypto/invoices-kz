@@ -65,6 +65,8 @@ function AiAgentDialogsInner() {
   const [loading, setLoading] = useState(true)
   const [forbidden, setForbidden] = useState(false)
   const [items, setItems] = useState<DialogItem[]>([])
+  const [agents, setAgents] = useState<{ id: string; name: string }[]>([])
+  const [agentFilter, setAgentFilter] = useState<string>('all')
   const [fetching, setFetching] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [messages, setMessages] = useState<MessageItem[]>([])
@@ -78,10 +80,13 @@ function AiAgentDialogsInner() {
     return { 'Authorization': `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' }
   }
 
-  const loadItems = useCallback(async (): Promise<DialogItem[]> => {
+  const loadItems = useCallback(async (agent: string = agentFilter): Promise<DialogItem[]> => {
     setFetching(true)
     const headers = await authHeader()
-    const res = await fetch('/api/ai-agent/dialogs', { headers })
+    const params = new URLSearchParams()
+    if (agent !== 'all') params.set('agentId', agent)
+    const qs = params.toString()
+    const res = await fetch(`/api/ai-agent/dialogs${qs ? `?${qs}` : ''}`, { headers })
     let fetched: DialogItem[] = []
     if (res.ok) {
       const data = await res.json()
@@ -90,7 +95,7 @@ function AiAgentDialogsInner() {
     }
     setFetching(false)
     return fetched
-  }, [])
+  }, [agentFilter])
 
   useEffect(() => {
     async function load() {
@@ -98,7 +103,19 @@ function AiAgentDialogsInner() {
       if (!user) { router.push('/login'); return }
       const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', user.id).single()
       if (!profile?.is_admin) { setForbidden(true); setLoading(false); return }
-      const fetched = await loadItems()
+      const headers = await authHeader()
+      // agents fetch + loadItems folded into one Promise.all (final-review
+      // finding) -- loadItems doesn't need to wait for the agents response
+      // to be handled first, so serializing it after was a needless extra
+      // round-trip on first paint.
+      const [agentsRes, fetched] = await Promise.all([
+        fetch('/api/ai-agent/agents', { headers }),
+        loadItems('all'),
+      ])
+      if (agentsRes.ok) {
+        const data = await agentsRes.json()
+        setAgents(Array.isArray(data.agents) ? data.agents.map((a: any) => ({ id: a.id, name: a.name })) : [])
+      }
       // Deep link from a «Заявки» lead card -- only auto-open when the id
       // genuinely belongs to one of the caller's own conversations (a
       // stale/foreign id is silently ignored).
@@ -109,7 +126,8 @@ function AiAgentDialogsInner() {
       setLoading(false)
     }
     load()
-  }, [router, loadItems, searchParams])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router, searchParams])
 
   async function openConversation(id: string) {
     setSelectedId(id)
@@ -126,6 +144,17 @@ function AiAgentDialogsInner() {
       setMessages(Array.isArray(data.messages) ? data.messages : [])
     }
     setMessagesLoading(false)
+  }
+
+  function changeAgent(id: string) {
+    setAgentFilter(id)
+    // The currently-open conversation may not belong to the newly-selected
+    // agent and disappear from the filtered list -- clear the thread pane
+    // (same clearing openConversation does when switching threads) so it
+    // doesn't silently show a stale/blank pane with no explanation.
+    setSelectedId(null)
+    setReplyText('')
+    loadItems(id)
   }
 
   async function sendReply() {
@@ -205,9 +234,23 @@ function AiAgentDialogsInner() {
             <h1 className="text-xl font-bold" style={{ color: 'var(--nav-text-primary)' }}>Переписка</h1>
             <p className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>Живая переписка с клиентами по всем каналам — перехватите диалог, просто ответив</p>
           </div>
-          <button onClick={loadItems} disabled={fetching} className="nav-glass rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-50" style={{ color: 'var(--nav-accent)' }}>
-            {fetching ? 'Обновляем…' : 'Обновить'}
-          </button>
+          <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
+            {agents.length > 0 && (
+              <select
+                value={agentFilter}
+                onChange={e => changeAgent(e.target.value)}
+                aria-label="Выбор агента"
+                className="nav-glass rounded-lg px-3 py-2 text-sm font-medium outline-none cursor-pointer"
+                style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }}
+              >
+                <option value="all">Все агенты</option>
+                {agents.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+              </select>
+            )}
+            <button onClick={() => loadItems()} disabled={fetching} className="nav-glass rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-50" style={{ color: 'var(--nav-accent)' }}>
+              {fetching ? 'Обновляем…' : 'Обновить'}
+            </button>
+          </div>
         </motion.div>
 
         <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-4">
@@ -238,6 +281,9 @@ function AiAgentDialogsInner() {
                     )}
                   </div>
                   <div className="text-sm font-semibold truncate" style={{ color: 'var(--nav-text-primary)' }}>{item.customerHandle}</div>
+                  {agentFilter === 'all' && agents.length > 1 && (
+                    <div className="text-[11px] font-medium truncate" style={{ color: 'var(--nav-text-muted)' }}>{item.agentName}</div>
+                  )}
                   <div className="text-xs truncate mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{item.lastMessagePreview}</div>
                   <div className="text-[10px] mt-1" style={{ color: 'var(--nav-text-muted)' }}>{formatRelative(item.lastActivityAt)}</div>
                 </button>
@@ -251,7 +297,12 @@ function AiAgentDialogsInner() {
             ) : (
               <>
                 <div className="flex items-center justify-between gap-2 mb-3 pb-3" style={{ borderBottom: '1px solid var(--nav-border-soft)' }}>
-                  <div className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{selected.customerHandle}</div>
+                  <div>
+                    <div className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{selected.customerHandle}</div>
+                    {agents.length > 1 && (
+                      <div className="text-[11px]" style={{ color: 'var(--nav-text-muted)' }}>{selected.agentName}</div>
+                    )}
+                  </div>
                   {selected.pausedForHuman && (
                     <button onClick={releaseConversation} disabled={sending}
                       className="text-xs font-semibold nav-glass rounded-lg px-3 py-1.5 disabled:opacity-50" style={{ color: 'var(--nav-text-secondary)' }}>

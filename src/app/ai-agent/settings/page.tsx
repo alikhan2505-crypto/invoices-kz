@@ -289,6 +289,10 @@ export default function AiAgentSettings() {
   const waWabaIdRef = useRef<string | null>(null)
   const [oauthNotice, setOauthNotice] = useState<'connected' | 'error' | null>(null)
   const [forbidden, setForbidden] = useState(false)
+  // ambiguous_agent (2026-09-02): a bare /ai-agent/settings visit with no
+  // ?agent= on an account with 2+ agents -- the settings API can't guess
+  // which one, so this renders an inline message instead of the form.
+  const [ambiguousAgent, setAmbiguousAgent] = useState(false)
   const [pendingCount, setPendingCount] = useState(0)
   // Whether the owner has an active Kaspi Shop connection -- drives the
   // «Подключите Kaspi Shop» hint on Промптинг. null = not checked yet
@@ -507,10 +511,27 @@ export default function AiAgentSettings() {
       const headers = await authHeader()
       loadWalletBalance(headers)
       loadKaspiShopStatus(headers)
-      const res = await fetch(agentParam ? `/api/ai-agent/settings?agentId=${encodeURIComponent(agentParam)}` : '/api/ai-agent/settings', { headers })
+      const res = await fetch(
+        agentParam ? `/api/ai-agent/settings?agentId=${encodeURIComponent(agentParam)}` :
+        isNew ? '/api/ai-agent/settings?new=1' :
+        '/api/ai-agent/settings',
+        { headers }
+      )
       if (res.status === 404) {
-        // ?agent= pointing at a deleted/foreign agent -- back to the list.
+        // ?agent= pointing at a deleted/foreign agent -- nothing to show,
+        // back to the list.
         router.push('/ai-agent')
+        return
+      }
+      if (res.status === 400) {
+        // ambiguous_agent (2026-09-02): a bare /ai-agent/settings visit (no
+        // ?agent=, no ?new=1) on an account with 2+ agents -- the API
+        // refuses to guess which one. Shown inline (see the ambiguousAgent
+        // render branch below) rather than silently redirected away, since
+        // this can also be reached via a real failure notice (Instagram
+        // OAuth error) that the user still needs to see.
+        setAmbiguousAgent(true)
+        setLoading(false)
         return
       }
       if (res.ok) {
@@ -938,6 +959,31 @@ export default function AiAgentSettings() {
     </DesktopShell>
   )
 
+  if (ambiguousAgent) return (
+    <DesktopShell>
+    <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
+      <SiteNav />
+      <div className="max-w-2xl mx-auto p-4 lg:p-6">
+        {oauthNotice === 'error' && (
+          <div className="rounded-lg px-3 py-2 text-sm mb-4" style={{ background: 'var(--nav-critical)', color: '#fff' }}>
+            Не удалось подключить Instagram. Попробуйте ещё раз — если не получится снова, напишите в поддержку.
+          </div>
+        )}
+        <div className="p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>
+          Не указан агент — выберите его в списке «Агенты»
+        </div>
+        <div className="flex justify-center">
+          <Link href="/ai-agent"
+            className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-semibold transition-transform hover:-translate-y-0.5"
+            style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)', boxShadow: '0 10px 24px -10px var(--nav-accent)' }}>
+            К списку агентов
+          </Link>
+        </div>
+      </div>
+    </main>
+    </DesktopShell>
+  )
+
   const instagramConnection = connections.find(c => c.channel === 'instagram')
   const telegramConnection = connections.find(c => c.channel === 'telegram')
   const whatsappConnection = connections.find(c => c.channel === 'whatsapp')
@@ -992,6 +1038,11 @@ export default function AiAgentSettings() {
               Все агенты
             </Link>
             <h1 className="text-xl font-bold mb-1" style={{ color: 'var(--nav-text-primary)' }}>AI-агент</h1>
+            {agentId && (
+              <div className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold mb-2" style={{ background: 'var(--nav-bg)', color: 'var(--nav-accent)' }}>
+                Агент: {name}
+              </div>
+            )}
             <p className="text-sm mb-5" style={{ color: 'var(--nav-text-secondary)' }}>Настройте ассистента, который отвечает вашим клиентам в Instagram и Telegram</p>
           </div>
           {/* Persistent across all five tabs (MoonAI-style shortcut) --

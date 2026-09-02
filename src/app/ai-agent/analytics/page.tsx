@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { motion, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
+import { buildAgentSettingsHref } from '@/lib/aiAgent/settingsLink'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 
@@ -524,7 +525,7 @@ export default function AiAgentAnalytics() {
                 Пока нет диалогов — подключите канал или попробуйте Тестовый чат
               </div>
               <div className="flex items-center gap-2 flex-wrap justify-center">
-                <Link href="/ai-agent/settings"
+                <Link href={buildAgentSettingsHref(agentFilter, agents)}
                   className="inline-flex items-center rounded-lg px-3.5 py-2 text-xs font-semibold transition-transform hover:-translate-y-0.5"
                   style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)', boxShadow: '0 10px 24px -10px var(--nav-accent)' }}>
                   Подключить канал

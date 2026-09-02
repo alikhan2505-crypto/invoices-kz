@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
+import { buildAgentSettingsHref } from '@/lib/aiAgent/settingsLink'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 
@@ -295,7 +296,7 @@ export default function AiAgentBroadcasts() {
             </div>
             <p className="text-xs mb-4 max-w-sm mx-auto" style={{ color: 'var(--nav-text-secondary)' }}>
               Рассылки работают через подключённые каналы — сначала{' '}
-              <Link href="/ai-agent/settings?tab=channels" className="font-semibold underline underline-offset-2" style={{ color: 'var(--nav-accent)' }}>
+              <Link href={buildAgentSettingsHref('all', agents, 'channels')} className="font-semibold underline underline-offset-2" style={{ color: 'var(--nav-accent)' }}>
                 подключите Telegram-бота или WhatsApp
               </Link>
               {' '}к вашему агенту. Получатели — те, кто уже писал в этот канал.
