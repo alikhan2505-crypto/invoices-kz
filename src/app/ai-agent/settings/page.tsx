@@ -508,8 +508,11 @@ export default function AiAgentSettings() {
       loadWalletBalance(headers)
       loadKaspiShopStatus(headers)
       const res = await fetch(agentParam ? `/api/ai-agent/settings?agentId=${encodeURIComponent(agentParam)}` : '/api/ai-agent/settings', { headers })
-      if (res.status === 404) {
-        // ?agent= pointing at a deleted/foreign agent -- back to the list.
+      if (res.status === 404 || res.status === 400) {
+        // 404: ?agent= pointing at a deleted/foreign agent. 400
+        // ambiguous_agent (2026-09-02): no ?agent= at all with 2+ agents on
+        // the account -- the API refuses to guess which one, so there's
+        // nothing to show here either. Both cases: back to the list.
         router.push('/ai-agent')
         return
       }
@@ -992,6 +995,11 @@ export default function AiAgentSettings() {
               Все агенты
             </Link>
             <h1 className="text-xl font-bold mb-1" style={{ color: 'var(--nav-text-primary)' }}>AI-агент</h1>
+            {agentId && (
+              <div className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold mb-2" style={{ background: 'var(--nav-bg)', color: 'var(--nav-accent)' }}>
+                Агент: {name}
+              </div>
+            )}
             <p className="text-sm mb-5" style={{ color: 'var(--nav-text-secondary)' }}>Настройте ассистента, который отвечает вашим клиентам в Instagram и Telegram</p>
           </div>
           {/* Persistent across all five tabs (MoonAI-style shortcut) --
