@@ -42,24 +42,43 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!(await isAdmin(user.id))) return NextResponse.json({ error: 'admin_only' }, { status: 403 })
 
-  // Multi-agent (2026-08-20): the review queue deliberately aggregates
-  // across ALL of the user's agents rather than taking an ?agentId= filter.
-  // Chosen as the least-invasive correct option: the old .maybeSingle()
-  // would error (data: null) as soon as a second agent existed, silently
-  // emptying the queue. One combined queue also matches how the user
-  // actually works it -- approve/skip everything pending, whichever agent
-  // it came from. POST needs no change: it resolves message -> conversation
-  // -> agent and ownership-checks that agent by user_id per item.
-  const { data: agents } = await supabase.from('ai_agents').select('id').eq('user_id', user.id)
-  if (!agents || agents.length === 0) return NextResponse.json({ items: [], pendingCount: 0 })
+  // Multi-agent (2026-08-20): the review queue defaults to aggregating
+  // across ALL of the user's agents -- chosen as the least-invasive correct
+  // option since a second agent could otherwise make the old .maybeSingle()
+  // error (data: null), silently emptying the queue. That default is
+  // UNCHANGED (matches how the user actually works it -- approve/skip
+  // everything pending, whichever agent it came from). An optional
+  // ?agentId= (2026-09-02) narrows to one owned agent instead, same
+  // 404-if-not-owned shape as leads/route.ts and dialogs/route.ts, for when
+  // the caller wants to focus on a single agent's drafts. POST needs no
+  // change: it resolves message -> conversation -> agent and
+  // ownership-checks that agent by user_id per item.
+  const agentIdParam = req.nextUrl.searchParams.get('agentId')
+  let agents: { id: string; name: string }[]
+  if (agentIdParam) {
+    const { data: agent } = await supabase.from('ai_agents').select('id, name').eq('id', agentIdParam).eq('user_id', user.id).maybeSingle()
+    if (!agent) return NextResponse.json({ error: 'not_found' }, { status: 404 })
+    agents = [agent]
+  } else {
+    const { data } = await supabase.from('ai_agents').select('id, name').eq('user_id', user.id)
+    agents = data || []
+  }
+  if (agents.length === 0) return NextResponse.json({ items: [], pendingCount: 0 })
+  const agentNameById: Record<string, string> = {}
+  for (const a of agents) agentNameById[a.id] = a.name
 
   const { data: conversations } = await supabase
     .from('ai_agent_conversations')
-    .select('id, customer_handle, channel')
+    .select('id, agent_id, customer_handle, channel')
     .in('agent_id', agents.map(a => a.id))
   const conversationIds = (conversations || []).map(c => c.id)
-  const conversationMeta: Record<string, { handle: string; channel: string }> = {}
-  for (const c of conversations || []) conversationMeta[c.id] = { handle: c.customer_handle || 'клиент', channel: c.channel || 'instagram' }
+  const conversationMeta: Record<string, { handle: string; channel: string; agentId: string; agentName: string }> = {}
+  for (const c of conversations || []) conversationMeta[c.id] = {
+    handle: c.customer_handle || 'клиент',
+    channel: c.channel || 'instagram',
+    agentId: c.agent_id,
+    agentName: agentNameById[c.agent_id] || '',
+  }
 
   if (conversationIds.length === 0) return NextResponse.json({ items: [], pendingCount: 0 })
 
@@ -98,6 +117,8 @@ export async function GET(req: NextRequest) {
 
   const items = (messages || []).map(m => ({
     id: m.id,
+    agentId: conversationMeta[m.conversation_id]?.agentId || '',
+    agentName: conversationMeta[m.conversation_id]?.agentName || '',
     customerHandle: conversationMeta[m.conversation_id]?.handle || 'клиент',
     channel: conversationMeta[m.conversation_id]?.channel || 'instagram',
     question: questionFor(m),
