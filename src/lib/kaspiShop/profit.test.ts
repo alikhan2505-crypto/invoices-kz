@@ -207,6 +207,80 @@ describe('computeProfitSummary', () => {
     expect(summary.totalRevenue).toBe(1000)
   })
 
+  it('uses a product-assigned category rate instead of the flat rate for that product', async () => {
+    const fakeListOrders = vi.fn(async (_c: string, _m: string, status: string, _page = 0) => {
+      if (status === 'KASPI_DELIVERY_TRANSMITTED') {
+        return {
+          total: 1,
+          sessionExpired: false,
+          orders: [makeOrder('1', '2026-08-13T10:00:00.000Z', [
+            { code: 'SKU1', name: 'Автозапчасть', imageUrl: null, quantity: 1, totalPrice: 1000 },
+          ])],
+        }
+      }
+      return { total: 0, sessionExpired: false, orders: [] }
+    })
+    // Автотовары is 12.5% per KASPI_CATEGORY_COMMISSIONS -- deliberately
+    // different from the flat 10% below so a wrong fallback is visible.
+    const catalog = [{ kaspiMasterSku: 'SKU1', trackedProductId: 'tp-1', cogsAmount: 200, commissionCategoryLabel: 'Автотовары' }]
+
+    const summary = await computeProfitSummary('cookies', 'merchant1', 7, catalog, { amount: 0, otherAmount: 0, configured: false }, 10, fakeListOrders as any)
+
+    const sku1 = summary.products.find(p => p.kaspiMasterSku === 'SKU1')!
+    expect(sku1.commissionRatePercent).toBe(12.5)
+    expect(sku1.commissionAmount).toBe(125)
+    expect(sku1.profit).toBe(1000 - 200 - 125)
+    expect(summary.commissionAmount).toBe(125) // no other revenue left for the flat 10% to apply to
+  })
+
+  it('blends a categorized product with the flat rate for the rest of the catalog', async () => {
+    const fakeListOrders = vi.fn(async (_c: string, _m: string, status: string, _page = 0) => {
+      if (status === 'KASPI_DELIVERY_TRANSMITTED') {
+        return {
+          total: 1,
+          sessionExpired: false,
+          orders: [makeOrder('1', '2026-08-13T10:00:00.000Z', [
+            { code: 'CATEGORIZED', name: 'С категорией', imageUrl: null, quantity: 1, totalPrice: 1000 },
+            { code: 'PLAIN', name: 'Без категории', imageUrl: null, quantity: 1, totalPrice: 1000 },
+          ])],
+        }
+      }
+      return { total: 0, sessionExpired: false, orders: [] }
+    })
+    const catalog = [
+      { kaspiMasterSku: 'CATEGORIZED', trackedProductId: 'tp-1', cogsAmount: null, commissionCategoryLabel: 'Украшения' }, // 15.5%
+      { kaspiMasterSku: 'PLAIN', trackedProductId: 'tp-2', cogsAmount: null },
+    ]
+
+    const summary = await computeProfitSummary('cookies', 'merchant1', 7, catalog, { amount: 0, otherAmount: 0, configured: false }, 10, fakeListOrders as any)
+
+    // 1000 * 15.5% (categorized) + 1000 * 10% (flat, uncategorized only)
+    expect(summary.commissionAmount).toBe(155 + 100)
+  })
+
+  it('falls back to the flat rate when an unrecognized category label somehow reaches computeProfitSummary', async () => {
+    const fakeListOrders = vi.fn(async (_c: string, _m: string, status: string, _page = 0) => {
+      if (status === 'KASPI_DELIVERY_TRANSMITTED') {
+        return {
+          total: 1,
+          sessionExpired: false,
+          orders: [makeOrder('1', '2026-08-13T10:00:00.000Z', [
+            { code: 'SKU1', name: 'Товар', imageUrl: null, quantity: 1, totalPrice: 1000 },
+          ])],
+        }
+      }
+      return { total: 0, sessionExpired: false, orders: [] }
+    })
+    const catalog = [{ kaspiMasterSku: 'SKU1', trackedProductId: 'tp-1', cogsAmount: null, commissionCategoryLabel: 'Несуществующая категория' }]
+
+    const summary = await computeProfitSummary('cookies', 'merchant1', 7, catalog, { amount: 0, otherAmount: 0, configured: false }, 10, fakeListOrders as any)
+
+    const sku1 = summary.products.find(p => p.kaspiMasterSku === 'SKU1')!
+    expect(sku1.commissionRatePercent).toBe(null)
+    expect(sku1.commissionAmount).toBe(null)
+    expect(summary.commissionAmount).toBe(100) // treated as uncategorized -> flat 10%
+  })
+
   it('stops immediately and reports sessionExpired when the session is dead', async () => {
     const fakeListOrders = vi.fn(async () => ({ total: 0, sessionExpired: true, orders: [] }))
 

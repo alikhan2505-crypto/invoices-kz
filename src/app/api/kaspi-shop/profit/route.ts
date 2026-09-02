@@ -79,29 +79,33 @@ export async function GET(req: NextRequest) {
       canonicalByMasterSku.set(p.kaspi_master_sku, candidate)
     }
   }
-  const catalog: { kaspiMasterSku: string; trackedProductId: string | null; cogsAmount: number | null }[] =
+  const catalog: { kaspiMasterSku: string; trackedProductId: string | null; cogsAmount: number | null; commissionCategoryLabel: string | null }[] =
     Array.from(canonicalByMasterSku.entries()).map(([kaspiMasterSku, row]) => ({
       kaspiMasterSku,
       trackedProductId: row.id,
       cogsAmount: row.cogsAmount,
+      commissionCategoryLabel: null,
     }))
 
-  // Себестоимость from the master-sku-keyed costs table (2026-08-21): it
-  // OVERRIDES the tracked-row value when both exist, and adds entries for
-  // sold products that were never added to демпинг -- those previously had
-  // no place to store cogs at all.
+  // Себестоимость (+ seller-assigned commission category, 2026-09-02) from
+  // the master-sku-keyed costs table (2026-08-21): OVERRIDES the
+  // tracked-row value when both exist, and adds entries for sold products
+  // that were never added to демпинг -- those previously had no place to
+  // store cogs at all.
   const { data: costRows } = await supabase
     .from('kaspi_shop_product_costs')
-    .select('kaspi_master_sku, cogs_amount')
+    .select('kaspi_master_sku, cogs_amount, commission_category_label')
     .eq('connection_id', connection.id)
   const catalogBySkuIndex = new Map(catalog.map((c, i) => [c.kaspiMasterSku, i]))
   for (const row of costRows || []) {
     const idx = catalogBySkuIndex.get(row.kaspi_master_sku)
     const cogs = row.cogs_amount !== null ? Number(row.cogs_amount) : null
+    const categoryLabel = row.commission_category_label || null
     if (idx !== undefined) {
       if (cogs !== null) catalog[idx].cogsAmount = cogs
+      if (categoryLabel !== null) catalog[idx].commissionCategoryLabel = categoryLabel
     } else {
-      catalog.push({ kaspiMasterSku: row.kaspi_master_sku, trackedProductId: null, cogsAmount: cogs })
+      catalog.push({ kaspiMasterSku: row.kaspi_master_sku, trackedProductId: null, cogsAmount: cogs, commissionCategoryLabel: categoryLabel })
     }
   }
 

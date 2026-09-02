@@ -7,6 +7,7 @@ import LoadingSpinner from '@/components/LoadingSpinner'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import SessionExpiredBanner from '@/components/kaspiShop/SessionExpiredBanner'
+import { KASPI_CATEGORY_COMMISSIONS } from '@/lib/kaspiShop/margin'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 const PERIODS = [7, 30, 90]
@@ -38,6 +39,9 @@ type ProductProfit = {
   revenue: number
   cogsAmount: number | null
   cogsTotal: number | null
+  commissionCategoryLabel: string | null
+  commissionRatePercent: number | null
+  commissionAmount: number | null
   profit: number | null
 }
 
@@ -66,6 +70,7 @@ export default function KaspiShopProfit() {
   const [commissionInput, setCommissionInput] = useState('')
   const [savingCogsFor, setSavingCogsFor] = useState<string | null>(null)
   const [cogsInputs, setCogsInputs] = useState<Record<string, string>>({})
+  const [savingCategoryFor, setSavingCategoryFor] = useState<string | null>(null)
   // «Расходы периода» modal: реклама + прочие (аренда, электроэнергия…),
   // one save per период-окно (founder request 2026-08-21).
   const [expensesOpen, setExpensesOpen] = useState(false)
@@ -172,6 +177,31 @@ export default function KaspiShopProfit() {
     }
   }
 
+  // Same master-sku-keyed override as saveCogs -- saves immediately on
+  // select (no separate confirm button, unlike the free-text COGS input)
+  // since a dropdown pick is already a complete, unambiguous choice.
+  async function saveCategory(kaspiMasterSku: string, label: string) {
+    setSavingCategoryFor(kaspiMasterSku)
+    setLoadError('')
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/kaspi-shop/profit/category', {
+        method: 'PATCH', headers,
+        body: JSON.stringify({ kaspiMasterSku, commissionCategoryLabel: label || null }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setLoadError(data.error || 'Не удалось сохранить категорию')
+        return
+      }
+      await loadSummary(days)
+    } catch {
+      setLoadError('Не удалось сохранить категорию. Проверьте соединение и попробуйте ещё раз.')
+    } finally {
+      setSavingCategoryFor(null)
+    }
+  }
+
   if (loading) return <LoadingSpinner />
 
   return (
@@ -239,21 +269,35 @@ export default function KaspiShopProfit() {
                 ₸ прочие расходы · <button onClick={() => setExpensesOpen(true)} className="underline underline-offset-2" style={{ color: 'var(--nav-accent)' }}>изменить</button>
               </div>
             </div>
-            <div>
-              {summary?.commissionRatePercent !== null && summary?.commissionRatePercent !== undefined ? (
-                <>
-                  <div className="text-lg font-bold font-mono tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{summary.commissionAmount.toLocaleString('ru-KZ')}</div>
-                  <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>₸ комиссия ({summary.commissionRatePercent}%)</div>
-                </>
-              ) : (
-                <div className="flex items-center gap-1.5">
-                  <input value={commissionInput} onChange={e => setCommissionInput(e.target.value)} placeholder="%"
-                    className={`w-16 ${INPUT_CLS}`} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
-                  <button onClick={saveCommission} className="text-xs font-medium rounded-lg px-2 py-1 flex items-center justify-center" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}><CheckIcon /></button>
+            {(() => {
+              const hasFlatRate = summary?.commissionRatePercent !== null && summary?.commissionRatePercent !== undefined
+              // Some products can now carry their own category-based rate
+              // (2026-09-02) -- the flat % here only ever applies to whatever
+              // revenue isn't covered by one, see profit.ts's blendedCommission.
+              const hasAnyCategorized = !!summary?.products.some(p => p.commissionCategoryLabel)
+              return (
+                <div>
+                  <div className="text-lg font-bold font-mono tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>
+                    {(summary?.commissionAmount ?? 0).toLocaleString('ru-KZ')}
+                  </div>
+                  <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>
+                    ₸ комиссия{hasFlatRate
+                      ? (hasAnyCategorized ? ` (${summary!.commissionRatePercent}% на остальное)` : ` (${summary!.commissionRatePercent}%)`)
+                      : (hasAnyCategorized ? ' (по категориям)' : '')}
+                  </div>
+                  {!hasFlatRate && (
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <input value={commissionInput} onChange={e => setCommissionInput(e.target.value)} placeholder="%"
+                        className={`w-16 ${INPUT_CLS}`} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
+                      <button onClick={saveCommission} className="text-xs font-medium rounded-lg px-2 py-1 flex items-center justify-center" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}><CheckIcon /></button>
+                    </div>
+                  )}
+                  {!hasFlatRate && !hasAnyCategorized && (
+                    <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>укажите комиссию Kaspi</div>
+                  )}
                 </div>
-              )}
-              <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>{summary?.commissionRatePercent !== null && summary?.commissionRatePercent !== undefined ? '' : 'укажите комиссию Kaspi'}</div>
-            </div>
+              )
+            })()}
           </div>
 
           {!!summary && summary.productsWithoutCogsCount > 0 && (
@@ -274,11 +318,17 @@ export default function KaspiShopProfit() {
           </div>
         ) : (
           <>
-            <div className="text-[11px] px-1 mb-2" style={{ color: 'var(--nav-text-muted)' }}>Прибыль по товару — выручка минус себестоимость (без учёта рекламы и комиссии, которые не делятся по товарам)</div>
+            <div className="text-[11px] px-1 mb-2" style={{ color: 'var(--nav-text-muted)' }}>
+              Прибыль по товару — выручка минус себестоимость минус комиссия (реклама не делится по товарам). Укажите категорию Kaspi, чтобы считать комиссию по реальной ставке вместо общего процента сверху.
+            </div>
             {/* Compact cards (founder 2026-08-21: no photo background, half
                 the width): small thumb + name + cogs input, dense grid.
                 Себестоимость is editable for EVERY product (keyed by
-                masterSku), tracked in демпинге or not. */}
+                masterSku), tracked in демпинге or not. Category select added
+                2026-09-02 (audit finding: the one flat commission % above
+                can't be accurate for a catalog spanning several categories)
+                -- picking one here computes THIS product's own commission
+                from Kaspi's real per-category rate instead of the flat %. */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-2.5">
               {summary.products.map(p => (
                 <div key={p.kaspiMasterSku} className="nav-glass rounded-2xl p-3 flex flex-col">
@@ -305,8 +355,22 @@ export default function KaspiShopProfit() {
                     </div>
                   </label>
 
+                  <label className="block mt-2">
+                    <span className="text-[10px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Категория Kaspi</span>
+                    <select
+                      value={p.commissionCategoryLabel || ''}
+                      disabled={savingCategoryFor === p.kaspiMasterSku}
+                      onChange={e => saveCategory(p.kaspiMasterSku, e.target.value)}
+                      className={`w-full min-w-0 ${INPUT_CLS} disabled:opacity-50`} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }}>
+                      <option value="">Общий процент</option>
+                      {KASPI_CATEGORY_COMMISSIONS.map(c => <option key={c.label} value={c.label}>{c.label} — {c.ratePercent}%</option>)}
+                    </select>
+                  </label>
+
                   <div className="pt-2 flex items-baseline justify-between gap-1">
-                    <span className="text-[10px]" style={{ color: 'var(--nav-text-muted)' }}>Прибыль</span>
+                    <span className="text-[10px]" style={{ color: 'var(--nav-text-muted)' }}>
+                      Прибыль{p.commissionAmount !== null && ` (−${p.commissionAmount.toLocaleString('ru-KZ')} ₸ комиссия)`}
+                    </span>
                     <span className="font-mono font-bold text-xs tabular-nums truncate" style={{ color: 'var(--nav-text-primary)' }}>
                       {p.profit !== null ? `${p.profit.toLocaleString('ru-KZ')} ₸` : <span className="text-[10px] font-normal" style={{ color: 'var(--nav-text-muted)' }}>укажите себест.</span>}
                     </span>

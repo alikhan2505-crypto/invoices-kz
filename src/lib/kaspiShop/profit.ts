@@ -1,4 +1,5 @@
 import { listOrders, Order, PAGE_SIZE } from './cabinetApi'
+import { KASPI_CATEGORY_COMMISSIONS } from './margin'
 
 // Real unit economics per product/store -- revenue minus COGS minus ad
 // spend minus commission. Kaspi has no API for accurate commission or ad
@@ -18,6 +19,15 @@ export type ProductProfit = {
   revenue: number
   cogsAmount: number | null
   cogsTotal: number | null
+  // Seller-assigned Kaspi category for this specific product (2026-09-02,
+  // audit finding: Profit used to accept only ONE flat commission % for the
+  // whole catalog, while Kaspi's real rate varies by category -- see
+  // margin.ts's KASPI_CATEGORY_COMMISSIONS for why this can't be inferred
+  // automatically from Kaspi's own raw category string). null means this
+  // product still falls back to the catalog-wide flat rate below.
+  commissionCategoryLabel: string | null
+  commissionRatePercent: number | null
+  commissionAmount: number | null
   profit: number | null
 }
 
@@ -45,7 +55,7 @@ export async function computeProfitSummary(
   sessionCookies: string,
   merchantId: string,
   sinceDays: number,
-  catalog: { kaspiMasterSku: string; trackedProductId: string | null; cogsAmount: number | null }[],
+  catalog: { kaspiMasterSku: string; trackedProductId: string | null; cogsAmount: number | null; commissionCategoryLabel?: string | null }[],
   adSpend: { amount: number; otherAmount: number; configured: boolean },
   commissionRatePercent: number | null,
   listOrdersFn: typeof listOrders = listOrders
@@ -90,12 +100,28 @@ export async function computeProfitSummary(
   const products: ProductProfit[] = []
   let totalCogsKnown = 0
   let productsWithoutCogsCount = 0
+  // Revenue already covered by a per-product category rate -- subtracted
+  // from the flat-rate bucket below so a seller can categorize their top
+  // products gradually without double-charging commission on that revenue.
+  let categorizedRevenue = 0
+  let categorizedCommission = 0
   for (const [sku, agg] of bySku.entries()) {
     const catalogEntry = catalogBySku.get(sku)
     const cogsAmount = catalogEntry?.cogsAmount ?? null
     const cogsTotal = cogsAmount !== null ? cogsAmount * agg.unitsSold : null
     if (cogsTotal !== null) totalCogsKnown += cogsTotal
     else productsWithoutCogsCount += 1
+
+    const commissionCategoryLabel = catalogEntry?.commissionCategoryLabel ?? null
+    const categoryRate = commissionCategoryLabel
+      ? KASPI_CATEGORY_COMMISSIONS.find(c => c.label === commissionCategoryLabel)?.ratePercent ?? null
+      : null
+    const productCommission = categoryRate !== null ? agg.revenue * (categoryRate / 100) : null
+    if (productCommission !== null) {
+      categorizedRevenue += agg.revenue
+      categorizedCommission += productCommission
+    }
+
     products.push({
       kaspiMasterSku: sku,
       trackedProductId: catalogEntry?.trackedProductId ?? null,
@@ -105,7 +131,10 @@ export async function computeProfitSummary(
       revenue: agg.revenue,
       cogsAmount,
       cogsTotal,
-      profit: cogsTotal !== null ? agg.revenue - cogsTotal : null,
+      commissionCategoryLabel,
+      commissionRatePercent: categoryRate,
+      commissionAmount: productCommission,
+      profit: cogsTotal !== null ? agg.revenue - cogsTotal - (productCommission ?? 0) : null,
     })
   }
   products.sort((a, b) => b.revenue - a.revenue)
@@ -114,7 +143,9 @@ export async function computeProfitSummary(
   // from order.totalPrice) so this number always reconciles with the
   // per-product breakdown shown below it in the UI.
   const totalRevenue = products.reduce((sum, p) => sum + p.revenue, 0)
-  const commissionAmount = commissionRatePercent !== null ? totalRevenue * (commissionRatePercent / 100) : 0
+  const uncategorizedRevenue = totalRevenue - categorizedRevenue
+  const blendedCommission = commissionRatePercent !== null ? uncategorizedRevenue * (commissionRatePercent / 100) : 0
+  const commissionAmount = categorizedCommission + blendedCommission
   const netProfit = totalRevenue - totalCogsKnown - adSpend.amount - adSpend.otherAmount - commissionAmount
 
   return {
