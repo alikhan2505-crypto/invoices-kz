@@ -231,6 +231,12 @@ export default function KaspiShop() {
   const [toppingUp, setToppingUp] = useState(false)
   const [topupPending, setTopupPending] = useState<{ topup_id: string, payment_link: string } | null>(null)
   const [walletOpen, setWalletOpen] = useState(false)
+  // Audit finding (2026-09-02): GET /api/kaspi-shop/wallet/history already
+  // existed (own product-scoped debits, deliberately excludes topups -- see
+  // that route) but no page ever called it -- a seller could top up and see
+  // the balance move but never see what it was spent on. Loaded once per
+  // modal open rather than on page load, since it's only relevant here.
+  const [walletHistory, setWalletHistory] = useState<{ label: string; amount: number; createdAt: string }[] | null>(null)
 
   // Stats cards + "Применить сейчас" / "Добавить несколько" -- see
   // GET /api/kaspi-shop/products for how stats is computed server-side, and
@@ -276,6 +282,22 @@ export default function KaspiShop() {
     const { data: { session } } = await supabase.auth.getSession()
     return { 'Authorization': `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' }
   }
+
+  useEffect(() => {
+    if (!walletOpen) return
+    async function loadHistory() {
+      try {
+        const headers = await authHeader()
+        const res = await fetch('/api/kaspi-shop/wallet/history', { headers })
+        if (res.ok) {
+          const data = await res.json()
+          setWalletHistory(Array.isArray(data.entries) ? data.entries : [])
+        }
+      } catch { /* modal just keeps the amount picker, no history list */ }
+    }
+    loadHistory()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [walletOpen])
 
   // Shared by load() and saveTrackedCities() -- GET /settings/cities is the
   // single source of truth for availableCities (real names when
@@ -1094,6 +1116,21 @@ export default function KaspiShop() {
                   <p className="text-xs mb-2" style={{ color: 'var(--nav-text-secondary)' }}>Оплатите QR-код Kaspi — баланс пополнится автоматически.</p>
                   <a href={topupPending.payment_link} target="_blank" rel="noopener noreferrer"
                     className="w-full rounded-xl py-2.5 text-sm font-medium block text-center" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>Оплатить</a>
+                </div>
+              )}
+              {walletHistory !== null && walletHistory.length > 0 && (
+                <div className="mt-4 pt-3" style={{ borderTop: '1px solid var(--nav-border-soft)' }}>
+                  <div className="text-[11px] font-semibold tracking-wider uppercase mb-2" style={{ color: 'var(--nav-text-muted)' }}>Последние списания</div>
+                  <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                    {walletHistory.map((entry, i) => (
+                      <div key={i} className="flex items-center justify-between gap-2 text-xs">
+                        <span className="truncate" style={{ color: 'var(--nav-text-secondary)' }}>{entry.label}</span>
+                        <span className="flex-shrink-0 font-mono tabular-nums" style={{ color: 'var(--nav-critical)' }}>
+                          −{Math.abs(entry.amount).toLocaleString('ru-KZ')} ₸
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </motion.div>
