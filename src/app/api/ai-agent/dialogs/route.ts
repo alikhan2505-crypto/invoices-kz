@@ -33,8 +33,20 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!(await isAdmin(user.id))) return NextResponse.json({ error: 'admin_only' }, { status: 403 })
 
-  const { data: agents } = await supabase.from('ai_agents').select('id, name').eq('user_id', user.id)
-  if (!agents || agents.length === 0) return NextResponse.json({ items: [] })
+  // ?agentId= (2026-09-02) narrows to one owned agent, same
+  // 404-if-not-owned shape as leads/route.ts and review/route.ts; omitted,
+  // every one of the caller's agents is included (unchanged default).
+  const agentIdParam = req.nextUrl.searchParams.get('agentId')
+  let agents: { id: string; name: string }[]
+  if (agentIdParam) {
+    const { data: agent } = await supabase.from('ai_agents').select('id, name').eq('id', agentIdParam).eq('user_id', user.id).maybeSingle()
+    if (!agent) return NextResponse.json({ error: 'not_found' }, { status: 404 })
+    agents = [agent]
+  } else {
+    const { data } = await supabase.from('ai_agents').select('id, name').eq('user_id', user.id)
+    agents = data || []
+  }
+  if (agents.length === 0) return NextResponse.json({ items: [] })
   const agentNameById: Record<string, string> = {}
   for (const a of agents) agentNameById[a.id] = a.name
 
