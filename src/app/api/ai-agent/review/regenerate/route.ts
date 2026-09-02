@@ -5,6 +5,7 @@ import { buildBusinessContextLine, buildCatalogBlock, AgentTone, AgentGoal } fro
 import { loadAgentCatalog } from '@/lib/aiAgent/catalogContext'
 import { pairConversationHistory } from '@/lib/aiAgent/telegram'
 import { debitAiAgentWallet, hasAiAgentBudget } from '@/lib/aiAgent/wallet'
+import { getActivePlan } from '@/lib/plan'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -30,9 +31,9 @@ async function requireUser(req: NextRequest) {
 
 // Same admin gate as ../route.ts (and settings/route.ts): logged-out -> 401,
 // logged-in non-admin -> distinct 403 admin_only.
-async function isAdmin(userId: string): Promise<boolean> {
-  const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', userId).single()
-  return !!profile?.is_admin
+async function hasAiAgentAccess(userId: string): Promise<boolean> {
+  const { data: profile } = await supabase.from('profiles').select('is_admin, plan, plan_expires_at, bonus_expires_at, trial_expires_at').eq('id', userId).single()
+  return !!profile?.is_admin || getActivePlan(profile).canAiAgent
 }
 
 // «Другой вариант»: re-runs the exact same reply pipeline the webhook
@@ -43,7 +44,7 @@ async function isAdmin(userId: string): Promise<boolean> {
 export async function POST(req: NextRequest) {
   const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!(await isAdmin(user.id))) return NextResponse.json({ error: 'admin_only' }, { status: 403 })
+  if (!(await hasAiAgentAccess(user.id))) return NextResponse.json({ error: 'admin_only' }, { status: 403 })
 
   const { messageId } = await req.json()
   if (!messageId) return NextResponse.json({ error: 'invalid request' }, { status: 400 })

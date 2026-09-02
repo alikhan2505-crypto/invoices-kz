@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getActivePlan } from '@/lib/plan'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -22,9 +23,9 @@ async function requireUser(req: NextRequest) {
 // src/app/api/ai-agent/settings/route.ts, kept as a separate check after
 // requireUser so a logged-out caller still gets 401 Unauthorized and only a
 // logged-in non-admin gets the distinct 403 admin_only body.
-async function isAdmin(userId: string): Promise<boolean> {
-  const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', userId).single()
-  return !!profile?.is_admin
+async function hasAiAgentAccess(userId: string): Promise<boolean> {
+  const { data: profile } = await supabase.from('profiles').select('is_admin, plan, plan_expires_at, bonus_expires_at, trial_expires_at').eq('id', userId).single()
+  return !!profile?.is_admin || getActivePlan(profile).canAiAgent
 }
 
 const VALID_DAYS = [7, 14, 30]
@@ -45,7 +46,7 @@ function kzDayKey(isoOrMs: string | number): string {
 export async function GET(req: NextRequest) {
   const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!(await isAdmin(user.id))) return NextResponse.json({ error: 'admin_only' }, { status: 403 })
+  if (!(await hasAiAgentAccess(user.id))) return NextResponse.json({ error: 'admin_only' }, { status: 403 })
 
   const daysParam = parseInt(req.nextUrl.searchParams.get('days') || '30', 10)
   const days = VALID_DAYS.includes(daysParam) ? daysParam : 30

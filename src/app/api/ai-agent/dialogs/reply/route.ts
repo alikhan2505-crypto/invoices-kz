@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { sendIntoConversation } from '@/lib/aiAgent/channelSend'
+import { getActivePlan } from '@/lib/plan'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -19,9 +20,9 @@ async function requireUser(req: NextRequest) {
   return user
 }
 
-async function isAdmin(userId: string): Promise<boolean> {
-  const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', userId).single()
-  return !!profile?.is_admin
+async function hasAiAgentAccess(userId: string): Promise<boolean> {
+  const { data: profile } = await supabase.from('profiles').select('is_admin, plan, plan_expires_at, bonus_expires_at, trial_expires_at').eq('id', userId).single()
+  return !!profile?.is_admin || getActivePlan(profile).canAiAgent
 }
 
 // Sending a manual reply IS the takeover -- no separate "Взять диалог"
@@ -29,7 +30,7 @@ async function isAdmin(userId: string): Promise<boolean> {
 export async function POST(req: NextRequest) {
   const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!(await isAdmin(user.id))) return NextResponse.json({ error: 'admin_only' }, { status: 403 })
+  if (!(await hasAiAgentAccess(user.id))) return NextResponse.json({ error: 'admin_only' }, { status: 403 })
 
   const body = await req.json().catch(() => null)
   const conversationId = typeof body?.conversationId === 'string' ? body.conversationId : null

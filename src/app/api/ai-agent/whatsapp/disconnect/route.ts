@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { decryptAtRest } from '@/lib/kaspiPay/crypto'
 import { getKey } from '@/lib/aiAgent/connection'
 import { unsubscribeWhatsAppWebhooks } from '@/lib/whatsapp'
+import { getActivePlan } from '@/lib/plan'
 
 // Disconnect an agent's WhatsApp number (Каналы tab) -- mirrors
 // src/app/api/ai-agent/instagram/disconnect/route.ts exactly: ownership
@@ -29,15 +30,15 @@ async function requireUser(req: NextRequest) {
 
 // AI-агент is admin-only for now -- same requireAdmin shape as the other
 // ai-agent routes (see settings/route.ts for the 401-vs-403 reasoning).
-async function isAdmin(userId: string): Promise<boolean> {
-  const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', userId).single()
-  return !!profile?.is_admin
+async function hasAiAgentAccess(userId: string): Promise<boolean> {
+  const { data: profile } = await supabase.from('profiles').select('is_admin, plan, plan_expires_at, bonus_expires_at, trial_expires_at').eq('id', userId).single()
+  return !!profile?.is_admin || getActivePlan(profile).canAiAgent
 }
 
 export async function POST(req: NextRequest) {
   const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!(await isAdmin(user.id))) return NextResponse.json({ error: 'admin_only' }, { status: 403 })
+  if (!(await hasAiAgentAccess(user.id))) return NextResponse.json({ error: 'admin_only' }, { status: 403 })
 
   const body = await req.json().catch(() => null)
   const agentId = body?.agentId

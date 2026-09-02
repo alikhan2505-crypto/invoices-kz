@@ -5,6 +5,7 @@ import { motion, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
+import { getActivePlan } from '@/lib/plan'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 const FREE_REGENS = 3
@@ -143,14 +144,15 @@ export default function AiAgentReview() {
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
-    // AI-агент is admin-only for now -- same client-side is_admin check this
-    // codebase already uses on /admin and every kaspi-shop/* page. The real
-    // enforcement is server-side (the API routes below now 403 admin_only
-    // for non-admins); this just swaps their redirect-to-/dashboard for an
-    // inline message, since a redirect can misfire on a legitimate admin
-    // session that hasn't finished loading yet.
-    const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', user.id).single()
-    if (!profile?.is_admin) { setForbidden(true); setLoading(false); return }
+    // AI-агент is open to admins (testing) and active Pro-plan users
+    // (2026-09-02, opened up now that Telegram/WhatsApp/website/API are
+    // proven live -- Instagram stays disabled below pending Meta review).
+    // The real enforcement is server-side (the API routes below 403
+    // admin_only for anyone that fails this same check); this just swaps
+    // their redirect-to-/dashboard for an inline message, since a redirect
+    // can misfire on a legitimate session that hasn't finished loading yet.
+    const { data: profile } = await supabase.from('profiles').select('is_admin, plan, plan_expires_at, bonus_expires_at, trial_expires_at').eq('id', user.id).single()
+    if (!profile?.is_admin && !getActivePlan(profile).canAiAgent) { setForbidden(true); setLoading(false); return }
     const headers = await authHeader()
     // loadItems folded into the same Promise.all as the other two initial
     // fetches (final-review finding) -- it doesn't need to wait for the

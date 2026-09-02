@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import TestChatPanel from '@/components/aiAgent/TestChatPanel'
+import { getActivePlan } from '@/lib/plan'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -49,8 +50,8 @@ export default function AiAgentTestChat() {
       // Same admin-only client-side check as ../page.tsx -- the real
       // enforcement is the API's 403 admin_only; this swaps a redirect for
       // an inline message.
-      const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', user.id).single()
-      if (!profile?.is_admin) { setForbidden(true); setLoading(false); return }
+      const { data: profile } = await supabase.from('profiles').select('is_admin, plan, plan_expires_at, bonus_expires_at, trial_expires_at').eq('id', user.id).single()
+      if (!profile?.is_admin && !getActivePlan(profile).canAiAgent) { setForbidden(true); setLoading(false); return }
       const headers = await authHeader()
       const res = await fetch('/api/ai-agent/agents', { headers })
       if (res.ok) {

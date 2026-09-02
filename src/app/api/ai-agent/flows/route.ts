@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { parseFlowDefinition, type FlowDefinition } from '@/lib/aiAgent/flow'
+import { getActivePlan } from '@/lib/plan'
 
 // CRUD for ai_agent_flows -- the Сценарии tab's save/load surface. Mirrors
 // src/app/api/ai-agent/templates/route.ts's shape (admin-only, agent
@@ -25,9 +26,9 @@ async function requireUser(req: NextRequest) {
   return user
 }
 
-async function isAdmin(userId: string): Promise<boolean> {
-  const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', userId).single()
-  return !!profile?.is_admin
+async function hasAiAgentAccess(userId: string): Promise<boolean> {
+  const { data: profile } = await supabase.from('profiles').select('is_admin, plan, plan_expires_at, bonus_expires_at, trial_expires_at').eq('id', userId).single()
+  return !!profile?.is_admin || getActivePlan(profile).canAiAgent
 }
 
 async function ownsAgent(userId: string, agentId: string): Promise<boolean> {
@@ -98,7 +99,7 @@ function toClientShape(row: any) {
 export async function GET(req: NextRequest) {
   const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!(await isAdmin(user.id))) return NextResponse.json({ error: 'admin_only' }, { status: 403 })
+  if (!(await hasAiAgentAccess(user.id))) return NextResponse.json({ error: 'admin_only' }, { status: 403 })
 
   const agentId = req.nextUrl.searchParams.get('agentId')
   if (!agentId) return NextResponse.json({ error: 'agentId required' }, { status: 400 })
@@ -117,7 +118,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!(await isAdmin(user.id))) return NextResponse.json({ error: 'admin_only' }, { status: 403 })
+  if (!(await hasAiAgentAccess(user.id))) return NextResponse.json({ error: 'admin_only' }, { status: 403 })
 
   const body = await req.json().catch(() => null)
   const name = typeof body?.name === 'string' ? body.name.trim().slice(0, MAX_NAME_LEN) : ''
@@ -165,7 +166,7 @@ export async function POST(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!(await isAdmin(user.id))) return NextResponse.json({ error: 'admin_only' }, { status: 403 })
+  if (!(await hasAiAgentAccess(user.id))) return NextResponse.json({ error: 'admin_only' }, { status: 403 })
 
   const body = await req.json().catch(() => null)
   const id = body?.id

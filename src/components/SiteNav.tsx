@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
+import { getActivePlan } from '@/lib/plan'
 import { useLanguage, type Lang } from './LanguageProvider'
 import KaspiShopStoreSwitcher from './KaspiShopStoreSwitcher'
 
@@ -18,6 +19,16 @@ const lockedMessages: Record<Lang, string> = {
   ru: 'Скоро откроем всем',
   kk: 'Жақында бәріне ашамыз',
   en: 'Coming soon for everyone',
+}
+
+// Copy for a proOnly section (2026-09-02, AI-агент) -- unlike the admin-gated
+// sections above, this one is already live for real customers; a Free/Basic
+// user hitting the lock needs a plan upsell, not a "coming soon" message
+// that would be simply false for them.
+const proLockedMessages: Record<Lang, string> = {
+  ru: 'Доступно на тарифе Про',
+  kk: 'Про тарифінде қолжетімді',
+  en: 'Available on the Pro plan',
 }
 
 type LocalizedLabel = Record<Lang, string>
@@ -86,15 +97,26 @@ type Section = {
   key: 'invoices' | 'kaspiApi' | 'kaspiShop' | 'aiAgent' | 'wildberries'
   links: { href: string; label: LocalizedLabel }[]
   adminOnly: boolean
+  // Unlocked for an active Pro plan too, not just admins (2026-09-02) --
+  // only meaningful when adminOnly is false. kaspiShop/wildberries stay
+  // admin-only until the founder reviews them the same way AI-агент was
+  // before this.
+  proOnly?: boolean
 }
 
 const SECTIONS: Section[] = [
   { key: 'invoices', links: invoicesLinks, adminOnly: false },
   { key: 'kaspiApi', links: kaspiApiLinks, adminOnly: false },
-  { key: 'aiAgent', links: aiAgentLinks, adminOnly: true },
+  { key: 'aiAgent', links: aiAgentLinks, adminOnly: false, proOnly: true },
   { key: 'kaspiShop', links: kaspiShopLinks, adminOnly: true },
   { key: 'wildberries', links: wbLinks, adminOnly: true },
 ]
+
+function isSectionLocked(s: Section, isAdmin: boolean, canAiAgent: boolean): boolean {
+  if (s.adminOnly) return !isAdmin
+  if (s.proOnly) return !(isAdmin || canAiAgent)
+  return false
+}
 
 function LockIcon({ size = 10 }: { size?: number }) {
   return (
@@ -130,6 +152,7 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
   const path = usePathname()
   const { lang } = useLanguage()
   const [isAdmin, setIsAdmin] = useState(false)
+  const [canAiAgent, setCanAiAgent] = useState(false)
   const [lockedHint, setLockedHint] = useState<string | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const navRef = useRef<HTMLElement>(null)
@@ -145,8 +168,9 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
     async function loadAdmin() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
-      const { data } = await supabase.from('profiles').select('is_admin').eq('id', user.id).single()
+      const { data } = await supabase.from('profiles').select('is_admin, plan, plan_expires_at, bonus_expires_at, trial_expires_at').eq('id', user.id).single()
       setIsAdmin(!!data?.is_admin)
+      setCanAiAgent(getActivePlan(data).canAiAgent)
     }
     loadAdmin()
   }, [])
@@ -243,7 +267,7 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
                   })}
 
                   {SECTIONS.map(s => {
-                    const locked = s.adminOnly && !isAdmin
+                    const locked = isSectionLocked(s, isAdmin, canAiAgent)
                     return (
                       <div key={s.key} className="mt-3">
                         <button
@@ -259,7 +283,7 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
                         {locked ? (
                           lockedHint === `drawer-${s.key}` && (
                             <div className="px-3 pb-1.5 text-xs font-medium" style={{ color: 'var(--nav-text-secondary)' }}>
-                              {lockedMessages[lang]}
+                              {s.proOnly ? proLockedMessages[lang] : lockedMessages[lang]}
                             </div>
                           )
                         ) : (
@@ -304,10 +328,10 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
             { href: '/dashboard', label: labels[lang].home },
             { href: '/history', label: labels[lang].history },
             { href: '/profile', label: labels[lang].profile },
-            { href: '/ai-agent', label: labels[lang].aiAgent, locked: !isAdmin, hintId: 'mobile-aiAgent' },
+            { href: '/ai-agent', label: labels[lang].aiAgent, locked: !(isAdmin || canAiAgent), hintId: 'mobile-aiAgent', proOnly: true },
             { href: '/kaspi-shop', label: labels[lang].kaspiShop, locked: !isAdmin, hintId: 'mobile-kaspiShop' },
             { href: '/wildberries', label: labels[lang].wildberries, locked: !isAdmin, hintId: 'mobile-wildberries' },
-          ] as { href: string; label: string; badge?: number; locked?: boolean; hintId?: string }[]).map(item => {
+          ] as { href: string; label: string; badge?: number; locked?: boolean; hintId?: string; proOnly?: boolean }[]).map(item => {
             const active = !item.locked && (path === item.href || path.startsWith(item.href + '/'))
             return (
               <div key={item.href} className="relative flex-1">
@@ -342,7 +366,7 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
                     className="nav-glass absolute bottom-[calc(100%+8px)] left-1/2 -translate-x-1/2 whitespace-nowrap px-3 py-1.5 rounded-xl text-xs font-medium z-20"
                     style={{ color: 'var(--nav-text-primary)' }}
                   >
-                    {lockedMessages[lang]}
+                    {item.proOnly ? proLockedMessages[lang] : lockedMessages[lang]}
                   </div>
                 )}
               </div>
@@ -383,7 +407,7 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
           </button>
 
           {SECTIONS.map(s => {
-            const locked = s.adminOnly && !isAdmin
+            const locked = isSectionLocked(s, isAdmin, canAiAgent)
             const active = !locked && activeSection?.key === s.key
             return (
               <div key={s.key} className="relative">
@@ -410,7 +434,7 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
                     className="nav-glass absolute top-[calc(100%+10px)] left-0 whitespace-nowrap px-3 py-2 rounded-xl text-xs font-medium z-20"
                     style={{ color: 'var(--nav-text-primary)', boxShadow: `0 20px 44px -18px rgba(10,10,15,0.3), var(--nav-card-glow)` }}
                   >
-                    {lockedMessages[lang]}
+                    {s.proOnly ? proLockedMessages[lang] : lockedMessages[lang]}
                   </div>
                 )}
               </div>

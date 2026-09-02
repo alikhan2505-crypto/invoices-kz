@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase'
 import { buildAgentSettingsHref } from '@/lib/aiAgent/settingsLink'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
+import { getActivePlan } from '@/lib/plan'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 const MAX_MESSAGE_LEN = 2000
@@ -129,8 +130,8 @@ export default function AiAgentBroadcasts() {
       // Same admin-only client-side check as ../analytics/page.tsx -- the
       // real enforcement is the API's 403 admin_only; this swaps a redirect
       // for an inline message.
-      const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', user.id).single()
-      if (!profile?.is_admin) { setForbidden(true); setLoading(false); return }
+      const { data: profile } = await supabase.from('profiles').select('is_admin, plan, plan_expires_at, bonus_expires_at, trial_expires_at').eq('id', user.id).single()
+      if (!profile?.is_admin && !getActivePlan(profile).canAiAgent) { setForbidden(true); setLoading(false); return }
       const headers = await authHeaders()
       const res = await fetch('/api/ai-agent/agents', { headers })
       if (res.ok) {

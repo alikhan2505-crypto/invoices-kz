@@ -4,6 +4,7 @@ import { decryptAtRest } from '@/lib/kaspiPay/crypto'
 import { getKey } from '@/lib/aiAgent/connection'
 import { sendTelegramBotMessage } from '@/lib/aiAgent/telegram'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
+import { getActivePlan } from '@/lib/plan'
 
 type BroadcastChannel = 'telegram' | 'whatsapp'
 
@@ -35,9 +36,9 @@ async function requireUser(req: NextRequest) {
 // kept as a separate check after requireUser so a logged-out caller still
 // gets 401 Unauthorized and only a logged-in non-admin gets the distinct
 // 403 admin_only body.
-async function isAdmin(userId: string): Promise<boolean> {
-  const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', userId).single()
-  return !!profile?.is_admin
+async function hasAiAgentAccess(userId: string): Promise<boolean> {
+  const { data: profile } = await supabase.from('profiles').select('is_admin, plan, plan_expires_at, bonus_expires_at, trial_expires_at').eq('id', userId).single()
+  return !!profile?.is_admin || getActivePlan(profile).canAiAgent
 }
 
 const MAX_MESSAGE_LEN = 2000
@@ -115,7 +116,7 @@ async function collectRecipients(agentId: string, channel: BroadcastChannel): Pr
 export async function GET(req: NextRequest) {
   const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!(await isAdmin(user.id))) return NextResponse.json({ error: 'admin_only' }, { status: 403 })
+  if (!(await hasAiAgentAccess(user.id))) return NextResponse.json({ error: 'admin_only' }, { status: 403 })
 
   // ?agentId=…&preview=1&channel=… -- recipient-count preview for the
   // compose modal ("Отправить N получателям?") without creating a broadcast
@@ -166,7 +167,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!(await isAdmin(user.id))) return NextResponse.json({ error: 'admin_only' }, { status: 403 })
+  if (!(await hasAiAgentAccess(user.id))) return NextResponse.json({ error: 'admin_only' }, { status: 403 })
 
   const body = await req.json().catch(() => null)
   const agentId = body?.agentId

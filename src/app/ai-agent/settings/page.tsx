@@ -9,6 +9,7 @@ import DesktopShell from '@/components/DesktopShell'
 import TestChatPanel from '@/components/aiAgent/TestChatPanel'
 import TriggerChipsEditor from '@/components/aiAgent/TriggerChipsEditor'
 import FlowBuilder from '@/components/aiAgent/FlowBuilder'
+import { getActivePlan } from '@/lib/plan'
 // promptContext is a pure, dependency-free module (no server-only imports,
 // no env access) -- safe to bundle client-side, so the Промптинг preview
 // shows the REAL assembled context line, not a hand-maintained copy.
@@ -296,6 +297,11 @@ export default function AiAgentSettings() {
   const waWabaIdRef = useRef<string | null>(null)
   const [oauthNotice, setOauthNotice] = useState<'connected' | 'error' | null>(null)
   const [forbidden, setForbidden] = useState(false)
+  // Instagram/WhatsApp self-serve connect is founder-only for now even
+  // though the section itself opened to Pro customers (2026-09-02) -- both
+  // depend on Meta app review the founder still has to finish personally;
+  // real customers see "Канал в работе" instead of a working button.
+  const [isAdmin, setIsAdmin] = useState(false)
   // ambiguous_agent (2026-09-02): a bare /ai-agent/settings visit with no
   // ?agent= on an account with 2+ agents -- the settings API can't guess
   // which one, so this renders an inline message instead of the form.
@@ -507,14 +513,16 @@ export default function AiAgentSettings() {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
-      // AI-агент is admin-only for now -- same client-side is_admin check this
-      // codebase already uses on /admin and every kaspi-shop/* page. The real
-      // enforcement is server-side (the API routes below now 403 admin_only
-      // for non-admins); this just swaps their redirect-to-/dashboard for an
-      // inline message, since a redirect can misfire on a legitimate admin
-      // session that hasn't finished loading yet.
-      const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', user.id).single()
-      if (!profile?.is_admin) { setForbidden(true); setLoading(false); return }
+      // AI-агент is open to admins (testing) and active Pro-plan users
+      // (2026-09-02, opened up now that Telegram/WhatsApp/website/API are
+      // proven live -- Instagram stays disabled below pending Meta review).
+      // The real enforcement is server-side (the API routes below 403
+      // admin_only for anyone that fails this same check); this just swaps
+      // their redirect-to-/dashboard for an inline message, since a redirect
+      // can misfire on a legitimate session that hasn't finished loading yet.
+      const { data: profile } = await supabase.from('profiles').select('is_admin, plan, plan_expires_at, bonus_expires_at, trial_expires_at').eq('id', user.id).single()
+      if (!profile?.is_admin && !getActivePlan(profile).canAiAgent) { setForbidden(true); setLoading(false); return }
+      setIsAdmin(!!profile?.is_admin)
       const headers = await authHeader()
       loadWalletBalance(headers)
       loadKaspiShopStatus(headers)
@@ -1512,13 +1520,20 @@ export default function AiAgentSettings() {
                   <ChannelCard
                     icon={<InstagramIcon />}
                     name="Instagram"
-                    chip={instagramConnection?.status === 'active'
+                    chip={!isAdmin
+                      ? <StatusChip kind="soon" label="Канал в работе" />
+                      : instagramConnection?.status === 'active'
                       ? <StatusChip kind="ok" label={`Подключено: ${instagramConnection.external_account_name || 'аккаунт'}`} />
                       : instagramConnection?.status === 'token_expired'
                         ? <StatusChip kind="warn" label="Требуется переподключение" />
                         : <StatusChip kind="off" label="Не подключен" />}
                     description="Агент отвечает на комментарии и сообщения в Директ вашего бизнес-аккаунта"
                   >
+                    {!isAdmin ? (
+                      <button disabled className="w-full nav-glass rounded-lg px-4 py-2.5 text-sm font-medium opacity-50 cursor-not-allowed" style={{ color: 'var(--nav-text-primary)' }}>
+                        Канал в работе
+                      </button>
+                    ) : <>
                     {instagramConnection?.status === 'active' && (
                       <button onClick={disconnectInstagram} disabled={igBusy}
                         className="w-full nav-glass rounded-lg px-4 py-2.5 text-sm font-medium disabled:opacity-50"
@@ -1548,6 +1563,7 @@ export default function AiAgentSettings() {
                     {igError && (
                       <div className="text-xs mt-2" style={{ color: 'var(--nav-critical)' }}>{igError}</div>
                     )}
+                    </>}
                   </ChannelCard>
 
                   <ChannelCard
@@ -1614,13 +1630,20 @@ export default function AiAgentSettings() {
                   <ChannelCard
                     icon={<WhatsAppIcon />}
                     name="WhatsApp"
-                    chip={whatsappConnection?.status === 'active'
+                    chip={!isAdmin
+                      ? <StatusChip kind="soon" label="Канал в работе" />
+                      : whatsappConnection?.status === 'active'
                       ? <StatusChip kind="ok" label={`Подключено: ${whatsappConnection.external_account_name || 'номер'}`} />
                       : whatsappConnection?.status === 'token_expired'
                         ? <StatusChip kind="warn" label="Требуется переподключение" />
                         : <StatusChip kind="off" label="Не подключен" />}
                     description="Агент отвечает на сообщения в вашем WhatsApp Business — официальный WhatsApp Cloud API"
                   >
+                    {!isAdmin ? (
+                      <button disabled className="w-full nav-glass rounded-lg px-4 py-2.5 text-sm font-medium opacity-50 cursor-not-allowed" style={{ color: 'var(--nav-text-primary)' }}>
+                        Канал в работе
+                      </button>
+                    ) : <>
                     {whatsappConnection?.status === 'active' && (
                       <button onClick={disconnectWhatsApp} disabled={waBusy}
                         className="w-full nav-glass rounded-lg px-4 py-2.5 text-sm font-medium disabled:opacity-50"
@@ -1650,6 +1673,7 @@ export default function AiAgentSettings() {
                     {waError && (
                       <div className="text-xs mt-2" style={{ color: 'var(--nav-critical)' }}>{waError}</div>
                     )}
+                    </>}
                   </ChannelCard>
 
                   <ChannelCard
