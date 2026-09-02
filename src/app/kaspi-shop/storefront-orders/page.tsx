@@ -38,6 +38,12 @@ export default function KaspiShopStorefrontOrders() {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
+      // Same admin-only gate as every other kaspi-shop/* page (audit finding,
+      // 2026-09-02) -- this page and storefront were the only two missing it,
+      // so any authenticated invoices.kz user could see real buyer PII
+      // (name/phone/address) by typing the URL directly.
+      const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', user.id).single()
+      if (!profile?.is_admin) { router.push('/dashboard'); return }
       const { data: { session } } = await supabase.auth.getSession()
       const headers = { 'Authorization': `Bearer ${session?.access_token}` }
       const res = await fetch('/api/kaspi-shop/storefront-orders', { headers })

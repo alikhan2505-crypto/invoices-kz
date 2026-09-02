@@ -42,6 +42,12 @@ export default function KaspiShopStorefrontSettings() {
     async function init() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
+      // Same admin-only gate as every other kaspi-shop/* page (audit finding,
+      // 2026-09-02) -- this page and storefront-orders were the only two
+      // missing it, so any authenticated invoices.kz user could reach a
+      // founder-only-until-reviewed feature by typing the URL directly.
+      const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', user.id).single()
+      if (!profile?.is_admin) { router.push('/dashboard'); return }
       await load()
     }
     init()
@@ -116,7 +122,7 @@ export default function KaspiShopStorefrontSettings() {
         {!settings?.cashierConnected ? (
           <div className="nav-glass rounded-2xl p-5 text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
             Для приёма оплаты на витрине нужен подключённый Kaspi Pay Кассир.{' '}
-            <a href="/profile/kaspi-pay" className="font-semibold" style={{ color: 'var(--nav-accent)' }}>Подключить →</a>
+            <a href="/kaspi-api" className="font-semibold" style={{ color: 'var(--nav-accent)' }}>Подключить →</a>
           </div>
         ) : (
           <div className="nav-glass rounded-2xl p-5 space-y-4">
