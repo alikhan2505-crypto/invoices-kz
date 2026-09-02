@@ -762,7 +762,7 @@ export default function DashboardPage() {
                     title="AI-агент"
                     state={agentState}
                     neutralText="Диалоги появятся здесь"
-                    onClick={isAdmin ? () => router.push('/ai-agent/settings') : undefined}
+                    onClick={isAdmin ? () => router.push('/ai-agent') : undefined}
                   />
                   <ProductCard
                     index={3}

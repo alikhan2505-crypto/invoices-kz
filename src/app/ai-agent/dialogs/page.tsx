@@ -104,12 +104,18 @@ function AiAgentDialogsInner() {
       const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', user.id).single()
       if (!profile?.is_admin) { setForbidden(true); setLoading(false); return }
       const headers = await authHeader()
-      const agentsRes = await fetch('/api/ai-agent/agents', { headers })
+      // agents fetch + loadItems folded into one Promise.all (final-review
+      // finding) -- loadItems doesn't need to wait for the agents response
+      // to be handled first, so serializing it after was a needless extra
+      // round-trip on first paint.
+      const [agentsRes, fetched] = await Promise.all([
+        fetch('/api/ai-agent/agents', { headers }),
+        loadItems('all'),
+      ])
       if (agentsRes.ok) {
         const data = await agentsRes.json()
         setAgents(Array.isArray(data.agents) ? data.agents.map((a: any) => ({ id: a.id, name: a.name })) : [])
       }
-      const fetched = await loadItems('all')
       // Deep link from a «Заявки» lead card -- only auto-open when the id
       // genuinely belongs to one of the caller's own conversations (a
       // stale/foreign id is silently ignored).
@@ -142,6 +148,12 @@ function AiAgentDialogsInner() {
 
   function changeAgent(id: string) {
     setAgentFilter(id)
+    // The currently-open conversation may not belong to the newly-selected
+    // agent and disappear from the filtered list -- clear the thread pane
+    // (same clearing openConversation does when switching threads) so it
+    // doesn't silently show a stale/blank pane with no explanation.
+    setSelectedId(null)
+    setReplyText('')
     loadItems(id)
   }
 

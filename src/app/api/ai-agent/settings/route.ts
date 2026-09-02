@@ -52,27 +52,40 @@ export async function GET(req: NextRequest) {
   // silently open/edit the wrong agent with no on-screen sign anything was
   // wrong. Now it's a loud 400 instead, so a missed call site fails
   // immediately in testing rather than quietly misconfiguring an agent.
+  //
+  // ?new=1 (whole-branch review, 2026-09-02): the «Создать агента» flow
+  // always wants a blank form regardless of how many agents the account
+  // already owns -- there's no agent to load and thus no ambiguity to
+  // detect, so this skips the lookups entirely rather than tripping the
+  // 400 above for exactly the multi-agent accounts this feature targets.
   const agentId = req.nextUrl.searchParams.get('agentId')
+  const isNew = req.nextUrl.searchParams.get('new') === '1'
   let agent: any = null
-  if (agentId) {
-    const { data } = await supabase.from('ai_agents').select('*').eq('id', agentId).eq('user_id', user.id).maybeSingle()
-    if (!data) return NextResponse.json({ error: 'not_found' }, { status: 404 })
-    agent = data
-  } else {
-    const { data: ownedAgents } = await supabase.from('ai_agents').select('id').eq('user_id', user.id)
-    if (ownedAgents && ownedAgents.length > 1) {
-      return NextResponse.json({ error: 'ambiguous_agent' }, { status: 400 })
+  if (!isNew) {
+    if (agentId) {
+      const { data } = await supabase.from('ai_agents').select('*').eq('id', agentId).eq('user_id', user.id).maybeSingle()
+      if (!data) return NextResponse.json({ error: 'not_found' }, { status: 404 })
+      agent = data
+    } else {
+      const { data: ownedAgents, error: ownedAgentsError } = await supabase.from('ai_agents').select('id').eq('user_id', user.id)
+      if (ownedAgentsError) return NextResponse.json({ error: ownedAgentsError.message }, { status: 500 })
+      if (ownedAgents.length > 1) {
+        return NextResponse.json({ error: 'ambiguous_agent' }, { status: 400 })
+      }
+      const { data } = await supabase
+        .from('ai_agents')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      agent = data
     }
-    const { data } = await supabase
-      .from('ai_agents')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-    agent = data
   }
   const { data: profile } = await supabase.from('profiles').select('company_name').eq('id', user.id).maybeSingle()
+  if (isNew) {
+    return NextResponse.json({ agent: null, suggestedName: profile?.company_name || '', connections: [] })
+  }
   const { data: connections } = agent
     ? await supabase.from('ai_agent_channel_connections').select('channel, external_account_name, status').eq('agent_id', agent.id)
     : { data: [] }

@@ -304,7 +304,7 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
             { href: '/dashboard', label: labels[lang].home },
             { href: '/history', label: labels[lang].history },
             { href: '/profile', label: labels[lang].profile },
-            { href: '/ai-agent/settings', label: labels[lang].aiAgent, locked: !isAdmin, hintId: 'mobile-aiAgent' },
+            { href: '/ai-agent', label: labels[lang].aiAgent, locked: !isAdmin, hintId: 'mobile-aiAgent' },
             { href: '/kaspi-shop', label: labels[lang].kaspiShop, locked: !isAdmin, hintId: 'mobile-kaspiShop' },
             { href: '/wildberries', label: labels[lang].wildberries, locked: !isAdmin, hintId: 'mobile-wildberries' },
           ] as { href: string; label: string; badge?: number; locked?: boolean; hintId?: string }[]).map(item => {
