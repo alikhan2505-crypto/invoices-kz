@@ -47,33 +47,65 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
     return NextResponse.json({ error: 'Слишком много заказов подряд, попробуйте позже' }, { status: 429 })
   }
 
-  const { data: product, error: productError } = await supabase
+  // A storefront product can come from either source (Витрина → Каталог:
+  // точечный выбор Kaspi-товаров + ручное добавление) -- try Kaspi first,
+  // fall back to the manually-added table. Gates on exactly the same
+  // conditions filterStorefrontProducts used to list it in the first place;
+  // this used to only check `enabled` (repricer on) and only the Kaspi
+  // table, a regression once the listing switched to available_for_sale: a
+  // product visibly listed for sale would fail here with "Товар недоступен"
+  // the moment a customer actually tried to order it.
+  const { data: kaspiProduct, error: kaspiProductError } = await supabase
     .from('kaspi_shop_tracked_products')
-    .select('id, product_name, own_current_price, available_for_sale, stock_count')
+    .select('id, product_name, own_current_price, available_for_sale, stock_count, show_on_storefront')
     .eq('id', productId)
     .eq('connection_id', storefront.connectionId)
     .maybeSingle()
-  if (productError) {
-    console.error('Storefront order: product lookup failed', productError.message)
+  if (kaspiProductError) {
+    console.error('Storefront order: Kaspi product lookup failed', kaspiProductError.message)
     return NextResponse.json({ error: 'Не удалось оформить заказ' }, { status: 500 })
   }
-  // Must gate on the same available_for_sale signal the listing itself uses
-  // (filterStorefrontProducts) -- this used to check `enabled` (repricer on),
-  // a regression once the listing switched to available_for_sale: a product
-  // visibly listed for sale would fail here with "Товар недоступен" the
-  // moment a customer actually tried to order it.
-  if (!product || product.available_for_sale === false || (product.stock_count !== null && product.stock_count <= 0)) {
-    return NextResponse.json({ error: 'Товар недоступен' }, { status: 400 })
+
+  let productName: string
+  let price: number
+  let trackedProductId: string | null = null
+  let customProductId: string | null = null
+
+  if (kaspiProduct) {
+    if (!kaspiProduct.show_on_storefront || kaspiProduct.available_for_sale === false || (kaspiProduct.stock_count !== null && kaspiProduct.stock_count <= 0)) {
+      return NextResponse.json({ error: 'Товар недоступен' }, { status: 400 })
+    }
+    price = Number(kaspiProduct.own_current_price) || 0
+    if (price <= 0) return NextResponse.json({ error: 'Товар недоступен' }, { status: 400 })
+    productName = kaspiProduct.product_name
+    trackedProductId = kaspiProduct.id
+  } else {
+    const { data: customProduct, error: customProductError } = await supabase
+      .from('kaspi_shop_custom_products')
+      .select('id, name, price, stock_count')
+      .eq('id', productId)
+      .eq('connection_id', storefront.connectionId)
+      .maybeSingle()
+    if (customProductError) {
+      console.error('Storefront order: custom product lookup failed', customProductError.message)
+      return NextResponse.json({ error: 'Не удалось оформить заказ' }, { status: 500 })
+    }
+    if (!customProduct || (customProduct.stock_count !== null && customProduct.stock_count <= 0)) {
+      return NextResponse.json({ error: 'Товар недоступен' }, { status: 400 })
+    }
+    price = Number(customProduct.price) || 0
+    if (price <= 0) return NextResponse.json({ error: 'Товар недоступен' }, { status: 400 })
+    productName = customProduct.name
+    customProductId = customProduct.id
   }
-  const price = Number(product.own_current_price) || 0
-  if (price <= 0) return NextResponse.json({ error: 'Товар недоступен' }, { status: 400 })
 
   const { data: order, error: orderError } = await supabase
     .from('kaspi_shop_orders')
     .insert({
       connection_id: storefront.connectionId,
-      tracked_product_id: product.id,
-      product_name: product.product_name,
+      tracked_product_id: trackedProductId,
+      custom_product_id: customProductId,
+      product_name: productName,
       price,
       buyer_name: buyerName,
       buyer_phone: buyerPhone,

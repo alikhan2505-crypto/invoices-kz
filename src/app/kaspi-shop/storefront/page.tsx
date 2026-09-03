@@ -10,6 +10,12 @@ import { getActivePlan } from '@/lib/plan'
 const EASE = [0.16, 1, 0.3, 1] as const
 
 type Settings = { connectionId: string; companyName: string; slug: string | null; published: boolean; cashierConnected: boolean; visibleProductCount: number }
+type KaspiCatalogProduct = { id: string; name: string; price: number; imageUrl: string | null; showOnStorefront: boolean }
+type CustomCatalogProduct = { id: string; name: string; price: number; imageUrl: string | null; stockCount: number | null }
+
+function formatPrice(price: number): string {
+  return new Intl.NumberFormat('ru-KZ').format(price) + ' ₸'
+}
 
 export default function KaspiShopStorefrontSettings() {
   const router = useRouter()
@@ -21,6 +27,21 @@ export default function KaspiShopStorefrontSettings() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [tab, setTab] = useState<'settings' | 'catalog'>('settings')
+
+  // Каталог tab state
+  const [catalogLoading, setCatalogLoading] = useState(false)
+  const [kaspiProducts, setKaspiProducts] = useState<KaspiCatalogProduct[]>([])
+  const [customProducts, setCustomProducts] = useState<CustomCatalogProduct[]>([])
+  const [catalogError, setCatalogError] = useState('')
+  const [togglingId, setTogglingId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [newName, setNewName] = useState('')
+  const [newPrice, setNewPrice] = useState('')
+  const [newImageUrl, setNewImageUrl] = useState('')
+  const [newStock, setNewStock] = useState('')
+  const [creating, setCreating] = useState(false)
+  const [createError, setCreateError] = useState('')
 
   async function authHeader() {
     const { data: { session } } = await supabase.auth.getSession()
@@ -37,6 +58,23 @@ export default function KaspiShopStorefrontSettings() {
       setSlugInput(data.slug || '')
     }
     setLoading(false)
+  }, [])
+
+  const loadCatalog = useCallback(async () => {
+    setCatalogLoading(true)
+    setCatalogError('')
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/kaspi-shop/storefront/catalog', { headers })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) { setCatalogError(data?.error || 'Не удалось загрузить каталог'); return }
+      setKaspiProducts(data.kaspiProducts || [])
+      setCustomProducts(data.customProducts || [])
+    } catch {
+      setCatalogError('Не удалось загрузить каталог. Проверьте соединение и попробуйте ещё раз.')
+    } finally {
+      setCatalogLoading(false)
+    }
   }, [])
 
   useEffect(() => {
@@ -61,6 +99,10 @@ export default function KaspiShopStorefrontSettings() {
     }
     init()
   }, [router, load])
+
+  useEffect(() => {
+    if (tab === 'catalog' && !loading) loadCatalog()
+  }, [tab, loading, loadCatalog])
 
   async function save(published: boolean) {
     setError(null)
@@ -95,6 +137,69 @@ export default function KaspiShopStorefrontSettings() {
     setTimeout(() => setCopied(false), 2000)
   }
 
+  async function toggleKaspiVisibility(product: KaspiCatalogProduct) {
+    setTogglingId(product.id)
+    setCatalogError('')
+    const nextShow = !product.showOnStorefront
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/kaspi-shop/storefront/catalog/kaspi-visibility', {
+        method: 'POST', headers, body: JSON.stringify({ trackedProductId: product.id, show: nextShow }),
+      })
+      if (!res.ok) { setCatalogError('Не удалось обновить товар'); return }
+      setKaspiProducts(prev => prev.map(p => p.id === product.id ? { ...p, showOnStorefront: nextShow } : p))
+      if (settings) setSettings({ ...settings, visibleProductCount: settings.visibleProductCount + (nextShow ? 1 : -1) })
+    } catch {
+      setCatalogError('Не удалось обновить товар. Проверьте соединение и попробуйте ещё раз.')
+    } finally {
+      setTogglingId(null)
+    }
+  }
+
+  async function createProduct() {
+    setCreateError('')
+    const price = Number(newPrice)
+    if (!newName.trim()) { setCreateError('Укажите название'); return }
+    if (!Number.isFinite(price) || price <= 0) { setCreateError('Укажите цену'); return }
+    setCreating(true)
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/kaspi-shop/storefront/catalog', {
+        method: 'POST', headers,
+        body: JSON.stringify({
+          name: newName.trim(), price,
+          imageUrl: newImageUrl.trim() || null,
+          stockCount: newStock.trim() ? Number(newStock) : null,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) { setCreateError(data.error || 'Не удалось добавить товар'); return }
+      setCustomProducts(prev => [data.product, ...prev])
+      setNewName(''); setNewPrice(''); setNewImageUrl(''); setNewStock('')
+    } catch {
+      setCreateError('Не удалось добавить товар. Проверьте соединение и попробуйте ещё раз.')
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  async function deleteProduct(id: string) {
+    setDeletingId(id)
+    setCatalogError('')
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/kaspi-shop/storefront/catalog/custom', {
+        method: 'DELETE', headers, body: JSON.stringify({ id }),
+      })
+      if (!res.ok) { setCatalogError('Не удалось удалить товар'); return }
+      setCustomProducts(prev => prev.filter(p => p.id !== id))
+    } catch {
+      setCatalogError('Не удалось удалить товар. Проверьте соединение и попробуйте ещё раз.')
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
   if (loading) return (
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
@@ -117,7 +222,7 @@ export default function KaspiShopStorefrontSettings() {
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
       <SiteNav />
-      <div className="max-w-2xl mx-auto p-4 lg:p-6 pb-24 lg:pb-6">
+      <div className="max-w-3xl mx-auto p-4 lg:p-6 pb-24 lg:pb-6">
         <motion.div
           className="mb-6"
           initial={reduceMotion ? false : { opacity: 0, y: 14 }}
@@ -128,50 +233,174 @@ export default function KaspiShopStorefrontSettings() {
           <p className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>Публичная страница с вашими товарами — делитесь ссылкой в Instagram/WhatsApp</p>
         </motion.div>
 
-        {!settings?.cashierConnected ? (
-          <div className="nav-glass rounded-2xl p-5 text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
-            Для приёма оплаты на витрине нужен подключённый Kaspi Pay Кассир.{' '}
-            <a href="/kaspi-api" className="font-semibold" style={{ color: 'var(--nav-accent)' }}>Подключить →</a>
-          </div>
-        ) : (
-          <div className="nav-glass rounded-2xl p-5 space-y-4">
-            <div>
-              <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Ссылка витрины</label>
-              <div className="flex items-center gap-2">
-                <span className="text-sm" style={{ color: 'var(--nav-text-muted)' }}>invoices.kz/shop/</span>
-                <input value={slugInput} onChange={e => setSlugInput(e.target.value.toLowerCase())}
-                  placeholder="my-store"
-                  className="flex-1 rounded-lg px-3 py-2 text-sm outline-none border border-[color:var(--nav-border)]"
-                  style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
-              </div>
-            </div>
-
-            {error && <div className="text-xs" style={{ color: 'var(--nav-critical)' }}>{error}</div>}
-
-            <div className="flex items-center gap-3">
-              <button onClick={() => save(!settings.published)} disabled={saving || !slugInput.trim()}
-                className="rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50"
-                style={{ background: settings.published ? 'var(--nav-critical)' : 'var(--nav-accent)', color: '#fff' }}>
-                {settings.published ? 'Снять с публикации' : 'Опубликовать'}
+        <div className="flex items-center gap-1 flex-wrap nav-glass rounded-full p-1 w-fit mb-4">
+          {([['settings', 'Настройки'], ['catalog', 'Каталог']] as const).map(([value, label]) => {
+            const active = tab === value
+            return (
+              <button key={value} onClick={() => setTab(value)}
+                className="relative text-sm font-medium rounded-full px-4 py-1.5 transition-colors"
+                style={{ color: active ? 'var(--nav-accent-ink)' : 'var(--nav-text-secondary)' }}>
+                {active && (
+                  <motion.span layoutId="storefrontTabPill" className="absolute inset-0 rounded-full" style={{ background: 'var(--nav-accent)', zIndex: 0 }}
+                    transition={{ type: 'spring', stiffness: 380, damping: 32 }} />
+                )}
+                <span className="relative" style={{ zIndex: 1 }}>{label}</span>
               </button>
-              {settings.published && settings.slug && (
-                <button onClick={copyLink} className="text-xs font-semibold nav-glass rounded-lg px-3 py-2" style={{ color: 'var(--nav-accent)' }}>
-                  {copied ? 'Скопировано ✓' : 'Скопировать ссылку'}
-                </button>
-              )}
-            </div>
-          </div>
+            )
+          })}
+        </div>
+
+        {tab === 'settings' && (
+          <>
+            {!settings?.cashierConnected ? (
+              <div className="nav-glass rounded-2xl p-5 text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
+                Для приёма оплаты на витрине нужен подключённый Kaspi Pay Кассир.{' '}
+                <a href="/kaspi-api" className="font-semibold" style={{ color: 'var(--nav-accent)' }}>Подключить →</a>
+              </div>
+            ) : (
+              <div className="nav-glass rounded-2xl p-5 space-y-4">
+                <div>
+                  <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Ссылка витрины</label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm" style={{ color: 'var(--nav-text-muted)' }}>invoices.kz/shop/</span>
+                    <input value={slugInput} onChange={e => setSlugInput(e.target.value.toLowerCase())}
+                      placeholder="my-store"
+                      className="flex-1 rounded-lg px-3 py-2 text-sm outline-none border border-[color:var(--nav-border)]"
+                      style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
+                  </div>
+                </div>
+
+                {error && <div className="text-xs" style={{ color: 'var(--nav-critical)' }}>{error}</div>}
+
+                <div className="flex items-center gap-3">
+                  <button onClick={() => save(!settings.published)} disabled={saving || !slugInput.trim()}
+                    className="rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50"
+                    style={{ background: settings.published ? 'var(--nav-critical)' : 'var(--nav-accent)', color: '#fff' }}>
+                    {settings.published ? 'Снять с публикации' : 'Опубликовать'}
+                  </button>
+                  {settings.published && settings.slug && (
+                    <button onClick={copyLink} className="text-xs font-semibold nav-glass rounded-lg px-3 py-2" style={{ color: 'var(--nav-accent)' }}>
+                      {copied ? 'Скопировано ✓' : 'Скопировать ссылку'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {settings?.cashierConnected && (
+              <div className="nav-glass rounded-2xl p-5 mt-4">
+                <div className="text-sm font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>
+                  На витрине сейчас: {settings.visibleProductCount} {settings.visibleProductCount === 1 ? 'товар' : 'товаров'}
+                </div>
+                <p className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>
+                  На витрине показываются только товары, которые вы включили во вкладке «Каталог» — плюс любые добавленные вручную. Товар из Kaspi пропадает оттуда, если вы снимете его с продажи или остаток закончится.{' '}
+                  <button onClick={() => setTab('catalog')} className="font-semibold" style={{ color: 'var(--nav-accent)' }}>Открыть каталог →</button>
+                </p>
+              </div>
+            )}
+          </>
         )}
 
-        {settings?.cashierConnected && (
-          <div className="nav-glass rounded-2xl p-5 mt-4">
-            <div className="text-sm font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>
-              На витрине сейчас: {settings.visibleProductCount} {settings.visibleProductCount === 1 ? 'товар' : 'товаров'}
+        {tab === 'catalog' && (
+          <div className="space-y-6">
+            {catalogError && (
+              <div className="nav-glass rounded-2xl p-4 flex items-center justify-between gap-3">
+                <span className="text-sm" style={{ color: 'var(--nav-critical)' }}>{catalogError}</span>
+                <button onClick={loadCatalog} className="text-xs font-semibold rounded-lg px-3 py-1.5 flex-shrink-0" style={{ background: 'var(--nav-critical)', color: '#fff' }}>Повторить</button>
+              </div>
+            )}
+
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: 'var(--nav-critical)' }} />
+                <h2 className="text-sm font-bold" style={{ color: 'var(--nav-text-primary)' }}>Товары из Kaspi</h2>
+              </div>
+              <p className="text-xs mb-3" style={{ color: 'var(--nav-text-muted)' }}>Включите нужные товары — они появятся на витрине с красной рамкой ниже.</p>
+              {catalogLoading ? (
+                <div className="nav-glass rounded-2xl p-6 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Загружаем…</div>
+              ) : kaspiProducts.length === 0 ? (
+                <div className="nav-glass rounded-2xl p-6 text-center text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
+                  Нет товаров в продаже. Проверьте <a href="/kaspi-shop/removed" className="font-semibold" style={{ color: 'var(--nav-accent)' }}>Управление товарами</a>.
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                  {kaspiProducts.map(p => (
+                    <div key={p.id} className="nav-glass rounded-xl overflow-hidden"
+                      style={p.showOnStorefront ? { boxShadow: '0 0 0 2px var(--nav-critical)' } : undefined}>
+                      {p.imageUrl ? (
+                        <img src={p.imageUrl} alt={p.name} className="w-full aspect-square object-cover" style={{ background: 'var(--nav-bg)' }} />
+                      ) : (
+                        <div className="w-full aspect-square" style={{ background: 'var(--nav-bg)' }} />
+                      )}
+                      <div className="p-2">
+                        <div className="text-[11px] font-semibold line-clamp-2 min-h-[2em]" style={{ color: 'var(--nav-text-primary)' }}>{p.name}</div>
+                        <div className="font-mono font-bold text-xs mt-0.5" style={{ color: 'var(--nav-text-primary)' }}>{formatPrice(p.price)}</div>
+                        <button onClick={() => toggleKaspiVisibility(p)} disabled={togglingId === p.id}
+                          className="w-full mt-1.5 rounded-lg py-1.5 text-[11px] font-semibold disabled:opacity-50"
+                          style={{ background: p.showOnStorefront ? 'var(--nav-critical)' : 'var(--nav-accent)', color: '#fff' }}>
+                          {togglingId === p.id ? '…' : p.showOnStorefront ? 'Убрать с витрины' : 'Показать на витрине'}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-            <p className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>
-              На витрине показываются все товары, которые сейчас в продаже на Kaspi и есть в наличии — товар пропадает оттуда, если вы снимете его с продажи или остаток закончится.{' '}
-              <a href="/kaspi-shop/removed" className="font-semibold" style={{ color: 'var(--nav-accent)' }}>Управление товарами →</a>
-            </p>
+
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: 'var(--nav-teal)' }} />
+                <h2 className="text-sm font-bold" style={{ color: 'var(--nav-text-primary)' }}>Свои товары</h2>
+              </div>
+              <p className="text-xs mb-3" style={{ color: 'var(--nav-text-muted)' }}>Товары, не связанные с Kaspi — всегда показываются на витрине с синей рамкой.</p>
+
+              {customProducts.length > 0 && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 mb-3">
+                  {customProducts.map(p => (
+                    <div key={p.id} className="nav-glass rounded-xl overflow-hidden" style={{ boxShadow: '0 0 0 2px var(--nav-teal)' }}>
+                      {p.imageUrl ? (
+                        <img src={p.imageUrl} alt={p.name} className="w-full aspect-square object-cover" style={{ background: 'var(--nav-bg)' }} />
+                      ) : (
+                        <div className="w-full aspect-square" style={{ background: 'var(--nav-bg)' }} />
+                      )}
+                      <div className="p-2">
+                        <div className="text-[11px] font-semibold line-clamp-2 min-h-[2em]" style={{ color: 'var(--nav-text-primary)' }}>{p.name}</div>
+                        <div className="font-mono font-bold text-xs mt-0.5" style={{ color: 'var(--nav-text-primary)' }}>{formatPrice(p.price)}</div>
+                        <button onClick={() => deleteProduct(p.id)} disabled={deletingId === p.id}
+                          className="w-full mt-1.5 rounded-lg py-1.5 text-[11px] font-semibold disabled:opacity-50"
+                          style={{ background: 'var(--nav-critical)', color: '#fff' }}>
+                          {deletingId === p.id ? '…' : 'Удалить'}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="nav-glass rounded-2xl p-4 space-y-2">
+                <div className="text-xs font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>+ Добавить товар</div>
+                <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Название"
+                  className="w-full rounded-lg px-3 py-2 text-sm outline-none border border-[color:var(--nav-border)]"
+                  style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
+                <div className="flex gap-2">
+                  <input value={newPrice} onChange={e => setNewPrice(e.target.value)} placeholder="Цена, ₸" inputMode="numeric"
+                    className="flex-1 rounded-lg px-3 py-2 text-sm outline-none border border-[color:var(--nav-border)]"
+                    style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
+                  <input value={newStock} onChange={e => setNewStock(e.target.value)} placeholder="Остаток (необязательно)" inputMode="numeric"
+                    className="flex-1 rounded-lg px-3 py-2 text-sm outline-none border border-[color:var(--nav-border)]"
+                    style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
+                </div>
+                <input value={newImageUrl} onChange={e => setNewImageUrl(e.target.value)} placeholder="Ссылка на фото (необязательно)"
+                  className="w-full rounded-lg px-3 py-2 text-sm outline-none border border-[color:var(--nav-border)]"
+                  style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
+                {createError && <div className="text-xs" style={{ color: 'var(--nav-critical)' }}>{createError}</div>}
+                <button onClick={createProduct} disabled={creating}
+                  className="rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50"
+                  style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                  {creating ? 'Добавляем…' : 'Добавить'}
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

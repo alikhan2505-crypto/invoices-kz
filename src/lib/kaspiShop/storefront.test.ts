@@ -1,72 +1,102 @@
 import { describe, it, expect } from 'vitest'
-import { filterStorefrontProducts } from './storefront'
+import { filterStorefrontProducts, filterCustomStorefrontProducts } from './storefront'
 
 describe('filterStorefrontProducts', () => {
-  it('excludes products removed from sale (available_for_sale: false)', () => {
+  it('excludes a Kaspi product the seller has not opted in (show_on_storefront: false)', () => {
     const result = filterStorefrontProducts([
-      { id: '1', product_name: 'Товар А', brand: 'Brand', own_current_price: 1000, stock_count: 5, available_for_sale: false, image_url: null },
+      { id: '1', product_name: 'Товар А', brand: 'Brand', own_current_price: 1000, stock_count: 5, available_for_sale: true, image_url: null, show_on_storefront: false },
     ])
     expect(result).toEqual([])
   })
 
-  it('includes products with the repricer never turned on, as long as they are for sale', () => {
+  it('excludes products removed from sale (available_for_sale: false), even if opted in', () => {
     const result = filterStorefrontProducts([
-      { id: '1', product_name: 'Товар А', brand: 'Brand', own_current_price: 1000, stock_count: 5, available_for_sale: true, image_url: null },
+      { id: '1', product_name: 'Товар А', brand: 'Brand', own_current_price: 1000, stock_count: 5, available_for_sale: false, image_url: null, show_on_storefront: true },
+    ])
+    expect(result).toEqual([])
+  })
+
+  it('includes an opted-in product with the repricer never turned on, as long as they are for sale', () => {
+    const result = filterStorefrontProducts([
+      { id: '1', product_name: 'Товар А', brand: 'Brand', own_current_price: 1000, stock_count: 5, available_for_sale: true, image_url: null, show_on_storefront: true },
     ])
     expect(result).toEqual([{ id: '1', name: 'Товар А', brand: 'Brand', price: 1000, imageUrl: null }])
   })
 
   it('treats a null available_for_sale (pre-migration row) as available', () => {
     const result = filterStorefrontProducts([
-      { id: '1', product_name: 'Товар А', brand: 'Brand', own_current_price: 1000, stock_count: 5, available_for_sale: null, image_url: null },
+      { id: '1', product_name: 'Товар А', brand: 'Brand', own_current_price: 1000, stock_count: 5, available_for_sale: null, image_url: null, show_on_storefront: true },
     ])
     expect(result).toEqual([{ id: '1', name: 'Товар А', brand: 'Brand', price: 1000, imageUrl: null }])
   })
 
   it('excludes products with zero stock', () => {
     const result = filterStorefrontProducts([
-      { id: '1', product_name: 'Товар А', brand: 'Brand', own_current_price: 1000, stock_count: 0, available_for_sale: true, image_url: null },
+      { id: '1', product_name: 'Товар А', brand: 'Brand', own_current_price: 1000, stock_count: 0, available_for_sale: true, image_url: null, show_on_storefront: true },
     ])
     expect(result).toEqual([])
   })
 
   it('includes products with null stock (untracked stock)', () => {
     const result = filterStorefrontProducts([
-      { id: '1', product_name: 'Товар А', brand: 'Brand', own_current_price: 1000, stock_count: null, available_for_sale: true, image_url: null },
+      { id: '1', product_name: 'Товар А', brand: 'Brand', own_current_price: 1000, stock_count: null, available_for_sale: true, image_url: null, show_on_storefront: true },
     ])
     expect(result).toEqual([{ id: '1', name: 'Товар А', brand: 'Brand', price: 1000, imageUrl: null }])
   })
 
   it('excludes products with zero or negative price', () => {
     const result = filterStorefrontProducts([
-      { id: '1', product_name: 'Товар А', brand: 'Brand', own_current_price: 0, stock_count: 5, available_for_sale: true, image_url: null },
-      { id: '2', product_name: 'Товар Б', brand: 'Brand', own_current_price: -100, stock_count: 5, available_for_sale: true, image_url: null },
+      { id: '1', product_name: 'Товар А', brand: 'Brand', own_current_price: 0, stock_count: 5, available_for_sale: true, image_url: null, show_on_storefront: true },
+      { id: '2', product_name: 'Товар Б', brand: 'Brand', own_current_price: -100, stock_count: 5, available_for_sale: true, image_url: null, show_on_storefront: true },
     ])
     expect(result).toEqual([])
   })
 
   it('trims name/brand and coerces price to a number', () => {
     const result = filterStorefrontProducts([
-      { id: '1', product_name: '  Товар А  ', brand: ' Brand ', own_current_price: '2500', stock_count: 3, available_for_sale: true, image_url: null },
+      { id: '1', product_name: '  Товар А  ', brand: ' Brand ', own_current_price: '2500', stock_count: 3, available_for_sale: true, image_url: null, show_on_storefront: true },
     ])
     expect(result).toEqual([{ id: '1', name: 'Товар А', brand: 'Brand', price: 2500, imageUrl: null }])
   })
 
-  it('includes positive-stock products for sale', () => {
-    const result = filterStorefrontProducts([
-      { id: '1', product_name: 'Товар А', brand: 'Brand', own_current_price: 1000, stock_count: 10, available_for_sale: true, image_url: null },
-    ])
-    expect(result).toEqual([{ id: '1', name: 'Товар А', brand: 'Brand', price: 1000, imageUrl: null }])
-  })
-
   it('passes through a real image_url, and reports null for a product never sold yet', () => {
     const result = filterStorefrontProducts([
-      { id: '1', product_name: 'Товар А', brand: 'Brand', own_current_price: 1000, stock_count: 5, available_for_sale: true, image_url: 'https://resources.cdn-kaspi.kz/img/a.jpg' },
-      { id: '2', product_name: 'Товар Б', brand: 'Brand', own_current_price: 1000, stock_count: 5, available_for_sale: true, image_url: null },
+      { id: '1', product_name: 'Товар А', brand: 'Brand', own_current_price: 1000, stock_count: 5, available_for_sale: true, image_url: 'https://resources.cdn-kaspi.kz/img/a.jpg', show_on_storefront: true },
+      { id: '2', product_name: 'Товар Б', brand: 'Brand', own_current_price: 1000, stock_count: 5, available_for_sale: true, image_url: null, show_on_storefront: true },
     ])
     expect(result).toEqual([
       { id: '1', name: 'Товар А', brand: 'Brand', price: 1000, imageUrl: 'https://resources.cdn-kaspi.kz/img/a.jpg' },
       { id: '2', name: 'Товар Б', brand: 'Brand', price: 1000, imageUrl: null },
     ])
+  })
+})
+
+describe('filterCustomStorefrontProducts', () => {
+  it('includes a manually-added product with no stock tracking (null = untracked)', () => {
+    const result = filterCustomStorefrontProducts([
+      { id: '1', name: 'Ручной товар', price: 3000, image_url: null, stock_count: null },
+    ])
+    expect(result).toEqual([{ id: '1', name: 'Ручной товар', brand: '', price: 3000, imageUrl: null }])
+  })
+
+  it('excludes a manually-added product with zero stock', () => {
+    const result = filterCustomStorefrontProducts([
+      { id: '1', name: 'Ручной товар', price: 3000, image_url: null, stock_count: 0 },
+    ])
+    expect(result).toEqual([])
+  })
+
+  it('excludes a manually-added product with zero or negative price', () => {
+    const result = filterCustomStorefrontProducts([
+      { id: '1', name: 'Ручной товар', price: 0, image_url: null, stock_count: null },
+    ])
+    expect(result).toEqual([])
+  })
+
+  it('passes through the image_url and coerces price to a number', () => {
+    const result = filterCustomStorefrontProducts([
+      { id: '1', name: '  Ручной товар  ', price: '4500', image_url: 'https://example.com/a.jpg', stock_count: 2 } as any,
+    ])
+    expect(result).toEqual([{ id: '1', name: 'Ручной товар', brand: '', price: 4500, imageUrl: 'https://example.com/a.jpg' }])
   })
 })
