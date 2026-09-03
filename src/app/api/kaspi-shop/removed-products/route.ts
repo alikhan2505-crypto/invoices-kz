@@ -121,12 +121,15 @@ export async function GET(req: NextRequest) {
   }
 
   const detailsBySku = new Map<string, Record<string, any>>()
+  let diagRawOfferDetail: unknown = null
   try {
     const detailsItems = await fetchOffersDetails(connection.sessionCookies, connection.merchantId, allOffers.map(o => o.sku))
     // TEMP diagnostic (2026-09-03): checking whether the raw offer-details
     // response carries any image field, for the storefront-photos feature.
-    // Remove once confirmed either way.
-    if (detailsItems[0]) console.log('DIAG raw offer detail:', JSON.stringify(detailsItems[0]).slice(0, 4000))
+    // Returned in the JSON response (not console.log -- Vercel's runtime-log
+    // API wasn't surfacing plain console.log text for this route). Remove
+    // once confirmed either way.
+    diagRawOfferDetail = detailsItems[0] ?? null
     for (const item of detailsItems) {
       if (typeof item.sku === 'string') detailsBySku.set(item.sku, item)
     }
@@ -144,6 +147,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     active: activeRes.offers.map(o => toSummary(o, pointsBySku)),
     removed: removedRes.offers.map(o => toSummary(o, pointsBySku)),
+    diagRawOfferDetail,
   })
 }
 
