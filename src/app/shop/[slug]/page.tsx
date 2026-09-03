@@ -212,7 +212,7 @@ export default function StorefrontPage() {
       {widgetKey && (
         <Script id="invoiceskz-storefront-widget" src="https://www.invoices.kz/widget.js" data-key={widgetKey} strategy="afterInteractive" />
       )}
-      <div className="max-w-3xl mx-auto p-4 lg:p-6 pb-24">
+      <div className="max-w-3xl mx-auto p-4 lg:p-6 pb-32">
         <div className="flex items-center gap-2.5 mb-6">
           <LogoMark />
           <h1 className="text-lg font-bold" style={{ color: 'var(--nav-text-primary)' }}>{companyName}</h1>
@@ -244,6 +244,7 @@ export default function StorefrontPage() {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE, delay: reduceMotion ? 0 : Math.min(i * 0.04, 0.3) }}
                         className="nav-glass rounded-2xl overflow-hidden flex flex-col"
+                        style={{ scrollMarginBottom: '7rem' }}
                       >
                         {p.imageUrl ? (
                           <img src={p.imageUrl} alt={p.name} className="w-full aspect-square object-cover" style={{ background: 'var(--nav-bg)' }} />
