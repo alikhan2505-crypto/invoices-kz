@@ -18,24 +18,81 @@ const supabase = createClient(
 // to get a fresh mint. This caps genuinely new orders per storefront.
 const ORDER_RATE_WINDOW_MS = 10 * 60 * 1000
 const ORDER_RATE_LIMIT = 10
+const MAX_CART_LINES = 20
+const MAX_LINE_QTY = 99
 
-// Public, unauthenticated -- creates one order and mints its first Kaspi
-// payment in a single call, mirroring how send-invoice mints an invoice's
-// first payment link. The buyer never has an account; buyerName/Phone/
-// Address is the only record of who placed the order (see Заказы витрины).
+function pluralizeTovar(n: number): string {
+  const mod10 = n % 10, mod100 = n % 100
+  if (mod10 === 1 && mod100 !== 11) return 'товар'
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return 'товара'
+  return 'товаров'
+}
+
+interface ResolvedLine { name: string; price: number; qty: number }
+
+// Re-validates and re-prices ONE cart line against live data, exactly the
+// same gates the storefront listing itself applies (filterStorefrontProducts
+// / filterCustomStorefrontProducts) -- never trusts a client-supplied price
+// or name. A storefront product can come from either source (Витрина →
+// Каталог: точечный выбор Kaspi-товаров + ручное добавление), so this tries
+// Kaspi first and falls back to the manually-added table, same as the
+// pre-cart single-product version of this route did. Returns null if the
+// line can't be fulfilled right now (gone, opted out, out of stock).
+async function resolveLine(connectionId: string, productId: string, qty: number): Promise<ResolvedLine | null> {
+  const { data: kaspiProduct, error: kaspiProductError } = await supabase
+    .from('kaspi_shop_tracked_products')
+    .select('id, product_name, own_current_price, available_for_sale, stock_count, show_on_storefront')
+    .eq('id', productId)
+    .eq('connection_id', connectionId)
+    .maybeSingle()
+  if (kaspiProductError) throw new Error(`Kaspi product lookup failed: ${kaspiProductError.message}`)
+
+  if (kaspiProduct) {
+    if (!kaspiProduct.show_on_storefront || kaspiProduct.available_for_sale === false || (kaspiProduct.stock_count !== null && kaspiProduct.stock_count < qty)) return null
+    const price = Number(kaspiProduct.own_current_price) || 0
+    if (price <= 0) return null
+    return { name: kaspiProduct.product_name, price, qty }
+  }
+
+  const { data: customProduct, error: customProductError } = await supabase
+    .from('kaspi_shop_custom_products')
+    .select('id, name, price, stock_count')
+    .eq('id', productId)
+    .eq('connection_id', connectionId)
+    .maybeSingle()
+  if (customProductError) throw new Error(`Custom product lookup failed: ${customProductError.message}`)
+  if (!customProduct || (customProduct.stock_count !== null && customProduct.stock_count < qty)) return null
+  const price = Number(customProduct.price) || 0
+  if (price <= 0) return null
+  return { name: customProduct.name, price, qty }
+}
+
+// Public, unauthenticated -- creates one order for the buyer's whole cart and
+// mints its first Kaspi payment in a single call, mirroring how send-invoice
+// mints an invoice's first payment link. The buyer never has an account;
+// buyerName/Phone/Address is the only record of who placed the order (see
+// Заказы витрины). One order row per checkout regardless of cart size --
+// cart_items carries the server-resolved line list, product_name becomes a
+// short summary, price becomes the cart total.
 export async function POST(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
   const storefront = await resolveStorefrontBySlug(slug)
   if (!storefront) return NextResponse.json({ error: 'not_found' }, { status: 404 })
 
   const body = await req.json().catch(() => null)
-  const productId = typeof body?.productId === 'string' ? body.productId : null
+  const rawItems = Array.isArray(body?.items) ? body.items : []
   const buyerName = typeof body?.buyerName === 'string' ? body.buyerName.trim() : ''
   const buyerAddress = typeof body?.buyerAddress === 'string' ? body.buyerAddress.trim() : ''
   const buyerPhone = normalizeKzPhone(typeof body?.buyerPhone === 'string' ? body.buyerPhone : '')
-  if (!productId || !buyerName || !buyerAddress || !buyerPhone) {
+  if (!buyerName || !buyerAddress || !buyerPhone) {
     return NextResponse.json({ error: 'Заполните имя, телефон и адрес' }, { status: 400 })
   }
+
+  const items = rawItems
+    .filter((it: any) => typeof it?.id === 'string' && Number.isInteger(it?.qty) && it.qty > 0 && it.qty <= MAX_LINE_QTY)
+    .slice(0, MAX_CART_LINES)
+    .map((it: any) => ({ id: it.id as string, qty: it.qty as number }))
+  if (items.length === 0) return NextResponse.json({ error: 'Корзина пуста' }, { status: 400 })
 
   const { count: recentOrders, error: rateError } = await supabase
     .from('kaspi_shop_orders')
@@ -47,66 +104,35 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
     return NextResponse.json({ error: 'Слишком много заказов подряд, попробуйте позже' }, { status: 429 })
   }
 
-  // A storefront product can come from either source (Витрина → Каталог:
-  // точечный выбор Kaspi-товаров + ручное добавление) -- try Kaspi first,
-  // fall back to the manually-added table. Gates on exactly the same
-  // conditions filterStorefrontProducts used to list it in the first place;
-  // this used to only check `enabled` (repricer on) and only the Kaspi
-  // table, a regression once the listing switched to available_for_sale: a
-  // product visibly listed for sale would fail here with "Товар недоступен"
-  // the moment a customer actually tried to order it.
-  const { data: kaspiProduct, error: kaspiProductError } = await supabase
-    .from('kaspi_shop_tracked_products')
-    .select('id, product_name, own_current_price, available_for_sale, stock_count, show_on_storefront')
-    .eq('id', productId)
-    .eq('connection_id', storefront.connectionId)
-    .maybeSingle()
-  if (kaspiProductError) {
-    console.error('Storefront order: Kaspi product lookup failed', kaspiProductError.message)
+  let lines: (ResolvedLine | null)[]
+  try {
+    lines = await Promise.all(items.map((it: { id: string; qty: number }) => resolveLine(storefront.connectionId, it.id, it.qty)))
+  } catch (e: any) {
+    console.error('Storefront order: line resolution failed', e.message)
     return NextResponse.json({ error: 'Не удалось оформить заказ' }, { status: 500 })
   }
-
-  let productName: string
-  let price: number
-  let trackedProductId: string | null = null
-  let customProductId: string | null = null
-
-  if (kaspiProduct) {
-    if (!kaspiProduct.show_on_storefront || kaspiProduct.available_for_sale === false || (kaspiProduct.stock_count !== null && kaspiProduct.stock_count <= 0)) {
-      return NextResponse.json({ error: 'Товар недоступен' }, { status: 400 })
-    }
-    price = Number(kaspiProduct.own_current_price) || 0
-    if (price <= 0) return NextResponse.json({ error: 'Товар недоступен' }, { status: 400 })
-    productName = kaspiProduct.product_name
-    trackedProductId = kaspiProduct.id
-  } else {
-    const { data: customProduct, error: customProductError } = await supabase
-      .from('kaspi_shop_custom_products')
-      .select('id, name, price, stock_count')
-      .eq('id', productId)
-      .eq('connection_id', storefront.connectionId)
-      .maybeSingle()
-    if (customProductError) {
-      console.error('Storefront order: custom product lookup failed', customProductError.message)
-      return NextResponse.json({ error: 'Не удалось оформить заказ' }, { status: 500 })
-    }
-    if (!customProduct || (customProduct.stock_count !== null && customProduct.stock_count <= 0)) {
-      return NextResponse.json({ error: 'Товар недоступен' }, { status: 400 })
-    }
-    price = Number(customProduct.price) || 0
-    if (price <= 0) return NextResponse.json({ error: 'Товар недоступен' }, { status: 400 })
-    productName = customProduct.name
-    customProductId = customProduct.id
+  // All-or-nothing: a partially-fulfillable cart is rejected outright rather
+  // than silently dropping lines the buyer can't see happen.
+  if (lines.some(l => l === null)) {
+    return NextResponse.json({ error: 'Часть товаров в корзине уже недоступна, обновите страницу' }, { status: 400 })
   }
+
+  const resolvedLines = lines as ResolvedLine[]
+  const total = resolvedLines.reduce((sum, l) => sum + l.price * l.qty, 0)
+  if (total <= 0) return NextResponse.json({ error: 'Товар недоступен' }, { status: 400 })
+
+  const totalQty = resolvedLines.reduce((sum, l) => sum + l.qty, 0)
+  const productName = resolvedLines.length === 1 && resolvedLines[0].qty === 1
+    ? resolvedLines[0].name
+    : `Корзина: ${resolvedLines.length} ${pluralizeTovar(resolvedLines.length)} (${totalQty} шт.)`
 
   const { data: order, error: orderError } = await supabase
     .from('kaspi_shop_orders')
     .insert({
       connection_id: storefront.connectionId,
-      tracked_product_id: trackedProductId,
-      custom_product_id: customProductId,
+      cart_items: resolvedLines,
       product_name: productName,
-      price,
+      price: total,
       buyer_name: buyerName,
       buyer_phone: buyerPhone,
       buyer_address: buyerAddress,

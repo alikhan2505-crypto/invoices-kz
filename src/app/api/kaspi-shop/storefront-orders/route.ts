@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
 
   const { data: rows, error: ordersError } = await supabase
     .from('kaspi_shop_orders')
-    .select('id, product_name, price, buyer_name, buyer_phone, buyer_address, status, created_at')
+    .select('id, product_name, price, cart_items, buyer_name, buyer_phone, buyer_address, status, created_at')
     .in('connection_id', connectionIds)
     .order('created_at', { ascending: false })
   if (ordersError) return NextResponse.json({ error: ordersError.message }, { status: 500 })
@@ -44,6 +44,7 @@ export async function GET(req: NextRequest) {
     id: r.id,
     productName: r.product_name,
     price: Number(r.price),
+    cartItems: Array.isArray(r.cart_items) ? r.cart_items : null,
     buyerName: r.buyer_name,
     buyerPhone: r.buyer_phone,
     buyerAddress: r.buyer_address,

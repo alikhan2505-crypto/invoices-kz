@@ -9,8 +9,9 @@ import { getActivePlan } from '@/lib/plan'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
+type CartLine = { name: string; price: number; qty: number }
 type Order = {
-  id: string; productName: string; price: number
+  id: string; productName: string; price: number; cartItems: CartLine[] | null
   buyerName: string; buyerPhone: string; buyerAddress: string
   status: string; createdAt: string
 }
@@ -103,8 +104,22 @@ export default function KaspiShopStorefrontOrders() {
                   className="nav-glass rounded-2xl p-4 flex items-center justify-between gap-3 flex-wrap"
                 >
                   <div>
-                    <div className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{o.productName} — {formatPrice(o.price)}</div>
-                    <div className="text-xs mt-0.5" style={{ color: 'var(--nav-text-secondary)' }}>{o.buyerName} · {o.buyerPhone} · {o.buyerAddress}</div>
+                    {o.cartItems && o.cartItems.length > 0 ? (
+                      <>
+                        <div className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{o.productName}</div>
+                        <ul className="mt-1 space-y-0.5">
+                          {o.cartItems.map((line, li) => (
+                            <li key={li} className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>
+                              {line.name} × {line.qty} — {formatPrice(line.price * line.qty)}
+                            </li>
+                          ))}
+                        </ul>
+                        <div className="text-xs font-bold mt-1" style={{ color: 'var(--nav-text-primary)' }}>Итого: {formatPrice(o.price)}</div>
+                      </>
+                    ) : (
+                      <div className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{o.productName} — {formatPrice(o.price)}</div>
+                    )}
+                    <div className="text-xs mt-1" style={{ color: 'var(--nav-text-secondary)' }}>{o.buyerName} · {o.buyerPhone} · {o.buyerAddress}</div>
                     <div className="text-[11px] mt-1" style={{ color: 'var(--nav-text-muted)' }}>{formatDate(o.createdAt)}</div>
                   </div>
                   <span className="text-xs font-bold" style={{ color: status.color }}>{status.label}</span>
