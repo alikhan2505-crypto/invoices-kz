@@ -4,7 +4,8 @@ import { useParams } from 'next/navigation'
 import { motion, useReducedMotion } from 'framer-motion'
 import QRCode from 'qrcode'
 
-type Product = { id: string; name: string; brand: string; price: number; imageUrl: string | null }
+type Product = { id: string; name: string; brand: string; price: number; imageUrl: string | null; categoryId: string | null }
+type Category = { id: string; name: string; sortOrder: number }
 type Payment = { qr_token: string | null; payment_link: string | null; status: string }
 
 const EASE = [0.16, 1, 0.3, 1] as const
@@ -19,6 +20,19 @@ function formatPrice(price: number): string {
   return new Intl.NumberFormat('ru-KZ').format(price) + ' ₸'
 }
 
+// Pure -- no I/O. Sellers who never touched Разделы get the plain flat grid
+// (no heading at all, same as before this feature existed); once at least
+// one category exists, products group under it in sortOrder, with anything
+// left uncategorized collected into a trailing "Другое" section.
+function groupProducts(products: Product[], categories: Category[]): { id: string | null; name: string; products: Product[] }[] {
+  if (categories.length === 0) return [{ id: null, name: '', products }]
+  const sorted = [...categories].sort((a, b) => a.sortOrder - b.sortOrder)
+  const groups = sorted.map(c => ({ id: c.id as string | null, name: c.name, products: products.filter(p => p.categoryId === c.id) }))
+  const uncategorized = products.filter(p => !sorted.some(c => c.id === p.categoryId))
+  if (uncategorized.length > 0) groups.push({ id: null, name: 'Другое', products: uncategorized })
+  return groups.filter(g => g.products.length > 0)
+}
+
 export default function StorefrontPage() {
   const params = useParams<{ slug: string }>()
   const reduceMotion = !!useReducedMotion()
@@ -26,6 +40,7 @@ export default function StorefrontPage() {
   const [notFound, setNotFound] = useState(false)
   const [companyName, setCompanyName] = useState('')
   const [products, setProducts] = useState<Product[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
   const [selected, setSelected] = useState<Product | null>(null)
   const [buyerName, setBuyerName] = useState('')
   const [buyerPhone, setBuyerPhone] = useState('')
@@ -43,6 +58,7 @@ export default function StorefrontPage() {
         if (data.error) { setNotFound(true); return }
         setCompanyName(data.companyName || '')
         setProducts(Array.isArray(data.products) ? data.products : [])
+        setCategories(Array.isArray(data.categories) ? data.categories : [])
       })
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false))
@@ -124,33 +140,42 @@ export default function StorefrontPage() {
         {products.length === 0 ? (
           <div className="text-sm text-center py-16" style={{ color: 'var(--nav-text-muted)' }}>Пока нет товаров в наличии</div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {products.map((p, i) => (
-              <motion.div
-                key={p.id}
-                initial={reduceMotion ? false : { opacity: 0, y: 14 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE, delay: reduceMotion ? 0 : Math.min(i * 0.04, 0.3) }}
-                className="nav-glass rounded-2xl overflow-hidden flex flex-col"
-              >
-                {p.imageUrl ? (
-                  <img src={p.imageUrl} alt={p.name} className="w-full aspect-square object-cover" style={{ background: 'var(--nav-bg)' }} />
-                ) : (
-                  <div className="w-full aspect-square" style={{ background: 'var(--nav-bg)' }} />
+          <div className="space-y-8">
+            {groupProducts(products, categories).map(group => (
+              <div key={group.id || group.name || 'all'}>
+                {group.name && (
+                  <h2 className="text-sm font-bold mb-3" style={{ color: 'var(--nav-text-primary)' }}>{group.name}</h2>
                 )}
-                <div className="p-4 flex flex-col flex-1">
-                  {p.brand && <div className="text-[11px] font-medium mb-1" style={{ color: 'var(--nav-text-muted)' }}>{p.brand}</div>}
-                  <div className="text-sm font-semibold mb-2" style={{ color: 'var(--nav-text-primary)' }}>{p.name}</div>
-                  <div className="text-base font-bold mb-3" style={{ color: 'var(--nav-text-primary)' }}>{formatPrice(p.price)}</div>
-                  <button
-                    onClick={() => setSelected(p)}
-                    className="mt-auto rounded-lg px-4 py-2 text-sm font-semibold"
-                    style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}
-                  >
-                    Купить
-                  </button>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {group.products.map((p, i) => (
+                    <motion.div
+                      key={p.id}
+                      initial={reduceMotion ? false : { opacity: 0, y: 14 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE, delay: reduceMotion ? 0 : Math.min(i * 0.04, 0.3) }}
+                      className="nav-glass rounded-2xl overflow-hidden flex flex-col"
+                    >
+                      {p.imageUrl ? (
+                        <img src={p.imageUrl} alt={p.name} className="w-full aspect-square object-cover" style={{ background: 'var(--nav-bg)' }} />
+                      ) : (
+                        <div className="w-full aspect-square" style={{ background: 'var(--nav-bg)' }} />
+                      )}
+                      <div className="p-4 flex flex-col flex-1">
+                        {p.brand && <div className="text-[11px] font-medium mb-1" style={{ color: 'var(--nav-text-muted)' }}>{p.brand}</div>}
+                        <div className="text-sm font-semibold mb-2" style={{ color: 'var(--nav-text-primary)' }}>{p.name}</div>
+                        <div className="text-base font-bold mb-3" style={{ color: 'var(--nav-text-primary)' }}>{formatPrice(p.price)}</div>
+                        <button
+                          onClick={() => setSelected(p)}
+                          className="mt-auto rounded-lg px-4 py-2 text-sm font-semibold"
+                          style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}
+                        >
+                          Купить
+                        </button>
+                      </div>
+                    </motion.div>
+                  ))}
                 </div>
-              </motion.div>
+              </div>
             ))}
           </div>
         )}

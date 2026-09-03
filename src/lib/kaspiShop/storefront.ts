@@ -14,6 +14,7 @@ export interface TrackedProductRow {
   available_for_sale: boolean | null
   image_url: string | null
   show_on_storefront: boolean
+  storefront_category_id: string | null
 }
 
 export interface CustomProductRow {
@@ -22,6 +23,7 @@ export interface CustomProductRow {
   price: number | string | null
   image_url: string | null
   stock_count: number | null
+  storefront_category_id: string | null
 }
 
 export interface StorefrontProduct {
@@ -30,6 +32,7 @@ export interface StorefrontProduct {
   brand: string
   price: number
   imageUrl: string | null
+  categoryId: string | null
 }
 
 // Pure -- no I/O. What counts as "available to buy right now" for a Kaspi-
@@ -51,6 +54,7 @@ export function filterStorefrontProducts(rows: TrackedProductRow[]): StorefrontP
       brand: String(r.brand || '').trim(),
       price: Number(r.own_current_price) || 0,
       imageUrl: r.image_url || null,
+      categoryId: r.storefront_category_id,
     }))
     .filter(p => p.name && p.price > 0)
 }
@@ -68,6 +72,7 @@ export function filterCustomStorefrontProducts(rows: CustomProductRow[]): Storef
       brand: '',
       price: Number(r.price) || 0,
       imageUrl: r.image_url || null,
+      categoryId: r.storefront_category_id,
     }))
     .filter(p => p.name && p.price > 0)
 }
@@ -173,11 +178,11 @@ export async function loadStorefrontProducts(connectionId: string): Promise<Stor
   const [kaspiRes, customRes] = await Promise.all([
     supabase
       .from('kaspi_shop_tracked_products')
-      .select('id, product_name, brand, own_current_price, stock_count, available_for_sale, image_url, show_on_storefront')
+      .select('id, product_name, brand, own_current_price, stock_count, available_for_sale, image_url, show_on_storefront, storefront_category_id')
       .eq('connection_id', connectionId),
     supabase
       .from('kaspi_shop_custom_products')
-      .select('id, name, price, image_url, stock_count')
+      .select('id, name, price, image_url, stock_count, storefront_category_id')
       .eq('connection_id', connectionId),
   ])
   if (kaspiRes.error) throw new Error(`kaspi_shop_tracked_products lookup failed for connection ${connectionId}: ${kaspiRes.error.message}`)
@@ -194,6 +199,7 @@ export interface CatalogKaspiProduct {
   price: number
   imageUrl: string | null
   showOnStorefront: boolean
+  categoryId: string | null
 }
 
 export interface CatalogCustomProduct {
@@ -202,6 +208,7 @@ export interface CatalogCustomProduct {
   price: number
   imageUrl: string | null
   stockCount: number | null
+  categoryId: string | null
 }
 
 // Admin-facing catalog view (Витрина → Каталог) -- unlike loadStorefrontProducts,
@@ -212,13 +219,13 @@ export async function loadStorefrontCatalog(connectionId: string): Promise<{ kas
   const [kaspiRes, customRes] = await Promise.all([
     supabase
       .from('kaspi_shop_tracked_products')
-      .select('id, product_name, own_current_price, image_url, show_on_storefront')
+      .select('id, product_name, own_current_price, image_url, show_on_storefront, storefront_category_id')
       .eq('connection_id', connectionId)
       .eq('available_for_sale', true)
       .order('product_name', { ascending: true }),
     supabase
       .from('kaspi_shop_custom_products')
-      .select('id, name, price, image_url, stock_count')
+      .select('id, name, price, image_url, stock_count, storefront_category_id')
       .eq('connection_id', connectionId)
       .order('created_at', { ascending: false }),
   ])
@@ -231,6 +238,7 @@ export async function loadStorefrontCatalog(connectionId: string): Promise<{ kas
       price: Number(r.own_current_price) || 0,
       imageUrl: r.image_url,
       showOnStorefront: r.show_on_storefront,
+      categoryId: r.storefront_category_id,
     })),
     customProducts: (customRes.data || []).map(r => ({
       id: r.id,
@@ -238,8 +246,70 @@ export async function loadStorefrontCatalog(connectionId: string): Promise<{ kas
       price: Number(r.price) || 0,
       imageUrl: r.image_url,
       stockCount: r.stock_count,
+      categoryId: r.storefront_category_id,
     })),
   }
+}
+
+export interface StorefrontCategory {
+  id: string
+  name: string
+  sortOrder: number
+}
+
+export async function loadStorefrontCategories(connectionId: string): Promise<StorefrontCategory[]> {
+  const { data, error } = await supabase
+    .from('kaspi_shop_storefront_categories')
+    .select('id, name, sort_order')
+    .eq('connection_id', connectionId)
+    .order('sort_order', { ascending: true })
+  if (error) throw new Error(`kaspi_shop_storefront_categories lookup failed for connection ${connectionId}: ${error.message}`)
+  return (data || []).map(r => ({ id: r.id, name: r.name, sortOrder: r.sort_order }))
+}
+
+export async function createStorefrontCategory(connectionId: string, name: string): Promise<StorefrontCategory> {
+  const { count } = await supabase
+    .from('kaspi_shop_storefront_categories')
+    .select('id', { count: 'exact', head: true })
+    .eq('connection_id', connectionId)
+  const { data, error } = await supabase
+    .from('kaspi_shop_storefront_categories')
+    .insert({ connection_id: connectionId, name, sort_order: count ?? 0 })
+    .select('id, name, sort_order')
+    .single()
+  if (error) throw new Error(`kaspi_shop_storefront_categories insert failed: ${error.message}`)
+  return { id: data.id, name: data.name, sortOrder: data.sort_order }
+}
+
+export async function deleteStorefrontCategory(connectionId: string, categoryId: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('kaspi_shop_storefront_categories')
+    .delete()
+    .eq('id', categoryId)
+    .eq('connection_id', connectionId)
+    .select('id')
+  if (error) throw new Error(`kaspi_shop_storefront_categories delete failed: ${error.message}`)
+  return !!data && data.length > 0
+}
+
+// Assigns (or clears, when categoryId is null) one product's storefront
+// category -- works for either source table, matching the dual-source
+// pattern the rest of this catalog uses.
+export async function setProductCategory(
+  connectionId: string,
+  productId: string,
+  source: 'kaspi' | 'custom',
+  categoryId: string | null
+): Promise<boolean> {
+  const table = source === 'kaspi' ? 'kaspi_shop_tracked_products' : 'kaspi_shop_custom_products'
+  const { data, error } = await supabase
+    .from(table)
+    .update({ storefront_category_id: categoryId })
+    .eq('id', productId)
+    .eq('connection_id', connectionId)
+    .select('id')
+  if (error) throw new Error(`${table} category update failed: ${error.message}`)
+  return !!data && data.length > 0
 }
 
 // Ownership check mirrors saveStorefrontSettings' pattern -- never trust a
@@ -280,6 +350,7 @@ export async function createCustomProduct(
     price: Number(data.price) || 0,
     imageUrl: data.image_url,
     stockCount: data.stock_count,
+    categoryId: null,
   }
 }
 

@@ -10,8 +10,9 @@ import { getActivePlan } from '@/lib/plan'
 const EASE = [0.16, 1, 0.3, 1] as const
 
 type Settings = { connectionId: string; companyName: string; slug: string | null; published: boolean; cashierConnected: boolean; visibleProductCount: number }
-type KaspiCatalogProduct = { id: string; name: string; price: number; imageUrl: string | null; showOnStorefront: boolean }
-type CustomCatalogProduct = { id: string; name: string; price: number; imageUrl: string | null; stockCount: number | null }
+type KaspiCatalogProduct = { id: string; name: string; price: number; imageUrl: string | null; showOnStorefront: boolean; categoryId: string | null }
+type CustomCatalogProduct = { id: string; name: string; price: number; imageUrl: string | null; stockCount: number | null; categoryId: string | null }
+type StorefrontCategory = { id: string; name: string; sortOrder: number }
 
 function formatPrice(price: number): string {
   return new Intl.NumberFormat('ru-KZ').format(price) + ' ₸'
@@ -43,6 +44,13 @@ export default function KaspiShopStorefrontSettings() {
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState('')
 
+  // Разделы (categories) state
+  const [categories, setCategories] = useState<StorefrontCategory[]>([])
+  const [newCategoryName, setNewCategoryName] = useState('')
+  const [creatingCategory, setCreatingCategory] = useState(false)
+  const [deletingCategoryId, setDeletingCategoryId] = useState<string | null>(null)
+  const [assigningId, setAssigningId] = useState<string | null>(null)
+
   async function authHeader() {
     const { data: { session } } = await supabase.auth.getSession()
     return { 'Authorization': `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' }
@@ -65,11 +73,16 @@ export default function KaspiShopStorefrontSettings() {
     setCatalogError('')
     try {
       const headers = await authHeader()
-      const res = await fetch('/api/kaspi-shop/storefront/catalog', { headers })
-      const data = await res.json().catch(() => null)
-      if (!res.ok) { setCatalogError(data?.error || 'Не удалось загрузить каталог'); return }
+      const [catalogRes, categoriesRes] = await Promise.all([
+        fetch('/api/kaspi-shop/storefront/catalog', { headers }),
+        fetch('/api/kaspi-shop/storefront/categories', { headers }),
+      ])
+      const data = await catalogRes.json().catch(() => null)
+      if (!catalogRes.ok) { setCatalogError(data?.error || 'Не удалось загрузить каталог'); return }
       setKaspiProducts(data.kaspiProducts || [])
       setCustomProducts(data.customProducts || [])
+      const categoriesData = await categoriesRes.json().catch(() => null)
+      if (categoriesRes.ok) setCategories(categoriesData.categories || [])
     } catch {
       setCatalogError('Не удалось загрузить каталог. Проверьте соединение и попробуйте ещё раз.')
     } finally {
@@ -200,6 +213,65 @@ export default function KaspiShopStorefrontSettings() {
     }
   }
 
+  async function createCategory() {
+    if (!newCategoryName.trim()) return
+    setCreatingCategory(true)
+    setCatalogError('')
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/kaspi-shop/storefront/categories', {
+        method: 'POST', headers, body: JSON.stringify({ name: newCategoryName.trim() }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) { setCatalogError(data.error || 'Не удалось добавить раздел'); return }
+      setCategories(prev => [...prev, data.category])
+      setNewCategoryName('')
+    } catch {
+      setCatalogError('Не удалось добавить раздел. Проверьте соединение и попробуйте ещё раз.')
+    } finally {
+      setCreatingCategory(false)
+    }
+  }
+
+  async function deleteCategory(id: string) {
+    setDeletingCategoryId(id)
+    setCatalogError('')
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/kaspi-shop/storefront/categories', {
+        method: 'DELETE', headers, body: JSON.stringify({ id }),
+      })
+      if (!res.ok) { setCatalogError('Не удалось удалить раздел'); return }
+      setCategories(prev => prev.filter(c => c.id !== id))
+      // Products in the deleted category fall back to "Без раздела" -- the DB
+      // FK is ON DELETE SET NULL, so this just mirrors that server-side effect.
+      setKaspiProducts(prev => prev.map(p => p.categoryId === id ? { ...p, categoryId: null } : p))
+      setCustomProducts(prev => prev.map(p => p.categoryId === id ? { ...p, categoryId: null } : p))
+    } catch {
+      setCatalogError('Не удалось удалить раздел. Проверьте соединение и попробуйте ещё раз.')
+    } finally {
+      setDeletingCategoryId(null)
+    }
+  }
+
+  async function assignCategory(productId: string, source: 'kaspi' | 'custom', categoryId: string | null) {
+    setAssigningId(productId)
+    setCatalogError('')
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/kaspi-shop/storefront/catalog/category', {
+        method: 'POST', headers, body: JSON.stringify({ productId, source, categoryId }),
+      })
+      if (!res.ok) { setCatalogError('Не удалось изменить раздел товара'); return }
+      if (source === 'kaspi') setKaspiProducts(prev => prev.map(p => p.id === productId ? { ...p, categoryId } : p))
+      else setCustomProducts(prev => prev.map(p => p.id === productId ? { ...p, categoryId } : p))
+    } catch {
+      setCatalogError('Не удалось изменить раздел товара. Проверьте соединение и попробуйте ещё раз.')
+    } finally {
+      setAssigningId(null)
+    }
+  }
+
   if (loading) return (
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
@@ -311,6 +383,38 @@ export default function KaspiShopStorefrontSettings() {
             )}
 
             <div>
+              <h2 className="text-sm font-bold mb-1" style={{ color: 'var(--nav-text-primary)' }}>Разделы</h2>
+              <p className="text-xs mb-3" style={{ color: 'var(--nav-text-muted)' }}>Группируйте товары по разделам — на витрине они покажутся отдельными блоками.</p>
+              {categories.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {categories.map(c => (
+                    <div key={c.id} className="nav-glass rounded-full pl-3 pr-1.5 py-1 flex items-center gap-2">
+                      <span className="text-xs font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{c.name}</span>
+                      <button onClick={() => deleteCategory(c.id)} disabled={deletingCategoryId === c.id}
+                        className="w-5 h-5 rounded-full flex items-center justify-center text-xs disabled:opacity-50"
+                        style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-muted)' }}
+                        aria-label={`Удалить раздел ${c.name}`}>
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="flex gap-2 mb-6">
+                <input value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') createCategory() }}
+                  placeholder="Новый раздел, например «Футболки»"
+                  className="flex-1 rounded-lg px-3 py-2 text-sm outline-none border border-[color:var(--nav-border)]"
+                  style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
+                <button onClick={createCategory} disabled={creatingCategory || !newCategoryName.trim()}
+                  className="rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50 flex-shrink-0"
+                  style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                  {creatingCategory ? '…' : 'Добавить'}
+                </button>
+              </div>
+            </div>
+
+            <div>
               <div className="flex items-center gap-2 mb-1">
                 <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: 'var(--nav-critical)' }} />
                 <h2 className="text-sm font-bold" style={{ color: 'var(--nav-text-primary)' }}>Товары из Kaspi</h2>
@@ -335,6 +439,15 @@ export default function KaspiShopStorefrontSettings() {
                       <div className="p-2">
                         <div className="text-[11px] font-semibold line-clamp-2 min-h-[2em]" style={{ color: 'var(--nav-text-primary)' }}>{p.name}</div>
                         <div className="font-mono font-bold text-xs mt-0.5" style={{ color: 'var(--nav-text-primary)' }}>{formatPrice(p.price)}</div>
+                        {categories.length > 0 && (
+                          <select value={p.categoryId || ''} disabled={assigningId === p.id}
+                            onChange={e => assignCategory(p.id, 'kaspi', e.target.value || null)}
+                            className="w-full mt-1.5 rounded-lg py-1 px-1.5 text-[11px] outline-none border border-[color:var(--nav-border)] disabled:opacity-50"
+                            style={{ color: 'var(--nav-text-secondary)', background: 'var(--nav-bg)' }}>
+                            <option value="">Без раздела</option>
+                            {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                          </select>
+                        )}
                         <button onClick={() => toggleKaspiVisibility(p)} disabled={togglingId === p.id}
                           className="w-full mt-1.5 rounded-lg py-1.5 text-[11px] font-semibold disabled:opacity-50"
                           style={{ background: p.showOnStorefront ? 'var(--nav-critical)' : 'var(--nav-accent)', color: '#fff' }}>
@@ -366,6 +479,15 @@ export default function KaspiShopStorefrontSettings() {
                       <div className="p-2">
                         <div className="text-[11px] font-semibold line-clamp-2 min-h-[2em]" style={{ color: 'var(--nav-text-primary)' }}>{p.name}</div>
                         <div className="font-mono font-bold text-xs mt-0.5" style={{ color: 'var(--nav-text-primary)' }}>{formatPrice(p.price)}</div>
+                        {categories.length > 0 && (
+                          <select value={p.categoryId || ''} disabled={assigningId === p.id}
+                            onChange={e => assignCategory(p.id, 'custom', e.target.value || null)}
+                            className="w-full mt-1.5 rounded-lg py-1 px-1.5 text-[11px] outline-none border border-[color:var(--nav-border)] disabled:opacity-50"
+                            style={{ color: 'var(--nav-text-secondary)', background: 'var(--nav-bg)' }}>
+                            <option value="">Без раздела</option>
+                            {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                          </select>
+                        )}
                         <button onClick={() => deleteProduct(p.id)} disabled={deletingId === p.id}
                           className="w-full mt-1.5 rounded-lg py-1.5 text-[11px] font-semibold disabled:opacity-50"
                           style={{ background: 'var(--nav-critical)', color: '#fff' }}>
