@@ -121,20 +121,12 @@ export async function GET(req: NextRequest) {
   }
 
   const detailsBySku = new Map<string, Record<string, any>>()
-  let diagRawOfferDetail: unknown = null
   try {
     const detailsItems = await fetchOffersDetails(connection.sessionCookies, connection.merchantId, allOffers.map(o => o.sku))
-    // TEMP diagnostic (2026-09-03): checking whether the raw offer-details
-    // response carries any image field, for the storefront-photos feature.
-    // Returned in the JSON response (not console.log -- Vercel's runtime-log
-    // API wasn't surfacing plain console.log text for this route). Remove
-    // once confirmed either way.
-    diagRawOfferDetail = { count: detailsItems.length, first: detailsItems[0] ?? null }
     for (const item of detailsItems) {
       if (typeof item.sku === 'string') detailsBySku.set(item.sku, item)
     }
   } catch (err: any) {
-    diagRawOfferDetail = { error: err.message }
     console.error('kaspi-shop removed-products: details batch failed (non-fatal, cards show no cities)', err.message)
   }
   const { data: connRow } = await supabase
@@ -148,7 +140,6 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     active: activeRes.offers.map(o => toSummary(o, pointsBySku)),
     removed: removedRes.offers.map(o => toSummary(o, pointsBySku)),
-    diagRawOfferDetail,
   })
 }
 
