@@ -90,6 +90,26 @@ describe('listRefunds', () => {
     }])
   })
 
+  it('strips embedded HTML markup out of Kaspi\'s own description field', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(jsonResponse({
+      data: [{
+        refundId: 'id1',
+        applicationNumber: '1-1',
+        tab: 'ON_DELIVERY',
+        refundReason: { reasonDescription: 'Не понравился' },
+        order: '1',
+        productSku: 'sku1',
+        customer: 'Тест Т.',
+        sum: 1000,
+        quantity: 1,
+        description: 'Покупатель должен оставить товар в Kaspi Postomat до <span>5 сентября</span>',
+      }],
+      total: 1,
+    }))
+    const result = await listRefunds('cookie=1', '425002', 'ON_DELIVERY', 0, fetchFn as any)
+    expect(result.refunds[0].statusText).toBe('Покупатель должен оставить товар в Kaspi Postomat до 5 сентября')
+  })
+
   it('reports sessionExpired on 403', async () => {
     const fetchFn = vi.fn().mockResolvedValue(jsonResponse({}, 403))
     const result = await listRefunds('c', '425002', 'NEW', 0, fetchFn as any)

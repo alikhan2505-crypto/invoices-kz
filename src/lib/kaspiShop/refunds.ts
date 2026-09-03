@@ -14,6 +14,16 @@ const COMMON_HEADERS = {
   'origin': 'https://kaspi.kz',
 }
 
+// Kaspi's own description/stepDescription fields are meant for their
+// cabinet's own HTML rendering and can embed real markup (found live,
+// 2026-09-03: "...до <span>5 сентября</span>") -- React's plain-text
+// interpolation shows those tags literally instead of styling the date.
+// Strips tags rather than rendering the markup via dangerouslySetInnerHTML,
+// since this is a 3rd-party string we don't want to trust as safe HTML.
+function stripHtml(text: string): string {
+  return text.replace(/<[^>]*>/g, '')
+}
+
 export const REFUND_TABS = ['NEW', 'ON_DELIVERY', 'WAITING_DECISION', 'DISPUTE', 'CLOSED'] as const
 export type RefundTab = typeof REFUND_TABS[number]
 
@@ -73,7 +83,7 @@ export async function listRefunds(
       sum: r.sum,
       quantity: r.quantity,
       reasonDescription: r.refundReason?.reasonDescription ?? '',
-      statusText: r.description ?? '',
+      statusText: stripHtml(r.description ?? ''),
     })),
     total: Number(json?.total) || 0,
     sessionExpired: false,
@@ -134,7 +144,7 @@ export async function getRefundDetails(
       total: json.total,
       totalWithdraw: json.totalWithdraw,
       comment: json.comment ?? null,
-      statusText: json.stepDescription ?? '',
+      statusText: stripHtml(json.stepDescription ?? ''),
       actions: Array.isArray(json.actions) ? json.actions : [],
       stateSteps: Array.isArray(json.stateSteps) ? json.stateSteps.map((s: any) => ({
         title: s.title ?? '',
