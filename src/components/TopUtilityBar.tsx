@@ -189,15 +189,19 @@ export default function TopUtilityBar() {
           if (res.ok && data?.claimed) {
             setBonusClaimMessage(`Начислено ${data.amount} ₸ — добро пожаловать!`)
             refreshBalances(visible, headers)
+          } else if (res.ok && data?.reason === 'already_claimed') {
+            setBonusClaimMessage('Бонус уже был получен ранее.')
+          }
+          if (res.ok && data && (data.claimed || data.reason === 'already_claimed')) {
             // Not openPanel('wallet') -- its closure over `userId` state
             // would still see the pre-setUserId(user.id) value this early in
             // the same init() call. selectWallet/loadWalletExtras do what
             // openPanel does for the wallet case, using user.id directly.
+            // Opened for BOTH outcomes -- a second visit to the same link
+            // must still show something, not silently do nothing.
             setPanel('wallet')
             selectWallet(activeWallet)
             loadWalletExtras(user.id)
-          } else if (res.ok && data?.reason === 'already_claimed') {
-            setBonusClaimMessage('Бонус уже был получен ранее.')
           }
         } catch {
           // Silent -- a failed claim attempt shouldn't block the rest of the page.
