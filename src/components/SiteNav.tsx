@@ -450,14 +450,7 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
         {/* Row 2: the active section's pages as persistent pill tabs. Stays
             visible on every page of the section (no dropdown to reopen). */}
         {activeSection && (
-          // pr reserves TopUtilityBar's own footprint (its fixed pill measures
-          // ~222px wide + the 24px right-6 gap it sits in) so this row's
-          // ml-auto-docked KaspiShopStoreSwitcher never renders underneath it
-          // -- founder screenshot, 2026-09-03: the switcher's "Подключить
-          // магазин" reconnect button (wider than the normal store-name pill)
-          // was overlapping the wallet/notifications/account cluster at a
-          // normal 1280px window width, not just some rare narrow edge case.
-          <div className="flex items-center gap-1.5 pl-7 pr-7 lg:pr-64 pb-2.5 -mt-1">
+          <div className="flex items-center gap-1.5 px-7 pb-2.5 -mt-1">
             {/* overflow-x-auto lives on this inner wrapper, not the row --
                 setting it on the row clipped KaspiShopStoreSwitcher's dropdown
                 too (an ancestor with overflow-x set implicitly gets
