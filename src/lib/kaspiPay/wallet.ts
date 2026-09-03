@@ -98,6 +98,28 @@ export async function debitWallet(
   return data as number
 }
 
+export const WELCOME_BONUS_TENGE = 200
+
+// One-time promotional credit (mass-announcement link), not tied to a real
+// Kaspi top-up -- reuses the existing 'adjustment' ledger type rather than
+// widening wallet_ledger's type CHECK constraint for a single-purpose code
+// path. Caller (claim-welcome-bonus route) is responsible for the
+// already-claimed guard via profiles.welcome_bonus_claimed_at; this function
+// itself has no idempotency of its own; calling it twice will credit twice.
+export async function creditWalletAdjustment(userId: string, amount: number, note: string): Promise<number> {
+  const { data, error } = await supabase.rpc('debit_wallet_balance', { p_user_id: userId, p_amount: -amount })
+  if (error) throw new Error(`wallet adjustment credit failed for user ${userId}: ${error.message}`)
+  const { error: ledgerError } = await supabase.from('wallet_ledger').insert({
+    user_id: userId,
+    type: 'adjustment',
+    amount,
+    balance_after: data,
+    note,
+  })
+  if (ledgerError) console.error('wallet_ledger insert failed after adjustment credit for user', userId, ':', ledgerError.message)
+  return data as number
+}
+
 export interface WalletTopupRow {
   id: string
   user_id: string

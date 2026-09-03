@@ -105,6 +105,7 @@ export default function TopUtilityBar() {
   const [panel, setPanel] = useState<Panel>(null)
   const [userId, setUserId] = useState<string | null>(null)
   const [profile, setProfile] = useState<any>(null)
+  const [bonusClaimMessage, setBonusClaimMessage] = useState<string | null>(null)
 
   // Wallet state
   const [balances, setBalances] = useState<Partial<Record<WalletKey, number>>>({})
@@ -175,6 +176,33 @@ export default function TopUtilityBar() {
       const visible = WALLETS.filter(w => !w.adminOnly || admin)
       refreshBalances(visible, headers)
       refreshUnreadCount(headers)
+
+      // Mass-announcement welcome-bonus link (?claimBonus=1) -- window.location
+      // instead of useSearchParams so this globally-mounted component (root
+      // layout) doesn't force a Suspense boundary there, same workaround
+      // ai-agent/settings' OAuth-notice query-param handling already uses.
+      if (new URLSearchParams(window.location.search).get('claimBonus') === '1') {
+        window.history.replaceState(null, '', window.location.pathname)
+        try {
+          const res = await fetch('/api/wallet/claim-welcome-bonus', { method: 'POST', headers })
+          const data = await res.json().catch(() => null)
+          if (res.ok && data?.claimed) {
+            setBonusClaimMessage(`Начислено ${data.amount} ₸ — добро пожаловать!`)
+            refreshBalances(visible, headers)
+            // Not openPanel('wallet') -- its closure over `userId` state
+            // would still see the pre-setUserId(user.id) value this early in
+            // the same init() call. selectWallet/loadWalletExtras do what
+            // openPanel does for the wallet case, using user.id directly.
+            setPanel('wallet')
+            selectWallet(activeWallet)
+            loadWalletExtras(user.id)
+          } else if (res.ok && data?.reason === 'already_claimed') {
+            setBonusClaimMessage('Бонус уже был получен ранее.')
+          }
+        } catch {
+          // Silent -- a failed claim attempt shouldn't block the rest of the page.
+        }
+      }
     }
     init()
   }, [refreshBalances, refreshUnreadCount])
@@ -427,6 +455,12 @@ export default function TopUtilityBar() {
                 <p className="text-xs mt-2 leading-relaxed" style={{ color: 'var(--nav-text-secondary)' }}>
                   Один баланс на все сервисы — пополняете один раз, тратится там, где используете.
                 </p>
+
+                {bonusClaimMessage && (
+                  <div className="text-xs font-semibold mt-3 rounded-xl px-3 py-2" style={{ background: 'var(--nav-success)', color: '#fff' }}>
+                    {bonusClaimMessage}
+                  </div>
+                )}
 
                 {breakdown && totalSpend30d > 0 && (
                   <div className="mt-5">
