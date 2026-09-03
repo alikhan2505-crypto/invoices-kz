@@ -46,6 +46,15 @@ function PauseIcon() {
   )
 }
 
+function LockIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+      <rect x="3" y="11" width="18" height="11" rx="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    </svg>
+  )
+}
+
 type StockEntry = {
   storeCode: string
   cityId: string | null
@@ -1029,6 +1038,27 @@ export default function KaspiShopProductAvailability() {
                       className="w-full text-sm rounded-lg px-3 py-2 outline-none border"
                       style={{ borderColor: 'var(--nav-border-soft)', background: 'var(--nav-surface-chrome)', color: 'var(--nav-text-primary)' }} />
                   </label>
+
+                  {/* Placeholders for the AI photo/video features (founder
+                      request 2026-09-03) -- kept visible-but-locked rather
+                      than hidden entirely so sellers know they're coming,
+                      while the actual OpenAI/Higgsfield integration is still
+                      pending real API details. */}
+                  <div className="space-y-2 mb-3">
+                    <button type="button" disabled
+                      className="w-full flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-left opacity-50 cursor-not-allowed"
+                      style={{ background: 'var(--nav-bg)', border: '1px dashed var(--nav-border-soft)' }}>
+                      <span className="text-xs font-medium" style={{ color: 'var(--nav-text-secondary)' }}>✨ Улучшить фото с ИИ</span>
+                      <span className="flex items-center gap-1 text-[10px] font-semibold" style={{ color: 'var(--nav-text-muted)' }}><LockIcon />Скоро</span>
+                    </button>
+                    <button type="button" disabled
+                      className="w-full flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-left opacity-50 cursor-not-allowed"
+                      style={{ background: 'var(--nav-bg)', border: '1px dashed var(--nav-border-soft)' }}>
+                      <span className="text-xs font-medium" style={{ color: 'var(--nav-text-secondary)' }}>🎬 Сгенерировать видео с ИИ</span>
+                      <span className="flex items-center gap-1 text-[10px] font-semibold" style={{ color: 'var(--nav-text-muted)' }}><LockIcon />Скоро</span>
+                    </button>
+                  </div>
+
                   {newCardModal.error && <div className="text-xs mb-2" style={{ color: 'var(--nav-critical)' }}>{newCardModal.error}</div>}
                   {newCardModal.imageId && (
                     <button onClick={proceedToAttributes}
