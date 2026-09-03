@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { loadStorefrontSettings, saveStorefrontSettings, hasCashierConnection, loadStorefrontProducts } from '@/lib/kaspiShop/storefront'
+import { loadStorefrontSettings, saveStorefrontSettings, hasCashierConnection, loadStorefrontProducts, loadWebsiteWidgetKey } from '@/lib/kaspiShop/storefront'
 
 const supabaseAuth = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -22,14 +22,17 @@ export async function GET(req: NextRequest) {
   const settings = await loadStorefrontSettings(user.id)
   if (!settings) return NextResponse.json({ error: 'no_connection' }, { status: 404 })
 
-  const cashierConnected = await hasCashierConnection(user.id)
-  // Surfaced so the settings page can explain an empty public storefront --
-  // a product only shows there while Kaspi still lists it for sale (see
-  // filterStorefrontProducts' own comment), which is not obvious from this
-  // page alone (founder repro 2026-09-03: published a store, no products
-  // ever appeared, no indication why).
-  const visibleProductCount = (await loadStorefrontProducts(settings.connectionId)).length
-  return NextResponse.json({ ...settings, cashierConnected, visibleProductCount })
+  const [cashierConnected, visibleProducts, widgetKey] = await Promise.all([
+    hasCashierConnection(user.id),
+    // Surfaced so the settings page can explain an empty public storefront --
+    // a product only shows there while Kaspi still lists it for sale (see
+    // filterStorefrontProducts' own comment), which is not obvious from this
+    // page alone (founder repro 2026-09-03: published a store, no products
+    // ever appeared, no indication why).
+    loadStorefrontProducts(settings.connectionId),
+    loadWebsiteWidgetKey(user.id),
+  ])
+  return NextResponse.json({ ...settings, cashierConnected, visibleProductCount: visibleProducts.length, hasWebsiteWidget: !!widgetKey })
 }
 
 export async function POST(req: NextRequest) {

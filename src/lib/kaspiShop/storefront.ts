@@ -82,7 +82,16 @@ export interface StorefrontSettings {
   companyName: string
   slug: string | null
   published: boolean
+  backgroundColor: string | null
+  deliveryInfo: string | null
+  chatWidgetEnabled: boolean
 }
+
+// A curated swatch list, not a free-form color picker -- keeps the public
+// page's palette sane and lets saveStorefrontAppearance validate server-side
+// with a simple membership check instead of parsing arbitrary CSS color
+// syntax. Null means "no override", i.e. the app's own var(--nav-bg).
+export const STOREFRONT_BACKGROUND_PRESETS = ['#ffffff', '#f5f4f0', '#eef2ff', '#fdf2f8', '#ecfdf5', '#111827'] as const
 
 // Scoped to the user's currently ACTIVE store, same as every other Kaspi
 // Shop settings surface (loadConnection in kaspiShop/connection.ts) -- the
@@ -92,7 +101,7 @@ export interface StorefrontSettings {
 export async function loadStorefrontSettings(userId: string): Promise<StorefrontSettings | null> {
   const { data, error } = await supabase
     .from('kaspi_shop_connections')
-    .select('id, company_name, storefront_slug, storefront_published')
+    .select('id, company_name, storefront_slug, storefront_published, storefront_background_color, storefront_delivery_info, storefront_chat_widget_enabled')
     .eq('user_id', userId)
     .eq('is_active', true)
     .maybeSingle()
@@ -103,7 +112,65 @@ export async function loadStorefrontSettings(userId: string): Promise<Storefront
     companyName: data.company_name,
     slug: data.storefront_slug,
     published: data.storefront_published,
+    backgroundColor: data.storefront_background_color,
+    deliveryInfo: data.storefront_delivery_info,
+    chatWidgetEnabled: data.storefront_chat_widget_enabled,
   }
+}
+
+// Same "does this user have a usable website chat widget" check the
+// ai-agent settings page implicitly relies on (a user can own several
+// ai_agents rows, so this fans out across all of them) -- reused here to
+// gate the storefront's chat-bot toggle without duplicating that lookup.
+export async function loadWebsiteWidgetKey(userId: string): Promise<string | null> {
+  const { data: agents, error: agentsError } = await supabase.from('ai_agents').select('id').eq('user_id', userId)
+  if (agentsError) throw new Error(`ai_agents lookup failed for user ${userId}: ${agentsError.message}`)
+  const agentIds = (agents || []).map(a => a.id)
+  if (agentIds.length === 0) return null
+  const { data, error } = await supabase
+    .from('ai_agent_channel_connections')
+    .select('external_account_id')
+    .in('agent_id', agentIds)
+    .eq('channel', 'website')
+    .eq('status', 'active')
+    .limit(1)
+    .maybeSingle()
+  if (error) throw new Error(`ai_agent_channel_connections website lookup failed: ${error.message}`)
+  return data?.external_account_id || null
+}
+
+export async function saveStorefrontAppearance(
+  userId: string,
+  connectionId: string,
+  params: { backgroundColor: string | null; deliveryInfo: string; chatWidgetEnabled: boolean }
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (params.backgroundColor !== null && !(STOREFRONT_BACKGROUND_PRESETS as readonly string[]).includes(params.backgroundColor)) {
+    return { ok: false, error: 'invalid_background' }
+  }
+  if (params.chatWidgetEnabled && !(await loadWebsiteWidgetKey(userId))) {
+    return { ok: false, error: 'widget_not_connected' }
+  }
+
+  // Ownership check mirrors saveStorefrontSettings' own pattern.
+  const { data: owned, error: ownedError } = await supabase
+    .from('kaspi_shop_connections')
+    .select('id')
+    .eq('id', connectionId)
+    .eq('user_id', userId)
+    .maybeSingle()
+  if (ownedError) throw new Error(`kaspi_shop_connections ownership check failed: ${ownedError.message}`)
+  if (!owned) return { ok: false, error: 'not_found' }
+
+  const { error } = await supabase
+    .from('kaspi_shop_connections')
+    .update({
+      storefront_background_color: params.backgroundColor,
+      storefront_delivery_info: params.deliveryInfo.trim() || null,
+      storefront_chat_widget_enabled: params.chatWidgetEnabled,
+    })
+    .eq('id', connectionId)
+  if (error) throw new Error(`kaspi_shop_connections appearance save failed: ${error.message}`)
+  return { ok: true }
 }
 
 const SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])?$/
@@ -163,15 +230,29 @@ export async function saveStorefrontSettings(
 // multi-store switcher (for repricer/orders/etc.) must never change what an
 // already-shared storefront link shows. Unpublished and never-claimed slugs
 // resolve identically (both null) -- a stale/guessed slug reveals nothing.
-export async function resolveStorefrontBySlug(slug: string): Promise<{ connectionId: string; userId: string; companyName: string } | null> {
+export async function resolveStorefrontBySlug(slug: string): Promise<{
+  connectionId: string
+  userId: string
+  companyName: string
+  backgroundColor: string | null
+  deliveryInfo: string | null
+  chatWidgetEnabled: boolean
+} | null> {
   const { data, error } = await supabase
     .from('kaspi_shop_connections')
-    .select('id, user_id, company_name')
+    .select('id, user_id, company_name, storefront_background_color, storefront_delivery_info, storefront_chat_widget_enabled')
     .eq('storefront_slug', slug)
     .eq('storefront_published', true)
     .maybeSingle()
   if (error) throw new Error(`storefront resolve by slug failed: ${error.message}`)
-  return data ? { connectionId: data.id, userId: data.user_id, companyName: data.company_name } : null
+  return data ? {
+    connectionId: data.id,
+    userId: data.user_id,
+    companyName: data.company_name,
+    backgroundColor: data.storefront_background_color,
+    deliveryInfo: data.storefront_delivery_info,
+    chatWidgetEnabled: data.storefront_chat_widget_enabled,
+  } : null
 }
 
 export async function loadStorefrontProducts(connectionId: string): Promise<StorefrontProduct[]> {

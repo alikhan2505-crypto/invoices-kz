@@ -9,7 +9,15 @@ import { getActivePlan } from '@/lib/plan'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
-type Settings = { connectionId: string; companyName: string; slug: string | null; published: boolean; cashierConnected: boolean; visibleProductCount: number }
+type Settings = {
+  connectionId: string; companyName: string; slug: string | null; published: boolean; cashierConnected: boolean; visibleProductCount: number
+  backgroundColor: string | null; deliveryInfo: string | null; chatWidgetEnabled: boolean; hasWebsiteWidget: boolean
+}
+
+// Mirrors STOREFRONT_BACKGROUND_PRESETS in src/lib/kaspiShop/storefront.ts --
+// duplicated here (not imported) since this is a 'use client' component and
+// that module pulls in the service-role Supabase client.
+const BACKGROUND_PRESETS = ['#ffffff', '#f5f4f0', '#eef2ff', '#fdf2f8', '#ecfdf5', '#111827'] as const
 type KaspiCatalogProduct = { id: string; name: string; price: number; imageUrl: string | null; showOnStorefront: boolean; categoryId: string | null }
 type CustomCatalogProduct = { id: string; name: string; price: number; imageUrl: string | null; stockCount: number | null; categoryId: string | null }
 type StorefrontCategory = { id: string; name: string; sortOrder: number }
@@ -51,6 +59,15 @@ export default function KaspiShopStorefrontSettings() {
   const [deletingCategoryId, setDeletingCategoryId] = useState<string | null>(null)
   const [assigningId, setAssigningId] = useState<string | null>(null)
 
+  // Оформление (appearance) state -- independent save action from the
+  // slug/publish one above.
+  const [backgroundColor, setBackgroundColor] = useState<string | null>(null)
+  const [deliveryInfo, setDeliveryInfo] = useState('')
+  const [chatWidgetEnabled, setChatWidgetEnabled] = useState(false)
+  const [appearanceSaving, setAppearanceSaving] = useState(false)
+  const [appearanceError, setAppearanceError] = useState('')
+  const [appearanceSaved, setAppearanceSaved] = useState(false)
+
   async function authHeader() {
     const { data: { session } } = await supabase.auth.getSession()
     return { 'Authorization': `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' }
@@ -64,9 +81,35 @@ export default function KaspiShopStorefrontSettings() {
       const data = await res.json()
       setSettings(data)
       setSlugInput(data.slug || '')
+      setBackgroundColor(data.backgroundColor || null)
+      setDeliveryInfo(data.deliveryInfo || '')
+      setChatWidgetEnabled(!!data.chatWidgetEnabled)
     }
     setLoading(false)
   }, [])
+
+  async function saveAppearance() {
+    setAppearanceError('')
+    setAppearanceSaved(false)
+    setAppearanceSaving(true)
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/kaspi-shop/storefront/appearance', {
+        method: 'POST', headers, body: JSON.stringify({ backgroundColor, deliveryInfo, chatWidgetEnabled }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setAppearanceError(data.error === 'widget_not_connected' ? 'Сначала подключите канал сайта в AI-агенте' : 'Не удалось сохранить')
+        return
+      }
+      setAppearanceSaved(true)
+      setTimeout(() => setAppearanceSaved(false), 2000)
+    } catch {
+      setAppearanceError('Ошибка сети. Проверьте соединение и попробуйте ещё раз.')
+    } finally {
+      setAppearanceSaving(false)
+    }
+  }
 
   const loadCatalog = useCallback(async () => {
     setCatalogLoading(true)
@@ -370,6 +413,56 @@ export default function KaspiShopStorefrontSettings() {
                 </p>
               </div>
             )}
+
+            <div className="nav-glass rounded-2xl p-5 mt-4 space-y-4">
+              <div className="text-sm font-bold" style={{ color: 'var(--nav-text-primary)' }}>Оформление</div>
+
+              <div>
+                <label className="text-xs font-semibold mb-2 block" style={{ color: 'var(--nav-text-muted)' }}>Фон страницы</label>
+                <div className="flex items-center gap-2">
+                  {BACKGROUND_PRESETS.map(color => (
+                    <button key={color} onClick={() => setBackgroundColor(color)} aria-label={`Фон ${color}`}
+                      className="w-8 h-8 rounded-full border"
+                      style={{ background: color, borderColor: backgroundColor === color ? 'var(--nav-accent)' : 'var(--nav-border)', borderWidth: backgroundColor === color ? 2 : 1 }} />
+                  ))}
+                  <button onClick={() => setBackgroundColor(null)}
+                    className="text-xs font-semibold px-3 py-1.5 rounded-full nav-glass"
+                    style={{ color: backgroundColor === null ? 'var(--nav-accent)' : 'var(--nav-text-muted)' }}>
+                    По умолчанию
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Доставка (описание и стоимость)</label>
+                <textarea value={deliveryInfo} onChange={e => setDeliveryInfo(e.target.value)} rows={3}
+                  placeholder="Например: доставка по Алматы — 1 500 ₸, по Казахстану — Kaspi Почтой"
+                  className="w-full rounded-lg px-3 py-2 text-sm outline-none border border-[color:var(--nav-border)] resize-none"
+                  style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Чат-бот на витрине</label>
+                {settings?.hasWebsiteWidget ? (
+                  <label className="flex items-center gap-2 text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
+                    <input type="checkbox" checked={chatWidgetEnabled} onChange={e => setChatWidgetEnabled(e.target.checked)} />
+                    Показывать чат с AI-агентом на витрине
+                  </label>
+                ) : (
+                  <p className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>
+                    Сначала подключите канал «Сайт» в AI-агенте.{' '}
+                    <a href="/ai-agent/settings" className="font-semibold" style={{ color: 'var(--nav-accent)' }}>Настроить →</a>
+                  </p>
+                )}
+              </div>
+
+              {appearanceError && <div className="text-xs" style={{ color: 'var(--nav-critical)' }}>{appearanceError}</div>}
+              <button onClick={saveAppearance} disabled={appearanceSaving}
+                className="rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50"
+                style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                {appearanceSaving ? 'Сохраняем…' : appearanceSaved ? 'Сохранено ✓' : 'Сохранить оформление'}
+              </button>
+            </div>
           </>
         )}
 

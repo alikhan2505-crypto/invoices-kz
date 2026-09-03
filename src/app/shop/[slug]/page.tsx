@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import { motion, useReducedMotion } from 'framer-motion'
+import Script from 'next/script'
 import QRCode from 'qrcode'
 
 type Product = { id: string; name: string; brand: string; price: number; imageUrl: string | null; categoryId: string | null }
@@ -41,6 +42,9 @@ export default function StorefrontPage() {
   const [companyName, setCompanyName] = useState('')
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
+  const [backgroundColor, setBackgroundColor] = useState<string | null>(null)
+  const [deliveryInfo, setDeliveryInfo] = useState<string | null>(null)
+  const [widgetKey, setWidgetKey] = useState<string | null>(null)
   const [selected, setSelected] = useState<Product | null>(null)
   const [buyerName, setBuyerName] = useState('')
   const [buyerPhone, setBuyerPhone] = useState('')
@@ -59,6 +63,9 @@ export default function StorefrontPage() {
         setCompanyName(data.companyName || '')
         setProducts(Array.isArray(data.products) ? data.products : [])
         setCategories(Array.isArray(data.categories) ? data.categories : [])
+        setBackgroundColor(data.backgroundColor || null)
+        setDeliveryInfo(data.deliveryInfo || null)
+        setWidgetKey(data.widgetKey || null)
       })
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false))
@@ -130,12 +137,22 @@ export default function StorefrontPage() {
   if (notFound) return <div className="min-h-screen flex items-center justify-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Витрина не найдена</div>
 
   return (
-    <div className="min-h-screen" style={{ background: 'var(--nav-bg)' }}>
+    <div className="min-h-screen" style={{ background: backgroundColor || 'var(--nav-bg)' }}>
+      {widgetKey && (
+        <Script id="invoiceskz-storefront-widget" src="https://www.invoices.kz/widget.js" data-key={widgetKey} strategy="afterInteractive" />
+      )}
       <div className="max-w-3xl mx-auto p-4 lg:p-6">
         <div className="flex items-center gap-2.5 mb-6">
           <LogoMark />
           <h1 className="text-lg font-bold" style={{ color: 'var(--nav-text-primary)' }}>{companyName}</h1>
         </div>
+
+        {deliveryInfo && (
+          <div className="nav-glass rounded-2xl p-4 mb-6">
+            <div className="text-xs font-semibold mb-1" style={{ color: 'var(--nav-text-muted)' }}>Доставка</div>
+            <div className="text-sm whitespace-pre-wrap" style={{ color: 'var(--nav-text-secondary)' }}>{deliveryInfo}</div>
+          </div>
+        )}
 
         {products.length === 0 ? (
           <div className="text-sm text-center py-16" style={{ color: 'var(--nav-text-muted)' }}>Пока нет товаров в наличии</div>
