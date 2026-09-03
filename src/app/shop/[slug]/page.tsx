@@ -212,7 +212,7 @@ export default function StorefrontPage() {
       {widgetKey && (
         <Script id="invoiceskz-storefront-widget" src="https://www.invoices.kz/widget.js" data-key={widgetKey} strategy="afterInteractive" />
       )}
-      <div className="max-w-3xl mx-auto p-4 lg:p-6 pb-32 lg:pb-32">
+      <div className="max-w-6xl mx-auto p-4 lg:p-6 pb-32 lg:pb-32">
         <div className="flex items-center gap-2.5 mb-6">
           <LogoMark />
           <h1 className="text-lg font-bold" style={{ color: 'var(--nav-text-primary)' }}>{companyName}</h1>
@@ -232,9 +232,9 @@ export default function StorefrontPage() {
             {groupProducts(products, categories).map(group => (
               <div key={group.id || group.name || 'all'}>
                 {group.name && (
-                  <h2 className="text-sm font-bold mb-3" style={{ color: 'var(--nav-text-primary)' }}>{group.name}</h2>
+                  <h2 className="text-lg font-bold mb-4 pb-2 border-b" style={{ color: 'var(--nav-text-primary)', borderColor: 'var(--nav-border)' }}>{group.name}</h2>
                 )}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
                   {group.products.map((p, i) => {
                     const qty = cartQty(p.id)
                     return (
@@ -243,7 +243,7 @@ export default function StorefrontPage() {
                         initial={reduceMotion ? false : { opacity: 0, y: 14 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE, delay: reduceMotion ? 0 : Math.min(i * 0.04, 0.3) }}
-                        className="nav-glass rounded-2xl overflow-hidden flex flex-col"
+                        className="nav-glass rounded-2xl overflow-hidden flex flex-col transition-shadow hover:shadow-md"
                         style={{ scrollMarginBottom: '7rem' }}
                       >
                         {p.imageUrl ? (
@@ -251,23 +251,23 @@ export default function StorefrontPage() {
                         ) : (
                           <div className="w-full aspect-square" style={{ background: 'var(--nav-bg)' }} />
                         )}
-                        <div className="p-4 flex flex-col flex-1">
-                          {p.brand && <div className="text-[11px] font-medium mb-1" style={{ color: 'var(--nav-text-muted)' }}>{p.brand}</div>}
-                          <div className="text-sm font-semibold mb-2" style={{ color: 'var(--nav-text-primary)' }}>{p.name}</div>
-                          <div className="text-base font-bold mb-3" style={{ color: 'var(--nav-text-primary)' }}>{formatPrice(p.price)}</div>
+                        <div className="p-3 sm:p-4 flex flex-col flex-1">
+                          {p.brand && <div className="text-[10px] font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--nav-text-muted)' }}>{p.brand}</div>}
+                          <div className="text-sm font-semibold mb-2 line-clamp-2" style={{ color: 'var(--nav-text-primary)' }}>{p.name}</div>
+                          <div className="text-base sm:text-lg font-bold mb-3 mt-auto" style={{ color: 'var(--nav-text-primary)' }}>{formatPrice(p.price)}</div>
                           {qty === 0 ? (
                             <button
                               onClick={() => setQty(p.id, 1)}
-                              className="mt-auto rounded-lg px-4 py-2 text-sm font-semibold"
+                              className="rounded-lg px-3 sm:px-4 py-2 text-sm font-semibold"
                               style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}
                             >
                               В корзину
                             </button>
                           ) : (
-                            <div className="mt-auto flex items-center justify-between rounded-lg overflow-hidden" style={{ background: 'var(--nav-accent)' }}>
-                              <button onClick={() => setQty(p.id, qty - 1)} className="px-4 py-2 text-sm font-bold" style={{ color: 'var(--nav-accent-ink)' }} aria-label="Уменьшить количество">−</button>
+                            <div className="flex items-center justify-between rounded-lg overflow-hidden" style={{ background: 'var(--nav-accent)' }}>
+                              <button onClick={() => setQty(p.id, qty - 1)} className="px-3 sm:px-4 py-2 text-sm font-bold" style={{ color: 'var(--nav-accent-ink)' }} aria-label="Уменьшить количество">−</button>
                               <span className="text-sm font-semibold" style={{ color: 'var(--nav-accent-ink)' }}>{qty}</span>
-                              <button onClick={() => setQty(p.id, qty + 1)} className="px-4 py-2 text-sm font-bold" style={{ color: 'var(--nav-accent-ink)' }} aria-label="Увеличить количество">+</button>
+                              <button onClick={() => setQty(p.id, qty + 1)} className="px-3 sm:px-4 py-2 text-sm font-bold" style={{ color: 'var(--nav-accent-ink)' }} aria-label="Увеличить количество">+</button>
                             </div>
                           )}
                         </div>
@@ -288,7 +288,7 @@ export default function StorefrontPage() {
             animate={{ opacity: 1, y: 0 }}
             exit={reduceMotion ? undefined : { opacity: 0, y: 20 }}
             transition={{ duration: reduceMotion ? 0 : 0.25, ease: EASE }}
-            className="fixed bottom-4 inset-x-4 z-40 max-w-3xl mx-auto"
+            className="fixed bottom-4 inset-x-4 z-40 max-w-6xl mx-auto"
           >
             <button
               onClick={() => setCheckoutOpen(true)}
