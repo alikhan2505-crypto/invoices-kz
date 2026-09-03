@@ -589,7 +589,7 @@ export default function KaspiShopProductAvailability() {
 
         <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
           <div className="flex items-center gap-1.5">
-            {([['removed', `Сняты с продажи (${removedCount})`], ['active', `В продаже (${activeCount})`]] as [Tab, string][]).map(([key, label]) => {
+            {([['active', `В продаже (${activeCount})`], ['removed', `Сняты с продажи (${removedCount})`]] as [Tab, string][]).map(([key, label]) => {
               const selected = tab === key
               return (
                 <button key={key} onClick={() => setTab(key)}

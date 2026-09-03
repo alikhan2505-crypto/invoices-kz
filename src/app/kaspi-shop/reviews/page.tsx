@@ -81,6 +81,7 @@ export default function KaspiShopReviews() {
   const [loadError, setLoadError] = useState('')
   const [activeStars, setActiveStars] = useState<number | null>(null)
   const [refreshNote, setRefreshNote] = useState('')
+  const [groupByProduct, setGroupByProduct] = useState(false)
 
   useEffect(() => { checkAccess() }, [])
   useEffect(() => { if (!loading) loadReviews(activeStars) }, [activeStars, loading])
@@ -240,21 +241,28 @@ function sleep(ms: number) {
             </div>
           )}
 
-          <div className="flex items-center gap-1 flex-wrap nav-glass rounded-full p-1 w-fit mt-6">
-            {STAR_PILLS.map(pill => {
-              const active = activeStars === pill.value
-              return (
-                <button key={pill.label} onClick={() => setActiveStars(pill.value)}
-                  className="relative text-xs font-medium rounded-full px-3 py-1.5 transition-colors"
-                  style={{ color: active ? 'var(--nav-accent-ink)' : 'var(--nav-text-secondary)' }}>
-                  {active && (
-                    <motion.span layoutId="reviewStarPill" className="absolute inset-0 rounded-full" style={{ background: 'var(--nav-accent)', zIndex: 0 }}
-                      transition={{ type: 'spring', stiffness: 380, damping: 32 }} />
-                  )}
-                  <span className="relative" style={{ zIndex: 1 }}>{pill.label}</span>
-                </button>
-              )
-            })}
+          <div className="flex items-center gap-2 flex-wrap mt-6">
+            <div className="flex items-center gap-1 flex-wrap nav-glass rounded-full p-1 w-fit">
+              {STAR_PILLS.map(pill => {
+                const active = activeStars === pill.value
+                return (
+                  <button key={pill.label} onClick={() => setActiveStars(pill.value)}
+                    className="relative text-xs font-medium rounded-full px-3 py-1.5 transition-colors"
+                    style={{ color: active ? 'var(--nav-accent-ink)' : 'var(--nav-text-secondary)' }}>
+                    {active && (
+                      <motion.span layoutId="reviewStarPill" className="absolute inset-0 rounded-full" style={{ background: 'var(--nav-accent)', zIndex: 0 }}
+                        transition={{ type: 'spring', stiffness: 380, damping: 32 }} />
+                    )}
+                    <span className="relative" style={{ zIndex: 1 }}>{pill.label}</span>
+                  </button>
+                )
+              })}
+            </div>
+            <button onClick={() => setGroupByProduct(v => !v)}
+              className="text-xs font-medium rounded-full px-3 py-1.5 transition-colors"
+              style={{ color: groupByProduct ? 'var(--nav-accent-ink)' : 'var(--nav-text-secondary)', background: groupByProduct ? 'var(--nav-accent)' : 'var(--nav-surface-glass)' }}>
+              По товарам
+            </button>
           </div>
         </motion.div>
 
@@ -268,14 +276,14 @@ function sleep(ms: number) {
               </div>
             </div>
           )
-        ) : (
-          <div className="space-y-2">
-            {data.reviews.map((r, i) => (
+        ) : (() => {
+          function renderReview(r: Review, i: number) {
+            return (
               <div key={`${r.trackedProductId}-${i}`} className="nav-glass rounded-2xl p-4">
                 <div className="flex items-start justify-between gap-3 mb-1.5">
                   <div className="min-w-0">
                     <div className="text-sm font-semibold truncate" style={{ color: 'var(--nav-text-primary)' }}>{r.authorName || 'Покупатель Kaspi'}</div>
-                    <div className="text-[11px] truncate mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{r.productName}</div>
+                    {!groupByProduct && <div className="text-[11px] truncate mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{r.productName}</div>}
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <span className="text-xs font-semibold flex items-center gap-0.5" style={{ color: r.rating <= 3 ? 'var(--nav-critical)' : 'var(--nav-text-primary)' }}>
@@ -286,9 +294,35 @@ function sleep(ms: number) {
                 </div>
                 {r.text && <div className="text-sm mt-1.5" style={{ color: 'var(--nav-text-secondary)' }}>{r.text}</div>}
               </div>
-            ))}
-          </div>
-        )}
+            )
+          }
+
+          if (!groupByProduct) {
+            return <div className="space-y-2">{data.reviews.map((r, i) => renderReview(r, i))}</div>
+          }
+
+          const groups = new Map<string, Review[]>()
+          for (const r of data.reviews) {
+            const key = r.trackedProductId || r.productName
+            const list = groups.get(key) || []
+            list.push(r)
+            groups.set(key, list)
+          }
+          const sortedGroups = Array.from(groups.values()).sort((a, b) => b.length - a.length)
+
+          return (
+            <div className="space-y-5">
+              {sortedGroups.map(groupReviews => (
+                <div key={groupReviews[0].trackedProductId || groupReviews[0].productName}>
+                  <div className="text-xs font-semibold mb-2 px-1 truncate" style={{ color: 'var(--nav-text-secondary)' }}>
+                    {groupReviews[0].productName} <span style={{ color: 'var(--nav-text-muted)', fontWeight: 400 }}>· {groupReviews.length}</span>
+                  </div>
+                  <div className="space-y-2">{groupReviews.map((r, i) => renderReview(r, i))}</div>
+                </div>
+              ))}
+            </div>
+          )
+        })()}
       </div>
     </main>
     </DesktopShell>
