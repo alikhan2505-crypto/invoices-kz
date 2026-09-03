@@ -176,6 +176,11 @@ export default function KaspiShopNiches() {
   const [activeBrand, setActiveBrand] = useState<string | null>(null)
   const [openProduct, setOpenProduct] = useState<NicheProduct | null>(null)
   const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null)
+  // Проверка идеи now costs 5 ₸/check (2026-09-03, same wallet+price the
+  // репрайсер's own price checks already debit) -- shown here so the cost
+  // isn't a surprise, mirroring the transparency principle already used for
+  // AI-агент's own wallet UI.
+  const [walletBalance, setWalletBalance] = useState<number | null>(null)
 
   // "Trending on Kaspi" passive dashboard -- its own state, own fetch,
   // deliberately not sharing anything with the search tool's state above
@@ -206,6 +211,18 @@ export default function KaspiShopNiches() {
     const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', user.id).single()
     if (!profile?.is_admin) { router.push('/dashboard'); return }
     setLoading(false)
+    loadWalletBalance()
+  }
+
+  async function loadWalletBalance() {
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/kaspi-shop/wallet', { headers })
+      if (res.ok) {
+        const data = await res.json()
+        if (typeof data.balance === 'number') setWalletBalance(data.balance)
+      }
+    } catch { /* price hint just stays hidden */ }
   }
 
   function stopPolling() {
@@ -231,6 +248,7 @@ export default function KaspiShopNiches() {
           stopPolling()
           setSearching(false)
           setSummary(data.result)
+          loadWalletBalance() // a real check just debited the wallet server-side
         } else if (data.status === 'error') {
           stopPolling()
           setSearching(false)
@@ -283,7 +301,13 @@ export default function KaspiShopNiches() {
         method: 'POST', headers, body: JSON.stringify({ query: query.trim() }),
       })
       const data = await res.json()
-      if (!res.ok) { setSearching(false); setLoadError(data.error || 'Не удалось запустить проверку'); return }
+      if (!res.ok) {
+        setSearching(false)
+        setLoadError(data.error === 'insufficient_balance'
+          ? 'Недостаточно средств на балансе Kaspi Bot — пополните на странице «Демпинг».'
+          : (data.error || 'Не удалось запустить проверку'))
+        return
+      }
       pollResult(data.checkId)
     } catch {
       setSearching(false)
@@ -309,11 +333,16 @@ export default function KaspiShopNiches() {
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}
           className="nav-glass nav-card-accent rounded-[28px] p-6 lg:p-8 mb-4">
           <div className="text-[11px] font-semibold tracking-wider uppercase mb-1" style={{ color: 'var(--nav-text-muted)' }}>Проверка идеи</div>
-          <h2 className="text-2xl lg:text-3xl font-extrabold tracking-tight mb-6" style={{ color: 'var(--nav-text-primary)' }}>Проверить идею товара</h2>
+          <div className="flex items-baseline gap-2 mb-6 flex-wrap">
+            <h2 className="text-2xl lg:text-3xl font-extrabold tracking-tight" style={{ color: 'var(--nav-text-primary)' }}>Проверить идею товара</h2>
+            <span className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>
+              5 ₸ за проверку{walletBalance !== null && ` · на балансе ${walletBalance.toLocaleString('ru-KZ')} ₸`}
+            </span>
+          </div>
           <form onSubmit={e => { e.preventDefault(); doSearch() }} className="flex gap-2">
             <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Например: термокружка"
               className={`flex-1 ${INPUT_CLS}`} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
-            <button type="submit" disabled={searching || !query.trim()}
+            <button type="submit" disabled={searching || !query.trim() || (walletBalance !== null && walletBalance < 5)}
               className="rounded-xl text-sm font-semibold px-5 py-3 disabled:opacity-40" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
               {searching ? 'Ищем...' : 'Проверить'}
             </button>

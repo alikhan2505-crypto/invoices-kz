@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createNicheCheck, failNicheCheck } from '@/lib/kaspiShop/nicheChecks'
+import { getKaspiShopWalletBalance, KASPI_SHOP_CREDIT_PRICE_TENGE } from '@/lib/kaspiShop/wallet'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -42,7 +43,17 @@ export async function POST(req: NextRequest) {
   const query = body?.query?.trim()
   if (!query) return NextResponse.json({ error: 'query обязателен' }, { status: 400 })
 
-  const checkId = await createNicheCheck(query)
+  // Real per-check cost, same wallet/price the репрайсер's own price checks
+  // already debit (2026-09-03, founder: monetize genuinely valuable
+  // on-demand actions like this one, mirroring what competitors already
+  // charge separately for their own niche-research tools). Charged only on
+  // successful delivery (niches/deliver/route.ts) -- refused up front here
+  // so a check that will fail for lack of balance never even dispatches.
+  if ((await getKaspiShopWalletBalance(user.id)) < KASPI_SHOP_CREDIT_PRICE_TENGE) {
+    return NextResponse.json({ error: 'insufficient_balance' }, { status: 402 })
+  }
+
+  const checkId = await createNicheCheck(query, user.id)
 
   const token = process.env.KASPI_SHOP_GITHUB_PAT
   if (!token) {

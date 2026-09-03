@@ -19,10 +19,10 @@ export type NicheCheck = {
   error: string | null
 }
 
-export async function createNicheCheck(query: string): Promise<string> {
+export async function createNicheCheck(query: string, userId: string): Promise<string> {
   const { data, error } = await supabase
     .from('kaspi_niche_checks')
-    .insert({ query, status: 'pending' })
+    .insert({ query, status: 'pending', user_id: userId })
     .select('id')
     .single()
   if (error) throw new Error(`kaspi_niche_checks insert failed: ${error.message}`)
@@ -40,12 +40,18 @@ export async function getNicheCheck(id: string): Promise<NicheCheck | null> {
   return { status: data.status, result: data.result, error: data.error }
 }
 
-export async function completeNicheCheck(id: string, result: NicheSummary): Promise<void> {
-  const { error } = await supabase
+// Returns the check's own user_id (whoever requested it) so the caller can
+// debit the right wallet for a completed, billable check -- older rows
+// (before this column existed) have no owner and are never charged.
+export async function completeNicheCheck(id: string, result: NicheSummary): Promise<{ userId: string | null; query: string }> {
+  const { data, error } = await supabase
     .from('kaspi_niche_checks')
     .update({ status: 'done', result })
     .eq('id', id)
+    .select('user_id, query')
+    .single()
   if (error) throw new Error(`kaspi_niche_checks complete failed for ${id}: ${error.message}`)
+  return { userId: data?.user_id ?? null, query: data?.query ?? '' }
 }
 
 export async function failNicheCheck(id: string, message: string): Promise<void> {
