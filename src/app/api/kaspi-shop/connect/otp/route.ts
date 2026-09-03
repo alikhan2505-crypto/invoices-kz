@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { submitOtp } from '@/lib/kaspiShop/cabinetAuth'
 import { listMerchants, getMerchantInfo } from '@/lib/kaspiShop/cabinetApi'
 import { finalizeConnection } from '@/lib/kaspiShop/finalizeConnection'
+import { loadConnection } from '@/lib/kaspiShop/connection'
 
 const supabaseAuth = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -34,7 +35,7 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: 'Некорректный JSON' }, { status: 400 })
   }
-  const { otpToken, code } = body
+  const { otpToken, code, isReconnect } = body
   if (!otpToken || !code) {
     return NextResponse.json({ error: 'otpToken и code обязательны' }, { status: 400 })
   }
@@ -56,6 +57,20 @@ export async function POST(req: NextRequest) {
   }))
 
   if (named.length > 1) {
+    // A reconnect (session expired for the store already connected) already
+    // knows which merchant it's for -- the picker exists so a seller can
+    // choose between DIFFERENT merchants on one phone number when adding a
+    // store, not to make them re-pick a store they're already connected to
+    // every time its session expires (real friction reported live 2026-09-03
+    // on the Abil-Sisters/ИП FIRST PROJECT phone number).
+    if (isReconnect) {
+      const activeConnection = await loadConnection(user.id)
+      const match = activeConnection && named.find(m => m.id === activeConnection.merchantId)
+      if (match) {
+        const { importedProducts } = await finalizeConnection(user.id, sessionCookies, match.id, match.name)
+        return NextResponse.json({ status: 'connected', companyName: match.name, importedProducts })
+      }
+    }
     return NextResponse.json({
       status: 'merchant_required',
       sessionToken: Buffer.from(sessionCookies, 'utf8').toString('base64'),

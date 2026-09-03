@@ -391,7 +391,11 @@ export default function KaspiShop() {
     setConnecting(true)
     setConnectError('')
     const headers = await authHeader()
-    const res = await fetch('/api/kaspi-shop/connect/otp', { method: 'POST', headers, body: JSON.stringify({ otpToken, code: otpCode }) })
+    // Reconnecting an expired session already knows which store it's for --
+    // tells the API to auto-pick the already-connected merchant instead of
+    // showing the same picker used for genuinely adding a new store.
+    const isReconnect = connected && sessionStatus === 'session_expired'
+    const res = await fetch('/api/kaspi-shop/connect/otp', { method: 'POST', headers, body: JSON.stringify({ otpToken, code: otpCode, isReconnect }) })
     const data = await res.json()
     setConnecting(false)
     if (!res.ok) { setConnectError(data.error || 'Не удалось подтвердить код'); return }
