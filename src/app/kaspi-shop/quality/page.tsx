@@ -192,7 +192,16 @@ export default function KaspiShopQualityPage() {
               </div>
             )}
             <div className="text-[11px]" style={{ color: 'var(--nav-text-muted)' }}>
-              {metric.numerator} из {metric.denominator} за последние {metric.daysPerPeriod} дней
+              {/* Rating has no natural "out of N" denominator the way a
+                  violation-count metric does (returns/delays/cancellations are
+                  genuinely X out of Y orders) -- Kaspi's own formulaElements
+                  sends denominator: 0 for rating (confirmed live 2026-09-03 on
+                  Abil-Sisters' real 245-review history, previously untested
+                  since earlier captures only had trivial rating data), which
+                  rendered as the nonsensical "245 из 0". */}
+              {activeTab.unit === 'rating'
+                ? `${metric.numerator} оценок за последние ${metric.daysPerPeriod} дней`
+                : `${metric.numerator} из ${metric.denominator} за последние ${metric.daysPerPeriod} дней`}
               {metric.from && metric.to && ` (${formatDateRu(metric.from)} — ${formatDateRu(metric.to)})`}
             </div>
           </div>
