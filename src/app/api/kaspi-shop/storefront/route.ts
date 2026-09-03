@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
 
   const cashierConnected = await hasCashierConnection(user.id)
   // Surfaced so the settings page can explain an empty public storefront --
-  // a product only shows there once the seller turns on Демпинг for it (see
+  // a product only shows there while Kaspi still lists it for sale (see
   // filterStorefrontProducts' own comment), which is not obvious from this
   // page alone (founder repro 2026-09-03: published a store, no products
   // ever appeared, no indication why).

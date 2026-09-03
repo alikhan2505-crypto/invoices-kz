@@ -11,7 +11,7 @@ export interface TrackedProductRow {
   brand: string | null
   own_current_price: number | string | null
   stock_count: number | null
-  enabled: boolean | null
+  available_for_sale: boolean | null
 }
 
 export interface StorefrontProduct {
@@ -21,15 +21,21 @@ export interface StorefrontProduct {
   price: number
 }
 
-// Pure -- no I/O. What counts as "available to buy right now": repricer-
-// enabled (the only signal we have for "seller wants this active" -- see the
-// design doc's deliberate v1 trade-off of reusing this flag) and either
-// untracked stock (stock_count is null -- not every product has stock
-// synced) or a genuinely positive count. Same zero-price guard
+// Pure -- no I/O. What counts as "available to buy right now": Kaspi still
+// lists it for sale (available_for_sale -- kept in sync with Kaspi's own
+// available=true/false by finalizeConnection's catalog import and by
+// removed-products/route.ts's Снять с продажи/Восстановить actions;
+// nullable defensively for any pre-migration row, treated as available) and
+// either untracked stock (stock_count is null -- not every product has stock
+// synced) or a genuinely positive count. Deliberately independent of
+// `enabled` (that column means "repricer turned on for this product", a
+// separate seller choice most products never opt into -- founder feedback
+// 2026-09-03: the storefront should show everything actually for sale, not
+// only products enrolled in Демпинг). Same zero-price guard
 // catalogContext.ts already applies for the AI-агент's own catalog block.
 export function filterStorefrontProducts(rows: TrackedProductRow[]): StorefrontProduct[] {
   return rows
-    .filter(r => r.enabled && (r.stock_count === null || r.stock_count === undefined || r.stock_count > 0))
+    .filter(r => r.available_for_sale !== false && (r.stock_count === null || r.stock_count === undefined || r.stock_count > 0))
     .map(r => ({
       id: r.id,
       name: String(r.product_name || '').trim(),
@@ -139,7 +145,7 @@ export async function resolveStorefrontBySlug(slug: string): Promise<{ connectio
 export async function loadStorefrontProducts(connectionId: string): Promise<StorefrontProduct[]> {
   const { data, error } = await supabase
     .from('kaspi_shop_tracked_products')
-    .select('id, product_name, brand, own_current_price, stock_count, enabled')
+    .select('id, product_name, brand, own_current_price, stock_count, available_for_sale')
     .eq('connection_id', connectionId)
   if (error) throw new Error(`kaspi_shop_tracked_products lookup failed for connection ${connectionId}: ${error.message}`)
   return filterStorefrontProducts(data || [])

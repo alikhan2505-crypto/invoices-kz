@@ -169,8 +169,8 @@ export default function KaspiShopStorefrontSettings() {
               На витрине сейчас: {settings.visibleProductCount} {settings.visibleProductCount === 1 ? 'товар' : 'товаров'}
             </div>
             <p className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>
-              Товар появляется на витрине, только если для него включён репрайсер в Демпинге и есть остаток на складе — иначе покупатель увидит «Пока нет товаров в наличии».{' '}
-              <a href="/kaspi-shop" className="font-semibold" style={{ color: 'var(--nav-accent)' }}>Включить товары в Демпинге →</a>
+              На витрине показываются все товары, которые сейчас в продаже на Kaspi и есть в наличии — товар пропадает оттуда, если вы снимете его с продажи или остаток закончится.{' '}
+              <a href="/kaspi-shop/removed" className="font-semibold" style={{ color: 'var(--nav-accent)' }}>Управление товарами →</a>
             </p>
           </div>
         )}

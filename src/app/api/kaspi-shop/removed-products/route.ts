@@ -173,12 +173,15 @@ export async function POST(req: NextRequest) {
     // CRITICAL: the repricer's own price push always sends available:"yes"
     // (pushPriceChange above in cabinetPricePush.ts) -- an enabled demping
     // rule on a just-removed offer would silently resurrect it on the next
-    // check cycle. Disable the rule alongside the removal.
+    // check cycle. Disable the rule alongside the removal. available_for_sale
+    // also goes false here -- it's the public storefront's own filter
+    // (independent of enabled, which only means "repricer on"), so a removed
+    // product must stop showing there too.
     try {
       if (offer.masterSku) {
         await supabase
           .from('kaspi_shop_tracked_products')
-          .update({ enabled: false })
+          .update({ enabled: false, available_for_sale: false })
           .eq('connection_id', connection.id)
           .eq('kaspi_master_sku', offer.masterSku)
       }
@@ -201,7 +204,15 @@ export async function POST(req: NextRequest) {
         .eq('connection_id', connection.id)
         .eq('kaspi_master_sku', offer.masterSku)
         .maybeSingle()
-      if (!existing) {
+      if (existing) {
+        // The row already exists from before it was removed (the common
+        // case) -- restoring must flip available_for_sale back on, or the
+        // public storefront stays blind to it even though Kaspi now lists
+        // it again. enabled (repricer) is deliberately left untouched: it
+        // was turned off by the removal on purpose and restoring to sale
+        // doesn't imply the seller wants automatic repricing back on too.
+        await supabase.from('kaspi_shop_tracked_products').update({ available_for_sale: true }).eq('id', existing.id)
+      } else {
         const { data: product, error: insertError } = await supabase
           .from('kaspi_shop_tracked_products')
           .insert({
@@ -217,6 +228,7 @@ export async function POST(req: NextRequest) {
             undercut_step: 100,
             check_frequency_minutes: 15,
             enabled: false,
+            available_for_sale: true,
             kaspi_master_sku: offer.masterSku,
             kaspi_brand: offer.brandName || offer.brandCode || null,
             kaspi_category: offer.masterCategory,

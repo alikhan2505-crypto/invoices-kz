@@ -110,6 +110,11 @@ export async function importCatalogProducts(connectionId: string, userId: string
             kaspi_brand: offer.brandName || offer.brandCode || null,
             kaspi_category: offer.masterCategory,
             point_city_codes: pointCitiesBySku.get(offer.sku) || [],
+            // offers here always come from listCatalog(..., true) below --
+            // being present in this refresh reconfirms Kaspi still lists it
+            // as available, self-healing a product restored via Kaspi's own
+            // native cabinet (never touched removed-products/route.ts).
+            available_for_sale: true,
           })
           .eq('id', existing.id)
         if (updateError) {
@@ -135,6 +140,7 @@ export async function importCatalogProducts(connectionId: string, userId: string
           undercut_step: 100,
           check_frequency_minutes: 15,
           enabled: false,
+          available_for_sale: true,
           kaspi_master_sku: offer.masterSku,
           kaspi_brand: offer.brandName || offer.brandCode || null,
           kaspi_category: offer.masterCategory,
