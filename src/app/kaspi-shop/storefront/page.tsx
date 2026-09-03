@@ -9,7 +9,7 @@ import { getActivePlan } from '@/lib/plan'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
-type Settings = { connectionId: string; companyName: string; slug: string | null; published: boolean; cashierConnected: boolean }
+type Settings = { connectionId: string; companyName: string; slug: string | null; published: boolean; cashierConnected: boolean; visibleProductCount: number }
 
 export default function KaspiShopStorefrontSettings() {
   const router = useRouter()
@@ -160,6 +160,18 @@ export default function KaspiShopStorefrontSettings() {
                 </button>
               )}
             </div>
+          </div>
+        )}
+
+        {settings?.cashierConnected && (
+          <div className="nav-glass rounded-2xl p-5 mt-4">
+            <div className="text-sm font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>
+              На витрине сейчас: {settings.visibleProductCount} {settings.visibleProductCount === 1 ? 'товар' : 'товаров'}
+            </div>
+            <p className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>
+              Товар появляется на витрине, только если для него включён репрайсер в Демпинге и есть остаток на складе — иначе покупатель увидит «Пока нет товаров в наличии».{' '}
+              <a href="/kaspi-shop" className="font-semibold" style={{ color: 'var(--nav-accent)' }}>Включить товары в Демпинге →</a>
+            </p>
           </div>
         )}
       </div>
