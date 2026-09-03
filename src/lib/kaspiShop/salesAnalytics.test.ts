@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { extractAttributes, computeAbc, computeAttributeSlices } from './salesAnalytics'
+import { extractAttributes, baseProductName, computeAbc, computeAttributeSlices } from './salesAnalytics'
 import { Order } from './cabinetApi'
 
 function order(items: { code: string; name: string; quantity: number; totalPrice: number }[]): Order {
@@ -34,6 +34,26 @@ describe('extractAttributes', () => {
   it('accepts standalone numeric clothing sizes 38-58, ignores quantities', () => {
     expect(extractAttributes('Джинсы женские 44 синие').size).toBe('44')
     expect(extractAttributes('Салфетки 70 шт').size).toBeNull()
+  })
+})
+
+describe('baseProductName', () => {
+  it('strips a colour so two colour variants collapse to the same key', () => {
+    expect(baseProductName('Лонгслив Abil.Sisters темно-синий')).toBe('Лонгслив Abil.Sisters')
+    expect(baseProductName('Лонгслив Abil.Sisters черный')).toBe('Лонгслив Abil.Sisters')
+  })
+
+  it('strips a standalone size', () => {
+    expect(baseProductName('Влажные полотенца Sunlight 70шт XXL Universal 70 шт')).toBe('Влажные полотенца Sunlight 70шт Universal 70 шт')
+    expect(baseProductName('Футболка M белая')).toBe('Футболка')
+  })
+
+  it('leaves a name with no detected colour or size unchanged', () => {
+    expect(baseProductName('Дженга Настольная игра "Башня"')).toBe('Дженга Настольная игра "Башня"')
+  })
+
+  it('strips both a size and a colour from the same name', () => {
+    expect(baseProductName('Джинсы женские 44 синие')).toBe('Джинсы женские')
   })
 })
 

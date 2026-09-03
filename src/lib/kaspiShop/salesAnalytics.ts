@@ -62,6 +62,41 @@ const COLOR_STEMS: [string, string][] = [
 const LETTER_SIZE_RE = /(?:^|[\s,("/])((?:XXXL|3XL|4XL|2XL|XXL|XL|XS|S|M|L))(?=$|[\s,)"/.])/u
 const NUMERIC_SIZE_RE = /(?:^|[\s,("/])(3[89]|4[0-9]|5[0-8])(?=$|[\s,)"/.])/u
 
+// Matches a whole token starting with any COLOR_STEMS entry, same order (so
+// "серебр" still wins over "сер" at the same position), plus an optional
+// hyphenated intensity modifier right before it ("темно-синий",
+// "светло-серый") -- without the optional group, "темно-синий" only lost
+// "синий", leaving "темно" behind as residue so it no longer matched the
+// "чёрный" variant's stripped name. Built once, not per call.
+const COLOR_STRIP_RE = new RegExp(
+  `(^|[^a-zа-яё0-9])(?:[a-zа-яё]+-)?(?:${COLOR_STEMS.map(([stem]) => stem).join('|')})[a-zа-яё]*(?=$|[^a-zа-яё0-9])`,
+  'iu'
+)
+
+// Derives a grouping key that collapses colour/size variants of the same
+// product ("Лонгслив Abil.Sisters темно-синий" / "...чёрный") into one
+// bucket -- used by Отзывы' "По товарам" grouping (founder 2026-09-03: group
+// by product, ignoring size and colour). Same honest-heuristic caveat as
+// extractAttributes: text-based, not real catalog data -- a name this
+// doesn't recognize a colour/size in is returned unchanged.
+export function baseProductName(name: string): string {
+  let result = name
+  const letter = result.match(LETTER_SIZE_RE)
+  if (letter && letter.index !== undefined) {
+    result = result.slice(0, letter.index) + result.slice(letter.index + letter[0].length)
+  } else {
+    const numeric = result.match(NUMERIC_SIZE_RE)
+    if (numeric && numeric.index !== undefined) {
+      result = result.slice(0, numeric.index) + result.slice(numeric.index + numeric[0].length)
+    }
+  }
+  const color = result.match(COLOR_STRIP_RE)
+  if (color && color.index !== undefined) {
+    result = result.slice(0, color.index) + result.slice(color.index + color[0].length)
+  }
+  return result.replace(/\s{2,}/g, ' ').trim()
+}
+
 export function extractAttributes(name: string): { color: string | null; size: string | null } {
   let color: string | null = null
   const tokens = name.toLowerCase().split(/[^a-zа-яё0-9]+/u).filter(Boolean)

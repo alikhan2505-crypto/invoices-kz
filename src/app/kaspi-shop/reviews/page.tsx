@@ -7,6 +7,7 @@ import LoadingSpinner from '@/components/LoadingSpinner'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import { getActivePlan } from '@/lib/plan'
+import { baseProductName } from '@/lib/kaspiShop/salesAnalytics'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -63,6 +64,20 @@ function formatDate(iso: string | null): string {
   }
 }
 
+function monthKey(iso: string | null): string {
+  if (!iso) return 'unknown'
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return 'unknown'
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+function monthLabel(key: string): string {
+  if (key === 'unknown') return 'Без даты'
+  const [year, month] = key.split('-').map(Number)
+  const label = new Date(year, month - 1, 1).toLocaleDateString('ru-KZ', { month: 'long', year: 'numeric' })
+  return label.charAt(0).toUpperCase() + label.slice(1)
+}
+
 function formatDateTime(iso: string | null): string {
   if (!iso) return ''
   try {
@@ -81,7 +96,7 @@ export default function KaspiShopReviews() {
   const [loadError, setLoadError] = useState('')
   const [activeStars, setActiveStars] = useState<number | null>(null)
   const [refreshNote, setRefreshNote] = useState('')
-  const [groupByProduct, setGroupByProduct] = useState(false)
+  const [groupMode, setGroupMode] = useState<'none' | 'product' | 'month'>('none')
 
   useEffect(() => { checkAccess() }, [])
   useEffect(() => { if (!loading) loadReviews(activeStars) }, [activeStars, loading])
@@ -258,11 +273,22 @@ function sleep(ms: number) {
                 )
               })}
             </div>
-            <button onClick={() => setGroupByProduct(v => !v)}
-              className="text-xs font-medium rounded-full px-3 py-1.5 transition-colors"
-              style={{ color: groupByProduct ? 'var(--nav-accent-ink)' : 'var(--nav-text-secondary)', background: groupByProduct ? 'var(--nav-accent)' : 'var(--nav-surface-glass)' }}>
-              По товарам
-            </button>
+            <div className="flex items-center gap-1 flex-wrap nav-glass rounded-full p-1 w-fit">
+              {([['none', 'Список'], ['product', 'По товарам'], ['month', 'По месяцам']] as const).map(([value, label]) => {
+                const active = groupMode === value
+                return (
+                  <button key={value} onClick={() => setGroupMode(value)}
+                    className="relative text-xs font-medium rounded-full px-3 py-1.5 transition-colors"
+                    style={{ color: active ? 'var(--nav-accent-ink)' : 'var(--nav-text-secondary)' }}>
+                    {active && (
+                      <motion.span layoutId="reviewGroupPill" className="absolute inset-0 rounded-full" style={{ background: 'var(--nav-accent)', zIndex: 0 }}
+                        transition={{ type: 'spring', stiffness: 380, damping: 32 }} />
+                    )}
+                    <span className="relative" style={{ zIndex: 1 }}>{label}</span>
+                  </button>
+                )
+              })}
+            </div>
           </div>
         </motion.div>
 
@@ -277,13 +303,19 @@ function sleep(ms: number) {
             </div>
           )
         ) : (() => {
-          function renderReview(r: Review, i: number) {
+          // Full card (with review text) for the flat list -- the product
+          // name earns its place there since nothing else on screen says
+          // which product a review is about. Grouped views already say that
+          // once in the group header, so each row compacts down to exactly
+          // the 3 fields that vary per review (founder 2026-09-03: "имя
+          // покупателя, дата оценки и оценка").
+          function renderReviewCard(r: Review, i: number) {
             return (
               <div key={`${r.trackedProductId}-${i}`} className="nav-glass rounded-2xl p-4">
                 <div className="flex items-start justify-between gap-3 mb-1.5">
                   <div className="min-w-0">
                     <div className="text-sm font-semibold truncate" style={{ color: 'var(--nav-text-primary)' }}>{r.authorName || 'Покупатель Kaspi'}</div>
-                    {!groupByProduct && <div className="text-[11px] truncate mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{r.productName}</div>}
+                    <div className="text-[11px] truncate mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{r.productName}</div>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <span className="text-xs font-semibold flex items-center gap-0.5" style={{ color: r.rating <= 3 ? 'var(--nav-critical)' : 'var(--nav-text-primary)' }}>
@@ -297,27 +329,46 @@ function sleep(ms: number) {
             )
           }
 
-          if (!groupByProduct) {
-            return <div className="space-y-2">{data.reviews.map((r, i) => renderReview(r, i))}</div>
+          function renderReviewRow(r: Review, i: number) {
+            return (
+              <div key={`${r.trackedProductId}-${i}`} className="flex items-center justify-between gap-3 px-3 py-2 nav-glass rounded-xl">
+                <span className="text-sm truncate" style={{ color: 'var(--nav-text-primary)' }}>{r.authorName || 'Покупатель Kaspi'}</span>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {r.date && <span className="text-[11px]" style={{ color: 'var(--nav-text-muted)' }}>{formatDate(r.date)}</span>}
+                  <span className="text-xs font-semibold flex items-center gap-0.5" style={{ color: r.rating <= 3 ? 'var(--nav-critical)' : 'var(--nav-text-primary)' }}>
+                    <StarIcon />{r.rating}
+                  </span>
+                </div>
+              </div>
+            )
+          }
+
+          if (groupMode === 'none') {
+            return <div className="space-y-2">{data.reviews.map((r, i) => renderReviewCard(r, i))}</div>
           }
 
           const groups = new Map<string, Review[]>()
+          const keyOf = groupMode === 'product'
+            ? (r: Review) => baseProductName(r.productName) || r.productName
+            : (r: Review) => monthKey(r.date)
           for (const r of data.reviews) {
-            const key = r.trackedProductId || r.productName
+            const key = keyOf(r)
             const list = groups.get(key) || []
             list.push(r)
             groups.set(key, list)
           }
-          const sortedGroups = Array.from(groups.values()).sort((a, b) => b.length - a.length)
+          const sortedEntries = groupMode === 'product'
+            ? Array.from(groups.entries()).sort((a, b) => b[1].length - a[1].length)
+            : Array.from(groups.entries()).sort((a, b) => b[0].localeCompare(a[0]))
 
           return (
             <div className="space-y-5">
-              {sortedGroups.map(groupReviews => (
-                <div key={groupReviews[0].trackedProductId || groupReviews[0].productName}>
+              {sortedEntries.map(([key, groupReviews]) => (
+                <div key={key}>
                   <div className="text-xs font-semibold mb-2 px-1 truncate" style={{ color: 'var(--nav-text-secondary)' }}>
-                    {groupReviews[0].productName} <span style={{ color: 'var(--nav-text-muted)', fontWeight: 400 }}>· {groupReviews.length}</span>
+                    {groupMode === 'product' ? key : monthLabel(key)} <span style={{ color: 'var(--nav-text-muted)', fontWeight: 400 }}>· {groupReviews.length}</span>
                   </div>
-                  <div className="space-y-2">{groupReviews.map((r, i) => renderReview(r, i))}</div>
+                  <div className="space-y-1.5">{groupReviews.map((r, i) => renderReviewRow(r, i))}</div>
                 </div>
               ))}
             </div>
