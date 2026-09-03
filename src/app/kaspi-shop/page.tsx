@@ -272,12 +272,17 @@ export default function KaspiShop() {
   useEffect(() => { load() }, [])
 
   useEffect(() => {
+    // Deps on searchParams (not []): KaspiShopStoreSwitcher's "+ Добавить
+    // магазин" does a client-side router.push('/kaspi-shop?addStore=1')
+    // from an already-mounted /kaspi-shop -- a mount-only effect here missed
+    // that navigation entirely (real bug found 2026-09-03: the button did
+    // nothing when clicked from Демпинг itself, only worked when arriving
+    // fresh from another page).
     if (searchParams.get('addStore') === '1') {
       setAddingStore(true)
       window.history.replaceState(null, '', '/kaspi-shop')
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [searchParams])
 
   async function authHeader() {
     const { data: { session } } = await supabase.auth.getSession()
