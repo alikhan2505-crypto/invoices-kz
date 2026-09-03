@@ -671,14 +671,17 @@ export default function KaspiShop() {
           </div>
         )}
 
-        {connected && sessionStatus === 'session_expired' && (
-          <div className="nav-glass rounded-2xl p-4 flex items-center justify-between gap-3 mb-4">
-            <span className="text-sm" style={{ color: 'var(--nav-critical)' }}>Сессия кабинета Kaspi истекла — переподключитесь, чтобы демпинг продолжил работать.</span>
-            <button onClick={() => { setConnected(false); setSessionStatus(null) }} className="text-xs font-semibold rounded-lg px-3 py-1.5 flex-shrink-0" style={{ background: 'var(--nav-critical)', color: '#fff' }}>Переподключиться</button>
-          </div>
-        )}
-
-        {(!connected || addingStore) ? (
+        {(() => {
+        // Founder, 2026-09-03: don't show any real content -- not even this
+        // page's own repricer rules -- once the live Kaspi session has died;
+        // send the seller straight into the same connect dialog instead of a
+        // banner they have to notice and click through first. The dialog
+        // below already doubles as "reconnect" for an existing store (see
+        // needsReconnect usages inside it), same idea
+        // KaspiShopStoreSwitcher's own session_expired button already relies
+        // on (?addStore=1 opens this same dialog).
+        const needsReconnect = connected && sessionStatus === 'session_expired'
+        return (!connected || addingStore || needsReconnect) ? (
           /* Centered connect dialog (2026-08-20, founder): the connect form
              used to render as a full-width inline card flush to the top-left,
              which read as a broken/half-empty page. Now it floats as a true
@@ -691,12 +694,19 @@ export default function KaspiShop() {
               className="relative nav-glass rounded-[24px] w-full max-w-md p-6 lg:p-8 max-h-[84vh] overflow-y-auto"
               style={{ boxShadow: '0 34px 80px -20px rgba(10,10,15,0.4), var(--nav-card-glow)' }}>
               <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[24px]" style={{ background: 'linear-gradient(90deg, var(--nav-accent), var(--nav-teal))' }} />
-              {connected && (
+              {connected && !needsReconnect && (
                 <button onClick={() => { setAddingStore(false); setPhone(''); setOtpToken(null); setOtpCode(''); setMerchantChoices(null); setSessionToken(null); setConnectError('') }}
                   className="absolute top-5 right-5 text-lg leading-none" style={{ color: 'var(--nav-text-secondary)' }}>✕</button>
               )}
               <div className="text-[11px] font-semibold tracking-wider uppercase mb-2" style={{ color: 'var(--nav-text-muted)' }}>Подключение</div>
-              <h1 className="text-2xl font-extrabold tracking-tight mb-6" style={{ color: 'var(--nav-text-primary)' }}>{connected ? 'Добавьте ещё один магазин' : 'Подключите Kaspi Магазин'}</h1>
+              <h1 className="text-2xl font-extrabold tracking-tight mb-6" style={{ color: 'var(--nav-text-primary)' }}>
+                {needsReconnect ? 'Сессия истекла — переподключитесь' : connected ? 'Добавьте ещё один магазин' : 'Подключите Kaspi Магазин'}
+              </h1>
+              {needsReconnect && (
+                <p className="text-sm mb-4 -mt-3" style={{ color: 'var(--nav-text-secondary)' }}>
+                  Товары и настройки сохранены — просто войдите в тот же магазин ещё раз, чтобы обновить сессию.
+                </p>
+              )}
               {connectError && <div className="text-sm mb-3" style={{ color: 'var(--nav-critical)' }}>{connectError}</div>}
 
               {merchantChoices ? (
@@ -1078,7 +1088,8 @@ export default function KaspiShop() {
               })()}
             </AnimatePresence>
           </>
-        )}
+        )
+        })()}
       </div>
 
       <AnimatePresence>

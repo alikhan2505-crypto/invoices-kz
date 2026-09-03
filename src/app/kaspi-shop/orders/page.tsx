@@ -131,7 +131,7 @@ function KaspiShopOrdersInner() {
     const { data: { session } } = await supabase.auth.getSession()
     const connRes = await fetch('/api/kaspi-shop/wallet', { headers: { Authorization: `Bearer ${session?.access_token}` } })
     const connData = await connRes.json().catch(() => null)
-    if (!connData?.connected) { router.push('/kaspi-shop'); return }
+    if (!connData?.connected || connData?.sessionStatus === 'session_expired') { router.push('/kaspi-shop'); return }
     setLoading(false)
   }
 
