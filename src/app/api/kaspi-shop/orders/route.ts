@@ -42,24 +42,28 @@ export async function GET(req: NextRequest) {
   // field (confirmed live 2026-09-03: fetchOffersDetails returns 0 items for
   // a real store), but every order's own entries[].product.images does
   // (same shape already rendered as real thumbnails on this page's own
-  // cards). product.code lives in the same catalog sku space as
-  // listCatalog's own sku (confirmed in the 2026-08-13 findings doc), i.e.
-  // kaspi_shop_tracked_products.kaspi_sku. Best-effort: never blocks the
-  // order list itself, and only ever fills a product in that doesn't
-  // already have one (a real product photo Kaspi served for an actual sale
-  // is never worse than what's already stored).
+  // cards). product.code is the MASTER sku, not the per-variant sku --
+  // verified live 2026-09-03: a real order's item.code (167403494) matched
+  // kaspi_shop_tracked_products.kaspi_master_sku, not kaspi_sku, for that
+  // product (the findings doc's "same sku space as listCatalog" note didn't
+  // specify which of listCatalog's two id fields it meant). This fills every
+  // size/colour variant sharing that master from one sale's photo -- close
+  // enough for variants that are the same garment, imprecise only for the
+  // rarer case where colour variants use genuinely different photos.
+  // Best-effort: never blocks the order list itself, and only ever fills a
+  // product that doesn't already have one.
   try {
-    const bySku = new Map<string, string>()
+    const byMasterSku = new Map<string, string>()
     for (const order of orders) {
       for (const item of order.items) {
-        if (item.code && item.imageUrl && !bySku.has(item.code)) bySku.set(item.code, item.imageUrl)
+        if (item.code && item.imageUrl && !byMasterSku.has(item.code)) byMasterSku.set(item.code, item.imageUrl)
       }
     }
-    await Promise.all(Array.from(bySku.entries()).map(([sku, imageUrl]) =>
+    await Promise.all(Array.from(byMasterSku.entries()).map(([masterSku, imageUrl]) =>
       supabase.from('kaspi_shop_tracked_products')
         .update({ image_url: imageUrl })
         .eq('connection_id', connection.id)
-        .eq('kaspi_sku', sku)
+        .eq('kaspi_master_sku', masterSku)
         .is('image_url', null)
     ))
   } catch (err: any) {
