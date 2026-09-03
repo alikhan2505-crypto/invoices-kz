@@ -4,7 +4,7 @@ import { useParams } from 'next/navigation'
 import { motion, useReducedMotion } from 'framer-motion'
 import QRCode from 'qrcode'
 
-type Product = { id: string; name: string; brand: string; price: number }
+type Product = { id: string; name: string; brand: string; price: number; imageUrl: string | null }
 type Payment = { qr_token: string | null; payment_link: string | null; status: string }
 
 const EASE = [0.16, 1, 0.3, 1] as const
@@ -131,18 +131,25 @@ export default function StorefrontPage() {
                 initial={reduceMotion ? false : { opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE, delay: reduceMotion ? 0 : Math.min(i * 0.04, 0.3) }}
-                className="nav-glass rounded-2xl p-4 flex flex-col"
+                className="nav-glass rounded-2xl overflow-hidden flex flex-col"
               >
-                {p.brand && <div className="text-[11px] font-medium mb-1" style={{ color: 'var(--nav-text-muted)' }}>{p.brand}</div>}
-                <div className="text-sm font-semibold mb-2" style={{ color: 'var(--nav-text-primary)' }}>{p.name}</div>
-                <div className="text-base font-bold mb-3" style={{ color: 'var(--nav-text-primary)' }}>{formatPrice(p.price)}</div>
-                <button
-                  onClick={() => setSelected(p)}
-                  className="mt-auto rounded-lg px-4 py-2 text-sm font-semibold"
-                  style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}
-                >
-                  Купить
-                </button>
+                {p.imageUrl ? (
+                  <img src={p.imageUrl} alt={p.name} className="w-full aspect-square object-cover" style={{ background: 'var(--nav-bg)' }} />
+                ) : (
+                  <div className="w-full aspect-square" style={{ background: 'var(--nav-bg)' }} />
+                )}
+                <div className="p-4 flex flex-col flex-1">
+                  {p.brand && <div className="text-[11px] font-medium mb-1" style={{ color: 'var(--nav-text-muted)' }}>{p.brand}</div>}
+                  <div className="text-sm font-semibold mb-2" style={{ color: 'var(--nav-text-primary)' }}>{p.name}</div>
+                  <div className="text-base font-bold mb-3" style={{ color: 'var(--nav-text-primary)' }}>{formatPrice(p.price)}</div>
+                  <button
+                    onClick={() => setSelected(p)}
+                    className="mt-auto rounded-lg px-4 py-2 text-sm font-semibold"
+                    style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}
+                  >
+                    Купить
+                  </button>
+                </div>
               </motion.div>
             ))}
           </div>
@@ -152,9 +159,14 @@ export default function StorefrontPage() {
       {selected && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.5)' }} onClick={closeModal}>
           <div className="nav-glass rounded-2xl p-5 w-full max-w-sm" style={{ background: 'var(--nav-bg)' }} onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <div className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{selected.name}</div>
-              <button onClick={closeModal} className="text-sm" style={{ color: 'var(--nav-text-muted)' }}>✕</button>
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <div className="flex items-center gap-3 min-w-0">
+                {selected.imageUrl && (
+                  <img src={selected.imageUrl} alt="" className="w-11 h-11 rounded-lg object-cover flex-shrink-0" />
+                )}
+                <div className="text-sm font-semibold truncate" style={{ color: 'var(--nav-text-primary)' }}>{selected.name}</div>
+              </div>
+              <button onClick={closeModal} className="text-sm flex-shrink-0" style={{ color: 'var(--nav-text-muted)' }}>✕</button>
             </div>
 
             {payment ? (

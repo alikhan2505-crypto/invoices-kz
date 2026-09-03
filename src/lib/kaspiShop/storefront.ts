@@ -12,6 +12,7 @@ export interface TrackedProductRow {
   own_current_price: number | string | null
   stock_count: number | null
   available_for_sale: boolean | null
+  image_url: string | null
 }
 
 export interface StorefrontProduct {
@@ -19,6 +20,7 @@ export interface StorefrontProduct {
   name: string
   brand: string
   price: number
+  imageUrl: string | null
 }
 
 // Pure -- no I/O. What counts as "available to buy right now": Kaspi still
@@ -41,6 +43,7 @@ export function filterStorefrontProducts(rows: TrackedProductRow[]): StorefrontP
       name: String(r.product_name || '').trim(),
       brand: String(r.brand || '').trim(),
       price: Number(r.own_current_price) || 0,
+      imageUrl: r.image_url || null,
     }))
     .filter(p => p.name && p.price > 0)
 }
@@ -145,7 +148,7 @@ export async function resolveStorefrontBySlug(slug: string): Promise<{ connectio
 export async function loadStorefrontProducts(connectionId: string): Promise<StorefrontProduct[]> {
   const { data, error } = await supabase
     .from('kaspi_shop_tracked_products')
-    .select('id, product_name, brand, own_current_price, stock_count, available_for_sale')
+    .select('id, product_name, brand, own_current_price, stock_count, available_for_sale, image_url')
     .eq('connection_id', connectionId)
   if (error) throw new Error(`kaspi_shop_tracked_products lookup failed for connection ${connectionId}: ${error.message}`)
   return filterStorefrontProducts(data || [])
