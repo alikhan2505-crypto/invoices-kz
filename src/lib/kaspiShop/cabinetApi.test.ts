@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { extractPointCity, confirmPacking } from './cabinetApi'
+import { extractPointCity, confirmPacking, listOrders } from './cabinetApi'
 
 describe('extractPointCity', () => {
   it('extracts city id/name from a point (warehouse/destination) with a city', () => {
@@ -28,6 +28,53 @@ function jsonResponse(body: any, status = 200) {
     headers: { 'content-type': 'application/json' },
   })
 }
+
+function orderFragment(code: string) {
+  return {
+    code,
+    customer: { firstName: 'Акбота', lastName: 'О.' },
+    totalPrice: 4100,
+    creationTime: '2026-05-02T17:06:35.489',
+    warehouse: { city: { id: 366, name: 'Алматы' } },
+    delivery: { plannedDeliveryDate: '2026-05-05T20:00:00' },
+    entries: [],
+  }
+}
+
+describe('listOrders', () => {
+  it('requests the normal (non-advanced) branch when no order code is given', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(jsonResponse({
+      data: { merchant: { orders: { orders: { total: 1, orders: [orderFragment('906725811')] } } } },
+    }))
+    const result = await listOrders('cookie=1', '425002', 'NEW', 0, '', '', fetchFn as any)
+    const [, init] = fetchFn.mock.calls[0]
+    const body = JSON.parse(init.body)
+    expect(body.variables.withAdvancedOrders).toBe(false)
+    expect(body.variables.input).toEqual({ presetFilter: 'NEW', orderCode: '', cityId: '' })
+    expect(body.variables.advancedInput).toEqual({ orderCode: '', phoneNumber: '', productCode: '' })
+    expect(result.total).toBe(1)
+    expect(result.orders[0].code).toBe('906725811')
+  })
+
+  it('switches to the advanced-search branch when an order code is given, and reads advancedOrders', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(jsonResponse({
+      data: { merchant: { orders: { advancedOrders: { total: 1, orders: [orderFragment('906725811')] } } } },
+    }))
+    const result = await listOrders('cookie=1', '425002', 'NEW', 0, '', '906725811', fetchFn as any)
+    const [, init] = fetchFn.mock.calls[0]
+    const body = JSON.parse(init.body)
+    expect(body.variables.withAdvancedOrders).toBe(true)
+    expect(body.variables.advancedInput).toEqual({ orderCode: '906725811', phoneNumber: '', productCode: '' })
+    expect(result.total).toBe(1)
+    expect(result.orders[0].code).toBe('906725811')
+  })
+
+  it('reports sessionExpired on 401', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(jsonResponse({}, 401))
+    const result = await listOrders('c', '425002', 'NEW', 0, '', '', fetchFn as any)
+    expect(result).toEqual({ orders: [], total: 0, sessionExpired: true })
+  })
+})
 
 describe('confirmPacking', () => {
   it('sends the exact captured cargo/assembled body for every selected order', async () => {

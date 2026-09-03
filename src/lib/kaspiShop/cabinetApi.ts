@@ -522,8 +522,23 @@ export type OrdersPage = { orders: Order[]; total: number; sessionExpired: boole
 // because of this limit -- any status with more than 10 orders needs it.
 export const PAGE_SIZE = 10
 
-export async function listOrders(sessionCookies: string, merchantId: string, status: string, page = 0, cityId = ''): Promise<OrdersPage> {
-  const res = await fetch('https://mc.shop.kaspi.kz/mc/facade/graphql?opName=getOrders', {
+export async function listOrders(
+  sessionCookies: string,
+  merchantId: string,
+  status: string,
+  page = 0,
+  cityId = '',
+  orderCode = '',
+  fetchFn: typeof fetch = fetch
+): Promise<OrdersPage> {
+  // Searching by order code switches to Kaspi's own "Расширенный поиск" --
+  // the schema's advancedOrders field takes orderCode/phoneNumber/productCode
+  // but no presetFilter, so a search runs across every status, not just the
+  // active tab (matches the real cabinet's own advanced-search behavior,
+  // confirmed shape captured live 2026-08-13, see
+  // docs/superpowers/specs/2026-08-13-kaspi-orders-api-findings.md).
+  const searching = orderCode.trim().length > 0
+  const res = await fetchFn('https://mc.shop.kaspi.kz/mc/facade/graphql?opName=getOrders', {
     method: 'POST',
     headers: authHeaders(sessionCookies),
     body: JSON.stringify({
@@ -533,8 +548,8 @@ export async function listOrders(sessionCookies: string, merchantId: string, sta
         size: PAGE_SIZE,
         page,
         input: { presetFilter: status, orderCode: '', cityId },
-        advancedInput: { orderCode: '', phoneNumber: '', productCode: '' },
-        withAdvancedOrders: false,
+        advancedInput: { orderCode: searching ? orderCode.trim() : '', phoneNumber: '', productCode: '' },
+        withAdvancedOrders: searching,
       },
       query: GET_ORDERS_QUERY,
     }),
@@ -545,7 +560,9 @@ export async function listOrders(sessionCookies: string, merchantId: string, sta
     return { orders: [], total: 0, sessionExpired: res.status === 401 }
   }
   const json = await res.json().catch(() => null)
-  const page_ = json?.data?.merchant?.orders?.orders
+  // @skip/@include on the two branches means only one of orders/advancedOrders
+  // is present in the response, depending on withAdvancedOrders above.
+  const page_ = searching ? json?.data?.merchant?.orders?.advancedOrders : json?.data?.merchant?.orders?.orders
   const orders = page_?.orders
   if (!Array.isArray(orders)) {
     console.error('kaspi-shop listOrders: unexpected response shape for status', status, JSON.stringify(json)?.slice(0, 2000))

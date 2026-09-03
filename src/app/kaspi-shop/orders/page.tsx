@@ -78,10 +78,13 @@ function KaspiShopOrdersInner() {
   const [cityOptions, setCityOptions] = useState<{ cityId: string; cityName: string }[]>([])
   const [dateMode, setDateMode] = useState<DeliveryDateMode>('all')
   const [exporting, setExporting] = useState(false)
+  const [orderCodeInput, setOrderCodeInput] = useState('')
+  const [orderCodeSearch, setOrderCodeSearch] = useState('')
 
   const PAGE_SIZE = 10
   const prevStatus = useRef(status)
   const prevCityId = useRef(cityId)
+  const prevOrderCodeSearch = useRef(orderCodeSearch)
 
   useEffect(() => { checkAccess() }, [])
   useEffect(() => {
@@ -89,30 +92,40 @@ function KaspiShopOrdersInner() {
     loadCityOptions()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading])
+  // Debounced so each keystroke doesn't fire a live Kaspi search request --
+  // only settles into orderCodeSearch (which triggers the fetch effect
+  // below) once the seller pauses typing.
+  useEffect(() => {
+    const t = setTimeout(() => setOrderCodeSearch(orderCodeInput.trim()), 500)
+    return () => clearTimeout(t)
+  }, [orderCodeInput])
   useEffect(() => {
     if (loading) return
-    // A status or city switch resets to page 0 -- skip this render's fetch
-    // (it'd use the stale page from before the switch) and let the
-    // resulting setPage(0) re-trigger this effect with the right value.
+    // A status, city, or order-code-search switch resets to page 0 -- skip
+    // this render's fetch (it'd use the stale page from before the switch)
+    // and let the resulting setPage(0) re-trigger this effect with the
+    // right value.
     const statusChanged = prevStatus.current !== status
     const cityChanged = prevCityId.current !== cityId
+    const orderCodeChanged = prevOrderCodeSearch.current !== orderCodeSearch
     prevStatus.current = status
     prevCityId.current = cityId
+    prevOrderCodeSearch.current = orderCodeSearch
     if (statusChanged) {
       setPage(0)
       setDateMode('all')
       loadCounts()
-      if (page === 0) loadOrders(status, 0, cityId)
+      if (page === 0) loadOrders(status, 0, cityId, orderCodeSearch)
       return
     }
-    if (cityChanged) {
+    if (cityChanged || orderCodeChanged) {
       setPage(0)
-      if (page === 0) loadOrders(status, 0, cityId)
+      if (page === 0) loadOrders(status, 0, cityId, orderCodeSearch)
       return
     }
-    loadOrders(status, page, cityId)
+    loadOrders(status, page, cityId, orderCodeSearch)
     loadCounts()
-  }, [status, page, cityId, loading])
+  }, [status, page, cityId, orderCodeSearch, loading])
 
   async function authHeader() {
     const { data: { session } } = await supabase.auth.getSession()
@@ -147,7 +160,7 @@ function KaspiShopOrdersInner() {
     }
   }
 
-  async function loadOrders(forStatus: string, forPage: number, forCityId: string = '') {
+  async function loadOrders(forStatus: string, forPage: number, forCityId: string = '', forOrderCode: string = '') {
     setOrdersLoading(true)
     setLoadError('')
     setSelected(new Set())
@@ -155,7 +168,8 @@ function KaspiShopOrdersInner() {
     try {
       const headers = await authHeader()
       const cityParam = forCityId ? `&cityId=${encodeURIComponent(forCityId)}` : ''
-      const res = await fetch(`/api/kaspi-shop/orders?status=${encodeURIComponent(forStatus)}&page=${forPage}${cityParam}`, { headers })
+      const orderCodeParam = forOrderCode ? `&orderCode=${encodeURIComponent(forOrderCode)}` : ''
+      const res = await fetch(`/api/kaspi-shop/orders?status=${encodeURIComponent(forStatus)}&page=${forPage}${cityParam}${orderCodeParam}`, { headers })
       const data = await res.json()
       if (!res.ok) { setLoadError(data.error || 'Не удалось загрузить заказы'); setOrders([]); setTotal(0); return }
       setOrders(data.orders || [])
@@ -299,6 +313,10 @@ function KaspiShopOrdersInner() {
         <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
           <h1 className="text-2xl font-extrabold" style={{ color: 'var(--nav-text-primary)' }}>Заказы</h1>
           <div className="flex items-center gap-2 flex-wrap">
+            <input type="text" value={orderCodeInput} onChange={e => setOrderCodeInput(e.target.value)}
+              placeholder="Поиск по номеру заказа"
+              className="nav-glass rounded-full px-3 py-1.5 text-xs font-medium outline-none w-44"
+              style={{ color: 'var(--nav-text-primary)' }} />
             <select value={cityId} onChange={e => setCityId(e.target.value)}
               className="nav-glass rounded-full px-3 py-1.5 text-xs font-medium" style={{ color: 'var(--nav-text-primary)' }}>
               <option value="">Все города</option>
@@ -330,7 +348,13 @@ function KaspiShopOrdersInner() {
         {loadError && (
           <div className="nav-glass rounded-2xl p-4 flex items-center justify-between gap-3 mb-4">
             <span className="text-sm" style={{ color: 'var(--nav-critical)' }}>{loadError}</span>
-            <button onClick={() => loadOrders(status, page, cityId)} className="text-xs font-semibold rounded-lg px-3 py-1.5 flex-shrink-0" style={{ background: 'var(--nav-critical)', color: '#fff' }}>Повторить</button>
+            <button onClick={() => loadOrders(status, page, cityId, orderCodeSearch)} className="text-xs font-semibold rounded-lg px-3 py-1.5 flex-shrink-0" style={{ background: 'var(--nav-critical)', color: '#fff' }}>Повторить</button>
+          </div>
+        )}
+
+        {orderCodeSearch && (
+          <div className="text-xs mb-3" style={{ color: 'var(--nav-text-muted)' }}>
+            Поиск по номеру заказа «{orderCodeSearch}» — ищет по всем статусам, вкладка ниже не учитывается
           </div>
         )}
 
@@ -438,6 +462,7 @@ function KaspiShopOrdersInner() {
                     {extraCount > 0 && <span style={{ color: 'var(--nav-text-muted)', fontWeight: 400 }}> +{extraCount}</span>}
                   </div>
                   <div className="text-[10px] mt-0.5 truncate" style={{ color: 'var(--nav-text-muted)' }}>{o.customerFirstName} {o.customerLastName}</div>
+                  <div className="text-[10px] font-mono truncate" style={{ color: 'var(--nav-text-muted)' }}>№{o.code}</div>
                   <div className="flex items-center justify-between gap-1 mt-1">
                     <div className="font-mono font-bold text-xs tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{o.totalPrice.toLocaleString('ru-KZ')} ₸</div>
                     <button type="button" aria-label="Подробнее о заказе"
