@@ -129,11 +129,12 @@ export async function GET(req: NextRequest) {
     // Returned in the JSON response (not console.log -- Vercel's runtime-log
     // API wasn't surfacing plain console.log text for this route). Remove
     // once confirmed either way.
-    diagRawOfferDetail = detailsItems[0] ?? null
+    diagRawOfferDetail = { count: detailsItems.length, first: detailsItems[0] ?? null }
     for (const item of detailsItems) {
       if (typeof item.sku === 'string') detailsBySku.set(item.sku, item)
     }
   } catch (err: any) {
+    diagRawOfferDetail = { error: err.message }
     console.error('kaspi-shop removed-products: details batch failed (non-fatal, cards show no cities)', err.message)
   }
   const { data: connRow } = await supabase
