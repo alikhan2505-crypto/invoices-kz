@@ -10,6 +10,12 @@ import { getActivePlan } from '@/lib/plan'
 type WalletKey = 'unified'
 type Panel = 'wallet' | 'notifications' | 'help' | 'account' | null
 
+// Carries the mass-announcement welcome-bonus link's intent (?claimBonus=1)
+// across a forced /login detour -- same "survive the login round-trip"
+// purpose as postLoginRedirect.ts, but a bare boolean rather than a path, so
+// it doesn't need that helper's exact-path allowlist.
+const PENDING_BONUS_KEY = 'invoices.pendingWelcomeBonus'
+
 interface HistoryEntry {
   label: string
   amount: number
@@ -159,6 +165,17 @@ export default function TopUtilityBar() {
 
   useEffect(() => {
     async function init() {
+      // Mass-announcement welcome-bonus link (?claimBonus=1) can land on
+      // this page while the visitor is logged out -- the common case for an
+      // email link, since /dashboard's own auth guard bounces to /login
+      // without preserving the query string. Persisted here, before the
+      // auth check below, so the intent survives that forced detour; the
+      // actual claim happens further down, once a real user exists.
+      if (new URLSearchParams(window.location.search).get('claimBonus') === '1') {
+        window.history.replaceState(null, '', window.location.pathname)
+        try { localStorage.setItem(PENDING_BONUS_KEY, '1') } catch {}
+      }
+
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
       setLoggedIn(true)
@@ -177,12 +194,13 @@ export default function TopUtilityBar() {
       refreshBalances(visible, headers)
       refreshUnreadCount(headers)
 
-      // Mass-announcement welcome-bonus link (?claimBonus=1) -- window.location
-      // instead of useSearchParams so this globally-mounted component (root
-      // layout) doesn't force a Suspense boundary there, same workaround
-      // ai-agent/settings' OAuth-notice query-param handling already uses.
-      if (new URLSearchParams(window.location.search).get('claimBonus') === '1') {
-        window.history.replaceState(null, '', window.location.pathname)
+      // Reads the flag captured near the top of this function, not the URL
+      // directly -- by the time a logged-out visitor's login detour lands
+      // back here, the query string from the original click is long gone.
+      let pendingBonus = false
+      try { pendingBonus = localStorage.getItem(PENDING_BONUS_KEY) === '1' } catch {}
+      if (pendingBonus) {
+        try { localStorage.removeItem(PENDING_BONUS_KEY) } catch {}
         try {
           const res = await fetch('/api/wallet/claim-welcome-bonus', { method: 'POST', headers })
           const data = await res.json().catch(() => null)
