@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { buildCollections, addDays, type NicheSnapshotRow } from '@/lib/kaspiShop/nicheCollections'
+import { getActivePlan } from '@/lib/plan'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -20,8 +21,8 @@ async function requireAdmin(req: NextRequest) {
     ? await supabaseAuth.auth.getUser(accessToken)
     : { data: { user: null } }
   if (!user) return null
-  const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', user.id).single()
-  return profile?.is_admin ? user : null
+  const { data: profile } = await supabase.from('profiles').select('is_admin, plan, plan_expires_at, bonus_expires_at, trial_expires_at').eq('id', user.id).single()
+  return (profile?.is_admin || getActivePlan(profile).canKaspiShop) ? user : null
 }
 
 // Collections are computed here at read time from the raw snapshot

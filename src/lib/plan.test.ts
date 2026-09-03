@@ -77,4 +77,13 @@ describe('getActivePlan', () => {
     expect(getActivePlan({ trial_expires_at: future }).canAiAgent).toBe(false)
     expect(getActivePlan(null).canAiAgent).toBe(false)
   })
+
+  it('grants canKaspiShop only to an active Pro plan, not Basic/trial/bonus', () => {
+    expect(getActivePlan({ plan: 'pro' }).canKaspiShop).toBe(true)
+    expect(getActivePlan({ plan: 'basic' }).canKaspiShop).toBe(false)
+    const future = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString()
+    expect(getActivePlan({ bonus_expires_at: future }).canKaspiShop).toBe(false)
+    expect(getActivePlan({ trial_expires_at: future }).canKaspiShop).toBe(false)
+    expect(getActivePlan(null).canKaspiShop).toBe(false)
+  })
 })

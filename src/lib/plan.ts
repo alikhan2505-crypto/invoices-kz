@@ -12,6 +12,7 @@ export interface PlanInfo {
   canEcp: boolean
   canAcquiring: boolean
   canAiAgent: boolean
+  canKaspiShop: boolean
   invoiceLimit: number | null
 }
 
@@ -21,7 +22,7 @@ export function getActivePlan(profile: any): PlanInfo {
     label: 'Бесплатный', isActive: false,
     invoiceLimit: 3,
     canEmail: false, canSign: false, canKpAvrNakl: false,
-    canTemplates: false, canRecurring: false, canEcp: false, canAcquiring: false, canAiAgent: false,
+    canTemplates: false, canRecurring: false, canEcp: false, canAcquiring: false, canAiAgent: false, canKaspiShop: false,
   }
 
   const now = new Date()
@@ -40,6 +41,7 @@ export function getActivePlan(profile: any): PlanInfo {
         canEcp: profile.plan === 'pro',
         canAcquiring: profile.plan === 'pro',
         canAiAgent: profile.plan === 'pro',
+        canKaspiShop: profile.plan === 'pro',
       }
     }
     const planEnd = new Date(profile.plan_expires_at)
@@ -56,6 +58,7 @@ export function getActivePlan(profile: any): PlanInfo {
         canEcp: profile.plan === 'pro',
         canAcquiring: profile.plan === 'pro',
         canAiAgent: profile.plan === 'pro',
+        canKaspiShop: profile.plan === 'pro',
       }
     }
   }
@@ -70,7 +73,7 @@ export function getActivePlan(profile: any): PlanInfo {
         label: `Бонус (${daysLeft} дн.)`,
         invoiceLimit: 30,
         canEmail: true, canSign: true,
-        canKpAvrNakl: false, canTemplates: false, canRecurring: false, canEcp: false, canAcquiring: false, canAiAgent: false,
+        canKpAvrNakl: false, canTemplates: false, canRecurring: false, canEcp: false, canAcquiring: false, canAiAgent: false, canKaspiShop: false,
       }
     }
   }
@@ -85,7 +88,7 @@ export function getActivePlan(profile: any): PlanInfo {
         label: `Пробный (${daysLeft} дн.)`,
         invoiceLimit: 10,
         canEmail: true, canSign: true,
-        canKpAvrNakl: false, canTemplates: false, canRecurring: false, canEcp: false, canAcquiring: false, canAiAgent: false,
+        canKpAvrNakl: false, canTemplates: false, canRecurring: false, canEcp: false, canAcquiring: false, canAiAgent: false, canKaspiShop: false,
       }
     }
   }
@@ -95,6 +98,6 @@ export function getActivePlan(profile: any): PlanInfo {
     plan: 'free', isTrial: false, daysLeft: null, isActive: false,
     label: 'Бесплатный', invoiceLimit: 3,
     canEmail: false, canSign: false, canKpAvrNakl: false,
-    canTemplates: false, canRecurring: false, canEcp: false, canAcquiring: false, canAiAgent: false,
+    canTemplates: false, canRecurring: false, canEcp: false, canAcquiring: false, canAiAgent: false, canKaspiShop: false,
   }
 }

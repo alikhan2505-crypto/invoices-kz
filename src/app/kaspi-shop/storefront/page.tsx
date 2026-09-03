@@ -5,6 +5,7 @@ import { motion, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
+import { getActivePlan } from '@/lib/plan'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -46,8 +47,16 @@ export default function KaspiShopStorefrontSettings() {
       // 2026-09-02) -- this page and storefront-orders were the only two
       // missing it, so any authenticated invoices.kz user could reach a
       // founder-only-until-reviewed feature by typing the URL directly.
-      const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', user.id).single()
-      if (!profile?.is_admin) { router.push('/dashboard'); return }
+      const { data: profile } = await supabase.from('profiles').select('is_admin, plan, plan_expires_at, bonus_expires_at, trial_expires_at').eq('id', user.id).single()
+      if (!profile?.is_admin && !getActivePlan(profile).canKaspiShop) { router.push('/dashboard'); return }
+      // Демпинг is the only page with the actual connect terminal (phone/OTP)
+      // -- every other page redirects there instead of rendering its own broken
+      // state when there's no active connection (2026-09-03 founder: check for a
+      // connected store before opening any page or sub-page).
+      const { data: { session } } = await supabase.auth.getSession()
+      const connRes = await fetch('/api/kaspi-shop/wallet', { headers: { Authorization: `Bearer ${session?.access_token}` } })
+      const connData = await connRes.json().catch(() => null)
+      if (!connData?.connected) { router.push('/kaspi-shop'); return }
       await load()
     }
     init()

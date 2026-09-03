@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createNicheCheck, failNicheCheck } from '@/lib/kaspiShop/nicheChecks'
 import { getKaspiShopWalletBalance, KASPI_SHOP_CREDIT_PRICE_TENGE } from '@/lib/kaspiShop/wallet'
+import { getActivePlan } from '@/lib/plan'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -17,16 +18,16 @@ const supabaseAuth = createClient(
 // shop's data via loadConnection(user.id)), any authenticated user could
 // otherwise poll another user's checkId. Requiring is_admin closes that gap
 // server-side, matching the requireAdmin pattern already used by
-// src/app/api/kaspi/admin-stats/route.ts, since this whole feature is
-// admin-only in practice (the page itself already gates on is_admin).
+// src/app/api/kaspi/admin-stats/route.ts, widened to admin-OR-Pro
+// (2026-09-03) since the page itself now gates the same way.
 async function requireAdmin(req: NextRequest) {
   const accessToken = req.headers.get('authorization')?.replace('Bearer ', '')
   const { data: { user } } = accessToken
     ? await supabaseAuth.auth.getUser(accessToken)
     : { data: { user: null } }
   if (!user) return null
-  const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', user.id).single()
-  return profile?.is_admin ? user : null
+  const { data: profile } = await supabase.from('profiles').select('is_admin, plan, plan_expires_at, bonus_expires_at, trial_expires_at').eq('id', user.id).single()
+  return (profile?.is_admin || getActivePlan(profile).canKaspiShop) ? user : null
 }
 
 // Static -- this repo never changes owner/name, so these are constants,

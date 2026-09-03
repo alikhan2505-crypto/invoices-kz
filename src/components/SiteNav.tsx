@@ -97,10 +97,10 @@ type Section = {
   key: 'invoices' | 'kaspiApi' | 'kaspiShop' | 'aiAgent' | 'wildberries'
   links: { href: string; label: LocalizedLabel }[]
   adminOnly: boolean
-  // Unlocked for an active Pro plan too, not just admins (2026-09-02) --
-  // only meaningful when adminOnly is false. kaspiShop/wildberries stay
-  // admin-only until the founder reviews them the same way AI-агент was
-  // before this.
+  // Unlocked for an active Pro plan too, not just admins (2026-09-02
+  // AI-агент, 2026-09-03 Kaspi Bot) -- only meaningful when adminOnly is
+  // false. wildberries stays admin-only until the founder reviews it the
+  // same way these two were before this.
   proOnly?: boolean
 }
 
@@ -108,13 +108,13 @@ const SECTIONS: Section[] = [
   { key: 'invoices', links: invoicesLinks, adminOnly: false },
   { key: 'kaspiApi', links: kaspiApiLinks, adminOnly: false },
   { key: 'aiAgent', links: aiAgentLinks, adminOnly: false, proOnly: true },
-  { key: 'kaspiShop', links: kaspiShopLinks, adminOnly: true },
+  { key: 'kaspiShop', links: kaspiShopLinks, adminOnly: false, proOnly: true },
   { key: 'wildberries', links: wbLinks, adminOnly: true },
 ]
 
-function isSectionLocked(s: Section, isAdmin: boolean, canAiAgent: boolean): boolean {
+function isSectionLocked(s: Section, isAdmin: boolean, isPro: boolean): boolean {
   if (s.adminOnly) return !isAdmin
-  if (s.proOnly) return !(isAdmin || canAiAgent)
+  if (s.proOnly) return !(isAdmin || isPro)
   return false
 }
 
@@ -152,7 +152,7 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
   const path = usePathname()
   const { lang } = useLanguage()
   const [isAdmin, setIsAdmin] = useState(false)
-  const [canAiAgent, setCanAiAgent] = useState(false)
+  const [isPro, setIsPro] = useState(false)
   const [lockedHint, setLockedHint] = useState<string | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const navRef = useRef<HTMLElement>(null)
@@ -170,7 +170,7 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
       if (!user) return
       const { data } = await supabase.from('profiles').select('is_admin, plan, plan_expires_at, bonus_expires_at, trial_expires_at').eq('id', user.id).single()
       setIsAdmin(!!data?.is_admin)
-      setCanAiAgent(getActivePlan(data).canAiAgent)
+      setIsPro(getActivePlan(data).canAiAgent)
     }
     loadAdmin()
   }, [])
@@ -267,7 +267,7 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
                   })}
 
                   {SECTIONS.map(s => {
-                    const locked = isSectionLocked(s, isAdmin, canAiAgent)
+                    const locked = isSectionLocked(s, isAdmin, isPro)
                     return (
                       <div key={s.key} className="mt-3">
                         <button
@@ -328,8 +328,8 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
             { href: '/dashboard', label: labels[lang].home },
             { href: '/history', label: labels[lang].history },
             { href: '/profile', label: labels[lang].profile },
-            { href: '/ai-agent', label: labels[lang].aiAgent, locked: !(isAdmin || canAiAgent), hintId: 'mobile-aiAgent', proOnly: true },
-            { href: '/kaspi-shop', label: labels[lang].kaspiShop, locked: !isAdmin, hintId: 'mobile-kaspiShop' },
+            { href: '/ai-agent', label: labels[lang].aiAgent, locked: !(isAdmin || isPro), hintId: 'mobile-aiAgent', proOnly: true },
+            { href: '/kaspi-shop', label: labels[lang].kaspiShop, locked: !(isAdmin || isPro), hintId: 'mobile-kaspiShop', proOnly: true },
             { href: '/wildberries', label: labels[lang].wildberries, locked: !isAdmin, hintId: 'mobile-wildberries' },
           ] as { href: string; label: string; badge?: number; locked?: boolean; hintId?: string; proOnly?: boolean }[]).map(item => {
             const active = !item.locked && (path === item.href || path.startsWith(item.href + '/'))
@@ -407,7 +407,7 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
           </button>
 
           {SECTIONS.map(s => {
-            const locked = isSectionLocked(s, isAdmin, canAiAgent)
+            const locked = isSectionLocked(s, isAdmin, isPro)
             const active = !locked && activeSection?.key === s.key
             return (
               <div key={s.key} className="relative">

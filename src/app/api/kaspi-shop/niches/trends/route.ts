@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { KASPI_TRENDING_CATEGORIES, type TrendProduct } from '@/lib/kaspiShop/nicheTrends'
+import { getActivePlan } from '@/lib/plan'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -23,8 +24,8 @@ async function requireAdmin(req: NextRequest) {
     ? await supabaseAuth.auth.getUser(accessToken)
     : { data: { user: null } }
   if (!user) return null
-  const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', user.id).single()
-  return profile?.is_admin ? user : null
+  const { data: profile } = await supabase.from('profiles').select('is_admin, plan, plan_expires_at, bonus_expires_at, trial_expires_at').eq('id', user.id).single()
+  return (profile?.is_admin || getActivePlan(profile).canKaspiShop) ? user : null
 }
 
 const PAGE_SIZE = 5

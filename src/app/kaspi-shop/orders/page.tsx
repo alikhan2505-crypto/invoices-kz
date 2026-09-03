@@ -10,6 +10,7 @@ import SessionExpiredBanner from '@/components/kaspiShop/SessionExpiredBanner'
 import { ORDER_STATUS_TABS, BULK_SELECTABLE_STATUSES, WAYBILL_PRINTABLE_STATUSES, PACKING_STATUS } from '@/lib/kaspiShop/orderStatuses'
 import { filterByDeliveryCutoff, type DeliveryDateMode } from '@/lib/kaspiShop/ordersFilters'
 import { normalizeKzPhone } from '@/lib/kaspiPay/phone'
+import { getActivePlan } from '@/lib/plan'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 const CARD_HOVER = 'transition-all duration-200 ease-out hover:-translate-y-1 hover:shadow-[var(--nav-card-glow)]'
@@ -121,8 +122,16 @@ function KaspiShopOrdersInner() {
   async function checkAccess() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
-    const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', user.id).single()
-    if (!profile?.is_admin) { router.push('/dashboard'); return }
+    const { data: profile } = await supabase.from('profiles').select('is_admin, plan, plan_expires_at, bonus_expires_at, trial_expires_at').eq('id', user.id).single()
+    if (!profile?.is_admin && !getActivePlan(profile).canKaspiShop) { router.push('/dashboard'); return }
+    // Демпинг is the only page with the actual connect terminal (phone/OTP)
+    // -- every other page redirects there instead of rendering its own broken
+    // state when there's no active connection (2026-09-03 founder: check for a
+    // connected store before opening any page or sub-page).
+    const { data: { session } } = await supabase.auth.getSession()
+    const connRes = await fetch('/api/kaspi-shop/wallet', { headers: { Authorization: `Bearer ${session?.access_token}` } })
+    const connData = await connRes.json().catch(() => null)
+    if (!connData?.connected) { router.push('/kaspi-shop'); return }
     setLoading(false)
   }
 
