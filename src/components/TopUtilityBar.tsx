@@ -316,7 +316,8 @@ export default function TopUtilityBar() {
     pathname.startsWith('/view/') ||
     pathname.startsWith('/contract-view/') ||
     pathname.startsWith('/verify/') ||
-    pathname.startsWith('/promo/')
+    pathname.startsWith('/promo/') ||
+    pathname.startsWith('/shop/')
   if (isPublicPage) return null
 
   if (!loggedIn) return null

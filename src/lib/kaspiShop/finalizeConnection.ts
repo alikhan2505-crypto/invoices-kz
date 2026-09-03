@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import { listCatalog, fetchCityNames, fetchOffersDetails, extractOfferPointInfo } from './cabinetApi'
+import { listCatalog, fetchCityNames, fetchOffersDetails, extractOfferPointInfo, totalStock } from './cabinetApi'
 import { saveConnection, loadConnectionByMerchant } from './connection'
 
 const supabase = createClient(
@@ -115,6 +115,11 @@ export async function importCatalogProducts(connectionId: string, userId: string
             // as available, self-healing a product restored via Kaspi's own
             // native cabinet (never touched removed-products/route.ts).
             available_for_sale: true,
+            // Real stock from Kaspi, not the 0 this used to leave untouched:
+            // only the repricer's cycle refreshed stock_count, so a product
+            // the seller never enrolled in Демпинг stayed at 0 and the
+            // storefront's stock filter hid it (founder repro 2026-09-03).
+            stock_count: totalStock(offer),
           })
           .eq('id', existing.id)
         if (updateError) {
@@ -134,7 +139,7 @@ export async function importCatalogProducts(connectionId: string, userId: string
           product_name: offer.title,
           brand: offer.brandName || offer.brandCode || '',
           store_id: offer.points[0] || '',
-          stock_count: 0,
+          stock_count: totalStock(offer),
           own_current_price: offer.minPrice,
           floor_price: offer.minPrice,
           undercut_step: 100,

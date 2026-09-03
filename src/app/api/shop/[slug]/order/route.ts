@@ -49,7 +49,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
 
   const { data: product, error: productError } = await supabase
     .from('kaspi_shop_tracked_products')
-    .select('id, product_name, own_current_price, enabled, stock_count')
+    .select('id, product_name, own_current_price, available_for_sale, stock_count')
     .eq('id', productId)
     .eq('connection_id', storefront.connectionId)
     .maybeSingle()
@@ -57,7 +57,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
     console.error('Storefront order: product lookup failed', productError.message)
     return NextResponse.json({ error: 'Не удалось оформить заказ' }, { status: 500 })
   }
-  if (!product || !product.enabled || (product.stock_count !== null && product.stock_count <= 0)) {
+  // Must gate on the same available_for_sale signal the listing itself uses
+  // (filterStorefrontProducts) -- this used to check `enabled` (repricer on),
+  // a regression once the listing switched to available_for_sale: a product
+  // visibly listed for sale would fail here with "Товар недоступен" the
+  // moment a customer actually tried to order it.
+  if (!product || product.available_for_sale === false || (product.stock_count !== null && product.stock_count <= 0)) {
     return NextResponse.json({ error: 'Товар недоступен' }, { status: 400 })
   }
   const price = Number(product.own_current_price) || 0

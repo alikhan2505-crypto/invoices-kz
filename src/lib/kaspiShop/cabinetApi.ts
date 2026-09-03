@@ -512,6 +512,13 @@ export async function getOrderCounters(sessionCookies: string, merchantId: strin
   return { counts: result, sessionExpired: false }
 }
 
+// Sum of a catalog offer's real per-point stock. Kaspi reports stock per
+// availability row (one per store point); a null count means "not tracked
+// at this point", not zero, so it contributes nothing to the sum.
+export function totalStock(offer: { availabilities: { stockCount: number | null }[] }): number {
+  return offer.availabilities.reduce((sum, a) => sum + (a.stockCount ?? 0), 0)
+}
+
 export type OrdersPage = { orders: Order[]; total: number; sessionExpired: boolean }
 
 // size MUST stay at 10 -- confirmed live 2026-08-13: the real cabinet's own

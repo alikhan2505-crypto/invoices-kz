@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { loadConnection, markSessionExpired } from '@/lib/kaspiShop/connection'
-import { listCatalog, listCatalogWithStatus, fetchOffersDetails, extractOfferPointInfo, CatalogOffer } from '@/lib/kaspiShop/cabinetApi'
+import { listCatalog, listCatalogWithStatus, fetchOffersDetails, extractOfferPointInfo, totalStock, CatalogOffer } from '@/lib/kaspiShop/cabinetApi'
 import { restoreOfferToSale, removeOfferFromSale } from '@/lib/kaspiShop/cabinetPricePush'
 
 const supabase = createClient(
@@ -90,6 +90,36 @@ export async function GET(req: NextRequest) {
   }
 
   const allOffers = [...activeRes.offers, ...removedRes.offers]
+
+  // Reconcile the storefront's own available_for_sale cache with the live
+  // truth this page just fetched -- this table only otherwise updates on
+  // catalog import/refresh or the Снять с продажи/Восстановить actions, so
+  // it silently drifted from reality whenever a product's availability
+  // changed on Kaspi's own native cabinet, or wasn't yet re-synced (founder
+  // repro 2026-09-03: Витрина's product count didn't match В продаже here).
+  // Best-effort: never blocks this page's own response.
+  // stock_count travels with it: catalog import hardcodes 0 and only the
+  // repricer's own cycle ever refreshes it, so a product the seller never
+  // enrolled in Демпинг sat at 0 forever and the storefront's stock filter
+  // hid it even though Kaspi reported real stock.
+  try {
+    const removedMasterSkus = Array.from(new Set(removedRes.offers.map(o => o.masterSku).filter((s): s is string => !!s)))
+    await Promise.all([
+      ...activeRes.offers
+        .filter(o => !!o.masterSku)
+        .map(o => supabase
+          .from('kaspi_shop_tracked_products')
+          .update({ available_for_sale: true, stock_count: totalStock(o) })
+          .eq('connection_id', connection.id)
+          .eq('kaspi_master_sku', o.masterSku!)),
+      removedMasterSkus.length > 0
+        ? supabase.from('kaspi_shop_tracked_products').update({ available_for_sale: false }).eq('connection_id', connection.id).in('kaspi_master_sku', removedMasterSkus)
+        : Promise.resolve(),
+    ])
+  } catch (err: any) {
+    console.error('kaspi-shop removed-products: available_for_sale reconcile failed (non-fatal)', err.message)
+  }
+
   const detailsBySku = new Map<string, Record<string, any>>()
   try {
     const detailsItems = await fetchOffersDetails(connection.sessionCookies, connection.merchantId, allOffers.map(o => o.sku))

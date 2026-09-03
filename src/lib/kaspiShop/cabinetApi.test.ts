@@ -1,5 +1,19 @@
 import { describe, it, expect, vi } from 'vitest'
-import { extractPointCity, confirmPacking, listOrders } from './cabinetApi'
+import { extractPointCity, confirmPacking, listOrders, totalStock } from './cabinetApi'
+
+describe('totalStock', () => {
+  it('sums stock across every store point', () => {
+    expect(totalStock({ availabilities: [{ stockCount: 16 }, { stockCount: 4 }] })).toBe(20)
+  })
+
+  it('treats an untracked (null) point stock as contributing nothing', () => {
+    expect(totalStock({ availabilities: [{ stockCount: null }, { stockCount: 9 }] })).toBe(9)
+  })
+
+  it('returns 0 for an offer with no availabilities at all', () => {
+    expect(totalStock({ availabilities: [] })).toBe(0)
+  })
+})
 
 describe('extractPointCity', () => {
   it('extracts city id/name from a point (warehouse/destination) with a city', () => {
