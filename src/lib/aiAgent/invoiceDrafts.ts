@@ -10,6 +10,51 @@ export const INVOICE_AUTONOMY_THRESHOLD = 5
 export const DRAFT_MAX_ITEMS = 20
 export const DRAFT_MAX_TOTAL = 10_000_000
 
+// Above this the agent never auto-sends, however much autonomy it has
+// earned -- the draft waits for the owner instead. Security audit
+// 2026-09-04: canAutoSend was a one-time, irreversible threshold, so after
+// five approvals there was no per-invoice review and no ceiling, ever.
+// Failure mode of setting this too low is only "the owner taps approve",
+// so it is deliberately on the cautious side.
+export const AUTO_SEND_MAX_TOTAL = 200_000
+
+// A customer can talk the model into a price (the tool description used to
+// invite exactly that). Prices are therefore checked against the owner's
+// own catalog server-side: a discount is normal, giving away a 4 500 ₸
+// item for 1 ₸ is not. Only blatantly-below-catalog prices are refused --
+// anything at or above half the catalog price passes, as do items that
+// aren't in the catalog at all (services, custom orders), which the model
+// legitimately cannot price from it.
+export const MAX_DISCOUNT_FRACTION = 0.5
+
+function normalizeName(name: string): string {
+  return name.toLowerCase().replace(/\s+/g, ' ').trim()
+}
+
+// Pure. `catalog` is the same {name, price} list the prompt's «Каталог и
+// цены» block is built from, so the model was shown exactly these prices.
+export function checkCatalogPricing(
+  items: DraftItem[],
+  catalog: { name: string; price: number }[],
+): { ok: true } | { ok: false; error: string } {
+  if (catalog.length === 0) return { ok: true }
+  const byName = new Map<string, number>()
+  for (const p of catalog) {
+    const key = normalizeName(p.name)
+    // Same product listed twice (size/colour variants share a name) -- the
+    // cheapest wins, so a legitimate variant price is never refused.
+    if (!byName.has(key) || p.price < (byName.get(key) as number)) byName.set(key, p.price)
+  }
+  for (const item of items) {
+    const catalogPrice = byName.get(normalizeName(item.name))
+    if (catalogPrice === undefined) continue
+    if (item.unitPrice < catalogPrice * MAX_DISCOUNT_FRACTION) {
+      return { ok: false, error: `Цена «${item.name}» слишком низкая по сравнению с каталогом` }
+    }
+  }
+  return { ok: true }
+}
+
 // The model sends snake_case (unit_price); the flow-step path builds
 // camelCase (unitPrice). Accept both, emit camelCase. total is ALWAYS
 // recomputed here -- never trusted from the model.
@@ -39,8 +84,13 @@ export function validateDraftInput(itemsRaw: unknown): DraftValidation {
 // AND the owner has personally approved INVOICE_AUTONOMY_THRESHOLD
 // drafts. auto_sent drafts never count toward the threshold -- only
 // human approvals do.
-export function canAutoSend(agentStatus: string, approvedCount: number): boolean {
-  return agentStatus === 'active' && approvedCount >= INVOICE_AUTONOMY_THRESHOLD
+// `total` is optional so existing flow-step callers keep working; when it is
+// supplied, an invoice over AUTO_SEND_MAX_TOTAL is held for the owner no
+// matter how much autonomy the agent has earned.
+export function canAutoSend(agentStatus: string, approvedCount: number, total?: number): boolean {
+  if (agentStatus !== 'active' || approvedCount < INVOICE_AUTONOMY_THRESHOLD) return false
+  if (typeof total === 'number' && total > AUTO_SEND_MAX_TOTAL) return false
+  return true
 }
 
 export type InvoiceToolInput = { items?: unknown; customer_name?: unknown; customer_phone?: unknown }

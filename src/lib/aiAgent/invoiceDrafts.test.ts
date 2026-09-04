@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { validateDraftInput, canAutoSend, normalizeToolInput, INVOICE_AUTONOMY_THRESHOLD } from './invoiceDrafts'
+import { validateDraftInput, canAutoSend, normalizeToolInput, checkCatalogPricing, INVOICE_AUTONOMY_THRESHOLD, AUTO_SEND_MAX_TOTAL } from './invoiceDrafts'
 
 describe('validateDraftInput', () => {
   it('accepts valid items, trims names, computes total server-side', () => {
@@ -44,5 +44,61 @@ describe('normalizeToolInput', () => {
     const r = normalizeToolInput({}, {})
     expect(r.customerName).toBe('')
     expect(r.customerPhone).toBe('')
+  })
+})
+
+describe('checkCatalogPricing', () => {
+  const catalog = [
+    { name: 'Футболка Abil.Sisters белый', price: 4500 },
+    { name: 'Лонгслив', price: 3900 },
+  ]
+
+  it('refuses a catalog item priced far below the catalog (the «договорились по 1 ₸» case)', () => {
+    const r = checkCatalogPricing([{ name: 'Футболка Abil.Sisters белый', qty: 1, unitPrice: 1 }], catalog)
+    expect(r.ok).toBe(false)
+  })
+
+  it('allows a plausible discount', () => {
+    const r = checkCatalogPricing([{ name: 'Футболка Abil.Sisters белый', qty: 1, unitPrice: 4000 }], catalog)
+    expect(r.ok).toBe(true)
+  })
+
+  it('allows exactly the catalog price', () => {
+    expect(checkCatalogPricing([{ name: 'Лонгслив', qty: 2, unitPrice: 3900 }], catalog).ok).toBe(true)
+  })
+
+  it('ignores case and extra spacing when matching a catalog name', () => {
+    const r = checkCatalogPricing([{ name: '  лонгслив  ', qty: 1, unitPrice: 10 }], catalog)
+    expect(r.ok).toBe(false)
+  })
+
+  it('lets through items that are not in the catalog at all (services, custom orders)', () => {
+    const r = checkCatalogPricing([{ name: 'Доставка курьером', qty: 1, unitPrice: 500 }], catalog)
+    expect(r.ok).toBe(true)
+  })
+
+  it('does nothing when the owner has no catalog', () => {
+    expect(checkCatalogPricing([{ name: 'Что угодно', qty: 1, unitPrice: 1 }], []).ok).toBe(true)
+  })
+
+  it('uses the cheapest variant when a name repeats in the catalog', () => {
+    const dup = [{ name: 'Футболка', price: 4500 }, { name: 'Футболка', price: 2500 }]
+    expect(checkCatalogPricing([{ name: 'Футболка', qty: 1, unitPrice: 2500 }], dup).ok).toBe(true)
+    expect(checkCatalogPricing([{ name: 'Футболка', qty: 1, unitPrice: 100 }], dup).ok).toBe(false)
+  })
+})
+
+describe('canAutoSend amount ceiling', () => {
+  it('still auto-sends a normal invoice for a trained agent', () => {
+    expect(canAutoSend('active', 5, 50_000)).toBe(true)
+  })
+
+  it('holds an oversized invoice for the owner even with full autonomy', () => {
+    expect(canAutoSend('active', 99, AUTO_SEND_MAX_TOTAL + 1)).toBe(false)
+  })
+
+  it('keeps the old two-argument behaviour for flow steps', () => {
+    expect(canAutoSend('active', 5)).toBe(true)
+    expect(canAutoSend('training', 5)).toBe(false)
   })
 })

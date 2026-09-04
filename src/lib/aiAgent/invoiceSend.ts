@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { sendIntoConversation } from './channelSend'
-import { validateDraftInput, normalizeToolInput, canAutoSend, type DraftItem, type InvoiceToolInput } from './invoiceDrafts'
+import { validateDraftInput, normalizeToolInput, canAutoSend, checkCatalogPricing, type DraftItem, type InvoiceToolInput } from './invoiceDrafts'
+import { loadAgentCatalog } from './catalogContext'
 import { createNotification } from '@/lib/notifications'
 
 // Phase 3 «счёт из чата» core: turns an approved (or auto-approved)
@@ -32,6 +33,18 @@ export function buildInvoiceToolExecutor(
       const norm = normalizeToolInput(raw, { name: conv?.collected_name, phone: conv?.collected_phone })
       const validated = validateDraftInput(norm.items)
       if (!validated.ok) return { outcome: 'draft_pending' as const, error: validated.error }
+
+      // The customer is an untrusted party in this conversation, and the
+      // model can be talked into a price. Re-check every line against the
+      // owner's own catalog -- the same list the prompt was given -- so a
+      // "мы же договорились по 1 ₸" cannot become a real invoice. Items
+      // absent from the catalog pass through; see checkCatalogPricing.
+      const { data: agentOwner } = await supabase.from('ai_agents').select('user_id').eq('id', agent.id).maybeSingle()
+      if (agentOwner?.user_id) {
+        const catalog = await loadAgentCatalog(supabase, agentOwner.user_id)
+        const priced = checkCatalogPricing(validated.items, catalog)
+        if (!priced.ok) return { outcome: 'draft_pending' as const, error: priced.error }
+      }
       const missing: ('customer_name' | 'customer_phone')[] = []
       if (!norm.customerName) missing.push('customer_name')
       if (!norm.customerPhone) missing.push('customer_phone')
@@ -40,7 +53,7 @@ export function buildInvoiceToolExecutor(
         .select('id', { count: 'exact', head: true })
         .eq('agent_id', agent.id)
         .eq('status', 'approved_sent')
-      const auto = canAutoSend(agent.status, count || 0)
+      const auto = canAutoSend(agent.status, count || 0, validated.total)
       const created = await createDraft(supabase, {
         agentId: agent.id,
         conversationId,

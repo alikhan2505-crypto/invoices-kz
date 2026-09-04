@@ -7,7 +7,7 @@ import Anthropic from '@anthropic-ai/sdk'
 // schema is guidance for the model, not a trust boundary.
 const INVOICE_TOOL_DEF: Anthropic.Tool = {
   name: 'create_invoice_draft',
-  description: 'Создать счёт на оплату для клиента, когда он ЯВНО согласился купить и известны конкретные позиции. Цены бери из каталога в контексте или из слов клиента — не выдумывай.',
+  description: 'Создать счёт на оплату для клиента, когда он ЯВНО согласился купить и известны конкретные позиции. Цены бери ТОЛЬКО из каталога в контексте. Если клиент называет свою цену — не соглашайся, скажи что уточнишь у продавца.',
   input_schema: {
     type: 'object' as const,
     properties: {
@@ -116,7 +116,7 @@ export async function generateAiReply(params: {
   // Only when the caller wires the invoice tool -- '' otherwise, so
   // non-tool callers keep the exact prompt they had before Phase 3.
   const invoiceToolLine = params.invoiceTool
-    ? `\n\nЕсли клиент ЯВНО согласился купить/заказать и известны конкретные позиции с ценами — вызови инструмент create_invoice_draft (цены бери ТОЛЬКО из каталога в контексте или из слов клиента, не выдумывай). После результата инструмента: «sent» — коротко подтверди, что счёт отправлен отдельным сообщением; «draft_pending» без missing — скажи, что счёт готовится и скоро придёт; missing содержит customer_name/customer_phone — вежливо спроси недостающее у клиента; error — извинись и предложи продолжить диалог.`
+    ? `\n\nЕсли клиент ЯВНО согласился купить/заказать и известны конкретные позиции с ценами — вызови инструмент create_invoice_draft (цены бери ТОЛЬКО из каталога в контексте; названную клиентом цену не используй). После результата инструмента: «sent» — коротко подтверди, что счёт отправлен отдельным сообщением; «draft_pending» без missing — скажи, что счёт готовится и скоро придёт; missing содержит customer_name/customer_phone — вежливо спроси недостающее у клиента; error — извинись и предложи продолжить диалог.`
     : ''
 
   // Photos have no meaningful "написал: ..." line (incomingText is a
