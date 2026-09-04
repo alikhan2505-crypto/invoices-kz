@@ -4,6 +4,7 @@ import { Resend } from 'resend'
 import { sendTelegramNotification } from '@/lib/telegramNotify'
 import { createNotification } from '@/lib/notifications'
 import { addDaysToDateString, todayDateString } from '@/lib/dueDate'
+import { loadDigestData, formatDigest } from '@/lib/kaspiShop/dailyDigest'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -219,5 +220,32 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.json({ success: true, reminders, overdue, reports, unpaidBells })
+  // --- Daily Kaspi shop digest (Telegram only) ---
+  // Rides the existing notify_telegram toggle rather than adding a column:
+  // a seller who asked for Telegram notifications at all is the same
+  // audience. Split into its own toggle only if that turns out to annoy
+  // someone. formatDigest returns null on a genuinely quiet day, so silence
+  // is the default and nobody gets a daily "ничего не произошло".
+  let digests = 0
+  const { data: shopOwners } = await supabase
+    .from('profiles')
+    .select('id, telegram_chat_id')
+    .eq('notify_telegram', true)
+    .not('telegram_chat_id', 'is', null)
+
+  for (const owner of shopOwners || []) {
+    try {
+      const digestData = await loadDigestData(supabase, owner.id, startOfDayAgo(1))
+      const text = formatDigest(digestData)
+      if (!text) continue
+      await sendTelegramNotification(owner.telegram_chat_id, text)
+      digests++
+    } catch (e: any) {
+      // One seller's broken digest must never stop the rest of the loop --
+      // same contract as every other section of this cron.
+      console.error('cron/notifications: kaspi digest failed for profile', owner.id, ':', e.message)
+    }
+  }
+
+  return NextResponse.json({ success: true, reminders, overdue, reports, unpaidBells, digests })
 }
