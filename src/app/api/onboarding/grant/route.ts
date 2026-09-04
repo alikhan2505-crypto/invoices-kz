@@ -72,10 +72,21 @@ export async function POST(req: NextRequest) {
       if (promo) {
         const bonusExpires = new Date()
         bonusExpires.setDate(bonusExpires.getDate() + (promo.bonus_days || 14))
-        bonusExpiresAt = bonusExpires.toISOString()
-        await supabase.from('profiles')
-          .update({ bonus_expires_at: bonusExpiresAt })
+        const candidate = bonusExpires.toISOString()
+        // Once per user, claimed atomically -- same compare-and-swap the
+        // welcome-bonus route uses, on a column the client cannot write
+        // (see protect_profile_privileged_columns). Before this, the branch
+        // had no guard at all: this route is callable at any time, not only
+        // during onboarding, so anyone holding any active promo code could
+        // re-POST it every 14 days forever for a free «Базовый» (security
+        // audit 2026-09-04).
+        const { data: claimed } = await supabase.from('profiles')
+          .update({ bonus_expires_at: candidate, promo_granted_at: new Date().toISOString() })
           .eq('id', user.id)
+          .is('promo_granted_at', null)
+          .select('id')
+          .maybeSingle()
+        if (claimed) bonusExpiresAt = candidate
       }
     } catch {
       // Swallowed, same as onboarding's original behavior.
