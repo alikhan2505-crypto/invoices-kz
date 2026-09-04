@@ -11,6 +11,19 @@ const supabase = createClient(
 // it is the human-typeable fallback. Looked up by `sigex_document_id`
 // rather than our own row id so the code printed on paper matches exactly
 // what SIGEX itself shows as the document's identifier.
+// This endpoint is unauthenticated by design -- its whole job is to let
+// someone holding a signed document confirm it is genuine. Showing WHO
+// signed is the point; showing their full ИИН is not, and a national id
+// number is exactly the kind of field that shouldn't be readable in bulk
+// (security audit 2026-09-04). Enough digits remain to match against the
+// ИИН printed on the document you are verifying.
+function maskIin(iin: string | null): string | null {
+  if (!iin) return null
+  const digits = String(iin).trim()
+  if (digits.length <= 6) return digits
+  return `${digits.slice(0, 6)}${'*'.repeat(digits.length - 6)}`
+}
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ sigexId: string }> }
@@ -40,10 +53,10 @@ export async function GET(
     documentTitle,
     companyName: owner?.company_name || null,
     ownerSignerName: row.owner_signer_name,
-    ownerSignerIin: row.owner_signer_iin,
+    ownerSignerIin: maskIin(row.owner_signer_iin),
     ownerSignedAt: row.owner_signed_at,
     clientSignerName: row.client_signer_name,
-    clientSignerIin: row.client_signer_iin,
+    clientSignerIin: maskIin(row.client_signer_iin),
     clientSignedAt: row.client_signed_at,
     documentUrl: `/api/documents/${row.id}/document`,
     cardUrl: `/api/documents/${row.id}/card`,

@@ -504,7 +504,7 @@ export default function PublicInvoice() {
           </div>
         )}
 
-        <SignatureSection mode="client" documentId={invoice.id} documentTitle={`Счёт №${invoice.number}`} ownerCompanyName={profile?.company_name} />
+        <SignatureSection mode="client" publicToken={token} documentId={invoice.id} documentTitle={`Счёт №${invoice.number}`} ownerCompanyName={profile?.company_name} />
 
         <div className="text-center py-4">
           <p className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>{t.createdViaLabel}</p>

@@ -23,11 +23,18 @@ async function loadDocumentTitleAndToken(documentType: string, documentId: strin
 
 // No auth — the client is never a registered invoices.kz user. Called from
 // the public document page after the client completes their own SIGEX QR/eGov
-// mobile ceremony. Access is gated by already knowing `signatureId`, which
-// is only ever shown on the public-token-gated document pages.
+// mobile ceremony.
+//
+// Access is gated by presenting the document's public token. It used to be
+// gated by knowing `signatureId` alone, on the assumption that the id only
+// ever appears on token-gated pages -- but /api/documents/verify/[sigexId]
+// hands that same row id to anonymous callers, so the assumption did not
+// hold and anyone could counter-sign a document awaiting its client.
+// (Security audit 2026-09-04. Same "possession of an identifier implies
+// authorization" shape as the public_token RLS policies fixed the same day.)
 export async function POST(req: NextRequest) {
-  const { signatureId, signatureCms } = await req.json()
-  if (!signatureId || !signatureCms) {
+  const { signatureId, signatureCms, publicToken } = await req.json()
+  if (!signatureId || !signatureCms || !publicToken) {
     return NextResponse.json({ error: 'Missing params' }, { status: 400 })
   }
 
@@ -42,7 +49,10 @@ export async function POST(req: NextRequest) {
   }
 
   const doc = await loadDocumentTitleAndToken(row.document_type, row.document_id)
-  if (!doc?.publicToken) {
+  // The token must MATCH, not merely exist -- "has a token" was the whole
+  // bug. Same 404 for a wrong token as for a missing document, so this
+  // can't be used to probe which signature ids are real.
+  if (!doc?.publicToken || doc.publicToken !== publicToken) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
 

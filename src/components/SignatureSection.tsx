@@ -47,7 +47,10 @@ type Props = {
   | { mode: 'owner'; getHtml: () => Promise<string>; getPdfUrl?: never }
   // Contract-style: an already-uploaded file is what gets signed as-is.
   | { mode: 'owner'; getPdfUrl: () => Promise<string>; getHtml?: never }
-  | { mode: 'client' }
+  // The public token of the document being signed. Required in client mode:
+  // the signing endpoint compares it, so knowing the signature id alone is
+  // no longer enough to counter-sign someone else's document.
+  | { mode: 'client'; publicToken: string }
 )
 
 export default function SignatureSection(props: Props) {
@@ -210,7 +213,7 @@ export default function SignatureSection(props: Props) {
       const res = await fetch('/api/signatures/client-sign', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ signatureId: row.id, signatureCms }),
+        body: JSON.stringify({ signatureId: row.id, signatureCms, publicToken: (props as { publicToken?: string }).publicToken }),
       })
       const json = await res.json()
       if (json.error) { setError(json.error); return }

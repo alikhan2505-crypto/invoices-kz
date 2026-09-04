@@ -75,7 +75,7 @@ export default function PublicContract() {
           {t.publicViewFileButton}
         </a>
 
-        <SignatureSection mode="client" documentType="contract" documentId={contract.id} documentTitle={contract.title} ownerCompanyName={companyName} />
+        <SignatureSection mode="client" publicToken={token} documentType="contract" documentId={contract.id} documentTitle={contract.title} ownerCompanyName={companyName} />
 
         <div className="text-center py-4">
           <a href="https://invoices.kz" className="text-xs font-medium text-[#1C2056]">INVOICES.KZ</a>
