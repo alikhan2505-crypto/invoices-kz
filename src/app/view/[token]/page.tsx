@@ -60,7 +60,10 @@ function SadIcon() {
 }
 
 export default function PublicInvoice() {
-  const { token } = useParams()
+  const { token: rawToken } = useParams()
+  // useParams can hand back string | string[] | undefined; every use below
+  // (and the API path it's interpolated into) wants a plain string.
+  const token = Array.isArray(rawToken) ? rawToken[0] : rawToken ?? ''
   const { lang } = useLanguage()
   const t = historyDict[lang]
   const tFlow = invoiceFlowDict[lang]
@@ -76,13 +79,14 @@ export default function PublicInvoice() {
 
   useEffect(() => {
     async function load() {
-      const { data: inv } = await supabase
-        .from('invoices')
-        .select('*')
-        .eq('public_token', token)
-        .single()
-
-
+      // Server-side lookup by token (2026-09-04). The browser no longer
+      // queries Supabase directly here: doing so required an RLS policy that
+      // let anonymous clients read every invoice/profile/bank row carrying a
+      // share token, which turned out to be dumpable wholesale with the
+      // public anon key. See src/app/api/public/invoice/[token]/route.ts.
+      const res = await fetch(`/api/public/invoice/${encodeURIComponent(token)}`)
+      if (!res.ok) { setLoading(false); return }
+      const { invoice: inv, profile: loadedProfile, bank: loadedBank } = await res.json()
       if (!inv) { setLoading(false); return }
       setInvoice(inv)
 
@@ -98,10 +102,10 @@ export default function PublicInvoice() {
         .catch(() => {})
         .finally(() => setKaspiPaymentLoading(false))
 
-      if (inv.status === 'sent') {
-        await supabase.from('invoices')
-          .update({ status: 'viewed', viewed_at: new Date().toISOString() })
-          .eq('id', inv.id)
+      // The sent -> viewed flip now happens server-side inside the route
+      // above (it needs to write, and there is no public UPDATE policy), so
+      // only the owner's notification is left to fire from here.
+      if (inv.status === 'viewed') {
         // Best-effort — viewing the invoice shouldn't block on this.
         fetch('/api/notify-viewed', {
           method: 'POST',
@@ -110,26 +114,12 @@ export default function PublicInvoice() {
         }).catch(() => {})
       }
 
-      // Загружаем полный профиль включая подпись и печать
-      const { data: p } = await supabase
-        .from('profiles')
-        .select('company_name, bin_iin, address, phone, email, director_name, signature_url, stamp_url, kaspi_pay_link, halyk_pay_link, website, social_links, plan, plan_expires_at, bonus_expires_at, trial_expires_at')
-        .eq('id', inv.user_id)
-        .single()
-      setProfile(p)
-
-      // Берём банк из счёта если есть, иначе основной
-      if (inv.bank_id) {
-        const { data: b } = await supabase
-          .from('bank_accounts').select('*').eq('id', inv.bank_id).single()
-        setBank(b)
-      } else {
-        const { data: b } = await supabase
-          .from('bank_accounts').select('*')
-          .eq('user_id', inv.user_id)
-          .eq('is_main', true).single()
-        setBank(b)
-      }
+      // Profile (with signature/stamp) and bank requisites come back with the
+      // invoice in one response -- picked server-side by the same rules as
+      // before: the invoice's own bank if it has one, otherwise the owner's
+      // main account.
+      setProfile(loadedProfile)
+      setBank(loadedBank)
 
       setLoading(false)
     }
@@ -178,7 +168,11 @@ export default function PublicInvoice() {
   async function markAsPaid() {
     if (!confirm(t.confirmPaymentConfirm)) return
     setMarking(true)
-    await supabase.from('invoices').update({ status: 'paid' }).eq('id', invoice.id)
+    // Goes through the server keyed by the share token: the browser has no
+    // write access to invoices any more (and never really did -- the old
+    // anon UPDATE was silently refused by RLS, so this button used to do
+    // nothing at all for the recipient).
+    await fetch(`/api/public/invoice/${encodeURIComponent(token)}/paid`, { method: 'POST' }).catch(() => {})
     setMarked(true)
     setMarking(false)
     // Best-effort — the client's "paid" confirmation shouldn't block on this.

@@ -7,7 +7,10 @@ import { contractsDict } from '@/lib/i18n/contracts'
 import SignatureSection from '@/components/SignatureSection'
 
 export default function PublicContract() {
-  const { token } = useParams()
+  const { token: rawToken } = useParams()
+  // useParams can hand back string | string[] | undefined; the API path this
+  // is interpolated into wants a plain string.
+  const token = Array.isArray(rawToken) ? rawToken[0] : rawToken ?? ''
   const { lang } = useLanguage()
   const t = contractsDict[lang]
   const [contract, setContract] = useState<any>(null)
@@ -16,11 +19,15 @@ export default function PublicContract() {
 
   useEffect(() => {
     async function load() {
-      const { data: c } = await supabase.from('contracts').select('*').eq('public_token', token).single()
+      // Server-side lookup by token (2026-09-04) -- the browser no longer
+      // reads contracts/profiles directly, because the RLS policy that
+      // allowed it granted anonymous read to every contract that merely had
+      // a token. See src/app/api/public/contract/[token]/route.ts.
+      const res = await fetch(`/api/public/contract/${encodeURIComponent(token)}`)
+      if (!res.ok) { setLoading(false); return }
+      const { contract: c, profile: p } = await res.json()
       if (!c) { setLoading(false); return }
       setContract(c)
-
-      const { data: p } = await supabase.from('profiles').select('company_name').eq('id', c.user_id).single()
       setCompanyName(p?.company_name)
 
       setLoading(false)
