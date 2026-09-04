@@ -2,6 +2,7 @@
 import { useState, useRef } from 'react'
 import Link from 'next/link'
 import { motion, useReducedMotion } from 'framer-motion'
+import { track } from '@vercel/analytics'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 const MAX_FILES = 30
@@ -47,6 +48,11 @@ export default function WaybillMergerTool() {
       a.download = `waybills-${format}.pdf`
       a.click()
       URL.revokeObjectURL(url)
+      // The signal that actually matters for a campaign: not that someone
+      // landed here, but that the tool did its job for them. File count is
+      // a rough "is this a real seller or a curious click" indicator; no
+      // filenames or anything identifying is sent.
+      track('waybills_merged', { format, files: files.length })
     } catch {
       setError('Ошибка сети. Проверьте соединение и попробуйте ещё раз.')
     } finally {
@@ -138,7 +144,8 @@ export default function WaybillMergerTool() {
               В invoices.kz накладные подтягиваются прямо из вашего кабинета Kaspi — вместе с заказами,
               демпингом цен с защитой минимальной цены, финансами и аналитикой ниш.
             </p>
-            <Link href="/" className="text-sm font-semibold" style={{ color: 'var(--nav-accent)' }}>
+            <Link href="/" onClick={() => track('waybills_to_product')}
+              className="text-sm font-semibold" style={{ color: 'var(--nav-accent)' }}>
               Посмотреть Kaspi Bot →
             </Link>
           </div>

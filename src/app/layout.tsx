@@ -5,6 +5,7 @@ import { ThemeProvider } from '@/components/ThemeProvider'
 import { LanguageProvider } from '@/components/LanguageProvider'
 import TopUtilityBar from '@/components/TopUtilityBar'
 import NavAurora from '@/components/NavAurora'
+import { Analytics } from '@vercel/analytics/next'
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -68,6 +69,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <NavAurora />
             {children}
             <TopUtilityBar />
+            {/* Added 2026-09-04: the project had no visitor analytics of any
+                kind, so there was no way to tell whether a paid campaign (or
+                the free /tools/waybills funnel it points at) brought anyone.
+                Pageviews only -- no custom events yet, and nothing that
+                identifies a person. */}
+            <Analytics />
           </ThemeProvider>
         </LanguageProvider>
       </body>
