@@ -993,7 +993,7 @@ export default function KaspiShop() {
                         </div>
                               <div className="grid grid-cols-3 gap-2 mb-2">
                                 <label className="block">
-                                  <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>Минимальная цена</span>
+                                  <span className="text-[11px] mb-1 block" style={{ color: 'var(--nav-text-muted)' }} title="Бот никогда не опустит цену ниже этого значения. Если конкурент ушёл ниже — бот остановится на минимуме и пришлёт уведомление, а когда конкурент вернётся выше, сам поднимет цену обратно.">Минимальная цена ⓘ</span>
                                   <input className={`${INPUT_CLS} font-mono px-2 py-1.5`} type="number" style={{ color: 'var(--nav-text-primary)' }}
                                     value={v.floorPrice} onChange={e => setEditValues(prev => ({ ...prev, [p.id]: { ...v, floorPrice: e.target.value } }))} />
                                 </label>
