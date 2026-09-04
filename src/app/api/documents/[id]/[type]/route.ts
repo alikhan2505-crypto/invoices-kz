@@ -12,6 +12,20 @@ const supabase = createClient(
 // reads as untrustworthy/unbranded for a document meant to carry legal
 // weight. No auth: same public trust model as the invoice itself (this
 // route is only ever linked from the public-token-gated invoice pages).
+// Only our own Supabase Storage may be fetched here. Parsed with the URL
+// API rather than a string prefix check, so "https://evil.example/?x=<our
+// host>" and similar can't slip past, and non-http schemes are rejected.
+function isAllowedDocumentSource(raw: string): boolean {
+  try {
+    const url = new URL(raw)
+    if (url.protocol !== 'https:') return false
+    const storageHost = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL!).host
+    return url.host === storageHost
+  } catch {
+    return false
+  }
+}
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string; type: string }> }
@@ -43,6 +57,17 @@ export async function GET(
   const filename = type === 'card' ? `Card-${label}.pdf` : `Schet-${label}.pdf`
   const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
   const safeFilename = escapeHtml(filename)
+
+  // sourceUrl comes from a column a user can set on their own row
+  // (signatures/set-display-pdf, owner-sign's snapshotPdfUrl), and this
+  // route is unauthenticated and returns the fetched bytes base64-encoded
+  // in the response -- i.e. a full-read SSRF, not a blind one. Restricted
+  // to our own Storage host so it can only ever serve documents we stored
+  // (security audit 2026-09-04, CWE-918).
+  if (!isAllowedDocumentSource(sourceUrl)) {
+    console.error('documents route: blocked non-Storage source url')
+    return NextResponse.json({ error: 'Source not allowed' }, { status: 400 })
+  }
 
   const fileRes = await fetch(sourceUrl)
   if (!fileRes.ok) return NextResponse.json({ error: 'Source fetch failed' }, { status: 502 })
