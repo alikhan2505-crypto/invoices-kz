@@ -87,11 +87,13 @@ export default function WaybillMergerTool() {
             className="nav-glass rounded-2xl p-8 text-center cursor-pointer mb-4 transition-colors"
             style={{ borderWidth: 2, borderStyle: 'dashed', borderColor: dragging ? 'var(--nav-accent)' : 'var(--nav-border)' }}
           >
+            {/* Mobile-first wording on purpose: analytics says 75% of this
+                audience is on a phone, where there is nothing to drag. */}
             <div className="text-sm font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>
-              Перетащите PDF-накладные сюда
+              Выберите PDF-накладные
             </div>
             <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>
-              или нажмите, чтобы выбрать · до {MAX_FILES} файлов
+              нажмите здесь или перетащите файлы · до {MAX_FILES} файлов
             </div>
             <input ref={inputRef} type="file" accept="application/pdf" multiple hidden
               onChange={e => { addFiles(e.target.files); e.target.value = '' }} />
