@@ -7,6 +7,7 @@ import { loadAgentCatalog } from './catalogContext'
 import { buildInvoiceToolExecutor, createDraft } from './invoiceSend'
 import { validateDraftInput, canAutoSend } from './invoiceDrafts'
 import { debitAiAgentWallet, AI_AGENT_CREDITS_PER_AI_REPLY, hasAiAgentBudget, AI_AGENT_BUDGET_DEPLETED_REPLY } from './wallet'
+import { isConversationRateLimited } from './rateLimit'
 import { sendTelegramNotification } from '@/lib/telegramNotify'
 import { createNotification } from '@/lib/notifications'
 import { findTemplateMatch, mergeCollectedData, findStopPhraseMatch, STOP_PHRASE_ACK_TEXT } from './webhookHandler'
@@ -255,6 +256,16 @@ export async function handleTelegramIncoming(conn: TelegramTenantConnection, par
       .limit(Math.min(historyPairs * 4, 80))
     const pairs = pairConversationHistory((historyRows || []).slice().reverse(), historyPairs)
     if (pairs.length > 0) conversationHistory = pairs
+  }
+
+  // Anti-abuse ceiling (security audit 2026-09-04): every reply below costs
+  // the seller 5 ₸ plus a real model call, and nothing capped how fast one
+  // thread could ask. A flooder is dropped silently; 30 AI replies in an
+  // hour inside a single conversation is far past anything a real customer
+  // does. See rateLimit.ts.
+  if (await isConversationRateLimited(supabase, conversation.id)) {
+    console.warn('ai-agent: conversation rate limit hit, dropping message for', conversation.id)
+    return
   }
 
   // No template -- generate an AI reply. source: 'dm' because a Telegram
