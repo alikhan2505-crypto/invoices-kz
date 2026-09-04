@@ -69,7 +69,11 @@ export async function GET(
     return NextResponse.json({ error: 'Source not allowed' }, { status: 400 })
   }
 
-  const fileRes = await fetch(sourceUrl)
+  // redirect: 'manual' matters as much as the allowlist above -- fetch
+  // follows redirects by default, so an allowed host answering 302 to an
+  // internal address would walk straight past the host check. A 3xx now
+  // surfaces as a non-ok response and is refused like any other failure.
+  const fileRes = await fetch(sourceUrl, { redirect: 'manual' })
   if (!fileRes.ok) return NextResponse.json({ error: 'Source fetch failed' }, { status: 502 })
   const bytes = await fileRes.arrayBuffer()
 
