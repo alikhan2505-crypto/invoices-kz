@@ -411,6 +411,7 @@ const COPY: Record<Lang, Copy> = {
       { label: 'Политика', href: '/privacy' },
       { label: 'Условия', href: '/terms' },
       { label: 'Удаление данных', href: '/data-deletion' },
+      { label: 'Бесплатно → Склейка накладных', href: '/tools/waybills' },
       { label: 'Для разработчиков → Cashier API', href: '/cashier-api' },
     ],
     footerContact: [
@@ -527,6 +528,7 @@ const COPY: Record<Lang, Copy> = {
       { label: 'Құпиялылық', href: '/privacy' },
       { label: 'Шарттар', href: '/terms' },
       { label: 'Деректерді жою', href: '/data-deletion' },
+      { label: 'Тегін → Жүкқұжаттарды желімдеу', href: '/tools/waybills' },
       { label: 'Әзірлеушілерге → Cashier API', href: '/cashier-api' },
     ],
     footerContact: [
@@ -643,6 +645,7 @@ const COPY: Record<Lang, Copy> = {
       { label: 'Privacy', href: '/privacy' },
       { label: 'Terms', href: '/terms' },
       { label: 'Data Deletion', href: '/data-deletion' },
+      { label: 'Free → Waybill Merger', href: '/tools/waybills' },
       { label: 'For Developers → Cashier API', href: '/cashier-api' },
     ],
     footerContact: [
