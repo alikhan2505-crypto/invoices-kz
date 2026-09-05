@@ -146,6 +146,14 @@ function ChevronLeftIcon({ size = 18 }: { size?: number }) {
   )
 }
 
+function ChevronRightIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+      <path d="m9 6 6 6-6 6" />
+    </svg>
+  )
+}
+
 function isActiveSection(links: { href: string }[], path: string) {
   return links.some(l => path === l.href || path.startsWith(l.href + '/'))
 }
@@ -289,6 +297,11 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
                     const active = !locked && activeSection?.key === s.key
                     return (
                       <div key={s.key} className="mt-3">
+                        {/* Was an 11px uppercase muted "divider label" back when
+                            it was decorative. fe3853f made it navigable but left
+                            that styling, so on a phone the drawer read as empty
+                            (founder, 2026-09-05) -- a header that does something
+                            has to look like the rows above it. */}
                         <button
                           type="button"
                           onClick={() => {
@@ -297,11 +310,11 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
                             router.push(s.links[0].href)
                           }}
                           aria-disabled={locked}
-                          className="w-full min-h-[36px] flex items-center gap-1.5 px-3 text-[11px] font-semibold tracking-wider uppercase text-left"
-                          style={{ color: active ? 'var(--nav-text-primary)' : 'var(--nav-text-muted)', cursor: locked ? 'not-allowed' : 'pointer' }}
+                          className="w-full min-h-[44px] flex items-center gap-1.5 px-3 rounded-xl text-sm font-semibold text-left"
+                          style={{ color: active ? 'var(--nav-text-primary)' : 'var(--nav-text-secondary)', cursor: locked ? 'not-allowed' : 'pointer' }}
                         >
-                          {labels[lang][s.key]}
-                          {locked && <LockIcon size={11} />}
+                          <span className="flex-1 truncate">{labels[lang][s.key]}</span>
+                          {locked ? <LockIcon size={13} /> : <ChevronRightIcon />}
                         </button>
                         {locked ? (
                           lockedHint === `drawer-${s.key}` && (
