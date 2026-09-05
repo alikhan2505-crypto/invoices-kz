@@ -428,6 +428,17 @@ const QR_FAILED = new Set([
   'Rejected', 'InsufficientFunds', 'InsufficientFundsError', 'Error',
   'IrisSrcBlockCode1', 'IrisSrcBlockCode3', 'IrisSrcBlockCode9',
   'IrisDestBlockCode3', 'IrisDestBlockCode5', 'IrisDestBlockCode7', 'IrisDestBlockCode10',
+  // A phone push (remote/create) is a different Kaspi flow end-to-end and
+  // uses its own status vocabulary, not the QR-scan strings above -- caught
+  // live 2026-09-05 via the diagnostic logging below: declining a pushed
+  // subscription payment in the Kaspi app reported exactly this, not any of
+  // the QR strings, so it silently looped as 'pending' forever until this
+  // was added. The in-flight counterpart is 'RemotePaymentCreated' (handled
+  // below, parallel to 'QrTokenCreated'); no evidence yet for what a PAID
+  // remote push reports, since none has been observed live -- if it turns
+  // out not to be 'Processed' like a QR, that path has the same silent-loop
+  // risk and the logging below is what will catch it.
+  'RemotePaymentRejected',
 ])
 const QR_EXPIRED = new Set(['QrTokenDiscarded', 'Expired'])
 // 'Wait' is Kaspi's own signal that the customer has already opened/scanned
@@ -466,16 +477,17 @@ export async function checkStatus(
   if (QR_EXPIRED.has(status)) return { status: 'expired' }
   if (QR_FAILED.has(status)) return { status: 'failed' }
   if (QR_SCANNING.has(status)) return { status: 'scanning' }
-  if (status !== 'QrTokenCreated') {
-    // QR_FAILED/QR_EXPIRED were built from strings OBSERVED on a QR someone
-    // scanned and then declined -- nobody has yet confirmed a phone push
-    // (remote/create) reports a decline the same way. Without this, an
-    // unrecognized string here silently loops as 'pending' forever with
-    // zero trace of what Kaspi actually said (founder repro 2026-09-05:
-    // cancelled a phone-pushed subscription payment in the Kaspi app, the
-    // site never noticed). Logged so the real string can be read from Vercel
-    // and added to the correct Set with evidence instead of guessed at.
+  // 'QrTokenCreated' (QR minted, untouched) and 'RemotePaymentCreated' (push
+  // sent, untouched) are the two confirmed-benign in-flight values -- caught
+  // live 2026-09-05 alongside 'RemotePaymentRejected' above. Anything else is
+  // still logged rather than silently treated as pending: QR_FAILED/
+  // QR_EXPIRED/QR_PAID were each built from strings actually observed for
+  // their flow, and a phone push's own PAID string has never been observed
+  // (no live remote payment has completed yet) -- if it isn't 'Processed'
+  // like a QR, this is what will catch it instead of a payment silently
+  // looping as 'pending' forever with the money already taken.
+  if (status !== 'QrTokenCreated' && status !== 'RemotePaymentCreated') {
     console.error('Kaspi checkStatus: unrecognized status', JSON.stringify(status), 'for operation', operationId, '-- treating as pending')
   }
-  return { status: 'pending' } // QrTokenCreated or another unrecognized in-flight status
+  return { status: 'pending' }
 }
