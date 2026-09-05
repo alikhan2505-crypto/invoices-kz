@@ -1,6 +1,7 @@
 'use client'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import QRCode from 'qrcode'
 import { supabase } from '@/lib/supabase'
 import { useLanguage } from '@/components/LanguageProvider'
 import { backLabel, closeLabel } from '@/lib/a11yLabels'
@@ -29,6 +30,15 @@ export default function Upgrade() {
   const [qrToken, setQrToken] = useState('')
   const [extTranId, setExtTranId] = useState('')
   const [checkingStatus, setCheckingStatus] = useState(false)
+  // Kaspi gives a QR roughly five minutes. Nothing used to surface that: the
+  // code silently died and the modal kept spinning "ожидаем подтверждение"
+  // forever, so the customer either waited on a dead square or closed the
+  // modal and hit `already_pending` on the retry. Now the deadline is shown
+  // and a fresh QR is minted the moment the old one lapses.
+  const [qrExpiresAt, setQrExpiresAt] = useState<number>(0)
+  const [secondsLeft, setSecondsLeft] = useState<number>(0)
+  const [qrDataUrl, setQrDataUrl] = useState('')
+  const [refreshingQr, setRefreshingQr] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [showPhoneModal, setShowPhoneModal] = useState(false)
   const [payPhone, setPayPhone] = useState('')
@@ -85,6 +95,14 @@ export default function Upgrade() {
         if (data.status === 'paid' && !cancelled) {
           clearInterval(interval)
           router.push('/profile?upgraded=1')
+        } else if (data.status === 'expired' && !cancelled) {
+          // Kaspi can discard a QR before its stated ExpireDate, so trust its
+          // verdict over the local clock: pushing the deadline into the past
+          // makes the countdown effect below mint a replacement on its next
+          // tick. Not calling requestPayment straight from here keeps this
+          // effect above its declaration, where it already sits.
+          clearInterval(interval)
+          setQrExpiresAt(Date.now() - 1)
         }
       } catch {
         // Transient network hiccup — the next tick tries again.
@@ -92,6 +110,20 @@ export default function Upgrade() {
     }, 5000)
     return () => { cancelled = true; clearInterval(interval) }
   }, [extTranId])
+
+  // Draws the QR here instead of fetching an <img> from api.qrserver.com.
+  // That third party received the Kaspi payment link in a query string on
+  // every render, and when it was slow or down the customer got an empty
+  // box with no explanation. The qrcode package is already a dependency and
+  // is what every other QR in the app uses.
+  useEffect(() => {
+    if (!qrToken) { setQrDataUrl(''); return }
+    let cancelled = false
+    QRCode.toDataURL(qrToken, { width: 200, margin: 1 })
+      .then(url => { if (!cancelled) setQrDataUrl(url) })
+      .catch(() => { if (!cancelled) setQrDataUrl('') })
+    return () => { cancelled = true }
+  }, [qrToken])
 
   async function loadData() {
     const { data: { user } } = await supabase.auth.getUser()
@@ -119,10 +151,88 @@ export default function Upgrade() {
     return result
   }
 
+  // Mints one Kaspi operation and wires the modal to it. Split out of
+  // openModal so the expiry watcher below can mint a replacement without
+  // reopening the modal or re-running the baseline snapshot.
+  // `link` carries the fresh payment URL because React state updates are
+  // async -- the mobile redirect needs the value in this tick and cannot read
+  // it back off `qrToken`. `settled` means the server found the plan already
+  // paid and the modal is now showing success, so the caller must leave it
+  // open instead of treating the empty link as a failure.
+  const requestPayment = useCallback(async (
+    planKey: string,
+    billingPeriod: BillingPeriod,
+  ): Promise<{ link: string; settled: boolean }> => {
+    const { data: { session } } = await supabase.auth.getSession()
+    const res = await fetch('/api/payment/create', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session?.access_token}`,
+      },
+      body: JSON.stringify({ userId, plan: planKey, period: billingPeriod })
+    })
+    const data = await res.json()
+
+    if (!res.ok || data.error) {
+      // already_paid means the server settled a QR the customer had in fact
+      // already paid -- the plan is now active, so show success rather than
+      // an error telling them to try again.
+      if (data.error === 'already_paid') {
+        setStep('success')
+        return { link: '', settled: true }
+      }
+      alert(data.error === 'already_pending' ? t.alreadyPendingAlert : t.errorPrefix(data.error || t.tryAgainDefault))
+      return { link: '', settled: false }
+    }
+
+    setQrToken(data.qr_token)
+    setExtTranId(data.ext_tran_id)
+    setQrExpiresAt(data.expire_date ? new Date(data.expire_date).getTime() : 0)
+    return { link: data.qr_token as string, settled: false }
+  }, [userId, t])
+
+  // Counts the QR down and replaces it the moment Kaspi's window closes, so
+  // the customer never sits in front of a code that can no longer be paid.
+  // Only runs while the modal is on its pending step -- a settled payment
+  // must not mint another operation. Declared after requestPayment because
+  // it calls it.
+  useEffect(() => {
+    if (!qrExpiresAt || !showModal || step !== 'pending' || phoneRequested) return
+    let cancelled = false
+
+    const tick = async () => {
+      const left = Math.max(0, Math.round((qrExpiresAt - Date.now()) / 1000))
+      setSecondsLeft(left)
+      if (left > 0 || cancelled || refreshingQr) return
+
+      setRefreshingQr(true)
+      try {
+        const plan = selectedPlan
+        if (plan) {
+          // Cleared first so this effect cannot re-enter while the
+          // replacement operation is still being minted.
+          setQrExpiresAt(0)
+          await requestPayment(plan.plan, plan.period)
+        }
+      } catch (e: any) {
+        console.error('QR refresh failed:', e.message)
+      } finally {
+        if (!cancelled) setRefreshingQr(false)
+      }
+    }
+
+    tick()
+    const timer = setInterval(tick, 1000)
+    return () => { cancelled = true; clearInterval(timer) }
+  }, [qrExpiresAt, showModal, step, phoneRequested, refreshingQr, selectedPlan, requestPayment])
+
   async function openModal(planName: string, amount: number, planKey: string, billingPeriod: BillingPeriod) {
     setSelectedPlan({ name: planName, amount, plan: planKey, period: billingPeriod })
     setQrToken('')
     setExtTranId('')
+    setQrExpiresAt(0)
+    setQrDataUrl('')
     setStep('pending')
     setPhoneRequested(false)
     setShowModal(true)
@@ -135,30 +245,17 @@ export default function Upgrade() {
         : { data: null }
       baselineExpiresRef.current = p?.plan === planKey && p?.plan_expires_at ? new Date(p.plan_expires_at).getTime() : 0
 
-      const { data: { session } } = await supabase.auth.getSession()
-      const res = await fetch('/api/payment/create', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token}`,
-        },
-        body: JSON.stringify({ userId, plan: planKey, period: billingPeriod })
-      })
-
-      const data = await res.json()
-
-      if (!res.ok || data.error) {
-        alert(data.error === 'already_pending' ? t.alreadyPendingAlert : t.errorPrefix(data.error || t.tryAgainDefault))
-        setShowModal(false)
+      const { link, settled } = await requestPayment(planKey, billingPeriod)
+      if (!link) {
+        // settled === true keeps the modal up on its success screen; only a
+        // real failure closes it.
+        if (!settled) setShowModal(false)
         setSubmitting(false)
         return
       }
 
-      setQrToken(data.qr_token)
-      setExtTranId(data.ext_tran_id)
-
       if (isMobile) {
-        window.location.href = data.qr_token
+        window.location.href = link
       }
 
       statusInterval.current = setInterval(() => checkPaymentStatus(planKey), 5000)
@@ -538,10 +635,10 @@ export default function Upgrade() {
                   <div className="text-center py-2">
                     <div className="font-semibold text-[#1C2056] mb-1">{t.scanQrTitle}</div>
                     <div className="text-xs text-gray-400 mb-4">{t.otherMethodHint}</div>
-                    {qrToken && (
-                      <div className="flex justify-center mb-4">
+                    {qrDataUrl && (
+                      <div className="flex justify-center mb-2">
                         <img
-                          src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrToken)}`}
+                          src={qrDataUrl}
                           alt={t.qrCodeAltText}
                           className="rounded-xl border border-gray-100"
                           width={200}
@@ -549,6 +646,15 @@ export default function Upgrade() {
                         />
                       </div>
                     )}
+                    <div className="text-xs mb-4 h-4" aria-live="polite">
+                      {refreshingQr ? (
+                        <span className="text-gray-400">Обновляем код…</span>
+                      ) : secondsLeft > 0 ? (
+                        <span className={secondsLeft <= 60 ? 'text-[#C2410C]' : 'text-gray-400'}>
+                          Код действует ещё {Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, '0')}
+                        </span>
+                      ) : null}
+                    </div>
                     <div className="flex flex-col gap-2">
                       <a href={qrToken} target="_blank"
                         className="text-xs text-gray-400 underline">

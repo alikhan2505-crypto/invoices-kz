@@ -1,3 +1,4 @@
+import QRCode from 'qrcode'
 import { resizeToFit } from './imageResize'
 
 interface Service {
@@ -121,6 +122,18 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<string> {
   function formatMoney(n: number): string {
     return n.toLocaleString('ru-KZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace('.', ',')
   }
+
+  // QR для оплаты рисуем локально, а не через api.qrserver.com, как было
+  // раньше. Тот вариант отправлял ссылку на счёт (data.viewUrl — публичный
+  // токен, открывающий документ с компанией, БИН и суммами) в строке запроса
+  // на чужой сервер при каждом рендере, а если сервис недоступен, в готовом
+  // счёте оставался битый квадрат. Библиотека qrcode уже стоит в проекте и
+  // используется во всех остальных местах — печатная форма была последней,
+  // где осталась внешняя зависимость.
+  const qrTarget = data.viewUrl || data.kaspiPayLink || ''
+  const qrDataUrl = qrTarget
+    ? await QRCode.toDataURL(qrTarget, { width: 200, margin: 1 }).catch(() => '')
+    : ''
 
   const totalWords = numberToWords(Math.floor(data.total)) + ' тенге 00 тиын'
   const vatType = data.vatType || 'no_vat'
@@ -298,9 +311,9 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<string> {
         />` : ''}
       </div>
 
-      ${data.kaspiPayLink ? `
+      ${data.kaspiPayLink && qrDataUrl ? `
         <div style="margin-top:32px;padding:12px;border:1px solid #e5e7eb;border-radius:8px;display:flex;align-items:center;gap:16px;">
-          <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(data.viewUrl || data.kaspiPayLink)}"
+          <img src="${qrDataUrl}"
             style="width:100px;height:100px;flex-shrink:0;" />
           <div>
             ${data.viewUrl ? `

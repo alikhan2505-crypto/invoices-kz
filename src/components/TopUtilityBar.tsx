@@ -123,7 +123,16 @@ export default function TopUtilityBar() {
   const [topupCustom, setTopupCustom] = useState('')
   const [toppingUp, setToppingUp] = useState(false)
   const [topupError, setTopupError] = useState('')
-  const [topupPending, setTopupPending] = useState<{ topup_id: string; payment_link: string } | null>(null)
+  // `amount` and `expires_at` ride along so the QR can be reissued in place
+  // when Kaspi's ~5-minute window closes. Before that, an expired code just
+  // dumped the customer back to the amount picker with "время оплаты
+  // истекло" -- the one real customer who ever tried to top up lost two
+  // payments that way on 2026-09-01 and never came back.
+  const [topupPending, setTopupPending] = useState<
+    { topup_id: string; payment_link: string; amount: number; expires_at: number } | null
+  >(null)
+  const [topupSecondsLeft, setTopupSecondsLeft] = useState(0)
+  const [topupRefreshing, setTopupRefreshing] = useState(false)
   const [topupQrDataUrl, setTopupQrDataUrl] = useState<string | null>(null)
   const [showTopup, setShowTopup] = useState(false)
   // "Заработано через Kaspi" (paid invoices, last 30 days) and the tariff
@@ -320,7 +329,12 @@ export default function TopUtilityBar() {
     const res = await fetch(wallet.topupUrl, { method: 'POST', headers, body: JSON.stringify({ [wallet.amountField]: amount }) })
     const data = await res.json()
     if (res.ok) {
-      setTopupPending({ topup_id: data.topup_id, payment_link: data.payment_link })
+      setTopupPending({
+        topup_id: data.topup_id,
+        payment_link: data.payment_link,
+        amount,
+        expires_at: data.expires_at ? new Date(data.expires_at).getTime() : 0,
+      })
     } else {
       setTopupError(data.error === 'invalid_amount' ? `Минимум ${(data.min ?? wallet.minAmount).toLocaleString('ru-KZ')} ₸` : 'Не удалось создать оплату, попробуйте ещё раз')
     }
@@ -339,14 +353,43 @@ export default function TopUtilityBar() {
         setTopupPending(null)
         await refreshBalances([wallet], headers)
         selectWallet(activeWallet)
-      } else if (data.status === 'expired') {
-        setTopupPending(null)
-        setTopupError('Время оплаты истекло, попробуйте снова')
+      } else if (data.status === 'expired' || data.status === 'failed') {
+        // Both statuses leave a QR that Kaspi's scanner answers with a raw
+        // "QR-код не распознан": 'expired' is the ~5-minute window closing or
+        // Kaspi discarding the token, 'failed' is the customer scanning and
+        // then cancelling. /kaspi-api already handles the pair this way.
+        //
+        // Reissue in place rather than sending the customer back to the
+        // amount picker: they already chose the amount and are standing in
+        // front of the phone with Kaspi open.
+        if (!topupRefreshing) {
+          setTopupRefreshing(true)
+          const amount = topupPending.amount
+          setTopupPending(null)
+          try {
+            await startTopup(wallet, amount)
+          } finally {
+            setTopupRefreshing(false)
+          }
+        }
       }
     }, 3000)
     return () => clearInterval(interval)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [topupPending, activeWallet])
+  }, [topupPending, activeWallet, topupRefreshing])
+
+  // Local countdown so the deadline is visible before it passes. The status
+  // poll above is what actually reissues the code; this only reports time and
+  // covers the case where the poll is slow to notice.
+  useEffect(() => {
+    if (!topupPending?.expires_at) { setTopupSecondsLeft(0); return }
+    const tick = () => setTopupSecondsLeft(
+      Math.max(0, Math.round((topupPending.expires_at - Date.now()) / 1000))
+    )
+    tick()
+    const timer = setInterval(tick, 1000)
+    return () => clearInterval(timer)
+  }, [topupPending])
 
   async function signOut() {
     await supabase.auth.signOut()
@@ -535,6 +578,15 @@ export default function TopUtilityBar() {
                             <img src={topupQrDataUrl} alt="Kaspi QR" className="w-40 h-40 rounded-lg" style={{ background: '#fff', padding: 8 }} />
                           </div>
                         )}
+                        <div className="text-[11px] text-center mb-2 h-4" aria-live="polite">
+                          {topupRefreshing ? (
+                            <span style={{ color: 'var(--nav-text-muted)' }}>Обновляем код…</span>
+                          ) : topupSecondsLeft > 0 ? (
+                            <span style={{ color: topupSecondsLeft <= 60 ? 'var(--nav-critical)' : 'var(--nav-text-muted)' }}>
+                              Код действует ещё {Math.floor(topupSecondsLeft / 60)}:{String(topupSecondsLeft % 60).padStart(2, '0')}
+                            </span>
+                          ) : null}
+                        </div>
                         <a href={topupPending.payment_link} target="_blank" rel="noopener noreferrer"
                           className="block text-center rounded-lg px-3 py-2 text-xs font-medium"
                           style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
