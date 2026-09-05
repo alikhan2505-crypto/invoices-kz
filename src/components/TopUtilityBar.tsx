@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
@@ -15,6 +15,11 @@ type Panel = 'wallet' | 'notifications' | 'help' | 'account' | null
 // purpose as postLoginRedirect.ts, but a bare boolean rather than a path, so
 // it doesn't need that helper's exact-path allowlist.
 const PENDING_BONUS_KEY = 'invoices.pendingWelcomeBonus'
+
+// How long an untouched QR is shown before it is retired for a fresh one.
+// Kaspi's own window is ~5 minutes; /kaspi-api and /upgrade already shorten
+// the visible wait to a minute, and this widget follows them.
+const IDLE_QR_MS = 60_000
 
 interface HistoryEntry {
   label: string
@@ -133,6 +138,17 @@ export default function TopUtilityBar() {
   >(null)
   const [topupSecondsLeft, setTopupSecondsLeft] = useState(0)
   const [topupRefreshing, setTopupRefreshing] = useState(false)
+  // Kaspi's 'Wait' status: the customer is on the confirmation screen right
+  // now. While true, the idle force-refresh below must not pull the code out
+  // from under them -- same guarantee /kaspi-api and /upgrade make. Read by
+  // the poll's closure, so it needs the ref (state alone would be stale
+  // there without adding it to the interval's dependency array, which would
+  // tear the interval down on every flip).
+  const [topupScanning, setTopupScanning] = useState(false)
+  const topupScanningRef = useRef(false)
+  // When the current code (QR or phone push) was minted -- the 60s idle
+  // deadline counts from here, not from Kaspi's own ~5-minute expiry.
+  const topupCreatedAtRef = useRef(0)
   // Payment pushed into the customer's own Kaspi app instead of a QR they'd
   // need a second device to scan. Subscriptions have had this for a while;
   // the wallet only offered the QR.
@@ -389,6 +405,9 @@ export default function TopUtilityBar() {
         amount,
         expires_at: data.expires_at ? new Date(data.expires_at).getTime() : 0,
       })
+      setTopupScanning(false)
+      topupScanningRef.current = false
+      topupCreatedAtRef.current = Date.now()
     } else {
       setTopupError(data.error === 'invalid_amount' ? `Минимум ${(data.min ?? wallet.minAmount).toLocaleString('ru-KZ')} ₸` : 'Не удалось создать оплату, попробуйте ещё раз')
     }
@@ -400,9 +419,30 @@ export default function TopUtilityBar() {
     const wallet = WALLETS.find(w => w.key === activeWallet)!
     const interval = setInterval(async () => {
       const headers = await authHeader()
-      const res = await fetch(`${wallet.topupStatusUrl}?topup_id=${topupPending.topup_id}`, { headers })
+      // Folded into the same 3s tick rather than a separate one-shot 60s
+      // timer: a standalone timeout that fires once and gets refused (the
+      // per-something rate limit, a slow network) never retries, since
+      // nothing re-arms it. Piggybacking on the poll means the idle flag is
+      // simply re-evaluated -- and re-sent -- every 3 seconds until it
+      // succeeds, costs no extra requests (the poll was already running),
+      // and can't drift out of sync with the code actually on screen.
+      // Phone pushes are excluded: /kaspi-api never idle-forces one either,
+      // since there's no code to swap and forcing it dead would just orphan
+      // a request the customer may still act on in their own time.
+      const idleOverdue = !topupPhoneSent && !topupScanningRef.current
+        && topupCreatedAtRef.current > 0
+        && Date.now() - topupCreatedAtRef.current >= IDLE_QR_MS
+      const url = `${wallet.topupStatusUrl}?topup_id=${topupPending.topup_id}${idleOverdue ? '&force=true' : ''}`
+      const res = await fetch(url, { headers })
       if (!res.ok) return
       const data = await res.json()
+      if (data.status === 'scanning') {
+        setTopupScanning(true)
+        topupScanningRef.current = true
+        return
+      }
+      setTopupScanning(false)
+      topupScanningRef.current = false
       if (data.status === 'paid') {
         setTopupPending(null)
         await refreshBalances([wallet], headers)
@@ -441,18 +481,24 @@ export default function TopUtilityBar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [topupPending, activeWallet, topupRefreshing])
 
-  // Local countdown so the deadline is visible before it passes. The status
-  // poll above is what actually reissues the code; this only reports time and
-  // covers the case where the poll is slow to notice.
+  // Local countdown so the deadline is visible before it passes. Shows the
+  // nearer of Kaspi's own expiry and the 60s idle deadline the poll above
+  // enforces -- matching /kaspi-api and /upgrade, so the number on screen
+  // never reads "4:41" a moment before the code the poll is about to retire.
+  // Purely informational: the poll's real Kaspi status decides everything,
+  // never this reaching zero.
   useEffect(() => {
-    if (!topupPending?.expires_at) { setTopupSecondsLeft(0); return }
-    const tick = () => setTopupSecondsLeft(
-      Math.max(0, Math.round((topupPending.expires_at - Date.now()) / 1000))
-    )
+    if (!topupPending?.expires_at || topupPhoneSent) { setTopupSecondsLeft(0); return }
+    const tick = () => {
+      const kaspiLeft = Math.round((topupPending.expires_at - Date.now()) / 1000)
+      const idleLeft = Math.round((topupCreatedAtRef.current + IDLE_QR_MS - Date.now()) / 1000)
+      const left = topupScanningRef.current ? kaspiLeft : Math.min(kaspiLeft, idleLeft)
+      setTopupSecondsLeft(Math.max(0, left))
+    }
     tick()
     const timer = setInterval(tick, 1000)
     return () => clearInterval(timer)
-  }, [topupPending])
+  }, [topupPending, topupPhoneSent])
 
   async function signOut() {
     await supabase.auth.signOut()
@@ -652,11 +698,13 @@ export default function TopUtilityBar() {
                           </div>
                         )}
                         <div className="text-[11px] text-center mb-2 h-4" aria-live="polite">
-                          {topupRefreshing ? (
+                          {topupScanning ? (
+                            <span style={{ color: 'var(--nav-success)' }}>Подтвердите оплату в приложении Kaspi…</span>
+                          ) : topupRefreshing ? (
                             <span style={{ color: 'var(--nav-text-muted)' }}>Обновляем код…</span>
                           ) : topupSecondsLeft > 0 ? (
-                            <span style={{ color: topupSecondsLeft <= 60 ? 'var(--nav-critical)' : 'var(--nav-text-muted)' }}>
-                              Код действует ещё {Math.floor(topupSecondsLeft / 60)}:{String(topupSecondsLeft % 60).padStart(2, '0')}
+                            <span style={{ color: 'var(--nav-text-muted)' }}>
+                              QR действителен ещё {Math.floor(topupSecondsLeft / 60)}:{String(topupSecondsLeft % 60).padStart(2, '0')}
                             </span>
                           ) : null}
                         </div>
@@ -665,6 +713,15 @@ export default function TopUtilityBar() {
                           style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                           Открыть оплату
                         </a>
+                        {/* The phone alternative sits on the amount-picker
+                            screen, which this QR view replaces -- without
+                            this, choosing "Пополнить" hides the alternative
+                            for good until the QR itself expires. */}
+                        <button onClick={() => { setTopupPending(null); setTopupPhoneOpen(true) }}
+                          className="w-full text-center text-[11px] mt-2 underline"
+                          style={{ color: 'var(--nav-text-muted)' }}>
+                          Отменить, отправить на телефон
+                        </button>
                       </div>
                     ) : (
                       <>

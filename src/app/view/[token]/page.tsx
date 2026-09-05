@@ -179,28 +179,6 @@ export default function PublicInvoice() {
     return () => clearInterval(interval)
   }, [kaspiPayment?.expires_at, kaspiPayment?.status])
 
-  // Retires a code nobody has touched after 60 seconds instead of making the
-  // payer wait out Kaspi's full ~5 minutes -- the behaviour /kaspi-api has had
-  // since the founder asked for it. Never fires while scanning is in progress.
-  useEffect(() => {
-    if (!kaspiPayment || kaspiPayment.status !== 'pending' || !token) return
-    const link = kaspiPayment.payment_link
-    const timeout = setTimeout(async () => {
-      if (kaspiScanningRef.current) return
-      try {
-        const res = await fetch(`/api/kaspi/invoice-payment?token=${token}&idle=true`)
-        const data = await res.json()
-        // Guard against a timer left over from a code that has already been
-        // replaced by the 5s poll.
-        if (data.payment && data.payment.payment_link !== link) kaspiCreatedAtRef.current = Date.now()
-        setKaspiPayment(data.payment || null)
-      } catch {
-        // The 5s poll keeps running; the next tick tries again.
-      }
-    }, IDLE_QR_MS)
-    return () => clearTimeout(timeout)
-  }, [kaspiPayment?.payment_link, kaspiPayment?.status, token])
-
   // Kaspi has no webhook to us, so the only way to learn a QR got paid is to
   // actively ask while the payer is here — this is what makes payment
   // confirmation instant and click-free without needing a frequent cron
@@ -222,7 +200,18 @@ export default function PublicInvoice() {
       kaspiPollCount.current++
       if (kaspiPollCount.current > 150) { clearInterval(interval); return }
       try {
-        const res = await fetch(`/api/kaspi/invoice-payment?token=${token}`)
+        // Folded into this same 5s tick rather than a separate one-shot 60s
+        // timeout: a standalone timer that fires once and gets refused (the
+        // per-invoice mint cap, a slow network) never retries, since nothing
+        // re-arms it -- which is what actually caused "QR ПРОПАЛ": the timer
+        // fired, the mint was capped, and no later attempt was ever made.
+        // Piggybacking on the poll means idle is simply re-sent every 5
+        // seconds until it succeeds, at no extra request cost.
+        const idleOverdue = !kaspiScanningRef.current
+          && kaspiCreatedAtRef.current > 0
+          && Date.now() - kaspiCreatedAtRef.current >= IDLE_QR_MS
+        const url = `/api/kaspi/invoice-payment?token=${token}${idleOverdue ? '&idle=true' : ''}`
+        const res = await fetch(url)
         const data = await res.json()
         const scanning = data.payment?.live === 'scanning'
         setKaspiScanning(scanning)
