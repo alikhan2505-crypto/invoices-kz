@@ -60,8 +60,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="yandex-verification" content="" />
-        <meta name="google-site-verification" content="" />
+        {/* Подтверждение прав в Яндекс.Вебмастере. Стоит в общем <head>, поэтому
+            отдаётся на обоих хостах (invoices.kz и www) — какой бы из них Яндекс
+            ни проверял. Google подтверждён отдельно, DNS-записью на уровне
+            домена (ресурс sc-domain:invoices.kz), поэтому мета-тег ему не нужен
+            и пустой плейсхолдер здесь убран (2026-09-05). */}
+        <meta name="yandex-verification" content="99d825a4e386fc08" />
         <StructuredData />
         {/* No hardcoded canonical here. It used to sit in this shared <head>,
             so EVERY route declared the homepage as its canonical URL --
