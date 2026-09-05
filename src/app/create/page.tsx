@@ -3,13 +3,12 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
-import { generateInvoicePDF } from '@/lib/generatePDF'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import InvoiceLivePreview from '@/components/InvoiceLivePreview'
 import { cacheGet, cacheSet } from '@/lib/cache'
 import { getActivePlan } from '@/lib/plan'
-import { formatDate, formatDateSafe } from '@/lib/date'
+import { formatDate } from '@/lib/date'
 import { computeDefaultDueDate, todayDateString } from '@/lib/dueDate'
 import { useLanguage } from '@/components/LanguageProvider'
 import { closeLabel, deleteLabel } from '@/lib/a11yLabels'
@@ -37,14 +36,6 @@ function InfoIcon() {
       <circle cx="12" cy="12" r="9" />
       <path d="M12 11v6" />
       <path d="M12 7.5h.01" />
-    </svg>
-  )
-}
-
-function ChevronRightIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="m9 6 6 6-6 6" />
     </svg>
   )
 }
@@ -89,13 +80,12 @@ export default function CreateInvoicePage() {
   const [monthStats, setMonthStats] = useState({ paid: 0, total: 0, amount: 0 })
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [bankAccounts, setBankAccounts] = useState<any[]>([])
-  const [showBankPicker, setShowBankPicker] = useState(false)
+  const [selectedBankId, setSelectedBankId] = useState<string | null>(null)
   const [showVatHint, setShowVatHint] = useState(false)
   // null while unknown (fetch pending) so the hint below never flashes on
   // for an already-connected founder before the check resolves.
   const [kaspiCashierConnected, setKaspiCashierConnected] = useState<boolean | null>(null)
   const vatHintRef = useRef<HTMLSpanElement>(null)
-  const [pendingInvoiceData, setPendingInvoiceData] = useState<any>(null)
   // Ref для хранения открытого окна PDF
  
   const [clientName, setClientName] = useState('')
@@ -145,6 +135,7 @@ export default function CreateInvoicePage() {
     const { data: banks } = await supabase
       .from('bank_accounts').select('*').eq('user_id', user.id).order('is_main', { ascending: false })
     setBankAccounts(banks || [])
+    if (banks && banks.length > 0) setSelectedBankId(banks[0].id)
 
     // Kaspi Cashier connection status, for the "connect for exact-amount
     // tracked payments" hint next to the live preview (desktop only, per
@@ -364,57 +355,6 @@ export default function CreateInvoicePage() {
     setShowSaveClient(false)
   }
 
-  function buildPDFProfile() {
-    return {
-      company_name: profile?.company_name || '',
-      bin_iin: profile?.bin_iin || '',
-      address: profile?.address || '',
-      director_name: profile?.director_name || '',
-      phone: profile?.phone || '',
-      signature_url: profile?.signature_url || '',
-      stamp_url: profile?.stamp_url || '',
-      logo_url: profile?.logo_url || '',
-    }
-  }
-
-  async function generateWithBank(bank: any) {
-    if (!pendingInvoiceData) return
-    const win = window.open('', '_blank')
-    const { invoiceNumber, invoiceDate, cn, cb, ce, ca, cp, cn2, cd, svcs, tot, nt, knp, pt, dd } = pendingInvoiceData
-    // Берём окно из ref (было открыто при клике на банк — прямой клик пользователя)
-    const html = await generateInvoicePDF({
-      number: invoiceNumber,
-      date: invoiceDate,
-      clientName: cn,
-      clientBin: cb,
-      clientEmail: ce,
-      clientAddress: ca,
-      clientPhone: cp,
-      contractNumber: cn2,
-      contractDate: cd ? formatDateSafe(cd) : undefined,
-      knp,
-      services: svcs,
-      total: tot,
-      note: nt || profile?.default_note || '',
-      autoPrint: false,
-      vatType: profile?.vat_type || 'no_vat',
-      profile: buildPDFProfile(),
-      bank: {
-        bank_name: bank.bank_name || '',
-        iik: bank.iik || '',
-        bik: bank.bik || '',
-        kbe: bank.kbe || '19',
-      },
-      kaspiPayLink: profile?.kaspi_pay_link || undefined,
-      viewUrl: pt ? `https://www.invoices.kz/view/${pt}` : undefined,
-      dueDate: dd ? formatDate(dd) : undefined,
-      showWatermark: !getActivePlan(profile).isActive,
-    })
-    setShowBankPicker(false)
-    setPendingInvoiceData(null)
-    if (win) { win.document.write(html); win.document.close() }
-  }
-
   async function createInvoice() {
     if (!profile?.company_name || !profile?.bin_iin) {
       alert(t.fillCompanyDetailsFirstAlert)
@@ -437,6 +377,8 @@ export default function CreateInvoicePage() {
 
     if (!clientName) { alert(t.enterClientNameAlert); return }
     if (!clientBin) { alert(t.enterClientBinAlert); return }
+    if (!clientAddress) { alert(t.enterClientAddressAlert); return }
+    if (!clientPhone) { alert(t.enterClientPhoneAlert); return }
     if (services.length === 0 || services.some(s => !s.name)) {
       alert(t.addAtLeastOneServiceAlert); return
     }
@@ -489,6 +431,7 @@ export default function CreateInvoicePage() {
       client_email: clientEmail,
       client_address: clientAddress,
       client_phone: clientPhone || null,
+      bank_id: selectedBankId,
       contract_number: contractNumber || null,
       contract_date: contractDate || null,
       due_date: dueDate || null,
@@ -508,49 +451,17 @@ export default function CreateInvoicePage() {
     setLastCreated(Date.now())
     setLoading(false)
 
-    const invoiceDate = new Date().toLocaleDateString('ru-KZ')
-
-    if (banks.length > 1) {
-      // Несколько банков — сохраняем окно в ref, откроется при выборе банка
-      setBankAccounts(banks)
-      setPendingInvoiceData({
-        invoiceNumber: data.number,
-        invoiceDate,
-        cn: clientName, cb: clientBin, ce: clientEmail,
-        ca: clientAddress, cp: clientPhone,
-        cn2: contractNumber, cd: contractDate,
-        knp: clientKnp, svcs: services, tot: total, nt: note,
-        pt: data.public_token,
-        dd: dueDate,
-      })
-      setShowBankPicker(true)
-      clearClient()
-      setServices([{ name: '', qty: 1, price: 0, unit: 'шт', code: '', type: 'service' }])
-      return
-    }
-    const bank = banks[0]
-    const win = window.open('', '_blank')
-    const html = await generateInvoicePDF({
-      number: data.number, date: invoiceDate,
-      clientName, clientBin, clientEmail, clientAddress, clientPhone,
-      contractNumber, contractDate: contractDate ? formatDateSafe(contractDate) : undefined, knp: clientKnp, services, total,
-      note: note || '', autoPrint: false, vatType: profile?.vat_type || 'no_vat',
-      profile: buildPDFProfile(),
-      bank: {
-        bank_name: bank.bank_name || '',
-        iik: bank.iik || '',
-        bik: bank.bik || '',
-        kbe: bank.kbe || '19',
-      },
-      kaspiPayLink: profile?.kaspi_pay_link || undefined,
-      viewUrl: data.public_token ? `https://www.invoices.kz/view/${data.public_token}` : undefined,
-      dueDate: dueDate ? formatDate(dueDate) : undefined,
-      showWatermark: !getActivePlan(profile).isActive,
-    })
-    if (win) { win.document.write(html); win.document.close() }
-
-    clearClient()
-    setServices([{ name: '', qty: 1, price: 0, unit: 'шт', code: '', type: 'service' }])
+    // Used to open a bare PDF in a new tab right here and stop -- the ONLY
+    // outcome of creating an invoice was a downloadable file, with no mention
+    // anywhere that the service could send it. /invoice/[id] already has the
+    // full set of ways to get an invoice to a client (WhatsApp first, then
+    // copy link, PDF, email) plus the Kaspi Pay section; landing there
+    // instead makes sending through the service the obvious next step rather
+    // than something the payer only finds by digging into an existing
+    // invoice later. selectedBankId is now saved on the row above, so
+    // /invoice/[id]'s own bank_id-or-main fallback picks up this choice
+    // instead of re-deciding it.
+    router.push('/invoice/' + data.id)
   }
 
   return (
@@ -693,6 +604,11 @@ export default function CreateInvoicePage() {
                     value={clientKnp} onChange={e => setClientKnp(e.target.value)}>
                     {KNP_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                   </select>
+                </div>
+                <div>
+                  <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.addressLabelDashboard}</label>
+                  <input className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
+                    placeholder={t.addressPlaceholder} value={clientAddress} onChange={e => setClientAddress(e.target.value)} />
                 </div>
                 <div>
                   <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.buyerPhoneLabel}</label>
@@ -937,6 +853,37 @@ export default function CreateInvoicePage() {
           </div>
           </div>
 
+          {bankAccounts.length > 1 && (
+            <motion.div
+              className="nav-glass rounded-2xl p-4 mb-4"
+              initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.22 }}
+            >
+              <h3 className="font-medium mb-3 text-sm" style={{ color: 'var(--nav-text-primary)' }}>{t.bankPickerTitle}</h3>
+              <div className="space-y-2">
+                {bankAccounts.map(bank => (
+                  <button key={bank.id} type="button" onClick={() => setSelectedBankId(bank.id)}
+                    className="w-full flex items-center justify-between rounded-xl px-3 py-2.5 text-left border transition-colors"
+                    style={selectedBankId === bank.id
+                      ? { borderColor: 'var(--nav-accent)', background: 'var(--nav-accent-soft)' }
+                      : { borderColor: 'var(--nav-border-soft)', background: 'var(--nav-surface-glass)' }}>
+                    <div>
+                      <div className="text-sm font-medium" style={{ color: 'var(--nav-text-primary)' }}>
+                        {bank.bank_name}
+                        {bank.is_main && <span className="ml-2 text-xs font-normal" style={{ color: 'var(--nav-text-muted)' }}>{t.mainBankBadge}</span>}
+                      </div>
+                      <div className="text-xs mt-0.5 tabular-nums" style={{ color: 'var(--nav-text-muted)' }}>{bank.iik}</div>
+                    </div>
+                    {selectedBankId === bank.id && (
+                      <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: 'var(--nav-accent)' }} />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
           <motion.button
             onClick={createInvoice} disabled={loading}
             initial={reduceMotion ? false : { opacity: 0, y: 16 }}
@@ -1026,37 +973,6 @@ export default function CreateInvoicePage() {
                 className="flex-1 rounded-xl py-3 text-sm font-medium" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                 {t.saveButtonLabel}
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Bank picker modal */}
-      {showBankPicker && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-3">
-          <div className="w-full max-w-lg rounded-3xl p-5 max-h-[80vh] overflow-y-auto" style={{ background: 'var(--nav-surface-chrome)' }}>
-            <div className="flex items-center justify-between mb-4">
-              <span className="font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{t.bankPickerTitle}</span>
-              <button onClick={() => {
-
-                setShowBankPicker(false)
-                setPendingInvoiceData(null)
-              }} className="back-btn transition-colors text-[color:var(--nav-text-muted)] hover:text-[color:var(--nav-text-secondary)]" aria-label={closeLabel(lang)}><XIcon /></button>
-            </div>
-            <div className="space-y-2">
-              {bankAccounts.map(bank => (
-                <div key={bank.id} onClick={() => generateWithBank(bank)}
-                  className="flex items-center justify-between p-4 rounded-xl cursor-pointer transition-colors border border-[color:var(--nav-border-soft)] hover:border-[color:var(--nav-accent)] hover:bg-[var(--nav-surface-glass)]">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm" style={{ color: 'var(--nav-text-primary)' }}>{bank.bank_name}</span>
-                      {bank.is_main && <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'var(--nav-success-soft)', color: 'var(--nav-success)' }}>{t.mainBankBadge}</span>}
-                    </div>
-                    <div className="text-xs mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{bank.iik}</div>
-                  </div>
-                  <span style={{ color: 'var(--nav-text-muted)' }}><ChevronRightIcon /></span>
-                </div>
-              ))}
             </div>
           </div>
         </div>

@@ -30,6 +30,7 @@ export interface ProfileAccountsContent {
   addLabel: string
   addAccountButton: string
   fillBankNameAndIikAlert: string
+  fillBankBikAlert: string
   deleteAccountConfirm: string
 
   // security page (security/page.tsx)
@@ -131,6 +132,7 @@ export const profileAccountsDict: Record<'ru' | 'kk' | 'en', ProfileAccountsCont
     addLabel: 'Добавить',
     addAccountButton: '+ Добавить счёт',
     fillBankNameAndIikAlert: 'Заполните название банка и ИИК',
+    fillBankBikAlert: 'Заполните БИК банка',
     deleteAccountConfirm: 'Удалить этот счёт?',
 
     securityHeaderLabel: 'ЭЦП и безопасность',
@@ -227,6 +229,7 @@ export const profileAccountsDict: Record<'ru' | 'kk' | 'en', ProfileAccountsCont
     addLabel: 'Қосу',
     addAccountButton: '+ Шот қосу',
     fillBankNameAndIikAlert: 'Банк атауы мен ЖСК-ны толтырыңыз',
+    fillBankBikAlert: 'Банктің БСК-сын толтырыңыз',
     deleteAccountConfirm: 'Бұл шотты жоясыз ба?',
 
     securityHeaderLabel: 'ЭЦҚ және қауіпсіздік',
@@ -323,6 +326,7 @@ export const profileAccountsDict: Record<'ru' | 'kk' | 'en', ProfileAccountsCont
     addLabel: 'Add',
     addAccountButton: '+ Add account',
     fillBankNameAndIikAlert: 'Fill in the bank name and IIK',
+    fillBankBikAlert: "Fill in the bank's BIK",
     deleteAccountConfirm: 'Delete this account?',
 
     securityHeaderLabel: 'Digital signature and security',

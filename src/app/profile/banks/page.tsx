@@ -101,6 +101,7 @@ export default function Banks() {
 
   async function saveAccount() {
     if (!form.bank_name || !form.iik) { alert(t.fillBankNameAndIikAlert); return }
+    if (!form.bik) { alert(t.fillBankBikAlert); return }
     setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return

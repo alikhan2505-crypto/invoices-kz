@@ -143,7 +143,7 @@ export default function Onboarding() {
   }
 
   async function saveStep2() {
-    if (bank.iik && bank.bank_name) {
+    if (bank.iik && bank.bank_name && bank.bik) {
       setSaving(true)
       await supabase.from('bank_accounts').insert({
         user_id: userId,
