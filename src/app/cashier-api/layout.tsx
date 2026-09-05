@@ -8,6 +8,9 @@ import type { Metadata } from 'next'
 export const metadata: Metadata = {
   title: 'Kaspi Cashier API — invoices.kz',
   description: 'Принимайте Kaspi Pay на своём сайте: создание платежа, QR-ссылка и вебхук об оплате. 2% с оплаченного — без абонплаты и минимального оборота.',
+  // Without its own canonical this page inherited the root's, which pointed
+  // at the homepage and asked search engines not to index this page at all.
+  alternates: { canonical: 'https://invoices.kz/cashier-api' },
   // The root layout's openGraph/twitter objects aren't merged field-by-field --
   // omitting these here would leak the accounting-software OG image/copy into
   // link previews shared with developers (Slack, Telegram, Twitter).
