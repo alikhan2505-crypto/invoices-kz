@@ -209,7 +209,14 @@ export default function PublicInvoice() {
   // Capped at 150 polls (~12.5 min) so an abandoned tab doesn't poll forever.
   const kaspiPollCount = useRef(0)
   useEffect(() => {
-    if (!kaspiPayment || kaspiPayment.status !== 'pending' || !token) return
+    // Keeps polling while there is NO payment too. The server can briefly have
+    // none to give -- the per-invoice mint cap is three a minute, so a page
+    // that has churned through codes gets a null for a few seconds. Stopping
+    // the poll there (the previous behaviour) made that gap permanent: the
+    // Kaspi block disappeared and only a manual reload brought it back. The
+    // 150-tick cap still stops an abandoned tab.
+    if (kaspiPaymentLoading || invoice?.status === 'paid' || invoice?.status === 'cancelled' || !token) return
+    if (kaspiPayment && kaspiPayment.status !== 'pending') return
     kaspiPollCount.current = 0
     const interval = setInterval(async () => {
       kaspiPollCount.current++
@@ -235,7 +242,11 @@ export default function PublicInvoice() {
       }
     }, 5000)
     return () => clearInterval(interval)
-  }, [kaspiPayment?.status, token])
+    // kaspiPayment itself is deliberately not a dependency: the poll rewrites
+    // it every tick, and depending on it would tear down and rebuild the
+    // interval each time (resetting the 150-tick cap along with it).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kaspiPayment?.status, kaspiPaymentLoading, invoice?.status, token])
 
   async function markAsPaid() {
     if (!confirm(t.confirmPaymentConfirm)) return

@@ -38,6 +38,29 @@ const MINT_WINDOW_MS = 60_000
 const MINT_LIMIT = 3
 
 /**
+ * True when a fresh payment could be minted for this invoice right now.
+ *
+ * Callers that are about to deliberately kill a still-valid QR (the payer
+ * page's 60s idle refresh) must ask this FIRST. Expiring the old row and only
+ * then discovering the mint is refused leaves the payer with nothing at all --
+ * exactly the dead end the idle refresh exists to prevent.
+ */
+export async function canMintKaspiPaymentForInvoice(invoiceId: string): Promise<boolean> {
+  const { count, error } = await supabase
+    .from('kaspi_payment_requests')
+    .select('id', { count: 'exact', head: true })
+    .eq('invoice_id', invoiceId)
+    .gte('created_at', new Date(Date.now() - MINT_WINDOW_MS).toISOString())
+  // Same fail-open stance as the check inside getOrCreate below: a broken
+  // count must not block a payer, and getOrCreate re-checks anyway.
+  if (error) {
+    console.error('Kaspi invoice payment: mint-capacity check failed for invoice', invoiceId, error.message)
+    return true
+  }
+  return (count ?? 0) < MINT_LIMIT
+}
+
+/**
  * Returns the invoice's currently-valid Kaspi payment, creating one on demand
  * if the previous link has expired (or none was ever created). Returns null
  * when no payment can or should exist: the owner has no Kaspi connection, the

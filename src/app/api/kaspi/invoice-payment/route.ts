@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { getOrCreateKaspiPaymentForInvoice } from '@/lib/kaspiPay/invoicePayment'
+import { getOrCreateKaspiPaymentForInvoice, canMintKaspiPaymentForInvoice } from '@/lib/kaspiPay/invoicePayment'
 import { checkAndSettleKaspiPayment } from '@/lib/kaspiPay/settlePayment'
 
 const supabase = createClient(
@@ -47,11 +47,18 @@ export async function GET(req: NextRequest) {
     let live: string = current.status
     if (current.status === 'pending') {
       try {
+        // Only honour the idle refresh when a replacement can actually be
+        // minted. Killing a still-valid code and then hitting the per-invoice
+        // mint cap would leave the payer with no QR at all -- the very dead
+        // end this refresh exists to avoid. Expiry and cancellation are
+        // different: that code is already dead either way, so terminateDead
+        // is not conditional on capacity.
+        const canReplace = idle ? await canMintKaspiPaymentForInvoice(invoice.id) : false
         // terminateDead: this page hands the payer a replacement immediately,
         // so a QR Kaspi has already rejected (scanned then cancelled) must not
         // linger. force: the page's 60s idle timer gave up on a code nobody
         // touched. Neither ever discards a 'paid' or 'scanning' attempt.
-        const outcome = await checkAndSettleKaspiPayment(current, { terminateDead: true, force: idle })
+        const outcome = await checkAndSettleKaspiPayment(current, { terminateDead: true, force: canReplace })
         live = outcome
         if (outcome === 'paid') current.status = 'paid'
         else if (outcome === 'expired' || outcome === 'failed') {
