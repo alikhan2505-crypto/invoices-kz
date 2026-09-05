@@ -3,12 +3,13 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
+import { generateInvoicePDF } from '@/lib/generatePDF'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import InvoiceLivePreview from '@/components/InvoiceLivePreview'
 import { cacheGet, cacheSet } from '@/lib/cache'
 import { getActivePlan } from '@/lib/plan'
-import { formatDate } from '@/lib/date'
+import { formatDate, formatDateSafe } from '@/lib/date'
 import { computeDefaultDueDate, todayDateString } from '@/lib/dueDate'
 import { useLanguage } from '@/components/LanguageProvider'
 import { closeLabel, deleteLabel } from '@/lib/a11yLabels'
@@ -81,7 +82,9 @@ export default function CreateInvoicePage() {
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [bankAccounts, setBankAccounts] = useState<any[]>([])
   const [showBankPicker, setShowBankPicker] = useState(false)
-  const [pendingInvoiceId, setPendingInvoiceId] = useState<string | null>(null)
+  const [showSignModal, setShowSignModal] = useState(false)
+  const [pendingInvoice, setPendingInvoice] = useState<any>(null)
+  const [pendingBank, setPendingBank] = useState<any>(null)
   const [showVatHint, setShowVatHint] = useState(false)
   // null while unknown (fetch pending) so the hint below never flashes on
   // for an already-connected founder before the check resolves.
@@ -449,40 +452,92 @@ export default function CreateInvoicePage() {
     setLastCreated(Date.now())
     setLoading(false)
 
-    // Used to open a bare PDF in a new tab right here and stop -- the ONLY
-    // outcome of creating an invoice was a downloadable file, with no mention
-    // anywhere that the service could send it. /invoice/[id] already has the
-    // full set of ways to get an invoice to a client (WhatsApp first, then
-    // copy link, PDF, email) plus the Kaspi Pay section; landing there
-    // instead makes sending through the service the obvious next step rather
-    // than something the payer only finds by digging into an existing
-    // invoice later. The row above already defaults bank_id to the main
-    // account, same as /invoice/[id]'s own fallback -- when there's more
-    // than one account, offer the picker as a light override instead of
-    // gating the redirect on it.
+    // /invoice/[id] already has the full set of ways to get an invoice to a
+    // client (WhatsApp first, then copy link, PDF, email) plus the Kaspi Pay
+    // section, so every path below ends there instead of stopping at a bare
+    // PDF popup with no mention that the service could send it. What's kept
+    // from the old flow is choosing a bank (when there's more than one --
+    // the row above already defaults bank_id to the main account, same as
+    // /invoice/[id]'s own fallback) and choosing signature/stamp, each its
+    // own step, ending in the same immediate PDF popup as before.
+    setPendingInvoice(data)
+    setPendingBank(banks[0])
     if (banks.length > 1) {
       setBankAccounts(banks)
-      setPendingInvoiceId(data.id)
       setShowBankPicker(true)
       return
     }
-
-    router.push('/invoice/' + data.id)
+    setShowSignModal(true)
   }
 
-  async function chooseBank(bankId: string) {
-    if (pendingInvoiceId) {
-      await supabase.from('invoices').update({ bank_id: bankId }).eq('id', pendingInvoiceId)
-    }
+  async function chooseBank(bank: any) {
+    await supabase.from('invoices').update({ bank_id: bank.id }).eq('id', pendingInvoice.id)
+    setPendingBank(bank)
     setShowBankPicker(false)
-    router.push('/invoice/' + pendingInvoiceId)
+    setShowSignModal(true)
   }
 
   function closeBankPicker() {
     // Дефолтный bank_id (основной счёт) уже сохранён при создании -- закрытие
-    // модалки без выбора просто оставляет его, а не блокирует переход.
+    // модалки без выбора просто оставляет его и идёт дальше к выбору подписи.
     setShowBankPicker(false)
-    router.push('/invoice/' + pendingInvoiceId)
+    setShowSignModal(true)
+  }
+
+  function buildPDFProfile(withSign: boolean) {
+    const ap = getActivePlan(profile)
+    return {
+      company_name: profile?.company_name || '',
+      bin_iin: profile?.bin_iin || '',
+      address: profile?.address || '',
+      director_name: profile?.director_name || '',
+      phone: profile?.phone || '',
+      signature_url: withSign && ap.canSign ? (profile?.signature_url || '') : '',
+      stamp_url: withSign && ap.canSign ? (profile?.stamp_url || '') : '',
+      logo_url: profile?.logo_url || '',
+    }
+  }
+
+  async function generateAndOpenPDF(withSign: boolean, win: Window | null) {
+    const html = await generateInvoicePDF({
+      number: pendingInvoice.number,
+      date: new Date().toLocaleDateString('ru-KZ'),
+      clientName, clientBin, clientEmail, clientAddress, clientPhone,
+      contractNumber, contractDate: contractDate ? formatDateSafe(contractDate) : undefined,
+      knp: clientKnp, services, total,
+      note: note || profile?.default_note || '', autoPrint: false, vatType: profile?.vat_type || 'no_vat',
+      profile: buildPDFProfile(withSign),
+      bank: {
+        bank_name: pendingBank?.bank_name || '',
+        iik: pendingBank?.iik || '',
+        bik: pendingBank?.bik || '',
+        kbe: pendingBank?.kbe || '19',
+      },
+      kaspiPayLink: profile?.kaspi_pay_link || undefined,
+      viewUrl: pendingInvoice.public_token ? `https://www.invoices.kz/view/${pendingInvoice.public_token}` : undefined,
+      dueDate: dueDate ? formatDate(dueDate) : undefined,
+      showWatermark: !getActivePlan(profile).isActive,
+    })
+    if (win) { win.document.write(html); win.document.close() }
+    router.push('/invoice/' + pendingInvoice.id)
+  }
+
+  function chooseSignature(withSign: boolean) {
+    if (withSign && !getActivePlan(profile).canSign) {
+      alert(t.pdfSignUpgradeMessage)
+      router.push('/upgrade')
+      return
+    }
+    // window.open здесь синхронно, до await генерации PDF -- иначе Safari
+    // на iOS блокирует попап, так как он больше не считается прямым кликом.
+    const win = window.open('', '_blank')
+    setShowSignModal(false)
+    generateAndOpenPDF(withSign, win)
+  }
+
+  function skipSignatureChoice() {
+    setShowSignModal(false)
+    router.push('/invoice/' + pendingInvoice.id)
   }
 
   return (
@@ -979,7 +1034,7 @@ export default function CreateInvoicePage() {
             </div>
             <div className="space-y-2">
               {bankAccounts.map(bank => (
-                <div key={bank.id} onClick={() => chooseBank(bank.id)}
+                <div key={bank.id} onClick={() => chooseBank(bank)}
                   className="flex items-center justify-between p-4 rounded-xl cursor-pointer transition-colors border border-[color:var(--nav-border-soft)] hover:border-[color:var(--nav-accent)] hover:bg-[var(--nav-surface-glass)]">
                   <div>
                     <div className="flex items-center gap-2">
@@ -998,6 +1053,38 @@ export default function CreateInvoicePage() {
           </div>
         </div>
       )}
+
+      {/* Signature/stamp choice -- same modal as /invoice/[id]'s PDF button,
+          but here it always fires right after creation and ends in the same
+          immediate PDF popup + redirect as the bank picker above. */}
+      {showSignModal && (() => {
+        const ap = getActivePlan(profile)
+        return (
+          <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-3">
+            <div className="w-full max-w-lg rounded-3xl p-6" style={{ background: 'var(--nav-surface-chrome)' }}>
+              <div className="text-center mb-5">
+                <div className="font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>{t.documentFormatModalTitle}</div>
+                <div className="text-sm" style={{ color: 'var(--nav-text-muted)' }}>{t.chooseDownloadVariantSubtitle}</div>
+              </div>
+              <div className="space-y-3 mb-4">
+                <button onClick={() => chooseSignature(true)}
+                  className="w-full rounded-xl py-4 text-sm font-medium relative"
+                  style={ap.canSign ? { background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' } : { background: 'var(--nav-surface-glass)', color: 'var(--nav-text-muted)' }}>
+                  {t.withSignatureButtonLabel}
+                  {!ap.canSign && <span className="absolute top-1 right-2 text-xs" style={{ color: 'var(--nav-text-muted)' }}>{t.basicPlusBadge}</span>}
+                </button>
+                <button onClick={() => chooseSignature(false)}
+                  className="w-full rounded-xl py-4 text-sm font-medium border-2"
+                  style={{ borderColor: 'var(--nav-border)', color: 'var(--nav-text-primary)' }}>
+                  {t.withoutSignatureButtonLabel}
+                </button>
+              </div>
+              <button onClick={skipSignatureChoice}
+                className="w-full text-sm py-2" style={{ color: 'var(--nav-text-muted)' }}>{t.skipButton}</button>
+            </div>
+          </div>
+        )
+      })()}
 
     </main>
     </DesktopShell>
