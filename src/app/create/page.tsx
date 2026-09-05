@@ -80,7 +80,8 @@ export default function CreateInvoicePage() {
   const [monthStats, setMonthStats] = useState({ paid: 0, total: 0, amount: 0 })
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [bankAccounts, setBankAccounts] = useState<any[]>([])
-  const [selectedBankId, setSelectedBankId] = useState<string | null>(null)
+  const [showBankPicker, setShowBankPicker] = useState(false)
+  const [pendingInvoiceId, setPendingInvoiceId] = useState<string | null>(null)
   const [showVatHint, setShowVatHint] = useState(false)
   // null while unknown (fetch pending) so the hint below never flashes on
   // for an already-connected founder before the check resolves.
@@ -135,7 +136,6 @@ export default function CreateInvoicePage() {
     const { data: banks } = await supabase
       .from('bank_accounts').select('*').eq('user_id', user.id).order('is_main', { ascending: false })
     setBankAccounts(banks || [])
-    if (banks && banks.length > 0) setSelectedBankId(banks[0].id)
 
     // Kaspi Cashier connection status, for the "connect for exact-amount
     // tracked payments" hint next to the live preview (desktop only, per
@@ -377,8 +377,6 @@ export default function CreateInvoicePage() {
 
     if (!clientName) { alert(t.enterClientNameAlert); return }
     if (!clientBin) { alert(t.enterClientBinAlert); return }
-    if (!clientAddress) { alert(t.enterClientAddressAlert); return }
-    if (!clientPhone) { alert(t.enterClientPhoneAlert); return }
     if (services.length === 0 || services.some(s => !s.name)) {
       alert(t.addAtLeastOneServiceAlert); return
     }
@@ -431,7 +429,7 @@ export default function CreateInvoicePage() {
       client_email: clientEmail,
       client_address: clientAddress,
       client_phone: clientPhone || null,
-      bank_id: selectedBankId,
+      bank_id: banks[0].id,
       contract_number: contractNumber || null,
       contract_date: contractDate || null,
       due_date: dueDate || null,
@@ -458,10 +456,33 @@ export default function CreateInvoicePage() {
     // copy link, PDF, email) plus the Kaspi Pay section; landing there
     // instead makes sending through the service the obvious next step rather
     // than something the payer only finds by digging into an existing
-    // invoice later. selectedBankId is now saved on the row above, so
-    // /invoice/[id]'s own bank_id-or-main fallback picks up this choice
-    // instead of re-deciding it.
+    // invoice later. The row above already defaults bank_id to the main
+    // account, same as /invoice/[id]'s own fallback -- when there's more
+    // than one account, offer the picker as a light override instead of
+    // gating the redirect on it.
+    if (banks.length > 1) {
+      setBankAccounts(banks)
+      setPendingInvoiceId(data.id)
+      setShowBankPicker(true)
+      return
+    }
+
     router.push('/invoice/' + data.id)
+  }
+
+  async function chooseBank(bankId: string) {
+    if (pendingInvoiceId) {
+      await supabase.from('invoices').update({ bank_id: bankId }).eq('id', pendingInvoiceId)
+    }
+    setShowBankPicker(false)
+    router.push('/invoice/' + pendingInvoiceId)
+  }
+
+  function closeBankPicker() {
+    // Дефолтный bank_id (основной счёт) уже сохранён при создании -- закрытие
+    // модалки без выбора просто оставляет его, а не блокирует переход.
+    setShowBankPicker(false)
+    router.push('/invoice/' + pendingInvoiceId)
   }
 
   return (
@@ -853,37 +874,6 @@ export default function CreateInvoicePage() {
           </div>
           </div>
 
-          {bankAccounts.length > 1 && (
-            <motion.div
-              className="nav-glass rounded-2xl p-4 mb-4"
-              initial={reduceMotion ? false : { opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.22 }}
-            >
-              <h3 className="font-medium mb-3 text-sm" style={{ color: 'var(--nav-text-primary)' }}>{t.bankPickerTitle}</h3>
-              <div className="space-y-2">
-                {bankAccounts.map(bank => (
-                  <button key={bank.id} type="button" onClick={() => setSelectedBankId(bank.id)}
-                    className="w-full flex items-center justify-between rounded-xl px-3 py-2.5 text-left border transition-colors"
-                    style={selectedBankId === bank.id
-                      ? { borderColor: 'var(--nav-accent)', background: 'var(--nav-accent-soft)' }
-                      : { borderColor: 'var(--nav-border-soft)', background: 'var(--nav-surface-glass)' }}>
-                    <div>
-                      <div className="text-sm font-medium" style={{ color: 'var(--nav-text-primary)' }}>
-                        {bank.bank_name}
-                        {bank.is_main && <span className="ml-2 text-xs font-normal" style={{ color: 'var(--nav-text-muted)' }}>{t.mainBankBadge}</span>}
-                      </div>
-                      <div className="text-xs mt-0.5 tabular-nums" style={{ color: 'var(--nav-text-muted)' }}>{bank.iik}</div>
-                    </div>
-                    {selectedBankId === bank.id && (
-                      <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: 'var(--nav-accent)' }} />
-                    )}
-                  </button>
-                ))}
-              </div>
-            </motion.div>
-          )}
-
           <motion.button
             onClick={createInvoice} disabled={loading}
             initial={reduceMotion ? false : { opacity: 0, y: 16 }}
@@ -973,6 +963,37 @@ export default function CreateInvoicePage() {
                 className="flex-1 rounded-xl py-3 text-sm font-medium" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                 {t.saveButtonLabel}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bank picker modal -- invoice already exists (bank_id defaulted to
+          the main account on insert); picking here just overrides it. */}
+      {showBankPicker && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-3">
+          <div className="w-full max-w-lg rounded-3xl p-5 max-h-[80vh] overflow-y-auto" style={{ background: 'var(--nav-surface-chrome)' }}>
+            <div className="flex items-center justify-between mb-4">
+              <span className="font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{t.bankPickerTitle}</span>
+              <button onClick={closeBankPicker} className="back-btn transition-colors text-[color:var(--nav-text-muted)] hover:text-[color:var(--nav-text-secondary)]" aria-label={closeLabel(lang)}><XIcon /></button>
+            </div>
+            <div className="space-y-2">
+              {bankAccounts.map(bank => (
+                <div key={bank.id} onClick={() => chooseBank(bank.id)}
+                  className="flex items-center justify-between p-4 rounded-xl cursor-pointer transition-colors border border-[color:var(--nav-border-soft)] hover:border-[color:var(--nav-accent)] hover:bg-[var(--nav-surface-glass)]">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-sm" style={{ color: 'var(--nav-text-primary)' }}>{bank.bank_name}</span>
+                      {bank.is_main && <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'var(--nav-success-soft)', color: 'var(--nav-success)' }}>{t.mainBankBadge}</span>}
+                    </div>
+                    <div className="text-xs mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{bank.iik}</div>
+                  </div>
+                </div>
+              ))}
+              <div onClick={() => router.push('/profile/banks')}
+                className="flex items-center justify-center p-4 rounded-xl cursor-pointer transition-colors border border-dashed border-[color:var(--nav-border)] hover:border-[color:var(--nav-accent)]">
+                <span className="text-sm font-medium" style={{ color: 'var(--nav-accent)' }}>{t.addBankAccountLabel}</span>
+              </div>
             </div>
           </div>
         </div>

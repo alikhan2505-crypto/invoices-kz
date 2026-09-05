@@ -85,8 +85,6 @@ export interface InvoiceFlowContent {
   signInAlert: string
   bankDetailsNeededConfirm: string
   enterClientBinAlert: string
-  enterClientAddressAlert: string
-  enterClientPhoneAlert: string
   addAtLeastOneServiceAlert: string
   specifyPriceForAllServicesAlert: string
   recentInvoiceConfirm: string
@@ -101,6 +99,7 @@ export interface InvoiceFlowContent {
   saveButtonLabel: string
   bankPickerTitle: string
   mainBankBadge: string
+  addBankAccountLabel: string
   vatHintAriaLabel: string
   vatHintText: string
   vatHintLink: string
@@ -287,8 +286,6 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     signInAlert: 'Войдите в систему',
     bankDetailsNeededConfirm: 'Не заполнены банковские реквизиты — они нужны для PDF. Заполнить сейчас?',
     enterClientBinAlert: 'Введите БИН/ИИН клиента',
-    enterClientAddressAlert: 'Введите адрес клиента',
-    enterClientPhoneAlert: 'Введите телефон клиента',
     addAtLeastOneServiceAlert: 'Добавьте хотя бы одну услугу',
     specifyPriceForAllServicesAlert: 'Укажите цену для всех услуг',
     recentInvoiceConfirm: 'Вы уже создали счёт недавно. Создать ещё один?',
@@ -303,6 +300,7 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     saveButtonLabel: 'Сохранить',
     bankPickerTitle: 'Выберите счёт',
     mainBankBadge: '★ Основной',
+    addBankAccountLabel: '+ Добавить счёт',
     vatHintAriaLabel: 'Что такое НДС 16%',
     vatHintText: 'Ставка НДС задаётся в настройках профиля и применяется ко всем новым счетам.',
     vatHintLink: 'Изменить в настройках →',
@@ -493,8 +491,6 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     signInAlert: 'Жүйеге кіріңіз',
     bankDetailsNeededConfirm: 'Банк деректемелері толтырылмаған — олар PDF үшін қажет. Қазір толтырасыз ба?',
     enterClientBinAlert: 'Клиенттің БСН/ЖСН нөмірін енгізіңіз',
-    enterClientAddressAlert: 'Клиенттің мекенжайын енгізіңіз',
-    enterClientPhoneAlert: 'Клиенттің телефонын енгізіңіз',
     addAtLeastOneServiceAlert: 'Кемінде бір қызмет қосыңыз',
     specifyPriceForAllServicesAlert: 'Барлық қызметтер үшін бағасын көрсетіңіз',
     recentInvoiceConfirm: 'Сіз жақында шот жасадыңыз. Тағы бір жасайсыз ба?',
@@ -509,6 +505,7 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     saveButtonLabel: 'Сақтау',
     bankPickerTitle: 'Шотты таңдаңыз',
     mainBankBadge: '★ Негізгі',
+    addBankAccountLabel: '+ Шот қосу',
     vatHintAriaLabel: 'ҚҚС 16% дегеніміз не',
     vatHintText: 'ҚҚС мөлшерлемесі профиль баптауларында беріледі және барлық жаңа шоттарға қолданылады.',
     vatHintLink: 'Баптауларда өзгерту →',
@@ -699,8 +696,6 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     signInAlert: 'Please sign in',
     bankDetailsNeededConfirm: 'Bank details are not filled in — they are required for the PDF. Fill them in now?',
     enterClientBinAlert: "Enter the client's BIN/IIN",
-    enterClientAddressAlert: "Enter the client's address",
-    enterClientPhoneAlert: "Enter the client's phone number",
     addAtLeastOneServiceAlert: 'Add at least one service',
     specifyPriceForAllServicesAlert: 'Specify a price for all services',
     recentInvoiceConfirm: 'You already created an invoice recently. Create another one?',
@@ -715,6 +710,7 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     saveButtonLabel: 'Save',
     bankPickerTitle: 'Choose an account',
     mainBankBadge: '★ Main',
+    addBankAccountLabel: '+ Add account',
     vatHintAriaLabel: 'What is 16% VAT',
     vatHintText: 'The VAT rate is set in your profile settings and applies to all new invoices.',
     vatHintLink: 'Change in settings →',
