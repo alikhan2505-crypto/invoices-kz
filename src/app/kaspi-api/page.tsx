@@ -1026,11 +1026,29 @@ export default function KaspiApiPage() {
                     </p>
                   )}
                   {!kaspiTopupScanning && (
-                    <button onClick={cancelTopup}
-                      className="w-full text-center text-[11px] mt-2 underline"
-                      style={{ color: 'var(--nav-text-muted)' }}>
-                      {t.kaspiTopupCancelButton}
-                    </button>
+                    <>
+                      <button onClick={cancelTopup}
+                        className="w-full text-center text-[11px] mt-2 underline"
+                        style={{ color: 'var(--nav-text-muted)' }}>
+                        {t.kaspiTopupCancelButton}
+                      </button>
+
+                      {/* Same divider-plus-button treatment the amount-picker
+                          screen uses for this choice (see below) -- without
+                          this, this screen was the only one of the three
+                          payment surfaces where switching to the phone
+                          alternative wasn't offered directly next to the QR. */}
+                      <div className="flex items-center gap-2 my-2">
+                        <div className="flex-1 h-px" style={{ background: 'var(--nav-border-soft)' }} />
+                        <span className="text-[11px]" style={{ color: 'var(--nav-text-muted)' }}>{t.kaspiTopupOrLabel}</span>
+                        <div className="flex-1 h-px" style={{ background: 'var(--nav-border-soft)' }} />
+                      </div>
+                      <button onClick={() => { cancelTopup(); setKaspiPhoneOpen(true) }}
+                        className="w-full rounded-xl py-2.5 text-sm font-semibold border"
+                        style={{ borderColor: 'var(--nav-border)', color: 'var(--nav-accent)', background: 'transparent' }}>
+                        {t.kaspiTopupPhoneButton}
+                      </button>
+                    </>
                   )}
                 </div>
               )}
