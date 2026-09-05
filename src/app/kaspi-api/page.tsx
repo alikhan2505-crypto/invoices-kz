@@ -584,6 +584,32 @@ export default function KaspiApiPage() {
     setKaspiPhoneSending(false)
   }
 
+  // A pushed phone request has no Kaspi-side expiry of its own (unlike a QR's
+  // ~5 minutes), so without an explicit way out the founder was stuck waiting
+  // on the poll to notice a decline -- or, if the push is never touched at
+  // all, stuck until the daily cron finally sweeps it a day later. force=true
+  // asks Kaspi for the real status first and only then closes the row, so a
+  // request paid in this exact instant is still credited rather than
+  // discarded.
+  async function cancelPhoneTopup() {
+    const topupId = kaspiTopupPending?.topup_id
+    kaspiTopupGeneration.current++
+    setKaspiTopupPending(null)
+    setKaspiPhoneSent(false)
+    setKaspiError('')
+    if (!topupId) return
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch(`/api/kaspi/wallet/topup-status?topup_id=${topupId}&force=true`, {
+        headers: { 'Authorization': `Bearer ${session?.access_token}` },
+      })
+      const data = await res.json()
+      if (data.status === 'paid') load()
+    } catch (e: any) {
+      console.error('Cancel phone topup: force-settle failed:', e.message)
+    }
+  }
+
   async function startTopup(amount: number) {
     // Claim this as the current attempt before the first await -- any
     // earlier call (a stale auto/idle-refresh, a doubled click) whose
@@ -952,7 +978,8 @@ export default function KaspiApiPage() {
                     </>
                   ) : (
                     <button onClick={() => setKaspiPhoneOpen(true)}
-                      className="w-full rounded-xl py-2.5 text-sm font-semibold mb-3 border"
+                      disabled={!((kaspiTopupAmount ?? Number(kaspiTopupCustom)) >= MIN_TOPUP_AMOUNT)}
+                      className="w-full rounded-xl py-2.5 text-sm font-semibold mb-3 border disabled:opacity-50"
                       style={{ borderColor: 'var(--nav-border)', color: 'var(--nav-accent)', background: 'transparent' }}>
                       {t.kaspiTopupPhoneButton}
                     </button>
@@ -966,9 +993,14 @@ export default function KaspiApiPage() {
                   <p className="text-sm mb-1" style={{ color: 'var(--nav-text-primary)' }}>
                     {t.kaspiTopupPhoneSentTitle(topupPhone)}
                   </p>
-                  <p className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>
+                  <p className="text-xs mb-3" style={{ color: 'var(--nav-text-secondary)' }}>
                     {t.kaspiTopupPhoneSentHint}
                   </p>
+                  <button onClick={cancelPhoneTopup}
+                    className="w-full text-center text-[11px] underline"
+                    style={{ color: 'var(--nav-text-muted)' }}>
+                    {t.kaspiTopupPhoneCancelButton}
+                  </button>
                 </div>
               )}
 

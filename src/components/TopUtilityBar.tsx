@@ -388,6 +388,29 @@ export default function TopUtilityBar() {
     setTopupPhoneSending(false)
   }
 
+  // A pushed phone request has no Kaspi-side expiry of its own (unlike a QR's
+  // ~5 minutes), so without an explicit way out the customer was stuck
+  // waiting on the poll to notice a decline -- or, if they never touch the
+  // Kaspi app at all, stuck until the daily cron finally sweeps it a day
+  // later. force=true asks Kaspi for the real status first and only then
+  // closes the row, so a request that is paid in this exact instant is still
+  // credited rather than discarded.
+  async function cancelPhoneTopup(wallet: WalletConfig) {
+    const topupId = topupPending?.topup_id
+    setTopupPending(null)
+    setTopupPhoneSent(false)
+    setTopupError('')
+    if (!topupId) return
+    try {
+      const headers = await authHeader()
+      const res = await fetch(`${wallet.topupStatusUrl}?topup_id=${topupId}&force=true`, { headers })
+      const data = await res.json()
+      if (data.status === 'paid') { await refreshBalances([wallet], headers); selectWallet(activeWallet) }
+    } catch (e: any) {
+      console.error('Cancel phone topup: force-settle failed:', e.message)
+    }
+  }
+
   async function startTopup(wallet: WalletConfig, amount: number) {
     if (amount < wallet.minAmount) {
       setTopupError(`Минимум ${wallet.minAmount.toLocaleString('ru-KZ')} ₸`)
@@ -685,9 +708,14 @@ export default function TopUtilityBar() {
                         <p className="text-xs mb-1" style={{ color: 'var(--nav-text-primary)' }}>
                           Запрос отправлен на {formatKzPhone(topupPhone)}
                         </p>
-                        <p className="text-[11px]" style={{ color: 'var(--nav-text-secondary)' }}>
+                        <p className="text-[11px] mb-3" style={{ color: 'var(--nav-text-secondary)' }}>
                           Подтвердите оплату в приложении Kaspi — баланс пополнится автоматически.
                         </p>
+                        <button onClick={() => cancelPhoneTopup(wallet)}
+                          className="w-full text-center text-[11px] underline"
+                          style={{ color: 'var(--nav-text-muted)' }}>
+                          Отменить запрос
+                        </button>
                       </div>
                     ) : topupPending ? (
                       <div>
@@ -713,14 +741,24 @@ export default function TopUtilityBar() {
                           style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                           Открыть оплату
                         </a>
+
                         {/* The phone alternative sits on the amount-picker
-                            screen, which this QR view replaces -- without
-                            this, choosing "Пополнить" hides the alternative
-                            for good until the QR itself expires. */}
+                            screen, which this QR view replaces -- without a
+                            way back to it, choosing "Пополнить" hid the
+                            alternative for good until the QR itself expired.
+                            Same divider-plus-button treatment as the picker
+                            screen below, not a plain text link, so the two
+                            screens read as one continuous choice rather than
+                            two different UI languages. */}
+                        <div className="flex items-center gap-2 my-2">
+                          <div className="flex-1 h-px" style={{ background: 'var(--nav-border-soft)' }} />
+                          <span className="text-[10px]" style={{ color: 'var(--nav-text-muted)' }}>или</span>
+                          <div className="flex-1 h-px" style={{ background: 'var(--nav-border-soft)' }} />
+                        </div>
                         <button onClick={() => { setTopupPending(null); setTopupPhoneOpen(true) }}
-                          className="w-full text-center text-[11px] mt-2 underline"
-                          style={{ color: 'var(--nav-text-muted)' }}>
-                          Отменить, отправить на телефон
+                          className="w-full rounded-lg px-3 py-2 text-xs font-medium border transition-colors"
+                          style={{ borderColor: 'var(--nav-border-soft)', color: 'var(--nav-accent)', background: 'transparent' }}>
+                          Отправить запрос на телефон
                         </button>
                       </div>
                     ) : (
@@ -793,7 +831,8 @@ export default function TopUtilityBar() {
                           </>
                         ) : (
                           <button onClick={() => setTopupPhoneOpen(true)}
-                            className="w-full rounded-lg px-3 py-2 text-xs font-medium border transition-colors"
+                            disabled={!((topupAmount ?? Number(topupCustom)) >= wallet.minAmount)}
+                            className="w-full rounded-lg px-3 py-2 text-xs font-medium border transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             style={{ borderColor: 'var(--nav-border-soft)', color: 'var(--nav-accent)', background: 'transparent' }}>
                             Отправить запрос на телефон
                           </button>
