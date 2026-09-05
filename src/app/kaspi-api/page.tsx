@@ -65,6 +65,10 @@ export default function KaspiApiPage() {
   const [kaspiPhoneOpen, setKaspiPhoneOpen] = useState(false)
   const [kaspiPhoneSending, setKaspiPhoneSending] = useState(false)
   const [kaspiPhoneSent, setKaspiPhoneSent] = useState(false)
+  // True once Kaspi reports the push declined/rejected (or it lapsed
+  // unanswered) -- a dedicated screen with a "Повторить" button rather than
+  // a transient error line under the amount picker.
+  const [kaspiPhoneDeclined, setKaspiPhoneDeclined] = useState(false)
   // True once Kaspi's own status reports 'scanning' (its 'Wait' status) --
   // the customer has already opened the QR and is looking at the
   // confirmation screen in their app. Purely informational: the QR is only
@@ -171,7 +175,7 @@ export default function KaspiApiPage() {
         // A pushed phone request has no QR to reissue -- the owner declined it
         // or let it lapse in their Kaspi app. Say so and let them choose again
         // instead of silently pushing another request at their phone.
-        if (kaspiPhoneSent) { setKaspiPhoneSent(false); setKaspiError(t.kaspiErrorGeneric); return }
+        if (kaspiPhoneSent) { setKaspiPhoneSent(false); setKaspiPhoneDeclined(true); return }
         startTopup(kaspiLastTopupAmount ?? 0)
       } else {
         setKaspiTopupScanning(false)
@@ -567,6 +571,7 @@ export default function KaspiApiPage() {
       const data = await res.json()
       if (res.ok) {
         setKaspiPhoneSent(true)
+        setKaspiPhoneDeclined(false)
         setKaspiPhoneOpen(false)
         // No expires_at: a pushed request has no scannable code and no local
         // deadline, so the countdown and refresh effects skip it.
@@ -622,6 +627,7 @@ export default function KaspiApiPage() {
     setKaspiTopupScanning(false)
     // A QR attempt supersedes any pushed phone request still on screen.
     setKaspiPhoneSent(false)
+    setKaspiPhoneDeclined(false)
     setKaspiToppingUp(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
@@ -910,7 +916,7 @@ export default function KaspiApiPage() {
                 </div>
               )}
 
-              {!kaspiTopupPending && (
+              {!kaspiTopupPending && !kaspiPhoneDeclined && (
                 <>
                   {/* Founder feedback (2026-09-01), 3rd recurrence of the same
                       confusion (Выписка commission column, wallet widget
@@ -985,6 +991,20 @@ export default function KaspiApiPage() {
                     </button>
                   )}
                 </>
+              )}
+
+              {!kaspiTopupPending && kaspiPhoneDeclined && (
+                <div className="rounded-xl p-4 mb-3 text-center" style={{ background: 'var(--nav-accent-soft)' }}>
+                  <div className="text-2xl mb-2">🚫</div>
+                  <p className="text-sm mb-3" style={{ color: 'var(--nav-text-primary)' }}>
+                    {t.kaspiTopupPhoneDeclinedLabel}
+                  </p>
+                  <button onClick={() => { setKaspiPhoneDeclined(false); setKaspiPhoneOpen(true) }}
+                    className="w-full rounded-xl py-2.5 text-sm font-semibold"
+                    style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                    {t.kaspiTopupPhoneRetryButton}
+                  </button>
+                </div>
               )}
 
               {kaspiTopupPending && kaspiPhoneSent && (

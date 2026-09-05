@@ -83,6 +83,17 @@ export default function PublicInvoice() {
   const [kaspiScanning, setKaspiScanning] = useState(false)
   const kaspiScanningRef = useRef(false)
   const kaspiCreatedAtRef = useRef<number>(0)
+  // Mirrors kaspiPayment for the poll's interval closure below. The poll
+  // deliberately does NOT list kaspiPayment as an effect dependency (doing
+  // so would tear the interval down and rebuild it, losing the 150-tick cap,
+  // every single tick), so reading `kaspiPayment` directly inside that
+  // closure would see whatever it was when the CURRENT effect instance was
+  // created -- stale the moment a later tick swaps the payment out from
+  // under it while `status` itself stays 'pending'. Kept in sync by a
+  // dedicated effect below instead of updated by hand at every call site,
+  // the same class of stale-closure bug already found and fixed on /upgrade.
+  const kaspiPaymentRef = useRef<typeof kaspiPayment>(null)
+  useEffect(() => { kaspiPaymentRef.current = kaspiPayment }, [kaspiPayment])
   // A Kaspi QR is only good for a few minutes. Nothing here said so, so a payer
   // who left the tab open came back to a code their Kaspi app answered with
   // "QR-код не распознан" and no hint that anything was wrong. The 5s poll
@@ -101,6 +112,12 @@ export default function PublicInvoice() {
   const [kaspiPhoneOpen, setKaspiPhoneOpen] = useState(false)
   const [kaspiPhoneSending, setKaspiPhoneSending] = useState(false)
   const [kaspiPhoneError, setKaspiPhoneError] = useState('')
+  // True once the server reports a phone push declined/rejected (or it
+  // lapsed unanswered) -- a dedicated screen with a "Повторить оплату"
+  // button, rather than silently minting a QR the payer never asked for in
+  // its place (which is what happens for a QR dying, and IS the right call
+  // there -- see the route's own comment on why phone pushes are different).
+  const [kaspiPhoneDeclined, setKaspiPhoneDeclined] = useState(false)
   const [loading, setLoading] = useState(true)
   const [marking, setMarking] = useState(false)
   const [marked, setMarked] = useState(false)
@@ -205,6 +222,11 @@ export default function PublicInvoice() {
     // 150-tick cap still stops an abandoned tab.
     if (kaspiPaymentLoading || invoice?.status === 'paid' || invoice?.status === 'cancelled' || !token) return
     if (kaspiPayment && kaspiPayment.status !== 'pending') return
+    // Stopped while the "declined" screen is up: kaspiPayment is null at
+    // that point, so without this the very next tick would call
+    // getOrCreateKaspiPaymentForInvoice again and silently mint a fresh QR
+    // underneath the "Повторить оплату" button 5 seconds later.
+    if (kaspiPhoneDeclined) return
     kaspiPollCount.current = 0
     const interval = setInterval(async () => {
       kaspiPollCount.current++
@@ -217,12 +239,25 @@ export default function PublicInvoice() {
         // fired, the mint was capped, and no later attempt was ever made.
         // Piggybacking on the poll means idle is simply re-sent every 5
         // seconds until it succeeds, at no extra request cost.
-        const idleOverdue = !kaspiScanningRef.current
+        // Phone pushes are excluded: there is no code to swap, and forcing
+        // one dead after 60 idle seconds would tell an unopened notification
+        // "declined" when the payer may still act on it in their own time --
+        // the same reasoning the wallet widget, /kaspi-api, and /upgrade
+        // already apply to their own idle refreshes.
+        const idleOverdue = !!kaspiPaymentRef.current?.payment_link && !kaspiScanningRef.current
           && kaspiCreatedAtRef.current > 0
           && Date.now() - kaspiCreatedAtRef.current >= IDLE_QR_MS
         const url = `/api/kaspi/invoice-payment?token=${token}${idleOverdue ? '&idle=true' : ''}`
         const res = await fetch(url)
         const data = await res.json()
+        if (data.phoneDeclined) {
+          clearInterval(interval)
+          setKaspiScanning(false)
+          kaspiScanningRef.current = false
+          setKaspiPayment(null)
+          setKaspiPhoneDeclined(true)
+          return
+        }
         const scanning = data.payment?.live === 'scanning'
         setKaspiScanning(scanning)
         kaspiScanningRef.current = scanning
@@ -245,7 +280,7 @@ export default function PublicInvoice() {
     // it every tick, and depending on it would tear down and rebuild the
     // interval each time (resetting the 150-tick cap along with it).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [kaspiPayment?.status, kaspiPaymentLoading, invoice?.status, token])
+  }, [kaspiPayment?.status, kaspiPaymentLoading, invoice?.status, token, kaspiPhoneDeclined])
 
   function formatKzPhone(value: string) {
     const digits = value.replace(/\D/g, '').replace(/^8/, '7')
@@ -270,6 +305,7 @@ export default function PublicInvoice() {
       const data = await res.json()
       if (res.ok) {
         setKaspiPhoneOpen(false)
+        setKaspiPhoneDeclined(false)
         // Picks up the freshly-pushed row (no qr_token/payment_link) on the
         // very next call, rather than waiting up to 5s for the poll's own
         // tick -- the button should feel like it did something immediately.
@@ -299,6 +335,23 @@ export default function PublicInvoice() {
     } catch {
       // The 5s poll (once a payment exists again) or a manual reload recovers.
     }
+  }
+
+  // "Повторить оплату" on the declined screen. No pending row exists at this
+  // point (the server already closed it), so a plain re-fetch is enough --
+  // getOrCreateKaspiPaymentForInvoice mints a fresh QR on its own, landing
+  // the payer back on the same QR-or-phone choice they started from.
+  async function retryKaspiPaymentAfterDecline() {
+    setKaspiPhoneDeclined(false)
+    setKaspiPaymentLoading(true)
+    try {
+      const res = await fetch(`/api/kaspi/invoice-payment?token=${token}`)
+      const data = await res.json()
+      setKaspiPayment(data.payment || null)
+    } catch {
+      // The poll (now re-armed since kaspiPhoneDeclined is false) retries.
+    }
+    setKaspiPaymentLoading(false)
   }
 
   async function markAsPaid() {
@@ -465,10 +518,25 @@ export default function PublicInvoice() {
         {/* Kaspi payment — brief loading hint while the live QR is still being
             minted against Kaspi's own API (the slowest thing on this page),
             so the gap doesn't read as "there's no Kaspi option here". */}
-        {kaspiPaymentLoading && !kaspiPayment && invoice.status !== 'paid' && invoice.status !== 'cancelled' && (
+        {kaspiPaymentLoading && !kaspiPayment && !kaspiPhoneDeclined && invoice.status !== 'paid' && invoice.status !== 'cancelled' && (
           <div className="nav-glass nav-card-accent rounded-2xl p-4 flex items-center gap-2">
             <div className="w-4 h-4 rounded-full animate-spin flex-shrink-0" style={{ border: '2px solid var(--nav-border-soft)', borderTopColor: 'var(--nav-accent)' }} />
             <span className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>Проверяем возможность оплаты через Kaspi...</span>
+          </div>
+        )}
+
+        {kaspiPhoneDeclined && (
+          <div className="nav-glass nav-card-accent rounded-2xl p-5 text-center">
+            <div className="text-xs uppercase tracking-wide mb-3" style={{ color: 'var(--nav-text-muted)' }}>Оплата через Kaspi</div>
+            <div className="text-2xl mb-2">🚫</div>
+            <p className="text-sm mb-4" style={{ color: 'var(--nav-text-primary)' }}>
+              Запрос отклонён в приложении Kaspi
+            </p>
+            <button onClick={retryKaspiPaymentAfterDecline}
+              className="w-full block text-center text-white rounded-xl py-3.5 font-medium text-sm transition-transform duration-150 hover:-translate-y-0.5"
+              style={{ background: '#E4171F' }}>
+              Повторить оплату
+            </button>
           </div>
         )}
 

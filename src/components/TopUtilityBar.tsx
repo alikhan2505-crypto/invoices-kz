@@ -158,6 +158,11 @@ export default function TopUtilityBar() {
   // True while a pushed request is outstanding: there is no QR to show or
   // refresh, so the countdown and the reissue path both stand down.
   const [topupPhoneSent, setTopupPhoneSent] = useState(false)
+  // True once Kaspi reports the push declined/rejected (or it lapsed
+  // unanswered) -- a dedicated screen rather than a transient error line, so
+  // "try again" is an actual button instead of the customer having to notice
+  // an error string and re-fill the amount from scratch.
+  const [topupPhoneDeclined, setTopupPhoneDeclined] = useState(false)
   const [topupQrDataUrl, setTopupQrDataUrl] = useState<string | null>(null)
   const [showTopup, setShowTopup] = useState(false)
   // "Заработано через Kaspi" (paid invoices, last 30 days) and the tariff
@@ -300,6 +305,7 @@ export default function TopUtilityBar() {
     setTopupError('')
     setTopupPending(null)
     setTopupPhoneSent(false)
+    setTopupPhoneDeclined(false)
     setTopupPhoneOpen(false)
     setShowTopup(false)
     setHistoryLoading(true)
@@ -374,6 +380,7 @@ export default function TopUtilityBar() {
         // it; expires_at 0 keeps the countdown and reissue paths out of it.
         setTopupPending({ topup_id: data.topup_id, payment_link: '', amount, expires_at: 0 })
         setTopupPhoneSent(true)
+        setTopupPhoneDeclined(false)
         setTopupPhoneOpen(false)
       } else {
         setTopupError(data.error === 'invalid_phone'
@@ -431,6 +438,7 @@ export default function TopUtilityBar() {
       setTopupScanning(false)
       topupScanningRef.current = false
       topupCreatedAtRef.current = Date.now()
+      setTopupPhoneDeclined(false)
     } else {
       setTopupError(data.error === 'invalid_amount' ? `Минимум ${(data.min ?? wallet.minAmount).toLocaleString('ru-KZ')} ₸` : 'Не удалось создать оплату, попробуйте ещё раз')
     }
@@ -482,7 +490,7 @@ export default function TopUtilityBar() {
         if (topupPhoneSent) {
           setTopupPending(null)
           setTopupPhoneSent(false)
-          setTopupError('Запрос не был оплачен. Попробуйте ещё раз.')
+          setTopupPhoneDeclined(true)
           return
         }
         // Reissue in place rather than sending the customer back to the
@@ -710,7 +718,19 @@ export default function TopUtilityBar() {
 
                 {topupOpen && (
                   <div className="mt-3 pt-4" style={{ borderTop: '1px solid var(--nav-border-soft)' }}>
-                    {topupPending && topupPhoneSent ? (
+                    {!topupPending && topupPhoneDeclined ? (
+                      <div className="text-center py-3">
+                        <div className="text-2xl mb-2">🚫</div>
+                        <p className="text-xs mb-3" style={{ color: 'var(--nav-text-primary)' }}>
+                          Запрос отклонён в приложении Kaspi
+                        </p>
+                        <button onClick={() => { setTopupPhoneDeclined(false); setTopupPhoneOpen(true) }}
+                          className="w-full rounded-lg px-3 py-2 text-xs font-medium transition-colors"
+                          style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                          Повторить
+                        </button>
+                      </div>
+                    ) : topupPending && topupPhoneSent ? (
                       <div className="text-center py-3">
                         <div className="text-2xl mb-2">📲</div>
                         <p className="text-xs mb-1" style={{ color: 'var(--nav-text-primary)' }}>

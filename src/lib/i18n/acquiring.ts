@@ -84,6 +84,8 @@ export interface AcquiringContent {
   kaspiTopupPhoneSentHint: string
   kaspiTopupPhoneInvalid: string
   kaspiTopupPhoneCancelButton: string
+  kaspiTopupPhoneDeclinedLabel: string
+  kaspiTopupPhoneRetryButton: string
   kaspiTopupPendingHint: string
   kaspiTopupPayLinkLabel: string
   kaspiTopupPayLinkHint: string
@@ -228,6 +230,8 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiTopupPhoneSentHint: 'Подтвердите оплату в приложении Kaspi — баланс пополнится автоматически.',
     kaspiTopupPhoneInvalid: 'Проверьте номер телефона',
     kaspiTopupPhoneCancelButton: 'Отменить запрос',
+    kaspiTopupPhoneDeclinedLabel: 'Запрос отклонён в приложении Kaspi',
+    kaspiTopupPhoneRetryButton: 'Повторить',
     kaspiTopupPendingHint: 'QR-код готов — отсканируйте камерой телефона или нажмите кнопку ниже, чтобы оплатить через Kaspi. Баланс обновится автоматически.',
     kaspiTopupPayLinkLabel: 'Оплатить с этого телефона',
     kaspiTopupPayLinkHint: 'Нажмите эту кнопку, только если открыли страницу на том же телефоне, где установлен Kaspi.kz — она откроет приложение Kaspi для оплаты в один тап. Если платите с компьютера, отсканируйте QR-код выше камерой телефона.',
@@ -370,6 +374,8 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiTopupPhoneSentHint: 'Kaspi қосымшасында төлемді растаңыз — баланс автоматты түрде толтырылады.',
     kaspiTopupPhoneInvalid: 'Телефон нөмірін тексеріңіз',
     kaspiTopupPhoneCancelButton: 'Сұранысты болдырмау',
+    kaspiTopupPhoneDeclinedLabel: 'Сұраныс Kaspi қосымшасында қабылданбады',
+    kaspiTopupPhoneRetryButton: 'Қайталау',
     kaspiTopupPendingHint: 'QR-код дайын — телефон камерасымен сканерлеңіз немесе Kaspi арқылы төлеу үшін төмендегі батырманы басыңыз. Баланс автоматты түрде жаңарады.',
     kaspiTopupPayLinkLabel: 'Осы телефоннан төлеу',
     kaspiTopupPayLinkHint: 'Бұл түймені тек Kaspi.kz орнатылған сол телефонда ашқан болсаңыз ғана басыңыз — ол Kaspi қосымшасын бір түртумен төлеу үшін ашады. Компьютерден төлесеңіз, жоғарыдағы QR-кодты телефон камерасымен сканерлеңіз.',
@@ -512,6 +518,8 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiTopupPhoneSentHint: 'Confirm the payment in your Kaspi app — the balance tops up automatically.',
     kaspiTopupPhoneInvalid: 'Check the phone number',
     kaspiTopupPhoneCancelButton: 'Cancel request',
+    kaspiTopupPhoneDeclinedLabel: 'The request was declined in the Kaspi app',
+    kaspiTopupPhoneRetryButton: 'Try again',
     kaspiTopupPendingHint: 'Your top-up payment link is ready — pay via Kaspi and the balance will update automatically.',
     kaspiTopupPayLinkLabel: 'Pay from this phone',
     kaspiTopupPayLinkHint: "Only tap this if you opened this page on the same phone that has Kaspi.kz installed — it opens the Kaspi app for a one-tap payment. Paying from a computer? Scan the QR code above with your phone's camera instead.",

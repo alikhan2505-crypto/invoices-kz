@@ -60,6 +60,11 @@ export default function Upgrade() {
   // while the same extTranId poll below keeps checking (create-phone reuses
   // it as the new payment_id, so the poll doesn't need to change).
   const [phoneRequested, setPhoneRequested] = useState(false)
+  // True once Kaspi reports the push declined/rejected (or it lapsed
+  // unanswered) -- a dedicated screen with a "Повторить оплату" button
+  // rather than leaving the "📲 Запрос отправлен" note up with nothing
+  // having actually happened.
+  const [phoneDeclined, setPhoneDeclined] = useState(false)
   const statusInterval = useRef<any>(null)
   // Snapshot of the renewer's plan_expires_at (ms) taken right before a
   // payment is created. For a renewer, p.plan === planKey && p.plan_expires_at
@@ -187,13 +192,22 @@ export default function Upgrade() {
   // 2026-09-05). A refusal here just gets retried on the next 5s tick, the
   // same recurring-tick safety net the wallet widget and /kaspi-api use.
   useEffect(() => {
-    if (!extTranId || !showModal || step !== 'pending' || phoneRequested) return
+    // phoneRequested is no longer a bail-out condition: this poll is the ONLY
+    // thing that ever learns a phone push was declined (Kaspi's 'failed'/
+    // 'expired'), so skipping it here meant a declined push left the modal
+    // showing "📲 Запрос отправлен" forever, with nothing detecting it short
+    // of the customer giving up and closing the modal. It's still read
+    // inside the tick, both to keep the QR-only idle refresh out of the
+    // phone-push case (there is no code to swap) and to branch the
+    // expired/failed reaction to a "declined, try again" screen instead of a
+    // silent QR reissue.
+    if (!extTranId || !showModal || step !== 'pending') return
     let cancelled = false
     let polls = 0
     const interval = setInterval(async () => {
       polls++
       if (polls > 150 || cancelled) { clearInterval(interval); return }
-      const idleOverdue = !scanningRef.current
+      const idleOverdue = !phoneRequested && !scanningRef.current
         && qrCreatedAtRef.current > 0
         && Date.now() - qrCreatedAtRef.current >= IDLE_QR_MS
       const { data: { session } } = await supabase.auth.getSession()
@@ -235,6 +249,15 @@ export default function Upgrade() {
           clearInterval(interval)
           setQrScanning(false)
           scanningRef.current = false
+          if (phoneRequested) {
+            // A pushed request has no code to swap -- only Kaspi's own
+            // terminal status can tell us it was declined or timed out
+            // unanswered. Surface that plainly instead of silently minting
+            // a QR the customer never asked for.
+            setPhoneRequested(false)
+            setPhoneDeclined(true)
+            return
+          }
           setRefreshingQr(true)
           try {
             if (selectedPlan) await requestPayment(selectedPlan.plan, selectedPlan.period)
@@ -279,6 +302,7 @@ export default function Upgrade() {
     setQrDataUrl('')
     setStep('pending')
     setPhoneRequested(false)
+    setPhoneDeclined(false)
     setShowModal(true)
     setSubmitting(true)
 
@@ -381,6 +405,7 @@ export default function Upgrade() {
       }
       setShowPhoneModal(false)
       setPhoneRequested(true)
+      setPhoneDeclined(false)
       // Without this, the phone-push path never started the same live poll
       // the QR path gets (data.payment_id is the same value the create-phone
       // route stored as payment_requests.order_id) -- it would otherwise
@@ -649,7 +674,16 @@ export default function Upgrade() {
                   }} className="back-btn text-gray-400 text-xl" aria-label={closeLabel(lang)}>✕</button>
                 </div>
 
-                {phoneRequested ? (
+                {phoneDeclined ? (
+                  <div className="text-center py-6">
+                    <div className="text-4xl mb-3">🚫</div>
+                    <div className="text-sm text-gray-500 mb-4">{t.phoneRequestDeclinedNote}</div>
+                    <button onClick={() => selectedPlan && openModal(selectedPlan.name, selectedPlan.amount, selectedPlan.plan, selectedPlan.period)}
+                      className="w-full bg-[#1C2056] text-white rounded-xl py-3.5 font-medium text-sm">
+                      {t.retryPaymentButton}
+                    </button>
+                  </div>
+                ) : phoneRequested ? (
                   <div className="text-center py-6">
                     <div className="text-4xl mb-3">📲</div>
                     <div className="text-sm text-gray-500">{t.phoneRequestPendingNote}</div>

@@ -74,6 +74,8 @@ export interface MiscContent {
   enterFullPhoneAlert: string
   phoneRequestSentAlert: string
   phoneRequestPendingNote: string
+  phoneRequestDeclinedNote: string
+  retryPaymentButton: string
   alreadyPendingAlert: string
 
   // admin page
@@ -211,6 +213,8 @@ export const miscDict: Record<'ru' | 'kk' | 'en', MiscContent> = {
     enterFullPhoneAlert: 'Введите полный номер телефона',
     phoneRequestSentAlert: '✅ Запрос отправлен! Откройте Kaspi и подтвердите оплату.',
     phoneRequestPendingNote: 'Запрос отправлен на телефон — подтвердите оплату в приложении Kaspi',
+    phoneRequestDeclinedNote: 'Запрос отклонён в приложении Kaspi',
+    retryPaymentButton: 'Повторить оплату',
     alreadyPendingAlert: 'У вас уже есть неподтверждённый платёж — проверьте Kaspi или дождитесь его истечения, прежде чем создавать новый.',
 
     adminBrandLabel: 'INVOICES.KZ Admin',
@@ -345,6 +349,8 @@ export const miscDict: Record<'ru' | 'kk' | 'en', MiscContent> = {
     enterFullPhoneAlert: 'Толық телефон нөмірін енгізіңіз',
     phoneRequestSentAlert: '✅ Сұрау жіберілді! Kaspi-ді ашып, төлемді растаңыз.',
     phoneRequestPendingNote: 'Телефонға сұрау жіберілді — Kaspi қосымшасында төлемді растаңыз',
+    phoneRequestDeclinedNote: 'Сұраныс Kaspi қосымшасында қабылданбады',
+    retryPaymentButton: 'Төлемді қайталау',
     alreadyPendingAlert: 'Сізде әлі расталмаған төлем бар — жаңасын жасамас бұрын Kaspi-ді тексеріңіз немесе оның мерзімі өткенше күтіңіз.',
 
     adminBrandLabel: 'INVOICES.KZ Admin',
@@ -479,6 +485,8 @@ export const miscDict: Record<'ru' | 'kk' | 'en', MiscContent> = {
     enterFullPhoneAlert: 'Enter the full phone number',
     phoneRequestSentAlert: '✅ Request sent! Open Kaspi and confirm the payment.',
     phoneRequestPendingNote: 'Request sent to your phone — confirm the payment in the Kaspi app',
+    phoneRequestDeclinedNote: 'The request was declined in the Kaspi app',
+    retryPaymentButton: 'Retry payment',
     alreadyPendingAlert: 'You already have an unconfirmed payment — check Kaspi or wait for it to expire before creating a new one.',
 
     adminBrandLabel: 'INVOICES.KZ Admin',

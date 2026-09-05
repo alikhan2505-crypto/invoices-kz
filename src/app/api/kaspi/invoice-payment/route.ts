@@ -83,11 +83,22 @@ export async function GET(req: NextRequest) {
         live = outcome
         if (outcome === 'paid') current.status = 'paid'
         else if (outcome === 'expired' || outcome === 'failed') {
+          // A phone push dying is NOT the same situation as a QR dying. A QR
+          // going dead is routine (it only lasts minutes) and the payer is
+          // still looking at this same card, so silently minting a fresh one
+          // is the right call -- the same thing the next page load would
+          // have done anyway. A phone push dying almost always means the
+          // payer declined it in their own Kaspi app; auto-minting a QR in
+          // its place would silently paper over that decision instead of
+          // telling them what happened. Report it and let the page show a
+          // dedicated "отклонён — повторить" screen instead.
+          if (!current.qr_token) {
+            return NextResponse.json({ payment: null, phoneDeclined: true })
+          }
           // Answering null here made the whole Kaspi block vanish from the
           // payer's page mid-poll, leaving them staring at an invoice with no
           // way to pay it and no explanation. The row is closed now, so
-          // getOrCreate mints a replacement instead of returning the dead one
-          // -- the same thing the next page load would have done anyway.
+          // getOrCreate mints a replacement instead of returning the dead one.
           const replacement = await getOrCreateKaspiPaymentForInvoice(invoice)
           if (!replacement) return NextResponse.json({ payment: null })
           current = replacement
