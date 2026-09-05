@@ -7,10 +7,10 @@ import { getActivePlan } from '@/lib/plan'
 import { useLanguage, type Lang } from './LanguageProvider'
 import KaspiShopStoreSwitcher from './KaspiShopStoreSwitcher'
 
-const labels: Record<Lang, { home: string; invoices: string; kaspiShop: string; aiAgent: string; kaspiApi: string; wildberries: string; profile: string; history: string; menu: string; close: string }> = {
-  ru: { home: 'Дашборд', invoices: 'Счета', kaspiShop: 'Kaspi Bot', aiAgent: 'AI-агент', kaspiApi: 'Kaspi Cashier API', wildberries: 'WB Bot', profile: 'Профиль', history: 'История', menu: 'Меню', close: 'Закрыть' },
-  kk: { home: 'Дашборд', invoices: 'Шоттар', kaspiShop: 'Kaspi Bot', aiAgent: 'AI-агент', kaspiApi: 'Kaspi Cashier API', wildberries: 'WB Bot', profile: 'Профиль', history: 'Тарих', menu: 'Мәзір', close: 'Жабу' },
-  en: { home: 'Dashboard', invoices: 'Invoices', kaspiShop: 'Kaspi Bot', aiAgent: 'AI Agent', kaspiApi: 'Kaspi Cashier API', wildberries: 'WB Bot', profile: 'Profile', history: 'History', menu: 'Menu', close: 'Close' },
+const labels: Record<Lang, { home: string; invoices: string; kaspiShop: string; aiAgent: string; kaspiApi: string; wildberries: string; profile: string; menu: string; close: string }> = {
+  ru: { home: 'Дашборд', invoices: 'Счета', kaspiShop: 'Kaspi Bot', aiAgent: 'AI-агент', kaspiApi: 'Kaspi Cashier API', wildberries: 'WB Bot', profile: 'Профиль', menu: 'Меню', close: 'Закрыть' },
+  kk: { home: 'Дашборд', invoices: 'Шоттар', kaspiShop: 'Kaspi Bot', aiAgent: 'AI-агент', kaspiApi: 'Kaspi Cashier API', wildberries: 'WB Bot', profile: 'Профиль', menu: 'Мәзір', close: 'Жабу' },
+  en: { home: 'Dashboard', invoices: 'Invoices', kaspiShop: 'Kaspi Bot', aiAgent: 'AI Agent', kaspiApi: 'Kaspi Cashier API', wildberries: 'WB Bot', profile: 'Profile', menu: 'Menu', close: 'Close' },
 }
 
 // Copy shown to non-admins when they interact with an admin-gated section
@@ -339,63 +339,6 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
             </div>
           )}
         </AnimatePresence>
-      )}
-
-      {/* Mobile: bottom icon bar — same fixed position/behavior as the old AppNav bottom bar, restyled */}
-      {!desktopOnly && (
-        <div
-          className="lg:hidden fixed bottom-0 left-0 right-0 flex z-40 nav-glass"
-          style={{ borderLeft: 'none', borderRight: 'none', borderBottom: 'none' }}
-        >
-          {([
-            { href: '/dashboard', label: labels[lang].home },
-            { href: '/history', label: labels[lang].history },
-            { href: '/profile', label: labels[lang].profile },
-            { href: '/ai-agent', label: labels[lang].aiAgent, locked: !(isAdmin || isPro), hintId: 'mobile-aiAgent', proOnly: true },
-            { href: '/kaspi-shop', label: labels[lang].kaspiShop, locked: !(isAdmin || isPro), hintId: 'mobile-kaspiShop', proOnly: true },
-            { href: '/wildberries', label: labels[lang].wildberries, locked: !isAdmin, hintId: 'mobile-wildberries' },
-          ] as { href: string; label: string; badge?: number; locked?: boolean; hintId?: string; proOnly?: boolean }[]).map(item => {
-            const active = !item.locked && (path === item.href || path.startsWith(item.href + '/'))
-            return (
-              <div key={item.href} className="relative flex-1">
-                <button
-                  onClick={() => {
-                    if (item.locked) { showLockedHint(item.hintId!); return }
-                    router.push(item.href)
-                  }}
-                  aria-disabled={item.locked}
-                  className="w-full flex flex-col items-center py-3 gap-1"
-                  style={{ opacity: item.locked ? 0.6 : 1, cursor: item.locked ? 'not-allowed' : 'pointer' }}
-                >
-                  <div className="relative flex items-center justify-center">
-                    <div className="w-2 h-2 rounded-full" style={{ background: active ? 'var(--nav-accent)' : 'var(--nav-text-muted)', opacity: active ? 1 : 0.4 }} />
-                    {item.locked && (
-                      <span className="absolute -top-1.5 -right-2.5" style={{ color: 'var(--nav-text-muted)' }}>
-                        <LockIcon size={9} />
-                      </span>
-                    )}
-                  </div>
-                  {item.badge ? (
-                    <div className="absolute -top-0.5 right-[calc(50%-18px)] bg-red-500 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center font-medium">
-                      {item.badge > 9 ? '9+' : item.badge}
-                    </div>
-                  ) : null}
-                  <span className="text-[11px]" style={{ color: active ? 'var(--nav-text-primary)' : 'var(--nav-text-muted)', fontWeight: active ? 600 : 400 }}>
-                    {item.label}
-                  </span>
-                </button>
-                {item.locked && lockedHint === item.hintId && (
-                  <div
-                    className="nav-glass absolute bottom-[calc(100%+8px)] left-1/2 -translate-x-1/2 whitespace-nowrap px-3 py-1.5 rounded-xl text-xs font-medium z-20"
-                    style={{ color: 'var(--nav-text-primary)' }}
-                  >
-                    {item.proOnly ? proLockedMessages[lang] : lockedMessages[lang]}
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
       )}
 
       {/* Desktop: sticky top bar (row 1: sections, row 2: active section's pages) */}
