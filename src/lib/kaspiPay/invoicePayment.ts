@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js'
 import { loadConnectionByUserId } from './connection'
-import { createPayment } from './client'
+import { createPayment, createInvoiceByPhone } from './client'
 import { getWalletBalance, computeCommission } from './wallet'
-import type { SettleableRequest } from './settlePayment'
+import { checkAndSettleKaspiPayment, type SettleableRequest } from './settlePayment'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -171,4 +171,111 @@ export async function getOrCreateKaspiPaymentForInvoice(invoice: {
   }
 
   return inserted as KaspiInvoicePayment
+}
+
+// This path is reachable from the PUBLIC /view/[token] page with NO
+// authentication -- unlike the wallet widget, /kaspi-api, and /upgrade's
+// phone-push, where a logged-in owner sends a request to their OWN Kaspi
+// account, here any anonymous visitor holding the link could type in
+// SOMEONE ELSE's number. A push notification is real-world delivery to a
+// stranger, not just a wasted API call, so this is throttled far tighter
+// than the QR mint window (3/minute) -- an hour, not a minute -- to bound
+// how many pushes one invoice link can fire at a phone number over time.
+// The amount is always the invoice's own (never client-supplied), so this
+// can't be used to solicit an arbitrary sum either.
+const PHONE_MINT_WINDOW_MS = 60 * 60 * 1000
+const PHONE_MINT_LIMIT = 3
+
+function normalizeKzPhone(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null
+  const digits = raw.replace(/\D/g, '')
+  if (digits.length !== 11 || !digits.startsWith('7')) return null
+  return digits
+}
+
+export type PhonePaymentResult =
+  | { ok: true; payment: KaspiInvoicePayment }
+  | { ok: false; reason: 'invalid_phone' | 'closed' | 'no_connection' | 'insufficient_balance' | 'rate_limited' | 'already_paid' | 'error' }
+
+/**
+ * Pushes a Kaspi payment request for this invoice's own amount to a phone
+ * number the payer supplies, replacing any QR-based payment already pending
+ * for it (kaspi_payment_requests allows only one 'pending' row per invoice --
+ * see kaspi_payment_requests_invoice_pending_idx).
+ */
+export async function createPhonePaymentForInvoice(
+  invoice: { id: string; user_id: string; amount: number | string; status?: string | null },
+  phone: unknown,
+): Promise<PhonePaymentResult> {
+  const phoneNumber = normalizeKzPhone(phone)
+  if (!phoneNumber) return { ok: false, reason: 'invalid_phone' }
+  if (invoice.status && CLOSED_INVOICE_STATUSES.has(invoice.status)) return { ok: false, reason: 'closed' }
+
+  // Clear any existing pending row (the QR minted on page load, almost
+  // always) before inserting -- the partial unique index allows only one.
+  // force=true is safe here specifically because a genuinely live payment is
+  // caught first: checkAndSettleKaspiPayment always asks Kaspi for the real
+  // status before closing anything, so a QR paid in this exact instant is
+  // still credited rather than discarded for a phone push nobody asked to
+  // replace it with.
+  const { data: existingRows } = await supabase
+    .from('kaspi_payment_requests')
+    .select(SETTLEABLE_COLUMNS)
+    .eq('invoice_id', invoice.id)
+    .eq('status', 'pending')
+  for (const row of (existingRows ?? []) as KaspiInvoicePayment[]) {
+    try {
+      const outcome = await checkAndSettleKaspiPayment(row, { terminateDead: true, force: true })
+      if (outcome === 'paid') return { ok: false, reason: 'already_paid' }
+    } catch (e: any) {
+      console.error('Phone payment: could not settle existing pending row', row.id, 'for invoice', invoice.id, ':', e.message)
+      return { ok: false, reason: 'error' }
+    }
+  }
+
+  const balance = await getWalletBalance(invoice.user_id)
+  if (balance < computeCommission(Number(invoice.amount))) return { ok: false, reason: 'insufficient_balance' }
+
+  const { count: recentPushes, error: rateError } = await supabase
+    .from('kaspi_payment_requests')
+    .select('id', { count: 'exact', head: true })
+    .eq('invoice_id', invoice.id)
+    .is('qr_token', null)
+    .gte('created_at', new Date(Date.now() - PHONE_MINT_WINDOW_MS).toISOString())
+  if (rateError) console.error('Phone payment: rate count failed for invoice', invoice.id, rateError.message)
+  else if ((recentPushes ?? 0) >= PHONE_MINT_LIMIT) return { ok: false, reason: 'rate_limited' }
+
+  const connection = await loadConnectionByUserId(invoice.user_id)
+  if (!connection) return { ok: false, reason: 'no_connection' }
+
+  try {
+    const push = await createInvoiceByPhone(connection, {
+      phoneNumber,
+      amount: Number(invoice.amount),
+      comment: 'Оплата счёта invoices.kz',
+    })
+    // No qr_token/payment_link/expires_at: there is nothing to scan, and a
+    // pushed request has no Kaspi-side deadline of its own (see the wallet's
+    // identical phone-push row for the same reasoning).
+    const { data: inserted, error: insertError } = await supabase
+      .from('kaspi_payment_requests')
+      .insert({
+        user_id: invoice.user_id,
+        invoice_id: invoice.id,
+        order_id: invoice.id,
+        amount: invoice.amount,
+        kaspi_operation_id: push.operationId,
+        status: 'pending',
+      })
+      .select(SETTLEABLE_COLUMNS)
+      .single()
+    if (insertError) {
+      console.error('Phone payment created but failed to persist for tracking — invoice', invoice.id, 'operation', push.operationId, ':', insertError.message)
+      return { ok: false, reason: 'error' }
+    }
+    return { ok: true, payment: inserted as KaspiInvoicePayment }
+  } catch (e: any) {
+    console.error('Phone payment: Kaspi push failed for invoice', invoice.id, ':', e.message)
+    return { ok: false, reason: 'error' }
+  }
 }

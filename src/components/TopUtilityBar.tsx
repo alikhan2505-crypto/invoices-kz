@@ -488,21 +488,29 @@ export default function TopUtilityBar() {
         // Reissue in place rather than sending the customer back to the
         // amount picker: they already chose the amount and are standing in
         // front of the phone with Kaspi open.
-        if (!topupRefreshing) {
-          setTopupRefreshing(true)
-          const amount = topupPending.amount
-          setTopupPending(null)
-          try {
-            await startTopup(wallet, amount)
-          } finally {
-            setTopupRefreshing(false)
-          }
+        //
+        // Stops THIS interval outright instead of guarding re-entrancy with
+        // the `topupRefreshing` state flag -- that exact pattern on /upgrade
+        // got permanently stuck: a successful reissue changes `topupPending`,
+        // this effect's own dependency, whose cleanup then races the
+        // `finally` block's reset. Clearing here first removes the
+        // possibility of a second tick ever overlapping with this one, so no
+        // flag is needed at all; a fresh interval starts on its own once
+        // `startTopup` sets a new `topupPending` below.
+        clearInterval(interval)
+        setTopupRefreshing(true)
+        const amount = topupPending.amount
+        setTopupPending(null)
+        try {
+          await startTopup(wallet, amount)
+        } finally {
+          setTopupRefreshing(false)
         }
       }
     }, 3000)
     return () => clearInterval(interval)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [topupPending, activeWallet, topupRefreshing])
+  }, [topupPending, activeWallet])
 
   // Local countdown so the deadline is visible before it passes. Shows the
   // nearer of Kaspi's own expiry and the 60s idle deadline the poll above

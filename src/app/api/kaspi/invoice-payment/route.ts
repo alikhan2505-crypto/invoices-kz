@@ -27,6 +27,9 @@ export async function GET(req: NextRequest) {
   // getOrCreateKaspiPaymentForInvoice's own 3-per-minute cap, so this cannot
   // be used to drive traffic into Kaspi on the owner's connection.
   const idle = req.nextUrl.searchParams.get('idle') === 'true'
+  // Set by the "Отменить запрос" link on a phone-push screen, wanting the QR
+  // back.
+  const cancelPhone = req.nextUrl.searchParams.get('cancelPhone') === 'true'
 
   const { data: invoice } = await supabase
     .from('invoices')
@@ -40,8 +43,26 @@ export async function GET(req: NextRequest) {
   // days later, by which point the original QR has expired and the payer was
   // left with no way to pay through Kaspi at all.
   try {
-    const payment = await getOrCreateKaspiPaymentForInvoice(invoice)
+    let payment = await getOrCreateKaspiPaymentForInvoice(invoice)
     if (!payment) return NextResponse.json({ payment: null })
+
+    // A phone push has no qr_token, and kaspi_payment_requests allows only
+    // one 'pending' row per invoice (kaspi_payment_requests_invoice_pending_idx),
+    // so it must be closed before a QR-based row can take its place.
+    if (cancelPhone && payment.status === 'pending' && !payment.qr_token) {
+      try {
+        const outcome = await checkAndSettleKaspiPayment(payment, { terminateDead: true, force: true })
+        if (outcome !== 'paid') {
+          const replacement = await getOrCreateKaspiPaymentForInvoice(invoice)
+          if (!replacement) return NextResponse.json({ payment: null })
+          payment = replacement
+        } else {
+          payment.status = 'paid'
+        }
+      } catch (e: any) {
+        console.error('Kaspi invoice-payment: cancel-phone failed for', payment.id, e.message)
+      }
+    }
 
     let current = payment
     let live: string = current.status

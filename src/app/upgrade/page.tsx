@@ -217,24 +217,29 @@ export default function Upgrade() {
           // Kaspi can discard a QR before its stated ExpireDate on its own,
           // and 'failed' covers a scan the customer then cancelled -- both
           // leave a code its own scanner answers with "QR-код не распознан".
+          //
+          // Stops THIS interval outright instead of guarding re-entrancy with
+          // a state flag: an earlier version gated the reissue on
+          // `!refreshingQr` (a STATE value) and reset it in a `finally` block
+          // behind `if (!cancelled)`. That was the actual bug the founder hit
+          // three times: requestPayment succeeding calls setExtTranId, which
+          // is this effect's OWN dependency, so its cleanup runs and flips
+          // `cancelled` true BEFORE the finally block's check -- the reset
+          // was silently skipped on every single successful reissue, so
+          // `refreshingQr` got stuck `true` forever and permanently blocked
+          // every later attempt behind its own guard. Clearing the interval
+          // immediately (matching /kaspi-api's original, unrelated design)
+          // sidesteps the whole class of bug: nothing can double-fire while
+          // requestPayment is in flight, since a fresh interval only starts
+          // once extTranId genuinely changes below.
+          clearInterval(interval)
           setQrScanning(false)
           scanningRef.current = false
-          if (!refreshingQr) {
-            setRefreshingQr(true)
-            try {
-              if (selectedPlan) {
-                const result = await requestPayment(selectedPlan.plan, selectedPlan.period)
-                // requestPayment itself flips to the success step when Kaspi
-                // reports this row already paid. extTranId is untouched in
-                // that branch, so without this the interval would live on
-                // and, on its next tick, re-read the same now-'paid' row and
-                // navigate the customer away from the success screen they
-                // are looking at.
-                if (result.settled) { clearInterval(interval); return }
-              }
-            } finally {
-              if (!cancelled) setRefreshingQr(false)
-            }
+          setRefreshingQr(true)
+          try {
+            if (selectedPlan) await requestPayment(selectedPlan.plan, selectedPlan.period)
+          } finally {
+            setRefreshingQr(false)
           }
         } else {
           setQrScanning(false)
@@ -245,7 +250,7 @@ export default function Upgrade() {
     }, 5000)
     return () => { cancelled = true; clearInterval(interval) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [extTranId, showModal, step, phoneRequested, refreshingQr, selectedPlan, requestPayment])
+  }, [extTranId, showModal, step, phoneRequested, selectedPlan, requestPayment])
 
   // Purely cosmetic countdown -- shows the nearer of Kaspi's own deadline and
   // the 60s idle deadline, the same number /kaspi-api shows, so it never

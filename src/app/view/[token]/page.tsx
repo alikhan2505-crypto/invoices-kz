@@ -91,6 +91,16 @@ export default function PublicInvoice() {
   const [kaspiSecondsLeft, setKaspiSecondsLeft] = useState<number | null>(null)
   const [kaspiPaymentLoading, setKaspiPaymentLoading] = useState(true)
   const [kaspiQrDataUrl, setKaspiQrDataUrl] = useState<string | null>(null)
+  // Alternative to scanning a QR: pushes the request straight into the
+  // payer's own Kaspi app, for when this page is open on the very phone that
+  // has Kaspi installed. A phone-push row carries no qr_token/payment_link
+  // (see createPhonePaymentForInvoice), so "was the last poll response a
+  // push, not a QR" is read directly off that rather than tracked as a
+  // separate flag that could drift out of sync with it.
+  const [kaspiPhone, setKaspiPhone] = useState('')
+  const [kaspiPhoneOpen, setKaspiPhoneOpen] = useState(false)
+  const [kaspiPhoneSending, setKaspiPhoneSending] = useState(false)
+  const [kaspiPhoneError, setKaspiPhoneError] = useState('')
   const [loading, setLoading] = useState(true)
   const [marking, setMarking] = useState(false)
   const [marked, setMarked] = useState(false)
@@ -236,6 +246,60 @@ export default function PublicInvoice() {
     // interval each time (resetting the 150-tick cap along with it).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kaspiPayment?.status, kaspiPaymentLoading, invoice?.status, token])
+
+  function formatKzPhone(value: string) {
+    const digits = value.replace(/\D/g, '').replace(/^8/, '7')
+    if (!digits) return ''
+    let out = '+7'
+    if (digits.length > 1) out += ' ' + digits.slice(1, 4)
+    if (digits.length > 4) out += ' ' + digits.slice(4, 7)
+    if (digits.length > 7) out += ' ' + digits.slice(7, 9)
+    if (digits.length > 9) out += ' ' + digits.slice(9, 11)
+    return out
+  }
+
+  async function sendKaspiPaymentToPhone() {
+    setKaspiPhoneSending(true)
+    setKaspiPhoneError('')
+    try {
+      const res = await fetch('/api/kaspi/invoice-payment-phone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, phone: kaspiPhone }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setKaspiPhoneOpen(false)
+        // Picks up the freshly-pushed row (no qr_token/payment_link) on the
+        // very next call, rather than waiting up to 5s for the poll's own
+        // tick -- the button should feel like it did something immediately.
+        const refreshed = await fetch(`/api/kaspi/invoice-payment?token=${token}`)
+        const refreshedData = await refreshed.json()
+        setKaspiPayment(refreshedData.payment || null)
+      } else {
+        setKaspiPhoneError(
+          data.error === 'invalid_phone' ? 'Проверьте номер телефона'
+          : data.error === 'rate_limited' ? 'Слишком много попыток, попробуйте позже'
+          : data.error === 'already_paid' ? 'Счёт уже оплачен'
+          : 'Не удалось отправить запрос, попробуйте ещё раз'
+        )
+      }
+    } catch {
+      setKaspiPhoneError('Не удалось отправить запрос, попробуйте ещё раз')
+    }
+    setKaspiPhoneSending(false)
+  }
+
+  async function cancelKaspiPhonePayment() {
+    setKaspiPayment(null)
+    try {
+      const res = await fetch(`/api/kaspi/invoice-payment?token=${token}&cancelPhone=true`)
+      const data = await res.json()
+      setKaspiPayment(data.payment || null)
+    } catch {
+      // The 5s poll (once a payment exists again) or a manual reload recovers.
+    }
+  }
 
   async function markAsPaid() {
     if (!confirm(t.confirmPaymentConfirm)) return
@@ -408,7 +472,25 @@ export default function PublicInvoice() {
           </div>
         )}
 
-        {kaspiPayment && kaspiPayment.status === 'pending' && (
+        {kaspiPayment && kaspiPayment.status === 'pending' && !kaspiPayment.payment_link && (
+          <div className="nav-glass nav-card-accent rounded-2xl p-5 text-center">
+            <div className="text-xs uppercase tracking-wide mb-3" style={{ color: 'var(--nav-text-muted)' }}>Оплата через Kaspi</div>
+            <div className="text-2xl mb-2">📲</div>
+            <p className="text-sm mb-1" style={{ color: 'var(--nav-text-primary)' }}>
+              Запрос отправлен на {formatKzPhone(kaspiPhone)}
+            </p>
+            <p className="text-xs mb-4" style={{ color: 'var(--nav-text-secondary)' }}>
+              Подтвердите оплату в приложении Kaspi — счёт подтвердится автоматически.
+            </p>
+            <button onClick={cancelKaspiPhonePayment}
+              className="w-full text-center text-[11px] underline"
+              style={{ color: 'var(--nav-text-muted)' }}>
+              Отменить запрос
+            </button>
+          </div>
+        )}
+
+        {kaspiPayment && kaspiPayment.status === 'pending' && kaspiPayment.payment_link && (
           <div className="nav-glass nav-card-accent rounded-2xl p-5">
             <div className="text-xs uppercase tracking-wide mb-3" style={{ color: 'var(--nav-text-muted)' }}>Оплата через Kaspi</div>
             <div className="flex items-center gap-4 mb-4">
@@ -441,9 +523,48 @@ export default function PublicInvoice() {
                     ? `QR действителен ещё ${Math.floor(kaspiSecondsLeft / 60)}:${String(kaspiSecondsLeft % 60).padStart(2, '0')}`
                     : 'Обновляем код…'}
             </div>
-            <div className="text-xs text-center mt-3" style={{ color: 'var(--nav-text-muted)' }}>
+            <div className="text-xs text-center mt-3 mb-1" style={{ color: 'var(--nav-text-muted)' }}>
               Счёт подтвердится автоматически сразу после оплаты — обновлять страницу не нужно.
             </div>
+
+            {/* Same divider-plus-button treatment the wallet widget and
+                /kaspi-api use for this choice -- useful when this page is
+                open on the very phone that has Kaspi installed, with
+                nothing to scan the QR with. */}
+            {!kaspiScanning && (
+              <>
+                <div className="flex items-center gap-2 my-3">
+                  <div className="flex-1 h-px" style={{ background: 'var(--nav-border-soft)' }} />
+                  <span className="text-[10px]" style={{ color: 'var(--nav-text-muted)' }}>или</span>
+                  <div className="flex-1 h-px" style={{ background: 'var(--nav-border-soft)' }} />
+                </div>
+                {kaspiPhoneOpen ? (
+                  <>
+                    <input
+                      value={kaspiPhone}
+                      onChange={e => setKaspiPhone(formatKzPhone(e.target.value))}
+                      placeholder="+7 777 123 45 67"
+                      type="tel" inputMode="tel"
+                      className="w-full border rounded-lg px-3 py-1.5 text-xs mb-2"
+                      style={{ borderColor: 'var(--nav-border-soft)', background: 'var(--nav-bg)', color: 'var(--nav-text-primary)' }}
+                    />
+                    {kaspiPhoneError && <div className="text-xs mb-2" style={{ color: 'var(--nav-critical)' }}>{kaspiPhoneError}</div>}
+                    <button onClick={sendKaspiPaymentToPhone}
+                      disabled={kaspiPhoneSending || kaspiPhone.replace(/\D/g, '').length !== 11}
+                      className="w-full rounded-lg px-3 py-2 text-xs font-medium transition-colors disabled:opacity-50"
+                      style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                      {kaspiPhoneSending ? 'Отправляем…' : 'Отправить запрос'}
+                    </button>
+                  </>
+                ) : (
+                  <button onClick={() => setKaspiPhoneOpen(true)}
+                    className="w-full rounded-lg px-3 py-2 text-xs font-medium border transition-colors"
+                    style={{ borderColor: 'var(--nav-border-soft)', color: 'var(--nav-accent)', background: 'transparent' }}>
+                    Отправить запрос на телефон
+                  </button>
+                )}
+              </>
+            )}
           </div>
         )}
 
