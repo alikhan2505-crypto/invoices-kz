@@ -466,5 +466,16 @@ export async function checkStatus(
   if (QR_EXPIRED.has(status)) return { status: 'expired' }
   if (QR_FAILED.has(status)) return { status: 'failed' }
   if (QR_SCANNING.has(status)) return { status: 'scanning' }
-  return { status: 'pending' } // QrTokenCreated or any other in-flight status
+  if (status !== 'QrTokenCreated') {
+    // QR_FAILED/QR_EXPIRED were built from strings OBSERVED on a QR someone
+    // scanned and then declined -- nobody has yet confirmed a phone push
+    // (remote/create) reports a decline the same way. Without this, an
+    // unrecognized string here silently loops as 'pending' forever with
+    // zero trace of what Kaspi actually said (founder repro 2026-09-05:
+    // cancelled a phone-pushed subscription payment in the Kaspi app, the
+    // site never noticed). Logged so the real string can be read from Vercel
+    // and added to the correct Set with evidence instead of guessed at.
+    console.error('Kaspi checkStatus: unrecognized status', JSON.stringify(status), 'for operation', operationId, '-- treating as pending')
+  }
+  return { status: 'pending' } // QrTokenCreated or another unrecognized in-flight status
 }
