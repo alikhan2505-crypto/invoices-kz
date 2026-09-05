@@ -39,20 +39,39 @@ export async function GET(req: NextRequest) {
     const payment = await getOrCreateKaspiPaymentForInvoice(invoice)
     if (!payment) return NextResponse.json({ payment: null })
 
-    if (payment.status === 'pending') {
+    let current = payment
+    if (current.status === 'pending') {
       try {
-        const outcome = await checkAndSettleKaspiPayment(payment)
-        if (outcome === 'paid') payment.status = 'paid'
-        else if (outcome === 'expired') return NextResponse.json({ payment: null })
+        const outcome = await checkAndSettleKaspiPayment(current)
+        if (outcome === 'paid') current.status = 'paid'
+        else if (outcome === 'expired') {
+          // Answering null here made the whole Kaspi block vanish from the
+          // payer's page mid-poll, leaving them staring at an invoice with no
+          // way to pay it and no explanation. The row is 'expired' now, so
+          // getOrCreate mints a replacement instead of returning the dead one
+          // -- the same thing the next page load would have done anyway.
+          const replacement = await getOrCreateKaspiPaymentForInvoice(invoice)
+          if (!replacement) return NextResponse.json({ payment: null })
+          current = replacement
+        }
       } catch (e: any) {
         // Fails open: the payer still sees their existing pending QR and the
         // page keeps polling, so a transient Kaspi/network hiccup on this one
         // tick just means the next poll (or the daily cron) catches it.
-        console.error('Kaspi live status check failed for payment', payment.id, e.message)
+        console.error('Kaspi live status check failed for payment', current.id, e.message)
       }
     }
 
-    return NextResponse.json({ payment: { qr_token: payment.qr_token, payment_link: payment.payment_link, status: payment.status } })
+    // expires_at lets the page count the QR down and notice a dead code on its
+    // own clock, instead of only finding out when Kaspi's scanner rejects it.
+    return NextResponse.json({
+      payment: {
+        qr_token: current.qr_token,
+        payment_link: current.payment_link,
+        status: current.status,
+        expires_at: current.expires_at ?? null,
+      },
+    })
   } catch (e: any) {
     // The page treats a null payment as "no Kaspi option here" and still
     // renders the bank requisites, so a Kaspi-side failure degrades rather

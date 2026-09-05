@@ -70,7 +70,15 @@ export default function PublicInvoice() {
   const [invoice, setInvoice] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
   const [bank, setBank] = useState<any>(null)
-  const [kaspiPayment, setKaspiPayment] = useState<{ qr_token: string; payment_link: string; status: string } | null>(null)
+  const [kaspiPayment, setKaspiPayment] = useState<
+    { qr_token: string; payment_link: string; status: string; expires_at?: string | null } | null
+  >(null)
+  // A Kaspi QR is only good for a few minutes. Nothing here said so, so a payer
+  // who left the tab open came back to a code their Kaspi app answered with
+  // "QR-код не распознан" and no hint that anything was wrong. The 5s poll
+  // already replaces a spent code (the API mints a fresh one); this is what
+  // makes the deadline visible while it runs.
+  const [kaspiSecondsLeft, setKaspiSecondsLeft] = useState<number | null>(null)
   const [kaspiPaymentLoading, setKaspiPaymentLoading] = useState(true)
   const [kaspiQrDataUrl, setKaspiQrDataUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -137,6 +145,19 @@ export default function PublicInvoice() {
       .catch(() => {}) // No QR image — the plain link still works.
     return () => { cancelled = true }
   }, [kaspiPayment?.payment_link])
+
+  // Ticks the visible deadline down. Purely informational: replacing a spent
+  // code is decided by the 5s poll below against Kaspi's real status, never by
+  // this reaching zero, so a slow clock or a backgrounded tab can't discard a
+  // QR someone is about to pay.
+  useEffect(() => {
+    if (!kaspiPayment?.expires_at || kaspiPayment.status !== 'pending') { setKaspiSecondsLeft(null); return }
+    const expiresAtMs = new Date(kaspiPayment.expires_at).getTime()
+    const tick = () => setKaspiSecondsLeft(Math.max(0, Math.round((expiresAtMs - Date.now()) / 1000)))
+    tick()
+    const interval = setInterval(tick, 1000)
+    return () => clearInterval(interval)
+  }, [kaspiPayment?.expires_at, kaspiPayment?.status])
 
   // Kaspi has no webhook to us, so the only way to learn a QR got paid is to
   // actively ask while the payer is here — this is what makes payment
@@ -360,6 +381,13 @@ export default function PublicInvoice() {
             >
               Оплатить через Kaspi
             </a>
+            {kaspiSecondsLeft !== null && (
+              <div className="text-xs text-center mt-3" aria-live="polite" style={{ color: 'var(--nav-text-muted)' }}>
+                {kaspiSecondsLeft > 0
+                  ? `QR действителен ещё ${Math.floor(kaspiSecondsLeft / 60)}:${String(kaspiSecondsLeft % 60).padStart(2, '0')}`
+                  : 'Обновляем код…'}
+              </div>
+            )}
             <div className="text-xs text-center mt-3" style={{ color: 'var(--nav-text-muted)' }}>
               Счёт подтвердится автоматически сразу после оплаты — обновлять страницу не нужно.
             </div>

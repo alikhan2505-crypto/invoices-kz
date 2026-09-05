@@ -70,27 +70,27 @@ export async function POST(req: NextRequest) {
       .eq('status', 'pending')
     if (pendingError) console.error('Payment create: pending-check failed, allowing request:', pendingError.message)
     else if ((pendingRows?.length ?? 0) > 0) {
-      let stillLive = 0
       for (const row of pendingRows as PlanPaymentRow[]) {
         try {
-          const result = await checkAndSettlePlanPayment(row)
+          // force: the caller is asking for a payable QR right now, so any
+          // older one is being abandoned by definition. Refusing instead
+          // (the previous behaviour) left customers staring at "у вас уже
+          // есть неподтверждённый платёж" with no way forward until the
+          // nightly cron cleared it. /kaspi-api has always worked this way.
+          const result = await checkAndSettlePlanPayment(row, { force: true })
           if (result === 'paid') {
             // Settling just activated the plan from a QR the customer had
             // already paid. Same as create-phone: report it as a successful
             // outcome instead of minting a second operation they'd be
-            // charged for. 'expired' falls through -- that row is dead.
+            // charged for.
             return NextResponse.json({ error: 'already_paid' }, { status: 409 })
           }
-          if (result === 'not_paid') stillLive++
         } catch (e: any) {
-          // Kaspi unreachable -- keep the old conservative behaviour and
-          // treat the row as live rather than minting a second operation.
-          console.error('Payment create: could not settle pending row', row.id, '— treating as live:', e.message)
-          stillLive++
+          // Kaspi unreachable: leave the row for the cron and carry on. The
+          // rate limit above is what stops this becoming a way to mint
+          // operations in bulk.
+          console.error('Payment create: could not settle pending row', row.id, '— leaving it for the next sweep:', e.message)
         }
-      }
-      if (stillLive > 0) {
-        return NextResponse.json({ error: 'already_pending' }, { status: 409 })
       }
     }
 

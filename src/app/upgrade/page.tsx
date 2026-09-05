@@ -11,6 +11,11 @@ import { getActivePlan } from '@/lib/plan'
 import { PLAN_PRICES, type BillingPeriod } from '@/lib/plans/pricing'
 import { consumePendingUpgrade } from '@/lib/pendingUpgrade'
 
+// How long an untouched QR is shown before it is retired for a fresh one.
+// Kaspi's own window is ~5 minutes; /kaspi-api shortens the visible wait to a
+// minute on the founder's ask, and this page follows it.
+const IDLE_QR_MS = 60_000
+
 export default function Upgrade() {
   const router = useRouter()
   const { lang } = useLanguage()
@@ -39,6 +44,16 @@ export default function Upgrade() {
   const [secondsLeft, setSecondsLeft] = useState<number>(0)
   const [qrDataUrl, setQrDataUrl] = useState('')
   const [refreshingQr, setRefreshingQr] = useState(false)
+  const [qrScanning, setQrScanning] = useState(false)
+  // Read by the idle timer, which must not list scanning in its deps: doing
+  // so would restart the 60s clock every time the flag flips, defeating it.
+  const scanningRef = useRef(false)
+  // When the current QR was minted -- the 60s idle deadline counts from here,
+  // not from Kaspi's ~5-minute ExpireDate.
+  const qrCreatedAtRef = useRef<number>(0)
+  // The QR the idle timer is allowed to retire. Guards against a timer left
+  // over from a previous code firing against its replacement.
+  const qrOperationRef = useRef<string>('')
   const [isMobile, setIsMobile] = useState(false)
   const [showPhoneModal, setShowPhoneModal] = useState(false)
   const [payPhone, setPayPhone] = useState('')
@@ -92,17 +107,30 @@ export default function Upgrade() {
           headers: { 'Authorization': `Bearer ${session?.access_token}` },
         })
         const data = await res.json()
-        if (data.status === 'paid' && !cancelled) {
+        if (cancelled) return
+        if (data.status === 'paid') {
           clearInterval(interval)
           router.push('/profile?upgraded=1')
-        } else if (data.status === 'expired' && !cancelled) {
-          // Kaspi can discard a QR before its stated ExpireDate, so trust its
+        } else if (data.status === 'scanning') {
+          // Kaspi's 'Wait': the customer is on the confirmation screen right
+          // now. Recorded so neither refresh path pulls the QR out from under
+          // them -- same guarantee /kaspi-api makes.
+          setQrScanning(true)
+          scanningRef.current = true
+        } else if (data.status === 'expired' || data.status === 'failed') {
+          // Kaspi can discard a QR before its stated ExpireDate, and 'failed'
+          // covers a scan the customer then cancelled -- both leave a code
+          // its own scanner answers with "QR-код не распознан". Trust Kaspi's
           // verdict over the local clock: pushing the deadline into the past
           // makes the countdown effect below mint a replacement on its next
           // tick. Not calling requestPayment straight from here keeps this
           // effect above its declaration, where it already sits.
           clearInterval(interval)
+          setQrScanning(false)
+          scanningRef.current = false
           setQrExpiresAt(Date.now() - 1)
+        } else {
+          setQrScanning(false)
         }
       } catch {
         // Transient network hiccup — the next tick tries again.
@@ -189,22 +217,61 @@ export default function Upgrade() {
     setQrToken(data.qr_token)
     setExtTranId(data.ext_tran_id)
     setQrExpiresAt(data.expire_date ? new Date(data.expire_date).getTime() : 0)
+    // A fresh code has never been scanned, and its idle clock starts now.
+    setQrScanning(false)
+    scanningRef.current = false
+    qrCreatedAtRef.current = Date.now()
+    qrOperationRef.current = data.ext_tran_id
     return { link: data.qr_token as string, settled: false }
   }, [userId, t])
 
-  // Counts the QR down and replaces it the moment Kaspi's window closes, so
-  // the customer never sits in front of a code that can no longer be paid.
-  // Only runs while the modal is on its pending step -- a settled payment
-  // must not mint another operation. Declared after requestPayment because
-  // it calls it.
+  // Retires a QR nobody has touched after 60 seconds rather than making the
+  // customer wait out Kaspi's full ~5 minutes -- /kaspi-api works this way at
+  // the founder's request ("время ожидания давай не 5 минут, а 1 минуту").
+  // Never fires once scanning has been seen: a code someone is actively
+  // confirming is never replaced. force=true settles the old row immediately
+  // so /api/payment/create doesn't see it as live.
+  useEffect(() => {
+    if (!extTranId || !showModal || step !== 'pending' || phoneRequested) return
+    const operationId = extTranId
+    const timeout = setTimeout(async () => {
+      if (scanningRef.current || qrOperationRef.current !== operationId) return
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        const res = await fetch(`/api/payment/status?order_id=${operationId}&force=true`, {
+          headers: { 'Authorization': `Bearer ${session?.access_token}` },
+        })
+        const data = await res.json()
+        if (data.status === 'paid') { router.push('/profile?upgraded=1'); return }
+        // The customer began scanning in the instant this fired -- leave the
+        // code alone and let the 5s poll keep driving it.
+        if (data.status === 'scanning') { setQrScanning(true); scanningRef.current = true; return }
+        setQrExpiresAt(Date.now() - 1)
+      } catch (e: any) {
+        console.error('Idle QR refresh check failed:', e.message)
+      }
+    }, IDLE_QR_MS)
+    return () => clearTimeout(timeout)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [extTranId, showModal, step, phoneRequested])
+
+  // Counts the QR down and replaces it once it is spent, so the customer never
+  // sits in front of a code that can no longer be paid. The number shown is
+  // the nearer of Kaspi's own deadline and the 60s idle deadline -- showing
+  // the longer one would read "4:56" right as the code was about to be
+  // swapped out. Declared after requestPayment because it calls it.
   useEffect(() => {
     if (!qrExpiresAt || !showModal || step !== 'pending' || phoneRequested) return
     let cancelled = false
 
     const tick = async () => {
-      const left = Math.max(0, Math.round((qrExpiresAt - Date.now()) / 1000))
+      const kaspiLeft = Math.round((qrExpiresAt - Date.now()) / 1000)
+      const idleLeft = scanningRef.current
+        ? kaspiLeft
+        : Math.round((qrCreatedAtRef.current + IDLE_QR_MS - Date.now()) / 1000)
+      const left = Math.max(0, Math.min(kaspiLeft, idleLeft))
       setSecondsLeft(left)
-      if (left > 0 || cancelled || refreshingQr) return
+      if (kaspiLeft > 0 || cancelled || refreshingQr) return
 
       setRefreshingQr(true)
       try {
@@ -647,11 +714,13 @@ export default function Upgrade() {
                       </div>
                     )}
                     <div className="text-xs mb-4 h-4" aria-live="polite">
-                      {refreshingQr ? (
+                      {qrScanning ? (
+                        <span className="text-[#2DC48D]">Подтвердите оплату в приложении Kaspi…</span>
+                      ) : refreshingQr ? (
                         <span className="text-gray-400">Обновляем код…</span>
                       ) : secondsLeft > 0 ? (
-                        <span className={secondsLeft <= 60 ? 'text-[#C2410C]' : 'text-gray-400'}>
-                          Код действует ещё {Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, '0')}
+                        <span className="text-gray-400">
+                          QR действителен ещё {Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, '0')}
                         </span>
                       ) : null}
                     </div>

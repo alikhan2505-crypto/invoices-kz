@@ -23,15 +23,15 @@ export interface PlanPaymentRow {
 // rather than sweeping it forever on every future daily cron run.
 const PLAN_PAYMENT_STALE_MS = 24 * 60 * 60 * 1000
 
-async function tryExpirePlanPayment(row: PlanPaymentRow): Promise<boolean> {
+async function tryExpirePlanPayment(row: PlanPaymentRow, status: 'expired' | 'failed' = 'expired'): Promise<boolean> {
   const { data, error } = await supabase
     .from('payment_requests')
-    .update({ status: 'expired' })
+    .update({ status })
     .eq('id', row.id)
     .eq('status', 'pending')
     .select('id')
   if (error) {
-    console.error('Plan payment: failed to expire', row.id, error.message)
+    console.error('Plan payment: failed to mark', row.id, 'as', status, ':', error.message)
     return false
   }
   return !!(data && data.length > 0)
@@ -42,15 +42,37 @@ async function tryExpirePlanPayment(row: PlanPaymentRow): Promise<boolean> {
 // instead of the paying customer's, and activates a plan instead of marking
 // an invoice paid. Ported from the old /api/payment/webhook's bonus-days
 // carry-over logic rather than dropping it.
-export async function checkAndSettlePlanPayment(row: PlanPaymentRow): Promise<'paid' | 'not_paid' | 'expired'> {
+export async function checkAndSettlePlanPayment(
+  row: PlanPaymentRow,
+  // force: settle the row NOW if Kaspi says it isn't paid, instead of leaving
+  // it 'pending' until the daily 04:00 cron. Mirrors the same option on
+  // checkAndSettleWalletTopup, and exists for the same reason: a caller that
+  // is about to replace this QR needs the old row closed immediately, or the
+  // next create call sees it as live and refuses. The real Kaspi status is
+  // still checked first, so a payment landing in this exact instant is
+  // credited rather than discarded.
+  opts: { force?: boolean } = {},
+): Promise<'paid' | 'not_paid' | 'expired' | 'scanning' | 'failed'> {
   const connection = await loadPlatformConnection()
   if (!connection) return 'not_paid'
 
   const result = await checkStatus(connection, row.qr_operation_id)
+  // 'scanning' and 'failed' are surfaced for the same reasons as in
+  // checkAndSettleWalletTopup. 'scanning' (Kaspi's 'Wait') means the customer
+  // is on the confirmation screen right now, so callers must not replace the
+  // QR under them. 'failed' is a scanned-then-cancelled/rejected attempt: the
+  // QR is just as dead as an expired one, but it used to fall through to
+  // 'not_paid' and leave the page showing a code Kaspi would refuse.
+  // Existing `=== 'paid'` / `=== 'expired'` callers are unaffected.
+  if (result.status === 'scanning') return 'scanning'
+  if (result.status === 'failed') {
+    if (await tryExpirePlanPayment(row, 'failed')) return 'failed'
+    return 'not_paid'
+  }
   if (result.status !== 'paid') {
     const expiredOnKaspi = result.status === 'expired'
     const isStale = !!row.created_at && (Date.now() - new Date(row.created_at).getTime()) > PLAN_PAYMENT_STALE_MS
-    if ((expiredOnKaspi || isStale) && (await tryExpirePlanPayment(row))) return 'expired'
+    if ((opts.force || expiredOnKaspi || isStale) && (await tryExpirePlanPayment(row))) return 'expired'
     return 'not_paid'
   }
 

@@ -31,7 +31,11 @@ export async function GET(req: NextRequest) {
 
   if (row.status === 'pending') {
     try {
-      const outcome = await checkAndSettlePlanPayment(row as any)
+      // force=true settles the row now instead of leaving it 'pending' until
+      // the daily cron. The /upgrade page passes it when its 60s idle timer
+      // gives up on an unscanned QR, mirroring /kaspi-api's topup-status.
+      const force = req.nextUrl.searchParams.get('force') === 'true'
+      const outcome = await checkAndSettlePlanPayment(row as any, { force })
       return NextResponse.json({ status: outcome === 'not_paid' ? 'pending' : outcome })
     } catch (e: any) {
       console.error('Plan payment status check failed for', orderId, ':', e.message)
