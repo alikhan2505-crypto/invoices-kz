@@ -268,14 +268,27 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
 
                   {SECTIONS.map(s => {
                     const locked = isSectionLocked(s, isAdmin, isPro)
+                    // Mirrors the desktop row above: tapping a header jumps to
+                    // that section's first page rather than toggling a local
+                    // open/closed flag -- the founder moved the desktop nav
+                    // away from dropdown-style reveal-on-click back on
+                    // 2026-08-20 specifically because it was "тяжело выбирать",
+                    // so the drawer stays consistent with that rather than
+                    // reintroducing it here. Only whichever section the current
+                    // route actually belongs to ever renders its sub-items.
+                    const active = !locked && activeSection?.key === s.key
                     return (
                       <div key={s.key} className="mt-3">
                         <button
                           type="button"
-                          onClick={() => { if (locked) showLockedHint(`drawer-${s.key}`) }}
+                          onClick={() => {
+                            if (locked) { showLockedHint(`drawer-${s.key}`); return }
+                            setDrawerOpen(false)
+                            router.push(s.links[0].href)
+                          }}
                           aria-disabled={locked}
                           className="w-full min-h-[36px] flex items-center gap-1.5 px-3 text-[11px] font-semibold tracking-wider uppercase text-left"
-                          style={{ color: 'var(--nav-text-muted)', cursor: locked ? 'not-allowed' : 'default' }}
+                          style={{ color: active ? 'var(--nav-text-primary)' : 'var(--nav-text-muted)', cursor: locked ? 'not-allowed' : 'pointer' }}
                         >
                           {labels[lang][s.key]}
                           {locked && <LockIcon size={11} />}
@@ -286,7 +299,7 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
                               {s.proOnly ? proLockedMessages[lang] : lockedMessages[lang]}
                             </div>
                           )
-                        ) : (
+                        ) : active && (
                           s.links.map(l => {
                             const bestMatch = s.links
                               .filter(x => path === x.href || path.startsWith(x.href + '/'))
