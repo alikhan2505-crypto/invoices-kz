@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter, usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
@@ -136,8 +137,8 @@ function CloseIcon({ size = 16 }: { size?: number }) {
 }
 
 // Same mark the profile-section headers use (e.g. profile/banks/page.tsx) --
-// duplicated locally rather than shared, matching how LockIcon/MenuIcon/
-// CloseIcon are already declared in this file.
+// duplicated locally rather than shared, matching how LockIcon/CloseIcon
+// are already declared in this file.
 function ChevronLeftIcon({ size = 18 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
@@ -166,6 +167,10 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
   const [isPro, setIsPro] = useState(false)
   const [lockedHint, setLockedHint] = useState<string | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  // Gates the drawer's createPortal call below -- document.body doesn't
+  // exist during SSR, so the portal target is only safe to touch once the
+  // client has actually mounted.
+  const [mounted, setMounted] = useState(false)
   const navRef = useRef<HTMLElement>(null)
   const lockedHintTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -174,6 +179,8 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
     if (lockedHintTimeout.current) clearTimeout(lockedHintTimeout.current)
     lockedHintTimeout.current = setTimeout(() => setLockedHint(null), 2200)
   }
+
+  useEffect(() => { setMounted(true) }, [])
 
   useEffect(() => {
     async function loadAdmin() {
@@ -232,8 +239,25 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
         </div>
       )}
 
-      {/* Mobile: left slide-in drawer with the full section tree */}
-      {!desktopOnly && (
+      {/* Mobile: left slide-in drawer with the full section tree. Portaled
+          straight to document.body rather than rendered in place: every app
+          page wraps <SiteNav /> in <main className="page-surface-in-shell">
+          (see dashboard/page.tsx), and that class puts backdrop-filter on
+          <main> (globals.css). In WebKit (iOS Safari -- invisible in
+          Chromium, which doesn't apply this rule) an element with
+          backdrop-filter becomes BOTH the containing block for `position:
+          fixed` descendants AND a new stacking context. Left in place, this
+          drawer's `fixed inset-0` measured against <main> (thousands of px
+          tall) instead of the viewport, rendering off-screen at any scroll
+          offset, and its z-[60] was trapped inside <main>'s stacking
+          context -- losing to TopUtilityBar's z-50 pill, which renders
+          outside <main> at the root layout. The close button hit-tested to
+          that pill instead, opening the wallet panel rather than closing
+          the drawer. Raising the drawer's z-index doesn't fix either
+          problem: it's a containing-block/stacking-context issue, not a
+          z-order one. `mounted` just keeps this off the server, where
+          document.body doesn't exist yet. */}
+      {!desktopOnly && mounted && createPortal(
         <AnimatePresence>
           {drawerOpen && (
             <div className="lg:hidden fixed inset-0 z-[60]">
@@ -351,7 +375,8 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
               </motion.div>
             </div>
           )}
-        </AnimatePresence>
+        </AnimatePresence>,
+        document.body
       )}
 
       {/* Desktop: sticky top bar (row 1: sections, row 2: active section's pages) */}

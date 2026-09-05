@@ -650,7 +650,7 @@ export default function TopUtilityBar() {
               initial={reduceMotion ? false : { opacity: 0, scale: 0.97, y: 6 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               transition={{ duration: reduceMotion ? 0 : 0.22, ease: [0.16, 1, 0.3, 1] }}
-              className="relative nav-glass rounded-[24px] w-full max-w-lg mb-32 lg:mb-0 max-h-[84vh] overflow-y-auto overflow-x-hidden"
+              className="relative nav-glass rounded-[24px] w-full max-w-lg mb-0 lg:mb-0 max-h-[84vh] overflow-y-auto overflow-x-hidden"
               style={{ boxShadow: '0 34px 80px -20px rgba(10,10,15,0.4), var(--nav-card-glow)' }}
               onClick={e => e.stopPropagation()}
             >
@@ -951,7 +951,7 @@ export default function TopUtilityBar() {
           )}
 
           {panel === 'notifications' && (
-            <div className="nav-glass rounded-2xl w-full max-w-sm mb-32 lg:mb-0 lg:mt-[76px] max-h-[80vh] overflow-y-auto" style={{ boxShadow: 'var(--nav-card-glow)' }} onClick={e => e.stopPropagation()}>
+            <div className="nav-glass rounded-2xl w-full max-w-sm mb-0 lg:mb-0 lg:mt-[76px] max-h-[80vh] overflow-y-auto" style={{ boxShadow: 'var(--nav-card-glow)' }} onClick={e => e.stopPropagation()}>
               <div className="p-4">
                 <div className="flex items-center justify-between mb-1">
                   <h2 className="text-sm font-bold text-[var(--nav-accent)]">Уведомления</h2>
@@ -992,7 +992,7 @@ export default function TopUtilityBar() {
           )}
 
           {panel === 'help' && (
-            <div className="nav-glass rounded-2xl w-full max-w-xs mb-32 lg:mb-0 lg:mt-[76px]" style={{ boxShadow: 'var(--nav-card-glow)' }} onClick={e => e.stopPropagation()}>
+            <div className="nav-glass rounded-2xl w-full max-w-xs mb-0 lg:mb-0 lg:mt-[76px]" style={{ boxShadow: 'var(--nav-card-glow)' }} onClick={e => e.stopPropagation()}>
               <div className="p-3">
                 <div className="flex items-center justify-between mb-1 px-1">
                   <h2 className="text-sm font-bold text-[var(--nav-accent)]">Помощь</h2>
@@ -1019,7 +1019,7 @@ export default function TopUtilityBar() {
           )}
 
           {panel === 'account' && (
-            <div className="nav-glass rounded-2xl w-full max-w-xs mb-32 lg:mb-0 lg:mt-[76px]" style={{ boxShadow: 'var(--nav-card-glow)' }} onClick={e => e.stopPropagation()}>
+            <div className="nav-glass rounded-2xl w-full max-w-xs mb-0 lg:mb-0 lg:mt-[76px]" style={{ boxShadow: 'var(--nav-card-glow)' }} onClick={e => e.stopPropagation()}>
               <div className="p-3">
                 <div className="flex items-center gap-3 px-2 py-2 mb-1">
                   <div className="w-10 h-10 rounded-full bg-[var(--nav-accent)] text-white text-xs font-bold flex items-center justify-center flex-shrink-0">
