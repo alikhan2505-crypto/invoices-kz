@@ -12,7 +12,7 @@
 
 - **The top bar is `sticky top-0`, never `fixed`.** A fixed bar needs `padding-top` on ~74 pages — the exact sweep reverted twice in August (`2a1cb30`, `481cdc7` → `c7ea68b`).
 - **Desktop (`lg:`) must not change at all** — not the two-row nav, not the utility pill's `lg:top-[21px] lg:right-6`.
-- Top bar height is exactly `h-14` (56px); the utility pill sits at `top-1.5` (6px) so its 44px height centres in that 56px.
+- Top bar height is exactly `h-14` (56px). ~~the utility pill sits at `top-1.5` (6px) so its 44px height centres in that 56px~~ — **CORRECTED mid-execution (2026-09-05, after Task 2's review):** the pill is NOT 44px. Measured live with Playwright at 390×844: **57.6px** — its 44px buttons plus its own `py-1.5` (12px) and `.nav-glass`'s 0.8px top+bottom border. A 56px bar is therefore *shorter* than the pill and it overhangs by ~7px. Founder's call: keep the bar at 56px and shrink the pill on mobile only — its container drops vertical padding (`py-1.5` → `py-0 lg:py-1.5`), giving ~45.6px, which sits inside the 56px bar. The 44px buttons inside are untouched, so the tap-target rule still holds.
 - `z-index`: top bar `z-40`, utility pill keeps its existing `z-50`.
 - Every tap target ≥44×44px (`w-11 h-11`), per DESIGN.md's Icon Action Buttons rule.
 - All three languages stay wired: any new user-visible string goes through the existing `labels[lang]` dict in `SiteNav.tsx` (ru/kk/en), never a hardcoded literal.
@@ -382,7 +382,12 @@ await page.goto('https://invoices.kz/dashboard')
 Assert all five:
 1. `page.locator('[role="dialog"][aria-label="Меню"]')` has count 0 before any click (drawer closed).
 2. The top bar exists and sits at the top: the «<» button's `boundingBox().y` is under 56.
-3. No bottom bar: `await page.locator('text=WB Bot').count()` is 0 while the drawer is closed.
+3. No bottom bar. NOT `count()` on the text — the desktop `<nav>` is `hidden lg:block`, i.e. `display:none` but still in the DOM, so a bare `text=WB Bot` count returns ≥1 on any viewport and would false-positive (caught in Task 3's review). Assert on visibility and on the deleted element's own shape instead:
+   ```js
+   // the deleted bar was the only `fixed bottom-0` flex row
+   await expect(page.locator('div.fixed.bottom-0')).toHaveCount(0)
+   await expect(page.getByText('WB Bot')).not.toBeVisible()
+   ```
 4. Clicking the «<» button opens the drawer, and `drawer.innerText()` contains `Дашборд`, `Профиль`, `Счета`, `Kaspi Cashier API`.
 5. Page content is not hidden under the bar: the dashboard's `h1`/first card has `boundingBox().y >= 56`.
 
