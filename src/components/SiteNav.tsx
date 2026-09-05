@@ -127,18 +127,21 @@ function LockIcon({ size = 10 }: { size?: number }) {
   )
 }
 
-function MenuIcon({ size = 18 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
-      <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  )
-}
-
 function CloseIcon({ size = 16 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
       <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+// Same mark the profile-section headers use (e.g. profile/banks/page.tsx) --
+// duplicated locally rather than shared, matching how LockIcon/MenuIcon/
+// CloseIcon are already declared in this file.
+function ChevronLeftIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+      <path d="m15 6-6 6 6 6" />
     </svg>
   )
 }
@@ -198,20 +201,27 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
 
   return (
     <>
-      {/* Mobile: floating menu trigger, bottom-left — mirrors TopUtilityBar's
-          wallet pill (fixed bottom-20 right-3) so both thumb corners carry one
-          control each. Opens the left drawer with every section's subpages,
-          which the desktop-only second tab row otherwise leaves unreachable
-          on mobile. */}
+      {/* Mobile: sticky top bar. STICKY, NOT FIXED -- a fixed bar would need
+          padding-top on the ~74 pages that render <SiteNav />, which is the
+          exact sweep this project reverted twice in August (2a1cb30, 481cdc7
+          -> c7ea68b). Sticky rides normal flow, pushes content down by
+          itself, and needs no page-level change; the desktop row below does
+          the same thing. h-14 (56px) is sized so TopUtilityBar's 44px pill
+          centres inside it at top-1.5. */}
       {!desktopOnly && (
-        <button
-          onClick={() => setDrawerOpen(true)}
-          aria-label={labels[lang].menu}
-          className="lg:hidden fixed bottom-20 left-3 z-50 w-11 h-11 flex items-center justify-center nav-glass rounded-full"
-          style={{ color: 'var(--nav-text-primary)' }}
+        <div
+          className="lg:hidden sticky top-0 z-40 h-14 flex items-center px-2 nav-glass"
+          style={{ borderLeft: 'none', borderRight: 'none', borderTop: 'none' }}
         >
-          <MenuIcon />
-        </button>
+          <button
+            onClick={() => setDrawerOpen(true)}
+            aria-label={labels[lang].menu}
+            className="w-11 h-11 flex items-center justify-center rounded-xl transition-colors hover:bg-[var(--nav-surface-glass)]"
+            style={{ color: 'var(--nav-text-primary)' }}
+          >
+            <ChevronLeftIcon />
+          </button>
+        </div>
       )}
 
       {/* Mobile: left slide-in drawer with the full section tree */}
