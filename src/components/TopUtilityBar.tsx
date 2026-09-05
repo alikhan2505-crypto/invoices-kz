@@ -579,8 +579,8 @@ export default function TopUtilityBar() {
 
   return (
     <>
-      {/* bottom-20 on mobile clears SiteNav's fixed bottom bar (mobile has no top bar).
-          lg:top-[21px] (not top-2.5): DesktopShell's card went back to a lg:top-3 gap
+      {/* top-1.5 on mobile centres the 44px pill inside SiteNav's sticky h-14 (56px)
+          top bar: 6 + 44 + 6 = 56. lg:top-[21px] (not top-2.5): DesktopShell's card went back to a lg:top-3 gap
           (floating/"парение" effect on all 4 sides), which shifts SiteNav's sticky bar
           — and everything in it — 12px lower on the 5 DesktopShell pages. The bar now
           spans roughly y=12..~77 there, and centering the ~46px pill in that range
@@ -591,7 +591,7 @@ export default function TopUtilityBar() {
           (not right-3): DesktopShell's card has a 28px corner radius at the same
           right-3 edge -- right-3 crowded the pill right into that curve, reading as
           jammed into the corner rather than sitting in the bar. right-6 clears it. */}
-      <div className="fixed bottom-20 lg:bottom-auto lg:top-[21px] right-3 lg:right-6 z-50 flex items-center gap-1.5 nav-glass rounded-full px-1.5 py-1.5"
+      <div className="fixed top-1.5 lg:top-[21px] right-3 lg:right-6 z-50 flex items-center gap-1.5 nav-glass rounded-full px-1.5 py-1.5"
         style={{ boxShadow: `0 12px 30px -14px rgba(10,10,15,0.35), var(--nav-card-glow)` }}>
         <button onClick={() => openPanel('wallet')} title="Кошелёк"
           className="flex items-center gap-1.5 rounded-full pl-2 pr-2.5 py-1.5 hover:bg-gray-50 transition-colors">
