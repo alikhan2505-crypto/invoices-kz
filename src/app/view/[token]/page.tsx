@@ -122,6 +122,26 @@ export default function PublicInvoice() {
   const [marking, setMarking] = useState(false)
   const [marked, setMarked] = useState(false)
 
+  // Single choke point for applying a fresh /api/kaspi/invoice-payment
+  // response: every caller that hands it a 'paid' payment must ALSO flip
+  // invoice.status in the same breath, or the "Как оплатить" instructions
+  // and the status badge are left showing unpaid even though the invoice
+  // really is closed. Founder repro 2026-09-05: paid via a phone push, the
+  // Kaspi card correctly disappeared once the invoice closed, but only the
+  // recurring poll's own inline update (further below) synced
+  // invoice.status -- the other four read sites (initial load, send-to-
+  // phone's own immediate refresh, cancel, retry-after-decline) set
+  // kaspiPayment directly and never touched invoice, so whichever of them
+  // happened to be the one that first observed 'paid' left the rest of the
+  // page looking unpaid. Pass null through here too (not just a payment) so
+  // every read site can route through one function.
+  function applyKaspiPayment(payment: typeof kaspiPayment) {
+    setKaspiPayment(payment)
+    if (payment?.status === 'paid') {
+      setInvoice((prev: any) => (prev ? { ...prev, status: 'paid' } : prev))
+    }
+  }
+
   useEffect(() => {
     async function load() {
       // Server-side lookup by token (2026-09-04). The browser no longer
@@ -145,7 +165,7 @@ export default function PublicInvoice() {
         .then(r => r.json())
         .then((data) => {
           kaspiCreatedAtRef.current = Date.now()
-          setKaspiPayment(data.payment || null)
+          applyKaspiPayment(data.payment || null)
         })
         .catch(() => {})
         .finally(() => setKaspiPaymentLoading(false))
@@ -311,7 +331,7 @@ export default function PublicInvoice() {
         // tick -- the button should feel like it did something immediately.
         const refreshed = await fetch(`/api/kaspi/invoice-payment?token=${token}`)
         const refreshedData = await refreshed.json()
-        setKaspiPayment(refreshedData.payment || null)
+        applyKaspiPayment(refreshedData.payment || null)
       } else {
         setKaspiPhoneError(
           data.error === 'invalid_phone' ? 'Проверьте номер телефона'
@@ -331,7 +351,7 @@ export default function PublicInvoice() {
     try {
       const res = await fetch(`/api/kaspi/invoice-payment?token=${token}&cancelPhone=true`)
       const data = await res.json()
-      setKaspiPayment(data.payment || null)
+      applyKaspiPayment(data.payment || null)
     } catch {
       // The 5s poll (once a payment exists again) or a manual reload recovers.
     }
@@ -347,7 +367,7 @@ export default function PublicInvoice() {
     try {
       const res = await fetch(`/api/kaspi/invoice-payment?token=${token}`)
       const data = await res.json()
-      setKaspiPayment(data.payment || null)
+      applyKaspiPayment(data.payment || null)
     } catch {
       // The poll (now re-armed since kaspiPhoneDeclined is false) retries.
     }
