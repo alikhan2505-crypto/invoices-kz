@@ -204,7 +204,7 @@ export default function Services() {
               <button
                 onClick={() => router.push('/profile')}
                 aria-label={backLabel(lang)}
-                className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0 transition-colors hover:bg-[var(--nav-surface-glass)]"
+                className="w-11 h-11 flex items-center justify-center rounded-xl flex-shrink-0 transition-colors hover:bg-[var(--nav-surface-glass)]"
                 style={{ color: 'var(--nav-text-muted)' }}
               >
                 <ChevronLeftIcon />

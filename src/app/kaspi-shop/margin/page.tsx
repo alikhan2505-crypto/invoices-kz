@@ -440,7 +440,7 @@ export default function KaspiShopMargin() {
                       </span>
                     </div>
                     <button onClick={() => deleteEvaluation(ev.id)} disabled={deletingId === ev.id}
-                      className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 transition-colors disabled:opacity-40"
+                      className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 transition-colors disabled:opacity-40"
                       style={{ color: 'var(--nav-text-muted)' }}
                       onMouseEnter={e => (e.currentTarget.style.color = 'var(--nav-critical)')} onMouseLeave={e => (e.currentTarget.style.color = 'var(--nav-text-muted)')}>
                       <XIcon />

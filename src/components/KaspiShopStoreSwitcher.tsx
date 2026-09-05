@@ -119,6 +119,12 @@ export default function KaspiShopStoreSwitcher() {
   return (
     <div ref={rootRef} className="relative ml-auto flex-shrink-0">
       <div className="flex items-center gap-0.5 rounded-full nav-glass pl-1 pr-1 py-1">
+        {/* Known, accepted exception to the 44px tap-zone rule (DESIGN.md):
+            this pill is 2px-gap tight against the company-name button next to
+            it, so growing the box would either balloon the whole chip or risk
+            the two buttons' hitboxes overlapping. Founder decision 2026-09-05:
+            leave at 24px rather than force a compliance fix that trades a
+            small-target problem for a wrong-button-fires-on-tap one. */}
         <button
           onClick={disconnectActive}
           disabled={busy}

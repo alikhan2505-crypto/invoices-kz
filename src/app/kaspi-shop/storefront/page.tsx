@@ -422,8 +422,10 @@ export default function KaspiShopStorefrontSettings() {
                 <div className="flex items-center gap-2">
                   {BACKGROUND_PRESETS.map(color => (
                     <button key={color} onClick={() => setBackgroundColor(color)} aria-label={`Фон ${color}`}
-                      className="w-8 h-8 rounded-full border"
-                      style={{ background: color, borderColor: backgroundColor === color ? 'var(--nav-accent)' : 'var(--nav-border)', borderWidth: backgroundColor === color ? 2 : 1 }} />
+                      className="w-11 h-11 flex items-center justify-center rounded-full flex-shrink-0">
+                      <span className="w-8 h-8 rounded-full border block"
+                        style={{ background: color, borderColor: backgroundColor === color ? 'var(--nav-accent)' : 'var(--nav-border)', borderWidth: backgroundColor === color ? 2 : 1 }} />
+                    </button>
                   ))}
                   <button onClick={() => setBackgroundColor(null)}
                     className="text-xs font-semibold px-3 py-1.5 rounded-full nav-glass"

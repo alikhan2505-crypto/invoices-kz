@@ -606,7 +606,7 @@ export default function TopUtilityBar() {
         </button>
 
         <button onClick={() => openPanel('notifications')} title="Уведомления"
-          className="relative w-9 h-9 flex items-center justify-center rounded-full hover:bg-gray-50 transition-colors">
+          className="relative w-11 h-11 flex items-center justify-center rounded-full hover:bg-gray-50 transition-colors">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
             <path d="M6 10a6 6 0 1 1 12 0c0 4 1.5 5.5 1.5 5.5H4.5S6 14 6 10Z" stroke="var(--nav-accent)" strokeWidth="1.6" strokeLinejoin="round" />
             <path d="M10 19a2 2 0 0 0 4 0" stroke="var(--nav-accent)" strokeWidth="1.6" strokeLinecap="round" />
@@ -619,7 +619,7 @@ export default function TopUtilityBar() {
         </button>
 
         <button onClick={() => openPanel('help')} title="Помощь"
-          className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-gray-50 transition-colors">
+          className="w-11 h-11 flex items-center justify-center rounded-full hover:bg-gray-50 transition-colors">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
             <circle cx="12" cy="12" r="9" stroke="var(--nav-accent)" strokeWidth="1.6" />
             <path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .8-1 1.4v.3" stroke="var(--nav-accent)" strokeWidth="1.6" strokeLinecap="round" />
@@ -628,7 +628,7 @@ export default function TopUtilityBar() {
         </button>
 
         <button onClick={() => openPanel('account')} title="Аккаунт"
-          className="w-9 h-9 rounded-full bg-[var(--nav-accent)] text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">
+          className="w-11 h-11 rounded-full bg-[var(--nav-accent)] text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">
           {initials}
         </button>
       </div>

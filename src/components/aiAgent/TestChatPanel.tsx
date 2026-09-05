@@ -258,7 +258,7 @@ export default function TestChatPanel({ agentId, fill = false }: { agentId: stri
             type="submit"
             disabled={sending || input.trim().length === 0}
             aria-label="Отправить"
-            className="flex items-center justify-center w-10 h-10 rounded-lg flex-shrink-0 disabled:opacity-40 transition-transform hover:-translate-y-0.5"
+            className="flex items-center justify-center w-11 h-11 rounded-lg flex-shrink-0 disabled:opacity-40 transition-transform hover:-translate-y-0.5"
             style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)', boxShadow: '0 10px 24px -10px var(--nav-accent)' }}
           >
             <SendIcon />
