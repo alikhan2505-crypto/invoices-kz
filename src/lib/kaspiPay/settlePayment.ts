@@ -26,7 +26,12 @@ export interface SettleableRequest {
   expires_at: string | null
 }
 
-export type SettleOutcome = 'paid' | 'not_paid' | 'expired' | 'no_connection'
+// 'scanning' and 'failed' are reported, not acted on: callers that are simply
+// watching (the daily cron, the owner's status page) keep treating anything
+// that isn't 'paid'/'expired' as still in flight, exactly as before. Only a
+// caller that is prepared to hand the payer a replacement QR passes
+// { terminateDead } below and acts on them.
+export type SettleOutcome = 'paid' | 'not_paid' | 'expired' | 'no_connection' | 'scanning' | 'failed'
 
 /**
  * Checks ONE pending kaspi_payment_requests row against Kaspi's real status
@@ -42,7 +47,21 @@ export type SettleOutcome = 'paid' | 'not_paid' | 'expired' | 'no_connection'
  * cron's whole run) can tell a systemic bad-key deploy from one dead
  * connection, so a single on-demand check must not decide that alone.
  */
-export async function checkAndSettleKaspiPayment(reqRow: SettleableRequest): Promise<SettleOutcome> {
+export async function checkAndSettleKaspiPayment(
+  reqRow: SettleableRequest,
+  // terminateDead: close this row now when Kaspi reports the QR cancelled or
+  // rejected ('failed'), instead of leaving it pending until expires_at. Only
+  // for callers that immediately mint a replacement for the payer -- the
+  // public /view/[token] page, where the founder's repro was scanning a code,
+  // closing the Kaspi confirmation screen, and being left with a QR that
+  // looked fine and that Kaspi would refuse. The cron and the owner-facing
+  // status pages keep the cautious default below.
+  // force: close the row even when Kaspi still calls it live, because the
+  // caller is abandoning this attempt on its own timeline -- /view/[token]'s
+  // 60s idle timer, mirroring /kaspi-api's. Never applied when Kaspi reports
+  // 'paid' or 'scanning', so a payment in flight is never discarded.
+  opts: { terminateDead?: boolean; force?: boolean } = {},
+): Promise<SettleOutcome> {
   const connection = await loadConnectionByUserId(reqRow.user_id)
   if (!connection) {
     // Disconnected, or already parked at status='error' by an earlier run
@@ -54,14 +73,24 @@ export async function checkAndSettleKaspiPayment(reqRow: SettleableRequest): Pro
 
   const result = await checkStatus(connection, reqRow.kaspi_operation_id)
 
+  if (result.status === 'scanning') return 'scanning'
+
   if (result.status !== 'paid') {
     // 'failed' rows (cancelled by the payer, insufficient funds, ...) are
     // deliberately left pending until their own expires_at passes -- some of
     // those Kaspi statuses are reachable while a QR is still usable for
     // another attempt, and we'd rather re-poll a dead QR than kill a live one.
+    // A caller that will replace the QR right away opts out of that caution.
     const expiredOnKaspi = result.status === 'expired'
-    if ((expiredOnKaspi || isPastExpiry(reqRow)) && (await tryExpire(reqRow))) return 'expired'
-    return 'not_paid'
+    const failedOnKaspi = result.status === 'failed'
+    const shouldTerminate = expiredOnKaspi
+      || (failedOnKaspi && opts.terminateDead)
+      || opts.force
+      || isPastExpiry(reqRow)
+    if (shouldTerminate && (await tryExpire(reqRow))) {
+      return failedOnKaspi ? 'failed' : 'expired'
+    }
+    return failedOnKaspi ? 'failed' : 'not_paid'
   }
 
   // Concurrent callers (an overlapping cron run, or two poll requests landing

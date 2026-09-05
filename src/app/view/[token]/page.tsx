@@ -59,6 +59,11 @@ function SadIcon() {
   )
 }
 
+// How long an untouched QR is shown before it is retired for a fresh one.
+// Kaspi's own window is ~5 minutes; the founder asked for a minute, and
+// /kaspi-api and /upgrade already work this way.
+const IDLE_QR_MS = 60_000
+
 export default function PublicInvoice() {
   const { token: rawToken } = useParams()
   // useParams can hand back string | string[] | undefined; every use below
@@ -71,8 +76,13 @@ export default function PublicInvoice() {
   const [profile, setProfile] = useState<any>(null)
   const [bank, setBank] = useState<any>(null)
   const [kaspiPayment, setKaspiPayment] = useState<
-    { qr_token: string; payment_link: string; status: string; expires_at?: string | null } | null
+    { qr_token: string; payment_link: string; status: string; expires_at?: string | null; live?: string } | null
   >(null)
+  // Kaspi's own 'Wait' status: the payer is on the confirmation screen. While
+  // it holds, neither the idle timer nor the countdown may replace the code.
+  const [kaspiScanning, setKaspiScanning] = useState(false)
+  const kaspiScanningRef = useRef(false)
+  const kaspiCreatedAtRef = useRef<number>(0)
   // A Kaspi QR is only good for a few minutes. Nothing here said so, so a payer
   // who left the tab open came back to a code their Kaspi app answered with
   // "QR-код не распознан" and no hint that anything was wrong. The 5s poll
@@ -106,7 +116,10 @@ export default function PublicInvoice() {
       // invoice itself from rendering; the client still has bank requisites.
       fetch(`/api/kaspi/invoice-payment?token=${token}`)
         .then(r => r.json())
-        .then((data) => setKaspiPayment(data.payment || null))
+        .then((data) => {
+          kaspiCreatedAtRef.current = Date.now()
+          setKaspiPayment(data.payment || null)
+        })
         .catch(() => {})
         .finally(() => setKaspiPaymentLoading(false))
 
@@ -146,18 +159,47 @@ export default function PublicInvoice() {
     return () => { cancelled = true }
   }, [kaspiPayment?.payment_link])
 
-  // Ticks the visible deadline down. Purely informational: replacing a spent
-  // code is decided by the 5s poll below against Kaspi's real status, never by
-  // this reaching zero, so a slow clock or a backgrounded tab can't discard a
-  // QR someone is about to pay.
+  // Ticks the visible deadline down, showing the nearer of Kaspi's own expiry
+  // and the 60s idle deadline -- the same number /kaspi-api shows, so the
+  // countdown never reads "4:56" a second before the code is swapped out.
+  // Purely informational: replacing a spent code is decided by the poll and
+  // the idle timer below against Kaspi's real status, never by this hitting
+  // zero, so a slow clock or a backgrounded tab can't discard a live QR.
   useEffect(() => {
     if (!kaspiPayment?.expires_at || kaspiPayment.status !== 'pending') { setKaspiSecondsLeft(null); return }
     const expiresAtMs = new Date(kaspiPayment.expires_at).getTime()
-    const tick = () => setKaspiSecondsLeft(Math.max(0, Math.round((expiresAtMs - Date.now()) / 1000)))
+    const idleDeadlineMs = kaspiCreatedAtRef.current + IDLE_QR_MS
+    const tick = () => {
+      const kaspiLeft = Math.round((expiresAtMs - Date.now()) / 1000)
+      const idleLeft = Math.round((idleDeadlineMs - Date.now()) / 1000)
+      setKaspiSecondsLeft(Math.max(0, kaspiScanningRef.current ? kaspiLeft : Math.min(kaspiLeft, idleLeft)))
+    }
     tick()
     const interval = setInterval(tick, 1000)
     return () => clearInterval(interval)
   }, [kaspiPayment?.expires_at, kaspiPayment?.status])
+
+  // Retires a code nobody has touched after 60 seconds instead of making the
+  // payer wait out Kaspi's full ~5 minutes -- the behaviour /kaspi-api has had
+  // since the founder asked for it. Never fires while scanning is in progress.
+  useEffect(() => {
+    if (!kaspiPayment || kaspiPayment.status !== 'pending' || !token) return
+    const link = kaspiPayment.payment_link
+    const timeout = setTimeout(async () => {
+      if (kaspiScanningRef.current) return
+      try {
+        const res = await fetch(`/api/kaspi/invoice-payment?token=${token}&idle=true`)
+        const data = await res.json()
+        // Guard against a timer left over from a code that has already been
+        // replaced by the 5s poll.
+        if (data.payment && data.payment.payment_link !== link) kaspiCreatedAtRef.current = Date.now()
+        setKaspiPayment(data.payment || null)
+      } catch {
+        // The 5s poll keeps running; the next tick tries again.
+      }
+    }, IDLE_QR_MS)
+    return () => clearTimeout(timeout)
+  }, [kaspiPayment?.payment_link, kaspiPayment?.status, token])
 
   // Kaspi has no webhook to us, so the only way to learn a QR got paid is to
   // actively ask while the payer is here — this is what makes payment
@@ -175,7 +217,16 @@ export default function PublicInvoice() {
       try {
         const res = await fetch(`/api/kaspi/invoice-payment?token=${token}`)
         const data = await res.json()
-        setKaspiPayment(data.payment || null)
+        const scanning = data.payment?.live === 'scanning'
+        setKaspiScanning(scanning)
+        kaspiScanningRef.current = scanning
+        // A replaced code restarts the 60s idle clock; the same one must not.
+        setKaspiPayment((prev) => {
+          if (data.payment && prev?.payment_link !== data.payment.payment_link) {
+            kaspiCreatedAtRef.current = Date.now()
+          }
+          return data.payment || null
+        })
         if (data.payment?.status === 'paid') {
           setInvoice((prev: any) => (prev ? { ...prev, status: 'paid' } : prev))
         }
@@ -381,13 +432,15 @@ export default function PublicInvoice() {
             >
               Оплатить через Kaspi
             </a>
-            {kaspiSecondsLeft !== null && (
-              <div className="text-xs text-center mt-3" aria-live="polite" style={{ color: 'var(--nav-text-muted)' }}>
-                {kaspiSecondsLeft > 0
-                  ? `QR действителен ещё ${Math.floor(kaspiSecondsLeft / 60)}:${String(kaspiSecondsLeft % 60).padStart(2, '0')}`
-                  : 'Обновляем код…'}
-              </div>
-            )}
+            <div className="text-xs text-center mt-3 h-4" aria-live="polite" style={{ color: 'var(--nav-text-muted)' }}>
+              {kaspiScanning
+                ? 'Подтвердите оплату в приложении Kaspi…'
+                : kaspiSecondsLeft === null
+                  ? ''
+                  : kaspiSecondsLeft > 0
+                    ? `QR действителен ещё ${Math.floor(kaspiSecondsLeft / 60)}:${String(kaspiSecondsLeft % 60).padStart(2, '0')}`
+                    : 'Обновляем код…'}
+            </div>
             <div className="text-xs text-center mt-3" style={{ color: 'var(--nav-text-muted)' }}>
               Счёт подтвердится автоматически сразу после оплаты — обновлять страницу не нужно.
             </div>

@@ -56,6 +56,15 @@ export default function KaspiApiPage() {
   // for the same amount (see the status-poll effect below), instead of
   // sending the founder back up to re-pick a preset.
   const [kaspiLastTopupAmount, setKaspiLastTopupAmount] = useState<number | null>(null)
+  // Pushed-to-phone top-up, the same alternative /upgrade offers. No QR is
+  // involved, so kaspiPhoneSent keeps the countdown and the idle/terminal
+  // refresh paths (which only make sense for a scannable code) out of it.
+  // Deliberately NOT the kaspiPhone above: that one is the merchant's login
+  // number for the OTP connect flow, which clears and re-fills on its own.
+  const [topupPhone, setTopupPhone] = useState('')
+  const [kaspiPhoneOpen, setKaspiPhoneOpen] = useState(false)
+  const [kaspiPhoneSending, setKaspiPhoneSending] = useState(false)
+  const [kaspiPhoneSent, setKaspiPhoneSent] = useState(false)
   // True once Kaspi's own status reports 'scanning' (its 'Wait' status) --
   // the customer has already opened the QR and is looking at the
   // confirmation screen in their app. Purely informational: the QR is only
@@ -159,6 +168,10 @@ export default function KaspiApiPage() {
         clearInterval(interval)
         setKaspiTopupPending(null)
         setKaspiTopupScanning(false)
+        // A pushed phone request has no QR to reissue -- the owner declined it
+        // or let it lapse in their Kaspi app. Say so and let them choose again
+        // instead of silently pushing another request at their phone.
+        if (kaspiPhoneSent) { setKaspiPhoneSent(false); setKaspiError(t.kaspiErrorGeneric); return }
         startTopup(kaspiLastTopupAmount ?? 0)
       } else {
         setKaspiTopupScanning(false)
@@ -184,7 +197,9 @@ export default function KaspiApiPage() {
   // 5s poll above already catches near-instantly via 'failed') -- a QR
   // someone has genuinely engaged with is never proactively replaced here.
   useEffect(() => {
-    if (!kaspiTopupPending) return
+    // A pushed phone request has no QR and no idle deadline -- it sits in the
+    // owner's Kaspi app until they act on it.
+    if (!kaspiTopupPending || kaspiPhoneSent) return
     const topupId = kaspiTopupPending.topup_id
     const timeout = setTimeout(async () => {
       if (kaspiTopupScanningRef.current) return
@@ -527,6 +542,48 @@ export default function KaspiApiPage() {
     }
   }
 
+  function formatKzPhone(value: string) {
+    const digits = value.replace(/\D/g, '').replace(/^8/, '7')
+    if (!digits) return ''
+    let out = '+7'
+    if (digits.length > 1) out += ' ' + digits.slice(1, 4)
+    if (digits.length > 4) out += ' ' + digits.slice(4, 7)
+    if (digits.length > 7) out += ' ' + digits.slice(7, 9)
+    if (digits.length > 9) out += ' ' + digits.slice(9, 11)
+    return out
+  }
+
+  async function sendTopupToPhone(amount: number) {
+    if (amount < MIN_TOPUP_AMOUNT) return
+    setKaspiPhoneSending(true)
+    setKaspiError('')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/kaspi/wallet/topup-phone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ amount, phone: topupPhone }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setKaspiPhoneSent(true)
+        setKaspiPhoneOpen(false)
+        // No expires_at: a pushed request has no scannable code and no local
+        // deadline, so the countdown and refresh effects skip it.
+        setKaspiTopupPending({ topup_id: data.topup_id, payment_link: '', expires_at: '' })
+      } else if (data.error === 'invalid_phone') {
+        setKaspiError(t.kaspiTopupPhoneInvalid)
+      } else if (data.error === 'invalid_amount') {
+        setKaspiError(t.kaspiErrorInvalidAmount(data.min || MIN_TOPUP_AMOUNT))
+      } else {
+        setKaspiError(t.kaspiErrorGeneric)
+      }
+    } catch {
+      setKaspiError(t.kaspiErrorGeneric)
+    }
+    setKaspiPhoneSending(false)
+  }
+
   async function startTopup(amount: number) {
     // Claim this as the current attempt before the first await -- any
     // earlier call (a stale auto/idle-refresh, a doubled click) whose
@@ -537,6 +594,8 @@ export default function KaspiApiPage() {
     setKaspiError('')
     setKaspiLastTopupAmount(amount)
     setKaspiTopupScanning(false)
+    // A QR attempt supersedes any pushed phone request still on screen.
+    setKaspiPhoneSent(false)
     setKaspiToppingUp(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
@@ -863,10 +922,57 @@ export default function KaspiApiPage() {
                     style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                     {kaspiToppingUp ? t.kaspiTopupStartingLabel : t.kaspiTopupButton}
                   </button>
+
+                  {/* The QR above assumes a second device to scan with. On the
+                      phone that actually has Kaspi installed there is nothing
+                      to point a camera at, so offer the pushed request the
+                      subscription page has always had. */}
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="flex-1 h-px" style={{ background: 'var(--nav-border-soft)' }} />
+                    <span className="text-[11px]" style={{ color: 'var(--nav-text-muted)' }}>{t.kaspiTopupOrLabel}</span>
+                    <div className="flex-1 h-px" style={{ background: 'var(--nav-border-soft)' }} />
+                  </div>
+
+                  {kaspiPhoneOpen ? (
+                    <>
+                      <input value={topupPhone}
+                        onChange={e => setTopupPhone(formatKzPhone(e.target.value))}
+                        placeholder={t.kaspiTopupPhonePlaceholder} type="tel" inputMode="tel"
+                        className="w-full py-2 text-sm outline-none mb-2 bg-transparent"
+                        style={{ borderBottom: '1px solid var(--nav-border)', color: 'var(--nav-text-primary)' }} />
+                      <button
+                        onClick={() => sendTopupToPhone((kaspiTopupAmount ?? Number(kaspiTopupCustom)) || 0)}
+                        disabled={kaspiPhoneSending
+                          || !((kaspiTopupAmount ?? Number(kaspiTopupCustom)) >= MIN_TOPUP_AMOUNT)
+                          || topupPhone.replace(/\D/g, "").length !== 11}
+                        className="w-full rounded-xl py-2.5 text-sm font-semibold mb-3 disabled:opacity-50"
+                        style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                        {kaspiPhoneSending ? t.kaspiTopupPhoneSending : t.kaspiTopupPhoneSend}
+                      </button>
+                    </>
+                  ) : (
+                    <button onClick={() => setKaspiPhoneOpen(true)}
+                      className="w-full rounded-xl py-2.5 text-sm font-semibold mb-3 border"
+                      style={{ borderColor: 'var(--nav-border)', color: 'var(--nav-accent)', background: 'transparent' }}>
+                      {t.kaspiTopupPhoneButton}
+                    </button>
+                  )}
                 </>
               )}
 
-              {kaspiTopupPending && (
+              {kaspiTopupPending && kaspiPhoneSent && (
+                <div className="rounded-xl p-4 mb-3 text-center" style={{ background: 'var(--nav-accent-soft)' }}>
+                  <div className="text-2xl mb-2">📲</div>
+                  <p className="text-sm mb-1" style={{ color: 'var(--nav-text-primary)' }}>
+                    {t.kaspiTopupPhoneSentTitle(topupPhone)}
+                  </p>
+                  <p className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>
+                    {t.kaspiTopupPhoneSentHint}
+                  </p>
+                </div>
+              )}
+
+              {kaspiTopupPending && !kaspiPhoneSent && (
                 <div className="rounded-xl p-3 mb-3" style={{ background: 'var(--nav-accent-soft)' }}>
                   <p className="text-xs mb-3" style={{ color: 'var(--nav-text-secondary)' }}>
                     {kaspiTopupScanning ? t.kaspiTopupScanningLabel : t.kaspiTopupPendingHint}

@@ -133,6 +133,15 @@ export default function TopUtilityBar() {
   >(null)
   const [topupSecondsLeft, setTopupSecondsLeft] = useState(0)
   const [topupRefreshing, setTopupRefreshing] = useState(false)
+  // Payment pushed into the customer's own Kaspi app instead of a QR they'd
+  // need a second device to scan. Subscriptions have had this for a while;
+  // the wallet only offered the QR.
+  const [topupPhone, setTopupPhone] = useState('')
+  const [topupPhoneOpen, setTopupPhoneOpen] = useState(false)
+  const [topupPhoneSending, setTopupPhoneSending] = useState(false)
+  // True while a pushed request is outstanding: there is no QR to show or
+  // refresh, so the countdown and the reissue path both stand down.
+  const [topupPhoneSent, setTopupPhoneSent] = useState(false)
   const [topupQrDataUrl, setTopupQrDataUrl] = useState<string | null>(null)
   const [showTopup, setShowTopup] = useState(false)
   // "Заработано через Kaspi" (paid invoices, last 30 days) and the tariff
@@ -274,6 +283,8 @@ export default function TopUtilityBar() {
     setTopupCustom('')
     setTopupError('')
     setTopupPending(null)
+    setTopupPhoneSent(false)
+    setTopupPhoneOpen(false)
     setShowTopup(false)
     setHistoryLoading(true)
     const wallet = WALLETS.find(w => w.key === key)!
@@ -318,6 +329,49 @@ export default function TopUtilityBar() {
     setUnreadCount(0)
   }
 
+  function formatKzPhone(value: string) {
+    const digits = value.replace(/\D/g, '').replace(/^8/, '7')
+    if (!digits) return ''
+    let out = '+7'
+    if (digits.length > 1) out += ' ' + digits.slice(1, 4)
+    if (digits.length > 4) out += ' ' + digits.slice(4, 7)
+    if (digits.length > 7) out += ' ' + digits.slice(7, 9)
+    if (digits.length > 9) out += ' ' + digits.slice(9, 11)
+    return out
+  }
+
+  async function sendTopupToPhone(wallet: WalletConfig, amount: number) {
+    if (amount < wallet.minAmount) {
+      setTopupError(`Минимум ${wallet.minAmount.toLocaleString('ru-KZ')} ₸`)
+      return
+    }
+    setTopupPhoneSending(true)
+    setTopupError('')
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/kaspi/wallet/topup-phone', {
+        method: 'POST', headers, body: JSON.stringify({ amount, phone: topupPhone }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        // Reuses the same pending shape so the existing status poll settles
+        // it; expires_at 0 keeps the countdown and reissue paths out of it.
+        setTopupPending({ topup_id: data.topup_id, payment_link: '', amount, expires_at: 0 })
+        setTopupPhoneSent(true)
+        setTopupPhoneOpen(false)
+      } else {
+        setTopupError(data.error === 'invalid_phone'
+          ? 'Проверьте номер телефона'
+          : data.error === 'invalid_amount'
+            ? `Минимум ${(data.min ?? wallet.minAmount).toLocaleString('ru-KZ')} ₸`
+            : 'Не удалось отправить запрос, попробуйте ещё раз')
+      }
+    } catch {
+      setTopupError('Не удалось отправить запрос, попробуйте ещё раз')
+    }
+    setTopupPhoneSending(false)
+  }
+
   async function startTopup(wallet: WalletConfig, amount: number) {
     if (amount < wallet.minAmount) {
       setTopupError(`Минимум ${wallet.minAmount.toLocaleString('ru-KZ')} ₸`)
@@ -359,6 +413,15 @@ export default function TopUtilityBar() {
         // Kaspi discarding the token, 'failed' is the customer scanning and
         // then cancelling. /kaspi-api already handles the pair this way.
         //
+        // A pushed phone request has no QR to reissue -- the customer either
+        // declined it or let it lapse in their Kaspi app, so say so and let
+        // them choose again rather than silently pushing another one.
+        if (topupPhoneSent) {
+          setTopupPending(null)
+          setTopupPhoneSent(false)
+          setTopupError('Запрос не был оплачен. Попробуйте ещё раз.')
+          return
+        }
         // Reissue in place rather than sending the customer back to the
         // amount picker: they already chose the amount and are standing in
         // front of the phone with Kaspi open.
@@ -570,7 +633,17 @@ export default function TopUtilityBar() {
 
                 {topupOpen && (
                   <div className="mt-3 pt-4" style={{ borderTop: '1px solid var(--nav-border-soft)' }}>
-                    {topupPending ? (
+                    {topupPending && topupPhoneSent ? (
+                      <div className="text-center py-3">
+                        <div className="text-2xl mb-2">📲</div>
+                        <p className="text-xs mb-1" style={{ color: 'var(--nav-text-primary)' }}>
+                          Запрос отправлен на {formatKzPhone(topupPhone)}
+                        </p>
+                        <p className="text-[11px]" style={{ color: 'var(--nav-text-secondary)' }}>
+                          Подтвердите оплату в приложении Kaspi — баланс пополнится автоматически.
+                        </p>
+                      </div>
+                    ) : topupPending ? (
                       <div>
                         <p className="text-xs mb-2" style={{ color: 'var(--nav-text-secondary)' }}>Отсканируйте QR-код Kaspi — баланс пополнится автоматически.</p>
                         {topupQrDataUrl && (
@@ -624,6 +697,50 @@ export default function TopUtilityBar() {
                             </button>
                           )
                         })()}
+
+                        {/* Same alternative the subscription modal offers:
+                            useful when the page is open on the very phone
+                            that has Kaspi installed, with nothing to scan
+                            the QR with. */}
+                        <div className="flex items-center gap-2 my-2">
+                          <div className="flex-1 h-px" style={{ background: 'var(--nav-border-soft)' }} />
+                          <span className="text-[10px]" style={{ color: 'var(--nav-text-muted)' }}>или</span>
+                          <div className="flex-1 h-px" style={{ background: 'var(--nav-border-soft)' }} />
+                        </div>
+
+                        {topupPhoneOpen ? (
+                          <>
+                            <input
+                              value={topupPhone}
+                              onChange={e => setTopupPhone(formatKzPhone(e.target.value))}
+                              placeholder="+7 777 123 45 67"
+                              type="tel" inputMode="tel" name="topupPhone"
+                              className="w-full border rounded-lg px-3 py-1.5 text-xs mb-2"
+                              style={{ borderColor: 'var(--nav-border-soft)', background: 'var(--nav-bg)', color: 'var(--nav-text-primary)' }}
+                            />
+                            {(() => {
+                              const amount = (topupAmount ?? Number(topupCustom)) || 0
+                              const disabled = topupPhoneSending
+                                || amount < wallet.minAmount
+                                || topupPhone.replace(/\D/g, '').length !== 11
+                              return (
+                                <button onClick={() => sendTopupToPhone(wallet, amount)} disabled={disabled}
+                                  className="w-full rounded-lg px-3 py-2 text-xs font-medium transition-colors"
+                                  style={disabled
+                                    ? { background: 'var(--nav-bg)', color: 'var(--nav-text-secondary)', cursor: 'not-allowed' }
+                                    : { background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                                  {topupPhoneSending ? 'Отправляем…' : 'Отправить запрос'}
+                                </button>
+                              )
+                            })()}
+                          </>
+                        ) : (
+                          <button onClick={() => setTopupPhoneOpen(true)}
+                            className="w-full rounded-lg px-3 py-2 text-xs font-medium border transition-colors"
+                            style={{ borderColor: 'var(--nav-border-soft)', color: 'var(--nav-accent)', background: 'transparent' }}>
+                            Отправить запрос на телефон
+                          </button>
+                        )}
                       </>
                     )}
                   </div>

@@ -23,6 +23,10 @@ const supabase = createClient(
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get('token')
   if (!token) return NextResponse.json({ error: 'token required' }, { status: 400 })
+  // Set by the page's 60s idle timer. Minting stays bounded by
+  // getOrCreateKaspiPaymentForInvoice's own 3-per-minute cap, so this cannot
+  // be used to drive traffic into Kaspi on the owner's connection.
+  const idle = req.nextUrl.searchParams.get('idle') === 'true'
 
   const { data: invoice } = await supabase
     .from('invoices')
@@ -40,19 +44,26 @@ export async function GET(req: NextRequest) {
     if (!payment) return NextResponse.json({ payment: null })
 
     let current = payment
+    let live: string = current.status
     if (current.status === 'pending') {
       try {
-        const outcome = await checkAndSettleKaspiPayment(current)
+        // terminateDead: this page hands the payer a replacement immediately,
+        // so a QR Kaspi has already rejected (scanned then cancelled) must not
+        // linger. force: the page's 60s idle timer gave up on a code nobody
+        // touched. Neither ever discards a 'paid' or 'scanning' attempt.
+        const outcome = await checkAndSettleKaspiPayment(current, { terminateDead: true, force: idle })
+        live = outcome
         if (outcome === 'paid') current.status = 'paid'
-        else if (outcome === 'expired') {
+        else if (outcome === 'expired' || outcome === 'failed') {
           // Answering null here made the whole Kaspi block vanish from the
           // payer's page mid-poll, leaving them staring at an invoice with no
-          // way to pay it and no explanation. The row is 'expired' now, so
+          // way to pay it and no explanation. The row is closed now, so
           // getOrCreate mints a replacement instead of returning the dead one
           // -- the same thing the next page load would have done anyway.
           const replacement = await getOrCreateKaspiPaymentForInvoice(invoice)
           if (!replacement) return NextResponse.json({ payment: null })
           current = replacement
+          live = 'pending'
         }
       } catch (e: any) {
         // Fails open: the payer still sees their existing pending QR and the
@@ -62,14 +73,16 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // expires_at lets the page count the QR down and notice a dead code on its
-    // own clock, instead of only finding out when Kaspi's scanner rejects it.
+    // expires_at lets the page count the QR down; `live` carries Kaspi's own
+    // verdict ('scanning' while the payer is on the confirmation screen) so
+    // the page can say what is happening instead of showing a bare timer.
     return NextResponse.json({
       payment: {
         qr_token: current.qr_token,
         payment_link: current.payment_link,
         status: current.status,
         expires_at: current.expires_at ?? null,
+        live,
       },
     })
   } catch (e: any) {
