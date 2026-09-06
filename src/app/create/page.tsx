@@ -14,6 +14,7 @@ import { computeDefaultDueDate, todayDateString } from '@/lib/dueDate'
 import { useLanguage } from '@/components/LanguageProvider'
 import { closeLabel, deleteLabel } from '@/lib/a11yLabels'
 import { invoiceFlowDict } from '@/lib/i18n/invoiceFlow'
+import { saveInvoiceDraft, takeInvoiceDraft, clearInvoiceDraft, type InvoiceDraft } from '@/lib/invoiceDraft'
 
 const UNIT_OPTIONS = ['шт', 'кг', 'л', 'м', 'м²', 'м³', 'час', 'день', 'месяц', 'услуга', 'работа']
 
@@ -101,10 +102,29 @@ export default function CreateInvoicePage() {
   const [contractDate, setContractDate] = useState('')
   const [noContract, setNoContract] = useState(false)
   const [dueDate, setDueDate] = useState('')
-  const [dueDateTouched, setDueDateTouched] = useState(false)
+  // A ref, not state: load() is a useCallback([router]), so it captures the
+  // first render's value forever. As state this flag read `false` inside
+  // load() no matter how many times the inputs below set it -- and load()
+  // re-runs on every window focus, so picking a due date and switching tabs
+  // silently reset it to the default (and would undo a restored draft's date
+  // the same way).
+  const dueDateTouched = useRef(false)
   const [clientKnp, setClientKnp] = useState('849')
   const [note, setNote] = useState('')
   const [services, setServices] = useState<any[]>([{ name: '', qty: 1, price: 0, unit: 'шт', code: '', type: 'service' }])
+
+  // load() re-runs on every window focus, not just on mount, so a parked draft
+  // has to be restored exactly once -- otherwise switching to another tab and
+  // back would re-apply it over whatever the user has since typed.
+  const draftRestored = useRef(false)
+
+  // Snapshot of everything a person can type into this form, for the two gates
+  // below that send them away to fill in something else. See src/lib/invoiceDraft.ts.
+  const currentDraft = useCallback((): InvoiceDraft => ({
+    clientName, clientBin, clientEmail, clientAddress, clientPhone,
+    contractNumber, contractDate, noContract, dueDate, clientKnp, note, services,
+  }), [clientName, clientBin, clientEmail, clientAddress, clientPhone,
+       contractNumber, contractDate, noContract, dueDate, clientKnp, note, services])
 
   const total = services.reduce((s, i) => s + i.qty * i.price, 0)
   const vatType = profile?.vat_type || 'no_vat'
@@ -132,7 +152,7 @@ export default function CreateInvoicePage() {
     setProfile(p)
     setProfileLoaded(true)
     if (p) cacheSet('profile_' + user.id, p)
-    if (!dueDateTouched) setDueDate(computeDefaultDueDate(todayDateString(), p?.default_due_days))
+    if (!dueDateTouched.current) setDueDate(computeDefaultDueDate(todayDateString(), p?.default_due_days))
 
     supabase.from('profiles').update({ last_active_at: new Date().toISOString() }).eq('id', user.id).then(() => {})
 
@@ -263,6 +283,37 @@ export default function CreateInvoicePage() {
     // instead, which is all this needs (no server re-fetch, just a
     // client-side URL cleanup).
     if (templateId || repeatId || agentDraftId) window.history.replaceState(null, '', '/create')
+
+    // Restore an invoice parked by one of createInvoice()'s gates. Runs here,
+    // at the end of load(), rather than in its own mount effect, because
+    // load() sets the default due date on the way through and would otherwise
+    // overwrite the restored one when its awaits resolve.
+    //
+    // Skipped entirely when the user arrived with an explicit prefill
+    // (?template=/?repeat=/?agentDraft=): that is a deliberate choice about
+    // what this invoice should contain, and it wins over a parked one. The
+    // draft is left in storage in that case, for whenever they come back
+    // without a prefill.
+    const firstLoad = !draftRestored.current
+    draftRestored.current = true
+    if (firstLoad && !templateId && !repeatId && !agentDraftId) {
+      const draft = takeInvoiceDraft()
+      if (draft) {
+        setClientName(draft.clientName)
+        setClientBin(draft.clientBin)
+        setClientEmail(draft.clientEmail)
+        setClientAddress(draft.clientAddress)
+        setClientPhone(draft.clientPhone)
+        setContractNumber(draft.contractNumber)
+        setContractDate(draft.contractDate)
+        setNoContract(draft.noContract)
+        if (draft.dueDate) { setDueDate(draft.dueDate); dueDateTouched.current = true }
+        if (draft.clientKnp) setClientKnp(draft.clientKnp)
+        setNote(draft.note)
+        if (draft.services.length > 0) setServices(draft.services)
+        if (draft.clientName) setClientSelected(true)
+      }
+    }
   }, [router])
 
   useEffect(() => {
@@ -323,7 +374,7 @@ export default function CreateInvoicePage() {
     setClientKnp('849')
     setClientSelected(false)
     setDueDate(computeDefaultDueDate(todayDateString(), profile?.default_due_days))
-    setDueDateTouched(false)
+    dueDateTouched.current = false
   }
 
   function selectService(svc: any) {
@@ -359,8 +410,16 @@ export default function CreateInvoicePage() {
   }
 
   async function createInvoice() {
+    // Both gates below stand exactly as they were -- requisites and a bank
+    // account stay hard requirements (founder, 2026-09-05). What changed is
+    // that leaving to fill them in no longer costs the user the invoice they
+    // had already typed: it is parked first and restored by load() when they
+    // come back. Since 2026-09-06 signup lands on the dashboard instead of
+    // walking through the requisites wizard, this is the ordinary first-invoice
+    // path, not a rare one.
     if (!profile?.company_name || !profile?.bin_iin) {
-      alert(t.fillCompanyDetailsFirstAlert)
+      const kept = saveInvoiceDraft(currentDraft())
+      alert(t.fillCompanyDetailsFirstAlert + (kept ? '\n\n' + t.draftKeptNote : ''))
       router.push('/profile/requisites')
       return
     }
@@ -372,7 +431,11 @@ export default function CreateInvoicePage() {
       .from('bank_accounts').select('*').eq('user_id', user.id).order('is_main', { ascending: false })
 
     if (!banks || banks.length === 0) {
+      // Parked only when the user actually accepts the trip to /profile/banks.
+      // Declining leaves them on this page with the form still in front of
+      // them, and a copy in storage would then ambush a later, unrelated visit.
       if (confirm(t.bankDetailsNeededConfirm)) {
+        saveInvoiceDraft(currentDraft())
         router.push('/profile/banks')
       }
       return
@@ -447,6 +510,11 @@ export default function CreateInvoicePage() {
     }
 
     await supabase.from('invoice_logs').insert({ invoice_id: data.id, status: 'draft' })
+
+    // The invoice exists now, so any copy parked by a gate is spent. Normally
+    // load() already consumed it on the way back in; this covers the path where
+    // it didn't (declining the bank prompt, then adding a bank in another tab).
+    clearInvoiceDraft()
 
     setMonthCount(prev => prev + 1)
     setLastCreated(Date.now())
@@ -712,7 +780,7 @@ export default function CreateInvoicePage() {
                 <div>
                   <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.dueDateLabel}</label>
                   <input type="date" className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
-                    value={dueDate} onChange={e => { setDueDate(e.target.value); setDueDateTouched(true) }} />
+                    value={dueDate} onChange={e => { setDueDate(e.target.value); dueDateTouched.current = true }} />
                 </div>
               </div>
             ) : (
@@ -778,7 +846,7 @@ export default function CreateInvoicePage() {
                 <div>
                   <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.dueDateLabel}</label>
                   <input type="date" className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
-                    value={dueDate} onChange={e => { setDueDate(e.target.value); setDueDateTouched(true) }} />
+                    value={dueDate} onChange={e => { setDueDate(e.target.value); dueDateTouched.current = true }} />
                 </div>
                 <div>
                   <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.knpLabel}</label>

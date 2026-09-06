@@ -82,6 +82,7 @@ export interface InvoiceFlowContent {
   fromDirectoryButton: string
   servicePickerTitle: string
   fillCompanyDetailsFirstAlert: string
+  draftKeptNote: string
   signInAlert: string
   bankDetailsNeededConfirm: string
   enterClientBinAlert: string
@@ -283,6 +284,7 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     fromDirectoryButton: 'Из справочника',
     servicePickerTitle: 'Выберите услугу',
     fillCompanyDetailsFirstAlert: 'Сначала заполните реквизиты компании в Профиле',
+    draftKeptNote: 'Начатый счёт сохранён — вернётесь и продолжите с того же места.',
     signInAlert: 'Войдите в систему',
     bankDetailsNeededConfirm: 'Не заполнены банковские реквизиты — они нужны для PDF. Заполнить сейчас?',
     enterClientBinAlert: 'Введите БИН/ИИН клиента',
@@ -488,6 +490,7 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     fromDirectoryButton: 'Анықтамалықтан',
     servicePickerTitle: 'Қызметті таңдаңыз',
     fillCompanyDetailsFirstAlert: 'Алдымен Профильде компания деректемелерін толтырыңыз',
+    draftKeptNote: 'Бастаған шот сақталды — оралғанда сол жерден жалғастырасыз.',
     signInAlert: 'Жүйеге кіріңіз',
     bankDetailsNeededConfirm: 'Банк деректемелері толтырылмаған — олар PDF үшін қажет. Қазір толтырасыз ба?',
     enterClientBinAlert: 'Клиенттің БСН/ЖСН нөмірін енгізіңіз',
@@ -693,6 +696,7 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     fromDirectoryButton: 'From directory',
     servicePickerTitle: 'Choose a service',
     fillCompanyDetailsFirstAlert: 'First fill in your company details in Profile',
+    draftKeptNote: 'Your unfinished invoice is saved — you will pick up where you left off.',
     signInAlert: 'Please sign in',
     bankDetailsNeededConfirm: 'Bank details are not filled in — they are required for the PDF. Fill them in now?',
     enterClientBinAlert: "Enter the client's BIN/IIN",
