@@ -170,7 +170,7 @@ export default function AiAgentLeads() {
 
   if (loading) return (
     <DesktopShell>
-    <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
+    <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
       <div className="p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Загрузка…</div>
     </main>
@@ -179,7 +179,7 @@ export default function AiAgentLeads() {
 
   if (forbidden) return (
     <DesktopShell>
-    <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
+    <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
       <div className="p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Эта функция пока доступна только администраторам.</div>
     </main>
@@ -188,9 +188,9 @@ export default function AiAgentLeads() {
 
   return (
     <DesktopShell>
-    <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
+    <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
-      <div className="max-w-7xl mx-auto p-4 lg:p-6 pb-24 lg:pb-6">
+      <div className="max-w-7xl mx-auto p-4 lg:p-6 pb-6">
         <motion.div
           className="flex items-start justify-between gap-3 mb-6 flex-wrap"
           initial={reduceMotion ? false : { opacity: 0, y: 14 }}

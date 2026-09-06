@@ -90,10 +90,10 @@ export default function KaspiShopOrderDetail() {
 
   return (
     <DesktopShell>
-    <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
+    <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
 
-      <div className="flex-1 min-w-0 p-4 lg:p-6 pb-24 lg:pb-6 max-w-2xl">
+      <div className="flex-1 min-w-0 p-4 lg:p-6 pb-6 max-w-2xl">
         <button onClick={() => router.back()} className="text-sm mb-4 transition-colors" style={{ color: 'var(--nav-text-muted)' }}>‹ Назад к заказам</button>
 
         {loadError && (

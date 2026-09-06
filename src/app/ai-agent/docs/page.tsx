@@ -137,9 +137,9 @@ function ChannelSwitcher() {
 export default function AiAgentDocsPage() {
   return (
     <DesktopShell>
-    <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
+    <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
-      <div className="max-w-5xl mx-auto px-4 lg:px-6 py-8 pb-24">
+      <div className="max-w-5xl mx-auto px-4 lg:px-6 py-8">
         <h1 className="text-3xl font-bold mb-2" style={{ color: 'var(--nav-text-primary)', letterSpacing: '-0.02em' }}>
           Как настроить AI-агента
         </h1>

@@ -581,10 +581,10 @@ export default function KaspiShopProductAvailability() {
 
   return (
     <DesktopShell>
-    <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
+    <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
 
-      <div className="flex-1 min-w-0 p-4 lg:p-6 pb-24 lg:pb-6">
+      <div className="flex-1 min-w-0 p-4 lg:p-6 pb-6">
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}
           className="nav-glass nav-card-accent rounded-[28px] p-6 lg:p-8 mb-4">
           <div className="text-[11px] font-semibold tracking-wider uppercase mb-1" style={{ color: 'var(--nav-text-muted)' }}>Kaspi Bot</div>

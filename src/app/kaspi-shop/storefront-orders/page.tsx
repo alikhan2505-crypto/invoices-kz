@@ -67,7 +67,7 @@ export default function KaspiShopStorefrontOrders() {
 
   if (loading) return (
     <DesktopShell>
-    <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
+    <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
       <div className="p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Загрузка…</div>
     </main>
@@ -76,9 +76,9 @@ export default function KaspiShopStorefrontOrders() {
 
   return (
     <DesktopShell>
-    <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
+    <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
-      <div className="max-w-4xl mx-auto p-4 lg:p-6 pb-24 lg:pb-6">
+      <div className="max-w-4xl mx-auto p-4 lg:p-6 pb-6">
         <motion.div
           className="mb-6"
           initial={reduceMotion ? false : { opacity: 0, y: 14 }}

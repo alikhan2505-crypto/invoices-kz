@@ -158,7 +158,7 @@ export default function EditInvoice() {
 
   if (loading) return (
     <DesktopShell>
-    <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
+    <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
       <div className="max-w-lg mx-auto p-4 space-y-4">
       <div className="flex items-center gap-3 mb-1">
@@ -175,7 +175,7 @@ export default function EditInvoice() {
 
   return (
     <DesktopShell>
-    <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
+    <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
       <div className="max-w-lg lg:max-w-5xl mx-auto p-4">
       <div className="flex items-center gap-3 mb-5">

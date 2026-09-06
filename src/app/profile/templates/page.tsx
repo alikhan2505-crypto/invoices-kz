@@ -107,7 +107,7 @@ export default function Templates() {
 
   return (
     <DesktopShell>
-      <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
+      <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
         <SiteNav />
         <div className="max-w-lg lg:max-w-3xl mx-auto p-4">
           {header}

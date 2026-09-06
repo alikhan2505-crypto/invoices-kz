@@ -330,10 +330,10 @@ export default function KaspiShopNiches() {
 
   return (
     <DesktopShell>
-    <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
+    <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
 
-      <div className="flex-1 min-w-0 p-4 lg:p-6 pb-24 lg:pb-6">
+      <div className="flex-1 min-w-0 p-4 lg:p-6 pb-6">
         {/* Витрина подборок -- the page's face (2026-08-23 founder
             decision); the keyword search below stays as the secondary
             "проверить свою идею" tool. */}

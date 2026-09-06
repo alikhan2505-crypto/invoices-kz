@@ -161,7 +161,7 @@ export default function Notifications() {
 
   if (loading) return (
     <DesktopShell>
-    <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
+    <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
       <div className="max-w-lg lg:max-w-2xl mx-auto p-4 flex items-center justify-center" style={{ minHeight: '50vh' }}>
         <p style={{ color: 'var(--nav-text-muted)' }}>…</p>
@@ -172,7 +172,7 @@ export default function Notifications() {
 
   return (
     <DesktopShell>
-    <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
+    <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
       <div className="max-w-lg lg:max-w-2xl mx-auto p-4 space-y-4">
 

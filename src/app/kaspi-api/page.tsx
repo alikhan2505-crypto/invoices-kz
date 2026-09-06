@@ -664,7 +664,7 @@ export default function KaspiApiPage() {
 
   if (loading) return (
     <DesktopShell>
-    <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
+    <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
       {/* cashier-dev-theme scopes the --nav-* tokens below to the dark
           developer palette (see globals.css) -- only this inner content
@@ -812,7 +812,7 @@ export default function KaspiApiPage() {
 
   return (
     <DesktopShell>
-    <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
+    <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
       {/* cashier-dev-theme (see globals.css): scopes --nav-* to the dark
           developer palette shared with /kaspi-api/docs and the public

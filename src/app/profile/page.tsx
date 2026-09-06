@@ -365,7 +365,7 @@ export default function Profile() {
 
   if (loading && !profile) return (
     <DesktopShell>
-    <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
+    <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
       <div className="max-w-lg lg:max-w-5xl mx-auto p-4 space-y-4">
         <div className="nav-glass nav-card-accent rounded-2xl p-5">
@@ -692,7 +692,7 @@ export default function Profile() {
 
   return (
     <DesktopShell>
-    <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full">
+    <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
 
       <div className="max-w-lg lg:max-w-5xl mx-auto p-4">

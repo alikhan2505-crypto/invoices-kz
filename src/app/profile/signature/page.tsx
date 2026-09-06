@@ -488,7 +488,7 @@ export default function Signature() {
 
   return (
     <DesktopShell>
-    <main className="page-surface-in-shell min-h-screen pb-24 lg:pb-6 lg:min-h-full flex flex-col">
+    <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full flex flex-col">
       <SiteNav />
       <div className="max-w-lg lg:max-w-2xl mx-auto p-4 space-y-4 w-full">
 
