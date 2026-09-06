@@ -33,18 +33,35 @@ export async function POST(req: NextRequest) {
   if (!referrer) return NextResponse.json({ error: 'Invalid referral code' }, { status: 404 })
   if (referrer.id === userId) return NextResponse.json({ error: 'Cannot refer yourself' }, { status: 400 })
 
-  // Проверяем не использовал ли этот пользователь уже реф код
-  const { data: newUserProfile } = await supabase
-    .from('profiles')
-    .select('referred_by')
-    .eq('id', userId)
-    .single()
+  // +7 дней новому пользователю (бонус начинается с сегодня). plan
+  // намеренно не трогаем — та же причина, что и ниже для referrerUpdate.
+  const newUserExpiry = new Date()
+  newUserExpiry.setDate(newUserExpiry.getDate() + 7)
 
-  if (newUserProfile?.referred_by) {
+  // Claimed atomically -- same compare-and-swap /api/onboarding/grant uses
+  // for promo_granted_at. This used to be a plain SELECT referred_by-then-
+  // UPDATE check: two concurrent calls for the same signup (e.g. a
+  // duplicated auth-callback mount, both racing the same 1-3.5s of
+  // setTimeout before this route is ever called) could both pass the
+  // "not yet referred" check before either had written, so the referrer
+  // below got credited twice for one signup. Now only the request whose
+  // UPDATE actually matches a still-NULL referred_by is the real claim.
+  const { data: claimed } = await supabase.from('profiles')
+    .update({
+      referred_by: referralCode,
+      bonus_expires_at: newUserExpiry.toISOString(),
+    })
+    .eq('id', userId)
+    .is('referred_by', null)
+    .select('id')
+    .maybeSingle()
+
+  if (!claimed) {
     return NextResponse.json({ error: 'Already used referral code' }, { status: 400 })
   }
 
-  // +7 дней тому кто пригласил (добавляем к существующим бонусам)
+  // +7 дней тому кто пригласил (добавляем к существующим бонусам). Only
+  // reached once per signup now that the claim above is atomic.
   const now = new Date()
   const referrerBonusBase = referrer.bonus_expires_at && new Date(referrer.bonus_expires_at) > now
     ? new Date(referrer.bonus_expires_at)  // продлеваем от текущего бонуса
@@ -65,16 +82,6 @@ export async function POST(req: NextRequest) {
   await supabase.from('profiles')
     .update(referrerUpdate)
     .eq('id', referrer.id)
-
-  // +7 дней новому пользователю (бонус начинается с сегодня). plan
-  // намеренно не трогаем — та же причина, что и выше для referrerUpdate.
-  const newUserExpiry = new Date()
-  newUserExpiry.setDate(newUserExpiry.getDate() + 7)
-
-  await supabase.from('profiles').update({
-    referred_by: referralCode,
-    bonus_expires_at: newUserExpiry.toISOString(),
-  }).eq('id', userId)
 
   return NextResponse.json({ success: true })
 }

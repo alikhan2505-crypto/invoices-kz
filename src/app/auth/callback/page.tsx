@@ -90,10 +90,19 @@ export default function AuthCallback() {
           // Order matters: the row must exist before /api/onboarding/grant
           // runs, because protect_profile_privileged_columns force-nulls
           // trial_expires_at on a non-service-role INSERT.
-          await supabase.from('profiles').upsert({
+          const { error: profileError } = await supabase.from('profiles').upsert({
             id: session.user.id,
             email: session.user.email,
           })
+          if (profileError) {
+            // Everything below needs this row to exist: /api/onboarding/grant writes
+            // trial_expires_at with .update(), which PostgREST reports as a success
+            // even when it matches zero rows -- so continuing here would hand the user
+            // a dashboard and a 200 response for a trial that was never granted.
+            console.error('signup bootstrap: profile row not created', profileError.message)
+            router.push('/dashboard')
+            return
+          }
 
           const refCode = localStorage.getItem('referral_code') || ''
           if (refCode) {
@@ -123,10 +132,24 @@ export default function AuthCallback() {
           // form to hold the user on, and blocking the very first screen on a
           // flaky network would be worse than a missing trial the founder can
           // grant by hand. A failure is logged, not alerted.
+          //
+          // Retries both failure shapes: a rejected fetch (the actual "flaky
+          // network" case -- fetch() throwing used to skip the `!grantRes.ok`
+          // check entirely and land straight in the outer catch with zero
+          // retries, so the one case this comment was written for got none)
+          // and a resolved-but-non-ok response.
           try {
-            let grantRes = await requestGrant()
-            if (!grantRes.ok) grantRes = await requestGrant()
-            if (!grantRes.ok) console.error('signup: trial grant failed', grantRes.status)
+            const attemptGrant = async (): Promise<Response | null> => {
+              try {
+                return await requestGrant()
+              } catch (e: any) {
+                console.error('signup: trial grant threw', e?.message)
+                return null
+              }
+            }
+            let grantRes = await attemptGrant()
+            if (!grantRes || !grantRes.ok) grantRes = await attemptGrant()
+            if (!grantRes || !grantRes.ok) console.error('signup: trial grant failed', grantRes?.status)
             else if (promoCode) localStorage.removeItem('promo_code')
           } catch (e: any) {
             console.error('signup: trial grant threw', e?.message)
