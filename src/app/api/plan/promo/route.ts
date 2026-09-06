@@ -46,17 +46,32 @@ export async function POST(req: NextRequest) {
     .eq('id', user.id)
     .single()
 
+  // A non-free plan with NO expiry counts as active too. getActivePlan reads
+  // that combination as a paid plan that never ends (src/lib/plan.ts:32-45), so
+  // requiring plan_expires_at here would let a time-boxed promo silently
+  // overwrite a permanent grant. No profile is in that state today -- checked --
+  // but the two files must agree on what "has a plan" means.
   const planActive = !!profile?.plan && profile.plan !== 'free' &&
-    !!profile.plan_expires_at && new Date(profile.plan_expires_at) > new Date()
+    (!profile.plan_expires_at || new Date(profile.plan_expires_at) > new Date())
   if (planActive) {
     return NextResponse.json({ error: 'plan_active' }, { status: 409 })
   }
 
   // One transaction does the whole redemption: the max_uses gate, the
-  // once-per-account claim (a unique constraint on promo_redemptions, not a
-  // check-then-act), the used_count increment and the grant itself. It also
-  // takes `for update` on the code row, which closes the over-redemption race
-  // the previous read-then-update version documented as an accepted tradeoff.
+  // once-per-account claim, the used_count increment and the grant itself.
+  //
+  // "Once per account" means one promo grant EVER, not one per code: the unique
+  // key on promo_redemptions is (user_id). With several codes live at the same
+  // time, a per-code key would let one account run FREE30 (30d), then СТАРТ
+  // (14d) once that lapsed, then INVOICES7 (7d) -- 51 free days through the
+  // ordinary form. It is a real claim, not a check-then-act, so it also settles
+  // two different codes submitted from two tabs at the same instant: the
+  // plan_active guard above reads outside the transaction and both would pass
+  // it, then race on profiles.plan with the later commit silently winning.
+  //
+  // The RPC also takes `for update` on the code row, closing the over-
+  // redemption race the previous read-then-update version documented as an
+  // accepted tradeoff.
   //
   // This is the ONLY place a promo code is redeemed. The signup path
   // (/auth/callback, for a code carried in via /promo/[code]) calls this same
