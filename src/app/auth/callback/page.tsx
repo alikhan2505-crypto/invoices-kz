@@ -59,12 +59,16 @@ export default function AuthCallback() {
           return
         }
 
-        // Проверяем профиль по bin_iin (надёжнее чем company_name)
+        // `id` (not bin_iin) because the question this branch asks is "does a
+        // profile row exist at all", not "are the invoice requisites filled".
+        // A Kaspi-Shop-only user legitimately has a row with an empty bin_iin
+        // and must NOT be bootstrapped a second time. maybeSingle() so the
+        // no-row case is null instead of an error.
         const { data: profile } = await supabase
           .from('profiles')
-          .select('bin_iin, company_name')
+          .select('id')
           .eq('id', session.user.id)
-          .single()
+          .maybeSingle()
 
         // Consume the stored postLoginRedirect exactly once, unconditionally,
         // regardless of which branch below ultimately fires -- otherwise a
@@ -74,12 +78,74 @@ export default function AuthCallback() {
         // it. See src/lib/postLoginRedirect.ts.
         const postLoginRedirect = consumePostLoginRedirect()
 
-        if (!profile?.bin_iin) {
-          // New/incomplete profile: must finish onboarding first, so a
-          // pending upgrade is left untouched for /upgrade to pick up
-          // whenever the user gets there later -- never skip onboarding.
-          const ref = localStorage.getItem('referral_code')
-          router.push(ref ? `/onboarding?ref=${ref}` : '/onboarding')
+        if (!profile) {
+          // Brand-new account. /onboarding's step 1 used to do all of this
+          // AND demand company name + BIN before any of it ran, which meant a
+          // seller who came only for Kaspi Bot or the AI agent had to invent
+          // invoice requisites to get past the door -- and, if they bounced,
+          // never got their trial. The requisites question now lives at
+          // /create, which already gates on it; everything else that step 1
+          // did for EVERY user happens here instead.
+          //
+          // Order matters: the row must exist before /api/onboarding/grant
+          // runs, because protect_profile_privileged_columns force-nulls
+          // trial_expires_at on a non-service-role INSERT.
+          await supabase.from('profiles').upsert({
+            id: session.user.id,
+            email: session.user.email,
+          })
+
+          const refCode = localStorage.getItem('referral_code') || ''
+          if (refCode) {
+            try {
+              await fetch('/api/referral', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${session.access_token}`,
+                },
+                body: JSON.stringify({ userId: session.user.id, referralCode: refCode }),
+              })
+            } catch {}
+            localStorage.removeItem('referral_code')
+          }
+
+          const promoCode = localStorage.getItem('promo_code') || ''
+          const requestGrant = () => fetch('/api/onboarding/grant', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({ promoCode: promoCode || undefined }),
+          })
+          // One retry, then give up quietly: unlike the old wizard there is no
+          // form to hold the user on, and blocking the very first screen on a
+          // flaky network would be worse than a missing trial the founder can
+          // grant by hand. A failure is logged, not alerted.
+          try {
+            let grantRes = await requestGrant()
+            if (!grantRes.ok) grantRes = await requestGrant()
+            if (!grantRes.ok) console.error('signup: trial grant failed', grantRes.status)
+            else if (promoCode) localStorage.removeItem('promo_code')
+          } catch (e: any) {
+            console.error('signup: trial grant threw', e?.message)
+          }
+
+          try {
+            await fetch('/api/telegram', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`,
+              },
+              body: JSON.stringify({
+                message: `🆕 <b>Новый пользователь!</b>\n📧 ${session.user.email}${refCode ? '\n🎁 Реферал: ' + refCode : ''}${promoCode ? '\n🏷 Промокод: ' + promoCode : ''}`,
+              }),
+            })
+          } catch {}
+
+          router.push('/dashboard')
         } else if (hasPendingUpgrade()) {
           // Already-onboarded account signing back in via magic link/Google/
           // Facebook -- safe to send straight to /upgrade when the landing
