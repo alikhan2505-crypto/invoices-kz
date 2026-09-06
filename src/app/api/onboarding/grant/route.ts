@@ -23,6 +23,18 @@ const supabaseAuth = createClient(
 // the service-role client -- the browser client onboarding used to write
 // them directly only worked because the trigger didn't protect these two
 // columns yet. See .superpowers/sdd/trigger-hole-investigation.md.
+// How many bonus days a promo code carried in through /promo/[code] is worth at
+// signup. This was written as `promo.bonus_days || 14`, but promo_codes has no
+// bonus_days column (its columns are id, code, plan, days, max_uses, used_count,
+// is_active) -- so the lookup was always undefined and every signup promo has
+// always granted exactly 14 days. Named here rather than made configurable,
+// because promo_codes.days is already spoken for: api/plan/promo/route.ts uses
+// it as the PLAN duration on /upgrade. Reading it here too would mean a code
+// created as "Pro for 365 days" also hands out 365 free bonus days to anyone who
+// opens /promo/<that code> before signing up. Which of the two a promo code
+// should mean is a product decision, not something to infer from a column name.
+const SIGNUP_PROMO_BONUS_DAYS = 14
+
 export async function POST(req: NextRequest) {
   const { promoCode } = await req.json().catch(() => ({ promoCode: undefined }))
 
@@ -83,7 +95,7 @@ export async function POST(req: NextRequest) {
         // /api/referral had just granted -- /auth/callback runs referral first,
         // so a signup that arrived with both codes kept only the promo.
         const { data: claimedUntil, error: claimError } = await supabase
-          .rpc('claim_promo_bonus', { p_user: user.id, p_days: promo.bonus_days || 14 })
+          .rpc('claim_promo_bonus', { p_user: user.id, p_days: SIGNUP_PROMO_BONUS_DAYS })
         if (claimError) console.error('grant: promo claim failed', user.id, claimError.message)
         else if (claimedUntil) bonusExpiresAt = claimedUntil
       }
