@@ -5,6 +5,7 @@ import { motion, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
+import DashboardTour from '@/components/DashboardTour'
 import { formatDateTime } from '@/lib/date'
 import Skeleton from '@/components/Skeleton'
 import Link from 'next/link'
@@ -722,7 +723,7 @@ export default function DashboardPage() {
             <div className="text-[11px] font-extrabold uppercase mb-3" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.09em' }}>
               Продукты платформы
             </div>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div data-tour="products" className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               {loading ? (
                 [0, 1, 2, 3].map(i => <div key={i} className="nav-glass nav-card-accent rounded-[22px] p-[18px]"><Skeleton className="h-8 w-8 rounded-[9px] mb-3" /><Skeleton className="h-4 w-24 mb-2" /><Skeleton className="h-3 w-32" /></div>)
               ) : (
@@ -975,6 +976,7 @@ export default function DashboardPage() {
               </motion.div>
 
               <motion.button
+                data-tour="create-invoice"
                 onClick={() => router.push('/create')}
                 initial={reduceMotion ? false : { opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -1080,6 +1082,7 @@ export default function DashboardPage() {
             </div>
           </footer>
         </div>
+        <DashboardTour />
       </main>
     </DesktopShell>
   )

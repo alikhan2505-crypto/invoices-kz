@@ -229,6 +229,7 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
           style={{ borderLeft: 'none', borderRight: 'none', borderTop: 'none' }}
         >
           <button
+            data-tour="menu"
             onClick={() => setDrawerOpen(true)}
             aria-label={labels[lang].menu}
             className="w-11 h-11 flex items-center justify-center rounded-xl transition-colors hover:bg-[var(--nav-surface-glass)]"
