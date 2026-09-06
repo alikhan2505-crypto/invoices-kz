@@ -311,7 +311,13 @@ export default function CreateInvoicePage() {
         if (draft.clientKnp) setClientKnp(draft.clientKnp)
         setNote(draft.note)
         if (draft.services.length > 0) setServices(draft.services)
-        if (draft.clientName) setClientSelected(true)
+        // Deliberately NOT setClientSelected(true), unlike the ?template= and
+        // ?repeat= prefills above. There the client is a saved record the user
+        // picked, so the read-only "selected client" card is right. A draft is
+        // unfinished typing -- possibly a client that doesn't exist yet, half
+        // spelled -- and that card would make the user hit × to clear it before
+        // they could carry on with the name. Leaving it false restores the same
+        // editable fields they were last looking at.
       }
     }
   }, [router])
