@@ -6,9 +6,10 @@ import { supabase } from '@/lib/supabase'
 type Step = { anchor: string; title: string; body: string }
 
 // Anchors are data-tour attributes on elements that already exist; the tour
-// never renders its own copy of them. A step whose anchor is missing from the
-// DOM (e.g. the mobile-only menu button on a desktop viewport) is skipped
-// rather than pointing at nothing.
+// never renders its own copy of them. A step whose anchor isn't actually
+// rendered right now -- absent from the DOM, or present but hidden by CSS
+// (e.g. the mobile-only menu button behind `lg:hidden` on a desktop
+// viewport) -- is skipped rather than pointing at nothing. See findAnchor().
 const STEPS: Step[] = [
   {
     anchor: 'products',
@@ -35,6 +36,16 @@ const STEPS: Step[] = [
 const PAD = 6      // breathing room around the highlighted element
 const GAP = 10     // distance from the element to the tooltip
 const MARGIN = 12  // minimum distance from the viewport edges
+
+// `lg:hidden` is display:none, not unmount -- the mobile menu button is in the
+// DOM on desktop too. querySelector would find it and getBoundingClientRect()
+// would hand back an all-zero rect, drawing a 12px highlight in the corner for
+// a control that isn't on screen. getClientRects() is empty for anything not
+// actually rendered, which is the question we mean to ask.
+function findAnchor(name: string): Element | null {
+  const el = document.querySelector(`[data-tour="${name}"]`)
+  return el && el.getClientRects().length > 0 ? el : null
+}
 
 export default function DashboardTour() {
   const [open, setOpen] = useState(false)
@@ -63,7 +74,16 @@ export default function DashboardTour() {
         .select('tour_completed_at')
         .eq('id', user.id)
         .maybeSingle()
-      if (!cancelled && data && !data.tour_completed_at) setOpen(true)
+      if (cancelled || !data || data.tour_completed_at) return
+      // Start at the first step whose anchor is actually rendered on this
+      // viewport (e.g. skip straight past "menu" on desktop, where that
+      // anchor sits in the DOM behind `lg:hidden`). If nothing on this
+      // viewport has a rendered anchor, don't open the tour at all rather
+      // than show an empty scrim.
+      const start = STEPS.findIndex((s) => findAnchor(s.anchor))
+      if (start === -1) return
+      setI(start)
+      setOpen(true)
     })()
     return () => { cancelled = true }
   }, [])
@@ -71,7 +91,7 @@ export default function DashboardTour() {
   const measure = useCallback(() => {
     const step = STEPS[i]
     if (!step) return
-    const el = document.querySelector(`[data-tour="${step.anchor}"]`)
+    const el = findAnchor(step.anchor)
     setVw(window.innerWidth)
     setVh(window.innerHeight)
     setRect(el ? el.getBoundingClientRect() : null)
@@ -92,15 +112,19 @@ export default function DashboardTour() {
     setOpen(false)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-    await supabase.from('profiles')
+    const { error } = await supabase.from('profiles')
       .update({ tour_completed_at: new Date().toISOString() })
       .eq('id', user.id)
+    // Close stays optimistic -- blocking the UI on this round-trip would be
+    // worse than a rare re-show -- but a silent failure here means the tour
+    // resurrects on next load with no trace, so at least log it.
+    if (error) console.error('DashboardTour: failed to save tour_completed_at', error)
   }, [])
 
   const next = useCallback(() => {
-    // Skip forward over any step whose anchor isn't on this viewport.
+    // Skip forward over any step whose anchor isn't rendered on this viewport.
     for (let j = i + 1; j < STEPS.length; j++) {
-      if (document.querySelector(`[data-tour="${STEPS[j].anchor}"]`)) { setI(j); return }
+      if (findAnchor(STEPS[j].anchor)) { setI(j); return }
     }
     finish()
   }, [i, finish])
@@ -117,7 +141,7 @@ export default function DashboardTour() {
   // users the jump is instant rather than animated.
   useEffect(() => {
     if (!open) return
-    const el = document.querySelector(`[data-tour="${STEPS[i].anchor}"]`)
+    const el = findAnchor(STEPS[i].anchor)
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     el?.scrollIntoView({ block: 'center', behavior: reduce ? 'auto' : 'smooth' })
     const t = setTimeout(measure, reduce ? 0 : 400)
@@ -140,10 +164,15 @@ export default function DashboardTour() {
   const tipLeft = box
     ? Math.max(MARGIN, Math.min(box.left, vw - tipWidth - MARGIN))
     : MARGIN
+  // Horizontal position is clamped into the viewport above, but height is not
+  // something we can predict from copy length -- so instead of guessing it,
+  // cap the tooltip to the room actually available on the side we chose
+  // (above/below stays exactly the 60%-of-viewport rule already computed)
+  // and let long text scroll inside the card rather than off the screen.
   const tipStyle: React.CSSProperties = box
     ? below
-      ? { top: box.top + box.height + GAP, left: tipLeft, width: tipWidth }
-      : { bottom: vh - box.top + GAP, left: tipLeft, width: tipWidth }
+      ? { top: box.top + box.height + GAP, left: tipLeft, width: tipWidth, maxHeight: Math.max(0, vh - (box.top + box.height + GAP) - MARGIN), overflowY: 'auto' }
+      : { bottom: vh - box.top + GAP, left: tipLeft, width: tipWidth, maxHeight: Math.max(0, box.top - GAP - MARGIN), overflowY: 'auto' }
     : { top: '50%', left: MARGIN, width: tipWidth, transform: 'translateY(-50%)' }
 
   return createPortal(
