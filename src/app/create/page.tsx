@@ -117,6 +117,13 @@ export default function CreateInvoicePage() {
   // has to be restored exactly once -- otherwise switching to another tab and
   // back would re-apply it over whatever the user has since typed.
   const draftRestored = useRef(false)
+  // A restore must be visible. Nothing sends the user back here after they fill
+  // in their requisites (/profile/requisites saves to /profile), so the return
+  // trip is an ordinary menu click -- days later it could just as easily be
+  // someone starting a different invoice, and a form that silently fills itself
+  // with a previous client's name, BIN and prices is how the wrong line items
+  // reach a real customer.
+  const [draftRestoredNotice, setDraftRestoredNotice] = useState(false)
 
   // Snapshot of everything a person can type into this form, for the two gates
   // below that send them away to fill in something else. See src/lib/invoiceDraft.ts.
@@ -297,8 +304,9 @@ export default function CreateInvoicePage() {
     const firstLoad = !draftRestored.current
     draftRestored.current = true
     if (firstLoad && !templateId && !repeatId && !agentDraftId) {
-      const draft = takeInvoiceDraft()
+      const draft = takeInvoiceDraft(user.id)
       if (draft) {
+        setDraftRestoredNotice(true)
         setClientName(draft.clientName)
         setClientBin(draft.clientBin)
         setClientEmail(draft.clientEmail)
@@ -369,6 +377,19 @@ export default function CreateInvoicePage() {
     return result
   }
 
+  // Empties the whole form, not just the client. clearClient() below leaves
+  // services, note and the contract fields alone -- deliberate there, since it
+  // means "different client, same order" -- but that is the wrong shape for
+  // "this restored draft is not what I came here to do": stale line items and
+  // prices would ride along into a completely different invoice.
+  function discardRestoredDraft() {
+    clearClient()
+    setServices([{ name: '', qty: 1, price: 0, unit: 'шт', code: '', type: 'service' }])
+    setNote('')
+    setNoContract(false)
+    setDraftRestoredNotice(false)
+  }
+
   function clearClient() {
     setClientName('')
     setClientBin('')
@@ -423,15 +444,18 @@ export default function CreateInvoicePage() {
     // come back. Since 2026-09-06 signup lands on the dashboard instead of
     // walking through the requisites wizard, this is the ordinary first-invoice
     // path, not a rare one.
+    // Resolved before the requisites gate, not after it: parking a draft needs
+    // the account it belongs to, so that an invoice typed under one login is
+    // never restored under another on a shared browser.
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { alert(t.signInAlert); return }
+
     if (!profile?.company_name || !profile?.bin_iin) {
-      const kept = saveInvoiceDraft(currentDraft())
+      const kept = saveInvoiceDraft(user.id, currentDraft())
       alert(t.fillCompanyDetailsFirstAlert + (kept ? '\n\n' + t.draftKeptNote : ''))
       router.push('/profile/requisites')
       return
     }
-
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { alert(t.signInAlert); return }
 
     const { data: banks } = await supabase
       .from('bank_accounts').select('*').eq('user_id', user.id).order('is_main', { ascending: false })
@@ -441,7 +465,7 @@ export default function CreateInvoicePage() {
       // Declining leaves them on this page with the form still in front of
       // them, and a copy in storage would then ambush a later, unrelated visit.
       if (confirm(t.bankDetailsNeededConfirm)) {
-        saveInvoiceDraft(currentDraft())
+        saveInvoiceDraft(user.id, currentDraft())
         router.push('/profile/banks')
       }
       return
@@ -520,7 +544,7 @@ export default function CreateInvoicePage() {
     // The invoice exists now, so any copy parked by a gate is spent. Normally
     // load() already consumed it on the way back in; this covers the path where
     // it didn't (declining the bank prompt, then adding a bank in another tab).
-    clearInvoiceDraft()
+    clearInvoiceDraft(user.id)
 
     setMonthCount(prev => prev + 1)
     setLastCreated(Date.now())
@@ -713,6 +737,17 @@ export default function CreateInvoicePage() {
             </div>
           </div>
         )}
+
+          {draftRestoredNotice && (
+            <div className="mb-3 rounded-xl p-3 flex items-center gap-3" style={{ background: 'var(--nav-accent-soft)' }}>
+              <div className="flex-1 text-xs" style={{ color: 'var(--nav-text-primary)' }}>{t.draftRestoredNotice}</div>
+              <button onClick={discardRestoredDraft}
+                className="text-xs font-semibold px-3 min-h-[44px] rounded-lg flex-shrink-0"
+                style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                {t.draftRestoredClearButton}
+              </button>
+            </div>
+          )}
 
           {clients.length > 0 && !clientSelected && (
             <div className="mb-3">

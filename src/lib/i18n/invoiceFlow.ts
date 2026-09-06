@@ -83,6 +83,8 @@ export interface InvoiceFlowContent {
   servicePickerTitle: string
   fillCompanyDetailsFirstAlert: string
   draftKeptNote: string
+  draftRestoredNotice: string
+  draftRestoredClearButton: string
   signInAlert: string
   bankDetailsNeededConfirm: string
   enterClientBinAlert: string
@@ -285,6 +287,8 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     servicePickerTitle: 'Выберите услугу',
     fillCompanyDetailsFirstAlert: 'Сначала заполните реквизиты компании в Профиле',
     draftKeptNote: 'Начатый счёт сохранён — вернётесь и продолжите с того же места.',
+    draftRestoredNotice: 'Продолжаем незаконченный счёт — данные клиента и позиции восстановлены.',
+    draftRestoredClearButton: 'Очистить',
     signInAlert: 'Войдите в систему',
     bankDetailsNeededConfirm: 'Не заполнены банковские реквизиты — они нужны для PDF. Заполнить сейчас?',
     enterClientBinAlert: 'Введите БИН/ИИН клиента',
@@ -491,6 +495,8 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     servicePickerTitle: 'Қызметті таңдаңыз',
     fillCompanyDetailsFirstAlert: 'Алдымен Профильде компания деректемелерін толтырыңыз',
     draftKeptNote: 'Бастаған шот сақталды — оралғанда сол жерден жалғастырасыз.',
+    draftRestoredNotice: 'Аяқталмаған шот жалғасуда — клиент деректері мен позициялар қалпына келтірілді.',
+    draftRestoredClearButton: 'Тазалау',
     signInAlert: 'Жүйеге кіріңіз',
     bankDetailsNeededConfirm: 'Банк деректемелері толтырылмаған — олар PDF үшін қажет. Қазір толтырасыз ба?',
     enterClientBinAlert: 'Клиенттің БСН/ЖСН нөмірін енгізіңіз',
@@ -697,6 +703,8 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     servicePickerTitle: 'Choose a service',
     fillCompanyDetailsFirstAlert: 'First fill in your company details in Profile',
     draftKeptNote: 'Your unfinished invoice is saved — you will pick up where you left off.',
+    draftRestoredNotice: 'Continuing an unfinished invoice — the client details and line items were restored.',
+    draftRestoredClearButton: 'Clear',
     signInAlert: 'Please sign in',
     bankDetailsNeededConfirm: 'Bank details are not filled in — they are required for the PDF. Fill them in now?',
     enterClientBinAlert: "Enter the client's BIN/IIN",

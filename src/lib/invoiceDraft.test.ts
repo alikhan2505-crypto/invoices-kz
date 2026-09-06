@@ -3,9 +3,13 @@ import {
   isDraftWorthKeeping,
   serializeDraft,
   parseStoredDraft,
+  invoiceDraftKey,
   INVOICE_DRAFT_MAX_AGE_MS,
   type InvoiceDraft,
 } from './invoiceDraft'
+
+const OWNER = 'aaaaaaaa-1111-2222-3333-444444444444'
+const OTHER = 'bbbbbbbb-5555-6666-7777-888888888888'
 
 const EMPTY: InvoiceDraft = {
   clientName: '',
@@ -35,6 +39,10 @@ describe('isDraftWorthKeeping', () => {
     expect(isDraftWorthKeeping({ ...EMPTY, dueDate: '2026-12-31', clientKnp: '710', note: 'что-то' })).toBe(false)
   })
 
+  it('keeps a draft whose only typed field is the contract date', () => {
+    expect(isDraftWorthKeeping({ ...EMPTY, contractDate: '2026-09-01' })).toBe(true)
+  })
+
   it('keeps a draft once any client field is typed', () => {
     expect(isDraftWorthKeeping({ ...EMPTY, clientName: 'ТОО Ромашка' })).toBe(true)
     expect(isDraftWorthKeeping({ ...EMPTY, clientBin: '123456789012' })).toBe(true)
@@ -61,38 +69,38 @@ describe('parseStoredDraft', () => {
   const filled: InvoiceDraft = { ...EMPTY, clientName: 'ТОО Ромашка', clientBin: '123456789012' }
 
   it('round-trips a draft saved a moment ago', () => {
-    expect(parseStoredDraft(serializeDraft(filled, NOW), NOW + 1000)).toEqual(filled)
+    expect(parseStoredDraft(serializeDraft(filled, OWNER, NOW), OWNER, NOW + 1000)).toEqual(filled)
   })
 
   it('returns null when there is nothing stored', () => {
-    expect(parseStoredDraft(null, NOW)).toBeNull()
-    expect(parseStoredDraft('', NOW)).toBeNull()
+    expect(parseStoredDraft(null, OWNER, NOW)).toBeNull()
+    expect(parseStoredDraft('', OWNER, NOW)).toBeNull()
   })
 
   it('returns null for anything unparseable or mis-shaped', () => {
-    expect(parseStoredDraft('not json', NOW)).toBeNull()
-    expect(parseStoredDraft('null', NOW)).toBeNull()
-    expect(parseStoredDraft('"a string"', NOW)).toBeNull()
-    expect(parseStoredDraft(JSON.stringify({ draft: filled }), NOW)).toBeNull()
-    expect(parseStoredDraft(JSON.stringify({ savedAt: 'yesterday', draft: filled }), NOW)).toBeNull()
-    expect(parseStoredDraft(JSON.stringify({ savedAt: NOW }), NOW)).toBeNull()
-    expect(parseStoredDraft(JSON.stringify({ savedAt: NOW, draft: { clientName: 'x' } }), NOW)).toBeNull()
+    expect(parseStoredDraft('not json', OWNER, NOW)).toBeNull()
+    expect(parseStoredDraft('null', OWNER, NOW)).toBeNull()
+    expect(parseStoredDraft('"a string"', OWNER, NOW)).toBeNull()
+    expect(parseStoredDraft(JSON.stringify({ draft: filled, userId: OWNER }), OWNER, NOW)).toBeNull()
+    expect(parseStoredDraft(JSON.stringify({ savedAt: 'yesterday', userId: OWNER, draft: filled }), OWNER, NOW)).toBeNull()
+    expect(parseStoredDraft(JSON.stringify({ savedAt: NOW, userId: OWNER }), OWNER, NOW)).toBeNull()
+    expect(parseStoredDraft(JSON.stringify({ savedAt: NOW, userId: OWNER, draft: { clientName: 'x' } }), OWNER, NOW)).toBeNull()
   })
 
   it('keeps a draft right up to the age limit and drops it past it', () => {
-    const raw = serializeDraft(filled, NOW)
-    expect(parseStoredDraft(raw, NOW + INVOICE_DRAFT_MAX_AGE_MS)).not.toBeNull()
-    expect(parseStoredDraft(raw, NOW + INVOICE_DRAFT_MAX_AGE_MS + 1)).toBeNull()
+    const raw = serializeDraft(filled, OWNER, NOW)
+    expect(parseStoredDraft(raw, OWNER, NOW + INVOICE_DRAFT_MAX_AGE_MS)).not.toBeNull()
+    expect(parseStoredDraft(raw, OWNER, NOW + INVOICE_DRAFT_MAX_AGE_MS + 1)).toBeNull()
   })
 
   it('drops a draft stamped in the future rather than trusting the clock', () => {
-    const raw = serializeDraft(filled, NOW + INVOICE_DRAFT_MAX_AGE_MS + 1)
-    expect(parseStoredDraft(raw, NOW)).toBeNull()
+    const raw = serializeDraft(filled, OWNER, NOW + INVOICE_DRAFT_MAX_AGE_MS + 1)
+    expect(parseStoredDraft(raw, OWNER, NOW)).toBeNull()
   })
 
   it('fills missing string fields instead of restoring undefined into inputs', () => {
-    const raw = JSON.stringify({ savedAt: NOW, draft: { services: [], clientName: 'ТОО Ромашка' } })
-    const parsed = parseStoredDraft(raw, NOW)
+    const raw = JSON.stringify({ savedAt: NOW, userId: OWNER, draft: { services: [], clientName: 'ТОО Ромашка' } })
+    const parsed = parseStoredDraft(raw, OWNER, NOW)
     expect(parsed).toEqual({
       clientName: 'ТОО Ромашка',
       clientBin: '',
@@ -107,5 +115,28 @@ describe('parseStoredDraft', () => {
       note: '',
       services: [],
     })
+  })
+})
+
+describe('account scoping', () => {
+  const filled: InvoiceDraft = { ...EMPTY, clientName: 'ТОО Ромашка', clientBin: '123456789012' }
+
+  it('gives each account its own key', () => {
+    expect(invoiceDraftKey(OWNER)).not.toBe(invoiceDraftKey(OTHER))
+    expect(invoiceDraftKey(OWNER)).toContain(OWNER)
+  })
+
+  // The bug this pins: a shared browser (a bookkeeper running several
+  // companies' invoicing from one machine) must never see one account's
+  // counterparty name, BIN, contacts and prices restored into another's form.
+  it('refuses to restore a draft belonging to a different account', () => {
+    const raw = serializeDraft(filled, OWNER, NOW)
+    expect(parseStoredDraft(raw, OTHER, NOW)).toBeNull()
+    expect(parseStoredDraft(raw, OWNER, NOW)).toEqual(filled)
+  })
+
+  it('refuses a draft that records no owner at all', () => {
+    const raw = JSON.stringify({ savedAt: NOW, draft: filled })
+    expect(parseStoredDraft(raw, OWNER, NOW)).toBeNull()
   })
 })
