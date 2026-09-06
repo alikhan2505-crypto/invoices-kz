@@ -59,14 +59,15 @@ export default function AuthCallback() {
           return
         }
 
-        // `id` (not bin_iin) because the question this branch asks is "does a
-        // profile row exist at all", not "are the invoice requisites filled".
-        // A Kaspi-Shop-only user legitimately has a row with an empty bin_iin
-        // and must NOT be bootstrapped a second time. maybeSingle() so the
-        // no-row case is null instead of an error.
+        // The profiles row is NOT created here -- an AFTER INSERT trigger on
+        // auth.users (on_auth_user_created -> handle_new_user) creates it
+        // inside the signup transaction, so it always exists by the time this
+        // code runs. Asking "does a row exist" therefore never fires. What we
+        // actually need to know is whether this account has ever been through
+        // the one-time bootstrap below, which these three columns record.
         const { data: profile } = await supabase
           .from('profiles')
-          .select('id')
+          .select('trial_expires_at, promo_granted_at, referred_by')
           .eq('id', session.user.id)
           .maybeSingle()
 
@@ -78,7 +79,32 @@ export default function AuthCallback() {
         // it. See src/lib/postLoginRedirect.ts.
         const postLoginRedirect = consumePostLoginRedirect()
 
-        if (!profile) {
+        // Exactly one place decides where a fully-authenticated user lands --
+        // used below by an already-bootstrapped account, and by the
+        // bootstrap chain itself (both its success path and its early return
+        // on a failed profile upsert), so the highest-intent user in the
+        // funnel (landing page's "Подключить Pro" -> setPendingUpgrade() ->
+        // /login) still reaches /upgrade no matter which of those ran.
+        const goToDestination = () => {
+          if (hasPendingUpgrade()) {
+            // Checked before the generic postLoginRedirect below since it
+            // carries a plan+period payload /upgrade's own mount effect
+            // still needs to consume (see src/lib/pendingUpgrade.ts).
+            router.replace('/upgrade')
+          } else if (postLoginRedirect) {
+            // Generic "return to the page that sent the user to /login" --
+            // e.g. /kaspi-api/docs's auth guard (see
+            // src/lib/postLoginRedirect.ts).
+            router.replace(postLoginRedirect)
+          } else {
+            router.push('/dashboard')
+          }
+        }
+
+        const needsBootstrap =
+          !profile || (!profile.trial_expires_at && !profile.promo_granted_at && !profile.referred_by)
+
+        if (needsBootstrap) {
           // Brand-new account. /onboarding's step 1 used to do all of this
           // AND demand company name + BIN before any of it ran, which meant a
           // seller who came only for Kaspi Bot or the AI agent had to invent
@@ -100,7 +126,7 @@ export default function AuthCallback() {
             // even when it matches zero rows -- so continuing here would hand the user
             // a dashboard and a 200 response for a trial that was never granted.
             console.error('signup bootstrap: profile row not created', profileError.message)
-            router.push('/dashboard')
+            goToDestination()
             return
           }
 
@@ -168,22 +194,9 @@ export default function AuthCallback() {
             })
           } catch {}
 
-          router.push('/dashboard')
-        } else if (hasPendingUpgrade()) {
-          // Already-onboarded account signing back in via magic link/Google/
-          // Facebook -- safe to send straight to /upgrade when the landing
-          // page's pricing CTA left one pending (see src/lib/pendingUpgrade.ts).
-          // Checked before the generic postLoginRedirect below since it
-          // carries a plan+period payload /upgrade's own mount effect still
-          // needs to consume -- no regression from adding the generic path.
-          router.replace('/upgrade')
-        } else if (postLoginRedirect) {
-          // Generic "return to the page that sent the user to /login" --
-          // e.g. /kaspi-api/docs's auth guard (see
-          // src/lib/postLoginRedirect.ts).
-          router.replace(postLoginRedirect)
+          goToDestination()
         } else {
-          router.push('/dashboard')
+          goToDestination()
         }
 
       } catch (err) {

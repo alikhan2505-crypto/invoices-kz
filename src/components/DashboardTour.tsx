@@ -19,7 +19,7 @@ const STEPS: Step[] = [
   {
     anchor: 'create-invoice',
     title: 'Первый счёт — за минуту',
-    body: 'Реквизиты компании спросим здесь же, в момент создания, а не заранее.',
+    body: 'Реквизиты компании понадобятся только на этом шаге — заранее их заполнять не нужно.',
   },
   {
     anchor: 'menu',
@@ -82,6 +82,16 @@ export default function DashboardTour() {
       // than show an empty scrim.
       const start = STEPS.findIndex((s) => findAnchor(s.anchor))
       if (start === -1) return
+      // Measure now, in this same batched update, instead of leaving
+      // vw/vh/rect at their zero/null initial state for one frame -- open
+      // and i changing without them means the first paint computes box as
+      // null (full-screen scrim, no highlight) and tipWidth as negative
+      // (vw is still 0), corrected only after the post-paint effect below
+      // runs measure().
+      const startEl = findAnchor(STEPS[start].anchor)
+      setVw(window.innerWidth)
+      setVh(window.innerHeight)
+      setRect(startEl ? startEl.getBoundingClientRect() : null)
       setI(start)
       setOpen(true)
     })()
@@ -148,9 +158,35 @@ export default function DashboardTour() {
     return () => clearTimeout(t)
   }, [open, i, measure])
 
+  // The spotlight hole is a real hole -- the four scrim rectangles only cover
+  // the area *around* the highlighted element, so it stays fully clickable by
+  // design. If the user activates it directly instead of Далее/Пропустить,
+  // that must still count as completing the tour, or finish() never runs and
+  // tour_completed_at never gets set. Capture-phase so this observes the
+  // click before the anchor's own handler can navigate away; one-shot so it
+  // never lingers past this step; never preventDefault/stopPropagation so
+  // the click still does exactly what it always did.
+  useEffect(() => {
+    if (!open) return
+    const el = findAnchor(STEPS[i].anchor)
+    if (!el) return
+    const onAnchorClick = () => finish()
+    el.addEventListener('click', onAnchorClick, { capture: true, once: true })
+    return () => el.removeEventListener('click', onAnchorClick, { capture: true })
+  }, [open, i, finish])
+
   if (!open || typeof document === 'undefined') return null
   const step = STEPS[i]
   if (!step) return null
+
+  // Number against the steps that will actually be shown on this viewport,
+  // not the raw STEPS array -- otherwise a step whose anchor isn't rendered
+  // here (e.g. "menu" on desktop, hidden behind `lg:hidden`) is skipped by
+  // next() but still counted, so the visible counter jumps 1 -> 2 -> 4.
+  // findAnchor stays the single source of truth for visibility, same as
+  // everywhere else in this component.
+  const visibleSteps = STEPS.filter((s) => findAnchor(s.anchor))
+  const stepNumber = visibleSteps.indexOf(step) + 1
 
   const scrim = 'rgba(10,10,15,0.55)'
   // Four opaque rectangles around the target instead of a mask/clip-path:
@@ -205,7 +241,7 @@ export default function DashboardTour() {
         style={{ ...tipStyle, boxShadow: '0 24px 50px -20px rgba(10,10,15,0.45)' }}
       >
         <div className="text-[11px] font-semibold mb-1" style={{ color: 'var(--nav-text-muted)' }}>
-          {i + 1} из {STEPS.length}
+          {stepNumber} из {visibleSteps.length}
         </div>
         <div className="font-semibold text-sm mb-1.5" style={{ color: 'var(--nav-text-primary)' }}>
           {step.title}

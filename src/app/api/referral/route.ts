@@ -79,9 +79,15 @@ export async function POST(req: NextRequest) {
     bonus_expires_at: referrerBonusBase.toISOString(),
   }
 
-  await supabase.from('profiles')
+  const { error } = await supabase.from('profiles')
     .update(referrerUpdate)
     .eq('id', referrer.id)
+  // The claim above is an irreversible compare-and-swap -- a retry after this
+  // fails hits `.is('referred_by', null)`, matches nothing (referred_by is
+  // already set), and returns "Already used referral code". So a failure
+  // here is invisible to the new user and unrecoverable by a retry; at least
+  // get it into the logs so the founder can credit the referrer by hand.
+  if (error) console.error('referral: failed to credit referrer', referrer.id, error.message)
 
   return NextResponse.json({ success: true })
 }
