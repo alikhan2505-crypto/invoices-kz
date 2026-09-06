@@ -123,6 +123,11 @@ export default function Referral() {
           <div className="text-sm" style={{ color: 'var(--nav-text-muted)' }}>
             {t.referralBannerDescBefore} <span className="font-bold" style={{ color: 'var(--nav-success)' }}>{t.referralBannerBonusBold}</span> {t.referralBannerDescAfter}
           </div>
+          {/* The 90-day ceiling is enforced in claim_referral_bonus /
+              credit_referrer_bonus, so it has to be stated here -- a page that
+              promises "+7 за каждого" without it would be a promise the
+              database does not keep. */}
+          <div className="text-xs mt-2" style={{ color: 'var(--nav-text-muted)' }}>{t.referralCapNote}</div>
         </motion.div>
 
         <motion.div {...fadeIn(2)} className="grid grid-cols-2 gap-3">

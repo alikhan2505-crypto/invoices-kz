@@ -91,17 +91,16 @@ export default function Onboarding() {
       localStorage.removeItem('referral_code')
     }
 
-    // Grants the 7-day trial (and promo bonus, if any) -- must succeed
-    // before advancing to step 2. The previous fire-and-forget try/catch
-    // swallowed every failure (network error, 401, 500) and always advanced
-    // the step regardless, so a user could lose the trial silently.
+    // Grants the 7-day trial -- must succeed before advancing to step 2. The
+    // previous fire-and-forget try/catch swallowed every failure (network
+    // error, 401, 500) and always advanced the step regardless, so a user
+    // could lose the trial silently.
     const requestGrant = () => fetch('/api/onboarding/grant', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${session.access_token}`,
       },
-      body: JSON.stringify({ promoCode: promoCode || undefined })
     })
 
     let grantRes: Response
@@ -124,7 +123,23 @@ export default function Onboarding() {
       setSaving(false)
       return
     }
-    if (promoCode) localStorage.removeItem('promo_code')
+    // Same redemption /upgrade and /auth/callback use, so a code grants the
+    // plan it was created with wherever it is entered. Best-effort: the trial
+    // above already succeeded and the wizard must not strand the user on step 1
+    // over a spent or mistyped code -- /upgrade's own promo field is the retry.
+    if (promoCode) {
+      try {
+        await fetch('/api/plan/promo', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ code: promoCode.toUpperCase() }),
+        })
+      } catch {}
+      localStorage.removeItem('promo_code')
+    }
 
     try {
       await fetch('/api/telegram', {

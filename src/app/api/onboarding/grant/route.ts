@@ -11,33 +11,24 @@ const supabaseAuth = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-// Called once from onboarding step 1 (saveStep1), right AFTER the client's
-// own upsert of the profile's non-privileged fields (company_name, bin_iin,
-// email, account_type) has completed -- that upsert must run first so the
-// profile row exists before this route updates it.
+// Grants the 7-day signup trial (trial_expires_at), and nothing else. Called
+// from /auth/callback when an account is first bootstrapped, and from
+// onboarding step 1 (saveStep1) right AFTER the client's own upsert of the
+// profile's non-privileged fields -- that upsert must run first so the profile
+// row exists before this route updates it.
 //
-// Grants the 7-day signup trial (trial_expires_at) and, if a promo code was
-// carried into onboarding via ?promo=, that promo's signup bonus
-// (bonus_expires_at). Both columns are guarded by the
-// protect_profile_privileged_columns trigger, so they must be written with
-// the service-role client -- the browser client onboarding used to write
-// them directly only worked because the trigger didn't protect these two
-// columns yet. See .superpowers/sdd/trigger-hole-investigation.md.
-// How many bonus days a promo code carried in through /promo/[code] is worth at
-// signup. This was written as `promo.bonus_days || 14`, but promo_codes has no
-// bonus_days column (its columns are id, code, plan, days, max_uses, used_count,
-// is_active) -- so the lookup was always undefined and every signup promo has
-// always granted exactly 14 days. Named here rather than made configurable,
-// because promo_codes.days is already spoken for: api/plan/promo/route.ts uses
-// it as the PLAN duration on /upgrade. Reading it here too would mean a code
-// created as "Pro for 365 days" also hands out 365 free bonus days to anyone who
-// opens /promo/<that code> before signing up. Which of the two a promo code
-// should mean is a product decision, not something to infer from a column name.
-const SIGNUP_PROMO_BONUS_DAYS = 14
-
+// trial_expires_at is guarded by the protect_profile_privileged_columns
+// trigger, so it must be written with the service-role client -- the browser
+// client onboarding used to write it directly only worked because the trigger
+// didn't protect it yet. See .superpowers/sdd/trigger-hole-investigation.md.
+//
+// Promo codes are NOT handled here any more. This route used to grant a promo
+// its own "signup bonus" in bonus_expires_at -- a second, invisible meaning for
+// the same code that /upgrade redeems as a plan, and one whose amount came from
+// `promo.bonus_days`, a column promo_codes does not have (so it was always
+// exactly 14 days, whatever the code said). A code now means one thing
+// everywhere; /auth/callback redeems it through /api/plan/promo like /upgrade.
 export async function POST(req: NextRequest) {
-  const { promoCode } = await req.json().catch(() => ({ promoCode: undefined }))
-
   const accessToken = req.headers.get('authorization')?.replace('Bearer ', '')
   const { data: { user } } = accessToken
     ? await supabaseAuth.auth.getUser(accessToken)
@@ -67,42 +58,5 @@ export async function POST(req: NextRequest) {
       .eq('id', user.id)
   }
 
-  // --- Promo bonus (optional). Mirrors onboarding's original logic exactly,
-  // including what it DOESN'T do: no max_uses/used_count check or increment
-  // here -- that gating only exists for /upgrade's plan-grant promos
-  // (api/plan/promo/route.ts). A failed/missing lookup is a silent no-op,
-  // same as the try/catch-swallowed original.
-  let bonusExpiresAt: string | null = null
-  if (promoCode && typeof promoCode === 'string' && promoCode.trim()) {
-    try {
-      const { data: promo } = await supabase
-        .from('promo_codes')
-        .select('*')
-        .eq('code', promoCode.toUpperCase())
-        .eq('is_active', true)
-        .single()
-      if (promo) {
-        // Once per user, claimed atomically -- the compare-and-swap on
-        // promo_granted_at lives inside claim_promo_bonus now (see the
-        // stack_bonus_days_atomically migration). Before that guard existed at
-        // all, this route being callable at any time -- not only during
-        // onboarding -- let anyone holding any active promo code re-POST it
-        // every 14 days forever for a free «Базовый» (security audit
-        // 2026-09-04).
-        //
-        // The days now ADD to whatever bonus the user already has. This used to
-        // write `today + bonus_days` flat, which erased the 7 referral days
-        // /api/referral had just granted -- /auth/callback runs referral first,
-        // so a signup that arrived with both codes kept only the promo.
-        const { data: claimedUntil, error: claimError } = await supabase
-          .rpc('claim_promo_bonus', { p_user: user.id, p_days: SIGNUP_PROMO_BONUS_DAYS })
-        if (claimError) console.error('grant: promo claim failed', user.id, claimError.message)
-        else if (claimedUntil) bonusExpiresAt = claimedUntil
-      }
-    } catch {
-      // Swallowed, same as onboarding's original behavior.
-    }
-  }
-
-  return NextResponse.json({ trialExpiresAt, bonusExpiresAt })
+  return NextResponse.json({ trialExpiresAt })
 }

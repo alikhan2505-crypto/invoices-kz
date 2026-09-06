@@ -11,9 +11,10 @@ const supabaseAuth = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-// Redeems a promo code on /upgrade for the caller's OWN profile. Must run
-// server-side with the service-role client: `plan` and `plan_expires_at` are
-// guarded by the protect_profile_privileged_columns trigger, which silently
+// Redeems a promo code for the caller's OWN profile -- from /upgrade, and from
+// /auth/callback for a code carried in through /promo/[code] at signup. Must
+// run server-side with the service-role client: `plan` and `plan_expires_at`
+// are guarded by the protect_profile_privileged_columns trigger, which silently
 // reverts any write to them from a non-admin, non-service-role client (i.e.
 // the browser client the old client-side applyPromo() used) -- so this
 // redemption was previously a no-op for ordinary users even though
@@ -33,25 +34,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { data: promo } = await supabase
-    .from('promo_codes')
-    .select('*')
-    .eq('code', code.toUpperCase())
-    .eq('is_active', true)
-    .single()
-
-  if (!promo) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  }
-
   // Refuse-if-active guard: a promo sets `plan`/`plan_expires_at` outright
   // (not additively), so redeeming one while an unrelated paid plan is
   // still active would silently overwrite/downgrade it -- e.g. a Pro
   // subscriber with 300 days left typing a Basic-30-day code would become
-  // Basic for 30 days. Checking this before touching promo_codes.used_count
-  // (below) also closes a second hole: without it, the same user could
-  // repeat this call indefinitely while their own plan stays active,
-  // draining used_count without the redemption ever actually applying.
+  // Basic for 30 days. Checked here rather than inside the RPC because it is
+  // a policy about this caller's own plan, not about the code.
   const { data: profile } = await supabase
     .from('profiles')
     .select('plan, plan_expires_at')
@@ -64,30 +52,43 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'plan_active' }, { status: 409 })
   }
 
-  // NULL max_uses means unlimited. Without this guard, `used_count >=
-  // max_uses` coerces a NULL max_uses to 0 in the numeric comparison, so
-  // any used_count (starting at 0) trips it and every "unlimited" code
-  // returns 409 on its very first redemption.
-  if (promo.max_uses != null && promo.used_count >= promo.max_uses) {
-    return NextResponse.json({ error: 'Exhausted' }, { status: 409 })
+  // One transaction does the whole redemption: the max_uses gate, the
+  // once-per-account claim (a unique constraint on promo_redemptions, not a
+  // check-then-act), the used_count increment and the grant itself. It also
+  // takes `for update` on the code row, which closes the over-redemption race
+  // the previous read-then-update version documented as an accepted tradeoff.
+  //
+  // This is the ONLY place a promo code is redeemed. The signup path
+  // (/auth/callback, for a code carried in via /promo/[code]) calls this same
+  // route, so a code grants the same plan for the same number of days no
+  // matter where it is entered -- it used to silently mean "14 bonus days" at
+  // signup and "the configured plan for the configured days" here.
+  const { data: result, error } = await supabase.rpc('redeem_promo_code', {
+    p_user: user.id,
+    p_code: code.toUpperCase(),
+  })
+
+  if (error) {
+    console.error('promo: redeem failed', user.id, error.message)
+    return NextResponse.json({ error: 'Failed' }, { status: 500 })
   }
 
-  const expiresAt = new Date()
-  expiresAt.setDate(expiresAt.getDate() + promo.days)
+  const status = (result as any)?.status
+  if (status === 'not_found') return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  // A code with no plan or no positive day count would mint a plan with no
+  // expiry -- which getActivePlan reads as paid forever. The RPC refuses it;
+  // surface it as "not found" to the user and loudly to the logs, since the
+  // fix is the founder editing the code, not anything the user can do.
+  if (status === 'misconfigured') {
+    console.error('promo: code is misconfigured (no plan or days <= 0)', code.toUpperCase())
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
+  if (status === 'exhausted') return NextResponse.json({ error: 'Exhausted' }, { status: 409 })
+  if (status === 'already_redeemed') return NextResponse.json({ error: 'already_redeemed' }, { status: 409 })
+  if (status !== 'ok') {
+    console.error('promo: unexpected redeem status', status, user.id)
+    return NextResponse.json({ error: 'Failed' }, { status: 500 })
+  }
 
-  await supabase.from('profiles')
-    .update({ plan: promo.plan, plan_expires_at: expiresAt.toISOString() })
-    .eq('id', user.id)
-
-  // Read-then-update, same shape as api/referral/route.ts's counter bumps.
-  // Not a strict atomic guard: two concurrent redemptions of a code sitting
-  // exactly one use below max_uses could both pass the check above and both
-  // land here, over-redeeming it by one. Promo codes are low-volume/admin-
-  // issued, so this narrow race is an accepted tradeoff rather than
-  // something worth a DB-side atomic RPC for right now.
-  await supabase.from('promo_codes')
-    .update({ used_count: promo.used_count + 1 })
-    .eq('id', promo.id)
-
-  return NextResponse.json({ plan: promo.plan, days: promo.days })
+  return NextResponse.json({ plan: (result as any).plan, days: (result as any).days })
 }

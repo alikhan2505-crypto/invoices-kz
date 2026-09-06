@@ -152,7 +152,6 @@ export default function AuthCallback() {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${session.access_token}`,
             },
-            body: JSON.stringify({ promoCode: promoCode || undefined }),
           })
           // One retry, then give up quietly: unlike the old wizard there is no
           // form to hold the user on, and blocking the very first screen on a
@@ -176,9 +175,36 @@ export default function AuthCallback() {
             let grantRes = await attemptGrant()
             if (!grantRes || !grantRes.ok) grantRes = await attemptGrant()
             if (!grantRes || !grantRes.ok) console.error('signup: trial grant failed', grantRes?.status)
-            else if (promoCode) localStorage.removeItem('promo_code')
           } catch (e: any) {
             console.error('signup: trial grant threw', e?.message)
+          }
+
+          // A promo code carried in from /promo/[code] is redeemed through the
+          // very same route /upgrade uses, so it grants the plan it was created
+          // with, for the days it was created with -- and goes through the same
+          // max_uses gate and once-per-account claim. It used to be handled
+          // inside the trial grant above as a separate "signup bonus", which
+          // meant one code quietly did two different things depending on where
+          // it was entered.
+          //
+          // The code is dropped from storage whatever the outcome: a bad or
+          // spent code is not worth silently retrying on every later sign-in,
+          // and /upgrade's own field is there for a second attempt.
+          if (promoCode) {
+            try {
+              const promoRes = await fetch('/api/plan/promo', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${session.access_token}`,
+                },
+                body: JSON.stringify({ code: promoCode.toUpperCase() }),
+              })
+              if (!promoRes.ok) console.error('signup: promo redeem failed', promoRes.status)
+            } catch (e: any) {
+              console.error('signup: promo redeem threw', e?.message)
+            }
+            localStorage.removeItem('promo_code')
           }
 
           try {

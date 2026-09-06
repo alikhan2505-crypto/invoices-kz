@@ -10,6 +10,7 @@ export interface ProfileMiscContent {
   referralBannerDescBefore: string
   referralBannerBonusBold: string
   referralBannerDescAfter: string
+  referralCapNote: string
   invitedFriendsLabel: string
   bonusDaysLabel: string
   yourReferralLinkLabel: string
@@ -132,6 +133,7 @@ export const profileContentDict: Record<'ru' | 'kk' | 'en', ProfileMiscContent> 
     referralBannerDescBefore: 'За каждого приглашённого друга вы оба получаете',
     referralBannerBonusBold: '+7 дней',
     referralBannerDescAfter: 'Базового тарифа бесплатно',
+    referralCapNote: 'Бонусные дни суммируются — максимум 90 дней одновременно.',
     invitedFriendsLabel: 'Приглашено друзей',
     bonusDaysLabel: 'Бонусных дней',
     yourReferralLinkLabel: 'Ваша реферальная ссылка',
@@ -242,6 +244,7 @@ export const profileContentDict: Record<'ru' | 'kk' | 'en', ProfileMiscContent> 
     referralBannerDescBefore: 'Шақырылған әрбір дос үшін екеуіңіз де',
     referralBannerBonusBold: '+7 күн',
     referralBannerDescAfter: 'тегін Негізгі тарифін аласыздар',
+    referralCapNote: 'Бонустық күндер жинақталады — бір уақытта ең көбі 90 күн.',
     invitedFriendsLabel: 'Шақырылған достар',
     bonusDaysLabel: 'Бонустық күндер',
     yourReferralLinkLabel: 'Сіздің реферал сілтемеңіз',
@@ -352,6 +355,7 @@ export const profileContentDict: Record<'ru' | 'kk' | 'en', ProfileMiscContent> 
     referralBannerDescBefore: 'For every friend you invite, you both get',
     referralBannerBonusBold: '+7 days',
     referralBannerDescAfter: 'of the Basic plan for free',
+    referralCapNote: 'Bonus days add up — up to 90 days at a time.',
     invitedFriendsLabel: 'Friends invited',
     bonusDaysLabel: 'Bonus days',
     yourReferralLinkLabel: 'Your referral link',
