@@ -295,6 +295,11 @@ export default function AiAgentSettings() {
   const [waError, setWaError] = useState<string | null>(null)
   const waPhoneNumberIdRef = useRef<string | null>(null)
   const waWabaIdRef = useRef<string | null>(null)
+  // What Meta's popup last told us (FINISH*/CANCEL/ERROR) and which of its
+  // steps it was on. Refs, not state: they are read inside the FB.login
+  // callback, which closes over the render it was created in.
+  const waLastEventRef = useRef<string | null>(null)
+  const waLastStepRef = useRef<string | null>(null)
   const [oauthNotice, setOauthNotice] = useState<'connected' | 'error' | null>(null)
   const [forbidden, setForbidden] = useState(false)
   // Instagram/WhatsApp self-serve connect is founder-only for now even
@@ -413,14 +418,31 @@ export default function AiAgentSettings() {
       // Matching only the exact string 'FINISH' silently dropped every one
       // of these: phoneNumberIdRef/wabaIdRef never got set, so our own
       // connect callback was never even called.
+      // Remember the last thing Meta told us, so the FB.login callback below
+      // can tell "the user backed out" apart from "the popup died on Meta's
+      // side" -- both of which otherwise arrive as simply "no code".
+      if (typeof data.event === 'string') waLastEventRef.current = data.event
       if (typeof data.event === 'string' && data.event.startsWith('FINISH') && data.data) {
         if (data.data.phone_number_id) waPhoneNumberIdRef.current = data.data.phone_number_id
         if (data.data.waba_id) waWabaIdRef.current = data.data.waba_id
       } else if (data.event === 'CANCEL') {
+        // Meta names the step the user was on when they closed it. Worth
+        // keeping: "backed out on the phone-number screen" and "backed out on
+        // the business-selection screen" are very different problems.
+        waLastStepRef.current = data.data?.current_step || null
         setWaConnecting(false)
       } else if (data.event === 'ERROR') {
         setWaConnecting(false)
-        setWaError('Ошибка при подключении WhatsApp. Попробуйте ещё раз.')
+        // Meta puts the actual reason in the event. Showing it is the whole
+        // point -- a generic "попробуйте ещё раз" for a failure that will
+        // never succeed on a retry just costs the customer another attempt.
+        const metaMessage = data.data?.error_message || data.data?.error_id
+        waLastStepRef.current = data.data?.current_step || null
+        setWaError(
+          metaMessage
+            ? `Meta отклонила подключение: ${metaMessage}${data.data?.current_step ? ` (шаг: ${data.data.current_step})` : ''}`
+            : 'Meta отклонила подключение и не назвала причину. Попробуйте ещё раз, и если повторится — напишите в поддержку.'
+        )
       }
     }
     window.addEventListener('message', onMessage)
@@ -852,17 +874,46 @@ export default function AiAgentSettings() {
       setWaError('WhatsApp SDK ещё загружается — подождите секунду и попробуйте снова.')
       return
     }
+    // Both of these are inlined at build time. When one is missing the SDK is
+    // handed an empty appId or config_id and Meta's popup dies on its own side
+    // -- nothing reaches our server, so there is no log anywhere and every
+    // symptom looks like "Meta refused us". Say it plainly instead.
+    const waAppId = process.env.NEXT_PUBLIC_WHATSAPP_APP_ID
+    const waConfigId = process.env.NEXT_PUBLIC_WHATSAPP_CONFIG_ID
+    if (!waAppId || !waConfigId) {
+      setWaError(
+        'Подключение WhatsApp не настроено на сервере: не задан ' +
+        [!waAppId && 'NEXT_PUBLIC_WHATSAPP_APP_ID', !waConfigId && 'NEXT_PUBLIC_WHATSAPP_CONFIG_ID']
+          .filter(Boolean).join(' и ') +
+        '. Это настройка деплоя, повторные попытки не помогут.'
+      )
+      return
+    }
     setWaError(null)
     setWaConnecting(true)
     waPhoneNumberIdRef.current = null
     waWabaIdRef.current = null
+    waLastEventRef.current = null
 
     FB.login((response: any) => {
       const code = response?.authResponse?.code
       if (!code) {
-        // Popup closed without completing the flow -- not necessarily an
-        // error (user may have just backed out), so no error banner.
         setWaConnecting(false)
+        // Backing out really is not an error, and CANCEL/ERROR already said
+        // their piece. But a popup that ends with NO event at all and no code
+        // is a genuine dead end -- and staying silent about it is exactly how
+        // this arrived as "I just couldn't register, no message".
+        const last = waLastEventRef.current
+        if (!last) {
+          setWaError(
+            'Окно Meta закрылось, не выдав код подключения, и не сообщило причину. ' +
+            'Чаще всего это значит, что у аккаунта Facebook нет бизнес-портфеля, ' +
+            'либо номер уже привязан к другому WhatsApp Business. ' +
+            'Проверьте, что входите под аккаунтом с доступом администратора к бизнес-портфелю.'
+          )
+        } else if (last === 'CANCEL' && waLastStepRef.current) {
+          setWaError(`Подключение прервано на шаге «${waLastStepRef.current}».`)
+        }
         return
       }
       ;(async () => {
@@ -892,10 +943,15 @@ export default function AiAgentSettings() {
             const data = await res.json()
             setConnections(prev => [...prev.filter(c => c.channel !== 'whatsapp'), { channel: 'whatsapp', external_account_id: '', external_account_name: data.displayPhoneNumber || null, status: 'active' }])
           } else {
-            setWaError('Не удалось подключить WhatsApp. Попробуйте ещё раз — если не получится снова, напишите в поддержку.')
+            const data = await res.json().catch(() => ({}) as any)
+            setWaError(
+              data?.detail
+                ? `Не удалось подключить WhatsApp: ${data.detail}`
+                : 'Не удалось подключить WhatsApp. Попробуйте ещё раз — если не получится снова, напишите в поддержку.'
+            )
           }
-        } catch {
-          setWaError('Не удалось подключить WhatsApp. Попробуйте ещё раз — если не получится снова, напишите в поддержку.')
+        } catch (e: any) {
+          setWaError(`Не удалось подключить WhatsApp: ${e?.message || 'сеть недоступна'}`)
         }
         setWaConnecting(false)
       })()

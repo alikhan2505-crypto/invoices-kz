@@ -114,7 +114,13 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true, phoneNumberId, displayPhoneNumber })
   } catch (e: any) {
-    console.error('ai-agent WhatsApp connect failed:', e instanceof WhatsAppApiError ? `[${e.status}] ${e.message}` : e.message)
-    return NextResponse.json({ error: 'connect_failed' }, { status: 502 })
+    const detail = e instanceof WhatsAppApiError ? `[${e.status}] ${e.message}` : e?.message
+    console.error('ai-agent WhatsApp connect failed:', detail)
+    // Hand the reason back, not just `connect_failed`. This is the caller's own
+    // connection attempt against their own WhatsApp account, so Meta's message
+    // is theirs to see -- and without it every failure looked identical on
+    // screen while the only copy of the cause sat in a server log with a
+    // one-day retention window.
+    return NextResponse.json({ error: 'connect_failed', detail }, { status: 502 })
   }
 }
