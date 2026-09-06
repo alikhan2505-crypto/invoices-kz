@@ -70,23 +70,22 @@ export async function POST(req: NextRequest) {
         .eq('is_active', true)
         .single()
       if (promo) {
-        const bonusExpires = new Date()
-        bonusExpires.setDate(bonusExpires.getDate() + (promo.bonus_days || 14))
-        const candidate = bonusExpires.toISOString()
-        // Once per user, claimed atomically -- same compare-and-swap the
-        // welcome-bonus route uses, on a column the client cannot write
-        // (see protect_profile_privileged_columns). Before this, the branch
-        // had no guard at all: this route is callable at any time, not only
-        // during onboarding, so anyone holding any active promo code could
-        // re-POST it every 14 days forever for a free «Базовый» (security
-        // audit 2026-09-04).
-        const { data: claimed } = await supabase.from('profiles')
-          .update({ bonus_expires_at: candidate, promo_granted_at: new Date().toISOString() })
-          .eq('id', user.id)
-          .is('promo_granted_at', null)
-          .select('id')
-          .maybeSingle()
-        if (claimed) bonusExpiresAt = candidate
+        // Once per user, claimed atomically -- the compare-and-swap on
+        // promo_granted_at lives inside claim_promo_bonus now (see the
+        // stack_bonus_days_atomically migration). Before that guard existed at
+        // all, this route being callable at any time -- not only during
+        // onboarding -- let anyone holding any active promo code re-POST it
+        // every 14 days forever for a free «Базовый» (security audit
+        // 2026-09-04).
+        //
+        // The days now ADD to whatever bonus the user already has. This used to
+        // write `today + bonus_days` flat, which erased the 7 referral days
+        // /api/referral had just granted -- /auth/callback runs referral first,
+        // so a signup that arrived with both codes kept only the promo.
+        const { data: claimedUntil, error: claimError } = await supabase
+          .rpc('claim_promo_bonus', { p_user: user.id, p_days: promo.bonus_days || 14 })
+        if (claimError) console.error('grant: promo claim failed', user.id, claimError.message)
+        else if (claimedUntil) bonusExpiresAt = claimedUntil
       }
     } catch {
       // Swallowed, same as onboarding's original behavior.
