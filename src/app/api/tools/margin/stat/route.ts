@@ -10,18 +10,43 @@ import { createClient } from '@supabase/supabase-js'
 // IP is stored. `sessionId` is a random id the page mints for itself and
 // keeps for the visit, so a visitor who keeps editing collapses into one
 // row rather than writing one per keystroke.
+//
+// The session id is chosen by the client, so a caller minting a fresh one per
+// request would insert a new row every time. The per-IP counter below is only
+// best-effort -- it lives in one lambda instance's memory, and an attacker
+// gets a fresh counter on every cold start -- so the ceiling that actually
+// bounds this table is the database-side one in `newSessionsExhausted`,
+// which no amount of instance churn or spoofed headers can get around. Same
+// reasoning as isConversationRateLimited in src/lib/aiAgent/rateLimit.ts.
 
 const RATE_WINDOW_MS = 10 * 60 * 1000
-const RATE_LIMIT = 60
-const hits = new Map<string, number[]>()
+// A real visit sends a handful: the client debounces 2.5s and only fires
+// after the visitor edits something.
+const REQUESTS_PER_IP = 20
+const SESSIONS_PER_IP = 5
+const NEW_SESSIONS_PER_HOUR = 500
 
-function rateLimited(ip: string): boolean {
+const requestHits = new Map<string, number[]>()
+const sessionHits = new Map<string, Map<string, number>>()
+
+function rateLimited(ip: string, sessionId: string): boolean {
   const now = Date.now()
-  const recent = (hits.get(ip) || []).filter(t => now - t < RATE_WINDOW_MS)
+
+  const recent = (requestHits.get(ip) || []).filter(t => now - t < RATE_WINDOW_MS)
   recent.push(now)
-  hits.set(ip, recent)
-  if (hits.size > 5000) hits.clear()
-  return recent.length > RATE_LIMIT
+  requestHits.set(ip, recent)
+  if (requestHits.size > 5000) requestHits.clear()
+  if (recent.length > REQUESTS_PER_IP) return true
+
+  // Distinct sessions, not just request count: one row is created per session
+  // id, so this is the part that maps to rows written.
+  const seen = sessionHits.get(ip) || new Map<string, number>()
+  for (const [id, at] of seen) if (now - at >= RATE_WINDOW_MS) seen.delete(id)
+  const isNew = !seen.has(sessionId)
+  seen.set(sessionId, now)
+  sessionHits.set(ip, seen)
+  if (sessionHits.size > 5000) sessionHits.clear()
+  return isNew && seen.size > SESSIONS_PER_IP
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -38,14 +63,14 @@ function num(v: unknown): number | null {
 }
 
 export async function POST(req: NextRequest) {
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
-  if (rateLimited(ip)) return NextResponse.json({ error: 'rate_limited' }, { status: 429 })
-
   const body = await req.json().catch(() => ({}))
   const sessionId = typeof body?.sessionId === 'string' ? body.sessionId : ''
   if (!UUID_RE.test(sessionId)) {
     return NextResponse.json({ error: 'invalid_session' }, { status: 400 })
   }
+
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+  if (rateLimited(ip, sessionId)) return NextResponse.json({ error: 'rate_limited' }, { status: 429 })
 
   const lang = ['ru', 'kk', 'en'].includes(body?.lang) ? body.lang : null
 
@@ -54,10 +79,7 @@ export async function POST(req: NextRequest) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
-  // Upsert on session_id: the last state of the form wins, so a visitor who
-  // never downloads the Excel is still counted with whatever they ended on.
-  const { error } = await supabase.from('tool_margin_stats').upsert({
-    session_id: sessionId,
+  const fields = {
     lang,
     cost_price: num(body?.costPrice),
     sell_price: num(body?.sellPrice),
@@ -69,15 +91,51 @@ export async function POST(req: NextRequest) {
     profit_per_unit: num(body?.profitPerUnit),
     margin_percent: num(body?.marginPercent),
     break_even_price: num(body?.breakEvenPrice),
+    updated_at: new Date().toISOString(),
     // Never allowed to go back to false: a later autosave must not erase the
     // fact that this visitor downloaded the file.
     ...(body?.exported === true ? { exported: true } : {}),
-    updated_at: new Date().toISOString(),
-  }, { onConflict: 'session_id' })
+  }
 
-  if (error) {
-    console.error('tools/margin/stat: upsert failed:', error.message)
-    return NextResponse.json({ error: 'insert_failed' }, { status: 500 })
+  // Update first, so the common case -- a visitor still editing -- never
+  // touches the ceiling below and never writes a second row.
+  const { data: updated, error: updateError } = await supabase
+    .from('tool_margin_stats')
+    .update(fields)
+    .eq('session_id', sessionId)
+    .select('id')
+    .maybeSingle()
+
+  if (updateError) {
+    console.error('tools/margin/stat: update failed:', updateError.message)
+    return NextResponse.json({ error: 'write_failed' }, { status: 500 })
+  }
+  if (updated) return NextResponse.json({ ok: true })
+
+  // A brand-new session is the only thing that grows the table, so that is
+  // where the ceiling belongs. Fails CLOSED, unlike the AI rate limit: this
+  // is analytics, so dropping a sample costs a data point, while letting the
+  // table grow without bound costs the database.
+  const since = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+  const { count, error: countError } = await supabase
+    .from('tool_margin_stats')
+    .select('id', { count: 'exact', head: true })
+    .gte('created_at', since)
+  if (countError) {
+    console.error('tools/margin/stat: ceiling check failed:', countError.message)
+    return NextResponse.json({ ok: true, recorded: false })
+  }
+  if ((count ?? 0) >= NEW_SESSIONS_PER_HOUR) {
+    console.warn(`tools/margin/stat: hourly ceiling reached (${count}) -- not recording new sessions`)
+    return NextResponse.json({ ok: true, recorded: false })
+  }
+
+  const { error: insertError } = await supabase
+    .from('tool_margin_stats')
+    .insert({ session_id: sessionId, ...fields })
+  if (insertError) {
+    console.error('tools/margin/stat: insert failed:', insertError.message)
+    return NextResponse.json({ error: 'write_failed' }, { status: 500 })
   }
   return NextResponse.json({ ok: true })
 }
