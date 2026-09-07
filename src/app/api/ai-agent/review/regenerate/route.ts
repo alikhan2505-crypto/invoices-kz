@@ -144,7 +144,7 @@ export async function POST(req: NextRequest) {
     // regenerated variant of a price question loses the real prices the
     // original draft had (final-review finding M2). No invoiceTool here:
     // «Другой вариант» regenerates TEXT, it must not create drafts.
-    const catalogBlock = buildCatalogBlock(await loadAgentCatalog(supabase, agent.user_id))
+    const catalogBlock = buildCatalogBlock(await loadAgentCatalog(supabase, agent.user_id, agent.kaspi_shop_connection_id))
     const result = await generateAiReply({
       incomingText: questionRow.text,
       fromUsername: conversation.customer_handle || 'клиент',

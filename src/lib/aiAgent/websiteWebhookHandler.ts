@@ -230,7 +230,7 @@ export async function handleWebsiteIncoming(conn: WebsiteTenantConnection, param
     draftReply = AI_AGENT_BUDGET_DEPLETED_REPLY
     urgent = false
   } else try {
-    const catalogBlock = buildCatalogBlock(await loadAgentCatalog(supabase, agent.user_id))
+    const catalogBlock = buildCatalogBlock(await loadAgentCatalog(supabase, agent.user_id, agent.kaspi_shop_connection_id))
     const result = await generateAiReply({
       incomingText: params.text,
       fromUsername: 'посетитель сайта',

@@ -264,6 +264,12 @@ export default function AiAgentSettings() {
   const [customInstructions, setCustomInstructions] = useState('')
   const [stopPhrases, setStopPhrases] = useState<string[]>(['оператор', 'человек', 'менеджер', 'позовите', 'поговорить с человеком'])
   const [historyPairs, setHistoryPairs] = useState(5)
+  // Which Kaspi Shop store this agent quotes prices from. '' = follow the
+  // account's active store, which is what every agent did before this was
+  // selectable -- an account with two stores gave both its agents whichever
+  // one happened to be active in the Kaspi Bot section.
+  const [kaspiShopConnectionId, setKaspiShopConnectionId] = useState('')
+  const [kaspiShops, setKaspiShops] = useState<{ id: string; name: string; isActive: boolean }[]>([])
   const [isEnabled, setIsEnabled] = useState(true)
   const [creating, setCreating] = useState(false)
   const [createCountdown, setCreateCountdown] = useState(0)
@@ -590,6 +596,7 @@ export default function AiAgentSettings() {
           if (typeof data.agent.historyPairs === 'number') setHistoryPairs(data.agent.historyPairs)
           if (typeof data.agent.isEnabled === 'boolean') setIsEnabled(data.agent.isEnabled)
           setConnections(data.connections || [])
+          setKaspiShopConnectionId(data.agent.kaspiShopConnectionId || '')
           // Secondary data (badge count + saved templates) loads in the
           // background -- neither should hold up first paint of the form.
           loadReviewCount(headers)
@@ -597,6 +604,9 @@ export default function AiAgentSettings() {
         } else {
           setName(data.suggestedName || 'Ассистент')
         }
+        // Returned for a new agent too, so the store can be chosen before the
+        // first save rather than only on a second visit.
+        setKaspiShops(data.kaspiShops || [])
       }
       setLoading(false)
     }
@@ -638,7 +648,7 @@ export default function AiAgentSettings() {
       method: 'POST',
       headers,
       // agentId present -> UPDATE that agent; absent -> CREATE a new one.
-      body: JSON.stringify({ ...(agentId ? { agentId } : {}), name, tone, businessDescription, goal, collectFields, timezone, currency, customInstructions, historyPairs, isEnabled, stopPhrases }),
+      body: JSON.stringify({ ...(agentId ? { agentId } : {}), name, tone, businessDescription, goal, collectFields, timezone, currency, customInstructions, historyPairs, isEnabled, stopPhrases, kaspiShopConnectionId: kaspiShopConnectionId || null }),
     })
     if (res.ok) {
       const data = await res.json()
@@ -1446,6 +1456,27 @@ export default function AiAgentSettings() {
                     Сколько прошлых сообщений агент помнит. Больше — точнее контекст, но дороже каждый ответ.
                   </span>
                 </label>
+
+                {/* Only worth showing when there is a choice to make: with one
+                    store the default already points at it, and with none the
+                    agent has no catalog to quote from at all. */}
+                {kaspiShops.length > 1 && (
+                  <label className="block mb-6">
+                    <span className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>Магазин Kaspi для цен и товаров</span>
+                    <select value={kaspiShopConnectionId} onChange={e => setKaspiShopConnectionId(e.target.value)}
+                      className={INPUT_CLS}
+                      style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-surface-chrome)' }}>
+                      <option value="">Активный магазин аккаунта</option>
+                      {kaspiShops.map(s => (
+                        <option key={s.id} value={s.id}>{s.name}{s.isActive ? ' — сейчас активный' : ''}</option>
+                      ))}
+                    </select>
+                    <span className="text-[11px] mt-1 block" style={{ color: 'var(--nav-text-muted)' }}>
+                      Откуда агент берёт названия товаров и цены. Если не выбирать, он следует за магазином,
+                      переключённым в разделе Kaspi Bot — и тогда все агенты аккаунта отвечают по одному и тому же.
+                    </span>
+                  </label>
+                )}
 
                 {saveButton}
               </div>

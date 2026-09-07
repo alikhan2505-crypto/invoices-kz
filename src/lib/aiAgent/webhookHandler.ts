@@ -335,7 +335,7 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
     // Phase 3: real catalog prices in context + the invoice tool. The
     // tool is DM-only -- a public comment thread is no place to collect
     // a phone number or drop a personal invoice link.
-    const catalogBlock = buildCatalogBlock(await loadAgentCatalog(supabase, agent.user_id))
+    const catalogBlock = buildCatalogBlock(await loadAgentCatalog(supabase, agent.user_id, agent.kaspi_shop_connection_id))
     const result = await generateAiReply({
       incomingText: params.incomingText,
       fromUsername: params.fromUsername,

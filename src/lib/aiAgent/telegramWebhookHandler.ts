@@ -283,7 +283,7 @@ export async function handleTelegramIncoming(conn: TelegramTenantConnection, par
     urgent = false
   } else try {
     // Phase 3: real catalog prices in context + the invoice tool.
-    const catalogBlock = buildCatalogBlock(await loadAgentCatalog(supabase, agent.user_id))
+    const catalogBlock = buildCatalogBlock(await loadAgentCatalog(supabase, agent.user_id, agent.kaspi_shop_connection_id))
     const result = await generateAiReply({
       incomingText: params.incomingText,
       fromUsername: params.fromHandle,

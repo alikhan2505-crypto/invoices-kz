@@ -84,8 +84,24 @@ export async function GET(req: NextRequest) {
     }
   }
   const { data: profile } = await supabase.from('profiles').select('company_name').eq('id', user.id).maybeSingle()
+
+  // Every Kaspi Shop store on this account, so the settings page can offer a
+  // choice instead of silently following whichever one is active in the Kaspi
+  // Bot section. Deliberately NOT filtered by is_active -- that flag is the
+  // default, not a restriction on what an agent may quote from.
+  const { data: shops } = await supabase
+    .from('kaspi_shop_connections')
+    .select('id, company_name, merchant_id, is_active')
+    .eq('user_id', user.id)
+    .order('is_active', { ascending: false })
+  const kaspiShops = (shops || []).map(s => ({
+    id: s.id,
+    name: s.company_name || `Магазин ${s.merchant_id || ''}`.trim(),
+    isActive: !!s.is_active,
+  }))
+
   if (isNew) {
-    return NextResponse.json({ agent: null, suggestedName: profile?.company_name || '', connections: [] })
+    return NextResponse.json({ agent: null, suggestedName: profile?.company_name || '', connections: [], kaspiShops })
   }
   const { data: connections } = agent
     ? await supabase.from('ai_agent_channel_connections').select('channel, external_account_name, status').eq('agent_id', agent.id)
@@ -108,9 +124,13 @@ export async function GET(req: NextRequest) {
       // pre-column row still reads as enabled.
       isEnabled: agent.is_enabled !== false,
       status: agent.status,
+      // null = follow the account's active store (the behaviour every agent
+      // had before stores became selectable).
+      kaspiShopConnectionId: agent.kaspi_shop_connection_id || null,
     } : null,
     suggestedName: profile?.company_name || '',
     connections: connections || [],
+    kaspiShops,
   })
 }
 
@@ -129,7 +149,7 @@ export async function POST(req: NextRequest) {
   if (!(await hasAiAgentAccess(user.id))) return NextResponse.json({ error: 'admin_only' }, { status: 403 })
 
   const body = await req.json()
-  const { agentId, name, tone, businessDescription, goal, collectFields, timezone, currency, customInstructions, historyPairs, isEnabled, stopPhrases } = body
+  const { agentId, name, tone, businessDescription, goal, collectFields, timezone, currency, customInstructions, historyPairs, isEnabled, stopPhrases, kaspiShopConnectionId } = body
 
   if (agentId !== undefined && typeof agentId !== 'string') return NextResponse.json({ error: 'invalid agentId' }, { status: 400 })
   if (historyPairs !== undefined && (typeof historyPairs !== 'number' || historyPairs < 1 || historyPairs > 20)) {
@@ -137,6 +157,24 @@ export async function POST(req: NextRequest) {
   }
   if (isEnabled !== undefined && typeof isEnabled !== 'boolean') {
     return NextResponse.json({ error: 'invalid isEnabled' }, { status: 400 })
+  }
+  if (kaspiShopConnectionId !== undefined && kaspiShopConnectionId !== null && typeof kaspiShopConnectionId !== 'string') {
+    return NextResponse.json({ error: 'invalid kaspiShopConnectionId' }, { status: 400 })
+  }
+
+  // A store id arrives from the browser, so it is a caller-supplied reference
+  // to another table's row -- verify it belongs to THIS user before storing it,
+  // or an agent could be pointed at a competitor's catalog by editing the
+  // request. loadAgentCatalog re-checks ownership on every read too; this check
+  // is here so the bad value never reaches the column in the first place.
+  if (typeof kaspiShopConnectionId === 'string' && kaspiShopConnectionId) {
+    const { data: shop } = await supabase
+      .from('kaspi_shop_connections')
+      .select('id')
+      .eq('id', kaspiShopConnectionId)
+      .eq('user_id', user.id)
+      .maybeSingle()
+    if (!shop) return NextResponse.json({ error: 'kaspi shop not found' }, { status: 400 })
   }
 
   if (!name || typeof name !== 'string') return NextResponse.json({ error: 'name required' }, { status: 400 })
@@ -188,6 +226,11 @@ export async function POST(req: NextRequest) {
     // boolean -- an older client omitting the field must never accidentally
     // re-enable an agent the owner paused.
     ...(typeof isEnabled === 'boolean' ? { is_enabled: isEnabled } : {}),
+    // Which Kaspi Shop store this agent quotes from. Only written when the
+    // client sent the field, same rule as isEnabled above -- an older client
+    // omitting it must not silently unpin an agent back to the active store.
+    // An explicit null IS a choice ("follow the active store") and is stored.
+    ...(kaspiShopConnectionId !== undefined ? { kaspi_shop_connection_id: kaspiShopConnectionId || null } : {}),
   }
 
   let agent: any = null

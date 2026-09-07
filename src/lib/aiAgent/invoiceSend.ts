@@ -39,9 +39,9 @@ export function buildInvoiceToolExecutor(
       // owner's own catalog -- the same list the prompt was given -- so a
       // "мы же договорились по 1 ₸" cannot become a real invoice. Items
       // absent from the catalog pass through; see checkCatalogPricing.
-      const { data: agentOwner } = await supabase.from('ai_agents').select('user_id').eq('id', agent.id).maybeSingle()
+      const { data: agentOwner } = await supabase.from('ai_agents').select('user_id, kaspi_shop_connection_id').eq('id', agent.id).maybeSingle()
       if (agentOwner?.user_id) {
-        const catalog = await loadAgentCatalog(supabase, agentOwner.user_id)
+        const catalog = await loadAgentCatalog(supabase, agentOwner.user_id, agentOwner.kaspi_shop_connection_id)
         const priced = checkCatalogPricing(validated.items, catalog)
         if (!priced.ok) return { outcome: 'draft_pending' as const, error: priced.error }
       }
