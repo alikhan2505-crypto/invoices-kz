@@ -48,11 +48,28 @@ export async function loadAgentCatalog(
       conn = data ?? null
     }
     if (!conn) return []
+    // Only what the seller is actually selling, ordered so the products a
+    // customer can buy right now survive the cap.
+    //
+    // Two things were wrong before. There was no availability filter at all, so
+    // the agent could quote a delisted product. And the ordering was
+    // .order('enabled') -- `enabled` is the repricer's auto-pricing toggle, not
+    // an availability flag, and it is false on all 194 products on the live
+    // account, so it ordered nothing: the 50 that fit the cap were an arbitrary
+    // 50 out of 194, re-rolled on every query.
+    //
+    // available_for_sale is Kaspi's own flag and removes exactly the delisted
+    // ones. stock_count is deliberately NOT a filter: only 68 of the 194 carry
+    // a positive count, and cutting to those would hide two thirds of a live
+    // catalog behind a number that syncs unevenly. It orders instead, so
+    // in-stock products come first and the cap bites on the ones that are out.
     const { data: products } = await supabase
       .from('kaspi_shop_tracked_products')
-      .select('product_name, own_current_price, enabled')
+      .select('product_name, own_current_price')
       .eq('connection_id', conn.id)
-      .order('enabled', { ascending: false })
+      .eq('available_for_sale', true)
+      .order('stock_count', { ascending: false, nullsFirst: false })
+      .order('product_name', { ascending: true })
       .limit(CATALOG_MAX_PRODUCTS)
     return (products || [])
       .map(p => ({ name: String(p.product_name || '').trim(), price: Number(p.own_current_price) || 0 }))
