@@ -249,7 +249,11 @@ export async function POST(req: NextRequest) {
     // object, so every connected account's events (the single-tenant
     // invoices.kz one AND every multi-tenant customer's one) arrive here.
     const accountId = entry.id
-    const isLegacyAccount = accountId === process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID
+    // The env var is deliberately unset now that the single-tenant path is
+    // retired. Without the truthiness guard a payload with no entry.id would
+    // compare undefined === undefined and route into that dead handler.
+    const legacyAccountId = process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID
+    const isLegacyAccount = !!legacyAccountId && accountId === legacyAccountId
 
     let tenantConnection: Awaited<ReturnType<typeof loadTenantConnection>> = null
     if (!isLegacyAccount) {

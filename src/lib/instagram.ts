@@ -36,14 +36,40 @@ async function waitUntilFinished(containerId: string, accessToken: string) {
   }
 }
 
+// The account we publish to, resolved from the token itself when
+// INSTAGRAM_BUSINESS_ACCOUNT_ID is not set.
+//
+// That variable does double duty: publishing used to read it, and the webhook
+// still compares it against entry.id to decide whether an event belongs to the
+// retired single-tenant auto-reply path. Unsetting it in Vercel to kill that
+// path therefore also killed posting — a draft the founder approved on
+// 2026-09-07 failed with "Instagram not configured" even though the token was
+// fine. Deriving the id from the token decouples the two: posting needs only
+// INSTAGRAM_ACCESS_TOKEN, and the legacy branch stays off.
+let cachedIgUserId: string | null = null
+
+async function resolveIgUserId(accessToken: string): Promise<string> {
+  const configured = process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID
+  if (configured) return configured
+  if (cachedIgUserId) return cachedIgUserId
+  const res = await fetch(`${GRAPH_API}/me?fields=user_id&access_token=${accessToken}`)
+  const data = await res.json()
+  const id = data?.user_id ? String(data.user_id) : ''
+  if (!res.ok || !id) {
+    throw new Error(data?.error?.message || 'Could not resolve the Instagram account from the access token')
+  }
+  cachedIgUserId = id
+  return id
+}
+
 // A single image publishes directly; 2+ images publish as a swipeable
 // carousel (each image becomes a child container, then a parent CAROUSEL
 // container references all of them) — the format users can slide through
 // instead of a single photo + a caption they have to open and read.
 export async function publishToInstagram(imageUrls: string[], caption: string): Promise<string> {
-  const igUserId = process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID
   const accessToken = process.env.INSTAGRAM_ACCESS_TOKEN
-  if (!igUserId || !accessToken) throw new Error('Instagram not configured')
+  if (!accessToken) throw new Error('Instagram not configured')
+  const igUserId = await resolveIgUserId(accessToken)
   if (imageUrls.length === 0) throw new Error('No images provided')
 
   let creationId: string
