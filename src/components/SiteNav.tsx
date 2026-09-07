@@ -113,9 +113,44 @@ const SECTIONS: Section[] = [
   { key: 'wildberries', links: wbLinks, adminOnly: true },
 ]
 
-function isSectionLocked(s: Section, isAdmin: boolean, isPro: boolean): boolean {
-  if (s.adminOnly) return !isAdmin
-  if (s.proOnly) return !(isAdmin || isPro)
+// null means "we haven't loaded the profile yet", which is a real third state
+// and not the same as "no permissions" -- see isSectionLocked.
+type Perms = { isAdmin: boolean; isPro: boolean }
+
+// Survives a remount within the tab. SiteNav is rendered per page rather than
+// from a shared shell, so every navigation remounts it and re-runs the profile
+// fetch; without this the unknown window comes back on each page change.
+const PERMS_CACHE_KEY = 'sitenav_perms'
+
+function readCachedPerms(): Perms | null {
+  try {
+    const raw = sessionStorage.getItem(PERMS_CACHE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (typeof parsed?.isAdmin !== 'boolean' || typeof parsed?.isPro !== 'boolean') return null
+    return { isAdmin: parsed.isAdmin, isPro: parsed.isPro }
+  } catch {
+    // Private mode, disabled site data, or a value someone else wrote --
+    // falling back to the unknown state is always safe.
+    return null
+  }
+}
+
+// Unknown counts as unlocked. It used to count as locked -- the flags started
+// at `false` and the profile fetch is a network round trip -- so every mount
+// painted locks over sections the person actually has access to and then took
+// them away, i.e. a lock flashing on every page change for the account that
+// owns the product (founder, 2026-09-07).
+//
+// A free account may now see a lock appear a moment later instead, which is
+// the honest direction for a guess to be wrong in: nothing is hidden that
+// should be shown, and every gated page guards itself anyway, so a click
+// inside that window lands on the page's own explanation rather than on
+// content it shouldn't see.
+function isSectionLocked(s: Section, perms: Perms | null): boolean {
+  if (!perms) return false
+  if (s.adminOnly) return !perms.isAdmin
+  if (s.proOnly) return !(perms.isAdmin || perms.isPro)
   return false
 }
 
@@ -163,8 +198,7 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
   const router = useRouter()
   const path = usePathname()
   const { lang } = useLanguage()
-  const [isAdmin, setIsAdmin] = useState(false)
-  const [isPro, setIsPro] = useState(false)
+  const [perms, setPerms] = useState<Perms | null>(null)
   const [lockedHint, setLockedHint] = useState<string | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
   // Gates the drawer's createPortal call below -- document.body doesn't
@@ -183,14 +217,26 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
   useEffect(() => { setMounted(true) }, [])
 
   useEffect(() => {
-    async function loadAdmin() {
+    // Paint the last known answer first so a remount doesn't reopen the
+    // unknown window, then revalidate over the network. A plan that expired
+    // mid-session self-corrects as soon as the fetch below lands.
+    const cached = readCachedPerms()
+    if (cached) setPerms(cached)
+
+    async function loadPerms() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
       const { data } = await supabase.from('profiles').select('is_admin, plan, plan_expires_at, bonus_expires_at, trial_expires_at').eq('id', user.id).single()
-      setIsAdmin(!!data?.is_admin)
-      setIsPro(getActivePlan(data).canAiAgent)
+      const next: Perms = { isAdmin: !!data?.is_admin, isPro: getActivePlan(data).canAiAgent }
+      setPerms(next)
+      try {
+        sessionStorage.setItem(PERMS_CACHE_KEY, JSON.stringify(next))
+      } catch {
+        // Cache is an optimization; failing to write it only costs the
+        // unknown window on the next mount.
+      }
     }
-    loadAdmin()
+    loadPerms()
   }, [])
 
   // Drawer follows navigation: any route change closes it.
@@ -310,7 +356,7 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
                   })}
 
                   {SECTIONS.map(s => {
-                    const locked = isSectionLocked(s, isAdmin, isPro)
+                    const locked = isSectionLocked(s, perms)
                     // Mirrors the desktop row above: tapping a header jumps to
                     // that section's first page rather than toggling a local
                     // open/closed flag -- the founder moved the desktop nav
@@ -412,7 +458,7 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
           </button>
 
           {SECTIONS.map(s => {
-            const locked = isSectionLocked(s, isAdmin, isPro)
+            const locked = isSectionLocked(s, perms)
             const active = !locked && activeSection?.key === s.key
             return (
               <div key={s.key} className="relative">
