@@ -420,7 +420,6 @@ export default function Profile() {
     { icon: <GiftIcon />, label: t.referralMenuLabel, href: '/profile/referral' },
     ...(isAdmin ? [
       { icon: <AdminIcon />, label: t.adminPanelMenuLabel, href: '/admin' },
-      { icon: <ChatIcon />, label: t.igRepliesMenuLabel, href: '/profile/instagram-replies' },
     ] : []),
   ]
 

@@ -35,7 +35,6 @@ export interface ProfileCoreContent {
   aboutMenuLabel: string
   referralMenuLabel: string
   adminPanelMenuLabel: string
-  igRepliesMenuLabel: string
   subscriptionSectionLabel: string
   proFeaturesLabel: string
   basicFeaturesLabel: string
@@ -166,7 +165,6 @@ export const profileCoreDict: Record<'ru' | 'kk' | 'en', ProfileCoreContent> = {
     aboutMenuLabel: 'О приложении',
     referralMenuLabel: 'Пригласить друзей',
     adminPanelMenuLabel: 'Админ панель',
-    igRepliesMenuLabel: 'Автоответы Instagram',
     subscriptionSectionLabel: 'Подписка',
     proFeaturesLabel: 'Безлимит · ЭЦП · Шаблоны',
     basicFeaturesLabel: '30 счетов в месяц',
@@ -292,7 +290,6 @@ export const profileCoreDict: Record<'ru' | 'kk' | 'en', ProfileCoreContent> = {
     aboutMenuLabel: 'Қосымша туралы',
     referralMenuLabel: 'Достарды шақыру',
     adminPanelMenuLabel: 'Әкімші панелі',
-    igRepliesMenuLabel: 'Instagram автожауаптары',
     subscriptionSectionLabel: 'Жазылым',
     proFeaturesLabel: 'Шексіз · ЭЦҚ · Үлгілер',
     basicFeaturesLabel: 'Айына 30 шот',
@@ -418,7 +415,6 @@ export const profileCoreDict: Record<'ru' | 'kk' | 'en', ProfileCoreContent> = {
     aboutMenuLabel: 'About the app',
     referralMenuLabel: 'Invite friends',
     adminPanelMenuLabel: 'Admin panel',
-    igRepliesMenuLabel: 'Instagram auto-replies',
     subscriptionSectionLabel: 'Subscription',
     proFeaturesLabel: 'Unlimited · e-signature · Templates',
     basicFeaturesLabel: '30 invoices per month',
