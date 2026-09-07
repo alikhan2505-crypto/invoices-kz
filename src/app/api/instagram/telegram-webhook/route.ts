@@ -21,13 +21,33 @@ const supabase = createClient(
 //
 // Returns undefined when there is no admin connection, so publishToInstagram
 // falls back to the env token exactly as before.
+// Walked in three plain steps rather than one nested select. ai_agents.user_id
+// references auth.users, not public.profiles, so PostgREST has no relationship
+// to traverse between them: the nested form failed with PGRST200, the lookup
+// returned undefined, and publishing quietly fell back to the stale env token —
+// which is exactly the failure this function exists to prevent, reported as an
+// unchanged "Application does not have permission for this action".
 async function loadPublishCredentials(): Promise<{ igUserId: string; accessToken: string } | undefined> {
+  const { data: admins, error: adminError } = await supabase
+    .from('profiles').select('id').eq('is_admin', true)
+  if (adminError || !admins?.length) {
+    console.error('instagram publish: no admin profile found:', adminError?.message)
+    return undefined
+  }
+
+  const { data: agents, error: agentError } = await supabase
+    .from('ai_agents').select('id').in('user_id', admins.map(a => a.id))
+  if (agentError || !agents?.length) {
+    console.error('instagram publish: no agent for an admin:', agentError?.message)
+    return undefined
+  }
+
   const { data, error } = await supabase
     .from('ai_agent_channel_connections')
-    .select('external_account_id, access_token_enc, ai_agents!inner(user_id, profiles!inner(is_admin))')
+    .select('external_account_id, access_token_enc')
     .eq('channel', 'instagram')
     .eq('status', 'active')
-    .eq('ai_agents.profiles.is_admin', true)
+    .in('agent_id', agents.map(a => a.id))
     .order('connected_at', { ascending: false })
     .limit(1)
     .maybeSingle()
