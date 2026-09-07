@@ -494,6 +494,27 @@ export default function MarginCalculatorTool() {
                 </>
               )}
             </div>
+
+            {/* Lives inside the result card rather than in one of its own two
+                cards further down. «Продаж в месяц» is the last field in the
+                form, so with the monthly figures below the cost breakdown the
+                only thing on screen while you edit it was the per-sale number
+                -- which the field does not affect. It read as a dead input
+                (founder, 2026-09-07). */}
+            <div className="grid grid-cols-2 gap-3 mt-4 pt-4" style={{ borderTop: '1px solid var(--nav-border-soft)' }}>
+              <div>
+                <div className="text-[11px] mb-0.5" style={{ color: 'var(--nav-text-muted)' }}>
+                  {t.monthlyTitle} · {t.monthlyRevenueLabel}
+                </div>
+                <div className="text-lg font-semibold tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{money(result.monthlyRevenue)}</div>
+              </div>
+              <div>
+                <div className="text-[11px] mb-0.5" style={{ color: 'var(--nav-text-muted)' }}>
+                  {t.monthlyTitle} · {t.monthlyProfitLabel}
+                </div>
+                <div className="text-lg font-semibold tabular-nums" style={{ color: profitColor }}>{money(result.monthlyProfit)}</div>
+              </div>
+            </div>
           </div>
 
           <div className="nav-glass rounded-2xl p-4 lg:p-5 mb-4">
@@ -516,20 +537,6 @@ export default function MarginCalculatorTool() {
                 <dd className="font-semibold tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{money(result.totalCosts)}</dd>
               </div>
             </dl>
-          </div>
-
-          <div className="nav-glass rounded-2xl p-4 lg:p-5 mb-4">
-            <div className="text-xs mb-3" style={{ color: 'var(--nav-text-secondary)' }}>{t.monthlyTitle}</div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <div className="text-[11px] mb-0.5" style={{ color: 'var(--nav-text-muted)' }}>{t.monthlyRevenueLabel}</div>
-                <div className="text-lg font-semibold tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{money(result.monthlyRevenue)}</div>
-              </div>
-              <div>
-                <div className="text-[11px] mb-0.5" style={{ color: 'var(--nav-text-muted)' }}>{t.monthlyProfitLabel}</div>
-                <div className="text-lg font-semibold tabular-nums" style={{ color: profitColor }}>{money(result.monthlyProfit)}</div>
-              </div>
-            </div>
           </div>
 
           <button onClick={exportExcel}
