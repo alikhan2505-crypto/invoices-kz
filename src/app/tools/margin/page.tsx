@@ -1,5 +1,5 @@
 'use client'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { motion, useReducedMotion } from 'framer-motion'
 import { track } from '@vercel/analytics'
@@ -264,6 +264,13 @@ export default function MarginCalculatorTool() {
   const [leadStatus, setLeadStatus] = useState<'idle' | 'sending' | 'sent'>('idle')
   const [exported, setExported] = useState(false)
 
+  // Anonymous usage stats -- see src/app/api/tools/margin/stat/route.ts.
+  // `touched` gates the whole thing: without it every visitor who opens the
+  // page and leaves would be recorded with the prefilled defaults, which
+  // would drown the real numbers we are trying to learn from.
+  const touched = useRef(false)
+  const statTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   const input = useMemo<MarginInput>(() => ({
     costPrice: Number(raw.costPrice) || 0,
     sellPrice: Number(raw.sellPrice) || 0,
@@ -278,6 +285,51 @@ export default function MarginCalculatorTool() {
 
   const money = (n: number) => `${Math.round(n).toLocaleString('ru-KZ')} ${t.unitTenge}`
   const percent = (n: number) => `${n.toFixed(1)} %`
+
+  // One id per visit, so a visitor still editing after a reload updates their
+  // own row instead of creating a second one.
+  function sessionId(): string | null {
+    try {
+      let id = sessionStorage.getItem('margin_session')
+      if (!id) {
+        id = crypto.randomUUID()
+        sessionStorage.setItem('margin_session', id)
+      }
+      return id
+    } catch {
+      // Private mode or blocked site data -- skip the stat rather than
+      // minting a fresh id on every keystroke and inflating the counts.
+      return null
+    }
+  }
+
+  const sendStat = useCallback((didExport: boolean) => {
+    const id = sessionId()
+    if (!id) return
+    fetch('/api/tools/margin/stat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      keepalive: true,
+      body: JSON.stringify({
+        sessionId: id, lang, ...input, exported: didExport,
+        profitPerUnit: result.profitPerUnit,
+        marginPercent: result.marginPercent,
+        breakEvenPrice: result.breakEvenPrice,
+      }),
+    }).catch(() => {
+      // Stats must never surface to the visitor: they came for a number,
+      // not for our analytics.
+    })
+  }, [lang, input, result])
+
+  // Debounced: fires once the visitor stops typing, so a row reflects a
+  // finished thought rather than a half-entered price.
+  useEffect(() => {
+    if (!touched.current) return
+    if (statTimer.current) clearTimeout(statTimer.current)
+    statTimer.current = setTimeout(() => sendStat(false), 2500)
+    return () => { if (statTimer.current) clearTimeout(statTimer.current) }
+  }, [sendStat])
 
   function exportExcel() {
     const rows: Record<string, string | number>[] = [
@@ -312,6 +364,10 @@ export default function MarginCalculatorTool() {
     // the tool did its job for them. Nothing identifying is sent -- only
     // whether the numbers they entered came out profitable.
     track('margin_exported', { profitable: result.profitPerUnit > 0 })
+    // Sent immediately rather than waiting for the debounce: downloading the
+    // file is the strongest signal the tool produced something useful, and
+    // the visitor often leaves right after.
+    sendStat(true)
     setExported(true)
   }
 
@@ -376,7 +432,7 @@ export default function MarginCalculatorTool() {
                       inputMode="decimal"
                       min={0}
                       value={raw[f.key]}
-                      onChange={e => setRaw(prev => ({ ...prev, [f.key]: e.target.value }))}
+                      onChange={e => { touched.current = true; setRaw(prev => ({ ...prev, [f.key]: e.target.value })) }}
                       className={INPUT_CLS}
                       style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-surface-glass)' }} />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs pointer-events-none" style={{ color: 'var(--nav-text-muted)' }}>
