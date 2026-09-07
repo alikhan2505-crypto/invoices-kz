@@ -7,22 +7,23 @@ import { supabase } from '@/lib/supabase'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import { getActivePlan } from '@/lib/plan'
+import { useLanguage } from '@/components/LanguageProvider'
+import { aiAgentDict, type AiAgentDict } from '@/lib/i18n/aiAgent'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
 // Mirrors GOAL_OPTIONS in ./settings/page.tsx (values are the API's goal keys).
-const GOAL_LABELS: Record<string, string> = {
-  answer_questions: 'Отвечать на вопросы',
-  qualify_lead: 'Квалифицировать заявку',
-  book_appointment: 'Записать на консультацию/приём',
-}
+// Keys are the API's goal values; the labels come from the dictionary so the
+// list reads in the viewer's language (see src/lib/i18n/aiAgent.ts).
+const goalLabel = (t: AiAgentDict, goal: string): string =>
+  goal === 'qualify_lead' ? t.goalQualifyLead
+  : goal === 'book_appointment' ? t.goalBookAppointment
+  : t.goalAnswerQuestions
 
 // The only statuses the code writes today: 'training' (column default on
 // insert) and 'active' (set by the review route once training exits).
-const STATUS_LABELS: Record<string, string> = {
-  training: 'Обучается',
-  active: 'Активен',
-}
+const statusLabel = (t: AiAgentDict, status: string): string =>
+  status === 'active' ? t.statusActive : t.statusTraining
 
 type AgentConnection = { channel: string; external_account_name: string | null; status: string }
 type AgentListItem = {
@@ -83,6 +84,8 @@ function BotIcon() {
 
 export default function AiAgentsList() {
   const router = useRouter()
+  const { lang } = useLanguage()
+  const t = aiAgentDict[lang]
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw
   const [loading, setLoading] = useState(true)
@@ -145,7 +148,7 @@ export default function AiAgentsList() {
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
-      <div className="p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Загрузка…</div>
+      <div className="p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>{t.loading}</div>
     </main>
     </DesktopShell>
   )
@@ -154,7 +157,7 @@ export default function AiAgentsList() {
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
-      <div className="p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Эта функция пока доступна только администраторам.</div>
+      <div className="p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>{t.adminOnly}</div>
     </main>
     </DesktopShell>
   )
@@ -171,14 +174,14 @@ export default function AiAgentsList() {
           transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE }}
         >
           <div>
-            <h1 className="text-xl font-bold mb-1" style={{ color: 'var(--nav-text-primary)' }}>Агенты</h1>
-            <p className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>Ваши AI-сотрудники, которые отвечают клиентам в Instagram</p>
+            <h1 className="text-xl font-bold mb-1" style={{ color: 'var(--nav-text-primary)' }}>{t.agentsTitle}</h1>
+            <p className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>{t.agentsSubtitle}</p>
           </div>
           {agents.length > 0 && (
             <Link href="/ai-agent/settings?new=1"
               className="flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-semibold flex-shrink-0 transition-transform hover:-translate-y-0.5"
               style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)', boxShadow: '0 10px 24px -10px var(--nav-accent)' }}>
-              <PlusIcon /> Создать агента
+              <PlusIcon /> {t.createAgentButton}
             </Link>
           )}
         </motion.div>
@@ -193,21 +196,21 @@ export default function AiAgentsList() {
             <div className="mx-auto mb-3 flex items-center justify-center w-12 h-12 rounded-2xl" style={{ background: 'var(--nav-bg)', color: 'var(--nav-accent)' }}>
               <BotIcon />
             </div>
-            <div className="text-base font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>Пока нет ни одного агента</div>
+            <div className="text-base font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>{t.emptyTitle}</div>
             <p className="text-sm mb-5 max-w-sm mx-auto" style={{ color: 'var(--nav-text-secondary)' }}>
-              Создайте AI-сотрудника, подключите Instagram — и он начнёт отвечать вашим клиентам на комментарии и сообщения.
+              {t.emptyText}
             </p>
             <Link href="/ai-agent/settings?new=1"
               className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-semibold transition-transform hover:-translate-y-0.5"
               style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)', boxShadow: '0 10px 24px -10px var(--nav-accent)' }}>
-              <PlusIcon /> Создать первого агента
+              <PlusIcon /> {t.emptyCta}
             </Link>
           </motion.div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {agents.map((agent, i) => {
               const instagram = agent.connections.find(c => c.channel === 'instagram')
-              const statusLabel = STATUS_LABELS[agent.status] || agent.status
+              const agentStatusLabel = statusLabel(t, agent.status)
               const statusColor = agent.status === 'active' ? 'var(--nav-success)' : 'var(--nav-accent)'
               return (
                 <motion.div
@@ -225,28 +228,28 @@ export default function AiAgentsList() {
                       <span className="text-sm font-semibold truncate" style={{ color: 'var(--nav-text-primary)' }}>{agent.name}</span>
                       <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium flex-shrink-0" style={{ background: 'var(--nav-bg)', color: statusColor }}>
                         <span className="w-1.5 h-1.5 rounded-full" style={{ background: statusColor }} aria-hidden />
-                        {statusLabel}
+                        {agentStatusLabel}
                       </span>
                     </div>
-                    <div className="text-xs mb-3" style={{ color: 'var(--nav-text-secondary)' }}>{GOAL_LABELS[agent.goal] || agent.goal}</div>
+                    <div className="text-xs mb-3" style={{ color: 'var(--nav-text-secondary)' }}>{goalLabel(t, agent.goal)}</div>
                     {instagram?.status === 'active' ? (
                       <div className="text-xs flex items-center gap-1.5 mb-1" style={{ color: 'var(--nav-success)' }}>
-                        <CheckCircleIcon /> Подключено: {instagram.external_account_name ? `@${instagram.external_account_name}` : 'Instagram'}
+                        <CheckCircleIcon /> {t.connectedTo(instagram.external_account_name ? `@${instagram.external_account_name}` : 'Instagram')}
                       </div>
                     ) : instagram?.status === 'token_expired' ? (
                       <div className="text-xs flex items-center gap-1.5 mb-1" style={{ color: 'var(--nav-critical)' }}>
-                        <WarnIcon /> Instagram отключился — переподключите
+                        <WarnIcon /> {t.instagramDisconnected}
                       </div>
                     ) : (
-                      <div className="text-xs mb-1" style={{ color: 'var(--nav-text-muted)' }}>Канал не подключён</div>
+                      <div className="text-xs mb-1" style={{ color: 'var(--nav-text-muted)' }}>{t.channelNotConnected}</div>
                     )}
                     <div className="text-[11px]" style={{ color: 'var(--nav-text-muted)' }}>
-                      Создан {new Date(agent.createdAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
+                      {t.createdOn(new Date(agent.createdAt).toLocaleDateString(lang === 'en' ? 'en-GB' : lang === 'kk' ? 'kk-KZ' : 'ru-RU', { day: 'numeric', month: 'long', year: 'numeric' }))}
                     </div>
                   </Link>
                   <button
                     onClick={() => { setDeleteTarget(agent); setConfirmText(''); setDeleteError(false) }}
-                    aria-label={`Удалить агента ${agent.name}`}
+                    aria-label={t.deleteAgentAria(agent.name)}
                     className="absolute top-3 right-3 p-2 rounded-lg transition-colors hover:bg-[color:var(--nav-bg)]"
                     style={{ color: 'var(--nav-text-muted)' }}>
                     <TrashIcon />
@@ -280,18 +283,18 @@ export default function AiAgentsList() {
               onClick={e => e.stopPropagation()}
               role="dialog"
               aria-modal="true"
-              aria-label="Удалить агента"
+              aria-label={t.deleteAgentTitle}
             >
-              <div className="text-base font-bold mb-2" style={{ color: 'var(--nav-text-primary)' }}>Удалить агента</div>
+              <div className="text-base font-bold mb-2" style={{ color: 'var(--nav-text-primary)' }}>{t.deleteAgentTitle}</div>
               <p className="text-sm mb-3" style={{ color: 'var(--nav-text-secondary)' }}>
-                Вы уверены, что хотите удалить агента «{deleteTarget.name}»?
+                {t.deleteAgentConfirm(deleteTarget.name)}
               </p>
               <div className="rounded-lg px-3 py-2.5 text-xs mb-4 flex items-start gap-2" style={{ background: 'var(--nav-bg)', color: 'var(--nav-critical)' }}>
                 <span className="mt-0.5"><WarnIcon /></span>
-                <span>Будет удалено безвозвратно: все настройки, подключения и диалоги агента</span>
+                <span>{t.deleteAgentWarning}</span>
               </div>
               <label className="block mb-4">
-                <span className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>Для подтверждения введите название агента</span>
+                <span className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.deleteAgentTypeName}</span>
                 <input
                   autoFocus
                   value={confirmText}
@@ -303,19 +306,19 @@ export default function AiAgentsList() {
               </label>
               {deleteError && (
                 <div className="text-xs mb-3" style={{ color: 'var(--nav-critical)' }}>
-                  Не удалось удалить агента. Попробуйте ещё раз.
+                  {t.deleteAgentError}
                 </div>
               )}
               <div className="flex gap-2">
                 <button onClick={closeModal} disabled={deleting}
                   className="flex-1 nav-glass rounded-lg px-4 py-2.5 text-sm font-medium disabled:opacity-50"
                   style={{ color: 'var(--nav-text-primary)' }}>
-                  Отмена
+                  {t.cancelButton}
                 </button>
                 <button onClick={deleteAgent} disabled={deleting || confirmText !== deleteTarget.name}
                   className="flex-1 rounded-lg px-4 py-2.5 text-sm font-semibold disabled:opacity-40"
                   style={{ background: 'var(--nav-critical)', color: '#fff' }}>
-                  {deleting ? 'Удаляем…' : 'Удалить'}
+                  {deleting ? t.deleting : t.deleteButton}
                 </button>
               </div>
             </motion.div>

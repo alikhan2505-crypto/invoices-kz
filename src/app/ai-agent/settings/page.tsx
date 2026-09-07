@@ -10,6 +10,8 @@ import TestChatPanel from '@/components/aiAgent/TestChatPanel'
 import TriggerChipsEditor from '@/components/aiAgent/TriggerChipsEditor'
 import FlowBuilder from '@/components/aiAgent/FlowBuilder'
 import { getActivePlan } from '@/lib/plan'
+import { useLanguage } from '@/components/LanguageProvider'
+import { aiAgentDict, type AiAgentDict } from '@/lib/i18n/aiAgent'
 // promptContext is a pure, dependency-free module (no server-only imports,
 // no env access) -- safe to bundle client-side, so the Промптинг preview
 // shows the REAL assembled context line, not a hand-maintained copy.
@@ -29,14 +31,24 @@ const REPLY_PRICE_TENGE = 5
 // router.replace, which is known-broken for query-only changes in this app)
 // so a refresh keeps the tab. «Настройки» is the default and ?new=1 always
 // lands there.
+// Labels come from the dictionary at render time (src/lib/i18n/aiAgent.ts);
+// only the keys are structural.
 const TABS = [
-  { key: 'settings', label: 'Настройки' },
-  { key: 'prompting', label: 'Промптинг' },
-  { key: 'control', label: 'Контроль' },
-  { key: 'templates', label: 'Шаблоны' },
-  { key: 'flows', label: 'Сценарии' },
-  { key: 'channels', label: 'Каналы' },
+  { key: 'settings' },
+  { key: 'prompting' },
+  { key: 'control' },
+  { key: 'templates' },
+  { key: 'flows' },
+  { key: 'channels' },
 ] as const
+
+const tabLabel = (t: AiAgentDict, key: string): string =>
+  key === 'prompting' ? t.tabPrompting
+  : key === 'control' ? t.tabControl
+  : key === 'templates' ? t.tabTemplates
+  : key === 'flows' ? t.tabFlows
+  : key === 'channels' ? t.tabChannels
+  : t.tabSettings
 type TabKey = typeof TABS[number]['key']
 const TAB_KEYS: string[] = TABS.map(t => t.key)
 
@@ -246,6 +258,8 @@ function ChannelCard({ icon, name, chip, description, children }: {
 }
 
 export default function AiAgentSettings() {
+  const { lang } = useLanguage()
+  const t = aiAgentDict[lang]
   const router = useRouter()
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw
@@ -1182,15 +1196,15 @@ export default function AiAgentSettings() {
           <div>
             <Link href="/ai-agent" className="inline-flex items-center gap-1 text-xs mb-2 transition-colors hover:text-[color:var(--nav-text-secondary)]" style={{ color: 'var(--nav-text-muted)' }}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M11 18l-6-6 6-6" /></svg>
-              Все агенты
+              {t.backToAgents}
             </Link>
-            <h1 className="text-xl font-bold mb-1" style={{ color: 'var(--nav-text-primary)' }}>AI-агент</h1>
+            <h1 className="text-xl font-bold mb-1" style={{ color: 'var(--nav-text-primary)' }}>{t.agentPageTitle}</h1>
             {agentId && (
               <div className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold mb-2" style={{ background: 'var(--nav-bg)', color: 'var(--nav-accent)' }}>
-                Агент: {name}
+                {t.agentLabel(name)}
               </div>
             )}
-            <p className="text-sm mb-5" style={{ color: 'var(--nav-text-secondary)' }}>Настройте ассистента, который отвечает вашим клиентам в Instagram и Telegram</p>
+            <p className="text-sm mb-5" style={{ color: 'var(--nav-text-secondary)' }}>{t.agentPageSubtitle}</p>
           </div>
           {/* Persistent across all five tabs (MoonAI-style shortcut) --
               disabled with a tooltip until the agent has a real id: a
@@ -1203,7 +1217,7 @@ export default function AiAgentSettings() {
             className="flex items-center gap-1.5 nav-glass rounded-lg px-3 py-2 text-sm font-medium flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed transition-colors hover:bg-[color:var(--nav-bg)]"
             style={{ color: 'var(--nav-text-primary)' }}
           >
-            <TestChatBubbleIcon /> Тестовый чат
+            <TestChatBubbleIcon /> {t.testChatButton}
           </button>
         </motion.div>
 
@@ -1228,10 +1242,10 @@ export default function AiAgentSettings() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE, delay: reduceMotion ? 0 : 0.04 }}
         >
-          {TABS.map(t => {
-            const active = tab === t.key
+          {TABS.map(tabDef => {
+            const active = tab === tabDef.key
             return (
-              <button key={t.key} role="tab" aria-selected={active} onClick={() => switchTab(t.key)}
+              <button key={tabDef.key} role="tab" aria-selected={active} onClick={() => switchTab(tabDef.key)}
                 className="relative flex-shrink-0 text-xs font-medium px-3.5 py-2 rounded-lg transition-colors"
                 style={{ color: active ? 'var(--nav-accent-ink)' : 'var(--nav-text-secondary)' }}>
                 {active && (
@@ -1242,7 +1256,7 @@ export default function AiAgentSettings() {
                     transition={{ duration: reduceMotion ? 0 : 0.3, ease: EASE }}
                   />
                 )}
-                <span className="relative z-[1]">{t.label}</span>
+                <span className="relative z-[1]">{tabLabel(t, tabDef.key)}</span>
               </button>
             )
           })}
@@ -1619,11 +1633,11 @@ export default function AiAgentSettings() {
                     icon={<InstagramIcon />}
                     name="Instagram"
                     chip={instagramConnection?.status === 'active'
-                      ? <StatusChip kind="ok" label={`Подключено: ${instagramConnection.external_account_name || 'аккаунт'}`} />
+                      ? <StatusChip kind="ok" label={t.chipConnected(instagramConnection.external_account_name || 'Instagram')} />
                       : instagramConnection?.status === 'token_expired'
-                        ? <StatusChip kind="warn" label="Требуется переподключение" />
-                        : <StatusChip kind="off" label="Не подключен" />}
-                    description="Агент отвечает на сообщения в Директ вашего бизнес-аккаунта Instagram"
+                        ? <StatusChip kind="warn" label={t.chipReconnectNeeded} />
+                        : <StatusChip kind="off" label={t.chipNotConnected} />}
+                    description={t.channelInstagramDesc}
                   >
                     {/* Open to every Pro customer since 2026-09-07: App Review
                         granted instagram_business_basic and
@@ -1636,18 +1650,18 @@ export default function AiAgentSettings() {
                       <button onClick={disconnectInstagram} disabled={igBusy}
                         className="w-full nav-glass rounded-lg px-4 py-2.5 text-sm font-medium disabled:opacity-50"
                         style={{ color: 'var(--nav-text-primary)' }}>
-                        {igBusy ? 'Отключаем…' : 'Отключить'}
+                        {igBusy ? t.disconnecting : t.disconnectButton}
                       </button>
                     )}
                     {instagramConnection?.status === 'token_expired' && (
                       <>
                         <div className="text-xs mb-2 flex items-center gap-1.5" style={{ color: 'var(--nav-critical)' }}>
-                          <WarnIcon /> Instagram отключился — переподключите аккаунт, чтобы агент снова отвечал
+                          <WarnIcon /> {t.instagramExpiredHint}
                         </div>
                         <button onClick={connectInstagram} disabled={connecting}
                           className="w-full rounded-lg px-4 py-2.5 text-sm font-medium disabled:opacity-50"
                           style={{ background: 'var(--nav-critical)', color: '#fff' }}>
-                          {connecting ? 'Открываем Instagram…' : 'Переподключить'}
+                          {connecting ? t.openingInstagram : t.reconnectButton}
                         </button>
                       </>
                     )}
@@ -1655,7 +1669,7 @@ export default function AiAgentSettings() {
                       <button onClick={connectInstagram} disabled={connecting}
                         className="w-full rounded-lg px-4 py-2.5 text-sm font-semibold disabled:opacity-50"
                         style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-                        {connecting ? 'Открываем Instagram…' : 'Подключить'}
+                        {connecting ? t.openingInstagram : t.connectButton}
                       </button>
                     )}
                     {igError && (
@@ -1667,17 +1681,17 @@ export default function AiAgentSettings() {
                     icon={<TelegramIcon />}
                     name="Telegram-бот"
                     chip={telegramConnection?.status === 'active'
-                      ? <StatusChip kind="ok" label={`Подключено: @${telegramConnection.external_account_name || 'бот'}`} />
+                      ? <StatusChip kind="ok" label={t.chipConnected(`@${telegramConnection.external_account_name || 'bot'}`)} />
                       : telegramConnection?.status === 'token_expired'
-                        ? <StatusChip kind="warn" label="Требуется переподключение" />
-                        : <StatusChip kind="off" label="Не подключен" />}
-                    description="Агент отвечает на сообщения в вашем Telegram-боте, созданном через @BotFather"
+                        ? <StatusChip kind="warn" label={t.chipReconnectNeeded} />
+                        : <StatusChip kind="off" label={t.chipNotConnected} />}
+                    description={t.channelTelegramDesc}
                   >
                     {telegramConnection?.status === 'active' ? (
                       <button onClick={disconnectTelegram} disabled={tgBusy}
                         className="w-full nav-glass rounded-lg px-4 py-2.5 text-sm font-medium disabled:opacity-50"
                         style={{ color: 'var(--nav-text-primary)' }}>
-                        {tgBusy ? 'Отключаем…' : 'Отключить'}
+                        {tgBusy ? t.disconnecting : t.disconnectButton}
                       </button>
                     ) : tgExpanded ? (
                       <>
@@ -1701,7 +1715,7 @@ export default function AiAgentSettings() {
                           <button onClick={connectTelegram} disabled={tgBusy || !telegramToken.trim()}
                             className="flex-1 rounded-lg px-4 py-2.5 text-sm font-semibold disabled:opacity-50"
                             style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-                            {tgBusy ? 'Подключаем…' : 'Подключить'}
+                            {tgBusy ? 'Подключаем…' : t.connectButton}
                           </button>
                           {telegramConnection?.status !== 'token_expired' && (
                             <button onClick={() => { setTgOpen(false); setTgError(null) }} disabled={tgBusy}
@@ -1716,7 +1730,7 @@ export default function AiAgentSettings() {
                       <button onClick={() => setTgOpen(true)}
                         className="w-full rounded-lg px-4 py-2.5 text-sm font-semibold"
                         style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-                        Подключить
+                        {t.connectButton}
                       </button>
                     )}
                     {tgError && (
@@ -1728,24 +1742,24 @@ export default function AiAgentSettings() {
                     icon={<WhatsAppIcon />}
                     name="WhatsApp"
                     chip={!isAdmin
-                      ? <StatusChip kind="soon" label="Канал в работе" />
+                      ? <StatusChip kind="soon" label={t.chipComingSoon} />
                       : whatsappConnection?.status === 'active'
-                      ? <StatusChip kind="ok" label={`Подключено: ${whatsappConnection.external_account_name || 'номер'}`} />
+                      ? <StatusChip kind="ok" label={t.chipConnected(whatsappConnection.external_account_name || 'WhatsApp')} />
                       : whatsappConnection?.status === 'token_expired'
-                        ? <StatusChip kind="warn" label="Требуется переподключение" />
-                        : <StatusChip kind="off" label="Не подключен" />}
-                    description="Агент отвечает на сообщения в вашем WhatsApp Business — официальный WhatsApp Cloud API"
+                        ? <StatusChip kind="warn" label={t.chipReconnectNeeded} />
+                        : <StatusChip kind="off" label={t.chipNotConnected} />}
+                    description={t.channelWhatsappDesc}
                   >
                     {!isAdmin ? (
                       <button disabled className="w-full nav-glass rounded-lg px-4 py-2.5 text-sm font-medium opacity-50 cursor-not-allowed" style={{ color: 'var(--nav-text-primary)' }}>
-                        Канал в работе
+                        {t.chipComingSoon}
                       </button>
                     ) : <>
                     {whatsappConnection?.status === 'active' && (
                       <button onClick={disconnectWhatsApp} disabled={waBusy}
                         className="w-full nav-glass rounded-lg px-4 py-2.5 text-sm font-medium disabled:opacity-50"
                         style={{ color: 'var(--nav-text-primary)' }}>
-                        {waBusy ? 'Отключаем…' : 'Отключить'}
+                        {waBusy ? t.disconnecting : t.disconnectButton}
                       </button>
                     )}
                     {whatsappConnection?.status === 'token_expired' && (
@@ -1756,7 +1770,7 @@ export default function AiAgentSettings() {
                         <button onClick={connectWhatsApp} disabled={waConnecting}
                           className="w-full rounded-lg px-4 py-2.5 text-sm font-medium disabled:opacity-50"
                           style={{ background: 'var(--nav-critical)', color: '#fff' }}>
-                          {waConnecting ? 'Открываем WhatsApp…' : 'Переподключить'}
+                          {waConnecting ? 'Открываем WhatsApp…' : t.reconnectButton}
                         </button>
                       </>
                     )}
@@ -1764,7 +1778,7 @@ export default function AiAgentSettings() {
                       <button onClick={connectWhatsApp} disabled={waConnecting}
                         className="w-full rounded-lg px-4 py-2.5 text-sm font-semibold disabled:opacity-50"
                         style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-                        {waConnecting ? 'Подключаем…' : 'Подключить'}
+                        {waConnecting ? 'Подключаем…' : t.connectButton}
                       </button>
                     )}
                     {waError && (
@@ -1778,8 +1792,8 @@ export default function AiAgentSettings() {
                     name="Чат для сайта"
                     chip={websiteConnection
                       ? <StatusChip kind="ok" label="Подключено" />
-                      : <StatusChip kind="off" label="Не подключен" />}
-                    description="Виджет чата на вашем сайте — агент отвечает посетителям в реальном времени"
+                      : <StatusChip kind="off" label={t.chipNotConnected} />}
+                    description={t.channelWebsiteDesc}
                   >
                     {websiteConnection ? (
                       <>
@@ -1796,7 +1810,7 @@ export default function AiAgentSettings() {
                           </button>
                           <button onClick={disconnectWebsite} disabled={websiteBusy}
                             className="nav-glass rounded-lg px-3 py-2 text-xs font-medium disabled:opacity-50" style={{ color: 'var(--nav-text-primary)' }}>
-                            {websiteBusy ? '…' : 'Отключить'}
+                            {websiteBusy ? '…' : t.disconnectButton}
                           </button>
                         </div>
                       </>
@@ -1804,7 +1818,7 @@ export default function AiAgentSettings() {
                       <button onClick={connectWebsite} disabled={websiteBusy}
                         className="w-full rounded-lg px-4 py-2.5 text-sm font-semibold disabled:opacity-50"
                         style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-                        {websiteBusy ? 'Подключаем…' : 'Подключить'}
+                        {websiteBusy ? 'Подключаем…' : t.connectButton}
                       </button>
                     )}
                     {websiteError && (
@@ -1817,8 +1831,8 @@ export default function AiAgentSettings() {
                     name="API"
                     chip={apiConnection
                       ? <StatusChip kind="ok" label="Подключено" />
-                      : <StatusChip kind="off" label="Не подключен" />}
-                    description="Подключите свою систему — CRM, сайт или приложение — через HTTP API"
+                      : <StatusChip kind="off" label={t.chipNotConnected} />}
+                    description={t.channelApiDesc}
                   >
                     {apiKeyReveal && (
                       <>
@@ -1845,14 +1859,14 @@ export default function AiAgentSettings() {
                         </button>
                         <button onClick={disconnectApi} disabled={apiBusy}
                           className="nav-glass rounded-lg px-3 py-2 text-xs font-medium disabled:opacity-50" style={{ color: 'var(--nav-text-primary)' }}>
-                          {apiBusy ? '…' : 'Отключить'}
+                          {apiBusy ? '…' : t.disconnectButton}
                         </button>
                       </div>
                     ) : (
                       <button onClick={connectApi} disabled={apiBusy}
                         className="w-full rounded-lg px-4 py-2.5 text-sm font-semibold disabled:opacity-50"
                         style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-                        {apiBusy ? 'Подключаем…' : 'Подключить'}
+                        {apiBusy ? 'Подключаем…' : t.connectButton}
                       </button>
                     )}
                     {apiError && (
@@ -1877,7 +1891,7 @@ export default function AiAgentSettings() {
             <Link href="/ai-agent/review"
               className="nav-glass nav-card-accent rounded-2xl px-4 py-3.5 flex items-center justify-between transition-transform hover:-translate-y-0.5">
               <span className="flex items-center gap-2 text-sm font-medium" style={{ color: 'var(--nav-text-primary)' }}>
-                Диалоги на проверке
+                {t.reviewQueueLink}
                 {pendingCount > 0 && (
                   <span className="text-[11px] font-bold px-1.5 min-w-[20px] h-5 rounded-full inline-flex items-center justify-center"
                     style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>

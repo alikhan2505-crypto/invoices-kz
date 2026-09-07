@@ -6,6 +6,8 @@ import { supabase } from '@/lib/supabase'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import { getActivePlan } from '@/lib/plan'
+import { useLanguage } from '@/components/LanguageProvider'
+import { aiAgentDict } from '@/lib/i18n/aiAgent'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 const FREE_REGENS = 3
@@ -99,6 +101,8 @@ const CHANNEL_META: Record<string, { label: string; icon: () => React.ReactEleme
 
 export default function AiAgentReview() {
   const router = useRouter()
+  const { lang } = useLanguage()
+  const t = aiAgentDict[lang]
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw
   const [loading, setLoading] = useState(true)
@@ -303,7 +307,7 @@ export default function AiAgentReview() {
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
-      <div className="p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Загрузка…</div>
+      <div className="p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>{t.loading}</div>
     </main>
     </DesktopShell>
   )
@@ -312,7 +316,7 @@ export default function AiAgentReview() {
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
-      <div className="p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Эта функция пока доступна только администраторам.</div>
+      <div className="p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>{t.adminOnly}</div>
     </main>
     </DesktopShell>
   )
@@ -330,31 +334,31 @@ export default function AiAgentReview() {
         >
           <div>
             <div className="flex items-center gap-2.5 mb-1 flex-wrap">
-              <h1 className="text-xl font-bold" style={{ color: 'var(--nav-text-primary)' }}>Диалоги на проверке</h1>
+              <h1 className="text-xl font-bold" style={{ color: 'var(--nav-text-primary)' }}>{t.reviewTitle}</h1>
               {(agentFilter === 'all' ? items.length + drafts.length : items.length) > 0 && (
                 <span className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-                  На проверке: {agentFilter === 'all' ? items.length + drafts.length : items.length}
+                  {t.reviewInReview(agentFilter === 'all' ? items.length + drafts.length : items.length)}
                 </span>
               )}
             </div>
-            <p className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>Черновики ответов ждут вашего одобрения</p>
+            <p className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>{t.reviewSubtitle}</p>
           </div>
           {agents.length > 0 && (
             <select
               value={agentFilter}
               onChange={e => changeAgent(e.target.value)}
-              aria-label="Выбор агента"
+              aria-label={t.allAgents}
               className="nav-glass rounded-lg px-3 py-2 text-sm font-medium outline-none cursor-pointer flex-shrink-0"
               style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }}
             >
-              <option value="all">Все агенты</option>
+              <option value="all">{t.allAgents}</option>
               {agents.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
             </select>
           )}
         </motion.div>
 
         {(agentFilter === 'all' ? items.length === 0 && drafts.length === 0 : items.length === 0) && (
-          <div className="text-sm text-center py-8" style={{ color: 'var(--nav-text-muted)' }}>Пока нечего проверять</div>
+          <div className="text-sm text-center py-8" style={{ color: 'var(--nav-text-muted)' }}>{t.reviewEmpty}</div>
         )}
 
         {agentFilter === 'all' && drafts.length > 0 && (
@@ -405,7 +409,7 @@ export default function AiAgentReview() {
                     <div className="flex gap-2 mt-auto">
                       <button onClick={() => draftAct(d.id, 'approve')} disabled={draftActing === d.id || d.status === 'sending'}
                         className="flex-1 rounded-lg px-3 py-2 text-sm font-medium disabled:opacity-50" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-                        {d.status === 'sending' ? 'Отправляется…' : d.status === 'error' ? 'Повторить' : 'Отправить'}
+                        {d.status === 'sending' ? t.sendingButton : d.status === 'error' ? 'Повторить' : 'Отправить'}
                       </button>
                       <button onClick={() => draftAct(d.id, 'reject')} disabled={draftActing === d.id || d.status === 'sending'}
                         className="flex-1 nav-glass rounded-lg px-3 py-2 text-sm font-medium disabled:opacity-50" style={{ color: 'var(--nav-text-secondary)' }}>
@@ -453,7 +457,7 @@ export default function AiAgentReview() {
               )}
               {item.question && (
                 <div className="rounded-lg px-3 py-2 mb-3" style={{ background: 'var(--nav-bg)' }}>
-                  <div className="text-[10px] font-bold uppercase tracking-wide mb-1" style={{ color: 'var(--nav-text-muted)' }}>Вопрос клиента</div>
+                  <div className="text-[10px] font-bold uppercase tracking-wide mb-1" style={{ color: 'var(--nav-text-muted)' }}>{t.customerQuestion}</div>
                   <div className="text-sm max-h-24 overflow-y-auto" style={{ color: 'var(--nav-text-secondary)' }}>{item.question}</div>
                 </div>
               )}
@@ -470,7 +474,7 @@ export default function AiAgentReview() {
                   className="flex-1 nav-glass rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
                   style={{ color: 'var(--nav-accent)' }}
                 >
-                  <SparklesIcon /> {regening === item.id ? 'Генерация…' : 'Другой вариант'}
+                  <SparklesIcon /> {regening === item.id ? t.generating : t.anotherVariant}
                 </button>
                 <span ref={el => { hintRefs.current[item.id] = el }} className="relative flex items-center">
                   <button
@@ -485,26 +489,26 @@ export default function AiAgentReview() {
                   {hintFor === item.id && (
                     <div className="absolute right-0 top-[calc(100%+8px)] z-10 w-60 rounded-xl p-3 text-xs leading-relaxed"
                       style={{ background: 'var(--nav-surface-chrome)', color: 'var(--nav-text-secondary)', boxShadow: '0 20px 44px -18px rgba(10,10,15,0.35)' }}>
-                      Первые 3 варианта — бесплатно, дальше 5 ₸ за генерацию. Списывается с единого кошелька.
+                      {t.regenPricingHint}
                     </div>
                   )}
                 </span>
               </div>
               <div className="text-[11px] mb-2" style={{ color: 'var(--nav-text-muted)' }}>
-                {freeLeft > 0 ? `осталось ${freeLeft} из ${FREE_REGENS} бесплатных` : 'бесплатные закончились — 5 ₸ за вариант'}
+                {freeLeft > 0 ? t.freeLeft(freeLeft, FREE_REGENS) : t.freeUsedUp}
               </div>
               <div className="text-[11px] leading-relaxed mb-3" style={{ color: 'var(--nav-text-muted)' }}>
-                После отправки ответ станет шаблоном — похожие вопросы (по ключевым словам) получат его бесплатно и мгновенно
+                {t.becomesTemplateHint}
               </div>
               {errors[item.id] && <div className="text-xs mb-2" style={{ color: 'var(--nav-critical)' }}>{errors[item.id]}</div>}
               <div className="flex gap-2 mt-auto">
                 <button onClick={() => act(item.id, 'send')} disabled={acting === item.id || regening === item.id}
                   className="flex-1 rounded-lg px-3 py-2 text-sm font-medium disabled:opacity-50" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-                  Отправить
+                  {t.sendButton}
                 </button>
                 <button onClick={() => act(item.id, 'skip')} disabled={acting === item.id || regening === item.id}
                   className="flex-1 nav-glass rounded-lg px-3 py-2 text-sm font-medium disabled:opacity-50" style={{ color: 'var(--nav-text-secondary)' }}>
-                  Пропустить
+                  {t.skipButton}
                 </button>
               </div>
             </motion.div>
