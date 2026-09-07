@@ -56,7 +56,17 @@ export async function GET(req: NextRequest) {
   const scopes = profile?.is_admin
     ? 'instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments'
     : 'instagram_business_basic,instagram_business_manage_messages'
-  const authorizeUrl = `https://www.instagram.com/oauth/authorize?client_id=${encodeURIComponent(appId)}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}&response_type=code&state=${encodeURIComponent(state)}`
+  // force_reauth makes the app user authorise from scratch even when Instagram
+  // already has them logged in. Without it, an account that connected before
+  // gets the short "you already connected invoices.kz-IG, continue?" screen,
+  // which lists no permissions at all -- so a scope added since the last
+  // connection is never actually granted, and the token silently keeps the old
+  // set. That is why comments stopped arriving after 11.08 and why the 07.09
+  // reconnect changed nothing.
+  //
+  // It also matters for App Review: the screencast has to show the user
+  // granting the permission, and there is nothing to show on the short screen.
+  const authorizeUrl = `https://www.instagram.com/oauth/authorize?client_id=${encodeURIComponent(appId)}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}&response_type=code&force_reauth=true&state=${encodeURIComponent(state)}`
 
   return NextResponse.json({ authorizeUrl })
 }
