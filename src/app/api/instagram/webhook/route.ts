@@ -21,9 +21,27 @@ export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get('hub.verify_token')
   const challenge = req.nextUrl.searchParams.get('hub.challenge')
 
-  if (mode === 'subscribe' && token === process.env.IG_WEBHOOK_VERIFY_TOKEN && challenge) {
+  const expected = process.env.IG_WEBHOOK_VERIFY_TOKEN
+  if (mode === 'subscribe' && token === expected && challenge) {
     return new NextResponse(challenge, { status: 200 })
   }
+  // TEMPORARY (07.09.2026): the handshake has been failing with no way to see
+  // which side is wrong -- the value is masked in Meta's dashboard and stored
+  // write-only in Vercel, so both ends are invisible and we were reduced to
+  // guessing. This logs enough to compare them. A verify token only proves URL
+  // ownership (it grants no data access), and both values are ours, so this is
+  // cheap to expose in our own logs -- but it is still noise: REMOVE IT once
+  // the handshake passes.
+  console.error(
+    'IG webhook verification failed:',
+    'mode=', mode,
+    'hasChallenge=', !!challenge,
+    'received=', JSON.stringify(token),
+    'receivedLen=', token?.length ?? null,
+    'expectedSet=', !!expected,
+    'expectedLen=', expected?.length ?? null,
+    'equalAfterTrim=', token?.trim() === expected?.trim(),
+  )
   return NextResponse.json({ error: 'Verification failed' }, { status: 403 })
 }
 
