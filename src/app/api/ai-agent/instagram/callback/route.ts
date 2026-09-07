@@ -86,6 +86,20 @@ export async function GET(req: NextRequest) {
       throw new Error(subData.error?.message || 'failed to subscribe the account to webhooks')
     }
 
+    // Instagram returns the permissions it actually granted alongside the
+    // short-lived token, and they are not always the ones we asked for: a
+    // scope the app does not hold can be dropped silently, leaving a
+    // connection that looks complete but never receives those events. On
+    // 07.09 comments stopped arriving with the consent screen showing all
+    // three permissions and the subscription call succeeding, which leaves
+    // this as the only unverified link in the chain. Permission names are not
+    // secrets, and this is the connection's own owner acting.
+    console.log(
+      'ai-agent Instagram connected:', meData.username,
+      '| granted:', tokenData.permissions ?? '(not reported)',
+      '| subscribed_fields: comments,messages',
+    )
+
     // Multi-agent (2026-08-20): the signed state carries the target agent id
     // (see connect/route.ts). Always scoped by user_id too -- the signature
     // proves we issued the state, the user_id filter proves the agent is
