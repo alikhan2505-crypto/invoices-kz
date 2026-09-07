@@ -663,6 +663,7 @@ export default function AiAgentSettings() {
   async function connectInstagram() {
     setConnecting(true)
     setOauthNotice(null)
+    setIgError(null)
     try {
       const headers = await authHeader()
       // agentId rides along so the OAuth callback attaches the connection
@@ -672,11 +673,21 @@ export default function AiAgentSettings() {
         const data = await res.json()
         window.location.href = data.authorizeUrl
       } else {
-        setOauthNotice('error')
+        // Say what actually went wrong. The WhatsApp channel spent a day
+        // looking like a Meta problem because every failure showed the same
+        // "try again" line; the one failure this route can produce on its own
+        // -- a missing NEXT_PUBLIC_INSTAGRAM_APP_ID -- is a deploy setting no
+        // amount of retrying fixes.
+        const data = await res.json().catch(() => ({}) as any)
+        setIgError(
+          data?.error === 'Instagram app not configured'
+            ? 'Подключение Instagram не настроено на сервере: не задан NEXT_PUBLIC_INSTAGRAM_APP_ID. Это настройка деплоя, повторные попытки не помогут.'
+            : `Не удалось открыть Instagram: ${data?.error || `HTTP ${res.status}`}`
+        )
         setConnecting(false)
       }
-    } catch {
-      setOauthNotice('error')
+    } catch (e: any) {
+      setIgError(`Не удалось открыть Instagram: ${e?.message || 'сеть недоступна'}`)
       setConnecting(false)
     }
   }
@@ -1576,20 +1587,20 @@ export default function AiAgentSettings() {
                   <ChannelCard
                     icon={<InstagramIcon />}
                     name="Instagram"
-                    chip={!isAdmin
-                      ? <StatusChip kind="soon" label="Канал в работе" />
-                      : instagramConnection?.status === 'active'
+                    chip={instagramConnection?.status === 'active'
                       ? <StatusChip kind="ok" label={`Подключено: ${instagramConnection.external_account_name || 'аккаунт'}`} />
                       : instagramConnection?.status === 'token_expired'
                         ? <StatusChip kind="warn" label="Требуется переподключение" />
                         : <StatusChip kind="off" label="Не подключен" />}
-                    description="Агент отвечает на комментарии и сообщения в Директ вашего бизнес-аккаунта"
+                    description="Агент отвечает на сообщения в Директ вашего бизнес-аккаунта Instagram"
                   >
-                    {!isAdmin ? (
-                      <button disabled className="w-full nav-glass rounded-lg px-4 py-2.5 text-sm font-medium opacity-50 cursor-not-allowed" style={{ color: 'var(--nav-text-primary)' }}>
-                        Канал в работе
-                      </button>
-                    ) : <>
+                    {/* Open to every Pro customer since 2026-09-07: App Review
+                        granted instagram_business_basic and
+                        instagram_business_manage_messages Advanced Access, so
+                        this no longer only works for people with a role on the
+                        Meta app. WhatsApp below stays admin-only until
+                        public_profile reaches Advanced Access -- until then its
+                        popup refuses every external account. */}
                     {instagramConnection?.status === 'active' && (
                       <button onClick={disconnectInstagram} disabled={igBusy}
                         className="w-full nav-glass rounded-lg px-4 py-2.5 text-sm font-medium disabled:opacity-50"
@@ -1619,7 +1630,6 @@ export default function AiAgentSettings() {
                     {igError && (
                       <div className="text-xs mt-2" style={{ color: 'var(--nav-critical)' }}>{igError}</div>
                     )}
-                    </>}
                   </ChannelCard>
 
                   <ChannelCard

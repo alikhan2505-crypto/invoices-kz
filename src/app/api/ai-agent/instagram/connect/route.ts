@@ -31,7 +31,15 @@ export async function GET(req: NextRequest) {
   const state = createOAuthState(user.id, agentId)
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.invoices.kz'
   const redirectUri = `${appUrl}/api/ai-agent/instagram/callback`
-  const scopes = 'instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments'
+  // Only what Meta actually granted. App Review decided this app's request on
+  // 2026-09-07: instagram_business_basic and instagram_business_manage_messages
+  // are Advanced Access; instagram_business_manage_comments was NOT approved.
+  // Asking for a permission the app does not hold risks Instagram refusing the
+  // whole authorization, which would fail every customer's connect attempt for
+  // a reason none of them could act on. Comment auto-replies therefore stay
+  // unavailable until that permission is approved -- put it back here on the
+  // same day it is, and not before.
+  const scopes = 'instagram_business_basic,instagram_business_manage_messages'
   const authorizeUrl = `https://www.instagram.com/oauth/authorize?client_id=${encodeURIComponent(appId)}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}&response_type=code&state=${encodeURIComponent(state)}`
 
   return NextResponse.json({ authorizeUrl })
