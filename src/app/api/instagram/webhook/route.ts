@@ -25,21 +25,6 @@ export async function GET(req: NextRequest) {
   if (mode === 'subscribe' && token === expected && challenge) {
     return new NextResponse(challenge, { status: 200 })
   }
-  // TEMPORARY (07.09.2026): the handshake keeps failing with no way to see
-  // which side is wrong -- the value is masked in Meta's dashboard and stored
-  // write-only in Vercel, so both ends are invisible and we were reduced to
-  // guessing. Neither value is printed: only the first and last three
-  // characters and the length, which is enough to tell "a completely different
-  // token" from "a trailing space" from "the variable is unset", and not
-  // enough to reconstruct either one. REMOVE once the handshake passes.
-  const mask = (v: string | null | undefined) =>
-    v == null ? String(v) : v.length <= 6 ? `(len ${v.length})` : `${v.slice(0, 3)}…${v.slice(-3)} (len ${v.length})`
-  console.error('IG webhook verification failed:', {
-    mode,
-    hasChallenge: !!challenge,
-    received: mask(token),
-    expected: mask(expected),
-  })
   return NextResponse.json({ error: 'Verification failed' }, { status: 403 })
 }
 
