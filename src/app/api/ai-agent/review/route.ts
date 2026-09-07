@@ -70,13 +70,16 @@ export async function GET(req: NextRequest) {
 
   const { data: conversations } = await supabase
     .from('ai_agent_conversations')
-    .select('id, agent_id, customer_handle, channel')
+    .select('id, agent_id, customer_handle, channel, source')
     .in('agent_id', agents.map(a => a.id))
   const conversationIds = (conversations || []).map(c => c.id)
-  const conversationMeta: Record<string, { handle: string; channel: string; agentId: string; agentName: string }> = {}
+  const conversationMeta: Record<string, { handle: string; channel: string; source: string; agentId: string; agentName: string }> = {}
   for (const c of conversations || []) conversationMeta[c.id] = {
     handle: c.customer_handle || 'клиент',
     channel: c.channel || 'instagram',
+    // 'dm' for anything older than the source column, matching what the
+    // review queue assumed for its whole life before it existed.
+    source: c.source || 'dm',
     agentId: c.agent_id,
     agentName: agentNameById[c.agent_id] || '',
   }
@@ -122,6 +125,7 @@ export async function GET(req: NextRequest) {
     agentName: conversationMeta[m.conversation_id]?.agentName || '',
     customerHandle: conversationMeta[m.conversation_id]?.handle || 'клиент',
     channel: conversationMeta[m.conversation_id]?.channel || 'instagram',
+    source: conversationMeta[m.conversation_id]?.source || 'dm',
     question: questionFor(m),
     text: m.text,
     urgent: m.urgent,
@@ -167,7 +171,7 @@ export async function POST(req: NextRequest) {
 
   const { data: conversation } = await supabase
     .from('ai_agent_conversations')
-    .select('id, agent_id, channel, external_thread_id')
+    .select('id, agent_id, channel, external_thread_id, source')
     .eq('id', message.conversation_id)
     .single()
   if (!conversation) return NextResponse.json({ error: 'not_found' }, { status: 404 })
@@ -197,16 +201,19 @@ export async function POST(req: NextRequest) {
       // target for both comment and DM sends, same as the single-tenant
       // bot's reply_target column.
       if (conversation.channel === 'instagram') {
-        // A conversation thread doesn't record whether it's a comment
-        // thread or a DM thread today -- v1 review-queue sends only ever
-        // apply to DMs in practice (comment replies are short and public,
-        // less likely to need editing before sending), but if a comment
-        // draft ever reaches this queue, sendDirectMessage would be wrong.
-        // Flagged here rather than silently guessed -- if comment drafts
-        // do reach training-mode review in practice, this needs a
-        // source column on ai_agent_conversations (or ai_agent_messages)
-        // to pick the right send function.
-        await sendDirectMessage(conversation.external_thread_id, finalText, { igUserId: connection.external_account_id, accessToken })
+        // The comment case is real, not hypothetical: the founder hit it on
+        // 2026-09-07 approving a reply to a comment, and it failed because
+        // this branch always called sendDirectMessage — with a COMMENT id
+        // where a user id belongs. ai_agent_conversations.source now records
+        // which surface the thread came from, so the right send function can
+        // be picked. A null source means a row from before that column
+        // existed; those were backfilled, and 'dm' stays the safe default
+        // because it is what this branch did for its whole life.
+        if (conversation.source === 'comment') {
+          await replyToComment(conversation.external_thread_id, finalText, { accessToken })
+        } else {
+          await sendDirectMessage(conversation.external_thread_id, finalText, { igUserId: connection.external_account_id, accessToken })
+        }
       } else if (conversation.channel === 'telegram') {
         // For telegram rows access_token_enc holds the encrypted BotFather
         // token (same column, same encryption -- see telegram/connect) and

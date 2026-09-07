@@ -117,6 +117,12 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
       channel: 'instagram',
       external_thread_id: params.replyTarget,
       customer_handle: params.fromUsername,
+      // Persisted rather than left as a runtime-only parameter. Without it the
+      // review queue had to assume every Instagram thread was a DM, so
+      // approving a comment draft sent a direct message to a comment id and
+      // failed; and the owner could not tell a public comment from a private
+      // message when reading Переписка.
+      source: params.source,
     }, { onConflict: 'agent_id,channel,external_thread_id', ignoreDuplicates: false })
     .select('id, paused_for_human')
     .single()

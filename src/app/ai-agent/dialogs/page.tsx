@@ -11,7 +11,7 @@ import { getActivePlan } from '@/lib/plan'
 const EASE = [0.16, 1, 0.3, 1] as const
 
 type DialogItem = {
-  id: string; agentId: string; agentName: string; channel: string
+  id: string; agentId: string; agentName: string; channel: string; source: string
   customerHandle: string; lastMessagePreview: string; lastActivityAt: string; pausedForHuman: boolean
 }
 type MessageItem = { id: string; direction: 'inbound' | 'outbound'; text: string; isAiGenerated: boolean; createdAt: string }
@@ -276,6 +276,18 @@ function AiAgentDialogsInner() {
                   <div className="flex items-center justify-between gap-2 mb-1">
                     <span className="inline-flex items-center gap-1.5 text-[10.5px] font-bold" style={{ color: 'var(--nav-text-secondary)' }}>
                       <ChannelIcon /> {channel.label}
+                      {/* Only Instagram has both a public and a private
+                          surface, so only there does this carry information.
+                          A comment is read by everyone under the post and is
+                          answered differently from a private message. */}
+                      {item.channel === 'instagram' && (
+                        <span className="px-1.5 py-0.5 rounded-full"
+                          style={item.source === 'comment'
+                            ? { background: 'var(--nav-teal)', color: '#fff' }
+                            : { background: 'var(--nav-bg)', color: 'var(--nav-text-muted)' }}>
+                          {item.source === 'comment' ? 'Комментарий' : 'Директ'}
+                        </span>
+                      )}
                     </span>
                     {item.pausedForHuman && (
                       <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'var(--nav-critical)', color: '#fff' }}>ждёт вас</span>

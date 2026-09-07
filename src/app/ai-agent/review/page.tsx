@@ -18,6 +18,7 @@ interface ReviewItem {
   agentName: string
   customerHandle: string
   channel: string
+  source: string
   question: string
   text: string
   urgent: boolean
@@ -450,6 +451,16 @@ export default function AiAgentReview() {
                 <span className="inline-flex items-center gap-1.5 nav-glass rounded-full px-2 py-1 text-[10.5px] font-bold" style={{ color: 'var(--nav-text-secondary)' }}>
                   <ChannelIcon /> {channel.label}
                 </span>
+                {/* Only Instagram has both a public and a private surface, so
+                    only there does the distinction carry information. */}
+                {item.channel === 'instagram' && (
+                  <span className="inline-flex items-center rounded-full px-2 py-1 text-[10.5px] font-bold"
+                    style={item.source === 'comment'
+                      ? { background: 'var(--nav-teal)', color: '#fff' }
+                      : { background: 'var(--nav-bg)', color: 'var(--nav-text-secondary)' }}>
+                    {item.source === 'comment' ? t.sourceComment : t.sourceDm}
+                  </span>
+                )}
                 <span className="text-xs truncate" style={{ color: 'var(--nav-text-muted)' }}>{item.customerHandle}</span>
               </div>
               {agentFilter === 'all' && agents.length > 1 && (

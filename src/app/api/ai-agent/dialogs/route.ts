@@ -53,7 +53,7 @@ export async function GET(req: NextRequest) {
 
   const { data: conversations, error: convError } = await supabase
     .from('ai_agent_conversations')
-    .select('id, agent_id, channel, customer_handle, collected_name, created_at, paused_for_human')
+    .select('id, agent_id, channel, source, customer_handle, collected_name, created_at, paused_for_human')
     .in('agent_id', agents.map(a => a.id))
   if (convError) return NextResponse.json({ error: convError.message }, { status: 500 })
   if (!conversations || conversations.length === 0) return NextResponse.json({ items: [] })
@@ -75,6 +75,9 @@ export async function GET(req: NextRequest) {
       agentId: c.agent_id,
       agentName: agentNameById[c.agent_id] || '',
       channel: c.channel || 'instagram',
+      // 'dm' for rows predating the source column -- that is what every
+      // channel except an Instagram comment actually is.
+      source: c.source || 'dm',
       customerHandle: c.collected_name || c.customer_handle || 'клиент',
       lastMessagePreview: previewByConversation[c.id]?.text.slice(0, 140) || '',
       lastActivityAt: previewByConversation[c.id]?.createdAt || c.created_at,

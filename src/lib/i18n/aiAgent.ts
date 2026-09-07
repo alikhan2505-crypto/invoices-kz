@@ -70,6 +70,11 @@ export interface AiAgentDict {
   chipConnected: (account: string) => string
   chipReconnectNeeded: string
   chipNotConnected: string
+  // Where a thread came from. Shown only for Instagram, the one channel with
+  // both a public and a private surface -- a comment is read by everyone and
+  // is answered differently from a private message.
+  sourceComment: string
+  sourceDm: string
   chipComingSoon: string
   connectButton: string
   disconnectButton: string
@@ -147,6 +152,8 @@ export const aiAgentDict: Record<Lang, AiAgentDict> = {
     chipConnected: (a) => `Подключено: ${a}`,
     chipReconnectNeeded: 'Требуется переподключение',
     chipNotConnected: 'Не подключен',
+    sourceComment: 'Комментарий',
+    sourceDm: 'Директ',
     chipComingSoon: 'Канал в работе',
     connectButton: 'Подключить',
     disconnectButton: 'Отключить',
@@ -222,6 +229,8 @@ export const aiAgentDict: Record<Lang, AiAgentDict> = {
     chipConnected: (a) => `Қосылған: ${a}`,
     chipReconnectNeeded: 'Қайта қосу қажет',
     chipNotConnected: 'Қосылмаған',
+    sourceComment: 'Пікір',
+    sourceDm: 'Директ',
     chipComingSoon: 'Арна жасалуда',
     connectButton: 'Қосу',
     disconnectButton: 'Ажырату',
@@ -297,6 +306,8 @@ export const aiAgentDict: Record<Lang, AiAgentDict> = {
     chipConnected: (a) => `Connected: ${a}`,
     chipReconnectNeeded: 'Reconnection required',
     chipNotConnected: 'Not connected',
+    sourceComment: 'Comment',
+    sourceDm: 'Direct',
     chipComingSoon: 'Channel in progress',
     connectButton: 'Connect',
     disconnectButton: 'Disconnect',
