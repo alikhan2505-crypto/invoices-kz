@@ -66,10 +66,20 @@ async function resolveIgUserId(accessToken: string): Promise<string> {
 // carousel (each image becomes a child container, then a parent CAROUSEL
 // container references all of them) — the format users can slide through
 // instead of a single photo + a caption they have to open and read.
-export async function publishToInstagram(imageUrls: string[], caption: string): Promise<string> {
-  const accessToken = process.env.INSTAGRAM_ACCESS_TOKEN
+export async function publishToInstagram(
+  imageUrls: string[],
+  caption: string,
+  credentials?: { igUserId: string; accessToken: string },
+): Promise<string> {
+  // Prefer the caller's credentials — the stored Instagram connection, whose
+  // token is re-minted whenever the account reconnects and therefore carries
+  // the scopes actually granted. INSTAGRAM_ACCESS_TOKEN is a hand-pasted
+  // fallback that goes stale silently: a reconnect on 2026-09-07 re-granted
+  // this account's scopes without content_publish, and the env token kept
+  // failing long after a fresh one would have worked.
+  const accessToken = credentials?.accessToken ?? process.env.INSTAGRAM_ACCESS_TOKEN
   if (!accessToken) throw new Error('Instagram not configured')
-  const igUserId = await resolveIgUserId(accessToken)
+  const igUserId = credentials?.igUserId ?? (await resolveIgUserId(accessToken))
   if (imageUrls.length === 0) throw new Error('No images provided')
 
   let creationId: string

@@ -52,9 +52,19 @@ export async function GET(req: NextRequest) {
   // without it would reproduce the very rejection we are answering.
   //
   // When Meta approves it, delete the branch and give all three to everyone.
+  // instagram_business_content_publish is in the same position as comments:
+  // rejected for Advanced Access, but Standard Access still covers people with
+  // a role on the app -- which is who posts to our own account. It is here
+  // because the 2026-09-07 reconnect (force_reauth=true) re-granted this
+  // account's scopes from this very list, and posting was not on it, so the
+  // token silently lost the permission and every approved draft failed with
+  // "Application does not have permission for this action".
+  //
+  // Customers never get it: they do not publish to our feed, and asking for a
+  // permission they have no use for would only widen their consent screen.
   const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', user.id).maybeSingle()
   const scopes = profile?.is_admin
-    ? 'instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments'
+    ? 'instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments,instagram_business_content_publish'
     : 'instagram_business_basic,instagram_business_manage_messages'
   // force_reauth makes the app user authorise from scratch even when Instagram
   // already has them logged in. Without it, an account that connected before

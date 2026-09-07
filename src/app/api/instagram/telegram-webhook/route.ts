@@ -2,11 +2,50 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { publishToInstagram, replyToComment, sendDirectMessage } from '@/lib/instagram'
 import { extractTriggerWords } from '@/lib/instagramAiReply'
+import { decryptAtRest } from '@/lib/kaspiPay/crypto'
+import { getKey } from '@/lib/aiAgent/connection'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
+
+// Credentials for posting to our OWN Instagram feed.
+//
+// Read from the admin's stored Instagram connection rather than
+// INSTAGRAM_ACCESS_TOKEN, because that env var is hand-pasted and goes stale
+// invisibly: reconnecting the account on 2026-09-07 re-granted its scopes from
+// the connect route's list, which had no content_publish, and every approved
+// draft then failed with "Application does not have permission for this
+// action" while the env token still looked present and valid.
+//
+// Returns undefined when there is no admin connection, so publishToInstagram
+// falls back to the env token exactly as before.
+async function loadPublishCredentials(): Promise<{ igUserId: string; accessToken: string } | undefined> {
+  const { data, error } = await supabase
+    .from('ai_agent_channel_connections')
+    .select('external_account_id, access_token_enc, ai_agents!inner(user_id, profiles!inner(is_admin))')
+    .eq('channel', 'instagram')
+    .eq('status', 'active')
+    .eq('ai_agents.profiles.is_admin', true)
+    .order('connected_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (error) {
+    console.error('instagram publish: admin connection lookup failed:', error.message)
+    return undefined
+  }
+  if (!data?.access_token_enc || !data?.external_account_id) return undefined
+  try {
+    return {
+      igUserId: data.external_account_id,
+      accessToken: decryptAtRest(data.access_token_enc, getKey()).toString('utf8'),
+    }
+  } catch (err: any) {
+    console.error('instagram publish: could not decrypt the connection token:', err?.message || err)
+    return undefined
+  }
+}
 
 async function telegram(method: string, body: object) {
   const token = process.env.TELEGRAM_BOT_TOKEN
@@ -225,7 +264,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const imageUrls: string[] = draft.image_urls?.length ? draft.image_urls : [draft.image_url]
-    const igMediaId = await publishToInstagram(imageUrls, draft.caption)
+    const igMediaId = await publishToInstagram(imageUrls, draft.caption, await loadPublishCredentials())
     await supabase
       .from('instagram_drafts')
       .update({ status: 'published', ig_media_id: igMediaId, published_at: new Date().toISOString() })
