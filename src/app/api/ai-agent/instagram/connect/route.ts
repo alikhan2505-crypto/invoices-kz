@@ -7,6 +7,11 @@ const supabaseAuth = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
+
 // Bearer-authed like every other route in this codebase -- called via a
 // client-side fetch from the settings page (Task 6), NOT a plain browser
 // navigation (a plain <a href> can't carry an Authorization header). The
@@ -31,15 +36,26 @@ export async function GET(req: NextRequest) {
   const state = createOAuthState(user.id, agentId)
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.invoices.kz'
   const redirectUri = `${appUrl}/api/ai-agent/instagram/callback`
-  // Only what Meta actually granted. App Review decided this app's request on
-  // 2026-09-07: instagram_business_basic and instagram_business_manage_messages
-  // are Advanced Access; instagram_business_manage_comments was NOT approved.
-  // Asking for a permission the app does not hold risks Instagram refusing the
-  // whole authorization, which would fail every customer's connect attempt for
-  // a reason none of them could act on. Comment auto-replies therefore stay
-  // unavailable until that permission is approved -- put it back here on the
-  // same day it is, and not before.
-  const scopes = 'instagram_business_basic,instagram_business_manage_messages'
+  // App Review decided this app's request on 2026-09-07: instagram_business_basic
+  // and instagram_business_manage_messages are Advanced Access;
+  // instagram_business_manage_comments was NOT approved (the screencast did not
+  // show the permission being granted, so Meta could not see it in use).
+  //
+  // That rejection is the reason for the split below. Customers get only the two
+  // approved scopes: asking for a permission the app does not hold risks
+  // Instagram refusing the whole authorization, which would fail their connect
+  // for a reason none of them could act on.
+  //
+  // App-role holders also get the comments scope, because at Standard Access
+  // that is exactly who it still works for -- and because the re-submission
+  // screencast has to show a user granting it. Recording the consent screen
+  // without it would reproduce the very rejection we are answering.
+  //
+  // When Meta approves it, delete the branch and give all three to everyone.
+  const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', user.id).maybeSingle()
+  const scopes = profile?.is_admin
+    ? 'instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments'
+    : 'instagram_business_basic,instagram_business_manage_messages'
   const authorizeUrl = `https://www.instagram.com/oauth/authorize?client_id=${encodeURIComponent(appId)}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}&response_type=code&state=${encodeURIComponent(state)}`
 
   return NextResponse.json({ authorizeUrl })
