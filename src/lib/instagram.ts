@@ -71,15 +71,21 @@ export async function publishToInstagram(
   caption: string,
   credentials?: { igUserId: string; accessToken: string },
 ): Promise<string> {
-  // Prefer the caller's credentials — the stored Instagram connection, whose
-  // token is re-minted whenever the account reconnects and therefore carries
-  // the scopes actually granted. INSTAGRAM_ACCESS_TOKEN is a hand-pasted
-  // fallback that goes stale silently: a reconnect on 2026-09-07 re-granted
-  // this account's scopes without content_publish, and the env token kept
-  // failing long after a fresh one would have worked.
-  const accessToken = credentials?.accessToken ?? process.env.INSTAGRAM_ACCESS_TOKEN
+  // INSTAGRAM_ACCESS_TOKEN wins. It is generated in the App Dashboard
+  // ("Сгенерируйте маркеры доступа" → Сгенерировать маркер) for our own
+  // account and carries every permission the app holds at Standard Access,
+  // including instagram_business_content_publish.
+  //
+  // The connection token is the fallback, not the other way round: it comes
+  // from the customer OAuth flow, whose scope list is deliberately narrow, and
+  // Instagram silently drops a scope that flow is not configured to grant. On
+  // 2026-09-07 that produced four identical "Application does not have
+  // permission for this action" failures — the OAuth grant came back with only
+  // basic, manage_messages and manage_comments, confirmed in the callback log.
+  const envToken = process.env.INSTAGRAM_ACCESS_TOKEN
+  const accessToken = envToken || credentials?.accessToken
   if (!accessToken) throw new Error('Instagram not configured')
-  const igUserId = credentials?.igUserId ?? (await resolveIgUserId(accessToken))
+  const igUserId = envToken ? await resolveIgUserId(envToken) : credentials!.igUserId
   if (imageUrls.length === 0) throw new Error('No images provided')
 
   let creationId: string
