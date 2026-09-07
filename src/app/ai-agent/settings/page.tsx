@@ -12,6 +12,7 @@ import FlowBuilder from '@/components/aiAgent/FlowBuilder'
 import { getActivePlan } from '@/lib/plan'
 import { useLanguage } from '@/components/LanguageProvider'
 import { aiAgentDict, type AiAgentDict } from '@/lib/i18n/aiAgent'
+import { aiAgentFormsDict } from '@/lib/i18n/aiAgentForms'
 // promptContext is a pure, dependency-free module (no server-only imports,
 // no env access) -- safe to bundle client-side, so the Промптинг preview
 // shows the REAL assembled context line, not a hand-maintained copy.
@@ -52,52 +53,26 @@ const tabLabel = (t: AiAgentDict, key: string): string =>
 type TabKey = typeof TABS[number]['key']
 const TAB_KEYS: string[] = TABS.map(t => t.key)
 
-const TONE_OPTIONS = [
-  { value: 'friendly', label: 'Дружелюбный и тёплый' },
-  { value: 'professional', label: 'Профессиональный и деловой' },
-  { value: 'energetic', label: 'Мотивирующий и энергичный' },
-  { value: 'caring', label: 'Заботливый и внимательный' },
-]
+// These lists hold only the values stored in the database. Their labels live in
+// src/lib/i18n/aiAgentForms.ts, keyed by the same value, so a language switch
+// changes what the option reads without changing what gets saved.
+const TONE_VALUES = ['friendly', 'professional', 'energetic', 'caring']
 
-const GOAL_OPTIONS = [
-  { value: 'answer_questions', label: 'Отвечать на вопросы' },
-  { value: 'qualify_lead', label: 'Квалифицировать заявку' },
-  { value: 'book_appointment', label: 'Записать на консультацию/приём' },
-]
+const GOAL_VALUES = ['answer_questions', 'qualify_lead', 'book_appointment']
 
 // Preset collect-field keys -- mirror COLLECT_FIELD_LABELS in
-// src/lib/aiAgent/promptContext.ts (keys must match; labels here are the
-// UI-facing capitalized variants). Anything the user adds beyond these is a
-// custom free-text field stored verbatim in the same array.
-const COLLECT_FIELD_OPTIONS: { value: string; label: string }[] = [
-  { value: 'name', label: 'Имя клиента' },
-  { value: 'phone', label: 'Номер телефона' },
-  { value: 'booking', label: 'Бронирование' },
-  { value: 'consultation', label: 'Запись на консультацию' },
-  { value: 'address', label: 'Адрес' },
-  { value: 'purpose', label: 'Цель обращения' },
-  { value: 'budget', label: 'Бюджет' },
-  { value: 'timeline', label: 'Желаемые сроки' },
-  { value: 'people_count', label: 'Количество человек' },
-  { value: 'city', label: 'Город' },
-  { value: 'preferences', label: 'Предпочтения' },
-  { value: 'past_experience', label: 'Прошлый опыт клиента' },
+// src/lib/aiAgent/promptContext.ts (keys must match). Anything the user adds
+// beyond these is a custom free-text field stored verbatim in the same array.
+const COLLECT_FIELD_VALUES: string[] = [
+  'name', 'phone', 'booking', 'consultation', 'address', 'purpose',
+  'budget', 'timeline', 'people_count', 'city', 'preferences', 'past_experience',
 ]
 
-const TIMEZONE_OPTIONS = [
-  { value: 'Asia/Almaty', label: 'Asia/Almaty (GMT+5) — Алматы, Астана' },
-  { value: 'Asia/Aqtobe', label: 'Asia/Aqtobe (GMT+5) — Актобе' },
-  { value: 'Asia/Atyrau', label: 'Asia/Atyrau (GMT+5) — Атырау' },
-  { value: 'Asia/Oral', label: 'Asia/Oral (GMT+5) — Уральск' },
-  { value: 'Asia/Aqtau', label: 'Asia/Aqtau (GMT+5) — Актау' },
-]
+// The GMT offset is the same for all five and is not translated; only the city
+// list after the dash is.
+const TIMEZONE_VALUES = ['Asia/Almaty', 'Asia/Aqtobe', 'Asia/Atyrau', 'Asia/Oral', 'Asia/Aqtau']
 
-const CURRENCY_OPTIONS = [
-  { value: 'KZT', label: 'Тенге (₸)' },
-  { value: 'USD', label: 'Доллар США ($)' },
-  { value: 'EUR', label: 'Евро (€)' },
-  { value: 'RUB', label: 'Рубль (₽)' },
-]
+const CURRENCY_VALUES = ['KZT', 'USD', 'EUR', 'RUB']
 
 // How long the "Создаём AI-агента" overlay stays up on FIRST creation.
 // The upsert itself is near-instant; the countdown exists to give the
@@ -260,6 +235,7 @@ function ChannelCard({ icon, name, chip, description, children }: {
 export default function AiAgentSettings() {
   const { lang } = useLanguage()
   const t = aiAgentDict[lang]
+  const tf = aiAgentFormsDict[lang]
   const router = useRouter()
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw
@@ -460,8 +436,8 @@ export default function AiAgentSettings() {
         waLastStepRef.current = data.data?.current_step || null
         setWaError(
           metaMessage
-            ? `Meta отклонила подключение: ${metaMessage}${data.data?.current_step ? ` (шаг: ${data.data.current_step})` : ''}`
-            : 'Meta отклонила подключение и не назвала причину. Попробуйте ещё раз, и если повторится — напишите в поддержку.'
+            ? tf.errMetaRejected(metaMessage, data.data?.current_step || '')
+            : tf.errMetaRejectedNoReason
         )
       }
     }
@@ -616,7 +592,7 @@ export default function AiAgentSettings() {
           loadReviewCount(headers)
           loadTemplates(headers, data.agent.id)
         } else {
-          setName(data.suggestedName || 'Ассистент')
+          setName(data.suggestedName || tf.defaultAgentName)
         }
         // Returned for a new agent too, so the store can be chosen before the
         // first save rather than only on a second visit.
@@ -705,20 +681,20 @@ export default function AiAgentSettings() {
         const data = await res.json().catch(() => ({}) as any)
         setIgError(
           data?.error === 'Instagram app not configured'
-            ? 'Подключение Instagram не настроено на сервере: не задан NEXT_PUBLIC_INSTAGRAM_APP_ID. Это настройка деплоя, повторные попытки не помогут.'
-            : `Не удалось открыть Instagram: ${data?.error || `HTTP ${res.status}`}`
+            ? tf.errIgNotConfigured
+            : tf.errIgOpen(data?.error || `HTTP ${res.status}`)
         )
         setConnecting(false)
       }
     } catch (e: any) {
-      setIgError(`Не удалось открыть Instagram: ${e?.message || 'сеть недоступна'}`)
+      setIgError(tf.errIgOpen(e?.message || tf.errNetworkUnavailable))
       setConnecting(false)
     }
   }
 
   async function disconnectInstagram() {
     if (!agentId) return
-    if (!window.confirm('Отключить Instagram? Агент перестанет отвечать клиентам в этом аккаунте.')) return
+    if (!window.confirm(tf.confirmDisconnectInstagram)) return
     setIgBusy(true)
     setIgError(null)
     try {
@@ -732,10 +708,10 @@ export default function AiAgentSettings() {
         setConnections(prev => prev.filter(c => c.channel !== 'instagram'))
         setOauthNotice(null)
       } else {
-        setIgError('Не удалось отключить Instagram. Попробуйте ещё раз.')
+        setIgError(tf.errDisconnectInstagram)
       }
     } catch {
-      setIgError('Не удалось отключить Instagram. Попробуйте ещё раз.')
+      setIgError(tf.errDisconnectInstagram)
     }
     setIgBusy(false)
   }
@@ -763,11 +739,11 @@ export default function AiAgentSettings() {
       } else {
         const data = await res.json().catch(() => null)
         setTgError(data?.error === 'invalid_token'
-          ? 'Токен не подошёл — проверьте, что скопировали его из @BotFather целиком.'
-          : 'Не удалось подключить Telegram. Попробуйте ещё раз — если не получится снова, напишите в поддержку.')
+          ? tf.errConnectTelegramToken
+          : tf.errConnectTelegram)
       }
     } catch {
-      setTgError('Не удалось подключить Telegram. Попробуйте ещё раз — если не получится снова, напишите в поддержку.')
+      setTgError(tf.errConnectTelegram)
     }
     setTgBusy(false)
   }
@@ -786,10 +762,10 @@ export default function AiAgentSettings() {
       if (res.ok) {
         setConnections(prev => prev.filter(c => c.channel !== 'telegram'))
       } else {
-        setTgError('Не удалось отключить Telegram. Попробуйте ещё раз.')
+        setTgError(tf.errDisconnectTelegram)
       }
     } catch {
-      setTgError('Не удалось отключить Telegram. Попробуйте ещё раз.')
+      setTgError(tf.errDisconnectTelegram)
     }
     setTgBusy(false)
   }
@@ -807,10 +783,10 @@ export default function AiAgentSettings() {
         const data = await res.json()
         setConnections(prev => [...prev.filter(c => c.channel !== 'website'), { channel: 'website', external_account_id: data.widgetKey, external_account_name: null, status: 'active' }])
       } else {
-        setWebsiteError('Не удалось подключить чат-виджет. Попробуйте ещё раз.')
+        setWebsiteError(tf.errConnectWebsite)
       }
     } catch {
-      setWebsiteError('Не удалось подключить чат-виджет. Попробуйте ещё раз.')
+      setWebsiteError(tf.errConnectWebsite)
     }
     setWebsiteBusy(false)
   }
@@ -827,10 +803,10 @@ export default function AiAgentSettings() {
       if (res.ok) {
         setConnections(prev => prev.filter(c => c.channel !== 'website'))
       } else {
-        setWebsiteError('Не удалось отключить чат-виджет. Попробуйте ещё раз.')
+        setWebsiteError(tf.errDisconnectWebsite)
       }
     } catch {
-      setWebsiteError('Не удалось отключить чат-виджет. Попробуйте ещё раз.')
+      setWebsiteError(tf.errDisconnectWebsite)
     }
     setWebsiteBusy(false)
   }
@@ -861,10 +837,10 @@ export default function AiAgentSettings() {
         setApiKeyReveal(data.apiKey)
         setApiCopied(false)
       } else {
-        setApiError('Не удалось подключить API. Попробуйте ещё раз.')
+        setApiError(tf.errConnectApi)
       }
     } catch {
-      setApiError('Не удалось подключить API. Попробуйте ещё раз.')
+      setApiError(tf.errConnectApi)
     }
     setApiBusy(false)
   }
@@ -882,10 +858,10 @@ export default function AiAgentSettings() {
         setConnections(prev => prev.filter(c => c.channel !== 'api'))
         setApiKeyReveal(null)
       } else {
-        setApiError('Не удалось отключить API. Попробуйте ещё раз.')
+        setApiError(tf.errDisconnectApi)
       }
     } catch {
-      setApiError('Не удалось отключить API. Попробуйте ещё раз.')
+      setApiError(tf.errDisconnectApi)
     }
     setApiBusy(false)
   }
@@ -906,7 +882,7 @@ export default function AiAgentSettings() {
     if (!agentId) return
     const FB = (window as any).FB
     if (!FB) {
-      setWaError('WhatsApp SDK ещё загружается — подождите секунду и попробуйте снова.')
+      setWaError(tf.errWaSdkLoading)
       return
     }
     // Both of these are inlined at build time. When one is missing the SDK is
@@ -916,12 +892,10 @@ export default function AiAgentSettings() {
     const waAppId = process.env.NEXT_PUBLIC_WHATSAPP_APP_ID
     const waConfigId = process.env.NEXT_PUBLIC_WHATSAPP_CONFIG_ID
     if (!waAppId || !waConfigId) {
-      setWaError(
-        'Подключение WhatsApp не настроено на сервере: не задан ' +
+      setWaError(tf.errWaNotConfigured(
         [!waAppId && 'NEXT_PUBLIC_WHATSAPP_APP_ID', !waConfigId && 'NEXT_PUBLIC_WHATSAPP_CONFIG_ID']
-          .filter(Boolean).join(' и ') +
-        '. Это настройка деплоя, повторные попытки не помогут.'
-      )
+          .filter(Boolean).join(tf.errWaEnvJoiner)
+      ))
       return
     }
     setWaError(null)
@@ -940,14 +914,9 @@ export default function AiAgentSettings() {
         // this arrived as "I just couldn't register, no message".
         const last = waLastEventRef.current
         if (!last) {
-          setWaError(
-            'Окно Meta закрылось, не выдав код подключения, и не сообщило причину. ' +
-            'Чаще всего это значит, что у аккаунта Facebook нет бизнес-портфеля, ' +
-            'либо номер уже привязан к другому WhatsApp Business. ' +
-            'Проверьте, что входите под аккаунтом с доступом администратора к бизнес-портфелю.'
-          )
+          setWaError(tf.errWaWindowClosed)
         } else if (last === 'CANCEL' && waLastStepRef.current) {
-          setWaError(`Подключение прервано на шаге «${waLastStepRef.current}».`)
+          setWaError(tf.errWaInterrupted(waLastStepRef.current))
         }
         return
       }
@@ -959,7 +928,7 @@ export default function AiAgentSettings() {
         }
         if (!waPhoneNumberIdRef.current || !waWabaIdRef.current) {
           setWaConnecting(false)
-          setWaError('Не удалось получить данные номера WhatsApp. Попробуйте ещё раз.')
+          setWaError(tf.errWaPhoneData)
           return
         }
         try {
@@ -981,12 +950,12 @@ export default function AiAgentSettings() {
             const data = await res.json().catch(() => ({}) as any)
             setWaError(
               data?.detail
-                ? `Не удалось подключить WhatsApp: ${data.detail}`
-                : 'Не удалось подключить WhatsApp. Попробуйте ещё раз — если не получится снова, напишите в поддержку.'
+                ? tf.errWaConnectDetail(data.detail)
+                : tf.errWaConnect
             )
           }
         } catch (e: any) {
-          setWaError(`Не удалось подключить WhatsApp: ${e?.message || 'сеть недоступна'}`)
+          setWaError(tf.errWaConnectDetail(e?.message || tf.errNetworkUnavailable))
         }
         setWaConnecting(false)
       })()
@@ -1000,7 +969,7 @@ export default function AiAgentSettings() {
 
   async function disconnectWhatsApp() {
     if (!agentId) return
-    if (!window.confirm('Отключить WhatsApp? Агент перестанет отвечать клиентам в этом номере.')) return
+    if (!window.confirm(tf.confirmDisconnectWhatsapp)) return
     setWaBusy(true)
     setWaError(null)
     try {
@@ -1013,10 +982,10 @@ export default function AiAgentSettings() {
       if (res.ok) {
         setConnections(prev => prev.filter(c => c.channel !== 'whatsapp'))
       } else {
-        setWaError('Не удалось отключить WhatsApp. Попробуйте ещё раз.')
+        setWaError(tf.errDisconnectWhatsapp)
       }
     } catch {
-      setWaError('Не удалось отключить WhatsApp. Попробуйте ещё раз.')
+      setWaError(tf.errDisconnectWhatsapp)
     }
     setWaBusy(false)
   }
@@ -1039,10 +1008,10 @@ export default function AiAgentSettings() {
         setTplFormWords([])
         setTplFormText('')
       } else {
-        setTplError('Не удалось сохранить шаблон. Попробуйте ещё раз.')
+        setTplError(tf.errSaveTemplate)
       }
     } catch {
-      setTplError('Не удалось сохранить шаблон. Попробуйте ещё раз.')
+      setTplError(tf.errSaveTemplate)
     }
     setTplBusy(false)
   }
@@ -1070,16 +1039,16 @@ export default function AiAgentSettings() {
         setTemplates(prev => prev.map(t => t.id === data.template.id ? data.template : t))
         setTplEditId(null)
       } else {
-        setTplError('Не удалось сохранить изменения. Попробуйте ещё раз.')
+        setTplError(tf.errSaveChanges)
       }
     } catch {
-      setTplError('Не удалось сохранить изменения. Попробуйте ещё раз.')
+      setTplError(tf.errSaveChanges)
     }
     setTplBusy(false)
   }
 
   async function removeTemplate(id: string) {
-    if (!window.confirm('Удалить шаблон? Агент перестанет отвечать им автоматически.')) return
+    if (!window.confirm(tf.confirmDeleteTemplate)) return
     setTplBusy(true)
     setTplError(null)
     try {
@@ -1093,10 +1062,10 @@ export default function AiAgentSettings() {
         setTemplates(prev => prev.filter(t => t.id !== id))
         if (tplEditId === id) setTplEditId(null)
       } else {
-        setTplError('Не удалось удалить шаблон. Попробуйте ещё раз.')
+        setTplError(tf.errDeleteTemplate)
       }
     } catch {
-      setTplError('Не удалось удалить шаблон. Попробуйте ещё раз.')
+      setTplError(tf.errDeleteTemplate)
     }
     setTplBusy(false)
   }
@@ -1105,7 +1074,7 @@ export default function AiAgentSettings() {
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
-      <div className="p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Загрузка…</div>
+      <div className="p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>{tf.loadingLabel}</div>
     </main>
     </DesktopShell>
   )
@@ -1114,7 +1083,7 @@ export default function AiAgentSettings() {
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
-      <div className="p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Эта функция пока доступна только администраторам.</div>
+      <div className="p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>{tf.adminOnlyLabel}</div>
     </main>
     </DesktopShell>
   )
@@ -1126,17 +1095,17 @@ export default function AiAgentSettings() {
       <div className="max-w-2xl mx-auto p-4 lg:p-6">
         {oauthNotice === 'error' && (
           <div className="rounded-lg px-3 py-2 text-sm mb-4" style={{ background: 'var(--nav-critical)', color: '#fff' }}>
-            Не удалось подключить Instagram. Попробуйте ещё раз — если не получится снова, напишите в поддержку.
+            {tf.errConnectInstagram}
           </div>
         )}
         <div className="p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>
-          Не указан агент — выберите его в списке «Агенты»
+          {tf.noAgentSelected}
         </div>
         <div className="flex justify-center">
           <Link href="/ai-agent"
             className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-semibold transition-transform hover:-translate-y-0.5"
             style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)', boxShadow: '0 10px 24px -10px var(--nav-accent)' }}>
-            К списку агентов
+            {tf.toAgentsList}
           </Link>
         </div>
       </div>
@@ -1155,7 +1124,7 @@ export default function AiAgentSettings() {
   // field values (promptContext is pure/portable). Labeled «примерный»
   // because the live prompt wraps additional system text around this line.
   const promptPreview = buildBusinessContextLine({
-    name: name.trim() || 'Ваш бизнес',
+    name: name.trim() || tf.defaultBusinessName,
     tone: tone as AgentTone,
     description: businessDescription,
     goal: goal as AgentGoal,
@@ -1169,7 +1138,7 @@ export default function AiAgentSettings() {
     <button onClick={save} disabled={saving}
       className="w-full rounded-lg px-4 py-3 text-sm font-semibold transition-transform hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0"
       style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)', boxShadow: '0 10px 24px -10px var(--nav-accent)' }}>
-      {saving ? 'Сохраняем…' : agentId ? 'Сохранить' : 'Создать агента'}
+      {saving ? tf.savingAgentButton : agentId ? tf.saveAgentButton : tf.createAgentButton}
     </button>
   )
 
@@ -1177,7 +1146,7 @@ export default function AiAgentSettings() {
     <div className="nav-glass nav-card-accent rounded-2xl p-5 text-sm text-center" style={{ color: 'var(--nav-text-muted)' }}>
       {text}{' '}
       <button onClick={() => switchTab('settings')} className="font-medium underline-offset-2 hover:underline" style={{ color: 'var(--nav-accent)' }}>
-        Перейти к настройкам
+        {tf.goToSettings}
       </button>
     </div>
   )
@@ -1213,7 +1182,7 @@ export default function AiAgentSettings() {
           <button
             onClick={openTestChat}
             disabled={!agentId}
-            title={agentId ? undefined : 'Сохраните агента, чтобы протестировать'}
+            title={agentId ? undefined : tf.testChatDisabledHint}
             className="flex items-center gap-1.5 nav-glass rounded-lg px-3 py-2 text-sm font-medium flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed transition-colors hover:bg-[color:var(--nav-bg)]"
             style={{ color: 'var(--nav-text-primary)' }}
           >
@@ -1223,12 +1192,12 @@ export default function AiAgentSettings() {
 
         {oauthNotice === 'connected' && (
           <div className="rounded-lg px-3 py-2 text-sm mb-4 flex items-center gap-2" style={{ background: 'var(--nav-success)', color: '#fff' }}>
-            <CheckCircleIcon /> Instagram подключён
+            <CheckCircleIcon /> {t.chipConnected('Instagram')}
           </div>
         )}
         {oauthNotice === 'error' && (
           <div className="rounded-lg px-3 py-2 text-sm mb-4" style={{ background: 'var(--nav-critical)', color: '#fff' }}>
-            Не удалось подключить Instagram. Попробуйте ещё раз — если не получится снова, напишите в поддержку.
+            {tf.errConnectInstagram}
           </div>
         )}
 
@@ -1237,7 +1206,7 @@ export default function AiAgentSettings() {
         <motion.div
           className="nav-glass rounded-xl p-1 mb-5 flex gap-1 overflow-x-auto"
           role="tablist"
-          aria-label="Разделы настроек агента"
+          aria-label={tf.tabsAria}
           initial={reduceMotion ? false : { opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE, delay: reduceMotion ? 0 : 0.04 }}
@@ -1273,7 +1242,7 @@ export default function AiAgentSettings() {
             {tab === 'settings' && (
               <div className="nav-glass nav-card-accent rounded-2xl p-5">
                 <label className="block mb-4">
-                  <span className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>Название компании</span>
+                  <span className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{tf.companyNameLabel}</span>
                   <input
                     className={INPUT_CLS}
                     style={{ color: 'var(--nav-text-primary)' }}
@@ -1281,15 +1250,15 @@ export default function AiAgentSettings() {
                 </label>
 
                 <div className="mb-4">
-                  <span className="text-xs mb-2 block" style={{ color: 'var(--nav-text-secondary)' }}>Формат общения</span>
+                  <span className="text-xs mb-2 block" style={{ color: 'var(--nav-text-secondary)' }}>{tf.toneLabel}</span>
                   <div className="grid grid-cols-2 gap-2">
-                    {TONE_OPTIONS.map(t => {
-                      const active = tone === t.value
+                    {TONE_VALUES.map(v => {
+                      const active = tone === v
                       return (
-                        <button key={t.value} onClick={() => setTone(t.value)}
+                        <button key={v} onClick={() => setTone(v)}
                           className="text-xs px-3 py-2 rounded-lg text-left transition-colors"
                           style={active ? { background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' } : { background: 'var(--nav-bg)', color: 'var(--nav-text-secondary)' }}>
-                          {t.label}
+                          {tf.toneLabels[v]}
                         </button>
                       )
                     })}
@@ -1297,24 +1266,24 @@ export default function AiAgentSettings() {
                 </div>
 
                 <label className="block mb-4">
-                  <span className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>О бизнесе</span>
+                  <span className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{tf.businessDescriptionLabel}</span>
                   <textarea
                     className={`${INPUT_CLS} min-h-[100px]`}
                     style={{ color: 'var(--nav-text-primary)' }}
-                    placeholder="Опишите подробнее что вы продаёте и как работаете"
+                    placeholder={tf.businessDescriptionPlaceholder}
                     value={businessDescription} onChange={e => setBusinessDescription(e.target.value)} />
                 </label>
 
                 <div className="mb-4">
-                  <span className="text-xs mb-2 block" style={{ color: 'var(--nav-text-secondary)' }}>Основная цель</span>
+                  <span className="text-xs mb-2 block" style={{ color: 'var(--nav-text-secondary)' }}>{tf.goalLabel}</span>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    {GOAL_OPTIONS.map(g => {
-                      const active = goal === g.value
+                    {GOAL_VALUES.map(v => {
+                      const active = goal === v
                       return (
-                        <button key={g.value} onClick={() => setGoal(g.value)}
+                        <button key={v} onClick={() => setGoal(v)}
                           className="text-xs px-3 py-2 rounded-lg transition-colors"
                           style={active ? { background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' } : { background: 'var(--nav-bg)', color: 'var(--nav-text-secondary)' }}>
-                          {g.label}
+                          {tf.goalLabels[v]}
                         </button>
                       )
                     })}
@@ -1322,20 +1291,20 @@ export default function AiAgentSettings() {
                 </div>
 
                 <div className="mb-4">
-                  <span className="text-xs mb-2 block" style={{ color: 'var(--nav-text-secondary)' }}>Какие данные агент должен собрать у клиента</span>
+                  <span className="text-xs mb-2 block" style={{ color: 'var(--nav-text-secondary)' }}>{tf.collectFieldsLabel}</span>
                   <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 mb-2">
-                    {COLLECT_FIELD_OPTIONS.map(f => (
-                      <label key={f.value} className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--nav-text-primary)' }}>
-                        <input type="checkbox" checked={collectFields.includes(f.value)} onChange={() => toggleCollectField(f.value)}
+                    {COLLECT_FIELD_VALUES.map(v => (
+                      <label key={v} className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--nav-text-primary)' }}>
+                        <input type="checkbox" checked={collectFields.includes(v)} onChange={() => toggleCollectField(v)}
                           className="accent-[var(--nav-accent)] w-3.5 h-3.5 flex-shrink-0" />
-                        {f.label}
+                        {tf.collectFieldLabels[v]}
                       </label>
                     ))}
                   </div>
                   {/* Custom fields the user has added (anything not a preset key) */}
-                  {collectFields.filter(f => !COLLECT_FIELD_OPTIONS.some(o => o.value === f)).length > 0 && (
+                  {collectFields.filter(f => !COLLECT_FIELD_VALUES.includes(f)).length > 0 && (
                     <div className="flex flex-wrap gap-1.5 mb-2">
-                      {collectFields.filter(f => !COLLECT_FIELD_OPTIONS.some(o => o.value === f)).map(f => (
+                      {collectFields.filter(f => !COLLECT_FIELD_VALUES.includes(f)).map(f => (
                         <button key={f} onClick={() => toggleCollectField(f)}
                           className="text-xs pl-2.5 pr-2 py-1 rounded-full flex items-center gap-1.5"
                           style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
@@ -1350,39 +1319,39 @@ export default function AiAgentSettings() {
                       <input autoFocus value={customField} maxLength={60}
                         onChange={e => setCustomField(e.target.value)}
                         onKeyDown={e => { if (e.key === 'Enter') addCustomField(); if (e.key === 'Escape') { setShowCustomInput(false); setCustomField('') } }}
-                        placeholder="Например: размер обуви"
+                        placeholder={tf.customFieldPlaceholder}
                         className={`flex-1 ${INPUT_CLS}`}
                         style={{ color: 'var(--nav-text-primary)' }} />
                       <button onClick={addCustomField}
                         className="text-xs px-3 py-2 rounded-lg font-semibold flex-shrink-0"
                         style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-                        Добавить
+                        {tf.addButton}
                       </button>
                     </div>
                   ) : (
                     <button onClick={() => setShowCustomInput(true)}
                       className="text-xs px-3 py-1.5 rounded-lg font-medium"
                       style={{ background: 'var(--nav-bg)', color: 'var(--nav-accent)' }}>
-                      ✨ Добавить своё
+                      {tf.addOwnButton}
                     </button>
                   )}
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
                   <label className="block">
-                    <span className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>Часовой пояс</span>
+                    <span className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{tf.timezoneLabel}</span>
                     <select value={timezone} onChange={e => setTimezone(e.target.value)}
                       className={INPUT_CLS}
                       style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-surface-chrome)' }}>
-                      {TIMEZONE_OPTIONS.map(tz => <option key={tz.value} value={tz.value}>{tz.label}</option>)}
+                      {TIMEZONE_VALUES.map(v => <option key={v} value={v}>{`${v} (GMT+5) — ${tf.timezoneCity[v]}`}</option>)}
                     </select>
                   </label>
                   <label className="block">
-                    <span className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>Валюта</span>
+                    <span className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{tf.currencyLabel}</span>
                     <select value={currency} onChange={e => setCurrency(e.target.value)}
                       className={INPUT_CLS}
                       style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-surface-chrome)' }}>
-                      {CURRENCY_OPTIONS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                      {CURRENCY_VALUES.map(v => <option key={v} value={v}>{tf.currencyLabels[v]}</option>)}
                     </select>
                   </label>
                 </div>
@@ -1395,23 +1364,23 @@ export default function AiAgentSettings() {
               <>
                 <div className="nav-glass nav-card-accent rounded-2xl p-5">
                   <label className="block mb-6">
-                    <span className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>Дополнительные инструкции (необязательно)</span>
+                    <span className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{tf.customInstructionsLabel}</span>
                     <textarea
                       className={`${INPUT_CLS} min-h-[120px]`}
                       style={{ color: 'var(--nav-text-primary)' }}
                       maxLength={2000}
-                      placeholder="Например: не обещай скидки; доставка только по Алматы; рабочие часы 9:00–18:00"
+                      placeholder={tf.customInstructionsPlaceholder}
                       value={customInstructions} onChange={e => setCustomInstructions(e.target.value)} />
                     <span className="text-[11px] mt-1 block" style={{ color: 'var(--nav-text-muted)' }}>
-                      Агент будет следовать этим правилам в каждом ответе.
+                      {tf.customInstructionsHint}
                     </span>
                   </label>
 
                   <label className="block mb-6">
-                    <span className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>Стоп-фразы (передают диалог вам)</span>
-                    <TriggerChipsEditor words={stopPhrases} onChange={setStopPhrases} />
+                    <span className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{tf.stopPhrasesLabel}</span>
+                    <TriggerChipsEditor words={stopPhrases} onChange={setStopPhrases} placeholder={tf.triggerPlaceholder} />
                     <span className="text-[11px] mt-1 block" style={{ color: 'var(--nav-text-muted)' }}>
-                      Если клиент напишет одну из этих фраз, агент замолчит в этом диалоге и пришлёт вам уведомление (и в Telegram, если он подключён в Профиле → Уведомления) — отвечайте в «Переписке».
+                      {tf.stopPhrasesHint}
                     </span>
                   </label>
 
@@ -1420,18 +1389,18 @@ export default function AiAgentSettings() {
 
                 {hasKaspiShop === false && (
                   <div className="nav-glass nav-card-accent rounded-2xl p-5 mt-4">
-                    <div className="text-sm font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>Подключите Kaspi Shop — агент будет знать реальные цены</div>
+                    <div className="text-sm font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>{tf.connectShopTitle}</div>
                     <p className="text-[11px] mb-3" style={{ color: 'var(--nav-text-muted)' }}>
-                      Сейчас агент отвечает про цены только из описания бизнеса выше — без магазина он не знает точный каталог и может ошибиться. С подключённым Kaspi Shop он сам подтягивает актуальные цены (до 50 товаров) и не выдумывает то, чего нет в каталоге — это же касается сумм в счетах, которые агент выставляет из переписки.
+                      {tf.connectShopText}
                     </p>
-                    <Link href="/kaspi-shop" className="text-xs font-semibold" style={{ color: 'var(--nav-accent)' }}>Подключить Kaspi Shop →</Link>
+                    <Link href="/kaspi-shop" className="text-xs font-semibold" style={{ color: 'var(--nav-accent)' }}>{tf.connectShopCta}</Link>
                   </div>
                 )}
 
                 <div className="nav-glass nav-card-accent rounded-2xl p-5 mt-4">
-                  <div className="text-sm font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>Как агент видит инструкции</div>
+                  <div className="text-sm font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>{tf.promptPreviewTitle}</div>
                   <p className="text-[11px] mb-3" style={{ color: 'var(--nav-text-muted)' }}>
-                    Примерный вид инструкций агента — собирается из полей выше; в реальном ответе к этой строке добавляется системный текст.
+                    {tf.promptPreviewHint}
                   </p>
                   <div className="rounded-lg p-3 text-xs leading-relaxed whitespace-pre-wrap" style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-secondary)' }}>
                     {promptPreview}
@@ -1444,12 +1413,12 @@ export default function AiAgentSettings() {
               <div className="nav-glass nav-card-accent rounded-2xl p-5">
                 <div className="flex items-start justify-between gap-4 mb-1">
                   <div>
-                    <span className="text-sm font-semibold block" style={{ color: 'var(--nav-text-primary)' }}>Статус бота</span>
+                    <span className="text-sm font-semibold block" style={{ color: 'var(--nav-text-primary)' }}>{tf.botStatusLabel}</span>
                     <span className="text-[11px] block mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>
-                      Выключенный агент не отвечает клиентам.
+                      {tf.botStatusHint}
                     </span>
                   </div>
-                  <button role="switch" aria-checked={isEnabled} aria-label="Статус бота"
+                  <button role="switch" aria-checked={isEnabled} aria-label={tf.botStatusLabel}
                     onClick={() => setIsEnabled(v => !v)}
                     className="relative w-10 h-6 rounded-full transition-colors flex-shrink-0 mt-0.5"
                     style={{ background: isEnabled ? 'var(--nav-accent)' : 'var(--nav-border)' }}>
@@ -1460,14 +1429,14 @@ export default function AiAgentSettings() {
                 <div className="my-5" style={{ borderTop: '1px solid var(--nav-border-soft)' }} />
 
                 <label className="block mb-6">
-                  <span className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>Глубина памяти диалога</span>
+                  <span className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{tf.historyDepthLabel}</span>
                   <select value={historyPairs} onChange={e => setHistoryPairs(Number(e.target.value))}
                     className={INPUT_CLS}
                     style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-surface-chrome)' }}>
-                    {[3, 5, 8, 10, 20].map(n => <option key={n} value={n}>Последние {n} обменов</option>)}
+                    {[3, 5, 8, 10, 20].map(n => <option key={n} value={n}>{tf.historyOption(n)}</option>)}
                   </select>
                   <span className="text-[11px] mt-1 block" style={{ color: 'var(--nav-text-muted)' }}>
-                    Сколько прошлых сообщений агент помнит. Больше — точнее контекст, но дороже каждый ответ.
+                    {tf.historyDepthHint}
                   </span>
                 </label>
 
@@ -1476,18 +1445,17 @@ export default function AiAgentSettings() {
                     agent has no catalog to quote from at all. */}
                 {kaspiShops.length > 1 && (
                   <label className="block mb-6">
-                    <span className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>Магазин Kaspi для цен и товаров</span>
+                    <span className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{tf.kaspiShopLabel}</span>
                     <select value={kaspiShopConnectionId} onChange={e => setKaspiShopConnectionId(e.target.value)}
                       className={INPUT_CLS}
                       style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-surface-chrome)' }}>
-                      <option value="">Активный магазин аккаунта</option>
+                      <option value="">{tf.kaspiShopDefaultOption}</option>
                       {kaspiShops.map(s => (
-                        <option key={s.id} value={s.id}>{s.name}{s.isActive ? ' — сейчас активный' : ''}</option>
+                        <option key={s.id} value={s.id}>{s.name}{s.isActive ? tf.kaspiShopActiveSuffix : ''}</option>
                       ))}
                     </select>
                     <span className="text-[11px] mt-1 block" style={{ color: 'var(--nav-text-muted)' }}>
-                      Откуда агент берёт названия товаров и цены. Если не выбирать, он следует за магазином,
-                      переключённым в разделе Kaspi Bot — и тогда все агенты аккаунта отвечают по одному и тому же.
+                      {tf.kaspiShopHint}
                     </span>
                   </label>
                 )}
@@ -1498,30 +1466,30 @@ export default function AiAgentSettings() {
 
             {tab === 'control' && (
               <div className="nav-glass nav-card-accent rounded-2xl p-5 mt-4">
-                <div className="text-sm font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>Стоимость ИИ-ответов</div>
+                <div className="text-sm font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>{tf.replyCostTitle}</div>
                 <p className="text-[11px] mb-3" style={{ color: 'var(--nav-text-muted)' }}>
-                  Ответ по совпадению с шаблоном — бесплатно. Ответ, который сгенерировал ИИ — {REPLY_PRICE_TENGE} ₸.
+                  {tf.replyCostText(REPLY_PRICE_TENGE)}
                 </p>
                 {walletBalance !== null && (
                   <div className="rounded-lg p-3 text-xs leading-relaxed" style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-secondary)' }}>
-                    Баланс кошелька: <b style={{ color: 'var(--nav-text-primary)' }}>{walletBalance.toLocaleString('ru-KZ')} ₸</b>
-                    {' '}— хватит примерно на <b style={{ color: 'var(--nav-text-primary)' }}>{Math.max(0, Math.floor(walletBalance / REPLY_PRICE_TENGE)).toLocaleString('ru-KZ')}</b> ИИ-ответов.
-                    <span className="block mt-1" style={{ color: 'var(--nav-text-muted)' }}>Кошелёк общий для Счетов, Kaspi Bot и AI-агента — пополнить можно значком кошелька в правом верхнем углу.</span>
+                    {tf.walletBalanceLabel} <b style={{ color: 'var(--nav-text-primary)' }}>{walletBalance.toLocaleString('ru-KZ')} ₸</b>
+                    {' '}{tf.walletEnoughFor} <b style={{ color: 'var(--nav-text-primary)' }}>{Math.max(0, Math.floor(walletBalance / REPLY_PRICE_TENGE)).toLocaleString('ru-KZ')}</b> {tf.walletRepliesSuffix}
+                    <span className="block mt-1" style={{ color: 'var(--nav-text-muted)' }}>{tf.walletSharedHint}</span>
                   </div>
                 )}
               </div>
             )}
 
             {tab === 'templates' && (
-              !agentId ? needsAgentHint('Шаблоны появятся после создания агента.') : (
+              !agentId ? needsAgentHint(tf.needsAgentTemplates) : (
                 <div>
                   <p className="text-xs mb-3" style={{ color: 'var(--nav-text-muted)' }}>
-                    Шаблоны отвечают мгновенно и бесплатно — если сообщение клиента содержит триггер, ИИ не вызывается.
+                    {tf.templatesHint}
                   </p>
 
                   {templates.length === 0 && !tplFormOpen && (
                     <div className="nav-glass nav-card-accent rounded-2xl p-5 text-sm text-center mb-3" style={{ color: 'var(--nav-text-muted)' }}>
-                      Шаблонов пока нет. Они создаются автоматически, когда вы одобряете ответы в «Диалогах на проверке», — и их можно добавить вручную.
+                      {tf.templatesEmpty}
                     </div>
                   )}
 
@@ -1530,9 +1498,9 @@ export default function AiAgentSettings() {
                       <div key={t.id} className="nav-glass nav-card-accent rounded-2xl p-4">
                         {tplEditId === t.id ? (
                           <div>
-                            <span className="text-xs mb-1.5 block" style={{ color: 'var(--nav-text-secondary)' }}>Триггерные слова</span>
-                            <TriggerChipsEditor words={tplEditWords} onChange={setTplEditWords} />
-                            <span className="text-xs mt-3 mb-1.5 block" style={{ color: 'var(--nav-text-secondary)' }}>Текст ответа</span>
+                            <span className="text-xs mb-1.5 block" style={{ color: 'var(--nav-text-secondary)' }}>{tf.triggerWordsLabel}</span>
+                            <TriggerChipsEditor words={tplEditWords} onChange={setTplEditWords} placeholder={tf.triggerPlaceholder} />
+                            <span className="text-xs mt-3 mb-1.5 block" style={{ color: 'var(--nav-text-secondary)' }}>{tf.replyTextLabel}</span>
                             <textarea
                               className={`${INPUT_CLS} min-h-[80px]`}
                               style={{ color: 'var(--nav-text-primary)' }}
@@ -1542,12 +1510,12 @@ export default function AiAgentSettings() {
                               <button onClick={saveEditTemplate} disabled={tplBusy || tplEditWords.length === 0 || !tplEditText.trim()}
                                 className="flex-1 rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50"
                                 style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-                                {tplBusy ? 'Сохраняем…' : 'Сохранить'}
+                                {tplBusy ? tf.savingButton : tf.saveButton}
                               </button>
                               <button onClick={() => setTplEditId(null)} disabled={tplBusy}
                                 className="rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50"
                                 style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-secondary)' }}>
-                                Отмена
+                                {tf.cancelButton}
                               </button>
                             </div>
                           </div>
@@ -1562,12 +1530,12 @@ export default function AiAgentSettings() {
                                 ))}
                               </div>
                               <div className="flex gap-1 flex-shrink-0">
-                                <button onClick={() => startEditTemplate(t)} aria-label="Редактировать шаблон"
+                                <button onClick={() => startEditTemplate(t)} aria-label={tf.editTemplateAria}
                                   className="p-1.5 rounded-lg transition-colors hover:text-[color:var(--nav-accent)]"
                                   style={{ color: 'var(--nav-text-muted)' }}>
                                   <PencilIcon />
                                 </button>
-                                <button onClick={() => removeTemplate(t.id)} disabled={tplBusy} aria-label="Удалить шаблон"
+                                <button onClick={() => removeTemplate(t.id)} disabled={tplBusy} aria-label={tf.deleteTemplateAria}
                                   className="p-1.5 rounded-lg transition-colors hover:text-[color:var(--nav-critical)] disabled:opacity-50"
                                   style={{ color: 'var(--nav-text-muted)' }}>
                                   <TrashIcon />
@@ -1583,25 +1551,25 @@ export default function AiAgentSettings() {
 
                   {tplFormOpen ? (
                     <div className="nav-glass nav-card-accent rounded-2xl p-4 mt-3">
-                      <span className="text-xs mb-1.5 block" style={{ color: 'var(--nav-text-secondary)' }}>Триггерные слова</span>
-                      <TriggerChipsEditor words={tplFormWords} onChange={setTplFormWords} />
-                      <span className="text-xs mt-3 mb-1.5 block" style={{ color: 'var(--nav-text-secondary)' }}>Текст ответа</span>
+                      <span className="text-xs mb-1.5 block" style={{ color: 'var(--nav-text-secondary)' }}>{tf.triggerWordsLabel}</span>
+                      <TriggerChipsEditor words={tplFormWords} onChange={setTplFormWords} placeholder={tf.triggerPlaceholder} />
+                      <span className="text-xs mt-3 mb-1.5 block" style={{ color: 'var(--nav-text-secondary)' }}>{tf.replyTextLabel}</span>
                       <textarea
                         className={`${INPUT_CLS} min-h-[80px]`}
                         style={{ color: 'var(--nav-text-primary)' }}
                         maxLength={2000}
-                        placeholder="Ответ, который клиент получит мгновенно"
+                        placeholder={tf.replyTextPlaceholder}
                         value={tplFormText} onChange={e => setTplFormText(e.target.value)} />
                       <div className="flex gap-2 mt-3">
                         <button onClick={createTemplate} disabled={tplBusy || tplFormWords.length === 0 || !tplFormText.trim()}
                           className="flex-1 rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50"
                           style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-                          {tplBusy ? 'Сохраняем…' : 'Добавить'}
+                          {tplBusy ? tf.savingButton : tf.addButton}
                         </button>
                         <button onClick={() => { setTplFormOpen(false); setTplFormWords([]); setTplFormText('') }} disabled={tplBusy}
                           className="rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50"
                           style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-secondary)' }}>
-                          Отмена
+                          {tf.cancelButton}
                         </button>
                       </div>
                     </div>
@@ -1609,7 +1577,7 @@ export default function AiAgentSettings() {
                     <button onClick={() => { setTplFormOpen(true); setTplError(null) }}
                       className="w-full nav-glass rounded-2xl px-4 py-3 text-sm font-medium mt-3 transition-transform hover:-translate-y-0.5"
                       style={{ color: 'var(--nav-accent)' }}>
-                      + Добавить шаблон
+                      {tf.addTemplateButton}
                     </button>
                   )}
 
@@ -1621,13 +1589,13 @@ export default function AiAgentSettings() {
             )}
 
             {tab === 'flows' && (
-              !agentId ? needsAgentHint('Сценарии появятся после создания агента.') : (
+              !agentId ? needsAgentHint(tf.needsAgentFlows) : (
                 <FlowBuilder agentId={agentId} authHeader={authHeader} />
               )
             )}
 
             {tab === 'channels' && (
-              !agentId ? needsAgentHint('Каналы можно подключить после создания агента.') : (
+              !agentId ? needsAgentHint(tf.needsAgentChannels) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <ChannelCard
                     icon={<InstagramIcon />}
@@ -1679,7 +1647,7 @@ export default function AiAgentSettings() {
 
                   <ChannelCard
                     icon={<TelegramIcon />}
-                    name="Telegram-бот"
+                    name={tf.channelTelegramName}
                     chip={telegramConnection?.status === 'active'
                       ? <StatusChip kind="ok" label={t.chipConnected(`@${telegramConnection.external_account_name || 'bot'}`)} />
                       : telegramConnection?.status === 'token_expired'
@@ -1697,11 +1665,11 @@ export default function AiAgentSettings() {
                       <>
                         {telegramConnection?.status === 'token_expired' && (
                           <div className="text-xs mb-2 flex items-center gap-1.5" style={{ color: 'var(--nav-critical)' }}>
-                            <WarnIcon /> Telegram-бот отключился — вставьте токен ещё раз, чтобы агент снова отвечал
+                            <WarnIcon /> {tf.telegramExpiredHint}
                           </div>
                         )}
                         <p className="text-[11px] mb-2" style={{ color: 'var(--nav-text-muted)' }}>
-                          Создайте бота через @BotFather и вставьте токен — агент начнёт отвечать на сообщения в этом боте
+                          {tf.telegramSetupHint}
                         </p>
                         <input
                           className={`${INPUT_CLS} mb-2`}
@@ -1715,13 +1683,13 @@ export default function AiAgentSettings() {
                           <button onClick={connectTelegram} disabled={tgBusy || !telegramToken.trim()}
                             className="flex-1 rounded-lg px-4 py-2.5 text-sm font-semibold disabled:opacity-50"
                             style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-                            {tgBusy ? 'Подключаем…' : t.connectButton}
+                            {tgBusy ? tf.connectingButton : t.connectButton}
                           </button>
                           {telegramConnection?.status !== 'token_expired' && (
                             <button onClick={() => { setTgOpen(false); setTgError(null) }} disabled={tgBusy}
                               className="rounded-lg px-3 py-2.5 text-sm font-medium disabled:opacity-50"
                               style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-secondary)' }}>
-                              Отмена
+                              {tf.cancelButton}
                             </button>
                           )}
                         </div>
@@ -1765,12 +1733,12 @@ export default function AiAgentSettings() {
                     {whatsappConnection?.status === 'token_expired' && (
                       <>
                         <div className="text-xs mb-2 flex items-center gap-1.5" style={{ color: 'var(--nav-critical)' }}>
-                          <WarnIcon /> WhatsApp отключился — переподключите номер, чтобы агент снова отвечал
+                          <WarnIcon /> {tf.whatsappExpiredHint}
                         </div>
                         <button onClick={connectWhatsApp} disabled={waConnecting}
                           className="w-full rounded-lg px-4 py-2.5 text-sm font-medium disabled:opacity-50"
                           style={{ background: 'var(--nav-critical)', color: '#fff' }}>
-                          {waConnecting ? 'Открываем WhatsApp…' : t.reconnectButton}
+                          {waConnecting ? tf.openingWhatsapp : t.reconnectButton}
                         </button>
                       </>
                     )}
@@ -1778,7 +1746,7 @@ export default function AiAgentSettings() {
                       <button onClick={connectWhatsApp} disabled={waConnecting}
                         className="w-full rounded-lg px-4 py-2.5 text-sm font-semibold disabled:opacity-50"
                         style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-                        {waConnecting ? 'Подключаем…' : t.connectButton}
+                        {waConnecting ? tf.connectingButton : t.connectButton}
                       </button>
                     )}
                     {waError && (
@@ -1789,16 +1757,16 @@ export default function AiAgentSettings() {
 
                   <ChannelCard
                     icon={<SiteChatIcon />}
-                    name="Чат для сайта"
+                    name={tf.channelWebsiteName}
                     chip={websiteConnection
-                      ? <StatusChip kind="ok" label="Подключено" />
+                      ? <StatusChip kind="ok" label={tf.connectedChip} />
                       : <StatusChip kind="off" label={t.chipNotConnected} />}
                     description={t.channelWebsiteDesc}
                   >
                     {websiteConnection ? (
                       <>
                         <p className="text-[11px] mb-2" style={{ color: 'var(--nav-text-muted)' }}>
-                          Вставьте перед `&lt;/body&gt;` на вашем сайте:
+                          {tf.websiteEmbedHint}
                         </p>
                         <code className="block text-[10px] mb-2 p-2 rounded-lg break-all" style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-secondary)' }}>
                           {`<script src="https://www.invoices.kz/widget.js" data-key="${websiteConnection.external_account_id}" async></script>`}
@@ -1806,7 +1774,7 @@ export default function AiAgentSettings() {
                         <div className="flex gap-2">
                           <button onClick={copyWidgetSnippet}
                             className="flex-1 text-xs font-semibold nav-glass rounded-lg px-3 py-2" style={{ color: 'var(--nav-accent)' }}>
-                            {websiteCopied ? 'Скопировано ✓' : 'Скопировать код'}
+                            {websiteCopied ? tf.copiedLabel : tf.copyCodeButton}
                           </button>
                           <button onClick={disconnectWebsite} disabled={websiteBusy}
                             className="nav-glass rounded-lg px-3 py-2 text-xs font-medium disabled:opacity-50" style={{ color: 'var(--nav-text-primary)' }}>
@@ -1818,7 +1786,7 @@ export default function AiAgentSettings() {
                       <button onClick={connectWebsite} disabled={websiteBusy}
                         className="w-full rounded-lg px-4 py-2.5 text-sm font-semibold disabled:opacity-50"
                         style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-                        {websiteBusy ? 'Подключаем…' : t.connectButton}
+                        {websiteBusy ? tf.connectingButton : t.connectButton}
                       </button>
                     )}
                     {websiteError && (
@@ -1830,24 +1798,24 @@ export default function AiAgentSettings() {
                     icon={<ApiIcon />}
                     name="API"
                     chip={apiConnection
-                      ? <StatusChip kind="ok" label="Подключено" />
+                      ? <StatusChip kind="ok" label={tf.connectedChip} />
                       : <StatusChip kind="off" label={t.chipNotConnected} />}
                     description={t.channelApiDesc}
                   >
                     {apiKeyReveal && (
                       <>
                         <p className="text-[11px] mb-2" style={{ color: 'var(--nav-critical)' }}>
-                          Сохраните ключ сейчас — второй раз мы его не покажем:
+                          {tf.apiKeyOnceHint}
                         </p>
                         <code className="block text-[10px] mb-2 p-2 rounded-lg break-all" style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-secondary)' }}>
                           {apiKeyReveal}
                         </code>
                         <button onClick={copyApiKey}
                           className="w-full mb-2 text-xs font-semibold nav-glass rounded-lg px-3 py-2" style={{ color: 'var(--nav-accent)' }}>
-                          {apiCopied ? 'Скопировано ✓' : 'Скопировать ключ'}
+                          {apiCopied ? tf.copiedLabel : tf.copyKeyButton}
                         </button>
                         <p className="text-[11px] mb-2" style={{ color: 'var(--nav-text-muted)' }}>
-                          Отправляйте сообщения клиента: <code>POST /api/ai-agent/external/message</code> с заголовком <code>Authorization: Bearer {'<ключ>'}</code>. Получайте ответы агента: <code>GET /api/ai-agent/external/messages</code>.
+                          {tf.apiUsageSend} <code>POST /api/ai-agent/external/message</code> {tf.apiUsageWithHeader} <code>Authorization: Bearer {tf.apiKeyWord}</code>. {tf.apiUsageReceive} <code>GET /api/ai-agent/external/messages</code>.
                         </p>
                       </>
                     )}
@@ -1855,7 +1823,7 @@ export default function AiAgentSettings() {
                       <div className="flex gap-2">
                         <button onClick={connectApi} disabled={apiBusy}
                           className="flex-1 text-xs font-semibold nav-glass rounded-lg px-3 py-2 disabled:opacity-50" style={{ color: 'var(--nav-accent)' }}>
-                          {apiBusy ? '…' : 'Перегенерировать ключ'}
+                          {apiBusy ? '…' : tf.regenerateKeyButton}
                         </button>
                         <button onClick={disconnectApi} disabled={apiBusy}
                           className="nav-glass rounded-lg px-3 py-2 text-xs font-medium disabled:opacity-50" style={{ color: 'var(--nav-text-primary)' }}>
@@ -1866,7 +1834,7 @@ export default function AiAgentSettings() {
                       <button onClick={connectApi} disabled={apiBusy}
                         className="w-full rounded-lg px-4 py-2.5 text-sm font-semibold disabled:opacity-50"
                         style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-                        {apiBusy ? 'Подключаем…' : t.connectButton}
+                        {apiBusy ? tf.connectingButton : t.connectButton}
                       </button>
                     )}
                     {apiError && (
@@ -1930,7 +1898,7 @@ export default function AiAgentSettings() {
               onClick={e => e.stopPropagation()}
               role="dialog"
               aria-modal="true"
-              aria-label="Тестовый чат"
+              aria-label={tf.testChatTitle}
             >
               <div className="flex items-center justify-between gap-3 px-4 lg:px-5 py-4 border-b border-[color:var(--nav-border)] flex-shrink-0">
                 <div className="flex items-center gap-2.5 min-w-0">
@@ -1938,11 +1906,11 @@ export default function AiAgentSettings() {
                     <TestChatBubbleIcon size={16} />
                   </span>
                   <div className="min-w-0">
-                    <div className="text-sm font-semibold truncate" style={{ color: 'var(--nav-text-primary)' }}>Тестовый чат</div>
-                    <div className="text-[11px] truncate" style={{ color: 'var(--nav-text-muted)' }}>{name.trim() || 'Ваш агент'}</div>
+                    <div className="text-sm font-semibold truncate" style={{ color: 'var(--nav-text-primary)' }}>{tf.testChatTitle}</div>
+                    <div className="text-[11px] truncate" style={{ color: 'var(--nav-text-muted)' }}>{name.trim() || tf.testChatAgentFallback}</div>
                   </div>
                 </div>
-                <button onClick={() => setTestChatOpen(false)} aria-label="Закрыть"
+                <button onClick={() => setTestChatOpen(false)} aria-label={tf.closeAria}
                   className="p-1.5 rounded-lg flex-shrink-0 transition-colors hover:bg-[color:var(--nav-bg)]"
                   style={{ color: 'var(--nav-text-muted)' }}>
                   <CloseIcon />
@@ -1992,7 +1960,7 @@ export default function AiAgentSettings() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE, delay: reduceMotion ? 0 : 0.1 }}
               >
-                Создаём AI-агента…
+                {tf.creatingAgentTitle}
               </motion.div>
               <motion.div
                 className="text-sm tabular-nums"
@@ -2001,7 +1969,7 @@ export default function AiAgentSettings() {
                 animate={{ opacity: 1 }}
                 transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE, delay: reduceMotion ? 0 : 0.2 }}
               >
-                Агент создастся примерно через 0:{String(createCountdown).padStart(2, '0')}
+                {tf.creatingAgentCountdown(String(createCountdown).padStart(2, '0'))}
               </motion.div>
             </div>
           </motion.div>
