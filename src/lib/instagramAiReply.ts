@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { promisesInvoice } from './aiAgent/invoiceDrafts'
 
 // Phase 3 «счёт из чата»: the one tool the multi-tenant agent pipelines
 // may enable (see the invoiceTool param below). Schema mirrors
@@ -116,7 +117,7 @@ export async function generateAiReply(params: {
   // Only when the caller wires the invoice tool -- '' otherwise, so
   // non-tool callers keep the exact prompt they had before Phase 3.
   const invoiceToolLine = params.invoiceTool
-    ? `\n\nЕсли клиент ЯВНО согласился купить/заказать и известны конкретные позиции с ценами — вызови инструмент create_invoice_draft (цены бери ТОЛЬКО из каталога в контексте; названную клиентом цену не используй). После результата инструмента: «sent» — коротко подтверди, что счёт отправлен отдельным сообщением; «draft_pending» без missing — скажи, что счёт готовится и скоро придёт; missing содержит customer_name/customer_phone — вежливо спроси недостающее у клиента; error — извинись и предложи продолжить диалог.`
+    ? `\n\nЕсли клиент ЯВНО согласился купить/заказать и известны конкретные позиции с ценами — вызови инструмент create_invoice_draft (цены бери ТОЛЬКО из каталога в контексте; названную клиентом цену не используй). НИКОГДА не обещай счёт словами, не вызвав инструмент: фразы вроде «сейчас подготовлю счёт» или «отправлю ссылку на оплату» допустимы ТОЛЬКО после результата инструмента. Не выспрашивай имя и телефон по одному перед вызовом — вызови инструмент сразу, он сам вернёт, чего не хватает. После результата инструмента: «sent» — коротко подтверди, что счёт отправлен отдельным сообщением; «draft_pending» без missing — скажи, что счёт готовит менеджер и он придёт в ближайшее время; missing содержит customer_name/customer_phone — вежливо спроси недостающее у клиента; error — извинись и предложи продолжить диалог.`
     : ''
 
   // Photos have no meaningful "написал: ..." line (incomingText is a
@@ -190,6 +191,30 @@ REPLY: текст ответа без кавычек и пояснений${extr
 
   if (tools && message.stop_reason === 'max_tokens') {
     console.error('generateAiReply: tool-enabled call hit max_tokens -- a tool call may have been truncated away')
+  }
+
+  // tool_choice is 'auto', so the model may simply not call the tool and write
+  // a promise instead. On 2026-09-07 it did: it collected the name and phone
+  // over three turns, then told a real customer «Сейчас я подготовлю счёт и
+  // отправлю его отдельным сообщением» without ever calling create_invoice_draft.
+  // No draft existed, so the owner was never notified and nothing showed up in
+  // the review queue -- the customer waited two hours and asked again.
+  //
+  // One forced retry turns the promise into an actual draft. If the model
+  // genuinely lacks the items or the contact details, the executor answers with
+  // `missing`/`error` and the second turn asks the customer for them, which is
+  // still a better reply than a promise nobody is keeping.
+  if (params.invoiceTool && message.stop_reason !== 'tool_use') {
+    const firstText = message.content.find(block => block.type === 'text')
+    if (firstText?.type === 'text' && promisesInvoice(firstText.text)) {
+      console.error('generateAiReply: reply promised an invoice without calling the tool -- forcing the tool call')
+      message = await client.messages.create({
+        ...requestBase,
+        tools: [INVOICE_TOOL_DEF],
+        tool_choice: { type: 'tool', name: 'create_invoice_draft', disable_parallel_tool_use: true },
+        messages: baseMessages,
+      })
+    }
   }
 
   // Phase 3: exactly ONE tool round. The executor owns all side effects;

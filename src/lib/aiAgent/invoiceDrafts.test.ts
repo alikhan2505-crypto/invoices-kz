@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { validateDraftInput, canAutoSend, normalizeToolInput, checkCatalogPricing, INVOICE_AUTONOMY_THRESHOLD, AUTO_SEND_MAX_TOTAL } from './invoiceDrafts'
+import { validateDraftInput, canAutoSend, normalizeToolInput, checkCatalogPricing, promisesInvoice, INVOICE_AUTONOMY_THRESHOLD, AUTO_SEND_MAX_TOTAL } from './invoiceDrafts'
 
 describe('validateDraftInput', () => {
   it('accepts valid items, trims names, computes total server-side', () => {
@@ -100,5 +100,63 @@ describe('canAutoSend amount ceiling', () => {
   it('keeps the old two-argument behaviour for flow steps', () => {
     expect(canAutoSend('active', 5)).toBe(true)
     expect(canAutoSend('training', 5)).toBe(false)
+  })
+})
+
+// Real messages from the conversation that exposed the bug (Instagram DM,
+// agent «Manufactor Astana», 2026-09-07). Kept verbatim so a future change to
+// the regexes is checked against what the model actually wrote, not against a
+// tidied-up paraphrase.
+describe('promisesInvoice', () => {
+  it('catches the promise that lost the sale', () => {
+    expect(promisesInvoice(
+      'Спасибо, Риана! 😊 Я получил(а) твой номер. Сейчас я подготовлю счёт на оплату юбки Abil.Sisters коричневая размер 2XL и отправлю его тебе отдельным сообщением. Совсем немного — и всё будет готово! 🛍️'
+    )).toBe(true)
+  })
+
+  it('catches the second promise made after the customer chased it', () => {
+    expect(promisesInvoice(
+      'Риана, очень извиняюсь за задержку! 😊 Дай мне минуту — я сейчас отправлю тебе счёт на оплату юбки.'
+    )).toBe(true)
+  })
+
+  // These two are the model behaving correctly -- it is asking, not promising.
+  // Forcing a tool call here would build a draft out of nothing.
+  it('ignores a question that mentions an invoice', () => {
+    expect(promisesInvoice(
+      'Отлично! 😊 Прежде чем я отправлю тебе счёт на оплату, подскажи, пожалуйста, как тебя зовут?'
+    )).toBe(false)
+  })
+
+  it('ignores a conditional clause', () => {
+    expect(promisesInvoice(
+      'Конечно! 😊 Чтобы я смог(ла) отправить тебе ссылку на оплату, нужно уточнить — какой именно товар ты хочешь заказать?'
+    )).toBe(false)
+  })
+
+  it('ignores merely describing that the business issues invoices', () => {
+    expect(promisesInvoice('Да, мы работаем по счетам и безналичной оплате.')).toBe(false)
+    expect(promisesInvoice('Оплатить можно картой или по счёту.')).toBe(false)
+  })
+
+  it('judges each sentence on its own', () => {
+    // Promise in the first sentence, unrelated question in the second: the
+    // question must not cancel the promise out.
+    expect(promisesInvoice('Сейчас отправлю счёт. А доставку куда оформляем?')).toBe(true)
+  })
+
+  it('catches a payment-link promise, not only the word счёт', () => {
+    expect(promisesInvoice('Отправлю тебе ссылку на оплату через пару минут.')).toBe(true)
+  })
+
+  it('works in Kazakh and English', () => {
+    expect(promisesInvoice('Шот дайындаймын, бір минут.')).toBe(true)
+    expect(promisesInvoice("I'll send you the invoice shortly.")).toBe(true)
+    expect(promisesInvoice('Could you please tell me your name before I send the invoice?')).toBe(false)
+  })
+
+  it('says no for ordinary replies with no invoice in them at all', () => {
+    expect(promisesInvoice('Привет! Чем могу помочь? 😊')).toBe(false)
+    expect(promisesInvoice('')).toBe(false)
   })
 })

@@ -93,6 +93,37 @@ export function canAutoSend(agentStatus: string, approvedCount: number, total?: 
   return true
 }
 
+// A promise the model made in words instead of calling create_invoice_draft.
+//
+// The tool is offered with tool_choice:auto, so the model is free to skip it --
+// and on 2026-09-07 it did exactly that with a real customer: it collected the
+// name and the phone over three turns and then wrote «Сейчас я подготовлю счёт
+// и отправлю его отдельным сообщением». No draft row was ever created, so the
+// owner got no notification, nothing appeared in the review queue, and the
+// customer waited two hours and asked again. A promise with no draft behind it
+// is worse than a refusal: everyone believes the sale is progressing.
+//
+// Used to force ONE retry with tool_choice:tool. False positives are cheap (the
+// forced call reports what is missing and the model asks the customer for it);
+// a false negative is the silent lost sale above. Still, questions are excluded
+// deliberately -- «Прежде чем я отправлю счёт, подскажи, как тебя зовут?» is
+// the model doing the right thing, not promising anything.
+// [а-яё]* rather than \w*: without the u flag JS's \w is [A-Za-z0-9_] and
+// matches no Cyrillic at all, so «ссылку на оплату» silently never matched.
+const INVOICE_NOUN = /счёт|счет|шот|invoice|ссылк[а-яё]*\s+на\s+оплату|payment\s+link/i
+const COMMIT_VERB = /подготовлю|подготовим|отправлю|отправим|пришлю|пришлём|пришлем|вышлю|вышлем|выставлю|выставим|оформлю|оформим|формирую|готовится|дайындаймын|жіберемін|жібереміз|i'?ll\s+send|we'?ll\s+send|i\s+will\s+send|sending\s+you/i
+// Anything that turns the sentence into a question or a condition rather than
+// a commitment.
+const CONDITIONAL = /чтобы|если|нужно уточнить|подскажи|скажи|уточни|которы|\?|сұра|please\s+tell|could\s+you/i
+
+export function promisesInvoice(replyText: string): boolean {
+  // Sentence by sentence: one sentence may promise while the next asks
+  // something unrelated, and judging the whole reply at once loses that.
+  return replyText
+    .split(/(?<=[.!?…])\s+|\n+/)
+    .some(s => INVOICE_NOUN.test(s) && COMMIT_VERB.test(s) && !CONDITIONAL.test(s))
+}
+
 export type InvoiceToolInput = { items?: unknown; customer_name?: unknown; customer_phone?: unknown }
 
 // Explicit tool values win; the conversation's already-collected
