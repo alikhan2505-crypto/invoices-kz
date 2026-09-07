@@ -29,6 +29,15 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.7,
     },
     {
+      // Second free no-signup tool, same purpose as the one above: an organic
+      // entry point for a Kaspi seller searching for what they actually earn
+      // per sale.
+      url: 'https://invoices.kz/tools/margin',
+      lastModified: new Date(),
+      changeFrequency: 'monthly',
+      priority: 0.7,
+    },
+    {
       url: 'https://invoices.kz/privacy',
       lastModified: new Date(),
       changeFrequency: 'monthly',

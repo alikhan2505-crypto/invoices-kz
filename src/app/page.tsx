@@ -412,6 +412,7 @@ const COPY: Record<Lang, Copy> = {
       { label: 'Условия', href: '/terms' },
       { label: 'Удаление данных', href: '/data-deletion' },
       { label: 'Бесплатно → Склейка накладных', href: '/tools/waybills' },
+      { label: 'Бесплатно → Калькулятор маржи', href: '/tools/margin' },
       { label: 'Для разработчиков → Cashier API', href: '/cashier-api' },
     ],
     footerContact: [
@@ -529,6 +530,7 @@ const COPY: Record<Lang, Copy> = {
       { label: 'Шарттар', href: '/terms' },
       { label: 'Деректерді жою', href: '/data-deletion' },
       { label: 'Тегін → Жүкқұжаттарды желімдеу', href: '/tools/waybills' },
+      { label: 'Тегін → Маржа калькуляторы', href: '/tools/margin' },
       { label: 'Әзірлеушілерге → Cashier API', href: '/cashier-api' },
     ],
     footerContact: [
@@ -646,6 +648,7 @@ const COPY: Record<Lang, Copy> = {
       { label: 'Terms', href: '/terms' },
       { label: 'Data Deletion', href: '/data-deletion' },
       { label: 'Free → Waybill Merger', href: '/tools/waybills' },
+      { label: 'Free → Margin Calculator', href: '/tools/margin' },
       { label: 'For Developers → Cashier API', href: '/cashier-api' },
     ],
     footerContact: [
