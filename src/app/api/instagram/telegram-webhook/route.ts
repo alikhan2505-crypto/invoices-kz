@@ -124,16 +124,32 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true })
     }
 
+    // Claim the row BEFORE publishing, with the status as the condition, so
+    // only one caller can ever send it. The status check above is a
+    // read-then-act: when Telegram flushes a queue of button presses at once
+    // -- which is exactly what happens after a broken webhook URL is fixed,
+    // and what published the same reply twice on 2026-09-07 -- every one of
+    // them reads 'pending_review' before any has written, and every one
+    // publishes. A conditional UPDATE is a real claim: the losers match zero
+    // rows and stop here.
+    const { data: claimed } = await supabase
+      .from('instagram_auto_replies')
+      .update({ status: 'sent_after_review', resolved_at: new Date().toISOString() })
+      .eq('id', entityId)
+      .eq('status', 'pending_review')
+      .select('id')
+      .maybeSingle()
+    if (!claimed) {
+      await telegram('answerCallbackQuery', { callback_query_id: cb.id, text: 'Уже обработано' })
+      return NextResponse.json({ ok: true })
+    }
+
     try {
       if (reply.source === 'comment') {
         await replyToComment(reply.reply_target, reply.reply_text)
       } else {
         await sendDirectMessage(reply.reply_target, reply.reply_text)
       }
-      await supabase
-        .from('instagram_auto_replies')
-        .update({ status: 'sent_after_review', resolved_at: new Date().toISOString() })
-        .eq('id', entityId)
 
       // Turn this approved AI reply into a reusable template, so a similar
       // future message gets an instant reply instead of another AI+approval
@@ -166,6 +182,13 @@ export async function POST(req: NextRequest) {
         parse_mode: 'HTML',
       })
     } catch (err: any) {
+      // The claim above already marked this sent. Publishing failed, so hand
+      // the draft back to the queue instead of leaving a reply that says
+      // "sent" and never reached anyone.
+      await supabase
+        .from('instagram_auto_replies')
+        .update({ status: 'pending_review', resolved_at: null })
+        .eq('id', entityId)
       await telegram('answerCallbackQuery', { callback_query_id: cb.id, text: 'Ошибка отправки', show_alert: true })
       await telegram('editMessageText', {
         chat_id: cb.message.chat.id,
