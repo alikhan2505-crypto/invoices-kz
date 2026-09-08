@@ -4,6 +4,7 @@ import { getKey } from './connection'
 import { generateAiReply } from '@/lib/instagramAiReply'
 import { buildBusinessContextLine, buildCollectFieldsToExtract, buildCatalogBlock, AgentTone, AgentGoal } from './promptContext'
 import { loadAgentCatalog } from './catalogContext'
+import { pickProductPhoto } from './productPhoto'
 import { buildInvoiceToolExecutor } from './invoiceSend'
 import { debitAiAgentWallet, AI_AGENT_CREDITS_PER_AI_REPLY, hasAiAgentBudget, AI_AGENT_BUDGET_DEPLETED_REPLY } from './wallet'
 import { isConversationRateLimited } from './rateLimit'
@@ -11,7 +12,7 @@ import { sendTelegramNotification } from '@/lib/telegramNotify'
 import { createNotification } from '@/lib/notifications'
 import { findTemplateMatch, mergeCollectedData, findStopPhraseMatch, STOP_PHRASE_ACK_TEXT } from './webhookHandler'
 import { pairConversationHistory } from './telegram'
-import { sendWhatsAppMessage, sendWhatsAppFlowStep, WhatsAppApiError } from '@/lib/whatsapp'
+import { sendWhatsAppImage, sendWhatsAppMessage, sendWhatsAppFlowStep, WhatsAppApiError } from '@/lib/whatsapp'
 import { UNSUPPORTED_MEDIA_REPLY_TEXT } from '@/lib/aiAgent/mediaLimits'
 import { findFlowTriggerMatch, type FlowStep } from './flow'
 import { startFlow, handleFlowButtonClick, FLOW_STALE_TEXT, type FlowStepSender } from './flowEngine'
@@ -306,12 +307,16 @@ export async function handleWhatsAppIncoming(conn: WhatsAppTenantConnection, par
   // depleted wallet also skips the real Anthropic cost of a reply that was
   // never going to be billed -- see hasAiAgentBudget's own comment.
   const budgetDepleted = !(await hasAiAgentBudget(agent.user_id))
+  // Hoisted: the same catalogue prices the model is shown are matched against
+  // its reply afterwards to decide whether a product photo goes with it.
+  let catalog: Awaited<ReturnType<typeof loadAgentCatalog>> = []
   if (budgetDepleted) {
     draftReply = AI_AGENT_BUDGET_DEPLETED_REPLY
     urgent = false
   } else try {
     // Phase 3: real catalog prices in context + the invoice tool.
-    const catalogBlock = buildCatalogBlock(await loadAgentCatalog(supabase, agent.user_id, agent.kaspi_shop_connection_id))
+    catalog = await loadAgentCatalog(supabase, agent.user_id, agent.kaspi_shop_connection_id)
+    const catalogBlock = buildCatalogBlock(catalog)
     const result = await generateAiReply({
       incomingText: params.incomingText,
       fromUsername: params.customerHandle,
@@ -394,7 +399,20 @@ export async function handleWhatsAppIncoming(conn: WhatsAppTenantConnection, par
   // a successful send, and a failed debit is logged but never un-sends the
   // reply.
   try {
-    await sendWhatsAppMessage(conn.phoneNumberId, params.from, draftReply, { accessToken: conn.accessToken })
+    // WhatsApp carries the text as the image's caption, so when a photo
+    // applies it replaces the text message rather than following it.
+    const photo = pickProductPhoto(draftReply, catalog)
+    if (photo) {
+      try {
+        await sendWhatsAppImage(conn.phoneNumberId, params.from, photo, draftReply, { accessToken: conn.accessToken })
+      } catch (photoErr: any) {
+        // A rejected image must not cost the customer the answer.
+        console.error('ai-agent whatsapp: product photo send failed, falling back to text:', photoErr?.message || photoErr)
+        await sendWhatsAppMessage(conn.phoneNumberId, params.from, draftReply, { accessToken: conn.accessToken })
+      }
+    } else {
+      await sendWhatsAppMessage(conn.phoneNumberId, params.from, draftReply, { accessToken: conn.accessToken })
+    }
     await supabase.from('ai_agent_messages').insert({
       conversation_id: conversation.id,
       direction: 'outbound',

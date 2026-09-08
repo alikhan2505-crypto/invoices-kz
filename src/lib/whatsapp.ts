@@ -162,6 +162,17 @@ export async function sendWhatsAppMessage(phoneNumberId: string, to: string, tex
   })
 }
 
+// WhatsApp carries the text as the image's caption, so one message does both.
+export async function sendWhatsAppImage(phoneNumberId: string, to: string, imageUrl: string, caption: string, opts: { accessToken: string }): Promise<void> {
+  await callGraphApi(`${GRAPH_API}/${phoneNumberId}/messages`, opts.accessToken, {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to,
+    type: 'image',
+    image: { link: imageUrl, caption },
+  })
+}
+
 const WHATSAPP_BUTTON_TITLE_MAX = 20
 const WHATSAPP_LIST_ROW_TITLE_MAX = 24
 const WHATSAPP_LIST_BUTTON_LABEL = 'Выбрать'

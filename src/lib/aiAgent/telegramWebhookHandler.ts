@@ -4,6 +4,7 @@ import { getKey } from './connection'
 import { generateAiReply } from '@/lib/instagramAiReply'
 import { buildBusinessContextLine, buildCollectFieldsToExtract, buildCatalogBlock, AgentTone, AgentGoal } from './promptContext'
 import { loadAgentCatalog } from './catalogContext'
+import { pickProductPhoto } from './productPhoto'
 import { buildInvoiceToolExecutor, createDraft } from './invoiceSend'
 import { validateDraftInput, canAutoSend } from './invoiceDrafts'
 import { debitAiAgentWallet, AI_AGENT_CREDITS_PER_AI_REPLY, hasAiAgentBudget, AI_AGENT_BUDGET_DEPLETED_REPLY } from './wallet'
@@ -11,7 +12,7 @@ import { isConversationRateLimited } from './rateLimit'
 import { sendTelegramNotification } from '@/lib/telegramNotify'
 import { createNotification } from '@/lib/notifications'
 import { findTemplateMatch, mergeCollectedData, findStopPhraseMatch, STOP_PHRASE_ACK_TEXT } from './webhookHandler'
-import { sendTelegramBotMessage, sendTelegramFlowStep, answerTelegramCallbackQuery, pairConversationHistory, TelegramApiError } from './telegram'
+import { sendTelegramBotMessage, sendTelegramBotPhoto, TELEGRAM_CAPTION_MAX, sendTelegramFlowStep, answerTelegramCallbackQuery, pairConversationHistory, TelegramApiError } from './telegram'
 import { UNSUPPORTED_MEDIA_REPLY_TEXT } from '@/lib/aiAgent/mediaLimits'
 import { parseFlowDefinition, isTerminalStep, firstStep, findFlowTriggerMatch, resolveFlowButtonClick, type FlowStep } from './flow'
 
@@ -278,12 +279,16 @@ export async function handleTelegramIncoming(conn: TelegramTenantConnection, par
   // depleted wallet also skips the real Anthropic cost of a reply that was
   // never going to be billed -- see hasAiAgentBudget's own comment.
   const budgetDepleted = !(await hasAiAgentBudget(agent.user_id))
+  // Hoisted: the same catalogue prices the model is shown are matched against
+  // its reply afterwards to decide whether a product photo goes with it.
+  let catalog: Awaited<ReturnType<typeof loadAgentCatalog>> = []
   if (budgetDepleted) {
     draftReply = AI_AGENT_BUDGET_DEPLETED_REPLY
     urgent = false
   } else try {
     // Phase 3: real catalog prices in context + the invoice tool.
-    const catalogBlock = buildCatalogBlock(await loadAgentCatalog(supabase, agent.user_id, agent.kaspi_shop_connection_id))
+    catalog = await loadAgentCatalog(supabase, agent.user_id, agent.kaspi_shop_connection_id)
+    const catalogBlock = buildCatalogBlock(catalog)
     const result = await generateAiReply({
       incomingText: params.incomingText,
       fromUsername: params.fromHandle,
@@ -365,7 +370,20 @@ export async function handleTelegramIncoming(conn: TelegramTenantConnection, par
   // successful send (a failed send costs the customer nothing), and a
   // failed debit is logged but never un-sends the reply.
   try {
-    await sendTelegramBotMessage(conn.botToken, params.chatId, draftReply)
+    // Telegram carries the text as the photo's caption, but its caption limit
+    // is 1024 against 4096 for a message, so a long reply stays text-only
+    // rather than being rejected for the sake of a picture.
+    const photo = draftReply.length <= TELEGRAM_CAPTION_MAX ? pickProductPhoto(draftReply, catalog) : null
+    if (photo) {
+      try {
+        await sendTelegramBotPhoto(conn.botToken, params.chatId, photo, draftReply)
+      } catch (photoErr: any) {
+        console.error('ai-agent telegram: product photo send failed, falling back to text:', photoErr?.message || photoErr)
+        await sendTelegramBotMessage(conn.botToken, params.chatId, draftReply)
+      }
+    } else {
+      await sendTelegramBotMessage(conn.botToken, params.chatId, draftReply)
+    }
     await supabase.from('ai_agent_messages').insert({
       conversation_id: conversation.id,
       direction: 'outbound',

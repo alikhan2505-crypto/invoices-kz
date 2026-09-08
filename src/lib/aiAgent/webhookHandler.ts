@@ -1,7 +1,8 @@
 import { createClient } from '@supabase/supabase-js'
 import { decryptAtRest } from '@/lib/kaspiPay/crypto'
 import { getKey } from './connection'
-import { replyToComment, sendDirectMessage, sendInstagramFlowStep, InstagramApiError } from '@/lib/instagram'
+import { replyToComment, sendDirectMessage, sendDirectImage, sendInstagramFlowStep, InstagramApiError } from '@/lib/instagram'
+import { pickProductPhoto } from './productPhoto'
 import { generateAiReply } from '@/lib/instagramAiReply'
 import { buildBusinessContextLine, buildCollectFieldsToExtract, buildCatalogBlock, AgentTone, AgentGoal } from './promptContext'
 import { loadAgentCatalog } from './catalogContext'
@@ -334,6 +335,9 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
   // depleted wallet also skips the real Anthropic cost of a reply that was
   // never going to be billed -- see hasAiAgentBudget's own comment.
   const budgetDepleted = !(await hasAiAgentBudget(agent.user_id))
+  // Hoisted: the same catalogue prices the model is shown are matched against
+  // its reply afterwards to decide whether a product photo goes with it.
+  let catalog: Awaited<ReturnType<typeof loadAgentCatalog>> = []
   if (budgetDepleted) {
     draftReply = AI_AGENT_BUDGET_DEPLETED_REPLY
     urgent = false
@@ -341,7 +345,8 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
     // Phase 3: real catalog prices in context + the invoice tool. The
     // tool is DM-only -- a public comment thread is no place to collect
     // a phone number or drop a personal invoice link.
-    const catalogBlock = buildCatalogBlock(await loadAgentCatalog(supabase, agent.user_id, agent.kaspi_shop_connection_id))
+    catalog = await loadAgentCatalog(supabase, agent.user_id, agent.kaspi_shop_connection_id)
+    const catalogBlock = buildCatalogBlock(catalog)
     const result = await generateAiReply({
       incomingText: params.incomingText,
       fromUsername: params.fromUsername,
@@ -427,9 +432,19 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
   // Agent is active -- send immediately.
   try {
     if (params.source === 'comment') {
+      // A comment reply is text-only on Instagram's side, and a public thread
+      // is the wrong place for a product photo anyway.
       await replyToComment(params.replyTarget, draftReply, { accessToken: conn.accessToken })
     } else {
       await sendDirectMessage(params.replyTarget, draftReply, { igUserId: conn.externalAccountId, accessToken: conn.accessToken })
+      // Photo second, and only if the reply actually named one product that
+      // has one. Failing to attach it must not lose the answer that already
+      // went out, so this never throws into the caller.
+      const photo = pickProductPhoto(draftReply, catalog)
+      if (photo) {
+        await sendDirectImage(params.replyTarget, photo, { igUserId: conn.externalAccountId, accessToken: conn.accessToken })
+          .catch((err: any) => console.error('ai-agent webhook: product photo send failed:', err?.message || err))
+      }
     }
     await supabase.from('ai_agent_messages').insert({
       conversation_id: conversation.id,

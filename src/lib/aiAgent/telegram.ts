@@ -187,6 +187,16 @@ export async function sendTelegramBotMessage(botToken: string, chatId: string, t
   await callTelegram(botToken, 'sendMessage', { chat_id: chatId, text })
 }
 
+// Telegram carries the text as the photo's caption, so one message does both.
+// Its caption limit is 1024 characters against 4096 for a plain message; a
+// longer reply would be rejected outright, so it falls back to text-only
+// rather than losing the answer for the sake of a picture.
+export const TELEGRAM_CAPTION_MAX = 1024
+
+export async function sendTelegramBotPhoto(botToken: string, chatId: string, imageUrl: string, caption: string): Promise<void> {
+  await callTelegram(botToken, 'sendPhoto', { chat_id: chatId, photo: imageUrl, caption })
+}
+
 // Downloads a Telegram file (photo or voice note) for the AI-агент
 // photo/voice pipeline. Telegram's getFile doesn't return a mime type --
 // callers already know it from which ParsedTelegramUpdate kind they're

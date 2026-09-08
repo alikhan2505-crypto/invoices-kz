@@ -210,6 +210,29 @@ export async function sendDirectMessage(recipientId: string, message: string, cr
   }
 }
 
+// Sends an image on its own. Instagram has no caption field on an attachment
+// message, so the text goes first as a normal message and the photo follows —
+// which is also the order that reads correctly in the chat.
+export async function sendDirectImage(recipientId: string, imageUrl: string, credentials?: { igUserId: string; accessToken: string }): Promise<void> {
+  const igUserId = credentials?.igUserId ?? process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID
+  const accessToken = credentials?.accessToken ?? process.env.INSTAGRAM_ACCESS_TOKEN
+  if (!igUserId || !accessToken) throw new Error('Instagram not configured')
+
+  const res = await fetch(`${GRAPH_API}/${igUserId}/messages`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      recipient: { id: recipientId },
+      message: { attachment: { type: 'image', payload: { url: imageUrl } } },
+      access_token: accessToken,
+    }),
+  })
+  const data = await res.json()
+  if (!res.ok) {
+    throw new InstagramApiError(data.error?.message || 'Failed to send image', res.status)
+  }
+}
+
 const INSTAGRAM_QUICK_REPLY_TITLE_MAX = 20
 const INSTAGRAM_QUICK_REPLY_MAX = 13
 
