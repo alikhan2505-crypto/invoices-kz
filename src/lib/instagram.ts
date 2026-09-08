@@ -1,4 +1,5 @@
 import type { FlowStep } from './aiAgent/flow'
+import { loadPublishToken } from './instagramPublishToken'
 
 // "Instagram API with Instagram Login" tokens (prefixed IGAA...) are only
 // valid against graph.instagram.com — the classic graph.facebook.com host
@@ -71,21 +72,22 @@ export async function publishToInstagram(
   caption: string,
   credentials?: { igUserId: string; accessToken: string },
 ): Promise<string> {
-  // INSTAGRAM_ACCESS_TOKEN wins. It is generated in the App Dashboard
-  // ("Сгенерируйте маркеры доступа" → Сгенерировать маркер) for our own
-  // account and carries every permission the app holds at Standard Access,
-  // including instagram_business_content_publish.
+  // Our OWN marker wins — the one generated in the App Dashboard, which
+  // carries every permission the app holds at Standard Access, including
+  // instagram_business_content_publish. loadPublishToken returns the rotated
+  // copy from the database when there is one and falls back to the env var
+  // otherwise, so this works before the cron has seeded the table.
   //
-  // The connection token is the fallback, not the other way round: it comes
-  // from the customer OAuth flow, whose scope list is deliberately narrow, and
-  // Instagram silently drops a scope that flow is not configured to grant. On
-  // 2026-09-07 that produced four identical "Application does not have
-  // permission for this action" failures — the OAuth grant came back with only
+  // The customer's connection token is the fallback, not the other way round:
+  // it comes from the Business Login flow, whose scope list is deliberately
+  // narrow, and Instagram silently drops a scope that flow is not configured
+  // to grant. On 2026-09-07 that produced four identical "Application does not
+  // have permission for this action" failures — the grant came back with only
   // basic, manage_messages and manage_comments, confirmed in the callback log.
-  const envToken = process.env.INSTAGRAM_ACCESS_TOKEN
-  const accessToken = envToken || credentials?.accessToken
+  const ownToken = await loadPublishToken()
+  const accessToken = ownToken || credentials?.accessToken
   if (!accessToken) throw new Error('Instagram not configured')
-  const igUserId = envToken ? await resolveIgUserId(envToken) : credentials!.igUserId
+  const igUserId = ownToken ? await resolveIgUserId(ownToken) : credentials!.igUserId
   if (imageUrls.length === 0) throw new Error('No images provided')
 
   let creationId: string
@@ -127,7 +129,10 @@ export interface MediaInsights {
 }
 
 export async function getMediaInsights(igMediaId: string): Promise<MediaInsights> {
-  const accessToken = process.env.INSTAGRAM_ACCESS_TOKEN
+  // Same token as publishing: insights are read for OUR posts on OUR account,
+  // and reading the env var directly here would break the moment the rotated
+  // copy diverges from it.
+  const accessToken = await loadPublishToken()
   if (!accessToken) throw new Error('Instagram not configured')
 
   const res = await fetch(

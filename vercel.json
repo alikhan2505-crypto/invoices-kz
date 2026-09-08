@@ -15,6 +15,10 @@
     {
       "path": "/api/cron/kaspi-poll",
       "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/instagram-token",
+      "schedule": "0 3 * * *"
     }
   ]
 }

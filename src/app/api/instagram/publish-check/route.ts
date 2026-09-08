@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { loadPublishToken } from '@/lib/instagramPublishToken'
 
 // Pre-flight for "can we actually publish a post right now?".
 //
@@ -24,9 +25,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const accessToken = process.env.INSTAGRAM_ACCESS_TOKEN
+  // The same resolution publishToInstagram uses -- checking a different token
+  // than the one that will actually publish would make this check a lie.
+  const accessToken = await loadPublishToken()
   if (!accessToken) {
-    return NextResponse.json({ ok: false, step: 'token', error: 'INSTAGRAM_ACCESS_TOKEN is not set' })
+    return NextResponse.json({ ok: false, step: 'token', error: 'no stored token and INSTAGRAM_ACCESS_TOKEN is not set' })
   }
 
   const meRes = await fetch(`${GRAPH_API}/me?fields=user_id,username&access_token=${accessToken}`)
