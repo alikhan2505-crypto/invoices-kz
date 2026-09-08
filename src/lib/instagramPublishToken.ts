@@ -67,7 +67,7 @@ export async function loadPublishToken(): Promise<string | null> {
   return process.env.INSTAGRAM_ACCESS_TOKEN || null
 }
 
-async function refreshWithMeta(token: string): Promise<{ token: string; expiresInSec: number }> {
+export async function refreshWithMeta(token: string): Promise<{ token: string; expiresInSec: number }> {
   // No app secret on this call, unlike the code-for-token exchange.
   const res = await fetch(
     `${GRAPH_API}/refresh_access_token?grant_type=ig_refresh_token&access_token=${token}`

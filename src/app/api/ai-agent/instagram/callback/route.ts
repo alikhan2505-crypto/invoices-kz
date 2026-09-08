@@ -120,6 +120,15 @@ export async function GET(req: NextRequest) {
       external_account_name: meData.username || null,
       access_token_enc: encryptedToken,
       status: 'active',
+      // Meta reports the lifetime and this used to be discarded, so nothing
+      // knew when a customer's agent would fall silent. A long-lived token
+      // lasts 60 days and cannot be refreshed at all once that passes, so the
+      // rotation cron needs the deadline to work against. Falls back to 60
+      // days when Meta omits expires_in.
+      token_expires_at: new Date(
+        Date.now() + (Number(longLivedData.expires_in) || 60 * 24 * 60 * 60) * 1000
+      ).toISOString(),
+      token_refreshed_at: new Date().toISOString(),
     }, { onConflict: 'channel,external_account_id' })
     if (upsertError) throw new Error(upsertError.message)
 

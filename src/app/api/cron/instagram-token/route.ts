@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { rotatePublishToken } from '@/lib/instagramPublishToken'
+import { rotateConnectionTokens } from '@/lib/aiAgent/connectionTokens'
 import { sendTelegramNotification } from '@/lib/telegramNotify'
 
 // Keeps the Instagram publishing token alive.
@@ -21,6 +22,24 @@ export async function GET(request: Request) {
 
   const result = await rotatePublishToken()
 
+  // Customers' Instagram connections expire the same way and were never
+  // renewed either — an agent would just fall silent 60 days after it was
+  // connected. Run after the publishing token and independently of it: one
+  // failing must not skip the other.
+  const connections = await rotateConnectionTokens()
+  if (connections.failed.length > 0) {
+    console.error('cron instagram-token: connection refresh failures:', JSON.stringify(connections.failed))
+    await sendTelegramNotification(
+      process.env.TELEGRAM_CHAT_ID!,
+      `⚠️ Не удалось продлить токен Instagram у ${connections.failed.length} подключений: ` +
+      connections.failed.map(f => f.account || f.id).join(', ') +
+      '\n\nЭти агенты перестанут отвечать клиентам, когда токен истечёт. ' +
+      'Владельцу нужно переподключить Instagram в настройках агента.'
+    ).catch((e: any) => console.error('cron instagram-token: telegram notice failed:', e?.message || e))
+  } else if (connections.refreshed > 0) {
+    console.log('cron instagram-token: refreshed', connections.refreshed, 'connection token(s)')
+  }
+
   if (result.status === 'failed' || result.status === 'no_token') {
     const detail = result.status === 'failed'
       ? result.error
@@ -37,5 +56,5 @@ export async function GET(request: Request) {
     console.log('cron instagram-token:', JSON.stringify(result))
   }
 
-  return NextResponse.json(result)
+  return NextResponse.json({ publishToken: result, connections })
 }
