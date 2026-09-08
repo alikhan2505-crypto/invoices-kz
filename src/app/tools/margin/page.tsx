@@ -6,17 +6,19 @@ import { track } from '@vercel/analytics'
 import * as XLSX from 'xlsx'
 import { useLanguage, Lang } from '@/components/LanguageProvider'
 import { calculateMargin, MarginInput } from '@/lib/marginCalc'
+import { KASPI_CATEGORY_COMMISSIONS } from '@/lib/kaspiShop/margin'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
-// Kaspi Магазин's commission is set per category and most sellers sit around
-// 10%; an ИП on упрощёнка in Kazakhstan pays 3% of turnover. Both are
-// pre-filled so the calculator gives a believable answer before anything is
-// typed, and both are editable because neither is universal.
+// 12.5% is the rate the large majority of Kaspi's top-level categories carry
+// (see KASPI_CATEGORY_COMMISSIONS, transcribed from Kaspi's own published
+// tariff). An ИП on упрощёнка in Kazakhstan pays 3% of turnover. Both are
+// pre-filled so the calculator answers before anything is typed, and both stay
+// editable because neither is universal.
 const DEFAULTS: MarginInput = {
   costPrice: 5000,
   sellPrice: 10000,
-  commissionPercent: 10,
+  commissionPercent: 12.5,
   deliveryCost: 800,
   taxPercent: 3,
   otherCosts: 200,
@@ -66,6 +68,9 @@ interface Copy {
   leadSubmitButton: string
   leadSendingButton: string
   leadThanks: string
+  categoryLabel: string
+  categoryManual: string
+  categoryHint: string
   otherToolLink: string
 }
 
@@ -83,7 +88,7 @@ const COPY: Record<Lang, Copy> = {
       monthlyUnits: 'Продаж в месяц',
     },
     fieldHints: {
-      commissionPercent: 'Зависит от категории — обычно 5–12%',
+      commissionPercent: 'Выберите категорию выше — ставка подставится сама',
       taxPercent: 'ИП на упрощёнке в РК — 3% с оборота',
       otherCosts: 'Упаковка, реклама, возвраты',
     },
@@ -123,6 +128,9 @@ const COPY: Record<Lang, Copy> = {
     leadSubmitButton: 'Отправить',
     leadSendingButton: 'Отправляем…',
     leadThanks: 'Спасибо! Дадим знать, когда выйдет что-то новое.',
+    categoryLabel: 'Категория товара на Kaspi',
+    categoryManual: 'Другое — укажу комиссию сам',
+    categoryHint: 'Ставки из официального тарифа Kaspi. Если вашей категории в списке нет, выберите «Другое» и впишите свой процент.',
     otherToolLink: 'Ещё бесплатно: склейка накладных Kaspi →',
   },
   kk: {
@@ -138,7 +146,7 @@ const COPY: Record<Lang, Copy> = {
       monthlyUnits: 'Айына сатылым',
     },
     fieldHints: {
-      commissionPercent: 'Санатқа байланысты — әдетте 5–12%',
+      commissionPercent: 'Жоғарыда санатты таңдаңыз — мөлшерлеме өзі қойылады',
       taxPercent: 'ҚР-дағы жеңілдетілген ЖК — айналымнан 3%',
       otherCosts: 'Қаптама, жарнама, қайтарымдар',
     },
@@ -178,6 +186,9 @@ const COPY: Record<Lang, Copy> = {
     leadSubmitButton: 'Жіберу',
     leadSendingButton: 'Жіберілуде…',
     leadThanks: 'Рахмет! Жаңалық шыққанда хабарлаймыз.',
+    categoryLabel: 'Kaspi-дегі тауар санаты',
+    categoryManual: 'Басқа — комиссияны өзім көрсетемін',
+    categoryHint: 'Мөлшерлемелер Kaspi-дің ресми тарифінен. Санатыңыз тізімде болмаса, «Басқа» таңдап, өз пайызыңызды жазыңыз.',
     otherToolLink: 'Тағы тегін: Kaspi жүкқұжаттарын желімдеу →',
   },
   en: {
@@ -193,7 +204,7 @@ const COPY: Record<Lang, Copy> = {
       monthlyUnits: 'Sales per month',
     },
     fieldHints: {
-      commissionPercent: 'Depends on the category — usually 5–12%',
+      commissionPercent: 'Pick a category above and the rate fills itself in',
       taxPercent: 'A simplified-regime sole trader in Kazakhstan pays 3%',
       otherCosts: 'Packaging, ads, returns',
     },
@@ -233,6 +244,9 @@ const COPY: Record<Lang, Copy> = {
     leadSubmitButton: 'Send',
     leadSendingButton: 'Sending…',
     leadThanks: "Thanks! We'll let you know when something new ships.",
+    categoryLabel: 'Product category on Kaspi',
+    categoryManual: 'Other — I will enter the rate myself',
+    categoryHint: "Rates come from Kaspi's own published tariff. If your category is not listed, pick Other and type your rate.",
     otherToolLink: 'Also free: Kaspi waybill merger →',
   },
 }
@@ -260,6 +274,8 @@ export default function MarginCalculatorTool() {
   const [raw, setRaw] = useState<Record<FieldKey, string>>(() =>
     Object.fromEntries(FIELDS.map(f => [f.key, String(DEFAULTS[f.key])])) as Record<FieldKey, string>
   )
+  // '' = manual entry, which is what the field alone used to be.
+  const [category, setCategory] = useState('')
   const [leadContact, setLeadContact] = useState('')
   const [leadStatus, setLeadStatus] = useState<'idle' | 'sending' | 'sent'>('idle')
   const [exported, setExported] = useState(false)
@@ -420,6 +436,32 @@ export default function MarginCalculatorTool() {
           <p className="text-sm mb-6" style={{ color: 'var(--nav-text-secondary)' }}>{t.subtitle}</p>
 
           <div className="nav-glass rounded-2xl p-4 lg:p-5 mb-4">
+            {/* Kaspi's real rates are 7.3 / 12.5 / 15.5 depending on category,
+                not the vague range this tool used to suggest. The table is the
+                one the in-app calculator uses, transcribed from Kaspi's own
+                published tariff — shared rather than copied so the two cannot
+                drift. Category names stay Russian in every language because
+                that is exactly how the seller sees them in their Kaspi
+                cabinet. */}
+            <label className="block mb-3">
+              <span className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.categoryLabel}</span>
+              <select
+                value={category}
+                onChange={e => {
+                  touched.current = true
+                  setCategory(e.target.value)
+                  const found = KASPI_CATEGORY_COMMISSIONS.find(c => c.label === e.target.value)
+                  if (found) setRaw(prev => ({ ...prev, commissionPercent: String(found.ratePercent) }))
+                }}
+                className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)]"
+                style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-surface-glass)' }}>
+                <option value="">{t.categoryManual}</option>
+                {KASPI_CATEGORY_COMMISSIONS.map(c => (
+                  <option key={c.label} value={c.label}>{c.label} — {c.ratePercent}%</option>
+                ))}
+              </select>
+              <span className="text-[11px] mt-1 block" style={{ color: 'var(--nav-text-muted)' }}>{t.categoryHint}</span>
+            </label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {FIELDS.map(f => (
                 <label key={f.key} className="block">
@@ -432,7 +474,14 @@ export default function MarginCalculatorTool() {
                       inputMode="decimal"
                       min={0}
                       value={raw[f.key]}
-                      onChange={e => { touched.current = true; setRaw(prev => ({ ...prev, [f.key]: e.target.value })) }}
+                      onChange={e => {
+                        touched.current = true
+                        // Typing your own commission drops the category:
+                        // leaving it selected would name a category whose
+                        // published rate is no longer what is in the field.
+                        if (f.key === 'commissionPercent') setCategory('')
+                        setRaw(prev => ({ ...prev, [f.key]: e.target.value }))
+                      }}
                       className={INPUT_CLS}
                       style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-surface-glass)' }} />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs pointer-events-none" style={{ color: 'var(--nav-text-muted)' }}>
