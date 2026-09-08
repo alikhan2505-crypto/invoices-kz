@@ -158,6 +158,39 @@ export default function KaspiShopProductAvailability() {
   const [search, setSearch] = useState('')
   const [addModal, setAddModal] = useState<AddModalState | null>(null)
   const [newCardModal, setNewCardModal] = useState<NewCardModalState | null>(null)
+  // Photo backfill: pulls product pictures from Kaspi's own catalogue cards.
+  // Runs in batches of 20 because the cabinet search is a session endpoint,
+  // not a bulk API, so progress is shown rather than a spinner that sits for
+  // a minute with nothing to say.
+  const [photoRun, setPhotoRun] = useState<{ filled: number; notFound: number; remaining: number } | null>(null)
+  const [photoBusy, setPhotoBusy] = useState(false)
+  const [photoError, setPhotoError] = useState('')
+
+  async function backfillPhotos() {
+    setPhotoBusy(true)
+    setPhotoError('')
+    try {
+      const res = await fetch('/api/kaspi-shop/products/backfill-images', {
+        method: 'POST',
+        headers: await authHeader(),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        setPhotoError(data?.error || 'Не удалось загрузить фото. Попробуйте ещё раз.')
+        return
+      }
+      setPhotoRun({
+        filled: (photoRun?.filled || 0) + (data.filled || 0),
+        notFound: (photoRun?.notFound || 0) + (data.notFound || 0),
+        remaining: data.remaining ?? 0,
+      })
+    } catch {
+      setPhotoError('Ошибка сети. Проверьте соединение и попробуйте ещё раз.')
+    } finally {
+      setPhotoBusy(false)
+    }
+  }
+
 
   useEffect(() => { load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -595,6 +628,34 @@ export default function KaspiShopProductAvailability() {
             выключается, чтобы репрайсер случайно не вернул его в продажу.
           </p>
         </motion.div>
+
+        {/* Product photos. The agent can attach one to a reply, but image_url
+            is otherwise only filled off order items -- so a product gets a
+            picture after it sells and not before. This takes them from Kaspi's
+            catalogue instead. */}
+        <div className="nav-glass rounded-2xl p-4 lg:p-5 mb-4">
+          <div className="text-sm font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>Фото товаров</div>
+          <p className="text-[13px] mb-3" style={{ color: 'var(--nav-text-muted)' }}>
+            Загружает фотографии из карточек Kaspi для товаров, у которых их ещё нет. Нужны, чтобы ИИ-агент
+            мог прислать клиенту фото товара. За один раз обрабатывается 20 товаров — нажимайте, пока не
+            останется ноль.
+          </p>
+          <div className="flex items-center gap-3 flex-wrap">
+            <button onClick={backfillPhotos} disabled={photoBusy}
+              className="rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50"
+              style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+              {photoBusy ? 'Загружаем…' : 'Загрузить фото'}
+            </button>
+            {photoRun && (
+              <span className="text-[13px]" style={{ color: 'var(--nav-text-secondary)' }}>
+                Загружено: <b style={{ color: 'var(--nav-success)' }}>{photoRun.filled}</b>
+                {photoRun.notFound > 0 && <> · не найдено в каталоге: {photoRun.notFound}</>}
+                {' '}· осталось без фото: <b style={{ color: 'var(--nav-text-primary)' }}>{photoRun.remaining}</b>
+              </span>
+            )}
+          </div>
+          {photoError && <div className="text-[13px] mt-2" style={{ color: 'var(--nav-critical)' }}>{photoError}</div>}
+        </div>
 
         <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
           <div className="flex items-center gap-1.5">
