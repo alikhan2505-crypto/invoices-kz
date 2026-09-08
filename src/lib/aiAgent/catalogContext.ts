@@ -71,17 +71,39 @@ export async function loadAgentCatalog(
       .order('stock_count', { ascending: false, nullsFirst: false })
       .order('product_name', { ascending: true })
       .limit(CATALOG_MAX_PRODUCTS)
-    // image_url comes along so a reply can carry the product's photo (see
-    // pickProductPhoto). It is only filled for products that have actually
-    // sold -- the backfill reads it off order items -- so most rows have none,
-    // and the founder's rule for those is to show nothing rather than a
-    // placeholder.
-    return (products || [])
-      .map(p => ({
-        name: String(p.product_name || '').trim(),
-        price: Number(p.own_current_price) || 0,
-        imageUrl: p.image_url || null,
+    // Second source: products the owner added by hand in Витрина. They exist
+    // nowhere in Kaspi's own catalogue, so without this the agent does not know
+    // they are for sale at all -- and their photo is the only one a seller can
+    // set themselves. On tracked products image_url is filled only for items
+    // that have actually sold, because the backfill reads it off order items.
+    const { data: custom } = await supabase
+      .from('kaspi_shop_custom_products')
+      .select('name, price, image_url, stock_count')
+      .eq('connection_id', conn.id)
+
+    const tracked = (products || []).map(p => ({
+      name: String(p.product_name || '').trim(),
+      price: Number(p.own_current_price) || 0,
+      imageUrl: (p.image_url as string | null) || null,
+    }))
+
+    // Same availability rule Витрина itself applies: an unset count means the
+    // owner is not tracking stock for this one, not that it is out.
+    const handAdded = (custom || [])
+      .filter(c => c.stock_count === null || c.stock_count === undefined || Number(c.stock_count) > 0)
+      .map(c => ({
+        name: String(c.name || '').trim(),
+        price: Number(c.price) || 0,
+        imageUrl: (c.image_url as string | null) || null,
       }))
+
+    // A hand-added product is by definition one Kaspi does not track, so the
+    // two lists should not overlap -- but a seller can retype a name that also
+    // exists in Kaspi, and two entries for one product would make
+    // pickProductPhoto call it a tie and send no photo at all. Tracked wins:
+    // its price is the one the repricer keeps current.
+    const seen = new Set(tracked.map(p => p.name.toLowerCase()))
+    return [...tracked, ...handAdded.filter(p => !seen.has(p.name.toLowerCase()))]
       .filter(p => p.name && p.price > 0)
   } catch {
     return []
