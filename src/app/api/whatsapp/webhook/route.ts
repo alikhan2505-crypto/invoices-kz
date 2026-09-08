@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
-import { loadWhatsAppConnection, handleWhatsAppIncoming, handleWhatsAppFlowButtonClick } from '@/lib/aiAgent/whatsappWebhookHandler'
+import { loadWhatsAppConnection, handleWhatsAppEcho, handleWhatsAppIncoming, handleWhatsAppFlowButtonClick } from '@/lib/aiAgent/whatsappWebhookHandler'
 import { downloadWhatsAppMedia, sendWhatsAppMessage } from '@/lib/whatsapp'
 import { transcribeAudio } from '@/lib/openaiWhisper'
 import { isImageWithinLimits, isAudioWithinLimits, UNSUPPORTED_MEDIA_REPLY_TEXT } from '@/lib/aiAgent/mediaLimits'
@@ -55,6 +55,10 @@ const WHATSAPP_CONTENT_TYPES = ['video', 'document', 'sticker', 'location', 'con
 interface WhatsAppValue {
   messaging_product?: string
   metadata?: { display_phone_number?: string; phone_number_id?: string }
+  // Coexistence only: messages the OWNER sent from their WhatsApp Business
+  // app, echoed to us so the thread stays whole. `to` is the customer, since
+  // the owner is the sender here.
+  message_echoes?: { id?: string; to?: string; timestamp?: string; type?: string; text?: { body?: string } }[]
   contacts?: { profile?: { name?: string }; wa_id?: string }[]
   messages?: {
     from?: string
@@ -89,6 +93,26 @@ export async function POST(req: NextRequest) {
 
   for (const entry of payload.entry || []) {
     for (const change of entry.changes || []) {
+      // Coexistence: the owner answered a customer from their own WhatsApp
+      // Business app on their phone. Mirrored into the thread so Переписка
+      // shows the whole conversation and the agent stops replying over a
+      // human who is already handling it.
+      if (change.field === 'smb_message_echoes') {
+        const value = change.value
+        const phoneNumberId = value?.metadata?.phone_number_id
+        if (!phoneNumberId) continue
+        const conn = await loadWhatsAppConnection(phoneNumberId)
+        if (!conn) continue
+        for (const msg of value?.message_echoes || []) {
+          const text = msg?.text?.body
+          // Text only for now. A photo the owner sent from the phone has no
+          // place to live yet, and inventing an empty message for it would
+          // make the thread read as if they sent nothing.
+          if (!msg?.id || !msg?.to || typeof text !== 'string' || !text) continue
+          await handleWhatsAppEcho(conn, { externalId: msg.id, to: String(msg.to), text })
+        }
+        continue
+      }
       if (change.field !== 'messages') continue
       const value = change.value
       // No messages array -- a statuses-only delivery (sent/delivered/read

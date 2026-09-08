@@ -952,6 +952,10 @@ export default function AiAgentSettings() {
               code,
               phoneNumberId: waPhoneNumberIdRef.current,
               wabaId: waWabaIdRef.current,
+              // Meta reports Coexistence with its own completion event. The
+              // server needs it: a Coexistence number is ALREADY registered
+              // for Cloud API, so registering it again fails.
+              esEvent: waLastEventRef.current,
             }),
           })
           if (res.ok) {

@@ -53,6 +53,11 @@ export async function POST(req: NextRequest) {
   const code = body?.code
   const phoneNumberId = body?.phoneNumberId
   const wabaId = body?.wabaId
+  // Meta names the Coexistence completion differently from a normal one:
+  // FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING against plain FINISH. That is
+  // the only signal that the number is already live in the seller's phone
+  // app, and it changes what this route must and must not do.
+  const isCoexistence = body?.esEvent === 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING'
   if (!agentId || typeof agentId !== 'string') return NextResponse.json({ error: 'agentId required' }, { status: 400 })
   if (!code || typeof code !== 'string') return NextResponse.json({ error: 'code required' }, { status: 400 })
   if (!phoneNumberId || typeof phoneNumberId !== 'string') return NextResponse.json({ error: 'phoneNumberId required' }, { status: 400 })
@@ -81,12 +86,22 @@ export async function POST(req: NextRequest) {
     // re-check the number's real verification status with Meta before
     // deciding, and only then continue; otherwise let the original error
     // propagate and fail the connect attempt honestly.
-    try {
-      await registerWhatsAppPhoneNumber(phoneNumberId, accessToken)
-    } catch (registerError: any) {
-      const verified = await isWhatsAppPhoneNumberVerified(phoneNumberId, accessToken)
-      if (!verified) throw registerError
-      console.error('ai-agent WhatsApp register call failed but number is independently confirmed VERIFIED -- continuing:', registerError instanceof WhatsAppApiError ? `[${registerError.status}] ${registerError.message}` : registerError.message)
+    //
+    // Coexistence skips this entirely: the number is already registered for
+    // Cloud API because it is already live in the seller's WhatsApp Business
+    // app, and calling register on it fails with that same generic message.
+    // It happened to survive anyway — the failure fell into the verified-
+    // number branch below — but relying on an error path to reach the right
+    // outcome is not a design, and the recovery costs an extra round trip to
+    // Meta on every Coexistence connect.
+    if (!isCoexistence) {
+      try {
+        await registerWhatsAppPhoneNumber(phoneNumberId, accessToken)
+      } catch (registerError: any) {
+        const verified = await isWhatsAppPhoneNumberVerified(phoneNumberId, accessToken)
+        if (!verified) throw registerError
+        console.error('ai-agent WhatsApp register call failed but number is independently confirmed VERIFIED -- continuing:', registerError instanceof WhatsAppApiError ? `[${registerError.status}] ${registerError.message}` : registerError.message)
+      }
     }
 
     // 3. Subscribe OUR app to this WABA's webhooks -- required, not
@@ -104,6 +119,7 @@ export async function POST(req: NextRequest) {
       channel: 'whatsapp',
       external_account_id: phoneNumberId,
       waba_id: wabaId,
+      is_coexistence: isCoexistence,
       access_token_enc: encryptedToken,
       status: 'active',
     }, { onConflict: 'channel,external_account_id' })

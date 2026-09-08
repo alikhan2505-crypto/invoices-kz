@@ -86,6 +86,69 @@ export async function loadWhatsAppConnection(phoneNumberId: string): Promise<Wha
   }
 }
 
+// A message the OWNER sent from their own WhatsApp Business app on their
+// phone, mirrored into the conversation so Переписка shows the whole thread
+// rather than half of it.
+//
+// This is what Coexistence buys and what makes it safe: the number keeps
+// working on the phone, and anything typed there still lands here. Without
+// mirroring, an owner who answered a customer by hand would look — to us and
+// to the agent's own conversation history — like someone who never replied,
+// and the agent could answer the same question again minutes later.
+export interface WhatsAppEchoParams {
+  externalId: string
+  // The CUSTOMER's number, which is the thread this belongs to — the owner is
+  // the sender here, not the recipient of interest.
+  to: string
+  text: string
+}
+
+export async function handleWhatsAppEcho(conn: WhatsAppTenantConnection, params: WhatsAppEchoParams): Promise<void> {
+  // Same dedup as an inbound message: Meta can redeliver an echo.
+  const { data: existing } = await supabase
+    .from('ai_agent_messages')
+    .select('id')
+    .eq('external_id', params.externalId)
+    .maybeSingle()
+  if (existing) return
+
+  // Only into a thread that already exists. An echo is the owner replying,
+  // and a reply implies a conversation; creating one from an echo alone would
+  // invent a customer we have never heard from.
+  const { data: conversation } = await supabase
+    .from('ai_agent_conversations')
+    .select('id')
+    .eq('agent_id', conn.agentId)
+    .eq('channel', 'whatsapp')
+    .eq('external_thread_id', params.to)
+    .maybeSingle()
+  if (!conversation) return
+
+  const { error } = await supabase.from('ai_agent_messages').insert({
+    conversation_id: conversation.id,
+    direction: 'outbound',
+    text: params.text,
+    // Not the agent's words and never billed: a human typed this on a phone.
+    is_ai_generated: false,
+    status: 'sent',
+    external_id: params.externalId,
+  })
+  // 23505 means a concurrent delivery of the same echo won the race, which is
+  // the dedup working rather than a failure.
+  if (error && error.code !== '23505') {
+    console.error('ai-agent whatsapp echo: insert failed:', error.message)
+    return
+  }
+
+  // The owner answered by hand, so the agent must stop answering in this
+  // thread — exactly the rule the stop-phrase path already applies. Otherwise
+  // the customer gets a human reply and a bot reply to the same question.
+  await supabase.from('ai_agent_conversations')
+    .update({ paused_for_human: true })
+    .eq('id', conversation.id)
+    .eq('paused_for_human', false)
+}
+
 interface WhatsAppIncomingParams {
   // The WhatsApp message's own `id` (e.g. "wamid.XXXX") -- globally unique
   // across all WhatsApp numbers (unlike Telegram's per-bot update_id), so
