@@ -20,13 +20,13 @@ export const metadata: Metadata = {
     siteName: 'INVOICES.KZ',
     title: 'Kaspi Cashier API — invoices.kz',
     description: 'Kaspi Pay на вашем сайте: создание платежа, QR-ссылка и вебхук об оплате. 2% с оплаченного, без абонплаты и минимального оборота.',
-    images: [{ url: 'https://invoices.kz/og-image.png', width: 1200, height: 630, alt: 'Kaspi Cashier API — invoices.kz' }],
+    images: [{ url: 'https://invoices.kz/og-cashier-api.png', width: 1200, height: 630, alt: 'Kaspi Cashier API — invoices.kz' }],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Kaspi Cashier API — invoices.kz',
     description: 'Kaspi Pay на вашем сайте: 2% с оплаченного, без абонплаты и минимального оборота.',
-    images: ['https://invoices.kz/og-image.png'],
+    images: ['https://invoices.kz/og-cashier-api.png'],
   },
 }
 

@@ -1,0 +1,27 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="630" fill="#1C2056"/>
+  <rect x="0" y="0" width="400" height="630" fill="#162048"/>
+  <rect x="0" y="580" width="1200" height="8" fill="#2DC48D"/>
+  <rect x="80" y="96" width="8" height="196" fill="#2DC48D"/>
+
+  <text x="120" y="128" font-family="Arial, sans-serif" font-weight="700" font-size="22" letter-spacing="3" fill="rgba(255,255,255,0.45)">INVOICES.KZ</text>
+  <text x="120" y="205" font-family="Arial, sans-serif" font-weight="800" font-size="62" fill="#ffffff">Склейка накладных</text>
+  <text x="120" y="272" font-family="Arial, sans-serif" font-weight="800" font-size="62" fill="#2DC48D">Kaspi</text>
+
+  <text x="122" y="332" font-family="Arial, sans-serif" font-size="30" fill="rgba(255,255,255,0.62)">Все накладные одним файлом</text>
+
+  <text x="122" y="378" font-family="Arial, sans-serif" font-size="24" fill="rgba(255,255,255,0.45)">А4 — по 4 на лист, бумаги вчетверо меньше</text>
+  <text x="122" y="414" font-family="Arial, sans-serif" font-size="24" fill="rgba(255,255,255,0.45)">А6 — по одной, на термопринтер</text>
+  <text x="122" y="450" font-family="Arial, sans-serif" font-size="24" fill="rgba(255,255,255,0.45)">Файлы нигде не сохраняются</text>
+
+  <rect x="122" y="484" width="330" height="52" rx="26" fill="#2DC48D"/>
+  <text x="287" y="518" text-anchor="middle" font-family="Arial, sans-serif" font-weight="700" font-size="21" fill="#ffffff">Бесплатно, без регистрации</text>
+
+  <circle cx="920" cy="290" r="190" fill="rgba(45,196,141,0.06)"/>
+  <circle cx="920" cy="290" r="138" fill="rgba(45,196,141,0.09)"/>
+  <circle cx="920" cy="290" r="88" fill="rgba(45,196,141,0.13)"/>
+  <text x="920" y="300" text-anchor="middle" font-family="Arial, sans-serif" font-weight="800" font-size="96" fill="#2DC48D">4</text>
+  <text x="920" y="344" text-anchor="middle" font-family="Arial, sans-serif" font-size="21" fill="rgba(255,255,255,0.42)">на одном листе</text>
+
+  <text x="122" y="562" font-family="Arial, sans-serif" font-size="18" fill="rgba(255,255,255,0.32)">invoices.kz/tools/waybills</text>
+</svg>

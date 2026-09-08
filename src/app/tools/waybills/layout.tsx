@@ -18,13 +18,13 @@ export const metadata: Metadata = {
     siteName: 'INVOICES.KZ',
     title: 'Склейка накладных Kaspi — бесплатно, без регистрации',
     description: 'Накладные Kaspi одним файлом: по 4 на лист А4 или по одной в А6 на термопринтер. Без регистрации, файлы не сохраняются.',
-    images: [{ url: 'https://invoices.kz/og-image.png', width: 1200, height: 630, alt: 'Склейка накладных Kaspi — invoices.kz' }],
+    images: [{ url: 'https://invoices.kz/og-waybills.png', width: 1200, height: 630, alt: 'Склейка накладных Kaspi — invoices.kz' }],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Склейка накладных Kaspi — бесплатно, без регистрации',
     description: 'Накладные Kaspi одним файлом: 4 на лист А4 или А6 на термопринтер.',
-    images: ['https://invoices.kz/og-image.png'],
+    images: ['https://invoices.kz/og-waybills.png'],
   },
 }
 
