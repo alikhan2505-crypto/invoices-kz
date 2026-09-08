@@ -327,7 +327,7 @@ export default function MarginCalculatorTool() {
       headers: { 'Content-Type': 'application/json' },
       keepalive: true,
       body: JSON.stringify({
-        sessionId: id, lang, ...input, exported: didExport,
+        sessionId: id, lang, category, ...input, exported: didExport,
         profitPerUnit: result.profitPerUnit,
         marginPercent: result.marginPercent,
         breakEvenPrice: result.breakEvenPrice,
@@ -336,7 +336,7 @@ export default function MarginCalculatorTool() {
       // Stats must never surface to the visitor: they came for a number,
       // not for our analytics.
     })
-  }, [lang, input, result])
+  }, [lang, category, input, result])
 
   // Debounced: fires once the visitor stops typing, so a row reflects a
   // finished thought rather than a half-entered price.

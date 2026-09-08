@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { KASPI_CATEGORY_COMMISSIONS } from '@/lib/kaspiShop/margin'
 
 // Anonymous usage stats for the free margin calculator.
 //
@@ -74,6 +75,12 @@ export async function POST(req: NextRequest) {
 
   const lang = ['ru', 'kk', 'en'].includes(body?.lang) ? body.lang : null
 
+  // Checked against the real category list rather than stored as sent: this
+  // is a public endpoint, and a free-text column is a free-text column.
+  const category = KASPI_CATEGORY_COMMISSIONS.some(c => c.label === body?.category)
+    ? String(body.category)
+    : null
+
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -81,6 +88,7 @@ export async function POST(req: NextRequest) {
 
   const fields = {
     lang,
+    category,
     cost_price: num(body?.costPrice),
     sell_price: num(body?.sellPrice),
     commission_percent: num(body?.commissionPercent),
