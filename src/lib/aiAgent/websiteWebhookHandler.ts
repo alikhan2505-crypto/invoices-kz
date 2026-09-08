@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { generateAiReply } from '@/lib/instagramAiReply'
 import { buildBusinessContextLine, buildCollectFieldsToExtract, buildCatalogBlock, AgentTone, AgentGoal } from './promptContext'
 import { loadAgentCatalog } from './catalogContext'
+import { pickProductPhoto } from './productPhoto'
 import { buildInvoiceToolExecutor } from './invoiceSend'
 import { debitAiAgentWallet, AI_AGENT_CREDITS_PER_AI_REPLY, hasAiAgentBudget, AI_AGENT_BUDGET_DEPLETED_REPLY } from './wallet'
 import { isConversationRateLimited } from './rateLimit'
@@ -226,11 +227,15 @@ export async function handleWebsiteIncoming(conn: WebsiteTenantConnection, param
   // depleted wallet also skips the real Anthropic cost of a reply that was
   // never going to be billed -- see hasAiAgentBudget's own comment.
   const budgetDepleted = !(await hasAiAgentBudget(agent.user_id))
+  // Hoisted: the same catalogue prices the model is shown are matched against
+  // its reply afterwards to decide whether a product photo goes with it.
+  let catalog: Awaited<ReturnType<typeof loadAgentCatalog>> = []
   if (budgetDepleted) {
     draftReply = AI_AGENT_BUDGET_DEPLETED_REPLY
     urgent = false
   } else try {
-    const catalogBlock = buildCatalogBlock(await loadAgentCatalog(supabase, agent.user_id, agent.kaspi_shop_connection_id))
+    catalog = await loadAgentCatalog(supabase, agent.user_id, agent.kaspi_shop_connection_id)
+    const catalogBlock = buildCatalogBlock(catalog)
     const result = await generateAiReply({
       incomingText: params.text,
       fromUsername: 'посетитель сайта',
@@ -294,6 +299,9 @@ export async function handleWebsiteIncoming(conn: WebsiteTenantConnection, param
     is_ai_generated: !budgetDepleted,
     status: 'sent',
     urgent,
+    // These two channels deliver by row rather than by API call, so the photo
+    // travels as a column and the client renders it.
+    image_url: pickProductPhoto(draftReply, catalog),
   })
   // The canned budget-depleted reply is never billed -- there is nothing to
   // debit for a message the AI never actually generated.

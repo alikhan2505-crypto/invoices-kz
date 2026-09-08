@@ -3,6 +3,7 @@ import crypto from 'crypto'
 import { generateAiReply } from '@/lib/instagramAiReply'
 import { buildBusinessContextLine, buildCollectFieldsToExtract, buildCatalogBlock, AgentTone, AgentGoal } from './promptContext'
 import { loadAgentCatalog } from './catalogContext'
+import { pickProductPhoto } from './productPhoto'
 import { buildInvoiceToolExecutor } from './invoiceSend'
 import { debitAiAgentWallet, AI_AGENT_CREDITS_PER_AI_REPLY, hasAiAgentBudget, AI_AGENT_BUDGET_DEPLETED_REPLY } from './wallet'
 import { isConversationRateLimited } from './rateLimit'
@@ -216,11 +217,15 @@ export async function handleExternalApiIncoming(conn: ExternalApiConnection, par
   let urgent: boolean
   let extractedFields: Record<string, string> | undefined
   const budgetDepleted = !(await hasAiAgentBudget(agent.user_id))
+  // Hoisted: the same catalogue prices the model is shown are matched against
+  // its reply afterwards to decide whether a product photo goes with it.
+  let catalog: Awaited<ReturnType<typeof loadAgentCatalog>> = []
   if (budgetDepleted) {
     draftReply = AI_AGENT_BUDGET_DEPLETED_REPLY
     urgent = false
   } else try {
-    const catalogBlock = buildCatalogBlock(await loadAgentCatalog(supabase, agent.user_id, agent.kaspi_shop_connection_id))
+    catalog = await loadAgentCatalog(supabase, agent.user_id, agent.kaspi_shop_connection_id)
+    const catalogBlock = buildCatalogBlock(catalog)
     const result = await generateAiReply({
       incomingText: params.text,
       fromUsername: params.customerName?.trim() || params.externalUserId,
@@ -284,6 +289,9 @@ export async function handleExternalApiIncoming(conn: ExternalApiConnection, par
     is_ai_generated: !budgetDepleted,
     status: 'sent',
     urgent,
+    // These two channels deliver by row rather than by API call, so the photo
+    // travels as a column and the client renders it.
+    image_url: pickProductPhoto(draftReply, catalog),
   })
   if (!budgetDepleted) {
     try {

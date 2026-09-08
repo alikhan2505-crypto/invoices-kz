@@ -51,7 +51,7 @@
     '.msg{max-width:80%;padding:8px 10px;border-radius:10px;font-size:13px;line-height:1.4;white-space:pre-wrap;}',
     '.msg.in{align-self:flex-end;background:#4f46e5;color:#fff;}',
     '.msg.out{align-self:flex-start;background:#f1f1f4;color:#111;}',
-    '.buttons{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}',
+    '.photo{max-width:70%;border-radius:12px;margin:2px 0 4px;display:block}.buttons{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}',
     '.btn{border:1px solid #4f46e5;color:#4f46e5;background:#fff;border-radius:8px;padding:5px 9px;font-size:12px;cursor:pointer;}',
     '.inputRow{display:flex;border-top:1px solid #eee;padding:8px;gap:6px;}',
     '.inputRow input{flex:1;border:1px solid #ddd;border-radius:8px;padding:8px 10px;font-size:13px;outline:none;}',
@@ -81,6 +81,21 @@
     row.className = 'msg ' + (m.direction === 'inbound' ? 'in' : 'out');
     row.textContent = m.text;
     messagesEl.appendChild(row);
+
+    // Product photo, when the reply carries one. Appended as its own element
+    // rather than inside the bubble so a slow or dead image URL cannot push
+    // the answer text around after it has been read. textContent above keeps
+    // the text itself inert; this is the only element built from server data.
+    if (m.imageUrl) {
+      var img = document.createElement('img');
+      img.className = 'photo';
+      img.src = m.imageUrl;
+      img.alt = '';
+      img.loading = 'lazy';
+      // A broken link leaves the answer intact instead of a broken-image icon.
+      img.onerror = function () { img.remove(); };
+      messagesEl.appendChild(img);
+    }
 
     if (m.buttons && m.buttons.length > 0) {
       var wrap = document.createElement('div');

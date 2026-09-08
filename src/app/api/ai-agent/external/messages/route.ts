@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
 
   let query = supabase
     .from('ai_agent_messages')
-    .select('id, direction, text, buttons, created_at')
+    .select('id, direction, text, buttons, image_url, created_at')
     .eq('conversation_id', conversation.id)
     .order('created_at', { ascending: true })
   if (since) query = query.gt('created_at', since)
@@ -46,6 +46,8 @@ export async function GET(req: NextRequest) {
     direction: r.direction,
     text: r.text,
     buttons: r.buttons as { label: string; payload: string }[] | null,
+    // Product photo attached to this reply, null on most messages.
+    imageUrl: r.image_url as string | null,
     createdAt: r.created_at,
   }))
   return NextResponse.json({ messages })
