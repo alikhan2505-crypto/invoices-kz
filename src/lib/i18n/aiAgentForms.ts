@@ -66,6 +66,10 @@ export interface AiAgentFormsDict {
   templatesHint: string
   templatesEmpty: string
   triggerWordsLabel: string
+  // Which surface a template answers on. Only Instagram has two.
+  templateChannelLabel: string
+  templateChannelAll: string
+  templateChannelHint: string
   replyTextLabel: string
   replyTextPlaceholder: string
   addTemplateButton: string
@@ -220,6 +224,9 @@ export const aiAgentFormsDict: Record<Lang, AiAgentFormsDict> = {
     templatesHint: 'Шаблоны отвечают мгновенно и бесплатно — если сообщение клиента содержит триггер, ИИ не вызывается.',
     templatesEmpty: 'Шаблонов пока нет. Они создаются автоматически, когда вы одобряете ответы в «Диалогах на проверке», — и их можно добавить вручную.',
     triggerWordsLabel: 'Триггерные слова',
+    templateChannelLabel: 'Где отвечать',
+    templateChannelAll: 'Везде',
+    templateChannelHint: 'Под постом ответ видят все, поэтому там он должен быть коротким и уводить в личные сообщения. В Директе можно отвечать подробно.',
     replyTextLabel: 'Текст ответа',
     replyTextPlaceholder: 'Ответ, который клиент получит мгновенно',
     addTemplateButton: '+ Добавить шаблон',
@@ -365,6 +372,9 @@ export const aiAgentFormsDict: Record<Lang, AiAgentFormsDict> = {
     templatesHint: 'Үлгілер бірден әрі тегін жауап береді — клиенттің хабарламасында триггер болса, ИИ шақырылмайды.',
     templatesEmpty: 'Әзірге үлгілер жоқ. Олар «Тексерудегі диалогтарда» жауаптарды мақұлдағанда автоматты түрде жасалады, оларды қолмен де қосуға болады.',
     triggerWordsLabel: 'Триггер сөздер',
+    templateChannelLabel: 'Қайда жауап беру',
+    templateChannelAll: 'Барлық жерде',
+    templateChannelHint: 'Пост астындағы жауапты бәрі көреді, сондықтан ол қысқа болып, жеке хабарламаға шақыруы керек. Директте толық жауап беруге болады.',
     replyTextLabel: 'Жауап мәтіні',
     replyTextPlaceholder: 'Клиент бірден алатын жауап',
     addTemplateButton: '+ Үлгі қосу',
@@ -510,6 +520,9 @@ export const aiAgentFormsDict: Record<Lang, AiAgentFormsDict> = {
     templatesHint: 'Templates reply instantly and for free — if the customer’s message contains a trigger, the AI is not called.',
     templatesEmpty: 'No templates yet. They are created automatically when you approve replies under Conversations to review, and can also be added by hand.',
     triggerWordsLabel: 'Trigger words',
+    templateChannelLabel: 'Where it replies',
+    templateChannelAll: 'Everywhere',
+    templateChannelHint: 'A reply under a post is read by everyone, so it should be short and move the person into Direct. In Direct you can answer in full.',
     replyTextLabel: 'Reply text',
     replyTextPlaceholder: 'The reply the customer receives instantly',
     addTemplateButton: '+ Add template',

@@ -124,16 +124,34 @@ export async function POST(req: NextRequest) {
   const replyText = typeof body?.replyText === 'string' ? body.replyText.trim().slice(0, MAX_REPLY_LEN) : ''
   if (!replyText) return NextResponse.json({ error: 'replyText required' }, { status: 400 })
 
-  // Manually created templates apply to every channel (channel stays null);
-  // the review-approve flow may write channel-scoped rows itself.
+  // Defaults to every channel when the caller says nothing, which is what
+  // every manually-created template was before the picker existed.
+  const channel = normalizeChannel(body?.channel)
+  if (channel === undefined && body?.channel !== undefined) {
+    return NextResponse.json({ error: 'invalid channel' }, { status: 400 })
+  }
   const { data: row, error } = await supabase
     .from('ai_agent_reply_templates')
-    .insert({ agent_id: agentId, trigger_words: triggerWords, reply_text: replyText })
+    .insert({ agent_id: agentId, trigger_words: triggerWords, reply_text: replyText, channel: channel ?? null })
     .select('id, trigger_words, reply_text, channel, created_at')
     .single()
   if (error || !row) return NextResponse.json({ error: error?.message || 'insert_failed' }, { status: 500 })
 
   return NextResponse.json({ template: toClientShape(row) })
+}
+
+// Which surface a template answers on. null means every surface, which is
+// what every manually-created template was until now — matching in
+// webhookHandler is `channel.is.null,channel.eq.<source>`.
+//
+// It matters because a comment is public and a DM is private: under a post the
+// right answer is one short line that moves the person into Direct, while in
+// Direct it can be the full answer. Without this the same canned text went to
+// both (founder, 2026-09-07).
+function normalizeChannel(value: unknown): string | null | undefined {
+  if (value === undefined) return undefined
+  if (value === null || value === '' || value === 'all') return null
+  return value === 'comment' || value === 'dm' ? value : undefined
 }
 
 export async function PATCH(req: NextRequest) {
@@ -157,6 +175,11 @@ export async function PATCH(req: NextRequest) {
     const replyText = typeof body.replyText === 'string' ? body.replyText.trim().slice(0, MAX_REPLY_LEN) : ''
     if (!replyText) return NextResponse.json({ error: 'invalid replyText' }, { status: 400 })
     update.reply_text = replyText
+  }
+  if (body?.channel !== undefined) {
+    const channel = normalizeChannel(body.channel)
+    if (channel === undefined) return NextResponse.json({ error: 'invalid channel' }, { status: 400 })
+    update.channel = channel
   }
   if (Object.keys(update).length === 0) return NextResponse.json({ error: 'nothing to update' }, { status: 400 })
 

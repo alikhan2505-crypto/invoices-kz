@@ -323,6 +323,17 @@ export default function AiAgentSettings() {
   const [tplFormOpen, setTplFormOpen] = useState(false)
   const [tplFormWords, setTplFormWords] = useState<string[]>([])
   const [tplFormText, setTplFormText] = useState('')
+  // '' means every surface. Only Instagram distinguishes the two, so the
+  // picker is shown as a plain three-way choice rather than a per-channel grid.
+  const [tplFormChannel, setTplFormChannel] = useState('')
+  // Hoisted out of the templates list: inside templates.map the loop
+  // variable is also called `t` and shadows the dictionary.
+  const templateChannelChoices: [string, string][] = [
+    ['', tf.templateChannelAll],
+    ['comment', t.sourceComment],
+    ['dm', t.sourceDm],
+  ]
+  const [tplEditChannel, setTplEditChannel] = useState('')
   const [tplEditId, setTplEditId] = useState<string | null>(null)
   const [tplEditWords, setTplEditWords] = useState<string[]>([])
   const [tplEditText, setTplEditText] = useState('')
@@ -999,7 +1010,7 @@ export default function AiAgentSettings() {
       const res = await fetch('/api/ai-agent/templates', {
         method: 'POST',
         headers,
-        body: JSON.stringify({ agentId, triggerWords: tplFormWords, replyText: tplFormText.trim() }),
+        body: JSON.stringify({ agentId, triggerWords: tplFormWords, replyText: tplFormText.trim(), channel: tplFormChannel || null }),
       })
       if (res.ok) {
         const data = await res.json()
@@ -1020,6 +1031,7 @@ export default function AiAgentSettings() {
     setTplEditId(t.id)
     setTplEditWords(t.triggerWords)
     setTplEditText(t.replyText)
+    setTplEditChannel(t.channel || '')
     setTplError(null)
   }
 
@@ -1032,7 +1044,7 @@ export default function AiAgentSettings() {
       const res = await fetch('/api/ai-agent/templates', {
         method: 'PATCH',
         headers,
-        body: JSON.stringify({ id: tplEditId, triggerWords: tplEditWords, replyText: tplEditText.trim() }),
+        body: JSON.stringify({ id: tplEditId, triggerWords: tplEditWords, replyText: tplEditText.trim(), channel: tplEditChannel || null }),
       })
       if (res.ok) {
         const data = await res.json()
@@ -1506,6 +1518,19 @@ export default function AiAgentSettings() {
                               style={{ color: 'var(--nav-text-primary)' }}
                               maxLength={2000}
                               value={tplEditText} onChange={e => setTplEditText(e.target.value)} />
+                            <span className="text-xs mt-3 mb-1.5 block" style={{ color: 'var(--nav-text-secondary)' }}>{tf.templateChannelLabel}</span>
+                            <div className="flex gap-1.5 flex-wrap">
+                              {templateChannelChoices.map(([value, label]) => (
+                                <button key={value || 'all'} type="button" onClick={() => setTplEditChannel(value)}
+                                  className="text-xs px-3 py-1.5 rounded-full font-medium transition-colors"
+                                  style={tplEditChannel === value
+                                    ? { background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }
+                                    : { background: 'var(--nav-bg)', color: 'var(--nav-text-secondary)' }}>
+                                  {label}
+                                </button>
+                              ))}
+                            </div>
+                            <span className="text-[11px] mt-1.5 block" style={{ color: 'var(--nav-text-muted)' }}>{tf.templateChannelHint}</span>
                             <div className="flex gap-2 mt-3">
                               <button onClick={saveEditTemplate} disabled={tplBusy || tplEditWords.length === 0 || !tplEditText.trim()}
                                 className="flex-1 rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50"
@@ -1528,6 +1553,15 @@ export default function AiAgentSettings() {
                                     {w}
                                   </span>
                                 ))}
+                                {/* Only shown when the template is scoped: an
+                                    unscoped one answers everywhere, which is
+                                    the default and needs no badge. */}
+                                {t.channel && (
+                                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
+                                    style={{ background: 'var(--nav-teal)', color: '#fff' }}>
+                                    {t.channel === 'comment' ? templateChannelChoices[1][1] : templateChannelChoices[2][1]}
+                                  </span>
+                                )}
                               </div>
                               <div className="flex gap-1 flex-shrink-0">
                                 <button onClick={() => startEditTemplate(t)} aria-label={tf.editTemplateAria}
@@ -1560,6 +1594,19 @@ export default function AiAgentSettings() {
                         maxLength={2000}
                         placeholder={tf.replyTextPlaceholder}
                         value={tplFormText} onChange={e => setTplFormText(e.target.value)} />
+                      <span className="text-xs mt-3 mb-1.5 block" style={{ color: 'var(--nav-text-secondary)' }}>{tf.templateChannelLabel}</span>
+                      <div className="flex gap-1.5 flex-wrap">
+                        {templateChannelChoices.map(([value, label]) => (
+                          <button key={value || 'all'} type="button" onClick={() => setTplFormChannel(value)}
+                            className="text-xs px-3 py-1.5 rounded-full font-medium transition-colors"
+                            style={tplFormChannel === value
+                              ? { background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }
+                              : { background: 'var(--nav-bg)', color: 'var(--nav-text-secondary)' }}>
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                      <span className="text-[11px] mt-1.5 block" style={{ color: 'var(--nav-text-muted)' }}>{tf.templateChannelHint}</span>
                       <div className="flex gap-2 mt-3">
                         <button onClick={createTemplate} disabled={tplBusy || tplFormWords.length === 0 || !tplFormText.trim()}
                           className="flex-1 rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50"
