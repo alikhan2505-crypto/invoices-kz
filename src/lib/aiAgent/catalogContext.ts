@@ -65,14 +65,23 @@ export async function loadAgentCatalog(
     // in-stock products come first and the cap bites on the ones that are out.
     const { data: products } = await supabase
       .from('kaspi_shop_tracked_products')
-      .select('product_name, own_current_price')
+      .select('product_name, own_current_price, image_url')
       .eq('connection_id', conn.id)
       .eq('available_for_sale', true)
       .order('stock_count', { ascending: false, nullsFirst: false })
       .order('product_name', { ascending: true })
       .limit(CATALOG_MAX_PRODUCTS)
+    // image_url comes along so a reply can carry the product's photo (see
+    // pickProductPhoto). It is only filled for products that have actually
+    // sold -- the backfill reads it off order items -- so most rows have none,
+    // and the founder's rule for those is to show nothing rather than a
+    // placeholder.
     return (products || [])
-      .map(p => ({ name: String(p.product_name || '').trim(), price: Number(p.own_current_price) || 0 }))
+      .map(p => ({
+        name: String(p.product_name || '').trim(),
+        price: Number(p.own_current_price) || 0,
+        imageUrl: p.image_url || null,
+      }))
       .filter(p => p.name && p.price > 0)
   } catch {
     return []
