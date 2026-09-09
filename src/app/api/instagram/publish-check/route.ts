@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, step: 'token', error: 'no stored token and INSTAGRAM_ACCESS_TOKEN is not set' })
   }
 
-  const meRes = await fetch(`${GRAPH_API}/me?fields=user_id,username&access_token=${accessToken}`)
+  const meRes = await fetch(`${GRAPH_API}/me?fields=user_id,username,followers_count,media_count&access_token=${accessToken}`)
   const me = await meRes.json()
   if (!meRes.ok || !me?.user_id) {
     return NextResponse.json({
@@ -59,6 +59,11 @@ export async function GET(req: NextRequest) {
     ok: true,
     username: me.username,
     igUserId: String(me.user_id),
+    // Reported alongside the publishing check because a post's reach means
+    // nothing without it: 12 posts averaging 11 people is a different problem
+    // depending on whether the account has 20 followers or 2000.
+    followers: me.followers_count ?? null,
+    posts: me.media_count ?? null,
     quota: limit?.data?.[0] ?? null,
   })
 }
