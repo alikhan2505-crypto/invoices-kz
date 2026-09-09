@@ -9,6 +9,7 @@ import { useLanguage } from '@/components/LanguageProvider'
 import { backLabel, editLabel, deleteLabel } from '@/lib/a11yLabels'
 import { profileAccountsDict } from '@/lib/i18n/profileAccounts'
 import Skeleton from '@/components/Skeleton'
+import { KAZAKHSTAN_BANKS, OTHER_BANK, findBankByBik, findBankByName } from '@/lib/kazakhstanBanks'
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
 // kept identical rather than inventing a second "house" ease.
@@ -76,6 +77,29 @@ export default function Banks() {
   const [saving, setSaving] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState({ bank_name: '', iik: '', bik: '', kbe: '19', currency: 'KZT' })
+  // Whether the bank is being typed by hand instead of picked. Only a bank
+  // outside the registry needs this, so it stays off unless the user asks for
+  // it or an existing account turns out not to match any known bank.
+  const [manualBank, setManualBank] = useState(false)
+
+  // The picker's value is derived from the form rather than stored alongside
+  // it: two sources for one fact drift, and the drifted one is what would be
+  // printed on the invoice.
+  const selectedBank = findBankByBik(form.bik) || findBankByName(form.bank_name)
+
+  function chooseBank(value: string) {
+    if (value === OTHER_BANK) {
+      // Cleared, not carried over: leaving the previous bank's name in the box
+      // invites saving it against a different bank's БИК.
+      setManualBank(true)
+      setForm({ ...form, bank_name: '', bik: '' })
+      return
+    }
+    const bank = KAZAKHSTAN_BANKS.find(b => b.bik === value)
+    if (!bank) return
+    setManualBank(false)
+    setForm({ ...form, bank_name: bank.name, bik: bank.bik })
+  }
 
   useEffect(() => { loadAccounts() }, [])
 
@@ -90,12 +114,18 @@ export default function Banks() {
   function startEdit(acc: any) {
     setEditingId(acc.id)
     setForm({ bank_name: acc.bank_name, iik: acc.iik, bik: acc.bik || '', kbe: acc.kbe || '19', currency: acc.currency || 'KZT' })
+    // Accounts saved before the picker existed hold hand-typed names such as
+    // 'AO kaspi bank'. Those that resolve to a known bank open with it
+    // selected; the rest open in manual mode so nothing the user already
+    // saved is silently blanked by the new control.
+    setManualBank(!findBankByBik(acc.bik) && !findBankByName(acc.bank_name))
     setShowForm(true)
   }
 
   function resetForm() {
     setEditingId(null)
     setForm({ bank_name: '', iik: '', bik: '', kbe: '19', currency: 'KZT' })
+    setManualBank(false)
     setShowForm(false)
   }
 
@@ -236,10 +266,45 @@ export default function Banks() {
               <div className="font-semibold text-sm mb-1" style={{ color: 'var(--nav-text-primary)' }}>
                 {editingId ? t.editAccountHeading : t.newAccountHeading}
               </div>
+              <div>
+                <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.bankNameFieldLabel}</label>
+                <select
+                  className={inputClass}
+                  value={manualBank ? OTHER_BANK : (selectedBank?.bik || '')}
+                  onChange={e => chooseBank(e.target.value)}>
+                  <option value="" disabled>{t.selectBankOption}</option>
+                  {KAZAKHSTAN_BANKS.map(bank => (
+                    <option key={bank.bik} value={bank.bik}>{bank.name}</option>
+                  ))}
+                  <option value={OTHER_BANK}>{t.otherBankOption}</option>
+                </select>
+              </div>
+              {manualBank && (
+                <div>
+                  <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.bankNameFieldLabel}</label>
+                  <input
+                    className={inputClass}
+                    placeholder={t.bankNamePlaceholder}
+                    value={form.bank_name}
+                    onChange={e => setForm({ ...form, bank_name: e.target.value })}
+                  />
+                </div>
+              )}
+              <div>
+                <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.bikFieldLabel}</label>
+                <input
+                  className={inputClass}
+                  placeholder={t.bikPlaceholder}
+                  value={form.bik}
+                  readOnly={!manualBank && !!selectedBank}
+                  onChange={e => setForm({ ...form, bik: e.target.value })}
+                />
+                {!manualBank && selectedBank && (
+                  <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>{t.bikFromRegistryHint}</div>
+                )}
+              </div>
               {[
-                { key: 'bank_name', label: t.bankNameFieldLabel, placeholder: t.bankNamePlaceholder },
                 { key: 'iik', label: t.iikFieldLabel, placeholder: t.iikPlaceholder },
-                { key: 'bik', label: t.bikFieldLabel, placeholder: t.bikPlaceholder },
                 { key: 'kbe', label: t.kbeFieldLabel, placeholder: t.kbePlaceholder },
               ].map(f => (
                 <div key={f.key}>

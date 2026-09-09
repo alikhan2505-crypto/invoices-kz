@@ -24,6 +24,9 @@ export interface ProfileAccountsContent {
   iikPlaceholder: string
   bikFieldLabel: string
   bikPlaceholder: string
+  selectBankOption: string
+  otherBankOption: string
+  bikFromRegistryHint: string
   kbeFieldLabel: string
   kbePlaceholder: string
   currencyFieldLabel: string
@@ -126,6 +129,9 @@ export const profileAccountsDict: Record<'ru' | 'kk' | 'en', ProfileAccountsCont
     iikPlaceholder: 'KZ...',
     bikFieldLabel: 'БИК',
     bikPlaceholder: 'CASPKZKA',
+    selectBankOption: 'Выберите банк',
+    otherBankOption: 'Другой банк — ввести вручную',
+    bikFromRegistryHint: 'БИК подставлен автоматически',
     kbeFieldLabel: 'КБе',
     kbePlaceholder: '19',
     currencyFieldLabel: 'Валюта',
@@ -223,6 +229,9 @@ export const profileAccountsDict: Record<'ru' | 'kk' | 'en', ProfileAccountsCont
     iikPlaceholder: 'KZ...',
     bikFieldLabel: 'БСК',
     bikPlaceholder: 'CASPKZKA',
+    selectBankOption: 'Банкті таңдаңыз',
+    otherBankOption: 'Басқа банк — қолмен енгізу',
+    bikFromRegistryHint: 'БСК автоматты түрде қойылды',
     kbeFieldLabel: 'КБЕ',
     kbePlaceholder: '19',
     currencyFieldLabel: 'Валюта',
@@ -320,6 +329,9 @@ export const profileAccountsDict: Record<'ru' | 'kk' | 'en', ProfileAccountsCont
     iikPlaceholder: 'KZ...',
     bikFieldLabel: 'BIK',
     bikPlaceholder: 'CASPKZKA',
+    selectBankOption: 'Choose your bank',
+    otherBankOption: 'Another bank — enter manually',
+    bikFromRegistryHint: 'BIK filled in automatically',
     kbeFieldLabel: 'KBe',
     kbePlaceholder: '19',
     currencyFieldLabel: 'Currency',
