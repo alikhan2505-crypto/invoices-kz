@@ -8,7 +8,7 @@ import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import { getActivePlan } from '@/lib/plan'
 import {
-  computeMargin, computeVerdict, estimateKaspiDeliveryFee,
+  computeMargin, computeVerdict, computeBreakEvenPrice, estimateKaspiDeliveryFee,
   KASPI_CATEGORY_COMMISSIONS, DEFAULT_CARGO_RATE_PER_KG, DEFAULT_TARGET_MARGIN_PERCENT,
 } from '@/lib/kaspiShop/margin'
 
@@ -158,6 +158,12 @@ export default function KaspiShopMargin() {
   }), [kaspiPrice, commissionRatePercent, sourcingPrice, weightGrams, cargoRatePerKg, packagingCost, deliveryFee])
 
   const result = useMemo(() => computeMargin(baseInputs), [baseInputs])
+  // Solved, not hunted for with the slider below: commission is a share OF
+  // the price, so the floor always sits above the plain sum of costs.
+  const floors = useMemo(
+    () => computeBreakEvenPrice(baseInputs, Number(targetMarginPercent) || 0),
+    [baseInputs, targetMarginPercent]
+  )
   const targetNum = Number(targetMarginPercent) || 0
   const verdict = computeVerdict(result.marginPercent, targetNum)
 
@@ -360,6 +366,37 @@ export default function KaspiShopMargin() {
                     <span className="font-mono font-bold tabular-nums" style={{ color: result.profit >= 0 ? 'var(--nav-success)' : 'var(--nav-critical)' }}>{fmt(result.profit)} ₸</span>
                   </div>
                 </div>
+              </div>
+
+
+              {/* Floor price. The what-if slider below shows how margin erodes
+                  as the price falls; this is the exact point where it hits
+                  zero, which is also the lowest a Демпинг floor should ever
+                  be set. */}
+              <div className="nav-glass rounded-2xl p-4 mb-3">
+                <div className="text-xs font-semibold mb-2" style={{ color: 'var(--nav-text-primary)' }}>Границы цены</div>
+                {floors.breakEven === null ? (
+                  <div className="text-xs" style={{ color: 'var(--nav-critical)' }}>
+                    Комиссия забирает всю цену — заработать невозможно ни при какой цене.
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between text-sm mb-1">
+                      <span style={{ color: 'var(--nav-text-secondary)' }}>Ниже этой цены — в минус</span>
+                      <span className="font-mono font-bold tabular-nums" style={{ color: 'var(--nav-critical)' }}>{fmt(floors.breakEven)} ₸</span>
+                    </div>
+                    {floors.atTargetMargin !== null && (
+                      <div className="flex items-center justify-between text-sm">
+                        <span style={{ color: 'var(--nav-text-secondary)' }}>Чтобы выйти на цель {targetMarginPercent}%</span>
+                        <span className="font-mono font-bold tabular-nums" style={{ color: 'var(--nav-success)' }}>{fmt(floors.atTargetMargin)} ₸</span>
+                      </div>
+                    )}
+                    <div className="text-[11px] mt-2" style={{ color: 'var(--nav-text-muted)' }}>
+                      Порог демпинга не должен опускаться ниже первой цифры: комиссия берётся с цены, поэтому
+                      она всегда выше суммы расходов.
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Target margin */}

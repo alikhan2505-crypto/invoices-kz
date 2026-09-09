@@ -5,8 +5,7 @@ import {
   estimateKaspiDeliveryFee,
   KASPI_CATEGORY_COMMISSIONS,
   DEFAULT_CARGO_RATE_PER_KG,
-  DEFAULT_TARGET_MARGIN_PERCENT,
-} from './margin'
+  DEFAULT_TARGET_MARGIN_PERCENT, computeBreakEvenPrice } from './margin'
 
 describe('computeMargin', () => {
   it('computes the full breakdown for a typical small item', () => {
@@ -168,5 +167,54 @@ describe('defaults', () => {
 
   it('exposes a sane positive default target margin', () => {
     expect(DEFAULT_TARGET_MARGIN_PERCENT).toBeGreaterThan(0)
+  })
+})
+
+describe('computeBreakEvenPrice', () => {
+  // Same cost structure used throughout this file's other cases.
+  const costs = {
+    commissionRatePercent: 12.5,
+    sourcingPrice: 3000,
+    weightGrams: 500,
+    cargoRatePerKgTenge: 1500,
+    packagingCost: 200,
+    deliveryFee: 799,
+  }
+
+  it('puts the floor above the plain sum of costs, because commission scales with price', () => {
+    const fixed = 3000 + 750 + 200 + 799
+    const { breakEven } = computeBreakEvenPrice(costs)
+    expect(breakEven).toBeGreaterThan(fixed)
+    expect(breakEven).toBeCloseTo(fixed / 0.875, 6)
+  })
+
+  // The property that matters: price the product at the returned floor and the
+  // existing margin calculation must agree that it earns nothing.
+  it('breaks even when fed back into computeMargin', () => {
+    const { breakEven } = computeBreakEvenPrice(costs)
+    const at = computeMargin({ ...costs, kaspiPrice: breakEven as number })
+    expect(at.profit).toBeCloseTo(0, 6)
+    expect(at.marginPercent).toBeCloseTo(0, 6)
+  })
+
+  it('returns the price that actually hits the target margin', () => {
+    const { atTargetMargin } = computeBreakEvenPrice(costs, 20)
+    const at = computeMargin({ ...costs, kaspiPrice: atTargetMargin as number })
+    expect(at.marginPercent).toBeCloseTo(20, 6)
+  })
+
+  it('has no answer when commission alone takes the whole price', () => {
+    expect(computeBreakEvenPrice({ ...costs, commissionRatePercent: 100 }).breakEven).toBeNull()
+  })
+
+  it('has no target price when commission and target together take everything', () => {
+    const r = computeBreakEvenPrice({ ...costs, commissionRatePercent: 85 }, 20)
+    expect(r.breakEven).not.toBeNull()
+    expect(r.atTargetMargin).toBeNull()
+  })
+
+  it('treats negative inputs as zero instead of producing a negative floor', () => {
+    const r = computeBreakEvenPrice({ ...costs, sourcingPrice: -5000, packagingCost: -1 })
+    expect(r.breakEven).toBeGreaterThan(0)
   })
 })

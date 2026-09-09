@@ -38,6 +38,38 @@ export function computeMargin(inputs: MarginInputs): MarginResult {
   return { commissionAmount, cargoCost, cogs, profit, marginPercent }
 }
 
+/**
+ * The selling price at which this product breaks even, and the price that hits
+ * a target margin. Null when commission alone takes the whole price, since no
+ * price can then work.
+ *
+ * Solved rather than hunted for. The page's "what if the price drops by N%"
+ * slider lets a seller watch margin erode until it looks bad, which is a way
+ * of guessing a number that has an exact answer: commission is a share OF the
+ * price, so raising the price raises what is taken off it, and the floor is
+ * therefore always above the plain sum of costs.
+ *
+ *   profit = P - P·r - fixed = 0        =>  P = fixed / (1 - r)
+ *   margin = (P - P·r - fixed) / P = m  =>  P = fixed / (1 - r - m)
+ *
+ * where fixed is everything that does not scale with the price — sourcing,
+ * cargo, packaging and the weight-based delivery fee.
+ */
+export function computeBreakEvenPrice(
+  inputs: Omit<MarginInputs, 'kaspiPrice'>,
+  targetMarginPercent = 0,
+): { breakEven: number | null; atTargetMargin: number | null } {
+  const rate = Math.max(0, Math.min(inputs.commissionRatePercent, 100)) / 100
+  const target = Math.max(0, Math.min(targetMarginPercent, 100)) / 100
+  const cargoCost = (Math.max(0, inputs.weightGrams) / 1000) * Math.max(0, inputs.cargoRatePerKgTenge)
+  const fixed = Math.max(0, inputs.sourcingPrice) + cargoCost + Math.max(0, inputs.packagingCost) + Math.max(0, inputs.deliveryFee)
+
+  return {
+    breakEven: rate >= 1 ? null : fixed / (1 - rate),
+    atTargetMargin: rate + target >= 1 ? null : fixed / (1 - rate - target),
+  }
+}
+
 export function computeVerdict(marginPercent: number, targetMarginPercent: number): Verdict {
   return marginPercent >= targetMarginPercent ? 'take' : 'skip'
 }
