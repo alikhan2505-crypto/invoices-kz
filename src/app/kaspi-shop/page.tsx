@@ -648,6 +648,16 @@ export default function KaspiShop() {
 
   const winningCount = products.filter(p => p.last_competitor_price !== null && p.own_current_price <= p.last_competitor_price).length
   const atFloorCount = products.filter(p => p.own_current_price <= p.floor_price + 0.01).length
+  // Products whose floor is still exactly the price they were imported at.
+  // finalizeConnection seeds floor_price = own_current_price, which is a safe
+  // default — no bot should start cutting prices the moment a shop connects —
+  // but it also means the repricer has nowhere to go. Until the floor is
+  // lowered, an enabled product can never undercut anyone, and the counter
+  // above reads "упёрлись в минимум", which sounds like a hard-fought race
+  // rather than a floor nobody has set yet.
+  const untouchedFloorCount = products.filter(
+    p => p.own_current_price > 0 && Math.abs(p.own_current_price - p.floor_price) < 0.01
+  ).length
   const activeCount = products.filter(p => p.enabled).length
 
   // Which cities this product's demping actually covers: manually tracked
@@ -779,6 +789,23 @@ export default function KaspiShop() {
                   </button>
                 </div>
               </div>
+
+        {untouchedFloorCount > 0 && (
+          <div className="nav-glass rounded-2xl p-4 lg:p-5 mb-4" style={{ borderLeft: '3px solid var(--nav-critical)' }}>
+            <div className="text-sm font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>
+              {untouchedFloorCount === products.length
+                ? 'Минимальная цена не задана ни у одного товара'
+                : `Минимальная цена не задана у ${untouchedFloorCount} товаров из ${products.length}`}
+            </div>
+            <p className="text-[13px]" style={{ color: 'var(--nav-text-secondary)' }}>
+              При подключении магазина минимум выставляется равным текущей цене — чтобы бот ничего не уронил без
+              вашего ведома. Но пока минимум равен цене, <b>снижать некуда: демпинг не сможет обойти конкурента</b>.
+              Задайте минимум ниже текущей цены — по одному товару или сразу всем через массовое изменение.
+              Посчитать безопасный минимум можно в <a href="/kaspi-shop/margin" style={{ color: 'var(--nav-accent)' }}>калькуляторе маржи</a>.
+            </p>
+          </div>
+        )}
+
               <div className="grid grid-cols-3 gap-3 lg:gap-6">
                 <div>
                   <div className="text-3xl lg:text-4xl font-black font-mono tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{winningCount}</div>
