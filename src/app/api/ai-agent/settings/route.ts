@@ -124,6 +124,10 @@ export async function GET(req: NextRequest) {
       // pre-column row still reads as enabled.
       isEnabled: agent.is_enabled !== false,
       status: agent.status,
+      // Training progress, so the settings page can say how much is left
+      // before the agent answers customers on its own instead of queueing.
+      trainingMessageCount: agent.training_message_count ?? 0,
+      trainingStartedAt: agent.training_started_at || null,
       // null = follow the account's active store (the behaviour every agent
       // had before stores became selectable).
       kaspiShopConnectionId: agent.kaspi_shop_connection_id || null,

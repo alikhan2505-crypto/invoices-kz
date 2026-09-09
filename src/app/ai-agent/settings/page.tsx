@@ -13,6 +13,7 @@ import { getActivePlan } from '@/lib/plan'
 import { useLanguage } from '@/components/LanguageProvider'
 import { aiAgentDict, type AiAgentDict } from '@/lib/i18n/aiAgent'
 import { aiAgentFormsDict } from '@/lib/i18n/aiAgentForms'
+import { TRAINING_MESSAGE_THRESHOLD, TRAINING_DAYS_THRESHOLD } from '@/lib/aiAgent/trainingStatus'
 // promptContext is a pure, dependency-free module (no server-only imports,
 // no env access) -- safe to bundle client-side, so the Промптинг preview
 // shows the REAL assembled context line, not a hand-maintained copy.
@@ -261,6 +262,11 @@ export default function AiAgentSettings() {
   const [kaspiShopConnectionId, setKaspiShopConnectionId] = useState('')
   const [kaspiShops, setKaspiShops] = useState<{ id: string; name: string; isActive: boolean }[]>([])
   const [isEnabled, setIsEnabled] = useState(true)
+  // Training mode queues every reply instead of sending it. The API has
+  // always returned this status and the page has always ignored it.
+  const [agentStatus, setAgentStatus] = useState('')
+  const [trainingCount, setTrainingCount] = useState(0)
+  const [trainingStartedAt, setTrainingStartedAt] = useState('')
   const [creating, setCreating] = useState(false)
   const [createCountdown, setCreateCountdown] = useState(0)
   const createTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -596,6 +602,9 @@ export default function AiAgentSettings() {
           if (Array.isArray(data.agent.stopPhrases)) setStopPhrases(data.agent.stopPhrases)
           if (typeof data.agent.historyPairs === 'number') setHistoryPairs(data.agent.historyPairs)
           if (typeof data.agent.isEnabled === 'boolean') setIsEnabled(data.agent.isEnabled)
+          setAgentStatus(data.agent.status || '')
+          setTrainingCount(data.agent.trainingMessageCount || 0)
+          setTrainingStartedAt(data.agent.trainingStartedAt || '')
           setConnections(data.connections || [])
           setKaspiShopConnectionId(data.agent.kaspiShopConnectionId || '')
           // Secondary data (badge count + saved templates) loads in the
@@ -1246,6 +1255,22 @@ export default function AiAgentSettings() {
             )
           })}
         </motion.div>
+
+        {agentStatus === 'training' && agentId && (
+          <div className="nav-glass rounded-2xl p-4 lg:p-5 mb-4" style={{ borderLeft: '3px solid var(--nav-magenta)' }}>
+            <div className="text-sm font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>{tf.trainingTitle}</div>
+            <p className="text-[13px] mb-2" style={{ color: 'var(--nav-text-secondary)' }}>{tf.trainingBody}</p>
+            <div className="text-[13px] mb-2" style={{ color: 'var(--nav-text-muted)' }}>
+              {tf.trainingLeft(
+                Math.max(0, TRAINING_MESSAGE_THRESHOLD - trainingCount),
+                trainingStartedAt
+                  ? Math.max(0, Math.ceil(TRAINING_DAYS_THRESHOLD - (Date.now() - new Date(trainingStartedAt).getTime()) / 86400000))
+                  : TRAINING_DAYS_THRESHOLD
+              )}
+            </div>
+            <Link href="/ai-agent/review" className="text-[13px] font-semibold" style={{ color: 'var(--nav-accent)' }}>{tf.trainingLink}</Link>
+          </div>
+        )}
 
         <AnimatePresence mode="wait" initial={false}>
           <motion.div

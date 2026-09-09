@@ -45,6 +45,11 @@ export interface AiAgentFormsDict {
   promptPreviewHint: string
 
   // Control tab
+  // Training mode: replies wait for the owner instead of reaching customers.
+  trainingTitle: string
+  trainingBody: string
+  trainingLeft: (approvals: number, days: number) => string
+  trainingLink: string
   botStatusLabel: string
   botStatusHint: string
   historyDepthLabel: string
@@ -205,6 +210,10 @@ export const aiAgentFormsDict: Record<Lang, AiAgentFormsDict> = {
     promptPreviewTitle: 'Как агент видит инструкции',
     promptPreviewHint: 'Примерный вид инструкций агента — собирается из полей выше; в реальном ответе к этой строке добавляется системный текст.',
 
+    trainingTitle: 'Агент на обучении — клиенты пока не видят его ответов',
+    trainingBody: 'Каждый ответ ждёт вашего одобрения в «Диалогах» и не уходит клиенту, пока вы его не отправите. Это защита: агент учится на ваших правках. Но если не заглядывать в очередь, клиент не получит ничего.',
+    trainingLeft: (a, d) => `До самостоятельной работы: ${a} одобрений или ${d} дней.`,
+    trainingLink: 'Открыть Диалоги →',
     botStatusLabel: 'Статус бота',
     botStatusHint: 'Выключенный агент не отвечает клиентам.',
     historyDepthLabel: 'Глубина памяти диалога',
@@ -353,6 +362,10 @@ export const aiAgentFormsDict: Record<Lang, AiAgentFormsDict> = {
     promptPreviewTitle: 'Агент нұсқауларды қалай көреді',
     promptPreviewHint: 'Агент нұсқауларының шамамен көрінісі — жоғарыдағы өрістерден жиналады; нақты жауапта бұл жолға жүйелік мәтін қосылады.',
 
+    trainingTitle: 'Агент оқуда — клиенттер оның жауаптарын әзірге көрмейді',
+    trainingBody: 'Әр жауап «Диалогтарда» сіздің мақұлдауыңызды күтеді және сіз жібермейінше клиентке бармайды. Бұл қорғаныс: агент сіздің түзетулеріңізден үйренеді. Бірақ кезекке қарамасаңыз, клиент ештеңе алмайды.',
+    trainingLeft: (a, d) => `Дербес жұмысқа дейін: ${a} мақұлдау немесе ${d} күн.`,
+    trainingLink: 'Диалогтарды ашу →',
     botStatusLabel: 'Бот күйі',
     botStatusHint: 'Өшірілген агент клиенттерге жауап бермейді.',
     historyDepthLabel: 'Диалог жадының тереңдігі',
@@ -501,6 +514,10 @@ export const aiAgentFormsDict: Record<Lang, AiAgentFormsDict> = {
     promptPreviewTitle: 'How the assistant sees its instructions',
     promptPreviewHint: 'An approximation of the assistant’s instructions, assembled from the fields above; a system prompt is added to this in a real reply.',
 
+    trainingTitle: 'The agent is in training — customers do not see its replies yet',
+    trainingBody: 'Every reply waits for your approval under Conversations and does not reach the customer until you send it. That is the safeguard: the agent learns from your edits. But if nobody opens the queue, the customer gets nothing.',
+    trainingLeft: (a, d) => `Until it works on its own: ${a} approvals or ${d} days.`,
+    trainingLink: 'Open Conversations →',
     botStatusLabel: 'Bot status',
     botStatusHint: 'A disabled assistant does not reply to customers.',
     historyDepthLabel: 'Conversation memory depth',
