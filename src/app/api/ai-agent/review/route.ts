@@ -3,9 +3,11 @@ import { createClient } from '@supabase/supabase-js'
 import { getActivePlan } from '@/lib/plan'
 import { decryptAtRest } from '@/lib/kaspiPay/crypto'
 import { getKey } from '@/lib/aiAgent/connection'
-import { replyToComment, sendDirectMessage, InstagramApiError } from '@/lib/instagram'
-import { sendTelegramBotMessage, TelegramApiError } from '@/lib/aiAgent/telegram'
-import { sendWhatsAppMessage, WhatsAppApiError } from '@/lib/whatsapp'
+import { replyToComment, sendDirectMessage, sendDirectImage, InstagramApiError } from '@/lib/instagram'
+import { pickProductPhoto } from '@/lib/aiAgent/productPhoto'
+import { loadAgentCatalog } from '@/lib/aiAgent/catalogContext'
+import { sendTelegramBotMessage, sendTelegramBotPhoto, TELEGRAM_CAPTION_MAX, TelegramApiError } from '@/lib/aiAgent/telegram'
+import { sendWhatsAppImage, sendWhatsAppMessage, WhatsAppApiError } from '@/lib/whatsapp'
 import { extractTriggerWords } from '@/lib/instagramAiReply'
 import { shouldExitTraining } from '@/lib/aiAgent/trainingStatus'
 import { debitAiAgentWallet, AI_AGENT_CREDITS_PER_AI_REPLY } from '@/lib/aiAgent/wallet'
@@ -187,15 +189,37 @@ export async function POST(req: NextRequest) {
   let triggerWords: string[] = []
 
   if (action === 'send') {
-    const { data: connection } = await supabase
-      .from('ai_agent_channel_connections')
-      .select('id, access_token_enc, external_account_id')
-      .eq('agent_id', agent.id)
-      .eq('channel', conversation.channel)
-      .single()
-    if (!connection) return NextResponse.json({ error: 'channel_not_connected' }, { status: 400 })
+    // The website widget and the external API deliver by row: the client polls
+    // ai_agent_messages, which now only returns approved ones. Flipping the
+    // status below IS the send, so there is nothing to call and no token to
+    // decrypt. Before this branch existed the request fell past every channel
+    // case, sent nothing, and still marked the draft 'sent'.
+    const deliversByRow = conversation.channel === 'website' || conversation.channel === 'api'
 
-    const accessToken = decryptAtRest(connection.access_token_enc, getKey()).toString('utf8')
+    let accessToken = ''
+    let connection: { id: string; access_token_enc: string; external_account_id: string } | null = null
+    if (!deliversByRow) {
+      const { data } = await supabase
+        .from('ai_agent_channel_connections')
+        .select('id, access_token_enc, external_account_id')
+        .eq('agent_id', agent.id)
+        .eq('channel', conversation.channel)
+        .single()
+      if (!data) return NextResponse.json({ error: 'channel_not_connected' }, { status: 400 })
+      connection = data
+      accessToken = decryptAtRest(data.access_token_enc, getKey()).toString('utf8')
+    }
+
+    // In training mode every reply the agent writes comes through here, and
+    // that is every agent until its owner has approved enough drafts. So a
+    // product photo that is only attached on the direct-send paths is a photo
+    // that never reaches anyone. Same choice, same catalogue, made again here
+    // against the text the owner is actually approving — which they may have
+    // edited, so re-deciding is right rather than reusing what was drafted.
+    const photo = deliversByRow
+      ? null
+      : pickProductPhoto(finalText, await loadAgentCatalog(supabase, agent.user_id, agent.kaspi_shop_connection_id))
+
     try {
       // ai_agent_conversations.external_thread_id doubles as the reply
       // target for both comment and DM sends, same as the single-tenant
@@ -212,18 +236,32 @@ export async function POST(req: NextRequest) {
         if (conversation.source === 'comment') {
           await replyToComment(conversation.external_thread_id, finalText, { accessToken })
         } else {
-          await sendDirectMessage(conversation.external_thread_id, finalText, { igUserId: connection.external_account_id, accessToken })
+          await sendDirectMessage(conversation.external_thread_id, finalText, { igUserId: connection!.external_account_id, accessToken })
+          if (photo) {
+            // Separate message, so a rejected image cannot take down the
+            // answer that already reached the customer.
+            await sendDirectImage(conversation.external_thread_id, photo, { igUserId: connection!.external_account_id, accessToken })
+              .catch((err: any) => console.error('ai-agent review: product photo send failed:', err?.message || err))
+          }
         }
       } else if (conversation.channel === 'telegram') {
         // For telegram rows access_token_enc holds the encrypted BotFather
         // token (same column, same encryption -- see telegram/connect) and
         // external_thread_id is the Telegram chat.id.
-        await sendTelegramBotMessage(accessToken, conversation.external_thread_id, finalText)
+        if (photo && finalText.length <= TELEGRAM_CAPTION_MAX) {
+          await sendTelegramBotPhoto(accessToken, conversation.external_thread_id, photo, finalText)
+        } else {
+          await sendTelegramBotMessage(accessToken, conversation.external_thread_id, finalText)
+        }
       } else if (conversation.channel === 'whatsapp') {
         // connection.external_account_id is the Cloud API phone_number_id
         // (see whatsapp/callback route); external_thread_id is the
         // customer's WhatsApp phone number (wa_id).
-        await sendWhatsAppMessage(connection.external_account_id, conversation.external_thread_id, finalText, { accessToken })
+        if (photo) {
+          await sendWhatsAppImage(connection!.external_account_id, conversation.external_thread_id, photo, finalText, { accessToken })
+        } else {
+          await sendWhatsAppMessage(connection!.external_account_id, conversation.external_thread_id, finalText, { accessToken })
+        }
       }
     } catch (e: any) {
       console.error('ai-agent review: send failed for message', messageId, ':', e.message)
@@ -234,7 +272,7 @@ export async function POST(req: NextRequest) {
       // means the bot token was revoked via BotFather; a WhatsApp 401 means
       // the Embedded Signup token was revoked -- same treatment both ways.
       if ((e instanceof InstagramApiError && e.status === 401) || (e instanceof TelegramApiError && e.status === 401) || (e instanceof WhatsAppApiError && e.status === 401)) {
-        await supabase.from('ai_agent_channel_connections').update({ status: 'token_expired' }).eq('id', connection.id)
+        if (connection) await supabase.from('ai_agent_channel_connections').update({ status: 'token_expired' }).eq('id', connection.id)
       }
       return NextResponse.json({ error: 'send_failed' }, { status: 502 })
     }

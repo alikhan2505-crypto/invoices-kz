@@ -31,10 +31,16 @@ export async function GET(req: NextRequest) {
     .maybeSingle()
   if (!conversation) return NextResponse.json({ messages: [] })
 
+  // Only approved messages. Both of these channels deliver by row — the client
+  // polls this endpoint — so without the filter a reply still sitting in the
+  // review queue was served to the customer the moment it was drafted, and
+  // training mode simply did not exist here. Rejected drafts ('skipped') stay
+  // hidden for the same reason.
   let query = supabase
     .from('ai_agent_messages')
     .select('id, direction, text, buttons, image_url, created_at')
     .eq('conversation_id', conversation.id)
+    .eq('status', 'sent')
     .order('created_at', { ascending: true })
   if (since) query = query.gt('created_at', since)
 
