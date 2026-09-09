@@ -47,11 +47,24 @@ function WebsiteIcon() {
     </svg>
   )
 }
+function ApiIcon() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+      <path d="m16 18 6-6-6-6M8 6l-6 6 6 6" />
+    </svg>
+  )
+}
+// Every channel a conversation can arrive on. An unlisted one falls back to
+// Instagram below, which is silently wrong rather than merely ugly: a draft
+// from the website widget would be approved under an Instagram label, and the
+// owner would answer it as if it were public. That is exactly what happened to
+// website and api here until 2026-09-09.
 const CHANNEL_META: Record<string, { label: string; icon: () => React.ReactElement }> = {
   instagram: { label: 'Instagram', icon: InstagramIcon },
   telegram: { label: 'Telegram', icon: TelegramIcon },
   whatsapp: { label: 'WhatsApp', icon: WhatsAppIcon },
   website: { label: 'Сайт', icon: WebsiteIcon },
+  api: { label: 'API', icon: ApiIcon },
 }
 
 function formatRelative(iso: string): string {
