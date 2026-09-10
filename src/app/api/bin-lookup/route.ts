@@ -5,7 +5,9 @@ import {
   type BinLookupResult,
 } from '@/lib/binLookup'
 import {
-  parseTaxpayer, parseVatStatus, KGD_TAXPAYER_URL, KGD_VAT_URL, KGD_TAXPAYER_TYPES,
+  parseTaxpayer, parseVatStatus, parseUnreliable, parseLiquidation,
+  KGD_TAXPAYER_URL, KGD_VAT_URL, KGD_UNRELIABLE_URL, KGD_LIQUIDATION_URL,
+  KGD_TAXPAYER_TYPES,
 } from '@/lib/kgdTaxpayer'
 
 const supabase = createClient(
@@ -90,6 +92,58 @@ async function lookUpVat(bin: string): Promise<{ isVatPayer: boolean; registered
   }
 }
 
+/**
+ * The two risk checks КГД lets us make with the token we have.
+ *
+ * Both answer null when nothing was learned, and the caller keeps that
+ * distinct from a clean result all the way to the screen: a seller shown
+ * silence because a request timed out would read it as "counterparty is
+ * fine", which is the one wrong thing this feature could do.
+ *
+ * Tax debt is deliberately absent. Its service demands a second token
+ * (personalAccountToken) that we do not have, and the public page carrying
+ * the same data is behind a reCAPTCHA — put there precisely to stop
+ * automated querying, so it is not ours to work around.
+ */
+async function checkRisk(bin: string): Promise<{ unreliable: boolean | null; liquidating: boolean | null }> {
+  const token = process.env.KGD_PORTAL_TOKEN
+  if (!token) return { unreliable: null, liquidating: null }
+  const headers = { 'X-Portal-Token': token }
+
+  const unreliable = (async () => {
+    try {
+      const res = await fetch(KGD_UNRELIABLE_URL, {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taxPayerCode: bin, language: 'ru' }),
+        signal: AbortSignal.timeout(12_000),
+      })
+      if (!res.ok) return null
+      return parseUnreliable(await res.json())
+    } catch (e) {
+      console.error('bin-lookup: КГД unreliable check failed:', e instanceof Error ? e.message : e)
+      return null
+    }
+  })()
+
+  const liquidating = (async () => {
+    try {
+      const res = await fetch(`${KGD_LIQUIDATION_URL}?taxpayerCode=${encodeURIComponent(bin)}`, {
+        headers,
+        signal: AbortSignal.timeout(12_000),
+      })
+      if (!res.ok) return null
+      return parseLiquidation(await res.json())
+    } catch (e) {
+      console.error('bin-lookup: КГД liquidation check failed:', e instanceof Error ? e.message : e)
+      return null
+    }
+  })()
+
+  const [u, l] = await Promise.all([unreliable, liquidating])
+  return { unreliable: u, liquidating: l }
+}
+
 // Looks a counterparty up by БИН across both state registers.
 //
 // The browser never sees either credential -- the egov agreement forbids
@@ -128,6 +182,8 @@ export async function GET(req: NextRequest) {
       source: cached.source,
       isVatPayer: cached.is_vat_payer,
       vatRegisteredAt: cached.vat_registered_at,
+      isUnreliable: cached.is_unreliable,
+      isLiquidating: cached.is_liquidating,
     }
 
     // A fresh row can still be missing its VAT status: it was cached before
@@ -135,15 +191,29 @@ export async function GET(req: NextRequest) {
     // that gap would persist for the whole cache lifetime, so it is filled
     // in on the next read instead of waiting for the row to expire. The
     // identity fields are not re-fetched -- only the hole is.
-    if (company.isVatPayer === null || company.isVatPayer === undefined) {
-      const vat = await lookUpVat(bin)
+    const missingVat = company.isVatPayer === null || company.isVatPayer === undefined
+    const missingRisk = company.isUnreliable === null || company.isUnreliable === undefined
+    if (missingVat || missingRisk) {
+      const [vat, risk] = await Promise.all([
+        missingVat ? lookUpVat(bin) : Promise.resolve(undefined),
+        missingRisk ? checkRisk(bin) : Promise.resolve(null),
+      ])
+      const patch: Record<string, unknown> = {}
       if (vat) {
         company.isVatPayer = vat.isVatPayer
         company.vatRegisteredAt = vat.registeredAt
-        const { error } = await supabase.from('bin_lookup_cache')
-          .update({ is_vat_payer: vat.isVatPayer, vat_registered_at: vat.registeredAt })
-          .eq('bin', bin)
-        if (error) console.error('bin-lookup: VAT backfill failed:', error.message)
+        patch.is_vat_payer = vat.isVatPayer
+        patch.vat_registered_at = vat.registeredAt
+      }
+      if (risk) {
+        company.isUnreliable = risk.unreliable
+        company.isLiquidating = risk.liquidating
+        patch.is_unreliable = risk.unreliable
+        patch.is_liquidating = risk.liquidating
+      }
+      if (Object.keys(patch).length > 0) {
+        const { error } = await supabase.from('bin_lookup_cache').update(patch).eq('bin', bin)
+        if (error) console.error('bin-lookup: backfill failed:', error.message)
       }
     }
 
@@ -159,11 +229,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ found: false })
   }
 
-  const vat = await lookUpVat(bin)
+  // Run together: three independent КГД calls, and the user is waiting.
+  const [vat, risk] = await Promise.all([lookUpVat(bin), checkRisk(bin)])
   if (vat) {
     company.isVatPayer = vat.isVatPayer
     company.vatRegisteredAt = vat.registeredAt
   }
+  company.isUnreliable = risk.unreliable
+  company.isLiquidating = risk.liquidating
 
   const { error: cacheError } = await supabase.from('bin_lookup_cache').upsert({
     bin: company.bin,
@@ -176,6 +249,8 @@ export async function GET(req: NextRequest) {
     source: company.source,
     is_vat_payer: company.isVatPayer,
     vat_registered_at: company.vatRegisteredAt,
+    is_unreliable: company.isUnreliable,
+    is_liquidating: company.isLiquidating,
     fetched_at: new Date().toISOString(),
   }, { onConflict: 'bin' })
   // A cache miss costs a request next time; not worth failing the lookup

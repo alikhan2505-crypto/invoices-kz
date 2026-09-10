@@ -16,6 +16,12 @@ const BASE = 'https://portal.kgd.gov.kz/services/isnaportalsync/public'
 
 export const KGD_TAXPAYER_URL = `${BASE}/taxpayer-data`
 export const KGD_VAT_URL = `${BASE}/search-payer-data`
+export const KGD_LIQUIDATION_URL = `${BASE}/find-liquidated-taxpayer`
+// Note the host path: the unreliable-taxpayer search lives under
+// `isnaportal`, not `isnaportalsync` like everything else. Easy to miss and
+// it answers 404 if you assume otherwise.
+export const KGD_UNRELIABLE_URL =
+  'https://portal.kgd.gov.kz/services/isnaportal/public/taxpayer-data/search'
 
 export interface KgdTaxpayer {
   name: string
@@ -97,3 +103,39 @@ export function parseVatStatus(payload: unknown): KgdVatStatus | null {
  * proprietor. UL remains as the fallback for a company the register missed.
  */
 export const KGD_TAXPAYER_TYPES = ['IP', 'UL'] as const
+
+/**
+ * Whether the search of unreliable taxpayers returned this counterparty.
+ *
+ * The service answers with a bare array — populated means listed, empty
+ * means not. Anything that is not an array means we learned nothing, and
+ * that is returned as null so the caller can keep "unknown" distinct from
+ * "clean": a seller must never be shown a reassuring silence produced by a
+ * failed request.
+ *
+ * NOT VERIFIED AGAINST A POSITIVE CASE. Both taxpayers available for testing
+ * on 2026-09-10 were clean, and no known-unreliable БИН was to hand — the
+ * open-data list of inactive taxpayers turned out to be a stub pointing back
+ * at КГД's own site. The empty-array path is confirmed; the populated path
+ * rests on the documented schema.
+ */
+export function parseUnreliable(payload: unknown): boolean | null {
+  if (!Array.isArray(payload)) return null
+  return payload.length > 0
+}
+
+/**
+ * Whether the counterparty is in liquidation.
+ *
+ * This service is more explicit than the one above: it wraps results in
+ * `taxpayers.content` and says «Данные не найдены» outright, so an empty
+ * answer is a statement rather than an absence.
+ */
+export function parseLiquidation(payload: unknown): boolean | null {
+  if (!payload || typeof payload !== 'object') return null
+  const taxpayers = (payload as Record<string, unknown>).taxpayers
+  if (!taxpayers || typeof taxpayers !== 'object') return null
+  const content = (taxpayers as Record<string, unknown>).content
+  if (!Array.isArray(content)) return null
+  return content.length > 0
+}

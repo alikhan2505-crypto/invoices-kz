@@ -106,6 +106,8 @@ export default function CreateInvoicePage() {
     source?: 'egov' | 'kgd'
     isVatPayer?: boolean | null
     vatRegisteredAt?: string | null
+    isUnreliable?: boolean | null
+    isLiquidating?: boolean | null
   }>({ status: 'idle' })
   // The БИН the last lookup was fired for, so re-typing the same twelve
   // digits does not spend another of the 40 requests per minute the portal
@@ -136,6 +138,8 @@ export default function CreateInvoicePage() {
         source: data.company.source,
         isVatPayer: data.company.isVatPayer,
         vatRegisteredAt: data.company.vatRegisteredAt,
+        isUnreliable: data.company.isUnreliable,
+        isLiquidating: data.company.isLiquidating,
       })
       // Only empty fields are filled. Overwriting a name the user already
       // typed would be the app arguing with them about their own customer.
@@ -920,6 +924,17 @@ export default function CreateInvoicePage() {
                             <span style={{ color: 'var(--nav-text-secondary)' }}>
                               {t.binLookupFound(binLookup.name || '', binLookup.companyStatus || null)}
                             </span>
+                            {/* Warnings only when КГД actually said yes.
+                                Silence here means "clean or unchecked", and
+                                an absent warning must never be produced by a
+                                timeout dressed up as reassurance -- so
+                                nothing is shown for null. */}
+                            {binLookup.isUnreliable === true && (
+                              <div className="font-medium" style={{ color: 'var(--nav-danger, #ef4444)' }}>{t.binLookupUnreliable}</div>
+                            )}
+                            {binLookup.isLiquidating === true && (
+                              <div className="font-medium" style={{ color: 'var(--nav-danger, #ef4444)' }}>{t.binLookupLiquidating}</div>
+                            )}
                             {/* VAT status decides whether this invoice may
                                 carry НДС at all, so it is stated plainly.
                                 Only when КГД actually answered: null means

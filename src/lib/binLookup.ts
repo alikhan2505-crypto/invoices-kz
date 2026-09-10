@@ -36,6 +36,9 @@ export interface BinLookupResult {
   /** null = not checked. false = checked and not registered for VAT. */
   isVatPayer: boolean | null
   vatRegisteredAt: string | null
+  /** КГД risk signals. null = not checked, false = checked and clean. */
+  isUnreliable: boolean | null
+  isLiquidating: boolean | null
 }
 
 /** One row of the gbd_ul dataset, as the API returns it. */
@@ -130,6 +133,8 @@ export function toLookupResult(bin: string, records: EgovUlRecord[]): BinLookupR
     source: 'egov',
     isVatPayer: null,
     vatRegisteredAt: null,
+    isUnreliable: null,
+    isLiquidating: null,
   }
 }
 
@@ -155,6 +160,8 @@ export function fromKgdTaxpayer(
     source: 'kgd',
     isVatPayer: null,
     vatRegisteredAt: null,
+    isUnreliable: null,
+    isLiquidating: null,
   }
 }
 

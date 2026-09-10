@@ -14,6 +14,8 @@ export interface InvoiceFlowContent {
   binLookupSearching: string
   binLookupVatYes: (since: string | null) => string
   binLookupVatNo: string
+  binLookupUnreliable: string
+  binLookupLiquidating: string
   binLookupSourceKgd: string
   binLookupNotFound: string
   binLookupSource: string
@@ -225,6 +227,8 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     binLookupSourceKgd: 'Данные: сервис «Поиск налогоплательщика», КГД МФ РК',
     binLookupVatYes: (since: string | null) => since ? `Плательщик НДС с ${since}` : 'Плательщик НДС',
     binLookupVatNo: 'Не плательщик НДС',
+    binLookupUnreliable: '⚠️ Числится в списке неблагонадёжных налогоплательщиков КГД',
+    binLookupLiquidating: '⚠️ Находится на стадии ликвидации по данным КГД',
     binLookupFound: (name: string, status: string | null) => status ? `${name} · ${status}` : name,
     binIinPlaceholder: '123456789012',
     emailLabel: 'Email',
@@ -440,6 +444,8 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     binLookupSourceKgd: 'Дереккөз: «Салық төлеушіні іздеу» сервисі, ҚР ҚМ МКК',
     binLookupVatYes: (since: string | null) => since ? `ҚҚС төлеуші ${since} бастап` : 'ҚҚС төлеуші',
     binLookupVatNo: 'ҚҚС төлеуші емес',
+    binLookupUnreliable: '⚠️ МКК-нің сенімсіз салық төлеушілер тізімінде тұр',
+    binLookupLiquidating: '⚠️ МКК деректері бойынша тарату сатысында',
     binLookupFound: (name: string, status: string | null) => status ? `${name} · ${status}` : name,
     binIinPlaceholder: '123456789012',
     emailLabel: 'Email',
@@ -655,6 +661,8 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     binLookupSourceKgd: 'Source: "Taxpayer search" service, State Revenue Committee',
     binLookupVatYes: (since: string | null) => since ? `Registered for VAT since ${since}` : 'Registered for VAT',
     binLookupVatNo: 'Not registered for VAT',
+    binLookupUnreliable: '⚠️ Listed as an unreliable taxpayer by the State Revenue Committee',
+    binLookupLiquidating: '⚠️ In liquidation according to the State Revenue Committee',
     binLookupFound: (name: string, status: string | null) => status ? `${name} · ${status}` : name,
     binIinPlaceholder: '123456789012',
     emailLabel: 'Email',

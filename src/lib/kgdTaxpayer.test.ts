@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseTaxpayer, parseVatStatus, KGD_TAXPAYER_TYPES } from './kgdTaxpayer'
+import { parseTaxpayer, parseVatStatus, parseUnreliable, parseLiquidation, KGD_TAXPAYER_TYPES } from './kgdTaxpayer'
 
 // Both fixtures are verbatim from live calls on 2026-09-10.
 const ipResponse = {
@@ -87,5 +87,44 @@ describe('KGD_TAXPAYER_TYPES', () => {
     // Legal entities are already covered by the register, so anything that
     // reaches КГД is most likely an ИП.
     expect(KGD_TAXPAYER_TYPES[0]).toBe('IP')
+  })
+})
+
+describe('parseUnreliable', () => {
+  it('reads an empty array as "not listed"', () => {
+    // Confirmed live on 2026-09-10 for both БИН 971240001315 and 890525350143.
+    expect(parseUnreliable([])).toBe(false)
+  })
+  it('reads a populated array as listed', () => {
+    expect(parseUnreliable([{ iin: '000000000000', name: 'ТОО «Пример»' }])).toBe(true)
+  })
+  it('returns null when the answer is not a list at all', () => {
+    // Unknown must stay distinct from clean: a failed request shown as
+    // "counterparty is fine" is worse than showing nothing.
+    expect(parseUnreliable({ error: 'oops' })).toBeNull()
+    expect(parseUnreliable(null)).toBeNull()
+    expect(parseUnreliable('')).toBeNull()
+  })
+})
+
+describe('parseLiquidation', () => {
+  const empty = {
+    taxpayers: { content: [], pageNumber: 0, pageSize: 0, numberOfElements: 0, empty: true },
+    status: 2,
+    message: { nameRu: 'Данные не найдены' },
+  }
+
+  it('reads the live empty answer as "not in liquidation"', () => {
+    expect(parseLiquidation(empty)).toBe(false)
+  })
+
+  it('reads a populated content list as "in liquidation"', () => {
+    expect(parseLiquidation({ taxpayers: { content: [{ ru: 'ТОО «Пример»' }] } })).toBe(true)
+  })
+
+  it('returns null for a shape it does not recognise', () => {
+    expect(parseLiquidation({ taxpayers: {} })).toBeNull()
+    expect(parseLiquidation({})).toBeNull()
+    expect(parseLiquidation(null)).toBeNull()
   })
 })
