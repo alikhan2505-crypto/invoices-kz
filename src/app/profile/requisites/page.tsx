@@ -8,6 +8,7 @@ import DesktopShell from '@/components/DesktopShell'
 import { useLanguage } from '@/components/LanguageProvider'
 import { backLabel } from '@/lib/a11yLabels'
 import { profileCoreDict } from '@/lib/i18n/profileCore'
+import { useAppDialog } from '@/components/AppDialog'
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
 // kept identical rather than inventing a second "house" ease.
@@ -56,6 +57,8 @@ export default function Requisites() {
   const router = useRouter()
   const { lang } = useLanguage()
   const t = profileCoreDict[lang]
+  // Same shadowing as /create: see src/components/AppDialog.tsx.
+  const { alert, dialogElement } = useAppDialog()
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw
   const [saving, setSaving] = useState(false)
@@ -173,6 +176,7 @@ export default function Requisites() {
             {saving ? t.savingEllipsis : t.saveChangesButton}
           </motion.button>
         </div>
+        {dialogElement}
       </main>
     </DesktopShell>
   )

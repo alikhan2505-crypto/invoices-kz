@@ -15,6 +15,7 @@ import { useLanguage } from '@/components/LanguageProvider'
 import { closeLabel, deleteLabel } from '@/lib/a11yLabels'
 import { invoiceFlowDict } from '@/lib/i18n/invoiceFlow'
 import { saveInvoiceDraft, takeInvoiceDraft, clearInvoiceDraft, type InvoiceDraft } from '@/lib/invoiceDraft'
+import { useAppDialog } from '@/components/AppDialog'
 
 const UNIT_OPTIONS = ['шт', 'кг', 'л', 'м', 'м²', 'м³', 'час', 'день', 'месяц', 'услуга', 'работа']
 
@@ -57,6 +58,11 @@ export default function CreateInvoicePage() {
   const router = useRouter()
   const { lang } = useLanguage()
   const t = invoiceFlowDict[lang]
+  // Shadows window.alert / window.confirm for this whole component, so every
+  // dialog on the page becomes an in-app one and none can be forgotten. Both
+  // confirms below are awaited -- a bare `if (confirm(...))` would now always
+  // be true, since a Promise is truthy.
+  const { alert, confirm, dialogElement } = useAppDialog()
   const KNP_OPTIONS = t.knpOptions
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw
@@ -518,7 +524,7 @@ export default function CreateInvoicePage() {
       // Parked only when the user actually accepts the trip to /profile/banks.
       // Declining leaves them on this page with the form still in front of
       // them, and a copy in storage would then ambush a later, unrelated visit.
-      if (confirm(t.bankDetailsNeededConfirm)) {
+      if (await confirm(t.bankDetailsNeededConfirm)) {
         saveInvoiceDraft(user.id, currentDraft())
         router.push('/profile/banks')
       }
@@ -534,7 +540,7 @@ export default function CreateInvoicePage() {
       alert(t.specifyPriceForAllServicesAlert); return
     }
     if (lastCreated && Date.now() - lastCreated < 180000) {
-      if (!confirm(t.recentInvoiceConfirm)) return
+      if (!(await confirm(t.recentInvoiceConfirm))) return
     }
 
     setLoading(true)
@@ -1301,6 +1307,7 @@ export default function CreateInvoicePage() {
         )
       })()}
 
+    {dialogElement}
     </main>
     </DesktopShell>
   )
