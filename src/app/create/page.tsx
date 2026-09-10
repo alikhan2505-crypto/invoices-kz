@@ -103,6 +103,9 @@ export default function CreateInvoicePage() {
     status: 'idle' | 'loading' | 'found' | 'notfound'
     name?: string
     companyStatus?: string | null
+    source?: 'egov' | 'kgd'
+    isVatPayer?: boolean | null
+    vatRegisteredAt?: string | null
   }>({ status: 'idle' })
   // The БИН the last lookup was fired for, so re-typing the same twelve
   // digits does not spend another of the 40 requests per minute the portal
@@ -126,7 +129,14 @@ export default function CreateInvoicePage() {
         setBinLookup({ status: 'notfound' })
         return
       }
-      setBinLookup({ status: 'found', name: data.company.name, companyStatus: data.company.status })
+      setBinLookup({
+        status: 'found',
+        name: data.company.name,
+        companyStatus: data.company.status,
+        source: data.company.source,
+        isVatPayer: data.company.isVatPayer,
+        vatRegisteredAt: data.company.vatRegisteredAt,
+      })
       // Only empty fields are filled. Overwriting a name the user already
       // typed would be the app arguing with them about their own customer.
       setClientName(prev => prev.trim() ? prev : data.company.name)
@@ -910,10 +920,22 @@ export default function CreateInvoicePage() {
                             <span style={{ color: 'var(--nav-text-secondary)' }}>
                               {t.binLookupFound(binLookup.name || '', binLookup.companyStatus || null)}
                             </span>
+                            {/* VAT status decides whether this invoice may
+                                carry НДС at all, so it is stated plainly.
+                                Only when КГД actually answered: null means
+                                "not checked", which must not be shown as a
+                                negative. */}
+                            {binLookup.isVatPayer !== null && binLookup.isVatPayer !== undefined && (
+                              <div style={{ color: 'var(--nav-text-secondary)' }}>
+                                {binLookup.isVatPayer ? t.binLookupVatYes(binLookup.vatRegisteredAt || null) : t.binLookupVatNo}
+                              </div>
+                            )}
                             {/* Crediting the portal is a condition of using
                                 its data (Приложение 2, пп. 7-8), not a
                                 courtesy -- it stays wherever the data shows. */}
-                            <div style={{ color: 'var(--nav-text-muted)' }}>{t.binLookupSource}</div>
+                            <div style={{ color: 'var(--nav-text-muted)' }}>
+                              {binLookup.source === 'kgd' ? t.binLookupSourceKgd : t.binLookupSource}
+                            </div>
                           </>
                         )}
                       </div>

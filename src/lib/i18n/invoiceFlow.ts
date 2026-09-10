@@ -12,6 +12,9 @@ export interface InvoiceFlowContent {
   companyNamePlaceholder: string
   binIinLabel: string
   binLookupSearching: string
+  binLookupVatYes: (since: string | null) => string
+  binLookupVatNo: string
+  binLookupSourceKgd: string
   binLookupNotFound: string
   binLookupSource: string
   binLookupFound: (name: string, status: string | null) => string
@@ -219,6 +222,9 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     binLookupSearching: 'Ищем в реестре…',
     binLookupNotFound: 'В реестре юридических лиц не найдено — скорее всего это ИП. Заполните поля вручную.',
     binLookupSource: 'Данные: реестр юридических лиц, портал открытых данных data.egov.kz',
+    binLookupSourceKgd: 'Данные: сервис «Поиск налогоплательщика», КГД МФ РК',
+    binLookupVatYes: (since: string | null) => since ? `Плательщик НДС с ${since}` : 'Плательщик НДС',
+    binLookupVatNo: 'Не плательщик НДС',
     binLookupFound: (name: string, status: string | null) => status ? `${name} · ${status}` : name,
     binIinPlaceholder: '123456789012',
     emailLabel: 'Email',
@@ -431,6 +437,9 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     binLookupSearching: 'Тізілімнен іздеудеміз…',
     binLookupNotFound: 'Заңды тұлғалар тізілімінен табылмады — бұл ЖК болуы мүмкін. Өрістерді қолмен толтырыңыз.',
     binLookupSource: 'Дереккөз: заңды тұлғалар тізілімі, ашық деректер порталы data.egov.kz',
+    binLookupSourceKgd: 'Дереккөз: «Салық төлеушіні іздеу» сервисі, ҚР ҚМ МКК',
+    binLookupVatYes: (since: string | null) => since ? `ҚҚС төлеуші ${since} бастап` : 'ҚҚС төлеуші',
+    binLookupVatNo: 'ҚҚС төлеуші емес',
     binLookupFound: (name: string, status: string | null) => status ? `${name} · ${status}` : name,
     binIinPlaceholder: '123456789012',
     emailLabel: 'Email',
@@ -643,6 +652,9 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     binLookupSearching: 'Searching the register…',
     binLookupNotFound: 'Not found in the register of legal entities — most likely a sole proprietor. Please fill the fields in by hand.',
     binLookupSource: 'Source: register of legal entities, open data portal data.egov.kz',
+    binLookupSourceKgd: 'Source: "Taxpayer search" service, State Revenue Committee',
+    binLookupVatYes: (since: string | null) => since ? `Registered for VAT since ${since}` : 'Registered for VAT',
+    binLookupVatNo: 'Not registered for VAT',
     binLookupFound: (name: string, status: string | null) => status ? `${name} · ${status}` : name,
     binIinPlaceholder: '123456789012',
     emailLabel: 'Email',

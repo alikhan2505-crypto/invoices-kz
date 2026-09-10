@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { isValidBin, normalizeBin, toLookupResult, egovQuery, type BinLookupResult } from '@/lib/binLookup'
+import {
+  isValidBin, normalizeBin, toLookupResult, fromKgdTaxpayer, egovQuery,
+  type BinLookupResult,
+} from '@/lib/binLookup'
+import {
+  parseTaxpayer, parseVatStatus, KGD_TAXPAYER_URL, KGD_VAT_URL, KGD_TAXPAYER_TYPES,
+} from '@/lib/kgdTaxpayer'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -11,22 +17,87 @@ const supabaseAuth = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-// A registry row is re-fetched after this. Companies get renamed and
-// liquidated, and a stale name printed on an invoice is worse than a slow
-// lookup -- but the register itself only refreshes daily, so anything
-// shorter would just spend requests.
+// A registry row is re-fetched after this. Companies get renamed, liquidated
+// and registered for VAT, and a stale name printed on an invoice is worse
+// than a slow lookup -- but the register itself only refreshes daily, so
+// anything shorter would just spend requests.
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000
 
-// Looks a counterparty up by БИН in the state register of legal entities.
+/** The legal-entity register. Rich, but holds no sole proprietors. */
+async function lookUpInEgov(bin: string): Promise<BinLookupResult | null> {
+  const key = process.env.EGOV_API_KEY
+  if (!key) {
+    console.error('bin-lookup: EGOV_API_KEY is not set')
+    return null
+  }
+  try {
+    const url = `https://data.egov.kz/api/v4/gbd_ul/v1?source=${encodeURIComponent(egovQuery(bin))}&apiKey=${key}`
+    const res = await fetch(url, { signal: AbortSignal.timeout(12_000) })
+    if (!res.ok) throw new Error(`egov responded ${res.status}`)
+    const records = await res.json()
+    return toLookupResult(bin, Array.isArray(records) ? records : [])
+  } catch (e) {
+    console.error('bin-lookup: egov request failed:', e instanceof Error ? e.message : e)
+    return null
+  }
+}
+
+/** КГД. The only official source that covers ИП, at the cost of detail. */
+async function lookUpInKgd(bin: string): Promise<BinLookupResult | null> {
+  const token = process.env.KGD_PORTAL_TOKEN
+  if (!token) return null
+  for (const taxpayerType of KGD_TAXPAYER_TYPES) {
+    try {
+      const url = `${KGD_TAXPAYER_URL}?taxpayerCode=${encodeURIComponent(bin)}&taxpayerType=${taxpayerType}`
+      const res = await fetch(url, {
+        headers: { 'X-Portal-Token': token },
+        signal: AbortSignal.timeout(12_000),
+      })
+      if (!res.ok) continue
+      const taxpayer = parseTaxpayer(await res.json())
+      if (taxpayer) return fromKgdTaxpayer(bin, taxpayer)
+    } catch (e) {
+      console.error('bin-lookup: КГД request failed:', e instanceof Error ? e.message : e)
+    }
+  }
+  return null
+}
+
+/**
+ * VAT registration for a БИН.
+ *
+ * Returns undefined when nothing could be learned, which is not the same as
+ * `false`: a seller reading "не плательщик НДС" on an invoice needs that to
+ * mean КГД said so, not that our request timed out.
+ */
+async function lookUpVat(bin: string): Promise<{ isVatPayer: boolean; registeredAt: string | null } | undefined> {
+  const token = process.env.KGD_PORTAL_TOKEN
+  if (!token) return undefined
+  try {
+    const res = await fetch(`${KGD_VAT_URL}?taxpayerCode=${encodeURIComponent(bin)}`, {
+      headers: { 'X-Portal-Token': token },
+      signal: AbortSignal.timeout(12_000),
+    })
+    if (!res.ok) return undefined
+    // An empty body is КГД saying "not registered", so the text is read
+    // first and only parsed as JSON when there is something to parse.
+    const body = (await res.text()).trim()
+    const status = parseVatStatus(body ? JSON.parse(body) : '')
+    return status ? { isVatPayer: status.isVatPayer, registeredAt: status.registeredAt } : undefined
+  } catch (e) {
+    console.error('bin-lookup: КГД VAT request failed:', e instanceof Error ? e.message : e)
+    return undefined
+  }
+}
+
+// Looks a counterparty up by БИН across both state registers.
 //
-// This route exists because the egov key must never reach a browser: the
-// portal's agreement forbids passing the key to anyone (Приложение 2,
-// пп. 5.2, 12), and a NEXT_PUBLIC_ variable would hand it to every visitor.
-// So the browser asks us, and we ask egov.
+// The browser never sees either credential -- the egov agreement forbids
+// passing its key to anyone, and the КГД token is issued to one account by
+// hand -- so the browser asks us and we ask them.
 //
-// Signed-in users only -- not because the data is private (it is a public
-// register) but because an open proxy would let anyone spend our 40
-// requests per minute.
+// Signed-in users only. Not because the data is private (both registers are
+// public) but because an open proxy would spend our 40 requests a minute.
 export async function GET(req: NextRequest) {
   const accessToken = req.headers.get('authorization')?.replace('Bearer ', '')
   const { data: { user } } = accessToken
@@ -56,37 +127,26 @@ export async function GET(req: NextRequest) {
         activity: cached.activity,
         status: cached.status,
         registeredAt: cached.registered_at,
+        source: cached.source,
+        isVatPayer: cached.is_vat_payer,
+        vatRegisteredAt: cached.vat_registered_at,
       } satisfies BinLookupResult,
     })
   }
 
-  const key = process.env.EGOV_API_KEY
-  if (!key) {
-    console.error('bin-lookup: EGOV_API_KEY is not set')
-    return NextResponse.json({ error: 'Справочник недоступен' }, { status: 503 })
-  }
-
-  let records: unknown
-  try {
-    const url = `https://data.egov.kz/api/v4/gbd_ul/v1?source=${encodeURIComponent(egovQuery(bin))}&apiKey=${key}`
-    const res = await fetch(url, { signal: AbortSignal.timeout(12_000) })
-    if (!res.ok) throw new Error(`egov responded ${res.status}`)
-    records = await res.json()
-  } catch (e) {
-    // The portal may cut access off at any time without notice (п. 11), and
-    // it is simply slow sometimes. Either way the invoice must still be
-    // fillable by hand, so this is reported as "lookup unavailable" and never
-    // as a failure of the form.
-    console.error('bin-lookup: egov request failed:', e instanceof Error ? e.message : e)
-    return NextResponse.json({ error: 'Справочник не отвечает' }, { status: 503 })
-  }
-
-  const company = toLookupResult(bin, Array.isArray(records) ? records : [])
+  // The register first: when it has the company it answers with an address,
+  // a director and an activity, none of which КГД publishes. КГД is the
+  // fallback that covers everyone the register cannot -- sole proprietors,
+  // who are simply absent from it.
+  const company = (await lookUpInEgov(bin)) ?? (await lookUpInKgd(bin))
   if (!company) {
-    // Most often a sole proprietor: gbd_ul is a register of legal entities
-    // and holds no ИП at all. That is why the caller is told "not found"
-    // rather than anything resembling an error.
     return NextResponse.json({ found: false })
+  }
+
+  const vat = await lookUpVat(bin)
+  if (vat) {
+    company.isVatPayer = vat.isVatPayer
+    company.vatRegisteredAt = vat.registeredAt
   }
 
   const { error: cacheError } = await supabase.from('bin_lookup_cache').upsert({
@@ -97,10 +157,13 @@ export async function GET(req: NextRequest) {
     activity: company.activity,
     status: company.status,
     registered_at: company.registeredAt,
+    source: company.source,
+    is_vat_payer: company.isVatPayer,
+    vat_registered_at: company.vatRegisteredAt,
     fetched_at: new Date().toISOString(),
   }, { onConflict: 'bin' })
-  // A cache miss costs a request next time; it is not worth failing the
-  // lookup the user is waiting on.
+  // A cache miss costs a request next time; not worth failing the lookup
+  // someone is waiting on.
   if (cacheError) console.error('bin-lookup: cache write failed:', cacheError.message)
 
   return NextResponse.json({ found: true, company })

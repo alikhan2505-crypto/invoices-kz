@@ -17,7 +17,7 @@
 // credited wherever the data is shown, and access can be withdrawn without
 // notice -- so a lookup is a convenience and manual entry always stays.
 
-/** A counterparty as the state registry describes it. */
+/** A counterparty as the state registers describe it. */
 export interface BinLookupResult {
   bin: string
   name: string
@@ -27,6 +27,15 @@ export interface BinLookupResult {
   /** «Зарегистрирован», «Ликвидирован», ... — shown as-is, never interpreted. */
   status: string | null
   registeredAt: string | null
+  /**
+   * Which register answered. 'kgd' rows carry a name and a date and nothing
+   * else — no address, no director — because that is all КГД publishes for a
+   * sole proprietor. Empty fields on a 'kgd' row are the truth, not a gap.
+   */
+  source: 'egov' | 'kgd'
+  /** null = not checked. false = checked and not registered for VAT. */
+  isVatPayer: boolean | null
+  vatRegisteredAt: string | null
 }
 
 /** One row of the gbd_ul dataset, as the API returns it. */
@@ -118,6 +127,34 @@ export function toLookupResult(bin: string, records: EgovUlRecord[]): BinLookupR
     activity: clean(record.okedru) || clean(record.okedkz),
     status: clean(record.statusru),
     registeredAt: cleanRegistrationDate(record.datereg),
+    source: 'egov',
+    isVatPayer: null,
+    vatRegisteredAt: null,
+  }
+}
+
+/**
+ * A КГД taxpayer shaped like a lookup result.
+ *
+ * Thin on purpose: address, director and activity stay null because КГД does
+ * not publish them, and `status` is left empty rather than invented — a
+ * registration date is not the same statement as «Зарегистрирован».
+ */
+export function fromKgdTaxpayer(
+  bin: string,
+  taxpayer: { name: string; registeredAt: string | null },
+): BinLookupResult {
+  return {
+    bin: normalizeBin(bin),
+    name: taxpayer.name,
+    address: null,
+    director: null,
+    activity: null,
+    status: null,
+    registeredAt: cleanRegistrationDate(taxpayer.registeredAt),
+    source: 'kgd',
+    isVatPayer: null,
+    vatRegisteredAt: null,
   }
 }
 
