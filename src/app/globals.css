@@ -57,10 +57,17 @@ body {
   --accent: #1C2056;
 }
 
-/* Placeholder visible on all devices */
+/* Placeholder visible on all devices.
+   -webkit-text-fill-color is repeated on every rule below on purpose. The
+   inputs themselves set it to #111827 (a few rules down, to stop mobile PWA
+   rendering text washed out), and in WebKit that property wins over
+   `color` for the placeholder as well -- so on iPhone every placeholder was
+   drawn in near-black and read as a filled-in value. Invisible in Chromium,
+   which is why it stood for so long. */
 input::placeholder,
 textarea::placeholder {
   color: #9ca3af;
+  -webkit-text-fill-color: #9ca3af;
   opacity: 1;
 }
 
@@ -68,6 +75,7 @@ textarea::placeholder {
 input::-webkit-input-placeholder,
 textarea::-webkit-input-placeholder {
   color: #9ca3af;
+  -webkit-text-fill-color: #9ca3af;
   opacity: 1;
 }
 
@@ -158,6 +166,11 @@ main {
 [data-theme="dark"] input::placeholder,
 [data-theme="dark"] textarea::placeholder {
   color: var(--text-secondary) !important;
+  /* !important is required, not stylistic: the rule just above sets
+     -webkit-text-fill-color on the input itself with !important, and in
+     WebKit that also paints the placeholder. Without it here the dark theme
+     would keep drawing placeholders in full-strength text colour. */
+  -webkit-text-fill-color: var(--text-secondary) !important;
 }
 
 [data-theme="dark"] .border-b {
