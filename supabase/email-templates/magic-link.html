@@ -9,7 +9,10 @@
      this template exists to fix. Styles are inline and the layout is tables:
      mail clients strip stylesheets and do not implement flex or grid.
 
-     Go template variables must stay verbatim: {{ .ConfirmationURL }} -->
+     The ConfirmationURL template variable must stay verbatim in all three
+     places it appears below. It is deliberately not written out here: this
+     comment survives into whatever is pasted, and Supabase would substitute a
+     live one-time sign-in link into it. -->
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f9fafb;margin:0;padding:24px 12px;font-family:Arial,Helvetica,sans-serif;">
   <tr>
     <td align="center">
