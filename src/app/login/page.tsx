@@ -14,6 +14,10 @@ export default function Login() {
   const t = authDict[lang]
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)
+  // Shown after a manual resend, so pressing the button visibly does
+  // something -- otherwise the screen is identical and the user cannot tell
+  // whether the second letter was actually sent.
+  const [resent, setResent] = useState(false)
   const [loading, setLoading] = useState(false)
   const [passkeySupported, setPasskeySupported] = useState(false)
   const [passkeyLoading, setPasskeyLoading] = useState(false)
@@ -73,10 +77,32 @@ export default function Login() {
     }
   }
 
-  async function sendLink() {
+  async function sendLink({ again = false }: { again?: boolean } = {}) {
     if (!email) { alert(t.emailRequiredError); return }
     if (!email.includes('@')) { alert(t.invalidEmailError); return }
     setLoading(true)
+
+    // Asked before sending, because the send itself gives no sign of
+    // failure: a suppressed address is dropped silently and the person is
+    // left staring at "Проверьте почту!" waiting for a letter that cannot
+    // arrive. Four registered accounts were stuck exactly here. A verdict of
+    // 'unknown' means the check itself failed and must not block anyone.
+    try {
+      const res = await fetch('/api/email/deliverable', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      })
+      const { verdict } = await res.json()
+      if (verdict === 'undeliverable') {
+        alert(t.undeliverableEmailAlert)
+        setLoading(false)
+        return
+      }
+    } catch {
+      // Same rule: a broken check never becomes a second locked door.
+    }
+
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: { emailRedirectTo: 'https://invoices.kz/auth/callback' }
@@ -85,6 +111,7 @@ export default function Login() {
       alert(t.errorPrefix(error.message === 'Invalid email' ? t.invalidEmailMessage : error.message))
     } else {
       setSent(true)
+      if (again) setResent(true)
     }
     setLoading(false)
   }
@@ -151,7 +178,7 @@ export default function Login() {
               onChange={e => setEmail(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && sendLink()}
             />
-            <button onClick={sendLink} disabled={loading}
+            <button onClick={() => sendLink()} disabled={loading}
               className="w-full bg-[#2DC48D] text-white rounded-xl py-4 font-medium text-sm">
               {loading ? t.sendingButton : t.sendLinkButton}
             </button>
@@ -161,7 +188,17 @@ export default function Login() {
             <div className="text-4xl mb-4">📧</div>
             <p className="font-medium text-[#1C2056] mb-2">{t.checkEmailTitle}</p>
             <p className="text-sm text-gray-500">{t.linkSentPrefix}<br/><strong>{email}</strong></p>
-            <button onClick={() => setSent(false)} className="text-sm text-gray-400 mt-6">
+            {/* Both of these were missing, and between them they are the only
+                way out of this screen when the letter does not show up: the
+                folder to look in, and a second try. */}
+            <p className="text-xs text-gray-400 mt-4">{t.spamHint}</p>
+            <button
+              onClick={() => sendLink({ again: true })}
+              disabled={loading || resent}
+              className="text-sm text-[#2DC48D] font-medium mt-4 disabled:text-gray-400">
+              {resent ? t.resentNote : (loading ? t.sendingButton : t.resendLinkButton)}
+            </button>
+            <button onClick={() => { setSent(false); setResent(false) }} className="text-sm text-gray-400 mt-6 block w-full">
               {t.changeEmailButton}
             </button>
           </div>

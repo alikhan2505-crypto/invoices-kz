@@ -16,6 +16,10 @@ export interface AuthContent {
   sendingButton: string
   sendLinkButton: string
   checkEmailTitle: string
+  undeliverableEmailAlert: string
+  spamHint: string
+  resendLinkButton: string
+  resentNote: string
   linkSentPrefix: string
   changeEmailButton: string
 
@@ -84,6 +88,10 @@ export const authDict: Record<'ru' | 'kk' | 'en', AuthContent> = {
     sendingButton: 'Отправка...',
     sendLinkButton: 'Получить ссылку для входа',
     checkEmailTitle: 'Проверьте почту!',
+    undeliverableEmailAlert: 'На этот адрес письма не доставляются — почтовый сервис отклонил их. Проверьте, нет ли опечатки в адресе, или войдите с другого.',
+    spamHint: 'Письмо приходит за минуту. Если его нет — загляните в «Спам».',
+    resendLinkButton: 'Отправить ещё раз',
+    resentNote: 'Отправили повторно',
     linkSentPrefix: 'Мы отправили ссылку для входа на',
     changeEmailButton: 'Изменить email',
 
@@ -150,6 +158,10 @@ export const authDict: Record<'ru' | 'kk' | 'en', AuthContent> = {
     sendingButton: 'Жіберілуде...',
     sendLinkButton: 'Кіру сілтемесін алу',
     checkEmailTitle: 'Поштаңызды тексеріңіз!',
+    undeliverableEmailAlert: 'Бұл мекенжайға хаттар жеткізілмейді — пошта қызметі оларды қабылдамады. Мекенжайда қате жоқ па, тексеріңіз немесе басқасымен кіріңіз.',
+    spamHint: 'Хат бір минутта келеді. Келмесе — «Спам» бумасын қараңыз.',
+    resendLinkButton: 'Қайта жіберу',
+    resentNote: 'Қайта жіберілді',
     linkSentPrefix: 'Кіру сілтемесін мына поштаға жібердік:',
     changeEmailButton: 'Email-ды өзгерту',
 
@@ -217,6 +229,10 @@ export const authDict: Record<'ru' | 'kk' | 'en', AuthContent> = {
     sendingButton: 'Sending...',
     sendLinkButton: 'Get sign-in link',
     checkEmailTitle: 'Check your inbox!',
+    undeliverableEmailAlert: 'Mail to this address is not being delivered — the provider rejected it. Check the address for a typo, or sign in with another one.',
+    spamHint: 'The letter arrives within a minute. If it has not, check your spam folder.',
+    resendLinkButton: 'Send it again',
+    resentNote: 'Sent again',
     linkSentPrefix: 'We sent a sign-in link to:',
     changeEmailButton: 'Change email',
 
