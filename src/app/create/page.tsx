@@ -95,6 +95,46 @@ export default function CreateInvoicePage() {
  
   const [clientName, setClientName] = useState('')
   const [clientBin, setClientBin] = useState('')
+  // Result of looking the counterparty up in the state register. Kept
+  // separate from the form fields: it is shown even when the fields were
+  // already filled by hand, so the user can see who the БИН actually belongs
+  // to instead of the app silently overwriting what they typed.
+  const [binLookup, setBinLookup] = useState<{
+    status: 'idle' | 'loading' | 'found' | 'notfound'
+    name?: string
+    companyStatus?: string | null
+  }>({ status: 'idle' })
+  // The БИН the last lookup was fired for, so re-typing the same twelve
+  // digits does not spend another of the 40 requests per minute the portal
+  // allows.
+  const lookedUpBinRef = useRef('')
+
+  async function lookUpBin(bin: string) {
+    if (lookedUpBinRef.current === bin) return
+    lookedUpBinRef.current = bin
+    setBinLookup({ status: 'loading' })
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch(`/api/bin-lookup?bin=${bin}`, {
+        headers: { Authorization: `Bearer ${session?.access_token || ''}` },
+      })
+      const data = await res.json()
+      if (!res.ok || !data.found) {
+        // A miss is the ordinary case for a sole proprietor, and an
+        // unreachable register is the portal's prerogative -- neither is the
+        // user's problem, so both just fall back to typing.
+        setBinLookup({ status: 'notfound' })
+        return
+      }
+      setBinLookup({ status: 'found', name: data.company.name, companyStatus: data.company.status })
+      // Only empty fields are filled. Overwriting a name the user already
+      // typed would be the app arguing with them about their own customer.
+      setClientName(prev => prev.trim() ? prev : data.company.name)
+      setClientAddress(prev => prev.trim() ? prev : (data.company.address || ''))
+    } catch {
+      setBinLookup({ status: 'notfound' })
+    }
+  }
   const [clientEmail, setClientEmail] = useState('')
   const [clientAddress, setClientAddress] = useState('')
   const [clientPhone, setClientPhone] = useState('')
@@ -839,16 +879,45 @@ export default function CreateInvoicePage() {
                       onChange={async e => {
                         const bin = e.target.value
                         setClientBin(bin)
-                        if (bin.length === 12) {
-                          const found = clients.find(c => c.bin_iin === bin)
-                          if (found) {
-                            setClientName(found.name)
-                            setClientEmail(found.email || '')
-                            setClientAddress(found.address || '')
-                            setClientPhone(found.phone || '')
-                          }
+                        if (bin.length !== 12) {
+                          if (binLookup.status !== 'idle') setBinLookup({ status: 'idle' })
+                          return
                         }
+                        const found = clients.find(c => c.bin_iin === bin)
+                        if (found) {
+                          // The user's own saved client wins over the state
+                          // register: they have already corrected it to how
+                          // they want it printed.
+                          setClientName(found.name)
+                          setClientEmail(found.email || '')
+                          setClientAddress(found.address || '')
+                          setClientPhone(found.phone || '')
+                          setBinLookup({ status: 'idle' })
+                          return
+                        }
+                        lookUpBin(bin)
                       }} />
+                    {binLookup.status !== 'idle' && (
+                      <div className="text-xs mt-1 leading-snug">
+                        {binLookup.status === 'loading' && (
+                          <span style={{ color: 'var(--nav-text-muted)' }}>{t.binLookupSearching}</span>
+                        )}
+                        {binLookup.status === 'notfound' && (
+                          <span style={{ color: 'var(--nav-text-muted)' }}>{t.binLookupNotFound}</span>
+                        )}
+                        {binLookup.status === 'found' && (
+                          <>
+                            <span style={{ color: 'var(--nav-text-secondary)' }}>
+                              {t.binLookupFound(binLookup.name || '', binLookup.companyStatus || null)}
+                            </span>
+                            {/* Crediting the portal is a condition of using
+                                its data (Приложение 2, пп. 7-8), not a
+                                courtesy -- it stays wherever the data shows. */}
+                            <div style={{ color: 'var(--nav-text-muted)' }}>{t.binLookupSource}</div>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div>
                     <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.emailLabel}</label>

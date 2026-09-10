@@ -11,6 +11,10 @@ export interface InvoiceFlowContent {
   companyNameLabel: string
   companyNamePlaceholder: string
   binIinLabel: string
+  binLookupSearching: string
+  binLookupNotFound: string
+  binLookupSource: string
+  binLookupFound: (name: string, status: string | null) => string
   binIinPlaceholder: string
   emailLabel: string
   emailPlaceholder: string
@@ -212,6 +216,10 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     companyNameLabel: 'Название компании / ИП *',
     companyNamePlaceholder: 'ТОО «Пример»',
     binIinLabel: 'БИН/ИИН *',
+    binLookupSearching: 'Ищем в реестре…',
+    binLookupNotFound: 'В реестре юридических лиц не найдено — скорее всего это ИП. Заполните поля вручную.',
+    binLookupSource: 'Данные: реестр юридических лиц, портал открытых данных data.egov.kz',
+    binLookupFound: (name: string, status: string | null) => status ? `${name} · ${status}` : name,
     binIinPlaceholder: '123456789012',
     emailLabel: 'Email',
     emailPlaceholder: 'client@mail.kz',
@@ -420,6 +428,10 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     companyNameLabel: 'Компания / ЖК атауы *',
     companyNamePlaceholder: 'ЖШС «Мысал»',
     binIinLabel: 'БСН/ЖСН *',
+    binLookupSearching: 'Тізілімнен іздеудеміз…',
+    binLookupNotFound: 'Заңды тұлғалар тізілімінен табылмады — бұл ЖК болуы мүмкін. Өрістерді қолмен толтырыңыз.',
+    binLookupSource: 'Дереккөз: заңды тұлғалар тізілімі, ашық деректер порталы data.egov.kz',
+    binLookupFound: (name: string, status: string | null) => status ? `${name} · ${status}` : name,
     binIinPlaceholder: '123456789012',
     emailLabel: 'Email',
     emailPlaceholder: 'client@mail.kz',
@@ -628,6 +640,10 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     companyNameLabel: 'Company / Sole proprietor name *',
     companyNamePlaceholder: 'LLP "Example"',
     binIinLabel: 'BIN/IIN *',
+    binLookupSearching: 'Searching the register…',
+    binLookupNotFound: 'Not found in the register of legal entities — most likely a sole proprietor. Please fill the fields in by hand.',
+    binLookupSource: 'Source: register of legal entities, open data portal data.egov.kz',
+    binLookupFound: (name: string, status: string | null) => status ? `${name} · ${status}` : name,
     binIinPlaceholder: '123456789012',
     emailLabel: 'Email',
     emailPlaceholder: 'client@mail.kz',
