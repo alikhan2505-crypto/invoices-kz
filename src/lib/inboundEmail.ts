@@ -71,3 +71,21 @@ export function isReceivedEvent(payload: unknown): boolean {
   const root = (payload && typeof payload === 'object' ? payload : {}) as Record<string, unknown>
   return str(root.type) === 'email.received'
 }
+
+/**
+ * The Telegram line announcing a reply.
+ *
+ * Deliberately short: the webhook payload carries no body at all, so there is
+ * nothing to quote, and a notification that only says who wrote and about
+ * what is the honest shape of what we know. The full text is fetched from
+ * Resend when someone actually reads the thread.
+ */
+export function inboundNotificationText(fields: InboundEmailFields): string {
+  const escape = (v: string) => v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const from = escape(fields.from || 'неизвестный отправитель')
+  const subject = fields.subject ? escape(fields.subject) : 'без темы'
+  return `✉️ <b>Ответ на нашу почту</b>
+
+От: ${from}
+Тема: ${subject}`
+}

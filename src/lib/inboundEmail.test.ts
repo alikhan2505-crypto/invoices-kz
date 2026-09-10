@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { extractInboundEmail, isReceivedEvent } from './inboundEmail'
+import { extractInboundEmail, isReceivedEvent, inboundNotificationText } from './inboundEmail'
 
 describe('isReceivedEvent', () => {
   it('accepts email.received', () => {
@@ -80,5 +80,37 @@ describe('extractInboundEmail', () => {
     expect(result.resendId).toBeNull()
     expect(result.subject).toBeNull()
     expect(result.to).toBeNull()
+  })
+})
+
+describe('inboundNotificationText', () => {
+  it('names the sender and the subject', () => {
+    const text = inboundNotificationText({
+      resendId: 'x', from: 'КГД <support@kgd.gov.kz>', to: 'otvet@z.resend.app',
+      subject: 'Ответ на обращение', text: null, receivedAt: null,
+    })
+    expect(text).toContain('КГД')
+    expect(text).toContain('Ответ на обращение')
+  })
+
+  it('escapes HTML so a crafted subject cannot break the message', () => {
+    // Telegram is called with parse_mode HTML and the subject is written by
+    // whoever sent the email -- an unescaped tag would either mangle the
+    // notification or make it fail to send at all.
+    const text = inboundNotificationText({
+      resendId: 'x', from: '<b>spoof</b>', to: null,
+      subject: '<script>alert(1)</script>', text: null, receivedAt: null,
+    })
+    expect(text).not.toContain('<script>')
+    expect(text).toContain('&lt;script&gt;')
+    expect(text).toContain('&lt;b&gt;spoof&lt;/b&gt;')
+  })
+
+  it('says something sensible when the fields are missing', () => {
+    const text = inboundNotificationText({
+      resendId: 'x', from: null, to: null, subject: null, text: null, receivedAt: null,
+    })
+    expect(text).toContain('неизвестный отправитель')
+    expect(text).toContain('без темы')
   })
 })

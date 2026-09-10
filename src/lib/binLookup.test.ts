@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { normalizeBin, isValidBin, pickBestRecord, toLookupResult, egovQuery } from './binLookup'
+import { normalizeBin, isValidBin, pickBestRecord, toLookupResult, egovQuery, cleanRegistrationDate } from './binLookup'
 
 // Shaped after real gbd_ul rows (checked against the live API on 2026-09-10).
 const kaspi = {
@@ -96,6 +96,22 @@ describe('toLookupResult', () => {
     // gbd_ul holds legal entities only, so a sole proprietor is a miss and
     // must not be reported as a failure.
     expect(toLookupResult('890525350143', [])).toBeNull()
+  })
+})
+
+describe('cleanRegistrationDate', () => {
+  it('drops the timezone offset the register appends', () => {
+    // The live API answered '1997-12-04+06:00' for Kaspi Bank — a date with
+    // an offset and no time, which no formatter accepts.
+    expect(cleanRegistrationDate('1997-12-04+06:00')).toBe('1997-12-04')
+  })
+  it('leaves a plain date alone', () => {
+    expect(cleanRegistrationDate('2016-03-29')).toBe('2016-03-29')
+  })
+  it('passes through anything unrecognised rather than inventing a date', () => {
+    expect(cleanRegistrationDate('не указано')).toBe('не указано')
+    expect(cleanRegistrationDate('')).toBeNull()
+    expect(cleanRegistrationDate(null)).toBeNull()
   })
 })
 

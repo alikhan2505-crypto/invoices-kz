@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { extractInboundEmail, isReceivedEvent } from '@/lib/inboundEmail'
+import { extractInboundEmail, isReceivedEvent, inboundNotificationText } from '@/lib/inboundEmail'
+import { sendTelegramNotification } from '@/lib/telegramNotify'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -66,6 +67,17 @@ export async function POST(req: NextRequest) {
     // A real failure, so let Resend retry -- it holds the message either way.
     console.error('email/inbound: insert failed:', error.message)
     return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  // Told immediately rather than on a schedule. The reply IS the event, and
+  // Vercel's Hobby plan runs a cron at most once a day -- which would have
+  // meant hearing about a customer's answer up to 24 hours late for no
+  // reason. Upsert ran first, so a Telegram failure cannot lose the message.
+  const chatId = process.env.TELEGRAM_CHAT_ID
+  if (chatId) {
+    await sendTelegramNotification(chatId, inboundNotificationText(fields))
+  } else {
+    console.error('email/inbound: TELEGRAM_CHAT_ID is not set, reply stored without a notification')
   }
 
   return NextResponse.json({ ok: true, stored: true })

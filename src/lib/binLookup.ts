@@ -66,6 +66,21 @@ const clean = (value: string | null | undefined): string | null => {
 }
 
 /**
+ * The registration date as a plain calendar date.
+ *
+ * The register returns it with a timezone offset and no time at all --
+ * `1997-12-04+06:00` -- which is not a date any formatter will accept and
+ * would reach the screen looking broken. There is no time-of-day to lose:
+ * only the date part is real data.
+ */
+export function cleanRegistrationDate(value: string | null | undefined): string | null {
+  const raw = clean(value)
+  if (!raw) return null
+  const match = raw.match(/^\d{4}-\d{2}-\d{2}/)
+  return match ? match[0] : raw
+}
+
+/**
  * The one record to use out of what the dataset returned, or null.
  *
  * Two things force a choice here. The dataset ships duplicates -- one БИН
@@ -102,7 +117,7 @@ export function toLookupResult(bin: string, records: EgovUlRecord[]): BinLookupR
     director: clean(record.director),
     activity: clean(record.okedru) || clean(record.okedkz),
     status: clean(record.statusru),
-    registeredAt: clean(record.datereg),
+    registeredAt: cleanRegistrationDate(record.datereg),
   }
 }
 
