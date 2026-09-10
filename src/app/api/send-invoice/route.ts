@@ -32,6 +32,18 @@ export async function POST(request: NextRequest) {
     if (!inv) return NextResponse.json({ error: 'Счёт не найден' }, { status: 404 })
     if (inv.user_id !== user.id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
+    // Where a reply goes. Without this the buyer answers mail@invoices.kz —
+    // a send-only address with no mailbox behind it, so "можно исправить
+    // сумму?" and "оплатил, вот квитанция" reached nobody and the seller
+    // never learned their customer had written. The seller's own address is
+    // who the buyer meant to write to anyway.
+    const { data: sellerProfile } = await supabase
+      .from('profiles')
+      .select('email')
+      .eq('id', inv.user_id)
+      .maybeSingle()
+    const replyTo = (sellerProfile?.email || '').trim() || undefined
+
     let kaspiPaymentLink: string | null = null
     try {
       // Shared with the payer-facing /api/kaspi/invoice-payment route, which
@@ -65,6 +77,10 @@ export async function POST(request: NextRequest) {
 
     await resend.emails.send({
       from: 'invoices.kz <mail@invoices.kz>',
+      // Omitted rather than defaulted when the seller has no email on file:
+      // pointing replies back at an unattended mailbox is the bug being
+      // fixed, not a safe fallback.
+      ...(replyTo ? { replyTo } : {}),
       to: recipientEmail,
       subject: `Счёт №${inv.number} на ${amount} ₸ — ${inv.client_name}`,
       html: `
