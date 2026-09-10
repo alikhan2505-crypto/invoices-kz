@@ -886,15 +886,16 @@ export default function CreateInvoicePage() {
               </div>
             ) : (
               <div className="space-y-3">
+                {/* БИН first, and full width, because it is now the field
+                    that fills the others in: one number and the name and
+                    address arrive from the state registers. Asking for the
+                    company name above it made people type what the state
+                    already knows. Email and phone stay manual -- no register
+                    publishes them; they come only from a client already
+                    saved in the user's own directory. */}
                 <div>
-                  <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.companyNameLabel}</label>
+                  <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.binIinLabel}</label>
                   <input className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
-                    placeholder={t.companyNamePlaceholder} value={clientName} onChange={e => setClientName(e.target.value)} />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.binIinLabel}</label>
-                    <input className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
                       placeholder={t.binIinPlaceholder} value={clientBin}
                       onChange={async e => {
                         const bin = e.target.value
@@ -961,23 +962,29 @@ export default function CreateInvoicePage() {
                         )}
                       </div>
                     )}
-                  </div>
-                  <div>
-                    <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.emailLabel}</label>
-                    <input className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
-                      placeholder={t.emailPlaceholder} value={clientEmail} onChange={e => setClientEmail(e.target.value)} />
-                  </div>
+                </div>
+                <div>
+                  <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.companyNameLabel}</label>
+                  <input className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
+                    placeholder={t.companyNamePlaceholder} value={clientName} onChange={e => setClientName(e.target.value)} />
                 </div>
                 <div>
                   <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.addressLabelDashboard}</label>
                   <input className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
                     placeholder={t.addressPlaceholder} value={clientAddress} onChange={e => setClientAddress(e.target.value)} />
                 </div>
-                <div>
-                  <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.buyerPhoneLabel}</label>
-                  <input className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
-                    placeholder={t.buyerPhonePlaceholderDashboard} value={clientPhone} type="tel" maxLength={16}
-                    onChange={e => setClientPhone(formatPhone(e.target.value))} />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.emailLabel}</label>
+                    <input className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
+                      placeholder={t.emailPlaceholder} value={clientEmail} onChange={e => setClientEmail(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.buyerPhoneLabel}</label>
+                    <input className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
+                      placeholder={t.buyerPhonePlaceholderDashboard} value={clientPhone} type="tel" maxLength={16}
+                      onChange={e => setClientPhone(formatPhone(e.target.value))} />
+                  </div>
                 </div>
                 <label className="flex items-center gap-2 cursor-pointer select-none">
                   <input type="checkbox" checked={noContract} onChange={e => toggleNoContract(e.target.checked)}
