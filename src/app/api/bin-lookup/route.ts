@@ -117,21 +117,37 @@ export async function GET(req: NextRequest) {
     .maybeSingle()
 
   if (cached && Date.now() - new Date(cached.fetched_at).getTime() < CACHE_TTL_MS) {
-    return NextResponse.json({
-      found: true,
-      company: {
-        bin: cached.bin,
-        name: cached.name,
-        address: cached.address,
-        director: cached.director,
-        activity: cached.activity,
-        status: cached.status,
-        registeredAt: cached.registered_at,
-        source: cached.source,
-        isVatPayer: cached.is_vat_payer,
-        vatRegisteredAt: cached.vat_registered_at,
-      } satisfies BinLookupResult,
-    })
+    const company: BinLookupResult = {
+      bin: cached.bin,
+      name: cached.name,
+      address: cached.address,
+      director: cached.director,
+      activity: cached.activity,
+      status: cached.status,
+      registeredAt: cached.registered_at,
+      source: cached.source,
+      isVatPayer: cached.is_vat_payer,
+      vatRegisteredAt: cached.vat_registered_at,
+    }
+
+    // A fresh row can still be missing its VAT status: it was cached before
+    // the VAT lookup existed, or КГД was unreachable at the time. Left alone
+    // that gap would persist for the whole cache lifetime, so it is filled
+    // in on the next read instead of waiting for the row to expire. The
+    // identity fields are not re-fetched -- only the hole is.
+    if (company.isVatPayer === null || company.isVatPayer === undefined) {
+      const vat = await lookUpVat(bin)
+      if (vat) {
+        company.isVatPayer = vat.isVatPayer
+        company.vatRegisteredAt = vat.registeredAt
+        const { error } = await supabase.from('bin_lookup_cache')
+          .update({ is_vat_payer: vat.isVatPayer, vat_registered_at: vat.registeredAt })
+          .eq('bin', bin)
+        if (error) console.error('bin-lookup: VAT backfill failed:', error.message)
+      }
+    }
+
+    return NextResponse.json({ found: true, company })
   }
 
   // The register first: when it has the company it answers with an address,
