@@ -12,6 +12,7 @@ import Link from 'next/link'
 import { useLanguage } from '@/components/LanguageProvider'
 import { getActivePlan } from '@/lib/plan'
 import { supportDict } from '@/lib/i18n/support'
+import { invoiceFlowDict } from '@/lib/i18n/invoiceFlow'
 
 // Same easing curve used on the landing page (src/app/page.tsx) -- kept
 // identical across the app rather than inventing a second "house" ease.
@@ -555,6 +556,7 @@ export default function DashboardPage() {
   const router = useRouter()
   const { lang } = useLanguage()
   const s = supportDict[lang]
+  const tf = invoiceFlowDict[lang]
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw
   const [invoices, setInvoices] = useState<any[]>([])
@@ -565,6 +567,10 @@ export default function DashboardPage() {
   // Telegram support is included from the Basic plan up (see src/lib/plan.ts);
   // free users (incl. before the profile loads) don't get the link, only Email.
   const [canTelegramSupport, setCanTelegramSupport] = useState(false)
+  // The trial was invisible on the very screen a new account lands on. It is
+  // shown on /create, but the reason to act today belongs on the first
+  // screen, not one click in.
+  const [plan, setPlan] = useState<ReturnType<typeof getActivePlan> | null>(null)
 
   useEffect(() => { load() }, [])
 
@@ -578,8 +584,9 @@ export default function DashboardPage() {
     ])
     setInvoices(data || [])
     setIsAdmin(!!profile?.is_admin)
-    const { plan, isActive } = getActivePlan(profile)
-    setCanTelegramSupport(isActive && plan !== 'free')
+    const activePlan = getActivePlan(profile)
+    setPlan(activePlan)
+    setCanTelegramSupport(activePlan.isActive && activePlan.plan !== 'free')
     setLoading(false)
 
     // Real usage for the Kaspi API tile (replaces the old static
@@ -717,6 +724,28 @@ export default function DashboardPage() {
                 create entry point on this page now. */}
             <h2 className="text-xl font-bold" style={{ color: 'var(--nav-text-primary)' }}>Дашборд</h2>
           </motion.div>
+
+          {/* Пробный период и срок тарифа. Same wording as the banner on
+              /create, from the same dictionary, so the two screens do not
+              describe one plan in two ways. */}
+          {plan?.isTrial && (
+            <div className="nav-glass flex items-center justify-between rounded-xl px-4 py-3 mb-5" style={{ background: 'var(--nav-success-soft)' }}>
+              <div>
+                <div className="text-sm font-medium" style={{ color: 'var(--nav-success)' }}>{tf.trialPlanTitle}</div>
+                <div className="text-xs mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{tf.daysLeftLabel(plan.daysLeft!)}</div>
+              </div>
+              <button onClick={() => router.push('/upgrade')} className="text-xs font-semibold px-3 py-1.5 rounded-lg flex-shrink-0" style={{ background: 'var(--nav-success)', color: '#fff' }}>{tf.buyButton}</button>
+            </div>
+          )}
+          {!plan?.isTrial && plan?.daysLeft !== null && plan?.daysLeft !== undefined && plan.daysLeft <= 3 && (
+            <div className="nav-glass flex items-center justify-between rounded-xl px-4 py-3 mb-5">
+              <div>
+                <div className="text-sm font-medium" style={{ color: 'var(--nav-critical)' }}>{tf.expiringPlanTitle}</div>
+                <div className="text-xs mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{tf.daysLeftLabel(plan.daysLeft)}</div>
+              </div>
+              <button onClick={() => router.push('/upgrade')} className="text-xs font-semibold px-3 py-1.5 rounded-lg flex-shrink-0" style={{ background: 'var(--nav-critical)', color: '#fff' }}>{tf.extendButton}</button>
+            </div>
+          )}
 
           {/* Продукты платформы */}
           <div className="mb-6">
