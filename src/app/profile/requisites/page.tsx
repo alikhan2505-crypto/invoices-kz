@@ -73,12 +73,44 @@ export default function Requisites() {
   async function lookUpOwnBin(force = false) {
     const company = await lookupBin(profile.bin_iin, { force })
     if (!company) return
+    // Empty fields are filled straight away -- that is the whole point on a
+    // blank form. Fields that already hold something are left alone and
+    // offered through applyRegistryData instead: on your OWN requisites the
+    // form is usually already filled in, so silently changing nothing made
+    // the button look broken, and saying "Заполнено из реестра" when nothing
+    // had been filled was simply untrue.
     setProfile(current => ({
       ...current,
       company_name: current.company_name?.trim() ? current.company_name : company.name,
       address: current.address?.trim() ? current.address : (company.address || ''),
       director_name: current.director_name?.trim() ? current.director_name : (company.director || ''),
     }))
+  }
+
+  /** Overwrites the fields with what the register says, on explicit request. */
+  function applyRegistryData() {
+    const company = binLookup.company
+    if (!company) return
+    setProfile(current => ({
+      ...current,
+      company_name: company.name || current.company_name,
+      address: company.address || current.address,
+      director_name: company.director || current.director_name,
+    }))
+  }
+
+  /** What the register holds that differs from what is in the form now. */
+  function registryDifferences() {
+    const company = binLookup.company
+    if (!company) return []
+    const rows: { label: string; value: string }[] = []
+    const add = (label: string, value: string | null, current: string | undefined) => {
+      if (value && value.trim() !== (current || '').trim()) rows.push({ label, value })
+    }
+    add(t.companyNameFieldLabel, company.name, profile.company_name)
+    add(t.legalAddressFieldLabel, company.address, profile.address)
+    add(t.directorNameFieldLabel, company.director, profile.director_name)
+    return rows
   }
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw
@@ -192,11 +224,35 @@ export default function Requisites() {
               {binLookup.status === 'notfound' && (
                 <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>{t.binLookupNotFound}</div>
               )}
-              {binLookup.status === 'found' && (
-                <div className="text-xs mt-1 leading-snug" style={{ color: 'var(--nav-text-muted)' }}>
-                  {t.binLookupFilled(binLookup.company?.source === 'kgd' ? t.binLookupSourceKgd : t.binLookupSourceEgov)}
-                </div>
-              )}
+              {binLookup.status === 'found' && (() => {
+                const diffs = registryDifferences()
+                return (
+                  <div className="text-xs mt-2 leading-snug rounded-lg p-3" style={{ background: 'var(--nav-surface-glass)' }}>
+                    {diffs.length === 0 ? (
+                      <div style={{ color: 'var(--nav-text-secondary)' }}>{t.binLookupMatches}</div>
+                    ) : (
+                      <>
+                        <div className="mb-1.5" style={{ color: 'var(--nav-text-secondary)' }}>{t.binLookupRegistrySays}</div>
+                        {diffs.map(row => (
+                          <div key={row.label} style={{ color: 'var(--nav-text-primary)' }}>
+                            <span style={{ color: 'var(--nav-text-muted)' }}>{row.label}: </span>{row.value}
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={applyRegistryData}
+                          className="mt-2 rounded-lg px-3 py-1.5 text-xs font-semibold"
+                          style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                          {t.binLookupApplyButton}
+                        </button>
+                      </>
+                    )}
+                    <div className="mt-2" style={{ color: 'var(--nav-text-muted)' }}>
+                      {binLookup.company?.source === 'kgd' ? t.binLookupSourceKgd : t.binLookupSourceEgov}
+                    </div>
+                  </div>
+                )
+              })()}
             </div>
 
             <Field label={t.companyNameFieldLabel} placeholder={t.companyNamePlaceholder}

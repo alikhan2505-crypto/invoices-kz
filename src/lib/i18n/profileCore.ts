@@ -66,6 +66,9 @@ export interface ProfileCoreContent {
   binLookupSearching: string
   binLookupNotFound: string
   binLookupFilled: (source: string) => string
+  binLookupRegistrySays: string
+  binLookupApplyButton: string
+  binLookupMatches: string
   binLookupSourceEgov: string
   binLookupSourceKgd: string
   companyNamePlaceholder: string
@@ -146,6 +149,9 @@ export const profileCoreDict: Record<'ru' | 'kk' | 'en', ProfileCoreContent> = {
     binLookupSearching: 'Ищем в реестре…',
     binLookupNotFound: 'В реестре не нашли — заполните поля вручную.',
     binLookupFilled: (source: string) => `Заполнено из реестра. ${source}`,
+    binLookupRegistrySays: 'В реестре записано так:',
+    binLookupApplyButton: 'Подставить в поля',
+    binLookupMatches: 'Ваши данные совпадают с реестром.',
     binLookupSourceEgov: 'Данные: реестр юридических лиц, портал открытых данных data.egov.kz',
     binLookupSourceKgd: 'Данные: сервис «Поиск налогоплательщика», КГД МФ РК',
     savingEllipsis: 'Сохраняем...',
@@ -278,6 +284,9 @@ export const profileCoreDict: Record<'ru' | 'kk' | 'en', ProfileCoreContent> = {
     binLookupSearching: 'Тізілімнен іздеудеміз…',
     binLookupNotFound: 'Тізілімнен табылмады — өрістерді қолмен толтырыңыз.',
     binLookupFilled: (source: string) => `Тізілімнен толтырылды. ${source}`,
+    binLookupRegistrySays: 'Тізілімде былай жазылған:',
+    binLookupApplyButton: 'Өрістерге қою',
+    binLookupMatches: 'Деректеріңіз тізіліммен сәйкес келеді.',
     binLookupSourceEgov: 'Дереккөз: заңды тұлғалар тізілімі, ашық деректер порталы data.egov.kz',
     binLookupSourceKgd: 'Дереккөз: «Салық төлеушіні іздеу» сервисі, ҚР ҚМ МКК',
     savingEllipsis: 'Сақталуда...',
@@ -410,6 +419,9 @@ export const profileCoreDict: Record<'ru' | 'kk' | 'en', ProfileCoreContent> = {
     binLookupSearching: 'Searching the register…',
     binLookupNotFound: 'Not found in the register — please fill the fields in by hand.',
     binLookupFilled: (source: string) => `Filled in from the register. ${source}`,
+    binLookupRegistrySays: 'The register has it as:',
+    binLookupApplyButton: 'Put into the fields',
+    binLookupMatches: 'Your details match the register.',
     binLookupSourceEgov: 'Source: register of legal entities, open data portal data.egov.kz',
     binLookupSourceKgd: 'Source: "Taxpayer search" service, State Revenue Committee',
     savingEllipsis: 'Saving...',
