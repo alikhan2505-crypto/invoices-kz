@@ -9,6 +9,7 @@ import { useLanguage } from '@/components/LanguageProvider'
 import { backLabel } from '@/lib/a11yLabels'
 import { profileCoreDict } from '@/lib/i18n/profileCore'
 import { useAppDialog } from '@/components/AppDialog'
+import { useBinLookup } from '@/components/useBinLookup'
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
 // kept identical rather than inventing a second "house" ease.
@@ -59,6 +60,26 @@ export default function Requisites() {
   const t = profileCoreDict[lang]
   // Same shadowing as /create: see src/components/AppDialog.tsx.
   const { alert, dialogElement } = useAppDialog()
+  const { binLookup, lookupBin, resetBinLookup } = useBinLookup()
+
+  /**
+   * Fills the user's own requisites from the register.
+   *
+   * Same rule as the counterparty form: only empty fields are touched. A
+   * company's registered name and the name it wants printed on its invoices
+   * are not always the same thing, and the person editing this page knows
+   * which they want.
+   */
+  async function lookUpOwnBin(force = false) {
+    const company = await lookupBin(profile.bin_iin, { force })
+    if (!company) return
+    setProfile(current => ({
+      ...current,
+      company_name: current.company_name?.trim() ? current.company_name : company.name,
+      address: current.address?.trim() ? current.address : (company.address || ''),
+      director_name: current.director_name?.trim() ? current.director_name : (company.director || ''),
+    }))
+  }
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw
   const [saving, setSaving] = useState(false)
@@ -142,11 +163,44 @@ export default function Requisites() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.06 }}
           >
+            {/* БИН first here too: it is the field that fills the others.
+                Unlike the counterparty form this one can also fill in the
+                director, because the register publishes it for legal
+                entities. */}
+            <div>
+              <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.binIinFieldLabel}</label>
+              <div className="flex gap-2">
+                <input
+                  className={inputClass.replace('w-full', 'flex-1')}
+                  placeholder={t.binIinPlaceholder}
+                  value={profile.bin_iin}
+                  onChange={async e => {
+                    const value = e.target.value
+                    setProfile({ ...profile, bin_iin: value })
+                    if (value.replace(/\D/g, '').length !== 12) { resetBinLookup(); return }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => lookUpOwnBin(true)}
+                  disabled={(profile.bin_iin || '').replace(/\D/g, '').length !== 12 || binLookup.status === 'loading'}
+                  className="px-3 rounded-lg text-sm font-medium flex-shrink-0 disabled:opacity-40 transition-colors"
+                  style={{ background: 'var(--nav-surface-glass)', color: 'var(--nav-accent)' }}>
+                  {binLookup.status === 'loading' ? '…' : t.binLookupCheckButton}
+                </button>
+              </div>
+              {binLookup.status === 'notfound' && (
+                <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>{t.binLookupNotFound}</div>
+              )}
+              {binLookup.status === 'found' && (
+                <div className="text-xs mt-1 leading-snug" style={{ color: 'var(--nav-text-muted)' }}>
+                  {t.binLookupFilled(binLookup.company?.source === 'kgd' ? t.binLookupSourceKgd : t.binLookupSourceEgov)}
+                </div>
+              )}
+            </div>
+
             <Field label={t.companyNameFieldLabel} placeholder={t.companyNamePlaceholder}
               value={profile.company_name} onChange={v => setProfile({ ...profile, company_name: v })} />
-
-            <Field label={t.binIinFieldLabel} placeholder={t.binIinPlaceholder}
-              value={profile.bin_iin} onChange={v => setProfile({ ...profile, bin_iin: v })} />
 
             <Field label={t.legalAddressFieldLabel} placeholder={t.legalAddressPlaceholder}
               value={profile.address} onChange={v => setProfile({ ...profile, address: v })} />

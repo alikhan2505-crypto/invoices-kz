@@ -62,6 +62,12 @@ export interface ProfileCoreContent {
   requisitesHeaderLabel: string
   companyNameFieldLabel: string
   requisitesMissingAlert: (missing: string) => string
+  binLookupCheckButton: string
+  binLookupSearching: string
+  binLookupNotFound: string
+  binLookupFilled: (source: string) => string
+  binLookupSourceEgov: string
+  binLookupSourceKgd: string
   companyNamePlaceholder: string
   binIinFieldLabel: string
   binIinPlaceholder: string
@@ -136,6 +142,12 @@ export const profileCoreDict: Record<'ru' | 'kk' | 'en', ProfileCoreContent> = {
     errorPrefix: (message: string) => `Ошибка: ${message}`,
     savedAlert: 'Сохранено!',
     requisitesMissingAlert: (missing: string) => `Без этого счёт выставить не получится — заполните: ${missing}`,
+    binLookupCheckButton: 'Проверить',
+    binLookupSearching: 'Ищем в реестре…',
+    binLookupNotFound: 'В реестре не нашли — заполните поля вручную.',
+    binLookupFilled: (source: string) => `Заполнено из реестра. ${source}`,
+    binLookupSourceEgov: 'Данные: реестр юридических лиц, портал открытых данных data.egov.kz',
+    binLookupSourceKgd: 'Данные: сервис «Поиск налогоплательщика», КГД МФ РК',
     savingEllipsis: 'Сохраняем...',
 
     fillProfileLabel: 'Заполните профиль',
@@ -262,6 +274,12 @@ export const profileCoreDict: Record<'ru' | 'kk' | 'en', ProfileCoreContent> = {
     errorPrefix: (message: string) => `Қате: ${message}`,
     savedAlert: 'Сақталды!',
     requisitesMissingAlert: (missing: string) => `Онсыз шот шығару мүмкін емес — толтырыңыз: ${missing}`,
+    binLookupCheckButton: 'Тексеру',
+    binLookupSearching: 'Тізілімнен іздеудеміз…',
+    binLookupNotFound: 'Тізілімнен табылмады — өрістерді қолмен толтырыңыз.',
+    binLookupFilled: (source: string) => `Тізілімнен толтырылды. ${source}`,
+    binLookupSourceEgov: 'Дереккөз: заңды тұлғалар тізілімі, ашық деректер порталы data.egov.kz',
+    binLookupSourceKgd: 'Дереккөз: «Салық төлеушіні іздеу» сервисі, ҚР ҚМ МКК',
     savingEllipsis: 'Сақталуда...',
 
     fillProfileLabel: 'Профильді толтырыңыз',
@@ -388,6 +406,12 @@ export const profileCoreDict: Record<'ru' | 'kk' | 'en', ProfileCoreContent> = {
     errorPrefix: (message: string) => `Error: ${message}`,
     savedAlert: 'Saved!',
     requisitesMissingAlert: (missing: string) => `An invoice cannot be issued without this — please fill in: ${missing}`,
+    binLookupCheckButton: 'Check',
+    binLookupSearching: 'Searching the register…',
+    binLookupNotFound: 'Not found in the register — please fill the fields in by hand.',
+    binLookupFilled: (source: string) => `Filled in from the register. ${source}`,
+    binLookupSourceEgov: 'Source: register of legal entities, open data portal data.egov.kz',
+    binLookupSourceKgd: 'Source: "Taxpayer search" service, State Revenue Committee',
     savingEllipsis: 'Saving...',
 
     fillProfileLabel: 'Fill out your profile',

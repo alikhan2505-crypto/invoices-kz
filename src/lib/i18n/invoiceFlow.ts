@@ -12,6 +12,7 @@ export interface InvoiceFlowContent {
   companyNamePlaceholder: string
   binIinLabel: string
   binLookupSearching: string
+  binLookupCheckButton: string
   binLookupVatYes: (since: string | null) => string
   binLookupVatNo: string
   binLookupUnreliable: string
@@ -222,6 +223,7 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     companyNamePlaceholder: 'ТОО «Пример»',
     binIinLabel: 'БИН/ИИН *',
     binLookupSearching: 'Ищем в реестре…',
+    binLookupCheckButton: 'Проверить',
     binLookupNotFound: 'В реестре юридических лиц не найдено — скорее всего это ИП. Заполните поля вручную.',
     binLookupSource: 'Данные: реестр юридических лиц, портал открытых данных data.egov.kz',
     binLookupSourceKgd: 'Данные: сервис «Поиск налогоплательщика», КГД МФ РК',
@@ -439,6 +441,7 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     companyNamePlaceholder: 'ЖШС «Мысал»',
     binIinLabel: 'БСН/ЖСН *',
     binLookupSearching: 'Тізілімнен іздеудеміз…',
+    binLookupCheckButton: 'Тексеру',
     binLookupNotFound: 'Заңды тұлғалар тізілімінен табылмады — бұл ЖК болуы мүмкін. Өрістерді қолмен толтырыңыз.',
     binLookupSource: 'Дереккөз: заңды тұлғалар тізілімі, ашық деректер порталы data.egov.kz',
     binLookupSourceKgd: 'Дереккөз: «Салық төлеушіні іздеу» сервисі, ҚР ҚМ МКК',
@@ -656,6 +659,7 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     companyNamePlaceholder: 'LLP "Example"',
     binIinLabel: 'BIN/IIN *',
     binLookupSearching: 'Searching the register…',
+    binLookupCheckButton: 'Check',
     binLookupNotFound: 'Not found in the register of legal entities — most likely a sole proprietor. Please fill the fields in by hand.',
     binLookupSource: 'Source: register of legal entities, open data portal data.egov.kz',
     binLookupSourceKgd: 'Source: "Taxpayer search" service, State Revenue Committee',

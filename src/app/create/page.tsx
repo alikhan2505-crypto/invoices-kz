@@ -16,6 +16,7 @@ import { closeLabel, deleteLabel } from '@/lib/a11yLabels'
 import { invoiceFlowDict } from '@/lib/i18n/invoiceFlow'
 import { saveInvoiceDraft, takeInvoiceDraft, clearInvoiceDraft, type InvoiceDraft } from '@/lib/invoiceDraft'
 import { useAppDialog } from '@/components/AppDialog'
+import { useBinLookup } from '@/components/useBinLookup'
 
 const UNIT_OPTIONS = ['шт', 'кг', 'л', 'м', 'м²', 'м³', 'час', 'день', 'месяц', 'услуга', 'работа']
 
@@ -101,59 +102,15 @@ export default function CreateInvoicePage() {
  
   const [clientName, setClientName] = useState('')
   const [clientBin, setClientBin] = useState('')
-  // Result of looking the counterparty up in the state register. Kept
-  // separate from the form fields: it is shown even when the fields were
-  // already filled by hand, so the user can see who the БИН actually belongs
-  // to instead of the app silently overwriting what they typed.
-  const [binLookup, setBinLookup] = useState<{
-    status: 'idle' | 'loading' | 'found' | 'notfound'
-    name?: string
-    companyStatus?: string | null
-    source?: 'egov' | 'kgd'
-    isVatPayer?: boolean | null
-    vatRegisteredAt?: string | null
-    isUnreliable?: boolean | null
-    isLiquidating?: boolean | null
-  }>({ status: 'idle' })
-  // The БИН the last lookup was fired for, so re-typing the same twelve
-  // digits does not spend another of the 40 requests per minute the portal
-  // allows.
-  const lookedUpBinRef = useRef('')
+  const { binLookup, lookupBin, resetBinLookup } = useBinLookup()
 
-  async function lookUpBin(bin: string) {
-    if (lookedUpBinRef.current === bin) return
-    lookedUpBinRef.current = bin
-    setBinLookup({ status: 'loading' })
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const res = await fetch(`/api/bin-lookup?bin=${bin}`, {
-        headers: { Authorization: `Bearer ${session?.access_token || ''}` },
-      })
-      const data = await res.json()
-      if (!res.ok || !data.found) {
-        // A miss is the ordinary case for a sole proprietor, and an
-        // unreachable register is the portal's prerogative -- neither is the
-        // user's problem, so both just fall back to typing.
-        setBinLookup({ status: 'notfound' })
-        return
-      }
-      setBinLookup({
-        status: 'found',
-        name: data.company.name,
-        companyStatus: data.company.status,
-        source: data.company.source,
-        isVatPayer: data.company.isVatPayer,
-        vatRegisteredAt: data.company.vatRegisteredAt,
-        isUnreliable: data.company.isUnreliable,
-        isLiquidating: data.company.isLiquidating,
-      })
-      // Only empty fields are filled. Overwriting a name the user already
-      // typed would be the app arguing with them about their own customer.
-      setClientName(prev => prev.trim() ? prev : data.company.name)
-      setClientAddress(prev => prev.trim() ? prev : (data.company.address || ''))
-    } catch {
-      setBinLookup({ status: 'notfound' })
-    }
+  /** Fills the empty fields from a registry answer. */
+  function applyCompany(company: { name: string; address: string | null } | null) {
+    if (!company) return
+    // Only empty fields. Overwriting a name the user already typed would be
+    // the app arguing with them about their own customer.
+    setClientName(prev => prev.trim() ? prev : company.name)
+    setClientAddress(prev => prev.trim() ? prev : (company.address || ''))
   }
   const [clientEmail, setClientEmail] = useState('')
   const [clientAddress, setClientAddress] = useState('')
@@ -895,13 +852,14 @@ export default function CreateInvoicePage() {
                     saved in the user's own directory. */}
                 <div>
                   <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.binIinLabel}</label>
-                  <input className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
+                  <div className="flex gap-2">
+                  <input className="flex-1 rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
                       placeholder={t.binIinPlaceholder} value={clientBin}
                       onChange={async e => {
                         const bin = e.target.value
                         setClientBin(bin)
                         if (bin.length !== 12) {
-                          if (binLookup.status !== 'idle') setBinLookup({ status: 'idle' })
+                          resetBinLookup()
                           return
                         }
                         const found = clients.find(c => c.bin_iin === bin)
@@ -913,11 +871,24 @@ export default function CreateInvoicePage() {
                           setClientEmail(found.email || '')
                           setClientAddress(found.address || '')
                           setClientPhone(found.phone || '')
-                          setBinLookup({ status: 'idle' })
+                          resetBinLookup()
                           return
                         }
-                        lookUpBin(bin)
+                        applyCompany(await lookupBin(bin))
                       }} />
+                    {/* The lookup already fires on the twelfth digit, so this
+                        is not the only way in. It exists so the capability is
+                        visible at all, and so a failed attempt has a second
+                        try -- `force` re-asks a БИН we remember requesting. */}
+                    <button
+                      type="button"
+                      onClick={async () => applyCompany(await lookupBin(clientBin, { force: true }))}
+                      disabled={clientBin.replace(/\D/g, '').length !== 12 || binLookup.status === 'loading'}
+                      className="px-3 rounded-lg text-sm font-medium flex-shrink-0 disabled:opacity-40 transition-colors"
+                      style={{ background: 'var(--nav-surface-glass)', color: 'var(--nav-accent)' }}>
+                      {binLookup.status === 'loading' ? '…' : t.binLookupCheckButton}
+                    </button>
+                  </div>
                     {binLookup.status !== 'idle' && (
                       <div className="text-xs mt-1 leading-snug">
                         {binLookup.status === 'loading' && (
@@ -929,17 +900,17 @@ export default function CreateInvoicePage() {
                         {binLookup.status === 'found' && (
                           <>
                             <span style={{ color: 'var(--nav-text-secondary)' }}>
-                              {t.binLookupFound(binLookup.name || '', binLookup.companyStatus || null)}
+                              {t.binLookupFound(binLookup.company?.name || '', binLookup.company?.status || null)}
                             </span>
                             {/* Warnings only when КГД actually said yes.
                                 Silence here means "clean or unchecked", and
                                 an absent warning must never be produced by a
                                 timeout dressed up as reassurance -- so
                                 nothing is shown for null. */}
-                            {binLookup.isUnreliable === true && (
+                            {binLookup.company?.isUnreliable === true && (
                               <div className="font-medium" style={{ color: 'var(--nav-danger, #ef4444)' }}>{t.binLookupUnreliable}</div>
                             )}
-                            {binLookup.isLiquidating === true && (
+                            {binLookup.company?.isLiquidating === true && (
                               <div className="font-medium" style={{ color: 'var(--nav-danger, #ef4444)' }}>{t.binLookupLiquidating}</div>
                             )}
                             {/* VAT status decides whether this invoice may
@@ -947,16 +918,16 @@ export default function CreateInvoicePage() {
                                 Only when КГД actually answered: null means
                                 "not checked", which must not be shown as a
                                 negative. */}
-                            {binLookup.isVatPayer !== null && binLookup.isVatPayer !== undefined && (
+                            {binLookup.company?.isVatPayer !== null && binLookup.company?.isVatPayer !== undefined && (
                               <div style={{ color: 'var(--nav-text-secondary)' }}>
-                                {binLookup.isVatPayer ? t.binLookupVatYes(binLookup.vatRegisteredAt || null) : t.binLookupVatNo}
+                                {binLookup.company?.isVatPayer ? t.binLookupVatYes(binLookup.company?.vatRegisteredAt || null) : t.binLookupVatNo}
                               </div>
                             )}
                             {/* Crediting the portal is a condition of using
                                 its data (Приложение 2, пп. 7-8), not a
                                 courtesy -- it stays wherever the data shows. */}
                             <div style={{ color: 'var(--nav-text-muted)' }}>
-                              {binLookup.source === 'kgd' ? t.binLookupSourceKgd : t.binLookupSource}
+                              {binLookup.company?.source === 'kgd' ? t.binLookupSourceKgd : t.binLookupSource}
                             </div>
                           </>
                         )}
