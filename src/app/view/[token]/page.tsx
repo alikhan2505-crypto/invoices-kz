@@ -447,6 +447,17 @@ export default function PublicInvoice() {
   const services = invoice.services || []
   const total = Number(invoice.amount)
   const statusLabels = t.statusLabels
+
+  // Whether any "pay online" button will actually render below. The three
+  // how-to-pay steps used to be fixed text promising a Kaspi/Halyk button
+  // "кнопкой ниже" whether or not one existed -- and for a seller who has not
+  // connected Kaspi (every new account) it does not, so the payer was sent
+  // hunting for a control that was never on the page.
+  const hasOnlinePayment = Boolean(
+    (kaspiPayment && kaspiPayment.status === 'pending') ||
+    profile?.kaspi_pay_link ||
+    profile?.halyk_pay_link
+  )
   // Older invoices carry a static "Оплата в течение Nх дней" note from before
   // due-date-based notes existed -- always show the due-date-derived sentence
   // when a due date is on record, same as the owner's own invoice-detail view.
@@ -460,9 +471,18 @@ export default function PublicInvoice() {
           <LogoMark />
           <span className="font-semibold text-sm" style={{ color: 'var(--nav-text-primary)', letterSpacing: '-0.02em' }}>invoices.kz</span>
         </div>
-        <span className="text-xs px-2.5 py-1 rounded-full font-semibold text-white" style={{ background: statusFill[invoice.status] || statusFill.draft }}>
-          {statusLabels[invoice.status] || statusLabels.draft}
-        </span>
+        {/* 'draft' is our own workflow state, not the payer's business. An
+            invoice keeps that status until it is marked sent, but its public
+            link works from the moment it exists -- so the buyer, who is
+            meeting both this seller and invoices.kz for the first time, was
+            being shown a document stamped "Черновик". That is a fair reason
+            not to pay. Every other status (paid, cancelled, overdue) does
+            concern them and still shows. */}
+        {invoice.status !== 'draft' && (
+          <span className="text-xs px-2.5 py-1 rounded-full font-semibold text-white" style={{ background: statusFill[invoice.status] || statusFill.draft }}>
+            {statusLabels[invoice.status] || statusLabels.draft}
+          </span>
+        )}
       </div>
 
       <div className="max-w-lg mx-auto p-4 pt-0 space-y-4">
@@ -691,7 +711,7 @@ export default function PublicInvoice() {
             <div className="text-sm font-medium mb-2" style={{ color: 'var(--nav-text-primary)' }}>{t.howToPayHeader}</div>
             <div className="space-y-2">
               {[
-                { step: '1', text: t.step1Text },
+                { step: '1', text: hasOnlinePayment ? t.step1Text : t.step1TextNoOnline },
                 { step: '2', text: t.step2Text },
                 { step: '3', text: t.step3Text },
               ].map(item => (

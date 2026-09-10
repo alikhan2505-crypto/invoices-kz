@@ -56,6 +56,7 @@ export interface HistoryContent {
   kbeLabel: string
   howToPayHeader: string
   step1Text: string
+  step1TextNoOnline: string
   step2Text: string
   step3Text: string
   payViaKaspiButton: string
@@ -146,6 +147,7 @@ export const historyDict: Record<'ru' | 'kk' | 'en', HistoryContent> = {
     kbeLabel: 'КБе',
     howToPayHeader: '📋 Как оплатить',
     step1Text: 'Нажмите "Открыть счёт" — скачайте PDF или оплатите через Kaspi/Halyk кнопкой ниже',
+    step1TextNoOnline: 'Нажмите "Открыть счёт" — скачайте PDF, в нём все реквизиты для оплаты',
     step2Text: 'Оплатите через свой банк по реквизитам из PDF',
     step3Text: 'Вернитесь сюда и нажмите "Я оплатил"',
     payViaKaspiButton: '🟡 Оплатить через Kaspi',
@@ -154,7 +156,7 @@ export const historyDict: Record<'ru' | 'kk' | 'en', HistoryContent> = {
     linkFallbackLabel: 'Ссылка',
     paymentConfirmedThanksLabel: 'Спасибо! Оплата подтверждена',
     supplierNotifiedLabel: 'Поставщик получит уведомление',
-    openInvoicePdfButton: '📄 Открыть счёт (PDF)',
+    openInvoicePdfButton: 'Открыть счёт (PDF)',
     processingButtonLabel: 'Обрабатываем...',
     alreadyPaidButton: '✓ Я уже оплатил этот счёт',
     invoicePaidLabel: 'Счёт оплачен',
@@ -234,6 +236,7 @@ export const historyDict: Record<'ru' | 'kk' | 'en', HistoryContent> = {
     kbeLabel: 'КБЕ',
     howToPayHeader: '📋 Қалай төлеу керек',
     step1Text: '«Шотты ашу» түймесін басыңыз — PDF жүктеңіз немесе төмендегі түйме арқылы Kaspi/Halyk-пен төлеңіз',
+    step1TextNoOnline: '«Шотты ашу» түймесін басыңыз — PDF жүктеңіз, төлем деректемелерінің бәрі сонда',
     step2Text: 'PDF-тегі деректемелер бойынша өз банкіңіз арқылы төлеңіз',
     step3Text: 'Осында қайта оралып, «Мен төледім» түймесін басыңыз',
     payViaKaspiButton: '🟡 Kaspi арқылы төлеу',
@@ -242,7 +245,7 @@ export const historyDict: Record<'ru' | 'kk' | 'en', HistoryContent> = {
     linkFallbackLabel: 'Сілтеме',
     paymentConfirmedThanksLabel: 'Рақмет! Төлем расталды',
     supplierNotifiedLabel: 'Жеткізуші хабарландыру алады',
-    openInvoicePdfButton: '📄 Шотты ашу (PDF)',
+    openInvoicePdfButton: 'Шотты ашу (PDF)',
     processingButtonLabel: 'Өңделуде...',
     alreadyPaidButton: '✓ Мен бұл шотты төледім',
     invoicePaidLabel: 'Шот төленді',
@@ -322,6 +325,7 @@ export const historyDict: Record<'ru' | 'kk' | 'en', HistoryContent> = {
     kbeLabel: 'KBe',
     howToPayHeader: '📋 How to pay',
     step1Text: 'Tap "Open invoice" — download the PDF or pay via Kaspi/Halyk using the button below',
+    step1TextNoOnline: 'Tap "Open invoice" — download the PDF, it carries the full payment details',
     step2Text: 'Pay through your bank using the details from the PDF',
     step3Text: 'Come back here and tap "I have paid"',
     payViaKaspiButton: '🟡 Pay via Kaspi',
@@ -330,7 +334,7 @@ export const historyDict: Record<'ru' | 'kk' | 'en', HistoryContent> = {
     linkFallbackLabel: 'Link',
     paymentConfirmedThanksLabel: 'Thank you! Payment confirmed',
     supplierNotifiedLabel: 'The supplier will be notified',
-    openInvoicePdfButton: '📄 Open invoice (PDF)',
+    openInvoicePdfButton: 'Open invoice (PDF)',
     processingButtonLabel: 'Processing...',
     alreadyPaidButton: '✓ I have already paid this invoice',
     invoicePaidLabel: 'Invoice paid',

@@ -87,6 +87,21 @@ export default function Requisites() {
   }
 
   async function save() {
+    // /create refuses to issue an invoice without a company name AND a БИН.
+    // This page used to accept either one missing, answer "Сохранено!", and
+    // send the user back to an invoice that bounced them here again with the
+    // same message -- a loop with no exit, since nothing ever said which
+    // field was the problem. Checked here so the answer is given where the
+    // fields are.
+    const missing = [
+      !profile.company_name?.trim() && t.companyNameFieldLabel,
+      !profile.bin_iin?.trim() && t.binIinFieldLabel,
+    ].filter(Boolean) as string[]
+    if (missing.length > 0) {
+      alert(t.requisitesMissingAlert(missing.map(m => m.replace(' *', '')).join(', ')))
+      return
+    }
+
     setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return

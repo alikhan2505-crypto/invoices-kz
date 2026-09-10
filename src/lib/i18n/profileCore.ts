@@ -61,6 +61,7 @@ export interface ProfileCoreContent {
   // requisites page (requisites/page.tsx)
   requisitesHeaderLabel: string
   companyNameFieldLabel: string
+  requisitesMissingAlert: (missing: string) => string
   companyNamePlaceholder: string
   binIinFieldLabel: string
   binIinPlaceholder: string
@@ -134,6 +135,7 @@ export const profileCoreDict: Record<'ru' | 'kk' | 'en', ProfileCoreContent> = {
     loadingLabel: 'Загрузка...',
     errorPrefix: (message: string) => `Ошибка: ${message}`,
     savedAlert: 'Сохранено!',
+    requisitesMissingAlert: (missing: string) => `Без этого счёт выставить не получится — заполните: ${missing}`,
     savingEllipsis: 'Сохраняем...',
 
     fillProfileLabel: 'Заполните профиль',
@@ -189,9 +191,9 @@ export const profileCoreDict: Record<'ru' | 'kk' | 'en', ProfileCoreContent> = {
     deleteAccountModalDeletingLabel: 'Удаляем...',
 
     requisitesHeaderLabel: 'Реквизиты компании',
-    companyNameFieldLabel: 'Название компании / ИП',
+    companyNameFieldLabel: 'Название компании / ИП *',
     companyNamePlaceholder: 'ИП Смагулов А.К.',
-    binIinFieldLabel: 'БИН / ИИН',
+    binIinFieldLabel: 'БИН / ИИН *',
     binIinPlaceholder: '920101401234',
     legalAddressFieldLabel: 'Юридический адрес',
     legalAddressPlaceholder: 'г. Алматы, ул. Абая 10, оф 25',
@@ -259,6 +261,7 @@ export const profileCoreDict: Record<'ru' | 'kk' | 'en', ProfileCoreContent> = {
     loadingLabel: 'Жүктелуде...',
     errorPrefix: (message: string) => `Қате: ${message}`,
     savedAlert: 'Сақталды!',
+    requisitesMissingAlert: (missing: string) => `Онсыз шот шығару мүмкін емес — толтырыңыз: ${missing}`,
     savingEllipsis: 'Сақталуда...',
 
     fillProfileLabel: 'Профильді толтырыңыз',
@@ -314,9 +317,9 @@ export const profileCoreDict: Record<'ru' | 'kk' | 'en', ProfileCoreContent> = {
     deleteAccountModalDeletingLabel: 'Жойылуда...',
 
     requisitesHeaderLabel: 'Компания деректемелері',
-    companyNameFieldLabel: 'Компания / ЖК атауы',
+    companyNameFieldLabel: 'Компания / ЖК атауы *',
     companyNamePlaceholder: 'ЖК Смағұлов А.Қ.',
-    binIinFieldLabel: 'БСН / ЖСН',
+    binIinFieldLabel: 'БСН / ЖСН *',
     binIinPlaceholder: '920101401234',
     legalAddressFieldLabel: 'Заңды мекенжай',
     legalAddressPlaceholder: 'Алматы қ., Абай көш. 10, кеңсе 25',
@@ -384,6 +387,7 @@ export const profileCoreDict: Record<'ru' | 'kk' | 'en', ProfileCoreContent> = {
     loadingLabel: 'Loading...',
     errorPrefix: (message: string) => `Error: ${message}`,
     savedAlert: 'Saved!',
+    requisitesMissingAlert: (missing: string) => `An invoice cannot be issued without this — please fill in: ${missing}`,
     savingEllipsis: 'Saving...',
 
     fillProfileLabel: 'Fill out your profile',
@@ -439,9 +443,9 @@ export const profileCoreDict: Record<'ru' | 'kk' | 'en', ProfileCoreContent> = {
     deleteAccountModalDeletingLabel: 'Deleting...',
 
     requisitesHeaderLabel: 'Company details',
-    companyNameFieldLabel: 'Company / sole proprietor name',
+    companyNameFieldLabel: 'Company / sole proprietor name *',
     companyNamePlaceholder: 'Sole Proprietor Smagulov A.K.',
-    binIinFieldLabel: 'BIN / IIN',
+    binIinFieldLabel: 'BIN / IIN *',
     binIinPlaceholder: '920101401234',
     legalAddressFieldLabel: 'Legal address',
     legalAddressPlaceholder: 'Almaty, Abay St. 10, office 25',
