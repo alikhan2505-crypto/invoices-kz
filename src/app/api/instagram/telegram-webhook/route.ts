@@ -179,6 +179,11 @@ export async function POST(req: NextRequest) {
         message_id: cb.message.message_id,
         text: `${cb.message.text}\n\n⏭️ Пропущено`,
         parse_mode: 'HTML',
+        // Terminal: 'skipped' is never re-queued. Without this the buttons
+        // stayed live in Telegram's UI while every press behind them fell
+        // through to the "already handled" answerCallbackQuery toast --
+        // easy to miss, so it looked like nothing was happening at all.
+        reply_markup: { inline_keyboard: [] },
       })
       return NextResponse.json({ ok: true })
     }
@@ -239,6 +244,7 @@ export async function POST(req: NextRequest) {
         message_id: cb.message.message_id,
         text: `${cb.message.text}\n\n✅ Отправлено`,
         parse_mode: 'HTML',
+        reply_markup: { inline_keyboard: [] },
       })
     } catch (err: any) {
       // The claim above already marked this sent. Publishing failed, so hand
@@ -249,6 +255,9 @@ export async function POST(req: NextRequest) {
         .update({ status: 'pending_review', resolved_at: null })
         .eq('id', entityId)
       await telegram('answerCallbackQuery', { callback_query_id: cb.id, text: 'Ошибка отправки', show_alert: true })
+      // No reply_markup here on purpose: the row was just reverted to
+      // pending_review above, so the same Send/Skip buttons genuinely work
+      // again on the next press. Removing them would block a real retry.
       await telegram('editMessageText', {
         chat_id: cb.message.chat.id,
         message_id: cb.message.message_id,
@@ -278,6 +287,7 @@ export async function POST(req: NextRequest) {
       message_id: cb.message.message_id,
       text: `${cb.message.text}\n\n❌ Отклонено`,
       parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: [] },
     })
     return NextResponse.json({ ok: true })
   }
@@ -295,15 +305,21 @@ export async function POST(req: NextRequest) {
       message_id: cb.message.message_id,
       text: `${cb.message.text}\n\n✅ Опубликовано в Instagram`,
       parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: [] },
     })
   } catch (err: any) {
     await supabase.from('instagram_drafts').update({ status: 'failed', error: err.message }).eq('id', draftId)
     await telegram('answerCallbackQuery', { callback_query_id: cb.id, text: 'Ошибка публикации', show_alert: true })
+    // Unlike the auto-reply failure above, this one does NOT go back to
+    // 'pending' -- it becomes 'failed', and the guard near the top of this
+    // handler only proceeds for status === 'pending'. A second press could
+    // never have worked through this button, so the keyboard comes off too.
     await telegram('editMessageText', {
       chat_id: cb.message.chat.id,
       message_id: cb.message.message_id,
       text: `${cb.message.text}\n\n⚠️ Ошибка: ${err.message}`,
       parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: [] },
     })
   }
 
