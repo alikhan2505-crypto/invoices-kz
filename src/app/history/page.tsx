@@ -12,6 +12,7 @@ import { useLanguage } from '@/components/LanguageProvider'
 import { clearSearchLabel } from '@/lib/a11yLabels'
 import { historyDict } from '@/lib/i18n/history'
 import Skeleton from '@/components/Skeleton'
+import { useAppDialog } from '@/components/AppDialog'
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
 // kept identical rather than inventing a second "house" ease.
@@ -108,6 +109,8 @@ export default function History() {
   const router = useRouter()
   const { lang } = useLanguage()
   const t = historyDict[lang]
+  // Same shadowing as the invoice page; the confirm below is awaited.
+  const { alert, confirm, dialogElement } = useAppDialog()
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw
   const [invoices, setInvoices] = useState<any[]>([])
@@ -132,7 +135,7 @@ export default function History() {
 
   async function deleteInvoice(e: React.MouseEvent, id: string, number: string) {
     e.stopPropagation()
-    if (!confirm(t.confirmCancelInvoice(number))) return
+    if (!(await confirm(t.confirmCancelInvoice(number)))) return
     const { error } = await supabase.from('invoices').update({ status: 'cancelled' }).eq('id', id)
     if (error) { alert(t.errorPrefix(error.message)); return }
     await supabase.from('invoice_logs').insert({ invoice_id: id, status: 'cancelled' })
@@ -509,6 +512,7 @@ export default function History() {
             {t.createNewInvoiceButton}
           </motion.button>
         </div>
+        {dialogElement}
       </main>
     </DesktopShell>
   )

@@ -17,6 +17,7 @@ import DesktopShell from '@/components/DesktopShell'
 import InvoiceLivePreview from '@/components/InvoiceLivePreview'
 import Skeleton from '@/components/Skeleton'
 import SignatureSection from '@/components/SignatureSection'
+import { useAppDialog } from '@/components/AppDialog'
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
 // kept identical rather than inventing a second "house" ease.
@@ -199,6 +200,10 @@ export default function InvoicePage() {
   const { id } = useParams()
   const { lang } = useLanguage()
   const t = invoiceFlowDict[lang]
+  // Shadows window.alert / window.confirm for this component -- see
+  // src/components/AppDialog.tsx. The confirm below is awaited: a Promise
+  // is always truthy, so a bare `if (confirm(...))` would silently pass.
+  const { alert, confirm, dialogElement } = useAppDialog()
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw
   const statusLabel: Record<string, { text: string; color: string; dot: string }> = {
@@ -362,7 +367,7 @@ export default function InvoicePage() {
   }
 
   async function deleteInvoice() {
-    if (!confirm(t.cancelInvoiceConfirm)) return
+    if (!(await confirm(t.cancelInvoiceConfirm))) return
     await supabase.from('invoices').update({ status: 'cancelled' }).eq('id', id)
     await supabase.from('invoice_logs').insert({ invoice_id: id, status: 'cancelled' })
     router.push('/history')
@@ -1212,6 +1217,7 @@ export default function InvoicePage() {
         </div>
       )}
 
+    {dialogElement}
     </main>
     </DesktopShell>
   )
