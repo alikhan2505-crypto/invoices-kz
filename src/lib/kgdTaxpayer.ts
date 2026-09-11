@@ -113,11 +113,13 @@ export const KGD_TAXPAYER_TYPES = ['IP', 'UL'] as const
  * "clean": a seller must never be shown a reassuring silence produced by a
  * failed request.
  *
- * NOT VERIFIED AGAINST A POSITIVE CASE. Both taxpayers available for testing
- * on 2026-09-10 were clean, and no known-unreliable БИН was to hand — the
- * open-data list of inactive taxpayers turned out to be a stub pointing back
- * at КГД's own site. The empty-array path is confirmed; the populated path
- * rests on the documented schema.
+ * STILL NOT VERIFIED AGAINST A POSITIVE CASE, unlike parseLiquidation below.
+ * Every taxpayer available for testing has come back clean and no
+ * known-unreliable БИН has been found — КГД's own list is reachable only
+ * through a captcha-protected page, and the open-data set that looks like it
+ * holds one is a stub pointing back at their site. The empty-array path is
+ * confirmed against live calls; the populated path rests on the documented
+ * schema alone. Worth re-checking the first time a warning actually fires.
  */
 export function parseUnreliable(payload: unknown): boolean | null {
   if (!Array.isArray(payload)) return null
@@ -130,6 +132,13 @@ export function parseUnreliable(payload: unknown): boolean | null {
  * This service is more explicit than the one above: it wraps results in
  * `taxpayers.content` and says «Данные не найдены» outright, so an empty
  * answer is a statement rather than an absence.
+ *
+ * Both paths verified end to end on 2026-09-11. A real sole proprietor in
+ * liquidation was pulled out of КГД's own paginated list and put through
+ * the form, which showed «Находится на стадии ликвидации по данным КГД» —
+ * so the warning reaches the screen and does not die in parsing. The БИН is
+ * not repeated here: it identifies a living person and this repository is
+ * public.
  */
 export function parseLiquidation(payload: unknown): boolean | null {
   if (!payload || typeof payload !== 'object') return null
