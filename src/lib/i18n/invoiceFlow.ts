@@ -19,6 +19,9 @@ export interface InvoiceFlowContent {
   binLookupLiquidating: string
   binLookupTaxDebt: (amount: string) => string
   binLookupNoTaxDebt: string
+  binLookupRegisteredAt: (date: string) => string
+  binLookupActivity: (activity: string) => string
+  binLookupChecking: string
   binLookupSourceKgd: string
   binLookupNotFound: string
   binLookupSource: string
@@ -235,6 +238,9 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     binLookupLiquidating: '⚠️ Находится на стадии ликвидации по данным КГД',
     binLookupTaxDebt: (amount: string) => `⚠️ Налоговая задолженность по данным КГД: ${amount} ₸`,
     binLookupNoTaxDebt: 'Налоговой задолженности нет',
+    binLookupRegisteredAt: (date: string) => `Зарегистрирован ${date}`,
+    binLookupActivity: (activity: string) => `Вид деятельности: ${activity}`,
+    binLookupChecking: 'Проверяем по данным КГД…',
     binLookupFound: (name: string, status: string | null) => status ? `${name} · ${status}` : name,
     binIinPlaceholder: '123456789012',
     emailLabel: 'Email',
@@ -455,6 +461,9 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     binLookupLiquidating: '⚠️ МКК деректері бойынша тарату сатысында',
     binLookupTaxDebt: (amount: string) => `⚠️ МКК деректері бойынша салық берешегі: ${amount} ₸`,
     binLookupNoTaxDebt: 'Салық берешегі жоқ',
+    binLookupRegisteredAt: (date: string) => `${date} тіркелген`,
+    binLookupActivity: (activity: string) => `Қызмет түрі: ${activity}`,
+    binLookupChecking: 'МКК деректері бойынша тексерудеміз…',
     binLookupFound: (name: string, status: string | null) => status ? `${name} · ${status}` : name,
     binIinPlaceholder: '123456789012',
     emailLabel: 'Email',
@@ -675,6 +684,9 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     binLookupLiquidating: '⚠️ In liquidation according to the State Revenue Committee',
     binLookupTaxDebt: (amount: string) => `⚠️ Tax arrears per the State Revenue Committee: ${amount} ₸`,
     binLookupNoTaxDebt: 'No tax arrears',
+    binLookupRegisteredAt: (date: string) => `Registered ${date}`,
+    binLookupActivity: (activity: string) => `Activity: ${activity}`,
+    binLookupChecking: 'Checking with the State Revenue Committee…',
     binLookupFound: (name: string, status: string | null) => status ? `${name} · ${status}` : name,
     binIinPlaceholder: '123456789012',
     emailLabel: 'Email',

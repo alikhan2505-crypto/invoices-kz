@@ -937,60 +937,61 @@ export default function CreateInvoicePage() {
                     </button>
                   </div>
                     {binLookup.status !== 'idle' && (
-                      <div className="text-xs mt-1 leading-snug">
+                      <div className="text-xs mt-2 leading-relaxed rounded-lg p-3 space-y-0.5"
+                           style={{ background: 'var(--nav-surface-glass)' }}>
                         {binLookup.status === 'loading' && (
-                          <span style={{ color: 'var(--nav-text-muted)' }}>{t.binLookupSearching}</span>
+                          <div style={{ color: 'var(--nav-text-muted)' }}>{t.binLookupSearching}</div>
                         )}
                         {binLookup.status === 'notfound' && (
-                          <span style={{ color: 'var(--nav-text-muted)' }}>{t.binLookupNotFound}</span>
+                          <div style={{ color: 'var(--nav-text-muted)' }}>{t.binLookupNotFound}</div>
                         )}
-                        {binLookup.status === 'found' && (
-                          <>
-                            <span style={{ color: 'var(--nav-text-secondary)' }}>
-                              {t.binLookupFound(binLookup.company?.name || '', binLookup.company?.status || null)}
-                            </span>
-                            {/* Warnings only when КГД actually said yes.
-                                Silence here means "clean or unchecked", and
-                                an absent warning must never be produced by a
-                                timeout dressed up as reassurance -- so
-                                nothing is shown for null. */}
-                            {binLookup.company?.isUnreliable === true && (
-                              <div className="font-medium" style={{ color: 'var(--nav-danger, #ef4444)' }}>{t.binLookupUnreliable}</div>
-                            )}
-                            {binLookup.company?.isLiquidating === true && (
-                              <div className="font-medium" style={{ color: 'var(--nav-danger, #ef4444)' }}>{t.binLookupLiquidating}</div>
-                            )}
-                            {/* Zero is worth saying out loud -- it is the
-                                reassurance a seller is looking for before
-                                shipping. null stays silent: "we did not ask"
-                                must not look like "owes nothing". */}
-                            {typeof binLookup.company?.totalArrear === 'number' && (
-                              binLookup.company.totalArrear > 0 ? (
-                                <div className="font-medium" style={{ color: 'var(--nav-danger, #ef4444)' }}>
-                                  {t.binLookupTaxDebt(binLookup.company.totalArrear.toLocaleString('ru-KZ', { maximumFractionDigits: 2 }))}
-                                </div>
-                              ) : (
-                                <div style={{ color: 'var(--nav-text-secondary)' }}>{t.binLookupNoTaxDebt}</div>
-                              )
-                            )}
-                            {/* VAT status decides whether this invoice may
-                                carry НДС at all, so it is stated plainly.
-                                Only when КГД actually answered: null means
-                                "not checked", which must not be shown as a
-                                negative. */}
-                            {binLookup.company?.isVatPayer !== null && binLookup.company?.isVatPayer !== undefined && (
-                              <div style={{ color: 'var(--nav-text-secondary)' }}>
-                                {binLookup.company?.isVatPayer ? t.binLookupVatYes(binLookup.company?.vatRegisteredAt || null) : t.binLookupVatNo}
+                        {binLookup.status === 'found' && binLookup.company && (() => {
+                          const c = binLookup.company
+                          // Одним блоком, а не россыпью подписей под полем:
+                          // продавец решает, отгружать или нет, и должен
+                          // видеть всё сразу, а не выискивать предупреждение
+                          // среди служебных строк.
+                          return (
+                            <>
+                              <div className="font-medium" style={{ color: 'var(--nav-text-primary)' }}>
+                                {t.binLookupFound(c.name, c.status || null)}
                               </div>
-                            )}
-                            {/* Crediting the portal is a condition of using
-                                its data (Приложение 2, пп. 7-8), not a
-                                courtesy -- it stays wherever the data shows. */}
-                            <div style={{ color: 'var(--nav-text-muted)' }}>
-                              {binLookup.company?.source === 'kgd' ? t.binLookupSourceKgd : t.binLookupSource}
-                            </div>
-                          </>
-                        )}
+                              {c.registeredAt && (
+                                <div style={{ color: 'var(--nav-text-secondary)' }}>{t.binLookupRegisteredAt(c.registeredAt)}</div>
+                              )}
+                              {c.activity && (
+                                <div style={{ color: 'var(--nav-text-secondary)' }}>{t.binLookupActivity(c.activity)}</div>
+                              )}
+                              {c.isVatPayer !== null && c.isVatPayer !== undefined && (
+                                <div style={{ color: 'var(--nav-text-secondary)' }}>
+                                  {c.isVatPayer ? t.binLookupVatYes(c.vatRegisteredAt || null) : t.binLookupVatNo}
+                                </div>
+                              )}
+                              {/* Долг и риски идут последними и выделены:
+                                  это то, ради чего проверку смотрят. null
+                                  молчит — «не спросили» не должно читаться
+                                  как «чисто». */}
+                              {typeof c.totalArrear === 'number' && (
+                                c.totalArrear > 0 ? (
+                                  <div className="font-medium" style={{ color: 'var(--nav-danger, #ef4444)' }}>
+                                    {t.binLookupTaxDebt(c.totalArrear.toLocaleString('ru-KZ', { maximumFractionDigits: 2 }))}
+                                  </div>
+                                ) : (
+                                  <div style={{ color: 'var(--nav-success)' }}>{t.binLookupNoTaxDebt}</div>
+                                )
+                              )}
+                              {c.isUnreliable === true && (
+                                <div className="font-medium" style={{ color: 'var(--nav-danger, #ef4444)' }}>{t.binLookupUnreliable}</div>
+                              )}
+                              {c.isLiquidating === true && (
+                                <div className="font-medium" style={{ color: 'var(--nav-danger, #ef4444)' }}>{t.binLookupLiquidating}</div>
+                              )}
+                              <div className="pt-1" style={{ color: 'var(--nav-text-muted)' }}>
+                                {c.source === 'kgd' ? t.binLookupSourceKgd : t.binLookupSource}
+                              </div>
+                            </>
+                          )
+                        })()}
                       </div>
                     )}
                 </div>

@@ -222,7 +222,12 @@ export async function GET(req: NextRequest) {
     // in on the next read instead of waiting for the row to expire. The
     // identity fields are not re-fetched -- only the hole is.
     const missingVat = company.isVatPayer === null || company.isVatPayer === undefined
-    const missingRisk = company.isUnreliable === null || company.isUnreliable === undefined
+    // Every КГД-derived field is checked, not just the first one. Listing
+    // them one at a time is how the tax-arrear column stayed empty after it
+    // shipped: rows cached earlier already had a VAT answer and a risk
+    // answer, so neither flag fired and the new column was never filled.
+    const missingRisk = [company.isUnreliable, company.isLiquidating, company.totalArrear]
+      .some(value => value === null || value === undefined)
     if (missingVat || missingRisk) {
       const [vat, risk] = await Promise.all([
         missingVat ? lookUpVat(bin) : Promise.resolve(undefined),
