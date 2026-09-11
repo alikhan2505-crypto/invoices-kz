@@ -605,7 +605,7 @@ export default function TopUtilityBar() {
           </span>
         </button>
 
-        <button onClick={() => openPanel('notifications')} title="Уведомления"
+        <button data-tour="notifications" onClick={() => openPanel('notifications')} title="Уведомления"
           className="relative w-11 h-11 flex items-center justify-center rounded-full hover:bg-gray-50 transition-colors">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
             <path d="M6 10a6 6 0 1 1 12 0c0 4 1.5 5.5 1.5 5.5H4.5S6 14 6 10Z" stroke="var(--nav-accent)" strokeWidth="1.6" strokeLinejoin="round" />
@@ -618,7 +618,7 @@ export default function TopUtilityBar() {
           )}
         </button>
 
-        <button onClick={() => openPanel('help')} title="Помощь"
+        <button data-tour="help" onClick={() => openPanel('help')} title="Помощь"
           className="w-11 h-11 flex items-center justify-center rounded-full hover:bg-gray-50 transition-colors">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
             <circle cx="12" cy="12" r="9" stroke="var(--nav-accent)" strokeWidth="1.6" />

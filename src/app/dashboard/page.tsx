@@ -825,6 +825,7 @@ export default function DashboardPage() {
                 </div>
               ) : (
                 <motion.div
+                  data-tour="analytics"
                   className="nav-glass nav-card-accent rounded-[24px] p-[22px_22px_12px]"
                   initial={reduceMotion ? false : { opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -931,6 +932,7 @@ export default function DashboardPage() {
             {/* Left: Recent invoices + Create button */}
             <div className="flex flex-col gap-4">
               <motion.div
+                data-tour="recent-invoices"
                 className={`nav-glass nav-card-accent rounded-2xl ${CARD_HOVER}`}
                 initial={reduceMotion ? false : { opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
