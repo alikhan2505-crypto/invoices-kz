@@ -8,6 +8,7 @@ import { backLabel, deleteLabel } from '@/lib/a11yLabels'
 import { profileAccountsDict, ProfileAccountsContent } from '@/lib/i18n/profileAccounts'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
+import { useAppDialog } from '@/components/AppDialog'
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
 // kept identical rather than inventing a second "house" ease.
@@ -80,6 +81,8 @@ export default function ConnectorsPage() {
   const router = useRouter()
   const { lang } = useLanguage()
   const t = profileAccountsDict[lang]
+  // Shadows window.alert for this component -- see src/components/AppDialog.tsx.
+  const { alert, dialogElement } = useAppDialog()
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw
   const [saving, setSaving] = useState(false)
@@ -247,6 +250,7 @@ export default function ConnectorsPage() {
         </motion.button>
 
       </div>
+      {dialogElement}
     </main>
     </DesktopShell>
   )

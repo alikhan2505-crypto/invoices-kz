@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import Skeleton from '@/components/Skeleton'
+import { useAppDialog } from '@/components/AppDialog'
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
 // kept identical rather than inventing a second "house" ease.
@@ -69,6 +70,10 @@ export default function Clients() {
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw
   const [clients, setClients] = useState<any[]>([])
+  // Shadows window.alert / window.confirm for this component -- see
+  // src/components/AppDialog.tsx. Every confirm below is awaited: a Promise
+  // is truthy, so `if (confirm(...))` would silently pass.
+  const { alert, confirm, dialogElement } = useAppDialog()
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -134,7 +139,7 @@ export default function Clients() {
   }
 
   async function deleteClient(id: string) {
-    if (!confirm('Удалить клиента?')) return
+    if (!(await confirm('Удалить клиента?'))) return
     await supabase.from('clients').delete().eq('id', id)
     setClients(prev => prev.filter(c => c.id !== id))
   }
@@ -362,6 +367,7 @@ export default function Clients() {
             </motion.button>
           )}
         </div>
+      {dialogElement}
       </main>
     </DesktopShell>
   )

@@ -8,6 +8,7 @@ import DesktopShell from '@/components/DesktopShell'
 import { useLanguage } from '@/components/LanguageProvider'
 import { acquiringDict } from '@/lib/i18n/acquiring'
 import { setPostLoginRedirect } from '@/lib/postLoginRedirect'
+import { useAppDialog } from '@/components/AppDialog'
 
 // Matches MIN_TOPUP in src/app/api/kaspi/wallet/topup/route.ts — kept here
 // too so the button can refuse an obviously-too-small amount before ever
@@ -34,6 +35,10 @@ export default function KaspiApiPage() {
   const router = useRouter()
   const { lang } = useLanguage()
   const t = acquiringDict[lang]
+  // Shadows window.alert / window.confirm for this component -- see
+  // src/components/AppDialog.tsx. Every confirm below is awaited: a Promise
+  // is truthy, so `if (confirm(...))` would silently pass.
+  const { alert, confirm, dialogElement } = useAppDialog()
 
   const [loading, setLoading] = useState(true)
   const [profile, setProfile] = useState<any>(null)
@@ -508,7 +513,7 @@ export default function KaspiApiPage() {
   }
 
   async function regenerateKaspiCredentials() {
-    if (!confirm(t.kaspiRegenerateConfirm)) return
+    if (!(await confirm(t.kaspiRegenerateConfirm))) return
     setKaspiError('')
     setKaspiRegenerating(true)
     try {
@@ -1151,6 +1156,7 @@ export default function KaspiApiPage() {
         </div>
       )}
       </div>
+      {dialogElement}
     </main>
     </DesktopShell>
   )

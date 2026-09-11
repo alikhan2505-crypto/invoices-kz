@@ -10,6 +10,7 @@ import { supportDict } from '@/lib/i18n/support'
 import { getActivePlan } from '@/lib/plan'
 import { PLAN_PRICES, type BillingPeriod } from '@/lib/plans/pricing'
 import { consumePendingUpgrade } from '@/lib/pendingUpgrade'
+import { useAppDialog } from '@/components/AppDialog'
 
 // How long an untouched QR is shown before it is retired for a fresh one.
 // Kaspi's own window is ~5 minutes; /kaspi-api shortens the visible wait to a
@@ -20,6 +21,8 @@ export default function Upgrade() {
   const router = useRouter()
   const { lang } = useLanguage()
   const t = miscDict[lang]
+  // Shadows window.alert for this component -- see src/components/AppDialog.tsx.
+  const { alert, dialogElement } = useAppDialog()
   const s = supportDict[lang]
   const [promoCode, setPromoCode] = useState('')
   const [promoLoading, setPromoLoading] = useState(false)
@@ -835,6 +838,7 @@ export default function Upgrade() {
           </div>
         </div>
       )}
+      {dialogElement}
 
     </main>
   )

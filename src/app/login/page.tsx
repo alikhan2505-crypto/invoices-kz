@@ -7,11 +7,14 @@ import { useLanguage, type Lang } from '@/components/LanguageProvider'
 import { authDict } from '@/lib/i18n/auth'
 import { hasPendingUpgrade } from '@/lib/pendingUpgrade'
 import { consumePostLoginRedirect } from '@/lib/postLoginRedirect'
+import { useAppDialog } from '@/components/AppDialog'
 
 export default function Login() {
   const router = useRouter()
   const { lang, setLang } = useLanguage()
   const t = authDict[lang]
+  // Shadows window.alert for this component -- see src/components/AppDialog.tsx.
+  const { alert, dialogElement } = useAppDialog()
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)
   // Shown after a manual resend, so pressing the button visibly does
@@ -227,6 +230,7 @@ export default function Login() {
           </div>
         )}
       </div>
+      {dialogElement}
     </main>
   )
 }

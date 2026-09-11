@@ -9,6 +9,7 @@ import { useLanguage } from '@/components/LanguageProvider'
 import { backLabel, editLabel, deleteLabel, clearSearchLabel } from '@/lib/a11yLabels'
 import { profileContentDict } from '@/lib/i18n/profileContent'
 import Skeleton from '@/components/Skeleton'
+import { useAppDialog } from '@/components/AppDialog'
 
 const UNIT_OPTIONS = ['шт', 'кг', 'л', 'м', 'м²', 'м³', 'час', 'день', 'месяц', 'услуга', 'работа']
 
@@ -69,6 +70,10 @@ export default function Services() {
   const router = useRouter()
   const { lang } = useLanguage()
   const t = profileContentDict[lang]
+  // Shadows window.alert / window.confirm for this component -- see
+  // src/components/AppDialog.tsx. Every confirm below is awaited: a Promise
+  // is truthy, so `if (confirm(...))` would silently pass.
+  const { alert, confirm, dialogElement } = useAppDialog()
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw
   const [services, setServices] = useState<any[]>([])
@@ -137,7 +142,7 @@ export default function Services() {
   }
 
   async function deleteService(id: string) {
-    if (!confirm(t.deleteItemConfirm)) return
+    if (!(await confirm(t.deleteItemConfirm))) return
     await supabase.from('services').delete().eq('id', id)
     setServices(prev => prev.filter(s => s.id !== id))
   }
@@ -388,6 +393,7 @@ export default function Services() {
             </motion.button>
           )}
         </div>
+      {dialogElement}
       </main>
     </DesktopShell>
   )

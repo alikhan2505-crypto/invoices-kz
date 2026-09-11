@@ -12,6 +12,7 @@ import { useLanguage } from '@/components/LanguageProvider'
 import { backLabel, deleteLabel } from '@/lib/a11yLabels'
 import { profileContentDict } from '@/lib/i18n/profileContent'
 import Skeleton from '@/components/Skeleton'
+import { useAppDialog } from '@/components/AppDialog'
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
 // kept identical rather than inventing a second "house" ease.
@@ -70,6 +71,10 @@ export default function Documents() {
   const router = useRouter()
   const { lang } = useLanguage()
   const t = profileContentDict[lang]
+  // Shadows window.alert / window.confirm for this component -- see
+  // src/components/AppDialog.tsx. Every confirm below is awaited: a Promise
+  // is truthy, so `if (confirm(...))` would silently pass.
+  const { alert, confirm, dialogElement } = useAppDialog()
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw
   const [loading, setLoading] = useState(true)
@@ -108,7 +113,7 @@ export default function Documents() {
   }
 
   async function deleteDoc(id: string, table: string) {
-    if (!confirm(t.deleteDocumentConfirm)) return
+    if (!(await confirm(t.deleteDocumentConfirm))) return
     setBusyDocId(id)
     await supabase.from(table).delete().eq('id', id)
     await load()
@@ -335,6 +340,7 @@ export default function Documents() {
             </motion.div>
           )}
         </div>
+      {dialogElement}
       </main>
     </DesktopShell>
   )

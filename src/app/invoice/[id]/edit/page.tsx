@@ -11,6 +11,7 @@ import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import InvoiceLivePreview from '@/components/InvoiceLivePreview'
 import Skeleton from '@/components/Skeleton'
+import { useAppDialog } from '@/components/AppDialog'
 
 const UNIT_OPTIONS = ['шт', 'кг', 'л', 'м', 'м²', 'м³', 'час', 'день', 'месяц', 'услуга', 'работа']
 
@@ -35,6 +36,8 @@ export default function EditInvoice() {
   const { id } = useParams()
   const { lang } = useLanguage()
   const t = invoiceFlowDict[lang]
+  // Shadows window.alert for this component -- see src/components/AppDialog.tsx.
+  const { alert, dialogElement } = useAppDialog()
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw
   const [loading, setLoading] = useState(true)
@@ -417,6 +420,7 @@ export default function EditInvoice() {
       </div>
       </div>
 
+      {dialogElement}
     </main>
     </DesktopShell>
   )

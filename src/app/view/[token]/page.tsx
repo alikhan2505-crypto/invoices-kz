@@ -10,6 +10,7 @@ import { useLanguage } from '@/components/LanguageProvider'
 import { historyDict } from '@/lib/i18n/history'
 import { invoiceFlowDict } from '@/lib/i18n/invoiceFlow'
 import SignatureSection from '@/components/SignatureSection'
+import { useAppDialog } from '@/components/AppDialog'
 
 // Flat solid-fill status badges -- same approved treatment used across the
 // app (dashboard/history/invoice-detail's statusFill), swapped in here for
@@ -71,6 +72,10 @@ export default function PublicInvoice() {
   const token = Array.isArray(rawToken) ? rawToken[0] : rawToken ?? ''
   const { lang } = useLanguage()
   const t = historyDict[lang]
+  // Shadows window.alert / window.confirm for this component -- see
+  // src/components/AppDialog.tsx. Every confirm below is awaited: a Promise
+  // is truthy, so `if (confirm(...))` would silently pass.
+  const { alert, confirm, dialogElement } = useAppDialog()
   const tFlow = invoiceFlowDict[lang]
   const [invoice, setInvoice] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
@@ -375,7 +380,7 @@ export default function PublicInvoice() {
   }
 
   async function markAsPaid() {
-    if (!confirm(t.confirmPaymentConfirm)) return
+    if (!(await confirm(t.confirmPaymentConfirm))) return
     setMarking(true)
     // Goes through the server keyed by the share token: the browser has no
     // write access to invoices any more (and never really did -- the old
@@ -821,6 +826,7 @@ export default function PublicInvoice() {
           <a href="https://invoices.kz" className="text-xs font-medium" style={{ color: 'var(--nav-accent)' }}>INVOICES.KZ</a>
         </div>
       </div>
+      {dialogElement}
     </main>
   )
 }

@@ -18,6 +18,7 @@ import { TRAINING_MESSAGE_THRESHOLD, TRAINING_DAYS_THRESHOLD } from '@/lib/aiAge
 // no env access) -- safe to bundle client-side, so the Промптинг preview
 // shows the REAL assembled context line, not a hand-maintained copy.
 import { buildBusinessContextLine, AgentTone, AgentGoal } from '@/lib/aiAgent/promptContext'
+import { useAppDialog } from '@/components/AppDialog'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -236,6 +237,10 @@ function ChannelCard({ icon, name, chip, description, children }: {
 export default function AiAgentSettings() {
   const { lang } = useLanguage()
   const t = aiAgentDict[lang]
+  // Shadows window.alert / window.confirm for this component -- see
+  // src/components/AppDialog.tsx. Every confirm below is awaited: a Promise
+  // is truthy, so `if (confirm(...))` would silently pass.
+  const { alert, confirm, dialogElement } = useAppDialog()
   const tf = aiAgentFormsDict[lang]
   const router = useRouter()
   const reduceMotionRaw = useReducedMotion()
@@ -714,7 +719,7 @@ export default function AiAgentSettings() {
 
   async function disconnectInstagram() {
     if (!agentId) return
-    if (!window.confirm(tf.confirmDisconnectInstagram)) return
+    if (!(await confirm(tf.confirmDisconnectInstagram))) return
     setIgBusy(true)
     setIgError(null)
     try {
@@ -993,7 +998,7 @@ export default function AiAgentSettings() {
 
   async function disconnectWhatsApp() {
     if (!agentId) return
-    if (!window.confirm(tf.confirmDisconnectWhatsapp)) return
+    if (!(await confirm(tf.confirmDisconnectWhatsapp))) return
     setWaBusy(true)
     setWaError(null)
     try {
@@ -1073,7 +1078,7 @@ export default function AiAgentSettings() {
   }
 
   async function removeTemplate(id: string) {
-    if (!window.confirm(tf.confirmDeleteTemplate)) return
+    if (!(await confirm(tf.confirmDeleteTemplate))) return
     setTplBusy(true)
     setTplError(null)
     try {
@@ -2051,6 +2056,7 @@ export default function AiAgentSettings() {
           </motion.div>
         )}
       </AnimatePresence>
+      {dialogElement}
     </main>
     </DesktopShell>
   )

@@ -8,6 +8,7 @@ import { buildAgentSettingsHref } from '@/lib/aiAgent/settingsLink'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import { getActivePlan } from '@/lib/plan'
+import { useAppDialog } from '@/components/AppDialog'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 const MAX_MESSAGE_LEN = 2000
@@ -96,6 +97,8 @@ export default function AiAgentBroadcasts() {
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw
   const [loading, setLoading] = useState(true)
+  // Shadows window.alert for this component -- see src/components/AppDialog.tsx.
+  const { alert, dialogElement } = useAppDialog()
   const [forbidden, setForbidden] = useState(false)
   const [agents, setAgents] = useState<Agent[]>([])
   const [broadcasts, setBroadcasts] = useState<Broadcast[]>([])
@@ -517,6 +520,7 @@ export default function AiAgentBroadcasts() {
           </motion.div>
         )}
       </AnimatePresence>
+      {dialogElement}
     </main>
     </DesktopShell>
   )

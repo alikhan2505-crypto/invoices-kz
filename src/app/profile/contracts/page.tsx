@@ -10,6 +10,7 @@ import { useLanguage } from '@/components/LanguageProvider'
 import { backLabel, deleteLabel } from '@/lib/a11yLabels'
 import { contractsDict } from '@/lib/i18n/contracts'
 import Skeleton from '@/components/Skeleton'
+import { useAppDialog } from '@/components/AppDialog'
 
 type Contract = {
   id: string
@@ -78,6 +79,10 @@ export default function Contracts() {
   const router = useRouter()
   const { lang } = useLanguage()
   const t = contractsDict[lang]
+  // Shadows window.alert / window.confirm for this component -- see
+  // src/components/AppDialog.tsx. Every confirm below is awaited: a Promise
+  // is truthy, so `if (confirm(...))` would silently pass.
+  const { alert, confirm, dialogElement } = useAppDialog()
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw
 
@@ -144,7 +149,7 @@ export default function Contracts() {
   }
 
   async function deleteContract(id: string) {
-    if (!confirm(t.deleteContractConfirm)) return
+    if (!(await confirm(t.deleteContractConfirm))) return
     await supabase.from('contracts').delete().eq('id', id)
     setContracts(prev => prev.filter(c => c.id !== id))
   }
@@ -310,6 +315,7 @@ export default function Contracts() {
             </div>
           )}
         </div>
+      {dialogElement}
       </main>
     </DesktopShell>
   )

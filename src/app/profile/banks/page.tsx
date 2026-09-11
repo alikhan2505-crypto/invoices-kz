@@ -10,6 +10,7 @@ import { backLabel, editLabel, deleteLabel } from '@/lib/a11yLabels'
 import { profileAccountsDict } from '@/lib/i18n/profileAccounts'
 import Skeleton from '@/components/Skeleton'
 import { KAZAKHSTAN_BANKS, OTHER_BANK, findBankByBik, findBankByName } from '@/lib/kazakhstanBanks'
+import { useAppDialog } from '@/components/AppDialog'
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
 // kept identical rather than inventing a second "house" ease.
@@ -69,6 +70,10 @@ export default function Banks() {
   const router = useRouter()
   const { lang } = useLanguage()
   const t = profileAccountsDict[lang]
+  // Shadows window.alert / window.confirm for this component -- see
+  // src/components/AppDialog.tsx. Every confirm below is awaited: a Promise
+  // is truthy, so `if (confirm(...))` would silently pass.
+  const { alert, confirm, dialogElement } = useAppDialog()
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw
   const [accounts, setAccounts] = useState<any[]>([])
@@ -157,7 +162,7 @@ export default function Banks() {
   }
 
   async function deleteAccount(id: string) {
-    if (!confirm(t.deleteAccountConfirm)) return
+    if (!(await confirm(t.deleteAccountConfirm))) return
     await supabase.from('bank_accounts').delete().eq('id', id)
     loadAccounts()
   }
@@ -358,6 +363,7 @@ export default function Banks() {
             </motion.button>
           )}
         </div>
+      {dialogElement}
       </main>
     </DesktopShell>
   )

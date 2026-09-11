@@ -8,11 +8,16 @@ import { useLanguage } from '@/components/LanguageProvider'
 import { deleteLabel } from '@/lib/a11yLabels'
 import { miscDict } from '@/lib/i18n/misc'
 import { getActivePlan } from '@/lib/plan'
+import { useAppDialog } from '@/components/AppDialog'
 
 export default function Admin() {
   const router = useRouter()
   const { lang } = useLanguage()
   const t = miscDict[lang]
+  // Shadows window.alert / window.confirm for this component -- see
+  // src/components/AppDialog.tsx. Every confirm below is awaited: a Promise
+  // is truthy, so `if (confirm(...))` would silently pass.
+  const { alert, confirm, dialogElement } = useAppDialog()
   const [users, setUsers] = useState<any[]>([])
   const [promos, setPromos] = useState<any[]>([])
   const [payments, setPayments] = useState<any[]>([])
@@ -203,7 +208,7 @@ export default function Admin() {
   }
 
   async function rejectPayment(id: string) {
-    if (!confirm(t.confirmRejectPayment)) return
+    if (!(await confirm(t.confirmRejectPayment))) return
     await supabase.from('payment_requests').update({ status: 'rejected' }).eq('id', id)
     load()
   }
@@ -229,7 +234,7 @@ export default function Admin() {
   }
 
   async function deletePromo(id: string) {
-    if (!confirm(t.confirmDeletePromo)) return
+    if (!(await confirm(t.confirmDeletePromo))) return
     await supabase.from('promo_codes').delete().eq('id', id)
     setPromos(prev => prev.filter(p => p.id !== id))
   }
@@ -646,6 +651,7 @@ export default function Admin() {
           </div>
         )}
       </div>
+      {dialogElement}
     </main>
   )
 }

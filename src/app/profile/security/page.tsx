@@ -10,6 +10,7 @@ import { formatDate } from '@/lib/date'
 import { useLanguage } from '@/components/LanguageProvider'
 import { backLabel } from '@/lib/a11yLabels'
 import { profileAccountsDict } from '@/lib/i18n/profileAccounts'
+import { useAppDialog } from '@/components/AppDialog'
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
 // kept identical rather than inventing a second "house" ease.
@@ -67,6 +68,10 @@ export default function Security() {
   const router = useRouter()
   const { lang } = useLanguage()
   const t = profileAccountsDict[lang]
+  // Shadows window.alert / window.confirm for this component -- see
+  // src/components/AppDialog.tsx. Every confirm below is awaited: a Promise
+  // is truthy, so `if (confirm(...))` would silently pass.
+  const { alert, confirm, dialogElement } = useAppDialog()
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw
   const [passkeys, setPasskeys] = useState<Passkey[]>([])
@@ -120,7 +125,7 @@ export default function Security() {
   }
 
   async function removePasskey(id: string) {
-    if (!confirm(t.passkeyRemoveConfirm)) return
+    if (!(await confirm(t.passkeyRemoveConfirm))) return
     await supabase.from('webauthn_credentials').delete().eq('id', id)
     setPasskeys(prev => prev.filter(p => p.id !== id))
   }
@@ -240,6 +245,7 @@ export default function Security() {
             </motion.div>
           </div>
         </div>
+      {dialogElement}
       </main>
     </DesktopShell>
   )

@@ -8,6 +8,7 @@ import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import { KASPI_SHOP_CONNECTIONS_CHANGED_EVENT } from '@/components/KaspiShopStoreSwitcher'
 import { getActivePlan } from '@/lib/plan'
+import { useAppDialog } from '@/components/AppDialog'
 
 type Product = {
   id: string
@@ -205,6 +206,10 @@ export default function KaspiShop() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [loading, setLoading] = useState(true)
+  // Shadows window.alert / window.confirm for this component -- see
+  // src/components/AppDialog.tsx. Every confirm below is awaited: a Promise
+  // is truthy, so `if (confirm(...))` would silently pass.
+  const { alert, confirm, dialogElement } = useAppDialog()
   // Opened from the store switcher's "+ Добавить магазин" (?addStore=1) --
   // reuses the same connect flow as the mandatory first-connect dialog, just
   // dismissible since the user already has at least one working store.
@@ -466,7 +471,7 @@ export default function KaspiShop() {
   }
 
   async function disconnect() {
-    if (!confirm('Отключить кабинет Kaspi? Отслеживаемые товары и их настройки будут удалены — при повторном подключении каталог импортируется заново.')) return
+    if (!(await confirm('Отключить кабинет Kaspi? Отслеживаемые товары и их настройки будут удалены — при повторном подключении каталог импортируется заново.'))) return
     const headers = await authHeader()
     await fetch('/api/kaspi-shop/settings', { method: 'DELETE', headers })
     window.dispatchEvent(new Event(KASPI_SHOP_CONNECTIONS_CHANGED_EVENT))
@@ -507,7 +512,7 @@ export default function KaspiShop() {
   }
 
   async function deleteProduct(id: string) {
-    if (!confirm('Удалить товар из демпинга? Правило и его настройки будут удалены у нас — сам товар на Kaspi это не трогает.')) return
+    if (!(await confirm('Удалить товар из демпинга? Правило и его настройки будут удалены у нас — сам товар на Kaspi это не трогает.'))) return
     const headers = await authHeader()
     await fetch('/api/kaspi-shop/products', { method: 'DELETE', headers, body: JSON.stringify({ id }) })
     setExpandedId(null)
@@ -1302,6 +1307,7 @@ export default function KaspiShop() {
           </motion.div>
         )}
       </AnimatePresence>
+      {dialogElement}
     </main>
     </DesktopShell>
   )

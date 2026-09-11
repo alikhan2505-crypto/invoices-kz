@@ -10,6 +10,7 @@ import { backLabel, deleteLabel } from '@/lib/a11yLabels'
 import { profileContentDict } from '@/lib/i18n/profileContent'
 import { getActivePlan } from '@/lib/plan'
 import Skeleton from '@/components/Skeleton'
+import { useAppDialog } from '@/components/AppDialog'
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
 // kept identical rather than inventing a second "house" ease.
@@ -52,6 +53,10 @@ export default function Templates() {
   const router = useRouter()
   const { lang } = useLanguage()
   const t = profileContentDict[lang]
+  // Shadows window.alert / window.confirm for this component -- see
+  // src/components/AppDialog.tsx. Every confirm below is awaited: a Promise
+  // is truthy, so `if (confirm(...))` would silently pass.
+  const { alert, confirm, dialogElement } = useAppDialog()
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw
   const [templates, setTemplates] = useState<any[]>([])
@@ -73,7 +78,7 @@ export default function Templates() {
   }
 
   async function deleteTemplate(id: string) {
-    if (!confirm(t.deleteTemplateConfirm)) return
+    if (!(await confirm(t.deleteTemplateConfirm))) return
     await supabase.from('templates').delete().eq('id', id)
     setTemplates(prev => prev.filter(tpl => tpl.id !== id))
   }
@@ -194,6 +199,7 @@ export default function Templates() {
             </div>
           )}
         </div>
+      {dialogElement}
       </main>
     </DesktopShell>
   )
