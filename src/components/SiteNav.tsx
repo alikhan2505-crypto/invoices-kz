@@ -432,7 +432,7 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
         className="hidden lg:block sticky top-0 z-30 nav-glass"
         style={{ borderLeft: 'none', borderRight: 'none', borderTop: 'none' }}
       >
-        <div className="flex items-center gap-1 px-7 py-3.5">
+        <div data-tour="menu-desktop" className="flex items-center gap-1 px-7 py-3.5">
           {/* Always the invoices.kz brand mark here (2026-08-19, founder:
               "тут надо поставить лого invoices.kz") -- /icon.svg is the
               same IK mark used for the favicon/PWA icons. */}

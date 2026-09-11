@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
@@ -46,6 +46,17 @@ const STEPS: Step[] = [
     title: 'Всё меню здесь',
     body: 'Разделы и их страницы. Открытым показывается только тот раздел, в котором вы сейчас.',
   },
+  // Same idea as the step above, aimed at the desktop nav row instead of the
+  // mobile hamburger button -- the two anchors never coexist (one is always
+  // `lg:hidden`, the other `hidden lg:block`), so exactly one of these two
+  // steps ever shows. Without this one, a desktop visitor got no explanation
+  // of navigation at all: 'menu' silently vanished from their tour with
+  // nothing standing in for it.
+  {
+    anchor: 'menu-desktop',
+    title: 'Все разделы — одной строкой',
+    body: 'Kaspi Cashier API, AI-агент, Kaspi Bot, WB Bot и остальное — переключайтесь отсюда в любой момент. Подсвечен раздел, в котором вы сейчас находитесь.',
+  },
   {
     anchor: 'notifications',
     title: 'Узнаёте первым',
@@ -87,6 +98,26 @@ export default function DashboardTour() {
   // rest of this codebase does (dashboard/page.tsx's own `reduceMotion`):
   // one source of truth, and it's already a dependency here.
   const reduce = useReducedMotion() ?? false
+
+  // The tooltip card's own rendered height, kept in state so "place above
+  // the highlight" can be expressed purely as a `top` value (box.top - GAP -
+  // tipHeight) instead of a CSS `bottom` offset.
+  //
+  // A `bottom`-based approach was tried first and shipped a real bug: when a
+  // step toggles between "below" (sets `top`, no `bottom`) and "above" (sets
+  // `bottom`, no `top`), framer-motion's `animate` prop does not clear a
+  // property that is absent from the new target -- it leaves the DOM's last
+  // driven value in place. The element ends up with BOTH `top` and `bottom`
+  // set at once, which is contradictory for `position: fixed` (the browser
+  // stretches/repositions the box to satisfy both), and the tooltip renders
+  // stuck near wherever an earlier "below" step last put it -- reported live
+  // by the founder as the card sitting far above the button it was supposed
+  // to sit under. Plain React `style` objects don't have this problem (React
+  // clears a CSS property that disappears between renders); framer's
+  // animate() does. Routing everything through `top` sidesteps the
+  // distinction entirely.
+  const [tipHeight, setTipHeight] = useState(0)
+  const tipRef = useRef<HTMLDivElement>(null)
 
   // Decide once, on mount, whether this account has seen the tour. A missing
   // profile row (or any error) means "don't show" -- the tour is a nicety and
@@ -151,6 +182,18 @@ export default function DashboardTour() {
       window.removeEventListener('scroll', measure, true)
     }
   }, [open, measure])
+
+  // Tracks the tooltip card's own height as copy or viewport width changes
+  // it. A plain effect keyed on [i, vw] would miss width-driven reflow that
+  // doesn't happen to land in the same render (e.g. a resize while the tour
+  // is open), so this observes the node directly instead.
+  useEffect(() => {
+    if (!open || !tipRef.current) return
+    const el = tipRef.current
+    const ro = new ResizeObserver(([entry]) => setTipHeight(entry.contentRect.height))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [open, i])
 
   const finish = useCallback(async () => {
     setOpen(false)
@@ -238,15 +281,24 @@ export default function DashboardTour() {
   // cap the tooltip to the room actually available on the side we chose
   // (above/below stays exactly the 60%-of-viewport rule already computed)
   // and let long text scroll inside the card rather than off the screen.
-  // `y` centers the box-less fallback vertically via transform rather than a
-  // raw pixel `top`, so it doesn't need its own rendered height to centre
-  // correctly -- matching what the pre-animation version did with
-  // `top: '50%', transform: 'translateY(-50%)'`.
-  const tipPos: { top?: number; bottom?: number; left: number; width: number; maxHeight: number; y: number | string } = box
-    ? below
-      ? { top: box.top + box.height + GAP, left: tipLeft, width: tipWidth, maxHeight: Math.max(0, vh - (box.top + box.height + GAP) - MARGIN), y: 0 }
-      : { bottom: vh - box.top + GAP, left: tipLeft, width: tipWidth, maxHeight: Math.max(0, box.top - GAP - MARGIN), y: 0 }
-    : { top: vh / 2, left: MARGIN, width: tipWidth, maxHeight: vh - MARGIN * 2, y: '-50%' }
+  //
+  // Everything below resolves to a single `top` -- see the tipHeight
+  // comment above for why `bottom` isn't used for the "above" case anymore.
+  // "Above" needs the card's own height to anchor its BOTTOM edge just
+  // above the highlight, so it uses the last measured `tipHeight`, capped to
+  // the room actually available (`maxHeight` below) so a still-growing or
+  // very tall card doesn't compute a `top` above the viewport margin.
+  const maxHeight = box
+    ? (below
+      ? Math.max(0, vh - (box.top + box.height + GAP) - MARGIN)
+      : Math.max(0, box.top - GAP - MARGIN))
+    : Math.max(0, vh - MARGIN * 2)
+  const top = box
+    ? (below
+      ? box.top + box.height + GAP
+      : Math.max(MARGIN, box.top - GAP - Math.min(tipHeight, maxHeight)))
+    : Math.max(MARGIN, vh / 2 - tipHeight / 2)
+  const tipPos = { top, left: tipLeft, width: tipWidth, maxHeight }
 
   // One duration/curve for every moving piece here, so the spotlight, its
   // four-rectangle scrim and the tooltip glide between anchors as a single
@@ -264,26 +316,37 @@ export default function DashboardTour() {
     >
       {box ? (
         <>
+          {/* These four stay fully transparent -- they exist only to catch a
+              click on the dimmed surround and call finish(), same "real hole"
+              reasoning as before. The dimming itself now comes from the ring
+              div's own box-shadow below, which is what gives the spotlight
+              rounded corners: four flat rectangles can only ever meet the
+              highlight at a sharp corner, matching the ring's `borderRadius`
+              needs a single shape, and a spread box-shadow is that shape
+              without touching clip-path/mask (still avoided for the same
+              cross-engine reasons as the original 4-rect approach -- iOS
+              Safari mask-image support is the specific worry, per this
+              codebase's WebKit history). */}
           <motion.div
-            style={{ position: 'fixed', left: 0, top: 0, width: '100%', background: scrim }}
+            style={{ position: 'fixed', left: 0, top: 0, width: '100%' }}
             animate={{ height: Math.max(0, box.top) }}
             transition={glide}
             onClick={finish}
           />
           <motion.div
-            style={{ position: 'fixed', left: 0, width: '100%', bottom: 0, background: scrim }}
+            style={{ position: 'fixed', left: 0, width: '100%', bottom: 0 }}
             animate={{ top: box.top + box.height }}
             transition={glide}
             onClick={finish}
           />
           <motion.div
-            style={{ position: 'fixed', left: 0, background: scrim }}
+            style={{ position: 'fixed', left: 0 }}
             animate={{ top: box.top, width: Math.max(0, box.left), height: box.height }}
             transition={glide}
             onClick={finish}
           />
           <motion.div
-            style={{ position: 'fixed', right: 0, background: scrim }}
+            style={{ position: 'fixed', right: 0 }}
             animate={{ top: box.top, left: box.left + box.width, height: box.height }}
             transition={glide}
             onClick={finish}
@@ -292,7 +355,7 @@ export default function DashboardTour() {
             style={{
               position: 'fixed',
               border: '2px solid var(--nav-accent)', borderRadius: 14, pointerEvents: 'none',
-              boxShadow: '0 0 0 4px rgba(91,76,224,0.25)',
+              boxShadow: `0 0 0 4px rgba(91,76,224,0.25), 0 0 0 9999px ${scrim}`,
             }}
             animate={{ top: box.top, left: box.left, width: box.width, height: box.height }}
             transition={glide}
@@ -318,16 +381,15 @@ export default function DashboardTour() {
         className="fixed"
         animate={{
           top: tipPos.top,
-          bottom: tipPos.bottom,
           left: tipPos.left,
           width: tipPos.width,
-          y: tipPos.y,
         }}
         transition={glide}
       >
         <AnimatePresence mode="popLayout" initial={false}>
           <motion.div
             key={i}
+            ref={tipRef}
             initial={reduce ? false : { opacity: 0, y: below ? -8 : 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={reduce ? { opacity: 0 } : { opacity: 0, y: below ? 8 : -8 }}
