@@ -594,6 +594,20 @@ export default function CreateInvoicePage() {
     }).select().single()
 
     if (error) {
+      // The database enforces the monthly limit too (trigger
+      // enforce_invoice_limit_trigger), because the check above runs in the
+      // browser and anyone holding their own session could go around it.
+      // When the backstop is what stopped us, say the same thing the
+      // browser check says instead of showing a Postgres message.
+      if (error.message.includes('invoice_limit_reached')) {
+        const limit = getActivePlan(profile).invoiceLimit ?? 0
+        alert(activePlan.plan === 'free' ? t.planLimitFreeMessage(limit)
+            : activePlan.isTrial ? t.planLimitTrialMessage(limit)
+            : t.planLimitBasicMessage(limit))
+        router.push('/upgrade')
+        setLoading(false)
+        return
+      }
       alert(t.errorPrefix(error.message))
       setLoading(false)
       return
