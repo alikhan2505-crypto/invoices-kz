@@ -17,6 +17,7 @@ const BASE = 'https://portal.kgd.gov.kz/services/isnaportalsync/public'
 export const KGD_TAXPAYER_URL = `${BASE}/taxpayer-data`
 export const KGD_VAT_URL = `${BASE}/search-payer-data`
 export const KGD_LIQUIDATION_URL = `${BASE}/find-liquidated-taxpayer`
+export const KGD_DEBT_URL = `${BASE}/tax-debt-info`
 // Note the host path: the unreliable-taxpayer search lives under
 // `isnaportal`, not `isnaportalsync` like everything else. Easy to miss and
 // it answers 404 if you assume otherwise.
@@ -147,4 +148,40 @@ export function parseLiquidation(payload: unknown): boolean | null {
   const content = (taxpayers as Record<string, unknown>).content
   if (!Array.isArray(content)) return null
   return content.length > 0
+}
+
+/**
+ * Tax arrears, in tenge.
+ *
+ * This is the one service that needs a second credential: a
+ * personalAccountToken, issued separately from the portal token. Despite the
+ * name it is not limited to the holder's own account — verified on
+ * 2026-09-11 against three unrelated taxpayers, so a seller really can check
+ * a counterparty before shipping.
+ *
+ * `totalArrear` aggregates everything; `totalTaxArrear` excludes pension,
+ * social and health contributions, which КГД accounts for separately. Both
+ * are kept: a debt made only of social contributions says something rather
+ * different about a company than unpaid tax.
+ *
+ * Returns null when nothing was learned, which the caller must not collapse
+ * into zero — "we did not ask" and "owes nothing" are different statements
+ * to put in front of someone deciding whether to ship goods.
+ */
+export interface KgdTaxDebt {
+  totalArrear: number
+  taxArrear: number
+}
+
+export function parseTaxDebt(payload: unknown): KgdTaxDebt | null {
+  if (!payload || typeof payload !== 'object') return null
+  const row = payload as Record<string, unknown>
+  const num = (v: unknown): number | null => {
+    if (typeof v === 'number' && Number.isFinite(v)) return v
+    if (typeof v === 'string' && v.trim() !== '' && Number.isFinite(Number(v))) return Number(v)
+    return null
+  }
+  const total = num(row.totalArrear)
+  if (total === null) return null
+  return { totalArrear: total, taxArrear: num(row.totalTaxArrear) ?? total }
 }

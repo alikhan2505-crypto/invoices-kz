@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseTaxpayer, parseVatStatus, parseUnreliable, parseLiquidation, KGD_TAXPAYER_TYPES } from './kgdTaxpayer'
+import { parseTaxpayer, parseVatStatus, parseUnreliable, parseLiquidation, parseTaxDebt, KGD_TAXPAYER_TYPES } from './kgdTaxpayer'
 
 // Both fixtures are verbatim from live calls on 2026-09-10.
 const ipResponse = {
@@ -126,5 +126,34 @@ describe('parseLiquidation', () => {
     expect(parseLiquidation({ taxpayers: {} })).toBeNull()
     expect(parseLiquidation({})).toBeNull()
     expect(parseLiquidation(null)).toBeNull()
+  })
+})
+
+describe('parseTaxDebt', () => {
+  it('reads a clean taxpayer', () => {
+    // Kaspi Bank, live on 2026-09-11.
+    expect(parseTaxDebt({
+      iinBin: '971240001315', totalArrear: 0, totalTaxArrear: 0,
+      pensionContributionArrear: 0, socialContributionArrear: 0, socialHealthInsuranceArrear: 0,
+    })).toEqual({ totalArrear: 0, taxArrear: 0 })
+  })
+
+  it('reads a real debt', () => {
+    // A sole proprietor in liquidation, live on the same day.
+    expect(parseTaxDebt({ totalArrear: 16015.86, totalTaxArrear: 16015.86 })).toEqual({
+      totalArrear: 16015.86, taxArrear: 16015.86,
+    })
+  })
+
+  it('falls back to the total when the tax-only figure is missing', () => {
+    expect(parseTaxDebt({ totalArrear: 500 })).toEqual({ totalArrear: 500, taxArrear: 500 })
+  })
+
+  it('returns null rather than zero when nothing was learned', () => {
+    // Zero means "owes nothing" and goes on screen as reassurance. A failed
+    // request must never be able to produce it.
+    expect(parseTaxDebt({ message: 'error.personal-account-token' })).toBeNull()
+    expect(parseTaxDebt(null)).toBeNull()
+    expect(parseTaxDebt('')).toBeNull()
   })
 })

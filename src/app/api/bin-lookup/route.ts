@@ -5,8 +5,8 @@ import {
   type BinLookupResult,
 } from '@/lib/binLookup'
 import {
-  parseTaxpayer, parseVatStatus, parseUnreliable, parseLiquidation,
-  KGD_TAXPAYER_URL, KGD_VAT_URL, KGD_UNRELIABLE_URL, KGD_LIQUIDATION_URL,
+  parseTaxpayer, parseVatStatus, parseUnreliable, parseLiquidation, parseTaxDebt,
+  KGD_TAXPAYER_URL, KGD_VAT_URL, KGD_UNRELIABLE_URL, KGD_LIQUIDATION_URL, KGD_DEBT_URL,
   KGD_TAXPAYER_TYPES,
 } from '@/lib/kgdTaxpayer'
 
@@ -105,9 +105,14 @@ async function lookUpVat(bin: string): Promise<{ isVatPayer: boolean; registered
  * the same data is behind a reCAPTCHA — put there precisely to stop
  * automated querying, so it is not ours to work around.
  */
-async function checkRisk(bin: string): Promise<{ unreliable: boolean | null; liquidating: boolean | null }> {
+async function checkRisk(bin: string): Promise<{
+  unreliable: boolean | null
+  liquidating: boolean | null
+  totalArrear: number | null
+  taxArrear: number | null
+}> {
   const token = process.env.KGD_PORTAL_TOKEN
-  if (!token) return { unreliable: null, liquidating: null }
+  if (!token) return { unreliable: null, liquidating: null, totalArrear: null, taxArrear: null }
   const headers = { 'X-Portal-Token': token }
 
   const unreliable = (async () => {
@@ -140,8 +145,31 @@ async function checkRisk(bin: string): Promise<{ unreliable: boolean | null; liq
     }
   })()
 
-  const [u, l] = await Promise.all([unreliable, liquidating])
-  return { unreliable: u, liquidating: l }
+  // Tax arrears need a second credential of their own: personalAccountToken,
+  // issued separately. Despite the name it is not limited to our own
+  // account -- verified against three unrelated taxpayers -- so this really
+  // does answer "does my counterparty owe the state anything".
+  const debt = (async () => {
+    const accountToken = process.env.KGD_PERSONAL_ACCOUNT_TOKEN
+    if (!accountToken) return null
+    try {
+      const url = `${KGD_DEBT_URL}?taxpayerCode=${encodeURIComponent(bin)}&personalAccountToken=${encodeURIComponent(accountToken)}`
+      const res = await fetch(url, { headers, signal: AbortSignal.timeout(12_000) })
+      if (!res.ok) return null
+      return parseTaxDebt(await res.json())
+    } catch (e) {
+      console.error('bin-lookup: КГД debt check failed:', e instanceof Error ? e.message : e)
+      return null
+    }
+  })()
+
+  const [u, l, d] = await Promise.all([unreliable, liquidating, debt])
+  return {
+    unreliable: u,
+    liquidating: l,
+    totalArrear: d ? d.totalArrear : null,
+    taxArrear: d ? d.taxArrear : null,
+  }
 }
 
 // Looks a counterparty up by БИН across both state registers.
@@ -184,6 +212,8 @@ export async function GET(req: NextRequest) {
       vatRegisteredAt: cached.vat_registered_at,
       isUnreliable: cached.is_unreliable,
       isLiquidating: cached.is_liquidating,
+      totalArrear: cached.total_arrear,
+      taxArrear: cached.tax_arrear,
     }
 
     // A fresh row can still be missing its VAT status: it was cached before
@@ -208,8 +238,12 @@ export async function GET(req: NextRequest) {
       if (risk) {
         company.isUnreliable = risk.unreliable
         company.isLiquidating = risk.liquidating
+        company.totalArrear = risk.totalArrear
+        company.taxArrear = risk.taxArrear
         patch.is_unreliable = risk.unreliable
         patch.is_liquidating = risk.liquidating
+        patch.total_arrear = risk.totalArrear
+        patch.tax_arrear = risk.taxArrear
       }
       if (Object.keys(patch).length > 0) {
         const { error } = await supabase.from('bin_lookup_cache').update(patch).eq('bin', bin)
@@ -237,6 +271,8 @@ export async function GET(req: NextRequest) {
   }
   company.isUnreliable = risk.unreliable
   company.isLiquidating = risk.liquidating
+  company.totalArrear = risk.totalArrear
+  company.taxArrear = risk.taxArrear
 
   const { error: cacheError } = await supabase.from('bin_lookup_cache').upsert({
     bin: company.bin,
@@ -251,6 +287,8 @@ export async function GET(req: NextRequest) {
     vat_registered_at: company.vatRegisteredAt,
     is_unreliable: company.isUnreliable,
     is_liquidating: company.isLiquidating,
+    total_arrear: company.totalArrear,
+    tax_arrear: company.taxArrear,
     fetched_at: new Date().toISOString(),
   }, { onConflict: 'bin' })
   // A cache miss costs a request next time; not worth failing the lookup

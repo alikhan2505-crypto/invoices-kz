@@ -39,6 +39,9 @@ export interface BinLookupResult {
   /** КГД risk signals. null = not checked, false = checked and clean. */
   isUnreliable: boolean | null
   isLiquidating: boolean | null
+  /** Tax arrears in tenge. null = not checked; 0 = checked, owes nothing. */
+  totalArrear: number | null
+  taxArrear: number | null
 }
 
 /** One row of the gbd_ul dataset, as the API returns it. */
@@ -135,6 +138,8 @@ export function toLookupResult(bin: string, records: EgovUlRecord[]): BinLookupR
     vatRegisteredAt: null,
     isUnreliable: null,
     isLiquidating: null,
+    totalArrear: null,
+    taxArrear: null,
   }
 }
 
@@ -162,6 +167,8 @@ export function fromKgdTaxpayer(
     vatRegisteredAt: null,
     isUnreliable: null,
     isLiquidating: null,
+    totalArrear: null,
+    taxArrear: null,
   }
 }
 

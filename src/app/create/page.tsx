@@ -960,6 +960,19 @@ export default function CreateInvoicePage() {
                             {binLookup.company?.isLiquidating === true && (
                               <div className="font-medium" style={{ color: 'var(--nav-danger, #ef4444)' }}>{t.binLookupLiquidating}</div>
                             )}
+                            {/* Zero is worth saying out loud -- it is the
+                                reassurance a seller is looking for before
+                                shipping. null stays silent: "we did not ask"
+                                must not look like "owes nothing". */}
+                            {typeof binLookup.company?.totalArrear === 'number' && (
+                              binLookup.company.totalArrear > 0 ? (
+                                <div className="font-medium" style={{ color: 'var(--nav-danger, #ef4444)' }}>
+                                  {t.binLookupTaxDebt(binLookup.company.totalArrear.toLocaleString('ru-KZ', { maximumFractionDigits: 2 }))}
+                                </div>
+                              ) : (
+                                <div style={{ color: 'var(--nav-text-secondary)' }}>{t.binLookupNoTaxDebt}</div>
+                              )
+                            )}
                             {/* VAT status decides whether this invoice may
                                 carry НДС at all, so it is stated plainly.
                                 Only when КГД actually answered: null means

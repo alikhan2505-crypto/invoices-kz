@@ -17,6 +17,8 @@ export interface InvoiceFlowContent {
   binLookupVatNo: string
   binLookupUnreliable: string
   binLookupLiquidating: string
+  binLookupTaxDebt: (amount: string) => string
+  binLookupNoTaxDebt: string
   binLookupSourceKgd: string
   binLookupNotFound: string
   binLookupSource: string
@@ -231,6 +233,8 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     binLookupVatNo: 'Не плательщик НДС',
     binLookupUnreliable: '⚠️ Числится в списке неблагонадёжных налогоплательщиков КГД',
     binLookupLiquidating: '⚠️ Находится на стадии ликвидации по данным КГД',
+    binLookupTaxDebt: (amount: string) => `⚠️ Налоговая задолженность по данным КГД: ${amount} ₸`,
+    binLookupNoTaxDebt: 'Налоговой задолженности нет',
     binLookupFound: (name: string, status: string | null) => status ? `${name} · ${status}` : name,
     binIinPlaceholder: '123456789012',
     emailLabel: 'Email',
@@ -449,6 +453,8 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     binLookupVatNo: 'ҚҚС төлеуші емес',
     binLookupUnreliable: '⚠️ МКК-нің сенімсіз салық төлеушілер тізімінде тұр',
     binLookupLiquidating: '⚠️ МКК деректері бойынша тарату сатысында',
+    binLookupTaxDebt: (amount: string) => `⚠️ МКК деректері бойынша салық берешегі: ${amount} ₸`,
+    binLookupNoTaxDebt: 'Салық берешегі жоқ',
     binLookupFound: (name: string, status: string | null) => status ? `${name} · ${status}` : name,
     binIinPlaceholder: '123456789012',
     emailLabel: 'Email',
@@ -667,6 +673,8 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     binLookupVatNo: 'Not registered for VAT',
     binLookupUnreliable: '⚠️ Listed as an unreliable taxpayer by the State Revenue Committee',
     binLookupLiquidating: '⚠️ In liquidation according to the State Revenue Committee',
+    binLookupTaxDebt: (amount: string) => `⚠️ Tax arrears per the State Revenue Committee: ${amount} ₸`,
+    binLookupNoTaxDebt: 'No tax arrears',
     binLookupFound: (name: string, status: string | null) => status ? `${name} · ${status}` : name,
     binIinPlaceholder: '123456789012',
     emailLabel: 'Email',
