@@ -3,14 +3,14 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { startAuthentication } from '@simplewebauthn/browser'
 import { supabase } from '@/lib/supabase'
-import { useLanguage } from '@/components/LanguageProvider'
+import { useLanguage, type Lang } from '@/components/LanguageProvider'
 import { authDict } from '@/lib/i18n/auth'
 import { hasPendingUpgrade } from '@/lib/pendingUpgrade'
 import { consumePostLoginRedirect } from '@/lib/postLoginRedirect'
 
 export default function Login() {
   const router = useRouter()
-  const { lang } = useLanguage()
+  const { lang, setLang } = useLanguage()
   const t = authDict[lang]
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)
@@ -133,6 +133,24 @@ export default function Login() {
   return (
     <main className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl p-8 w-full max-w-sm shadow-sm">
+        {/* A language switcher here because this page can be arrived at
+            directly -- from a bookmark or the sign-in link in an email --
+            and until now there was no way to change language once you had. */}
+        <div className="flex justify-end mb-3">
+          <div className="flex rounded-full p-0.5 bg-gray-100">
+            {(['ru', 'kk', 'en'] as Lang[]).map(l => (
+              <button
+                key={l}
+                onClick={() => setLang(l)}
+                aria-pressed={lang === l}
+                className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase transition-colors ${
+                  lang === l ? 'bg-[#1C2056] text-white' : 'text-gray-500'
+                }`}>
+                {l === 'kk' ? 'ҚЗ' : l}
+              </button>
+            ))}
+          </div>
+        </div>
         <h1 className="text-2xl font-bold text-[#1C2056] mb-1">INVOICES.KZ</h1>
         <p className="text-gray-500 text-sm mb-8">{t.loginSubtitle}</p>
 
@@ -182,6 +200,11 @@ export default function Login() {
               className="w-full bg-[#2DC48D] text-white rounded-xl py-4 font-medium text-sm">
               {loading ? t.sendingButton : t.sendLinkButton}
             </button>
+            {/* Everything on this screen says "Войти", but people arrive
+                here from a button that says "Начать бесплатно" — and there
+                is no separate sign-up anywhere. Someone without an account
+                had every reason to think they were in the wrong place. */}
+            <p className="text-xs text-gray-400 mt-4 text-center leading-relaxed">{t.noAccountHint}</p>
           </>
         ) : (
           <div className="text-center">

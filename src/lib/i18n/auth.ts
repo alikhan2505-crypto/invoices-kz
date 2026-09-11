@@ -3,6 +3,7 @@ type AccountType = 'ИП' | 'ТОО' | 'Физлицо'
 export interface AuthContent {
   // login/page.tsx
   loginSubtitle: string
+  noAccountHint: string
   passkeyLoginButton: string
   googleSignInButton: string
   facebookSignInButton: string
@@ -74,7 +75,8 @@ export interface AuthContent {
 
 export const authDict: Record<'ru' | 'kk' | 'en', AuthContent> = {
   ru: {
-    loginSubtitle: 'Создавайте счета за 1 минуту',
+    loginSubtitle: 'Вход и регистрация — одно и то же',
+    noAccountHint: 'Аккаунта ещё нет? Просто введите почту — мы создадим его сами, пароль придумывать не нужно.',
     passkeyLoginButton: 'Войти по Face ID / Touch ID',
     googleSignInButton: 'Войти через Google',
     facebookSignInButton: 'Войти через Facebook',
@@ -144,7 +146,8 @@ export const authDict: Record<'ru' | 'kk' | 'en', AuthContent> = {
     loggingInMessage: 'Входим в систему...',
   },
   kk: {
-    loginSubtitle: 'Шоттарды 1 минутта жасаңыз',
+    loginSubtitle: 'Кіру мен тіркелу — бір нәрсе',
+    noAccountHint: 'Аккаунтыңыз жоқ па? Поштаңызды енгізіңіз — біз оны өзіміз жасаймыз, құпия сөз ойлап табудың қажеті жоқ.',
     passkeyLoginButton: 'Face ID / Touch ID арқылы кіру',
     googleSignInButton: 'Google арқылы кіру',
     facebookSignInButton: 'Facebook арқылы кіру',
@@ -215,7 +218,8 @@ export const authDict: Record<'ru' | 'kk' | 'en', AuthContent> = {
     loggingInMessage: 'Жүйеге кіру...',
   },
   en: {
-    loginSubtitle: 'Create invoices in 1 minute',
+    loginSubtitle: 'Signing in and signing up are the same thing',
+    noAccountHint: 'No account yet? Just enter your email — we create one for you, and there is no password to invent.',
     passkeyLoginButton: 'Sign in with Face ID / Touch ID',
     googleSignInButton: 'Sign in with Google',
     facebookSignInButton: 'Sign in with Facebook',
