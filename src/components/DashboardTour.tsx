@@ -187,10 +187,22 @@ export default function DashboardTour() {
   // it. A plain effect keyed on [i, vw] would miss width-driven reflow that
   // doesn't happen to land in the same render (e.g. a resize while the tour
   // is open), so this observes the node directly instead.
+  //
+  // Read the height from getBoundingClientRect(), not the callback's own
+  // `entry.contentRect.height` -- contentRect is the CSS content box only,
+  // excluding padding and border regardless of the element's own
+  // box-sizing. This card has `p-4` padding (32px vertical) and a 1px
+  // border from .nav-glass, so contentRect understated its true rendered
+  // height by ~34px every time. That's exactly a fixed-size version of the
+  // bug this component keeps fighting: "above" placement subtracts this
+  // height from the highlight's top edge, so an understated height computed
+  // a `top` that was ~34px too low, and the card's actual (correctly-sized)
+  // bottom edge landed that far into the highlighted element -- reported
+  // live as the tooltip overlapping the very thing it points at.
   useEffect(() => {
     if (!open || !tipRef.current) return
     const el = tipRef.current
-    const ro = new ResizeObserver(([entry]) => setTipHeight(entry.contentRect.height))
+    const ro = new ResizeObserver(() => setTipHeight(el.getBoundingClientRect().height))
     ro.observe(el)
     return () => ro.disconnect()
   }, [open, i])
