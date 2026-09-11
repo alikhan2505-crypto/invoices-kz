@@ -104,11 +104,54 @@ export default function CreateInvoicePage() {
   const [clientBin, setClientBin] = useState('')
   const { binLookup, lookupBin, resetBinLookup } = useBinLookup()
 
-  /** Fills the empty fields from a registry answer. */
-  function applyCompany(company: { name: string; address: string | null } | null) {
+  // The БИН these client fields currently describe. Empty when they were
+  // typed by hand rather than filled from a lookup.
+  const appliedBinRef = useRef('')
+
+  /**
+   * Clears the client fields, because the БИН they belong to has changed.
+   *
+   * Without this the form quietly mixed two counterparties: fill in one
+   * company, type a different БИН, and the register's answer was ignored --
+   * the fill-only-empty rule saw a name already there and left the previous
+   * company's name sitting under the new number. Nothing on screen said the
+   * two disagreed.
+   *
+   * Only fields that a lookup had filled are cleared. Anything typed by hand
+   * is left alone: appliedBinRef is empty in that case, and wiping someone's
+   * own typing because they corrected a digit would be worse than the bug.
+   */
+  function clearClientFields() {
+    if (!appliedBinRef.current) return
+    appliedBinRef.current = ''
+    setClientName('')
+    setClientAddress('')
+    setClientEmail('')
+    setClientPhone('')
+  }
+
+  /**
+   * Fills the client fields from a registry answer, overwriting.
+   *
+   * For the button only. Pressing «Проверить» is an explicit request for
+   * what the state says, so it wins over whatever is in the fields —
+   * including a name typed by hand, which is exactly what someone pressing
+   * it is asking to replace.
+   */
+  function applyCompanyOverwrite(bin: string, company: { name: string; address: string | null } | null) {
     if (!company) return
-    // Only empty fields. Overwriting a name the user already typed would be
-    // the app arguing with them about their own customer.
+    appliedBinRef.current = bin
+    setClientName(company.name)
+    setClientAddress(company.address || '')
+  }
+
+  /** Fills the client fields from a registry answer. */
+  function applyCompany(bin: string, company: { name: string; address: string | null } | null) {
+    if (!company) return
+    appliedBinRef.current = bin
+    // Still fill-only-empty, but the fields were just cleared for a new БИН,
+    // so in practice this writes -- while a name the user typed themselves
+    // survives, which is the case the rule was written for.
     setClientName(prev => prev.trim() ? prev : company.name)
     setClientAddress(prev => prev.trim() ? prev : (company.address || ''))
   }
@@ -858,6 +901,9 @@ export default function CreateInvoicePage() {
                       onChange={async e => {
                         const bin = e.target.value
                         setClientBin(bin)
+                        // The number in the box no longer matches the data
+                        // below it, so the data goes.
+                        if (bin !== appliedBinRef.current) clearClientFields()
                         if (bin.length !== 12) {
                           resetBinLookup()
                           return
@@ -867,6 +913,7 @@ export default function CreateInvoicePage() {
                           // The user's own saved client wins over the state
                           // register: they have already corrected it to how
                           // they want it printed.
+                          appliedBinRef.current = bin
                           setClientName(found.name)
                           setClientEmail(found.email || '')
                           setClientAddress(found.address || '')
@@ -874,7 +921,7 @@ export default function CreateInvoicePage() {
                           resetBinLookup()
                           return
                         }
-                        applyCompany(await lookupBin(bin))
+                        applyCompany(bin, await lookupBin(bin))
                       }} />
                     {/* The lookup already fires on the twelfth digit, so this
                         is not the only way in. It exists so the capability is
@@ -882,7 +929,7 @@ export default function CreateInvoicePage() {
                         try -- `force` re-asks a БИН we remember requesting. */}
                     <button
                       type="button"
-                      onClick={async () => applyCompany(await lookupBin(clientBin, { force: true }))}
+                      onClick={async () => applyCompanyOverwrite(clientBin, await lookupBin(clientBin, { force: true }))}
                       disabled={clientBin.replace(/\D/g, '').length !== 12 || binLookup.status === 'loading'}
                       className="px-3 rounded-lg text-sm font-medium flex-shrink-0 disabled:opacity-40 transition-colors"
                       style={{ background: 'var(--nav-surface-glass)', color: 'var(--nav-accent)' }}>
