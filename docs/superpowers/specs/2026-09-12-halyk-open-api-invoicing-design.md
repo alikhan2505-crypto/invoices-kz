@@ -53,6 +53,6 @@ Once real API access exists, this follows the same test shape as `kaspiPay`: uni
 
 ## What happens next
 
-1. Founder completes Phase 0 (register, request ISV-level sandbox access).
+1. Founder completes Phase 0 (register, request ISV-level sandbox access). **Done 2026-09-12**: заявка отправлена через форму на `halykbank.kz/business/other/halyk-open-api`, цель подключения — «Выставление счетов и приём оплаты (Invoicing)», контактная почта `mail@invoices.kz` (форвардится и основателю, и на `otvet@zenesyon.resend.app`, так что ответ Halyk можно прочитать программно через тот же Resend-пайплайн, что и клиентские ответы). Ждём реакции банка.
 2. Once real API docs/sandbox credentials exist, this spec's architecture section is revisited for any real-world corrections (exact field names, whether a real webhook exists, exact OAuth scopes) — then `writing-plans` produces the actual task-by-task implementation plan.
 3. Until then, this work is blocked, exactly like the BCC v2 statement integration is currently blocked on BCC's own Dev→Production approval — not a reason to stall other founder-approved work in the meantime.
