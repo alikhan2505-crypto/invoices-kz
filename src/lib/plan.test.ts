@@ -86,4 +86,10 @@ describe('getActivePlan', () => {
     expect(getActivePlan({ trial_expires_at: future }).canKaspiShop).toBe(false)
     expect(getActivePlan(null).canKaspiShop).toBe(false)
   })
+
+  it('grants canEsf only on an active pro plan', () => {
+    expect(getActivePlan({ plan: 'pro' }).canEsf).toBe(true)
+    expect(getActivePlan({ plan: 'basic' }).canEsf).toBe(false)
+    expect(getActivePlan({}).canEsf).toBe(false)
+  })
 })
