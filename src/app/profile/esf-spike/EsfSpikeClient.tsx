@@ -60,9 +60,15 @@ export default function EsfSpikeClient() {
       {qr?.qrImage && <img src={qr.qrImage} alt="QR" style={{ marginTop: 16, width: 240 }} />}
       {qr?.mobileLink && <p><a href={qr.mobileLink}>Открыть в eGov mobile (если сканируете с того же телефона)</a></p>}
       {signature && (
-        <p style={{ wordBreak: 'break-all' }}>
-          Подпись получена ({signature.length} символов base64): {signature.slice(0, 80)}...
-        </p>
+        <div style={{ marginTop: 12 }}>
+          <p>Подпись получена ({signature.length} символов base64). Скопируйте всё содержимое ниже и пришлите:</p>
+          <textarea
+            readOnly
+            value={signature}
+            onFocus={e => e.currentTarget.select()}
+            style={{ width: '100%', height: 160, fontSize: 11, wordBreak: 'break-all' }}
+          />
+        </div>
       )}
       {error && <p style={{ color: 'red' }}>Ошибка: {error}</p>}
     </div>
