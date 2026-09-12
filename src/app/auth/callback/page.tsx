@@ -215,7 +215,10 @@ export default function AuthCallback() {
                 'Authorization': `Bearer ${session.access_token}`,
               },
               body: JSON.stringify({
-                message: `🆕 <b>Новый пользователь!</b>\n📧 ${session.user.email}${refCode ? '\n🎁 Реферал: ' + refCode : ''}${promoCode ? '\n🏷 Промокод: ' + promoCode : ''}`,
+                event: 'signup',
+                email: session.user.email,
+                refCode: refCode || undefined,
+                promoCode: promoCode || undefined,
               }),
             })
           } catch {}

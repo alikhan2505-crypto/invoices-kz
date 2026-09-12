@@ -198,7 +198,9 @@ export default function Admin() {
           'Authorization': `Bearer ${session?.access_token}`,
         },
         body: JSON.stringify({
-          message: `🎉 <b>Тариф активирован!</b>\n📱 ${payment.email}\n📦 ${payment.plan === 'pro' ? 'Про' : 'Базовый'} тариф активирован`
+          event: 'plan_activated',
+          email: payment.email,
+          plan: payment.plan,
         })
       })
     } catch {}

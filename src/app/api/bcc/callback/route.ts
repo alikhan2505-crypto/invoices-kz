@@ -2,6 +2,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { verifyState } from '@/lib/bccState'
 import { getBccAppToken, BCC_AUTH_CLIENT_BASE, BCC_BUSINESS_ACCOUNT_BASE } from '@/lib/bccAuth'
+import { encryptAtRest } from '@/lib/kaspiPay/crypto'
+
+// A dedicated key, separate from the other integrations' encryption keys
+// (see wildberries/connection.ts) -- one key compromised should not expose
+// every connected bank/marketplace credential in this database.
+function getBccKey(): string {
+  const key = process.env.BCC_ENCRYPTION_KEY
+  if (!key) throw new Error('BCC_ENCRYPTION_KEY is not configured')
+  return key
+}
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -63,8 +73,8 @@ export async function GET(req: NextRequest) {
       user_id: verified.userId,
       iban: account.iban,
       currency: account.currency,
-      access_token,
-      refresh_token,
+      access_token: encryptAtRest(access_token, getBccKey()),
+      refresh_token: encryptAtRest(refresh_token, getBccKey()),
       expires_at: expiresAt,
       status: 'active',
       last_checked_at: new Date().toISOString(),

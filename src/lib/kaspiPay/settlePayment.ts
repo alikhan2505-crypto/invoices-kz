@@ -163,11 +163,24 @@ export async function checkAndSettleKaspiPayment(
         amount: reqRow.amount,
         operation_id: reqRow.kaspi_operation_id,
       })
+      // redirect: 'manual' is load-bearing, not incidental. isSafeWebhookUrl
+      // only validates callback_url itself; the customer's own server can
+      // answer this POST with a 3xx to a private/metadata address, and the
+      // default redirect:'follow' would have this backend fetch THAT target
+      // next with no safety check at all -- a deterministic SSRF, not just
+      // the DNS-rebind timing race this fetch is otherwise exposed to.
       await fetch(reqRow.callback_url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Kaspi-Pay-Signature': signWebhookPayload(payload, secret) },
         body: payload,
         signal: AbortSignal.timeout(5000),
+        redirect: 'manual',
+      }).then((res) => {
+        if (res.type === 'opaqueredirect' || (res.status >= 300 && res.status < 400)) {
+          console.error('Kaspi webhook skipped for', reqRow.id, '— callback_url returned a redirect, refusing to follow it')
+        } else if (!res.ok) {
+          console.error('Kaspi webhook delivery failed for', reqRow.id, 'status', res.status)
+        }
       }).catch((e) => console.error('Kaspi webhook delivery failed for', reqRow.id, e.message))
     }
   }

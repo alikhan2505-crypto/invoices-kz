@@ -5,6 +5,13 @@ import { findMatches, OpenInvoice } from '@/lib/acquiringMatch'
 import { mapBccTransactions } from '@/lib/bccStatement'
 import { getBccAppToken, BCC_AUTH_CLIENT_BASE, BCC_BUSINESS_ACCOUNT_BASE } from '@/lib/bccAuth'
 import { getActivePlan } from '@/lib/plan'
+import { encryptAtRest, decryptAtRest } from '@/lib/kaspiPay/crypto'
+
+function getBccKey(): string {
+  const key = process.env.BCC_ENCRYPTION_KEY
+  if (!key) throw new Error('BCC_ENCRYPTION_KEY is not configured')
+  return key
+}
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -95,13 +102,14 @@ export async function GET(request: Request) {
       if (profileError) console.error('BCC cron: profile fetch failed for connection', conn.id, profileError.message)
       if (!getActivePlan(ownerProfile).canAcquiring) continue
 
-      let clientToken = conn.access_token
+      let clientToken = decryptAtRest(conn.access_token, getBccKey()).toString('utf8')
       if (new Date(conn.expires_at) <= new Date()) {
-        const refreshed = await refreshAccessToken(appToken, conn.refresh_token)
+        const refreshToken = decryptAtRest(conn.refresh_token, getBccKey()).toString('utf8')
+        const refreshed = await refreshAccessToken(appToken, refreshToken)
         clientToken = refreshed.access_token
         await supabase.from('bcc_connections').update({
-          access_token: refreshed.access_token,
-          refresh_token: refreshed.refresh_token,
+          access_token: encryptAtRest(refreshed.access_token, getBccKey()),
+          refresh_token: encryptAtRest(refreshed.refresh_token, getBccKey()),
           expires_at: new Date(Date.now() + refreshed.expires_in * 1000).toISOString(),
         }).eq('id', conn.id)
       }
