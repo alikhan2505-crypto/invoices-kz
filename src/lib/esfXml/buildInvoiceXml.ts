@@ -43,10 +43,20 @@ function money(n: number): string {
   return n.toFixed(2)
 }
 
+function round2(n: number): number {
+  return Math.round(n * 100) / 100
+}
+
 function buildLine(line: EsfInvoiceInput['lines'][number]) {
-  const priceWithoutTax = line.quantity * line.unitPrice
-  const ndsAmount = priceWithoutTax * (line.ndsRate / 100)
-  const priceWithTax = priceWithoutTax + ndsAmount
+  const rawPriceWithoutTax = line.quantity * line.unitPrice
+  const rawNdsAmount = rawPriceWithoutTax * (line.ndsRate / 100)
+  // Round each displayed money value first, then derive priceWithTax from the
+  // already-rounded parts. This guarantees a single line's three fields tie
+  // out exactly, and (since totals below sum these same rounded numbers)
+  // that productSet totals always equal the sum of the visible line items.
+  const priceWithoutTax = round2(rawPriceWithoutTax)
+  const ndsAmount = round2(rawNdsAmount)
+  const priceWithTax = round2(priceWithoutTax + ndsAmount)
   return {
     xml: `
                     <product>
