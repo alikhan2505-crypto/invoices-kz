@@ -14,7 +14,7 @@ function baseUrl(): string {
 
 function extractTag(xml: string, tag: string): string | null {
   const match = xml.match(new RegExp(`<(?:\\w+:)?${tag}>([^<]*)</(?:\\w+:)?${tag}>`))
-  return match ? match[1] : null
+  return match ? match[1].trim() : null
 }
 
 async function soapCall(service: string, action: string, bodyXml: string, headerXml = ''): Promise<string> {
@@ -85,17 +85,30 @@ export async function syncInvoice(
     </esf:syncInvoiceRequest>`
   const responseXml = await soapCall('UploadInvoiceService', 'syncInvoice', bodyXml)
 
-  const acceptedMatch = responseXml.match(/<acceptedSet>[\s\S]*?<standardResponse>[\s\S]*?<\/standardResponse>[\s\S]*?<\/acceptedSet>/)
+  // Per the real UploadInvoiceService.wsdl (SyncInvoiceResponse / StandardResponse
+  // complex types), acceptedSet and declinedSet both hold the SAME element,
+  // <standardResponse>, of type StandardResponse -- there is no separate
+  // <declinedResponse> element. A StandardResponse always carries <num> (and
+  // <date>); it carries <id> only once the ЭСФ is registered (accepted), and
+  // carries an <errors><error>...</error></errors> list only when declined for
+  // ФЛК validation errors, each <error> having <property>, <errorCode>, <text>.
+  const acceptedMatch = responseXml.match(/<(?:\w+:)?acceptedSet>[\s\S]*?<(?:\w+:)?standardResponse>[\s\S]*?<\/(?:\w+:)?standardResponse>[\s\S]*?<\/(?:\w+:)?acceptedSet>/)
   if (acceptedMatch) {
     const registrationId = extractTag(acceptedMatch[0], 'id')
     const num = extractTag(acceptedMatch[0], 'num')
     if (registrationId && num) return { accepted: true, registrationId, num }
   }
 
-  const declinedMatch = responseXml.match(/<declinedSet>[\s\S]*?<declinedResponse>[\s\S]*?<\/declinedResponse>[\s\S]*?<\/declinedSet>/)
+  const declinedMatch = responseXml.match(/<(?:\w+:)?declinedSet>[\s\S]*?<(?:\w+:)?standardResponse>[\s\S]*?<\/(?:\w+:)?standardResponse>[\s\S]*?<\/(?:\w+:)?declinedSet>/)
   if (declinedMatch) {
-    const errorCode = extractTag(declinedMatch[0], 'errorCode') || 'UNKNOWN'
-    const errorDescription = extractTag(declinedMatch[0], 'errorDescription') || responseXml.slice(0, 500)
+    const errorBlocks = declinedMatch[0].match(/<(?:\w+:)?error>[\s\S]*?<\/(?:\w+:)?error>/g) || []
+    const errorCode = (errorBlocks[0] && extractTag(errorBlocks[0], 'errorCode')) || 'UNKNOWN'
+    // StandardResponse.errors can carry multiple <error> entries (one per failed
+    // ФЛК validation rule); EsfSyncResult only has room for one description
+    // string, so join every error's <text> into one semicolon-separated message
+    // rather than dropping all but the first.
+    const errorTexts = errorBlocks.map((block) => extractTag(block, 'text')).filter((text): text is string => !!text)
+    const errorDescription = errorTexts.length > 0 ? errorTexts.join('; ') : responseXml.slice(0, 500)
     return { accepted: false, errorCode, errorDescription }
   }
 
