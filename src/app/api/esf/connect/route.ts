@@ -7,12 +7,16 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
+const supabaseAuth = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 export async function POST(req: NextRequest) {
-  const authHeader = req.headers.get('authorization')
-  const token = authHeader?.replace('Bearer ', '')
-  if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const { data: { user } } = await supabase.auth.getUser(token)
+  const accessToken = req.headers.get('authorization')?.replace('Bearer ', '')
+  const { data: { user } } = accessToken
+    ? await supabaseAuth.auth.getUser(accessToken)
+    : { data: { user: null } }
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { data: profile } = await supabase.from('profiles').select('plan, plan_expires_at, bonus_expires_at, trial_expires_at').eq('id', user.id).maybeSingle()
