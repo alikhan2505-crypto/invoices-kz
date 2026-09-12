@@ -61,23 +61,39 @@ export async function POST(req: NextRequest) {
     let updated = 0
     let updateFailed = 0
     let unmatched = 0
-    for (const oc of body.offerCounts as OfferCount[]) {
-      if (!oc?.sku || typeof oc.sellersCount !== 'number' || oc.sellersCount < 0) { updateFailed++; continue }
-      // .select('sku') so a 0-row match is visible -- supabase-js reports
-      // no error on updates that matched nothing.
-      const { data: updatedRows, error } = await supabase
-        .from('kaspi_shop_niche_product_snapshots')
-        .update({ sellers_count: Math.floor(oc.sellersCount) })
-        .eq('sku', String(oc.sku))
-        .eq('snapshot_date', snapshotDate)
-        .select('sku')
-      if (error) {
-        console.error(`kaspi-shop niche-trends deliver: sellers update failed for sku=${oc.sku}:`, error.message)
-        updateFailed++
-      } else if (!updatedRows || updatedRows.length === 0) {
-        unmatched++
-      } else {
-        updated++
+
+    // One row per SKU+date, each independent -- safe to run concurrently.
+    // Running these 150 updates sequentially (one Supabase round-trip
+    // each) was marginal against the 60s maxDuration budget and started
+    // intermittently timing out the whole request (killing the retention
+    // delete below along with it). A bounded-concurrency batch keeps the
+    // same per-row error handling while cutting wall-clock time roughly
+    // by the concurrency factor.
+    const UPDATE_CONCURRENCY = 20
+    const offerCounts = body.offerCounts as OfferCount[]
+    for (let i = 0; i < offerCounts.length; i += UPDATE_CONCURRENCY) {
+      const batch = offerCounts.slice(i, i + UPDATE_CONCURRENCY)
+      const results = await Promise.all(batch.map(async oc => {
+        if (!oc?.sku || typeof oc.sellersCount !== 'number' || oc.sellersCount < 0) return 'failed' as const
+        // .select('sku') so a 0-row match is visible -- supabase-js reports
+        // no error on updates that matched nothing.
+        const { data: updatedRows, error } = await supabase
+          .from('kaspi_shop_niche_product_snapshots')
+          .update({ sellers_count: Math.floor(oc.sellersCount) })
+          .eq('sku', String(oc.sku))
+          .eq('snapshot_date', snapshotDate)
+          .select('sku')
+        if (error) {
+          console.error(`kaspi-shop niche-trends deliver: sellers update failed for sku=${oc.sku}:`, error.message)
+          return 'failed' as const
+        }
+        if (!updatedRows || updatedRows.length === 0) return 'unmatched' as const
+        return 'updated' as const
+      }))
+      for (const r of results) {
+        if (r === 'failed') updateFailed++
+        else if (r === 'unmatched') unmatched++
+        else updated++
       }
     }
     if (unmatched > 0) {
