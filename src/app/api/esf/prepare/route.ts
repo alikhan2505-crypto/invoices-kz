@@ -44,5 +44,13 @@ export async function POST(req: NextRequest) {
   }
   if (!isVatPayer) return NextResponse.json({ error: 'Покупатель не отмечен как плательщик НДС', errorCode: 'not_vat_payer' }, { status: 400 })
 
-  return NextResponse.json({ invoiceXml: buildInvoiceXml(built.input) })
+  // date/turnoverDate are returned here so /api/esf/submit can rebuild the
+  // byte-identical XML later instead of recomputing `new Date()` itself --
+  // see buildEsfInvoiceInputForInvoice's dateOverride comment for why (the
+  // live signing ceremony in between can straddle midnight).
+  return NextResponse.json({
+    invoiceXml: buildInvoiceXml(built.input),
+    date: built.input.date,
+    turnoverDate: built.input.turnoverDate,
+  })
 }

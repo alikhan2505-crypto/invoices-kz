@@ -35,15 +35,24 @@ export async function POST(req: NextRequest) {
   const invoiceId = body?.invoiceId
   const cmsSignatureBase64 = body?.cmsSignatureBase64 // the raw runSigexQrSigning() output over the exact XML /api/esf/prepare returned -- signature + signing certificate both get extracted from this single blob below
   const lines = body?.lines // same lines the browser sent to /api/esf/prepare -- rebuilding from them here (not trusting a client-echoed XML string) is what makes the two-step flow safe
+  const date = body?.date // the exact date/turnoverDate string /api/esf/prepare computed and returned -- reused verbatim (not recomputed via `new Date()`) so the XML rebuilt here is byte-identical to what was actually signed, even if the live signing ceremony straddled midnight
   if (!invoiceId || !cmsSignatureBase64 || !Array.isArray(lines) || lines.length === 0) {
     return NextResponse.json({ error: 'invoiceId, cmsSignatureBase64, lines обязательны', errorCode: 'missing_fields' }, { status: 400 })
+  }
+  // date now comes from the client (echoing back what /api/esf/prepare gave
+  // it), and buildInvoiceXml interpolates it into <date>/<turnoverDate>
+  // unescaped -- so it's validated strictly as DD.MM.YYYY rather than passed
+  // through, closing off XML injection via this field. undefined is allowed
+  // (falls back to buildEsfInvoiceInputForInvoice computing a fresh date).
+  if (date !== undefined && (typeof date !== 'string' || !/^\d{2}\.\d{2}\.\d{4}$/.test(date))) {
+    return NextResponse.json({ error: 'Некорректный формат date', errorCode: 'invalid_date' }, { status: 400 })
   }
 
   const connection = await loadEsfConnectionByUserId(user.id)
   if (!connection) return NextResponse.json({ error: 'ЭСФ не подключён', errorCode: 'not_connected' }, { status: 400 })
   if (!connection.authCertificateBase64) return NextResponse.json({ error: 'Не загружен сертификат аутентификации ЭСФ', errorCode: 'no_auth_certificate' }, { status: 400 })
 
-  const built = await buildEsfInvoiceInputForInvoice(user.id, invoiceId, lines)
+  const built = await buildEsfInvoiceInputForInvoice(user.id, invoiceId, lines, date)
   if ('error' in built) return NextResponse.json({ error: built.error, errorCode: built.errorCode }, { status: built.status })
 
   // Same is_vat_payer-or-fresh-lookup fallback as /api/esf/prepare -- this

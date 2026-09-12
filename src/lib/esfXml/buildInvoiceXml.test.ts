@@ -24,7 +24,11 @@ const SAMPLE_INPUT: EsfInvoiceInput = {
     countryCode: 'KZ',
   },
   lines: [
-    { description: 'Консультационные услуги', quantity: 1, unitPrice: 10000, unitCode: '3004200002', unitNomenclature: '796', ndsRate: 12 },
+    // unitCode intentionally omitted here: it's the TN VED EAEU commodity
+    // classifier (a different, 10-digit field this app doesn't collect), not
+    // the ОКЕИ unit code -- see buildInvoiceXml.ts's EsfInvoiceInput comment.
+    // unitNomenclature carries the ОКЕИ code ('796' = Штука).
+    { description: 'Консультационные услуги', quantity: 1, unitPrice: 10000, unitNomenclature: '796', ndsRate: 12 },
   ],
 }
 
@@ -68,6 +72,21 @@ describe('buildInvoiceXml', () => {
     expect(xml).toContain('<catalogTruId>1</catalogTruId>')
   })
 
+  it('puts the ОКЕИ unit code in unitNomenclature and omits unitCode when not provided (InvoiceV2.xsd: unitCode is a different, minOccurs=0 TN VED EAEU classifier)', () => {
+    const xml = buildInvoiceXml(SAMPLE_INPUT)
+    expect(xml).toContain('<unitNomenclature>796</unitNomenclature>')
+    expect(xml).not.toContain('<unitCode>')
+  })
+
+  it('includes unitCode only when a line explicitly provides one', () => {
+    const input: EsfInvoiceInput = {
+      ...SAMPLE_INPUT,
+      lines: [{ ...SAMPLE_INPUT.lines[0], unitCode: '3004200002' }],
+    }
+    const xml = buildInvoiceXml(input)
+    expect(xml).toContain('<unitCode>3004200002</unitCode>')
+  })
+
   it('rounds each line before summing, so productSet totals tie out to the sum of the rounded per-line values (round(sum) vs sum(round))', () => {
     // Both lines have a raw (unrounded) priceWithoutTax of 10.004ish, which each
     // independently rounds DOWN to 10.00. Their raw sum is ~20.009, which on its
@@ -76,8 +95,8 @@ describe('buildInvoiceXml', () => {
     const input: EsfInvoiceInput = {
       ...SAMPLE_INPUT,
       lines: [
-        { description: 'Товар A', quantity: 4, unitPrice: 2.501, unitCode: '3004200002', unitNomenclature: '796', ndsRate: 12 },
-        { description: 'Товар B', quantity: 3, unitPrice: 3.335, unitCode: '3004200002', unitNomenclature: '796', ndsRate: 12 },
+        { description: 'Товар A', quantity: 4, unitPrice: 2.501, unitNomenclature: '796', ndsRate: 12 },
+        { description: 'Товар B', quantity: 3, unitPrice: 3.335, unitNomenclature: '796', ndsRate: 12 },
       ],
     }
     const xml = buildInvoiceXml(input)

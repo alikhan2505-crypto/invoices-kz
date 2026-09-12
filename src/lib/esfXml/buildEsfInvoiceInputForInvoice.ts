@@ -15,7 +15,14 @@ export type EsfInvoiceLine = EsfInvoiceInput['lines'][number]
 export async function buildEsfInvoiceInputForInvoice(
   userId: string,
   invoiceId: string,
-  lines: EsfInvoiceLine[]
+  lines: EsfInvoiceLine[],
+  // Computed once by /api/esf/prepare and threaded through to /api/esf/submit
+  // so both routes build byte-for-byte the same XML even if the live
+  // SIGEX/eGov signing ceremony in between straddles midnight (that ceremony
+  // has a multi-minute timeout -- see ESF_SIGNING_TIMEOUT_MS in
+  // src/app/invoice/[id]/page.tsx). Defaults to computing fresh so existing
+  // callers/tests that don't pass it are unaffected.
+  dateOverride?: string
 ): Promise<{ input: EsfInvoiceInput; invoice: any } | { error: string; errorCode: string; status: number }> {
   // profiles has no `legal_address` column -- `address` is the field this
   // app actually stores and reads everywhere else (see buildProfile() in
@@ -28,8 +35,10 @@ export async function buildEsfInvoiceInputForInvoice(
   const connection = await loadEsfConnectionByUserId(userId)
   if (!connection) return { error: 'ЭСФ не подключён', errorCode: 'not_connected', status: 400 }
 
-  const today = new Date()
-  const dateStr = `${String(today.getDate()).padStart(2, '0')}.${String(today.getMonth() + 1).padStart(2, '0')}.${today.getFullYear()}`
+  const dateStr = dateOverride || (() => {
+    const today = new Date()
+    return `${String(today.getDate()).padStart(2, '0')}.${String(today.getMonth() + 1).padStart(2, '0')}.${today.getFullYear()}`
+  })()
 
   const input: EsfInvoiceInput = {
     num: String(invoice.number).replace(/\D/g, '') || '1',

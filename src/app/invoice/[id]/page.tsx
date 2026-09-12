@@ -595,8 +595,12 @@ export default function InvoicePage() {
           description: s.name,
           quantity: s.qty,
           unitPrice: s.price,
-          unitCode: unit.code,
-          unitNomenclature: unit.label,
+          // unitNomenclature carries the ОКЕИ unit code (e.g. '796' = Штука,
+          // confirmed against the government's own reference XML sample).
+          // unitCode is a DIFFERENT, more granular TN VED EAEU classifier
+          // this feature doesn't collect -- omitted rather than sending
+          // COMMON_UNIT_CODES' ОКЕИ code under the wrong field.
+          unitNomenclature: unit.code,
           ndsRate: cfg.ndsRate,
         }
       })
@@ -615,9 +619,13 @@ export default function InvoicePage() {
       const cmsSignatureBase64 = await signEsfWithEscape(xmlBlob, `ЭСФ по счёту №${invoice.number}`)
       setEsfQr(null)
 
+      // Pass back the exact date/turnoverDate prepare computed (not a fresh
+      // one) -- the signing ceremony above can take real time, and submit
+      // must rebuild byte-identical XML to what was actually signed even if
+      // that ceremony straddled midnight.
       const submitRes = await fetch('/api/esf/submit', {
         method: 'POST', headers: authHeader,
-        body: JSON.stringify({ invoiceId: id, lines, cmsSignatureBase64 }),
+        body: JSON.stringify({ invoiceId: id, lines, cmsSignatureBase64, date: prepareJson.date }),
       })
       const submitJson = await submitRes.json()
       if (submitJson.error) { setEsfError(submitJson.error); return }

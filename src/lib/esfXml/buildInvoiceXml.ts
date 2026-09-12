@@ -24,7 +24,14 @@ export interface EsfInvoiceInput {
     description: string
     quantity: number
     unitPrice: number // price WITHOUT tax, per unit
-    unitCode: string
+    // unitCode is the TN VED EAEU commodity classifier (InvoiceV2.xsd "Код
+    // товара (ТНВД ЕАЭС) (G 4)", a 10-digit code from a much larger catalog
+    // this feature does not collect) -- NOT the ОКЕИ unit-of-measure code.
+    // It's minOccurs="0" in the XSD, so it's simply omitted here rather than
+    // guessing a value. The ОКЕИ code (e.g. '796' for "Штука") belongs in
+    // unitNomenclature ("Ед.изм (G 5)"), confirmed against the SDK's own
+    // reference sample (docs/superpowers/plans/2026-09-12-esf-electronic-invoice.md).
+    unitCode?: string
     unitNomenclature: string
     ndsRate: number // 0-100, integer
   }>
@@ -67,8 +74,8 @@ function buildLine(line: EsfInvoiceInput['lines'][number]) {
                         <priceWithTax>${money(priceWithTax)}</priceWithTax>
                         <priceWithoutTax>${money(priceWithoutTax)}</priceWithoutTax>
                         <quantity>${line.quantity}</quantity>
-                        <turnoverSize>${money(priceWithoutTax)}</turnoverSize>
-                        <unitCode>${escapeXml(line.unitCode)}</unitCode>
+                        <turnoverSize>${money(priceWithoutTax)}</turnoverSize>${line.unitCode ? `
+                        <unitCode>${escapeXml(line.unitCode)}</unitCode>` : ''}
                         <unitNomenclature>${escapeXml(line.unitNomenclature)}</unitNomenclature>
                         <unitPrice>${money(line.unitPrice)}</unitPrice>
                     </product>`,
