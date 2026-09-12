@@ -586,6 +586,7 @@ export default function CreateInvoicePage() {
       client_address: clientAddress,
       client_phone: clientPhone || null,
       bank_id: banks[0].id,
+      is_vat_payer: binLookup.company?.isVatPayer ?? null,
       contract_number: contractNumber || null,
       contract_date: contractDate || null,
       due_date: dueDate || null,
