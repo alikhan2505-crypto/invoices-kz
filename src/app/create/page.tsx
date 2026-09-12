@@ -425,6 +425,11 @@ export default function CreateInvoicePage() {
     setClientAddress(client.address || '')
     setClientPhone(client.phone || '')
     setClientSelected(true)
+    // A quick-pick client may not match whichever БИН was last manually
+    // typed and looked up -- that stale lookup (isVatPayer included) must
+    // not ride along onto this client. See resetBinLookup() in the
+    // manual-БИН onChange handler below for the same guard.
+    resetBinLookup()
   }
 
   function formatPhone(value: string) {
@@ -462,6 +467,9 @@ export default function CreateInvoicePage() {
     setClientSelected(false)
     setDueDate(computeDefaultDueDate(todayDateString(), profile?.default_due_days))
     dueDateTouched.current = false
+    // Same reason as in selectClient(): the БИН field is now empty, so any
+    // manually-typed-BIN lookup result (isVatPayer included) is stale.
+    resetBinLookup()
   }
 
   function selectService(svc: any) {
