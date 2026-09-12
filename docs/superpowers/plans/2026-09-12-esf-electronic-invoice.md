@@ -157,13 +157,11 @@ Deploy, then ask the founder to open `/profile/esf-spike` on his phone or scan t
 2. If it showed a choice, did any of the listed certificates indicate GOST specifically (Kazakhstan eGov mobile typically labels a certificate's purpose/type on the selection screen)?
 3. Did signing complete without error, and did the page show a returned signature?
 
-- [ ] **Step 6: Record the outcome and decide**
+- [x] **Step 6: Record the outcome and decide**
 
-Add a line to this plan file right here recording the outcome:
+> **Spike result (confirmed 2026-09-12):** eGov mobile signed immediately with no certificate-choice screen (only one certificate was available on the founder's device), so the choice couldn't be observed visually. Decoded the returned CMS signature with OpenSSL instead: the embedded signing certificate's issuer is `ҰЛТТЫҚ КУӘЛАНДЫРУШЫ ОРТАЛЫҚ (GOST) 2022` (Kazakhstan's national GOST-branch CA), its signature algorithm OID is `1.2.398.3.10.1.1.2.3.2` (Kazakhstan's own national PKI arc, `1.2.398`, not the RSA/PKCS arc `1.2.840.113549`), and its public key algorithm OID (`1.2.398.3.10.1.1.2.2`) is the corresponding GOST key type. **Confirmed: `runSigexQrSigning` produces a genuine GOST-algorithm signature with no modification needed.** Task 5 reuses it unmodified.
 
-> **Spike result:** _(fill in after Step 5)_ — if a GOST certificate was selectable and signing succeeded, Task 5 below reuses `runSigexQrSigning` unmodified. If no GOST option ever appeared, or the founder's certificate is RSA-only, STOP here and return to brainstorming — Task 5 needs a different signing mechanism, which is a design decision, not an implementation detail.
-
-- [ ] **Step 7: Remove the diagnostic route and page**
+- [x] **Step 7: Remove the diagnostic route and page**
 
 ```bash
 git rm src/app/api/esf/spike-sign/route.ts
