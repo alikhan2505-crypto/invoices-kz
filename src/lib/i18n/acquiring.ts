@@ -137,6 +137,23 @@ export interface AcquiringContent {
   kaspiExportExcelButton: string
   kaspiExportPdfButton: string
   kaspiExportingLabel: string
+  esfSectionTitle: string
+  esfIntroText: string
+  esfProLockedHint: string
+  esfLoginLabel: string
+  esfLoginPlaceholder: string
+  esfPasswordLabel: string
+  esfPasswordPlaceholder: string
+  esfVatCertNumLabel: string
+  esfVatCertNumPlaceholder: string
+  esfVatCertSeriesLabel: string
+  esfVatCertSeriesPlaceholder: string
+  esfConnectButton: string
+  esfConnectingLabel: string
+  esfConnectedMessage: string
+  esfErrorNotPro: string
+  esfErrorMissingFields: string
+  esfErrorGeneric: string
 }
 
 export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
@@ -283,6 +300,23 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiExportPdfButton: 'PDF',
     kaspiExportingLabel: 'Формируем...',
     kaspiColCategory: 'Категория',
+    esfSectionTitle: 'Электронные счета-фактуры (ЭСФ)',
+    esfIntroText: 'Подключите логин и пароль от личного кабинета ИС ЭСФ (kgd.gov.kz), чтобы выставлять электронные счета-фактуры прямо из invoices.kz. Данные хранятся в зашифрованном виде.',
+    esfProLockedHint: 'Доступно на тарифе Про',
+    esfLoginLabel: 'Логин ИС ЭСФ',
+    esfLoginPlaceholder: 'БИН/ИИН или логин',
+    esfPasswordLabel: 'Пароль ИС ЭСФ',
+    esfPasswordPlaceholder: 'Пароль',
+    esfVatCertNumLabel: 'Номер свидетельства НДС (необязательно)',
+    esfVatCertNumPlaceholder: 'Номер свидетельства',
+    esfVatCertSeriesLabel: 'Серия свидетельства НДС (необязательно)',
+    esfVatCertSeriesPlaceholder: 'Серия',
+    esfConnectButton: 'Подключить ЭСФ',
+    esfConnectingLabel: 'Подключаем...',
+    esfConnectedMessage: 'ЭСФ успешно подключён.',
+    esfErrorNotPro: 'Подключение ЭСФ доступно только на тарифе Про.',
+    esfErrorMissingFields: 'Укажите логин и пароль.',
+    esfErrorGeneric: 'Не удалось подключить ЭСФ. Попробуйте ещё раз.',
   },
   kk: {
     headerLabel: 'Эквайринг',
@@ -427,6 +461,23 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiExportPdfButton: 'PDF',
     kaspiExportingLabel: 'Дайындалуда...',
     kaspiColCategory: 'Санаты',
+    esfSectionTitle: 'Электрондық шот-фактуралар (ЭСФ)',
+    esfIntroText: 'invoices.kz-тен тікелей электрондық шот-фактураларды шығару үшін ИС ЭСФ (kgd.gov.kz) жеке кабинетінің логині мен құпия сөзін қосыңыз. Деректер шифрланған түрде сақталады.',
+    esfProLockedHint: 'Про тарифінде қолжетімді',
+    esfLoginLabel: 'ИС ЭСФ логині',
+    esfLoginPlaceholder: 'БИН/ИИН немесе логин',
+    esfPasswordLabel: 'ИС ЭСФ құпия сөзі',
+    esfPasswordPlaceholder: 'Құпия сөз',
+    esfVatCertNumLabel: 'ҚҚС куәлігінің нөмірі (міндетті емес)',
+    esfVatCertNumPlaceholder: 'Куәлік нөмірі',
+    esfVatCertSeriesLabel: 'ҚҚС куәлігінің сериясы (міндетті емес)',
+    esfVatCertSeriesPlaceholder: 'Серия',
+    esfConnectButton: 'ЭСФ қосу',
+    esfConnectingLabel: 'Қосылуда...',
+    esfConnectedMessage: 'ЭСФ сәтті қосылды.',
+    esfErrorNotPro: 'ЭСФ қосу тек Про тарифінде қолжетімді.',
+    esfErrorMissingFields: 'Логин мен құпия сөзді көрсетіңіз.',
+    esfErrorGeneric: 'ЭСФ қосу мүмкін болмады. Қайталап көріңіз.',
   },
   en: {
     headerLabel: 'Acquiring',
@@ -571,5 +622,22 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiExportPdfButton: 'PDF',
     kaspiExportingLabel: 'Generating...',
     kaspiColCategory: 'Category',
+    esfSectionTitle: 'Electronic tax invoices (ESF)',
+    esfIntroText: 'Connect your ИС ЭСФ (kgd.gov.kz) personal cabinet login and password to issue electronic tax invoices directly from invoices.kz. Your credentials are stored encrypted.',
+    esfProLockedHint: 'Available on the Pro plan',
+    esfLoginLabel: 'ИС ЭСФ login',
+    esfLoginPlaceholder: 'BIN/IIN or login',
+    esfPasswordLabel: 'ИС ЭСФ password',
+    esfPasswordPlaceholder: 'Password',
+    esfVatCertNumLabel: 'VAT certificate number (optional)',
+    esfVatCertNumPlaceholder: 'Certificate number',
+    esfVatCertSeriesLabel: 'VAT certificate series (optional)',
+    esfVatCertSeriesPlaceholder: 'Series',
+    esfConnectButton: 'Connect ESF',
+    esfConnectingLabel: 'Connecting...',
+    esfConnectedMessage: 'ESF connected successfully.',
+    esfErrorNotPro: 'Connecting ESF is available on the Pro plan only.',
+    esfErrorMissingFields: 'Enter your login and password.',
+    esfErrorGeneric: 'Could not connect ESF. Please try again.',
   },
 }
