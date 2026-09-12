@@ -150,6 +150,7 @@ export interface AcquiringContent {
   esfVatCertSeriesPlaceholder: string
   esfAuthCertLabel: string
   esfAuthCertHint: string
+  esfAuthCertChooseButton: string
   esfAuthCertSelectedLabel: (name: string) => string
   esfAuthCertReadError: string
   esfConnectButton: string
@@ -317,6 +318,7 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     esfVatCertSeriesPlaceholder: 'Серия',
     esfAuthCertLabel: 'Сертификат аутентификации (необязательно)',
     esfAuthCertHint: 'Публичный сертификат (.cer, .pem, .crt), выданный при регистрации в ИС ЭСФ. Можно загрузить позже.',
+    esfAuthCertChooseButton: 'Выбрать сертификат',
     esfAuthCertSelectedLabel: (name: string) => `Файл: ${name}`,
     esfAuthCertReadError: 'Не удалось прочитать файл сертификата.',
     esfConnectButton: 'Подключить ЭСФ',
@@ -482,6 +484,7 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     esfVatCertSeriesPlaceholder: 'Серия',
     esfAuthCertLabel: 'Аутентификация сертификаты (міндетті емес)',
     esfAuthCertHint: 'ИС ЭСФ-те тіркелу кезінде берілген жария сертификат (.cer, .pem, .crt). Кейінірек жүктеуге болады.',
+    esfAuthCertChooseButton: 'Сертификатты таңдау',
     esfAuthCertSelectedLabel: (name: string) => `Файл: ${name}`,
     esfAuthCertReadError: 'Сертификат файлын оқу мүмкін болмады.',
     esfConnectButton: 'ЭСФ қосу',
@@ -647,6 +650,7 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     esfVatCertSeriesPlaceholder: 'Series',
     esfAuthCertLabel: 'Authentication certificate (optional)',
     esfAuthCertHint: 'The public certificate (.cer, .pem, .crt) issued when registering with ИС ЭСФ. You can upload it later.',
+    esfAuthCertChooseButton: 'Choose certificate',
     esfAuthCertSelectedLabel: (name: string) => `File: ${name}`,
     esfAuthCertReadError: 'Could not read the certificate file.',
     esfConnectButton: 'Connect ESF',

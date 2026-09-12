@@ -551,9 +551,15 @@ export default function AcquiringPage() {
                       style={{ borderBottom: '1px solid var(--nav-border)', color: 'var(--nav-text-primary)' }} />
                     <label className="block text-xs mb-1" style={{ color: 'var(--nav-text-muted)' }}>{t.esfAuthCertLabel}</label>
                     <p className="text-[11px] mb-1.5" style={{ color: 'var(--nav-text-muted)' }}>{t.esfAuthCertHint}</p>
-                    <input onChange={onEsfAuthCertChange} accept=".cer,.pem,.crt" type="file"
-                      className="w-full text-xs mb-3"
-                      style={{ color: 'var(--nav-text-primary)' }} />
+                    <label
+                      htmlFor="esf-auth-cert-input"
+                      className="inline-block rounded-xl px-4 py-2 text-xs font-medium border cursor-pointer transition-colors hover:bg-[var(--nav-surface-glass)] mb-3"
+                      style={{ borderColor: 'var(--nav-accent)', color: 'var(--nav-accent)' }}
+                    >
+                      {t.esfAuthCertChooseButton}
+                    </label>
+                    <input id="esf-auth-cert-input" onChange={onEsfAuthCertChange} accept=".cer,.pem,.crt" type="file"
+                      className="hidden" />
                     {esfAuthCertName && (
                       <p className="text-[11px] mb-3 -mt-2" style={{ color: 'var(--nav-accent)' }}>{t.esfAuthCertSelectedLabel(esfAuthCertName)}</p>
                     )}
