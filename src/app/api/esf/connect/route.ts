@@ -23,9 +23,9 @@ export async function POST(req: NextRequest) {
   if (!getActivePlan(profile).canEsf) return NextResponse.json({ error: 'Требуется тариф Про' }, { status: 403 })
 
   const body = await req.json().catch(() => null)
-  const { login, password, vatCertificateNum, vatCertificateSeries } = body || {}
+  const { login, password, vatCertificateNum, vatCertificateSeries, authCertificateBase64 } = body || {}
   if (!login || !password) return NextResponse.json({ error: 'login и password обязательны' }, { status: 400 })
 
-  await saveEsfConnection(user.id, login, password, vatCertificateNum || null, vatCertificateSeries || null)
+  await saveEsfConnection(user.id, login, password, vatCertificateNum || null, vatCertificateSeries || null, authCertificateBase64 || null)
   return NextResponse.json({ ok: true })
 }

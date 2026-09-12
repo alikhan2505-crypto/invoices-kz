@@ -18,6 +18,7 @@ export interface EsfConnection {
   password: string
   vatCertificateNum: string | null
   vatCertificateSeries: string | null
+  authCertificateBase64: string | null
 }
 
 function toConnection(row: any): EsfConnection {
@@ -30,6 +31,9 @@ function toConnection(row: any): EsfConnection {
       password: decryptAtRest(row.password_enc, key).toString('utf8'),
       vatCertificateNum: row.vat_certificate_num,
       vatCertificateSeries: row.vat_certificate_series,
+      // Unencrypted -- this is the merchant's own public AUTH certificate,
+      // not a secret, unlike password_enc above.
+      authCertificateBase64: row.auth_certificate_base64,
     }
   } catch (e: any) {
     throw new EsfConnectionSecretsError(`esf_connections for user ${row.user_id} could not be decrypted: ${e.message}`)
@@ -52,7 +56,8 @@ export async function saveEsfConnection(
   login: string,
   password: string,
   vatCertificateNum: string | null,
-  vatCertificateSeries: string | null
+  vatCertificateSeries: string | null,
+  authCertificateBase64: string | null
 ): Promise<void> {
   const key = process.env.ESF_SESSION_ENCRYPTION_KEY
   if (!key) throw new Error('ESF_SESSION_ENCRYPTION_KEY is not configured')
@@ -62,6 +67,7 @@ export async function saveEsfConnection(
     password_enc: encryptAtRest(password, key),
     vat_certificate_num: vatCertificateNum,
     vat_certificate_series: vatCertificateSeries,
+    auth_certificate_base64: authCertificateBase64,
     status: 'active',
     updated_at: new Date().toISOString(),
   }, { onConflict: 'user_id' })

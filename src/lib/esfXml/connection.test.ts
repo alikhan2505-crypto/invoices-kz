@@ -39,7 +39,7 @@ describe('loadEsfConnectionByUserId', () => {
 
   it('throws EsfConnectionSecretsError when the stored ciphertext cannot be decrypted', async () => {
     mockSingle.mockResolvedValue({
-      data: { user_id: 'user-1', login: '123456789021', password_enc: 'not-valid-ciphertext', vat_certificate_num: null, vat_certificate_series: null },
+      data: { user_id: 'user-1', login: '123456789021', password_enc: 'not-valid-ciphertext', vat_certificate_num: null, vat_certificate_series: null, auth_certificate_base64: null },
       error: null,
     })
     await expect(loadEsfConnectionByUserId('user-1')).rejects.toThrow(EsfConnectionSecretsError)
@@ -58,7 +58,7 @@ describe('saveEsfConnection', () => {
     mockUpsert.mockResolvedValue({ error: null })
 
     const before = Date.now()
-    await saveEsfConnection('user-1', '123456789021', 'super-secret-password', '123456789', '01')
+    await saveEsfConnection('user-1', '123456789021', 'super-secret-password', '123456789', '01', 'ZmFrZS1jZXJ0LWRlcg==')
     const after = Date.now()
 
     expect(mockUpsert).toHaveBeenCalledTimes(1)
@@ -70,6 +70,8 @@ describe('saveEsfConnection', () => {
     expect(row.login).toBe('123456789021')
     expect(row.vat_certificate_num).toBe('123456789')
     expect(row.vat_certificate_series).toBe('01')
+    // Unencrypted -- a public certificate, unlike password_enc below.
+    expect(row.auth_certificate_base64).toBe('ZmFrZS1jZXJ0LWRlcg==')
     expect(row.status).toBe('active')
 
     // password must be encrypted, never stored in plaintext, and must
@@ -89,7 +91,7 @@ describe('saveEsfConnection', () => {
     mockUpsert.mockResolvedValue({ error: { message: 'duplicate key value' } })
 
     await expect(
-      saveEsfConnection('user-1', '123456789021', 'super-secret-password', null, null)
+      saveEsfConnection('user-1', '123456789021', 'super-secret-password', null, null, null)
     ).rejects.toThrow('duplicate key value')
   })
 })

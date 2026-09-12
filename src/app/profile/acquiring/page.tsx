@@ -126,6 +126,8 @@ export default function AcquiringPage() {
   const [esfPassword, setEsfPassword] = useState('')
   const [esfVatNum, setEsfVatNum] = useState('')
   const [esfVatSeries, setEsfVatSeries] = useState('')
+  const [esfAuthCert, setEsfAuthCert] = useState<string | null>(null)
+  const [esfAuthCertName, setEsfAuthCertName] = useState('')
   const [esfConnecting, setEsfConnecting] = useState(false)
   const [esfMessage, setEsfMessage] = useState('')
   const [esfError, setEsfError] = useState('')
@@ -232,6 +234,23 @@ export default function AcquiringPage() {
     }
   }
 
+  function onEsfAuthCertChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setEsfError('')
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      const dataUrl = ev.target?.result as string
+      // Strip the "data:...;base64," prefix -- the connect route stores
+      // this alongside login/password, unencrypted since it's a public cert.
+      setEsfAuthCert(dataUrl.split(',')[1] || null)
+      setEsfAuthCertName(file.name)
+    }
+    reader.onerror = () => setEsfError(t.esfAuthCertReadError)
+    reader.readAsDataURL(file)
+  }
+
   async function connectEsf(e: React.FormEvent) {
     e.preventDefault()
     setEsfError('')
@@ -250,6 +269,7 @@ export default function AcquiringPage() {
           password: esfPassword,
           vatCertificateNum: esfVatNum || null,
           vatCertificateSeries: esfVatSeries || null,
+          authCertificateBase64: esfAuthCert || null,
         }),
       })
       const data = await res.json().catch(() => ({}))
@@ -529,6 +549,14 @@ export default function AcquiringPage() {
                       type="text"
                       className="w-full py-2 text-sm outline-none mb-3 bg-transparent"
                       style={{ borderBottom: '1px solid var(--nav-border)', color: 'var(--nav-text-primary)' }} />
+                    <label className="block text-xs mb-1" style={{ color: 'var(--nav-text-muted)' }}>{t.esfAuthCertLabel}</label>
+                    <p className="text-[11px] mb-1.5" style={{ color: 'var(--nav-text-muted)' }}>{t.esfAuthCertHint}</p>
+                    <input onChange={onEsfAuthCertChange} accept=".cer,.pem,.crt" type="file"
+                      className="w-full text-xs mb-3"
+                      style={{ color: 'var(--nav-text-primary)' }} />
+                    {esfAuthCertName && (
+                      <p className="text-[11px] mb-3 -mt-2" style={{ color: 'var(--nav-accent)' }}>{t.esfAuthCertSelectedLabel(esfAuthCertName)}</p>
+                    )}
                     <button type="submit" disabled={esfConnecting}
                       className="w-full rounded-xl py-2.5 text-sm font-semibold transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60"
                       style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>

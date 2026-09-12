@@ -148,6 +148,10 @@ export interface AcquiringContent {
   esfVatCertNumPlaceholder: string
   esfVatCertSeriesLabel: string
   esfVatCertSeriesPlaceholder: string
+  esfAuthCertLabel: string
+  esfAuthCertHint: string
+  esfAuthCertSelectedLabel: (name: string) => string
+  esfAuthCertReadError: string
   esfConnectButton: string
   esfConnectingLabel: string
   esfConnectedMessage: string
@@ -311,6 +315,10 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     esfVatCertNumPlaceholder: 'Номер свидетельства',
     esfVatCertSeriesLabel: 'Серия свидетельства НДС (необязательно)',
     esfVatCertSeriesPlaceholder: 'Серия',
+    esfAuthCertLabel: 'Сертификат аутентификации (необязательно)',
+    esfAuthCertHint: 'Публичный сертификат (.cer, .pem, .crt), выданный при регистрации в ИС ЭСФ. Можно загрузить позже.',
+    esfAuthCertSelectedLabel: (name: string) => `Файл: ${name}`,
+    esfAuthCertReadError: 'Не удалось прочитать файл сертификата.',
     esfConnectButton: 'Подключить ЭСФ',
     esfConnectingLabel: 'Подключаем...',
     esfConnectedMessage: 'ЭСФ успешно подключён.',
@@ -472,6 +480,10 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     esfVatCertNumPlaceholder: 'Куәлік нөмірі',
     esfVatCertSeriesLabel: 'ҚҚС куәлігінің сериясы (міндетті емес)',
     esfVatCertSeriesPlaceholder: 'Серия',
+    esfAuthCertLabel: 'Аутентификация сертификаты (міндетті емес)',
+    esfAuthCertHint: 'ИС ЭСФ-те тіркелу кезінде берілген жария сертификат (.cer, .pem, .crt). Кейінірек жүктеуге болады.',
+    esfAuthCertSelectedLabel: (name: string) => `Файл: ${name}`,
+    esfAuthCertReadError: 'Сертификат файлын оқу мүмкін болмады.',
     esfConnectButton: 'ЭСФ қосу',
     esfConnectingLabel: 'Қосылуда...',
     esfConnectedMessage: 'ЭСФ сәтті қосылды.',
@@ -633,6 +645,10 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     esfVatCertNumPlaceholder: 'Certificate number',
     esfVatCertSeriesLabel: 'VAT certificate series (optional)',
     esfVatCertSeriesPlaceholder: 'Series',
+    esfAuthCertLabel: 'Authentication certificate (optional)',
+    esfAuthCertHint: 'The public certificate (.cer, .pem, .crt) issued when registering with ИС ЭСФ. You can upload it later.',
+    esfAuthCertSelectedLabel: (name: string) => `File: ${name}`,
+    esfAuthCertReadError: 'Could not read the certificate file.',
     esfConnectButton: 'Connect ESF',
     esfConnectingLabel: 'Connecting...',
     esfConnectedMessage: 'ESF connected successfully.',
