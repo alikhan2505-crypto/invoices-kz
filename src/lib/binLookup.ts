@@ -1,3 +1,5 @@
+import { parseVatStatus, KGD_VAT_URL } from './kgdTaxpayer'
+
 // Looking a counterparty up by БИН, so it does not have to be typed.
 //
 // Every invoice makes the user retype a company's name and address that the
@@ -175,4 +177,36 @@ export function fromKgdTaxpayer(
 /** The gbd_ul query for one БИН. Kept here so the route and its tests agree. */
 export function egovQuery(bin: string): string {
   return JSON.stringify({ size: 5, query: { match: { bin: normalizeBin(bin) } } })
+}
+
+/**
+ * A fresh (uncached) VAT-registration check against КГД, safe to call from
+ * server code directly -- unlike `useBinLookup` (src/components/useBinLookup.ts),
+ * which is a client-side React hook that hits `/api/bin-lookup` over HTTP and
+ * cannot be called from a route handler. Extracted out of
+ * `/api/bin-lookup`'s own lookUpVat() (which now delegates here) so both call
+ * sites share one implementation instead of drifting.
+ *
+ * Returns undefined when nothing could be learned (no token configured, a
+ * timeout, a non-OK response) -- not the same as `false`: a caller deciding
+ * "not a VAT payer" needs that to mean КГД actually said so.
+ */
+export async function lookupVatStatus(bin: string): Promise<{ isVatPayer: boolean; registeredAt: string | null } | undefined> {
+  const token = process.env.KGD_PORTAL_TOKEN
+  if (!token) return undefined
+  try {
+    const res = await fetch(`${KGD_VAT_URL}?taxpayerCode=${encodeURIComponent(bin)}`, {
+      headers: { 'X-Portal-Token': token },
+      signal: AbortSignal.timeout(12_000),
+    })
+    if (!res.ok) return undefined
+    // An empty body is КГД saying "not registered", so the text is read
+    // first and only parsed as JSON when there is something to parse.
+    const body = (await res.text()).trim()
+    const status = parseVatStatus(body ? JSON.parse(body) : '')
+    return status ? { isVatPayer: status.isVatPayer, registeredAt: status.registeredAt } : undefined
+  } catch (e) {
+    console.error('lookupVatStatus: КГД VAT request failed:', e instanceof Error ? e.message : e)
+    return undefined
+  }
 }

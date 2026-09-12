@@ -17,7 +17,30 @@ import DesktopShell from '@/components/DesktopShell'
 import InvoiceLivePreview from '@/components/InvoiceLivePreview'
 import Skeleton from '@/components/Skeleton'
 import SignatureSection from '@/components/SignatureSection'
+import { runSigexQrSigning, SigexQrState } from '@/lib/signDocument'
 import { useAppDialog } from '@/components/AppDialog'
+
+// Common ОКЕИ unit codes -- confirmed against the SDK's own "796" example
+// (штука) and standard, widely-documented ОКЕИ values. Expand from the full
+// classifier (esf-sdk-2025.zip's "Классификатор Ед Изм ИС ЭСФ_211218.xlsx")
+// if a merchant needs a unit not listed here -- out of scope for the simple
+// case this modal covers.
+const COMMON_UNIT_CODES = [
+  { code: '796', label: 'Штука' },
+  { code: '166', label: 'Килограмм' },
+  { code: '112', label: 'Литр' },
+  { code: '006', label: 'Метр' },
+  { code: '055', label: 'Метр квадратный' },
+  { code: '113', label: 'Метр кубический' },
+  { code: '163', label: 'Грамм' },
+  { code: '736', label: 'Упаковка' },
+]
+
+// Same escape-hatch timeout as SignatureSection.tsx's own SIGNING_TIMEOUT_MS
+// (kept as a separate local constant rather than importing that file's
+// unexported one) -- well under SIGEX's own ~15min QR expiry, just long
+// enough that a genuinely still-in-progress signing ceremony isn't cut off.
+const ESF_SIGNING_TIMEOUT_MS = 4 * 60 * 1000
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
 // kept identical rather than inventing a second "house" ease.
@@ -187,6 +210,16 @@ const statusIconComp: Record<string, () => React.ReactElement> = {
   paid: CheckCircleIcon, sent: SendStatusIcon, overdue: ClockStatusIcon, draft: DraftStatusIcon, viewed: EyeStatusIcon,
 }
 
+function EsfIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="4" y="3" width="16" height="18" rx="2" />
+      <path d="M8 8h8M8 12h8M8 16h5" />
+      <path d="m15.5 15.5 1.7 1.7 3-3" />
+    </svg>
+  )
+}
+
 function ChevronIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -232,6 +265,13 @@ export default function InvoicePage() {
   const [kpCount, setKpCount] = useState(0)
   const [avrCount, setAvrCount] = useState(0)
   const [naklCount, setNaklCount] = useState(0)
+  const [showEsfModal, setShowEsfModal] = useState(false)
+  const [esfLineConfigs, setEsfLineConfigs] = useState<{ unitCode: string; ndsRate: number }[]>([])
+  const [esfSigning, setEsfSigning] = useState(false)
+  const [esfQr, setEsfQr] = useState<SigexQrState | null>(null)
+  const [esfError, setEsfError] = useState('')
+  const [esfSuccessId, setEsfSuccessId] = useState<string | null>(null)
+  const esfCancelRef = useRef<(() => void) | null>(null)
   // Ref для хранения открытого окна — открывается в модале (прямой клик пользователя)
   const pdfWinRef = useRef<Window | null>(null)
 
@@ -487,6 +527,113 @@ export default function InvoicePage() {
     const { data, error } = await supabase.rpc('claim_doc_number', { p_user_id: userId, p_doc_type: type })
     if (error) throw error
     return data as string
+  }
+
+  function openEsfModal() {
+    const defaultNdsRate = profile?.vat_type === 'vat_16' ? 16 : 0
+    setEsfLineConfigs((invoice.services || []).map(() => ({ unitCode: '796', ndsRate: defaultNdsRate })))
+    setEsfError('')
+    setEsfSuccessId(null)
+    setShowEsfModal(true)
+  }
+
+  function updateEsfLine(index: number, patch: Partial<{ unitCode: string; ndsRate: number }>) {
+    setEsfLineConfigs(prev => prev.map((line, i) => (i === index ? { ...line, ...patch } : line)))
+  }
+
+  // Mirrors SignatureSection.tsx's own signWithEscape (same 4-minute give-up
+  // point, same cancel-ref wiring to the QR panel's Отмена button) -- kept
+  // as a separate local copy rather than a shared export since the two live
+  // in different signing flows (document ЭЦП vs. ЭСФ XML) with their own
+  // state (qr/error/cancelRef) to update.
+  function signEsfWithEscape(xmlBlob: Blob, title: string): Promise<string> {
+    return new Promise<string>((resolve, reject) => {
+      let settled = false
+      const timeoutId = setTimeout(() => {
+        if (settled) return
+        settled = true
+        reject(Object.assign(new Error('Signing wait timed out'), { timedOut: true }))
+      }, ESF_SIGNING_TIMEOUT_MS)
+      esfCancelRef.current = () => {
+        if (settled) return
+        settled = true
+        clearTimeout(timeoutId)
+        reject(Object.assign(new Error('Signing cancelled by user'), { userCancelled: true }))
+      }
+      runSigexQrSigning(title, xmlBlob, setEsfQr)
+        .then((sig) => {
+          if (settled) return
+          settled = true
+          clearTimeout(timeoutId)
+          resolve(sig)
+        })
+        .catch((err) => {
+          if (settled) return
+          settled = true
+          clearTimeout(timeoutId)
+          reject(err)
+        })
+    })
+  }
+
+  // The full ЭСФ flow: build the XML server-side (prepare), have the
+  // merchant sign exactly that text with a live SIGEX/eGov ceremony, then
+  // submit the invoice + extracted signature. Two round trips because the
+  // exact bytes to sign depend on server-held data (seller profile, the
+  // ЭСФ connection's VAT certificate) the browser doesn't have -- see
+  // src/app/api/esf/prepare/route.ts.
+  async function submitEsf() {
+    if (!invoice) return
+    setEsfSigning(true)
+    setEsfError('')
+    setEsfQr(null)
+    try {
+      const lines = (invoice.services || []).map((s: any, i: number) => {
+        const cfg = esfLineConfigs[i] || { unitCode: '796', ndsRate: 0 }
+        const unit = COMMON_UNIT_CODES.find(u => u.code === cfg.unitCode) || COMMON_UNIT_CODES[0]
+        return {
+          description: s.name,
+          quantity: s.qty,
+          unitPrice: s.price,
+          unitCode: unit.code,
+          unitNomenclature: unit.label,
+          ndsRate: cfg.ndsRate,
+        }
+      })
+
+      const { data: { session } } = await supabase.auth.getSession()
+      const authHeader = { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` }
+
+      const prepareRes = await fetch('/api/esf/prepare', {
+        method: 'POST', headers: authHeader,
+        body: JSON.stringify({ invoiceId: id, lines }),
+      })
+      const prepareJson = await prepareRes.json()
+      if (prepareJson.error) { setEsfError(prepareJson.error); return }
+
+      const xmlBlob = new Blob([prepareJson.invoiceXml], { type: 'text/xml' })
+      const cmsSignatureBase64 = await signEsfWithEscape(xmlBlob, `ЭСФ по счёту №${invoice.number}`)
+      setEsfQr(null)
+
+      const submitRes = await fetch('/api/esf/submit', {
+        method: 'POST', headers: authHeader,
+        body: JSON.stringify({ invoiceId: id, lines, cmsSignatureBase64 }),
+      })
+      const submitJson = await submitRes.json()
+      if (submitJson.error) { setEsfError(submitJson.error); return }
+      setEsfSuccessId(submitJson.registrationId || 'ok')
+    } catch (e: any) {
+      // Same three exception shapes sigex-qr-signing-client can throw as
+      // SignatureSection.tsx handles -- an explicit cancel tap, a client-side
+      // timeout, or a session interruption on the eGov side.
+      if (e?.userCancelled) return
+      if (e?.timedOut) { setEsfError('Истекло время ожидания подписи. Попробуйте ещё раз.'); return }
+      if (e?.canceledByUser) { setEsfError('Подписание не было завершено.'); return }
+      setEsfError(e?.message || String(e))
+    } finally {
+      setEsfSigning(false)
+      setEsfQr(null)
+    }
   }
 
   if (loading) return (
@@ -749,6 +896,50 @@ export default function InvoicePage() {
             {t.goToPlansButton}
           </button>
         </motion.div>
+        )}
+
+        {/* ЭСФ -- hidden entirely when the customer is confirmed NOT a VAT
+            payer (is_vat_payer === false). A `null` value might still turn
+            out to be a VAT payer per /api/esf/prepare's own fresh-lookup
+            re-check, so it stays visible in that case. */}
+        {invoice.is_vat_payer !== false && (
+          ap.canEsf ? (
+            <motion.div
+              className={`nav-glass nav-card-accent rounded-2xl p-4 ${CARD_HOVER}`}
+              initial={reduceMotion ? false : { opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE, delay: reduceMotion ? 0 : 0.11 }}
+            >
+              <button onClick={openEsfModal} className="w-full flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'var(--nav-accent-soft)', color: 'var(--nav-accent)' }}><EsfIcon /></div>
+                <div className="flex-1 text-left">
+                  <div className="text-sm font-medium" style={{ color: 'var(--nav-text-primary)' }}>Выставить ЭСФ</div>
+                  <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>Электронная счёт-фактура в ИС ЭСФ</div>
+                </div>
+                <span style={{ color: 'var(--nav-text-muted)' }}><ChevronIcon /></span>
+              </button>
+            </motion.div>
+          ) : (
+            <motion.div
+              className={`nav-glass nav-card-accent rounded-2xl p-4 ${CARD_HOVER}`}
+              initial={reduceMotion ? false : { opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE, delay: reduceMotion ? 0 : 0.11 }}
+            >
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'var(--nav-accent-soft)', color: 'var(--nav-accent)' }}><EsfIcon /></div>
+                <div className="text-sm font-medium flex-1" style={{ color: 'var(--nav-text-primary)' }}>Выставить ЭСФ</div>
+                <span className="text-xs px-2 py-0.5 rounded-full flex items-center gap-1 flex-shrink-0" style={{ background: 'var(--nav-surface-glass)', color: 'var(--nav-text-muted)' }}>
+                  <LockIcon /> {t.proBadge}
+                </span>
+              </div>
+              <div className="text-xs mb-3" style={{ color: 'var(--nav-text-muted)' }}>{t.proLockedLabel}</div>
+              <button onClick={() => showUpgrade('Выставление ЭСФ доступно на тарифе Про', 'pro')}
+                className="w-full rounded-xl py-2.5 text-sm font-medium" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                {t.goToPlansButton}
+              </button>
+            </motion.div>
+          )
         )}
 
         {services.length > 0 && (
@@ -1213,6 +1404,94 @@ export default function InvoicePage() {
             </div>
             <button onClick={() => setShowSignModal(false)}
               className="w-full text-sm py-2" style={{ color: 'var(--nav-text-muted)' }}>{t.cancelButton}</button>
+          </div>
+        </div>
+      )}
+
+      {/* Модал ЭСФ */}
+      {showEsfModal && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center sm:justify-center p-0 sm:p-4">
+          <div className="w-full sm:max-w-lg mx-auto rounded-t-3xl sm:rounded-3xl p-6 max-h-[90vh] overflow-y-auto" style={{ background: 'var(--nav-surface-chrome)' }}>
+            {esfSuccessId ? (
+              <div className="text-center py-2">
+                <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3" style={{ background: 'var(--nav-success-soft)', color: 'var(--nav-success)' }}>
+                  <CheckCircleIcon />
+                </div>
+                <div className="font-semibold mb-2" style={{ color: 'var(--nav-text-primary)' }}>ЭСФ принята</div>
+                {esfSuccessId !== 'ok' && (
+                  <div className="text-sm mb-4" style={{ color: 'var(--nav-text-muted)' }}>Регистрационный номер: {esfSuccessId}</div>
+                )}
+                <button onClick={() => setShowEsfModal(false)}
+                  className="w-full rounded-xl py-3 text-sm font-medium" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                  Закрыть
+                </button>
+              </div>
+            ) : esfQr ? (
+              <div className="text-center py-2">
+                {esfQr.qrImage && (
+                  <img src={`data:image/png;base64,${esfQr.qrImage}`} alt="QR" className="mx-auto w-48 h-48 mb-3 rounded-xl" />
+                )}
+                <p className="text-sm mb-3" style={{ color: 'var(--nav-text-secondary)' }}>Отсканируйте QR-код приложением eGov mobile, чтобы подписать ЭСФ</p>
+                {esfQr.mobileLink && (
+                  <a href={esfQr.mobileLink} className="inline-block text-xs rounded-lg px-4 py-2 mb-2 border"
+                    style={{ color: 'var(--nav-accent)', borderColor: 'var(--nav-accent)' }}>
+                    Открыть в eGov mobile
+                  </a>
+                )}
+                <p className="text-xs mb-2" style={{ color: 'var(--nav-text-muted)' }}>Подписываем…</p>
+                <button onClick={() => esfCancelRef.current?.()} className="text-xs underline" style={{ color: 'var(--nav-text-muted)' }}>
+                  Отмена
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="text-center mb-5">
+                  <div className="w-11 h-11 rounded-full flex items-center justify-center mx-auto mb-2" style={{ background: 'var(--nav-accent-soft)', color: 'var(--nav-accent)' }}>
+                    <EsfIcon />
+                  </div>
+                  <div className="font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>Выставить ЭСФ</div>
+                  <div className="text-sm" style={{ color: 'var(--nav-text-muted)' }}>Укажите единицу измерения и ставку НДС для каждой позиции</div>
+                </div>
+                <div className="space-y-3 mb-4">
+                  {(invoice.services || []).map((s: any, i: number) => (
+                    <div key={i} className="rounded-xl p-3" style={{ background: 'var(--nav-surface-glass)' }}>
+                      <div className="text-sm font-medium mb-2" style={{ color: 'var(--nav-text-primary)' }}>{s.name}</div>
+                      <div className="text-xs mb-2" style={{ color: 'var(--nav-text-muted)' }}>{s.qty} × {Number(s.price).toLocaleString('ru-KZ')} ₸</div>
+                      <div className="flex gap-2">
+                        <select
+                          className="flex-1 rounded-lg px-2 py-2 text-xs outline-none border border-[color:var(--nav-border)]"
+                          style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-surface-chrome)' }}
+                          value={esfLineConfigs[i]?.unitCode ?? '796'}
+                          onChange={e => updateEsfLine(i, { unitCode: e.target.value })}
+                        >
+                          {COMMON_UNIT_CODES.map(u => (
+                            <option key={u.code} value={u.code}>{u.label} ({u.code})</option>
+                          ))}
+                        </select>
+                        <input
+                          type="number" min={0} max={100} step={1}
+                          className="w-24 rounded-lg px-2 py-2 text-xs outline-none border border-[color:var(--nav-border)]"
+                          style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-surface-chrome)' }}
+                          value={esfLineConfigs[i]?.ndsRate ?? 0}
+                          onChange={e => updateEsfLine(i, { ndsRate: Math.max(0, Math.min(100, Number(e.target.value) || 0)) })}
+                          aria-label="Ставка НДС, %"
+                        />
+                        <span className="self-center text-xs" style={{ color: 'var(--nav-text-muted)' }}>% НДС</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {esfError && <p className="text-xs mb-3" style={{ color: 'var(--nav-critical)' }}>{t.errorPrefix(esfError)}</p>}
+                <div className="space-y-2">
+                  <button onClick={submitEsf} disabled={esfSigning || (invoice.services || []).length === 0}
+                    className="w-full rounded-xl py-4 text-sm font-medium" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                    {esfSigning ? 'Подписываем…' : 'Подписать ЭЦП и отправить'}
+                  </button>
+                  <button onClick={() => setShowEsfModal(false)} disabled={esfSigning}
+                    className="w-full text-sm py-2" style={{ color: 'var(--nav-text-muted)' }}>{t.cancelButton}</button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

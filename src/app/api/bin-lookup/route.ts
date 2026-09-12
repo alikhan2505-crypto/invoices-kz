@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import {
-  isValidBin, normalizeBin, toLookupResult, fromKgdTaxpayer, egovQuery,
+  isValidBin, normalizeBin, toLookupResult, fromKgdTaxpayer, egovQuery, lookupVatStatus,
   type BinLookupResult,
 } from '@/lib/binLookup'
 import {
-  parseTaxpayer, parseVatStatus, parseUnreliable, parseLiquidation, parseTaxDebt,
-  KGD_TAXPAYER_URL, KGD_VAT_URL, KGD_UNRELIABLE_URL, KGD_LIQUIDATION_URL, KGD_DEBT_URL,
+  parseTaxpayer, parseUnreliable, parseLiquidation, parseTaxDebt,
+  KGD_TAXPAYER_URL, KGD_UNRELIABLE_URL, KGD_LIQUIDATION_URL, KGD_DEBT_URL,
   KGD_TAXPAYER_TYPES,
 } from '@/lib/kgdTaxpayer'
 
@@ -65,32 +65,11 @@ async function lookUpInKgd(bin: string): Promise<BinLookupResult | null> {
   return null
 }
 
-/**
- * VAT registration for a БИН.
- *
- * Returns undefined when nothing could be learned, which is not the same as
- * `false`: a seller reading "не плательщик НДС" on an invoice needs that to
- * mean КГД said so, not that our request timed out.
- */
-async function lookUpVat(bin: string): Promise<{ isVatPayer: boolean; registeredAt: string | null } | undefined> {
-  const token = process.env.KGD_PORTAL_TOKEN
-  if (!token) return undefined
-  try {
-    const res = await fetch(`${KGD_VAT_URL}?taxpayerCode=${encodeURIComponent(bin)}`, {
-      headers: { 'X-Portal-Token': token },
-      signal: AbortSignal.timeout(12_000),
-    })
-    if (!res.ok) return undefined
-    // An empty body is КГД saying "not registered", so the text is read
-    // first and only parsed as JSON when there is something to parse.
-    const body = (await res.text()).trim()
-    const status = parseVatStatus(body ? JSON.parse(body) : '')
-    return status ? { isVatPayer: status.isVatPayer, registeredAt: status.registeredAt } : undefined
-  } catch (e) {
-    console.error('bin-lookup: КГД VAT request failed:', e instanceof Error ? e.message : e)
-    return undefined
-  }
-}
+// VAT registration for a БИН -- shared with src/lib/binLookup.ts's
+// lookupVatStatus() so the ЭСФ prepare/submit routes' own fresh-lookup
+// fallback (Task 9) can call the identical implementation server-side
+// without going through this HTTP route or the client-only useBinLookup hook.
+const lookUpVat = lookupVatStatus
 
 /**
  * The two risk checks КГД lets us make with the token we have.
