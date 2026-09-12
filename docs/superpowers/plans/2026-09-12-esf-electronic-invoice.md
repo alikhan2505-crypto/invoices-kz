@@ -966,58 +966,122 @@ git commit -m "feat(esf): persist buyer VAT-payer status on the invoice"
 
 ---
 
-## Task 9: Submit route and invoice-page entry point
+## Task 9: Signature extraction, auth-certificate storage, submit route, and invoice-page entry point
+
+**Revision note (added after Tasks 1-8 shipped, before this task was ever dispatched):** the original version of this task assumed the browser could hand the submit route two ready-made base64 certificate strings (`authCertificateBase64`, `signingCertificateBase64`) plus a signature, with the exact mechanism left as "a real UI decision this plan does not resolve." Investigating with real tools closed that gap, but the answer reshapes this task:
+
+- **`runSigexQrSigning`'s return value is not what `syncInvoice` needs.** It resolves a full CMS `SignedData` structure (confirmed live: ~3.9KB for the founder's actual signing ceremony from Task 1) — this contains the signing certificate, algorithm identifiers, an embedded RFC3161 timestamp token, AND the raw signature value all bundled together. But `<signature>` in a real `syncInvoiceRequest` is the RAW signature value alone: decoding the government's own sample (`Документация по API ЭСФ.pdf` section 4.1.1) gives exactly 64 bytes — nowhere near CMS-structure size. Confirmed by parsing the founder's real Task 1 signature with `openssl cms -cmsout -print`: the actual per-line item this plan needs lives at `SignedData.signerInfos[0].signature` (a 128-byte OCTET STRING in that real example — GOST algorithm/curve generation affects the exact length, the point is it's the raw value, not the envelope). **The signing certificate itself is ALSO embedded in that same CMS blob** (`SignedData.certificates[0]`), extractable from the identical structure — so one signing ceremony yields both values needed for `syncInvoice`, with no separate certificate upload for the *signing* cert.
+- **The AUTH certificate (for `createSession`) is a different matter and does not need a live signature at all.** Re-reading the `createSessionRequest` sample: the `<x509Certificate>` there is submitted as plain data alongside a WS-Security `UsernameToken` (login+password) — the actual proof of identity is the shared login/password issued at ИС ЭСФ registration, not a live cryptographic action tied to that certificate. This means the AUTH certificate is just the merchant's own public certificate file, uploaded once at connect time (Task 7) and stored — never produced by a per-submission signing ceremony.
+
+This changes Task 9's shape: it now needs (a) a small extension to `esf_connections`/Task 7's connect flow to store the merchant's public AUTH certificate, (b) a new CMS-parsing helper to pull the raw signature and signing certificate out of one `runSigexQrSigning` result, and (c) the submit route and UI, now simpler than originally drafted since the merchant only ever runs ONE live signing action per invoice, not a separate certificate-selection step.
 
 **Files:**
+- Modify: `src/lib/esfXml/connection.ts`, `src/lib/esfXml/connection.test.ts` (add `authCertificateBase64` field)
+- Modify: `src/app/api/esf/connect/route.ts` (accept and store it)
+- Modify: `src/app/profile/acquiring/page.tsx` (add a file input for the AUTH certificate to the existing ЭСФ card from Task 7)
+- Create: `src/lib/esfXml/extractSignatureAndCertificate.ts`, `src/lib/esfXml/extractSignatureAndCertificate.test.ts`
 - Create: `src/app/api/esf/submit/route.ts`
 - Modify: `src/app/invoice/[id]/page.tsx` (add the "Выставить ЭСФ" button — read the file first to match its existing action-button pattern)
 
 **Interfaces:**
-- Consumes: `loadEsfConnectionByUserId` (Task 4), `buildInvoiceXml`/`EsfInvoiceInput` (Task 5), `createEsfSession`/`syncInvoice` (Task 6), `getActivePlan` (Task 3), and whichever signing function Task 1's spike confirmed (`runSigexQrSigning` from `src/lib/signDocument.ts`, assumed reusable per that task's expected outcome).
-- Produces: `POST /api/esf/submit` — the end-to-end feature. Nothing later depends on this task; it is the plan's final integration point.
+- Consumes: `loadEsfConnectionByUserId`/`saveEsfConnection` (Task 4, extended here), `buildInvoiceXml`/`EsfInvoiceInput` (Task 5), `createEsfSession`/`syncInvoice` (Task 6), `getActivePlan` (Task 3), `runSigexQrSigning` (confirmed GOST-capable, Task 1), the anon-key `auth.getUser` pattern established in Task 7's fix.
+- Produces: `extractSignatureAndCertificate(cmsSignatureBase64: string): { signatureBase64: string, certificateBase64: string }`, `POST /api/esf/connect` (extended), `POST /api/esf/submit` — the end-to-end feature. Nothing later depends on this task; it is the plan's final integration point.
 
-- [ ] **Step 1: Write the route**
+- [ ] **Step 0: Extend `esf_connections` for the stored AUTH certificate**
+
+Add the column:
+
+```sql
+alter table esf_connections add column auth_certificate_base64 text;
+```
+
+In `src/lib/esfXml/connection.ts`: add `authCertificateBase64: string | null` to the `EsfConnection` interface, read it (unencrypted — it's a public certificate, no secrecy needed, unlike `password_enc`) in `toConnection`, and add an `authCertificateBase64: string | null` parameter to `saveEsfConnection`, writing it to the new column. Update `connection.test.ts`'s existing fixtures/assertions to include the new field so they keep passing.
+
+In `src/app/api/esf/connect/route.ts`: accept `authCertificateBase64` from the request body (optional — a merchant might save login/password first and add the certificate in a second pass) and pass it through to `saveEsfConnection`.
+
+In `src/app/profile/acquiring/page.tsx`'s ЭСФ card (from Task 7): add a file input for the merchant's public AUTH certificate (`.cer`/`.pem`/`.crt`), read it client-side via `FileReader` as a data URL, strip the `data:...;base64,` prefix before sending, matching whatever pattern this codebase already uses elsewhere for a file-to-base64 upload (check `src/components/` for an existing file-upload helper before writing a new one).
+
+- [ ] **Step 1: `extractSignatureAndCertificate` — pull the raw values out of the CMS blob**
+
+Add the `pkijs` and `asn1js` packages (`npm install pkijs asn1js`) — pure-JS, isomorphic (Node + browser) RFC5652 CMS parsing, chosen over hand-rolled ASN.1 walking because the real signature structure includes optional `signedAttrs`/`unsignedAttrs` and a nested RFC3161 timestamp token (itself a second, embedded CMS structure) that make fixed byte-offset parsing unreliable.
 
 ```typescript
-// src/app/api/esf/submit/route.ts
-import { NextRequest, NextResponse } from 'next/server'
+// src/lib/esfXml/extractSignatureAndCertificate.ts
+import * as asn1js from 'asn1js'
+import { ContentInfo, SignedData } from 'pkijs'
+
+// runSigexQrSigning (src/lib/signDocument.ts) resolves a full CMS SignedData
+// structure -- certificates, algorithm identifiers, an embedded RFC3161
+// timestamp, AND the raw signature value all bundled together. ИС ЭСФ's
+// syncInvoiceRequest wants only two things out of that bundle: the bare
+// signature bytes (SignerInfo.signature, a few dozen/hundred bytes -- NOT
+// the whole multi-KB CMS envelope) and the signer's own certificate
+// (SignedData.certificates[0]). Both live inside the SAME blob, so one
+// signing ceremony is enough -- no separate certificate-selection step.
+export function extractSignatureAndCertificate(cmsSignatureBase64: string): {
+  signatureBase64: string
+  certificateBase64: string
+} {
+  const der = Buffer.from(cmsSignatureBase64, 'base64')
+  const asn1 = asn1js.fromBER(der.buffer.slice(der.byteOffset, der.byteOffset + der.byteLength))
+  if (asn1.offset === -1) throw new Error('CMS signature is not valid DER')
+
+  const contentInfo = new ContentInfo({ schema: asn1.result })
+  const signedData = new SignedData({ schema: contentInfo.content })
+
+  if (!signedData.signerInfos?.length) throw new Error('CMS structure has no signerInfos')
+  const signerInfo = signedData.signerInfos[0]
+  const signatureBytes = signerInfo.signature.valueBlock.valueHex
+  if (!signatureBytes || signatureBytes.byteLength === 0) throw new Error('signerInfo has no signature value')
+
+  if (!signedData.certificates?.length) throw new Error('CMS structure has no embedded certificate')
+  const certificateDer = signedData.certificates[0].toSchema().toBER(false)
+
+  return {
+    signatureBase64: Buffer.from(signatureBytes).toString('base64'),
+    certificateBase64: Buffer.from(certificateDer).toString('base64'),
+  }
+}
+```
+
+Write `extractSignatureAndCertificate.test.ts` using the REAL CMS signature the founder produced during Task 1's live spike as a fixture (it's quoted in full in this plan's Task 1 Step 6 outcome note — if it was not preserved verbatim there, this is a blocking gap: ask for a fresh live signing round rather than fabricating a synthetic CMS blob, since a hand-built fake risks not matching real-world structural quirks like the embedded timestamp token that motivated using a real parsing library in the first place). Assert: `signatureBase64` decodes to a plausible raw-signature byte length (a few dozen to ~128 bytes — NOT thousands), and `certificateBase64` decodes to valid DER whose parsed subject matches the known signer (`АБИЛЬБАЕВ АЛИХАН` / `IIN890525350143`, from Task 1's findings) — parse it with Node's built-in `crypto.X509Certificate` to read the subject without adding a second certificate-parsing dependency.
+
+Run: `npx tsc --noEmit && npm test -- --run src/lib/esfXml/extractSignatureAndCertificate.test.ts`
+Expected: PASS.
+
+**A second architecture correction, found while writing this route:** signing must happen in the browser (`runSigexQrSigning` needs the QR/eGov-mobile ceremony with the actual human), but the exact XML bytes to sign depend on server-held data (seller profile, the ЭСФ connection's stored VAT certificate number/series) that the browser doesn't have and shouldn't need to duplicate. That means one HTTP round trip cannot both build the XML and receive its signature — the browser has to sign something that doesn't exist yet at the time the signing ceremony needs it. Splitting into two routes solves this: `/api/esf/prepare` builds and returns the exact XML text (read-only, no submission yet), the browser signs exactly that text, then `/api/esf/submit` rebuilds the identical XML from the same inputs (deterministic — same invoice/profile/connection/lines in, same XML out) and submits it alongside the extracted signature. No server-side session state needs to be kept between the two calls.
+
+- [ ] **Step 2: Write a shared XML-assembly helper, then the prepare and submit routes**
+
+```typescript
+// src/lib/esfXml/buildEsfInvoiceInputForInvoice.ts
 import { createClient } from '@supabase/supabase-js'
-import { getActivePlan } from '@/lib/plan'
-import { loadEsfConnectionByUserId } from '@/lib/esfXml/connection'
-import { buildInvoiceXml, EsfInvoiceInput } from '@/lib/esfXml/buildInvoiceXml'
-import { createEsfSession, syncInvoice } from '@/lib/esfXml/client'
+import { EsfInvoiceInput } from './buildInvoiceXml'
+import { EsfConnection } from './connection'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-export async function POST(req: NextRequest) {
-  const authHeader = req.headers.get('authorization')
-  const token = authHeader?.replace('Bearer ', '')
-  if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const { data: { user } } = await supabase.auth.getUser(token)
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+export type EsfInvoiceLine = EsfInvoiceInput['lines'][number]
 
-  const { data: profile } = await supabase.from('profiles').select('plan, plan_expires_at, bonus_expires_at, trial_expires_at, bin_iin, company_name, legal_address, bank_name, bik, iik, kbe').eq('id', user.id).maybeSingle()
-  if (!getActivePlan(profile).canEsf) return NextResponse.json({ error: 'Требуется тариф Про' }, { status: 403 })
+// Shared by /api/esf/prepare and /api/esf/submit so both build byte-for-byte
+// the same EsfInvoiceInput from the same (invoiceId, lines) pair -- prepare
+// returns the XML for the browser to sign, submit rebuilds it independently
+// rather than trusting anything the client echoes back about invoice content.
+export async function buildEsfInvoiceInputForInvoice(
+  userId: string,
+  invoiceId: string,
+  lines: EsfInvoiceLine[]
+): Promise<{ input: EsfInvoiceInput; invoice: any } | { error: string; errorCode: string; status: number }> {
+  const { data: profile } = await supabase.from('profiles').select('company_name, bin_iin, legal_address, bank_name, bik, iik, kbe').eq('id', userId).maybeSingle()
+  const { data: invoice } = await supabase.from('invoices').select('*').eq('id', invoiceId).eq('user_id', userId).maybeSingle()
+  if (!invoice) return { error: 'Счёт не найден', errorCode: 'invoice_not_found', status: 404 }
 
-  const body = await req.json().catch(() => null)
-  const invoiceId = body?.invoiceId
-  const authCertificateBase64 = body?.authCertificateBase64
-  const signingCertificateBase64 = body?.signingCertificateBase64
-  const signatureBase64 = body?.signatureBase64
-  const lines = body?.lines // Array<{ description, quantity, unitPrice, unitCode, unitNomenclature, ndsRate }>, entered on the entry-point form since the base invoice's `services` shape doesn't carry per-line VAT/unit yet
-  if (!invoiceId || !authCertificateBase64 || !signingCertificateBase64 || !signatureBase64 || !Array.isArray(lines) || lines.length === 0) {
-    return NextResponse.json({ error: 'invoiceId, authCertificateBase64, signingCertificateBase64, signatureBase64, lines обязательны' }, { status: 400 })
-  }
-
-  const connection = await loadEsfConnectionByUserId(user.id)
-  if (!connection) return NextResponse.json({ error: 'ЭСФ не подключён' }, { status: 400 })
-
-  const { data: invoice } = await supabase.from('invoices').select('*').eq('id', invoiceId).eq('user_id', user.id).maybeSingle()
-  if (!invoice) return NextResponse.json({ error: 'Счёт не найден' }, { status: 404 })
-  if (!invoice.is_vat_payer) return NextResponse.json({ error: 'Покупатель не отмечен как плательщик НДС' }, { status: 400 })
+  const { loadEsfConnectionByUserId } = await import('./connection')
+  const connection = await loadEsfConnectionByUserId(userId)
+  if (!connection) return { error: 'ЭСФ не подключён', errorCode: 'not_connected', status: 400 }
 
   const today = new Date()
   const dateStr = `${String(today.getDate()).padStart(2, '0')}.${String(today.getMonth() + 1).padStart(2, '0')}.${today.getFullYear()}`
@@ -1047,19 +1111,128 @@ export async function POST(req: NextRequest) {
     lines,
   }
 
-  const invoiceXml = buildInvoiceXml(input)
+  return { input, invoice }
+}
+```
+
+```typescript
+// src/app/api/esf/prepare/route.ts
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
+import { getActivePlan } from '@/lib/plan'
+import { buildInvoiceXml } from '@/lib/esfXml/buildInvoiceXml'
+import { buildEsfInvoiceInputForInvoice } from '@/lib/esfXml/buildEsfInvoiceInputForInvoice'
+import { lookupBin } from '@/lib/binLookup'
+
+const supabaseAuth = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+
+export async function POST(req: NextRequest) {
+  const accessToken = req.headers.get('authorization')?.replace('Bearer ', '')
+  const { data: { user } } = accessToken ? await supabaseAuth.auth.getUser(accessToken) : { data: { user: null } }
+  if (!user) return NextResponse.json({ error: 'Unauthorized', errorCode: 'unauthorized' }, { status: 401 })
+
+  const { data: profile } = await supabase.from('profiles').select('plan, plan_expires_at, bonus_expires_at, trial_expires_at').eq('id', user.id).maybeSingle()
+  if (!getActivePlan(profile).canEsf) return NextResponse.json({ error: 'Требуется тариф Про', errorCode: 'not_pro' }, { status: 403 })
+
+  const body = await req.json().catch(() => null)
+  const invoiceId = body?.invoiceId
+  const lines = body?.lines
+  if (!invoiceId || !Array.isArray(lines) || lines.length === 0) {
+    return NextResponse.json({ error: 'invoiceId, lines обязательны', errorCode: 'missing_fields' }, { status: 400 })
+  }
+
+  const built = await buildEsfInvoiceInputForInvoice(user.id, invoiceId, lines)
+  if ('error' in built) return NextResponse.json({ error: built.error, errorCode: built.errorCode }, { status: built.status })
+
+  // Same is_vat_payer-or-fresh-lookup fallback as the submit route below --
+  // see that route's comment for why a stored `false`/`null` doesn't
+  // necessarily mean "not a VAT payer" (Task 8's review finding).
+  let isVatPayer = built.invoice.is_vat_payer as boolean | null
+  if (isVatPayer !== true && built.invoice.client_bin) {
+    const freshLookup = await lookupBin(built.invoice.client_bin).catch(() => null)
+    isVatPayer = freshLookup?.isVatPayer ?? isVatPayer
+  }
+  if (!isVatPayer) return NextResponse.json({ error: 'Покупатель не отмечен как плательщик НДС', errorCode: 'not_vat_payer' }, { status: 400 })
+
+  return NextResponse.json({ invoiceXml: buildInvoiceXml(built.input) })
+}
+```
+
+```typescript
+// src/app/api/esf/submit/route.ts
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
+import { getActivePlan } from '@/lib/plan'
+import { loadEsfConnectionByUserId } from '@/lib/esfXml/connection'
+import { buildInvoiceXml } from '@/lib/esfXml/buildInvoiceXml'
+import { buildEsfInvoiceInputForInvoice } from '@/lib/esfXml/buildEsfInvoiceInputForInvoice'
+import { createEsfSession, syncInvoice } from '@/lib/esfXml/client'
+import { extractSignatureAndCertificate } from '@/lib/esfXml/extractSignatureAndCertificate'
+import { lookupBin } from '@/lib/binLookup'
+
+// Matches the repo-wide two-client auth pattern confirmed in Task 7's
+// review (src/app/api/bcc/connect/route.ts and every other authenticated
+// route) -- auth.getUser must go through the ANON key, never the
+// service-role client used for the actual DB reads/writes below.
+const supabaseAuth = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
+
+export async function POST(req: NextRequest) {
+  const accessToken = req.headers.get('authorization')?.replace('Bearer ', '')
+  const { data: { user } } = accessToken
+    ? await supabaseAuth.auth.getUser(accessToken)
+    : { data: { user: null } }
+  if (!user) return NextResponse.json({ error: 'Unauthorized', errorCode: 'unauthorized' }, { status: 401 })
+
+  const { data: profile } = await supabase.from('profiles').select('plan, plan_expires_at, bonus_expires_at, trial_expires_at').eq('id', user.id).maybeSingle()
+  if (!getActivePlan(profile).canEsf) return NextResponse.json({ error: 'Требуется тариф Про', errorCode: 'not_pro' }, { status: 403 })
+
+  const body = await req.json().catch(() => null)
+  const invoiceId = body?.invoiceId
+  const cmsSignatureBase64 = body?.cmsSignatureBase64 // the raw runSigexQrSigning() output over the exact XML /api/esf/prepare returned -- signature + signing certificate both get extracted from this single blob below
+  const lines = body?.lines // same lines the browser sent to /api/esf/prepare -- rebuilding from them here (not trusting a client-echoed XML string) is what makes the two-step flow safe
+  if (!invoiceId || !cmsSignatureBase64 || !Array.isArray(lines) || lines.length === 0) {
+    return NextResponse.json({ error: 'invoiceId, cmsSignatureBase64, lines обязательны', errorCode: 'missing_fields' }, { status: 400 })
+  }
+
+  const connection = await loadEsfConnectionByUserId(user.id)
+  if (!connection) return NextResponse.json({ error: 'ЭСФ не подключён', errorCode: 'not_connected' }, { status: 400 })
+  if (!connection.authCertificateBase64) return NextResponse.json({ error: 'Не загружен сертификат аутентификации ЭСФ', errorCode: 'no_auth_certificate' }, { status: 400 })
+
+  const built = await buildEsfInvoiceInputForInvoice(user.id, invoiceId, lines)
+  if ('error' in built) return NextResponse.json({ error: built.error, errorCode: built.errorCode }, { status: built.status })
+
+  // Same is_vat_payer-or-fresh-lookup fallback as /api/esf/prepare -- this
+  // route re-checks independently rather than trusting that prepare was
+  // ever called, since a client could call submit directly.
+  let isVatPayer = built.invoice.is_vat_payer as boolean | null
+  if (isVatPayer !== true && built.invoice.client_bin) {
+    const freshLookup = await lookupBin(built.invoice.client_bin).catch(() => null)
+    isVatPayer = freshLookup?.isVatPayer ?? isVatPayer
+  }
+  if (!isVatPayer) return NextResponse.json({ error: 'Покупатель не отмечен как плательщик НДС', errorCode: 'not_vat_payer' }, { status: 400 })
+
+  const invoiceXml = buildInvoiceXml(built.input)
 
   let result
   try {
-    const sessionId = await createEsfSession(connection.login, connection.password, authCertificateBase64)
-    result = await syncInvoice(sessionId, invoiceXml, signatureBase64, signingCertificateBase64)
+    const { signatureBase64, certificateBase64 } = extractSignatureAndCertificate(cmsSignatureBase64)
+    const sessionId = await createEsfSession(connection.login, connection.password, connection.authCertificateBase64)
+    result = await syncInvoice(sessionId, invoiceXml, signatureBase64, certificateBase64)
   } catch (e: any) {
     await supabase.from('esf_submissions').insert({
       invoice_id: invoiceId, user_id: user.id, status: 'declined',
       error_code: 'TRANSPORT_ERROR', error_description: e?.message || String(e),
       invoice_xml_snapshot: invoiceXml,
     })
-    return NextResponse.json({ error: 'Ошибка связи с ИС ЭСФ: ' + (e?.message || String(e)) }, { status: 502 })
+    return NextResponse.json({ error: 'Ошибка связи с ИС ЭСФ: ' + (e?.message || String(e)), errorCode: 'transport_error' }, { status: 502 })
   }
 
   if (result.accepted) {
@@ -1080,11 +1253,11 @@ export async function POST(req: NextRequest) {
 }
 ```
 
-**Note on `authCertificateBase64`/`signingCertificateBase64`:** these come from the merchant's own certificate files, which they must upload or select somewhere in the flow — this route intentionally does not store them (they're read fresh from the request each submission, not persisted, since a certificate rotates independently of the login/password already stored in `esf_connections`). The actual UI for obtaining these two base64 certificate strings from the merchant's browser (a file picker reading a `.p12`/`.cer` file, or extracting the public cert from the SIGEX signing ceremony's own certificate-selection step) is a real UI decision this plan does not resolve — it depends on what Task 1's live spike revealed about how `runSigexQrSigning` exposes the signer's certificate, if at all. Confirm this against Task 1's actual findings before writing the entry-point form in Step 2 below; do not guess it.
+`lookupBin` above: use whatever the actual exported function name/signature is in `src/lib/binLookup.ts` (confirm by reading the file — this plan's earlier investigation named the module but not this exact call shape) — it must be safe to call server-side (Task 8's usage was client-side via a hook; this route needs the underlying function directly, not the React hook).
 
-- [ ] **Step 2: Add the invoice-page entry point**
+- [ ] **Step 3: Add the invoice-page entry point**
 
-Read `src/app/invoice/[id]/page.tsx` in full. Add a "Выставить ЭСФ" button, visible only when the loaded invoice's `is_vat_payer` is `true` and the current user's plan has `canEsf`. Clicking it should open a form collecting each line's `unitCode`/`unitNomenclature` (offer the small fixed set below as a dropdown, since the full government classifier is out of scope per this plan's Global Constraints) and `ndsRate`, run the signing ceremony (per Task 1's confirmed mechanism) over the built XML, and POST to `/api/esf/submit`:
+Read `src/app/invoice/[id]/page.tsx` in full. Add a "Выставить ЭСФ" button, visible only when the loaded invoice's `is_vat_payer` is not `false` (i.e. `true` or `null` — a `null` might still turn out to be a VAT payer per the route's own re-check above; only a confirmed `false` should hide the button) and the current user's plan has `canEsf`. Clicking it should open a form collecting each line's `unitCode`/`unitNomenclature` (offer the small fixed set below as a dropdown, since the full government classifier is out of scope per this plan's Global Constraints) and `ndsRate`, then on submit: (1) `POST /api/esf/prepare` with `{ invoiceId, lines }`, getting back `{ invoiceXml }`; (2) run ONE `runSigexQrSigning` ceremony over that exact `invoiceXml` string (the same function Task 1 confirmed produces a GOST signature) — the browser never builds or sees the XML itself except as this opaque string to sign; (3) `POST /api/esf/submit` with `{ invoiceId, lines, cmsSignatureBase64 }` (the same `lines` sent to prepare, plus the raw signing-ceremony result) — no certificate handling in the browser at all, that all happens server-side in Step 2 above:
 
 ```typescript
 // Common ОКЕИ unit codes -- confirmed against the SDK's own "796" example
@@ -1103,15 +1276,21 @@ const COMMON_UNIT_CODES = [
 ]
 ```
 
-- [ ] **Step 3: Manual verification against the sandbox**
+- [ ] **Step 4: Manual verification against the sandbox**
 
 Deferred to Task 10 below, which exercises this exact route end-to-end.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
-git add src/app/api/esf/submit/route.ts src/app/invoice/[id]/page.tsx
-git commit -m "feat(esf): add submit route and invoice-page entry point"
+npm install pkijs asn1js
+git add src/lib/esfXml/connection.ts src/lib/esfXml/connection.test.ts \
+  src/app/api/esf/connect/route.ts src/app/profile/acquiring/page.tsx \
+  src/lib/esfXml/extractSignatureAndCertificate.ts src/lib/esfXml/extractSignatureAndCertificate.test.ts \
+  src/lib/esfXml/buildEsfInvoiceInputForInvoice.ts \
+  src/app/api/esf/prepare/route.ts src/app/api/esf/submit/route.ts \
+  src/app/invoice/[id]/page.tsx package.json package-lock.json
+git commit -m "feat(esf): auth-certificate storage, signature/certificate extraction, prepare+submit routes, invoice-page entry point"
 ```
 
 ---
