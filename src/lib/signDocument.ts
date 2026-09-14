@@ -1,5 +1,4 @@
 'use client'
-import html2pdf from 'html2pdf.js'
 import QRCode from 'qrcode'
 import { QRSigningClientCMS } from 'sigex-qr-signing-client'
 import { supabase } from './supabase'
@@ -19,6 +18,12 @@ import { supabase } from './supabase'
 // html2pdf a DOM element instead of a string skips DOMPurify entirely, since
 // `.from(element)` never sanitizes its input.
 export async function renderPdfBlob(html: string): Promise<Blob> {
+  // Dynamic, not a top-level import: html2pdf.js touches `self` at module
+  // load time (it's browser-only), which crashes this module's SSR pass on
+  // any page that renders SignatureSection -- notably /view/[token], the
+  // public payer page. Same pattern already used everywhere else this
+  // codebase loads html2pdf.js (generatePDF.ts, kaspi-api/page.tsx, ...).
+  const html2pdf = (await import('html2pdf.js')).default
   const parsed = new DOMParser().parseFromString(html, 'text/html')
   const root = parsed.body.cloneNode(true) as HTMLElement
   parsed.querySelectorAll('style').forEach(style => {
