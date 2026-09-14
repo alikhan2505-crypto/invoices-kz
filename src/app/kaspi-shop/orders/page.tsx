@@ -64,6 +64,14 @@ function KaspiShopOrdersInner() {
   const [ordersLoading, setOrdersLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  // Full order objects (items/quantity) for every currently-selected code --
+  // not just the ones on the loaded page. Kaspi hard-caps list pages at 10
+  // (see PAGE_SIZE in cabinetApi.ts), so a seller packing/printing more than
+  // 10 orders at once needs a selection that survives moving between pages;
+  // confirmPackingAction needs the actual item quantities, which only exist
+  // on an order object, not a bare code.
+  const [selectedOrdersData, setSelectedOrdersData] = useState<Map<string, Order>>(new Map())
+  const [selectAllLoading, setSelectAllLoading] = useState(false)
   const [printing, setPrinting] = useState<'a4' | 'a6' | null>(null)
   const [confirmingPacking, setConfirmingPacking] = useState(false)
   const [packingConfirmedMessage, setPackingConfirmedMessage] = useState('')
@@ -164,6 +172,7 @@ function KaspiShopOrdersInner() {
     setOrdersLoading(true)
     setLoadError('')
     setSelected(new Set())
+    setSelectedOrdersData(new Map())
     setPackingConfirmedMessage('')
     try {
       const headers = await authHeader()
@@ -204,6 +213,60 @@ function KaspiShopOrdersInner() {
       if (next.has(code)) next.delete(code); else next.add(code)
       return next
     })
+    setSelectedOrdersData(prev => {
+      const next = new Map(prev)
+      if (next.has(code)) {
+        next.delete(code)
+      } else {
+        const order = orders.find(o => o.code === code)
+        if (order) next.set(code, order)
+      }
+      return next
+    })
+  }
+
+  function deselectAll() {
+    setSelected(new Set())
+    setSelectedOrdersData(new Map())
+  }
+
+  // Selects every order across EVERY page of the current status/filters --
+  // not just the 10 on screen. Without this, packing or printing more than
+  // one page silently acted on only whichever page was visible when the
+  // button was clicked (the actual cause of the founder's "2 заказа
+  // потерялись": 12 orders in Передача, page 1 shows 10, nothing on screen
+  // hints the other 2 are one click away on page 2). Capped like
+  // exportExcel's own 500-order cap -- a seller with that many orders in one
+  // status at once is not the case this button was built for.
+  const SELECT_ALL_CAP = 500
+  async function selectAllAcrossPages() {
+    if (selectAllLoading || total === 0) return
+    setSelectAllLoading(true)
+    setLoadError('')
+    try {
+      const headers = await authHeader()
+      const cityParam = cityId ? `&cityId=${encodeURIComponent(cityId)}` : ''
+      const orderCodeParam = orderCodeSearch ? `&orderCode=${encodeURIComponent(orderCodeSearch)}` : ''
+      const pagesNeeded = Math.min(Math.ceil(total / PAGE_SIZE), Math.ceil(SELECT_ALL_CAP / PAGE_SIZE))
+      const all: Order[] = []
+      for (let p = 0; p < pagesNeeded; p++) {
+        // Sequential, not Promise.all: this hits Kaspi's own cabinet API,
+        // which the codebase has already found to be picky about request
+        // shape/rate under load (see PAGE_SIZE's own size:50 rejection).
+        const res = await fetch(`/api/kaspi-shop/orders?status=${encodeURIComponent(status)}&page=${p}${cityParam}${orderCodeParam}`, { headers })
+        const data = await res.json()
+        if (!res.ok) { setLoadError(data.error || 'Не удалось выбрать все заказы'); return }
+        all.push(...(data.orders || []))
+      }
+      const filtered = BULK_SELECTABLE_STATUSES.includes(status) ? filterByDeliveryCutoff(all, dateMode) : all
+      setSelectedOrdersData(new Map(filtered.map(o => [o.code, o])))
+      setSelected(new Set(filtered.map(o => o.code)))
+      if (total > SELECT_ALL_CAP) setLoadError(`Выбраны первые ${SELECT_ALL_CAP} заказов из ${total} — слишком много для одного действия`)
+    } catch {
+      setLoadError('Не удалось выбрать все заказы. Проверьте соединение и попробуйте ещё раз.')
+    } finally {
+      setSelectAllLoading(false)
+    }
   }
 
   async function printWaybills(format: 'a4' | 'a6') {
@@ -247,8 +310,12 @@ function KaspiShopOrdersInner() {
     setPackingConfirmedMessage('')
     try {
       const headers = await authHeader()
-      const selectedOrders = orders
-        .filter(o => selected.has(o.code))
+      // selectedOrdersData, not the loaded `orders` page: a selection made
+      // via "Выбрать все" spans pages Kaspi never returns together, so
+      // filtering the current page's `orders` here would silently drop
+      // every selected order not on whichever page happens to be loaded --
+      // exactly what caused orders to go missing before this existed.
+      const selectedOrders = Array.from(selectedOrdersData.values())
         .map(o => ({ orderCode: o.code, quantity: o.items.reduce((sum, it) => sum + it.quantity, 0) }))
       const res = await fetch('/api/kaspi-shop/orders/confirm-packing', {
         method: 'POST', headers, body: JSON.stringify({ orders: selectedOrders }),
@@ -392,6 +459,25 @@ function KaspiShopOrdersInner() {
                 </button>
               )
             })}
+          </div>
+        )}
+
+        {/* Kaspi caps list pages at 10 orders -- "Выбрать все" fetches every
+            page of the current status/filters so packing or printing more
+            than 10 at once no longer requires noticing the "Дальше" button
+            page by page (see selectAllAcrossPages's own comment). */}
+        {BULK_SELECTABLE_STATUSES.includes(status) && total > 0 && (
+          <div className="flex items-center gap-2 mb-4">
+            <button onClick={selectAllAcrossPages} disabled={selectAllLoading}
+              className="nav-glass text-xs font-semibold rounded-full px-3 py-1.5 disabled:opacity-50" style={{ color: 'var(--nav-text-primary)' }}>
+              {selectAllLoading ? 'Выбираем...' : `Выбрать все (${total})`}
+            </button>
+            {selected.size > 0 && (
+              <button onClick={deselectAll}
+                className="nav-glass text-xs font-semibold rounded-full px-3 py-1.5" style={{ color: 'var(--nav-text-secondary)' }}>
+                Снять выбор
+              </button>
+            )}
           </div>
         )}
 
