@@ -59,19 +59,11 @@ function KaspiShopOrdersInner() {
   const [loading, setLoading] = useState(true)
   const [orders, setOrders] = useState<Order[]>([])
   const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(0)
+  const [loadedCount, setLoadedCount] = useState(0)
   const [counts, setCounts] = useState<Record<string, number>>({})
   const [ordersLoading, setOrdersLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
-  // Full order objects (items/quantity) for every currently-selected code --
-  // not just the ones on the loaded page. Kaspi hard-caps list pages at 10
-  // (see PAGE_SIZE in cabinetApi.ts), so a seller packing/printing more than
-  // 10 orders at once needs a selection that survives moving between pages;
-  // confirmPackingAction needs the actual item quantities, which only exist
-  // on an order object, not a bare code.
-  const [selectedOrdersData, setSelectedOrdersData] = useState<Map<string, Order>>(new Map())
-  const [selectAllLoading, setSelectAllLoading] = useState(false)
   const [printing, setPrinting] = useState<'a4' | 'a6' | null>(null)
   const [confirmingPacking, setConfirmingPacking] = useState(false)
   const [packingConfirmedMessage, setPackingConfirmedMessage] = useState('')
@@ -89,10 +81,15 @@ function KaspiShopOrdersInner() {
   const [orderCodeInput, setOrderCodeInput] = useState('')
   const [orderCodeSearch, setOrderCodeSearch] = useState('')
 
+  // Kaspi hard-caps a single list request at 10 orders (confirmed in
+  // cabinetApi.ts -- requesting 50 is rejected outright), so "show
+  // everything, no pagination" means fetching pages 0..N ourselves and
+  // concatenating them client-side rather than asking Kaspi for more per
+  // page. Capped like exportExcel's own 500-order cap: a status with more
+  // than that is not what this list view is for.
   const PAGE_SIZE = 10
+  const LOAD_ALL_CAP = 500
   const prevStatus = useRef(status)
-  const prevCityId = useRef(cityId)
-  const prevOrderCodeSearch = useRef(orderCodeSearch)
 
   useEffect(() => { checkAccess() }, [])
   useEffect(() => {
@@ -109,31 +106,10 @@ function KaspiShopOrdersInner() {
   }, [orderCodeInput])
   useEffect(() => {
     if (loading) return
-    // A status, city, or order-code-search switch resets to page 0 -- skip
-    // this render's fetch (it'd use the stale page from before the switch)
-    // and let the resulting setPage(0) re-trigger this effect with the
-    // right value.
-    const statusChanged = prevStatus.current !== status
-    const cityChanged = prevCityId.current !== cityId
-    const orderCodeChanged = prevOrderCodeSearch.current !== orderCodeSearch
-    prevStatus.current = status
-    prevCityId.current = cityId
-    prevOrderCodeSearch.current = orderCodeSearch
-    if (statusChanged) {
-      setPage(0)
-      setDateMode('all')
-      loadCounts()
-      if (page === 0) loadOrders(status, 0, cityId, orderCodeSearch)
-      return
-    }
-    if (cityChanged || orderCodeChanged) {
-      setPage(0)
-      if (page === 0) loadOrders(status, 0, cityId, orderCodeSearch)
-      return
-    }
-    loadOrders(status, page, cityId, orderCodeSearch)
+    if (prevStatus.current !== status) { prevStatus.current = status; setDateMode('all') }
+    loadOrders(status, cityId, orderCodeSearch)
     loadCounts()
-  }, [status, page, cityId, orderCodeSearch, loading])
+  }, [status, cityId, orderCodeSearch, loading])
 
   async function authHeader() {
     const { data: { session } } = await supabase.auth.getSession()
@@ -168,22 +144,41 @@ function KaspiShopOrdersInner() {
     }
   }
 
-  async function loadOrders(forStatus: string, forPage: number, forCityId: string = '', forOrderCode: string = '') {
+  // Fetches every page for forStatus/forCityId/forOrderCode and concatenates
+  // them into one list -- sequential, not Promise.all, because this hits
+  // Kaspi's own cabinet API, which the codebase has already found picky
+  // about request shape/rate under load (see PAGE_SIZE's own size:50
+  // rejection). setLoadedCount along the way so the loading state can show
+  // progress instead of sitting on "Загружаем заказы..." for however long a
+  // few dozen sequential requests take.
+  async function loadOrders(forStatus: string, forCityId: string = '', forOrderCode: string = '') {
     setOrdersLoading(true)
     setLoadError('')
     setSelected(new Set())
-    setSelectedOrdersData(new Map())
     setPackingConfirmedMessage('')
+    setLoadedCount(0)
     try {
       const headers = await authHeader()
       const cityParam = forCityId ? `&cityId=${encodeURIComponent(forCityId)}` : ''
       const orderCodeParam = forOrderCode ? `&orderCode=${encodeURIComponent(forOrderCode)}` : ''
-      const res = await fetch(`/api/kaspi-shop/orders?status=${encodeURIComponent(forStatus)}&page=${forPage}${cityParam}${orderCodeParam}`, { headers })
-      const data = await res.json()
-      if (!res.ok) { setLoadError(data.error || 'Не удалось загрузить заказы'); setOrders([]); setTotal(0); return }
-      setOrders(data.orders || [])
-      setTotal(data.total || 0)
-      if (data.sessionExpired) setSessionExpired(true)
+      const all: Order[] = []
+      let realTotal = 0
+      let sawSessionExpired = false
+      for (let p = 0; p * PAGE_SIZE < LOAD_ALL_CAP; p++) {
+        const res = await fetch(`/api/kaspi-shop/orders?status=${encodeURIComponent(forStatus)}&page=${p}${cityParam}${orderCodeParam}`, { headers })
+        const data = await res.json()
+        if (!res.ok) { setLoadError(data.error || 'Не удалось загрузить заказы'); setOrders([]); setTotal(0); return }
+        if (data.sessionExpired) sawSessionExpired = true
+        realTotal = data.total || 0
+        const pageOrders: Order[] = data.orders || []
+        all.push(...pageOrders)
+        setLoadedCount(all.length)
+        if (pageOrders.length < PAGE_SIZE || all.length >= realTotal) break
+      }
+      setOrders(all)
+      setTotal(realTotal)
+      if (sawSessionExpired) setSessionExpired(true)
+      if (realTotal > LOAD_ALL_CAP) setLoadError(`Показаны первые ${LOAD_ALL_CAP} заказов из ${realTotal} — сузьте фильтром по городу или поиском по номеру`)
     } catch (e: any) {
       setLoadError('Не удалось загрузить заказы. Проверьте соединение и попробуйте ещё раз.')
       setOrders([])
@@ -213,60 +208,18 @@ function KaspiShopOrdersInner() {
       if (next.has(code)) next.delete(code); else next.add(code)
       return next
     })
-    setSelectedOrdersData(prev => {
-      const next = new Map(prev)
-      if (next.has(code)) {
-        next.delete(code)
-      } else {
-        const order = orders.find(o => o.code === code)
-        if (order) next.set(code, order)
-      }
-      return next
-    })
   }
 
   function deselectAll() {
     setSelected(new Set())
-    setSelectedOrdersData(new Map())
   }
 
-  // Selects every order across EVERY page of the current status/filters --
-  // not just the 10 on screen. Without this, packing or printing more than
-  // one page silently acted on only whichever page was visible when the
-  // button was clicked (the actual cause of the founder's "2 заказа
-  // потерялись": 12 orders in Передача, page 1 shows 10, nothing on screen
-  // hints the other 2 are one click away on page 2). Capped like
-  // exportExcel's own 500-order cap -- a seller with that many orders in one
-  // status at once is not the case this button was built for.
-  const SELECT_ALL_CAP = 500
-  async function selectAllAcrossPages() {
-    if (selectAllLoading || total === 0) return
-    setSelectAllLoading(true)
-    setLoadError('')
-    try {
-      const headers = await authHeader()
-      const cityParam = cityId ? `&cityId=${encodeURIComponent(cityId)}` : ''
-      const orderCodeParam = orderCodeSearch ? `&orderCode=${encodeURIComponent(orderCodeSearch)}` : ''
-      const pagesNeeded = Math.min(Math.ceil(total / PAGE_SIZE), Math.ceil(SELECT_ALL_CAP / PAGE_SIZE))
-      const all: Order[] = []
-      for (let p = 0; p < pagesNeeded; p++) {
-        // Sequential, not Promise.all: this hits Kaspi's own cabinet API,
-        // which the codebase has already found to be picky about request
-        // shape/rate under load (see PAGE_SIZE's own size:50 rejection).
-        const res = await fetch(`/api/kaspi-shop/orders?status=${encodeURIComponent(status)}&page=${p}${cityParam}${orderCodeParam}`, { headers })
-        const data = await res.json()
-        if (!res.ok) { setLoadError(data.error || 'Не удалось выбрать все заказы'); return }
-        all.push(...(data.orders || []))
-      }
-      const filtered = BULK_SELECTABLE_STATUSES.includes(status) ? filterByDeliveryCutoff(all, dateMode) : all
-      setSelectedOrdersData(new Map(filtered.map(o => [o.code, o])))
-      setSelected(new Set(filtered.map(o => o.code)))
-      if (total > SELECT_ALL_CAP) setLoadError(`Выбраны первые ${SELECT_ALL_CAP} заказов из ${total} — слишком много для одного действия`)
-    } catch {
-      setLoadError('Не удалось выбрать все заказы. Проверьте соединение и попробуйте ещё раз.')
-    } finally {
-      setSelectAllLoading(false)
-    }
+  // Every order for the current status/filters is already in `orders` --
+  // loadOrders fetches all of it up front, not just one 10-item page -- so
+  // "select all" is just selecting what's already on screen, no extra
+  // network round-trip needed.
+  function selectAllVisible() {
+    setSelected(new Set(visibleOrders.map(o => o.code)))
   }
 
   async function printWaybills(format: 'a4' | 'a6') {
@@ -310,12 +263,8 @@ function KaspiShopOrdersInner() {
     setPackingConfirmedMessage('')
     try {
       const headers = await authHeader()
-      // selectedOrdersData, not the loaded `orders` page: a selection made
-      // via "Выбрать все" spans pages Kaspi never returns together, so
-      // filtering the current page's `orders` here would silently drop
-      // every selected order not on whichever page happens to be loaded --
-      // exactly what caused orders to go missing before this existed.
-      const selectedOrders = Array.from(selectedOrdersData.values())
+      const selectedOrders = orders
+        .filter(o => selected.has(o.code))
         .map(o => ({ orderCode: o.code, quantity: o.items.reduce((sum, it) => sum + it.quantity, 0) }))
       const res = await fetch('/api/kaspi-shop/orders/confirm-packing', {
         method: 'POST', headers, body: JSON.stringify({ orders: selectedOrders }),
@@ -325,7 +274,7 @@ function KaspiShopOrdersInner() {
         setLoadError(data.error || 'Не удалось подтвердить упаковку')
         return
       }
-      await Promise.all([loadOrders(status, page, cityId), loadCounts()])
+      await Promise.all([loadOrders(status, cityId, orderCodeSearch), loadCounts()])
       setPackingConfirmedMessage('Накладные появятся на вкладке «Передача» в течение 5 минут.')
     } catch {
       setLoadError('Не удалось подтвердить упаковку. Проверьте соединение и попробуйте ещё раз.')
@@ -415,7 +364,7 @@ function KaspiShopOrdersInner() {
         {loadError && (
           <div className="nav-glass rounded-2xl p-4 flex items-center justify-between gap-3 mb-4">
             <span className="text-sm" style={{ color: 'var(--nav-critical)' }}>{loadError}</span>
-            <button onClick={() => loadOrders(status, page, cityId, orderCodeSearch)} className="text-xs font-semibold rounded-lg px-3 py-1.5 flex-shrink-0" style={{ background: 'var(--nav-critical)', color: '#fff' }}>Повторить</button>
+            <button onClick={() => loadOrders(status, cityId, orderCodeSearch)} className="text-xs font-semibold rounded-lg px-3 py-1.5 flex-shrink-0" style={{ background: 'var(--nav-critical)', color: '#fff' }}>Повторить</button>
           </div>
         )}
 
@@ -462,15 +411,11 @@ function KaspiShopOrdersInner() {
           </div>
         )}
 
-        {/* Kaspi caps list pages at 10 orders -- "Выбрать все" fetches every
-            page of the current status/filters so packing or printing more
-            than 10 at once no longer requires noticing the "Дальше" button
-            page by page (see selectAllAcrossPages's own comment). */}
         {BULK_SELECTABLE_STATUSES.includes(status) && total > 0 && (
           <div className="flex items-center gap-2 mb-4">
-            <button onClick={selectAllAcrossPages} disabled={selectAllLoading}
-              className="nav-glass text-xs font-semibold rounded-full px-3 py-1.5 disabled:opacity-50" style={{ color: 'var(--nav-text-primary)' }}>
-              {selectAllLoading ? 'Выбираем...' : `Выбрать все (${total})`}
+            <button onClick={selectAllVisible}
+              className="nav-glass text-xs font-semibold rounded-full px-3 py-1.5" style={{ color: 'var(--nav-text-primary)' }}>
+              {`Выбрать все (${total})`}
             </button>
             {selected.size > 0 && (
               <button onClick={deselectAll}
@@ -512,11 +457,13 @@ function KaspiShopOrdersInner() {
         )}
 
         {ordersLoading ? (
-          <div className="nav-glass rounded-2xl p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Загружаем заказы...</div>
+          <div className="nav-glass rounded-2xl p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>
+            {loadedCount > PAGE_SIZE ? `Загружаем заказы... (${loadedCount})` : 'Загружаем заказы...'}
+          </div>
         ) : visibleOrders.length === 0 ? (
           <div className="nav-glass rounded-2xl p-8 text-center">
             <div className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
-              {orders.length > 0 && dateMode === 'tomorrow' ? 'На этой странице нет заказов на завтра до 20:00.' : 'Заказов в этом статусе нет.'}
+              {orders.length > 0 && dateMode === 'tomorrow' ? 'Среди загруженных заказов нет заказов на завтра до 20:00.' : 'Заказов в этом статусе нет.'}
             </div>
           </div>
         ) : (() => {
@@ -606,16 +553,8 @@ function KaspiShopOrdersInner() {
           )
         })()}
 
-        {total > PAGE_SIZE && (
-          <div className="flex items-center justify-between mt-4">
-            <span className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>{page * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE + orders.length, total)} из {total}</span>
-            <div className="flex gap-2">
-              <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}
-                className="nav-glass text-xs font-medium rounded-lg px-3 py-1.5 disabled:opacity-40" style={{ color: 'var(--nav-text-primary)' }}>Назад</button>
-              <button onClick={() => setPage(p => p + 1)} disabled={page * PAGE_SIZE + orders.length >= total}
-                className="nav-glass text-xs font-medium rounded-lg px-3 py-1.5 disabled:opacity-40" style={{ color: 'var(--nav-text-primary)' }}>Дальше</button>
-            </div>
-          </div>
+        {orders.length < total && (
+          <div className="mt-4 text-xs" style={{ color: 'var(--nav-text-muted)' }}>Показаны первые {orders.length} из {total}</div>
         )}
       </div>
 
