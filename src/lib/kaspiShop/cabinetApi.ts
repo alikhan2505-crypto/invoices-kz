@@ -14,6 +14,21 @@ export function authHeaders(sessionCookies: string): Record<string, string> {
   }
 }
 
+// A single 401 from Kaspi isn't reliable proof a session is actually dead --
+// observed live 2026-09-14: listOrders and getOrderCounters both 401'd for a
+// connection that answered normally again seconds later with the exact same
+// cookies (most likely a transient hiccup on Kaspi's side, not a real logout).
+// The caller treats sessionExpired as gospel and writes it straight to
+// kaspi_shop_connections.session_status, which forces a full phone+OTP
+// reconnect -- expensive to be wrong about, cheap to double-check. One retry
+// after a short pause is enough to filter that case out before committing.
+async function fetchWithRetryOn401(url: string, init: RequestInit, fetchFn: typeof fetch): Promise<Response> {
+  const res = await fetchFn(url, init)
+  if (res.status !== 401) return res
+  await new Promise(r => setTimeout(r, 500))
+  return fetchFn(url, init)
+}
+
 // Confirmed live 2026-08-13: this is the same call the real cabinet's own
 // SPA makes right after landing on kaspi.kz/mc/ to figure out which
 // merchant(s) the logged-in phone number can manage -- one login can have
@@ -489,8 +504,8 @@ const GET_ORDER_COUNTERS_QUERY = `query getOrderCounters($merchantUid: String!) 
   }
 }`
 
-export async function getOrderCounters(sessionCookies: string, merchantId: string): Promise<OrderCountersResult> {
-  const res = await fetch('https://mc.shop.kaspi.kz/mc/facade/graphql?opName=getOrderCounters', {
+export async function getOrderCounters(sessionCookies: string, merchantId: string, fetchFn: typeof fetch = fetch): Promise<OrderCountersResult> {
+  const res = await fetchWithRetryOn401('https://mc.shop.kaspi.kz/mc/facade/graphql?opName=getOrderCounters', {
     method: 'POST',
     headers: authHeaders(sessionCookies),
     body: JSON.stringify({
@@ -498,7 +513,7 @@ export async function getOrderCounters(sessionCookies: string, merchantId: strin
       variables: { merchantUid: merchantId },
       query: GET_ORDER_COUNTERS_QUERY,
     }),
-  })
+  }, fetchFn)
   if (!res.ok) {
     const bodyText = await res.text().catch(() => '')
     console.error('kaspi-shop getOrderCounters: upstream not ok', res.status, bodyText.slice(0, 1000))
@@ -545,7 +560,7 @@ export async function listOrders(
   // confirmed shape captured live 2026-08-13, see
   // docs/superpowers/specs/2026-08-13-kaspi-orders-api-findings.md).
   const searching = orderCode.trim().length > 0
-  const res = await fetchFn('https://mc.shop.kaspi.kz/mc/facade/graphql?opName=getOrders', {
+  const res = await fetchWithRetryOn401('https://mc.shop.kaspi.kz/mc/facade/graphql?opName=getOrders', {
     method: 'POST',
     headers: authHeaders(sessionCookies),
     body: JSON.stringify({
@@ -560,7 +575,7 @@ export async function listOrders(
       },
       query: GET_ORDERS_QUERY,
     }),
-  })
+  }, fetchFn)
   if (!res.ok) {
     const bodyText = await res.text().catch(() => '')
     console.error('kaspi-shop listOrders: upstream not ok', res.status, bodyText.slice(0, 1000))

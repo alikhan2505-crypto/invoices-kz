@@ -83,10 +83,23 @@ describe('listOrders', () => {
     expect(result.orders[0].code).toBe('906725811')
   })
 
-  it('reports sessionExpired on 401', async () => {
+  it('reports sessionExpired only after a retry also 401s', async () => {
     const fetchFn = vi.fn().mockResolvedValue(jsonResponse({}, 401))
     const result = await listOrders('c', '425002', 'NEW', 0, '', '', fetchFn as any)
     expect(result).toEqual({ orders: [], total: 0, sessionExpired: true })
+    expect(fetchFn).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not report sessionExpired when a 401 is followed by a real retry success', async () => {
+    const fetchFn = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({}, 401))
+      .mockResolvedValueOnce(jsonResponse({
+        data: { merchant: { orders: { orders: { total: 1, orders: [orderFragment('906725811')] } } } },
+      }))
+    const result = await listOrders('c', '425002', 'NEW', 0, '', '', fetchFn as any)
+    expect(result.sessionExpired).toBe(false)
+    expect(result.orders[0].code).toBe('906725811')
+    expect(fetchFn).toHaveBeenCalledTimes(2)
   })
 })
 
