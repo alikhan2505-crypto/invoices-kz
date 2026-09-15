@@ -102,6 +102,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
   }
 
   const publicLink = `https://invoices.kz/view/${invoice.public_token}`
+  // clientName comes straight from an anonymous public POST body -- HTML-
+  // escaped before going into the email body so a buyer can't inject markup
+  // (a fake "click here" link, broken layout) into mail sent from our own
+  // mail@invoices.kz address. companyName is seller-controlled (set once at
+  // Kaspi Shop connect time), escaped too for defense-in-depth.
+  const escapeHtml = (s: string) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!))
   try {
     await resend.emails.send({
       from: 'invoices.kz <mail@invoices.kz>',
@@ -113,8 +119,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
             <h1 style="color: white; margin: 0; font-size: 24px;">INVOICES.KZ</h1>
           </div>
           <div style="background: #f9fafb; padding: 30px; border-radius: 0 0 12px 12px;">
-            <p style="font-size: 16px; color: #374151;">Здравствуйте, <strong>${clientName}</strong>!</p>
-            <p style="color: #6b7280;">Ваша заявка у ${storefront.companyName} оформлена. Счёт на оплату — по ссылке ниже.</p>
+            <p style="font-size: 16px; color: #374151;">Здравствуйте, <strong>${escapeHtml(clientName)}</strong>!</p>
+            <p style="color: #6b7280;">Ваша заявка у ${escapeHtml(storefront.companyName)} оформлена. Счёт на оплату — по ссылке ниже.</p>
             <a href="${publicLink}" style="display: inline-block; margin-top: 12px; background: #1C2056; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none;">Открыть счёт №${invoiceNumber}</a>
           </div>
         </div>
