@@ -64,6 +64,10 @@ export default function KaspiShopStorefrontSettings() {
   const [backgroundColor, setBackgroundColor] = useState<string | null>(null)
   const [deliveryInfo, setDeliveryInfo] = useState('')
   const [chatWidgetEnabled, setChatWidgetEnabled] = useState(false)
+  const [landingEnabled, setLandingEnabled] = useState(false)
+  const [landingHistory, setLandingHistory] = useState('')
+  const [landingCapacity, setLandingCapacity] = useState('')
+  const [landingAnnualVolume, setLandingAnnualVolume] = useState('')
   const [appearanceSaving, setAppearanceSaving] = useState(false)
   const [appearanceError, setAppearanceError] = useState('')
   const [appearanceSaved, setAppearanceSaved] = useState(false)
@@ -84,6 +88,10 @@ export default function KaspiShopStorefrontSettings() {
       setBackgroundColor(data.backgroundColor || null)
       setDeliveryInfo(data.deliveryInfo || '')
       setChatWidgetEnabled(!!data.chatWidgetEnabled)
+      setLandingEnabled(!!data.landingEnabled)
+      setLandingHistory(data.landingHistory || '')
+      setLandingCapacity(data.landingCapacity || '')
+      setLandingAnnualVolume(data.landingAnnualVolume || '')
     }
     setLoading(false)
   }, [])
@@ -95,7 +103,7 @@ export default function KaspiShopStorefrontSettings() {
     try {
       const headers = await authHeader()
       const res = await fetch('/api/kaspi-shop/storefront/appearance', {
-        method: 'POST', headers, body: JSON.stringify({ backgroundColor, deliveryInfo, chatWidgetEnabled }),
+        method: 'POST', headers, body: JSON.stringify({ backgroundColor, deliveryInfo, chatWidgetEnabled, landingEnabled, landingHistory, landingCapacity, landingAnnualVolume }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -365,6 +373,10 @@ export default function KaspiShopStorefrontSettings() {
           })}
         </div>
 
+        <a href="/kaspi-shop/storefront/models" className="inline-block text-sm font-semibold rounded-full px-4 py-2 nav-glass mb-4" style={{ color: 'var(--nav-text-primary)' }}>
+          Модели (оптовый каталог) →
+        </a>
+
         {tab === 'settings' && (
           <>
             {!settings?.cashierConnected ? (
@@ -456,6 +468,21 @@ export default function KaspiShopStorefrontSettings() {
                     <a href="/ai-agent/settings" className="font-semibold" style={{ color: 'var(--nav-accent)' }}>Настроить →</a>
                   </p>
                 )}
+              </div>
+
+              <div className="mt-6 pt-6 border-t" style={{ borderColor: 'var(--nav-border)' }}>
+                <div className="flex items-center gap-2 mb-3">
+                  <input type="checkbox" checked={landingEnabled} onChange={e => setLandingEnabled(e.target.checked)} id="landing-enabled" />
+                  <label htmlFor="landing-enabled" className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>
+                    Показывать лендинг о компании на главной странице витрины
+                  </label>
+                </div>
+                <textarea value={landingHistory} onChange={e => setLandingHistory(e.target.value)} placeholder="История становления компании" rows={3}
+                  className="w-full rounded-lg px-3 py-2 text-sm outline-none border border-[color:var(--nav-border)] mb-2" style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
+                <textarea value={landingCapacity} onChange={e => setLandingCapacity(e.target.value)} placeholder="Имеющиеся мощности" rows={2}
+                  className="w-full rounded-lg px-3 py-2 text-sm outline-none border border-[color:var(--nav-border)] mb-2" style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
+                <textarea value={landingAnnualVolume} onChange={e => setLandingAnnualVolume(e.target.value)} placeholder="Годовые объёмы" rows={2}
+                  className="w-full rounded-lg px-3 py-2 text-sm outline-none border border-[color:var(--nav-border)]" style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
               </div>
 
               {appearanceError && <div className="text-xs" style={{ color: 'var(--nav-critical)' }}>{appearanceError}</div>}
