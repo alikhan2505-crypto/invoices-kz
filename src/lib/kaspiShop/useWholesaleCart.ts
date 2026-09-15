@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 
 export type WholesaleCartLine = {
   key: string
@@ -23,6 +23,17 @@ function lineKey(modelId: string, size: string, color: string): string {
   return `${modelId}:${size}:${color}`
 }
 
+// The model-detail page (which calls addLine) and WholesaleCartBar (which
+// displays the floating bar) are separate components, each with their own
+// useWholesaleCart() call and so their own independent React state -- the
+// native `storage` event only fires in OTHER tabs/windows, never the one
+// that made the write, so without this a same-page add-to-cart left the
+// floating bar showing stale (empty) state until a reload or navigation
+// (confirmed live during Task 13's end-to-end check). A custom event, fired
+// after every localStorage write and listened for by every instance on the
+// same page, keeps them in sync within one page load.
+const CART_CHANGED_EVENT = 'wholesale-cart-changed'
+
 // Cart lines are stored denormalized (full name/price/image, not just an id)
 // -- unlike the existing flat storefront cart (shop/[slug]/page.tsx), which
 // re-derives display data from one already-fetched product list, a
@@ -34,20 +45,40 @@ function lineKey(modelId: string, size: string, color: string): string {
 export function useWholesaleCart(slug: string) {
   const [lines, setLines] = useState<WholesaleCartLine[]>([])
   const [loaded, setLoaded] = useState(false)
+  // The exact JSON string this instance itself last wrote -- lets the event
+  // listener below tell "another instance changed the cart" (raw differs,
+  // must re-render) apart from "I'm hearing the echo of my own write" (raw
+  // is identical, skip). Without this a self-dispatched event would setLines
+  // to a new-but-equal array, which changes reference, re-triggers the write
+  // effect, dispatches again, and loops forever.
+  const lastWrittenRef = useRef<string | null>(null)
 
-  useEffect(() => {
+  const readFromStorage = useCallback(() => {
     try {
       const raw = localStorage.getItem(cartStorageKey(slug))
-      if (raw) setLines(JSON.parse(raw))
+      if (raw === lastWrittenRef.current) return
+      setLines(raw ? JSON.parse(raw) : [])
     } catch {
-      // Corrupt/blocked storage -- start with an empty cart rather than crash.
+      // Corrupt/blocked storage -- fall back to an empty cart rather than crash.
+      setLines([])
     }
-    setLoaded(true)
   }, [slug])
 
   useEffect(() => {
+    readFromStorage()
+    setLoaded(true)
+    window.addEventListener(CART_CHANGED_EVENT, readFromStorage)
+    return () => window.removeEventListener(CART_CHANGED_EVENT, readFromStorage)
+  }, [readFromStorage])
+
+  useEffect(() => {
     if (!loaded) return
-    try { localStorage.setItem(cartStorageKey(slug), JSON.stringify(lines)) } catch {}
+    try {
+      const raw = JSON.stringify(lines)
+      lastWrittenRef.current = raw
+      localStorage.setItem(cartStorageKey(slug), raw)
+      window.dispatchEvent(new Event(CART_CHANGED_EVENT))
+    } catch {}
   }, [lines, loaded, slug])
 
   const addLine = useCallback((line: WholesaleCartLine) => {
