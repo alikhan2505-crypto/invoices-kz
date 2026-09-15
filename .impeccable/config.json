@@ -12,8 +12,14 @@
       {
         "rule": "design-system-color",
         "value": "rgba(0,0,0,0.4)",
-        "reason": "Dark theme box-shadow override, intentional pre-existing code",
-        "createdAt": "2026-07-01T04:53:57.907Z"
+        "createdAt": "2026-07-01T04:53:57.907Z",
+        "reason": "Dark theme box-shadow override, intentional pre-existing code"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(0,0,0,0.5)",
+        "createdAt": "2026-09-15T04:36:01.369Z",
+        "reason": "Standard modal overlay color, intentional design pattern"
       }
     ]
   }
