@@ -51,6 +51,10 @@ export default function StorefrontPage() {
   const [backgroundColor, setBackgroundColor] = useState<string | null>(null)
   const [deliveryInfo, setDeliveryInfo] = useState<string | null>(null)
   const [widgetKey, setWidgetKey] = useState<string | null>(null)
+  const [landingEnabled, setLandingEnabled] = useState(false)
+  const [landingHistory, setLandingHistory] = useState<string | null>(null)
+  const [landingCapacity, setLandingCapacity] = useState<string | null>(null)
+  const [landingAnnualVolume, setLandingAnnualVolume] = useState<string | null>(null)
 
   // Cart -- productId -> qty, persisted per-storefront (not customer-wide;
   // no accounts, see the design doc) so browsing a different seller's shop
@@ -80,6 +84,10 @@ export default function StorefrontPage() {
         setBackgroundColor(data.backgroundColor || null)
         setDeliveryInfo(data.deliveryInfo || null)
         setWidgetKey(data.widgetKey || null)
+        setLandingEnabled(!!data.landingEnabled)
+        setLandingHistory(data.landingHistory || null)
+        setLandingCapacity(data.landingCapacity || null)
+        setLandingAnnualVolume(data.landingAnnualVolume || null)
       })
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false))
@@ -206,6 +214,41 @@ export default function StorefrontPage() {
 
   if (loading) return <div className="min-h-screen flex items-center justify-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Загрузка…</div>
   if (notFound) return <div className="min-h-screen flex items-center justify-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Витрина не найдена</div>
+
+  if (landingEnabled) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: backgroundColor || 'var(--nav-bg)' }}>
+        <div className="max-w-2xl mx-auto p-6 text-center">
+          <div className="flex items-center justify-center gap-2.5 mb-6">
+            <LogoMark />
+            <h1 className="text-2xl font-bold" style={{ color: 'var(--nav-text-primary)' }}>{companyName}</h1>
+          </div>
+          {landingHistory && (
+            <div className="nav-glass rounded-2xl p-5 mb-4 text-left">
+              <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--nav-text-muted)' }}>История</div>
+              <div className="text-sm whitespace-pre-wrap" style={{ color: 'var(--nav-text-secondary)' }}>{landingHistory}</div>
+            </div>
+          )}
+          {landingCapacity && (
+            <div className="nav-glass rounded-2xl p-5 mb-4 text-left">
+              <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--nav-text-muted)' }}>Мощности</div>
+              <div className="text-sm whitespace-pre-wrap" style={{ color: 'var(--nav-text-secondary)' }}>{landingCapacity}</div>
+            </div>
+          )}
+          {landingAnnualVolume && (
+            <div className="nav-glass rounded-2xl p-5 mb-6 text-left">
+              <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--nav-text-muted)' }}>Годовые объёмы</div>
+              <div className="text-sm whitespace-pre-wrap" style={{ color: 'var(--nav-text-secondary)' }}>{landingAnnualVolume}</div>
+            </div>
+          )}
+          <a href={`/shop/${params.slug}/catalog`}
+            className="inline-block rounded-xl px-6 py-3 text-sm font-semibold" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+            Перейти в каталог →
+          </a>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen" style={{ background: backgroundColor || 'var(--nav-bg)' }}>

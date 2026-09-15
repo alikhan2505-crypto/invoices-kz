@@ -21,5 +21,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
     backgroundColor: storefront.backgroundColor,
     deliveryInfo: storefront.deliveryInfo,
     widgetKey,
+    landingEnabled: storefront.landingEnabled,
+    landingHistory: storefront.landingHistory,
+    landingCapacity: storefront.landingCapacity,
+    landingAnnualVolume: storefront.landingAnnualVolume,
   })
 }
