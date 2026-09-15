@@ -85,6 +85,10 @@ export interface StorefrontSettings {
   backgroundColor: string | null
   deliveryInfo: string | null
   chatWidgetEnabled: boolean
+  landingEnabled: boolean
+  landingHistory: string | null
+  landingCapacity: string | null
+  landingAnnualVolume: string | null
 }
 
 // A curated swatch list, not a free-form color picker -- keeps the public
@@ -101,7 +105,7 @@ export const STOREFRONT_BACKGROUND_PRESETS = ['#ffffff', '#f5f4f0', '#eef2ff', '
 export async function loadStorefrontSettings(userId: string): Promise<StorefrontSettings | null> {
   const { data, error } = await supabase
     .from('kaspi_shop_connections')
-    .select('id, company_name, storefront_slug, storefront_published, storefront_background_color, storefront_delivery_info, storefront_chat_widget_enabled')
+    .select('id, company_name, storefront_slug, storefront_published, storefront_background_color, storefront_delivery_info, storefront_chat_widget_enabled, storefront_landing_enabled, storefront_landing_history, storefront_landing_capacity, storefront_landing_annual_volume')
     .eq('user_id', userId)
     .eq('is_active', true)
     .maybeSingle()
@@ -115,6 +119,10 @@ export async function loadStorefrontSettings(userId: string): Promise<Storefront
     backgroundColor: data.storefront_background_color,
     deliveryInfo: data.storefront_delivery_info,
     chatWidgetEnabled: data.storefront_chat_widget_enabled,
+    landingEnabled: data.storefront_landing_enabled,
+    landingHistory: data.storefront_landing_history,
+    landingCapacity: data.storefront_landing_capacity,
+    landingAnnualVolume: data.storefront_landing_annual_volume,
   }
 }
 
@@ -142,7 +150,15 @@ export async function loadWebsiteWidgetKey(userId: string): Promise<string | nul
 export async function saveStorefrontAppearance(
   userId: string,
   connectionId: string,
-  params: { backgroundColor: string | null; deliveryInfo: string; chatWidgetEnabled: boolean }
+  params: {
+    backgroundColor: string | null
+    deliveryInfo: string
+    chatWidgetEnabled: boolean
+    landingEnabled: boolean
+    landingHistory: string
+    landingCapacity: string
+    landingAnnualVolume: string
+  }
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (params.backgroundColor !== null && !(STOREFRONT_BACKGROUND_PRESETS as readonly string[]).includes(params.backgroundColor)) {
     return { ok: false, error: 'invalid_background' }
@@ -167,6 +183,10 @@ export async function saveStorefrontAppearance(
       storefront_background_color: params.backgroundColor,
       storefront_delivery_info: params.deliveryInfo.trim() || null,
       storefront_chat_widget_enabled: params.chatWidgetEnabled,
+      storefront_landing_enabled: params.landingEnabled,
+      storefront_landing_history: params.landingHistory.trim() || null,
+      storefront_landing_capacity: params.landingCapacity.trim() || null,
+      storefront_landing_annual_volume: params.landingAnnualVolume.trim() || null,
     })
     .eq('id', connectionId)
   if (error) throw new Error(`kaspi_shop_connections appearance save failed: ${error.message}`)
@@ -237,10 +257,14 @@ export async function resolveStorefrontBySlug(slug: string): Promise<{
   backgroundColor: string | null
   deliveryInfo: string | null
   chatWidgetEnabled: boolean
+  landingEnabled: boolean
+  landingHistory: string | null
+  landingCapacity: string | null
+  landingAnnualVolume: string | null
 } | null> {
   const { data, error } = await supabase
     .from('kaspi_shop_connections')
-    .select('id, user_id, company_name, storefront_background_color, storefront_delivery_info, storefront_chat_widget_enabled')
+    .select('id, user_id, company_name, storefront_background_color, storefront_delivery_info, storefront_chat_widget_enabled, storefront_landing_enabled, storefront_landing_history, storefront_landing_capacity, storefront_landing_annual_volume')
     .eq('storefront_slug', slug)
     .eq('storefront_published', true)
     .maybeSingle()
@@ -252,6 +276,10 @@ export async function resolveStorefrontBySlug(slug: string): Promise<{
     backgroundColor: data.storefront_background_color,
     deliveryInfo: data.storefront_delivery_info,
     chatWidgetEnabled: data.storefront_chat_widget_enabled,
+    landingEnabled: data.storefront_landing_enabled,
+    landingHistory: data.storefront_landing_history,
+    landingCapacity: data.storefront_landing_capacity,
+    landingAnnualVolume: data.storefront_landing_annual_volume,
   } : null
 }
 

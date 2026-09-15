@@ -30,8 +30,14 @@ export async function POST(req: NextRequest) {
   const backgroundColor = typeof body?.backgroundColor === 'string' && body.backgroundColor ? body.backgroundColor : null
   const deliveryInfo = typeof body?.deliveryInfo === 'string' ? body.deliveryInfo : ''
   const chatWidgetEnabled = !!body?.chatWidgetEnabled
+  const landingEnabled = !!body?.landingEnabled
+  const landingHistory = typeof body?.landingHistory === 'string' ? body.landingHistory : ''
+  const landingCapacity = typeof body?.landingCapacity === 'string' ? body.landingCapacity : ''
+  const landingAnnualVolume = typeof body?.landingAnnualVolume === 'string' ? body.landingAnnualVolume : ''
 
-  const result = await saveStorefrontAppearance(user.id, settings.connectionId, { backgroundColor, deliveryInfo, chatWidgetEnabled })
+  const result = await saveStorefrontAppearance(user.id, settings.connectionId, {
+    backgroundColor, deliveryInfo, chatWidgetEnabled, landingEnabled, landingHistory, landingCapacity, landingAnnualVolume,
+  })
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 })
   return NextResponse.json({ ok: true })
 }
