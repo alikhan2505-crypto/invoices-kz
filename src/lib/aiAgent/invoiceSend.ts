@@ -203,7 +203,13 @@ export async function sendInvoiceForDraft(
     const itemLines = items
       .map(i => `• ${i.name} × ${i.qty} — ${(i.qty * i.unitPrice).toLocaleString('ru-KZ')} ₸`)
       .join('\n')
-    const text = `Ваш счёт №${invoiceNumber}:\n${itemLines}\n\nИтого: ${Number(draft.total).toLocaleString('ru-KZ')} ₸\n\nСсылка на оплату: ${link}`
+    const summary = `Ваш счёт №${invoiceNumber}:\n${itemLines}\n\nИтого: ${Number(draft.total).toLocaleString('ru-KZ')} ₸`
+    // Full text (with the raw link) is what gets stored in ai_agent_messages
+    // history and what any channel without a real button falls back to --
+    // WhatsApp's own body (below, via ctaBodyText) drops the link since the
+    // "Оплатить счёт" button already carries it (founder feedback
+    // 2026-09-16: showing both read as one link too many).
+    const text = `${summary}\n\nСсылка на оплату: ${link}`
 
     // Same rule as every other place a product photo is offered
     // (productPhoto.ts): only when the catalog has an unambiguous
@@ -217,12 +223,14 @@ export async function sendInvoiceForDraft(
     }
 
     // WhatsApp gets a tappable "Оплатить счёт" button (+ the matched product
-    // photo as the message's header, if any) instead of a bare pasted link.
-    // text still carries the link too, both for channels that ignore cta and
-    // for the history row below, which always stores the same plain text
+    // photo as the message's header, if any) instead of a bare pasted link --
+    // ctaBodyText (no link line, the button already carries it) is what
+    // actually renders there. Every other channel falls back to the full
+    // `text`, and the history row below always stores that same full text
     // regardless of channel.
     const sendError = await sendIntoConversation(supabase, conversation, text, {
       cta: { label: 'Оплатить счёт', url: link },
+      ctaBodyText: summary,
       headerImageUrl: photoUrl,
     })
     if (sendError) return fail(`отправка в чат: ${sendError}`)
