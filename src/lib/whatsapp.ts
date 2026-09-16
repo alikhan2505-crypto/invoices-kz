@@ -173,21 +173,27 @@ export async function sendWhatsAppCtaUrlButton(
   to: string,
   bodyText: string,
   cta: { label: string; url: string },
-  opts: { accessToken: string },
+  opts: { accessToken: string; headerImageUrl?: string | null },
 ): Promise<void> {
+  const interactive: Record<string, unknown> = {
+    type: 'cta_url',
+    body: { text: bodyText },
+    action: {
+      name: 'cta_url',
+      parameters: { display_text: cta.label.slice(0, WHATSAPP_BUTTON_TITLE_MAX), url: cta.url },
+    },
+  }
+  // cta_url (like the button/list interactive types above) accepts an image
+  // header alongside body+button -- one message shows the product photo, the
+  // full text, and the tappable link together, rather than a separate photo
+  // message ahead of it.
+  if (opts.headerImageUrl) interactive.header = { type: 'image', image: { link: opts.headerImageUrl } }
   await callGraphApi(`${GRAPH_API}/${phoneNumberId}/messages`, opts.accessToken, {
     messaging_product: 'whatsapp',
     recipient_type: 'individual',
     to,
     type: 'interactive',
-    interactive: {
-      type: 'cta_url',
-      body: { text: bodyText },
-      action: {
-        name: 'cta_url',
-        parameters: { display_text: cta.label.slice(0, WHATSAPP_BUTTON_TITLE_MAX), url: cta.url },
-      },
-    },
+    interactive,
   })
 }
 

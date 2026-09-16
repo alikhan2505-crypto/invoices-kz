@@ -19,7 +19,7 @@ export async function sendIntoConversation(
   // pasted link in the body -- e.g. the invoice link invoiceSend.ts sends.
   // Every other channel ignores this and falls back to plain text, which is
   // still `text` itself (already includes the link), so nothing is lost.
-  opts?: { cta?: { label: string; url: string } },
+  opts?: { cta?: { label: string; url: string }; headerImageUrl?: string | null },
 ): Promise<string | null> {
   const { data: connection } = await supabase.from('ai_agent_channel_connections')
     .select('external_account_id, access_token_enc, status')
@@ -35,7 +35,7 @@ export async function sendIntoConversation(
       await sendTelegramBotMessage(accessToken, conversation.external_thread_id, text)
     } else if (conversation.channel === 'whatsapp') {
       if (opts?.cta) {
-        await sendWhatsAppCtaUrlButton(connection.external_account_id, conversation.external_thread_id, text, opts.cta, { accessToken })
+        await sendWhatsAppCtaUrlButton(connection.external_account_id, conversation.external_thread_id, text, opts.cta, { accessToken, headerImageUrl: opts.headerImageUrl })
       } else {
         await sendWhatsAppMessage(connection.external_account_id, conversation.external_thread_id, text, { accessToken })
       }

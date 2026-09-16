@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { sendIntoConversation } from './channelSend'
 import { validateDraftInput, normalizeToolInput, canAutoSend, checkCatalogPricing, type DraftItem, type InvoiceToolInput } from './invoiceDrafts'
 import { loadAgentCatalog } from './catalogContext'
+import { pickProductPhoto } from './productPhoto'
 import { createNotification } from '@/lib/notifications'
 
 // Phase 3 «счёт из чата» core: turns an approved (or auto-approved)
@@ -148,7 +149,7 @@ export async function sendInvoiceForDraft(
     const { data: draft } = await supabase.from('ai_agent_invoice_drafts').select('*').eq('id', draftId).single()
     if (!draft) return { ok: false, error: 'draft not found' }
 
-    const { data: agent } = await supabase.from('ai_agents').select('id, user_id, name').eq('id', draft.agent_id).single()
+    const { data: agent } = await supabase.from('ai_agents').select('id, user_id, name, kaspi_shop_connection_id').eq('id', draft.agent_id).single()
     if (!agent) return fail('агент не найден')
     const { data: conversation } = await supabase.from('ai_agent_conversations')
       .select('id, channel, external_thread_id, agent_id')
@@ -195,12 +196,35 @@ export async function sendInvoiceForDraft(
     }
 
     const link = `https://www.invoices.kz/view/${publicToken}`
-    const text = `Ваш счёт №${invoiceNumber} на ${Number(draft.total).toLocaleString('ru-KZ')} ₸ готов: ${link}`
-    // WhatsApp gets a tappable "Оплатить счёт" button instead of a bare
-    // pasted link (founder request 2026-09-16) -- text still carries the
-    // link too, both for channels that ignore cta and for the history row
-    // below, which always stores the same plain text regardless of channel.
-    const sendError = await sendIntoConversation(supabase, conversation, text, { cta: { label: 'Оплатить счёт', url: link } })
+    // Line-by-line breakdown (founder request 2026-09-16: name/qty/price per
+    // item, e.g. a "Доставка" line the model added as a plain item shows up
+    // here the same as any product) instead of only the bare total.
+    const items = draft.items as DraftItem[]
+    const itemLines = items
+      .map(i => `• ${i.name} × ${i.qty} — ${(i.qty * i.unitPrice).toLocaleString('ru-KZ')} ₸`)
+      .join('\n')
+    const text = `Ваш счёт №${invoiceNumber}:\n${itemLines}\n\nИтого: ${Number(draft.total).toLocaleString('ru-KZ')} ₸\n\nСсылка на оплату: ${link}`
+
+    // Same rule as every other place a product photo is offered
+    // (productPhoto.ts): only when the catalog has an unambiguous
+    // image match for the item names actually in the message, never a guess.
+    let photoUrl: string | null = null
+    try {
+      const catalog = await loadAgentCatalog(supabase, agent.user_id, agent.kaspi_shop_connection_id)
+      photoUrl = pickProductPhoto(itemLines, catalog)
+    } catch (e: any) {
+      console.error('ai-agent invoice draft: catalog photo lookup failed (non-fatal):', e?.message || e)
+    }
+
+    // WhatsApp gets a tappable "Оплатить счёт" button (+ the matched product
+    // photo as the message's header, if any) instead of a bare pasted link.
+    // text still carries the link too, both for channels that ignore cta and
+    // for the history row below, which always stores the same plain text
+    // regardless of channel.
+    const sendError = await sendIntoConversation(supabase, conversation, text, {
+      cta: { label: 'Оплатить счёт', url: link },
+      headerImageUrl: photoUrl,
+    })
     if (sendError) return fail(`отправка в чат: ${sendError}`)
 
     const { error: finalError } = await supabase.from('ai_agent_invoice_drafts').update({
