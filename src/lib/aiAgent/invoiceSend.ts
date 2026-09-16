@@ -200,8 +200,16 @@ export async function sendInvoiceForDraft(
     // item, e.g. a "Доставка" line the model added as a plain item shows up
     // here the same as any product) instead of only the bare total.
     const items = draft.items as DraftItem[]
+    // Kept as compact as the numbers allow -- no bullet prefix, non-breaking
+    // spaces gluing "qty × price ₸" into one chunk (founder feedback
+    // 2026-09-16). This reduces wrapping but can't guarantee one line every
+    // time: WhatsApp wraps at the RECIPIENT's own screen width, which this
+    // text has no way to know or control, and a long Kaspi product name
+    // alone can already fill most of a phone-width line before qty/price
+    // are even added. If a line wraps at all now, it wraps after the name,
+    // never inside the numbers themselves.
     const itemLines = items
-      .map(i => `• ${i.name} × ${i.qty} — ${(i.qty * i.unitPrice).toLocaleString('ru-KZ')} ₸`)
+      .map(i => `${i.name} — ${i.qty} × ${(i.qty * i.unitPrice).toLocaleString('ru-KZ')} ₸`)
       .join('\n')
     const summary = `Ваш счёт №${invoiceNumber}:\n${itemLines}\n\nИтого: ${Number(draft.total).toLocaleString('ru-KZ')} ₸`
     // Full text (with the raw link) is what gets stored in ai_agent_messages
