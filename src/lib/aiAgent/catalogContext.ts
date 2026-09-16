@@ -148,3 +148,38 @@ export async function loadAgentDeliveryInfo(
     return null
   }
 }
+
+// Links to send when a customer asks to see "the whole catalog" instead of
+// apologizing that there isn't one. kaspiShopUrl is always present once the
+// store is connected (merchant_id is assigned by Kaspi itself); URL format
+// confirmed live against a real seller page 2026-09-16:
+// kaspi.kz/shop/info/merchant/{merchant_id}/address-tab/ resolves to that
+// seller's own Kaspi Shop page. storefrontUrl is only returned when the
+// seller has actually published their Витрина -- an unpublished slug would
+// send the customer to a page that looks broken.
+export async function loadAgentShopLinks(
+  supabase: SupabaseClient,
+  ownerUserId: string,
+  pinnedConnectionId?: string | null,
+): Promise<{ kaspiShopUrl: string | null; storefrontUrl: string | null }> {
+  try {
+    const connId = await resolveAgentConnectionId(supabase, ownerUserId, pinnedConnectionId)
+    if (!connId) return { kaspiShopUrl: null, storefrontUrl: null }
+    const { data } = await supabase
+      .from('kaspi_shop_connections')
+      .select('merchant_id, storefront_slug, storefront_published')
+      .eq('id', connId)
+      .maybeSingle()
+    const merchantId = data?.merchant_id ? String(data.merchant_id).trim() : ''
+    const kaspiShopUrl = merchantId
+      ? `https://kaspi.kz/shop/info/merchant/${encodeURIComponent(merchantId)}/address-tab/`
+      : null
+    const slug = data?.storefront_slug ? String(data.storefront_slug).trim() : ''
+    const storefrontUrl = slug && data?.storefront_published
+      ? `https://invoices.kz/shop/${encodeURIComponent(slug)}`
+      : null
+    return { kaspiShopUrl, storefrontUrl }
+  } catch {
+    return { kaspiShopUrl: null, storefrontUrl: null }
+  }
+}

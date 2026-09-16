@@ -126,6 +126,20 @@ export function buildDeliveryBlock(sellerDeliveryInfo: string | null): string {
   return ` ${GENERIC_KZ_DELIVERY_GUIDE}`
 }
 
+// «Ссылки на магазин» -- appended alongside the catalog block whenever the
+// agent owner has an active Kaspi Shop connection, so the model can hand the
+// customer a real link when asked "есть каталог?" / "все товары?" instead of
+// apologizing that there isn't one. kaspiShopUrl is present whenever the
+// store is connected (merchant_id always exists on Kaspi's side);
+// storefrontUrl only when the seller actually published their Витрина.
+export function buildShopLinksBlock(links: { kaspiShopUrl: string | null; storefrontUrl: string | null }): string {
+  const lines: string[] = []
+  if (links.kaspiShopUrl) lines.push(`Магазин на Kaspi.kz: ${links.kaspiShopUrl}`)
+  if (links.storefrontUrl) lines.push(`Витрина (invoices.kz): ${links.storefrontUrl}`)
+  if (lines.length === 0) return ''
+  return ` Ссылки на магазин этого бизнеса (если клиент спрашивает про каталог, все товары или где посмотреть ассортимент -- НЕ извиняйся, что каталога нет, а пришли эту ссылку/ссылки):\n${lines.join('\n')}`
+}
+
 // Maps an agent's raw collect_fields array (the same array
 // buildBusinessContextLine above flattens into prose) into the
 // {key,label}[] shape generateAiReply's collectFieldsToExtract param needs
