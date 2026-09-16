@@ -137,7 +137,7 @@ export function buildShopLinksBlock(links: { kaspiShopUrl: string | null; storef
   if (links.kaspiShopUrl) lines.push(`Магазин на Kaspi.kz: ${links.kaspiShopUrl}`)
   if (links.storefrontUrl) lines.push(`Витрина (invoices.kz): ${links.storefrontUrl}`)
   if (lines.length === 0) return ''
-  return ` Ссылки на магазин этого бизнеса (если клиент спрашивает про каталог, все товары или где посмотреть ассортимент -- НЕ извиняйся, что каталога нет, а пришли эту ссылку/ссылки):\n${lines.join('\n')}`
+  return ` Ссылки на магазин этого бизнеса (если клиент просит каталог -- в любом виде: файлом, PDF, фото, списком -- или спрашивает про весь ассортимент/все товары, НЕ говори, что каталога нет и НЕ извиняйся за это, а пришли эту ссылку/ссылки как способ посмотреть каталог):\n${lines.join('\n')}`
 }
 
 // Maps an agent's raw collect_fields array (the same array
