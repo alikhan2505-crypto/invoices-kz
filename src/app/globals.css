@@ -650,6 +650,93 @@ html {
   background: linear-gradient(90deg, var(--nav-accent), var(--nav-teal));
 }
 
+/* Long-form guide prose (/guides). The guides are hand-written markup rather
+   than a markdown pipeline, so the type scale lives here instead of being
+   repeated as inline styles on every paragraph of every article. */
+.guide-prose {
+  color: var(--nav-text-secondary);
+  font-size: 15px;
+  line-height: 1.7;
+}
+.guide-prose > * + * {
+  margin-top: 1rem;
+}
+.guide-prose h2 {
+  color: var(--nav-text-primary);
+  font-size: 1.125rem;
+  font-weight: 700;
+  line-height: 1.35;
+  margin-top: 2rem;
+}
+.guide-prose strong {
+  color: var(--nav-text-primary);
+  font-weight: 600;
+}
+.guide-prose a {
+  color: var(--nav-accent);
+  font-weight: 600;
+}
+.guide-prose a:hover {
+  text-decoration: underline;
+}
+.guide-prose .lead {
+  font-size: 16px;
+  color: var(--nav-text-primary);
+}
+.guide-prose .note {
+  font-size: 13px;
+  color: var(--nav-text-muted);
+  border-left: 2px solid var(--nav-border);
+  padding-left: 0.875rem;
+}
+.guide-prose ul {
+  padding-left: 1.125rem;
+  list-style: disc;
+}
+.guide-prose li + li {
+  margin-top: 0.5rem;
+}
+.guide-prose .guide-formula {
+  color: var(--nav-text-primary);
+  background: var(--nav-surface-glass);
+  border: 1px solid var(--nav-border-soft);
+  border-radius: 0.75rem;
+  padding: 0.875rem 1rem;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 14px;
+  text-align: center;
+}
+/* The table scrolls inside its own box instead of widening the article — the
+   column is narrow on a phone and the commission table carries real category
+   names, not short numbers. */
+.guide-prose .guide-table-wrap {
+  overflow-x: auto;
+}
+.guide-prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.guide-prose th {
+  text-align: left;
+  color: var(--nav-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0 0.75rem 0.5rem 0;
+  border-bottom: 1px solid var(--nav-border);
+  white-space: nowrap;
+}
+.guide-prose td {
+  padding: 0.5rem 0.75rem 0.5rem 0;
+  border-bottom: 1px solid var(--nav-border-soft);
+  vertical-align: top;
+}
+.guide-prose tbody tr:last-child td {
+  border-bottom: none;
+}
+
 .nav-aurora {
   position: fixed;
   inset: 0;
