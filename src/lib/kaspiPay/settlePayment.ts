@@ -4,6 +4,7 @@ import { loadConnectionByUserId, loadWebhookSecretByUserId } from './connection'
 import { checkStatus } from './client'
 import { isSafeWebhookUrl } from './webhookSafety'
 import { debitWalletForCommission } from './wallet'
+import { notifyInvoicePaidInConversation } from '@/lib/aiAgent/invoiceSend'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -109,6 +110,14 @@ export async function checkAndSettleKaspiPayment(
   if (reqRow.invoice_id) {
     await supabase.from('invoices').update({ status: 'paid' }).eq('id', reqRow.invoice_id)
     await supabase.from('invoice_logs').insert({ invoice_id: reqRow.invoice_id, status: 'paid' })
+    // Best-effort, same reasoning as the commission debit below -- a real
+    // Kaspi-confirmed payment is already settled at this point regardless of
+    // whether the customer ever hears about it here.
+    try {
+      await notifyInvoicePaidInConversation(supabase, reqRow.invoice_id, 'confirmed')
+    } catch (e: any) {
+      console.error('Kaspi settle: chat payment notification failed for invoice', reqRow.invoice_id, ':', e.message)
+    }
   }
 
   // Parallel to the invoice branch above -- a payment request can settle

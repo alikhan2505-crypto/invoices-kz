@@ -215,3 +215,41 @@ export async function sendInvoiceForDraft(
     return fail(String(err?.message || err))
   }
 }
+
+// Fired the moment an invoice actually settles -- either Kaspi Cashier
+// confirms real payment (settlePayment.ts, both the webhook and the
+// cron/on-demand poll go through there) or the payer self-reports via «Я
+// оплатил» on the public /view/[token] page (that route calls this too).
+// If this invoice came from an AI-agent chat draft, tells the SAME customer
+// in the SAME conversation what happened -- founder request 2026-09-16, so a
+// WhatsApp/Instagram/Telegram customer who paid gets a reply instead of
+// silence. Every invoice NOT created this way (the overwhelming majority)
+// has no matching draft row, so this is a no-op for them: one lookup, done.
+export async function notifyInvoicePaidInConversation(
+  supabase: SupabaseClient,
+  invoiceId: string,
+  kind: 'confirmed' | 'self_reported',
+): Promise<void> {
+  const { data: draft } = await supabase.from('ai_agent_invoice_drafts')
+    .select('conversation_id')
+    .eq('invoice_id', invoiceId)
+    .maybeSingle()
+  if (!draft) return
+
+  const { data: conversation } = await supabase.from('ai_agent_conversations')
+    .select('id, channel, external_thread_id, agent_id')
+    .eq('id', draft.conversation_id)
+    .maybeSingle()
+  if (!conversation) return
+
+  // 'confirmed' is Kaspi itself telling us the money moved -- safe to thank
+  // the customer outright. 'self_reported' is only the payer's own claim
+  // (the button writes straight to invoices.status with no Kaspi check
+  // behind it, see the /paid route's own comment) -- the reply says so
+  // plainly rather than confirming a payment nobody has actually verified.
+  const text = kind === 'confirmed'
+    ? 'Вы провели оплату через Kaspi, благодарим вас! 🙏'
+    : 'Вы нажали, что оплатили — мы проверим и вернёмся к вам.'
+  const sendError = await sendIntoConversation(supabase, conversation, text)
+  if (sendError) console.error('notifyInvoicePaidInConversation: send failed for invoice', invoiceId, sendError)
+}

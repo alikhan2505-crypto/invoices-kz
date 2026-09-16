@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { notifyInvoicePaidInConversation } from '@/lib/aiAgent/invoiceSend'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -32,6 +33,15 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ to
     return NextResponse.json({ error: 'update_failed' }, { status: 500 })
   }
   if (!data) return NextResponse.json({ error: 'not_found' }, { status: 404 })
+
+  // Best-effort: this is a self-report, not a Kaspi-verified payment (see the
+  // route's own comment above) -- a failure here must never undo the status
+  // change or block the response to the payer.
+  try {
+    await notifyInvoicePaidInConversation(supabase, data.id, 'self_reported')
+  } catch (e: any) {
+    console.error('public invoice mark-paid: chat notification failed:', e.message)
+  }
 
   return NextResponse.json({ ok: true, invoiceId: data.id })
 }
