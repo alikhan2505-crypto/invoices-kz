@@ -162,6 +162,35 @@ export async function sendWhatsAppMessage(phoneNumberId: string, to: string, tex
   })
 }
 
+// A tappable "Оплатить счёт"-style button instead of a bare pasted link --
+// WhatsApp Cloud API's `cta_url` interactive type. Unlike Reply Buttons
+// (interactive.type:'button', see buildWhatsAppFlowMessage below), only
+// cta_url can open an external URL; reply buttons only send a reply id
+// back to us, they can't link anywhere. Same session-message rules as
+// sendWhatsAppMessage -- no template approval needed within the 24h window.
+export async function sendWhatsAppCtaUrlButton(
+  phoneNumberId: string,
+  to: string,
+  bodyText: string,
+  cta: { label: string; url: string },
+  opts: { accessToken: string },
+): Promise<void> {
+  await callGraphApi(`${GRAPH_API}/${phoneNumberId}/messages`, opts.accessToken, {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to,
+    type: 'interactive',
+    interactive: {
+      type: 'cta_url',
+      body: { text: bodyText },
+      action: {
+        name: 'cta_url',
+        parameters: { display_text: cta.label.slice(0, WHATSAPP_BUTTON_TITLE_MAX), url: cta.url },
+      },
+    },
+  })
+}
+
 // WhatsApp carries the text as the image's caption, so one message does both.
 export async function sendWhatsAppImage(phoneNumberId: string, to: string, imageUrl: string, caption: string, opts: { accessToken: string }): Promise<void> {
   await callGraphApi(`${GRAPH_API}/${phoneNumberId}/messages`, opts.accessToken, {

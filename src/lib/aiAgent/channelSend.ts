@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { decryptAtRest } from '@/lib/kaspiPay/crypto'
 import { getKey } from './connection'
 import { sendTelegramBotMessage } from './telegram'
-import { sendWhatsAppMessage } from '@/lib/whatsapp'
+import { sendWhatsAppMessage, sendWhatsAppCtaUrlButton } from '@/lib/whatsapp'
 import { sendDirectMessage } from '@/lib/instagram'
 
 // Sends one plain-text message into a conversation via its channel's
@@ -15,6 +15,11 @@ export async function sendIntoConversation(
   supabase: SupabaseClient,
   conversation: { id: string; channel: string; external_thread_id: string; agent_id: string },
   text: string,
+  // Optional tappable button instead of (WhatsApp only, for now) a bare
+  // pasted link in the body -- e.g. the invoice link invoiceSend.ts sends.
+  // Every other channel ignores this and falls back to plain text, which is
+  // still `text` itself (already includes the link), so nothing is lost.
+  opts?: { cta?: { label: string; url: string } },
 ): Promise<string | null> {
   const { data: connection } = await supabase.from('ai_agent_channel_connections')
     .select('external_account_id, access_token_enc, status')
@@ -29,7 +34,11 @@ export async function sendIntoConversation(
     if (conversation.channel === 'telegram') {
       await sendTelegramBotMessage(accessToken, conversation.external_thread_id, text)
     } else if (conversation.channel === 'whatsapp') {
-      await sendWhatsAppMessage(connection.external_account_id, conversation.external_thread_id, text, { accessToken })
+      if (opts?.cta) {
+        await sendWhatsAppCtaUrlButton(connection.external_account_id, conversation.external_thread_id, text, opts.cta, { accessToken })
+      } else {
+        await sendWhatsAppMessage(connection.external_account_id, conversation.external_thread_id, text, { accessToken })
+      }
     } else if (conversation.channel === 'instagram') {
       await sendDirectMessage(conversation.external_thread_id, text, {
         igUserId: connection.external_account_id,

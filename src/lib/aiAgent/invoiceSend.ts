@@ -196,7 +196,11 @@ export async function sendInvoiceForDraft(
 
     const link = `https://www.invoices.kz/view/${publicToken}`
     const text = `Ваш счёт №${invoiceNumber} на ${Number(draft.total).toLocaleString('ru-KZ')} ₸ готов: ${link}`
-    const sendError = await sendIntoConversation(supabase, conversation, text)
+    // WhatsApp gets a tappable "Оплатить счёт" button instead of a bare
+    // pasted link (founder request 2026-09-16) -- text still carries the
+    // link too, both for channels that ignore cta and for the history row
+    // below, which always stores the same plain text regardless of channel.
+    const sendError = await sendIntoConversation(supabase, conversation, text, { cta: { label: 'Оплатить счёт', url: link } })
     if (sendError) return fail(`отправка в чат: ${sendError}`)
 
     const { error: finalError } = await supabase.from('ai_agent_invoice_drafts').update({
