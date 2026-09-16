@@ -22,32 +22,43 @@ import { CATALOG_MAX_PRODUCTS } from './promptContext'
 // into the reply pipeline. Column names verified against the live schema
 // 2026-08-25: product_name / own_current_price / enabled (NOT current_price /
 // is_enabled).
+// Shared by loadAgentCatalog and loadAgentDeliveryInfo below -- both need
+// exactly the same "which store" answer (the pin, re-checked against
+// ownerUserId, falling back to the active store), and duplicating this
+// ownership-sensitive lookup in two places would be the kind of thing that
+// drifts the moment one of them gets a fix the other doesn't.
+async function resolveAgentConnectionId(
+  supabase: SupabaseClient,
+  ownerUserId: string,
+  pinnedConnectionId?: string | null,
+): Promise<string | null> {
+  if (pinnedConnectionId) {
+    const { data } = await supabase
+      .from('kaspi_shop_connections')
+      .select('id')
+      .eq('id', pinnedConnectionId)
+      .eq('user_id', ownerUserId)
+      .maybeSingle()
+    if (data) return data.id
+  }
+  const { data } = await supabase
+    .from('kaspi_shop_connections')
+    .select('id')
+    .eq('user_id', ownerUserId)
+    .eq('is_active', true)
+    .maybeSingle()
+  return data?.id ?? null
+}
+
 export async function loadAgentCatalog(
   supabase: SupabaseClient,
   ownerUserId: string,
   pinnedConnectionId?: string | null,
 ): Promise<{ name: string; price: number }[]> {
   try {
-    let conn: { id: string } | null = null
-    if (pinnedConnectionId) {
-      const { data } = await supabase
-        .from('kaspi_shop_connections')
-        .select('id')
-        .eq('id', pinnedConnectionId)
-        .eq('user_id', ownerUserId)
-        .maybeSingle()
-      conn = data ?? null
-    }
-    if (!conn) {
-      const { data } = await supabase
-        .from('kaspi_shop_connections')
-        .select('id')
-        .eq('user_id', ownerUserId)
-        .eq('is_active', true)
-        .maybeSingle()
-      conn = data ?? null
-    }
-    if (!conn) return []
+    const connId = await resolveAgentConnectionId(supabase, ownerUserId, pinnedConnectionId)
+    if (!connId) return []
+    const conn = { id: connId }
     // Only what the seller is actually selling, ordered so the products a
     // customer can buy right now survive the cap.
     //
@@ -107,5 +118,33 @@ export async function loadAgentCatalog(
       .filter(p => p.name && p.price > 0)
   } catch {
     return []
+  }
+}
+
+// The seller's own delivery text (Kaspi Bot -> Витрина -> Оформление,
+// storefront_delivery_info -- already shown on the public storefront page,
+// never previously fed into the AI agent's own prompt). Null when the
+// seller never set one, so the invoice-tool instruction (promptContext.ts's
+// buildDeliveryBlock) falls back to a generic Kazakhstan-wide price guide
+// instead of inventing a number with nothing behind it. Same
+// best-effort/never-throw contract as loadAgentCatalog -- a lookup failure
+// here must never break the reply pipeline.
+export async function loadAgentDeliveryInfo(
+  supabase: SupabaseClient,
+  ownerUserId: string,
+  pinnedConnectionId?: string | null,
+): Promise<string | null> {
+  try {
+    const connId = await resolveAgentConnectionId(supabase, ownerUserId, pinnedConnectionId)
+    if (!connId) return null
+    const { data } = await supabase
+      .from('kaspi_shop_connections')
+      .select('storefront_delivery_info')
+      .eq('id', connId)
+      .maybeSingle()
+    const info = data?.storefront_delivery_info
+    return typeof info === 'string' && info.trim() ? info.trim() : null
+  } catch {
+    return null
   }
 }

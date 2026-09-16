@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
 import { generateAiReply } from '@/lib/instagramAiReply'
-import { buildBusinessContextLine, buildCollectFieldsToExtract, buildCatalogBlock, AgentTone, AgentGoal } from './promptContext'
-import { loadAgentCatalog } from './catalogContext'
+import { buildBusinessContextLine, buildCollectFieldsToExtract, buildCatalogBlock, buildDeliveryBlock, AgentTone, AgentGoal } from './promptContext'
+import { loadAgentCatalog, loadAgentDeliveryInfo } from './catalogContext'
 import { pickProductPhoto } from './productPhoto'
 import { buildInvoiceToolExecutor } from './invoiceSend'
 import { debitAiAgentWallet, AI_AGENT_CREDITS_PER_AI_REPLY, hasAiAgentBudget, AI_AGENT_BUDGET_DEPLETED_REPLY } from './wallet'
@@ -226,6 +226,8 @@ export async function handleExternalApiIncoming(conn: ExternalApiConnection, par
   } else try {
     catalog = await loadAgentCatalog(supabase, agent.user_id, agent.kaspi_shop_connection_id)
     const catalogBlock = buildCatalogBlock(catalog)
+    const deliveryInfo = await loadAgentDeliveryInfo(supabase, agent.user_id, agent.kaspi_shop_connection_id)
+    const deliveryBlock = buildDeliveryBlock(deliveryInfo)
     const result = await generateAiReply({
       incomingText: params.text,
       fromUsername: params.customerName?.trim() || params.externalUserId,
@@ -241,7 +243,7 @@ export async function handleExternalApiIncoming(conn: ExternalApiConnection, par
         currency: agent.currency || undefined,
         customInstructions: typeof agent.custom_instructions === 'string' ? agent.custom_instructions : undefined,
         channel: 'api',
-      }) + catalogBlock,
+      }) + catalogBlock + deliveryBlock,
       collectFieldsToExtract: buildCollectFieldsToExtract(Array.isArray(agent.collect_fields) ? agent.collect_fields : undefined),
       invoiceTool: buildInvoiceToolExecutor(supabase, { id: agent.id, status: agent.status }, conversation.id),
     })

@@ -2,8 +2,8 @@ import { createClient } from '@supabase/supabase-js'
 import { decryptAtRest } from '@/lib/kaspiPay/crypto'
 import { getKey } from './connection'
 import { generateAiReply } from '@/lib/instagramAiReply'
-import { buildBusinessContextLine, buildCollectFieldsToExtract, buildCatalogBlock, AgentTone, AgentGoal } from './promptContext'
-import { loadAgentCatalog } from './catalogContext'
+import { buildBusinessContextLine, buildCollectFieldsToExtract, buildCatalogBlock, buildDeliveryBlock, AgentTone, AgentGoal } from './promptContext'
+import { loadAgentCatalog, loadAgentDeliveryInfo } from './catalogContext'
 import { pickProductPhoto } from './productPhoto'
 import { buildInvoiceToolExecutor, createDraft } from './invoiceSend'
 import { validateDraftInput, canAutoSend } from './invoiceDrafts'
@@ -289,6 +289,8 @@ export async function handleTelegramIncoming(conn: TelegramTenantConnection, par
     // Phase 3: real catalog prices in context + the invoice tool.
     catalog = await loadAgentCatalog(supabase, agent.user_id, agent.kaspi_shop_connection_id)
     const catalogBlock = buildCatalogBlock(catalog)
+    const deliveryInfo = await loadAgentDeliveryInfo(supabase, agent.user_id, agent.kaspi_shop_connection_id)
+    const deliveryBlock = buildDeliveryBlock(deliveryInfo)
     const result = await generateAiReply({
       incomingText: params.incomingText,
       fromUsername: params.fromHandle,
@@ -305,7 +307,7 @@ export async function handleTelegramIncoming(conn: TelegramTenantConnection, par
         currency: agent.currency || undefined,
         customInstructions: typeof agent.custom_instructions === 'string' ? agent.custom_instructions : undefined,
         channel: 'telegram',
-      }) + catalogBlock,
+      }) + catalogBlock + deliveryBlock,
       collectFieldsToExtract: buildCollectFieldsToExtract(Array.isArray(agent.collect_fields) ? agent.collect_fields : undefined),
       invoiceTool: buildInvoiceToolExecutor(supabase, { id: agent.id, status: agent.status }, conversation.id),
     })

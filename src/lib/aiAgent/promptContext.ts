@@ -99,6 +99,33 @@ export function buildCatalogBlock(products: { name: string; price: number }[]): 
   return ` Актуальный каталог товаров и цен этого бизнеса (используй ТОЛЬКО эти цены, не выдумывай другие; если товара нет в каталоге — скажи, что уточнишь):\n${lines}`
 }
 
+// Generic Kazakhstan-wide courier price guide, used ONLY when the seller has
+// never filled in their own delivery info on Витрина -> Оформление
+// (storefront_delivery_info, loaded by catalogContext.ts's
+// loadAgentDeliveryInfo). Founder-approved ballpark 2026-09-16 (1000–15000 ₸
+// range) -- explicitly a fallback, not a real rate: the instruction below
+// tells the model to treat it as approximate and prefer the seller's own
+// text whenever one exists.
+const GENERIC_KZ_DELIVERY_GUIDE = `Ориентировочные цены доставки по Казахстану (это ПРИБЛИЗИТЕЛЬНЫЙ ориентир для оценки, не официальный тариф — предупреждай об этом клиента, если называешь цену по этому списку):
+- Доставка по своему городу (курьер): 1000–1500 ₸
+- Алматы, Астана, Шымкент (если это не свой город): 1500–2500 ₸
+- Другие областные центры (Караганда, Актобе, Тараз, Павлодар, Усть-Каменогорск, Семей, Костанай, Кызылорда, Атырау, Петропавловск, Уральск, Актау, Талдыкорган, Кокшетау, Туркестан): 2500–4000 ₸
+- Отдалённые районные центры и небольшие населённые пункты: 5000–8000 ₸
+- Труднодоступные/очень отдалённые направления, крупногабаритные заказы: до 15000 ₸`
+
+// «Доставка» -- appended alongside the catalog block whenever the agent
+// owner has an active Kaspi Shop connection, so the invoice tool (see
+// invoiceToolLine in instagramAiReply.ts) can add a real delivery line
+// instead of skipping delivery entirely or inventing an arbitrary price.
+// sellerDeliveryInfo is authoritative when the seller set one; the generic
+// guide is only ever the fallback.
+export function buildDeliveryBlock(sellerDeliveryInfo: string | null): string {
+  if (sellerDeliveryInfo) {
+    return ` Условия и цены доставки этого бизнеса (используй ИМЕННО это, это реальные условия продавца):\n${sellerDeliveryInfo}`
+  }
+  return ` ${GENERIC_KZ_DELIVERY_GUIDE}`
+}
+
 // Maps an agent's raw collect_fields array (the same array
 // buildBusinessContextLine above flattens into prose) into the
 // {key,label}[] shape generateAiReply's collectFieldsToExtract param needs
