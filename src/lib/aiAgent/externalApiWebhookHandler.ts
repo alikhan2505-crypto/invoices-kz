@@ -192,6 +192,7 @@ export async function handleExternalApiIncoming(conn: ExternalApiConnection, par
 
   const historyPairs = typeof agent.history_pairs === 'number' && agent.history_pairs >= 0 ? agent.history_pairs : 5
   let conversationHistory: { incoming: string; reply: string }[] | undefined
+  let historyGapHours: number | null = null
   if (historyPairs > 0) {
     const { data: historyRows } = await supabase
       .from('ai_agent_messages')
@@ -199,6 +200,9 @@ export async function handleExternalApiIncoming(conn: ExternalApiConnection, par
       .eq('conversation_id', conversation.id)
       .order('created_at', { ascending: false })
       .limit(Math.min(historyPairs * 4, 80))
+    if (historyRows && historyRows[0]) {
+      historyGapHours = (Date.now() - new Date(historyRows[0].created_at).getTime()) / 3_600_000
+    }
     const pairs = pairConversationHistory((historyRows || []).slice().reverse(), historyPairs)
     if (pairs.length > 0) conversationHistory = pairs
   }
@@ -233,6 +237,7 @@ export async function handleExternalApiIncoming(conn: ExternalApiConnection, par
       fromUsername: params.customerName?.trim() || params.externalUserId,
       source: 'dm',
       conversationHistory,
+      historyGapHours,
       businessContextLine: buildBusinessContextLine({
         name: agent.name,
         tone: agent.tone as AgentTone,

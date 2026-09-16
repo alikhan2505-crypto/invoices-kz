@@ -248,6 +248,7 @@ export async function handleTelegramIncoming(conn: TelegramTenantConnection, par
   // drafts/skips, then re-ascended for the pairing walk.
   const historyPairs = typeof agent.history_pairs === 'number' && agent.history_pairs >= 0 ? agent.history_pairs : 5
   let conversationHistory: { incoming: string; reply: string }[] | undefined
+  let historyGapHours: number | null = null
   if (historyPairs > 0) {
     const { data: historyRows } = await supabase
       .from('ai_agent_messages')
@@ -255,6 +256,9 @@ export async function handleTelegramIncoming(conn: TelegramTenantConnection, par
       .eq('conversation_id', conversation.id)
       .order('created_at', { ascending: false })
       .limit(Math.min(historyPairs * 4, 80))
+    if (historyRows && historyRows[0]) {
+      historyGapHours = (Date.now() - new Date(historyRows[0].created_at).getTime()) / 3_600_000
+    }
     const pairs = pairConversationHistory((historyRows || []).slice().reverse(), historyPairs)
     if (pairs.length > 0) conversationHistory = pairs
   }
@@ -296,6 +300,7 @@ export async function handleTelegramIncoming(conn: TelegramTenantConnection, par
       fromUsername: params.fromHandle,
       source: 'dm',
       conversationHistory,
+      historyGapHours,
       image: params.media?.kind === 'image' ? { base64: params.media.base64, mediaType: params.media.mediaType } : undefined,
       businessContextLine: buildBusinessContextLine({
         name: agent.name,

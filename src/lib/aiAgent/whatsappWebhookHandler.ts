@@ -339,6 +339,7 @@ export async function handleWhatsAppIncoming(conn: WhatsAppTenantConnection, par
   // mid-conversation -- same depth/pairing rule as the Telegram path.
   const historyPairs = typeof agent.history_pairs === 'number' && agent.history_pairs >= 0 ? agent.history_pairs : 5
   let conversationHistory: { incoming: string; reply: string }[] | undefined
+  let historyGapHours: number | null = null
   if (historyPairs > 0) {
     const { data: historyRows } = await supabase
       .from('ai_agent_messages')
@@ -346,6 +347,13 @@ export async function handleWhatsAppIncoming(conn: WhatsAppTenantConnection, par
       .eq('conversation_id', conversation.id)
       .order('created_at', { ascending: false })
       .limit(Math.min(historyPairs * 4, 80))
+    // historyRows[0] (descending order) is the most recent message BEFORE
+    // this inbound one -- how long ago it landed decides whether a
+    // "с возвращением" greeting reads as natural or repetitive (see
+    // instagramAiReply.ts's REGREET_GAP_HOURS).
+    if (historyRows && historyRows[0]) {
+      historyGapHours = (Date.now() - new Date(historyRows[0].created_at).getTime()) / 3_600_000
+    }
     const pairs = pairConversationHistory((historyRows || []).slice().reverse(), historyPairs)
     if (pairs.length > 0) conversationHistory = pairs
   }
@@ -387,6 +395,7 @@ export async function handleWhatsAppIncoming(conn: WhatsAppTenantConnection, par
       fromUsername: params.customerHandle,
       source: 'dm',
       conversationHistory,
+      historyGapHours,
       image: params.media?.kind === 'image' ? { base64: params.media.base64, mediaType: params.media.mediaType } : undefined,
       businessContextLine: buildBusinessContextLine({
         name: agent.name,

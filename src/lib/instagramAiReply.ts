@@ -46,6 +46,14 @@ export async function generateAiReply(params: {
   // Only ever populated for source: 'dm' -- a comment thread under a post
   // isn't a continuous conversation the same way.
   conversationHistory?: { incoming: string; reply: string }[]
+  // Hours since the last message in this conversation (either direction),
+  // before this one. Only meaningful alongside conversationHistory -- lets
+  // the "не здоровайся заново" rule below relax after a real gap, instead
+  // of permanently forbidding a "с возвращением" greeting for a customer
+  // who comes back a day (or a week) later. undefined/null when unknown
+  // (no history, or a caller that doesn't track it) keeps the old
+  // never-re-greet behavior.
+  historyGapHours?: number | null
   businessContextLine: string
   // Structured collect-field keys the multi-tenant tenant pipelines
   // (webhookHandler.ts and its Telegram/WhatsApp twins) pass when the
@@ -91,10 +99,19 @@ export async function generateAiReply(params: {
         : 'Это комментарий под постом.')
     : 'Это личное сообщение (DM).'
 
+  // 12h is deliberately generous (not "since yesterday" at midnight, an
+  // actual elapsed-time threshold) -- long enough that same-conversation
+  // back-and-forth (minutes to a few hours apart) never re-greets, short
+  // enough that a customer back the next day gets a natural "с возвращением"
+  // instead of jumping straight back into a stale mid-order context.
+  const REGREET_GAP_HOURS = 12
+  const longGap = typeof params.historyGapHours === 'number' && params.historyGapHours >= REGREET_GAP_HOURS
   const historyBlock = params.conversationHistory?.length
     ? `\n\nПредыдущая переписка с этим же человеком (от старых сообщений к новым):\n${params.conversationHistory
         .map(h => `Клиент: "${h.incoming}"\nТы уже ответил(а): "${h.reply}"`)
-        .join('\n\n')}\n\nНе здоровайся заново и не повторяй то, что уже сказал(а) выше — продолжай диалог естественно, как живой человек, помнящий контекст.`
+        .join('\n\n')}\n\n${longGap
+        ? 'С последнего сообщения прошло больше 12 часов — это фактически новое обращение, можно естественно поприветствовать клиента как вернувшегося (например «Здравствуйте, с возвращением!»), но опирайся на контекст выше и не повторяй старые ответы дословно.'
+        : 'Не здоровайся заново и не повторяй то, что уже сказал(а) выше — продолжай диалог естественно, как живой человек, помнящий контекст.'}`
     : ''
 
   // Comments are public -- anyone reading the post sees them, so a long

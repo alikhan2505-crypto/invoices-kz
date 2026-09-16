@@ -292,6 +292,7 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
   // own just-inserted inbound row naturally never forms a pair (nothing
   // outbound follows it yet), so it doesn't need to be excluded separately.
   let conversationHistory: { incoming: string; reply: string }[] | undefined
+  let historyGapHours: number | null = null
   if (params.source === 'dm') {
     const { data: historyRows } = await supabase
       .from('ai_agent_messages')
@@ -299,6 +300,13 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
       .eq('conversation_id', conversation.id)
       .order('created_at', { ascending: true })
       .limit(20)
+    // historyRows' own last element is THIS turn's just-inserted inbound row
+    // (see the comment above) -- the one before it is the most recent PRIOR
+    // message, which is what decides whether a "с возвращением" greeting
+    // reads as natural (see instagramAiReply.ts's REGREET_GAP_HOURS).
+    if (historyRows && historyRows.length >= 2) {
+      historyGapHours = (Date.now() - new Date(historyRows[historyRows.length - 2].created_at).getTime()) / 3_600_000
+    }
     const pairs: { incoming: string; reply: string }[] = []
     let pendingIncoming: string | null = null
     for (const row of historyRows || []) {
@@ -353,6 +361,7 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
       fromUsername: params.fromUsername,
       source: params.source,
       conversationHistory,
+      historyGapHours,
       image: params.media?.kind === 'image' ? { base64: params.media.base64, mediaType: params.media.mediaType } : undefined,
       businessContextLine: buildBusinessContextLine({
         name: agent.name,
