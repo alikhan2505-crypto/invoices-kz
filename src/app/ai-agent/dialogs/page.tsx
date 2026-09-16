@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback, Suspense } from 'react'
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { motion, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
@@ -88,6 +88,14 @@ function AiAgentDialogsInner() {
   const [replyText, setReplyText] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Keep the thread scrolled to the newest message -- on first opening a
+  // conversation, and again every time the list grows (a reply just sent,
+  // or a fresh poll picking up a new inbound message).
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ block: 'end' })
+  }, [messages])
 
   async function authHeader() {
     const { data: { session } } = await supabase.auth.getSession()
@@ -237,9 +245,9 @@ function AiAgentDialogsInner() {
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
-      <div className="max-w-7xl mx-auto p-4 lg:p-6 pb-6">
+      <div className="max-w-7xl mx-auto p-4 lg:p-6 pb-6 flex flex-col" style={{ height: 'calc(100vh - 200px)', minHeight: 560 }}>
         <motion.div
-          className="flex items-center justify-between gap-3 mb-4 flex-wrap"
+          className="flex items-center justify-between gap-3 mb-4 flex-wrap flex-shrink-0"
           initial={reduceMotion ? false : { opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE }}
@@ -267,8 +275,8 @@ function AiAgentDialogsInner() {
           </div>
         </motion.div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-4">
-          <div className="space-y-2" style={{ opacity: fetching ? 0.6 : 1 }}>
+        <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-4 flex-1 min-h-0">
+          <div className="space-y-2 overflow-y-auto" style={{ opacity: fetching ? 0.6 : 1 }}>
             {items.length === 0 && !fetching && (
               <div className="nav-glass rounded-2xl p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Пока нет ни одного диалога</div>
             )}
@@ -317,12 +325,12 @@ function AiAgentDialogsInner() {
             })}
           </div>
 
-          <div className="nav-glass rounded-2xl p-4 flex flex-col" style={{ minHeight: 420 }}>
+          <div className="nav-glass rounded-2xl p-4 flex flex-col min-h-0">
             {!selected ? (
               <div className="flex-1 flex items-center justify-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Выберите диалог слева</div>
             ) : (
               <>
-                <div className="flex items-center justify-between gap-2 mb-3 pb-3" style={{ borderBottom: '1px solid var(--nav-border-soft)' }}>
+                <div className="flex items-center justify-between gap-2 mb-3 pb-3 flex-shrink-0" style={{ borderBottom: '1px solid var(--nav-border-soft)' }}>
                   <div>
                     <div className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{selected.customerHandle}</div>
                     {agents.length > 1 && (
@@ -337,7 +345,7 @@ function AiAgentDialogsInner() {
                   )}
                 </div>
 
-                <div className="flex-1 overflow-y-auto space-y-2 mb-3" style={{ maxHeight: 420 }}>
+                <div className="flex-1 min-h-0 overflow-y-auto space-y-2 mb-3">
                   {messagesLoading ? (
                     <div className="text-center text-sm py-8" style={{ color: 'var(--nav-text-muted)' }}>Загрузка…</div>
                   ) : messages.map(m => (
@@ -354,11 +362,12 @@ function AiAgentDialogsInner() {
                       </div>
                     </div>
                   ))}
+                  <div ref={messagesEndRef} />
                 </div>
 
-                {error && <div className="text-xs mb-2" style={{ color: 'var(--nav-critical)' }}>{error}</div>}
+                {error && <div className="text-xs mb-2 flex-shrink-0" style={{ color: 'var(--nav-critical)' }}>{error}</div>}
 
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-shrink-0">
                   <input value={replyText} onChange={e => setReplyText(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter' && !sending) sendReply() }}
                     placeholder="Ваш ответ клиенту…"
