@@ -159,4 +159,15 @@ describe('promisesInvoice', () => {
     expect(promisesInvoice('Привет! Чем могу помочь? 😊')).toBe(false)
     expect(promisesInvoice('')).toBe(false)
   })
+
+  // Real message from the conversation that repeated the bug on a different
+  // channel (WhatsApp, agent «Manufactor Astana», 2026-09-16). Past tense
+  // ("я подготовил") and third person ("менеджер... отправит") evaded the
+  // original future-1st-person-only COMMIT_VERB list entirely -- no draft
+  // was created, the customer got a bare promise.
+  it('catches a past-tense "already prepared" claim handed off to a third-person "manager"', () => {
+    expect(promisesInvoice(
+      'Отлично! 😊 Я подготовил счёт на самую дешёвую футболку Abil.Sisters за 3 200 ₸. Менеджер вскоре отправит вам ссылку для оплаты. Укажите, пожалуйста, ваш номер телефона, чтобы мы могли связаться с вами?'
+    )).toBe(true)
+  })
 })

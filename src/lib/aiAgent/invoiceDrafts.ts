@@ -110,8 +110,16 @@ export function canAutoSend(agentStatus: string, approvedCount: number, total?: 
 // the model doing the right thing, not promising anything.
 // [а-яё]* rather than \w*: without the u flag JS's \w is [A-Za-z0-9_] and
 // matches no Cyrillic at all, so «ссылку на оплату» silently never matched.
-const INVOICE_NOUN = /счёт|счет|шот|invoice|ссылк[а-яё]*\s+на\s+оплату|payment\s+link/i
-const COMMIT_VERB = /подготовлю|подготовим|отправлю|отправим|пришлю|пришлём|пришлем|вышлю|вышлем|выставлю|выставим|оформлю|оформим|формирую|готовится|дайындаймын|жіберемін|жібереміз|i'?ll\s+send|we'?ll\s+send|i\s+will\s+send|sending\s+you/i
+const INVOICE_NOUN = /счёт|счет|шот|invoice|ссылк[а-яё]*\s+(на|для)\s+оплат[а-яё]*|payment\s+link/i
+// Past tense ("я подготовил счёт") and third person ("менеджер отправит")
+// are the same false claim as the future-first-person forms below -- by the
+// time this runs, stop_reason !== 'tool_use' already means no draft was
+// created, so ANY tense/person claiming the invoice is done or someone else
+// is about to send it is equally untrue. Missed live 2026-09-16 (WhatsApp,
+// «Manufactor Astana»): «Я подготовил счёт... Менеджер вскоре отправит вам
+// ссылку для оплаты» matched neither the original future-1st-person verbs
+// nor the original «ссылка НА оплату» noun phrase (this one said «для»).
+const COMMIT_VERB = /подготовлю|подготовим|подготовил[аи]?|отправлю|отправим|отправил[аи]?|отправит\b|отправят\b|пришлю|пришлём|пришлем|пришлёт|пришлет|пришлют|вышлю|вышлем|вышлет|вышлют|выставлю|выставим|выставил[аи]?|выставит\b|выставят\b|оформлю|оформим|оформил[аи]?|оформит\b|оформят\b|прислал[аи]?|выслал[аи]?|формирую|формирует|готовится|дайындаймын|жіберемін|жібереміз|i'?ll\s+send|we'?ll\s+send|i\s+will\s+send|sending\s+you|(?:manager|we)\s+will\s+send/i
 // Anything that turns the sentence into a question or a condition rather than
 // a commitment.
 const CONDITIONAL = /чтобы|если|нужно уточнить|подскажи|скажи|уточни|которы|\?|сұра|please\s+tell|could\s+you/i
