@@ -305,7 +305,18 @@ function parseUrgentReply(text: string): { replyText: string; urgent: boolean } 
 // logic, the same exception parseStartToken gets in telegramNotify.ts).
 export function parseExtractedFieldsBlock(text: string): { cleanText: string; extractedFields?: Record<string, string> } {
   const match = text.match(/<<<EXTRACTED>>>([\s\S]*?)<<<END>>>/)
-  if (!match) return { cleanText: text }
+  if (!match) {
+    // The model occasionally mangles its own delimiter (seen live 2026-09-16:
+    // `<<<EXTRACTED>>>>>>END>>>`, missing the JSON payload and the opening
+    // `<<<` on END) -- the regex above then finds no match, and without this
+    // fallback the raw marker text was sent straight to the customer. The
+    // instruction always places this block at the very end of the reply, so
+    // once `<<<EXTRACTED>>>` shows up at all, everything from there on is
+    // safe to drop even when it can't be parsed as a field block.
+    const openIdx = text.indexOf('<<<EXTRACTED>>>')
+    if (openIdx === -1) return { cleanText: text }
+    return { cleanText: text.slice(0, openIdx).trim() }
+  }
   const cleanText = (text.slice(0, match.index) + text.slice(match.index! + match[0].length)).trim()
 
   try {

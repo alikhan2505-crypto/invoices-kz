@@ -59,4 +59,11 @@ describe('parseExtractedFieldsBlock', () => {
     const { extractedFields } = parseExtractedFieldsBlock(raw)
     expect(extractedFields).toBeUndefined()
   })
+
+  it('strips a mangled delimiter (real live case, 2026-09-16) instead of leaking it to the customer', () => {
+    const raw = 'Спасибо за информацию! 😊 Мы уже работаем над настройкой нашего аккаунта.\n\n<<<EXTRACTED>>>>>>END>>>'
+    const { cleanText, extractedFields } = parseExtractedFieldsBlock(raw)
+    expect(cleanText).toBe('Спасибо за информацию! 😊 Мы уже работаем над настройкой нашего аккаунта.')
+    expect(extractedFields).toBeUndefined()
+  })
 })
