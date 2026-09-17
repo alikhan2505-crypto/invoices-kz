@@ -176,7 +176,18 @@ export default function SiteGenerator() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-900 text-white">
+    <main className="min-h-screen bg-gray-900 text-white salon-admin-form">
+      {/* Founder-reported 2026-09-17: typed text read as invisible on this
+          page's dark inputs. Root cause: a site-wide `input { -webkit-text-
+          fill-color: #111827 }` rule (light-theme default, in globals.css)
+          sets a WebKit/Blink-only property inputClass's text-white never
+          touches -- color and -webkit-text-fill-color are independent for
+          the cascade. Override lives in globals.css (.salon-admin-form
+          input, .salon-admin-form textarea), scoped to this page since
+          every other page here is light-themed and would break under a
+          blanket white-text rule. Same bug/fix already exists for
+          .cashier-dev-theme -- see that rule's comment for the fuller
+          writeup. */}
       <div className="bg-gray-800 border-b border-gray-700 px-6 py-4 flex items-center justify-between">
         <div>
           <div className="font-bold text-lg">Генератор сайтов</div>

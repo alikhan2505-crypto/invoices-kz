@@ -881,3 +881,16 @@ html {
   color-scheme: dark;
 }
 
+/* Same bug, same fix, different dark-on-dark page: the site-wide `input {
+   -webkit-text-fill-color: #111827 }` rule (light-theme default, near the
+   top of this file) sets a WebKit/Blink-only property that `text-white`
+   never touches -- color and -webkit-text-fill-color are independent for
+   the cascade, so nothing here was overriding the near-black glyph fill
+   until now. Founder-reported 2026-09-17: typed text on /admin/site-
+   generator's form fields read as invisible against their dark background.
+   See the .cashier-dev-theme rule above for the fuller writeup. */
+.salon-admin-form input,
+.salon-admin-form textarea {
+  -webkit-text-fill-color: #ffffff;
+}
+
