@@ -3,28 +3,28 @@ import Link from 'next/link'
 import { GUIDES } from '@/lib/guides'
 
 export const metadata: Metadata = {
-  title: 'Полезное для бизнеса Казахстана — гайды invoices.kz',
+  title: 'Қазақстан бизнесі үшін пайдалы — invoices.kz нұсқаулары',
   description:
-    'Разборы для ИП, ТОО и продавцов Kaspi: комиссия Kaspi Магазина по категориям, как выставить счёт на оплату, чем отличаются счёт, АВР, накладная и КП. Бесплатно, без регистрации.',
+    'ЖК, ЖШС және Kaspi сатушылары үшін талдаулар: санаттар бойынша Kaspi Магазин комиссиясы, төлемге шотты қалай шығару керек, шот, ОЖА, жүкқұжат және КҰ айырмашылығы. Тегін, тіркелусіз.',
   keywords:
-    'счет на оплату ип казахстан, комиссия kaspi магазина, авр казахстан, накладная на отпуск запасов, коммерческое предложение кз, документы для ип рк',
+    'ип үшін төлемге шот қазақстан, kaspi магазин комиссиясы, ожа қазақстан, жүкқұжат, коммерциялық ұсыныс, ип құжаттары рк',
   alternates: {
-    canonical: 'https://invoices.kz/guides',
+    canonical: 'https://invoices.kz/guides/kk',
     languages: { ru: 'https://invoices.kz/guides', kk: 'https://invoices.kz/guides/kk' },
   },
   openGraph: {
     type: 'website',
-    locale: 'ru_KZ',
-    url: 'https://invoices.kz/guides',
+    locale: 'kk_KZ',
+    url: 'https://invoices.kz/guides/kk',
     siteName: 'INVOICES.KZ',
-    title: 'Полезное для бизнеса Казахстана — гайды invoices.kz',
+    title: 'Қазақстан бизнесі үшін пайдалы — invoices.kz нұсқаулары',
     description:
-      'Комиссия Kaspi по категориям, как выставить счёт для ИП и ТОО, чем отличаются счёт, АВР, накладная и КП.',
-    images: [{ url: 'https://invoices.kz/og-image.png', width: 1200, height: 630, alt: 'Полезное — invoices.kz' }],
+      'Санаттар бойынша Kaspi комиссиясы, ЖК және ЖШС үшін шотты қалай шығару керек, шот, ОЖА, жүкқұжат және КҰ айырмашылығы.',
+    images: [{ url: 'https://invoices.kz/og-image.png', width: 1200, height: 630, alt: 'Пайдалы — invoices.kz' }],
   },
 }
 
-export default function GuidesIndex() {
+export default function GuidesIndexKk() {
   return (
     <div className="min-h-screen" style={{ background: 'var(--nav-bg)' }}>
       <div className="max-w-3xl mx-auto p-4 lg:p-6">
@@ -36,8 +36,8 @@ export default function GuidesIndex() {
             </Link>
           </div>
           <Link
-            href="/guides/kk"
-            hrefLang="kk"
+            href="/guides"
+            hrefLang="ru"
             className="text-xs font-semibold rounded-full px-3 py-1.5"
             style={{
               color: 'var(--nav-text-secondary)',
@@ -45,28 +45,28 @@ export default function GuidesIndex() {
               border: '1px solid var(--nav-border)',
             }}
           >
-            Қазақша
+            Русский
           </Link>
         </div>
 
         <h1 className="text-2xl lg:text-3xl font-bold mb-2" style={{ color: 'var(--nav-text-primary)' }}>
-          Полезное
+          Пайдалы
         </h1>
         <p className="text-sm mb-7" style={{ color: 'var(--nav-text-secondary)' }}>
-          Короткие разборы по документам и деньгам для ИП, ТОО и продавцов Kaspi. Без воды и без регистрации.
+          ЖК, ЖШС және Kaspi сатушылары үшін құжаттар мен ақша туралы қысқа талдаулар. Артық сөзсіз, тіркелусіз.
         </p>
 
         <div className="grid gap-3">
           {GUIDES.map(g => (
             <Link
               key={g.slug}
-              href={`/guides/${g.slug}`}
+              href={`/guides/kk/${g.slug}`}
               className="nav-glass rounded-2xl p-5 block"
               style={{ color: 'var(--nav-text-primary)' }}
             >
-              <div className="text-base font-semibold mb-1.5">{g.ru.title}</div>
+              <div className="text-base font-semibold mb-1.5">{g.kk.title}</div>
               <div className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
-                {g.ru.description}
+                {g.kk.description}
               </div>
             </Link>
           ))}
@@ -74,19 +74,19 @@ export default function GuidesIndex() {
 
         <div className="mt-8">
           <div className="text-xs font-semibold mb-3 uppercase tracking-wide" style={{ color: 'var(--nav-text-muted)' }}>
-            Бесплатные инструменты
+            Тегін құралдар
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <Link href="/tools/margin" className="nav-glass rounded-xl p-4 block" style={{ color: 'var(--nav-text-primary)' }}>
-              <div className="text-sm font-semibold mb-1">Калькулятор маржи Kaspi</div>
+              <div className="text-sm font-semibold mb-1">Kaspi маржа калькуляторы</div>
               <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>
-                Сколько остаётся с продажи после комиссии, доставки и налога
+                Комиссия, жеткізу және салықтан кейін сатудан қанша қалады
               </div>
             </Link>
             <Link href="/tools/waybills" className="nav-glass rounded-xl p-4 block" style={{ color: 'var(--nav-text-primary)' }}>
-              <div className="text-sm font-semibold mb-1">Склейка накладных Kaspi</div>
+              <div className="text-sm font-semibold mb-1">Kaspi жүкқұжаттарын желімдеу</div>
               <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>
-                Накладные одним PDF: 4 на лист А4 или А6 на термопринтер
+                Жүкқұжаттар бір PDF-те: А4 парағына 4-тен немесе термопринтерге А6
               </div>
             </Link>
           </div>

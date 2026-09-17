@@ -6,25 +6,28 @@ import { getGuide } from '@/lib/guides'
 const guide = getGuide('kak-vystavit-schet-ip')!
 
 export const metadata: Metadata = {
-  title: `${guide.title} | invoices.kz`,
-  description: guide.description,
+  title: `${guide.ru.title} | invoices.kz`,
+  description: guide.ru.description,
   keywords:
     'как выставить счет на оплату, счет на оплату ип казахстан, счет на оплату тоо, реквизиты для счета казахстан, иик бик счет, счет на оплату образец рк',
-  alternates: { canonical: `https://invoices.kz/guides/${guide.slug}` },
+  alternates: {
+    canonical: `https://invoices.kz/guides/${guide.slug}`,
+    languages: { ru: `https://invoices.kz/guides/${guide.slug}`, kk: `https://invoices.kz/guides/kk/${guide.slug}` },
+  },
   openGraph: {
     type: 'article',
     locale: 'ru_KZ',
     url: `https://invoices.kz/guides/${guide.slug}`,
     siteName: 'INVOICES.KZ',
-    title: guide.title,
-    description: guide.description,
-    images: [{ url: 'https://invoices.kz/og-image.png', width: 1200, height: 630, alt: guide.title }],
+    title: guide.ru.title,
+    description: guide.ru.description,
+    images: [{ url: 'https://invoices.kz/og-image.png', width: 1200, height: 630, alt: guide.ru.title }],
   },
 }
 
 export default function Page() {
   return (
-    <GuideShell guide={guide}>
+    <GuideShell guide={guide} lang="ru">
       <p className="lead">
         Счёт на оплату — это просьба заплатить: в нём написано, кто, кому, за что и на какие банковские реквизиты
         переводит деньги. Форма счёта законом не установлена, но если в нём не хватает реквизитов, бухгалтерия

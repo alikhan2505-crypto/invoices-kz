@@ -6,25 +6,28 @@ import { getGuide } from '@/lib/guides'
 const guide = getGuide('dokumenty-ip-kazakhstan')!
 
 export const metadata: Metadata = {
-  title: `${guide.title} | invoices.kz`,
-  description: guide.description,
+  title: `${guide.ru.title} | invoices.kz`,
+  description: guide.ru.description,
   keywords:
     'акт выполненных работ казахстан, авр что это, накладная на отпуск запасов на сторону, коммерческое предложение образец кз, какие документы нужны ип казахстан, чем отличается счет от акта',
-  alternates: { canonical: `https://invoices.kz/guides/${guide.slug}` },
+  alternates: {
+    canonical: `https://invoices.kz/guides/${guide.slug}`,
+    languages: { ru: `https://invoices.kz/guides/${guide.slug}`, kk: `https://invoices.kz/guides/kk/${guide.slug}` },
+  },
   openGraph: {
     type: 'article',
     locale: 'ru_KZ',
     url: `https://invoices.kz/guides/${guide.slug}`,
     siteName: 'INVOICES.KZ',
-    title: guide.title,
-    description: guide.description,
-    images: [{ url: 'https://invoices.kz/og-image.png', width: 1200, height: 630, alt: guide.title }],
+    title: guide.ru.title,
+    description: guide.ru.description,
+    images: [{ url: 'https://invoices.kz/og-image.png', width: 1200, height: 630, alt: guide.ru.title }],
   },
 }
 
 export default function Page() {
   return (
-    <GuideShell guide={guide}>
+    <GuideShell guide={guide} lang="ru">
       <p className="lead">
         Четыре документа, которые чаще всего путают между собой. Разница простая: каждый отвечает на свой вопрос —
         сколько заплатить, за что заплатили, что передали и сколько это будет стоить.

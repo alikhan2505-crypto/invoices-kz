@@ -7,25 +7,28 @@ import { KASPI_CATEGORY_COMMISSIONS } from '@/lib/kaspiShop/margin'
 const guide = getGuide('komissiya-kaspi')!
 
 export const metadata: Metadata = {
-  title: `${guide.title} | invoices.kz`,
-  description: guide.description,
+  title: `${guide.ru.title} | invoices.kz`,
+  description: guide.ru.description,
   keywords:
     'комиссия kaspi магазина, комиссия каспи по категориям, сколько забирает kaspi, тарифы kaspi магазин 2026, комиссия каспи с ндс, минимальная цена на kaspi',
-  alternates: { canonical: `https://invoices.kz/guides/${guide.slug}` },
+  alternates: {
+    canonical: `https://invoices.kz/guides/${guide.slug}`,
+    languages: { ru: `https://invoices.kz/guides/${guide.slug}`, kk: `https://invoices.kz/guides/kk/${guide.slug}` },
+  },
   openGraph: {
     type: 'article',
     locale: 'ru_KZ',
     url: `https://invoices.kz/guides/${guide.slug}`,
     siteName: 'INVOICES.KZ',
-    title: guide.title,
-    description: guide.description,
-    images: [{ url: 'https://invoices.kz/og-margin.png', width: 1200, height: 630, alt: guide.title }],
+    title: guide.ru.title,
+    description: guide.ru.description,
+    images: [{ url: 'https://invoices.kz/og-margin.png', width: 1200, height: 630, alt: guide.ru.title }],
   },
 }
 
 export default function Page() {
   return (
-    <GuideShell guide={guide}>
+    <GuideShell guide={guide} lang="ru">
       <p className="lead">
         Короткий ответ: Kaspi Магазин удерживает <strong>7,3%, 12,5% или 15,5%</strong> от цены продажи — ставка зависит
         от категории товара. Это уже с НДС, то есть та доля цены, которая реально не доходит до вашего счёта.

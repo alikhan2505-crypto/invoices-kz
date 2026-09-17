@@ -532,7 +532,7 @@ const COPY: Record<Lang, Copy> = {
       { label: 'Деректерді жою', href: '/data-deletion' },
       { label: 'Тегін → Жүкқұжаттарды желімдеу', href: '/tools/waybills' },
       { label: 'Тегін → Маржа калькуляторы', href: '/tools/margin' },
-      { label: 'Пайдалы → Бизнеске арналған нұсқаулар', href: '/guides' },
+      { label: 'Пайдалы → Бизнеске арналған нұсқаулар', href: '/guides/kk' },
       { label: 'Әзірлеушілерге → Cashier API', href: '/cashier-api' },
     ],
     footerContact: [

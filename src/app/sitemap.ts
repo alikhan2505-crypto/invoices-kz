@@ -1,5 +1,5 @@
 import { MetadataRoute } from 'next'
-import { GUIDES } from '@/lib/guides'
+import { GUIDES, guideAlternates } from '@/lib/guides'
 
 export default function sitemap(): MetadataRoute.Sitemap {
   return [
@@ -46,15 +46,35 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified: new Date(),
       changeFrequency: 'weekly',
       priority: 0.7,
+      alternates: { languages: { ru: 'https://invoices.kz/guides', kk: 'https://invoices.kz/guides/kk' } },
+    },
+    {
+      url: 'https://invoices.kz/guides/kk',
+      lastModified: new Date(),
+      changeFrequency: 'weekly',
+      priority: 0.7,
+      alternates: { languages: { ru: 'https://invoices.kz/guides', kk: 'https://invoices.kz/guides/kk' } },
     },
     // Each guide reports its own real edit date, so a crawler is never told a
-    // page changed when only its neighbours did.
-    ...GUIDES.map(g => ({
-      url: `https://invoices.kz/guides/${g.slug}`,
-      lastModified: new Date(g.updated),
-      changeFrequency: 'monthly' as const,
-      priority: 0.7,
-    })),
+    // page changed when only its neighbours did. Both language routes list
+    // each other via alternates.languages (hreflang) so a crawler knows
+    // they're the same article, not duplicate content.
+    ...GUIDES.flatMap(g => [
+      {
+        url: `https://invoices.kz/guides/${g.slug}`,
+        lastModified: new Date(g.updated),
+        changeFrequency: 'monthly' as const,
+        priority: 0.7,
+        alternates: { languages: guideAlternates(g.slug) },
+      },
+      {
+        url: `https://invoices.kz/guides/kk/${g.slug}`,
+        lastModified: new Date(g.updated),
+        changeFrequency: 'monthly' as const,
+        priority: 0.7,
+        alternates: { languages: guideAlternates(g.slug) },
+      },
+    ]),
     {
       url: 'https://invoices.kz/privacy',
       lastModified: new Date(),
