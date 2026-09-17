@@ -562,6 +562,12 @@ export default function TopUtilityBar() {
     pathname.startsWith('/tools/')
   if (isPublicPage) return null
 
+  // Founder-requested 2026-09-17: not a public page (opposite reason from
+  // isPublicPage above) -- this is an internal admin tool with its own
+  // dedicated header, and the wallet balance is just noise there, not
+  // something the founder needs while generating salon landing pages.
+  if (pathname === '/admin/site-generator') return null
+
   if (!loggedIn) return null
 
   const visibleWallets = WALLETS.filter(w => !w.adminOnly || isAdmin)
