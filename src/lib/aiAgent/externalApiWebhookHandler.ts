@@ -196,7 +196,7 @@ export async function handleExternalApiIncoming(conn: ExternalApiConnection, par
   if (historyPairs > 0) {
     const { data: historyRows } = await supabase
       .from('ai_agent_messages')
-      .select('direction, text, status, created_at')
+      .select('direction, text, status, is_ai_generated, created_at')
       .eq('conversation_id', conversation.id)
       .order('created_at', { ascending: false })
       .limit(Math.min(historyPairs * 4, 80))

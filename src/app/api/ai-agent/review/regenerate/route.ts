@@ -109,7 +109,7 @@ export async function POST(req: NextRequest) {
     if (historyPairs > 0) {
       const { data: historyRows } = await supabase
         .from('ai_agent_messages')
-        .select('direction, text, status, created_at')
+        .select('direction, text, status, is_ai_generated, created_at')
         .eq('conversation_id', conversation.id)
         .order('created_at', { ascending: false })
         .limit(Math.min(historyPairs * 4, 80))
@@ -119,7 +119,7 @@ export async function POST(req: NextRequest) {
   } else {
     const { data: historyRows } = await supabase
       .from('ai_agent_messages')
-      .select('direction, text, status, created_at')
+      .select('direction, text, status, is_ai_generated, created_at')
       .eq('conversation_id', conversation.id)
       .order('created_at', { ascending: true })
       .limit(20)
@@ -128,7 +128,9 @@ export async function POST(req: NextRequest) {
     for (const row of historyRows || []) {
       if (row.direction === 'inbound') {
         pendingIncoming = row.text
-      } else if (row.direction === 'outbound' && row.status === 'sent' && pendingIncoming) {
+      } else if (row.direction === 'outbound' && row.status === 'sent' && row.is_ai_generated && pendingIncoming) {
+        // Same is_ai_generated gate as pairConversationHistory (telegram.ts)
+        // and webhookHandler.ts's own Instagram branch -- see their comments.
         pairs.push({ incoming: pendingIncoming, reply: row.text })
         pendingIncoming = null
       }

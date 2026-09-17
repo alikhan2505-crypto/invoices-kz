@@ -124,8 +124,23 @@ export function parseTelegramUpdate(update: unknown): ParsedTelegramUpdate {
 // webhookHandler.ts: an inbound row pairs with the next *sent* outbound
 // row; a still-pending or skipped draft was never seen by the customer,
 // so it doesn't count as "already said".
+//
+// is_ai_generated additionally gates which *sent* outbound row counts as a
+// reply worth pairing (code audit finding, 2026-09-01, fixed 2026-09-17): an
+// invoice-link message, a payment confirmation, a template/flow-engine send,
+// or the canned budget-depleted text are all real, delivered text (status
+// 'sent'), but none of them are something the MODEL composed -- they're
+// templated or come from a different code path entirely. Pairing them in
+// anyway told the model it had said that exact rigid text, which it never
+// did. A manual founder reply through the same shared send path also has
+// is_ai_generated: false, but that's not a loss here: sending one flips
+// paused_for_human, so the AI pipeline stops running for that conversation
+// until released -- there is no future call that would have needed to see
+// it. Falsy/undefined treated as false, not true, so a caller that forgets
+// to select the column degrades to "pair nothing" rather than silently
+// reintroducing this bug.
 export function pairConversationHistory(
-  rows: { direction: string; text: string; status: string }[],
+  rows: { direction: string; text: string; status: string; is_ai_generated?: boolean | null }[],
   maxPairs: number
 ): { incoming: string; reply: string }[] {
   const pairs: { incoming: string; reply: string }[] = []
@@ -133,7 +148,7 @@ export function pairConversationHistory(
   for (const row of rows) {
     if (row.direction === 'inbound') {
       pendingIncoming = row.text
-    } else if (row.direction === 'outbound' && row.status === 'sent' && pendingIncoming) {
+    } else if (row.direction === 'outbound' && row.status === 'sent' && row.is_ai_generated && pendingIncoming) {
       pairs.push({ incoming: pendingIncoming, reply: row.text })
       pendingIncoming = null
     }

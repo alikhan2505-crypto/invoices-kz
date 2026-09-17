@@ -171,9 +171,9 @@ describe('pairConversationHistory', () => {
   it('pairs each inbound with the next sent outbound, same rule as the Instagram tenant path', () => {
     const rows = [
       { direction: 'inbound', text: 'Привет', status: 'sent' },
-      { direction: 'outbound', text: 'Здравствуйте!', status: 'sent' },
+      { direction: 'outbound', text: 'Здравствуйте!', status: 'sent', is_ai_generated: true },
       { direction: 'inbound', text: 'Сколько стоит?', status: 'sent' },
-      { direction: 'outbound', text: '5000 тенге', status: 'sent' },
+      { direction: 'outbound', text: '5000 тенге', status: 'sent', is_ai_generated: true },
     ]
     expect(pairConversationHistory(rows, 5)).toEqual([
       { incoming: 'Привет', reply: 'Здравствуйте!' },
@@ -184,10 +184,10 @@ describe('pairConversationHistory', () => {
   it('skips pending_review and skipped drafts -- the customer never saw them', () => {
     const rows = [
       { direction: 'inbound', text: 'Вопрос 1', status: 'sent' },
-      { direction: 'outbound', text: 'черновик', status: 'pending_review' },
+      { direction: 'outbound', text: 'черновик', status: 'pending_review', is_ai_generated: true },
       { direction: 'inbound', text: 'Вопрос 2', status: 'sent' },
-      { direction: 'outbound', text: 'пропущено', status: 'skipped' },
-      { direction: 'outbound', text: 'Реальный ответ', status: 'sent' },
+      { direction: 'outbound', text: 'пропущено', status: 'skipped', is_ai_generated: true },
+      { direction: 'outbound', text: 'Реальный ответ', status: 'sent', is_ai_generated: true },
     ]
     // Вопрос 1's pendingIncoming is overwritten by Вопрос 2, which then
     // pairs with the first *sent* outbound after it.
@@ -199,7 +199,7 @@ describe('pairConversationHistory', () => {
   it('keeps only the last maxPairs pairs', () => {
     const rows = Array.from({ length: 8 }, (_, i) => [
       { direction: 'inbound', text: `in${i}`, status: 'sent' },
-      { direction: 'outbound', text: `out${i}`, status: 'sent' },
+      { direction: 'outbound', text: `out${i}`, status: 'sent', is_ai_generated: true },
     ]).flat()
     const pairs = pairConversationHistory(rows, 3)
     expect(pairs).toHaveLength(3)
@@ -210,5 +210,26 @@ describe('pairConversationHistory', () => {
   it('returns empty for an empty or unpaired history', () => {
     expect(pairConversationHistory([], 5)).toEqual([])
     expect(pairConversationHistory([{ direction: 'inbound', text: 'только вопрос', status: 'sent' }], 5)).toEqual([])
+  })
+
+  it('does not pair a sent outbound row the model never composed (code audit finding, 2026-09-01)', () => {
+    const rows = [
+      { direction: 'inbound', text: 'Хочу заказать', status: 'sent' },
+      // A real, delivered invoice-link message -- sendIntoConversation
+      // (channelSend.ts) always writes is_ai_generated: false for this kind
+      // of send, since the text is templated, not model-composed.
+      { direction: 'outbound', text: 'Ваш счёт №INV-1: Итого 5000 ₸\nСсылка: https://…', status: 'sent', is_ai_generated: false },
+      { direction: 'inbound', text: 'Оплатил', status: 'sent' },
+      { direction: 'outbound', text: 'Спасибо, оплата подтверждена!', status: 'sent', is_ai_generated: false },
+    ]
+    expect(pairConversationHistory(rows, 5)).toEqual([])
+  })
+
+  it('treats a missing is_ai_generated as false rather than pairing it in', () => {
+    const rows = [
+      { direction: 'inbound', text: 'Привет', status: 'sent' },
+      { direction: 'outbound', text: 'Здравствуйте!', status: 'sent' },
+    ]
+    expect(pairConversationHistory(rows, 5)).toEqual([])
   })
 })

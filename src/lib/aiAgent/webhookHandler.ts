@@ -296,7 +296,7 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
   if (params.source === 'dm') {
     const { data: historyRows } = await supabase
       .from('ai_agent_messages')
-      .select('direction, text, status, created_at')
+      .select('direction, text, status, is_ai_generated, created_at')
       .eq('conversation_id', conversation.id)
       .order('created_at', { ascending: true })
       .limit(20)
@@ -312,7 +312,12 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
     for (const row of historyRows || []) {
       if (row.direction === 'inbound') {
         pendingIncoming = row.text
-      } else if (row.direction === 'outbound' && row.status === 'sent' && pendingIncoming) {
+      } else if (row.direction === 'outbound' && row.status === 'sent' && row.is_ai_generated && pendingIncoming) {
+        // is_ai_generated gates this the same way pairConversationHistory
+        // (telegram.ts) does for the other 3 channels -- see its comment for
+        // why: an invoice-link/payment-confirmation/template send is real,
+        // delivered text, but not something the model itself composed, so it
+        // must not be replayed into the model's own context as its own words.
         pairs.push({ incoming: pendingIncoming, reply: row.text })
         pendingIncoming = null
       }
