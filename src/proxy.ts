@@ -7,8 +7,11 @@ import type { NextRequest } from 'next/server'
 const BASE_DOMAIN = process.env.NEXT_PUBLIC_SITE_DOMAIN || 'invoices.kz'
 
 // Занятые поддомены платформы: на них лендинг салона не отдаём, даже если
-// кто-то заведёт строку с таким slug мимо проверок.
-const PLATFORM_SUBDOMAINS = new Set(['www', 'api', 'app', 'admin', 'mail', 'cdn', 'static'])
+// кто-то заведёт строку с таким slug мимо проверок. Тот же список, что и
+// constraint salon_sites_slug_reserved в supabase/migrations/salon_sites.sql --
+// оба места решают один вопрос ("что зарезервировано"), и если бы списки
+// разошлись, один бы тихо пропускал то, что другой уже отсёк на входе.
+const PLATFORM_SUBDOMAINS = new Set(['www', 'api', 'app', 'admin', 'mail', 'smtp', 'ftp', 'cdn', 'static', 'invoices', 'shop', 'pay'])
 
 export function proxy(request: NextRequest) {
   const hostname = (request.headers.get('host') || '').split(':')[0].toLowerCase()
