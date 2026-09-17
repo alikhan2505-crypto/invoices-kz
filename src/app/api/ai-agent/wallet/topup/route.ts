@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { loadPlatformConnection } from '@/lib/kaspiPay/connection'
 import { createPayment } from '@/lib/kaspiPay/client'
+import { getActivePlan } from '@/lib/plan'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -11,6 +12,14 @@ const supabaseAuth = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
+
+// AI-агент is admin-only for now -- same requireAdmin shape as every other
+// ai-agent route (see ai-agent/settings/route.ts for the 401-vs-403
+// reasoning).
+async function hasAiAgentAccess(userId: string): Promise<boolean> {
+  const { data: profile } = await supabase.from('profiles').select('is_admin, plan, plan_expires_at, bonus_expires_at, trial_expires_at').eq('id', userId).single()
+  return !!profile?.is_admin || getActivePlan(profile).canAiAgent
+}
 
 const MIN_TOPUP_TENGE = 500
 
@@ -27,6 +36,7 @@ export async function POST(req: NextRequest) {
     ? await supabaseAuth.auth.getUser(accessToken)
     : { data: { user: null } }
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!(await hasAiAgentAccess(user.id))) return NextResponse.json({ error: 'admin_only' }, { status: 403 })
 
   const { amountTenge } = await req.json()
   if (!amountTenge || typeof amountTenge !== 'number' || amountTenge < MIN_TOPUP_TENGE) {

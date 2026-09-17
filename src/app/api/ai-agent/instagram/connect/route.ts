@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createOAuthState } from '@/lib/aiAgent/oauthState'
+import { getActivePlan } from '@/lib/plan'
 
 const supabaseAuth = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -11,6 +12,17 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
+
+// AI-агент is admin-only for now -- same requireAdmin shape as the other
+// ai-agent routes (see settings/route.ts for the 401-vs-403 reasoning). Every
+// sibling connect/disconnect route (telegram/connect, whatsapp/callback,
+// website/connect, instagram/disconnect) already checks this; this route
+// only checked auth before, letting any signed-in user kick off an Instagram
+// OAuth flow and land a real channel connection even without AI-агент access.
+async function hasAiAgentAccess(userId: string): Promise<boolean> {
+  const { data: profile } = await supabase.from('profiles').select('is_admin, plan, plan_expires_at, bonus_expires_at, trial_expires_at').eq('id', userId).single()
+  return !!profile?.is_admin || getActivePlan(profile).canAiAgent
+}
 
 // Bearer-authed like every other route in this codebase -- called via a
 // client-side fetch from the settings page (Task 6), NOT a plain browser
@@ -24,6 +36,7 @@ export async function GET(req: NextRequest) {
     ? await supabaseAuth.auth.getUser(accessToken)
     : { data: { user: null } }
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!(await hasAiAgentAccess(user.id))) return NextResponse.json({ error: 'admin_only' }, { status: 403 })
 
   const appId = process.env.NEXT_PUBLIC_INSTAGRAM_APP_ID
   if (!appId) return NextResponse.json({ error: 'Instagram app not configured' }, { status: 500 })
