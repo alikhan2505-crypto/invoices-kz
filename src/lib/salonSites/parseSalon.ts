@@ -50,6 +50,13 @@ export function parseSalonData(input: unknown): SalonData | null {
     ? raw.masters.map(str).filter(Boolean)
     : []
 
+  // Один отзыв -- одна строка, до разумной длины: это цитата клиента, а не
+  // сочинение, и слишком длинная "строка" обычно значит, что кто-то вставил
+  // не то поле.
+  const reviews = Array.isArray(raw.reviews)
+    ? raw.reviews.map(str).filter(Boolean).map((r) => r.slice(0, 400))
+    : []
+
   return {
     name,
     city,
@@ -62,5 +69,7 @@ export function parseSalonData(input: unknown): SalonData | null {
     masters: masters.length ? masters : undefined,
     workingHours: optional(raw.workingHours),
     styleNotes: optional(raw.styleNotes),
+    reviews: reviews.length ? reviews.slice(0, 12) : undefined,
+    ratingBadge: optional(raw.ratingBadge),
   }
 }

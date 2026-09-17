@@ -21,6 +21,7 @@ const EMPTY_SALON: SalonData = {
   whatsapp: '', instagram: '', about: '', workingHours: '', styleNotes: '',
   services: [{ name: '', price: '' }],
   masters: [],
+  ratingBadge: '',
 }
 
 export default function SiteGenerator() {
@@ -33,6 +34,11 @@ export default function SiteGenerator() {
   const [slug, setSlug] = useState('')
   const [pattern, setPattern] = useState(LANDING_PATTERNS[0].id)
   const [mastersText, setMastersText] = useState('')
+  // Один отзыв -- одна строка. Владелец вставляет реальные цитаты клиентов
+  // (например, скопированные с 2ГИС) сюда вручную: автоматически стянуть их
+  // с 2ГИС нельзя (см. generateLanding.ts) -- их страницы отдают ботам
+  // заглушку вместо контента, подтверждено вживую 2026-09-17.
+  const [reviewsText, setReviewsText] = useState('')
 
   const [siteId, setSiteId] = useState<string | null>(null)
   const [variants, setVariants] = useState<SalonSiteVariant[]>([])
@@ -83,6 +89,7 @@ export default function SiteGenerator() {
       const payload = {
         ...salon,
         masters: mastersText.split(',').map((m) => m.trim()).filter(Boolean),
+        reviews: reviewsText.split('\n').map((r) => r.trim()).filter(Boolean),
         services: salon.services.filter((s) => s.name.trim() && s.price.trim()),
       }
 
@@ -163,6 +170,7 @@ export default function SiteGenerator() {
       setSalon(EMPTY_SALON)
       setSlug('')
       setMastersText('')
+      setReviewsText('')
       await loadSites()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Не получилось')
@@ -241,7 +249,17 @@ export default function SiteGenerator() {
               <Field label="Мастера через запятую">
                 <input value={mastersText} onChange={(e) => setMastersText(e.target.value)} className={inputClass} />
               </Field>
+              <Field label="Рейтинг (необязательно)">
+                <input value={salon.ratingBadge ?? ''} onChange={(e) => setSalon({ ...salon, ratingBadge: e.target.value })}
+                  placeholder="4.6 из 5 · 209 оценок (2ГИС)" className={inputClass} />
+              </Field>
             </div>
+
+            <Field label="Реальные отзывы клиентов (по одному на строку, необязательно)">
+              <textarea value={reviewsText} onChange={(e) => setReviewsText(e.target.value)}
+                rows={4} placeholder={'Скопируйте несколько реальных отзывов, например с 2ГИС или Google-карт.\nОдна строка — один отзыв. Автоматически стянуть их с сайта нельзя (см. подсказку), только руками.'}
+                className={inputClass} />
+            </Field>
 
             <Field label="О салоне">
               <textarea value={salon.about ?? ''} onChange={(e) => setSalon({ ...salon, about: e.target.value })}
