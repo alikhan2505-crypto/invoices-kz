@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { validateBookingInput, normalizeBookingToolInput, resolveAgainstList, promisesBooking } from './bookingDrafts'
+import { validateBookingInput, normalizeBookingToolInput, resolveAgainstList, promisesBooking, resolveKzDateTime } from './bookingDrafts'
 
 // Fixed future date so date-in-the-past rejection tests stay stable
 // regardless of when the suite runs.
@@ -61,6 +61,19 @@ describe('resolveAgainstList', () => {
   })
   it('passes an unmatched name through unchanged rather than refusing it', () => {
     expect(resolveAgainstList('Массаж лица', ['Маникюр', 'Педикюр'])).toBe('Массаж лица')
+  })
+})
+
+describe('resolveKzDateTime', () => {
+  it('converts a KZ-local date+time to the matching UTC instant (fixed +05:00)', () => {
+    expect(resolveKzDateTime('2026-09-25', '15:00')).toBe(new Date('2026-09-25T15:00:00+05:00').toISOString())
+  })
+  it('does NOT reject a past date/time -- manual entries have no such guard, unlike validateBookingInput', () => {
+    expect(resolveKzDateTime('2020-01-01', '10:00')).toBe(new Date('2020-01-01T10:00:00+05:00').toISOString())
+  })
+  it('returns null on a malformed date or time', () => {
+    expect(resolveKzDateTime('25.09.2026', '15:00')).toBeNull()
+    expect(resolveKzDateTime('2026-09-25', '25:00')).toBeNull()
   })
 })
 

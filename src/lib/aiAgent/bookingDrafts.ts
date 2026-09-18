@@ -31,6 +31,21 @@ export function resolveAgainstList(name: string, list: string[]): string {
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 const TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/
 
+// Shared date+time -> UTC instant conversion, split out of
+// validateBookingInput so the planner's manual-booking route (Stage 4,
+// src/app/api/planner/bookings/route.ts) can reuse the exact same fixed
+// +05:00 parsing without duplicating it. Deliberately does NOT reject a
+// past instant the way validateBookingInput does -- that rule exists
+// because the AI tool proposes a slot for a customer who isn't present
+// and could be hallucinating; an owner typing a manual entry themselves
+// (a walk-in, or logging a same-day visit after the fact) has no such
+// failure mode to guard against.
+export function resolveKzDateTime(date: string, time: string): string | null {
+  if (!DATE_RE.test(date) || !TIME_RE.test(time)) return null
+  const d = new Date(`${date}T${time}:00${KZ_OFFSET}`)
+  return Number.isNaN(d.getTime()) ? null : d.toISOString()
+}
+
 export type BookingToolInput = {
   service_name?: unknown
   master_name?: unknown
