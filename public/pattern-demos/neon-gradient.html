@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Демо Салон — салон красоты в Алматы</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,wght@0,400..900;1,400..900&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --cyan:#00f0ff;
+    --magenta:#ff2ee6;
+    --purple:#7b2ff7;
+    --deep:#0d0518;
+    --deep2:#160a2b;
+    --cream:#fbf6f0;
+    --ink:#1a0f26;
+  }
+
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html{scroll-behavior:smooth;}
+  body{
+    font-family:'Manrope', sans-serif;
+    background:var(--cream);
+    color:var(--ink);
+    overflow-x:hidden;
+    width:100%;
+    position:relative;
+  }
+
+  a{color:inherit; text-decoration:none;}
+  ul{list-style:none;}
+
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:.01ms !important; animation-iteration-count:1 !important;}
+  }
+
+  /* fixed ambient background */
+  .ambient{
+    position:fixed; inset:0; z-index:-2; pointer-events:none;
+    background:
+      radial-gradient(circle at 15% 20%, rgba(255,46,230,.18), transparent 45%),
+      radial-gradient(circle at 85% 60%, rgba(0,240,255,.14), transparent 50%),
+      radial-gradient(circle at 50% 90%, rgba(123,47,247,.16), transparent 55%);
+    animation: bgPulse 18s ease-in-out infinite alternate;
+  }
+  @keyframes bgPulse{
+    from{ opacity:.6; }
+    to{ opacity:1; }
+  }
+
+  /* ===== HERO ===== */
+  .hero{
+    position:relative;
+    min-height:100svh;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    padding: 8vh 6vw 10vh;
+    overflow:hidden;
+    background: linear-gradient(125deg, var(--cyan) 0%, var(--magenta) 48%, var(--purple) 100%);
+    color:#fff;
+  }
+  .ghost-letter{
+    position:absolute;
+    top:50%; left:50%;
+    transform:translate(-50%,-55%);
+    font-family:'Bodoni Moda', serif;
+    font-size:52vw;
+    line-height:1;
+    color:rgba(255,255,255,.08);
+    z-index:0;
+    pointer-events:none;
+    user-select:none;
+    font-weight:700;
+  }
+  .hero-inner{ position:relative; z-index:2; max-width:900px; }
+  .eyebrow{
+    display:flex; align-items:center; gap:.75rem;
+    font-size:.8rem; letter-spacing:.22em; text-transform:uppercase;
+    font-weight:700; opacity:.9; margin-bottom:1.6rem;
+    animation: fadeInUp .8s cubic-bezier(.16,1,.3,1) both;
+  }
+  .eyebrow::before{ content:''; width:2.4rem; height:1px; background:rgba(255,255,255,.8); display:inline-block;}
+
+  .hero h1{
+    font-family:'Bodoni Moda', serif;
+    font-weight:800;
+    font-size: clamp(2.75rem, 6vw + 1rem, 5.5rem);
+    letter-spacing:-0.02em;
+    line-height:1.02;
+    margin-bottom:1.5rem;
+  }
+  .hero h1 span{
+    display:inline-block;
+    animation: fadeInUp .9s cubic-bezier(.16,1,.3,1) both;
+  }
+
+  .hero p.lead{
+    font-size: clamp(1.05rem, 1.2vw + .8rem, 1.4rem);
+    max-width:36rem;
+    line-height:1.55;
+    font-weight:500;
+    opacity:.95;
+    margin-bottom:2.4rem;
+    animation: fadeInUp .8s cubic-bezier(.16,1,.3,1) .15s both;
+  }
+
+  .cta-row{
+    display:flex; flex-wrap:wrap; gap:1rem;
+    animation: fadeInUp .8s cubic-bezier(.16,1,.3,1) .3s both;
+  }
+
+  .pill{
+    display:inline-flex; align-items:center; gap:.6rem;
+    padding: .95rem 1.9rem;
+    border-radius:999px;
+    font-weight:700;
+    font-size:.98rem;
+    border:1.5px solid rgba(255,255,255,.85);
+    background:rgba(255,255,255,.08);
+    backdrop-filter: blur(12px);
+    color:#fff;
+    transition: transform .25s cubic-bezier(.16,1,.3,1), box-shadow .25s cubic-bezier(.16,1,.3,1), background .25s;
+    box-shadow: 0 1px 2px rgba(0,0,0,.1), 0 8px 24px -8px rgba(0,0,0,.35);
+  }
+  .pill:hover{
+    transform: translateY(-2px) scale(1.03);
+    box-shadow: 0 4px 12px rgba(0,0,0,.15), 0 20px 40px -12px rgba(255,46,230,.55);
+    background:rgba(255,255,255,.18);
+  }
+  .pill.solid{
+    background: #fff;
+    color:var(--ink);
+    border-color:#fff;
+  }
+  .pill.solid:hover{
+    box-shadow: 0 4px 12px rgba(0,0,0,.2), 0 20px 40px -12px rgba(0,240,255,.6);
+  }
+  .arrow{ font-size:1.1rem; transition: transform .25s cubic-bezier(.16,1,.3,1); }
+  .pill:hover .arrow{ transform: translateX(4px); }
+
+  @keyframes fadeInUp{
+    from{ opacity:0; transform:translateY(24px); }
+    to{ opacity:1; transform:translateY(0); }
+  }
+
+  /* marquee */
+  .marquee{
+    position:relative;
+    background: var(--ink);
+    color:#fff;
+    padding: .9rem 0;
+    overflow:hidden;
+    white-space:nowrap;
+    border-top:1px solid rgba(255,255,255,.1);
+    border-bottom:1px solid rgba(255,255,255,.1);
+  }
+  .marquee-track{
+    display:flex;
+    width:max-content;
+    gap:3rem;
+    animation: marquee 22s linear infinite;
+  }
+  .marquee-track span{
+    font-family:'Bodoni Moda', serif;
+    font-size:1.1rem;
+    letter-spacing:.05em;
+    text-transform:uppercase;
+    opacity:.85;
+  }
+  @keyframes marquee{ to{ transform: translateX(-50%); } }
+
+  /* section base */
+  section{ position:relative; }
+  .reveal-1{ animation: reveal linear both; animation-timeline: view(); animation-range: entry 0% cover 65%; }
+  .reveal-2{ animation: reveal linear both; animation-timeline: view(); animation-range: entry 10% cover 75%; }
+  @keyframes reveal{
+    from{ opacity:0; transform: translateY(64px); }
+    to{ opacity:1; transform: translateY(0); }
+  }
+
+  /* ===== ABOUT ===== */
+  .about{
+    background: radial-gradient(ellipse at 20% 20%, rgba(0,240,255,.12), transparent 55%), var(--deep);
+    color:#fdf9ff;
+    padding: 7rem 6vw;
+  }
+  .about-grid{
+    display:grid;
+    grid-template-columns: 1.1fr .9fr;
+    gap: 3.5rem;
+    max-width:1200px;
+    margin:0 auto;
+    align-items:start;
+  }
+  .about h2{
+    font-family:'Bodoni Moda', serif;
+    font-weight:700;
+    font-size: clamp(2.2rem, 3.4vw + 1rem, 3.4rem);
+    letter-spacing:-0.02em;
+    line-height:1.08;
+    margin-bottom:1.5rem;
+  }
+  .about h2 .grad{
+    background: linear-gradient(135deg, var(--cyan), var(--magenta));
+    -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+  }
+  .about p{
+    font-size:1.08rem;
+    line-height:1.7;
+    color:rgba(255,255,255,.78);
+    max-width:34rem;
+  }
+  .info-list{
+    display:flex; flex-direction:column; gap:1.4rem;
+  }
+  .info-card{
+    background: rgba(255,255,255,.05);
+    border:1px solid rgba(255,255,255,.12);
+    backdrop-filter: blur(14px);
+    border-radius: 20px;
+    padding: 1.4rem 1.6rem;
+    transition: transform .25s cubic-bezier(.16,1,.3,1), box-shadow .25s cubic-bezier(.16,1,.3,1);
+  }
+  .info-card:hover{
+    transform: translateY(-3px);
+    box-shadow: 0 1px 2px rgba(0,0,0,.2), 0 20px 40px -14px rgba(123,47,247,.5);
+  }
+  .info-card .label{
+    font-size:.75rem; letter-spacing:.16em; text-transform:uppercase;
+    color: var(--cyan); font-weight:700; margin-bottom:.4rem;
+  }
+  .info-card .value{ font-size:1.15rem; font-weight:700; }
+
+  .masters{
+    margin-top: 3.5rem;
+    display:flex; gap:1.5rem; flex-wrap:wrap;
+  }
+  .master-card{
+    flex:1 1 200px;
+    background: rgba(255,255,255,.04);
+    border:1px solid rgba(255,255,255,.12);
+    border-radius:24px;
+    padding: 1.8rem 1.5rem;
+    text-align:center;
+    transition: transform .25s cubic-bezier(.16,1,.3,1), box-shadow .25s cubic-bezier(.16,1,.3,1);
+  }
+  .master-card:hover{
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 1px 2px rgba(0,0,0,.2), 0 20px 40px -14px rgba(0,240,255,.4);
+  }
+  .monogram{
+    width:4.2rem; height:4.2rem; border-radius:50%;
+    margin: 0 auto 1rem;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Bodoni Moda', serif; font-weight:700; font-size:1.6rem;
+    background: linear-gradient(135deg, var(--magenta), var(--purple));
+    color:#fff;
+  }
+  .master-card h3{ font-size:1.15rem; font-weight:700; margin-bottom:.25rem; }
+  .master-card span{ font-size:.85rem; color:rgba(255,255,255,.6); }
+
+  /* ===== SERVICES ===== */
+  .services{
+    background: var(--cream);
+    padding: 7rem 6vw;
+  }
+  .services-head{ max-width:1200px; margin:0 auto 3rem; }
+  .services-head .tag{
+    font-size:.8rem; letter-spacing:.2em; text-transform:uppercase;
+    font-weight:800; color: var(--purple); margin-bottom:.9rem; display:block;
+  }
+  .services h2{
+    font-family:'Bodoni Moda', serif;
+    font-size: clamp(2.2rem, 3.4vw + 1rem, 3.2rem);
+    letter-spacing:-0.02em;
+    font-weight:700;
+    max-width:40rem;
+  }
+  .service-list{
+    max-width:1200px; margin:0 auto;
+    display:flex; flex-direction:column;
+  }
+  .service-row{
+    display:flex; justify-content:space-between; align-items:baseline;
+    gap:1rem; flex-wrap:wrap;
+    padding: 2rem 0;
+    border-bottom:1px solid;
+    border-image: linear-gradient(90deg, var(--cyan), var(--magenta), var(--purple)) 1;
+    transition: transform .25s cubic-bezier(.16,1,.3,1);
+  }
+  .service-row:hover{ transform: translateX(6px); }
+  .service-row:first-child{ padding-top:0; }
+  .service-name{
+    font-family:'Bodoni Moda', serif;
+    font-size: clamp(1.4rem, 1.6vw + 1rem, 2rem);
+    font-weight:700;
+  }
+  .service-meta{
+    display:flex; align-items:baseline; gap:1.6rem;
+  }
+  .service-dur{ font-size:.95rem; color:#7a6f88; font-weight:600; }
+  .service-price{
+    font-family:'Bodoni Moda', serif;
+    font-size: clamp(1.5rem, 1.8vw + 1rem, 2.2rem);
+    font-weight:800;
+    background: linear-gradient(135deg, var(--purple), var(--magenta));
+    -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+  }
+
+  /* ===== MASTERS ACCENT SECTION ===== */
+  .accent{
+    background:
+      radial-gradient(circle at 30% 30%, rgba(255,46,230,.55), transparent 55%),
+      radial-gradient(circle at 75% 70%, rgba(0,240,255,.45), transparent 55%),
+      linear-gradient(160deg, #3d0e6b, #170430);
+    padding: 7rem 6vw;
+    color:#fff;
+    text-align:center;
+  }
+  .accent .tag{
+    font-size:.8rem; letter-spacing:.2em; text-transform:uppercase; font-weight:800;
+    opacity:.85; margin-bottom:1rem; display:block;
+  }
+  .accent h2{
+    font-family:'Bodoni Moda', serif;
+    font-size: clamp(2rem, 3.2vw + 1rem, 3rem);
+    font-weight:700;
+    max-width:36rem;
+    margin: 0 auto 2.4rem;
+    letter-spacing:-0.02em;
+  }
+  .badge-row{
+    display:flex; justify-content:center; flex-wrap:wrap; gap:1.2rem;
+    max-width:900px; margin:0 auto;
+  }
+  .badge{
+    display:flex; flex-direction:column; align-items:center; gap:.7rem;
+    padding:1.6rem 1.4rem;
+    border-radius:20px;
+    background: rgba(255,255,255,.08);
+    border:1px solid rgba(255,255,255,.18);
+    backdrop-filter: blur(14px);
+    min-width:140px;
+    transition: transform .25s cubic-bezier(.16,1,.3,1), box-shadow .25s cubic-bezier(.16,1,.3,1);
+  }
+  .badge:hover{
+    transform: translateY(-4px) scale(1.03);
+    box-shadow: 0 1px 2px rgba(0,0,0,.2), 0 20px 40px -12px rgba(255,255,255,.25);
+  }
+  .badge .circle{
+    width:3.2rem; height:3.2rem; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-size:1.3rem;
+    background: linear-gradient(135deg, var(--cyan), var(--purple));
+  }
+  .badge .txt{ font-size:.88rem; font-weight:700; text-align:center; line-height:1.3; }
+
+  /* ===== FINAL CTA ===== */
+  .final{
+    background: linear-gradient(200deg, var(--deep2), var(--deep) 70%);
+    padding: 7rem 6vw 6rem;
+    color:#fff;
+    position:relative;
+    overflow:hidden;
+  }
+  .final::before{
+    content:'';
+    position:absolute; top:-20%; right:-10%;
+    width:60vw; height:60vw;
+    background: radial-gradient(circle, rgba(255,46,230,.28), transparent 60%);
+    filter: blur(10px);
+    pointer-events:none;
+  }
+  .final-inner{ position:relative; max-width:760px; margin:0 auto; text-align:center; }
+  .final .tag{
+    font-size:.8rem; letter-spacing:.2em; text-transform:uppercase; font-weight:800;
+    color: var(--cyan); margin-bottom:1.2rem; display:block;
+  }
+  .final h2{
+    font-family:'Bodoni Moda', serif;
+    font-size: clamp(2.4rem, 4.2vw + 1rem, 3.8rem);
+    font-weight:800;
+    letter-spacing:-0.02em;
+    margin-bottom:1.4rem;
+    line-height:1.05;
+  }
+  .final p{
+    font-size:1.05rem; color:rgba(255,255,255,.72); margin-bottom:2.4rem;
+  }
+  .final .cta-row{ justify-content:center; }
+  .final-details{
+    margin-top:3.5rem;
+    display:flex; justify-content:center; gap:2.4rem; flex-wrap:wrap;
+    font-size:.95rem; color:rgba(255,255,255,.65);
+  }
+  .final-details strong{ color:#fff; display:block; font-size:1rem; margin-bottom:.2rem;}
+
+  footer{
+    background: var(--deep);
+    color: rgba(255,255,255,.45);
+    text-align:center;
+    padding: 2rem 1rem;
+    font-size:.85rem;
+  }
+
+  @media (max-width: 860px){
+    .about-grid{ grid-template-columns: 1fr; }
+    .ghost-letter{ font-size:70vw; }
+  }
+
+  @media (max-width: 480px){
+    .hero{ padding: 6vh 5vw 8vh; }
+    .about, .services, .accent, .final{ padding-left:5vw; padding-right:5vw; }
+    .badge-row{ gap:.8rem; }
+    .badge{ min-width:120px; padding:1.2rem 1rem; }
+    .final-details{ gap:1.4rem; }
+    .service-meta{ gap:1rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="ambient"></div>
+
+<section class="hero">
+  <span class="ghost-letter">Д</span>
+  <div class="hero-inner">
+    <div class="eyebrow">— Только по записи</div>
+    <h1>
+      <span style="animation-delay:0s">Демо</span><br>
+      <span style="animation-delay:.06s">Салон</span>
+    </h1>
+    <p class="lead">Небольшая частная студия красоты в центре Алматы — маникюр, педикюр и наращивание ресниц с вниманием к деталям.</p>
+    <div class="cta-row">
+      <a class="pill solid" href="https://wa.me/77010000000">Записаться в WhatsApp <span class="arrow">→</span></a>
+      <a class="pill" href="tel:+77010000000">Позвонить <span class="arrow">→</span></a>
+    </div>
+  </div>
+</section>
+
+<div class="marquee">
+  <div class="marquee-track">
+    <span>Маникюр · Педикюр · Наращивание ресниц ·</span>
+    <span>Алматы, ул. Абая, 10 ·</span>
+    <span>Только по записи ·</span>
+    <span>Маникюр · Педикюр · Наращивание ресниц ·</span>
+    <span>Алматы, ул. Абая, 10 ·</span>
+    <span>Только по записи ·</span>
+  </div>
+</div>
+
+<section class="about">
+  <div class="reveal-1 about-grid">
+    <div>
+      <h2>О <span class="grad">салоне</span></h2>
+      <p>Демо Салон — небольшая частная студия красоты в центре города. Мы занимаемся маникюром, педикюром и наращиванием ресниц, работаем аккуратно и по записи, чтобы уделить время каждому клиенту.</p>
+    </div>
+    <div class="info-list">
+      <div class="info-card">
+        <div class="label">Адрес</div>
+        <div class="value">г. Алматы, ул. Абая, 10</div>
+      </div>
+      <div class="info-card">
+        <div class="label">Часы работы</div>
+        <div class="value">Пн–Вс 10:00–20:00</div>
+      </div>
+      <div class="info-card">
+        <div class="label">Instagram</div>
+        <div class="value">@demo.salon</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="reveal-2 masters">
+    <div class="master-card">
+      <div class="monogram">А</div>
+      <h3>Айгерим</h3>
+      <span>Мастер салона</span>
+    </div>
+    <div class="master-card">
+      <div class="monogram">Д</div>
+      <h3>Динара</h3>
+      <span>Мастер салона</span>
+    </div>
+  </div>
+</section>
+
+<section class="services">
+  <div class="reveal-1 services-head">
+    <span class="tag">Прайс-лист</span>
+    <h2>Услуги и цены</h2>
+  </div>
+  <div class="reveal-2 service-list">
+    <div class="service-row">
+      <div class="service-name">Маникюр</div>
+      <div class="service-meta">
+        <span class="service-dur">60 мин</span>
+        <span class="service-price">8 000 ₸</span>
+      </div>
+    </div>
+    <div class="service-row">
+      <div class="service-name">Педикюр</div>
+      <div class="service-meta">
+        <span class="service-dur">75 мин</span>
+        <span class="service-price">10 000 ₸</span>
+      </div>
+    </div>
+    <div class="service-row">
+      <div class="service-name">Наращивание ресниц</div>
+      <div class="service-meta">
+        <span class="service-dur">90 мин</span>
+        <span class="service-price">12 000 ₸</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="accent">
+  <div class="reveal-1">
+    <span class="tag">Контакты</span>
+    <h2>Свяжитесь с нами удобным способом</h2>
+  </div>
+  <div class="reveal-2 badge-row">
+    <a class="badge" href="tel:+77010000000">
+      <span class="circle">☎</span>
+      <span class="txt">+7 701 000 00 00</span>
+    </a>
+    <a class="badge" href="https://wa.me/77010000000">
+      <span class="circle">✆</span>
+      <span class="txt">WhatsApp</span>
+    </a>
+    <a class="badge" href="https://instagram.com/demo.salon">
+      <span class="circle">@</span>
+      <span class="txt">demo.salon</span>
+    </a>
+    <div class="badge">
+      <span class="circle">⏰</span>
+      <span class="txt">Пн–Вс 10:00–20:00</span>
+    </div>
+  </div>
+</section>
+
+<section class="final">
+  <div class="final-inner">
+    <div class="reveal-1">
+      <span class="tag">— Готовы к записи?</span>
+      <h2>Забронируйте время прямо сейчас</h2>
+      <p>Напишите нам в WhatsApp или позвоните — подберём удобное время у Айгерим или Динары.</p>
+      <div class="cta-row">
+        <a class="pill solid" href="https://wa.me/77010000000">Записаться в WhatsApp <span class="arrow">→</span></a>
+        <a class="pill" href="tel:+77010000000">Позвонить <span class="arrow">→</span></a>
+      </div>
+    </div>
+    <div class="reveal-2 final-details">
+      <div><strong>Адрес</strong>г. Алматы, ул. Абая, 10</div>
+      <div><strong>Часы работы</strong>Пн–Вс 10:00–20:00</div>
+      <div><strong>Instagram</strong>@demo.salon</div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  Демо Салон · Алматы, ул. Абая, 10 · Пн–Вс 10:00–20:00
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Демо Салон — маникюр, педикюр, ресницы в Алматы</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..900&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#241a1f;
+    --cream:#fdf6ee;
+    --rose:#c8385a;
+    --rose-deep:#8f1f3b;
+    --terracotta:#e8834a;
+    --olive:#4a5b3f;
+    --gold:#d7a13b;
+    --line: rgba(36,26,31,.12);
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html{scroll-behavior:smooth;}
+  body{
+    font-family:'Manrope', sans-serif;
+    background:var(--cream);
+    color:var(--ink);
+    overflow-x:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3{font-family:'Fraunces', serif; letter-spacing:-0.02em;}
+  a{text-decoration:none; color:inherit;}
+  img{display:none;}
+
+  .bg-aura{
+    position:fixed; inset:0; z-index:-1; pointer-events:none;
+    background:
+      radial-gradient(circle at 15% 20%, rgba(200,56,90,.16), transparent 55%),
+      radial-gradient(circle at 85% 10%, rgba(215,161,59,.14), transparent 50%),
+      radial-gradient(circle at 50% 90%, rgba(74,91,63,.12), transparent 55%);
+    animation: breathe 18s ease-in-out infinite alternate;
+    animation-timeline: scroll(root);
+  }
+  @keyframes breathe{
+    from{opacity:.7; transform:translateY(0);}
+    to{opacity:1; transform:translateY(40px);}
+  }
+
+  @keyframes fadeInUp{
+    from{opacity:0; transform:translateY(24px);}
+    to{opacity:1; transform:translateY(0);}
+  }
+  @keyframes reveal{
+    from{opacity:0; transform:translateY(64px);}
+    to{opacity:1; transform:translateY(0);}
+  }
+
+  section{ animation: reveal linear both; animation-timeline: view(); animation-range: entry 0% cover 65%; }
+
+  .pill{
+    display:inline-flex; align-items:center; gap:.5rem;
+    border-radius:999px; padding:.9rem 2rem;
+    font-weight:700; font-size:.95rem;
+    transition: transform .25s cubic-bezier(.16,1,.3,1), box-shadow .25s cubic-bezier(.16,1,.3,1);
+  }
+  .pill-primary{
+    background: linear-gradient(135deg, var(--rose), var(--rose-deep));
+    color:#fff;
+    box-shadow:0 1px 2px rgba(0,0,0,.1), 0 8px 24px -8px rgba(200,56,90,.5), 0 24px 48px -16px rgba(200,56,90,.35);
+  }
+  .pill-primary:hover{ transform:translateY(-3px) scale(1.03); box-shadow:0 2px 4px rgba(0,0,0,.12), 0 12px 32px -8px rgba(200,56,90,.65); }
+  .pill-outline{
+    background:rgba(255,255,255,.5);
+    border:1.5px solid var(--ink);
+    color:var(--ink);
+  }
+  .pill-outline:hover{ transform:translateY(-3px) scale(1.03); background:var(--ink); color:var(--cream); }
+
+  /* ===== HERO ===== */
+  .hero{
+    position:relative;
+    min-height:100vh;
+    display:flex; align-items:center;
+    background: linear-gradient(160deg, #1c1216 0%, #2c1620 45%, #4a1f2c 100%);
+    color:#fdf6ee;
+    padding: 8rem 6vw 5rem;
+    overflow:hidden;
+  }
+  .hero-ghost{
+    position:absolute; top:-4vw; left:-2vw;
+    font-size:26vw; font-weight:800; opacity:.06;
+    line-height:1; pointer-events:none; z-index:0;
+    color:#fff; white-space:nowrap;
+  }
+  .hero-grid{
+    display:grid; grid-template-columns: 1.3fr .9fr; gap:3rem;
+    position:relative; z-index:1; width:100%; max-width:1280px; margin:0 auto;
+    align-items:center;
+  }
+  .hero-badge{
+    display:inline-flex; align-items:center; gap:.6rem;
+    background:rgba(255,255,255,.08); backdrop-filter: blur(16px);
+    border:1px solid rgba(255,255,255,.16);
+    padding:.5rem 1.1rem; border-radius:999px; font-size:.82rem;
+    margin-bottom:1.6rem; letter-spacing:.02em;
+    animation:fadeInUp .8s cubic-bezier(.16,1,.3,1) both;
+  }
+  .hero h1{
+    font-size:clamp(2.75rem, 6vw + 1rem, 5.5rem);
+    line-height:1.02; font-weight:600;
+  }
+  .hero h1 span{
+    display:inline-block;
+    animation:fadeInUp .9s cubic-bezier(.16,1,.3,1) both;
+  }
+  .hero h1 .l1{animation-delay:0s;}
+  .hero h1 .l2{
+    background:linear-gradient(135deg, #f2a3ae, var(--gold));
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+    animation-delay:.15s;
+  }
+  .hero p.lead{
+    margin-top:1.6rem; font-size:1.15rem; max-width:32rem; color:rgba(253,246,238,.78);
+    animation:fadeInUp 1s cubic-bezier(.16,1,.3,1) both; animation-delay:.3s;
+  }
+  .hero-cta{
+    display:flex; gap:1rem; flex-wrap:wrap; margin-top:2.4rem;
+    animation:fadeInUp 1.1s cubic-bezier(.16,1,.3,1) both; animation-delay:.45s;
+  }
+  .hero-cta .pill-outline{ border-color:rgba(255,255,255,.4); color:#fdf6ee; background:rgba(255,255,255,.06); }
+  .hero-cta .pill-outline:hover{ background:#fdf6ee; color:var(--ink); }
+
+  .hero-cards{ position:relative; height:420px; }
+  .float-card{
+    position:absolute; border-radius:24px; padding:1.6rem 1.4rem;
+    background:rgba(255,255,255,.08); backdrop-filter: blur(18px);
+    border:1px solid rgba(255,255,255,.16);
+    box-shadow:0 1px 2px rgba(0,0,0,.1), 0 24px 48px -16px rgba(0,0,0,.4);
+    width:78%;
+  }
+  .float-card .tag{ font-size:.72rem; text-transform:uppercase; letter-spacing:.12em; opacity:.6;}
+  .float-card .price{ font-family:'Fraunces',serif; font-size:2rem; margin-top:.4rem; }
+  .fc1{ top:0; left:0; animation: idle-float 6s ease-in-out infinite alternate; }
+  .fc2{ top:150px; left:22%; background:linear-gradient(135deg, rgba(215,161,59,.22), rgba(255,255,255,.06)); animation: idle-float 7.5s ease-in-out infinite alternate-reverse; }
+  .fc3{ top:290px; left:6%; background:linear-gradient(135deg, rgba(200,56,90,.28), rgba(255,255,255,.05)); animation: idle-float 5.2s ease-in-out infinite alternate; }
+  @keyframes idle-float{ from{transform:translateY(-.7rem) rotate(-1.4deg);} to{transform:translateY(.7rem) rotate(1.4deg);} }
+
+  /* ===== ABOUT ===== */
+  .about{
+    background: var(--cream);
+    padding: 7rem 6vw;
+  }
+  .about-grid{
+    max-width:1200px; margin:0 auto;
+    display:grid; grid-template-columns: .9fr 1.1fr; gap:4rem; align-items:start;
+  }
+  .about .kicker{
+    text-transform:uppercase; letter-spacing:.16em; font-size:.8rem; color:var(--rose); font-weight:800;
+    animation: reveal linear both; animation-timeline: view(); animation-range: entry 0% cover 65%;
+  }
+  .about h2{
+    font-size:clamp(2.2rem, 4vw, 3.4rem); margin-top:.8rem; font-weight:500;
+    animation: reveal linear both; animation-timeline: view(); animation-range: entry 0% cover 65%;
+  }
+  .about-content{
+    font-size:1.1rem; line-height:1.75; color:#4a3f44;
+    animation: reveal linear both; animation-timeline: view(); animation-range: entry 10% cover 75%;
+  }
+  .about-content p{margin-bottom:1.4rem;}
+  .about-stats{
+    display:flex; gap:2rem; margin-top:2rem; flex-wrap:wrap;
+  }
+  .about-stats div{
+    border-top:2px solid var(--rose);
+    padding-top:.7rem; min-width:120px;
+  }
+  .about-stats .num{ font-family:'Fraunces',serif; font-size:1.9rem; font-weight:600; }
+  .about-stats .lbl{ font-size:.85rem; color:#71636a; }
+
+  /* ===== SERVICES ===== */
+  .services{
+    background: radial-gradient(circle at 30% 0%, #f4d9c4 0%, #eec9a5 40%, #e39a5f 100%);
+    padding:7rem 6vw;
+    position:relative;
+  }
+  .services-inner{ max-width:1100px; margin:0 auto; position:relative; z-index:1;}
+  .services .kicker{
+    text-transform:uppercase; letter-spacing:.16em; font-size:.8rem; color:var(--rose-deep); font-weight:800;
+    animation: reveal linear both; animation-timeline: view(); animation-range: entry 0% cover 65%;
+  }
+  .services h2{
+    font-size:clamp(2.2rem,4vw,3.4rem); font-weight:500; margin-top:.8rem; margin-bottom:2.6rem; color:var(--ink);
+    animation: reveal linear both; animation-timeline: view(); animation-range: entry 0% cover 65%;
+  }
+  .svc-list{
+    animation: reveal linear both; animation-timeline: view(); animation-range: entry 10% cover 75%;
+  }
+  .svc-row{
+    display:flex; justify-content:space-between; align-items:baseline; gap:1.5rem;
+    padding:1.8rem 0; flex-wrap:wrap;
+    border-bottom:1px solid rgba(36,26,31,.18);
+    transition: transform .25s cubic-bezier(.16,1,.3,1);
+  }
+  .svc-row:hover{ transform: translateX(6px); }
+  .svc-row:last-child{ border-bottom:none; }
+  .svc-name{ font-family:'Fraunces',serif; font-size:1.7rem; font-weight:500; color:var(--ink); }
+  .svc-meta{ font-size:.9rem; color:#5c4630; }
+  .svc-price{
+    font-family:'Fraunces',serif; font-size:1.9rem; font-weight:700;
+    background:linear-gradient(135deg, var(--rose-deep), var(--rose));
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+    white-space:nowrap;
+  }
+
+  /* ===== MASTERS ===== */
+  .masters{
+    background: linear-gradient(180deg, #221419, #33161f);
+    color:#fdf6ee;
+    padding:7rem 6vw;
+  }
+  .masters-inner{ max-width:1100px; margin:0 auto; }
+  .masters .kicker{
+    text-transform:uppercase; letter-spacing:.16em; font-size:.8rem; color:var(--gold); font-weight:800;
+    animation: reveal linear both; animation-timeline: view(); animation-range: entry 0% cover 65%;
+  }
+  .masters h2{
+    font-size:clamp(2.2rem,4vw,3.4rem); font-weight:500; margin:.8rem 0 2.8rem;
+    animation: reveal linear both; animation-timeline: view(); animation-range: entry 0% cover 65%;
+  }
+  .masters-grid{
+    display:grid; grid-template-columns:repeat(2,1fr); gap:2rem;
+    animation: reveal linear both; animation-timeline: view(); animation-range: entry 10% cover 75%;
+  }
+  .master-card{
+    background:rgba(255,255,255,.06); backdrop-filter: blur(16px);
+    border:1px solid rgba(255,255,255,.12);
+    border-radius:28px; padding:2.4rem 2rem;
+    box-shadow:0 1px 2px rgba(0,0,0,.08), 0 24px 48px -16px rgba(0,0,0,.45);
+    transition: transform .25s cubic-bezier(.16,1,.3,1), box-shadow .25s cubic-bezier(.16,1,.3,1);
+  }
+  .master-card:hover{ transform: translateY(-6px) scale(1.02); box-shadow:0 2px 4px rgba(0,0,0,.1), 0 30px 60px -12px rgba(200,56,90,.35); }
+  .master-avatar{
+    width:64px; height:64px; border-radius:50%;
+    background:linear-gradient(135deg, var(--rose), var(--gold));
+    margin-bottom:1.2rem;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Fraunces',serif; font-size:1.5rem; font-weight:700; color:#fff;
+  }
+  .master-card h3{ font-size:1.5rem; font-weight:500; }
+  .master-card p{ margin-top:.5rem; color:rgba(253,246,238,.65); font-size:.95rem; }
+
+  /* ===== INFO / HOURS-ADDRESS ===== */
+  .info{
+    background: var(--cream);
+    padding:7rem 6vw;
+  }
+  .info-grid{
+    max-width:1100px; margin:0 auto;
+    display:grid; grid-template-columns: 1fr 1fr; gap:3rem;
+  }
+  .info-card{
+    padding:2.6rem; border-radius:28px;
+    background:#fff;
+    border:1px solid var(--line);
+    box-shadow:0 1px 2px rgba(0,0,0,.05), 0 12px 32px -12px rgba(36,26,31,.14);
+    animation: reveal linear both; animation-timeline: view(); animation-range: entry 5% cover 70%;
+  }
+  .info-card .kicker{
+    text-transform:uppercase; letter-spacing:.14em; font-size:.78rem; color:var(--rose); font-weight:800; margin-bottom:1rem;
+  }
+  .info-card h3{ font-size:1.9rem; font-weight:500; margin-bottom:1.2rem; }
+  .info-line{ display:flex; justify-content:space-between; padding:.7rem 0; border-bottom:1px dashed var(--line); font-size:1rem;}
+  .info-line:last-child{ border-bottom:none; }
+  .info-card .addr{ font-size:1.1rem; line-height:1.7; color:#4a3f44; margin-bottom:1.4rem; }
+  .info-card .wa-mini{ margin-top:1.2rem; }
+
+  /* ===== FINAL CTA ===== */
+  .final{
+    position:relative;
+    background: radial-gradient(circle at 50% 20%, #7a1f3a 0%, #3c1220 55%, #1c0d13 100%);
+    color:#fdf6ee;
+    padding:8rem 6vw 6rem;
+    text-align:center;
+    overflow:hidden;
+  }
+  .final-ghost{
+    position:absolute; bottom:-10vw; left:50%; transform:translateX(-50%);
+    font-size:22vw; font-weight:800; opacity:.05; white-space:nowrap; line-height:1; z-index:0;
+  }
+  .final-inner{ position:relative; z-index:1; max-width:800px; margin:0 auto;
+    animation: reveal linear both; animation-timeline: view(); animation-range: entry 0% cover 65%;
+  }
+  .final h2{
+    font-size:clamp(2.4rem,5vw,4rem); font-weight:500; margin-bottom:1.2rem;
+  }
+  .final h2 .accent{
+    background:linear-gradient(135deg, var(--gold), #f2a3ae);
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+  }
+  .final p{ font-size:1.15rem; color:rgba(253,246,238,.75); margin-bottom:2.4rem; }
+  .final-cta{ display:flex; gap:1.2rem; justify-content:center; flex-wrap:wrap; }
+  .final .pill-outline{ border-color:rgba(255,255,255,.4); color:#fdf6ee; }
+  .final .pill-outline:hover{ background:#fdf6ee; color:var(--ink); }
+
+  footer{
+    background:#1c0d13; color:rgba(253,246,238,.5);
+    text-align:center; padding:2rem 6vw; font-size:.85rem;
+  }
+
+  .rating-badge{
+    display:inline-flex; align-items:center; gap:.4rem;
+    background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15);
+    padding:.4rem .9rem; border-radius:999px; font-size:.85rem; margin-top:1.2rem;
+  }
+
+  @media (max-width: 860px){
+    .hero{ padding:6rem 5vw 4rem; }
+    .hero-grid{ grid-template-columns:1fr; gap:2.5rem;}
+    .hero-cards{ height:340px; }
+    .about-grid{ grid-template-columns:1fr; gap:2rem; }
+    .masters-grid{ grid-template-columns:1fr; }
+    .info-grid{ grid-template-columns:1fr; }
+    .hero-ghost{ font-size:40vw; }
+    .final-ghost{ font-size:34vw; }
+  }
+  @media (max-width:400px){
+    .svc-name{ font-size:1.4rem; }
+    .svc-price{ font-size:1.5rem; }
+    .float-card{ width:90%; }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ animation-duration:.01ms !important; animation-iteration-count:1 !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="bg-aura"></div>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-ghost">САЛОН</div>
+  <div class="hero-grid">
+    <div>
+      <div class="hero-badge">Алматы · ул. Абая, 10</div>
+      <h1>
+        <span class="l1">Демо Салон —</span><br>
+        <span class="l2">красота без спешки</span>
+      </h1>
+      <p class="lead">Небольшая частная студия в центре города — маникюр, педикюр, наращивание ресниц. Тихо, аккуратно, по-настоящему.</p>
+      <div class="rating-badge">Пн–Вс 10:00–20:00</div>
+      <div class="hero-cta">
+        <a class="pill pill-primary" href="https://wa.me/77010000000">Записаться в WhatsApp</a>
+        <a class="pill pill-outline" href="tel:+77010000000">Позвонить</a>
+      </div>
+    </div>
+    <div class="hero-cards">
+      <div class="float-card fc1">
+        <div class="tag">Маникюр</div>
+        <div class="price">8 000 ₸</div>
+      </div>
+      <div class="float-card fc2">
+        <div class="tag">Педикюр</div>
+        <div class="price">10 000 ₸</div>
+      </div>
+      <div class="float-card fc3">
+        <div class="tag">Ресницы</div>
+        <div class="price">12 000 ₸</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ABOUT -->
+<section class="about">
+  <div class="about-grid">
+    <div>
+      <div class="kicker">О салоне</div>
+      <h2>Студия, где<br>вас узнают по имени</h2>
+    </div>
+    <div class="about-content">
+      <p>Небольшая частная студия красоты в центре города — маникюр, педикюр, наращивание ресниц. Мы работаем без суеты и лишних людей в очереди: только вы и мастер.</p>
+      <p>Айгерим и Динара — мастера, к которым возвращаются снова и снова.</p>
+      <div class="about-stats">
+        <div><div class="num">2</div><div class="lbl">мастера</div></div>
+        <div><div class="num">3</div><div class="lbl">услуги</div></div>
+        <div><div class="num">10–20</div><div class="lbl">часы работы</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SERVICES -->
+<section class="services">
+  <div class="services-inner">
+    <div class="kicker">Услуги</div>
+    <h2>Прайс без сюрпризов</h2>
+    <div class="svc-list">
+      <div class="svc-row">
+        <div>
+          <div class="svc-name">Маникюр</div>
+          <div class="svc-meta">60 минут</div>
+        </div>
+        <div class="svc-price">8 000 ₸</div>
+      </div>
+      <div class="svc-row">
+        <div>
+          <div class="svc-name">Педикюр</div>
+          <div class="svc-meta">75 минут</div>
+        </div>
+        <div class="svc-price">10 000 ₸</div>
+      </div>
+      <div class="svc-row">
+        <div>
+          <div class="svc-name">Наращивание ресниц</div>
+          <div class="svc-meta">90 минут</div>
+        </div>
+        <div class="svc-price">12 000 ₸</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- MASTERS -->
+<section class="masters">
+  <div class="masters-inner">
+    <div class="kicker">Мастера</div>
+    <h2>Те, кому доверяют руки</h2>
+    <div class="masters-grid">
+      <div class="master-card">
+        <div class="master-avatar">А</div>
+        <h3>Айгерим</h3>
+        <p>Мастер маникюра и педикюра студии Демо Салон.</p>
+      </div>
+      <div class="master-card">
+        <div class="master-avatar">Д</div>
+        <h3>Динара</h3>
+        <p>Мастер наращивания ресниц студии Демо Салон.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- INFO -->
+<section class="info">
+  <div class="info-grid">
+    <div class="info-card">
+      <div class="kicker">Часы работы</div>
+      <h3>Когда мы ждём вас</h3>
+      <div class="info-line"><span>Понедельник – Воскресенье</span><span>10:00–20:00</span></div>
+    </div>
+    <div class="info-card">
+      <div class="kicker">Контакты</div>
+      <h3>Как нас найти</h3>
+      <div class="addr">г. Алматы, ул. Абая, 10<br>Instagram: @demo.salon</div>
+      <a class="pill pill-primary wa-mini" href="https://wa.me/77010000000">Написать в WhatsApp</a>
+    </div>
+  </div>
+</section>
+
+<!-- FINAL CTA -->
+<section class="final">
+  <div class="final-ghost">10:00–20:00</div>
+  <div class="final-inner">
+    <h2>Запишитесь <span class="accent">сегодня</span></h2>
+    <p>Маникюр, педикюр или ресницы — напишите нам, и мы подберём удобное время.</p>
+    <div class="final-cta">
+      <a class="pill pill-primary" href="https://wa.me/77010000000">Записаться в WhatsApp</a>
+      <a class="pill pill-outline" href="tel:+77010000000">+7 701 000 00 00</a>
+    </div>
+  </div>
+</section>
+
+<footer>Демо Салон · Алматы, ул. Абая, 10 · Пн–Вс 10:00–20:00</footer>
+
+</body>
+</html>

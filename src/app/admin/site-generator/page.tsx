@@ -51,6 +51,11 @@ export default function SiteGenerator() {
   const [generating, setGenerating] = useState(false)
   const [publishing, setPublishing] = useState(false)
   const [preview, setPreview] = useState<SalonSiteVariant | null>(null)
+  // Демо на паттерн -- статичный пример, сгенерированный заранее (см. комментарий
+  // в api/salon-sites/demo/[patternId]/route.ts), а не по клику: иначе каждый
+  // просмотр стиля перед выбором стоил бы настоящей генерации.
+  const [demo, setDemo] = useState<{ patternLabel: string; html: string } | null>(null)
+  const [loadingDemoId, setLoadingDemoId] = useState<string | null>(null)
 
   async function authHeader() {
     const { data: { session } } = await supabase.auth.getSession()
@@ -123,6 +128,21 @@ export default function SiteGenerator() {
       setError(e instanceof Error ? e.message : 'не удалось получить данные из 2ГИС')
     } finally {
       setFetchingTwoGis(false)
+    }
+  }
+
+  async function showDemo(p: { id: string; label: string }) {
+    setError(null)
+    setLoadingDemoId(p.id)
+    try {
+      const res = await fetch(`/api/salon-sites/demo/${p.id}`, { headers: await authHeader() })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error === 'demo_not_generated' ? 'демо для этого паттерна ещё не сгенерировано' : (json.error || 'не удалось загрузить демо'))
+      setDemo({ patternLabel: p.label, html: json.html })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'не удалось загрузить демо')
+    } finally {
+      setLoadingDemoId(null)
     }
   }
 
@@ -356,13 +376,19 @@ export default function SiteGenerator() {
               <div className="text-xs text-gray-400 mb-2">Паттерн лендинга</div>
               <div className="grid sm:grid-cols-2 gap-2">
                 {LANDING_PATTERNS.map((p) => (
-                  <button key={p.id} onClick={() => setPattern(p.id)}
-                    className={`text-left rounded-xl px-4 py-3 border text-sm ${
+                  <div key={p.id}
+                    className={`rounded-xl px-4 py-3 border text-sm ${
                       pattern === p.id ? 'border-blue-400 bg-blue-500/10' : 'border-gray-700 bg-gray-900'
                     }`}>
-                    <div className="font-medium">{p.label}</div>
-                    <div className="text-xs text-gray-400 mt-1 line-clamp-2">{p.brief}</div>
-                  </button>
+                    <button onClick={() => setPattern(p.id)} className="text-left w-full">
+                      <div className="font-medium">{p.label}</div>
+                      <div className="text-xs text-gray-400 mt-1 line-clamp-2">{p.brief}</div>
+                    </button>
+                    <button onClick={() => showDemo(p)} disabled={loadingDemoId === p.id}
+                      className="text-xs text-blue-400 mt-2 disabled:opacity-50">
+                      {loadingDemoId === p.id ? 'Гружу…' : 'Демо'}
+                    </button>
+                  </div>
                 ))}
               </div>
             </div>
@@ -455,6 +481,17 @@ export default function SiteGenerator() {
           {/* sandbox без allow-scripts: превью показывает ровно то, что увидит
               клиент под CSP со script-src 'none'. */}
           <iframe title={`Вариант ${preview.variant_no}`} srcDoc={preview.html} sandbox=""
+            className="flex-1 w-full bg-white" />
+        </div>
+      )}
+
+      {demo && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex flex-col">
+          <div className="flex items-center justify-between px-4 py-3 bg-gray-900">
+            <div className="text-sm">Демо: {demo.patternLabel}</div>
+            <button onClick={() => setDemo(null)} className="text-sm text-gray-400">Закрыть</button>
+          </div>
+          <iframe title={`Демо: ${demo.patternLabel}`} srcDoc={demo.html} sandbox=""
             className="flex-1 w-full bg-white" />
         </div>
       )}
