@@ -13,7 +13,7 @@ const supabaseAuth = createClient(
 
 // Генератор сайтов целиком админский: таблицы salon_sites закрыты RLS без
 // политик, и единственный путь к ним -- служебная роль в этих маршрутах.
-// Один помощник на все четыре маршрута вместо копии проверки в каждом.
+// Один помощник на все маршруты вместо копии проверки в каждом.
 export async function requireAdmin(req: NextRequest): Promise<{ userId: string } | { error: string; status: number }> {
   const accessToken = req.headers.get('authorization')?.replace('Bearer ', '')
   const { data: { user } } = accessToken

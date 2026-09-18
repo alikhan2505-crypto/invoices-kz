@@ -39,6 +39,12 @@ export default function SiteGenerator() {
   // с 2ГИС нельзя (см. generateLanding.ts) -- их страницы отдают ботам
   // заглушку вместо контента, подтверждено вживую 2026-09-17.
   const [reviewsText, setReviewsText] = useState('')
+  // Ссылка на карточку организации в 2ГИС -- "Заполнить по ссылке" тянет
+  // название/адрес/телефон/часы/рейтинг через официальный API 2ГИС
+  // (fetch2gis.ts). Тексты самих отзывов API не отдаёт -- те по-прежнему
+  // через reviewsText выше.
+  const [twoGisUrl, setTwoGisUrl] = useState('')
+  const [fetchingTwoGis, setFetchingTwoGis] = useState(false)
 
   const [siteId, setSiteId] = useState<string | null>(null)
   const [variants, setVariants] = useState<SalonSiteVariant[]>([])
@@ -78,6 +84,42 @@ export default function SiteGenerator() {
       ...prev,
       services: prev.services.map((s, i) => (i === index ? { ...s, ...patch } : s)),
     }))
+  }
+
+  async function fillFrom2gis() {
+    if (!twoGisUrl.trim()) return
+    setError(null)
+    setFetchingTwoGis(true)
+    try {
+      const res = await fetch('/api/salon-sites/fetch-2gis', {
+        method: 'POST',
+        headers: await authHeader(),
+        body: JSON.stringify({ url: twoGisUrl.trim() }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'не удалось получить данные из 2ГИС')
+
+      const place = json.place as { name?: string; address?: string; phone?: string; workingHours?: string; ratingBadge?: string }
+      // full_address_name обычно приходит как "Город, Улица дом" -- делим по
+      // первой запятой, но оба поля остаются редактируемыми, если разбор
+      // для конкретного адреса ушёл криво.
+      const [cityGuess, ...addressRest] = (place.address ?? '').split(',')
+      const addressGuess = addressRest.join(',').trim()
+
+      setSalon((prev) => ({
+        ...prev,
+        name: place.name || prev.name,
+        city: addressGuess ? cityGuess.trim() : prev.city,
+        address: addressGuess || place.address || prev.address,
+        phone: place.phone || prev.phone,
+        workingHours: place.workingHours || prev.workingHours,
+        ratingBadge: place.ratingBadge || prev.ratingBadge,
+      }))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'не удалось получить данные из 2ГИС')
+    } finally {
+      setFetchingTwoGis(false)
+    }
   }
 
   async function createAndGenerate() {
@@ -171,6 +213,7 @@ export default function SiteGenerator() {
       setSlug('')
       setMastersText('')
       setReviewsText('')
+      setTwoGisUrl('')
       await loadSites()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Не получилось')
@@ -220,6 +263,20 @@ export default function SiteGenerator() {
                 <input value={slug} onChange={(e) => setSlug(e.target.value.toLowerCase())}
                   placeholder="lotos" className={inputClass} />
                 <span className="text-xs text-gray-400 whitespace-nowrap">.{BASE_DOMAIN}</span>
+              </div>
+            </Field>
+
+            <Field label="Ссылка на 2ГИС (необязательно)">
+              <div className="flex items-center gap-2">
+                <input value={twoGisUrl} onChange={(e) => setTwoGisUrl(e.target.value)}
+                  placeholder="https://2gis.kz/shymkent/firm/70000001101134746" className={inputClass} />
+                <button onClick={fillFrom2gis} disabled={fetchingTwoGis || !twoGisUrl.trim()}
+                  className="text-xs bg-gray-700 text-gray-200 px-3 py-2.5 rounded-lg whitespace-nowrap disabled:opacity-50">
+                  {fetchingTwoGis ? 'Тяну…' : 'Заполнить по ссылке'}
+                </button>
+              </div>
+              <div className="text-xs text-gray-500 mt-1">
+                Подтянет название/адрес/телефон/часы/рейтинг через официальный API 2ГИС. Сами тексты отзывов API не отдаёт — их по-прежнему вставлять вручную ниже.
               </div>
             </Field>
 
