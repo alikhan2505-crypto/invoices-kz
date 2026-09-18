@@ -403,6 +403,17 @@ export async function handleWhatsAppIncoming(conn: WhatsAppTenantConnection, par
     // slot per call (see its own params comment).
     const salonInfo = agent.salon_site_id ? await loadAgentSalonInfo(supabase, agent.salon_site_id) : null
     const salonBlock = salonInfo ? buildSalonBlock(salonInfo) : ''
+    // Live UX gap found 18.09.2026: params.from (the customer's own wa_id)
+    // sits on every inbound WhatsApp message, yet the booking flow still
+    // asked the customer to retype their number from scratch. Tell the
+    // model it already has it -- offer it as the default contact instead
+    // of a blind "какой у вас номер телефона", still leaving room for the
+    // customer to give a different one. Only a prompt hint: the real
+    // guarantee a booking can complete without re-asking is
+    // buildBookingToolExecutor's own fallback (bookingSend.ts).
+    const knownPhoneLine = salonInfo
+      ? `\nКлиент пишет с номера WhatsApp +${params.from}. Когда понадобится контактный телефон для записи, сначала предложи использовать этот же номер (например: "Запишем этот же номер WhatsApp как контактный?"), а не спрашивай номер с нуля -- называй другой номер только если клиент сам его попросит.`
+      : ''
 
     const result = await generateAiReply({
       incomingText: params.incomingText,
@@ -421,7 +432,7 @@ export async function handleWhatsAppIncoming(conn: WhatsAppTenantConnection, par
         currency: agent.currency || undefined,
         customInstructions: typeof agent.custom_instructions === 'string' ? agent.custom_instructions : undefined,
         channel: 'whatsapp',
-      }) + catalogBlock + deliveryBlock + shopLinksBlock + salonBlock,
+      }) + catalogBlock + deliveryBlock + shopLinksBlock + salonBlock + knownPhoneLine,
       collectFieldsToExtract: buildCollectFieldsToExtract(Array.isArray(agent.collect_fields) ? agent.collect_fields : undefined),
       ...(salonInfo
         ? { bookingTool: buildBookingToolExecutor(supabase, { id: agent.id }, conversation.id, salonInfo) }

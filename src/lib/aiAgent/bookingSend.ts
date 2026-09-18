@@ -27,10 +27,21 @@ export function buildBookingToolExecutor(
 
       const { data: conv } = await supabase
         .from('ai_agent_conversations')
-        .select('collected_name, collected_phone')
+        .select('collected_name, collected_phone, channel, external_thread_id')
         .eq('id', conversationId)
         .single()
-      const norm = normalizeBookingToolInput(raw, { name: conv?.collected_name, phone: conv?.collected_phone })
+      // WhatsApp's external_thread_id IS the customer's own number (see
+      // whatsappWebhookHandler.ts: external_thread_id: params.from, the
+      // wa_id every inbound message carries) -- live gap found 18.09.2026:
+      // the prompt asks the model to OFFER this as the contact number
+      // instead of asking cold (whatsappWebhookHandler.ts's knownPhoneLine),
+      // but if it ever calls the tool without an explicit customer_phone
+      // anyway, falling back to it here means a booking never stalls on
+      // "please retype a number we already have" for something we can
+      // already reach the customer on. Explicit/previously-collected values
+      // still win -- this is only the last resort.
+      const whatsappPhone = conv?.channel === 'whatsapp' && conv?.external_thread_id ? `+${conv.external_thread_id}` : undefined
+      const norm = normalizeBookingToolInput(raw, { name: conv?.collected_name, phone: conv?.collected_phone || whatsappPhone })
       const missing: ('customer_name' | 'customer_phone')[] = []
       if (!norm.customerName) missing.push('customer_name')
       if (!norm.customerPhone) missing.push('customer_phone')
