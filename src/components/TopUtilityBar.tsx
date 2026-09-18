@@ -568,6 +568,16 @@ export default function TopUtilityBar() {
   // something the founder needs while generating salon landing pages.
   if (pathname === '/admin/site-generator') return null
 
+  // Same reasoning, 2026-09-18: the salon booking planner is reached via its
+  // own Telegram-QR login (src/lib/plannerAuth.ts), not the platform's
+  // normal session -- this bar showing the FOUNDER's own wallet/profile here
+  // (visible whenever the same browser also happens to have a normal
+  // logged-in session, e.g. during testing) has nothing to do with whichever
+  // salon's planner is on screen. A reception tablet with no ordinary session
+  // at all would already get `!loggedIn` below regardless; this is the
+  // explicit, unconditional version of that for the case where one exists.
+  if (pathname?.startsWith('/planner/')) return null
+
   if (!loggedIn) return null
 
   const visibleWallets = WALLETS.filter(w => !w.adminOnly || isAdmin)
