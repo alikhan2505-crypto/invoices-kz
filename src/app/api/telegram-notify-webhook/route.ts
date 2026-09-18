@@ -37,6 +37,54 @@ export async function POST(req: NextRequest) {
   }
 
   const token = parseStartToken(text)
+
+  // Отдельная ветка для входа в планировщик салона (planner_<code>) -- это
+  // НЕ обычная привязка аккаунта (та ветка ниже), а проверка "совпадает ли
+  // сканирующий Telegram-аккаунт с уже привязанным владельцем салона". При
+  // несовпадении строку planner_sessions не трогаем -- настоящий владелец
+  // должен суметь отсканировать через мгновение и получить доступ, ошибка
+  // чужого скана не должна портить код.
+  if (token?.startsWith('planner_')) {
+    const code = token.slice('planner_'.length)
+
+    const { data: session } = await supabase
+      .from('planner_sessions')
+      .select('site_id, status, expires_at')
+      .eq('code', code)
+      .maybeSingle()
+
+    const stillValid = session?.status === 'pending' && new Date(session.expires_at).getTime() > Date.now()
+    const site = stillValid
+      ? (await supabase.from('salon_sites').select('slug, owner_profile_id').eq('id', session.site_id).maybeSingle()).data
+      : null
+    const owner = site?.owner_profile_id
+      ? (await supabase.from('profiles').select('telegram_chat_id').eq('id', site.owner_profile_id).maybeSingle()).data
+      : null
+
+    if (site && owner?.telegram_chat_id === String(chatId)) {
+      const { data: claimed } = await supabase
+        .from('planner_sessions')
+        .update({ status: 'confirmed', owner_profile_id: site.owner_profile_id })
+        .eq('code', code)
+        .eq('status', 'pending')
+        .gt('expires_at', new Date().toISOString())
+        .select('id')
+        .maybeSingle()
+
+      if (claimed) {
+        await reply(chatId, '✅ Вход в планировщик подтверждён — вернитесь к экрану, он откроется сам.')
+      } else {
+        await reply(chatId, 'Код уже использован или истёк — обновите QR на экране планировщика и отсканируйте заново.')
+      }
+    } else if (site) {
+      await reply(chatId, `Этот QR предназначен для владельца салона. Страница салона: https://${site.slug}.invoices.kz`)
+    } else {
+      await reply(chatId, 'Код недействителен или истёк — обновите QR на экране планировщика.')
+    }
+
+    return NextResponse.json({ ok: true })
+  }
+
   if (!token) {
     await reply(chatId, 'Этот бот используется только для уведомлений invoices.kz. Чтобы подключить его к своему аккаунту, перейдите в Профиль → Уведомления и нажмите «Подключить».')
     return NextResponse.json({ ok: true })
