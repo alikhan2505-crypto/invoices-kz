@@ -99,7 +99,9 @@ export default function SiteGenerator() {
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || 'не удалось получить данные из 2ГИС')
 
-      const place = json.place as { name?: string; address?: string; phone?: string; workingHours?: string; ratingBadge?: string }
+      const place = json.place as {
+        name?: string; address?: string; phone?: string; workingHours?: string; ratingBadge?: string; lat?: number; lon?: number
+      }
       // full_address_name обычно приходит как "Город, Улица дом" -- делим по
       // первой запятой, но оба поля остаются редактируемыми, если разбор
       // для конкретного адреса ушёл криво.
@@ -114,6 +116,8 @@ export default function SiteGenerator() {
         phone: place.phone || prev.phone,
         workingHours: place.workingHours || prev.workingHours,
         ratingBadge: place.ratingBadge || prev.ratingBadge,
+        lat: place.lat ?? prev.lat,
+        lon: place.lon ?? prev.lon,
       }))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'не удалось получить данные из 2ГИС')
@@ -276,7 +280,7 @@ export default function SiteGenerator() {
                 </button>
               </div>
               <div className="text-xs text-gray-500 mt-1">
-                Подтянет название/адрес/часы/рейтинг через официальный API 2ГИС. Телефон и тексты отзывов API не отдаёт (demo-ключ без доступа к контактам) — их по-прежнему вписывать вручную.
+                Подтянет название/адрес/часы/рейтинг/координаты (для кнопки «Как доехать») через официальный API 2ГИС. Телефон и тексты отзывов API не отдаёт (demo-ключ без доступа к контактам) — их по-прежнему вписывать вручную.
               </div>
             </Field>
 

@@ -36,6 +36,8 @@ export type TwoGisPlace = {
   phone?: string
   workingHours?: string
   ratingBadge?: string
+  lat?: number
+  lon?: number
 }
 
 const DAY_ORDER = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const
@@ -110,7 +112,7 @@ export async function fetch2gisPlace(sourceUrl: string): Promise<TwoGisPlace> {
   apiUrl.searchParams.set('key', apiKey)
   apiUrl.searchParams.set('id', firmId)
   apiUrl.searchParams.set('locale', 'ru_KZ')
-  apiUrl.searchParams.set('fields', 'items.full_address_name,items.contact_groups,items.schedule,items.reviews')
+  apiUrl.searchParams.set('fields', 'items.full_address_name,items.contact_groups,items.schedule,items.reviews,items.point')
 
   const res = await fetch(apiUrl.toString())
   if (!res.ok) throw new Error(`2ГИС API вернул ошибку (${res.status})`)
@@ -131,11 +133,15 @@ export async function fetch2gisPlace(sourceUrl: string): Promise<TwoGisPlace> {
     ? reviews.general_review_count_with_stars
     : null
 
+  const point = isRecord(item.point) ? item.point : null
+
   return {
     name: typeof item.name === 'string' ? item.name : undefined,
     address: typeof item.full_address_name === 'string' ? item.full_address_name : undefined,
     phone: extractPhone(item.contact_groups),
     workingHours: formatSchedule(item.schedule),
     ratingBadge: rating !== null ? `${rating.toFixed(1)} ★${reviewCount ? ` · ${reviewCount} оценок` : ''}` : undefined,
+    lat: typeof point?.lat === 'number' ? point.lat : undefined,
+    lon: typeof point?.lon === 'number' ? point.lon : undefined,
   }
 }

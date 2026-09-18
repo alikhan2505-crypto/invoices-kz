@@ -19,6 +19,13 @@ function optional(value: unknown): string | undefined {
   return s || undefined
 }
 
+// Валидный lat/lon: конечное число в разумном географическом диапазоне --
+// координаты уезжают прямо в ссылку на Google-карты в тексте промпта,
+// поэтому NaN/Infinity/мусор отсекаем здесь, а не полагаемся на fetch2gis.ts.
+function optionalCoord(value: unknown, max: number): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) && Math.abs(value) <= max ? value : undefined
+}
+
 // Данные приходят из админской формы, но валидируем всё равно: строка отсюда
 // уезжает в промпт модели и в HTML лендинга.
 export function parseSalonData(input: unknown): SalonData | null {
@@ -71,5 +78,7 @@ export function parseSalonData(input: unknown): SalonData | null {
     styleNotes: optional(raw.styleNotes),
     reviews: reviews.length ? reviews.slice(0, 12) : undefined,
     ratingBadge: optional(raw.ratingBadge),
+    lat: optionalCoord(raw.lat, 90),
+    lon: optionalCoord(raw.lon, 180),
   }
 }
