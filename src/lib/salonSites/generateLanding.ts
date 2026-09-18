@@ -114,7 +114,7 @@ export async function generateLandingVariant({
   // Лендинг -- длинный вывод, поэтому поток: иначе запрос упирается в таймаут
   // HTTP раньше, чем модель успевает дописать документ.
   const stream = client.messages.stream({
-    model: 'claude-opus-5',
+    model: 'claude-sonnet-5',
     max_tokens: 32000,
     thinking: { type: 'adaptive' },
     output_config: { effort: 'medium' },
