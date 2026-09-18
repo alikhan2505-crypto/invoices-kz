@@ -56,10 +56,33 @@ export async function loadAgentSalonInfo(
   }
 }
 
-// "Today" for the prompt, at the salon's fixed UTC+5 offset -- see
-// bookingDrafts.ts's own comment on why no timezone library is needed.
-function todayInAlmaty(): string {
-  return new Date(Date.now() + 5 * 60 * 60 * 1000).toISOString().slice(0, 10)
+// Almaty "now" as a Date whose UTC getters read as Almaty local time -- the
+// same fixed +05:00 shift bookingDrafts.ts uses, just kept as a Date here
+// instead of a string so both the date AND the weekday can be read off it.
+function almatyNow(offsetDays = 0): Date {
+  return new Date(Date.now() + 5 * 60 * 60 * 1000 + offsetDays * 24 * 60 * 60 * 1000)
+}
+
+const WEEKDAY_RU = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота']
+
+// Exported for its own colocated test (cross-checked against Intl's
+// independent weekday calculation, not just re-asserting this same table)
+// -- same exception this codebase already makes for other pure pieces of
+// an otherwise time-dependent module.
+export function formatWithWeekday(d: Date): string {
+  return `${d.toISOString().slice(0, 10)} (${WEEKDAY_RU[d.getUTCDay()]})`
+}
+
+// Live incident 18.09.2026: given only a bare "Сегодняшняя дата: 2026-09-18"
+// with no weekday, the model was asked to book "пятница" and answered with
+// a date that wasn't even a Friday -- a Haiku-tier model reliably computing
+// day-of-week arithmetic from an ISO date alone is not a safe assumption
+// for something that decides which day a real customer shows up on. Fix:
+// never make the model calculate a date at all -- hand it a ready lookup
+// table for the next two weeks (each date with its weekday spelled out) so
+// "пятница"/"завтра"/"через неделю" is a read, not a computation.
+function nextTwoWeeksTable(): string {
+  return Array.from({ length: 14 }, (_, i) => formatWithWeekday(almatyNow(i))).join(', ')
 }
 
 // Pure formatter -- mirrors buildCatalogBlock's shape (promptContext.ts).
@@ -67,7 +90,10 @@ function todayInAlmaty(): string {
 // prompt stays byte-for-byte unchanged; callers append this only when the
 // agent has salon_site_id set.
 export function buildSalonBlock(info: SalonInfo): string {
-  const lines = [`Сегодняшняя дата: ${todayInAlmaty()} (часовой пояс салона: Алматы, UTC+5).`]
+  const lines = [
+    `Сегодня: ${formatWithWeekday(almatyNow(0))} (часовой пояс салона: Алматы, UTC+5).`,
+    `Даты на ближайшие две недели по дням недели: ${nextTwoWeeksTable()}. Когда клиент называет день недели, "завтра", "послезавтра" или "через неделю" -- бери ТОЧНУЮ дату из этого списка, никогда не вычисляй её самостоятельно.`,
+  ]
   if (info.services.length) lines.push(`Услуги: ${info.services.join(', ')}.`)
   if (info.masters.length) lines.push(`Мастера: ${info.masters.join(', ')}.`)
   if (info.workingHours) lines.push(`Часы работы: ${info.workingHours}.`)
