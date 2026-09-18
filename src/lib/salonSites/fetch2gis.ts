@@ -4,16 +4,18 @@
 // агрегированный рейтинг, но НЕ тексты самих отзывов -- их по-прежнему
 // вставляют вручную.
 //
-// Ключ: dev.2gis.ru -> Platform Manager -> создать demo-ключ (бесплатный,
-// с лимитами). Пока TWO_GIS_API_KEY не задан в окружении -- функция кидает
-// понятную ошибку вместо того, чтобы тихо возвращать пустоту.
+// Ключ: platform.2gis.ru -> "Ключи API" -> создать demo-ключ (бесплатный,
+// но ОДНОРАЗОВЫЙ и на 30 дней с даты создания -- после блокировки нужна
+// платная подписка). Пока TWO_GIS_API_KEY не задан в окружении -- функция
+// кидает понятную ошибку вместо того, чтобы тихо возвращать пустоту.
 //
 // ID организации извлекается из хвоста ссылки вида
-// https://2gis.kz/shymkent/firm/70000001101134746 -- это тот же числовой ID,
-// который 2ГИС использует в своих публичных виджетах карт. Не проверено
-// вживую с реальным ключом (ключа пока нет) -- если 2ГИС всё же ждёт другой
-// формат ID, API ответит 404, и это всплывёт понятной ошибкой при первом
-// реальном запросе, а не тихим расхождением.
+// https://2gis.kz/shymkent/firm/70000001101134746 -- подтверждено вживую
+// 18.09.2026 реальным запросом с demo-ключом, этот числовой ID из URL
+// действительно принимается как id= у items/byid без преобразований.
+// Телефон в этом же тестовом запросе не вернулся вообще (contact_groups
+// пустой) -- вероятно, ограничение demo-тарифа, а не баг парсинга: код уже
+// готов к его отсутствию и просто не заполняет поле.
 
 export type TwoGisPlace = {
   name?: string
@@ -105,9 +107,16 @@ export async function fetch2gisPlace(sourceUrl: string): Promise<TwoGisPlace> {
   const item = Array.isArray(items) ? items[0] : null
   if (!isRecord(item)) throw new Error('организация не найдена в 2ГИС по этой ссылке')
 
+  // Проверено вживую 18.09.2026 реальным запросом: документация называет
+  // поля "rating"/"review_count", но настоящий ответ отдаёт
+  // "general_rating"/"general_review_count_with_stars" -- второе счётное
+  // поле ближе к тому, что видно на самой странице 2ГИС (общее число
+  // оценок, а не только оценок с текстом).
   const reviews = isRecord(item.reviews) ? item.reviews : null
-  const rating = typeof reviews?.rating === 'number' ? reviews.rating : null
-  const reviewCount = typeof reviews?.review_count === 'number' ? reviews.review_count : null
+  const rating = typeof reviews?.general_rating === 'number' ? reviews.general_rating : null
+  const reviewCount = typeof reviews?.general_review_count_with_stars === 'number'
+    ? reviews.general_review_count_with_stars
+    : null
 
   return {
     name: typeof item.name === 'string' ? item.name : undefined,
