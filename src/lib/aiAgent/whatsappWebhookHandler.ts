@@ -6,6 +6,8 @@ import { buildBusinessContextLine, buildCollectFieldsToExtract, buildCatalogBloc
 import { loadAgentCatalog, loadAgentDeliveryInfo, loadAgentShopLinks } from './catalogContext'
 import { pickProductPhoto } from './productPhoto'
 import { buildInvoiceToolExecutor } from './invoiceSend'
+import { loadAgentSalonInfo, buildSalonBlock } from './salonContext'
+import { buildBookingToolExecutor } from './bookingSend'
 import { debitAiAgentWallet, AI_AGENT_CREDITS_PER_AI_REPLY, hasAiAgentBudget, AI_AGENT_BUDGET_DEPLETED_REPLY } from './wallet'
 import { isConversationRateLimited } from './rateLimit'
 import { sendTelegramNotification } from '@/lib/telegramNotify'
@@ -392,6 +394,16 @@ export async function handleWhatsAppIncoming(conn: WhatsAppTenantConnection, par
     const deliveryBlock = buildDeliveryBlock(deliveryInfo)
     const shopLinks = await loadAgentShopLinks(supabase, agent.user_id, agent.kaspi_shop_connection_id)
     const shopLinksBlock = buildShopLinksBlock(shopLinks)
+
+    // Salon booking planner: only an agent pinned to a salon
+    // (ai_agents.salon_site_id) gets the salon context block and the
+    // booking tool -- every other agent's prompt/tools stay exactly as
+    // before this feature. A salon agent gets bookingTool INSTEAD OF
+    // invoiceTool, never both: generateAiReply only ever honors one tool
+    // slot per call (see its own params comment).
+    const salonInfo = agent.salon_site_id ? await loadAgentSalonInfo(supabase, agent.salon_site_id) : null
+    const salonBlock = salonInfo ? buildSalonBlock(salonInfo) : ''
+
     const result = await generateAiReply({
       incomingText: params.incomingText,
       fromUsername: params.customerHandle,
@@ -409,9 +421,11 @@ export async function handleWhatsAppIncoming(conn: WhatsAppTenantConnection, par
         currency: agent.currency || undefined,
         customInstructions: typeof agent.custom_instructions === 'string' ? agent.custom_instructions : undefined,
         channel: 'whatsapp',
-      }) + catalogBlock + deliveryBlock + shopLinksBlock,
+      }) + catalogBlock + deliveryBlock + shopLinksBlock + salonBlock,
       collectFieldsToExtract: buildCollectFieldsToExtract(Array.isArray(agent.collect_fields) ? agent.collect_fields : undefined),
-      invoiceTool: buildInvoiceToolExecutor(supabase, { id: agent.id, status: agent.status }, conversation.id),
+      ...(salonInfo
+        ? { bookingTool: buildBookingToolExecutor(supabase, { id: agent.id }, conversation.id, salonInfo) }
+        : { invoiceTool: buildInvoiceToolExecutor(supabase, { id: agent.id, status: agent.status }, conversation.id) }),
     })
     draftReply = result.replyText
     urgent = result.urgent

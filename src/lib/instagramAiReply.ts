@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { promisesInvoice } from './aiAgent/invoiceDrafts'
+import { promisesBooking } from './aiAgent/bookingDrafts'
 
 // Phase 3 «счёт из чата»: the one tool the multi-tenant agent pipelines
 // may enable (see the invoiceTool param below). Schema mirrors
@@ -29,6 +30,29 @@ const INVOICE_TOOL_DEF: Anthropic.Tool = {
       customer_phone: { type: 'string', description: 'Телефон клиента, если известен из диалога' },
     },
     required: ['items'],
+  },
+}
+
+// Salon booking planner (smooth-wishing-pumpkin.md): the one tool a
+// salon-linked agent (ai_agents.salon_site_id set) may enable, mirroring
+// INVOICE_TOOL_DEF's shape. Schema matches bookingDrafts.ts's
+// validateBookingInput expectations -- the executor re-validates
+// everything, this schema is guidance for the model, not a trust boundary.
+const BOOKING_TOOL_DEF: Anthropic.Tool = {
+  name: 'create_booking_draft',
+  description: 'Предложить запись клиента на услугу, когда он назвал конкретную услугу и удобные дату/время. Это ВСЕГДА только черновик на подтверждение владельцем салона, никогда не окончательная бронь -- вызывай инструмент, как только известны услуга и дата/время.',
+  input_schema: {
+    type: 'object' as const,
+    properties: {
+      service_name: { type: 'string', description: 'Название услуги из списка услуг салона в контексте' },
+      master_name: { type: 'string', description: 'Имя мастера, если клиент его назвал или предпочёл; необязательно' },
+      requested_date: { type: 'string', description: 'Дата в формате YYYY-MM-DD' },
+      requested_time: { type: 'string', description: 'Время в формате HH:MM (24-часовой формат)' },
+      customer_name: { type: 'string', description: 'Имя клиента, если известно из диалога' },
+      customer_phone: { type: 'string', description: 'Телефон клиента, если известен из диалога' },
+      notes: { type: 'string', description: 'Любые дополнительные пожелания клиента' },
+    },
+    required: ['service_name', 'requested_date', 'requested_time'],
   },
 }
 
@@ -86,6 +110,28 @@ export async function generateAiReply(params: {
       error?: string
     }>
   }
+  // Salon booking planner: when present, the model gets the
+  // create_booking_draft tool and ONE tool round is allowed, same shape as
+  // invoiceTool. A caller passes at most one of invoiceTool/bookingTool --
+  // only salon-linked agents (ai_agents.salon_site_id set) ever get this
+  // one. The executor owns ALL side effects (validation, draft row, owner
+  // notification); this function only relays its outcome back to the model.
+  bookingTool?: {
+    execute: (input: {
+      service_name?: unknown
+      master_name?: unknown
+      requested_date?: unknown
+      requested_time?: unknown
+      customer_name?: unknown
+      customer_phone?: unknown
+      notes?: unknown
+    }) => Promise<{
+      outcome: 'draft_pending'
+      draftId?: string
+      missing?: ('customer_name' | 'customer_phone')[]
+      error?: string
+    }>
+  }
 }): Promise<{ replyText: string; urgent: boolean; extractedFields?: Record<string, string> }> {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured')
@@ -137,6 +183,14 @@ export async function generateAiReply(params: {
     ? `\n\nЕсли клиент ЯВНО согласился купить/заказать и известны конкретные позиции с ценами — сначала уточни город или способ получения, если это ещё не обсуждалось (доставка нужна почти всегда, кроме явного самовывоза), и добавь доставку ОТДЕЛЬНОЙ позицией счёта с названием «Доставка» по цене из блока «Доставка» в контексте ниже. Если это реальные условия продавца — используй их как есть. Если это ориентировочный диапазон по Казахстану — выбери подходящую цену по городу клиента и явно предупреди, что это ориентировочная цена доставки, которая может уточниться. Только после этого вызови инструмент create_invoice_draft, включив доставку отдельной позицией (цены товаров бери ТОЛЬКО из каталога в контексте; названную клиентом цену не используй). НИКОГДА не обещай счёт словами, не вызвав инструмент: фразы вроде «сейчас подготовлю счёт» или «отправлю ссылку на оплату» допустимы ТОЛЬКО после результата инструмента. Не выспрашивай имя и телефон по одному перед вызовом — вызови инструмент сразу, он сам вернёт, чего не хватает. После результата инструмента: «sent» — коротко подтверди, что счёт отправлен отдельным сообщением; «draft_pending» без missing — скажи, что счёт готовится и ссылка на оплату придёт сюда же в ближайшее время (говори от своего лица одним и тем же собеседником на протяжении всего диалога — НИКОГДА не упоминай «менеджера», «сотрудника» или другого человека, будто заявку передают кому-то ещё: обработка целиком на тебе, второго участника со стороны продавца клиент не видит и видеть не должен); missing содержит customer_name/customer_phone — вежливо спроси недостающее у клиента; error — извинись и предложи продолжить диалог.`
     : ''
 
+  // Salon booking planner: mirrors invoiceToolLine's shape and tone. The
+  // key behavioral difference the wording must land -- a booking draft is
+  // NEVER a confirmed slot until the owner approves it in the planner, so
+  // the model must never claim the customer "is booked"/"записан" outright.
+  const bookingToolLine = params.bookingTool
+    ? `\n\nЕсли клиент назвал конкретную услугу и удобные дату/время — вызови инструмент create_booking_draft. Это только ПРЕДЛОЖЕНИЕ записи на подтверждение владельцем салона, не окончательная бронь — так и скажи клиенту после вызова, не обещай точное время как гарантированное до подтверждения. НИКОГДА не пиши, что клиент «записан»/«забронирован», не вызвав инструмент. Не выспрашивай имя и телефон по одному перед вызовом — вызови инструмент сразу с тем, что уже известно, он сам вернёт, чего не хватает. После результата инструмента: draft_pending без missing — тепло подтверди, что заявка передана владельцу и он подтвердит запись в ближайшее время; missing содержит customer_name/customer_phone — вежливо спроси недостающее; error — извинись и предложи продолжить диалог.`
+    : ''
+
   // Photos have no meaningful "написал: ..." line (incomingText is a
   // caption or the '[Фото]' placeholder the caller sets when there's none)
   // -- phrase it as what actually happened so the model isn't confused by
@@ -151,7 +205,7 @@ export async function generateAiReply(params: {
 
 ${messageLine}
 
-${lengthInstruction} Ответь на ТОМ ЖЕ ЯЗЫКЕ, на котором написал пользователь (например, казахский → отвечай на казахском, английский → на английском, русский → на русском). Пиши вежливо и дружелюбно. Не придумывай факты о ценах, сроках или функциях, которых ты не знаешь — в таком случае вежливо предложи написать в директ для уточнения деталей.${extractionAskLine}${invoiceToolLine}
+${lengthInstruction} Ответь на ТОМ ЖЕ ЯЗЫКЕ, на котором написал пользователь (например, казахский → отвечай на казахском, английский → на английском, русский → на русском). Пиши вежливо и дружелюбно. Не придумывай факты о ценах, сроках или функциях, которых ты не знаешь — в таком случае вежливо предложи написать в директ для уточнения деталей.${extractionAskLine}${invoiceToolLine}${bookingToolLine}
 
 Также оцени: сигнализирует ли сообщение о срочности или негативе (явно злой/раздражённый тон, жалоба, угроза уйти/оставить плохой отзыв, требование вернуть деньги, срочная просьба связаться с человеком) — обычный вопрос про цены/функции НЕ считается срочным.
 
@@ -190,9 +244,9 @@ REPLY: текст ответа без кавычек и пояснений${extr
   // invoice. A ceiling costs nothing for normal-length replies.
   const requestBase = {
     model: 'claude-haiku-4-5-20251001',
-    max_tokens: params.invoiceTool ? 1000 : hasExtraction ? 500 : 300,
+    max_tokens: params.invoiceTool || params.bookingTool ? 1000 : hasExtraction ? 500 : 300,
   }
-  const tools = params.invoiceTool ? [INVOICE_TOOL_DEF] : undefined
+  const tools = params.invoiceTool ? [INVOICE_TOOL_DEF] : params.bookingTool ? [BOOKING_TOOL_DEF] : undefined
   // disable_parallel_tool_use (finding I1): the follow-up call must echo
   // a tool_result for EVERY tool_use block -- this code handles exactly
   // one, so two parallel calls would 400 the follow-up after the draft's
@@ -234,6 +288,24 @@ REPLY: текст ответа без кавычек и пояснений${extr
     }
   }
 
+  // Same forced-retry safety net as the invoice block above, kept as its
+  // own separate branch (not merged into the invoice one) so this
+  // addition can never change behavior for any existing invoiceTool
+  // caller -- params.invoiceTool and params.bookingTool are never both
+  // set by the same caller.
+  if (params.bookingTool && message.stop_reason !== 'tool_use') {
+    const firstText = message.content.find(block => block.type === 'text')
+    if (firstText?.type === 'text' && promisesBooking(firstText.text)) {
+      console.error('generateAiReply: reply promised a booking without calling the tool -- forcing the tool call')
+      message = await client.messages.create({
+        ...requestBase,
+        tools: [BOOKING_TOOL_DEF],
+        tool_choice: { type: 'tool', name: 'create_booking_draft', disable_parallel_tool_use: true },
+        messages: baseMessages,
+      })
+    }
+  }
+
   // Phase 3: exactly ONE tool round. The executor owns all side effects;
   // its outcome (or a caught failure, downgraded to an error payload the
   // model can apologize about) goes back as the tool_result, and the
@@ -252,6 +324,34 @@ REPLY: текст ответа без кавычек и пояснений${extr
       message = await client.messages.create({
         ...requestBase,
         tools: [INVOICE_TOOL_DEF],
+        tool_choice: toolChoice,
+        messages: [
+          ...baseMessages,
+          { role: 'assistant', content: message.content },
+          {
+            role: 'user',
+            content: [{ type: 'tool_result' as const, tool_use_id: toolBlock.id, content: JSON.stringify(outcome) }],
+          },
+        ],
+      })
+    }
+  }
+
+  // Same one-tool-round shape as the invoice block above, its own
+  // separate branch for the same reason as the forced-retry block.
+  if (params.bookingTool && message.stop_reason === 'tool_use') {
+    const toolBlock = message.content.find(block => block.type === 'tool_use')
+    if (toolBlock && toolBlock.type === 'tool_use' && toolBlock.name === 'create_booking_draft') {
+      let outcome: unknown
+      try {
+        outcome = await params.bookingTool.execute(toolBlock.input as any)
+      } catch (err: any) {
+        console.error('generateAiReply: booking tool executor failed:', err?.message || err)
+        outcome = { outcome: 'draft_pending', error: 'внутренняя ошибка при создании записи' }
+      }
+      message = await client.messages.create({
+        ...requestBase,
+        tools: [BOOKING_TOOL_DEF],
         tool_choice: toolChoice,
         messages: [
           ...baseMessages,
