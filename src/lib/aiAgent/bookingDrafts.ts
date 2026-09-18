@@ -52,11 +52,18 @@ export function validateBookingInput(raw: BookingToolInput): BookingValidation {
 
   const startsAt = new Date(`${date}T${time}:00${KZ_OFFSET}`)
   if (Number.isNaN(startsAt.getTime())) return { ok: false, error: 'Некорректные дата или время' }
-  // A day of slack rather than "now" exactly -- a customer confirming a
-  // same-day slot a few minutes into the past (clock skew, a slow reply)
-  // must not be refused; only a clearly stale/hallucinated date should be.
-  if (startsAt.getTime() < Date.now() - 24 * 60 * 60 * 1000) {
-    return { ok: false, error: 'Дата записи уже прошла' }
+  // Live incident 18.09.2026: a customer asked at 21:58 for "пятница в
+  // 15:00" (today, 7 hours earlier) and the model -- not yet told the
+  // current TIME, only the date (see salonContext.ts's own fix) --
+  // confirmed it as a normal future slot. A generous 24h grace window
+  // here would have let that exact draft through regardless of the
+  // prompt fix; this is the real backstop, same philosophy as
+  // checkCatalogPricing in this same file's invoice sibling -- never
+  // trust the model alone for something with a real-world consequence.
+  // 15 minutes is slack for reply latency/clock skew, not for "earlier
+  // today".
+  if (startsAt.getTime() < Date.now() - 15 * 60 * 1000) {
+    return { ok: false, error: 'Указанное время уже прошло' }
   }
 
   const masterName = typeof raw.master_name === 'string' && raw.master_name.trim()

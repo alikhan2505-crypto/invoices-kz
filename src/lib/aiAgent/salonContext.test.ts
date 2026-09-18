@@ -29,14 +29,18 @@ describe('formatWithWeekday', () => {
 })
 
 describe('buildSalonBlock', () => {
-  it('includes a 14-day date/weekday lookup table, not just a bare today date', () => {
+  it('includes the current time (not just a bare date) and a 14-day date/weekday lookup table', () => {
     const block = buildSalonBlock({
       siteId: 'x', name: 'Тест', services: [], masters: [], upcomingBookings: [],
     })
-    expect(block).toContain('Сегодня:')
+    expect(block).toContain('Сейчас:')
+    // HH:MM right after the weekday parens -- live incident 18.09.2026:
+    // a bare date with no time let the model confirm a same-day slot
+    // that had already passed hours earlier.
+    expect(block).toMatch(/Сейчас: \d{4}-\d{2}-\d{2} \([а-яё]+\), \d{2}:\d{2}/)
     expect(block).toContain('Даты на ближайшие две недели')
     // 14 entries, each carrying a weekday in parens -- a coarse but honest
     // check that the lookup table actually has 14 rows, not e.g. 1.
-    expect(block.match(/\([а-яё]+\)/g)?.length).toBe(15) // 14 table rows + 1 for "Сегодня:"
+    expect(block.match(/\([а-яё]+\)/g)?.length).toBe(15) // 14 table rows + 1 for "Сейчас:"
   })
 })

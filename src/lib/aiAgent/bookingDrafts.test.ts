@@ -16,6 +16,19 @@ describe('validateBookingInput', () => {
     const r = validateBookingInput({ service_name: 'Маникюр', master_name: ' Айгерим ', requested_date: FUTURE_DATE, requested_time: '10:00' })
     expect(r.ok && r.masterName).toBe('Айгерим')
   })
+  it('rejects a time on TODAY that has already passed, even though the date itself is not in the past (live incident 18.09.2026)', () => {
+    const now = new Date()
+    // An hour before "now" on today's own date -- the date is valid and
+    // current, only the time-of-day is stale. Skipped near local midnight
+    // to avoid a same-run flake where "an hour ago" rolls onto yesterday's
+    // date, which isn't the case this test targets.
+    if (now.getUTCHours() < 1) return
+    const past = new Date(now.getTime() - 60 * 60 * 1000)
+    const almaty = new Date(past.getTime() + 5 * 60 * 60 * 1000)
+    const date = almaty.toISOString().slice(0, 10)
+    const time = almaty.toISOString().slice(11, 16)
+    expect(validateBookingInput({ service_name: 'Маникюр', requested_date: date, requested_time: time }).ok).toBe(false)
+  })
   it('rejects: no service, bad date format, bad time format, a clearly past date', () => {
     expect(validateBookingInput({ requested_date: FUTURE_DATE, requested_time: '10:00' }).ok).toBe(false)
     expect(validateBookingInput({ service_name: 'X', requested_date: '15.06.2099', requested_time: '10:00' }).ok).toBe(false)

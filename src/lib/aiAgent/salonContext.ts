@@ -73,6 +73,20 @@ export function formatWithWeekday(d: Date): string {
   return `${d.toISOString().slice(0, 10)} (${WEEKDAY_RU[d.getUTCDay()]})`
 }
 
+// Live incident 18.09.2026, round two: after the date/weekday fix below,
+// the model correctly resolved "пятница" to today's date -- but a
+// customer asked at 21:58 for "пятница в 15:00" (today, 7 hours ago) and
+// the model confirmed it as if it were a normal future slot, having never
+// been told what time it currently is, only what date. Fixed by handing
+// over the current time alongside the date; validateBookingInput
+// (bookingDrafts.ts) is the real backstop that refuses it server-side
+// regardless of what the model does with this.
+function formatWithTime(d: Date): string {
+  const hh = String(d.getUTCHours()).padStart(2, '0')
+  const mm = String(d.getUTCMinutes()).padStart(2, '0')
+  return `${formatWithWeekday(d)}, ${hh}:${mm}`
+}
+
 // Live incident 18.09.2026: given only a bare "Сегодняшняя дата: 2026-09-18"
 // with no weekday, the model was asked to book "пятница" and answered with
 // a date that wasn't even a Friday -- a Haiku-tier model reliably computing
@@ -91,7 +105,7 @@ function nextTwoWeeksTable(): string {
 // agent has salon_site_id set.
 export function buildSalonBlock(info: SalonInfo): string {
   const lines = [
-    `Сегодня: ${formatWithWeekday(almatyNow(0))} (часовой пояс салона: Алматы, UTC+5).`,
+    `Сейчас: ${formatWithTime(almatyNow(0))} (часовой пояс салона: Алматы, UTC+5). Если клиент просит время сегодняшним же днём, которое уже прошло относительно текущего времени -- не подтверждай его как есть, сначала уточни другое время.`,
     `Даты на ближайшие две недели по дням недели: ${nextTwoWeeksTable()}. Когда клиент называет день недели, "завтра", "послезавтра" или "через неделю" -- бери ТОЧНУЮ дату из этого списка, никогда не вычисляй её самостоятельно.`,
   ]
   if (info.services.length) lines.push(`Услуги: ${info.services.join(', ')}.`)
