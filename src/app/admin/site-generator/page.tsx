@@ -34,6 +34,11 @@ export default function SiteGenerator() {
   const [slug, setSlug] = useState('')
   const [pattern, setPattern] = useState(LANDING_PATTERNS[0].id)
   const [mastersText, setMastersText] = useState('')
+  // Категории для группировки мастеров в календаре планировщика (напр.
+  // "Маникюр" -> "Айгерим, Динара"). Тот же паттерн редактирования, что у
+  // mastersText -- свободный текст на строку, парсится в массив только на
+  // отправке (createAndGenerate).
+  const [categories, setCategories] = useState<{ name: string; mastersText: string }[]>([])
   // Один отзыв -- одна строка. Владелец вставляет реальные цитаты клиентов
   // (например, скопированные с 2ГИС) сюда вручную: автоматически стянуть их
   // с 2ГИС нельзя (см. generateLanding.ts) -- их страницы отдают ботам
@@ -155,6 +160,9 @@ export default function SiteGenerator() {
       const payload = {
         ...salon,
         masters: mastersText.split(',').map((m) => m.trim()).filter(Boolean),
+        masterCategories: categories
+          .map((c) => ({ name: c.name.trim(), masters: c.mastersText.split(',').map((m) => m.trim()).filter(Boolean) }))
+          .filter((c) => c.name && c.masters.length > 0),
         reviews: reviewsText.split('\n').map((r) => r.trim()).filter(Boolean),
         services: salon.services.filter((s) => s.name.trim() && s.price.trim()),
       }
@@ -236,6 +244,7 @@ export default function SiteGenerator() {
       setSalon(EMPTY_SALON)
       setSlug('')
       setMastersText('')
+      setCategories([])
       setReviewsText('')
       setTwoGisUrl('')
       await loadSites()
@@ -369,6 +378,34 @@ export default function SiteGenerator() {
               <button onClick={() => setSalon({ ...salon, services: [...salon.services, { name: '', price: '' }] })}
                 className="mt-2 text-xs text-blue-400">
                 + услуга
+              </button>
+            </div>
+
+            <div>
+              <div className="text-xs text-gray-400 mb-2">
+                Категории для планировщика (необязательно) — группирует мастеров в календаре записей, напр. «Маникюр» → «Айгерим, Динара»
+              </div>
+              <div className="space-y-2">
+                {categories.map((cat, i) => (
+                  <div key={i} className="flex gap-2">
+                    <input
+                      value={cat.name}
+                      onChange={(e) => setCategories((prev) => prev.map((c, idx) => (idx === i ? { ...c, name: e.target.value } : c)))}
+                      placeholder="Маникюр"
+                      className={`${inputClass} max-w-[180px]`}
+                    />
+                    <input
+                      value={cat.mastersText}
+                      onChange={(e) => setCategories((prev) => prev.map((c, idx) => (idx === i ? { ...c, mastersText: e.target.value } : c)))}
+                      placeholder="Мастера через запятую"
+                      className={inputClass}
+                    />
+                  </div>
+                ))}
+              </div>
+              <button onClick={() => setCategories([...categories, { name: '', mastersText: '' }])}
+                className="mt-2 text-xs text-blue-400">
+                + категория
               </button>
             </div>
 

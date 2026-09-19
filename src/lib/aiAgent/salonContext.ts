@@ -5,6 +5,12 @@ export type SalonInfo = {
   name: string
   services: string[]
   masters: string[]
+  // Groups masters for the planner's timeline calendar
+  // (/planner/[slug]) -- unused by the AI prompt block below, only the
+  // planner bookings route (src/app/api/planner/bookings/route.ts) reads
+  // it. Kept on this same type rather than a second DB round-trip since
+  // loadAgentSalonInfo already fetches the salon row it lives on.
+  masterCategories: { name: string; masters: string[] }[]
   workingHours?: string
   upcomingBookings: { startsAt: string; masterName: string | null }[]
 }
@@ -30,6 +36,17 @@ export async function loadAgentSalonInfo(
           .filter(Boolean)
       : []
     const masters = Array.isArray(salon.masters) ? salon.masters.filter((m): m is string => typeof m === 'string') : []
+    const masterCategories = Array.isArray(salon.masterCategories)
+      ? salon.masterCategories
+          .map((c) => {
+            if (!c || typeof c !== 'object') return null
+            const cat = c as Record<string, unknown>
+            const catName = typeof cat.name === 'string' ? cat.name : ''
+            const catMasters = Array.isArray(cat.masters) ? cat.masters.filter((m): m is string => typeof m === 'string') : []
+            return catName && catMasters.length ? { name: catName, masters: catMasters } : null
+          })
+          .filter((c): c is { name: string; masters: string[] } => c !== null)
+      : []
     const workingHours = typeof salon.workingHours === 'string' ? salon.workingHours : undefined
 
     const weekAhead = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
@@ -48,6 +65,7 @@ export async function loadAgentSalonInfo(
       name,
       services,
       masters,
+      masterCategories,
       workingHours,
       upcomingBookings: (bookings || []).map((b) => ({ startsAt: b.starts_at, masterName: b.master_name })),
     }

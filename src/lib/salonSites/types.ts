@@ -4,6 +4,17 @@ export type SalonService = {
   duration?: string
 }
 
+// Groups masters for the planner's timeline calendar (/planner/[slug]) --
+// e.g. "Маникюр" -> ["Вениамин Фёдорович", "Изабелла Всеволодовна"].
+// Purely a display/grouping concern: a master name still only needs to
+// match `masters` (unchanged, see below) to be usable everywhere else
+// (AI booking tool, landing page prompt) -- this is additive, nothing
+// existing reads or requires it.
+export type SalonMasterCategory = {
+  name: string
+  masters: string[]
+}
+
 export type SalonData = {
   name: string
   city: string
@@ -14,6 +25,7 @@ export type SalonData = {
   about?: string
   services: SalonService[]
   masters?: string[]
+  masterCategories?: SalonMasterCategory[]
   workingHours?: string
   styleNotes?: string
   // Настоящие цитаты клиентов, вставленные владельцем вручную (например,

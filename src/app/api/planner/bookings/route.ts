@@ -47,7 +47,11 @@ export async function GET(req: NextRequest) {
   // collapses the grid to whatever master_names the bookings carry.
   const salonInfo = await loadAgentSalonInfo(supabase, session.siteId)
 
-  return NextResponse.json({ bookings: bookings || [], masters: salonInfo?.masters || [] })
+  return NextResponse.json({
+    bookings: bookings || [],
+    masters: salonInfo?.masters || [],
+    masterCategories: salonInfo?.masterCategories || [],
+  })
 }
 
 // POST: manual booking entry (source: 'manual') -- the form the founder

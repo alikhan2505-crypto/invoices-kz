@@ -305,74 +305,159 @@ function dayKey(iso: string) {
   return new Date(new Date(iso).getTime() + 5 * 60 * 60 * 1000).toISOString().slice(0, 10)
 }
 
-// Time x master grid for one day -- founder's own request after seeing the
-// flat chronological list: two different masters can both have a 15:00
-// booking, and a plain list doesn't show that at a glance the way a real
-// resource calendar does. Columns start from the salon's configured
-// master roster (masters param, from GET /api/planner/bookings -- so an
-// empty column still reads as "this master is free", not just "nobody
-// booked yet"), extended with any master_name a booking carries that
-// isn't in that roster (legacy/ad-hoc data), and a trailing "unassigned"
-// column only when at least one booking that day actually has none.
-function buildDayGrid(dayBookings: Booking[], masters: string[], lang: Lang) {
+// Continuous timeline, not a sparse grid -- founder shared a real
+// scheduling product (YCLIENTS-style) as the reference: hour axis down
+// the side, appointment blocks absolutely positioned by actual start time
+// and sized by duration, master columns grouped under category headers.
+const PX_PER_MIN = 1.2
+const DEFAULT_DURATION_MIN = 60
+const DAY_MIN_START = 7 * 60
+const DAY_MAX_END = 22 * 60
+const MIN_CARD_PX = 34
+const COLUMN_PX = 160
+const HOUR_GUTTER_PX = 52
+
+function minutesSinceMidnight(iso: string): number {
+  // Same fixed +05:00 shift-then-read-UTC-getters trick as the rest of
+  // this feature -- Kazakhstan is one fixed offset, no tz library needed.
+  const d = new Date(new Date(iso).getTime() + 5 * 60 * 60 * 1000)
+  return d.getUTCHours() * 60 + d.getUTCMinutes()
+}
+
+// The visible hour range for one day's timeline: always at least
+// DAY_MIN_START..DAY_MAX_END (07:00-22:00, a sane default with no
+// structured "working hours" to read -- salon.workingHours is free text),
+// expanded automatically if a real booking falls outside it, with an
+// hour of padding on whichever end actually has bookings near it.
+function computeDayRange(dayBookings: Booking[]): { start: number; end: number } {
+  let minStart = Infinity
+  let maxEnd = -Infinity
+  for (const b of dayBookings) {
+    const s = minutesSinceMidnight(b.starts_at)
+    const e = s + (b.duration_minutes || DEFAULT_DURATION_MIN)
+    minStart = Math.min(minStart, s)
+    maxEnd = Math.max(maxEnd, e)
+  }
+  const start = Math.max(0, Math.min(DAY_MIN_START, Math.floor(minStart / 60) * 60 - 60))
+  const end = Math.min(24 * 60, Math.max(DAY_MAX_END, Math.ceil(maxEnd / 60) * 60 + 60))
+  return { start, end }
+}
+
+type ColumnDef = { key: string; label: string; category: string | null }
+
+// Columns start from the salon's configured category->masters roster
+// (masterCategories, from GET /api/planner/bookings) so an empty column
+// still reads as "this master is free", not just "nobody booked yet" --
+// the whole point of a resource-calendar view. Any master in the flat
+// `masters` list but not assigned to a category gets its own uncategorized
+// column; any master_name a booking carries that isn't in `masters` at
+// all (legacy/ad-hoc data) does too; a trailing "unassigned" column only
+// when at least one booking that day actually has no master.
+function buildTimelineColumns(
+  masterCategories: { name: string; masters: string[] }[],
+  masters: string[],
+  dayBookings: Booking[],
+  lang: Lang,
+): ColumnDef[] {
   const unassigned = t(lang, 'unassigned')
+  const categorized = new Set(masterCategories.flatMap(c => c.masters))
+  const uncategorized = masters.filter(m => !categorized.has(m))
   const extra = Array.from(new Set(
     dayBookings.map(b => b.master_name).filter((m): m is string => !!m && !masters.includes(m))
   ))
   const hasUnassigned = dayBookings.some(b => !b.master_name)
-  const columns = [...masters, ...extra, ...(hasUnassigned ? [unassigned] : [])]
-  const times = Array.from(new Set(dayBookings.map(b => fmtTime(b.starts_at, lang)))).sort()
 
-  const cellMap = new Map<string, Booking[]>()
-  for (const b of dayBookings) {
-    const key = `${fmtTime(b.starts_at, lang)}|${b.master_name || unassigned}`
-    if (!cellMap.has(key)) cellMap.set(key, [])
-    cellMap.get(key)!.push(b)
+  const columns: ColumnDef[] = []
+  for (const cat of masterCategories) {
+    for (const m of cat.masters) columns.push({ key: m, label: m, category: cat.name })
   }
-  return { columns, times, cellMap }
+  for (const m of [...uncategorized, ...extra]) columns.push({ key: m, label: m, category: null })
+  if (hasUnassigned) columns.push({ key: unassigned, label: unassigned, category: null })
+  return columns
 }
 
-// One grid cell's card -- compact on purpose (columns run ~150px): service
-// + client name only, actions stacked as full-width rows rather than
-// side-by-side so they stay tappable in a narrow column. onMessage is
-// null for a manual booking with no conversation_id behind it.
-function BookingCard({ booking: b, lang, busy, onMessage, onReschedule, onCancel }: {
+// Consecutive columns sharing the same (non-null) category collapse into
+// one spanning header cell, matching the reference layout -- an
+// uncategorized master or the "no master" bucket each get their own
+// single-column run with no category label above them.
+function categoryRuns(columns: ColumnDef[]): { category: string | null; span: number }[] {
+  const runs: { category: string | null; span: number }[] = []
+  for (const col of columns) {
+    const last = runs[runs.length - 1]
+    if (last && last.category === col.category && col.category !== null) last.span++
+    else runs.push({ category: col.category, span: 1 })
+  }
+  return runs
+}
+
+// One absolutely-positioned block on the timeline -- compact on purpose
+// (columns run 160px, a short appointment only tens of px tall): time +
+// service on one line, client name on the next. The whole block is the
+// tap target (opens BookingActionsModal below), not stacked inline
+// buttons -- a 15-30 minute slot has no room for three action rows.
+function TimelineBookingCard({ booking: b, lang, top, height, onOpen }: {
   booking: Booking
   lang: Lang
-  busy: boolean
+  top: number
+  height: number
+  onOpen: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      title={`${b.service_name} — ${b.client_name || t(lang, 'noName')}`}
+      className={`absolute left-0.5 right-0.5 text-left plnr-card rounded-md px-1.5 py-1 text-[11px] leading-tight overflow-hidden border-l-[3px] ${b.status === 'cancelled' ? 'opacity-50 line-through' : ''}`}
+      style={{
+        top,
+        height,
+        borderLeftColor: b.status === 'cancelled' ? '#ef4444' : '#3b82f6',
+      }}
+    >
+      <div className="font-medium truncate">{fmtTime(b.starts_at, lang)} {b.service_name}</div>
+      <div className="plnr-text-2 truncate">{b.client_name || t(lang, 'noName')}</div>
+    </button>
+  )
+}
+
+// Tapping a card opens this instead of always-visible action buttons (see
+// TimelineBookingCard's own comment) -- reuses the same
+// message/reschedule/cancel handlers PlannerDashboard already had for the
+// old flat list.
+function BookingActionsModal({ booking: b, lang, onClose, onMessage, onReschedule, onCancel }: {
+  booking: Booking
+  lang: Lang
+  onClose: () => void
   onMessage: (() => void) | null
   onReschedule: () => void
   onCancel: () => void
 }) {
   return (
-    <div
-      className={`plnr-card rounded-lg p-2 mb-1.5 text-xs ${b.status === 'cancelled' ? 'opacity-50' : ''}`}
-      title={`${b.client_name || t(lang, 'noName')}${b.client_phone ? `, ${b.client_phone}` : ''}`}
-    >
-      <div className="font-medium truncate">{b.service_name}</div>
-      <div className="plnr-text-2 truncate">{b.client_name || t(lang, 'noName')}</div>
-      {b.status === 'cancelled' ? (
-        <div className="text-red-400 mt-1">{t(lang, 'cancelled')}</div>
-      ) : (
-        <div className="flex flex-col gap-1 mt-1.5">
-          {onMessage && (
-            <button onClick={onMessage} className="text-left plnr-quiet rounded px-1.5 py-1">
-              {t(lang, 'message')}
-            </button>
-          )}
-          <button onClick={onReschedule} className="text-left plnr-quiet rounded px-1.5 py-1">
-            {t(lang, 'reschedule')}
-          </button>
-          <button
-            disabled={busy}
-            onClick={onCancel}
-            className="text-left plnr-quiet disabled:opacity-50 rounded px-1.5 py-1"
-          >
-            {t(lang, 'cancel')}
-          </button>
+    <ModalShell title={b.service_name} lang={lang} onClose={onClose}>
+      <div className="space-y-3 text-sm">
+        <div>
+          <div className="plnr-text-2">{fmtDateTime(b.starts_at, lang)}{b.master_name ? ` · ${b.master_name}` : ''}</div>
+          <div>{b.client_name || t(lang, 'noName')}{b.client_phone ? `, ${b.client_phone}` : ''}</div>
         </div>
-      )}
-    </div>
+        {b.status === 'cancelled' ? (
+          <div className="text-red-400">{t(lang, 'cancelled')}</div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {onMessage && (
+              <button onClick={onMessage} className="text-left plnr-quiet rounded-lg px-3 py-2">
+                {t(lang, 'message')}
+              </button>
+            )}
+            <button onClick={onReschedule} className="text-left plnr-quiet rounded-lg px-3 py-2">
+              {t(lang, 'reschedule')}
+            </button>
+            <button onClick={onCancel} className="text-left plnr-quiet rounded-lg px-3 py-2">
+              {t(lang, 'cancel')}
+            </button>
+          </div>
+        )}
+      </div>
+    </ModalShell>
   )
 }
 
@@ -390,12 +475,14 @@ function PlannerDashboard({ salonName, theme, setTheme, lang, setLang }: {
   const [drafts, setDrafts] = useState<Draft[]>([])
   const [bookings, setBookings] = useState<Booking[]>([])
   const [masters, setMasters] = useState<string[]>([])
+  const [masterCategories, setMasterCategories] = useState<{ name: string; masters: string[] }[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [showAddForm, setShowAddForm] = useState(false)
   const [messageFor, setMessageFor] = useState<Booking | null>(null)
   const [rescheduleFor, setRescheduleFor] = useState<string | null>(null)
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
 
   const load = useCallback(async () => {
     const [draftsRes, bookingsRes] = await Promise.all([
@@ -407,6 +494,7 @@ function PlannerDashboard({ salonName, theme, setTheme, lang, setLang }: {
       const data = await bookingsRes.json()
       setBookings(data.bookings)
       setMasters(data.masters || [])
+      setMasterCategories(data.masterCategories || [])
     }
     setLoading(false)
   }, [])
@@ -455,51 +543,57 @@ function PlannerDashboard({ salonName, theme, setTheme, lang, setLang }: {
   const days = Array.from(byDay.keys()).sort()
 
   return (
-    <main className="planner-shell plnr-page min-h-screen p-4 sm:p-6" data-planner-theme={theme}>
-      <div className="max-w-3xl mx-auto space-y-8 pb-10">
+    <main className="planner-shell plnr-page min-h-screen" data-planner-theme={theme}>
+      {/* Founder's own ask: these switches belong in the page's actual
+          top-right corner, on their own, not squeezed inline next to a
+          growing title. Icon buttons sized ~36px, under DESIGN.md's usual
+          44px rule but within its own documented exception for a tight
+          multi-button segmented control where blowing each one up would
+          make the whole cluster disproportionate. */}
+      <div className="flex justify-end items-center gap-2 px-4 sm:px-6 py-3">
+        <div className="flex items-center gap-0.5 plnr-quiet rounded-lg p-0.5">
+          {THEME_ORDER.map(v => (
+            <button
+              key={v}
+              type="button"
+              onClick={() => setTheme(v)}
+              title={t(lang, THEME_KEY[v])}
+              aria-label={t(lang, THEME_KEY[v])}
+              className={`w-9 h-9 flex items-center justify-center rounded-md text-sm ${theme === v ? 'bg-blue-600' : ''}`}
+            >
+              {THEME_ICON[v]}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-0.5 plnr-quiet rounded-lg p-0.5">
+          {(['ru', 'kk'] as const).map(v => (
+            <button
+              key={v}
+              type="button"
+              onClick={() => setLang(v)}
+              className={`h-9 px-2.5 rounded-md text-xs font-medium ${lang === v ? 'bg-blue-600' : ''}`}
+            >
+              {v === 'ru' ? 'РУ' : 'ҚАЗ'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Founder: "растягиваешь планировщик на всю станицу... все сжатым
+          смотрится" -- widened from the original max-w-3xl (768px). Not
+          uncapped: on an ultrawide monitor a bare w-full would stretch
+          the draft cards/title into unreadably long lines, so a generous
+          cap instead -- the calendar below scrolls its own overflow-x
+          regardless of this wrapper's width. */}
+      <div className="max-w-[1800px] mx-auto px-4 sm:px-6 pb-10 space-y-8">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <h1 className="text-lg font-semibold">{t(lang, 'plannerTitle')} — {salonName}</h1>
-          {/* Top-right cluster: theme (light/dark/auto) + language (RU/KK)
-              switches, then the add-booking CTA -- founder's own ask
-              right after seeing the page live. Icon buttons sized ~36px,
-              under DESIGN.md's usual 44px rule but within its own
-              documented exception for a tight multi-button segmented
-              control where blowing each one up would make the whole
-              cluster disproportionate next to the title. */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center gap-0.5 plnr-quiet rounded-lg p-0.5">
-              {THEME_ORDER.map(v => (
-                <button
-                  key={v}
-                  type="button"
-                  onClick={() => setTheme(v)}
-                  title={t(lang, THEME_KEY[v])}
-                  aria-label={t(lang, THEME_KEY[v])}
-                  className={`w-9 h-9 flex items-center justify-center rounded-md text-sm ${theme === v ? 'bg-blue-600' : ''}`}
-                >
-                  {THEME_ICON[v]}
-                </button>
-              ))}
-            </div>
-            <div className="flex items-center gap-0.5 plnr-quiet rounded-lg p-0.5">
-              {(['ru', 'kk'] as const).map(v => (
-                <button
-                  key={v}
-                  type="button"
-                  onClick={() => setLang(v)}
-                  className={`h-9 px-2.5 rounded-md text-xs font-medium ${lang === v ? 'bg-blue-600' : ''}`}
-                >
-                  {v === 'ru' ? 'РУ' : 'ҚАЗ'}
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={() => setShowAddForm(true)}
-              className="shrink-0 text-sm bg-blue-600 hover:bg-blue-500 rounded-lg px-3 py-2"
-            >
-              + {t(lang, 'addBooking')}
-            </button>
-          </div>
+          <button
+            onClick={() => setShowAddForm(true)}
+            className="shrink-0 text-sm bg-blue-600 hover:bg-blue-500 rounded-lg px-3 py-2"
+          >
+            + {t(lang, 'addBooking')}
+          </button>
         </div>
 
         {error && <div className="text-sm text-red-400 bg-red-950/40 rounded-lg p-3">{error}</div>}
@@ -549,57 +643,92 @@ function PlannerDashboard({ salonName, theme, setTheme, lang, setLang }: {
           ) : days.length === 0 ? (
             <div className="text-sm plnr-text-3">{t(lang, 'noBookings')}</div>
           ) : (
-            <div className="space-y-6">
+            <div className="space-y-8">
               {days.map(day => {
                 const dayBookings = byDay.get(day)!
-                const grid = buildDayGrid(dayBookings, masters, lang)
+                const columns = buildTimelineColumns(masterCategories, masters, dayBookings, lang)
+                const runs = categoryRuns(columns)
+                const { start, end } = computeDayRange(dayBookings)
+                const bodyHeight = (end - start) * PX_PER_MIN
+                const hourMarks: number[] = []
+                for (let h = Math.ceil(start / 60); h * 60 <= end; h++) hourMarks.push(h)
+
                 return (
                   <div key={day}>
                     <div className="text-xs uppercase tracking-wide plnr-text-3 mb-2">{fmtDay(dayBookings[0].starts_at, lang)}</div>
-                    {/* Grid, not a flat list -- founder's own point: two
-                        different masters can both have a 15:00 slot, and a
-                        chronological list conflates them. Columns = the
-                        salon's real staff (masters, from GET's own
-                        response) so an empty column still reads as "free",
-                        the way a real resource-calendar view should. */}
+                    {/* Continuous timeline, not a sparse grid -- founder's
+                        own reference screenshot (a real scheduling
+                        product): hour axis on the left, blocks positioned
+                        by actual start time and sized by duration,
+                        master columns grouped under category headers so
+                        two different masters at the same 15:00 don't
+                        collide the way a flat list did. */}
                     <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
-                      <table className="border-separate border-spacing-1.5">
-                        <thead>
-                          <tr>
-                            <th className="w-14" />
-                            {grid.columns.map(col => (
-                              <th key={col} className="min-w-[150px] text-left text-xs font-medium plnr-text-2 px-1 pb-1 whitespace-nowrap">
-                                {col}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {grid.times.map(time => (
-                            <tr key={time}>
-                              <td className="align-top pt-2 text-xs plnr-text-2 whitespace-nowrap">{time}</td>
-                              {grid.columns.map(col => {
-                                const cellBookings = grid.cellMap.get(`${time}|${col}`) || []
-                                return (
-                                  <td key={col} className="align-top">
-                                    {cellBookings.map(b => (
-                                      <BookingCard
-                                        key={b.id}
-                                        booking={b}
-                                        lang={lang}
-                                        busy={busyId === b.id}
-                                        onMessage={b.conversation_id ? () => setMessageFor(b) : null}
-                                        onReschedule={() => setRescheduleFor(b.id)}
-                                        onCancel={() => cancelBooking(b.id)}
-                                      />
-                                    ))}
-                                  </td>
-                                )
-                              })}
-                            </tr>
+                      <div style={{ width: HOUR_GUTTER_PX + columns.length * COLUMN_PX }}>
+                        <div className="flex" style={{ paddingLeft: HOUR_GUTTER_PX }}>
+                          {runs.map((run, i) => (
+                            <div
+                              key={i}
+                              className="text-xs font-semibold plnr-text-2 px-2 py-1 border-b plnr-border truncate"
+                              style={{ width: run.span * COLUMN_PX }}
+                            >
+                              {run.category || ' '}
+                            </div>
                           ))}
-                        </tbody>
-                      </table>
+                        </div>
+                        <div className="flex" style={{ paddingLeft: HOUR_GUTTER_PX }}>
+                          {columns.map(col => (
+                            <div
+                              key={col.key}
+                              className="text-xs font-medium plnr-text px-2 py-1.5 border-b plnr-border truncate"
+                              style={{ width: COLUMN_PX }}
+                            >
+                              {col.label}
+                            </div>
+                          ))}
+                        </div>
+                        <div className="flex" style={{ height: bodyHeight }}>
+                          <div className="relative shrink-0" style={{ width: HOUR_GUTTER_PX }}>
+                            {hourMarks.map(h => (
+                              <div
+                                key={h}
+                                className="absolute right-2 text-xs plnr-text-3 -translate-y-1/2"
+                                style={{ top: (h * 60 - start) * PX_PER_MIN }}
+                              >
+                                {String(h).padStart(2, '0')}:00
+                              </div>
+                            ))}
+                          </div>
+                          {columns.map(col => (
+                            <div
+                              key={col.key}
+                              className="relative plnr-border"
+                              style={{
+                                width: COLUMN_PX,
+                                borderLeftWidth: 1,
+                                backgroundImage: `repeating-linear-gradient(to bottom, transparent, transparent ${60 * PX_PER_MIN - 1}px, var(--p-border) ${60 * PX_PER_MIN - 1}px, var(--p-border) ${60 * PX_PER_MIN}px)`,
+                              }}
+                            >
+                              {dayBookings
+                                .filter(b => (b.master_name || t(lang, 'unassigned')) === col.key)
+                                .map(b => {
+                                  const s = minutesSinceMidnight(b.starts_at)
+                                  const dur = b.duration_minutes || DEFAULT_DURATION_MIN
+                                  return (
+                                    <TimelineBookingCard
+                                      key={b.id}
+                                      booking={b}
+                                      lang={lang}
+                                      top={(s - start) * PX_PER_MIN}
+                                      height={Math.max(MIN_CARD_PX, dur * PX_PER_MIN)}
+                                      onOpen={() => setSelectedBooking(b)}
+                                    />
+                                  )
+                                })}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )
@@ -609,6 +738,16 @@ function PlannerDashboard({ salonName, theme, setTheme, lang, setLang }: {
         </section>
       </div>
 
+      {selectedBooking && (
+        <BookingActionsModal
+          booking={selectedBooking}
+          lang={lang}
+          onClose={() => setSelectedBooking(null)}
+          onMessage={selectedBooking.conversation_id ? () => { setMessageFor(selectedBooking); setSelectedBooking(null) } : null}
+          onReschedule={() => { setRescheduleFor(selectedBooking.id); setSelectedBooking(null) }}
+          onCancel={() => { setSelectedBooking(null); void cancelBooking(selectedBooking.id) }}
+        />
+      )}
       {showAddForm && (
         <AddBookingModal lang={lang} onClose={() => setShowAddForm(false)} onSaved={() => { setShowAddForm(false); void load() }} />
       )}

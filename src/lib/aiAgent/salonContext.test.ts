@@ -31,7 +31,7 @@ describe('formatWithWeekday', () => {
 describe('buildSalonBlock', () => {
   it('includes the current time (not just a bare date) and a 14-day date/weekday lookup table', () => {
     const block = buildSalonBlock({
-      siteId: 'x', name: 'Тест', services: [], masters: [], upcomingBookings: [],
+      siteId: 'x', name: 'Тест', services: [], masters: [], masterCategories: [], upcomingBookings: [],
     })
     expect(block).toContain('Сейчас:')
     // HH:MM right after the weekday parens -- live incident 18.09.2026:
