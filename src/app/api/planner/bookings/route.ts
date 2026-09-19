@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { requirePlannerSession } from '@/lib/plannerAuth'
 import { resolveKzDateTime } from '@/lib/aiAgent/bookingDrafts'
+import { loadAgentSalonInfo } from '@/lib/aiAgent/salonContext'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -37,7 +38,16 @@ export async function GET(req: NextRequest) {
     console.error('planner bookings GET failed:', error.message)
     return NextResponse.json({ error: 'Не удалось загрузить расписание' }, { status: 502 })
   }
-  return NextResponse.json({ bookings: bookings || [] })
+
+  // The salon's own configured master roster -- so the agenda's grid can
+  // show a column for every real member of staff, not just whoever
+  // happens to already have a booking that day (the whole point of a
+  // resource-style grid is seeing who's free, per founder's own framing).
+  // Best-effort: loadAgentSalonInfo never throws, an empty list just
+  // collapses the grid to whatever master_names the bookings carry.
+  const salonInfo = await loadAgentSalonInfo(supabase, session.siteId)
+
+  return NextResponse.json({ bookings: bookings || [], masters: salonInfo?.masters || [] })
 }
 
 // POST: manual booking entry (source: 'manual') -- the form the founder

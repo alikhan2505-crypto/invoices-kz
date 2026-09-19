@@ -894,3 +894,19 @@ html {
   -webkit-text-fill-color: #ffffff;
 }
 
+/* Same bug, same fix, third dark-on-dark page: founder-reported 2026-09-19,
+   typed text (and native type="date"/type="time" chrome) on the salon
+   planner's modals (/planner/[slug], Stage 4 -- Добавить бронь / Написать
+   клиенту / Перенести) read as invisible against their dark background.
+   See .cashier-dev-theme above for the fuller root-cause writeup -- same
+   site-wide `-webkit-text-fill-color: #111827` rule, same fix. */
+.planner-dark-form input,
+.planner-dark-form textarea {
+  -webkit-text-fill-color: #ffffff;
+}
+
+.planner-dark-form input[type="date"],
+.planner-dark-form input[type="time"] {
+  color-scheme: dark;
+}
+

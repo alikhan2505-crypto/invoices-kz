@@ -152,14 +152,86 @@ function dayKey(iso: string) {
   return new Date(new Date(iso).getTime() + 5 * 60 * 60 * 1000).toISOString().slice(0, 10)
 }
 
+const UNASSIGNED_COLUMN = 'Без мастера'
+
+// Time x master grid for one day -- founder's own request after seeing the
+// flat chronological list: two different masters can both have a 15:00
+// booking, and a plain list doesn't show that at a glance the way a real
+// resource calendar does. Columns start from the salon's configured
+// master roster (masters param, from GET /api/planner/bookings -- so an
+// empty column still reads as "this master is free", not just "nobody
+// booked yet"), extended with any master_name a booking carries that
+// isn't in that roster (legacy/ad-hoc data), and a trailing "Без мастера"
+// column only when at least one booking that day actually has none.
+function buildDayGrid(dayBookings: Booking[], masters: string[]) {
+  const extra = Array.from(new Set(
+    dayBookings.map(b => b.master_name).filter((m): m is string => !!m && !masters.includes(m))
+  ))
+  const hasUnassigned = dayBookings.some(b => !b.master_name)
+  const columns = [...masters, ...extra, ...(hasUnassigned ? [UNASSIGNED_COLUMN] : [])]
+  const times = Array.from(new Set(dayBookings.map(b => fmtTime(b.starts_at)))).sort()
+
+  const cellMap = new Map<string, Booking[]>()
+  for (const b of dayBookings) {
+    const key = `${fmtTime(b.starts_at)}|${b.master_name || UNASSIGNED_COLUMN}`
+    if (!cellMap.has(key)) cellMap.set(key, [])
+    cellMap.get(key)!.push(b)
+  }
+  return { columns, times, cellMap }
+}
+
+// One grid cell's card -- compact on purpose (columns run ~150px): service
+// + client name only, actions stacked as full-width rows rather than
+// side-by-side so they stay tappable in a narrow column. onMessage is
+// null for a manual booking with no conversation_id behind it.
+function BookingCard({ booking: b, busy, onMessage, onReschedule, onCancel }: {
+  booking: Booking
+  busy: boolean
+  onMessage: (() => void) | null
+  onReschedule: () => void
+  onCancel: () => void
+}) {
+  return (
+    <div
+      className={`bg-gray-800 rounded-lg p-2 mb-1.5 text-xs ${b.status === 'cancelled' ? 'opacity-50' : ''}`}
+      title={`${b.client_name || 'Без имени'}${b.client_phone ? `, ${b.client_phone}` : ''}`}
+    >
+      <div className="font-medium truncate">{b.service_name}</div>
+      <div className="text-gray-400 truncate">{b.client_name || 'Без имени'}</div>
+      {b.status === 'cancelled' ? (
+        <div className="text-red-400 mt-1">отменена</div>
+      ) : (
+        <div className="flex flex-col gap-1 mt-1.5">
+          {onMessage && (
+            <button onClick={onMessage} className="text-left bg-gray-700 hover:bg-gray-600 rounded px-1.5 py-1">
+              Написать
+            </button>
+          )}
+          <button onClick={onReschedule} className="text-left bg-gray-700 hover:bg-gray-600 rounded px-1.5 py-1">
+            Перенести
+          </button>
+          <button
+            disabled={busy}
+            onClick={onCancel}
+            className="text-left bg-gray-700 hover:bg-gray-600 disabled:opacity-50 rounded px-1.5 py-1"
+          >
+            Отменить
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function PlannerDashboard({ salonName }: { salonName: string }) {
   const [drafts, setDrafts] = useState<Draft[]>([])
   const [bookings, setBookings] = useState<Booking[]>([])
+  const [masters, setMasters] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [showAddForm, setShowAddForm] = useState(false)
-  const [messageFor, setMessageFor] = useState<string | null>(null)
+  const [messageFor, setMessageFor] = useState<Booking | null>(null)
   const [rescheduleFor, setRescheduleFor] = useState<string | null>(null)
 
   const load = useCallback(async () => {
@@ -168,7 +240,11 @@ function PlannerDashboard({ salonName }: { salonName: string }) {
       fetch('/api/planner/bookings'),
     ])
     if (draftsRes.ok) setDrafts((await draftsRes.json()).drafts)
-    if (bookingsRes.ok) setBookings((await bookingsRes.json()).bookings)
+    if (bookingsRes.ok) {
+      const data = await bookingsRes.json()
+      setBookings(data.bookings)
+      setMasters(data.masters || [])
+    }
     setLoading(false)
   }, [])
 
@@ -216,7 +292,7 @@ function PlannerDashboard({ salonName }: { salonName: string }) {
   const days = Array.from(byDay.keys()).sort()
 
   return (
-    <main className="min-h-screen bg-gray-900 text-white p-4 sm:p-6">
+    <main className="planner-dark-form min-h-screen bg-gray-900 text-white p-4 sm:p-6">
       <div className="max-w-3xl mx-auto space-y-8 pb-10">
         <div className="flex items-center justify-between gap-3">
           <h1 className="text-lg font-semibold">Планировщик — {salonName}</h1>
@@ -275,49 +351,56 @@ function PlannerDashboard({ salonName }: { salonName: string }) {
           ) : days.length === 0 ? (
             <div className="text-sm text-gray-500">Пока нет записей на ближайшие две недели.</div>
           ) : (
-            <div className="space-y-5">
+            <div className="space-y-6">
               {days.map(day => {
                 const dayBookings = byDay.get(day)!
+                const grid = buildDayGrid(dayBookings, masters)
                 return (
                   <div key={day}>
                     <div className="text-xs uppercase tracking-wide text-gray-500 mb-2">{fmtDay(dayBookings[0].starts_at)}</div>
-                    <div className="space-y-2">
-                      {dayBookings.map(b => (
-                        <div
-                          key={b.id}
-                          className={`bg-gray-800 rounded-xl p-3 flex items-center justify-between gap-3 flex-wrap ${b.status === 'cancelled' ? 'opacity-50' : ''}`}
-                        >
-                          <div className="min-w-0">
-                            <div className="text-sm font-medium">
-                              {fmtTime(b.starts_at)} — {b.service_name}
-                              {b.master_name ? ` (${b.master_name})` : ''}
-                              {b.status === 'cancelled' && <span className="text-red-400 ml-2">отменена</span>}
-                            </div>
-                            <div className="text-sm text-gray-400 truncate">
-                              {b.client_name || 'Без имени'}{b.client_phone ? `, ${b.client_phone}` : ''}
-                            </div>
-                          </div>
-                          {b.status !== 'cancelled' && (
-                            <div className="flex gap-1.5 shrink-0">
-                              {b.conversation_id && (
-                                <button onClick={() => setMessageFor(b.id)} className="text-xs bg-gray-700 hover:bg-gray-600 rounded-lg px-2 py-1.5">
-                                  Написать
-                                </button>
-                              )}
-                              <button onClick={() => setRescheduleFor(b.id)} className="text-xs bg-gray-700 hover:bg-gray-600 rounded-lg px-2 py-1.5">
-                                Перенести
-                              </button>
-                              <button
-                                disabled={busyId === b.id}
-                                onClick={() => cancelBooking(b.id)}
-                                className="text-xs bg-gray-700 hover:bg-gray-600 disabled:opacity-50 rounded-lg px-2 py-1.5"
-                              >
-                                Отменить
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      ))}
+                    {/* Grid, not a flat list -- founder's own point: two
+                        different masters can both have a 15:00 slot, and a
+                        chronological list conflates them. Columns = the
+                        salon's real staff (masters, from GET's own
+                        response) so an empty column still reads as "free",
+                        the way a real resource-calendar view should. */}
+                    <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+                      <table className="border-separate border-spacing-1.5">
+                        <thead>
+                          <tr>
+                            <th className="w-14" />
+                            {grid.columns.map(col => (
+                              <th key={col} className="min-w-[150px] text-left text-xs font-medium text-gray-300 px-1 pb-1 whitespace-nowrap">
+                                {col}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {grid.times.map(time => (
+                            <tr key={time}>
+                              <td className="align-top pt-2 text-xs text-gray-400 whitespace-nowrap">{time}</td>
+                              {grid.columns.map(col => {
+                                const cellBookings = grid.cellMap.get(`${time}|${col}`) || []
+                                return (
+                                  <td key={col} className="align-top">
+                                    {cellBookings.map(b => (
+                                      <BookingCard
+                                        key={b.id}
+                                        booking={b}
+                                        busy={busyId === b.id}
+                                        onMessage={b.conversation_id ? () => setMessageFor(b) : null}
+                                        onReschedule={() => setRescheduleFor(b.id)}
+                                        onCancel={() => cancelBooking(b.id)}
+                                      />
+                                    ))}
+                                  </td>
+                                )
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
                 )
@@ -331,7 +414,7 @@ function PlannerDashboard({ salonName }: { salonName: string }) {
         <AddBookingModal onClose={() => setShowAddForm(false)} onSaved={() => { setShowAddForm(false); void load() }} />
       )}
       {messageFor && (
-        <MessageModal bookingId={messageFor} onClose={() => setMessageFor(null)} onSent={() => setMessageFor(null)} />
+        <MessageModal booking={messageFor} onClose={() => setMessageFor(null)} onSent={() => setMessageFor(null)} />
       )}
       {rescheduleFor && (
         <RescheduleModal bookingId={rescheduleFor} onClose={() => setRescheduleFor(null)} onSaved={() => { setRescheduleFor(null); void load() }} />
@@ -346,7 +429,18 @@ function ModalShell({ title, onClose, children }: { title: string; onClose: () =
       <div className="bg-gray-800 rounded-xl p-5 w-full max-w-sm space-y-3" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <h3 className="font-medium">{title}</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-white text-sm px-1">✕</button>
+          {/* 44x44 tap target per DESIGN.md's icon-action-button rule --
+              founder reported the visible ✕ (previously just text-sm px-1)
+              as not closing the modal; a glyph that small is easy to miss
+              entirely, especially on the tablet this page is meant for. */}
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Закрыть"
+            className="shrink-0 -mr-2 -mt-2 w-11 h-11 flex items-center justify-center rounded-full text-gray-400 hover:text-white text-lg"
+          >
+            ✕
+          </button>
         </div>
         {children}
       </div>
@@ -404,7 +498,23 @@ function AddBookingModal({ onClose, onSaved }: { onClose: () => void; onSaved: (
   )
 }
 
-function MessageModal({ bookingId, onClose, onSent }: { bookingId: string; onClose: () => void; onSent: () => void }) {
+// Parameterized with the real booking's own service/time so a tap is
+// actually ready to send, not a generic fill-in-the-blanks stub -- founder
+// asked for "стандартные скрипты для ответа" while testing this modal.
+// A fixed built-in set on purpose (no per-salon custom-template CRUD --
+// that's a bigger, separate feature nobody asked for yet).
+function buildQuickReplies(b: Booking): { label: string; text: string }[] {
+  const when = fmtDateTime(b.starts_at)
+  const service = b.master_name ? `${b.service_name} (${b.master_name})` : b.service_name
+  return [
+    { label: 'Подтвердить', text: `Здравствуйте! Подтверждаем вашу запись: ${service}, ${when}. Ждём вас!` },
+    { label: 'Напомнить', text: `Напоминаем о записи: ${service}, ${when}. Если планы изменились, напишите нам, пожалуйста.` },
+    { label: 'Предложить перенос', text: `Здравствуйте! К сожалению, нужно перенести вашу запись (${service}, ${when}). Когда вам будет удобно?` },
+    { label: 'Клиент опаздывает', text: `Здравствуйте! Ждём вас на «${service}» ${when} — если задерживаетесь, дайте, пожалуйста, знать.` },
+  ]
+}
+
+function MessageModal({ booking, onClose, onSent }: { booking: Booking; onClose: () => void; onSent: () => void }) {
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -412,7 +522,7 @@ function MessageModal({ bookingId, onClose, onSent }: { bookingId: string; onClo
   async function send() {
     setSending(true)
     setError(null)
-    const res = await fetch(`/api/planner/bookings/${bookingId}/message`, {
+    const res = await fetch(`/api/planner/bookings/${booking.id}/message`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text }),
@@ -426,6 +536,18 @@ function MessageModal({ bookingId, onClose, onSent }: { bookingId: string; onClo
   return (
     <ModalShell title="Написать клиенту" onClose={onClose}>
       <div className="space-y-2">
+        <div className="flex flex-wrap gap-1.5">
+          {buildQuickReplies(booking).map(r => (
+            <button
+              key={r.label}
+              type="button"
+              onClick={() => setText(r.text)}
+              className="text-xs bg-gray-700 hover:bg-gray-600 rounded-full px-2.5 py-1.5"
+            >
+              {r.label}
+            </button>
+          ))}
+        </div>
         <textarea value={text} onChange={e => setText(e.target.value)} rows={4} placeholder="Текст сообщения" className={inputClass} />
         {error && <div className="text-sm text-red-400">{error}</div>}
         <button
