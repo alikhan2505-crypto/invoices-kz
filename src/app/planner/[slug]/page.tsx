@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import QRCode from 'qrcode'
 
@@ -514,10 +514,33 @@ function buildQuickReplies(b: Booking): { label: string; text: string }[] {
   ]
 }
 
+type ConversationMessage = { id: string; direction: string; text: string; isAiGenerated: boolean; createdAt: string }
+
 function MessageModal({ booking, onClose, onSent }: { booking: Booking; onClose: () => void; onSent: () => void }) {
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [history, setHistory] = useState<ConversationMessage[]>([])
+  const [historyLoading, setHistoryLoading] = useState(true)
+  const threadRef = useRef<HTMLDivElement>(null)
+
+  // Founder's own ask right after this modal shipped: replying blind, with
+  // no view of what was already said, isn't enough -- show the real thread
+  // first. Best-effort: a failed fetch just leaves the thread empty, it
+  // never blocks composing/sending a new message.
+  useEffect(() => {
+    let cancelled = false
+    fetch(`/api/planner/bookings/${booking.id}/message`)
+      .then(res => (res.ok ? res.json() : { messages: [] }))
+      .then(data => { if (!cancelled) setHistory(data.messages || []) })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setHistoryLoading(false) })
+    return () => { cancelled = true }
+  }, [booking.id])
+
+  useEffect(() => {
+    threadRef.current?.scrollTo({ top: threadRef.current.scrollHeight })
+  }, [history])
 
   async function send() {
     setSending(true)
@@ -536,6 +559,22 @@ function MessageModal({ booking, onClose, onSent }: { booking: Booking; onClose:
   return (
     <ModalShell title="Написать клиенту" onClose={onClose}>
       <div className="space-y-2">
+        <div ref={threadRef} className="max-h-56 overflow-y-auto bg-gray-900 rounded-lg p-2 space-y-1.5">
+          {historyLoading ? (
+            <div className="text-xs text-gray-500 p-1">Загружаю переписку…</div>
+          ) : history.length === 0 ? (
+            <div className="text-xs text-gray-500 p-1">Переписки пока нет.</div>
+          ) : (
+            history.map(m => (
+              <div key={m.id} className={`flex ${m.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[80%] rounded-lg px-2.5 py-1.5 text-xs ${m.direction === 'outbound' ? 'bg-blue-600' : 'bg-gray-700'}`}>
+                  <div className="whitespace-pre-wrap break-words">{m.text}</div>
+                  <div className="text-[10px] opacity-70 mt-0.5">{fmtDateTime(m.createdAt)}</div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
         <div className="flex flex-wrap gap-1.5">
           {buildQuickReplies(booking).map(r => (
             <button
