@@ -894,19 +894,94 @@ html {
   -webkit-text-fill-color: #ffffff;
 }
 
-/* Same bug, same fix, third dark-on-dark page: founder-reported 2026-09-19,
-   typed text (and native type="date"/type="time" chrome) on the salon
-   planner's modals (/planner/[slug], Stage 4 -- Добавить бронь / Написать
-   клиенту / Перенести) read as invisible against their dark background.
-   See .cashier-dev-theme above for the fuller root-cause writeup -- same
-   site-wide `-webkit-text-fill-color: #111827` rule, same fix. */
-.planner-dark-form input,
-.planner-dark-form textarea {
-  -webkit-text-fill-color: #ffffff;
-}
-
-.planner-dark-form input[type="date"],
-.planner-dark-form input[type="time"] {
+/* Планировщик (/planner/[slug], Stage 4+): its own light/dark/auto theme,
+   deliberately independent from the main app's ThemeProvider.tsx (a
+   different `data-*` attribute, its own localStorage keys). This page is
+   often opened on a shared reception tablet rather than the owner's own
+   browser, so its look shouldn't silently follow whatever theme some
+   individual staff member happens to have set on their personal
+   invoices.kz account, and vice versa -- see the .planner-shell comment
+   in page.tsx for the toggle UI. Dark values match this feature's
+   already-shipped, already-used-live look (the pre-existing default);
+   light values reuse DESIGN.md's own documented light palette
+   (surface-page/surface-card/ink-*) for consistency with the rest of the
+   product. Three states via [data-planner-theme] on .planner-shell:
+   "light"/"dark" force explicitly; "auto" (or the attribute absent)
+   follows prefers-color-scheme, falling back to the dark base when the OS
+   has no light preference. */
+.planner-shell {
+  --p-bg: #111827;
+  --p-card: #1f2937;
+  --p-card-2: #0b0f19;
+  --p-quiet: #374151;
+  --p-quiet-hover: #4b5563;
+  --p-text: #ffffff;
+  --p-text-2: #9ca3af;
+  --p-text-3: #6b7280;
+  --p-border: #374151;
   color-scheme: dark;
 }
+
+.planner-shell[data-planner-theme="light"] {
+  --p-bg: #f9fafb;
+  --p-card: #ffffff;
+  --p-card-2: #f3f4f6;
+  --p-quiet: #f3f4f6;
+  --p-quiet-hover: #e5e7eb;
+  --p-text: #111827;
+  --p-text-2: #6b7280;
+  --p-text-3: #9ca3af;
+  --p-border: #e5e7eb;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: light) {
+  .planner-shell[data-planner-theme="auto"] {
+    --p-bg: #f9fafb;
+    --p-card: #ffffff;
+    --p-card-2: #f3f4f6;
+    --p-quiet: #f3f4f6;
+    --p-quiet-hover: #e5e7eb;
+    --p-text: #111827;
+    --p-text-2: #6b7280;
+    --p-text-3: #9ca3af;
+    --p-border: #e5e7eb;
+    color-scheme: light;
+  }
+}
+
+/* Same site-wide `-webkit-text-fill-color: #111827` bug already fixed for
+   .cashier-dev-theme and .salon-admin-form above -- here tied to the
+   theme variable instead of a hardcoded white, since this scope now has
+   to render correctly in both light and dark. color-scheme (set above)
+   is inherited, so it alone fixes the native type="date"/"time" picker
+   chrome -- no separate rule needed for that part. */
+.planner-shell input,
+.planner-shell textarea {
+  -webkit-text-fill-color: var(--p-text);
+}
+
+/* Semantic surfaces for the planner's own markup, reading the variables
+   above -- keeps page.tsx free of hardcoded bg-gray-900/text-white/etc
+   Tailwind literals that would only ever show one theme. Named plnr- (not
+   the p- Tailwind spacing prefix) to avoid any ambiguity with Tailwind's
+   own utility classes. */
+.plnr-page { background-color: var(--p-bg); color: var(--p-text); }
+.plnr-card { background-color: var(--p-card); }
+.plnr-card-2 { background-color: var(--p-card-2); }
+.plnr-text { color: var(--p-text); }
+.plnr-text-2 { color: var(--p-text-2); }
+.plnr-text-3 { color: var(--p-text-3); }
+.plnr-border { border-color: var(--p-border); }
+.plnr-quiet { background-color: var(--p-quiet); }
+.plnr-quiet:hover { background-color: var(--p-quiet-hover); }
+.plnr-input { background-color: var(--p-card-2); border-color: var(--p-border); color: var(--p-text); }
+.plnr-input::placeholder { color: var(--p-text-3); }
+
+/* Tailwind's hover: prefix only generates a variant for its OWN utility
+   classes, not for plnr-text (a plain custom class) -- `hover:plnr-text`
+   in a className string would silently do nothing. Real :hover rule
+   instead, for the modal close button. */
+.plnr-close-btn { color: var(--p-text-2); }
+.plnr-close-btn:hover { color: var(--p-text); }
 
