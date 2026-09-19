@@ -517,7 +517,7 @@ function MiniCalendar({ lang, selectedKey, onSelect, byDay, todayKey }: {
               key={i}
               type="button"
               onClick={() => onSelect(key)}
-              className={`relative text-xs rounded-md py-1.5 ${isSelected ? 'bg-blue-600 text-white' : isToday ? 'plnr-quiet font-semibold' : ''}`}
+              className={`relative text-xs rounded-md py-1.5 ${isSelected ? 'plnr-accent' : isToday ? 'plnr-quiet font-semibold' : ''}`}
             >
               {day}
               {dotColor && !isSelected && <span className={`absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full ${dotColor}`} />}
@@ -580,6 +580,36 @@ type Client = {
   history: ClientHistoryEntry[]
 }
 
+// Initials for the avatar circle -- "Алихан Абильбаев" -> "АА". No photo
+// source exists (or ever will, for a phone-collected client), so an
+// initials avatar carries the visual weight a blank row otherwise has
+// nothing to anchor on.
+function initials(name: string | null): string {
+  if (!name) return '?'
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  return parts.slice(0, 2).map(p => p[0]?.toUpperCase() || '').join('') || '?'
+}
+
+function ClientAvatar({ name, size = 40 }: { name: string | null; size?: number }) {
+  return (
+    <div
+      className="plnr-accent-soft rounded-full flex items-center justify-center font-semibold shrink-0"
+      style={{ width: size, height: size, fontSize: size * 0.38 }}
+    >
+      {initials(name)}
+    </div>
+  )
+}
+
+function RegularBadge({ lang }: { lang: Lang }) {
+  return (
+    <span className="plnr-success-soft text-[10px] font-medium rounded-full px-2 py-0.5 shrink-0 inline-flex items-center gap-1">
+      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: 'var(--p-success)' }} />
+      {t(lang, 'regularBadge')}
+    </span>
+  )
+}
+
 // Founder's ask 19.09.2026: assess return rate/loyalty from real visit
 // history, not a manually-set flag -- "Постоянный" comes straight from
 // /api/planner/clients' own visit count (REGULAR_VISIT_THRESHOLD there),
@@ -593,20 +623,20 @@ function ClientsList({ clients, lang, onOpen }: { clients: Client[]; lang: Lang;
           key={c.phone}
           type="button"
           onClick={() => onOpen(c)}
-          className="w-full text-left plnr-card rounded-xl p-3 flex items-center justify-between gap-3 flex-wrap"
+          className="w-full text-left plnr-card plnr-border border rounded-xl p-3.5 flex items-center gap-3 hover:shadow-sm transition-shadow"
         >
-          <div className="min-w-0">
-            <div className="font-medium truncate flex items-center gap-2">
+          <ClientAvatar name={c.name} />
+          <div className="min-w-0 flex-1">
+            <div className="font-semibold truncate flex items-center gap-2">
               {c.name || t(lang, 'noName')}
-              {c.isRegular && (
-                <span className="text-[10px] bg-green-600 text-white rounded-full px-2 py-0.5 shrink-0">{t(lang, 'regularBadge')}</span>
-              )}
+              {c.isRegular && <RegularBadge lang={lang} />}
             </div>
             <div className="text-sm plnr-text-2 truncate">{c.phone || t(lang, 'noPhone')}</div>
           </div>
-          <div className="text-sm plnr-text-2 text-right shrink-0">
-            <div>{c.visitCount} {t(lang, 'visitsCount')}</div>
-            {c.lastVisitAt && <div className="text-xs plnr-text-3">{t(lang, 'lastVisit')}: {fmtDateTime(c.lastVisitAt, lang)}</div>}
+          <div className="text-right shrink-0">
+            <div className="text-sm font-semibold">{c.visitCount}</div>
+            <div className="text-xs plnr-text-3">{t(lang, 'visitsCount')}</div>
+            {c.lastVisitAt && <div className="text-[11px] plnr-text-3 mt-0.5">{fmtDateTime(c.lastVisitAt, lang)}</div>}
           </div>
         </button>
       ))}
@@ -617,19 +647,37 @@ function ClientsList({ clients, lang, onOpen }: { clients: Client[]; lang: Lang;
 function ClientProfileModal({ client: c, lang, onClose }: { client: Client; lang: Lang; onClose: () => void }) {
   return (
     <ModalShell title={c.name || t(lang, 'noName')} lang={lang} onClose={onClose}>
-      <div className="space-y-3 text-sm">
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="plnr-text-2">{c.phone || t(lang, 'noPhone')}</div>
-          {c.isRegular && <span className="text-xs bg-green-600 text-white rounded-full px-2 py-0.5">{t(lang, 'regularBadge')}</span>}
+      <div className="space-y-4 text-sm">
+        <div className="flex items-center gap-3">
+          <ClientAvatar name={c.name} size={48} />
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="font-semibold truncate">{c.name || t(lang, 'noName')}</div>
+              {c.isRegular && <RegularBadge lang={lang} />}
+            </div>
+            <div className="plnr-text-2 truncate">{c.phone || t(lang, 'noPhone')}</div>
+          </div>
         </div>
-        <div className="plnr-text-2">{c.visitCount} {t(lang, 'visitsCount')}</div>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="plnr-card-2 rounded-lg p-2.5 text-center">
+            <div className="text-lg font-semibold">{c.visitCount}</div>
+            <div className="text-xs plnr-text-3">{t(lang, 'visitsCount')}</div>
+          </div>
+          <div className="plnr-card-2 rounded-lg p-2.5 text-center flex flex-col justify-center">
+            <div className="text-sm font-medium truncate">{c.lastVisitAt ? fmtDateTime(c.lastVisitAt, lang) : '—'}</div>
+            <div className="text-xs plnr-text-3">{t(lang, 'lastVisit')}</div>
+          </div>
+        </div>
         <div>
-          <div className="text-xs font-medium plnr-text-2 mb-1">{t(lang, 'visitHistory')}</div>
-          <div className="max-h-64 overflow-y-auto space-y-1.5">
+          <div className="text-xs font-medium plnr-text-2 mb-2">{t(lang, 'visitHistory')}</div>
+          <div className="max-h-64 overflow-y-auto space-y-2.5">
             {c.history.map(h => (
-              <div key={h.id} className={`plnr-card-2 rounded-lg px-2.5 py-1.5 text-xs ${h.status === 'cancelled' ? 'opacity-50 line-through' : ''}`}>
-                <div className="font-medium">{h.serviceName}{h.masterName ? ` — ${h.masterName}` : ''}</div>
-                <div className="plnr-text-2">{fmtDateTime(h.startsAt, lang)}</div>
+              <div key={h.id} className="flex items-start gap-2.5">
+                <span className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${h.status === 'cancelled' ? 'plnr-danger-dot' : 'plnr-accent-dot'}`} />
+                <div className={`min-w-0 flex-1 ${h.status === 'cancelled' ? 'opacity-60 line-through' : ''}`}>
+                  <div className="font-medium truncate">{h.serviceName}{h.masterName ? ` — ${h.masterName}` : ''}</div>
+                  <div className="text-xs plnr-text-2">{fmtDateTime(h.startsAt, lang)}</div>
+                </div>
               </div>
             ))}
           </div>
@@ -769,7 +817,7 @@ function PlannerDashboard({ salonName, theme, setTheme, lang, setLang }: {
                   onClick={() => setTheme(v)}
                   title={t(lang, THEME_KEY[v])}
                   aria-label={t(lang, THEME_KEY[v])}
-                  className={`w-9 h-9 flex items-center justify-center rounded-md text-sm ${theme === v ? 'bg-blue-600' : ''}`}
+                  className={`w-9 h-9 flex items-center justify-center rounded-md text-sm ${theme === v ? 'plnr-accent' : ''}`}
                 >
                   {THEME_ICON[v]}
                 </button>
@@ -781,7 +829,7 @@ function PlannerDashboard({ salonName, theme, setTheme, lang, setLang }: {
                   key={v}
                   type="button"
                   onClick={() => setLang(v)}
-                  className={`h-9 px-2.5 rounded-md text-xs font-medium ${lang === v ? 'bg-blue-600' : ''}`}
+                  className={`h-9 px-2.5 rounded-md text-xs font-medium ${lang === v ? 'plnr-accent' : ''}`}
                 >
                   {v === 'ru' ? 'РУ' : 'ҚАЗ'}
                 </button>
@@ -789,7 +837,7 @@ function PlannerDashboard({ salonName, theme, setTheme, lang, setLang }: {
             </div>
             <button
               onClick={() => setShowAddForm(true)}
-              className="shrink-0 text-sm bg-blue-600 hover:bg-blue-500 rounded-lg px-3 py-2"
+              className="shrink-0 text-sm plnr-accent rounded-lg px-3 py-2"
             >
               + {t(lang, 'addBooking')}
             </button>
@@ -818,7 +866,7 @@ function PlannerDashboard({ salonName, theme, setTheme, lang, setLang }: {
                     <button
                       disabled={busyId === d.id}
                       onClick={() => decideDraft(d.id, 'approve')}
-                      className="text-sm bg-green-600 hover:bg-green-500 disabled:opacity-50 rounded-lg px-3 py-1.5"
+                      className="text-sm plnr-accent disabled:opacity-50 rounded-lg px-3 py-1.5"
                     >
                       {t(lang, 'confirm')}
                     </button>
@@ -841,14 +889,14 @@ function PlannerDashboard({ salonName, theme, setTheme, lang, setLang }: {
             <button
               type="button"
               onClick={() => setActiveTab('schedule')}
-              className={`text-sm rounded-lg px-3 py-1.5 ${activeTab === 'schedule' ? 'bg-blue-600' : 'plnr-quiet'}`}
+              className={`text-sm rounded-lg px-3 py-1.5 ${activeTab === 'schedule' ? 'plnr-accent' : 'plnr-quiet'}`}
             >
               {t(lang, 'tabSchedule')}
             </button>
             <button
               type="button"
               onClick={openClientsTab}
-              className={`text-sm rounded-lg px-3 py-1.5 ${activeTab === 'clients' ? 'bg-blue-600' : 'plnr-quiet'}`}
+              className={`text-sm rounded-lg px-3 py-1.5 ${activeTab === 'clients' ? 'plnr-accent' : 'plnr-quiet'}`}
             >
               {t(lang, 'tabClients')}
             </button>
@@ -982,7 +1030,7 @@ function AddBookingModal({ lang, onClose, onSaved }: { lang: Lang; onClose: () =
         <button
           disabled={saving || !serviceName.trim() || !date || !time}
           onClick={save}
-          className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg px-3 py-2 text-sm font-medium"
+          className="w-full plnr-accent disabled:opacity-50 rounded-lg px-3 py-2 text-sm font-medium"
         >
           {saving ? t(lang, 'saving') : t(lang, 'add')}
         </button>
@@ -1073,7 +1121,7 @@ function MessageModal({ booking, lang, onClose, onSent }: { booking: Booking; la
           ) : (
             history.map(m => (
               <div key={m.id} className={`flex ${m.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[80%] rounded-lg px-2.5 py-1.5 text-xs ${m.direction === 'outbound' ? 'bg-blue-600 text-white' : 'plnr-quiet'}`}>
+                <div className={`max-w-[80%] rounded-lg px-2.5 py-1.5 text-xs ${m.direction === 'outbound' ? 'plnr-accent' : 'plnr-quiet'}`}>
                   <div className="whitespace-pre-wrap break-words">{m.text}</div>
                   <div className="text-[10px] opacity-70 mt-0.5">{fmtDateTime(m.createdAt, lang)}</div>
                 </div>
@@ -1098,7 +1146,7 @@ function MessageModal({ booking, lang, onClose, onSent }: { booking: Booking; la
         <button
           disabled={sending || !text.trim()}
           onClick={send}
-          className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg px-3 py-2 text-sm font-medium"
+          className="w-full plnr-accent disabled:opacity-50 rounded-lg px-3 py-2 text-sm font-medium"
         >
           {sending ? t(lang, 'sending') : t(lang, 'send')}
         </button>
@@ -1138,7 +1186,7 @@ function RescheduleModal({ bookingId, lang, onClose, onSaved }: { bookingId: str
         <button
           disabled={saving || !date || !time}
           onClick={save}
-          className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg px-3 py-2 text-sm font-medium"
+          className="w-full plnr-accent disabled:opacity-50 rounded-lg px-3 py-2 text-sm font-medium"
         >
           {saving ? t(lang, 'saving') : t(lang, 'reschedule')}
         </button>

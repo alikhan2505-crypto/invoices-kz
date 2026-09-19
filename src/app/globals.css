@@ -919,6 +919,14 @@ html {
   --p-text-2: #9ca3af;
   --p-text-3: #6b7280;
   --p-border: #374151;
+  /* Founder: "не нравится, используй design uxui pro max" -- a generic
+     Tailwind blue-600 read as templated. Dark keeps a bright blue (navy
+     goes muddy/low-contrast on a dark surface); light uses DESIGN.md's
+     own real brand navy, not a re-invented color, so the planner's light
+     mode actually looks like the rest of the product's design system. */
+  --p-accent: #3b82f6;
+  --p-accent-text: #ffffff;
+  --p-success: #22c55e;
   color-scheme: dark;
 }
 
@@ -932,6 +940,9 @@ html {
   --p-text-2: #6b7280;
   --p-text-3: #9ca3af;
   --p-border: #e5e7eb;
+  --p-accent: #1C2056;
+  --p-accent-text: #ffffff;
+  --p-success: #16a34a;
   color-scheme: light;
 }
 
@@ -946,6 +957,9 @@ html {
     --p-text-2: #6b7280;
     --p-text-3: #9ca3af;
     --p-border: #e5e7eb;
+    --p-accent: #1C2056;
+    --p-accent-text: #ffffff;
+    --p-success: #16a34a;
     color-scheme: light;
   }
 }
@@ -984,4 +998,15 @@ html {
    instead, for the modal close button. */
 .plnr-close-btn { color: var(--p-text-2); }
 .plnr-close-btn:hover { color: var(--p-text); }
+
+/* Real accent system (see .planner-shell's own comment) -- solid button/
+   active-state fill, a soft translucent tint for avatars and badges
+   (color-mix keeps the tint automatically in sync with whichever accent
+   is active, dark or light, instead of a second hand-picked hex pair). */
+.plnr-accent { background-color: var(--p-accent); color: var(--p-accent-text); }
+.plnr-accent:hover { filter: brightness(1.08); }
+.plnr-accent-soft { background-color: color-mix(in srgb, var(--p-accent) 14%, transparent); color: var(--p-accent); }
+.plnr-accent-dot { background-color: var(--p-accent); }
+.plnr-success-soft { background-color: color-mix(in srgb, var(--p-success) 16%, transparent); color: var(--p-success); }
+.plnr-danger-dot { background-color: #ef4444; }
 
