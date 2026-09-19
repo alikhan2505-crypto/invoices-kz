@@ -91,6 +91,15 @@ const STRINGS = {
     themeLight: 'Светлая тема',
     themeDark: 'Тёмная тема',
     themeAuto: 'Как в системе',
+    tabSchedule: 'Расписание',
+    tabClients: 'Клиенты',
+    regularBadge: 'Постоянный',
+    visitsCount: 'визитов',
+    lastVisit: 'Последний визит',
+    noPhone: 'Без телефона',
+    noClients: 'Пока нет клиентов с завершёнными визитами.',
+    clientProfileTitle: 'Профиль клиента',
+    visitHistory: 'История посещений',
   },
   kk: {
     loading: 'Жүктелуде…',
@@ -142,6 +151,15 @@ const STRINGS = {
     themeLight: 'Ашық тема',
     themeDark: 'Қараңғы тема',
     themeAuto: 'Жүйе бойынша',
+    tabSchedule: 'Кесте',
+    tabClients: 'Клиенттер',
+    regularBadge: 'Тұрақты',
+    visitsCount: 'келу',
+    lastVisit: 'Соңғы келуі',
+    noPhone: 'Телефон жоқ',
+    noClients: 'Әзірге аяқталған келу жоқ.',
+    clientProfileTitle: 'Клиент профилі',
+    visitHistory: 'Келу тарихы',
   },
 } as const
 
@@ -552,6 +570,75 @@ function BookingActionsModal({ booking: b, lang, onClose, onMessage, onReschedul
   )
 }
 
+type ClientHistoryEntry = { id: string; serviceName: string; masterName: string | null; startsAt: string; status: string }
+type Client = {
+  phone: string
+  name: string | null
+  visitCount: number
+  lastVisitAt: string | null
+  isRegular: boolean
+  history: ClientHistoryEntry[]
+}
+
+// Founder's ask 19.09.2026: assess return rate/loyalty from real visit
+// history, not a manually-set flag -- "Постоянный" comes straight from
+// /api/planner/clients' own visit count (REGULAR_VISIT_THRESHOLD there),
+// this just renders it.
+function ClientsList({ clients, lang, onOpen }: { clients: Client[]; lang: Lang; onOpen: (c: Client) => void }) {
+  if (clients.length === 0) return <div className="text-sm plnr-text-3">{t(lang, 'noClients')}</div>
+  return (
+    <div className="space-y-2">
+      {clients.map(c => (
+        <button
+          key={c.phone}
+          type="button"
+          onClick={() => onOpen(c)}
+          className="w-full text-left plnr-card rounded-xl p-3 flex items-center justify-between gap-3 flex-wrap"
+        >
+          <div className="min-w-0">
+            <div className="font-medium truncate flex items-center gap-2">
+              {c.name || t(lang, 'noName')}
+              {c.isRegular && (
+                <span className="text-[10px] bg-green-600 text-white rounded-full px-2 py-0.5 shrink-0">{t(lang, 'regularBadge')}</span>
+              )}
+            </div>
+            <div className="text-sm plnr-text-2 truncate">{c.phone || t(lang, 'noPhone')}</div>
+          </div>
+          <div className="text-sm plnr-text-2 text-right shrink-0">
+            <div>{c.visitCount} {t(lang, 'visitsCount')}</div>
+            {c.lastVisitAt && <div className="text-xs plnr-text-3">{t(lang, 'lastVisit')}: {fmtDateTime(c.lastVisitAt, lang)}</div>}
+          </div>
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function ClientProfileModal({ client: c, lang, onClose }: { client: Client; lang: Lang; onClose: () => void }) {
+  return (
+    <ModalShell title={c.name || t(lang, 'noName')} lang={lang} onClose={onClose}>
+      <div className="space-y-3 text-sm">
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="plnr-text-2">{c.phone || t(lang, 'noPhone')}</div>
+          {c.isRegular && <span className="text-xs bg-green-600 text-white rounded-full px-2 py-0.5">{t(lang, 'regularBadge')}</span>}
+        </div>
+        <div className="plnr-text-2">{c.visitCount} {t(lang, 'visitsCount')}</div>
+        <div>
+          <div className="text-xs font-medium plnr-text-2 mb-1">{t(lang, 'visitHistory')}</div>
+          <div className="max-h-64 overflow-y-auto space-y-1.5">
+            {c.history.map(h => (
+              <div key={h.id} className={`plnr-card-2 rounded-lg px-2.5 py-1.5 text-xs ${h.status === 'cancelled' ? 'opacity-50 line-through' : ''}`}>
+                <div className="font-medium">{h.serviceName}{h.masterName ? ` — ${h.masterName}` : ''}</div>
+                <div className="plnr-text-2">{fmtDateTime(h.startsAt, lang)}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </ModalShell>
+  )
+}
+
 const THEME_ORDER: Theme[] = ['light', 'dark', 'auto']
 const THEME_ICON: Record<Theme, string> = { light: '☀', dark: '☾', auto: '◐' }
 const THEME_KEY: Record<Theme, keyof typeof STRINGS['ru']> = { light: 'themeLight', dark: 'themeDark', auto: 'themeAuto' }
@@ -576,6 +663,27 @@ function PlannerDashboard({ salonName, theme, setTheme, lang, setLang }: {
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
   const todayKey = dayKey(new Date().toISOString())
   const [selectedDateKey, setSelectedDateKey] = useState(todayKey)
+  const [activeTab, setActiveTab] = useState<'schedule' | 'clients'>('schedule')
+  const [clients, setClients] = useState<Client[]>([])
+  const [clientsLoaded, setClientsLoaded] = useState(false)
+  const [clientsLoading, setClientsLoading] = useState(false)
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null)
+
+  // Lazy: the clients tab reads all-time history (no date window, unlike
+  // /api/planner/bookings), a separate and heavier query nobody pays for
+  // unless they actually open this tab.
+  const loadClients = useCallback(async () => {
+    setClientsLoading(true)
+    const res = await fetch('/api/planner/clients')
+    if (res.ok) setClients((await res.json()).clients || [])
+    setClientsLoading(false)
+    setClientsLoaded(true)
+  }, [])
+
+  function openClientsTab() {
+    setActiveTab('clients')
+    if (!clientsLoaded) void loadClients()
+  }
 
   const load = useCallback(async () => {
     const [draftsRes, bookingsRes] = await Promise.all([
@@ -729,33 +837,55 @@ function PlannerDashboard({ salonName, theme, setTheme, lang, setLang }: {
         )}
 
         <section>
-          <h2 className="text-sm font-medium plnr-text-2 mb-2">{t(lang, 'scheduleHeading')}</h2>
-          {loading ? (
+          <div className="flex items-center gap-1 mb-3">
+            <button
+              type="button"
+              onClick={() => setActiveTab('schedule')}
+              className={`text-sm rounded-lg px-3 py-1.5 ${activeTab === 'schedule' ? 'bg-blue-600' : 'plnr-quiet'}`}
+            >
+              {t(lang, 'tabSchedule')}
+            </button>
+            <button
+              type="button"
+              onClick={openClientsTab}
+              className={`text-sm rounded-lg px-3 py-1.5 ${activeTab === 'clients' ? 'bg-blue-600' : 'plnr-quiet'}`}
+            >
+              {t(lang, 'tabClients')}
+            </button>
+          </div>
+
+          {activeTab === 'schedule' ? (
+            loading ? (
+              <div className="text-sm plnr-text-3">{t(lang, 'loading')}</div>
+            ) : (
+              // Calendar-driven single-day view, not every booked day stacked
+              // at once -- founder's ask: a left-side date picker to browse
+              // history as well as upcoming bookings (yellow = past day with
+              // bookings, green = today/future with bookings).
+              <div className="flex gap-4 items-start flex-wrap lg:flex-nowrap">
+                <MiniCalendar lang={lang} selectedKey={selectedDateKey} onSelect={setSelectedDateKey} byDay={byDay} todayKey={todayKey} />
+                <div className="flex-1 min-w-0 w-full">
+                  <div className="text-xs uppercase tracking-wide plnr-text-3 mb-2">
+                    {fmtDay(`${selectedDateKey}T00:00:00+05:00`, lang)}
+                  </div>
+                  {selectedBookings.length === 0 ? (
+                    <div className="text-sm plnr-text-3">{t(lang, 'noBookings')}</div>
+                  ) : (
+                    <DayTable
+                      dayBookings={selectedBookings}
+                      masters={masters}
+                      masterCategories={masterCategories}
+                      lang={lang}
+                      onOpen={setSelectedBooking}
+                    />
+                  )}
+                </div>
+              </div>
+            )
+          ) : clientsLoading ? (
             <div className="text-sm plnr-text-3">{t(lang, 'loading')}</div>
           ) : (
-            // Calendar-driven single-day view, not every booked day stacked
-            // at once -- founder's ask: a left-side date picker to browse
-            // history as well as upcoming bookings (yellow = past day with
-            // bookings, green = today/future with bookings).
-            <div className="flex gap-4 items-start flex-wrap lg:flex-nowrap">
-              <MiniCalendar lang={lang} selectedKey={selectedDateKey} onSelect={setSelectedDateKey} byDay={byDay} todayKey={todayKey} />
-              <div className="flex-1 min-w-0 w-full">
-                <div className="text-xs uppercase tracking-wide plnr-text-3 mb-2">
-                  {fmtDay(`${selectedDateKey}T00:00:00+05:00`, lang)}
-                </div>
-                {selectedBookings.length === 0 ? (
-                  <div className="text-sm plnr-text-3">{t(lang, 'noBookings')}</div>
-                ) : (
-                  <DayTable
-                    dayBookings={selectedBookings}
-                    masters={masters}
-                    masterCategories={masterCategories}
-                    lang={lang}
-                    onOpen={setSelectedBooking}
-                  />
-                )}
-              </div>
-            </div>
+            <ClientsList clients={clients} lang={lang} onOpen={setSelectedClient} />
           )}
         </section>
       </div>
@@ -769,6 +899,9 @@ function PlannerDashboard({ salonName, theme, setTheme, lang, setLang }: {
           onReschedule={() => { setRescheduleFor(selectedBooking.id); setSelectedBooking(null) }}
           onCancel={() => { setSelectedBooking(null); void cancelBooking(selectedBooking.id) }}
         />
+      )}
+      {selectedClient && (
+        <ClientProfileModal client={selectedClient} lang={lang} onClose={() => setSelectedClient(null)} />
       )}
       {showAddForm && (
         <AddBookingModal lang={lang} onClose={() => setShowAddForm(false)} onSaved={() => { setShowAddForm(false); void load() }} />
