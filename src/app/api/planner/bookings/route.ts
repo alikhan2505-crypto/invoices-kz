@@ -9,23 +9,28 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-// Same 14-day horizon as buildSalonBlock's own lookup table
-// (salonContext.ts) -- one consistent "how far ahead this feature looks"
-// window across the whole booking planner.
-const AGENDA_WINDOW_DAYS = 14
+// Founder's ask 19.09.2026: a left-side date picker for browsing history
+// as well as upcoming bookings, not just the next two weeks -- widened
+// from the original forward-only 14-day window to cover a real past
+// window too. Still bounded (not "everything ever") so a long-lived salon
+// doesn't eventually turn this into an unbounded table scan.
+const PAST_WINDOW_DAYS = 90
+const FUTURE_WINDOW_DAYS = 60
 
-// GET: agenda from the start of today (Almaty time, fixed +05:00 -- same
-// convention as the rest of this feature) through the window. Every
-// status included, cancelled rows too -- the client greys them out rather
-// than this route silently hiding history the owner might want to see.
+// GET: agenda from PAST_WINDOW_DAYS before today through FUTURE_WINDOW_DAYS
+// after (Almaty time, fixed +05:00 -- same convention as the rest of this
+// feature). Every status included, cancelled rows too -- the client greys
+// them out rather than this route silently hiding history the owner might
+// want to see.
 export async function GET(req: NextRequest) {
   const session = await requirePlannerSession(req)
   if ('error' in session) return NextResponse.json({ error: session.error }, { status: session.status })
 
   const almatyNow = new Date(Date.now() + 5 * 60 * 60 * 1000)
   almatyNow.setUTCHours(0, 0, 0, 0)
-  const from = new Date(almatyNow.getTime() - 5 * 60 * 60 * 1000)
-  const to = new Date(from.getTime() + AGENDA_WINDOW_DAYS * 24 * 60 * 60 * 1000)
+  const todayStart = new Date(almatyNow.getTime() - 5 * 60 * 60 * 1000)
+  const from = new Date(todayStart.getTime() - PAST_WINDOW_DAYS * 24 * 60 * 60 * 1000)
+  const to = new Date(todayStart.getTime() + FUTURE_WINDOW_DAYS * 24 * 60 * 60 * 1000)
 
   const { data: bookings, error } = await supabase
     .from('salon_bookings')

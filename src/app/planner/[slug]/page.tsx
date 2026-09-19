@@ -58,7 +58,7 @@ const STRINGS = {
     reject: 'Отклонить',
     decideFailed: 'Не удалось выполнить действие',
     scheduleHeading: 'Расписание',
-    noBookings: 'Пока нет записей на ближайшие две недели.',
+    noBookings: 'На этот день записей нет.',
     unassigned: 'Без мастера',
     cancelled: 'отменена',
     message: 'Написать',
@@ -109,7 +109,7 @@ const STRINGS = {
     reject: 'Қабылдамау',
     decideFailed: 'Әрекет орындалмады',
     scheduleHeading: 'Кесте',
-    noBookings: 'Алдағы екі аптаға жазылу жоқ.',
+    noBookings: 'Бұл күнге жазылу жоқ.',
     unassigned: 'Маман көрсетілмеген',
     cancelled: 'болдырылды',
     message: 'Хабарласу',
@@ -305,44 +305,6 @@ function dayKey(iso: string) {
   return new Date(new Date(iso).getTime() + 5 * 60 * 60 * 1000).toISOString().slice(0, 10)
 }
 
-// Continuous timeline, not a sparse grid -- founder shared a real
-// scheduling product (YCLIENTS-style) as the reference: hour axis down
-// the side, appointment blocks absolutely positioned by actual start time
-// and sized by duration, master columns grouped under category headers.
-const PX_PER_MIN = 1.2
-const DEFAULT_DURATION_MIN = 60
-const DAY_MIN_START = 7 * 60
-const DAY_MAX_END = 22 * 60
-const MIN_CARD_PX = 34
-const COLUMN_PX = 160
-const HOUR_GUTTER_PX = 52
-
-function minutesSinceMidnight(iso: string): number {
-  // Same fixed +05:00 shift-then-read-UTC-getters trick as the rest of
-  // this feature -- Kazakhstan is one fixed offset, no tz library needed.
-  const d = new Date(new Date(iso).getTime() + 5 * 60 * 60 * 1000)
-  return d.getUTCHours() * 60 + d.getUTCMinutes()
-}
-
-// The visible hour range for one day's timeline: always at least
-// DAY_MIN_START..DAY_MAX_END (07:00-22:00, a sane default with no
-// structured "working hours" to read -- salon.workingHours is free text),
-// expanded automatically if a real booking falls outside it, with an
-// hour of padding on whichever end actually has bookings near it.
-function computeDayRange(dayBookings: Booking[]): { start: number; end: number } {
-  let minStart = Infinity
-  let maxEnd = -Infinity
-  for (const b of dayBookings) {
-    const s = minutesSinceMidnight(b.starts_at)
-    const e = s + (b.duration_minutes || DEFAULT_DURATION_MIN)
-    minStart = Math.min(minStart, s)
-    maxEnd = Math.max(maxEnd, e)
-  }
-  const start = Math.max(0, Math.min(DAY_MIN_START, Math.floor(minStart / 60) * 60 - 60))
-  const end = Math.min(24 * 60, Math.max(DAY_MAX_END, Math.ceil(maxEnd / 60) * 60 + 60))
-  return { start, end }
-}
-
 type ColumnDef = { key: string; label: string; category: string | null }
 
 // Columns start from the salon's configured category->masters roster
@@ -390,33 +352,162 @@ function categoryRuns(columns: ColumnDef[]): { category: string | null; span: nu
   return runs
 }
 
-// One absolutely-positioned block on the timeline -- compact on purpose
-// (columns run 160px, a short appointment only tens of px tall): time +
-// service on one line, client name on the next. The whole block is the
-// tap target (opens BookingActionsModal below), not stacked inline
-// buttons -- a 15-30 minute slot has no room for three action rows.
-function TimelineBookingCard({ booking: b, lang, top, height, onOpen }: {
-  booking: Booking
-  lang: Lang
-  top: number
-  height: number
-  onOpen: () => void
-}) {
+// One cell's booking block -- compact card, service + client name only.
+// The whole card is the tap target (opens BookingActionsModal below), not
+// stacked inline buttons -- doesn't fit next to other same-time bookings.
+function CompactBookingCard({ booking: b, lang, onOpen }: { booking: Booking; lang: Lang; onOpen: () => void }) {
   return (
     <button
       type="button"
       onClick={onOpen}
       title={`${b.service_name} — ${b.client_name || t(lang, 'noName')}`}
-      className={`absolute left-0.5 right-0.5 text-left plnr-card rounded-md px-1.5 py-1 text-[11px] leading-tight overflow-hidden border-l-[3px] ${b.status === 'cancelled' ? 'opacity-50 line-through' : ''}`}
-      style={{
-        top,
-        height,
-        borderLeftColor: b.status === 'cancelled' ? '#ef4444' : '#3b82f6',
-      }}
+      className={`w-full text-left plnr-card rounded-md px-1.5 py-1 mb-1 text-[11px] leading-tight border-l-[3px] ${b.status === 'cancelled' ? 'opacity-50 line-through' : ''}`}
+      style={{ borderLeftColor: b.status === 'cancelled' ? '#ef4444' : '#3b82f6' }}
     >
-      <div className="font-medium truncate">{fmtTime(b.starts_at, lang)} {b.service_name}</div>
+      <div className="font-medium truncate">{b.service_name}</div>
       <div className="plnr-text-2 truncate">{b.client_name || t(lang, 'noName')}</div>
     </button>
+  )
+}
+
+// One day's schedule as a real <table> -- founder: hide fully-empty hour
+// slots entirely (only rows for times that actually have a booking; a new
+// booking at a new time just adds a row) and give every column a real
+// closing border. A <table> with border-collapse gets clean, uniform
+// borders on every edge (including the last column's right edge, which a
+// manually-bordered div grid kept missing) basically for free, and
+// table-layout:fixed + an unset <col> per data column makes them share
+// the full available width evenly, however many there are.
+function DayTable({ dayBookings, masters, masterCategories, lang, onOpen }: {
+  dayBookings: Booking[]
+  masters: string[]
+  masterCategories: { name: string; masters: string[] }[]
+  lang: Lang
+  onOpen: (b: Booking) => void
+}) {
+  const columns = buildTimelineColumns(masterCategories, masters, dayBookings, lang)
+  const runs = categoryRuns(columns)
+  const times = Array.from(new Set(dayBookings.map(b => fmtTime(b.starts_at, lang)))).sort()
+  const cellMap = new Map<string, Booking[]>()
+  for (const b of dayBookings) {
+    const key = `${fmtTime(b.starts_at, lang)}|${b.master_name || t(lang, 'unassigned')}`
+    if (!cellMap.has(key)) cellMap.set(key, [])
+    cellMap.get(key)!.push(b)
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[560px]" style={{ tableLayout: 'fixed', borderCollapse: 'collapse' }}>
+        <colgroup>
+          <col style={{ width: 64 }} />
+          {columns.map(col => <col key={col.key} />)}
+        </colgroup>
+        <thead>
+          <tr>
+            <th className="plnr-border border" />
+            {runs.map((run, i) => (
+              <th key={i} colSpan={run.span} className="plnr-border border text-xs font-semibold plnr-text-2 px-2 py-1 truncate">
+                {run.category || ' '}
+              </th>
+            ))}
+          </tr>
+          <tr>
+            <th className="plnr-border border" />
+            {columns.map(col => (
+              <th key={col.key} className="plnr-border border text-xs font-medium plnr-text px-2 py-1.5 truncate">
+                {col.label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {times.map(time => (
+            <tr key={time}>
+              <td className="plnr-border border text-xs plnr-text-2 px-2 py-1.5 whitespace-nowrap align-top">{time}</td>
+              {columns.map(col => {
+                const cellBookings = cellMap.get(`${time}|${col.key}`) || []
+                return (
+                  <td key={col.key} className="plnr-border border align-top p-1">
+                    {cellBookings.map(b => (
+                      <CompactBookingCard key={b.id} booking={b} lang={lang} onOpen={() => onOpen(b)} />
+                    ))}
+                  </td>
+                )
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+const WEEKDAY_HEADERS: Record<Lang, string[]> = {
+  ru: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'],
+  kk: ['Дс', 'Сс', 'Ср', 'Бс', 'Жм', 'Сб', 'Жс'],
+}
+
+// Left-side date picker -- founder's ask: browse history as well as
+// upcoming bookings, not just the next two weeks. Yellow dot = a past day
+// that had bookings, green dot = today or a future day with bookings, no
+// dot = nothing that day. Selecting a day drives DayTable above.
+function MiniCalendar({ lang, selectedKey, onSelect, byDay, todayKey }: {
+  lang: Lang
+  selectedKey: string
+  onSelect: (key: string) => void
+  byDay: Map<string, Booking[]>
+  todayKey: string
+}) {
+  const initial = new Date(`${selectedKey}T00:00:00`)
+  const [viewYear, setViewYear] = useState(initial.getFullYear())
+  const [viewMonth, setViewMonth] = useState(initial.getMonth())
+
+  const monthLabel = new Date(viewYear, viewMonth, 1).toLocaleDateString(localeFor(lang), { month: 'long', year: 'numeric' })
+  const firstOfMonth = new Date(viewYear, viewMonth, 1)
+  const startOffset = (firstOfMonth.getDay() + 6) % 7 // Monday-first
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate()
+  const cells: (number | null)[] = [
+    ...Array(startOffset).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+  ]
+
+  function goPrevMonth() {
+    if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1) } else setViewMonth(m => m - 1)
+  }
+  function goNextMonth() {
+    if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1) } else setViewMonth(m => m + 1)
+  }
+
+  return (
+    <div className="plnr-card rounded-xl p-3 w-full lg:w-[260px] shrink-0">
+      <div className="flex items-center justify-between mb-2">
+        <button type="button" onClick={goPrevMonth} className="plnr-quiet w-7 h-7 rounded-md flex items-center justify-center text-sm">‹</button>
+        <div className="text-xs font-medium capitalize">{monthLabel}</div>
+        <button type="button" onClick={goNextMonth} className="plnr-quiet w-7 h-7 rounded-md flex items-center justify-center text-sm">›</button>
+      </div>
+      <div className="grid grid-cols-7 gap-1 text-center">
+        {WEEKDAY_HEADERS[lang].map(w => <div key={w} className="text-[10px] plnr-text-3 py-1">{w}</div>)}
+        {cells.map((day, i) => {
+          if (day === null) return <div key={i} />
+          const key = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+          const hasBookings = (byDay.get(key)?.length ?? 0) > 0
+          const isSelected = key === selectedKey
+          const isToday = key === todayKey
+          const dotColor = hasBookings ? (key < todayKey ? 'bg-yellow-500' : 'bg-green-500') : ''
+          return (
+            <button
+              key={i}
+              type="button"
+              onClick={() => onSelect(key)}
+              className={`relative text-xs rounded-md py-1.5 ${isSelected ? 'bg-blue-600 text-white' : isToday ? 'plnr-quiet font-semibold' : ''}`}
+            >
+              {day}
+              {dotColor && !isSelected && <span className={`absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full ${dotColor}`} />}
+            </button>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 
@@ -483,6 +574,8 @@ function PlannerDashboard({ salonName, theme, setTheme, lang, setLang }: {
   const [messageFor, setMessageFor] = useState<Booking | null>(null)
   const [rescheduleFor, setRescheduleFor] = useState<string | null>(null)
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
+  const todayKey = dayKey(new Date().toISOString())
+  const [selectedDateKey, setSelectedDateKey] = useState(todayKey)
 
   const load = useCallback(async () => {
     const [draftsRes, bookingsRes] = await Promise.all([
@@ -540,60 +633,59 @@ function PlannerDashboard({ salonName, theme, setTheme, lang, setLang }: {
     if (!byDay.has(k)) byDay.set(k, [])
     byDay.get(k)!.push(b)
   }
-  const days = Array.from(byDay.keys()).sort()
+  const selectedBookings = byDay.get(selectedDateKey) || []
 
   return (
     <main className="planner-shell plnr-page min-h-screen" data-planner-theme={theme}>
-      {/* Founder's own ask: these switches belong in the page's actual
-          top-right corner, on their own, not squeezed inline next to a
-          growing title. Icon buttons sized ~36px, under DESIGN.md's usual
-          44px rule but within its own documented exception for a tight
-          multi-button segmented control where blowing each one up would
-          make the whole cluster disproportionate. */}
-      <div className="flex justify-end items-center gap-2 px-4 sm:px-6 py-3">
-        <div className="flex items-center gap-0.5 plnr-quiet rounded-lg p-0.5">
-          {THEME_ORDER.map(v => (
-            <button
-              key={v}
-              type="button"
-              onClick={() => setTheme(v)}
-              title={t(lang, THEME_KEY[v])}
-              aria-label={t(lang, THEME_KEY[v])}
-              className={`w-9 h-9 flex items-center justify-center rounded-md text-sm ${theme === v ? 'bg-blue-600' : ''}`}
-            >
-              {THEME_ICON[v]}
-            </button>
-          ))}
-        </div>
-        <div className="flex items-center gap-0.5 plnr-quiet rounded-lg p-0.5">
-          {(['ru', 'kk'] as const).map(v => (
-            <button
-              key={v}
-              type="button"
-              onClick={() => setLang(v)}
-              className={`h-9 px-2.5 rounded-md text-xs font-medium ${lang === v ? 'bg-blue-600' : ''}`}
-            >
-              {v === 'ru' ? 'РУ' : 'ҚАЗ'}
-            </button>
-          ))}
-        </div>
-      </div>
-
       {/* Founder: "растягиваешь планировщик на всю станицу... все сжатым
           смотрится" -- widened from the original max-w-3xl (768px). Not
           uncapped: on an ultrawide monitor a bare w-full would stretch
           the draft cards/title into unreadably long lines, so a generous
           cap instead -- the calendar below scrolls its own overflow-x
-          regardless of this wrapper's width. */}
-      <div className="max-w-[1800px] mx-auto px-4 sm:px-6 pb-10 space-y-8">
+          regardless of this wrapper's width. Title, switches and the
+          add-booking CTA share one row (founder: don't spend a whole
+          extra row on the switches) instead of two stacked ones. */}
+      <div className="max-w-[1800px] mx-auto px-4 sm:px-6 pt-3 pb-10 space-y-8">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <h1 className="text-lg font-semibold">{t(lang, 'plannerTitle')} — {salonName}</h1>
-          <button
-            onClick={() => setShowAddForm(true)}
-            className="shrink-0 text-sm bg-blue-600 hover:bg-blue-500 rounded-lg px-3 py-2"
-          >
-            + {t(lang, 'addBooking')}
-          </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Icon buttons sized ~36px, under DESIGN.md's usual 44px rule
+                but within its own documented exception for a tight
+                multi-button segmented control where blowing each one up
+                would make the whole cluster disproportionate. */}
+            <div className="flex items-center gap-0.5 plnr-quiet rounded-lg p-0.5">
+              {THEME_ORDER.map(v => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setTheme(v)}
+                  title={t(lang, THEME_KEY[v])}
+                  aria-label={t(lang, THEME_KEY[v])}
+                  className={`w-9 h-9 flex items-center justify-center rounded-md text-sm ${theme === v ? 'bg-blue-600' : ''}`}
+                >
+                  {THEME_ICON[v]}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-0.5 plnr-quiet rounded-lg p-0.5">
+              {(['ru', 'kk'] as const).map(v => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setLang(v)}
+                  className={`h-9 px-2.5 rounded-md text-xs font-medium ${lang === v ? 'bg-blue-600' : ''}`}
+                >
+                  {v === 'ru' ? 'РУ' : 'ҚАЗ'}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setShowAddForm(true)}
+              className="shrink-0 text-sm bg-blue-600 hover:bg-blue-500 rounded-lg px-3 py-2"
+            >
+              + {t(lang, 'addBooking')}
+            </button>
+          </div>
         </div>
 
         {error && <div className="text-sm text-red-400 bg-red-950/40 rounded-lg p-3">{error}</div>}
@@ -640,99 +732,29 @@ function PlannerDashboard({ salonName, theme, setTheme, lang, setLang }: {
           <h2 className="text-sm font-medium plnr-text-2 mb-2">{t(lang, 'scheduleHeading')}</h2>
           {loading ? (
             <div className="text-sm plnr-text-3">{t(lang, 'loading')}</div>
-          ) : days.length === 0 ? (
-            <div className="text-sm plnr-text-3">{t(lang, 'noBookings')}</div>
           ) : (
-            <div className="space-y-8">
-              {days.map(day => {
-                const dayBookings = byDay.get(day)!
-                const columns = buildTimelineColumns(masterCategories, masters, dayBookings, lang)
-                const runs = categoryRuns(columns)
-                const { start, end } = computeDayRange(dayBookings)
-                const bodyHeight = (end - start) * PX_PER_MIN
-                const hourMarks: number[] = []
-                for (let h = Math.ceil(start / 60); h * 60 <= end; h++) hourMarks.push(h)
-
-                return (
-                  <div key={day}>
-                    <div className="text-xs uppercase tracking-wide plnr-text-3 mb-2">{fmtDay(dayBookings[0].starts_at, lang)}</div>
-                    {/* Continuous timeline, not a sparse grid -- founder's
-                        own reference screenshot (a real scheduling
-                        product): hour axis on the left, blocks positioned
-                        by actual start time and sized by duration,
-                        master columns grouped under category headers so
-                        two different masters at the same 15:00 don't
-                        collide the way a flat list did. */}
-                    <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
-                      <div style={{ width: HOUR_GUTTER_PX + columns.length * COLUMN_PX }}>
-                        <div className="flex" style={{ paddingLeft: HOUR_GUTTER_PX }}>
-                          {runs.map((run, i) => (
-                            <div
-                              key={i}
-                              className="text-xs font-semibold plnr-text-2 px-2 py-1 border-b plnr-border truncate"
-                              style={{ width: run.span * COLUMN_PX }}
-                            >
-                              {run.category || ' '}
-                            </div>
-                          ))}
-                        </div>
-                        <div className="flex" style={{ paddingLeft: HOUR_GUTTER_PX }}>
-                          {columns.map(col => (
-                            <div
-                              key={col.key}
-                              className="text-xs font-medium plnr-text px-2 py-1.5 border-b plnr-border truncate"
-                              style={{ width: COLUMN_PX }}
-                            >
-                              {col.label}
-                            </div>
-                          ))}
-                        </div>
-                        <div className="flex" style={{ height: bodyHeight }}>
-                          <div className="relative shrink-0" style={{ width: HOUR_GUTTER_PX }}>
-                            {hourMarks.map(h => (
-                              <div
-                                key={h}
-                                className="absolute right-2 text-xs plnr-text-3 -translate-y-1/2"
-                                style={{ top: (h * 60 - start) * PX_PER_MIN }}
-                              >
-                                {String(h).padStart(2, '0')}:00
-                              </div>
-                            ))}
-                          </div>
-                          {columns.map(col => (
-                            <div
-                              key={col.key}
-                              className="relative plnr-border"
-                              style={{
-                                width: COLUMN_PX,
-                                borderLeftWidth: 1,
-                                backgroundImage: `repeating-linear-gradient(to bottom, transparent, transparent ${60 * PX_PER_MIN - 1}px, var(--p-border) ${60 * PX_PER_MIN - 1}px, var(--p-border) ${60 * PX_PER_MIN}px)`,
-                              }}
-                            >
-                              {dayBookings
-                                .filter(b => (b.master_name || t(lang, 'unassigned')) === col.key)
-                                .map(b => {
-                                  const s = minutesSinceMidnight(b.starts_at)
-                                  const dur = b.duration_minutes || DEFAULT_DURATION_MIN
-                                  return (
-                                    <TimelineBookingCard
-                                      key={b.id}
-                                      booking={b}
-                                      lang={lang}
-                                      top={(s - start) * PX_PER_MIN}
-                                      height={Math.max(MIN_CARD_PX, dur * PX_PER_MIN)}
-                                      onOpen={() => setSelectedBooking(b)}
-                                    />
-                                  )
-                                })}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
+            // Calendar-driven single-day view, not every booked day stacked
+            // at once -- founder's ask: a left-side date picker to browse
+            // history as well as upcoming bookings (yellow = past day with
+            // bookings, green = today/future with bookings).
+            <div className="flex gap-4 items-start flex-wrap lg:flex-nowrap">
+              <MiniCalendar lang={lang} selectedKey={selectedDateKey} onSelect={setSelectedDateKey} byDay={byDay} todayKey={todayKey} />
+              <div className="flex-1 min-w-0 w-full">
+                <div className="text-xs uppercase tracking-wide plnr-text-3 mb-2">
+                  {fmtDay(`${selectedDateKey}T00:00:00+05:00`, lang)}
+                </div>
+                {selectedBookings.length === 0 ? (
+                  <div className="text-sm plnr-text-3">{t(lang, 'noBookings')}</div>
+                ) : (
+                  <DayTable
+                    dayBookings={selectedBookings}
+                    masters={masters}
+                    masterCategories={masterCategories}
+                    lang={lang}
+                    onOpen={setSelectedBooking}
+                  />
+                )}
+              </div>
             </div>
           )}
         </section>
