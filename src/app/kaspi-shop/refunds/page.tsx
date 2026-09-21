@@ -230,9 +230,10 @@ export default function KaspiShopRefundsPage() {
                   transition={{ duration: 0.3, delay: i * 0.03, ease: EASE }}
                   onClick={() => openDetail(r)}
                   className="nav-glass rounded-2xl p-4 cursor-pointer transition-transform hover:-translate-y-0.5">
-                  <div className="flex items-start justify-between gap-2 mb-1.5">
-                    <span className="text-[11px] font-mono" style={{ color: 'var(--nav-text-muted)' }}>№ {r.applicationNumber}</span>
-                    <span className="text-[10px] font-semibold rounded-full px-2 py-0.5 flex-shrink-0" style={{ background: colors.bg, color: colors.fg }}>{r.statusText}</span>
+                  <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1.5 mb-1.5">
+                    <span className="text-[11px] font-mono whitespace-nowrap" style={{ color: 'var(--nav-text-muted)' }}>№ {r.applicationNumber}</span>
+                    {/* Kaspi's status can be a whole sentence (a decision deadline): it wraps inside the card instead of running out of it. */}
+                    <span className="text-[10px] font-semibold rounded-lg px-2 py-1 leading-snug max-w-full" style={{ background: colors.bg, color: colors.fg }}>{r.statusText}</span>
                   </div>
                   <div className="text-[11px] mb-2" style={{ color: 'var(--nav-text-secondary)' }}>
                     {r.customer} · заказ {r.order}
