@@ -21,6 +21,8 @@ type OrderRow = {
   totalPrice: number
   creationTime: string
   items: { name: string; quantity: number }[]
+  // The cabinet tab the order was read from (its label is the status shown to the seller).
+  tab: string
 }
 type ProductRow = { own_current_price: number; last_competitor_price: number | null; floor_price: number }
 
@@ -80,7 +82,7 @@ export default function KaspiShopOverview() {
           const pages = await Promise.all(active.map((s) =>
             fetch(`/api/kaspi-shop/orders?status=${encodeURIComponent(s)}&page=0`, { headers }).then((r) => (r.ok ? r.json() : null)).catch(() => null),
           ))
-          const merged: OrderRow[] = pages.flatMap((p) => (p?.orders ?? []) as OrderRow[])
+          const merged: OrderRow[] = pages.flatMap((p, i) => ((p?.orders ?? []) as OrderRow[]).map((o) => ({ ...o, tab: active[i] })))
           merged.sort((a, b) => new Date(b.creationTime).getTime() - new Date(a.creationTime).getTime())
           if (alive) setOrders(merged.slice(0, 5))
         })
@@ -124,7 +126,7 @@ export default function KaspiShopOverview() {
     <DesktopShell>
       <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
         <SiteNav />
-        <div className="flex-1 min-w-0 p-4 lg:p-6 pb-6 space-y-6 max-w-5xl">
+        <div className="flex-1 min-w-0 p-4 lg:p-6 pb-6 space-y-6">
           <div className="flex items-baseline gap-3 flex-wrap">
             <h1 className="text-2xl font-bold" style={{ color: 'var(--nav-text-primary)', letterSpacing: '-0.02em' }}>Обзор</h1>
             <span className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>Kaspi Bot</span>
@@ -171,7 +173,7 @@ export default function KaspiShopOverview() {
                         {o.items?.[0]?.name ?? '—'}{(o.items?.length ?? 0) > 1 ? ` и ещё ${o.items.length - 1}` : ''}
                       </td>
                       <td className="px-4 py-3 text-right tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{money(o.totalPrice)}</td>
-                      <td className="px-4 py-3" style={{ color: 'var(--nav-text-secondary)' }}>{statusLabel(o.status)}</td>
+                      <td className="px-4 py-3" style={{ color: 'var(--nav-text-secondary)' }}>{statusLabel(o.tab)}</td>
                     </tr>
                   ))}
                 </tbody>
