@@ -1045,6 +1045,10 @@ html {
    (specificity 0,1,1). Text on a coloured tile must keep its own ink, so this
    resets them to inherit; it sits at the end of the file so it wins the tie. */
 .prd-root :is(div, p, span, label, h1, button, a) { color: inherit; }
+/* The reset above (0,1,1) would beat .prd-tile's own colour (0,1,0) and paint light-ink tiles
+   (Счета) with the page's dark ink; this restores the tile's colour. */
+.prd-root .prd-tile { color: var(--ink-t); }
+.prd-root .prd-ghost { color: transparent; }
 
 .prd-blob { position: absolute; border-radius: 50%; filter: blur(70px); z-index: -1; pointer-events: none; }
 .prd-b1 { width: 420px; height: 420px; background: var(--prd-b1); top: -120px; left: -80px; }
