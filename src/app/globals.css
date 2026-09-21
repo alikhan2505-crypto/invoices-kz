@@ -1168,6 +1168,8 @@ html {
   .product-shell-main { padding-left: 260px; }
   /* Wallet, bell, help and account live in the sidebar footer on desktop. */
   body.product-shell-active [data-tour="wallet"] { display: none; }
+  /* Notifications / help / account open next to the sidebar footer they were launched from. */
+  body.product-shell-active .utility-panel-overlay { align-items: flex-end; justify-content: flex-start; padding: 12px 12px 12px 268px; }
 }
 
 /* The balance lives in the shell's sidebar, so the top pill drops its own balance button. */

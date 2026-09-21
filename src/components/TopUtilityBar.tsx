@@ -691,7 +691,7 @@ export default function TopUtilityBar() {
               // (max-w-md, true dialog) instead of dropping from the pill --
               // notifications/help/account are untouched top-right drops.
               ? 'fixed inset-0 z-50 flex items-end justify-center lg:items-center lg:justify-center p-3 bg-black/30'
-              : 'fixed inset-0 z-50 flex items-end lg:items-start justify-end p-3 lg:pr-6 bg-black/30'
+              : 'utility-panel-overlay fixed inset-0 z-50 flex items-end lg:items-start justify-end p-3 lg:pr-6 bg-black/30'
           }
           onClick={() => setPanel(null)}>
 
