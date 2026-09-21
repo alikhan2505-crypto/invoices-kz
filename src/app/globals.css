@@ -1160,3 +1160,11 @@ html {
 @media (prefers-reduced-motion: reduce) { .prd-chip { transition: none; } }
 
 /* start-page chips: rebuild marker */
+
+/* Product shell (sidebar cabinet layout, stage 5 of the product split). The sidebar is
+   fixed at the left; DesktopShell's card is shifted right through --shell-left, and its
+   scroll area gets top room for the wallet/account pill that used to sit in SiteNav's row. */
+@media (min-width: 1024px) {
+  .product-shell .desktop-shell-scroll { padding-top: 64px; }
+  .product-shell-main { padding-left: 260px; padding-top: 64px; }
+}

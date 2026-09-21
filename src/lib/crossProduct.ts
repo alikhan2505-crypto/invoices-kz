@@ -6,6 +6,8 @@ import { PRODUCTS, type ProductKey } from './products'
 // with a way back. Pure and testable; the browser side is HandoffBanner.
 
 const ORIGINS: Partial<Record<ProductKey, string>> = {
+  invoices: 'https://invoices.kz',
+  salon: 'https://salon.invoices.kz',
   kaspiShop: 'https://kaspi.invoices.kz',
   kaspiApi: 'https://api.invoices.kz',
   aiAgent: 'https://agent.invoices.kz',
@@ -32,6 +34,12 @@ export function crossProductHref(o: { to: ProductKey; path: string; from: Produc
 function isSafeBack(back: string | null): back is string {
   if (!back || !back.startsWith('/') || back.startsWith('//') || back.includes('\\')) return false
   return BACK_PREFIXES.some((p) => back === p || back.startsWith(`${p}/`) || back.startsWith(`${p}?`))
+}
+
+// Address of a product's cabinet: its own host in production, the current host elsewhere.
+export function productCabinetHref(key: ProductKey, hostname: string): string {
+  const p = PRODUCTS.find((x) => x.key === key)
+  return p ? `${originFor(key, hostname)}${p.href}` : '/products'
 }
 
 export type Handoff = { from: ProductKey; back: string }

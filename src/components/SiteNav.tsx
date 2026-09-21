@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useRef } from 'react'
+import { useContext, useEffect, useState, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { useEffectivePath, useProductHost } from '@/lib/useEffectivePath'
@@ -9,6 +9,7 @@ import { getActivePlan } from '@/lib/plan'
 import { useLanguage, type Lang } from './LanguageProvider'
 import KaspiShopStoreSwitcher from './KaspiShopStoreSwitcher'
 import { connectProduct, useMyProducts } from '@/lib/useMyProducts'
+import { ShellContext } from './shellContext'
 import { isSectionVisible } from '@/lib/products'
 
 const labels: Record<Lang, { home: string; invoices: string; kaspiShop: string; aiAgent: string; kaspiApi: string; wildberries: string; products: string; profile: string; menu: string; close: string }> = {
@@ -35,7 +36,7 @@ const proLockedMessages: Record<Lang, string> = {
   en: 'Available on the Pro plan',
 }
 
-type LocalizedLabel = Record<Lang, string>
+export type LocalizedLabel = Record<Lang, string>
 
 const invoicesLinks: { href: string; label: LocalizedLabel }[] = [
   { href: '/create', label: { ru: 'Создать счёт', kk: 'Шот құру', en: 'Create invoice' } },
@@ -97,7 +98,7 @@ const wbLinks: { href: string; label: LocalizedLabel }[] = [
 // a top-level button (click = go to the section's first page) + its links
 // rendered as pill tabs in a second bar whenever the current path belongs
 // to the section.
-type Section = {
+export type Section = {
   key: 'invoices' | 'kaspiApi' | 'kaspiShop' | 'aiAgent' | 'wildberries'
   links: { href: string; label: LocalizedLabel }[]
   adminOnly: boolean
@@ -113,7 +114,7 @@ type Section = {
   soon?: boolean
 }
 
-const SECTIONS: Section[] = [
+export const SECTIONS: Section[] = [
   { key: 'invoices', links: invoicesLinks, adminOnly: false },
   { key: 'kaspiApi', links: kaspiApiLinks, adminOnly: false },
   { key: 'aiAgent', links: aiAgentLinks, adminOnly: false, proOnly: true },
@@ -205,7 +206,13 @@ function isActiveSection(links: { href: string }[], path: string) {
   return links.some(l => path === l.href || path.startsWith(l.href + '/'))
 }
 
-export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean }) {
+// Inside a product shell (sidebar layout) the shell is the navigation.
+export default function SiteNav(props: { desktopOnly?: boolean }) {
+  const inShell = useContext(ShellContext)
+  return inShell ? null : <SiteNavBar {...props} />
+}
+
+function SiteNavBar({ desktopOnly = false }: { desktopOnly?: boolean }) {
   const router = useRouter()
   const path = useEffectivePath()
   const { lang } = useLanguage()

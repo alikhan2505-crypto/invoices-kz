@@ -17,7 +17,7 @@ export default function DesktopShell({ children }: { children: React.ReactNode }
           (lg:top-[21px]), scoped to these 5 DesktopShell pages only. Full corner
           rounding (all four) stays -- with a real gap on every side there's no
           longer a flush edge anywhere that would call for a squared-off corner. */}
-      <div className="desktop-shell-glass desktop-shell-scroll lg:fixed lg:top-3 lg:right-3 lg:bottom-3 lg:left-3 lg:rounded-[28px] lg:overflow-y-auto lg:shadow-2xl lg:ring-1 lg:ring-black/5">
+      <div className="desktop-shell-glass desktop-shell-scroll lg:fixed lg:top-3 lg:right-3 lg:bottom-3 lg:left-[var(--shell-left,0.75rem)] lg:rounded-[28px] lg:overflow-y-auto lg:shadow-2xl lg:ring-1 lg:ring-black/5">
         {children}
       </div>
     </>
