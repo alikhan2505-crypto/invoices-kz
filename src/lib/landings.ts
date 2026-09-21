@@ -4,7 +4,7 @@ import type { ProductKey } from './products'
 // Content of the public product landings (stage 4 of the product split).
 // Colours come from the PRODUCTS registry; only the softer sticker tint lives
 // here. Copy follows the founder-approved mock of 21.09.2026.
-export type LandingKey = 'kaspi' | 'agent'
+export type LandingKey = 'kaspi' | 'agent' | 'salon'
 
 type L10n = Record<Lang, string>
 
@@ -12,7 +12,10 @@ export type LandingDef = {
   key: LandingKey
   product: ProductKey
   origin: string // canonical public address
-  cabinet: '/kaspi-shop' | '/ai-agent' // where a signed-in person goes
+  cabinet: '/kaspi-shop' | '/ai-agent' | '/admin/site-generator' // where a signed-in person goes
+  // 'invite': the product is not open to everyone yet -- the call to action is
+  // an application by e-mail, and only admins are sent to the cabinet.
+  access: 'open' | 'invite'
   soft: string
   audience: L10n
   tagline: L10n
@@ -28,6 +31,7 @@ export const LANDINGS: Record<LandingKey, LandingDef> = {
     product: 'kaspiShop',
     origin: 'https://kaspi.invoices.kz',
     cabinet: '/kaspi-shop',
+    access: 'open',
     soft: '#FF8F7F',
     audience: { ru: 'Продавцы Kaspi Магазина', kk: 'Kaspi Дүкені сатушылары', en: 'Kaspi Magazin sellers' },
     tagline: {
@@ -53,6 +57,7 @@ export const LANDINGS: Record<LandingKey, LandingDef> = {
     product: 'aiAgent',
     origin: 'https://agent.invoices.kz',
     cabinet: '/ai-agent',
+    access: 'open',
     soft: '#D2C7FF',
     audience: { ru: 'Бизнес, который живёт в переписке', kk: 'Жазысуда жұмыс істейтін бизнес', en: 'Businesses that live in chat' },
     tagline: {
@@ -73,24 +78,50 @@ export const LANDINGS: Record<LandingKey, LandingDef> = {
     metaTitle: 'AI-агент — ответы клиентам в WhatsApp и Instagram | invoices.kz',
     metaDescription: 'AI-агент отвечает клиентам в WhatsApp, Instagram и на сайте, готовит счета и записи черновиком на подтверждение и передаёт диалог человеку.',
   },
+  salon: {
+    key: 'salon',
+    product: 'salon',
+    origin: 'https://salon.invoices.kz',
+    cabinet: '/admin/site-generator',
+    access: 'invite',
+    soft: '#FBDDE6',
+    audience: { ru: 'Салоны красоты и барбершопы', kk: 'Сұлулық салондары мен барбершоптар', en: 'Beauty salons and barbershops' },
+    tagline: {
+      ru: 'Записи клиентов, мастера и сайт салона',
+      kk: 'Клиент жазылулары, мастерлер және салон сайты',
+      en: 'Client bookings, masters and a salon website',
+    },
+    lead: {
+      ru: 'Календарь по мастерам, записи из переписки на подтверждение владельцу и история каждого клиента.',
+      kk: 'Мастерлер бойынша күнтізбе, жазысудан келген жазылулар иесіне растауға және әр клиенттің тарихы.',
+      en: 'A calendar by master, bookings from chats for the owner to approve, and a history for every client.',
+    },
+    points: {
+      ru: ['Календарь по мастерам и категориям услуг', 'Записи из переписки — на подтверждение', 'Клиенты и статус «Постоянный»'],
+      kk: ['Мастерлер мен қызмет санаттары бойынша күнтізбе', 'Жазысудан келген жазылулар — растауға', 'Клиенттер және «Тұрақты» мәртебесі'],
+      en: ['Calendar by master and service category', 'Bookings from chats wait for your approval', 'Clients and a "Regular" status'],
+    },
+    metaTitle: 'Салон — записи клиентов, мастера и сайт салона | invoices.kz',
+    metaDescription: 'Календарь по мастерам, записи из переписки на подтверждение владельцу, история клиентов и сайт салона. Подключаем салоны по заявке.',
+  },
 }
 
 export function isLandingKey(v: string): v is LandingKey {
   return Object.prototype.hasOwnProperty.call(LANDINGS, v)
 }
 
-export const LANDING_UI: Record<Lang, { allProducts: string; login: string; open: string; enter: string; others: string; soon: string; lockedHint: string }> = {
-  ru: { allProducts: 'Все продукты', login: 'Войти', open: 'Открыть кабинет', enter: 'Войти и открыть', others: 'Другие продукты', soon: 'скоро', lockedHint: 'Раздел ещё дорабатывается' },
-  kk: { allProducts: 'Барлық өнімдер', login: 'Кіру', open: 'Кабинетті ашу', enter: 'Кіріп ашу', others: 'Басқа өнімдер', soon: 'жақында', lockedHint: 'Бөлім әлі дайындалуда' },
-  en: { allProducts: 'All products', login: 'Log in', open: 'Open dashboard', enter: 'Log in and open', others: 'Other products', soon: 'soon', lockedHint: 'This section is still in progress' },
+export const LANDING_UI: Record<Lang, { allProducts: string; login: string; open: string; enter: string; apply: string; inviteNote: string; others: string; soon: string; lockedHint: string }> = {
+  ru: { allProducts: 'Все продукты', login: 'Войти', open: 'Открыть кабинет', enter: 'Войти и открыть', apply: 'Оставить заявку', inviteNote: 'Салоны подключаем по заявке', others: 'Другие продукты', soon: 'скоро', lockedHint: 'Раздел ещё дорабатывается' },
+  kk: { allProducts: 'Барлық өнімдер', login: 'Кіру', open: 'Кабинетті ашу', enter: 'Кіріп ашу', apply: 'Өтінім қалдыру', inviteNote: 'Салондарды өтінім бойынша қосамыз', others: 'Басқа өнімдер', soon: 'жақында', lockedHint: 'Бөлім әлі дайындалуда' },
+  en: { allProducts: 'All products', login: 'Log in', open: 'Open dashboard', enter: 'Log in and open', apply: 'Request access', inviteNote: 'We onboard salons by request', others: 'Other products', soon: 'soon', lockedHint: 'This section is still in progress' },
 }
 
-// Public addresses shown in the "other products" bar. Salon stays out until
-// the founder opens it to customers.
+// Public addresses shown in the "other products" bar.
 export const OTHER_PRODUCT_LINKS: { product: ProductKey; label: string; url: string | null }[] = [
   { product: 'invoices', label: 'Счета', url: 'https://invoices.kz' },
   { product: 'kaspiShop', label: 'Kaspi Bot', url: 'https://kaspi.invoices.kz' },
   { product: 'kaspiApi', label: 'Kaspi Cashier API', url: 'https://api.invoices.kz' },
   { product: 'aiAgent', label: 'AI-агент', url: 'https://agent.invoices.kz' },
+  { product: 'salon', label: 'Салон', url: 'https://salon.invoices.kz' },
   { product: 'wildberries', label: 'WB Bot', url: null },
 ]

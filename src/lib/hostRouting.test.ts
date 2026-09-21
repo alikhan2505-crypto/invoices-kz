@@ -36,8 +36,8 @@ describe('agent host', () => {
 })
 
 describe('salon host', () => {
-  it('root opens the site generator; the planner path passes through', () => {
-    expect(productHostRewrite('salon.invoices.kz', '/', 'invoices.kz')).toBe('/admin/site-generator')
+  it('root opens the salon landing; the planner path passes through', () => {
+    expect(productHostRewrite('salon.invoices.kz', '/', 'invoices.kz')).toBe('/lp/salon')
     expect(productHostRewrite('salon.invoices.kz', '/planner/demo', 'invoices.kz')).toBeNull()
   })
 })

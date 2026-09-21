@@ -1120,6 +1120,7 @@ html {
 .lp-hero { position: relative; z-index: 1; display: grid; gap: 16px; padding-block: 34px 22px; max-width: 640px; }
 .lp-eyebrow { margin: 0; font: 500 12px/1.2 var(--font-onest), Arial, sans-serif; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.75; }
 .lp-h1 { margin: 0; font: 700 clamp(32px, 5.4vw, 62px)/1.04 var(--font-unbounded), Arial, sans-serif; letter-spacing: -0.03em; text-wrap: balance; }
+.lp-note { margin: 0; justify-self: start; border: 2px dashed var(--ink-t); border-radius: 9999px; padding: 6px 14px; font: 600 13px/1 var(--font-onest), Arial, sans-serif; }
 .lp-lead { margin: 0; font-size: 18px; max-width: 44ch; opacity: 0.9; }
 .lp-cta { justify-self: start; border: 2px solid var(--ink-t); background: var(--ink-t); border-radius: 9999px; padding: 13px 26px; font: 600 16px/1 var(--font-onest), Arial, sans-serif; text-decoration: none; transition: transform 0.15s; }
 .lp-cta, .lp-cta span { color: var(--bg-t) !important; }

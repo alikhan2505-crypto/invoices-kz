@@ -6,7 +6,7 @@ const PRODUCT_HOST_ROUTES: Record<string, Record<string, string>> = {
   api: { '/': '/cashier-api', '/docs': '/kaspi-api/docs' },
   kaspi: { '/': '/lp/kaspi' },
   agent: { '/': '/lp/agent' },
-  salon: { '/': '/admin/site-generator' },
+  salon: { '/': '/lp/salon' },
 }
 
 // Returns the internal path to rewrite to, or null to leave the request alone.
