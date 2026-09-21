@@ -1187,3 +1187,5 @@ body.product-shell-active [data-tour="wallet"] > button:first-child { display: n
 .brand-loader-ch.brand-loader-tail { color: color-mix(in srgb, var(--nav-accent) 65%, white); }
 @keyframes brand-loader-wave { 0%, 60%, 100% { opacity: 0.45; transform: translateY(0); } 25% { opacity: 1; transform: translateY(-3px); } }
 @media (prefers-reduced-motion: reduce) { .brand-loader-ch { animation: none; opacity: 1; } }
+
+/* rebuild marker: loader styles */

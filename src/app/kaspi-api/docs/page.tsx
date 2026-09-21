@@ -9,6 +9,7 @@ import { useLanguage } from '@/components/LanguageProvider'
 import { setPostLoginRedirect } from '@/lib/postLoginRedirect'
 import ApiDocsViewer from '@/components/ApiDocsViewer'
 import { CASHIER_API_THEMED as C, CASHIER_API_FONT_SANS as FONT_SANS, CASHIER_API_FONT_MONO as FONT_MONO } from '@/lib/kaspiCashierApi/theme'
+import BrandLoader from '@/components/BrandLoader'
 
 interface DocsCopy {
   loading: string
@@ -185,9 +186,7 @@ export default function KaspiApiDocsPage() {
             definite height, so min-h-full's percentage resolves to 0 at the
             lg breakpoint and collapses this div, leaving the light ambient
             background showing below it (same bug fixed on /kaspi-api). */}
-        <div className="flex min-h-screen items-center justify-center" style={{ background: 'transparent', color: 'var(--nav-text-muted)', fontFamily: FONT_SANS }}>
-          {d.loading}
-        </div>
+        <BrandLoader />
       </main>
       </DesktopShell>
     )
