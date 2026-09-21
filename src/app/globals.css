@@ -1055,7 +1055,7 @@ html {
 .prd-b2 { width: 360px; height: 360px; background: var(--prd-b2); top: 140px; right: -100px; }
 .prd-b3 { width: 320px; height: 320px; background: var(--prd-b3); top: 620px; left: 30%; }
 .prd-ghost {
-  position: absolute; z-index: -1; right: clamp(-10px, 2vw, 30px); top: 30px;
+  position: absolute; z-index: -1; right: max(2vw, calc((100% - 1160px) / 2 - 20px)); top: 30px;
   font: 700 clamp(220px, 34vw, 420px)/0.8 var(--font-unbounded), Arial, sans-serif;
   color: transparent; -webkit-text-stroke: 2px var(--prd-line); user-select: none; pointer-events: none;
 }

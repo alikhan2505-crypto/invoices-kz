@@ -17,6 +17,9 @@ export type ProductDef = {
   blurb: string
   audience: string
   href: string
+  // Public page of the product for people who are not in its cabinet (guests, or
+  // an account that can't open it yet); signed-in people with access go to href.
+  landing?: string
   // Colours follow DESIGN.md §7 (marketing surfaces): one flat colour per
   // product, one ink on it, one softer tint for stickers.
   bg: string
@@ -33,10 +36,10 @@ export type ProductDef = {
 
 export const PRODUCTS: ProductDef[] = [
   { key: 'invoices', name: 'Счета', blurb: 'Счёт, КП и АВР за 30 секунд', audience: 'ИП и ТОО Казахстана', href: '/create', bg: '#1C2056', ink: '#F4F6FF', inNav: true },
-  { key: 'kaspiShop', name: 'Kaspi Bot', blurb: 'Демпинг цен и заказы Kaspi', audience: 'Продавцы Kaspi Магазина', href: '/kaspi-shop', bg: '#FF6B57', ink: '#2A0B07', proOnly: true, inNav: true },
-  { key: 'kaspiApi', name: 'Kaspi Cashier API', blurb: 'Приём Kaspi Pay в ваш код', audience: 'Разработчики и интеграторы', href: '/kaspi-api', bg: '#F5E663', ink: '#14130A', inNav: true },
-  { key: 'aiAgent', name: 'AI-агент', blurb: 'Отвечает клиентам в мессенджерах', audience: 'Бизнес, который живёт в переписке', href: '/ai-agent', bg: '#B7A6FF', ink: '#1D1140', proOnly: true, inNav: true },
-  { key: 'salon', name: 'Салон', blurb: 'Записи, мастера, сайт салона', audience: 'Салоны красоты и барбершопы', href: '/admin/site-generator', bg: '#F7C6D4', ink: '#3B1030', adminOnly: true, inNav: false },
+  { key: 'kaspiShop', name: 'Kaspi Bot', blurb: 'Демпинг цен и заказы Kaspi', audience: 'Продавцы Kaspi Магазина', href: '/kaspi-shop', landing: 'https://kaspi.invoices.kz', bg: '#FF6B57', ink: '#2A0B07', proOnly: true, inNav: true },
+  { key: 'kaspiApi', name: 'Kaspi Cashier API', blurb: 'Приём Kaspi Pay в ваш код', audience: 'Разработчики и интеграторы', href: '/kaspi-api', landing: 'https://api.invoices.kz', bg: '#F5E663', ink: '#14130A', inNav: true },
+  { key: 'aiAgent', name: 'AI-агент', blurb: 'Отвечает клиентам в мессенджерах', audience: 'Бизнес, который живёт в переписке', href: '/ai-agent', landing: 'https://agent.invoices.kz', bg: '#B7A6FF', ink: '#1D1140', proOnly: true, inNav: true },
+  { key: 'salon', name: 'Салон', blurb: 'Записи, мастера, сайт салона', audience: 'Салоны красоты и барбершопы', href: '/admin/site-generator', landing: 'https://salon.invoices.kz', bg: '#F7C6D4', ink: '#3B1030', inNav: false },
   { key: 'wildberries', name: 'WB Bot', blurb: 'Товары и заказы Wildberries', audience: 'Продавцы Wildberries', href: '/wildberries', bg: '#7A2E8E', ink: '#FBEAFB', locked: true, inNav: true },
 ]
 
@@ -109,7 +112,7 @@ export function homeFor(list: unknown): string {
   if (keys.length === 0) return '/dashboard'
   if (keys.length > 1) return '/products'
   const only = PRODUCTS.find((p) => p.key === keys[0])
-  return only && only.key !== 'invoices' && !only.locked ? only.href : '/dashboard'
+  return only && only.key !== 'invoices' && only.key !== 'salon' && !only.locked ? only.href : '/dashboard'
 }
 
 // "What do you do?" on the start page (founder's mock, 21.09.2026): one tap

@@ -34,10 +34,10 @@ describe('toggleProduct', () => {
   })
 })
 
-describe('locked and admin-only products are never selectable by default', () => {
-  it('excludes wildberries (locked) and salon (admin-only)', () => {
+describe('locked products are never selectable by default', () => {
+  it('excludes wildberries (locked); salon is public by application since 21.09', () => {
     expect(SELECTABLE_KEYS).not.toContain('wildberries')
-    expect(SELECTABLE_KEYS).not.toContain('salon')
+    expect(SELECTABLE_KEYS).toContain('salon')
   })
   it('isInMyProducts with no choice reflects the same set', () => {
     expect(isInMyProducts(null, 'invoices')).toBe(true)

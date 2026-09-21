@@ -118,10 +118,12 @@ export default function ProductsHub({ fontClass }: { fontClass: string }) {
               )
             }
             const inMenu = isInMyProducts(mine, p.key)
+            // Guests (and accounts that can't open the cabinet, e.g. salon for now) see the product's public page.
+            const target = p.landing && (!logged || (p.key === 'salon' && !isAdmin)) ? p.landing : p.href
             const proTag = p.proOnly && who.state === 'user' && !isPro && !isAdmin
             return (
               <div key={p.key} className="prd-tile" style={style} data-big={big} data-out={logged && !inMenu}>
-                <Link href={p.href} className="prd-cover" aria-label={`Открыть: ${p.name}`} />
+                <Link href={target} className="prd-cover" aria-label={`Открыть: ${p.name}`} />
                 {logged && <span className={`prd-pill${inMenu ? ' prd-on' : ''}`}><span>{inMenu ? 'В меню' : 'Не в меню'}</span></span>}
                 <span className="prd-tn">{p.name}</span>
                 <span className="prd-tl">{p.blurb}{proTag ? ' · тариф Про' : ''}</span>
