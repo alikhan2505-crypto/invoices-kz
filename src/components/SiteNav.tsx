@@ -45,6 +45,7 @@ const invoicesLinks: { href: string; label: LocalizedLabel }[] = [
 ]
 
 const kaspiShopLinks: { href: string; label: LocalizedLabel }[] = [
+  { href: '/kaspi-shop/overview', label: { ru: 'Обзор', kk: 'Шолу', en: 'Overview' } },
   { href: '/kaspi-shop', label: { ru: 'Демпинг', kk: 'Демпинг', en: 'Repricer' } },
   { href: '/kaspi-shop/orders', label: { ru: 'Заказы', kk: 'Тапсырыстар', en: 'Orders' } },
   { href: '/kaspi-shop/refunds', label: { ru: 'Возвраты', kk: 'Қайтарулар', en: 'Refunds' } },

@@ -12,7 +12,7 @@ export type LandingDef = {
   key: LandingKey
   product: ProductKey
   origin: string // canonical public address
-  cabinet: '/kaspi-shop' | '/ai-agent' | '/admin/site-generator' // where a signed-in person goes
+  cabinet: '/kaspi-shop/overview' | '/ai-agent' | '/admin/site-generator' // where a signed-in person goes
   // 'invite': the product is not open to everyone yet -- the call to action is
   // an application by e-mail, and only admins are sent to the cabinet.
   access: 'open' | 'invite'
@@ -30,7 +30,7 @@ export const LANDINGS: Record<LandingKey, LandingDef> = {
     key: 'kaspi',
     product: 'kaspiShop',
     origin: 'https://kaspi.invoices.kz',
-    cabinet: '/kaspi-shop',
+    cabinet: '/kaspi-shop/overview',
     access: 'open',
     soft: '#FF8F7F',
     audience: { ru: 'Продавцы Kaspi Магазина', kk: 'Kaspi Дүкені сатушылары', en: 'Kaspi Magazin sellers' },
