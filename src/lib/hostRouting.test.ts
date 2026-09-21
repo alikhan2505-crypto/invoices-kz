@@ -28,6 +28,13 @@ describe('kaspi host', () => {
   })
 })
 
+describe('agent host', () => {
+  it('root opens the AI agent cabinet, other paths pass through', () => {
+    expect(productHostRewrite('agent.invoices.kz', '/', 'invoices.kz')).toBe('/ai-agent')
+    expect(productHostRewrite('agent.invoices.kz', '/ai-agent/review', 'invoices.kz')).toBeNull()
+  })
+})
+
 describe('apexToApiRedirect', () => {
   it('is off by default', () => {
     expect(apexToApiRedirect('invoices.kz', '/cashier-api', 'invoices.kz', false)).toBeNull()
