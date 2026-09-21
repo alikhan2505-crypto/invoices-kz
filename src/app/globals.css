@@ -1144,3 +1144,13 @@ html {
   .lp-art { position: relative; right: auto; bottom: auto; width: min(70%, 320px); margin: 6px 0 0 auto; }
 }
 @media (prefers-reduced-motion: reduce) { .lp-art svg { animation: none; } .lp-cta { transition: none; } }
+
+/* "What do you do?" chips on the start page. */
+.prd-persona { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding-bottom: 22px; }
+.prd-hand { font: 600 26px/1 var(--font-caveat), cursive; transform: rotate(-3deg); margin-right: 6px; color: var(--prd-ink2) !important; }
+.prd-chip { border: 2px solid var(--prd-ink); background: transparent; border-radius: 9999px; padding: 10px 18px; font: 600 15px/1 var(--font-onest), Arial, sans-serif; transition: transform 0.15s; }
+.prd-chip:hover { transform: translateY(-2px); }
+.prd-chip[data-on="true"] { background: var(--prd-ink); }
+.prd-chip[data-on="true"], .prd-chip[data-on="true"] span { color: var(--prd-bg) !important; }
+.prd-chip-quiet { border-style: dashed; font-weight: 500; }
+@media (prefers-reduced-motion: reduce) { .prd-chip { transition: none; } }

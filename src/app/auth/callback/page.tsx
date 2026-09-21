@@ -6,7 +6,7 @@ import { useLanguage } from '@/components/LanguageProvider'
 import { authDict } from '@/lib/i18n/auth'
 import { hasPendingUpgrade } from '@/lib/pendingUpgrade'
 import { consumePostLoginRedirect } from '@/lib/postLoginRedirect'
-import { homeFor } from '@/lib/products'
+import { homeFor, personaProducts, PENDING_PERSONA_KEY } from '@/lib/products'
 
 export default function AuthCallback() {
   const router = useRouter()
@@ -80,6 +80,21 @@ export default function AuthCallback() {
         // it. See src/lib/postLoginRedirect.ts.
         const postLoginRedirect = consumePostLoginRedirect()
 
+        // Start-page answer ("what do you do?") given before signing in: it
+        // connects the matching products, but only for an account that has not
+        // chosen yet -- it never overwrites an existing account's list.
+        let enabledProducts: unknown = profile?.enabled_products
+        try {
+          const persona = personaProducts(localStorage.getItem(PENDING_PERSONA_KEY))
+          localStorage.removeItem(PENDING_PERSONA_KEY)
+          if (persona && !Array.isArray(enabledProducts)) {
+            await supabase.from('profiles').update({ enabled_products: persona }).eq('id', session.user.id)
+            enabledProducts = persona
+          }
+        } catch {
+          // Storage blocked: the account simply stays unchosen (shows everything).
+        }
+
         // Exactly one place decides where a fully-authenticated user lands --
         // used below by an already-bootstrapped account, and by the
         // bootstrap chain itself (both its success path and its early return
@@ -98,7 +113,7 @@ export default function AuthCallback() {
             // src/lib/postLoginRedirect.ts).
             router.replace(postLoginRedirect)
           } else {
-            router.push(homeFor(profile?.enabled_products))
+            router.push(homeFor(enabledProducts))
           }
         }
 

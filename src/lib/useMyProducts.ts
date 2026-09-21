@@ -69,8 +69,9 @@ export async function connectProduct(key: ProductKey): Promise<void> {
   if (!user) return
   const { data } = await supabase.from('profiles').select('enabled_products').eq('id', user.id).single()
   const list = data?.enabled_products
-  if (!Array.isArray(list) || list.includes(key)) return
-  const next = [...(list as ProductKey[]), key]
+  if (Array.isArray(list) && list.includes(key)) return
+  // A new account has no list yet: the first product it opens becomes its only one.
+  const next = Array.isArray(list) ? [...(list as ProductKey[]), key] : [key]
   await supabase.from('profiles').update({ enabled_products: next }).eq('id', user.id)
   writeCache(serializeMyProducts(next))
 }

@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { getActivePlan } from '@/lib/plan'
-import { PRODUCTS, isInMyProducts, toggleProduct, type ProductDef } from '@/lib/products'
+import { PRODUCTS, PERSONAS, PENDING_PERSONA_KEY, personaProducts, isInMyProducts, toggleProduct, type ProductDef } from '@/lib/products'
 import { useMyProducts } from '@/lib/useMyProducts'
 import ProductArt from '@/components/products/ProductArt'
 
@@ -12,6 +12,8 @@ type Who = { state: 'loading' } | { state: 'guest' } | { state: 'user'; isAdmin:
 // Grid spans: two big tiles first, then rows of three; a short last row
 // stretches so nothing sits alone next to dead space.
 function spanFor(i: number, n: number): number {
+  if (n === 1) return 12
+  if (n === 2) return 6
   if (i === 0) return 7
   if (i === 1) return 5
   const rest = n - 2
@@ -29,6 +31,8 @@ function tileVars(p: ProductDef): React.CSSProperties {
 export default function ProductsHub({ fontClass }: { fontClass: string }) {
   const [who, setWho] = useState<Who>({ state: 'loading' })
   const [mine, saveMine] = useMyProducts()
+  // Guest's answer to "what do you do?" (narrows the tiles, applied after sign-in).
+  const [persona, setPersona] = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -43,7 +47,25 @@ export default function ProductsHub({ fontClass }: { fontClass: string }) {
   const logged = who.state === 'user'
   const isAdmin = who.state === 'user' && who.isAdmin
   const isPro = who.state === 'user' && who.isPro
-  const shown = PRODUCTS.filter((p) => !p.adminOnly || isAdmin)
+  const personaKeys = who.state === 'guest' ? personaProducts(persona) : null
+  const shown = PRODUCTS.filter((p) => (!p.adminOnly || isAdmin) && (!personaKeys || personaKeys.includes(p.key)))
+  // Asked of guests and of signed-in people who have not chosen products yet.
+  const askPersona = who.state === 'guest' || (logged && mine === null)
+
+  function choosePersona(key: string | null) {
+    if (logged) {
+      const keys = personaProducts(key)
+      if (keys) saveMine(keys)
+      return
+    }
+    setPersona(key)
+    try {
+      if (key) localStorage.setItem(PENDING_PERSONA_KEY, key)
+      else localStorage.removeItem(PENDING_PERSONA_KEY)
+    } catch {
+      // Blocked storage: the tiles still narrow, the account just stays unchosen.
+    }
+  }
 
   return (
     <main className={`prd-root ${fontClass}`}>
@@ -69,6 +91,16 @@ export default function ProductsHub({ fontClass }: { fontClass: string }) {
               : 'Не продаёте на Kaspi — не увидите его в меню. Понадобится позже — добавите в один клик.'}
           </p>
         </div>
+
+        {askPersona && (
+          <div className="prd-persona">
+            <span className="prd-hand">чем занимаетесь?</span>
+            {PERSONAS.map((x) => (
+              <button key={x.key} type="button" className="prd-chip" data-on={persona === x.key} onClick={() => choosePersona(x.key)}><span>{x.label}</span></button>
+            ))}
+            {persona && <button type="button" className="prd-chip prd-chip-quiet" onClick={() => choosePersona(null)}><span>Показать все</span></button>}
+          </div>
+        )}
 
         <div className="prd-grid">
           {shown.map((p, i) => {

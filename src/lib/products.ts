@@ -111,3 +111,19 @@ export function homeFor(list: unknown): string {
   const only = PRODUCTS.find((p) => p.key === keys[0])
   return only && only.key !== 'invoices' && !only.locked ? only.href : '/dashboard'
 }
+
+// "What do you do?" on the start page (founder's mock, 21.09.2026): one tap
+// connects the products that fit. Salon comes with the AI agent, as in the mock.
+export const PERSONAS: { key: string; label: string; products: ProductKey[] }[] = [
+  { key: 'kaspi', label: 'Продаю на Kaspi', products: ['kaspiShop'] },
+  { key: 'ip', label: 'Я ИП или ТОО', products: ['invoices'] },
+  { key: 'dev', label: 'Пишу код', products: ['kaspiApi'] },
+  { key: 'salon', label: 'У меня салон', products: ['salon', 'aiAgent'] },
+]
+
+export function personaProducts(key: string | null): ProductKey[] | null {
+  return PERSONAS.find((p) => p.key === key)?.products ?? null
+}
+
+// Remembered across the trip through /login (same origin, so localStorage works).
+export const PENDING_PERSONA_KEY = 'pending_persona'
