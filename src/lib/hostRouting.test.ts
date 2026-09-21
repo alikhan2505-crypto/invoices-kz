@@ -29,8 +29,8 @@ describe('kaspi host', () => {
 })
 
 describe('agent host', () => {
-  it('root opens the AI agent cabinet, other paths pass through', () => {
-    expect(productHostRewrite('agent.invoices.kz', '/', 'invoices.kz')).toBe('/ai-agent')
+  it('root opens the AI agent landing, other paths pass through', () => {
+    expect(productHostRewrite('agent.invoices.kz', '/', 'invoices.kz')).toBe('/lp/agent')
     expect(productHostRewrite('agent.invoices.kz', '/ai-agent/review', 'invoices.kz')).toBeNull()
   })
 })

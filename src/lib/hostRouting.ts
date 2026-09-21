@@ -5,7 +5,7 @@
 const PRODUCT_HOST_ROUTES: Record<string, Record<string, string>> = {
   api: { '/': '/cashier-api', '/docs': '/kaspi-api/docs' },
   kaspi: { '/': '/lp/kaspi' },
-  agent: { '/': '/ai-agent' },
+  agent: { '/': '/lp/agent' },
   salon: { '/': '/admin/site-generator' },
 }
 
