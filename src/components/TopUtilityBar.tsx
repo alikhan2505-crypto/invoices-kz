@@ -327,10 +327,28 @@ export default function TopUtilityBar() {
   // The product shell shows the balance in its sidebar; its "top up" opens this panel.
   const openPanelRef = useRef<(p: Exclude<Panel, null>) => void>(() => {})
   useEffect(() => {
-    const onOpen = () => openPanelRef.current('wallet')
-    window.addEventListener('open-wallet-panel', onOpen)
-    return () => window.removeEventListener('open-wallet-panel', onOpen)
+    const onWallet = () => openPanelRef.current('wallet')
+    const onPanel = (e: Event) => {
+      const p = (e as CustomEvent<{ panel?: string }>).detail?.panel
+      if (p === 'notifications' || p === 'help' || p === 'account') openPanelRef.current(p)
+    }
+    window.addEventListener('open-wallet-panel', onWallet)
+    window.addEventListener('open-utility-panel', onPanel)
+    return () => {
+      window.removeEventListener('open-wallet-panel', onWallet)
+      window.removeEventListener('open-utility-panel', onPanel)
+    }
   }, [])
+
+  // The shell sidebar shows the unread badge and the initials; it asks for them on mount.
+  useEffect(() => {
+    const emit = () => window.dispatchEvent(new CustomEvent('utility-bar-state', {
+      detail: { unread: unreadCount, initials: companyName ? companyName.slice(0, 2).toUpperCase() : '··' },
+    }))
+    emit()
+    window.addEventListener('utility-bar-request', emit)
+    return () => window.removeEventListener('utility-bar-request', emit)
+  }, [unreadCount, companyName])
 
   function openPanel(p: Exclude<Panel, null>) {
     setPanel(p)

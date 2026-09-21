@@ -10,10 +10,14 @@ import { productCabinetHref } from '@/lib/crossProduct'
 import { useEffectivePath } from '@/lib/useEffectivePath'
 import { useMyProducts } from '@/lib/useMyProducts'
 
-const TEXT: Record<Lang, { all: string; menu: string; close: string; balance: string; topup: string; connected: string; notConnected: string }> = {
-  ru: { all: 'Все продукты', menu: 'Меню', close: 'Закрыть', balance: 'Баланс', topup: 'Пополнить', connected: 'Магазин подключён', notConnected: 'Магазин не подключён' },
-  kk: { all: 'Барлық өнімдер', menu: 'Мәзір', close: 'Жабу', balance: 'Баланс', topup: 'Толтыру', connected: 'Дүкен қосылған', notConnected: 'Дүкен қосылмаған' },
-  en: { all: 'All products', menu: 'Menu', close: 'Close', balance: 'Balance', topup: 'Top up', connected: 'Store connected', notConnected: 'Store not connected' },
+const TEXT: Record<Lang, { all: string; menu: string; close: string; balance: string; topup: string; connected: string; notConnected: string; notifications: string; help: string; account: string }> = {
+  ru: { all: 'Все продукты', menu: 'Меню', close: 'Закрыть', balance: 'Баланс', topup: 'Пополнить баланс', connected: 'Магазин подключён', notConnected: 'Магазин не подключён', notifications: 'Уведомления', help: 'Помощь', account: 'Аккаунт' },
+  kk: { all: 'Барлық өнімдер', menu: 'Мәзір', close: 'Жабу', balance: 'Баланс', topup: 'Балансты толтыру', connected: 'Дүкен қосылған', notConnected: 'Дүкен қосылмаған', notifications: 'Хабарландырулар', help: 'Көмек', account: 'Аккаунт' },
+  en: { all: 'All products', menu: 'Menu', close: 'Close', balance: 'Balance', topup: 'Top up balance', connected: 'Store connected', notConnected: 'Store not connected', notifications: 'Notifications', help: 'Help', account: 'Account' },
+}
+
+function openUtility(panel: 'notifications' | 'help' | 'account') {
+  window.dispatchEvent(new CustomEvent('open-utility-panel', { detail: { panel } }))
 }
 
 function Chevron() {
@@ -34,6 +38,7 @@ export default function ProductShell({ product, children }: { product: ProductKe
   const [menuOpen, setMenuOpen] = useState(false)
   const [storeState, setStoreState] = useState<StoreState>('loading')
   const [balance, setBalance] = useState<number | null>(null)
+  const [util, setUtil] = useState<{ unread: number; initials: string }>({ unread: 0, initials: '··' })
   const [mine] = useMyProducts()
   const [hostname] = useState(() => (typeof window === 'undefined' ? '' : window.location.hostname))
   const switchRef = useRef<HTMLDivElement>(null)
@@ -67,6 +72,17 @@ export default function ProductShell({ product, children }: { product: ProductKe
     }
     void load()
     return () => { alive = false }
+  }, [])
+
+  // Bell badge and initials come from the top bar component (it owns the data).
+  useEffect(() => {
+    const onState = (e: Event) => {
+      const d = (e as CustomEvent<{ unread: number; initials: string }>).detail
+      if (d) setUtil({ unread: d.unread, initials: d.initials })
+    }
+    window.addEventListener('utility-bar-state', onState)
+    window.dispatchEvent(new Event('utility-bar-request'))
+    return () => window.removeEventListener('utility-bar-state', onState)
   }, [])
 
   useEffect(() => {
@@ -152,20 +168,38 @@ export default function ProductShell({ product, children }: { product: ProductKe
       </nav>
 
       <div className="px-3 py-3 flex-shrink-0" style={{ borderTop: '1px solid var(--nav-border)' }}>
-        <div className="flex items-center gap-2 rounded-2xl px-3 py-2" style={{ background: 'var(--nav-surface-glass)' }}>
-          <div className="flex-1 min-w-0">
-            <div className="text-[11px] font-semibold uppercase" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.08em' }}>{t.balance}</div>
-            <div className="text-[15px] font-bold tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>
-              {balance === null ? '···' : `${balance.toLocaleString('ru-KZ')} ₸`}
-            </div>
-          </div>
+        <div className="flex items-center gap-1 rounded-2xl pl-3 pr-1.5 py-1.5" style={{ background: 'var(--nav-surface-glass)' }}>
           <button
             type="button"
             onClick={() => { setOpen(false); window.dispatchEvent(new Event('open-wallet-panel')) }}
-            className="rounded-full px-3 py-1.5 text-[12px] font-semibold"
-            style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}
+            title={t.topup}
+            className="flex-1 min-w-0 text-left"
           >
-            {t.topup}
+            <div className="text-[11px] font-semibold uppercase" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.08em' }}>{t.balance}</div>
+            <div className="text-[15px] font-bold tabular-nums truncate" style={{ color: 'var(--nav-text-primary)' }}>
+              {balance === null ? '···' : `${balance.toLocaleString('ru-KZ')} ₸`}
+            </div>
+          </button>
+          <button type="button" onClick={() => { setOpen(false); openUtility('notifications') }} title={t.notifications} aria-label={t.notifications} className="relative w-9 h-9 flex items-center justify-center rounded-full flex-shrink-0 hover:bg-[var(--nav-surface-glass)]">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M6 10a6 6 0 1 1 12 0c0 4 1.5 5.5 1.5 5.5H4.5S6 14 6 10Z" stroke="var(--nav-accent)" strokeWidth="1.6" strokeLinejoin="round" />
+              <path d="M10 19a2 2 0 0 0 4 0" stroke="var(--nav-accent)" strokeWidth="1.6" strokeLinecap="round" />
+            </svg>
+            {util.unread > 0 && (
+              <span className="absolute top-0 right-0 text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center" style={{ background: 'var(--nav-critical)', color: 'var(--nav-accent-ink)' }}>
+                {util.unread > 9 ? '9+' : util.unread}
+              </span>
+            )}
+          </button>
+          <button type="button" onClick={() => { setOpen(false); openUtility('help') }} title={t.help} aria-label={t.help} className="w-9 h-9 flex items-center justify-center rounded-full flex-shrink-0 hover:bg-[var(--nav-surface-glass)]">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" stroke="var(--nav-accent)" strokeWidth="1.6" />
+              <path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .8-1 1.4v.3" stroke="var(--nav-accent)" strokeWidth="1.6" strokeLinecap="round" />
+              <circle cx="12" cy="17" r="0.9" fill="var(--nav-accent)" />
+            </svg>
+          </button>
+          <button type="button" onClick={() => { setOpen(false); openUtility('account') }} title={t.account} aria-label={t.account} className="w-9 h-9 rounded-full text-[11px] font-bold flex items-center justify-center flex-shrink-0" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+            {util.initials}
           </button>
         </div>
       </div>

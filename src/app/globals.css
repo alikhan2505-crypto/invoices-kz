@@ -1165,8 +1165,9 @@ html {
    fixed at the left; DesktopShell's card is shifted right through --shell-left, and its
    scroll area gets top room for the wallet/account pill that used to sit in SiteNav's row. */
 @media (min-width: 1024px) {
-  .product-shell .desktop-shell-scroll { padding-top: 84px; }
-  .product-shell-main { padding-left: 260px; padding-top: 84px; }
+  .product-shell-main { padding-left: 260px; }
+  /* Wallet, bell, help and account live in the sidebar footer on desktop. */
+  body.product-shell-active [data-tour="wallet"] { display: none; }
 }
 
 /* The balance lives in the shell's sidebar, so the top pill drops its own balance button. */
