@@ -16,3 +16,16 @@ export function productHostRewrite(hostname: string, pathname: string, baseDomai
   const clean = pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname
   return Object.prototype.hasOwnProperty.call(routes, clean) ? routes[clean] : null
 }
+
+// Stage 3, step 6: once api.<base> is live, the old apex addresses of the API
+// product 301 to it. Off unless the caller passes enabled=true (env
+// API_HOST_REDIRECT=1); the cabinet /kaspi-api stays on the apex on purpose.
+const APEX_TO_API: Record<string, string> = { '/cashier-api': '/', '/kaspi-api/docs': '/docs' }
+
+export function apexToApiRedirect(hostname: string, pathname: string, baseDomain: string, enabled: boolean): string | null {
+  if (!enabled || hostname !== baseDomain) return null
+  const clean = pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname
+  return Object.prototype.hasOwnProperty.call(APEX_TO_API, clean) ? `https://api.${baseDomain}${APEX_TO_API[clean]}` : null
+}
+
+export const API_HOST_BASE = process.env.API_HOST_REDIRECT === '1' ? 'https://api.invoices.kz' : 'https://invoices.kz'

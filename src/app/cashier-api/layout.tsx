@@ -1,4 +1,9 @@
 import type { Metadata } from 'next'
+import { API_HOST_BASE } from '@/lib/hostRouting'
+
+// Canonical follows the redirect switch: apex path until API_HOST_REDIRECT=1,
+// then the api subdomain root.
+const PAGE_URL = API_HOST_BASE === 'https://api.invoices.kz' ? 'https://api.invoices.kz/' : 'https://invoices.kz/cashier-api'
 
 // The root layout (src/app/layout.tsx) sets a metadata title/description
 // aimed at the accounting-software buyer ("INVOICES.KZ -- Счета, АВР, КП и
@@ -10,13 +15,13 @@ export const metadata: Metadata = {
   description: 'Принимайте Kaspi Pay на своём сайте: создание платежа, QR-ссылка и вебхук об оплате. 2% с оплаченного — без абонплаты и минимального оборота.',
   // Without its own canonical this page inherited the root's, which pointed
   // at the homepage and asked search engines not to index this page at all.
-  alternates: { canonical: 'https://invoices.kz/cashier-api' },
+  alternates: { canonical: PAGE_URL },
   // The root layout's openGraph/twitter objects aren't merged field-by-field --
   // omitting these here would leak the accounting-software OG image/copy into
   // link previews shared with developers (Slack, Telegram, Twitter).
   openGraph: {
     type: 'website',
-    url: 'https://invoices.kz/cashier-api',
+    url: PAGE_URL,
     siteName: 'INVOICES.KZ',
     title: 'Kaspi Cashier API — invoices.kz',
     description: 'Kaspi Pay на вашем сайте: создание платежа, QR-ссылка и вебхук об оплате. 2% с оплаченного, без абонплаты и минимального оборота.',

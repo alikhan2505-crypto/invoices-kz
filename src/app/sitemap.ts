@@ -16,7 +16,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.8,
     },
     {
-      url: 'https://invoices.kz/cashier-api',
+      url: process.env.API_HOST_REDIRECT === '1' ? 'https://api.invoices.kz/' : 'https://invoices.kz/cashier-api',
       lastModified: new Date(),
       changeFrequency: 'monthly',
       priority: 0.6,

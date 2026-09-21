@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { productHostRewrite } from '@/lib/hostRouting'
+import { productHostRewrite, apexToApiRedirect } from '@/lib/hostRouting'
 
 // Next 16 переименовал middleware в proxy -- см.
 // node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/proxy.md
@@ -16,6 +16,9 @@ const PLATFORM_SUBDOMAINS = new Set(['www', 'api', 'app', 'admin', 'mail', 'smtp
 
 export function proxy(request: NextRequest) {
   const hostname = (request.headers.get('host') || '').split(':')[0].toLowerCase()
+
+  const apexRedirect = apexToApiRedirect(hostname, request.nextUrl.pathname, BASE_DOMAIN, process.env.API_HOST_REDIRECT === '1')
+  if (apexRedirect) return NextResponse.redirect(apexRedirect, 301)
 
   const suffix = `.${BASE_DOMAIN}`
   if (!hostname.endsWith(suffix)) return NextResponse.next()
