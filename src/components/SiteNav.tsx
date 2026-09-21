@@ -7,11 +7,13 @@ import { supabase } from '@/lib/supabase'
 import { getActivePlan } from '@/lib/plan'
 import { useLanguage, type Lang } from './LanguageProvider'
 import KaspiShopStoreSwitcher from './KaspiShopStoreSwitcher'
+import { useMyProducts } from '@/lib/useMyProducts'
+import { isSectionVisible } from '@/lib/products'
 
-const labels: Record<Lang, { home: string; invoices: string; kaspiShop: string; aiAgent: string; kaspiApi: string; wildberries: string; profile: string; menu: string; close: string }> = {
-  ru: { home: 'Дашборд', invoices: 'Счета', kaspiShop: 'Kaspi Bot', aiAgent: 'AI-агент', kaspiApi: 'Kaspi Cashier API', wildberries: 'WB Bot', profile: 'Профиль', menu: 'Меню', close: 'Закрыть' },
-  kk: { home: 'Дашборд', invoices: 'Шоттар', kaspiShop: 'Kaspi Bot', aiAgent: 'AI-агент', kaspiApi: 'Kaspi Cashier API', wildberries: 'WB Bot', profile: 'Профиль', menu: 'Мәзір', close: 'Жабу' },
-  en: { home: 'Dashboard', invoices: 'Invoices', kaspiShop: 'Kaspi Bot', aiAgent: 'AI Agent', kaspiApi: 'Kaspi Cashier API', wildberries: 'WB Bot', profile: 'Profile', menu: 'Menu', close: 'Close' },
+const labels: Record<Lang, { home: string; invoices: string; kaspiShop: string; aiAgent: string; kaspiApi: string; wildberries: string; products: string; profile: string; menu: string; close: string }> = {
+  ru: { home: 'Дашборд', invoices: 'Счета', kaspiShop: 'Kaspi Bot', aiAgent: 'AI-агент', kaspiApi: 'Kaspi Cashier API', wildberries: 'WB Bot', products: 'Все продукты', profile: 'Профиль', menu: 'Меню', close: 'Закрыть' },
+  kk: { home: 'Дашборд', invoices: 'Шоттар', kaspiShop: 'Kaspi Bot', aiAgent: 'AI-агент', kaspiApi: 'Kaspi Cashier API', wildberries: 'WB Bot', products: 'Барлық өнімдер', profile: 'Профиль', menu: 'Мәзір', close: 'Жабу' },
+  en: { home: 'Dashboard', invoices: 'Invoices', kaspiShop: 'Kaspi Bot', aiAgent: 'AI Agent', kaspiApi: 'Kaspi Cashier API', wildberries: 'WB Bot', products: 'All products', profile: 'Profile', menu: 'Menu', close: 'Close' },
 }
 
 // Copy shown to non-admins when they interact with an admin-gated section
@@ -268,6 +270,13 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
   // so the second row simply doesn't render there.
   const activeSection = SECTIONS.find(s => isActiveSection(s.links, path)) || null
 
+  // Stage 1 of the product split: someone who picked their products on
+  // /products only sees those tabs (plus the one they're standing in). Nothing
+  // chosen = every tab, exactly as before. Display only -- access is still
+  // decided by isSectionLocked and each page's own guard.
+  const [mine] = useMyProducts()
+  const visibleSections = SECTIONS.filter(s => isSectionVisible(mine, s.key, activeSection?.key ?? null))
+
   return (
     <>
       {/* Mobile: sticky top bar. STICKY, NOT FIXED -- a fixed bar would need
@@ -345,6 +354,7 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
                 <div className="flex-1 overflow-y-auto px-2 pb-6">
                   {([
                     { href: '/dashboard', label: labels[lang].home },
+                    { href: '/products', label: labels[lang].products },
                     { href: '/profile', label: labels[lang].profile },
                   ]).map(item => {
                     const active = path === item.href || path.startsWith(item.href + '/')
@@ -363,7 +373,7 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
                     )
                   })}
 
-                  {SECTIONS.map(s => {
+                  {visibleSections.map(s => {
                     const locked = isSectionLocked(s, perms)
                     // Mirrors the desktop row above: tapping a header jumps to
                     // that section's first page rather than toggling a local
@@ -465,7 +475,7 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
             {labels[lang].home}
           </button>
 
-          {SECTIONS.map(s => {
+          {visibleSections.map(s => {
             const locked = isSectionLocked(s, perms)
             const active = !locked && activeSection?.key === s.key
             return (
@@ -499,6 +509,18 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
               </div>
             )
           })}
+
+          <button
+            type="button"
+            onClick={() => router.push('/products')}
+            className="px-3 py-2 rounded-lg text-sm font-semibold transition-colors"
+            style={{
+              color: path === '/products' ? 'var(--nav-text-primary)' : 'var(--nav-text-secondary)',
+              boxShadow: path === '/products' ? `inset 0 -2px 0 var(--nav-accent)` : 'none',
+            }}
+          >
+            {labels[lang].products}
+          </button>
 
           <div className="flex-1" />
           {/* TopUtilityBar renders its own wallet/notifications/account trigger

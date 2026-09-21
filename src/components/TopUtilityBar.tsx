@@ -578,6 +578,11 @@ export default function TopUtilityBar() {
   // explicit, unconditional version of that for the case where one exists.
   if (pathname?.startsWith('/planner/')) return null
 
+  // 21.09.2026: /products is the start page (DESIGN.md §7), with its own
+  // header and its own top-right button -- this fixed bar would sit on top of
+  // it. The wallet and profile stay one click away via its "Дашборд" link.
+  if (pathname === '/products') return null
+
   if (!loggedIn) return null
 
   const visibleWallets = WALLETS.filter(w => !w.adminOnly || isAdmin)

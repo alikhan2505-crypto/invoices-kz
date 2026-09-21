@@ -1010,3 +1010,96 @@ html {
 .plnr-success-soft { background-color: color-mix(in srgb, var(--p-success) 16%, transparent); color: var(--p-success); }
 .plnr-danger-dot { background-color: #ef4444; }
 
+
+/* ==========================================================================
+   /products -- the start page with every product (DESIGN.md §7, "marketing
+   surfaces"). Deliberately its own expressive layer, separate from the calm
+   cabinet system above. Class prefix prd-.
+   ========================================================================== */
+:root {
+  --prd-bg: #e9ecf7;
+  --prd-ink: #14163a;
+  --prd-ink2: #4a4f7a;
+  --prd-line: #c9cee8;
+  --prd-b1: rgba(91, 103, 232, 0.26);
+  --prd-b2: rgba(45, 196, 141, 0.22);
+  --prd-b3: rgba(255, 107, 87, 0.18);
+}
+[data-theme="dark"] {
+  --prd-bg: #0c0e22;
+  --prd-ink: #eef0ff;
+  --prd-ink2: #9aa1d4;
+  --prd-line: #2a2f5c;
+  --prd-b1: rgba(91, 103, 232, 0.3);
+  --prd-b2: rgba(45, 196, 141, 0.14);
+  --prd-b3: rgba(255, 107, 87, 0.12);
+}
+
+.prd-root {
+  position: relative; overflow: hidden; isolation: isolate; min-height: 100vh;
+  background: var(--prd-bg); color: var(--prd-ink);
+  font-family: var(--font-onest), Arial, Helvetica, sans-serif;
+  padding: 0 clamp(16px, 4vw, 40px) 48px;
+}
+/* The site-wide dark theme paints every div/p/span/h1 with --text-primary
+   (specificity 0,1,1). Text on a coloured tile must keep its own ink, so this
+   resets them to inherit; it sits at the end of the file so it wins the tie. */
+.prd-root :is(div, p, span, label, h1, button, a) { color: inherit; }
+
+.prd-blob { position: absolute; border-radius: 50%; filter: blur(70px); z-index: -1; pointer-events: none; }
+.prd-b1 { width: 420px; height: 420px; background: var(--prd-b1); top: -120px; left: -80px; }
+.prd-b2 { width: 360px; height: 360px; background: var(--prd-b2); top: 140px; right: -100px; }
+.prd-b3 { width: 320px; height: 320px; background: var(--prd-b3); top: 620px; left: 30%; }
+.prd-ghost {
+  position: absolute; z-index: -1; right: clamp(-10px, 2vw, 30px); top: 30px;
+  font: 700 clamp(220px, 34vw, 420px)/0.8 var(--font-unbounded), Arial, sans-serif;
+  color: transparent; -webkit-text-stroke: 2px var(--prd-line); user-select: none; pointer-events: none;
+}
+.prd-wrap { max-width: 1160px; margin-inline: auto; }
+.prd-top { display: flex; align-items: center; gap: 12px; padding-block: 18px; }
+.prd-mark { display: inline-flex; align-items: center; gap: 10px; font: 700 17px/1 var(--font-unbounded), Arial, sans-serif; letter-spacing: -0.02em; text-decoration: none; }
+.prd-mark i { width: 26px; height: 26px; border-radius: 50% 50% 50% 8px; background: var(--prd-ink); display: block; }
+.prd-btn { border: 2px solid var(--prd-ink); background: var(--prd-ink); border-radius: 9999px; padding: 9px 20px; font: 600 14px/1 var(--font-onest), Arial, sans-serif; text-decoration: none; }
+.prd-btn, .prd-btn span { color: var(--prd-bg) !important; }
+.prd-btn.prd-alt { background: transparent; }
+.prd-btn.prd-alt, .prd-btn.prd-alt span { color: var(--prd-ink) !important; }
+.prd-btn:hover { transform: translateY(-1px); }
+.prd-hero { display: grid; gap: 16px; padding-block: 26px 26px; max-width: 880px; }
+.prd-eyebrow { margin: 0; font: 500 12px/1.2 var(--font-onest), Arial, sans-serif; letter-spacing: 0.12em; text-transform: uppercase; color: var(--prd-ink2) !important; }
+.prd-h1 { margin: 0; font: 700 clamp(30px, 5.6vw, 64px)/1.04 var(--font-unbounded), Arial, sans-serif; letter-spacing: -0.03em; text-wrap: balance; }
+.prd-sub { margin: 0; font-size: clamp(16px, 2vw, 19px); max-width: 54ch; color: var(--prd-ink2) !important; }
+
+.prd-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 14px; }
+.prd-tile {
+  position: relative; overflow: hidden; border-radius: 28px; padding: 22px; min-height: 270px;
+  background: var(--bg-t); color: var(--ink-t); display: grid; grid-template-rows: auto 1fr auto; align-content: start; gap: 6px;
+  transition: transform 0.25s ease, opacity 0.25s ease, filter 0.25s ease;
+}
+.prd-tile:not([data-locked="true"]):hover { transform: translateY(-4px) rotate(-0.4deg); }
+.prd-tile[data-locked="true"] { opacity: 0.4; filter: saturate(0.55); cursor: not-allowed; }
+.prd-tile[data-out="true"] { opacity: 0.55; filter: saturate(0.7); }
+.prd-tile[data-big="true"] { min-height: 340px; }
+.prd-cover { position: absolute; inset: 0; z-index: 1; border-radius: 28px; }
+.prd-tn { font: 700 clamp(22px, 2.6vw, 34px)/1.05 var(--font-unbounded), Arial, sans-serif; letter-spacing: -0.02em; max-width: 12ch; position: relative; z-index: 0; }
+.prd-tl { font-size: 15px; max-width: 24ch; position: relative; z-index: 0; }
+.prd-tl, .prd-th { opacity: 0.85; }
+.prd-th { font: 500 12px/1 var(--font-geist-mono), monospace; }
+.prd-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; position: relative; z-index: 2; align-self: end; }
+.prd-go { display: inline-flex; align-items: center; gap: 8px; background: var(--ink-t); border-radius: 9999px; padding: 8px 14px; font: 600 13px/1 var(--font-onest), Arial, sans-serif; }
+.prd-go, .prd-go span { color: var(--bg-t) !important; }
+.prd-pill { position: absolute; top: 18px; right: 18px; z-index: 2; border-radius: 9999px; padding: 5px 11px; font: 600 12px/1 var(--font-onest), Arial, sans-serif; border: 2px solid var(--ink-t); }
+.prd-pill.prd-on { background: var(--ink-t); }
+.prd-pill.prd-on, .prd-pill.prd-on span { color: var(--bg-t) !important; }
+.prd-toggle { border: 2px solid var(--ink-t); background: transparent; border-radius: 9999px; padding: 6px 12px; font: 600 12px/1 var(--font-onest), Arial, sans-serif; }
+.prd-toggle:hover { background: var(--ink-t); }
+.prd-toggle:hover, .prd-toggle:hover span { color: var(--bg-t) !important; }
+.prd-art { position: absolute; right: -3%; bottom: -6%; width: min(60%, 310px); z-index: 0; pointer-events: none; }
+.prd-tile[data-big="true"] .prd-art { width: min(64%, 380px); }
+.prd-art svg { display: block; width: 100%; height: auto; animation: prd-bob 5s ease-in-out infinite; }
+@keyframes prd-bob { 0%, 100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-7px) rotate(1.2deg); } }
+.prd-note { padding-top: 26px; font-size: 14px; max-width: 70ch; color: var(--prd-ink2) !important; }
+@media (max-width: 860px) {
+  .prd-tile { grid-column: span 12 !important; }
+  .prd-tile[data-big="true"] { min-height: 300px; }
+}
+@media (prefers-reduced-motion: reduce) { .prd-art svg { animation: none; } .prd-tile { transition: none; } }
