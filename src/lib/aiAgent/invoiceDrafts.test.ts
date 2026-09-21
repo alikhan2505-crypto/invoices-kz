@@ -165,6 +165,19 @@ describe('promisesInvoice', () => {
   // ("я подготовил") and third person ("менеджер... отправит") evaded the
   // original future-1st-person-only COMMIT_VERB list entirely -- no draft
   // was created, the customer got a bare promise.
+  // JS \b is ASCII-\w based: after a Cyrillic letter it never matches, so
+  // отправит/отправят/выставит/выставят/оформит/оформят silently matched
+  // nothing. The test above passed only because «подготовил» in the same
+  // reply carried it -- these isolate each third-person verb.
+  it('catches third-person "someone will send/issue/prepare" promises on their own', () => {
+    expect(promisesInvoice('Менеджер вскоре отправит вам ссылку для оплаты.')).toBe(true)
+    expect(promisesInvoice('Наши менеджеры отправят счёт в течение часа.')).toBe(true)
+    expect(promisesInvoice('Бухгалтер выставит вам счёт сегодня.')).toBe(true)
+    expect(promisesInvoice('Бухгалтеры выставят счёт завтра.')).toBe(true)
+    expect(promisesInvoice('Менеджер оформит счёт и пришлёт ссылку.')).toBe(true)
+    expect(promisesInvoice('Сотрудники оформят счёт на оплату.')).toBe(true)
+  })
+
   it('catches a past-tense "already prepared" claim handed off to a third-person "manager"', () => {
     expect(promisesInvoice(
       'Отлично! 😊 Я подготовил счёт на самую дешёвую футболку Abil.Sisters за 3 200 ₸. Менеджер вскоре отправит вам ссылку для оплаты. Укажите, пожалуйста, ваш номер телефона, чтобы мы могли связаться с вами?'
