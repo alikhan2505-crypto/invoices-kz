@@ -1,11 +1,9 @@
 'use client'
-import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useLanguage } from '@/components/LanguageProvider'
 import { PRODUCTS } from '@/lib/products'
 import { LANDINGS, LANDING_UI, OTHER_PRODUCT_LINKS, type LandingKey } from '@/lib/landings'
-import { setPostLoginRedirect } from '@/lib/postLoginRedirect'
 import ProductArt from '@/components/products/ProductArt'
 
 export default function ProductLanding({ landing, fontClass }: { landing: LandingKey; fontClass: string }) {
@@ -30,9 +28,9 @@ export default function ProductLanding({ landing, fontClass }: { landing: Landin
 
   const vars = { '--bg-t': p.bg, '--ink-t': p.ink, '--soft-t': l.soft } as React.CSSProperties
 
-  function startLogin() {
-    setPostLoginRedirect(l.cabinet)
-  }
+  // Always the apex login: OAuth and e-mail links return there, and it hands the
+  // destination over via ?next= (localStorage is per host, so it can't travel).
+  const loginHref = `https://invoices.kz/login?next=${l.cabinet}`
 
   return (
     <main className={`lp-root ${fontClass}`} style={vars}>
@@ -42,7 +40,7 @@ export default function ProductLanding({ landing, fontClass }: { landing: Landin
         {signedIn ? (
           <a className="lp-back" href={l.cabinet}><span>{ui.open}</span></a>
         ) : (
-          <Link className="lp-back" href="/login" onClick={startLogin}><span>{ui.login}</span></Link>
+          <a className="lp-back" href={loginHref}><span>{ui.login}</span></a>
         )}
       </div>
 
@@ -53,7 +51,7 @@ export default function ProductLanding({ landing, fontClass }: { landing: Landin
         {signedIn ? (
           <a className="lp-cta" href={l.cabinet}><span>{ui.open}</span></a>
         ) : (
-          <Link className="lp-cta" href="/login" onClick={startLogin}><span>{ui.enter}</span></Link>
+          <a className="lp-cta" href={loginHref}><span>{ui.enter}</span></a>
         )}
       </div>
 

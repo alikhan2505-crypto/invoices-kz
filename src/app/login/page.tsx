@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { useLanguage, type Lang } from '@/components/LanguageProvider'
 import { authDict } from '@/lib/i18n/auth'
 import { hasPendingUpgrade } from '@/lib/pendingUpgrade'
-import { consumePostLoginRedirect } from '@/lib/postLoginRedirect'
+import { consumePostLoginRedirect, postLoginRedirectFromSearch, setPostLoginRedirect } from '@/lib/postLoginRedirect'
 import { useAppDialog } from '@/components/AppDialog'
 
 export default function Login() {
@@ -29,6 +29,8 @@ export default function Login() {
     const params = new URLSearchParams(window.location.search)
     const ref = params.get('ref')
     if (ref) localStorage.setItem('referral_code', ref)
+    const next = postLoginRedirectFromSearch(window.location.search)
+    if (next) setPostLoginRedirect(next)
     setPasskeySupported(typeof window !== 'undefined' && !!window.PublicKeyCredential)
   }, [])
 

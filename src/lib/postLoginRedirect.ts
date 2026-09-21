@@ -53,3 +53,12 @@ export function consumePostLoginRedirect(): PostLoginRedirectPath | null {
     return null
   }
 }
+
+// Product landings live on other hosts (kaspi.invoices.kz, ...), where
+// localStorage is a different store from the one /login and /auth/callback
+// read. So they pass the destination in the URL instead (/login?next=/kaspi-shop)
+// and /login stores it on its own origin. Same allowlist: anything else is dropped.
+export function postLoginRedirectFromSearch(search: string): PostLoginRedirectPath | null {
+  const next = new URLSearchParams(search).get('next')
+  return isAllowedPath(next) ? next : null
+}
