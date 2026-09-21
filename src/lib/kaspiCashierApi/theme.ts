@@ -23,3 +23,19 @@ export const CASHIER_API_COLOR = {
 
 export const CASHIER_API_FONT_SANS = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
 export const CASHIER_API_FONT_MONO = "'SF Mono', Consolas, monospace"
+
+// Same roles, but resolved from the app's own theme tokens: the cabinet and the
+// docs inside the product shell follow the site's light/dark setting like every
+// other cabinet (founder, 21.09.2026). The public landing keeps the dark palette above.
+export const CASHIER_API_THEMED = {
+  bg0: 'var(--nav-surface-glass)',
+  bg1: 'var(--nav-surface-glass)',
+  bg2: 'var(--nav-surface-glass)',
+  text: 'var(--nav-text-primary)',
+  muted: 'var(--nav-text-secondary)',
+  accent: 'var(--nav-accent)',
+  border: 'var(--nav-border)',
+  borderStrong: 'var(--nav-border)',
+  button: 'var(--nav-accent)',
+  buttonHover: 'var(--nav-accent)',
+} as const

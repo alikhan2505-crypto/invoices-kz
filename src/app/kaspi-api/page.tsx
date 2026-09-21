@@ -671,7 +671,7 @@ export default function KaspiApiPage() {
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
-      {/* cashier-dev-theme scopes the --nav-* tokens below to the dark
+      {/* (was: cashier-dev-theme dark scope -- removed 21.09.2026, follows the site theme) the --nav-* tokens below were dark
           developer palette (see globals.css) -- only this inner content
           area goes dark; DesktopShell's card and SiteNav's menu strip
           above stay on the normal light app chrome. Unconditional
@@ -680,7 +680,7 @@ export default function KaspiApiPage() {
           resolves to 0 at the lg breakpoint per CSS's percentage-height
           rules, collapsing this div to its text's intrinsic height and
           leaving the app's light ambient background showing below it. */}
-      <div className="cashier-dev-theme min-h-screen" style={{ background: 'var(--nav-bg)' }}>
+      <div className="min-h-screen">
         <div className="p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Загрузка…</div>
       </div>
     </main>
@@ -819,13 +819,13 @@ export default function KaspiApiPage() {
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
-      {/* cashier-dev-theme (see globals.css): scopes --nav-* to the dark
+      {/* (was: cashier-dev-theme dark scope, removed 21.09.2026) --nav-* dark
           developer palette shared with /kaspi-api/docs and the public
           /cashier-api landing, so Connection and Documentation read as one
           product under the shared «Подключение | Документация API» menu
           strip above (rendered by SiteNav, outside this dark wrapper --
           the menu itself deliberately keeps its normal light app chrome). */}
-      <div className="cashier-dev-theme min-h-screen lg:min-h-full" style={{ background: 'var(--nav-bg)' }}>
+      <div className="min-h-screen lg:min-h-full">
       <div className="max-w-3xl mx-auto p-6 pb-12">
         <h1 className="text-xl font-bold mb-1" style={{ color: 'var(--nav-text-primary)', letterSpacing: '-0.02em' }}>Kaspi Cashier API</h1>
         <p className="text-sm mb-6" style={{ color: 'var(--nav-text-muted)' }}>Приём оплат Kaspi Pay на вашем сайте — токен, вебхуки, документация</p>

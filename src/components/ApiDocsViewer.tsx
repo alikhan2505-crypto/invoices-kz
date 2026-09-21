@@ -1,9 +1,10 @@
 'use client'
 
 import dynamic from 'next/dynamic'
+import { useSyncExternalStore } from 'react'
 import '@scalar/api-reference-react/style.css'
 import { useLanguage } from '@/components/LanguageProvider'
-import { CASHIER_API_COLOR as C, CASHIER_API_FONT_MONO as FONT_MONO } from '@/lib/kaspiCashierApi/theme'
+import { CASHIER_API_THEMED as C, CASHIER_API_FONT_MONO as FONT_MONO } from '@/lib/kaspiCashierApi/theme'
 import openApiRu from '@/lib/kaspiCashierApi/openapi.ru.json'
 import openApiEn from '@/lib/kaspiCashierApi/openapi.en.json'
 
@@ -57,7 +58,7 @@ const ApiReferenceReact = dynamic(
 // identical to a single source of truth.
 const SCALAR_CUSTOM_CSS = `
   .light-mode, .dark-mode {
-    --scalar-background-1: ${C.bg0};
+    --scalar-background-1: transparent;
     --scalar-background-2: ${C.bg1};
     --scalar-background-3: ${C.bg2};
     --scalar-color-1: ${C.text};
@@ -68,11 +69,20 @@ const SCALAR_CUSTOM_CSS = `
     --scalar-sidebar-border-color: ${C.borderStrong};
     --scalar-button-1: ${C.button};
     --scalar-button-1-hover: ${C.buttonHover};
-    --scalar-button-1-color: #ffffff;
+    --scalar-button-1-color: var(--nav-accent-ink);
   }
 `
 
+// The app's light/dark choice lives on <html data-theme>; Scalar's own light/dark
+// defaults (code blocks, badges) must agree with it.
+function subscribeTheme(cb: () => void) {
+  const mo = new MutationObserver(cb)
+  mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+  return () => mo.disconnect()
+}
+
 export default function ApiDocsViewer({ lang }: { lang: 'ru' | 'en' }) {
+  const isDark = useSyncExternalStore(subscribeTheme, () => document.documentElement.getAttribute('data-theme') === 'dark', () => false)
   const content = lang === 'en' ? openApiEn : openApiRu
 
   return (
@@ -94,8 +104,8 @@ export default function ApiDocsViewer({ lang }: { lang: 'ru' | 'en' }) {
         // carry the customer's real production Cashier token.
         proxyUrl: '',
         theme: 'none',
-        darkMode: true,
-        forceDarkModeState: 'dark',
+        darkMode: isDark,
+        forceDarkModeState: isDark ? 'dark' : 'light',
         hideDarkModeToggle: true,
         customCss: SCALAR_CUSTOM_CSS,
       }}

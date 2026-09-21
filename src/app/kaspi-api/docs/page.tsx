@@ -8,7 +8,7 @@ import DesktopShell from '@/components/DesktopShell'
 import { useLanguage } from '@/components/LanguageProvider'
 import { setPostLoginRedirect } from '@/lib/postLoginRedirect'
 import ApiDocsViewer from '@/components/ApiDocsViewer'
-import { CASHIER_API_COLOR as C, CASHIER_API_FONT_SANS as FONT_SANS, CASHIER_API_FONT_MONO as FONT_MONO } from '@/lib/kaspiCashierApi/theme'
+import { CASHIER_API_THEMED as C, CASHIER_API_FONT_SANS as FONT_SANS, CASHIER_API_FONT_MONO as FONT_MONO } from '@/lib/kaspiCashierApi/theme'
 
 interface DocsCopy {
   loading: string
@@ -177,7 +177,7 @@ export default function KaspiApiDocsPage() {
       <DesktopShell>
       <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
         <SiteNav />
-        {/* cashier-dev-theme (see globals.css): same dark developer palette
+        {/* (was: cashier-dev-theme, removed 21.09.2026) same dark developer palette
             as /kaspi-api's Connection tab -- only this inner content area
             goes dark, DesktopShell's card and SiteNav's menu strip above
             keep the normal light app chrome. Unconditional min-h-screen (not
@@ -185,7 +185,7 @@ export default function KaspiApiDocsPage() {
             definite height, so min-h-full's percentage resolves to 0 at the
             lg breakpoint and collapses this div, leaving the light ambient
             background showing below it (same bug fixed on /kaspi-api). */}
-        <div className="cashier-dev-theme flex min-h-screen items-center justify-center" style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-muted)', fontFamily: FONT_SANS }}>
+        <div className="flex min-h-screen items-center justify-center" style={{ background: 'transparent', color: 'var(--nav-text-muted)', fontFamily: FONT_SANS }}>
           {d.loading}
         </div>
       </main>
@@ -197,14 +197,14 @@ export default function KaspiApiDocsPage() {
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
-      {/* cashier-dev-theme (see globals.css): scopes --nav-* to the dark
+      {/* (was: cashier-dev-theme dark scope, removed 21.09.2026) --nav-* dark
           developer palette shared with /kaspi-api's Connection tab and the
           public /cashier-api landing, so both pages under the
           «Подключение | Документация API» menu strip above (rendered by
           SiteNav, outside this dark wrapper) read as one product. Replaces
           this page's old standalone header (own back-link, own sticky bar)
           now that SiteNav provides the app chrome and the section tabs. */}
-      <div className="cashier-dev-theme min-h-screen lg:min-h-full" style={{ background: 'var(--nav-bg)', color: C.text, fontFamily: FONT_SANS }}>
+      <div className="min-h-screen lg:min-h-full" style={{ background: 'transparent', color: C.text, fontFamily: FONT_SANS }}>
         {/* Title + the Scalar-limitation caption that used to live in the
             standalone header's sticky bar. The page's own language follows
             the site-wide switcher (docsLang above) -- no independent toggle
