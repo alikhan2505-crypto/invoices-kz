@@ -22,8 +22,8 @@ describe('productHostRewrite', () => {
 })
 
 describe('kaspi host', () => {
-  it('root opens the Kaspi Bot cabinet, other paths pass through', () => {
-    expect(productHostRewrite('kaspi.invoices.kz', '/', 'invoices.kz')).toBe('/kaspi-shop')
+  it('root opens the Kaspi Bot landing, other paths pass through', () => {
+    expect(productHostRewrite('kaspi.invoices.kz', '/', 'invoices.kz')).toBe('/lp/kaspi')
     expect(productHostRewrite('kaspi.invoices.kz', '/kaspi-shop/orders', 'invoices.kz')).toBeNull()
   })
 })

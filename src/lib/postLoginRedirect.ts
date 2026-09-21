@@ -18,7 +18,7 @@ export const POST_LOGIN_REDIRECT_KEY = 'invoices.postLoginRedirect'
 // Exact paths only -- never arbitrary URLs, never external hosts. Add a
 // path here only when a real auth-gated page needs to preserve where the
 // user was headed across a forced /login detour.
-export const ALLOWED_POST_LOGIN_REDIRECTS = ['/kaspi-api/docs', '/kaspi-api', '/upgrade'] as const
+export const ALLOWED_POST_LOGIN_REDIRECTS = ['/kaspi-api/docs', '/kaspi-api', '/upgrade', '/kaspi-shop', '/ai-agent'] as const
 
 export type PostLoginRedirectPath = typeof ALLOWED_POST_LOGIN_REDIRECTS[number]
 

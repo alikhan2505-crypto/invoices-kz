@@ -1103,3 +1103,43 @@ html {
   .prd-tile[data-big="true"] { min-height: 300px; }
 }
 @media (prefers-reduced-motion: reduce) { .prd-art svg { animation: none; } .prd-tile { transition: none; } }
+
+/* Product landings (DESIGN.md §7, stage 4 of the product split). Prefix lp-.
+   One flat product colour fills the page; --bg-t/--ink-t/--soft-t come inline. */
+.lp-root {
+  position: relative; overflow: hidden; isolation: isolate; min-height: 100vh;
+  background: var(--bg-t); color: var(--ink-t);
+  font-family: var(--font-onest), Arial, Helvetica, sans-serif;
+  padding: 0 clamp(16px, 4vw, 40px) 30px; display: flex; flex-direction: column;
+}
+.lp-root :is(div, p, span, label, h1, button, a, i) { color: inherit; }
+.lp-top { display: flex; align-items: center; gap: 12px; padding-block: 18px; }
+.lp-back { border: 2px solid var(--ink-t); background: transparent; border-radius: 9999px; padding: 8px 16px; font: 600 14px/1 var(--font-onest), Arial, sans-serif; display: inline-flex; align-items: center; gap: 8px; text-decoration: none; }
+.lp-back:hover { background: var(--ink-t); }
+.lp-back:hover, .lp-back:hover span { color: var(--bg-t) !important; }
+.lp-hero { position: relative; z-index: 1; display: grid; gap: 16px; padding-block: 34px 22px; max-width: 640px; }
+.lp-eyebrow { margin: 0; font: 500 12px/1.2 var(--font-onest), Arial, sans-serif; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.75; }
+.lp-h1 { margin: 0; font: 700 clamp(32px, 5.4vw, 62px)/1.04 var(--font-unbounded), Arial, sans-serif; letter-spacing: -0.03em; text-wrap: balance; }
+.lp-lead { margin: 0; font-size: 18px; max-width: 44ch; opacity: 0.9; }
+.lp-cta { justify-self: start; border: 2px solid var(--ink-t); background: var(--ink-t); border-radius: 9999px; padding: 13px 26px; font: 600 16px/1 var(--font-onest), Arial, sans-serif; text-decoration: none; transition: transform 0.15s; }
+.lp-cta, .lp-cta span { color: var(--bg-t) !important; }
+.lp-cta:hover { transform: translateY(-2px) rotate(-0.6deg); }
+.lp-art { position: absolute; z-index: 0; width: min(46%, 440px); right: 3%; bottom: 96px; pointer-events: none; }
+.lp-art svg { display: block; width: 100%; height: auto; animation: prd-bob 5s ease-in-out infinite; }
+.lp-stickers { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 12px; margin-top: auto; padding-top: 24px; }
+.lp-stk { background: var(--soft-t); border-radius: 18px; padding: 12px 16px; font: 500 15px/1.3 var(--font-onest), Arial, sans-serif; max-width: 240px; }
+.lp-stk, .lp-stk span { color: var(--ink-t) !important; }
+.lp-stk:nth-child(1) { transform: rotate(-1.6deg); }
+.lp-stk:nth-child(2) { transform: rotate(1.2deg); }
+.lp-stk:nth-child(3) { transform: rotate(-0.8deg); }
+.lp-bar { position: relative; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding-top: 22px; margin-top: 8px; border-top: 2px solid color-mix(in srgb, var(--ink-t) 25%, transparent); }
+.lp-lab { opacity: 0.7; font-size: 13px; }
+.lp-mini { border: 2px solid var(--ink-t); background: transparent; border-radius: 9999px; padding: 5px 12px; font: 500 13px/1 var(--font-onest), Arial, sans-serif; display: inline-flex; align-items: center; gap: 8px; text-decoration: none; }
+.lp-mini i { width: 10px; height: 10px; border-radius: 50%; background: var(--dot); display: block; border: 1.5px solid currentColor; }
+.lp-mini:not([data-locked="true"]):hover { background: var(--ink-t); }
+.lp-mini:not([data-locked="true"]):hover, .lp-mini:not([data-locked="true"]):hover span { color: var(--bg-t) !important; }
+.lp-mini[data-locked="true"] { opacity: 0.5; cursor: not-allowed; }
+@media (max-width: 860px) {
+  .lp-art { position: relative; right: auto; bottom: auto; width: min(70%, 320px); margin: 6px 0 0 auto; }
+}
+@media (prefers-reduced-motion: reduce) { .lp-art svg { animation: none; } .lp-cta { transition: none; } }

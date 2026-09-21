@@ -4,7 +4,7 @@
 // host is just removing its row here.
 const PRODUCT_HOST_ROUTES: Record<string, Record<string, string>> = {
   api: { '/': '/cashier-api', '/docs': '/kaspi-api/docs' },
-  kaspi: { '/': '/kaspi-shop' },
+  kaspi: { '/': '/lp/kaspi' },
   agent: { '/': '/ai-agent' },
   salon: { '/': '/admin/site-generator' },
 }
