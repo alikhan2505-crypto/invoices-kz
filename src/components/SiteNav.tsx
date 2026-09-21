@@ -103,6 +103,11 @@ type Section = {
   // false. wildberries stays admin-only until the founder reviews it the
   // same way these two were before this.
   proOnly?: boolean
+  // Locked for EVERYONE, admin included (founder, 21.09.2026: Wildberries is
+  // not finished yet) -- unlike adminOnly, which the founder himself could
+  // still open. The section stays visible with a lock so people see it's
+  // coming; its pages are held back by src/app/wildberries/layout.tsx.
+  soon?: boolean
 }
 
 const SECTIONS: Section[] = [
@@ -110,7 +115,7 @@ const SECTIONS: Section[] = [
   { key: 'kaspiApi', links: kaspiApiLinks, adminOnly: false },
   { key: 'aiAgent', links: aiAgentLinks, adminOnly: false, proOnly: true },
   { key: 'kaspiShop', links: kaspiShopLinks, adminOnly: false, proOnly: true },
-  { key: 'wildberries', links: wbLinks, adminOnly: true },
+  { key: 'wildberries', links: wbLinks, adminOnly: false, soon: true },
 ]
 
 // null means "we haven't loaded the profile yet", which is a real third state
@@ -148,6 +153,9 @@ function readCachedPerms(): Perms | null {
 // inside that window lands on the page's own explanation rather than on
 // content it shouldn't see.
 function isSectionLocked(s: Section, perms: Perms | null): boolean {
+  // Checked before the unknown-perms escape below: a lock that applies to
+  // everyone can't flash on and off while the profile loads.
+  if (s.soon) return true
   if (!perms) return false
   if (s.adminOnly) return !perms.isAdmin
   if (s.proOnly) return !(perms.isAdmin || perms.isPro)
