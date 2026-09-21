@@ -11,6 +11,7 @@ import Skeleton from '@/components/Skeleton'
 import Link from 'next/link'
 import { useLanguage } from '@/components/LanguageProvider'
 import { getActivePlan } from '@/lib/plan'
+import { useMyProducts } from '@/lib/useMyProducts'
 import { supportDict } from '@/lib/i18n/support'
 import { invoiceFlowDict } from '@/lib/i18n/invoiceFlow'
 
@@ -554,6 +555,9 @@ type Period = typeof PERIODS[number]
 
 export default function DashboardPage() {
   const router = useRouter()
+  // Only the products connected to this account get a card (nothing chosen = all).
+  const [mine] = useMyProducts()
+  const shows = (key: string) => mine === null || (mine as string[]).includes(key)
   const { lang } = useLanguage()
   const s = supportDict[lang]
   const tf = invoiceFlowDict[lang]
@@ -757,7 +761,8 @@ export default function DashboardPage() {
                 [0, 1, 2, 3].map(i => <div key={i} className="nav-glass nav-card-accent rounded-[22px] p-[18px]"><Skeleton className="h-8 w-8 rounded-[9px] mb-3" /><Skeleton className="h-4 w-24 mb-2" /><Skeleton className="h-3 w-32" /></div>)
               ) : (
                 <>
-                  <ProductCard
+                  {shows('invoices') && (
+<ProductCard
                     index={0}
                     reduceMotion={reduceMotion}
                     icon={<InvoiceIcon />}
@@ -771,7 +776,9 @@ export default function DashboardPage() {
                     sparkValues={last14CreatedCounts}
                     onClick={() => router.push('/create')}
                   />
-                  <ProductCard
+)}
+                  {shows('kaspiApi') && (
+<ProductCard
                     index={1}
                     reduceMotion={reduceMotion}
                     icon={<ApiIcon />}
@@ -783,7 +790,9 @@ export default function DashboardPage() {
                     neutralText="Приём оплат Kaspi на вашем сайте"
                     onClick={() => router.push('/kaspi-api')}
                   />
-                  <ProductCard
+)}
+                  {shows('aiAgent') && (
+<ProductCard
                     index={2}
                     reduceMotion={reduceMotion}
                     icon={<AgentIcon />}
@@ -794,7 +803,9 @@ export default function DashboardPage() {
                     neutralText="Диалоги появятся здесь"
                     onClick={isAdmin ? () => router.push('/ai-agent') : undefined}
                   />
-                  <ProductCard
+)}
+                  {shows('kaspiShop') && (
+<ProductCard
                     index={3}
                     reduceMotion={reduceMotion}
                     icon={<ShopIcon />}
@@ -805,6 +816,7 @@ export default function DashboardPage() {
                     neutralText="Показатели появятся здесь"
                     onClick={isAdmin ? () => router.push('/kaspi-shop') : undefined}
                   />
+)}
                 </>
               )}
             </div>

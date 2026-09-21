@@ -98,3 +98,16 @@ export function isSectionVisible(mine: ProductKey[] | null, key: ProductKey, act
   if (mine === null) return true
   return mine.includes(key) || activeKey === key
 }
+
+// Where a person lands after signing in when nothing more specific was asked
+// for. One connected product other than invoices -> straight into it; several
+// -> the products page; invoices only, or nothing chosen yet (new account, tour)
+// -> the dashboard, as before. Display routing only, never an access decision.
+export function homeFor(list: unknown): string {
+  if (!Array.isArray(list)) return '/dashboard'
+  const keys = list.filter((k): k is ProductKey => typeof k === 'string' && ALL_KEYS.has(k))
+  if (keys.length === 0) return '/dashboard'
+  if (keys.length > 1) return '/products'
+  const only = PRODUCTS.find((p) => p.key === keys[0])
+  return only && only.key !== 'invoices' && !only.locked ? only.href : '/dashboard'
+}

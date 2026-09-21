@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseMyProducts, toggleProduct, isInMyProducts, isSectionVisible, SELECTABLE_KEYS } from './products'
+import { homeFor, parseMyProducts, toggleProduct, isInMyProducts, isSectionVisible, SELECTABLE_KEYS } from './products'
 
 describe('parseMyProducts', () => {
   it('null means never chose', () => {
@@ -54,5 +54,18 @@ describe('isSectionVisible', () => {
   })
   it('keeps the section you are standing in even if you unchose it', () => {
     expect(isSectionVisible(['invoices'], 'kaspiShop', 'kaspiShop')).toBe(true)
+  })
+})
+
+describe('homeFor', () => {
+  it('sends people to the right place after login', () => {
+    expect(homeFor(null)).toBe('/dashboard')
+    expect(homeFor([])).toBe('/dashboard')
+    expect(homeFor(['invoices'])).toBe('/dashboard')
+    expect(homeFor(['kaspiShop'])).toBe('/kaspi-shop')
+    expect(homeFor(['aiAgent'])).toBe('/ai-agent')
+    expect(homeFor(['invoices', 'kaspiShop'])).toBe('/products')
+    expect(homeFor(['wildberries'])).toBe('/dashboard')
+    expect(homeFor(['nonsense'])).toBe('/dashboard')
   })
 })

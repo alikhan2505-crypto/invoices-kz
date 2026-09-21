@@ -8,6 +8,7 @@ import { authDict } from '@/lib/i18n/auth'
 import { hasPendingUpgrade } from '@/lib/pendingUpgrade'
 import { consumePostLoginRedirect, postLoginRedirectFromSearch, setPostLoginRedirect } from '@/lib/postLoginRedirect'
 import { useAppDialog } from '@/components/AppDialog'
+import { homeFor } from '@/lib/products'
 
 export default function Login() {
   const router = useRouter()
@@ -74,7 +75,11 @@ export default function Login() {
       // neither is set.
       if (hasPendingUpgrade()) router.replace('/upgrade')
       else if (postLoginRedirect) router.replace(postLoginRedirect)
-      else router.push('/dashboard')
+      else {
+        const { data: { user } } = await supabase.auth.getUser()
+        const { data: prof } = user ? await supabase.from('profiles').select('enabled_products').eq('id', user.id).maybeSingle() : { data: null }
+        router.push(homeFor(prof?.enabled_products))
+      }
     } catch (e: any) {
       if (e?.name !== 'NotAllowedError') alert(t.errorPrefix(e?.message || String(e)))
     } finally {

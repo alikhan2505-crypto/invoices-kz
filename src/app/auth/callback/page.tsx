@@ -6,6 +6,7 @@ import { useLanguage } from '@/components/LanguageProvider'
 import { authDict } from '@/lib/i18n/auth'
 import { hasPendingUpgrade } from '@/lib/pendingUpgrade'
 import { consumePostLoginRedirect } from '@/lib/postLoginRedirect'
+import { homeFor } from '@/lib/products'
 
 export default function AuthCallback() {
   const router = useRouter()
@@ -67,7 +68,7 @@ export default function AuthCallback() {
         // the one-time bootstrap below, which these three columns record.
         const { data: profile } = await supabase
           .from('profiles')
-          .select('trial_expires_at, promo_granted_at, referred_by')
+          .select('trial_expires_at, promo_granted_at, referred_by, enabled_products')
           .eq('id', session.user.id)
           .maybeSingle()
 
@@ -97,7 +98,7 @@ export default function AuthCallback() {
             // src/lib/postLoginRedirect.ts).
             router.replace(postLoginRedirect)
           } else {
-            router.push('/dashboard')
+            router.push(homeFor(profile?.enabled_products))
           }
         }
 
