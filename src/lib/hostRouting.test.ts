@@ -35,6 +35,13 @@ describe('agent host', () => {
   })
 })
 
+describe('salon host', () => {
+  it('root opens the site generator; the planner path passes through', () => {
+    expect(productHostRewrite('salon.invoices.kz', '/', 'invoices.kz')).toBe('/admin/site-generator')
+    expect(productHostRewrite('salon.invoices.kz', '/planner/demo', 'invoices.kz')).toBeNull()
+  })
+})
+
 describe('apexToApiRedirect', () => {
   it('is off by default', () => {
     expect(apexToApiRedirect('invoices.kz', '/cashier-api', 'invoices.kz', false)).toBeNull()
