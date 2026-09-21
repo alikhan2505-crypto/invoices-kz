@@ -324,6 +324,14 @@ export default function TopUtilityBar() {
     setHistoryLoading(false)
   }
 
+  // The product shell shows the balance in its sidebar; its "top up" opens this panel.
+  const openPanelRef = useRef<(p: Exclude<Panel, null>) => void>(() => {})
+  useEffect(() => {
+    const onOpen = () => openPanelRef.current('wallet')
+    window.addEventListener('open-wallet-panel', onOpen)
+    return () => window.removeEventListener('open-wallet-panel', onOpen)
+  }, [])
+
   function openPanel(p: Exclude<Panel, null>) {
     setPanel(p)
     if (p === 'wallet') {
@@ -599,6 +607,7 @@ export default function TopUtilityBar() {
     : null
   const topupOpen = showTopup || !!topupPending
   const isWalletPanel = panel === 'wallet'
+  openPanelRef.current = openPanel
 
   return (
     <>

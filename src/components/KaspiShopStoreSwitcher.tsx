@@ -43,9 +43,12 @@ function ChevronIcon() {
 // Kaspi Bot page -- shows which of the user's connected Kaspi stores is
 // active (2026-08-21: real need, one phone with 2 real merchant accounts),
 // lets them switch, and a door icon to disconnect the active one.
-export default function KaspiShopStoreSwitcher() {
+export type StoreState = 'loading' | 'connected' | 'expired' | 'none'
+
+export default function KaspiShopStoreSwitcher({ inSidebar = false, onState }: { inSidebar?: boolean; onState?: (s: StoreState) => void } = {}) {
   const router = useRouter()
   const [connections, setConnections] = useState<Connection[]>([])
+  const [loaded, setLoaded] = useState(false)
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -53,9 +56,10 @@ export default function KaspiShopStoreSwitcher() {
   const refresh = useCallback(async () => {
     const headers = await authHeader()
     const res = await fetch('/api/kaspi-shop/connections', { headers })
-    if (!res.ok) return
+    if (!res.ok) { setLoaded(true); return }
     const data = await res.json()
     setConnections(data.connections || [])
+    setLoaded(true)
   }, [])
 
   useEffect(() => {
@@ -95,8 +99,15 @@ export default function KaspiShopStoreSwitcher() {
     window.location.href = '/kaspi-shop'
   }
 
+  const activeConn = connections.find(c => c.isActive) ?? connections[0]
+  const state: StoreState = !loaded ? 'loading' : !activeConn ? 'none' : activeConn.sessionStatus === 'session_expired' ? 'expired' : 'connected'
+  useEffect(() => { onState?.(state) }, [state, onState])
+
+  // While the list is loading the sidebar keeps the slot (a quiet placeholder),
+  // so the store picker doesn't seem to be missing on a slow first load.
+  if (inSidebar && !loaded) return <div className="h-9 rounded-full nav-glass animate-pulse" aria-hidden="true" />
   if (connections.length === 0) return null
-  const active = connections.find(c => c.isActive) ?? connections[0]
+  const active = activeConn
 
   // Dead cabinet session (founder request 2026-08-21): the whole pill
   // becomes one clear reconnect button instead of a store name that no
@@ -104,10 +115,10 @@ export default function KaspiShopStoreSwitcher() {
   // refreshes the session for the same merchant without duplicates.
   if (active.sessionStatus === 'session_expired') {
     return (
-      <div className="relative ml-auto flex-shrink-0">
+      <div className={inSidebar ? 'relative w-full' : 'relative ml-auto flex-shrink-0'}>
         <button
           onClick={() => router.push('/kaspi-shop?addStore=1')}
-          className="text-[12px] font-semibold rounded-full px-3 py-1.5"
+          className={`text-[12px] font-semibold rounded-full px-3 py-1.5${inSidebar ? ' w-full' : ''}`}
           style={{ background: 'var(--nav-critical)', color: '#fff' }}
         >
           Подключить магазин
@@ -117,8 +128,8 @@ export default function KaspiShopStoreSwitcher() {
   }
 
   return (
-    <div ref={rootRef} className="relative ml-auto flex-shrink-0">
-      <div className="flex items-center gap-0.5 rounded-full nav-glass pl-1 pr-1 py-1">
+    <div ref={rootRef} className={inSidebar ? 'relative w-full' : 'relative ml-auto flex-shrink-0'}>
+      <div className={`flex items-center gap-0.5 rounded-full nav-glass pl-1 pr-1 py-1${inSidebar ? ' w-full' : ''}`}>
         {/* Known, accepted exception to the 44px tap-zone rule (DESIGN.md):
             this pill is 2px-gap tight against the company-name button next to
             it, so growing the box would either balloon the whole chip or risk
@@ -136,7 +147,7 @@ export default function KaspiShopStoreSwitcher() {
         </button>
         <button
           onClick={() => setOpen(v => !v)}
-          className="flex items-center gap-1 pl-1 pr-2 py-1 rounded-full text-[12px] font-medium max-w-[180px]"
+          className={`flex items-center gap-1 pl-1 pr-2 py-1 rounded-full text-[12px] font-medium ${inSidebar ? 'flex-1 min-w-0 justify-between' : 'max-w-[180px]'}`}
           style={{ color: 'var(--nav-text-secondary)' }}
         >
           <span className="truncate">{active.companyName}</span>
@@ -151,7 +162,7 @@ export default function KaspiShopStoreSwitcher() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -6, scale: 0.97 }}
             transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
-            className="absolute right-0 top-[calc(100%+8px)] nav-glass rounded-2xl py-1.5 w-64 z-40"
+            className={`absolute top-[calc(100%+8px)] nav-glass rounded-2xl py-1.5 z-40 ${inSidebar ? 'left-0 right-0' : 'right-0 w-64'}`}
             style={{ boxShadow: '0 24px 50px -20px rgba(10,10,15,0.35), var(--nav-card-glow)' }}
           >
             <div className="px-3 py-1.5 text-[10px] font-extrabold uppercase" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.07em' }}>

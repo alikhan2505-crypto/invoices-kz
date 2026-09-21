@@ -1165,6 +1165,14 @@ html {
    fixed at the left; DesktopShell's card is shifted right through --shell-left, and its
    scroll area gets top room for the wallet/account pill that used to sit in SiteNav's row. */
 @media (min-width: 1024px) {
-  .product-shell .desktop-shell-scroll { padding-top: 64px; }
-  .product-shell-main { padding-left: 260px; padding-top: 64px; }
+  .product-shell .desktop-shell-scroll { padding-top: 84px; }
+  .product-shell-main { padding-left: 260px; padding-top: 84px; }
 }
+
+/* The balance lives in the shell's sidebar, so the top pill drops its own balance button. */
+body.product-shell-active [data-tour="wallet"] > button:first-child { display: none; }
+@keyframes shell-dot-pulse { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--nav-success) 55%, transparent); } 50% { box-shadow: 0 0 0 6px transparent; } }
+.shell-dot { width: 10px; height: 10px; border-radius: 9999px; flex-shrink: 0; }
+.shell-dot[data-state="connected"] { background: var(--nav-success); animation: shell-dot-pulse 1.8s ease-in-out infinite; }
+.shell-dot[data-state="off"] { background: var(--nav-critical); }
+@media (prefers-reduced-motion: reduce) { .shell-dot[data-state="connected"] { animation: none; } }
