@@ -1,7 +1,8 @@
 'use client'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
-import { useRouter, usePathname } from 'next/navigation'
+import { useRouter } from 'next/navigation'
+import { useEffectivePath } from '@/lib/useEffectivePath'
 import Link from 'next/link'
 import QRCode from 'qrcode'
 import { supabase } from '@/lib/supabase'
@@ -107,7 +108,7 @@ function walletDotColor(entry: HistoryEntry): string {
 
 export default function TopUtilityBar() {
   const router = useRouter()
-  const pathname = usePathname()
+  const pathname = useEffectivePath()
   const reduceMotion = !!useReducedMotion()
   const [loggedIn, setLoggedIn] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)

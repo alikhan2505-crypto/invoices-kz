@@ -1,7 +1,8 @@
 'use client'
 import { useEffect, useState, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { useRouter, usePathname } from 'next/navigation'
+import { useRouter } from 'next/navigation'
+import { useEffectivePath } from '@/lib/useEffectivePath'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { getActivePlan } from '@/lib/plan'
@@ -206,7 +207,7 @@ function isActiveSection(links: { href: string }[], path: string) {
 
 export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean }) {
   const router = useRouter()
-  const path = usePathname()
+  const path = useEffectivePath()
   const { lang } = useLanguage()
   const [perms, setPerms] = useState<Perms | null>(null)
   const [lockedHint, setLockedHint] = useState<string | null>(null)

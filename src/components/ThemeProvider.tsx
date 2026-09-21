@@ -1,6 +1,6 @@
 'use client'
 import { createContext, useContext, useEffect, useState } from 'react'
-import { usePathname } from 'next/navigation'
+import { useEffectivePath } from '@/lib/useEffectivePath'
 
 // Light is the default theme -- the approved reference design (the Focus
 // artifact) is the LIGHT version: soft #F5F6FB ground with pastel aurora
@@ -22,7 +22,7 @@ const FORCE_LIGHT_ROUTES = new Set(['/', '/cashier-api'])
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState('light')
-  const pathname = usePathname()
+  const pathname = useEffectivePath()
 
   useEffect(() => {
     const saved = localStorage.getItem('theme') || 'light'
