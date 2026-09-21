@@ -21,7 +21,7 @@ create table if not exists public.salon_sites (
   -- Служебные имена заняты самой платформой: отдать их салону — значит
   -- увести на лендинг тех, кто шёл на www или api.
   constraint salon_sites_slug_reserved check (
-    slug not in ('www', 'api', 'app', 'admin', 'mail', 'smtp', 'ftp', 'cdn', 'static', 'invoices', 'shop', 'pay')
+    slug not in ('www', 'api', 'app', 'admin', 'mail', 'smtp', 'ftp', 'cdn', 'static', 'invoices', 'shop', 'pay', 'kaspi', 'agent', 'salon', 'docs', 'my', 'wb', 'bot')
   )
 );
 

@@ -4,6 +4,7 @@
 // host is just removing its row here.
 const PRODUCT_HOST_ROUTES: Record<string, Record<string, string>> = {
   api: { '/': '/cashier-api', '/docs': '/kaspi-api/docs' },
+  kaspi: { '/': '/kaspi-shop' },
 }
 
 // Returns the internal path to rewrite to, or null to leave the request alone.

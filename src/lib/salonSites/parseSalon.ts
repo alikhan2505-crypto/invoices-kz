@@ -1,7 +1,7 @@
 import type { SalonData, SalonMasterCategory, SalonService } from './types'
 
 const SLUG_RE = /^[a-z0-9]([a-z0-9-]{1,30}[a-z0-9])$/
-const RESERVED = ['www', 'api', 'app', 'admin', 'mail', 'smtp', 'ftp', 'cdn', 'static', 'invoices', 'shop', 'pay']
+const RESERVED = ['www', 'api', 'app', 'admin', 'mail', 'smtp', 'ftp', 'cdn', 'static', 'invoices', 'shop', 'pay', 'kaspi', 'agent', 'salon', 'docs', 'my', 'wb', 'bot']
 
 export function parseSlug(value: unknown): string | null {
   if (typeof value !== 'string') return null

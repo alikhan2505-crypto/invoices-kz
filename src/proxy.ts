@@ -12,7 +12,7 @@ const BASE_DOMAIN = process.env.NEXT_PUBLIC_SITE_DOMAIN || 'invoices.kz'
 // constraint salon_sites_slug_reserved в supabase/migrations/salon_sites.sql --
 // оба места решают один вопрос ("что зарезервировано"), и если бы списки
 // разошлись, один бы тихо пропускал то, что другой уже отсёк на входе.
-const PLATFORM_SUBDOMAINS = new Set(['www', 'api', 'app', 'admin', 'mail', 'smtp', 'ftp', 'cdn', 'static', 'invoices', 'shop', 'pay'])
+const PLATFORM_SUBDOMAINS = new Set(['www', 'api', 'app', 'admin', 'mail', 'smtp', 'ftp', 'cdn', 'static', 'invoices', 'shop', 'pay', 'kaspi', 'agent', 'salon', 'docs', 'my', 'wb', 'bot'])
 
 export function proxy(request: NextRequest) {
   const hostname = (request.headers.get('host') || '').split(':')[0].toLowerCase()

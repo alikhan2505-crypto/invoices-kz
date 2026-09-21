@@ -21,6 +21,13 @@ describe('productHostRewrite', () => {
   })
 })
 
+describe('kaspi host', () => {
+  it('root opens the Kaspi Bot cabinet, other paths pass through', () => {
+    expect(productHostRewrite('kaspi.invoices.kz', '/', 'invoices.kz')).toBe('/kaspi-shop')
+    expect(productHostRewrite('kaspi.invoices.kz', '/kaspi-shop/orders', 'invoices.kz')).toBeNull()
+  })
+})
+
 describe('apexToApiRedirect', () => {
   it('is off by default', () => {
     expect(apexToApiRedirect('invoices.kz', '/cashier-api', 'invoices.kz', false)).toBeNull()
