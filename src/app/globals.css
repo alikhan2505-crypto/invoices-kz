@@ -1154,3 +1154,5 @@ html {
 .prd-chip[data-on="true"], .prd-chip[data-on="true"] span { color: var(--prd-bg) !important; }
 .prd-chip-quiet { border-style: dashed; font-weight: 500; }
 @media (prefers-reduced-motion: reduce) { .prd-chip { transition: none; } }
+
+/* start-page chips: rebuild marker */
