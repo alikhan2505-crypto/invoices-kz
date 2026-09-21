@@ -4,6 +4,7 @@ import './globals.css'
 import { ThemeProvider } from '@/components/ThemeProvider'
 import { LanguageProvider } from '@/components/LanguageProvider'
 import TopUtilityBar from '@/components/TopUtilityBar'
+import HandoffBanner from '@/components/HandoffBanner'
 import NavAurora from '@/components/NavAurora'
 import { Analytics } from '@vercel/analytics/next'
 import StructuredData from '@/components/StructuredData'
@@ -80,6 +81,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <NavAurora />
             {children}
             <TopUtilityBar />
+            <HandoffBanner />
             {/* Added 2026-09-04: the project had no visitor analytics of any
                 kind, so there was no way to tell whether a paid campaign (or
                 the free /tools/waybills funnel it points at) brought anyone.

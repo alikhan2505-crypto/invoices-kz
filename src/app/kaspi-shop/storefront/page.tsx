@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import { getActivePlan } from '@/lib/plan'
+import { useCrossHref } from '@/lib/useCrossHref'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -27,6 +28,7 @@ function formatPrice(price: number): string {
 }
 
 export default function KaspiShopStorefrontSettings() {
+  const crossHref = useCrossHref()
   const router = useRouter()
   const reduceMotion = !!useReducedMotion()
   const [loading, setLoading] = useState(true)
@@ -382,7 +384,7 @@ export default function KaspiShopStorefrontSettings() {
             {!settings?.cashierConnected ? (
               <div className="nav-glass rounded-2xl p-5 text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
                 Для приёма оплаты на витрине нужен подключённый Kaspi Pay Кассир.{' '}
-                <a href="/kaspi-api" className="font-semibold" style={{ color: 'var(--nav-accent)' }}>Подключить →</a>
+                <a href={crossHref('kaspiApi', '/kaspi-api', 'kaspiShop', '/kaspi-shop/storefront')} className="font-semibold" style={{ color: 'var(--nav-accent)' }}>Подключить →</a>
               </div>
             ) : (
               <div className="nav-glass rounded-2xl p-5 space-y-4">
@@ -465,7 +467,7 @@ export default function KaspiShopStorefrontSettings() {
                 ) : (
                   <p className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>
                     Сначала подключите канал «Сайт» в AI-агенте.{' '}
-                    <a href="/ai-agent/settings" className="font-semibold" style={{ color: 'var(--nav-accent)' }}>Настроить →</a>
+                    <a href={crossHref('aiAgent', '/ai-agent/settings', 'kaspiShop', '/kaspi-shop/storefront')} className="font-semibold" style={{ color: 'var(--nav-accent)' }}>Настроить →</a>
                   </p>
                 )}
               </div>

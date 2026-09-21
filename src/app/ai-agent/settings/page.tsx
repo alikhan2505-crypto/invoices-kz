@@ -19,6 +19,7 @@ import { TRAINING_MESSAGE_THRESHOLD, TRAINING_DAYS_THRESHOLD } from '@/lib/aiAge
 // shows the REAL assembled context line, not a hand-maintained copy.
 import { buildBusinessContextLine, AgentTone, AgentGoal } from '@/lib/aiAgent/promptContext'
 import { useAppDialog } from '@/components/AppDialog'
+import { useCrossHref } from '@/lib/useCrossHref'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -235,6 +236,7 @@ function ChannelCard({ icon, name, chip, description, children }: {
 }
 
 export default function AiAgentSettings() {
+  const crossHref = useCrossHref()
   const { lang } = useLanguage()
   const t = aiAgentDict[lang]
   // Shadows window.alert / window.confirm for this component -- see
@@ -1439,7 +1441,7 @@ export default function AiAgentSettings() {
                     <p className="text-[11px] mb-3" style={{ color: 'var(--nav-text-muted)' }}>
                       {tf.connectShopText}
                     </p>
-                    <Link href="/kaspi-shop" className="text-xs font-semibold" style={{ color: 'var(--nav-accent)' }}>{tf.connectShopCta}</Link>
+                    <a href={crossHref('kaspiShop', '/kaspi-shop', 'aiAgent', '/ai-agent/settings')} className="text-xs font-semibold" style={{ color: 'var(--nav-accent)' }}>{tf.connectShopCta}</a>
                   </div>
                 )}
 
