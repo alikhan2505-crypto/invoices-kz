@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { productHostRewrite } from '@/lib/hostRouting'
 
 // Next 16 переименовал middleware в proxy -- см.
 // node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/proxy.md
@@ -18,6 +19,13 @@ export function proxy(request: NextRequest) {
 
   const suffix = `.${BASE_DOMAIN}`
   if (!hostname.endsWith(suffix)) return NextResponse.next()
+
+  const productPath = productHostRewrite(hostname, request.nextUrl.pathname, BASE_DOMAIN)
+  if (productPath) {
+    const url = request.nextUrl.clone()
+    url.pathname = productPath
+    return NextResponse.rewrite(url)
+  }
 
   const slug = hostname.slice(0, -suffix.length)
   if (!slug || slug.includes('.') || PLATFORM_SUBDOMAINS.has(slug)) return NextResponse.next()
