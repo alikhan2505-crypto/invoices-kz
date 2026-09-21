@@ -2,13 +2,13 @@
 import { useEffect, useState, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
-import { useEffectivePath } from '@/lib/useEffectivePath'
+import { useEffectivePath, useProductHost } from '@/lib/useEffectivePath'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { getActivePlan } from '@/lib/plan'
 import { useLanguage, type Lang } from './LanguageProvider'
 import KaspiShopStoreSwitcher from './KaspiShopStoreSwitcher'
-import { useMyProducts } from '@/lib/useMyProducts'
+import { connectProduct, useMyProducts } from '@/lib/useMyProducts'
 import { isSectionVisible } from '@/lib/products'
 
 const labels: Record<Lang, { home: string; invoices: string; kaspiShop: string; aiAgent: string; kaspiApi: string; wildberries: string; products: string; profile: string; menu: string; close: string }> = {
@@ -276,7 +276,16 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
   // chosen = every tab, exactly as before. Display only -- access is still
   // decided by isSectionLocked and each page's own guard.
   const [mine] = useMyProducts()
-  const visibleSections = SECTIONS.filter(s => isSectionVisible(mine, s.key, activeSection?.key ?? null))
+  // On a product subdomain the menu is that product only ("you went where you
+  // clicked, nothing else is offered"); the way to other products is «Все продукты».
+  const onProductHost = useProductHost()
+  const visibleSections = SECTIONS.filter(s => onProductHost ? s.key === activeSection?.key : isSectionVisible(mine, s.key, activeSection?.key ?? null))
+
+  // Opening a product section connects it to the account.
+  const activeKey = activeSection?.key
+  useEffect(() => {
+    if (activeKey) void connectProduct(activeKey)
+  }, [activeKey])
 
   return (
     <>
@@ -354,7 +363,7 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
 
                 <div className="flex-1 overflow-y-auto px-2 pb-6">
                   {([
-                    { href: '/dashboard', label: labels[lang].home },
+                    ...(onProductHost ? [] : [{ href: '/dashboard', label: labels[lang].home }]),
                     { href: '/products', label: labels[lang].products },
                     { href: '/profile', label: labels[lang].profile },
                   ]).map(item => {
@@ -465,16 +474,18 @@ export default function SiteNav({ desktopOnly = false }: { desktopOnly?: boolean
             <span className="font-semibold text-sm" style={{ color: 'var(--nav-text-primary)', letterSpacing: '-0.02em' }}>invoices.kz</span>
           </button>
 
-          <button
-            onClick={() => router.push('/dashboard')}
-            className="px-3 py-2 rounded-lg text-sm font-semibold transition-colors"
-            style={{
-              color: path === '/dashboard' ? 'var(--nav-text-primary)' : 'var(--nav-text-secondary)',
-              boxShadow: path === '/dashboard' ? `inset 0 -2px 0 var(--nav-accent)` : 'none',
-            }}
-          >
-            {labels[lang].home}
-          </button>
+          {!onProductHost && (
+            <button
+              onClick={() => router.push('/dashboard')}
+              className="px-3 py-2 rounded-lg text-sm font-semibold transition-colors"
+              style={{
+                color: path === '/dashboard' ? 'var(--nav-text-primary)' : 'var(--nav-text-secondary)',
+                boxShadow: path === '/dashboard' ? `inset 0 -2px 0 var(--nav-accent)` : 'none',
+              }}
+            >
+              {labels[lang].home}
+            </button>
+          )}
 
           {visibleSections.map(s => {
             const locked = isSectionLocked(s, perms)

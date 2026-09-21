@@ -60,6 +60,21 @@ function refreshFromProfile(): Promise<void> {
   return refreshed
 }
 
+// Opening a product's section connects it to the account ("go there and it's
+// yours"). Re-reads the account's list first, so a stale per-host cache can
+// never overwrite it with an older one.
+export async function connectProduct(key: ProductKey): Promise<void> {
+  await refreshFromProfile()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
+  const { data } = await supabase.from('profiles').select('enabled_products').eq('id', user.id).single()
+  const list = data?.enabled_products
+  if (!Array.isArray(list) || list.includes(key)) return
+  const next = [...(list as ProductKey[]), key]
+  await supabase.from('profiles').update({ enabled_products: next }).eq('id', user.id)
+  writeCache(serializeMyProducts(next))
+}
+
 export function useMyProducts(): [ProductKey[] | null, (next: ProductKey[]) => void] {
   const raw = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
   const mine = useMemo(() => parseMyProducts(raw), [raw])

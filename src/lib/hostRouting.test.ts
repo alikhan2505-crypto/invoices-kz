@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { productHostRewrite, apexToApiRedirect } from './hostRouting'
+import { productHostRewrite, apexToApiRedirect, isProductHost } from './hostRouting'
 
 describe('productHostRewrite', () => {
   it('api host: root shows the Cashier API landing, /docs the docs', () => {
@@ -55,5 +55,15 @@ describe('apexToApiRedirect', () => {
   })
   it('never loops on the api host itself', () => {
     expect(apexToApiRedirect('api.invoices.kz', '/cashier-api', 'invoices.kz', true)).toBeNull()
+  })
+})
+
+describe('isProductHost', () => {
+  it('true only for product subdomains', () => {
+    for (const h of ['api', 'kaspi', 'agent', 'salon']) expect(isProductHost(`${h}.invoices.kz`, 'invoices.kz')).toBe(true)
+    expect(isProductHost('invoices.kz', 'invoices.kz')).toBe(false)
+    expect(isProductHost('www.invoices.kz', 'invoices.kz')).toBe(false)
+    expect(isProductHost('my-salon.invoices.kz', 'invoices.kz')).toBe(false)
+    expect(isProductHost('localhost', 'invoices.kz')).toBe(false)
   })
 })

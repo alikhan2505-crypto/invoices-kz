@@ -9,6 +9,14 @@ const PRODUCT_HOST_ROUTES: Record<string, Record<string, string>> = {
   salon: { '/': '/lp/salon' },
 }
 
+// True on a product subdomain (api., kaspi., agent., salon.): there the menu
+// shows only that product, not the whole platform.
+export function isProductHost(hostname: string, baseDomain: string): boolean {
+  const suffix = `.${baseDomain}`
+  if (!hostname.endsWith(suffix)) return false
+  return Object.prototype.hasOwnProperty.call(PRODUCT_HOST_ROUTES, hostname.slice(0, -suffix.length))
+}
+
 // Returns the internal path to rewrite to, or null to leave the request alone.
 export function productHostRewrite(hostname: string, pathname: string, baseDomain: string): string | null {
   const suffix = `.${baseDomain}`
