@@ -7,6 +7,7 @@ import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import { getActivePlan } from '@/lib/plan'
 import { useCrossHref } from '@/lib/useCrossHref'
+import BrandLoader from '@/components/BrandLoader'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -329,7 +330,7 @@ export default function KaspiShopStorefrontSettings() {
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
-      <div className="p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Загрузка…</div>
+      <BrandLoader />
     </main>
     </DesktopShell>
   )

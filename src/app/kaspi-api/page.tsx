@@ -9,6 +9,7 @@ import { useLanguage } from '@/components/LanguageProvider'
 import { acquiringDict } from '@/lib/i18n/acquiring'
 import { setPostLoginRedirect } from '@/lib/postLoginRedirect'
 import { useAppDialog } from '@/components/AppDialog'
+import BrandLoader from '@/components/BrandLoader'
 
 // Matches MIN_TOPUP in src/app/api/kaspi/wallet/topup/route.ts — kept here
 // too so the button can refuse an obviously-too-small amount before ever
@@ -681,7 +682,7 @@ export default function KaspiApiPage() {
           rules, collapsing this div to its text's intrinsic height and
           leaving the app's light ambient background showing below it. */}
       <div className="min-h-screen">
-        <div className="p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Загрузка…</div>
+        <BrandLoader />
       </div>
     </main>
     </DesktopShell>

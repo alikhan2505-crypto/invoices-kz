@@ -146,7 +146,7 @@ export default function ProductShell({ product, children }: { product: ProductKe
         {product === 'kaspiShop' && <KaspiShopStoreSwitcher inSidebar onState={setStoreState} />}
       </div>
 
-      <nav aria-label={def.name} className="flex-1 min-h-0 overflow-y-auto px-2 pb-3">
+      <nav aria-label={def.name} className="flex-1 min-h-0 overflow-y-auto hide-scrollbar px-2 pb-3">
         {links.map((l) => {
           const active = l.href === bestMatch
           return (

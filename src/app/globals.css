@@ -1179,3 +1179,11 @@ body.product-shell-active [data-tour="wallet"] > button:first-child { display: n
 .shell-dot[data-state="connected"] { background: var(--nav-success); animation: shell-dot-pulse 1.8s ease-in-out infinite; }
 .shell-dot[data-state="off"] { background: var(--nav-critical); }
 @media (prefers-reduced-motion: reduce) { .shell-dot[data-state="connected"] { animation: none; } }
+
+/* Brand loader: navy plate, white wordmark, accent ".KZ", letters lighting up in a wave. */
+.brand-loader-wrap { min-height: 60vh; display: flex; align-items: center; justify-content: center; }
+.brand-loader { display: inline-flex; padding: 14px 22px; border-radius: 16px; background: #1C2056; font: 800 22px/1 var(--font-geist-sans), Arial, sans-serif; letter-spacing: 0.14em; }
+.brand-loader-ch { display: inline-block; color: #fff; animation: brand-loader-wave 1.8s ease-in-out infinite; }
+.brand-loader-ch.brand-loader-tail { color: color-mix(in srgb, var(--nav-accent) 65%, white); }
+@keyframes brand-loader-wave { 0%, 60%, 100% { opacity: 0.45; transform: translateY(0); } 25% { opacity: 1; transform: translateY(-3px); } }
+@media (prefers-reduced-motion: reduce) { .brand-loader-ch { animation: none; opacity: 1; } }
