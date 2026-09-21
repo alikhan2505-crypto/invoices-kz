@@ -14,7 +14,7 @@ describe('productHostRewrite', () => {
   it('other hosts are untouched', () => {
     expect(productHostRewrite('invoices.kz', '/', 'invoices.kz')).toBeNull()
     expect(productHostRewrite('www.invoices.kz', '/', 'invoices.kz')).toBeNull()
-    expect(productHostRewrite('salon.invoices.kz', '/', 'invoices.kz')).toBeNull()
+    expect(productHostRewrite('my.invoices.kz', '/', 'invoices.kz')).toBeNull()
     expect(productHostRewrite('api.evil.com', '/', 'invoices.kz')).toBeNull()
     expect(productHostRewrite('x.api.invoices.kz', '/', 'invoices.kz')).toBeNull()
     expect(productHostRewrite('constructor.invoices.kz', '/', 'invoices.kz')).toBeNull()
