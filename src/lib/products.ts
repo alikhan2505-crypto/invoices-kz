@@ -38,7 +38,7 @@ export const PRODUCTS: ProductDef[] = [
   { key: 'invoices', name: 'Счета', blurb: 'Счёт, КП и АВР за 30 секунд', audience: 'ИП и ТОО Казахстана', href: '/create', bg: '#1C2056', ink: '#F4F6FF', inNav: true },
   { key: 'kaspiShop', name: 'Kaspi Bot', blurb: 'Демпинг цен и заказы Kaspi', audience: 'Продавцы Kaspi Магазина', href: '/kaspi-shop/overview', landing: 'https://kaspi.invoices.kz', bg: '#FF6B57', ink: '#2A0B07', proOnly: true, inNav: true },
   { key: 'kaspiApi', name: 'Kaspi Cashier API', blurb: 'Приём Kaspi Pay в ваш код', audience: 'Разработчики и интеграторы', href: '/kaspi-api', landing: 'https://api.invoices.kz', bg: '#F5E663', ink: '#14130A', inNav: true },
-  { key: 'aiAgent', name: 'AI-агент', blurb: 'Отвечает клиентам в мессенджерах', audience: 'Бизнес, который живёт в переписке', href: '/ai-agent', landing: 'https://agent.invoices.kz', bg: '#B7A6FF', ink: '#1D1140', proOnly: true, inNav: true },
+  { key: 'aiAgent', name: 'AI-агент', blurb: 'Отвечает клиентам в мессенджерах', audience: 'Бизнес, который живёт в переписке', href: '/ai-agent/overview', landing: 'https://agent.invoices.kz', bg: '#B7A6FF', ink: '#1D1140', proOnly: true, inNav: true },
   { key: 'salon', name: 'Салон', blurb: 'Записи, мастера, сайт салона', audience: 'Салоны красоты и барбершопы', href: '/admin/site-generator', landing: 'https://salon.invoices.kz', bg: '#F7C6D4', ink: '#3B1030', inNav: false },
   { key: 'wildberries', name: 'WB Bot', blurb: 'Товары и заказы Wildberries', audience: 'Продавцы Wildberries', href: '/wildberries', bg: '#7A2E8E', ink: '#FBEAFB', locked: true, inNav: true },
 ]

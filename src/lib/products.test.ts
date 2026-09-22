@@ -63,7 +63,7 @@ describe('homeFor', () => {
     expect(homeFor([])).toBe('/dashboard')
     expect(homeFor(['invoices'])).toBe('/dashboard')
     expect(homeFor(['kaspiShop'])).toBe('/kaspi-shop/overview')
-    expect(homeFor(['aiAgent'])).toBe('/ai-agent')
+    expect(homeFor(['aiAgent'])).toBe('/ai-agent/overview')
     expect(homeFor(['invoices', 'kaspiShop'])).toBe('/products')
     expect(homeFor(['wildberries'])).toBe('/dashboard')
     expect(homeFor(['nonsense'])).toBe('/dashboard')

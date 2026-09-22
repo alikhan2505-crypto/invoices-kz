@@ -69,6 +69,7 @@ const kaspiShopLinks: { href: string; label: LocalizedLabel }[] = [
 // '/ai-agent'), so "Агенты" is what lights up while on it -- exactly the
 // parent it drills down from.
 const aiAgentLinks: { href: string; label: LocalizedLabel }[] = [
+  { href: '/ai-agent/overview', label: { ru: 'Обзор', kk: 'Шолу', en: 'Overview' } },
   { href: '/ai-agent', label: { ru: 'Агенты', kk: 'Агенттер', en: 'Agents' } },
   { href: '/ai-agent/review', label: { ru: 'Диалоги', kk: 'Диалогтар', en: 'Conversations' } },
   { href: '/ai-agent/dialogs', label: { ru: 'Переписка', kk: 'Хат алмасу', en: 'Correspondence' } },
