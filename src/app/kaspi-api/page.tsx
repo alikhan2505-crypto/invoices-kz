@@ -10,6 +10,7 @@ import { acquiringDict } from '@/lib/i18n/acquiring'
 import { setPostLoginRedirect } from '@/lib/postLoginRedirect'
 import { useAppDialog } from '@/components/AppDialog'
 import BrandLoader from '@/components/BrandLoader'
+import { useCrossHref } from '@/lib/useCrossHref'
 
 // Matches MIN_TOPUP in src/app/api/kaspi/wallet/topup/route.ts — kept here
 // too so the button can refuse an obviously-too-small amount before ever
@@ -36,6 +37,7 @@ export default function KaspiApiPage() {
   const router = useRouter()
   const { lang } = useLanguage()
   const t = acquiringDict[lang]
+  const crossHref = useCrossHref()
   // Shadows window.alert / window.confirm for this component -- see
   // src/components/AppDialog.tsx. Every confirm below is awaited: a Promise
   // is truthy, so `if (confirm(...))` would silently pass.
@@ -1156,6 +1158,22 @@ export default function KaspiApiPage() {
           {kaspiStatementSection}
         </div>
       )}
+
+      <div className="max-w-3xl mx-auto px-6 pb-16">
+        <h2 className="text-[13px] font-semibold uppercase mb-3" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.08em' }}>Связано с другими продуктами</h2>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <a href={crossHref('invoices', '/create', 'kaspiApi', '/kaspi-api')} className="nav-glass rounded-2xl p-4 flex flex-col gap-1.5 transition-transform hover:-translate-y-0.5">
+            <span className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>Выставлять счета клиентам без кода</span>
+            <span className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>Счета · invoices.kz</span>
+            <span className="text-xs font-semibold mt-auto pt-2" style={{ color: 'var(--nav-accent)' }}>Открыть →</span>
+          </a>
+          <a href={crossHref('kaspiShop', '/kaspi-shop/overview', 'kaspiApi', '/kaspi-api')} className="nav-glass rounded-2xl p-4 flex flex-col gap-1.5 transition-transform hover:-translate-y-0.5">
+            <span className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>Заказы и демпинг цен на Kaspi Магазине</span>
+            <span className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>Kaspi Bot · kaspi.invoices.kz</span>
+            <span className="text-xs font-semibold mt-auto pt-2" style={{ color: 'var(--nav-accent)' }}>Открыть →</span>
+          </a>
+        </div>
+      </div>
       </div>
       {dialogElement}
     </main>
