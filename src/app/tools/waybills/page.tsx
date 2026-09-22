@@ -1,6 +1,7 @@
 'use client'
 import { useState, useRef } from 'react'
 import Link from 'next/link'
+import { FEATURES_HREF } from '@/lib/rootHub'
 import { motion, useReducedMotion } from 'framer-motion'
 import { track } from '@vercel/analytics'
 import { useLanguage, Lang } from '@/components/LanguageProvider'
@@ -315,7 +316,7 @@ export default function WaybillMergerTool() {
             <p className="text-sm mb-3" style={{ color: 'var(--nav-text-secondary)' }}>
               {t.ctaBody}
             </p>
-            <Link href="/#features" onClick={() => track('waybills_to_product')}
+            <Link href={FEATURES_HREF} onClick={() => track('waybills_to_product')}
               className="text-sm font-semibold" style={{ color: 'var(--nav-accent)' }}>
               {t.ctaLink}
             </Link>

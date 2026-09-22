@@ -7,10 +7,15 @@ const PRODUCT_HOST_ROUTES: Record<string, Record<string, string>> = {
   kaspi: { '/': '/lp/kaspi' },
   agent: { '/': '/lp/agent' },
   salon: { '/': '/lp/salon' },
+  // Stage 5: the Счета marketing page's own address, once it moves off
+  // apex '/' (see src/lib/rootHub.ts). Not gated here -- inert on its own
+  // until the docs.invoices.kz domain itself is attached in Vercel, exactly
+  // like every other host row above was before its own domain step.
+  docs: { '/': '/invoices-landing' },
 }
 
-// True on a product subdomain (api., kaspi., agent., salon.): there the menu
-// shows only that product, not the whole platform.
+// True on a product subdomain (api., kaspi., agent., salon., docs.): there
+// the menu shows only that product, not the whole platform.
 export function isProductHost(hostname: string, baseDomain: string): boolean {
   const suffix = `.${baseDomain}`
   if (!hostname.endsWith(suffix)) return false

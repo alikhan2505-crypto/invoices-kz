@@ -581,6 +581,7 @@ export default function TopUtilityBar() {
     pathname === '/terms' ||
     pathname === '/data-deletion' ||
     pathname === '/cashier-api' ||
+    pathname === '/invoices-landing' ||
     pathname.startsWith('/lp/') ||
     pathname.startsWith('/view/') ||
     pathname.startsWith('/contract-view/') ||

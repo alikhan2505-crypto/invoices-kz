@@ -15,6 +15,23 @@ export interface PendingUpgrade {
   period: BillingPeriod
 }
 
+// The landing page's Basic/Pro CTA can now be served from docs.invoices.kz
+// (see hostRouting.ts) and always sends the visitor to the apex /login --
+// a different origin, where localStorage set on docs. isn't readable. The
+// plan/period travel in the URL instead (?plan=&period=), read here on
+// /login's own origin and turned into the same localStorage entry
+// consumePendingUpgrade() already expects. Same validate-on-read shape as
+// postLoginRedirectFromSearch.
+export function pendingUpgradeFromSearch(search: string): PendingUpgrade | null {
+  const params = new URLSearchParams(search)
+  const plan = params.get('plan')
+  const period = params.get('period')
+  if ((plan === 'basic' || plan === 'pro') && (period === 'monthly' || period === 'annual')) {
+    return { plan, period }
+  }
+  return null
+}
+
 export function setPendingUpgrade(plan: PendingUpgrade['plan'], period: BillingPeriod) {
   try {
     localStorage.setItem(PENDING_UPGRADE_KEY, JSON.stringify({ plan, period }))

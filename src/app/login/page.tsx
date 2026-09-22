@@ -5,7 +5,7 @@ import { startAuthentication } from '@simplewebauthn/browser'
 import { supabase } from '@/lib/supabase'
 import { useLanguage, type Lang } from '@/components/LanguageProvider'
 import { authDict } from '@/lib/i18n/auth'
-import { hasPendingUpgrade } from '@/lib/pendingUpgrade'
+import { hasPendingUpgrade, pendingUpgradeFromSearch, setPendingUpgrade } from '@/lib/pendingUpgrade'
 import { consumePostLoginRedirect, postLoginRedirectFromSearch, setPostLoginRedirect } from '@/lib/postLoginRedirect'
 import { useAppDialog } from '@/components/AppDialog'
 import { homeFor } from '@/lib/products'
@@ -32,6 +32,8 @@ export default function Login() {
     if (ref) localStorage.setItem('referral_code', ref)
     const next = postLoginRedirectFromSearch(window.location.search)
     if (next) setPostLoginRedirect(next)
+    const pending = pendingUpgradeFromSearch(window.location.search)
+    if (pending) setPendingUpgrade(pending.plan, pending.period)
     setPasskeySupported(typeof window !== 'undefined' && !!window.PublicKeyCredential)
   }, [])
 

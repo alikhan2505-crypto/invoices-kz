@@ -42,6 +42,13 @@ describe('salon host', () => {
   })
 })
 
+describe('docs host', () => {
+  it('root opens the moved Счета marketing page, other paths pass through', () => {
+    expect(productHostRewrite('docs.invoices.kz', '/', 'invoices.kz')).toBe('/invoices-landing')
+    expect(productHostRewrite('docs.invoices.kz', '/login', 'invoices.kz')).toBeNull()
+  })
+})
+
 describe('apexToApiRedirect', () => {
   it('is off by default', () => {
     expect(apexToApiRedirect('invoices.kz', '/cashier-api', 'invoices.kz', false)).toBeNull()
@@ -60,7 +67,7 @@ describe('apexToApiRedirect', () => {
 
 describe('isProductHost', () => {
   it('true only for product subdomains', () => {
-    for (const h of ['api', 'kaspi', 'agent', 'salon']) expect(isProductHost(`${h}.invoices.kz`, 'invoices.kz')).toBe(true)
+    for (const h of ['api', 'kaspi', 'agent', 'salon', 'docs']) expect(isProductHost(`${h}.invoices.kz`, 'invoices.kz')).toBe(true)
     expect(isProductHost('invoices.kz', 'invoices.kz')).toBe(false)
     expect(isProductHost('www.invoices.kz', 'invoices.kz')).toBe(false)
     expect(isProductHost('my-salon.invoices.kz', 'invoices.kz')).toBe(false)

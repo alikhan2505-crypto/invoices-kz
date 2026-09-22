@@ -1,5 +1,6 @@
 import { MetadataRoute } from 'next'
 import { GUIDES, guideAlternates } from '@/lib/guides'
+import { ROOT_HUB_LIVE } from '@/lib/rootHub'
 
 export default function sitemap(): MetadataRoute.Sitemap {
   return [
@@ -9,6 +10,16 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: 'weekly',
       priority: 1,
     },
+    // The Счета pitch's own address once it moves off apex '/' -- see
+    // src/lib/rootHub.ts. Listed only once it's actually what's live there
+    // (same gating the api. cutover below already uses), so the sitemap
+    // never claims a page that isn't the one really serving yet.
+    ...(ROOT_HUB_LIVE ? [{
+      url: 'https://docs.invoices.kz/',
+      lastModified: new Date(),
+      changeFrequency: 'weekly' as const,
+      priority: 0.9,
+    }] : []),
     {
       url: 'https://invoices.kz/login',
       lastModified: new Date(),

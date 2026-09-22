@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { FEATURES_HREF } from '@/lib/rootHub'
 import { Guide, GuideLang, guidePath, guidesIndexPath, otherGuides } from '@/lib/guides'
 
 // Shared chrome for every guide page in both languages: header, breadcrumb,
@@ -157,7 +158,7 @@ export default function GuideShell({
           <p className="text-sm mb-3" style={{ color: 'var(--nav-text-secondary)' }}>
             {chrome.ctaBody}
           </p>
-          <Link href="/#features" className="text-sm font-semibold" style={{ color: 'var(--nav-accent)' }}>
+          <Link href={FEATURES_HREF} className="text-sm font-semibold" style={{ color: 'var(--nav-accent)' }}>
             {chrome.ctaLink}
           </Link>
         </div>
