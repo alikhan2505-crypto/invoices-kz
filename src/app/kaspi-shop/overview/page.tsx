@@ -50,7 +50,11 @@ export default function KaspiShopOverview() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
       const { data: profile } = await supabase.from('profiles').select('is_admin, plan, plan_expires_at, bonus_expires_at, trial_expires_at').eq('id', user.id).single()
-      if (!profile?.is_admin && !getActivePlan(profile).canKaspiShop) { router.push('/dashboard'); return }
+      // Not silently back to /dashboard -- that left a Pro-only wall with zero
+      // explanation (founder's own Instagram ads send people here directly).
+      // /upgrade is where every other Pro paywall in the app already sends a
+      // blocked user (SiteNav's proOnly sections, /profile/acquiring's cards).
+      if (!profile?.is_admin && !getActivePlan(profile).canKaspiShop) { router.push('/upgrade'); return }
 
       const headers = await authHeader()
       const walletRes = await fetch('/api/kaspi-shop/wallet', { headers })

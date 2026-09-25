@@ -41,9 +41,16 @@ const statusText: Record<string, string> = {
 
 const MONTH_ABBR_RU = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек']
 
-// Copy reused verbatim from SiteNav's lockedMessages.ru so the "coming
-// soon" language matches what non-admins already see in the nav dropdowns.
-const LOCKED_TEXT = 'Скоро откроем всем'
+// Kaspi Bot and AI-агент are live, Pro-only features (not "coming soon" --
+// SiteNav.tsx marks both sections proOnly: true and shows proLockedMessages
+// for exactly this reason, see src/components/SiteNav.tsx). This dashboard
+// widget used to reuse SiteNav's OTHER message (lockedMessages, meant for
+// genuinely unbuilt adminOnly sections like Wildberries) and gate on
+// isAdmin alone -- which told a real paying Pro customer without the admin
+// flag "coming soon" for a feature they already use, and told a trial user
+// nothing about how to actually unlock it. Copy now matches SiteNav's
+// proLockedMessages.ru exactly.
+const LOCKED_TEXT = 'Доступно на тарифе Про'
 
 function PlusIcon() {
   return (
@@ -708,8 +715,13 @@ export default function DashboardPage() {
   const maxClientTotal = Math.max(...topClients.map(c => c.total), 1)
   const maxItemCount = Math.max(...topItems.map(i => i.count), 1)
 
-  const kaspiState: ProductState = isAdmin ? 'neutral' : 'locked'
-  const agentState: ProductState = isAdmin ? 'neutral' : 'locked'
+  // Gated on the real plan (matching SiteNav's proOnly check), not isAdmin
+  // alone -- a paying Pro customer who isn't flagged is_admin was seeing
+  // "locked" on their own dashboard for a feature they already use.
+  const canOpenKaspiShop = isAdmin || !!plan?.canKaspiShop
+  const canOpenAiAgent = isAdmin || !!plan?.canAiAgent
+  const kaspiState: ProductState = canOpenKaspiShop ? 'neutral' : 'locked'
+  const agentState: ProductState = canOpenAiAgent ? 'neutral' : 'locked'
 
   return (
     <DesktopShell>
@@ -801,7 +813,7 @@ export default function DashboardPage() {
                     title="AI-агент"
                     state={agentState}
                     neutralText="Диалоги появятся здесь"
-                    onClick={isAdmin ? () => router.push('/ai-agent') : undefined}
+                    onClick={() => router.push(canOpenAiAgent ? '/ai-agent' : '/upgrade')}
                   />
 )}
                   {shows('kaspiShop') && (
@@ -814,7 +826,7 @@ export default function DashboardPage() {
                     title="Kaspi Bot"
                     state={kaspiState}
                     neutralText="Показатели появятся здесь"
-                    onClick={isAdmin ? () => router.push('/kaspi-shop') : undefined}
+                    onClick={() => router.push(canOpenKaspiShop ? '/kaspi-shop' : '/upgrade')}
                   />
 )}
                 </>
@@ -925,7 +937,7 @@ export default function DashboardPage() {
                       label="Kaspi Bot"
                       state={kaspiState}
                       neutralText="Показатели появятся здесь"
-                      onClick={isAdmin ? () => router.push('/kaspi-shop') : undefined}
+                      onClick={() => router.push(canOpenKaspiShop ? '/kaspi-shop' : '/upgrade')}
                     />
                   </>
                 )}

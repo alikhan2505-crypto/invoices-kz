@@ -153,7 +153,7 @@ export default function KaspiShopStorefrontSettings() {
       // missing it, so any authenticated invoices.kz user could reach a
       // founder-only-until-reviewed feature by typing the URL directly.
       const { data: profile } = await supabase.from('profiles').select('is_admin, plan, plan_expires_at, bonus_expires_at, trial_expires_at').eq('id', user.id).single()
-      if (!profile?.is_admin && !getActivePlan(profile).canKaspiShop) { router.push('/dashboard'); return }
+      if (!profile?.is_admin && !getActivePlan(profile).canKaspiShop) { router.push('/upgrade'); return }
       // Демпинг is the only page with the actual connect terminal (phone/OTP)
       // -- every other page redirects there instead of rendering its own broken
       // state when there's no active connection (2026-09-03 founder: check for a
