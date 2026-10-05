@@ -5,3 +5,11 @@ export function getKey(): string {
   if (!key) throw new Error('AI_AGENT_ENCRYPTION_KEY is not configured')
   return key
 }
+
+// Its own dedicated key, not AI_AGENT_ENCRYPTION_KEY -- same one-key-per-
+// feature-area convention as getKey() above.
+export function getMetaCapiKey(): string {
+  const key = process.env.META_CAPI_ENCRYPTION_KEY
+  if (!key) throw new Error('META_CAPI_ENCRYPTION_KEY is not configured')
+  return key
+}

@@ -73,6 +73,11 @@ interface WhatsAppValue {
       button_reply?: { id?: string; title?: string }
       list_reply?: { id?: string; title?: string }
     }
+    // Present only on the first message of a conversation that started
+    // from a Click-to-WhatsApp ad -- ctwa_clid is the one field this
+    // pipeline actually uses (see docs/superpowers/specs/2026-10-05-ctwa-
+    // meta-capi-design.md).
+    referral?: { source_id?: string; source_type?: string; source_url?: string; ctwa_clid?: string }
   }[]
   statuses?: unknown[]
 }
@@ -151,6 +156,7 @@ export async function POST(req: NextRequest) {
               from: msg.from,
               customerHandle,
               incomingText: msg.text.body,
+              ctwaClid: msg.referral?.ctwa_clid,
             })
             continue
           }

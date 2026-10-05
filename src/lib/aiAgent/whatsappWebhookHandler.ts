@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { decryptAtRest } from '@/lib/kaspiPay/crypto'
-import { getKey } from './connection'
+import { getKey, getMetaCapiKey } from './connection'
+import { sendLeadEvent } from './metaCapi'
 import { generateAiReply } from '@/lib/instagramAiReply'
 import { buildBusinessContextLine, buildCollectFieldsToExtract, buildCatalogBlock, buildDeliveryBlock, buildShopLinksBlock, AgentTone, AgentGoal } from './promptContext'
 import { loadAgentCatalog, loadAgentDeliveryInfo, loadAgentShopLinks } from './catalogContext'
@@ -166,6 +167,10 @@ interface WhatsAppIncomingParams {
   // this goes straight to generateAiReply's `image` param instead. Never
   // set for a transcribed voice message (that flows as plain incomingText).
   media?: { kind: 'image'; base64: string; mediaType: string }
+  // Meta's Click-to-WhatsApp click id, present only on a conversation's
+  // genuinely first message. Persisted on the conversation (below), never
+  // re-derived from a later message.
+  ctwaClid?: string
 }
 
 export async function handleWhatsAppIncoming(conn: WhatsAppTenantConnection, params: WhatsAppIncomingParams): Promise<void> {
@@ -210,6 +215,26 @@ export async function handleWhatsAppIncoming(conn: WhatsAppTenantConnection, par
   const { data: startClaim } = await supabase.from('ai_agent_conversations')
     .update({ start_flow_triggered: true }).eq('id', conversation.id).eq('start_flow_triggered', false).select('id')
   const isFirstMessage = !!(startClaim && startClaim.length > 0)
+
+  // ctwa_clid only ever arrives on the first message of a CTWA-originated
+  // conversation -- a separate, conditional update (not part of the
+  // upsert above) so a later message with no referral object can never
+  // null it back out.
+  if (isFirstMessage && params.ctwaClid) {
+    await supabase.from('ai_agent_conversations').update({ ctwa_clid: params.ctwaClid }).eq('id', conversation.id)
+
+    // Best-effort, never allowed to affect the reply below -- same
+    // tolerance already applied to the wallet debit and Telegram nudge
+    // further down this file.
+    if (agent.meta_pixel_id && agent.meta_capi_token_enc) {
+      try {
+        const token = decryptAtRest(agent.meta_capi_token_enc, getMetaCapiKey()).toString('utf8')
+        await sendLeadEvent(agent.meta_pixel_id, token, params.ctwaClid)
+      } catch (capiErr: any) {
+        console.error('ai-agent whatsapp: Meta CAPI Lead event failed for', params.externalId, ':', capiErr.message)
+      }
+    }
+  }
 
   // Log the inbound message. If two concurrent deliveries of the same
   // message both pass the SELECT-based dedup above, the unique index on
