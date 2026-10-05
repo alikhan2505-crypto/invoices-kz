@@ -32,6 +32,29 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: 'monthly',
       priority: 0.6,
     },
+    // Product subdomain landings (kaspi./agent./salon., stage 3 of the
+    // product split, hostRouting.ts) -- these have always been missing
+    // from the sitemap even though they're live, canonical-self URLs
+    // (lp/[key]/page.tsx -> l.origin) with nothing gating them, unlike
+    // docs./api. above. Added 05.10.2026.
+    {
+      url: 'https://kaspi.invoices.kz/',
+      lastModified: new Date(),
+      changeFrequency: 'monthly',
+      priority: 0.6,
+    },
+    {
+      url: 'https://agent.invoices.kz/',
+      lastModified: new Date(),
+      changeFrequency: 'monthly',
+      priority: 0.6,
+    },
+    {
+      url: 'https://salon.invoices.kz/',
+      lastModified: new Date(),
+      changeFrequency: 'monthly',
+      priority: 0.6,
+    },
     {
       // Free no-signup tool -- exists partly as an organic entry point for
       // Kaspi sellers searching for waybill printing, so it belongs here.
