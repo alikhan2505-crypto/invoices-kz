@@ -679,6 +679,7 @@ export default function InvoicePage() {
   const status = statusLabel[invoice.status] || statusLabel.draft
   const services = invoice.services || []
   const ap = getActivePlan(profile)
+  if (typeof window !== 'undefined') (window as any).__DEBUG_AP__ = { is_admin: profile?.is_admin, ap }
   // Older invoices carry a static "Оплата в течение Nх дней" note from
   // before due-date-based notes existed -- for display (and for regenerated
   // PDFs), always show the due-date-derived sentence when a due date is on
