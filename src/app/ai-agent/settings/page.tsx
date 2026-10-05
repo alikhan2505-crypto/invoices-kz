@@ -268,6 +268,11 @@ export default function AiAgentSettings() {
   // one happened to be active in the Kaspi Bot section.
   const [kaspiShopConnectionId, setKaspiShopConnectionId] = useState('')
   const [kaspiShops, setKaspiShops] = useState<{ id: string; name: string; isActive: boolean }[]>([])
+  const [metaPixelId, setMetaPixelId] = useState<string | null>(null)
+  const [metaPixelIdInput, setMetaPixelIdInput] = useState('')
+  const [metaTokenInput, setMetaTokenInput] = useState('')
+  const [metaCapiBusy, setMetaCapiBusy] = useState(false)
+  const [metaCapiError, setMetaCapiError] = useState<string | null>(null)
   const [isEnabled, setIsEnabled] = useState(true)
   // Training mode queues every reply instead of sending it. The API has
   // always returned this status and the page has always ignored it.
@@ -614,6 +619,7 @@ export default function AiAgentSettings() {
           setTrainingStartedAt(data.agent.trainingStartedAt || '')
           setConnections(data.connections || [])
           setKaspiShopConnectionId(data.agent.kaspiShopConnectionId || '')
+          setMetaPixelId(data.agent.metaPixelId || null)
           // Secondary data (badge count + saved templates) loads in the
           // background -- neither should hold up first paint of the form.
           loadReviewCount(headers)
@@ -836,6 +842,49 @@ export default function AiAgentSettings() {
       setWebsiteError(tf.errDisconnectWebsite)
     }
     setWebsiteBusy(false)
+  }
+
+  async function connectMetaCapi() {
+    if (!agentId || !metaPixelIdInput.trim() || !metaTokenInput.trim()) return
+    setMetaCapiBusy(true)
+    setMetaCapiError(null)
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/ai-agent/meta-capi/connect', {
+        method: 'POST', headers,
+        body: JSON.stringify({ agentId, pixelId: metaPixelIdInput.trim(), accessToken: metaTokenInput.trim() }),
+      })
+      if (res.ok) {
+        setMetaPixelId(metaPixelIdInput.trim())
+        setMetaTokenInput('')
+      } else {
+        setMetaCapiError('Не удалось сохранить. Проверьте Pixel ID и токен.')
+      }
+    } catch {
+      setMetaCapiError('Не удалось сохранить. Проверьте Pixel ID и токен.')
+    }
+    setMetaCapiBusy(false)
+  }
+
+  async function disconnectMetaCapi() {
+    if (!agentId) return
+    setMetaCapiBusy(true)
+    setMetaCapiError(null)
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/ai-agent/meta-capi/connect', {
+        method: 'DELETE', headers, body: JSON.stringify({ agentId }),
+      })
+      if (res.ok) {
+        setMetaPixelId(null)
+        setMetaPixelIdInput('')
+      } else {
+        setMetaCapiError('Не удалось отключить. Попробуйте ещё раз.')
+      }
+    } catch {
+      setMetaCapiError('Не удалось отключить. Попробуйте ещё раз.')
+    }
+    setMetaCapiBusy(false)
   }
 
   function copyWidgetSnippet() {
@@ -1679,6 +1728,7 @@ export default function AiAgentSettings() {
 
             {tab === 'channels' && (
               !agentId ? needsAgentHint(tf.needsAgentChannels) : (
+                <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <ChannelCard
                     icon={<InstagramIcon />}
@@ -1925,6 +1975,52 @@ export default function AiAgentSettings() {
                     )}
                   </ChannelCard>
                 </div>
+
+                <div className="mt-6">
+                  <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--nav-text-muted)' }}>
+                    Реклама
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <ChannelCard
+                      icon={<ApiIcon />}
+                      name="Meta Pixel / CAPI"
+                      chip={metaPixelId
+                        ? <StatusChip kind="ok" label={tf.connectedChip} />
+                        : <StatusChip kind="off" label={t.chipNotConnected} />}
+                      description="Переписки, начатые по клику на рекламу WhatsApp, засчитываются как лиды в вашем рекламном кабинете Meta."
+                    >
+                      {metaPixelId ? (
+                        <div className="flex gap-2">
+                          <button onClick={disconnectMetaCapi} disabled={metaCapiBusy}
+                            className="flex-1 nav-glass rounded-lg px-3 py-2 text-xs font-medium disabled:opacity-50" style={{ color: 'var(--nav-text-primary)' }}>
+                            {metaCapiBusy ? '…' : t.disconnectButton}
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <input type="text" placeholder="Pixel ID" value={metaPixelIdInput}
+                            onChange={e => setMetaPixelIdInput(e.target.value)}
+                            className="w-full mb-2 text-xs rounded-lg px-3 py-2 nav-glass" style={{ color: 'var(--nav-text-primary)' }} />
+                          <input type="password" placeholder="Токен доступа" value={metaTokenInput}
+                            onChange={e => setMetaTokenInput(e.target.value)}
+                            className="w-full mb-2 text-xs rounded-lg px-3 py-2 nav-glass" style={{ color: 'var(--nav-text-primary)' }} />
+                          <button onClick={connectMetaCapi} disabled={metaCapiBusy || !metaPixelIdInput.trim() || !metaTokenInput.trim()}
+                            className="w-full rounded-lg px-4 py-2.5 text-sm font-semibold disabled:opacity-50"
+                            style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                            {metaCapiBusy ? tf.connectingButton : t.connectButton}
+                          </button>
+                          <p className="text-[11px] mt-2" style={{ color: 'var(--nav-text-muted)' }}>
+                            Pixel ID и токен — в Meta Events Manager → источники данных → ваш Pixel → Настройки → Генерировать токен доступа.
+                          </p>
+                        </>
+                      )}
+                      {metaCapiError && (
+                        <div className="text-xs mt-2" style={{ color: 'var(--nav-critical)' }}>{metaCapiError}</div>
+                      )}
+                    </ChannelCard>
+                  </div>
+                </div>
+                </>
               )
             )}
           </motion.div>

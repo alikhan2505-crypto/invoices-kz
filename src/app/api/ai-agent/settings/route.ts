@@ -131,6 +131,7 @@ export async function GET(req: NextRequest) {
       // null = follow the account's active store (the behaviour every agent
       // had before stores became selectable).
       kaspiShopConnectionId: agent.kaspi_shop_connection_id || null,
+      metaPixelId: agent.meta_pixel_id || null,
     } : null,
     suggestedName: profile?.company_name || '',
     connections: connections || [],
