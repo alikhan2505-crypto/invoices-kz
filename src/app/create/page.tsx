@@ -555,25 +555,35 @@ export default function CreateInvoicePage() {
 
     const activePlan = getActivePlan(profile)
 
-    if (activePlan.invoiceLimit !== null && monthCount >= activePlan.invoiceLimit) {
-      setLoading(false)
-      if (activePlan.plan === 'free') {
-        alert(t.planLimitFreeMessage(activePlan.invoiceLimit!))
-        router.push('/upgrade')
-      } else if (activePlan.isTrial) {
-        alert(t.planLimitTrialMessage(activePlan.invoiceLimit!))
-        router.push('/upgrade')
-      } else {
-        alert(t.planLimitBasicMessage(activePlan.invoiceLimit!))
-        router.push('/upgrade')
+    // is_admin bypasses plan gating entirely server-side too (enforce_invoice_limit()
+    // trigger returns NEW immediately for an admin, before even computing a limit) --
+    // these two browser-side checks exist purely to give a non-admin a fast,
+    // friendly message instead of waiting on the DB round-trip, and must mirror
+    // that same bypass. Without it, an admin account whose plan/trial has simply
+    // lapsed (getActivePlan falls through to the Free branch) gets bounced to
+    // /upgrade on every attempt, even though the server would have let them
+    // through -- confirmed live 2026-10-05 (founder's sister's admin account).
+    if (!profile?.is_admin) {
+      if (activePlan.invoiceLimit !== null && monthCount >= activePlan.invoiceLimit) {
+        setLoading(false)
+        if (activePlan.plan === 'free') {
+          alert(t.planLimitFreeMessage(activePlan.invoiceLimit!))
+          router.push('/upgrade')
+        } else if (activePlan.isTrial) {
+          alert(t.planLimitTrialMessage(activePlan.invoiceLimit!))
+          router.push('/upgrade')
+        } else {
+          alert(t.planLimitBasicMessage(activePlan.invoiceLimit!))
+          router.push('/upgrade')
+        }
+        return
       }
-      return
-    }
 
-    if (!activePlan.isActive && activePlan.plan === 'free') {
-      router.push('/upgrade')
-      setLoading(false)
-      return
+      if (!activePlan.isActive && activePlan.plan === 'free') {
+        router.push('/upgrade')
+        setLoading(false)
+        return
+      }
     }
 
     const { data: invoiceNumber, error: numberError } = await supabase.rpc('claim_invoice_number', { p_user_id: user.id })
@@ -697,14 +707,14 @@ export default function CreateInvoicePage() {
       kaspiPayLink: profile?.kaspi_pay_link || undefined,
       viewUrl: pendingInvoice.public_token ? `https://www.invoices.kz/view/${pendingInvoice.public_token}` : undefined,
       dueDate: dueDate ? formatDate(dueDate) : undefined,
-      showWatermark: !getActivePlan(profile).isActive,
+      showWatermark: !profile?.is_admin && !getActivePlan(profile).isActive,
     })
     if (win) { win.document.write(html); win.document.close() }
     router.push('/invoice/' + pendingInvoice.id)
   }
 
   function chooseSignature(withSign: boolean) {
-    if (withSign && !getActivePlan(profile).canSign) {
+    if (withSign && !profile?.is_admin && !getActivePlan(profile).canSign) {
       alert(t.pdfSignUpgradeMessage)
       router.push('/upgrade')
       return

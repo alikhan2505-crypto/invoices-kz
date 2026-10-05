@@ -597,7 +597,7 @@ export default function DashboardPage() {
     setIsAdmin(!!profile?.is_admin)
     const activePlan = getActivePlan(profile)
     setPlan(activePlan)
-    setCanTelegramSupport(activePlan.isActive && activePlan.plan !== 'free')
+    setCanTelegramSupport(!!profile?.is_admin || (activePlan.isActive && activePlan.plan !== 'free'))
     setLoading(false)
 
     // Real usage for the Kaspi API tile (replaces the old static

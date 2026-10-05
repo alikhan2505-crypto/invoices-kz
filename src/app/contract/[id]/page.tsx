@@ -70,7 +70,7 @@ export default function ContractPage() {
           {t.viewFileButton}
         </a>
 
-        {getActivePlan(profile).canEcp ? (
+        {profile?.is_admin || getActivePlan(profile).canEcp ? (
         <SignatureSection
           mode="owner"
           documentType="contract"

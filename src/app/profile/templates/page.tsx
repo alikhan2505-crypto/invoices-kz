@@ -69,7 +69,7 @@ export default function Templates() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
     const [{ data: p }, { data: tData }] = await Promise.all([
-      supabase.from('profiles').select('plan, plan_expires_at, trial_expires_at, bonus_expires_at').eq('id', user.id).single(),
+      supabase.from('profiles').select('is_admin, plan, plan_expires_at, trial_expires_at, bonus_expires_at').eq('id', user.id).single(),
       supabase.from('templates').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
     ])
     setProfile(p)
@@ -89,7 +89,7 @@ export default function Templates() {
   // this page's Pro-only template features (confirmed live 2026-08-21:
   // ИП ВЕКТОР's plan expired 2026-07-12 but templates stayed unlocked).
   // getActivePlan is the one source of truth for expiry everywhere else.
-  const isPro = getActivePlan(profile).canTemplates
+  const isPro = !!profile?.is_admin || getActivePlan(profile).canTemplates
 
   const header = (
     <motion.div
