@@ -7,6 +7,8 @@ import { generateAiReply } from '@/lib/instagramAiReply'
 import { buildBusinessContextLine, buildCollectFieldsToExtract, buildCatalogBlock, buildDeliveryBlock, buildShopLinksBlock, AgentTone, AgentGoal } from './promptContext'
 import { loadAgentCatalog, loadAgentDeliveryInfo, loadAgentShopLinks } from './catalogContext'
 import { buildInvoiceToolExecutor } from './invoiceSend'
+import { loadAgentSalonInfo, buildSalonBlock } from './salonContext'
+import { buildBookingToolExecutor } from './bookingSend'
 import { debitAiAgentWallet, AI_AGENT_CREDITS_PER_AI_REPLY, hasAiAgentBudget, AI_AGENT_BUDGET_DEPLETED_REPLY } from './wallet'
 import { isConversationRateLimited } from './rateLimit'
 import { sendTelegramNotification } from '@/lib/telegramNotify'
@@ -363,6 +365,16 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
     const deliveryBlock = buildDeliveryBlock(deliveryInfo)
     const shopLinks = await loadAgentShopLinks(supabase, agent.user_id, agent.kaspi_shop_connection_id)
     const shopLinksBlock = buildShopLinksBlock(shopLinks)
+
+    // Salon booking planner: only an agent pinned to a salon
+    // (ai_agents.salon_site_id), and only in DM -- same "DM-only" rule the
+    // invoice tool already follows above, for the same reason (a public
+    // comment thread is no place to collect a phone number or start a
+    // booking). A salon agent gets bookingTool INSTEAD OF invoiceTool,
+    // never both (see whatsappWebhookHandler.ts's identical comment).
+    const salonInfo = (params.source === 'dm' && agent.salon_site_id) ? await loadAgentSalonInfo(supabase, agent.salon_site_id) : null
+    const salonBlock = salonInfo ? buildSalonBlock(salonInfo) : ''
+
     const result = await generateAiReply({
       incomingText: params.incomingText,
       fromUsername: params.fromUsername,
@@ -379,10 +391,12 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
         timezone: agent.timezone || undefined,
         currency: agent.currency || undefined,
         customInstructions: typeof agent.custom_instructions === 'string' ? agent.custom_instructions : undefined,
-      }) + catalogBlock + deliveryBlock + shopLinksBlock,
+      }) + catalogBlock + deliveryBlock + shopLinksBlock + salonBlock,
       collectFieldsToExtract: buildCollectFieldsToExtract(Array.isArray(agent.collect_fields) ? agent.collect_fields : undefined),
       ...(params.source === 'dm'
-        ? { invoiceTool: buildInvoiceToolExecutor(supabase, { id: agent.id, status: agent.status }, conversation.id) }
+        ? (salonInfo
+            ? { bookingTool: buildBookingToolExecutor(supabase, { id: agent.id }, conversation.id, salonInfo) }
+            : { invoiceTool: buildInvoiceToolExecutor(supabase, { id: agent.id, status: agent.status }, conversation.id) })
         : {}),
     })
     draftReply = result.replyText
