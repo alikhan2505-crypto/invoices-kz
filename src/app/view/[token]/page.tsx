@@ -5,7 +5,6 @@ import QRCode from 'qrcode'
 import { supabase } from '@/lib/supabase'
 import { formatDate, formatDateSafe } from '@/lib/date'
 import { generateInvoicePDF } from '@/lib/generatePDF'
-import { getActivePlan } from '@/lib/plan'
 import { useLanguage } from '@/components/LanguageProvider'
 import { historyDict } from '@/lib/i18n/history'
 import { invoiceFlowDict } from '@/lib/i18n/invoiceFlow'
@@ -80,6 +79,11 @@ export default function PublicInvoice() {
   const [invoice, setInvoice] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
   const [bank, setBank] = useState<any>(null)
+  // Computed server-side (src/app/api/public/invoice/[token]/route.ts) from
+  // the issuer's real plan/is_admin -- this public, unauthenticated page has
+  // no business knowing is_admin itself, so the server sends the already-
+  // decided boolean instead of the field it was decided from.
+  const [showWatermark, setShowWatermark] = useState(true)
   const [kaspiPayment, setKaspiPayment] = useState<
     { qr_token: string; payment_link: string; status: string; expires_at?: string | null; live?: string } | null
   >(null)
@@ -156,7 +160,7 @@ export default function PublicInvoice() {
       // public anon key. See src/app/api/public/invoice/[token]/route.ts.
       const res = await fetch(`/api/public/invoice/${encodeURIComponent(token)}`)
       if (!res.ok) { setLoading(false); return }
-      const { invoice: inv, profile: loadedProfile, bank: loadedBank } = await res.json()
+      const { invoice: inv, profile: loadedProfile, bank: loadedBank, showWatermark: loadedShowWatermark } = await res.json()
       if (!inv) { setLoading(false); return }
       setInvoice(inv)
 
@@ -193,6 +197,7 @@ export default function PublicInvoice() {
       // main account.
       setProfile(loadedProfile)
       setBank(loadedBank)
+      setShowWatermark(loadedShowWatermark ?? true)
 
       setLoading(false)
     }
@@ -429,7 +434,7 @@ export default function PublicInvoice() {
         kbe: bank.kbe,
       } : undefined,
       dueDate: invoice.due_date ? formatDate(invoice.due_date) : undefined,
-      showWatermark: !getActivePlan(profile).isActive,
+      showWatermark,
       autoPrint: false,
     })
   if (win) { win.document.write(html); win.document.close() }

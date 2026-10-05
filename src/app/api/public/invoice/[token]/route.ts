@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getActivePlan } from '@/lib/plan'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -44,12 +45,26 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ tok
   // are real.
   if (!invoice) return NextResponse.json({ error: 'not_found' }, { status: 404 })
 
-  const [{ data: profile }, bank] = await Promise.all([
-    supabase.from('profiles').select(PROFILE_FIELDS).eq('id', invoice.user_id).maybeSingle(),
+  // is_admin is fetched alongside the public fields (one query) purely to
+  // compute showWatermark server-side -- an admin's own watermark-free PDF
+  // generation already respects is_admin (src/lib/plan.ts), but this public,
+  // unauthenticated page had no way to know that without is_admin leaking
+  // into the JSON a random visitor with the link can read. Stripped out of
+  // `profile` below before it ever reaches the response.
+  const [{ data: profileRow }, bank] = await Promise.all([
+    supabase.from('profiles').select(`${PROFILE_FIELDS}, is_admin`).eq('id', invoice.user_id).maybeSingle(),
     invoice.bank_id
       ? supabase.from('bank_accounts').select('*').eq('id', invoice.bank_id).maybeSingle()
       : supabase.from('bank_accounts').select('*').eq('user_id', invoice.user_id).eq('is_main', true).maybeSingle(),
   ])
+
+  let profile: Record<string, unknown> | null = null
+  let showWatermark = true
+  if (profileRow) {
+    const { is_admin, ...publicFields } = profileRow as Record<string, unknown> & { is_admin: boolean }
+    profile = publicFields
+    showWatermark = !getActivePlan(profileRow).isActive
+  }
 
   // First open by the recipient flips sent -> viewed. This used to be
   // attempted from the browser, where RLS silently refused it (there is no
@@ -64,5 +79,5 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ tok
     invoice.status = 'viewed'
   }
 
-  return NextResponse.json({ invoice, profile: profile || null, bank: bank?.data || null })
+  return NextResponse.json({ invoice, profile, bank: bank?.data || null, showWatermark })
 }
