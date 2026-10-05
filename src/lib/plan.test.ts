@@ -92,4 +92,37 @@ describe('getActivePlan', () => {
     expect(getActivePlan({ plan: 'basic' }).canEsf).toBe(false)
     expect(getActivePlan({}).canEsf).toBe(false)
   })
+
+  // Real incident 2026-10-05: an is_admin account whose plan AND trial had
+  // both lapsed got bounced out of /create, the PDF signature choice, ЭЦП
+  // signing and templates -- every one of those gates read getActivePlan()
+  // without a separate is_admin check. The browser-side checks must match
+  // the server's own exemption (enforce_invoice_limit() returns immediately
+  // for is_admin_user()), for every capability, not just the ones that have
+  // already broken once.
+  it('is_admin unlocks every capability regardless of plan/trial/bonus state', () => {
+    const lapsed = getActivePlan({ is_admin: true })
+    expect(lapsed.isActive).toBe(true)
+    expect(lapsed.invoiceLimit).toBeNull()
+    for (const key of ['canEmail', 'canSign', 'canKpAvrNakl', 'canTemplates', 'canRecurring', 'canEcp', 'canAcquiring', 'canEsf', 'canAiAgent', 'canKaspiShop'] as const) {
+      expect(lapsed[key]).toBe(true)
+    }
+  })
+
+  it('is_admin unlocks everything even with an explicitly expired plan', () => {
+    const past = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+    const result = getActivePlan({ is_admin: true, plan: 'pro', plan_expires_at: past })
+    expect(result.isActive).toBe(true)
+    expect(result.canKaspiShop).toBe(true)
+    expect(result.canSign).toBe(true)
+    expect(result.invoiceLimit).toBeNull()
+    // The underlying (expired) plan/label are left alone -- is_admin unlocks
+    // capabilities, it doesn't pretend the subscription itself is current.
+    expect(result.plan).toBe('free')
+  })
+
+  it('is_admin: false (or absent) never triggers the override', () => {
+    expect(getActivePlan({ is_admin: false }).isActive).toBe(false)
+    expect(getActivePlan({ plan: 'basic' }).canKaspiShop).toBe(false)
+  })
 })

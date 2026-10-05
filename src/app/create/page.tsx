@@ -676,15 +676,15 @@ export default function CreateInvoicePage() {
   }
 
   function buildPDFProfile(withSign: boolean) {
-    const ap = getActivePlan(profile)
+    const canSign = !!profile?.is_admin || getActivePlan(profile).canSign
     return {
       company_name: profile?.company_name || '',
       bin_iin: profile?.bin_iin || '',
       address: profile?.address || '',
       director_name: profile?.director_name || '',
       phone: profile?.phone || '',
-      signature_url: withSign && ap.canSign ? (profile?.signature_url || '') : '',
-      stamp_url: withSign && ap.canSign ? (profile?.stamp_url || '') : '',
+      signature_url: withSign && canSign ? (profile?.signature_url || '') : '',
+      stamp_url: withSign && canSign ? (profile?.stamp_url || '') : '',
       logo_url: profile?.logo_url || '',
     }
   }
@@ -1351,7 +1351,7 @@ export default function CreateInvoicePage() {
           but here it always fires right after creation and ends in the same
           immediate PDF popup + redirect as the bank picker above. */}
       {showSignModal && (() => {
-        const ap = getActivePlan(profile)
+        const canSign = !!profile?.is_admin || getActivePlan(profile).canSign
         return (
           <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-3">
             <div className="w-full max-w-lg rounded-3xl p-6" style={{ background: 'var(--nav-surface-chrome)' }}>
@@ -1362,9 +1362,9 @@ export default function CreateInvoicePage() {
               <div className="space-y-3 mb-4">
                 <button onClick={() => chooseSignature(true)}
                   className="w-full rounded-xl py-4 text-sm font-medium relative"
-                  style={ap.canSign ? { background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' } : { background: 'var(--nav-surface-glass)', color: 'var(--nav-text-muted)' }}>
+                  style={canSign ? { background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' } : { background: 'var(--nav-surface-glass)', color: 'var(--nav-text-muted)' }}>
                   {t.withSignatureButtonLabel}
-                  {!ap.canSign && <span className="absolute top-1 right-2 text-xs" style={{ color: 'var(--nav-text-muted)' }}>{t.basicPlusBadge}</span>}
+                  {!canSign && <span className="absolute top-1 right-2 text-xs" style={{ color: 'var(--nav-text-muted)' }}>{t.basicPlusBadge}</span>}
                 </button>
                 <button onClick={() => chooseSignature(false)}
                   className="w-full rounded-xl py-4 text-sm font-medium border-2"

@@ -17,7 +17,38 @@ export interface PlanInfo {
   invoiceLimit: number | null
 }
 
+// is_admin is a platform-level override, independent of billing state -- an
+// admin account (the founder's own testing accounts, or one explicitly
+// granted to someone like a family member helping test the product) must
+// never be blocked by a lapsed plan/trial/bonus. The server already enforces
+// this (enforce_invoice_limit() returns NEW immediately for is_admin_user()),
+// but every browser-side gate derived from getActivePlan() needs the same
+// exemption -- and scattering `!profile?.is_admin && !getActivePlan(...).canX`
+// across dozens of call sites has already let the real bug through three
+// times in one day (dashboard tiles, /create's invoice-limit gate, the PDF
+// signature/ЭЦП/templates gates) because it is too easy to add a new
+// `.canX` check and forget the admin guard next to it. Centralizing it here
+// means every current and future caller is correct by construction. The
+// underlying plan/label/daysLeft/isTrial are left as computed (so an admin
+// who is also a real paying customer still sees their own real status),
+// only the capability flags and limits are forced open.
+function withAdminOverride(profile: any, result: PlanInfo): PlanInfo {
+  if (!profile?.is_admin) return result
+  return {
+    ...result,
+    isActive: true,
+    invoiceLimit: null,
+    canEmail: true, canSign: true, canKpAvrNakl: true, canTemplates: true,
+    canRecurring: true, canEcp: true, canAcquiring: true, canEsf: true,
+    canAiAgent: true, canKaspiShop: true,
+  }
+}
+
 export function getActivePlan(profile: any): PlanInfo {
+  return withAdminOverride(profile, computeActivePlan(profile))
+}
+
+function computeActivePlan(profile: any): PlanInfo {
   if (!profile) return {
     plan: 'free', isTrial: false, daysLeft: null,
     label: 'Бесплатный', isActive: false,

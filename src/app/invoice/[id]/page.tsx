@@ -384,7 +384,7 @@ export default function InvoicePage() {
   }
 
   function buildProfile(withSign: boolean) {
-    const ap = getActivePlan(profile)
+    const canSign = !!profile?.is_admin || getActivePlan(profile).canSign
     return {
       company_name: profile.company_name || '',
       bin_iin: profile.bin_iin || '',
@@ -392,8 +392,8 @@ export default function InvoicePage() {
       director_name: profile.director_name || '',
       phone: profile.phone || '',
       email: profile.email || '',
-      signature_url: withSign && ap.canSign ? (profile.signature_url || '') : '',
-      stamp_url: withSign && ap.canSign ? (profile.stamp_url || '') : '',
+      signature_url: withSign && canSign ? (profile.signature_url || '') : '',
+      stamp_url: withSign && canSign ? (profile.stamp_url || '') : '',
       logo_url: profile.logo_url || '',
     }
   }
