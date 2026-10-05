@@ -74,6 +74,13 @@ MCP 18.09.2026.
 маршрутах `/api/planner/*`, которые сами проверяют куку планировщика
 (`src/lib/plannerAuth.ts`), а не сессию Supabase.
 
+`ctwa_meta_capi.sql` (05.10.2026) добавляет `ai_agents.meta_pixel_id` и
+`ai_agents.meta_capi_token_enc` (вручную вставленные Pixel ID + токен для
+Meta Conversions API, токен шифруется своим собственным ключом
+`META_CAPI_ENCRYPTION_KEY`) и `ai_agent_conversations.ctwa_clid` (Meta
+Click-to-WhatsApp click id, пишется только на первое сообщение переписки —
+см. `docs/superpowers/specs/2026-10-05-ctwa-meta-capi-design.md`).
+
 ## Шаблоны писем
 
 См. `supabase/email-templates/` — там лежит шаблон письма со ссылкой для
