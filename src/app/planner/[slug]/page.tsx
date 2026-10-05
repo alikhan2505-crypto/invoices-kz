@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import QRCode from 'qrcode'
+import type { AnalyticsSummary } from '@/lib/planner/analytics'
 
 type LoginState = { code: string; botUsername: string; qrDataUrl: string | null }
 
@@ -100,6 +101,14 @@ const STRINGS = {
     noClients: 'Пока нет клиентов с завершёнными визитами.',
     clientProfileTitle: 'Профиль клиента',
     visitHistory: 'История посещений',
+    tabAnalytics: 'Аналитика',
+    analyticsTotalBookings: 'Записей за 8 недель',
+    analyticsCancellationRate: 'Процент отмен',
+    analyticsWeekly: 'По неделям',
+    analyticsByMaster: 'По мастерам',
+    analyticsNoData: 'Пока нет данных за последние 8 недель.',
+    analyticsBookingsSuffix: 'записей',
+    analyticsWeekOf: 'Неделя с',
   },
   kk: {
     loading: 'Жүктелуде…',
@@ -160,6 +169,14 @@ const STRINGS = {
     noClients: 'Әзірге аяқталған келу жоқ.',
     clientProfileTitle: 'Клиент профилі',
     visitHistory: 'Келу тарихы',
+    tabAnalytics: 'Талдау',
+    analyticsTotalBookings: '8 аптадағы жазылымдар',
+    analyticsCancellationRate: 'Болдырмау пайызы',
+    analyticsWeekly: 'Апта бойынша',
+    analyticsByMaster: 'Маман бойынша',
+    analyticsNoData: 'Соңғы 8 аптада деректер жоқ.',
+    analyticsBookingsSuffix: 'жазылым',
+    analyticsWeekOf: 'Апта басы',
   },
 } as const
 
@@ -644,6 +661,65 @@ function ClientsList({ clients, lang, onOpen }: { clients: Client[]; lang: Lang;
   )
 }
 
+// Stage 5 of the salon booking planner plan -- "приятный бонус" per the
+// founder's own framing, built on the already-tested buildAnalyticsSummary
+// aggregator. Weekly bars are relative to the busiest week in the returned
+// window, not to a fixed scale, so a quiet salon's chart still reads.
+function AnalyticsPanel({ summary, lang }: { summary: AnalyticsSummary; lang: Lang }) {
+  if (summary.totalBookings === 0) return <div className="text-sm plnr-text-3">{t(lang, 'analyticsNoData')}</div>
+
+  const maxWeekly = Math.max(1, ...summary.weekly.map(w => w.total))
+  const cancellationPct = Math.round(summary.cancellationRate * 100)
+
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-2 gap-2">
+        <div className="plnr-card-2 rounded-lg p-3 text-center">
+          <div className="text-2xl font-semibold">{summary.totalBookings}</div>
+          <div className="text-xs plnr-text-3">{t(lang, 'analyticsTotalBookings')}</div>
+        </div>
+        <div className="plnr-card-2 rounded-lg p-3 text-center">
+          <div className="text-2xl font-semibold">{cancellationPct}%</div>
+          <div className="text-xs plnr-text-3">{t(lang, 'analyticsCancellationRate')}</div>
+        </div>
+      </div>
+
+      <div>
+        <div className="text-sm font-medium plnr-text-2 mb-2">{t(lang, 'analyticsWeekly')}</div>
+        <div className="space-y-1.5">
+          {summary.weekly.map(w => (
+            <div key={w.weekStart} className="flex items-center gap-2.5">
+              <div className="w-20 shrink-0 text-xs plnr-text-3">
+                {new Date(`${w.weekStart}T00:00:00+05:00`).toLocaleDateString(localeFor(lang), { timeZone: 'Asia/Almaty', day: 'numeric', month: 'short' })}
+              </div>
+              <div className="flex-1 plnr-card-2 rounded h-5 overflow-hidden">
+                <div className="h-full plnr-accent" style={{ width: `${Math.max(6, (w.total / maxWeekly) * 100)}%` }} />
+              </div>
+              <div className="w-24 shrink-0 text-xs plnr-text-3 text-right">
+                {w.total} {t(lang, 'analyticsBookingsSuffix')}{w.cancelled > 0 ? ` (−${w.cancelled})` : ''}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <div className="text-sm font-medium plnr-text-2 mb-2">{t(lang, 'analyticsByMaster')}</div>
+        <div className="space-y-1.5">
+          {summary.byMaster.map(m => (
+            <div key={m.masterName || '—'} className="flex items-center justify-between plnr-card-2 rounded-lg px-3 py-2">
+              <div className="text-sm truncate">{m.masterName || t(lang, 'unassigned')}</div>
+              <div className="text-xs plnr-text-3 shrink-0">
+                {m.total} {t(lang, 'analyticsBookingsSuffix')}{m.cancelled > 0 ? ` (−${m.cancelled})` : ''}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function ClientProfileModal({ client: c, lang, onClose }: { client: Client; lang: Lang; onClose: () => void }) {
   return (
     <ModalShell title={c.name || t(lang, 'noName')} lang={lang} onClose={onClose}>
@@ -711,11 +787,14 @@ function PlannerDashboard({ salonName, theme, setTheme, lang, setLang }: {
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
   const todayKey = dayKey(new Date().toISOString())
   const [selectedDateKey, setSelectedDateKey] = useState(todayKey)
-  const [activeTab, setActiveTab] = useState<'schedule' | 'clients'>('schedule')
+  const [activeTab, setActiveTab] = useState<'schedule' | 'clients' | 'analytics'>('schedule')
   const [clients, setClients] = useState<Client[]>([])
   const [clientsLoaded, setClientsLoaded] = useState(false)
   const [clientsLoading, setClientsLoading] = useState(false)
   const [selectedClient, setSelectedClient] = useState<Client | null>(null)
+  const [analytics, setAnalytics] = useState<AnalyticsSummary | null>(null)
+  const [analyticsLoaded, setAnalyticsLoaded] = useState(false)
+  const [analyticsLoading, setAnalyticsLoading] = useState(false)
 
   // Lazy: the clients tab reads all-time history (no date window, unlike
   // /api/planner/bookings), a separate and heavier query nobody pays for
@@ -731,6 +810,21 @@ function PlannerDashboard({ salonName, theme, setTheme, lang, setLang }: {
   function openClientsTab() {
     setActiveTab('clients')
     if (!clientsLoaded) void loadClients()
+  }
+
+  // Same lazy pattern as the clients tab -- Stage 5, "приятный бонус",
+  // nobody pays for this aggregation unless they open the tab.
+  const loadAnalytics = useCallback(async () => {
+    setAnalyticsLoading(true)
+    const res = await fetch('/api/planner/analytics')
+    if (res.ok) setAnalytics(await res.json())
+    setAnalyticsLoading(false)
+    setAnalyticsLoaded(true)
+  }, [])
+
+  function openAnalyticsTab() {
+    setActiveTab('analytics')
+    if (!analyticsLoaded) void loadAnalytics()
   }
 
   const load = useCallback(async () => {
@@ -900,6 +994,13 @@ function PlannerDashboard({ salonName, theme, setTheme, lang, setLang }: {
             >
               {t(lang, 'tabClients')}
             </button>
+            <button
+              type="button"
+              onClick={openAnalyticsTab}
+              className={`text-sm rounded-lg px-3 py-1.5 ${activeTab === 'analytics' ? 'plnr-accent' : 'plnr-quiet'}`}
+            >
+              {t(lang, 'tabAnalytics')}
+            </button>
           </div>
 
           {activeTab === 'schedule' ? (
@@ -930,10 +1031,16 @@ function PlannerDashboard({ salonName, theme, setTheme, lang, setLang }: {
                 </div>
               </div>
             )
-          ) : clientsLoading ? (
+          ) : activeTab === 'clients' ? (
+            clientsLoading ? (
+              <div className="text-sm plnr-text-3">{t(lang, 'loading')}</div>
+            ) : (
+              <ClientsList clients={clients} lang={lang} onOpen={setSelectedClient} />
+            )
+          ) : analyticsLoading || !analytics ? (
             <div className="text-sm plnr-text-3">{t(lang, 'loading')}</div>
           ) : (
-            <ClientsList clients={clients} lang={lang} onOpen={setSelectedClient} />
+            <AnalyticsPanel summary={analytics} lang={lang} />
           )}
         </section>
       </div>
