@@ -2,7 +2,7 @@
 'use client'
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { Canvas } from '@react-three/fiber'
-import { OrbitControls, Bounds, useBounds, ContactShadows } from '@react-three/drei'
+import { OrbitControls, Bounds, useBounds } from '@react-three/drei'
 import * as opentype from 'opentype.js'
 import QRCode from 'qrcode'
 import { PRINT_SHOP_FONTS, printShopFontUrl } from '@/lib/printShop/fonts'
@@ -40,13 +40,23 @@ function KeychainMesh({ font, text, size, ringAtEnd, ringSize, baseColor, textCo
   if (!geometries) return null
   // roughness/metalness tuned for a printed-PLA satin sheen (not matte clay,
   // not a glossy toy) -- pure visual tuning, no geometry/business-logic risk.
+  //
+  // Founder 2026-10-06: "букву Н съело немного" at an unusual rotation --
+  // the text mesh's bottom face starts EXACTLY at the base mesh's top face
+  // (keychainGeometry.ts translates it to z=baseThicknessMm with zero gap),
+  // so at grazing/edge-on camera angles the GPU's depth test flickers
+  // between the two coincident surfaces (classic z-fighting), eating
+  // fragments of whichever letter happens to sit on that boundary.
+  // polygonOffset nudges the text mesh's depth values slightly toward the
+  // camera relative to the base -- a material-only fix, doesn't touch the
+  // shared (and heavily reviewed) geometry itself.
   return (
     <group rotation={[-Math.PI / 2, 0, 0]}>
       <mesh geometry={geometries.baseGeometry}>
-        <meshStandardMaterial color={COLOR_HEX[baseColor]} roughness={0.4} metalness={0.05} />
+        <meshStandardMaterial color={COLOR_HEX[baseColor]} roughness={0.4} metalness={0.05} polygonOffset polygonOffsetFactor={1} polygonOffsetUnits={1} />
       </mesh>
       <mesh geometry={geometries.textGeometry}>
-        <meshStandardMaterial color={COLOR_HEX[textColor]} roughness={0.4} metalness={0.05} />
+        <meshStandardMaterial color={COLOR_HEX[textColor]} roughness={0.4} metalness={0.05} polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} />
       </mesh>
     </group>
   )
@@ -225,12 +235,16 @@ export default function PrintShopClient() {
               {font && <KeychainMesh font={font} text={text} size={size} ringAtEnd={ringAtEnd} ringSize={ringSize} baseColor={baseColor} textColor={textColor} />}
               <RefitBoundsOnChange deps={[font, text, size, ringAtEnd, ringSize]} />
             </Bounds>
-            {/* Grounds the object with a soft contact shadow instead of it
-                floating in empty space -- sits right at the model's own
-                bottom face (local z=0 becomes world y=0 after KeychainMesh's
-                -90°-about-X rotation). Purely a baked blurred shadow plane,
-                no shadow-mapped lights needed. */}
-            <ContactShadows position={[0, -0.02, 0]} opacity={0.35} blur={2.4} far={30} scale={60} />
+            {/* Founder 2026-10-06: "тень какую-то" -- ContactShadows bakes
+                its shadow onto a FIXED plane in world space that does not
+                rotate with the orbiting camera. Once the customer rotates
+                the keychain to an unusual/flipped angle (the exact scenario
+                reported), that static plane stops reading as "shadow under
+                the object" and shows up as a disconnected grey patch.
+                Removed outright -- same call already made twice this
+                session for autoRotate and the preview frame: when one of
+                my own additions causes a real, reproduced confusion, remove
+                it rather than add more complexity trying to salvage it. */}
             {/* Founder 2026-10-06: "дальше брелок не перевернуть/не
                 сдвинуть" -- autoRotate was constantly fighting the
                 customer's own drag (it keeps advancing every frame
