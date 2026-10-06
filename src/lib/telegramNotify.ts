@@ -18,11 +18,21 @@ export async function sendTelegramNotification(chatId: string, text: string): Pr
     return
   }
   try {
-    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML' }),
     })
+    // fetch does NOT throw on a 4xx/5xx, so without this check every
+    // API-level rejection was silently swallowed: the single most likely one
+    // is parse_mode: 'HTML' refusing a message whose text contains a bare
+    // '<' ("Аня <3"), which returns 400 and drops the notification entirely.
+    // Callers here have no other channel (a paid print order has no admin
+    // page), so a silent drop means the notification simply never existed.
+    if (!response.ok) {
+      const body = await response.text().catch(() => '<unreadable body>')
+      console.error('sendTelegramNotification rejected by Telegram for chat', chatId, '— status', response.status, ':', body.slice(0, 500))
+    }
   } catch (e: any) {
     console.error('sendTelegramNotification delivery failed for chat', chatId, ':', e.message)
   }
