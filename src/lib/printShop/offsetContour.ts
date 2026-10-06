@@ -19,7 +19,7 @@ export function offsetOutward(subpaths: Point[][], distanceMm: number): Point[][
 
   const co = new ClipperLib.ClipperOffset()
   co.AddPaths(paths, ClipperLib.JoinType.jtRound, ClipperLib.EndType.etClosedPolygon)
-  const solution = new ClipperLib.Paths()
+  const solution: ClipperLib.Paths = []
   co.Execute(solution, distanceMm * SCALE)
 
   return solution.map((path: { X: number; Y: number }[]) => path.map(p => ({ x: p.X / SCALE, y: p.Y / SCALE })))
