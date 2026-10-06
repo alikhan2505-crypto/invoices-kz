@@ -5,6 +5,7 @@ import { Canvas } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import * as opentype from 'opentype.js'
 import * as THREE from 'three'
+import QRCode from 'qrcode'
 import { PRINT_SHOP_FONTS, printShopFontUrl } from '@/lib/printShop/fonts'
 import { SIZE_PRESETS, priceForSize, type KeychainSize } from '@/lib/printShop/pricing'
 import { buildKeychainGeometries } from '@/lib/printShop/keychainGeometry'
@@ -52,6 +53,17 @@ function KeychainMesh({ font, text, size, ringAtEnd, baseColor, textColor }: {
 
 type Step = 'configure' | 'details' | 'payment'
 
+const PAYMENT_POLL_INTERVAL_MS = 3000
+// «Готовим оплату…» честно означает «через пару секунд будет QR»:
+// getOrCreateKaspiPaymentForPrintOrder минтит платёж сразу же, когда всё
+// настроено. Если сервер и после ~30 секунд отдаёт payment: null -- это не
+// «готовим», а одна из тихих причин отказа (баланс кошелька владельца ниже
+// комиссии, нет активного Kaspi-подключения, лимит минтов, заказ уже
+// закрыт, PRINT_SHOP_OWNER_USER_ID не настроен, insert упал). Все они
+// неотличимы на уровне API и ни одна не исчезнет сама за время ожидания,
+// так что крутить спиннер бесконечно -- врать клиенту.
+const MAX_EMPTY_PAYMENT_POLLS = 10
+
 export default function PrintShopClient() {
   const [text, setText] = useState('Самал')
   const [fontId, setFontId] = useState(PRINT_SHOP_FONTS[0].id)
@@ -70,7 +82,10 @@ export default function PrintShopClient() {
   const [error, setError] = useState<string | null>(null)
   const [orderId, setOrderId] = useState<string | null>(null)
   const [payment, setPayment] = useState<{ qr_token: string | null; payment_link: string | null; status: string } | null>(null)
+  const [paymentUnavailable, setPaymentUnavailable] = useState(false)
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const emptyPollsRef = useRef(0)
 
   useEffect(() => {
     let cancelled = false
@@ -80,15 +95,45 @@ export default function PrintShopClient() {
 
   useEffect(() => {
     if (step !== 'payment' || !orderId || payment?.status === 'paid') return
+    emptyPollsRef.current = 0
+    setPaymentUnavailable(false)
     const poll = async () => {
-      const res = await fetch(`/api/print/orders/${orderId}/payment`)
-      const data = await res.json()
-      if (data.payment) setPayment(data.payment)
+      try {
+        const res = await fetch(`/api/print/orders/${orderId}/payment`)
+        const data = await res.json()
+        if (data.payment) {
+          emptyPollsRef.current = 0
+          setPaymentUnavailable(false)
+          setPayment(data.payment)
+          return
+        }
+      } catch {
+        // Моргнувшая сеть считается такой же неудачной попыткой, как
+        // payment: null -- важен только факт «QR до сих пор нет».
+      }
+      emptyPollsRef.current++
+      if (emptyPollsRef.current >= MAX_EMPTY_PAYMENT_POLLS) {
+        setPaymentUnavailable(true)
+        if (pollRef.current) clearInterval(pollRef.current)
+      }
     }
     poll()
-    pollRef.current = setInterval(poll, 3000)
+    pollRef.current = setInterval(poll, PAYMENT_POLL_INTERVAL_MS)
     return () => { if (pollRef.current) clearInterval(pollRef.current) }
   }, [step, orderId, payment?.status])
+
+  // Тот же приём, что на публичной витрине (src/app/shop/[slug]/page.tsx):
+  // QR рисуется из payment_link на клиенте пакетом qrcode. Без картинки
+  // текст «Отсканируйте QR» был прямой ложью, а на десктопе kaspi-ссылку
+  // осмысленно нажать нельзя -- то есть оплатить было нечем.
+  useEffect(() => {
+    if (!payment?.payment_link) { setQrDataUrl(null); return }
+    let cancelled = false
+    QRCode.toDataURL(payment.payment_link, { width: 160, margin: 1 })
+      .then(url => { if (!cancelled) setQrDataUrl(url) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [payment?.payment_link])
 
   const filteredFonts = useMemo(
     () => PRINT_SHOP_FONTS.filter(f => f.label.toLowerCase().includes(fontQuery.toLowerCase())),
@@ -232,12 +277,20 @@ export default function PrintShopClient() {
               ) : payment?.payment_link ? (
                 <>
                   <div className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>Отсканируйте QR или откройте ссылку в приложении Kaspi.</div>
+                  {qrDataUrl && (
+                    <img src={qrDataUrl} alt="Kaspi QR" width={160} height={160}
+                      className="mx-auto rounded-lg" style={{ maxWidth: '100%' }} />
+                  )}
                   <a href={payment.payment_link} target="_blank" rel="noreferrer"
                     className="inline-block rounded-xl py-3 px-6 text-sm font-medium"
                     style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                     Оплатить в Kaspi
                   </a>
                 </>
+              ) : paymentUnavailable ? (
+                <div className="text-sm text-red-400">
+                  Не удалось подготовить оплату — попробуйте позже или свяжитесь с нами.
+                </div>
               ) : (
                 <div className="text-sm" style={{ color: 'var(--nav-text-muted)' }}>Готовим оплату…</div>
               )}

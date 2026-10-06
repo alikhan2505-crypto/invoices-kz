@@ -6,6 +6,7 @@ import path from 'node:path'
 import * as opentype from 'opentype.js'
 import { priceForSize, type KeychainSize } from '@/lib/printShop/pricing'
 import { findPrintShopFont } from '@/lib/printShop/fonts'
+import { buildKeychainGeometries } from '@/lib/printShop/keychainGeometry'
 import { normalizeKzPhone } from '@/lib/kaspiPay/phone'
 
 const supabase = createClient(
@@ -25,9 +26,12 @@ const VALID_COLORS = new Set(['белый', 'чёрный', 'серый', 'жё�
 // this character" signal regardless of what a given font happens to draw in
 // that slot, so checking it here -- before an order (and a real payment) can
 // even be created -- is the fix, not an optional nice-to-have.
-async function fontSupportsText(fontId: string, text: string): Promise<boolean> {
+async function loadFontFile(fontId: string): Promise<opentype.Font> {
   const buf = await readFile(path.join(process.cwd(), 'public', 'fonts', 'print-shop', `${fontId}.ttf`))
-  const font = opentype.parse(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength))
+  return opentype.parse(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength))
+}
+
+function fontSupportsText(font: opentype.Font, text: string): boolean {
   for (const char of text) {
     if (font.charToGlyphIndex(char) === 0) return false
   }
@@ -61,15 +65,33 @@ export async function POST(req: NextRequest) {
   // read below should always succeed -- but if the static .ttf is ever
   // missing or unreadable, fail closed with a clean JSON error instead of
   // crashing the route with an unhandled exception.
-  let supported: boolean
+  let font: opentype.Font
   try {
-    supported = await fontSupportsText(fontId, text)
+    font = await loadFontFile(fontId)
   } catch (e: any) {
     console.error('print-shop glyph validation failed to load font', fontId, ':', e.message)
     return NextResponse.json({ error: 'Не удалось проверить шрифт. Попробуйте ещё раз' }, { status: 500 })
   }
-  if (!supported) {
+  if (!fontSupportsText(font, text)) {
     return NextResponse.json({ error: 'Этот шрифт не поддерживает один из символов в тексте — попробуйте другой шрифт' }, { status: 400 })
+  }
+
+  // Glyph coverage is only a SUBSET of "this text can be 3D-printed":
+  // buildKeychainGeometries also throws "produced no drawable glyph outlines"
+  // and "could not place the key-ring hole", and opentype.js 2.0's GSUB
+  // handling can throw on multi-character strings for some fonts (see
+  // scripts/fetch-print-shop-fonts.mjs). Those paths used to surface only
+  // inside order fulfillment -- i.e. AFTER the customer had already paid,
+  // where the failure is invisible to them and nothing retries it.
+  //
+  // Running the EXACT function fulfillment will later run, with the exact
+  // same parameters, is what makes this check genuinely complete: if it
+  // passes here, it passes there.
+  try {
+    buildKeychainGeometries({ font, text, size: size as KeychainSize, ringAtEnd })
+  } catch (e: any) {
+    console.error('print-shop geometry pre-check failed for font', fontId, 'text', JSON.stringify(text), ':', e.message)
+    return NextResponse.json({ error: 'Не удалось построить модель для этого текста — попробуйте другой шрифт или текст' }, { status: 400 })
   }
 
   const price = priceForSize(size as KeychainSize)
