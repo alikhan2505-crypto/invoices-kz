@@ -191,19 +191,12 @@ export default function PrintShopClient() {
     <div className="min-h-screen" style={{ background: 'var(--nav-bg)' }}>
       <style>{fontFaceCss}</style>
       <div className="max-w-4xl mx-auto p-4 lg:p-8 grid lg:grid-cols-2 gap-8">
-        <div
-          className="aspect-square rounded-2xl overflow-hidden"
-          style={{
-            // Founder 2026-10-06: "сам вид 3D-модели" -- a near-invisible
-            // 0.035-alpha glass tint (the shared --nav-surface-glass token,
-            // meant for text-heavy cabinet cards) made a WHITE keychain
-            // nearly vanish into its own stage. A real radial "studio
-            // backdrop" gradient gives every colour real contrast and a
-            // sense of a lit podium instead of an empty rectangle.
-            background: 'radial-gradient(120% 120% at 50% 15%, var(--nav-accent-soft), var(--nav-surface-glass) 60%)',
-            boxShadow: 'inset 0 1px 0 rgba(255,255,255,.06), inset 0 0 0 1px var(--nav-accent-track)',
-          }}
-        >
+        {/* Founder 2026-10-06: "убрать рамки у визуализации... как будто
+            она на странице" -- no panel background/border/shadow at all.
+            The Canvas itself has no scene.background set, so it's
+            transparent by default and the page's own --nav-bg shows
+            straight through -- the keychain just sits on the page. */}
+        <div className="aspect-square">
           <Canvas camera={{ position: [0, 52, 18], fov: 35 }}>
             {/* Three-point studio lighting (no HDRI/environment map -- this
                 is a public page, keeping it to procedural lights avoids a
@@ -238,10 +231,15 @@ export default function PrintShopClient() {
                 -90°-about-X rotation). Purely a baked blurred shadow plane,
                 no shadow-mapped lights needed. */}
             <ContactShadows position={[0, -0.02, 0]} opacity={0.35} blur={2.4} far={30} scale={60} />
-            {/* autoRotate makes the object read as 3D at a glance even
-                before anyone touches it -- stops being the only cue once
-                the customer drags, which still works exactly as before. */}
-            <OrbitControls enablePan={false} autoRotate autoRotateSpeed={1.1} />
+            {/* Founder 2026-10-06: "дальше брелок не перевернуть/не
+                сдвинуть" -- autoRotate was constantly fighting the
+                customer's own drag (it keeps advancing every frame
+                regardless of pointer input), making manual rotation feel
+                stuck/unresponsive. Removed -- OrbitControls' default
+                azimuth/polar range is already unrestricted (full flip
+                around in every direction), the object was never actually
+                limited, autoRotate's tug-of-war just made it feel that way. */}
+            <OrbitControls enablePan={false} />
           </Canvas>
         </div>
 
