@@ -8,7 +8,7 @@ import {
   type Point,
 } from './geometryUtils'
 import { offsetOutward, unionNonZeroGroups } from './offsetContour'
-import { SIZE_PRESETS, type KeychainSize } from './pricing'
+import { SIZE_PRESETS, RING_SIZE_PRESETS, DEFAULT_RING_SIZE, type KeychainSize, type RingSize } from './pricing'
 
 function shapesFromGroups(groups: { outer: Point[]; holes: Point[][] }[]): THREE.Shape[] {
   return groups.map(g => {
@@ -57,11 +57,16 @@ export function buildKeychainGeometries(params: {
   text: string
   size: KeychainSize
   ringAtEnd: boolean
+  // Optional, defaults to DEFAULT_RING_SIZE -- independent of `size` (the
+  // keychain's own S/M/L): founder 2026-10-06 asked for the ring to be
+  // separately adjustable, not just scaled with the whole keychain.
+  ringSize?: RingSize
 }): { baseGeometry: THREE.BufferGeometry; textGeometry: THREE.BufferGeometry } {
   const text = params.text.trim()
   if (!text) throw new Error('buildKeychainGeometries: text must not be empty')
 
   const preset = SIZE_PRESETS[params.size]
+  const ringPreset = RING_SIZE_PRESETS[params.ringSize ?? DEFAULT_RING_SIZE]
 
   // opentype.js's getPath() is Y-DOWN, NOT Y-up. Verified empirically against
   // pt-sans.ttf rather than assumed: getPath('A', 0, 0, 14) returns y in
@@ -120,12 +125,12 @@ export function buildKeychainGeometries(params: {
   }
 
   const midY = (bbox.minY + bbox.maxY) / 2
-  const ringRadius = preset.ringHoleDiameterMm / 2 + preset.ringWallMm
+  const ringRadius = ringPreset.holeDiameterMm / 2 + ringPreset.wallMm
   const ringCenterX = params.ringAtEnd
     ? bbox.maxX + preset.ringDistanceMm + ringRadius
     : bbox.minX - preset.ringDistanceMm - ringRadius
   const ringOuter = circlePoints(ringCenterX, midY, ringRadius)
-  const bridgeHalfHeight = preset.ringWallMm
+  const bridgeHalfHeight = ringPreset.wallMm
   const bridgeStartX = params.ringAtEnd ? bbox.maxX : ringCenterX + ringRadius
   const bridgeEndX = params.ringAtEnd ? ringCenterX - ringRadius : bbox.minX
   const bridge: Point[] = [
@@ -152,7 +157,7 @@ export function buildKeychainGeometries(params: {
   // vertex average sits in the middle of the whole keychain (measured 35.3mm
   // from the ring centre for "Алихан"/M), so any radius-based threshold either
   // misses the hole entirely or would have to be wide enough to be meaningless.
-  const ringHoleRadius = preset.ringHoleDiameterMm / 2
+  const ringHoleRadius = ringPreset.holeDiameterMm / 2
   let ringHoleAttached = false
   for (const group of baseGroups) {
     if (!pointInPolygon(ringCenterX, midY, group.outer)) continue

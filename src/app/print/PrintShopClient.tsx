@@ -2,12 +2,11 @@
 'use client'
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { Canvas } from '@react-three/fiber'
-import { OrbitControls } from '@react-three/drei'
+import { OrbitControls, Bounds, useBounds } from '@react-three/drei'
 import * as opentype from 'opentype.js'
-import * as THREE from 'three'
 import QRCode from 'qrcode'
 import { PRINT_SHOP_FONTS, printShopFontUrl } from '@/lib/printShop/fonts'
-import { SIZE_PRESETS, priceForSize, type KeychainSize } from '@/lib/printShop/pricing'
+import { priceForSize, DEFAULT_RING_SIZE, type KeychainSize, type RingSize } from '@/lib/printShop/pricing'
 import { buildKeychainGeometries } from '@/lib/printShop/keychainGeometry'
 
 const COLORS = ['белый', 'чёрный', 'серый', 'жёлтый', 'зелёный', 'красный', 'бордовый'] as const
@@ -26,17 +25,17 @@ async function loadFont(fontId: string): Promise<opentype.Font> {
   return font
 }
 
-function KeychainMesh({ font, text, size, ringAtEnd, baseColor, textColor }: {
-  font: opentype.Font; text: string; size: KeychainSize; ringAtEnd: boolean; baseColor: string; textColor: string
+function KeychainMesh({ font, text, size, ringAtEnd, ringSize, baseColor, textColor }: {
+  font: opentype.Font; text: string; size: KeychainSize; ringAtEnd: boolean; ringSize: RingSize; baseColor: string; textColor: string
 }) {
   const geometries = useMemo(() => {
     if (!text.trim()) return null
     try {
-      return buildKeychainGeometries({ font, text, size, ringAtEnd })
+      return buildKeychainGeometries({ font, text, size, ringAtEnd, ringSize })
     } catch {
       return null
     }
-  }, [font, text, size, ringAtEnd])
+  }, [font, text, size, ringAtEnd, ringSize])
 
   if (!geometries) return null
   return (
@@ -49,6 +48,25 @@ function KeychainMesh({ font, text, size, ringAtEnd, baseColor, textColor }: {
       </mesh>
     </group>
   )
+}
+
+// <Bounds observe> only detects objects being ADDED/REMOVED from the scene
+// graph -- KeychainMesh keeps the SAME <mesh> instances across re-renders
+// and just swaps their `geometry` prop in place (normal R3F reconciliation),
+// so a text/font/size/ring change never triggers observe's refit at all
+// (confirmed: it framed the FIRST name correctly, then stayed frozen on
+// every edit after that -- the "брелок в квадрат не входит" report was
+// reproduced live with a longer name after the initial fix). Calling the
+// imperative useBounds() API explicitly on every relevant dependency change
+// is the documented way to refit on data that changed without the scene
+// graph itself changing shape.
+function RefitBoundsOnChange({ deps }: { deps: unknown[] }) {
+  const bounds = useBounds()
+  useEffect(() => {
+    bounds.refresh().fit()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps)
+  return null
 }
 
 type Step = 'configure' | 'details' | 'payment'
@@ -70,6 +88,7 @@ export default function PrintShopClient() {
   const [fontQuery, setFontQuery] = useState('')
   const [size, setSize] = useState<KeychainSize>('M')
   const [ringAtEnd, setRingAtEnd] = useState(false)
+  const [ringSize, setRingSize] = useState<RingSize>(DEFAULT_RING_SIZE)
   const [baseColor, setBaseColor] = useState<typeof COLORS[number]>('белый')
   const [textColor, setTextColor] = useState<typeof COLORS[number]>('чёрный')
   const [font, setFont] = useState<opentype.Font | null>(null)
@@ -146,7 +165,7 @@ export default function PrintShopClient() {
     const res = await fetch('/api/print/orders', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, font: fontId, size, ringAtEnd, baseColor, textColor, customerName, customerPhone, note }),
+      body: JSON.stringify({ text, font: fontId, size, ringAtEnd, ringSize, baseColor, textColor, customerName, customerPhone, note }),
     })
     const data = await res.json().catch(() => ({}))
     setSubmitting(false)
@@ -159,10 +178,25 @@ export default function PrintShopClient() {
     <div className="min-h-screen" style={{ background: 'var(--nav-bg)' }}>
       <div className="max-w-4xl mx-auto p-4 lg:p-8 grid lg:grid-cols-2 gap-8">
         <div className="aspect-square rounded-2xl overflow-hidden" style={{ background: 'var(--nav-surface-glass)' }}>
-          <Canvas camera={{ position: [0, 60, 0], fov: 35 }}>
+          <Canvas camera={{ position: [0, 52, 18], fov: 35 }}>
             <ambientLight intensity={0.7} />
             <directionalLight position={[20, 40, 20]} intensity={0.8} />
-            {font && <KeychainMesh font={font} text={text} size={size} ringAtEnd={ringAtEnd} baseColor={baseColor} textColor={textColor} />}
+            {/* Founder 2026-10-06: "брелок в квадрат не входит" -- the old
+                fixed camera DISTANCE assumed a roughly-constant keychain
+                size, but a long name's base contour is much wider than a
+                short one. <Bounds observe fit clip> re-fits the camera's
+                DISTANCE (keeping the same top-down viewing direction the
+                initial position above implies -- Bounds fits along the
+                camera's current direction, it does not invent one) every
+                time the geometry changes (text/font/size/ring), so the
+                keychain always fills the square instead of overflowing or
+                floating tiny in the middle. OrbitControls still lets the
+                customer drag-rotate afterward -- the two are meant to
+                compose, Bounds only sets where the camera STARTS. */}
+            <Bounds observe fit clip margin={1.3}>
+              {font && <KeychainMesh font={font} text={text} size={size} ringAtEnd={ringAtEnd} ringSize={ringSize} baseColor={baseColor} textColor={textColor} />}
+              <RefitBoundsOnChange deps={[font, text, size, ringAtEnd, ringSize]} />
+            </Bounds>
             <OrbitControls enablePan={false} />
           </Canvas>
         </div>
@@ -213,6 +247,19 @@ export default function PrintShopClient() {
                 <input type="checkbox" checked={ringAtEnd} onChange={e => setRingAtEnd(e.target.checked)} />
                 Кольцо в конце имени (по умолчанию — в начале)
               </label>
+
+              <div>
+                <div className="text-xs mb-1" style={{ color: 'var(--nav-text-muted)' }}>Размер кольца</div>
+                <div className="flex gap-2">
+                  {([['S', 'Маленькое'], ['M', 'Среднее'], ['L', 'Большое']] as const).map(([rs, label]) => (
+                    <button key={rs} onClick={() => setRingSize(rs)}
+                      className="flex-1 rounded-lg py-1.5 text-xs font-medium"
+                      style={{ background: ringSize === rs ? 'var(--nav-accent)' : 'var(--nav-surface-glass)', color: ringSize === rs ? 'var(--nav-accent-ink)' : 'var(--nav-text-secondary)' }}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>

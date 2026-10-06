@@ -8,7 +8,7 @@ import { exportGeometryToSTL } from './stlExport'
 import { findPrintShopFont } from './fonts'
 import { loadPrintShopOwnerTelegramChatId } from './ownerAccount'
 import { sendTelegramNotification } from '@/lib/telegramNotify'
-import type { KeychainSize } from './pricing'
+import type { KeychainSize, RingSize } from './pricing'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -20,6 +20,7 @@ type PrintOrderRow = {
   font: string
   text: string
   ring_at_end: boolean
+  ring_size: RingSize
   base_color: string
   text_color: string
   size: KeychainSize
@@ -105,7 +106,7 @@ async function alertOwnerOfFulfillmentFailure(printOrderId: string): Promise<voi
 async function fulfillPrintOrder(printOrderId: string): Promise<void> {
   const { data: order, error } = await supabase
     .from('print_orders')
-    .select('id, font, text, ring_at_end, base_color, text_color, size, price, customer_name, customer_phone, note')
+    .select('id, font, text, ring_at_end, ring_size, base_color, text_color, size, price, customer_name, customer_phone, note')
     .eq('id', printOrderId)
     .single()
   if (error || !order) throw new Error(`print order ${printOrderId} not found: ${error?.message}`)
@@ -113,7 +114,7 @@ async function fulfillPrintOrder(printOrderId: string): Promise<void> {
 
   const font = await loadFontFile(row.font)
   const { baseGeometry, textGeometry } = buildKeychainGeometries({
-    font, text: row.text, size: row.size, ringAtEnd: row.ring_at_end,
+    font, text: row.text, size: row.size, ringAtEnd: row.ring_at_end, ringSize: row.ring_size,
   })
   const baseStl = exportGeometryToSTL(baseGeometry)
   const textStl = exportGeometryToSTL(textGeometry)
@@ -149,7 +150,7 @@ async function fulfillPrintOrder(printOrderId: string): Promise<void> {
       `🔑 Новый заказ брелка — ${row.price.toLocaleString('ru-KZ')} ₸`,
       `Текст: «${escapeHtml(row.text)}»`,
       `Шрифт: ${fontMeta?.label ?? row.font}`,
-      `Размер: ${row.size}, кольцо: ${row.ring_at_end ? 'в конце' : 'в начале'}`,
+      `Размер: ${row.size}, кольцо: ${row.ring_at_end ? 'в конце' : 'в начале'} (${row.ring_size})`,
       `Цвета: основа ${row.base_color}, текст ${row.text_color}`,
       `Клиент: ${escapeHtml(row.customer_name)}, ${row.customer_phone}`,
       row.note ? `Комментарий: ${escapeHtml(row.note)}` : null,

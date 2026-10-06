@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import * as opentype from 'opentype.js'
-import { priceForSize, type KeychainSize } from '@/lib/printShop/pricing'
+import { priceForSize, DEFAULT_RING_SIZE, type KeychainSize, type RingSize } from '@/lib/printShop/pricing'
 import { findPrintShopFont } from '@/lib/printShop/fonts'
 import { buildKeychainGeometries } from '@/lib/printShop/keychainGeometry'
 import { normalizeKzPhone } from '@/lib/kaspiPay/phone'
@@ -16,6 +16,7 @@ const supabase = createClient(
 
 const MAX_TEXT_LENGTH = 20
 const VALID_SIZES = new Set(['S', 'M', 'L'])
+const VALID_RING_SIZES = new Set(['S', 'M', 'L'])
 const VALID_COLORS = new Set(['белый', 'чёрный', 'серый', 'жёлтый', 'зелёный', 'красный', 'бордовый'])
 
 // Task 7's review found that none of the 20 curated fonts have glyphs for
@@ -48,6 +49,10 @@ export async function POST(req: NextRequest) {
   const fontId = typeof body?.font === 'string' ? body.font : ''
   const size = typeof body?.size === 'string' ? body.size : ''
   const ringAtEnd = body?.ringAtEnd === true
+  // Optional and independent of `size` -- defaults to DEFAULT_RING_SIZE
+  // (same default buildKeychainGeometries itself falls back to when
+  // ringSize is omitted) so older/simpler clients still work.
+  const ringSize = typeof body?.ringSize === 'string' && body.ringSize ? body.ringSize : DEFAULT_RING_SIZE
   const baseColor = typeof body?.baseColor === 'string' ? body.baseColor : ''
   const textColor = typeof body?.textColor === 'string' ? body.textColor : ''
   const customerName = typeof body?.customerName === 'string' ? body.customerName.trim() : ''
@@ -57,6 +62,7 @@ export async function POST(req: NextRequest) {
   if (!text || text.length > MAX_TEXT_LENGTH) return NextResponse.json({ error: 'Укажите текст брелка (до 20 символов)' }, { status: 400 })
   if (!findPrintShopFont(fontId)) return NextResponse.json({ error: 'Неизвестный шрифт' }, { status: 400 })
   if (!VALID_SIZES.has(size)) return NextResponse.json({ error: 'Неизвестный размер' }, { status: 400 })
+  if (!VALID_RING_SIZES.has(ringSize)) return NextResponse.json({ error: 'Неизвестный размер кольца' }, { status: 400 })
   if (!VALID_COLORS.has(baseColor) || !VALID_COLORS.has(textColor)) return NextResponse.json({ error: 'Неизвестный цвет' }, { status: 400 })
   if (!customerName) return NextResponse.json({ error: 'Укажите имя' }, { status: 400 })
   if (!customerPhone) return NextResponse.json({ error: 'Укажите телефон' }, { status: 400 })
@@ -88,7 +94,7 @@ export async function POST(req: NextRequest) {
   // same parameters, is what makes this check genuinely complete: if it
   // passes here, it passes there.
   try {
-    buildKeychainGeometries({ font, text, size: size as KeychainSize, ringAtEnd })
+    buildKeychainGeometries({ font, text, size: size as KeychainSize, ringAtEnd, ringSize: ringSize as RingSize })
   } catch (e: any) {
     console.error('print-shop geometry pre-check failed for font', fontId, 'text', JSON.stringify(text), ':', e.message)
     return NextResponse.json({ error: 'Не удалось построить модель для этого текста — попробуйте другой шрифт или текст' }, { status: 400 })
@@ -102,6 +108,7 @@ export async function POST(req: NextRequest) {
       font: fontId,
       text,
       ring_at_end: ringAtEnd,
+      ring_size: ringSize,
       base_color: baseColor,
       text_color: textColor,
       size,

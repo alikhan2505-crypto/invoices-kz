@@ -6,7 +6,7 @@ import * as THREE from 'three'
 import { buildKeychainGeometries } from './keychainGeometry'
 import { flattenOpentypePath, type OpentypeCommand, type Point } from './geometryUtils'
 import { PRINT_SHOP_FONTS } from './fonts'
-import { SIZE_PRESETS, type KeychainSize } from './pricing'
+import { SIZE_PRESETS, RING_SIZE_PRESETS, DEFAULT_RING_SIZE, type KeychainSize, type RingSize } from './pricing'
 
 let font: opentype.Font
 
@@ -207,15 +207,16 @@ function glyphFootprintMismatch(fontId: string, text: string, scanlines = 1500) 
  * preset -- so the test knows the hole's intended centre without reaching
  * into the implementation.
  */
-function ringHoleCentre(textGeometry: THREE.BufferGeometry, size: KeychainSize, ringAtEnd: boolean) {
+function ringHoleCentre(textGeometry: THREE.BufferGeometry, size: KeychainSize, ringAtEnd: boolean, ringSize: RingSize = DEFAULT_RING_SIZE) {
   const preset = SIZE_PRESETS[size]
+  const ringPreset = RING_SIZE_PRESETS[ringSize]
   textGeometry.computeBoundingBox()
   const bb = textGeometry.boundingBox!
-  const ringRadius = preset.ringHoleDiameterMm / 2 + preset.ringWallMm
+  const ringRadius = ringPreset.holeDiameterMm / 2 + ringPreset.wallMm
   return {
     x: ringAtEnd ? bb.max.x + preset.ringDistanceMm + ringRadius : bb.min.x - preset.ringDistanceMm - ringRadius,
     y: (bb.min.y + bb.max.y) / 2,
-    holeRadius: preset.ringHoleDiameterMm / 2,
+    holeRadius: ringPreset.holeDiameterMm / 2,
     ringRadius,
   }
 }
@@ -304,6 +305,26 @@ describe('buildKeychainGeometries', () => {
     expect(end.right).toBeGreaterThan(end.left * 2)
     expect(start.left).toBeCloseTo(end.right, 3)
     expect(start.right).toBeCloseTo(end.left, 3)
+  })
+
+  it('ringSize changes the ring overhang, smaller for S than M than L, independent of the keychain size preset', () => {
+    const overhang = (ringSize: RingSize) => {
+      const { baseGeometry, textGeometry } = buildKeychainGeometries({ font, text: 'Ким', size: 'M', ringAtEnd: false, ringSize })
+      baseGeometry.computeBoundingBox()
+      textGeometry.computeBoundingBox()
+      return textGeometry.boundingBox!.min.x - baseGeometry.boundingBox!.min.x
+    }
+    const s = overhang('S'), m = overhang('M'), l = overhang('L')
+    expect(s).toBeLessThan(m)
+    expect(m).toBeLessThan(l)
+  })
+
+  it('omitting ringSize defaults to RING_SIZE_PRESETS.M, matching an explicit ringSize: "M"', () => {
+    const implicit = buildKeychainGeometries({ font, text: 'Ким', size: 'M', ringAtEnd: false })
+    const explicit = buildKeychainGeometries({ font, text: 'Ким', size: 'M', ringAtEnd: false, ringSize: 'M' })
+    implicit.baseGeometry.computeBoundingBox()
+    explicit.baseGeometry.computeBoundingBox()
+    expect(implicit.baseGeometry.boundingBox).toEqual(explicit.baseGeometry.boundingBox)
   })
 
   // --- Letter shapes must match the font's own nonzero-winding fill --------
@@ -494,7 +515,7 @@ describe('buildKeychainGeometries', () => {
     // whose spacing at x ~= 74mm (size L with the ring at the end) is already
     // ~5e-6. Still ~100000x tighter than the 5mm hole this is measuring.
     expect(gap, 'no gap in the base material at the ring centre -- the hole was not cut').toBeDefined()
-    expect(gap!.to - gap!.from).toBeCloseTo(preset.ringHoleDiameterMm, 4)
+    expect(gap!.to - gap!.from).toBeCloseTo(ring.holeRadius * 2, 4)
     expect((gap!.from + gap!.to) / 2).toBeCloseTo(ring.x, 4)
   })
 
