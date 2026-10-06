@@ -12,5 +12,5 @@ const exporter = new STLExporter()
 export function exportGeometryToSTL(geometry: THREE.BufferGeometry): ArrayBuffer {
   const mesh = new THREE.Mesh(geometry)
   const result = exporter.parse(mesh, { binary: true }) as DataView
-  return result.buffer.slice(result.byteOffset, result.byteOffset + result.byteLength)
+  return (result.buffer as ArrayBuffer).slice(result.byteOffset, result.byteOffset + result.byteLength)
 }
