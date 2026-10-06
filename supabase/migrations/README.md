@@ -81,6 +81,16 @@ Meta Conversions API, токен шифруется своим собствен�
 Click-to-WhatsApp click id, пишется только на первое сообщение переписки —
 см. `docs/superpowers/specs/2026-10-05-ctwa-meta-capi-design.md`).
 
+## Витрина именных 3D-брелков — `print_orders`
+
+Личный магазин founder'а (не мультитенантная фича), та же поза RLS-без-политик,
+что у `salon_sites`/`planner_sessions` — доступ только через service-role.
+`kaspi_payment_requests.print_order_id` — третья, взаимоисключающая с
+`invoice_id`/`shop_order_id`, ветка `checkAndSettleKaspiPayment`
+(`src/lib/kaspiPay/settlePayment.ts`). STL-файлы лежат в публичном Storage-
+бакете `print-orders` (`<orderId>/base.stl`, `<orderId>/text.stl`). Дизайн:
+`docs/superpowers/specs/2026-10-05-print-keychain-shop-design.md`.
+
 ## Шаблоны писем
 
 См. `supabase/email-templates/` — там лежит шаблон письма со ссылкой для
