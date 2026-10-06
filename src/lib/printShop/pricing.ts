@@ -15,10 +15,14 @@ export type SizePreset = {
 // (base 2.0 / text 1.4 / border 3.4), масштабированы по трём размерам.
 // Диаметр/стенка кольца живут отдельно в RING_SIZE_PRESETS -- founder явно
 // попросил независимую настройку кольца, не привязанную к размеру брелка.
+// Founder 2026-10-06: "сам брелок как объект" needed tighter proportions --
+// borderMm trimmed ~20% narrower than the original MakerWorld-derived
+// defaults so the base hugs the letters more closely instead of reading as
+// a loose blob around the name.
 export const SIZE_PRESETS: Record<KeychainSize, SizePreset> = {
-  S: { fontSizeMm: 10, baseThicknessMm: 2.0, textThicknessMm: 1.2, borderMm: 2.5, ringDistanceMm: 1.2, price: 2500 },
-  M: { fontSizeMm: 14, baseThicknessMm: 2.0, textThicknessMm: 1.4, borderMm: 3.0, ringDistanceMm: 1.2, price: 3500 },
-  L: { fontSizeMm: 18, baseThicknessMm: 2.4, textThicknessMm: 1.6, borderMm: 3.5, ringDistanceMm: 1.2, price: 4500 },
+  S: { fontSizeMm: 10, baseThicknessMm: 2.0, textThicknessMm: 1.2, borderMm: 2.0, ringDistanceMm: 1.2, price: 2500 },
+  M: { fontSizeMm: 14, baseThicknessMm: 2.0, textThicknessMm: 1.4, borderMm: 2.4, ringDistanceMm: 1.2, price: 3500 },
+  L: { fontSizeMm: 18, baseThicknessMm: 2.4, textThicknessMm: 1.6, borderMm: 2.8, ringDistanceMm: 1.2, price: 4500 },
 }
 
 export function priceForSize(size: KeychainSize): number {

@@ -2,7 +2,7 @@
 'use client'
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { Canvas } from '@react-three/fiber'
-import { OrbitControls, Bounds, useBounds } from '@react-three/drei'
+import { OrbitControls, Bounds, useBounds, ContactShadows } from '@react-three/drei'
 import * as opentype from 'opentype.js'
 import QRCode from 'qrcode'
 import { PRINT_SHOP_FONTS, printShopFontUrl } from '@/lib/printShop/fonts'
@@ -38,13 +38,15 @@ function KeychainMesh({ font, text, size, ringAtEnd, ringSize, baseColor, textCo
   }, [font, text, size, ringAtEnd, ringSize])
 
   if (!geometries) return null
+  // roughness/metalness tuned for a printed-PLA satin sheen (not matte clay,
+  // not a glossy toy) -- pure visual tuning, no geometry/business-logic risk.
   return (
     <group rotation={[-Math.PI / 2, 0, 0]}>
       <mesh geometry={geometries.baseGeometry}>
-        <meshStandardMaterial color={COLOR_HEX[baseColor]} />
+        <meshStandardMaterial color={COLOR_HEX[baseColor]} roughness={0.4} metalness={0.05} />
       </mesh>
       <mesh geometry={geometries.textGeometry}>
-        <meshStandardMaterial color={COLOR_HEX[textColor]} />
+        <meshStandardMaterial color={COLOR_HEX[textColor]} roughness={0.4} metalness={0.05} />
       </mesh>
     </group>
   )
@@ -159,6 +161,17 @@ export default function PrintShopClient() {
     [fontQuery]
   )
 
+  // Founder 2026-10-06: "общий дизайн" -- every font button showed its own
+  // NAME in the page's system font, so a customer had no idea what "Caveat"
+  // or "Yeseva One" actually looked like without clicking each one. The same
+  // .ttf files the geometry pipeline already parses with opentype.js are
+  // also served as plain static files (printShopFontUrl) -- registering them
+  // as real @font-face rules lets the picker render each label IN that font.
+  const fontFaceCss = useMemo(
+    () => PRINT_SHOP_FONTS.map(f => `@font-face { font-family: "print-shop-${f.id}"; src: url("${printShopFontUrl(f.id)}") format("truetype"); font-display: swap; }`).join('\n'),
+    []
+  )
+
   async function submitOrder() {
     setSubmitting(true)
     setError(null)
@@ -176,11 +189,33 @@ export default function PrintShopClient() {
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--nav-bg)' }}>
+      <style>{fontFaceCss}</style>
       <div className="max-w-4xl mx-auto p-4 lg:p-8 grid lg:grid-cols-2 gap-8">
-        <div className="aspect-square rounded-2xl overflow-hidden" style={{ background: 'var(--nav-surface-glass)' }}>
+        <div
+          className="aspect-square rounded-2xl overflow-hidden"
+          style={{
+            // Founder 2026-10-06: "сам вид 3D-модели" -- a near-invisible
+            // 0.035-alpha glass tint (the shared --nav-surface-glass token,
+            // meant for text-heavy cabinet cards) made a WHITE keychain
+            // nearly vanish into its own stage. A real radial "studio
+            // backdrop" gradient gives every colour real contrast and a
+            // sense of a lit podium instead of an empty rectangle.
+            background: 'radial-gradient(120% 120% at 50% 15%, var(--nav-accent-soft), var(--nav-surface-glass) 60%)',
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,.06), inset 0 0 0 1px var(--nav-accent-track)',
+          }}
+        >
           <Canvas camera={{ position: [0, 52, 18], fov: 35 }}>
-            <ambientLight intensity={0.7} />
-            <directionalLight position={[20, 40, 20]} intensity={0.8} />
+            {/* Three-point studio lighting (no HDRI/environment map -- this
+                is a public page, keeping it to procedural lights avoids a
+                runtime dependency on an external asset CDN): a strong key
+                light for real form/shadow, a soft cool fill from the
+                opposite side so nothing goes pure black, and a dim rim
+                light from behind to separate the object's edge from the
+                backdrop. */}
+            <ambientLight intensity={0.45} />
+            <directionalLight position={[30, 55, 20]} intensity={1.15} />
+            <directionalLight position={[-28, 18, -10]} intensity={0.3} color="#cfd6ff" />
+            <directionalLight position={[0, 12, -30]} intensity={0.35} />
             {/* Founder 2026-10-06: "брелок в квадрат не входит" -- the old
                 fixed camera DISTANCE assumed a roughly-constant keychain
                 size, but a long name's base contour is much wider than a
@@ -193,28 +228,46 @@ export default function PrintShopClient() {
                 floating tiny in the middle. OrbitControls still lets the
                 customer drag-rotate afterward -- the two are meant to
                 compose, Bounds only sets where the camera STARTS. */}
-            <Bounds observe fit clip margin={1.3}>
+            <Bounds observe fit clip margin={1.5}>
               {font && <KeychainMesh font={font} text={text} size={size} ringAtEnd={ringAtEnd} ringSize={ringSize} baseColor={baseColor} textColor={textColor} />}
               <RefitBoundsOnChange deps={[font, text, size, ringAtEnd, ringSize]} />
             </Bounds>
-            <OrbitControls enablePan={false} />
+            {/* Grounds the object with a soft contact shadow instead of it
+                floating in empty space -- sits right at the model's own
+                bottom face (local z=0 becomes world y=0 after KeychainMesh's
+                -90°-about-X rotation). Purely a baked blurred shadow plane,
+                no shadow-mapped lights needed. */}
+            <ContactShadows position={[0, -0.02, 0]} opacity={0.35} blur={2.4} far={30} scale={60} />
+            {/* autoRotate makes the object read as 3D at a glance even
+                before anyone touches it -- stops being the only cue once
+                the customer drags, which still works exactly as before. */}
+            <OrbitControls enablePan={false} autoRotate autoRotateSpeed={1.1} />
           </Canvas>
         </div>
 
         <div className="space-y-4">
-          <h1 className="text-xl font-bold" style={{ color: 'var(--nav-text-primary)' }}>Именной 3D-брелок</h1>
+          <div>
+            <h1 className="text-xl font-bold" style={{ color: 'var(--nav-text-primary)' }}>Именной 3D-брелок</h1>
+            <p className="text-sm mt-1" style={{ color: 'var(--nav-text-secondary)' }}>
+              Настройте форму, шрифт и цвета — и сразу увидите, каким будет готовый брелок.
+            </p>
+          </div>
 
           {step === 'configure' && (
             <>
-              <input
-                value={text}
-                onChange={e => setText(e.target.value.slice(0, 20))}
-                placeholder="Текст на брелке"
-                className="w-full rounded-lg px-3 py-2 text-sm"
-                style={{ background: 'var(--nav-surface-glass)', color: 'var(--nav-text-primary)' }}
-              />
+              <div>
+                <div className="text-xs mb-1" style={{ color: 'var(--nav-text-muted)' }}>Текст на брелке</div>
+                <input
+                  value={text}
+                  onChange={e => setText(e.target.value.slice(0, 20))}
+                  placeholder="Например, Айгерим"
+                  className="w-full rounded-lg px-3 py-2 text-sm"
+                  style={{ background: 'var(--nav-surface-glass)', color: 'var(--nav-text-primary)' }}
+                />
+              </div>
 
               <div>
+                <div className="text-xs mb-1" style={{ color: 'var(--nav-text-muted)' }}>Шрифт</div>
                 <input
                   value={fontQuery}
                   onChange={e => setFontQuery(e.target.value)}
@@ -222,11 +275,19 @@ export default function PrintShopClient() {
                   className="w-full rounded-lg px-3 py-2 text-sm mb-2"
                   style={{ background: 'var(--nav-surface-glass)', color: 'var(--nav-text-primary)' }}
                 />
-                <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
+                {/* Each button renders its OWN label in its own @font-face
+                    (fontFaceCss above) -- a customer can actually see what
+                    "Caveat" or "Yeseva One" look like, not just read the name. */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-44 overflow-y-auto pr-1">
                   {filteredFonts.map(f => (
-                    <button key={f.id} onClick={() => setFontId(f.id)}
-                      className="rounded-full px-3 py-1.5 text-xs font-medium"
-                      style={{ background: fontId === f.id ? 'var(--nav-accent)' : 'var(--nav-surface-glass)', color: fontId === f.id ? 'var(--nav-accent-ink)' : 'var(--nav-text-secondary)' }}>
+                    <button key={f.id} onClick={() => setFontId(f.id)} title={f.label}
+                      className="rounded-lg px-2.5 py-2 text-base text-left truncate"
+                      style={{
+                        fontFamily: `"print-shop-${f.id}", sans-serif`,
+                        background: fontId === f.id ? 'var(--nav-accent-soft)' : 'var(--nav-surface-glass)',
+                        color: fontId === f.id ? 'var(--nav-accent)' : 'var(--nav-text-secondary)',
+                        boxShadow: fontId === f.id ? 'inset 0 0 0 1.5px var(--nav-accent)' : 'none',
+                      }}>
                       {f.label}
                     </button>
                   ))}
@@ -264,21 +325,25 @@ export default function PrintShopClient() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <div className="text-xs mb-1" style={{ color: 'var(--nav-text-muted)' }}>Цвет основы</div>
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="flex flex-wrap gap-2">
                     {COLORS.map(c => (
-                      <button key={c} onClick={() => setBaseColor(c)} title={c}
-                        className="w-7 h-7 rounded-full border-2"
-                        style={{ background: COLOR_HEX[c], borderColor: baseColor === c ? 'var(--nav-accent)' : 'transparent' }} />
+                      <button key={c} onClick={() => setBaseColor(c)} title={c} aria-label={c}
+                        className="w-8 h-8 rounded-full flex items-center justify-center text-xs"
+                        style={{ background: COLOR_HEX[c], boxShadow: baseColor === c ? '0 0 0 2px var(--nav-bg), 0 0 0 4px var(--nav-accent)' : '0 0 0 1px var(--nav-accent-track)' }}>
+                        {baseColor === c && <span style={{ color: c === 'белый' || c === 'жёлтый' ? '#14162A' : '#fff' }}>✓</span>}
+                      </button>
                     ))}
                   </div>
                 </div>
                 <div>
                   <div className="text-xs mb-1" style={{ color: 'var(--nav-text-muted)' }}>Цвет текста</div>
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="flex flex-wrap gap-2">
                     {COLORS.map(c => (
-                      <button key={c} onClick={() => setTextColor(c)} title={c}
-                        className="w-7 h-7 rounded-full border-2"
-                        style={{ background: COLOR_HEX[c], borderColor: textColor === c ? 'var(--nav-accent)' : 'transparent' }} />
+                      <button key={c} onClick={() => setTextColor(c)} title={c} aria-label={c}
+                        className="w-8 h-8 rounded-full flex items-center justify-center text-xs"
+                        style={{ background: COLOR_HEX[c], boxShadow: textColor === c ? '0 0 0 2px var(--nav-bg), 0 0 0 4px var(--nav-accent)' : '0 0 0 1px var(--nav-accent-track)' }}>
+                        {textColor === c && <span style={{ color: c === 'белый' || c === 'жёлтый' ? '#14162A' : '#fff' }}>✓</span>}
+                      </button>
                     ))}
                   </div>
                 </div>
