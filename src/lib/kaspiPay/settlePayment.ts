@@ -21,6 +21,7 @@ export interface SettleableRequest {
   invoice_id: string | null
   order_id: string | null
   shop_order_id: string | null
+  print_order_id: string | null
   amount: number | string
   kaspi_operation_id: string
   callback_url: string | null
@@ -126,6 +127,21 @@ export async function checkAndSettleKaspiPayment(
   // one of them).
   if (reqRow.shop_order_id) {
     await supabase.from('kaspi_shop_orders').update({ status: 'paid' }).eq('id', reqRow.shop_order_id)
+  }
+
+  // Третья, взаимоисключающая с invoice_id/shop_order_id, ветка -- см.
+  // print_order_id в getOrCreateKaspiPaymentForPrintOrder (orderPayment.ts).
+  // Best-effort, как и notifyInvoicePaidInConversation выше: реальная
+  // Kaspi-подтверждённая оплата уже состоялась независимо от того,
+  // получится ли сгенерировать STL и отправить Telegram прямо сейчас.
+  if (reqRow.print_order_id) {
+    await supabase.from('print_orders').update({ status: 'paid' }).eq('id', reqRow.print_order_id)
+    try {
+      const { handlePrintOrderPaid } = await import('@/lib/printShop/orderFulfillment')
+      await handlePrintOrderPaid(reqRow.print_order_id)
+    } catch (e: any) {
+      console.error('Kaspi settle: print order fulfillment failed for', reqRow.print_order_id, ':', e.message)
+    }
   }
 
   // Commission is charged exactly once, here — the moment a payment is
