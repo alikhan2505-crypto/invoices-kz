@@ -2,7 +2,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
-import opentype from 'opentype.js'
+import * as opentype from 'opentype.js'
 import { buildKeychainGeometries } from './keychainGeometry'
 import { exportGeometryToSTL } from './stlExport'
 import { findPrintShopFont } from './fonts'
