@@ -54,18 +54,38 @@ function meshVolume(geometry: THREE.BufferGeometry): number {
 }
 
 /**
- * x-intervals that the geometry's TOP CAP actually covers at scanline y --
- * i.e. where there is material, read straight off the triangles three.js
- * emitted rather than off the 2D shapes that went in.
+ * Precomputes a geometry's TOP CAP triangles once: a single
+ * computeBoundingBox() call plus a single walk over every triangle to find
+ * the ones lying in the top plane. Callers that need intervals at MANY
+ * scanlines against the same geometry (e.g. glyphFootprintMismatch, which
+ * scans ~1500 lines) must extract this once and reuse it, rather than
+ * re-walking the whole triangle set and recomputing the bounding box inside
+ * the scanline loop -- for a large glyph mesh that quadratic blow-up is what
+ * made this suite flaky under parallel load (fast in isolation, timing out
+ * under full-suite CPU contention).
  */
-function topCapIntervals(geometry: THREE.BufferGeometry, y: number): [number, number][] {
+function extractTopCapTriangles(geometry: THREE.BufferGeometry): Point[][] {
   const p = geometry.attributes.position
   geometry.computeBoundingBox()
   const topZ = geometry.boundingBox!.max.z
-  const raw: [number, number][] = []
+  const tris: Point[][] = []
   for (let t = 0; t < p.count; t += 3) {
     const vs = [0, 1, 2].map(k => ({ x: p.getX(t + k), y: p.getY(t + k), z: p.getZ(t + k) }))
     if (!vs.every(v => Math.abs(v.z - topZ) < 1e-9)) continue
+    tris.push(vs.map(v => ({ x: v.x, y: v.y })))
+  }
+  return tris
+}
+
+/**
+ * x-intervals that a precomputed set of TOP CAP triangles (see
+ * extractTopCapTriangles) covers at scanline y -- i.e. where there is
+ * material, read straight off the triangles three.js emitted rather than off
+ * the 2D shapes that went in.
+ */
+function topCapIntervalsFromTriangles(tris: Point[][], y: number): [number, number][] {
+  const raw: [number, number][] = []
+  for (const vs of tris) {
     const xs: number[] = []
     for (let i = 0; i < 3; i++) {
       const a = vs[i], b = vs[(i + 1) % 3]
@@ -84,6 +104,17 @@ function topCapIntervals(geometry: THREE.BufferGeometry, y: number): [number, nu
     else merged.push([iv[0], iv[1]])
   }
   return merged
+}
+
+/**
+ * x-intervals that the geometry's TOP CAP actually covers at scanline y.
+ * Convenience wrapper for single-scanline callers -- extracts the top-cap
+ * triangle set fresh on every call, so callers that query many scanlines
+ * against the same geometry should instead call extractTopCapTriangles()
+ * once up front and topCapIntervalsFromTriangles() per line.
+ */
+function topCapIntervals(geometry: THREE.BufferGeometry, y: number): [number, number][] {
+  return topCapIntervalsFromTriangles(extractTopCapTriangles(geometry), y)
 }
 
 /**
@@ -138,6 +169,9 @@ function glyphFootprintMismatch(fontId: string, text: string, scanlines = 1500) 
   const commands = f.getPath(text, 0, 0, SIZE_PRESETS.L.fontSizeMm).commands as unknown as OpentypeCommand[]
   const truth = flattenOpentypePath(commands).map(sp => [...sp].reverse().map(p => ({ x: p.x, y: -p.y })))
   const { textGeometry } = buildKeychainGeometries({ font: f, text, size: 'L', ringAtEnd: false })
+  // Extract the top-cap triangle set ONCE (bounding box + full triangle
+  // walk), not once per scanline -- see extractTopCapTriangles.
+  const topCapTris = extractTopCapTriangles(textGeometry)
 
   let minY = Infinity, maxY = -Infinity
   for (const sp of truth) for (const p of sp) { if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y }
@@ -146,7 +180,7 @@ function glyphFootprintMismatch(fontId: string, text: string, scanlines = 1500) 
   for (let i = 0; i < scanlines; i++) {
     const y = minY + (i + 0.5) * dy
     const expected = nonzeroIntervals(truth, y)
-    const actual = topCapIntervals(textGeometry, y)
+    const actual = topCapIntervalsFromTriangles(topCapTris, y)
     truthArea += intervalsLength(expected) * dy
     misplacedArea += symmetricDifferenceLength(expected, actual) * dy
   }
