@@ -60,7 +60,12 @@ export function flattenOpentypePath(commands: OpentypeCommand[], curveSegments =
   return subpaths
 }
 
-function shoelaceArea(points: Point[]): number {
+/**
+ * Signed area of a closed polygon (shoelace formula). Positive = counter-
+ * clockwise in a Y-up coordinate system. The SIGN is load-bearing for callers
+ * that need a polygon's winding direction, not just its size.
+ */
+export function shoelaceArea(points: Point[]): number {
   let sum = 0
   for (let i = 0; i < points.length; i++) {
     const a = points[i], b = points[(i + 1) % points.length]

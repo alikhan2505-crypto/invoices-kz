@@ -1,7 +1,13 @@
 import * as THREE from 'three'
 import type { Font } from 'opentype.js'
-import { flattenOpentypePath, groupIntoShapesWithHoles, type Point } from './geometryUtils'
-import { offsetOutward } from './offsetContour'
+import {
+  flattenOpentypePath,
+  groupIntoShapesWithHoles,
+  shoelaceArea,
+  type OpentypeCommand,
+  type Point,
+} from './geometryUtils'
+import { offsetOutward, unionNonZeroGroups } from './offsetContour'
 import { SIZE_PRESETS, type KeychainSize } from './pricing'
 
 function shapesFromGroups(groups: { outer: Point[]; holes: Point[][] }[]): THREE.Shape[] {
@@ -21,15 +27,6 @@ function circlePoints(cx: number, cy: number, radius: number, segments = 32): Po
   return pts
 }
 
-function signedArea(points: Point[]): number {
-  let sum = 0
-  for (let i = 0; i < points.length; i++) {
-    const a = points[i], b = points[(i + 1) % points.length]
-    sum += a.x * b.y - b.x * a.y
-  }
-  return sum / 2
-}
-
 /**
  * Normalizes every subpath to positive (counter-clockwise in Y-up space)
  * orientation. ClipperOffset decides which way "outward" is from the
@@ -42,7 +39,7 @@ function signedArea(points: Point[]): number {
  * accidental.
  */
 function toPositiveOrientation(subpaths: Point[][]): Point[][] {
-  return subpaths.map(sp => (signedArea(sp) < 0 ? [...sp].reverse() : sp))
+  return subpaths.map(sp => (shoelaceArea(sp) < 0 ? [...sp].reverse() : sp))
 }
 
 /** Standard ray-casting point-in-polygon test (polygon is implicitly closed). */
@@ -79,15 +76,26 @@ export function buildKeychainGeometries(params: {
   // exact pass-through of synthetic commands); bridging opentype's convention
   // to three.js's is this orchestrator's job.
   //
-  // Negating y alone would reverse every polygon's winding, which Clipper
-  // cares about (see toPositiveOrientation), so each subpath's point order is
-  // reversed too -- together that is a plain reflection about the x axis which
-  // leaves orientation unchanged.
+  // Negating y alone would reverse every polygon's winding; reversing each
+  // subpath's point order as well makes the pair a plain reflection about the
+  // x axis, so every subpath keeps THE FONT'S OWN winding direction.
+  //
+  // That matters for unionNonZeroGroups below, which reads winding as the
+  // difference between "this subpath is a counter" and "this subpath is an
+  // overlapping union piece". (It is NOT what protects the Clipper OFFSET
+  // step further down -- that is protected by toPositiveOrientation, which
+  // normalises orientation anyway and makes this reverse provably inert for
+  // the offset input. Verified: identical output with and without it there.)
   const path = params.font.getPath(text, 0, 0, preset.fontSizeMm)
-  const letterSubpaths = flattenOpentypePath(path.commands as never).map(sp =>
+  const letterSubpaths = flattenOpentypePath(path.commands as unknown as OpentypeCommand[]).map(sp =>
     [...sp].reverse().map(p => ({ x: p.x, y: -p.y }))
   )
-  const letterGroups = groupIntoShapesWithHoles(letterSubpaths)
+  // Nonzero-winding union, NOT groupIntoShapesWithHoles: a containment-based
+  // classifier SUBTRACTS an overlapping same-winding piece (e.g. the crossbar
+  // of montserrat's "А") instead of unioning it, which corrupted 29
+  // (font, letter) pairs across montserrat, unbounded, comfortaa, manrope,
+  // exo-2 and tektur. See unionNonZeroGroups for the detail.
+  const letterGroups = unionNonZeroGroups(letterSubpaths)
 
   // Ring: a hole-with-wall annulus plus a short rectangular bridge
   // connecting it to the nearest end of the text, added to the SAME subpath

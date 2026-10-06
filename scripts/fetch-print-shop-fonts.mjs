@@ -6,17 +6,29 @@ import path from 'node:path'
 // 3D-печати мелким текстом (без тонких засечек/волосяных линий). Список
 // курирован вручную 2026-10-05 -- см. docs/superpowers/specs/2026-10-05-
 // print-keychain-shop-design.md.
+//
+// ВАЖНО (2026-10-06): шрифт в этот список попадает только после ПРОВЕРКИ
+// сборки реальной геометрии многобуквенного имени через
+// buildKeychainGeometries -- наличия глифов НЕ достаточно. opentype.js 2.0
+// не поддерживает GSUB substFormat 2 для lookupType 6 и бросает
+// "substitutionType : 62 lookupType: 6 - substFormat: 2 is not yet
+// supported" на ЛЮБОЙ строке длиннее одного символа. Так тихо выпали
+// Nunito, Rubik и Oswald (заменены на Ruda, Onest, Yanone Kaffeesatz) --
+// каждый из них показывал все глифы на месте и всё равно не рендерил ни
+// одного имени. Из той же ловушки: Nunito Sans, Inter Tight, Oswald на
+// любом весе. Шрифты без реальной кириллицы (Actor, Anton, Baloo 2 --
+// CSS2 отдаёт латинский сабсет) тоже сюда не годятся.
 const FONTS = [
   { id: 'pt-sans', label: 'PT Sans', family: 'PT Sans', weight: 700 },
   { id: 'pt-sans-caption', label: 'PT Sans Caption', family: 'PT Sans Caption', weight: 700 },
   { id: 'pt-serif', label: 'PT Serif', family: 'PT Serif', weight: 700 },
   { id: 'montserrat', label: 'Montserrat', family: 'Montserrat', weight: 800 },
-  { id: 'nunito', label: 'Nunito', family: 'Nunito', weight: 800 },
+  { id: 'ruda', label: 'Ruda', family: 'Ruda', weight: 800 },
   { id: 'golos-text', label: 'Golos Text', family: 'Golos Text', weight: 700 },
   { id: 'unbounded', label: 'Unbounded', family: 'Unbounded', weight: 700 },
   { id: 'caveat', label: 'Caveat', family: 'Caveat', weight: 700 },
   { id: 'comfortaa', label: 'Comfortaa', family: 'Comfortaa', weight: 700 },
-  { id: 'rubik', label: 'Rubik', family: 'Rubik', weight: 800 },
+  { id: 'onest', label: 'Onest', family: 'Onest', weight: 800 },
   { id: 'manrope', label: 'Manrope', family: 'Manrope', weight: 800 },
   { id: 'exo-2', label: 'Exo 2', family: 'Exo 2', weight: 800 },
   { id: 'tektur', label: 'Tektur', family: 'Tektur', weight: 700 },
@@ -24,7 +36,7 @@ const FONTS = [
   { id: 'marck-script', label: 'Marck Script', family: 'Marck Script', weight: 400 },
   { id: 'yeseva-one', label: 'Yeseva One', family: 'Yeseva One', weight: 400 },
   { id: 'russo-one', label: 'Russo One', family: 'Russo One', weight: 400 },
-  { id: 'oswald', label: 'Oswald', family: 'Oswald', weight: 700 },
+  { id: 'yanone-kaffeesatz', label: 'Yanone Kaffeesatz', family: 'Yanone Kaffeesatz', weight: 700 },
   { id: 'jura', label: 'Jura', family: 'Jura', weight: 700 },
   { id: 'play', label: 'Play', family: 'Play', weight: 700 },
 ]
