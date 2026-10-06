@@ -253,7 +253,19 @@ export default function PrintShopClient() {
                 azimuth/polar range is already unrestricted (full flip
                 around in every direction), the object was never actually
                 limited, autoRotate's tug-of-war just made it feel that way. */}
-            <OrbitControls enablePan={false} />
+            {/* Founder 2026-10-06: "при скроллинге визуал брелка скачет" --
+                confirmed live: OrbitControls' wheel handler calls
+                preventDefault() and dollies the camera on every wheel tick
+                whenever enableZoom is true (see onMouseWheel in
+                node_modules/three/examples/jsm/controls/OrbitControls.js),
+                so a mouse-wheel scroll gesture that merely passes over the
+                canvas gets eaten as a sudden zoom jump instead of scrolling
+                the page -- reproduced: window.scrollY stayed 0 after a
+                wheel scroll over the canvas. Bounds already auto-fits the
+                camera distance on every parameter change, so scroll-to-zoom
+                isn't needed for this to work as a product preview;
+                disabling it removes the conflict with page scroll entirely. */}
+            <OrbitControls enablePan={false} enableZoom={false} />
           </Canvas>
         </div>
 
