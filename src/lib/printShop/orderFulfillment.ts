@@ -76,7 +76,10 @@ export async function handlePrintOrderPaid(printOrderId: string): Promise<void> 
   const baseUrl = supabase.storage.from('print-orders').getPublicUrl(basePath).data.publicUrl
   const textUrl = supabase.storage.from('print-orders').getPublicUrl(textPath).data.publicUrl
 
-  await supabase.from('print_orders').update({ base_stl_path: basePath, text_stl_path: textPath }).eq('id', printOrderId)
+  const { error: updateError } = await supabase.from('print_orders').update({ base_stl_path: basePath, text_stl_path: textPath }).eq('id', printOrderId)
+  if (updateError) {
+    console.error(`Failed to update print order ${printOrderId} with STL paths: ${updateError.message}`)
+  }
 
   const chatId = await loadPrintShopOwnerTelegramChatId()
   if (chatId) {
