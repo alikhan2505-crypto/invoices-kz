@@ -10,9 +10,18 @@ import { SIZE_PRESETS, type KeychainSize } from './pricing'
 
 let font: opentype.Font
 
+// Memoized: several tests below walk the whole 20-font roster, and a parsed
+// opentype.Font is only ever read from (getPath/charToGlyphIndex), so sharing
+// one instance per id is safe and keeps the roster walks off the disk.
+const fontCache = new Map<string, opentype.Font>()
+
 function loadFont(id: string): opentype.Font {
+  const cached = fontCache.get(id)
+  if (cached) return cached
   const buf = readFileSync(path.resolve(__dirname, `../../../public/fonts/print-shop/${id}.ttf`))
-  return opentype.parse(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength))
+  const parsed = opentype.parse(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength))
+  fontCache.set(id, parsed)
+  return parsed
 }
 
 beforeAll(() => {
@@ -364,6 +373,62 @@ describe('buildKeychainGeometries', () => {
         `font ${f.id} cannot render a multi-character name`).not.toThrow()
     }
   })
+
+  // --- Kazakh Cyrillic, digits and the hyphen ------------------------------
+  // scripts/fetch-print-shop-fonts.mjs downloads these .ttf files through
+  // Google CSS2's `text=` parameter, which SUBSETS: the file physically
+  // contains only the listed glyphs. Its first version listed basic Russian
+  // Cyrillic + Latin only, so all 20 fonts rejected Әсел / Қуаныш / Өмірбек,
+  // every digit, and every hyphenated name (Аян-Бек) -- in a Kazakhstan
+  // name-keychain shop. These tests fail if that charset is ever narrowed.
+
+  const KAZAKH_ONLY_LETTERS = [...'ӘҒҚҢӨҰҮҺІәғқңөұүһі']
+
+  it.each(PRINT_SHOP_FONTS.map(f => f.id))('%s has digits, a hyphen and basic punctuation', (fontId) => {
+    const f = loadFont(fontId)
+    for (const char of [...'0123456789', '-', '.', ',']) {
+      expect(f.charToGlyphIndex(char), `font ${fontId} has no glyph for ${JSON.stringify(char)}`).not.toBe(0)
+    }
+  })
+
+  it('most of the roster covers the full extended Kazakh alphabet', () => {
+    // Deliberately a threshold, not "all 20": some families genuinely lack
+    // these letters UPSTREAM (measured 2026-10-06: unbounded, marck-script,
+    // russo-one and jura have none of them, manrope misses Ә Ғ Қ Ң Ұ,
+    // yanone-kaffeesatz misses Ғ Ө Ү Һ). That is handled gracefully per
+    // character by /api/print/orders, so it is not a defect -- but if this
+    // count collapses toward zero the charset regressed again.
+    const fullyCovered = PRINT_SHOP_FONTS.filter(f => {
+      const loaded = loadFont(f.id)
+      return KAZAKH_ONLY_LETTERS.every(c => loaded.charToGlyphIndex(c) !== 0)
+    })
+    expect(fullyCovered.length, `only ${fullyCovered.length} font(s) cover Kazakh: ${fullyCovered.map(f => f.id).join(', ')}`).toBeGreaterThanOrEqual(10)
+    // І (U+0406) is the one extended Kazakh letter every family ships, so it
+    // is the strictest honest assertion available across the whole roster.
+    for (const f of PRINT_SHOP_FONTS) {
+      expect(loadFont(f.id).charToGlyphIndex('І'), `font ${f.id} has no glyph for І`).not.toBe(0)
+    }
+  })
+
+  it('builds real geometry for Kazakh and hyphenated names in every font that has the glyphs', () => {
+    // Glyph presence is NOT sufficient (see the GSUB note on the roster test
+    // above), so this runs the full pipeline. Any font whose glyphs are all
+    // present must also actually render the name -- otherwise the pre-payment
+    // check in /api/print/orders would pass and fulfillment would still fail.
+    const names = ['Әсел', 'Қуаныш', 'Өмірбек', 'Ілияс', 'Аян-Бек', 'Аят 2025']
+    let built = 0
+    for (const f of PRINT_SHOP_FONTS) {
+      const loaded = loadFont(f.id)
+      for (const name of names) {
+        if (![...name].every(c => c === ' ' || loaded.charToGlyphIndex(c) !== 0)) continue
+        expect(() => buildKeychainGeometries({ font: loaded, text: name, size: 'M', ringAtEnd: false }),
+          `font ${f.id} has every glyph for ${JSON.stringify(name)} but cannot build its geometry`).not.toThrow()
+        built++
+      }
+    }
+    // Sanity that the skip-if-missing guard above did not skip everything.
+    expect(built).toBeGreaterThan(60)
+  }, 60_000)
 
   // --- The key-ring hole must be a real void, not just an attached contour --
 
