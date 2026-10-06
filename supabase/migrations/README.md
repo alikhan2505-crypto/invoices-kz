@@ -91,6 +91,10 @@ Click-to-WhatsApp click id, пишется только на первое соо
 бакете `print-orders` (`<orderId>/base.stl`, `<orderId>/text.stl`). Дизайн:
 `docs/superpowers/specs/2026-10-05-print-keychain-shop-design.md`.
 
+Требует `PRINT_SHOP_OWNER_USER_ID` в Vercel (profiles.id founder'а) — без
+него `getPrintShopOwnerUserId()` бросает ошибку, и чекаут не сможет
+создать Kaspi-платёж ни для одного заказа.
+
 ## Шаблоны писем
 
 См. `supabase/email-templates/` — там лежит шаблон письма со ссылкой для
