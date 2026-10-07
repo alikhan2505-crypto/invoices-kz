@@ -25,10 +25,25 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const pathname = useEffectivePath()
 
   useEffect(() => {
-    const saved = localStorage.getItem('theme') || 'light'
-    setTheme(saved)
-    const applied = FORCE_LIGHT_ROUTES.has(pathname) ? 'light' : saved
-    document.documentElement.setAttribute('data-theme', applied)
+    const saved = localStorage.getItem('theme')
+    // A visitor who has never touched the toggle has no `saved` value --
+    // that's the "system" state, not an implicit choice of light. The old
+    // code defaulted `saved` to 'light' and stamped data-theme="light"
+    // unconditionally, which permanently beat globals.css's
+    // `@media (prefers-color-scheme: dark)` block for every --nav-* token
+    // (same specificity, later source order) -- the whole dashboard stayed
+    // light for every OS-dark visitor who'd never manually toggled, which
+    // is most of them. Leaving the attribute UNSET for that case lets the
+    // media query govern, as its own comment in globals.css already assumed.
+    const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+    setTheme(saved ?? (systemDark ? 'dark' : 'light'))
+    if (FORCE_LIGHT_ROUTES.has(pathname)) {
+      document.documentElement.setAttribute('data-theme', 'light')
+    } else if (saved) {
+      document.documentElement.setAttribute('data-theme', saved)
+    } else {
+      document.documentElement.removeAttribute('data-theme')
+    }
   }, [pathname])
 
   function toggle() {
