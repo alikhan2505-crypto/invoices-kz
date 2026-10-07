@@ -104,6 +104,15 @@ export default function SignatureSection(props: Props) {
   }
 
   async function loadRow() {
+    // The client is anonymous and RLS only lets an owner read their own rows,
+    // so client mode goes through the token-gated server route instead.
+    if (props.mode === 'client') {
+      const res = await fetch(`/api/public/signature/${encodeURIComponent(props.publicToken)}?type=${documentType}`)
+      const json = res.ok ? await res.json() : null
+      setRow(json?.signature ?? null)
+      setLoading(false)
+      return
+    }
     const { data } = await supabase
       .from('document_signatures')
       .select('id, status, owner_signed_at, client_signed_at, owner_signer_name, owner_signer_iin, client_signer_name, client_signer_iin, ddc_pdf_url, snapshot_pdf_url, display_pdf_url')
