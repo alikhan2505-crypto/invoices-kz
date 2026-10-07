@@ -7,6 +7,7 @@ import { monthKey, todayIso } from '@/lib/cfo/dates'
 import { dayLabel, monthTitle, opTitle, shortMonth } from '@/lib/cfo/labels'
 import { formatTenge } from '@/lib/cfo/money'
 import { useCfo } from '../CfoWorkspace'
+import AskCfo from '../AskCfo'
 import { Card, CfoPage, EmptyState, Money, SectionTitle, inputClass, inputStyle } from '../ui'
 
 function Kpi({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: 'bad' | 'good' }) {
@@ -133,6 +134,7 @@ export default function CfoOverview() {
           </div>
         ))}
       </Card>
+      <AskCfo />
     </CfoPage>
   )
 }

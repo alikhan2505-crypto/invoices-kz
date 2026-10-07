@@ -114,3 +114,5 @@ Click-to-WhatsApp click id, пишется только на первое соо
 `cfo_account_deposit.sql` (07.10.2026) — четвёртый вид счёта `deposit` (депозит).
 
 `cfo_telegram_digest.sql` (07.10.2026) — флаг `telegram_digest` у компании: утренняя сводка в Telegram.
+
+`cfo_ask_quota.sql` (07.10.2026) — дневной лимит вопросов «Спроси CFO».
