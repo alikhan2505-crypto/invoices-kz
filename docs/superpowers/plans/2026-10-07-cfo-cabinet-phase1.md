@@ -3741,7 +3741,7 @@ git commit -m "feat(cfo): editable plan grid with copy-from-previous and even ye
 - Produces:
   - `type Measure = 'fact' | 'plan' | 'diff'`
   - `type ReportRow = { key: string; label: string; level: 0 | 1 | 2; strong: boolean; toggleKey?: string; parentKey?: string; cells: Record<string, { plan: number | null; fact: number }>; total: { plan: number | null; fact: number }; higherIsBetter: boolean }`
-  - `ReportTable({ months, rows, measure, collapsed, onToggle })`
+  - `ReportTable({ months, rows, measure, collapsed, onToggle, currentMonth })` — месяцы после `currentMonth` ('YYYY-MM') показывают факт и отклонение как «—» (решение founder'а 07.10.2026 по макету), план — как есть
   - `MEASURE_OPTIONS`
 
 - [ ] **Step 1: Общая таблица**
@@ -3771,7 +3771,10 @@ export type ReportRow = {
   higherIsBetter: boolean
 }
 
-function Value({ cell, measure, higherIsBetter }: { cell: { plan: number | null; fact: number }; measure: Measure; higherIsBetter: boolean }) {
+// Founder 07.10.2026: a month that hasn't happened yet has no fact — show «—»,
+// not «0 ₸». The plan of a future month is real and stays visible.
+function Value({ cell, measure, higherIsBetter, future }: { cell: { plan: number | null; fact: number }; measure: Measure; higherIsBetter: boolean; future: boolean }) {
+  if (future && measure !== 'plan') return <span style={{ color: 'var(--nav-text-muted)' }}>—</span>
   if (measure === 'fact') return <span style={{ color: cell.fact < 0 ? 'var(--nav-critical)' : undefined }}>{formatTenge(cell.fact)}</span>
   if (cell.plan === null) return <span style={{ color: 'var(--nav-text-muted)' }}>—</span>
   if (measure === 'plan') return <span>{formatTenge(cell.plan)}</span>
@@ -3787,12 +3790,13 @@ function Value({ cell, measure, higherIsBetter }: { cell: { plan: number | null;
   )
 }
 
-export default function ReportTable({ months, rows, measure, collapsed, onToggle }: {
+export default function ReportTable({ months, rows, measure, collapsed, onToggle, currentMonth }: {
   months: string[]
   rows: ReportRow[]
   measure: Measure
   collapsed: Set<string>
   onToggle: (key: string) => void
+  currentMonth: string
 }) {
   const visible = rows.filter((r) => !r.parentKey || !collapsed.has(r.parentKey))
   return (
@@ -3819,11 +3823,11 @@ export default function ReportTable({ months, rows, measure, collapsed, onToggle
               </td>
               {months.map((m) => (
                 <td key={m} className="px-3 py-2 text-right tabular-nums whitespace-nowrap" style={{ fontWeight: r.strong ? 600 : 400 }}>
-                  <Value cell={r.cells[m]} measure={measure} higherIsBetter={r.higherIsBetter} />
+                  <Value cell={r.cells[m]} measure={measure} higherIsBetter={r.higherIsBetter} future={m > currentMonth} />
                 </td>
               ))}
               <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap font-semibold">
-                <Value cell={r.total} measure={measure} higherIsBetter={r.higherIsBetter} />
+                <Value cell={r.total} measure={measure} higherIsBetter={r.higherIsBetter} future={false} />
               </td>
             </tr>
           ))}
@@ -3840,7 +3844,7 @@ export default function ReportTable({ months, rows, measure, collapsed, onToggle
 // src/app/cfo/pnl/page.tsx
 'use client'
 import { useMemo, useState } from 'react'
-import { todayIso, yearMonths } from '@/lib/cfo/dates'
+import { monthKey, todayIso, yearMonths } from '@/lib/cfo/dates'
 import { buildPnl, type PnlRow } from '@/lib/cfo/pnl'
 import { useCfo } from '../CfoWorkspace'
 import ReportTable, { MEASURE_OPTIONS, type Measure, type ReportRow } from '../ReportTable'
@@ -3882,7 +3886,7 @@ export default function CfoPnl() {
       <p className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
         Доходы и расходы по дате начисления. Кредиты, вложения и вывод денег собственником, покупка оборудования и переводы между счетами сюда не входят — они в БДДС.
       </p>
-      <ReportTable months={months} rows={rows} measure={measure} collapsed={collapsed} onToggle={toggle} />
+      <ReportTable months={months} rows={rows} measure={measure} collapsed={collapsed} onToggle={toggle} currentMonth={monthKey(todayIso())} />
     </CfoPage>
   )
 }
@@ -3895,7 +3899,7 @@ export default function CfoPnl() {
 'use client'
 import { useMemo, useState } from 'react'
 import { buildCashflow, type CashflowRow } from '@/lib/cfo/cashflow'
-import { todayIso, yearMonths } from '@/lib/cfo/dates'
+import { monthKey, todayIso, yearMonths } from '@/lib/cfo/dates'
 import { useCfo } from '../CfoWorkspace'
 import ReportTable, { MEASURE_OPTIONS, type Measure, type ReportRow } from '../ReportTable'
 import { CfoPage, Segmented, YearPicker } from '../ui'
@@ -3945,7 +3949,7 @@ export default function CfoCashflow() {
       <p className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
         Деньги по дате оплаты, по видам деятельности. Остатки — по всем счетам и кассам, переводы между ними не считаются ни поступлением, ни выплатой.
       </p>
-      <ReportTable months={months} rows={rows} measure={measure} collapsed={collapsed} onToggle={toggle} />
+      <ReportTable months={months} rows={rows} measure={measure} collapsed={collapsed} onToggle={toggle} currentMonth={monthKey(todayIso())} />
     </CfoPage>
   )
 }
@@ -3980,6 +3984,7 @@ git commit -m "feat(cfo): БДР and БДДС report pages with plan/fact/deviat
 'use client'
 import { useMemo, useState } from 'react'
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
+import { accountBalanceAt } from '@/lib/cfo/balances'
 import { buildDashboard } from '@/lib/cfo/dashboard'
 import { monthKey, todayIso } from '@/lib/cfo/dates'
 import { dayLabel, monthTitle, opTitle, shortMonth } from '@/lib/cfo/labels'
@@ -4011,7 +4016,17 @@ export default function CfoOverview() {
     )
   }
 
-  const planNote = (plan: number) => (plan ? `план ${formatTenge(plan)}` : 'плана нет')
+  // Как в утверждённом макете: «план 5 200 000 ₸ · −7%».
+  const planNote = (c: { plan: number; fact: number }) => {
+    if (!c.plan) return 'плана нет'
+    const pct = Math.round(((c.fact - c.plan) / Math.abs(c.plan)) * 100)
+    return `план ${formatTenge(c.plan)} · ${pct > 0 ? '+' : ''}${pct}%`
+  }
+  const actual = ws.operations.filter((o) => o.status === 'actual')
+  const byAccount = ws.accounts
+    .filter((a) => !a.archived)
+    .map((a) => `${a.name} ${formatTenge(accountBalanceAt(a, actual, today))}`)
+    .join(' · ')
   const breakeven = d.breakeven.kind === 'ok' ? formatTenge(d.breakeven.value) : d.breakeven.kind === 'unreachable' ? 'не достигается' : '—'
   const breakevenSub = d.breakeven.kind === 'ok' ? 'выручка в месяц, при которой прибыль = 0' : d.breakeven.kind === 'unreachable' ? 'при текущей марже' : 'нет выручки за месяц'
   const maxExpense = d.expenseStructure[0]?.amount ?? 0
@@ -4030,10 +4045,10 @@ export default function CfoOverview() {
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        <Kpi label={`Выручка · ${monthTitle(month)}`} value={formatTenge(d.revenue.fact)} sub={planNote(d.revenue.plan)} />
+        <Kpi label={`Выручка · ${monthTitle(month)}`} value={formatTenge(d.revenue.fact)} sub={planNote(d.revenue)} />
         <Kpi label="Валовая маржа" value={d.grossMarginPct === null ? '—' : `${Math.round(d.grossMarginPct)}%`} sub="(выручка − себестоимость) ÷ выручка" />
-        <Kpi label="Чистая прибыль" value={formatTenge(d.netProfit.fact)} sub={planNote(d.netProfit.plan)} tone={d.netProfit.fact < 0 ? 'bad' : undefined} />
-        <Kpi label="Деньги сейчас" value={formatTenge(d.cashNow)} sub="на всех счетах и в кассах" tone={d.cashNow < 0 ? 'bad' : undefined} />
+        <Kpi label="Чистая прибыль" value={formatTenge(d.netProfit.fact)} sub={planNote(d.netProfit)} tone={d.netProfit.fact < 0 ? 'bad' : undefined} />
+        <Kpi label="Деньги сейчас" value={formatTenge(d.cashNow)} sub={byAccount || 'на всех счетах и в кассах'} tone={d.cashNow < 0 ? 'bad' : undefined} />
         <Kpi label="Запас денег" value={d.runwayDays === null ? '—' : `${d.runwayDays} дн.`} sub={d.runwayDays === null ? 'нет выплат за 90 дней' : 'без новых поступлений, по средним выплатам за 90 дней'} tone={d.runwayDays !== null && d.runwayDays < 30 ? 'bad' : undefined} />
         <Kpi label="Точка безубыточности" value={breakeven} sub={breakevenSub} />
       </div>
