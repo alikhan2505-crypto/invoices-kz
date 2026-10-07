@@ -53,6 +53,14 @@ describe('buildCashflow', () => {
     }
   })
 
+  it('opening plus flow equals closing in the month an account starts', () => {
+    const fresh: CfoAccount = { ...kaspi, openingDate: '2026-01-01' }
+    const r = buildCashflow({ accounts: [fresh], articles, operations: [op({ direction: 'in', articleId: 'rev', amount: t(100_000), paidOn: '2026-01-10' })], plan: [], months: ['2026-01'] })
+    const get = (k: string) => r.find((x) => x.key === k)!.cells['2026-01'].fact
+    expect(get('b:opening')).toBe(t(1_000_000))
+    expect(get('b:opening') + get('t:netflow')).toBe(get('b:closing'))
+  })
+
   it('carries the plan, with no plan for balances', () => {
     expect(row('act:operating').cells['2026-01'].plan).toBe(t(400_000))
     expect(row('b:opening').cells['2026-01'].plan).toBeNull()

@@ -79,7 +79,12 @@ export function buildCashflow(input: {
   const opening: Record<string, FlowCell> = {}
   const closing: Record<string, FlowCell> = {}
   for (const m of months) {
-    opening[m] = { plan: null, fact: totalBalanceAt(accounts, actual, addDays(firstDay(m), -1)) }
+    // Счёт, у которого начало учёта попало в этот месяц, вносит свой стартовый остаток в
+    // остаток на начало: иначе «начало + поток» не сходилось бы с «концом» в первый месяц.
+    const joining = accounts
+      .filter((a) => a.openingDate >= firstDay(m) && a.openingDate <= lastDay(m))
+      .reduce((s, a) => s + a.openingBalance, 0)
+    opening[m] = { plan: null, fact: totalBalanceAt(accounts, actual, addDays(firstDay(m), -1)) + joining }
     closing[m] = { plan: null, fact: totalBalanceAt(accounts, actual, lastDay(m)) }
   }
 
