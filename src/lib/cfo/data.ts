@@ -1,0 +1,239 @@
+// Чтение и запись CFO-кабинета из браузера. Доступ ограничен RLS «только свои
+// строки»; суммы в БД — numeric(14,2) в тенге, здесь переводятся в тиыны.
+import { supabase } from '@/lib/supabase'
+import { toDbAmount, toTiyn } from './money'
+import type { AccountKind, Activity, ArticleKind, CfoAccount, CfoArticle, CfoOperation, CfoPlanItem, CfoRecurrence, Direction, OpStatus, PnlGroup } from './types'
+import type { OperationDraft, RecurrenceDraft } from './validate'
+
+export type Workspace = {
+  userId: string
+  companyId: string
+  companyName: string
+  accounts: CfoAccount[]
+  articles: CfoArticle[]
+  operations: CfoOperation[]
+  recurrences: CfoRecurrence[]
+  plan: CfoPlanItem[]
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Row = Record<string, any>
+
+const PAGE_SIZE = 1000
+
+function check(error: { message: string } | null) {
+  if (error) throw new Error(error.message)
+}
+
+// PostgREST отдаёт не больше 1000 строк за раз — длинный журнал читаем страницами.
+async function selectAll(table: string, columns: string, companyId: string): Promise<Row[]> {
+  const rows: Row[] = []
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from(table)
+      .select(columns)
+      .eq('company_id', companyId)
+      .order('id')
+      .range(from, from + PAGE_SIZE - 1)
+    check(error)
+    const page = (data ?? []) as unknown as Row[]
+    rows.push(...page)
+    if (page.length < PAGE_SIZE) return rows
+  }
+}
+
+const bySort = <T extends { sort: number; name: string }>(a: T, b: T) => a.sort - b.sort || a.name.localeCompare(b.name, 'ru')
+
+const mapAccount = (r: Row): CfoAccount => ({
+  id: r.id, name: r.name, kind: r.kind as AccountKind, openingBalance: toTiyn(r.opening_balance),
+  openingDate: r.opening_date, archived: r.archived, sort: r.sort,
+})
+const mapArticle = (r: Row): CfoArticle => ({
+  id: r.id, name: r.name, kind: r.kind as ArticleKind, activity: r.activity as Activity,
+  pnlGroup: (r.pnl_group ?? null) as PnlGroup | null, archived: r.archived, sort: r.sort,
+})
+const mapOperation = (r: Row): CfoOperation => ({
+  id: r.id, direction: r.direction as Direction, amount: toTiyn(r.amount), accountId: r.account_id,
+  toAccountId: r.to_account_id ?? null, articleId: r.article_id ?? null, counterparty: r.counterparty ?? null,
+  comment: r.comment ?? null, paidOn: r.paid_on, accruedOn: r.accrued_on, status: r.status as OpStatus,
+  recurrenceId: r.recurrence_id ?? null, recurrenceDate: r.recurrence_date ?? null,
+})
+const mapRecurrence = (r: Row): CfoRecurrence => ({
+  id: r.id, direction: r.direction as Direction, amount: toTiyn(r.amount), accountId: r.account_id,
+  toAccountId: r.to_account_id ?? null, articleId: r.article_id ?? null, counterparty: r.counterparty ?? null,
+  comment: r.comment ?? null, dayOfMonth: r.day_of_month, startsOn: r.starts_on, endsOn: r.ends_on ?? null,
+})
+const mapPlan = (r: Row): CfoPlanItem => ({ articleId: r.article_id, month: String(r.month).slice(0, 7), amount: toTiyn(r.amount) })
+
+export async function bootstrapWorkspace(): Promise<string> {
+  const { data, error } = await supabase.rpc('cfo_bootstrap')
+  check(error)
+  return data as string
+}
+
+export async function loadWorkspace(companyId: string, userId: string): Promise<Workspace> {
+  const [company, accounts, articles, operations, recurrences, plan] = await Promise.all([
+    supabase.from('cfo_companies').select('name').eq('id', companyId).single(),
+    selectAll('cfo_accounts', 'id, name, kind, opening_balance, opening_date, archived, sort', companyId),
+    selectAll('cfo_articles', 'id, name, kind, activity, pnl_group, archived, sort', companyId),
+    selectAll('cfo_operations', 'id, direction, amount, account_id, to_account_id, article_id, counterparty, comment, paid_on, accrued_on, status, recurrence_id, recurrence_date', companyId),
+    selectAll('cfo_recurrences', 'id, direction, amount, account_id, to_account_id, article_id, counterparty, comment, day_of_month, starts_on, ends_on', companyId),
+    selectAll('cfo_plan_items', 'id, article_id, month, amount', companyId),
+  ])
+  check(company.error)
+  return {
+    userId,
+    companyId,
+    companyName: (company.data as Row).name,
+    accounts: accounts.map(mapAccount).sort(bySort),
+    articles: articles.map(mapArticle).sort(bySort),
+    operations: operations.map(mapOperation).sort((a, b) => b.paidOn.localeCompare(a.paidOn)),
+    recurrences: recurrences.map(mapRecurrence),
+    plan: plan.map(mapPlan),
+  }
+}
+
+const owned = (ws: Workspace) => ({ user_id: ws.userId, company_id: ws.companyId })
+
+export async function saveCompanyName(ws: Workspace, name: string): Promise<void> {
+  const { error } = await supabase.from('cfo_companies').update({ name }).eq('id', ws.companyId)
+  check(error)
+}
+
+export async function saveAccount(ws: Workspace, a: { id?: string; name: string; kind: AccountKind; openingBalance: number; openingDate: string }): Promise<void> {
+  const row = { name: a.name, kind: a.kind, opening_balance: toDbAmount(a.openingBalance), opening_date: a.openingDate }
+  if (a.id) {
+    const { error } = await supabase.from('cfo_accounts').update(row).eq('id', a.id)
+    check(error)
+    return
+  }
+  const sort = Math.max(0, ...ws.accounts.map((x) => x.sort)) + 10
+  const { error } = await supabase.from('cfo_accounts').insert({ ...row, ...owned(ws), sort })
+  check(error)
+}
+
+export async function saveArticle(ws: Workspace, a: { id?: string; name: string; kind: ArticleKind; activity: Activity; pnlGroup: PnlGroup | null }): Promise<void> {
+  const row = { name: a.name, kind: a.kind, activity: a.activity, pnl_group: a.pnlGroup }
+  if (a.id) {
+    const { error } = await supabase.from('cfo_articles').update(row).eq('id', a.id)
+    check(error)
+    return
+  }
+  const sort = Math.max(0, ...ws.articles.map((x) => x.sort)) + 10
+  const { error } = await supabase.from('cfo_articles').insert({ ...row, ...owned(ws), sort })
+  check(error)
+}
+
+export async function setArchived(table: 'cfo_accounts' | 'cfo_articles', id: string, archived: boolean): Promise<void> {
+  const { error } = await supabase.from(table).update({ archived }).eq('id', id)
+  check(error)
+}
+
+// Переписывает sort только у тех, чья позиция изменилась (10, 20, 30…).
+export async function reorder(table: 'cfo_accounts' | 'cfo_articles', orderedIds: string[], current: { id: string; sort: number }[]): Promise<void> {
+  for (let i = 0; i < orderedIds.length; i++) {
+    const want = (i + 1) * 10
+    const cur = current.find((c) => c.id === orderedIds[i])
+    if (!cur || cur.sort === want) continue
+    const { error } = await supabase.from(table).update({ sort: want }).eq('id', orderedIds[i])
+    check(error)
+  }
+}
+
+export async function saveOperation(ws: Workspace, op: OperationDraft & { id?: string; counterparty: string | null; comment: string | null }): Promise<void> {
+  const row = {
+    direction: op.direction,
+    amount: toDbAmount(op.amount),
+    account_id: op.accountId,
+    to_account_id: op.direction === 'transfer' ? op.toAccountId : null,
+    article_id: op.direction === 'transfer' ? null : op.articleId,
+    counterparty: op.counterparty,
+    comment: op.comment,
+    paid_on: op.paidOn,
+    accrued_on: op.accruedOn,
+    status: op.status,
+  }
+  if (op.id) {
+    const { error } = await supabase.from('cfo_operations').update({ ...row, updated_at: new Date().toISOString() }).eq('id', op.id)
+    check(error)
+    return
+  }
+  const { error } = await supabase.from('cfo_operations').insert({ ...row, ...owned(ws) })
+  check(error)
+}
+
+export async function deleteOperation(id: string): Promise<void> {
+  const { error } = await supabase.from('cfo_operations').delete().eq('id', id)
+  check(error)
+}
+
+// «Оплачено сегодня». Вхождение повтора становится отдельной фактической
+// операцией со ссылкой на правило; разовая плановая — просто переходит в факт.
+export async function markPaid(ws: Workspace, op: CfoOperation, today: string): Promise<void> {
+  if (op.id.startsWith('rec:')) {
+    const { error } = await supabase.from('cfo_operations').insert({
+      ...owned(ws),
+      direction: op.direction,
+      amount: toDbAmount(op.amount),
+      account_id: op.accountId,
+      to_account_id: op.toAccountId,
+      article_id: op.articleId,
+      counterparty: op.counterparty,
+      comment: op.comment,
+      paid_on: today,
+      accrued_on: op.accruedOn,
+      status: 'actual',
+      recurrence_id: op.recurrenceId,
+      recurrence_date: op.recurrenceDate,
+    })
+    check(error)
+    return
+  }
+  const { error } = await supabase
+    .from('cfo_operations')
+    .update({ status: 'actual', paid_on: today, updated_at: new Date().toISOString() })
+    .eq('id', op.id)
+  check(error)
+}
+
+export async function saveRecurrence(ws: Workspace, r: RecurrenceDraft & { counterparty: string | null; comment: string | null }): Promise<void> {
+  const { error } = await supabase.from('cfo_recurrences').insert({
+    ...owned(ws),
+    direction: r.direction,
+    amount: toDbAmount(r.amount),
+    account_id: r.accountId,
+    to_account_id: r.direction === 'transfer' ? r.toAccountId : null,
+    article_id: r.direction === 'transfer' ? null : r.articleId,
+    counterparty: r.counterparty,
+    comment: r.comment,
+    day_of_month: r.dayOfMonth,
+    starts_on: r.startsOn,
+    ends_on: r.endsOn,
+  })
+  check(error)
+}
+
+export async function deleteRecurrence(id: string): Promise<void> {
+  const { error } = await supabase.from('cfo_recurrences').delete().eq('id', id)
+  check(error)
+}
+
+// Ячейка с нулём удаляется, остальные — upsert по (company_id, article_id, month).
+export async function setPlanCells(ws: Workspace, cells: { articleId: string; month: string; amount: number }[]): Promise<void> {
+  const upserts = cells
+    .filter((c) => c.amount > 0)
+    .map((c) => ({ ...owned(ws), article_id: c.articleId, month: `${c.month}-01`, amount: toDbAmount(c.amount) }))
+  if (upserts.length > 0) {
+    const { error } = await supabase.from('cfo_plan_items').upsert(upserts, { onConflict: 'company_id,article_id,month' })
+    check(error)
+  }
+  for (const c of cells.filter((x) => x.amount <= 0)) {
+    const { error } = await supabase
+      .from('cfo_plan_items')
+      .delete()
+      .eq('company_id', ws.companyId)
+      .eq('article_id', c.articleId)
+      .eq('month', `${c.month}-01`)
+    check(error)
+  }
+}
