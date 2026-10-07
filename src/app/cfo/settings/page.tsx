@@ -8,6 +8,7 @@ import { validateArticle } from '@/lib/cfo/validate'
 import type { Activity, ArticleKind, CfoAccount, CfoArticle, PnlGroup } from '@/lib/cfo/types'
 import { useCfo } from '../CfoWorkspace'
 import AccountForm from '../AccountForm'
+import DigestSettings from '../DigestSettings'
 import { Card, CfoPage, ErrorText, Field, GhostButton, PrimaryButton, SectionTitle, inputClass, inputStyle } from '../ui'
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e))
@@ -228,6 +229,8 @@ export default function CfoSettings() {
         </form>
         <ErrorText>{nameError}</ErrorText>
       </Card>
+
+      <DigestSettings />
 
       <Card>
         <div className="flex items-center justify-between gap-2 mb-1">

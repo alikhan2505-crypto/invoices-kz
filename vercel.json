@@ -17,6 +17,10 @@
       "schedule": "0 4 * * *"
     },
     {
+      "path": "/api/cron/cfo-digest",
+      "schedule": "0 3 * * *"
+    },
+    {
       "path": "/api/cron/instagram-token",
       "schedule": "0 3 * * *"
     }

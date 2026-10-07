@@ -1,5 +1,6 @@
 // Чтение и запись CFO-кабинета из браузера. Доступ ограничен RLS «только свои
 // строки»; суммы в БД — numeric(14,2) в тенге, здесь переводятся в тиыны.
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { toDbAmount, toTiyn } from './money'
 import type { AccountKind, Activity, ArticleKind, CfoAccount, CfoArticle, CfoOperation, CfoPlanItem, CfoRecurrence, Direction, OpStatus, PnlGroup } from './types'
@@ -10,6 +11,7 @@ export type Workspace = {
   userId: string
   companyId: string
   companyName: string
+  telegramDigest: boolean
   accounts: CfoAccount[]
   articles: CfoArticle[]
   operations: CfoOperation[]
@@ -27,10 +29,10 @@ function check(error: { message: string } | null) {
 }
 
 // PostgREST отдаёт не больше 1000 строк за раз — длинный журнал читаем страницами.
-async function selectAll(table: string, columns: string, companyId: string): Promise<Row[]> {
+async function selectAll(db: SupabaseClient, table: string, columns: string, companyId: string): Promise<Row[]> {
   const rows: Row[] = []
   for (let from = 0; ; from += PAGE_SIZE) {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from(table)
       .select(columns)
       .eq('company_id', companyId)
@@ -72,20 +74,22 @@ export async function bootstrapWorkspace(): Promise<string> {
   return data as string
 }
 
-export async function loadWorkspace(companyId: string, userId: string): Promise<Workspace> {
+// db — клиент браузера (RLS) по умолчанию; серверная рассылка передаёт service-role клиент.
+export async function loadWorkspace(companyId: string, userId: string, db: SupabaseClient = supabase): Promise<Workspace> {
   const [company, accounts, articles, operations, recurrences, plan] = await Promise.all([
-    supabase.from('cfo_companies').select('name').eq('id', companyId).single(),
-    selectAll('cfo_accounts', 'id, name, kind, opening_balance, opening_date, archived, sort', companyId),
-    selectAll('cfo_articles', 'id, name, kind, activity, pnl_group, archived, sort', companyId),
-    selectAll('cfo_operations', 'id, direction, amount, account_id, to_account_id, article_id, counterparty, comment, paid_on, accrued_on, status, recurrence_id, recurrence_date', companyId),
-    selectAll('cfo_recurrences', 'id, direction, amount, account_id, to_account_id, article_id, counterparty, comment, day_of_month, starts_on, ends_on', companyId),
-    selectAll('cfo_plan_items', 'id, article_id, month, amount', companyId),
+    db.from('cfo_companies').select('name, telegram_digest').eq('id', companyId).single(),
+    selectAll(db, 'cfo_accounts', 'id, name, kind, opening_balance, opening_date, archived, sort', companyId),
+    selectAll(db, 'cfo_articles', 'id, name, kind, activity, pnl_group, archived, sort', companyId),
+    selectAll(db, 'cfo_operations', 'id, direction, amount, account_id, to_account_id, article_id, counterparty, comment, paid_on, accrued_on, status, recurrence_id, recurrence_date', companyId),
+    selectAll(db, 'cfo_recurrences', 'id, direction, amount, account_id, to_account_id, article_id, counterparty, comment, day_of_month, starts_on, ends_on', companyId),
+    selectAll(db, 'cfo_plan_items', 'id, article_id, month, amount', companyId),
   ])
   check(company.error)
   return {
     userId,
     companyId,
     companyName: (company.data as Row).name,
+    telegramDigest: (company.data as Row).telegram_digest === true,
     accounts: accounts.map(mapAccount).sort(bySort),
     articles: articles.map(mapArticle).sort(bySort),
     operations: operations.map(mapOperation).sort((a, b) => b.paidOn.localeCompare(a.paidOn)),
@@ -95,6 +99,11 @@ export async function loadWorkspace(companyId: string, userId: string): Promise<
 }
 
 const owned = (ws: Workspace) => ({ user_id: ws.userId, company_id: ws.companyId })
+
+export async function setTelegramDigest(ws: Workspace, on: boolean): Promise<void> {
+  const { error } = await supabase.from('cfo_companies').update({ telegram_digest: on }).eq('id', ws.companyId)
+  check(error)
+}
 
 export async function saveCompanyName(ws: Workspace, name: string): Promise<void> {
   const { error } = await supabase.from('cfo_companies').update({ name }).eq('id', ws.companyId)
