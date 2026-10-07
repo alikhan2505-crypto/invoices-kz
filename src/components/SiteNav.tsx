@@ -12,10 +12,10 @@ import { connectProduct, useMyProducts } from '@/lib/useMyProducts'
 import { ShellContext } from './shellContext'
 import { isSectionVisible } from '@/lib/products'
 
-const labels: Record<Lang, { home: string; invoices: string; kaspiShop: string; aiAgent: string; kaspiApi: string; wildberries: string; products: string; profile: string; menu: string; close: string }> = {
-  ru: { home: 'Дашборд', invoices: 'Счета', kaspiShop: 'Kaspi Bot', aiAgent: 'AI-агент', kaspiApi: 'Kaspi Cashier API', wildberries: 'WB Bot', products: 'Все продукты', profile: 'Профиль', menu: 'Меню', close: 'Закрыть' },
-  kk: { home: 'Дашборд', invoices: 'Шоттар', kaspiShop: 'Kaspi Bot', aiAgent: 'AI-агент', kaspiApi: 'Kaspi Cashier API', wildberries: 'WB Bot', products: 'Барлық өнімдер', profile: 'Профиль', menu: 'Мәзір', close: 'Жабу' },
-  en: { home: 'Dashboard', invoices: 'Invoices', kaspiShop: 'Kaspi Bot', aiAgent: 'AI Agent', kaspiApi: 'Kaspi Cashier API', wildberries: 'WB Bot', products: 'All products', profile: 'Profile', menu: 'Menu', close: 'Close' },
+const labels: Record<Lang, { home: string; invoices: string; kaspiShop: string; aiAgent: string; kaspiApi: string; wildberries: string; cfo: string; products: string; profile: string; menu: string; close: string }> = {
+  ru: { home: 'Дашборд', invoices: 'Счета', kaspiShop: 'Kaspi Bot', aiAgent: 'AI-агент', kaspiApi: 'Kaspi Cashier API', wildberries: 'WB Bot', cfo: 'CFO', products: 'Все продукты', profile: 'Профиль', menu: 'Меню', close: 'Закрыть' },
+  kk: { home: 'Дашборд', invoices: 'Шоттар', kaspiShop: 'Kaspi Bot', aiAgent: 'AI-агент', kaspiApi: 'Kaspi Cashier API', wildberries: 'WB Bot', cfo: 'CFO', products: 'Барлық өнімдер', profile: 'Профиль', menu: 'Мәзір', close: 'Жабу' },
+  en: { home: 'Dashboard', invoices: 'Invoices', kaspiShop: 'Kaspi Bot', aiAgent: 'AI Agent', kaspiApi: 'Kaspi Cashier API', wildberries: 'WB Bot', cfo: 'CFO', products: 'All products', profile: 'Profile', menu: 'Menu', close: 'Close' },
 }
 
 // Copy shown to non-admins when they interact with an admin-gated section
@@ -94,6 +94,16 @@ const wbLinks: { href: string; label: LocalizedLabel }[] = [
   { href: '/wildberries/orders', label: { ru: 'Заказы', kk: 'Тапсырыстар', en: 'Orders' } },
 ]
 
+const cfoLinks: { href: string; label: LocalizedLabel }[] = [
+  { href: '/cfo/overview', label: { ru: 'Обзор', kk: 'Шолу', en: 'Overview' } },
+  { href: '/cfo/operations', label: { ru: 'Операции', kk: 'Операциялар', en: 'Transactions' } },
+  { href: '/cfo/calendar', label: { ru: 'Календарь', kk: 'Күнтізбе', en: 'Calendar' } },
+  { href: '/cfo/pnl', label: { ru: 'БДР', kk: 'КШБ', en: 'P&L' } },
+  { href: '/cfo/cashflow', label: { ru: 'БДДС', kk: 'АҚБ', en: 'Cash flow' } },
+  { href: '/cfo/plan', label: { ru: 'План', kk: 'Жоспар', en: 'Plan' } },
+  { href: '/cfo/settings', label: { ru: 'Настройки', kk: 'Баптаулар', en: 'Settings' } },
+]
+
 // Second-row sub-navigation (2026-08-20, founder: dropdowns were "тяжело
 // выбирать" -- replaced with a persistent second tab row that stays open on
 // every page of the active section, MoonAI/NestedTabs-style). Each section:
@@ -101,7 +111,7 @@ const wbLinks: { href: string; label: LocalizedLabel }[] = [
 // rendered as pill tabs in a second bar whenever the current path belongs
 // to the section.
 export type Section = {
-  key: 'invoices' | 'kaspiApi' | 'kaspiShop' | 'aiAgent' | 'wildberries'
+  key: 'invoices' | 'kaspiApi' | 'kaspiShop' | 'aiAgent' | 'wildberries' | 'cfo'
   links: { href: string; label: LocalizedLabel }[]
   adminOnly: boolean
   // Unlocked for an active Pro plan too, not just admins (2026-09-02
@@ -122,6 +132,7 @@ export const SECTIONS: Section[] = [
   { key: 'aiAgent', links: aiAgentLinks, adminOnly: false, proOnly: true },
   { key: 'kaspiShop', links: kaspiShopLinks, adminOnly: false, proOnly: true },
   { key: 'wildberries', links: wbLinks, adminOnly: false, soon: true },
+  { key: 'cfo', links: cfoLinks, adminOnly: true },
 ]
 
 // null means "we haven't loaded the profile yet", which is a real third state
@@ -288,7 +299,12 @@ function SiteNavBar({ desktopOnly = false }: { desktopOnly?: boolean }) {
   // On a product subdomain the menu is that product only ("you went where you
   // clicked, nothing else is offered"); the way to other products is «Все продукты».
   const onProductHost = useProductHost()
-  const visibleSections = SECTIONS.filter(s => onProductHost ? s.key === activeSection?.key : isSectionVisible(mine, s.key, activeSection?.key ?? null))
+  // A section still under the founder's review (adminOnly) is hidden, not shown
+  // with a lock -- until the profile is known nobody sees it, so it can't flash
+  // in front of a non-admin; an admin sees it appear a moment later.
+  const visibleSections = SECTIONS
+    .filter(s => !s.adminOnly || perms?.isAdmin === true)
+    .filter(s => onProductHost ? s.key === activeSection?.key : isSectionVisible(mine, s.key, activeSection?.key ?? null))
 
   // Opening a product section connects it to the account.
   const activeKey = activeSection?.key

@@ -7,7 +7,7 @@
 // and safe to import from server code; the browser side lives in
 // useMyProducts.ts.
 
-export type ProductKey = 'invoices' | 'kaspiApi' | 'kaspiShop' | 'aiAgent' | 'wildberries' | 'salon'
+export type ProductKey = 'invoices' | 'kaspiApi' | 'kaspiShop' | 'aiAgent' | 'wildberries' | 'salon' | 'cfo'
 
 export type ProductDef = {
   key: ProductKey
@@ -40,6 +40,7 @@ export const PRODUCTS: ProductDef[] = [
   { key: 'kaspiApi', name: 'Kaspi Cashier API', blurb: 'Приём Kaspi Pay в ваш код', audience: 'Разработчики и интеграторы', href: '/kaspi-api', landing: 'https://api.invoices.kz', bg: '#F5E663', ink: '#14130A', inNav: true },
   { key: 'aiAgent', name: 'AI-агент', blurb: 'Отвечает клиентам в мессенджерах', audience: 'Бизнес, который живёт в переписке', href: '/ai-agent/overview', landing: 'https://agent.invoices.kz', bg: '#B7A6FF', ink: '#1D1140', proOnly: true, inNav: true },
   { key: 'salon', name: 'Салон', blurb: 'Записи, мастера, сайт салона', audience: 'Салоны красоты и барбершопы', href: '/admin/site-generator', landing: 'https://salon.invoices.kz', bg: '#F7C6D4', ink: '#3B1030', inNav: false },
+  { key: 'cfo', name: 'CFO', blurb: 'БДР, БДДС и платёжный календарь', audience: 'Финдиректора и собственники бизнеса', href: '/cfo/overview', landing: 'https://cfo.invoices.kz', bg: '#0E4D45', ink: '#DFFAF1', adminOnly: true, inNav: true },
   { key: 'wildberries', name: 'WB Bot', blurb: 'Товары и заказы Wildberries', audience: 'Продавцы Wildberries', href: '/wildberries', bg: '#7A2E8E', ink: '#FBEAFB', locked: true, inNav: true },
 ]
 

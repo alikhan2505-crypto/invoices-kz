@@ -37,6 +37,7 @@ describe('toggleProduct', () => {
 describe('locked products are never selectable by default', () => {
   it('excludes wildberries (locked); salon is public by application since 21.09', () => {
     expect(SELECTABLE_KEYS).not.toContain('wildberries')
+    expect(SELECTABLE_KEYS).not.toContain('cfo')
     expect(SELECTABLE_KEYS).toContain('salon')
   })
   it('isInMyProducts with no choice reflects the same set', () => {
@@ -64,6 +65,7 @@ describe('homeFor', () => {
     expect(homeFor(['invoices'])).toBe('/dashboard')
     expect(homeFor(['kaspiShop'])).toBe('/kaspi-shop/overview')
     expect(homeFor(['aiAgent'])).toBe('/ai-agent/overview')
+    expect(homeFor(['cfo'])).toBe('/cfo/overview')
     expect(homeFor(['invoices', 'kaspiShop'])).toBe('/products')
     expect(homeFor(['wildberries'])).toBe('/dashboard')
     expect(homeFor(['nonsense'])).toBe('/dashboard')

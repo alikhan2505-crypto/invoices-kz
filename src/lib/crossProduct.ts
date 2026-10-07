@@ -11,6 +11,7 @@ const ORIGINS: Partial<Record<ProductKey, string>> = {
   kaspiShop: 'https://kaspi.invoices.kz',
   kaspiApi: 'https://api.invoices.kz',
   aiAgent: 'https://agent.invoices.kz',
+  cfo: 'https://cfo.invoices.kz',
 }
 
 // Only paths of the product cabinets can be a way back -- never an arbitrary URL.

@@ -4,7 +4,7 @@ import type { ProductKey } from './products'
 // Content of the public product landings (stage 4 of the product split).
 // Colours come from the PRODUCTS registry; only the softer sticker tint lives
 // here. Copy follows the founder-approved mock of 21.09.2026.
-export type LandingKey = 'kaspi' | 'agent' | 'salon'
+export type LandingKey = 'kaspi' | 'agent' | 'salon' | 'cfo'
 
 type L10n = Record<Lang, string>
 
@@ -12,10 +12,12 @@ export type LandingDef = {
   key: LandingKey
   product: ProductKey
   origin: string // canonical public address
-  cabinet: '/kaspi-shop/overview' | '/ai-agent/overview' | '/admin/site-generator' // where a signed-in person goes
+  cabinet: '/kaspi-shop/overview' | '/ai-agent/overview' | '/admin/site-generator' | '/cfo/overview' // where a signed-in person goes
   // 'invite': the product is not open to everyone yet -- the call to action is
   // an application by e-mail, and only admins are sent to the cabinet.
   access: 'open' | 'invite'
+  // Note under the call to action for 'invite' landings; falls back to LANDING_UI.inviteNote.
+  inviteNote?: L10n
   soft: string
   audience: L10n
   tagline: L10n
@@ -103,6 +105,37 @@ export const LANDINGS: Record<LandingKey, LandingDef> = {
     },
     metaTitle: 'Салон — записи клиентов, мастера и сайт салона | invoices.kz',
     metaDescription: 'Календарь по мастерам, записи из переписки на подтверждение владельцу, история клиентов и сайт салона. Подключаем салоны по заявке.',
+  },
+  cfo: {
+    key: 'cfo',
+    product: 'cfo',
+    origin: 'https://cfo.invoices.kz',
+    cabinet: '/cfo/overview',
+    access: 'invite',
+    soft: '#9BE3CF',
+    audience: { ru: 'Финдиректора и собственники бизнеса', kk: 'Қаржы директорлары мен бизнес иелері', en: 'CFOs and business owners' },
+    tagline: {
+      ru: 'БДР, БДДС и платёжный календарь в одном кабинете',
+      kk: 'Кірістер мен шығыстар бюджеті, ақша ағыны және төлем күнтізбесі бір кабинетте',
+      en: 'P&L budget, cash flow and a payment calendar in one place',
+    },
+    lead: {
+      ru: 'Заносите операции один раз — отчёт о прибылях, движение денег и прогноз остатка по дням строятся сами. Кассовый разрыв видно заранее.',
+      kk: 'Операцияларды бір рет енгізіңіз — пайда туралы есеп, ақша қозғалысы және күн сайынғы қалдық болжамы өздігінен құрылады. Кассалық үзіліс алдын ала көрінеді.',
+      en: 'Enter each transaction once — the P&L, cash flow and a day-by-day balance forecast build themselves. Cash gaps show up in advance.',
+    },
+    points: {
+      ru: ['План и факт по статьям за каждый месяц', 'Платёжный календарь с прогнозом остатка', 'Выручка, маржа, точка безубыточности, запас денег'],
+      kk: ['Әр ай бойынша баптар бойынша жоспар мен факт', 'Қалдық болжамы бар төлем күнтізбесі', 'Түсім, маржа, залалсыздық нүктесі, ақша қоры'],
+      en: ['Plan vs actual by line item, every month', 'Payment calendar with a balance forecast', 'Revenue, margin, break-even and cash runway'],
+    },
+    inviteNote: {
+      ru: 'Сейчас в закрытом тесте — открываем по заявке',
+      kk: 'Қазір жабық сынақта — өтінім бойынша ашамыз',
+      en: 'In closed beta — access by request',
+    },
+    metaTitle: 'CFO — БДР, БДДС и платёжный календарь | invoices.kz',
+    metaDescription: 'Кабинет финансового директора: бюджет доходов и расходов, движение денежных средств, платёжный календарь с прогнозом кассовых разрывов и ключевые показатели.',
   },
 }
 

@@ -3,7 +3,7 @@ import type { ProductKey } from '@/lib/products'
 // Flat CSS/SVG "illustrations", one per product and drawn from its subject
 // (DESIGN.md §7): sheets and a payment stamp for invoices, a parcel and a
 // price tag for Kaspi, braces for the API, two dialogues for the agent, a
-// calendar for the salon, berries for Wildberries. Decorative only.
+// calendar for the salon, berries for Wildberries, bars and a trend for CFO. Decorative only.
 const DISPLAY = { fontFamily: 'var(--font-unbounded), Arial, sans-serif', fontWeight: 700 } as const
 const MONO = { fontFamily: 'var(--font-geist-mono), monospace', fontWeight: 500 } as const
 
@@ -78,6 +78,23 @@ export default function ProductArt({ product }: { product: ProductKey }) {
           <g transform="rotate(-8 190 176)">
             <rect x="140" y="152" width="82" height="38" rx="19" fill="#FFFFFF" />
             <text x="181" y="178" textAnchor="middle" fontSize="16" fill="#3B1030" style={DISPLAY}>15:00</text>
+          </g>
+        </svg>
+      )
+    case 'cfo':
+      return (
+        <svg {...common}>
+          <rect x="34" y="40" width="172" height="136" rx="20" fill="#DFFAF1" />
+          <g fill="#0E4D45">
+            <rect x="58" y="120" width="22" height="34" rx="5" />
+            <rect x="90" y="96" width="22" height="58" rx="5" />
+            <rect x="122" y="108" width="22" height="46" rx="5" />
+            <rect x="154" y="72" width="22" height="82" rx="5" />
+          </g>
+          <path d="M58 92 98 70l32 14 46-34" fill="none" stroke="#2DC48D" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" />
+          <g transform="rotate(-7 190 178)">
+            <rect x="150" y="160" width="76" height="38" rx="19" fill="#0E4D45" />
+            <text x="188" y="185" textAnchor="middle" fontSize="16" fill="#DFFAF1" style={DISPLAY}>+12 %</text>
           </g>
         </svg>
       )

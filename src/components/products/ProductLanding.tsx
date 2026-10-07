@@ -62,7 +62,7 @@ export default function ProductLanding({ landing, fontClass }: { landing: Landin
         <p className="lp-eyebrow">{l.audience[lang]}</p>
         <h1 className="lp-h1">{l.tagline[lang]}</h1>
         <p className="lp-lead">{l.lead[lang]}</p>
-        {l.access === 'invite' && <p className="lp-note"><span>{ui.inviteNote}</span></p>}
+        {l.access === 'invite' && <p className="lp-note"><span>{l.inviteNote?.[lang] ?? ui.inviteNote}</span></p>}
         {canOpen ? (
           <a className="lp-cta" href={l.cabinet}><span>{ui.open}</span></a>
         ) : l.access === 'invite' ? (

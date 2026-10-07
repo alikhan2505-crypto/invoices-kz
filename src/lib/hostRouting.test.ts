@@ -74,3 +74,11 @@ describe('isProductHost', () => {
     expect(isProductHost('localhost', 'invoices.kz')).toBe(false)
   })
 })
+
+describe('cfo host', () => {
+  it('root opens the CFO landing, cabinet paths pass through', () => {
+    expect(productHostRewrite('cfo.invoices.kz', '/', 'invoices.kz')).toBe('/lp/cfo')
+    expect(productHostRewrite('cfo.invoices.kz', '/cfo/overview', 'invoices.kz')).toBeNull()
+    expect(isProductHost('cfo.invoices.kz', 'invoices.kz')).toBe(true)
+  })
+})
