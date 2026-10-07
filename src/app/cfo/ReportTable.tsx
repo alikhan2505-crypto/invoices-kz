@@ -49,6 +49,16 @@ export default function ReportTable({ months, rows, measure, collapsed, onToggle
   currentMonth: string
 }) {
   const visible = rows.filter((r) => !r.parentKey || !collapsed.has(r.parentKey))
+  const elapsed = months.filter((m) => m <= currentMonth)
+  // Deviation in «Итого» compares like with like: only months that have already started,
+  // otherwise mid-year the year-to-date fact is set against the full-year plan.
+  const totalCell = (r: ReportRow): ReportRow['total'] => {
+    if (measure !== 'diff' || r.total.plan === null) return r.total
+    return elapsed.reduce(
+      (acc, m) => ({ plan: (acc.plan ?? 0) + (r.cells[m]?.plan ?? 0), fact: acc.fact + (r.cells[m]?.fact ?? 0) }),
+      { plan: 0 as number | null, fact: 0 },
+    )
+  }
   return (
     <div className="nav-glass rounded-2xl overflow-x-auto">
       <table className="text-sm border-collapse min-w-full">
@@ -56,7 +66,7 @@ export default function ReportTable({ months, rows, measure, collapsed, onToggle
           <tr style={{ borderBottom: '1px solid var(--nav-border)' }}>
             <th className="sticky left-0 z-10 text-left font-semibold px-3 py-2 min-w-[240px]" style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-secondary)' }}>Статья</th>
             {months.map((m) => <th key={m} className="px-3 py-2 font-semibold text-right whitespace-nowrap" style={{ color: 'var(--nav-text-secondary)' }}>{shortMonth(m)}</th>)}
-            <th className="px-3 py-2 font-semibold text-right" style={{ color: 'var(--nav-text-secondary)' }}>Итого</th>
+            <th className="px-3 py-2 font-semibold text-right whitespace-nowrap" style={{ color: 'var(--nav-text-secondary)' }}>{measure === 'diff' && elapsed.length > 0 && elapsed.length < months.length ? 'Итого с начала года' : 'Итого'}</th>
           </tr>
         </thead>
         <tbody>
@@ -64,7 +74,7 @@ export default function ReportTable({ months, rows, measure, collapsed, onToggle
             <tr key={r.key} style={{ borderBottom: '1px solid var(--nav-border-soft)', background: r.strong && r.level === 0 ? 'var(--nav-surface-glass)' : undefined }}>
               <td className="sticky left-0 z-10 px-3 py-2" style={{ background: 'var(--nav-bg)', paddingLeft: `${12 + r.level * 16}px` }}>
                 {r.toggleKey ? (
-                  <button type="button" onClick={() => onToggle(r.toggleKey!)} aria-expanded={!collapsed.has(r.toggleKey)} className="min-h-[36px] text-left" style={{ color: 'var(--nav-text-primary)', fontWeight: r.strong ? 600 : 400 }}>
+                  <button type="button" onClick={() => onToggle(r.toggleKey!)} aria-expanded={!collapsed.has(r.toggleKey)} className="min-h-[44px] text-left" style={{ color: 'var(--nav-text-primary)', fontWeight: r.strong ? 600 : 400 }}>
                     <span aria-hidden="true" className="inline-block w-4">{collapsed.has(r.toggleKey) ? '▸' : '▾'}</span>{r.label}
                   </button>
                 ) : (
@@ -77,7 +87,7 @@ export default function ReportTable({ months, rows, measure, collapsed, onToggle
                 </td>
               ))}
               <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap font-semibold">
-                <Value cell={r.total} measure={measure} higherIsBetter={r.higherIsBetter} future={false} />
+                <Value cell={totalCell(r)} measure={measure} higherIsBetter={r.higherIsBetter} future={elapsed.length === 0} />
               </td>
             </tr>
           ))}
