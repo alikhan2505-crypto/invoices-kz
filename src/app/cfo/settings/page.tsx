@@ -1,0 +1,234 @@
+'use client'
+import { useState } from 'react'
+import { useAppDialog } from '@/components/AppDialog'
+import { reorder, saveAccount, saveArticle, saveCompanyName, setArchived } from '@/lib/cfo/data'
+import { ACCOUNT_KIND_LABEL, ACTIVITY_LABEL, ARTICLE_KIND_LABEL, PNL_GROUP_LABEL } from '@/lib/cfo/labels'
+import { formatTenge } from '@/lib/cfo/money'
+import { validateArticle } from '@/lib/cfo/validate'
+import type { Activity, ArticleKind, CfoAccount, CfoArticle, PnlGroup } from '@/lib/cfo/types'
+import { useCfo } from '../CfoWorkspace'
+import AccountForm from '../AccountForm'
+import { Card, CfoPage, ErrorText, Field, GhostButton, PrimaryButton, SectionTitle, inputClass, inputStyle } from '../ui'
+
+const errText = (e: unknown) => (e instanceof Error ? e.message : String(e))
+
+function ArticleForm({ initial, onSave, onCancel }: {
+  initial?: CfoArticle
+  onSave: (a: { name: string; kind: ArticleKind; activity: Activity; pnlGroup: PnlGroup | null }) => Promise<string | null>
+  onCancel: () => void
+}) {
+  const [name, setName] = useState(initial?.name ?? '')
+  const [kind, setKind] = useState<ArticleKind>(initial?.kind ?? 'expense')
+  const [activity, setActivity] = useState<Activity>(initial?.activity ?? 'operating')
+  const [pnl, setPnl] = useState<PnlGroup | 'none'>(initial ? initial.pnlGroup ?? 'none' : 'opex')
+  const [error, setError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    const draft = { name: name.trim(), kind, activity, pnlGroup: pnl === 'none' ? null : pnl }
+    const v = validateArticle(draft)
+    if (v) { setError(v); return }
+    setSaving(true)
+    setError(null)
+    const err = await onSave(draft)
+    setSaving(false)
+    if (err) setError(err)
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-3 rounded-xl p-3" style={{ border: '1px solid var(--nav-border)' }}>
+      <Field label="Название статьи">
+        <input className={inputClass} style={inputStyle} value={name} onChange={(e) => setName(e.target.value)} />
+      </Field>
+      <div className="grid sm:grid-cols-3 gap-3">
+        <Field label="Тип">
+          <select className={inputClass} style={inputStyle} value={kind} onChange={(e) => setKind(e.target.value as ArticleKind)}>
+            <option value="income">{ARTICLE_KIND_LABEL.income}</option>
+            <option value="expense">{ARTICLE_KIND_LABEL.expense}</option>
+          </select>
+        </Field>
+        <Field label="Вид деятельности (БДДС)">
+          <select className={inputClass} style={inputStyle} value={activity} onChange={(e) => setActivity(e.target.value as Activity)}>
+            {(Object.keys(ACTIVITY_LABEL) as Activity[]).map((a) => <option key={a} value={a}>{ACTIVITY_LABEL[a]}</option>)}
+          </select>
+        </Field>
+        <Field label="Строка БДР">
+          <select className={inputClass} style={inputStyle} value={pnl} onChange={(e) => setPnl(e.target.value as PnlGroup | 'none')}>
+            {(Object.keys(PNL_GROUP_LABEL) as PnlGroup[]).map((g) => <option key={g} value={g}>{PNL_GROUP_LABEL[g]}</option>)}
+            <option value="none">Не идёт в БДР</option>
+          </select>
+        </Field>
+      </div>
+      <ErrorText>{error}</ErrorText>
+      <div className="flex gap-2">
+        <GhostButton type="button" onClick={onCancel}>Отмена</GhostButton>
+        <PrimaryButton type="submit" disabled={saving}>{saving ? 'Сохраняю…' : 'Сохранить'}</PrimaryButton>
+      </div>
+    </form>
+  )
+}
+
+export default function CfoSettings() {
+  const { ws, reload } = useCfo()
+  const { alert, dialogElement } = useAppDialog()
+  const [companyName, setCompanyName] = useState(ws.companyName)
+  const [editingAccount, setEditingAccount] = useState<string | 'new' | null>(null)
+  const [editingArticle, setEditingArticle] = useState<string | 'new' | null>(null)
+  const [showArchived, setShowArchived] = useState(false)
+
+  async function run(action: () => Promise<void>) {
+    try {
+      await action()
+      await reload()
+    } catch (e) {
+      await alert(errText(e))
+    }
+  }
+
+  async function move<T extends { id: string; sort: number }>(table: 'cfo_accounts' | 'cfo_articles', list: T[], index: number, dir: -1 | 1) {
+    const target = index + dir
+    if (target < 0 || target >= list.length) return
+    const ids = list.map((x) => x.id)
+    ;[ids[index], ids[target]] = [ids[target], ids[index]]
+    await run(() => reorder(table, ids, list))
+  }
+
+  const accounts = ws.accounts.filter((a) => showArchived || !a.archived)
+  const articleList = (kind: ArticleKind) => ws.articles.filter((a) => a.kind === kind && (showArchived || !a.archived))
+
+  const accountRow = (a: CfoAccount, i: number, list: CfoAccount[]) => (
+    <div key={a.id} className="py-3 flex items-start gap-2 flex-wrap" style={{ borderBottom: '1px solid var(--nav-border-soft)' }}>
+      <div className="flex-1 min-w-[180px]">
+        <div className="text-sm font-medium" style={{ color: a.archived ? 'var(--nav-text-muted)' : 'var(--nav-text-primary)' }}>
+          {a.name}{a.archived && ' · в архиве'}
+        </div>
+        <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>
+          {ACCOUNT_KIND_LABEL[a.kind]} · остаток {formatTenge(a.openingBalance)} на {a.openingDate}
+        </div>
+      </div>
+      <div className="flex gap-1 flex-wrap">
+        <GhostButton type="button" aria-label="Выше" onClick={() => void move('cfo_accounts', list, i, -1)}>↑</GhostButton>
+        <GhostButton type="button" aria-label="Ниже" onClick={() => void move('cfo_accounts', list, i, 1)}>↓</GhostButton>
+        <GhostButton type="button" onClick={() => setEditingAccount(a.id)}>Изменить</GhostButton>
+        <GhostButton type="button" onClick={() => void run(() => setArchived('cfo_accounts', a.id, !a.archived))}>
+          {a.archived ? 'Вернуть' : 'В архив'}
+        </GhostButton>
+      </div>
+      {editingAccount === a.id && (
+        <div className="w-full pt-2">
+          <AccountForm
+            initial={a}
+            operations={ws.operations}
+            submitLabel="Сохранить"
+            onCancel={() => setEditingAccount(null)}
+            onSave={async (input) => {
+              try { await saveAccount(ws, input); setEditingAccount(null); await reload(); return null } catch (e) { return errText(e) }
+            }}
+          />
+        </div>
+      )}
+    </div>
+  )
+
+  const articleRow = (a: CfoArticle, i: number, list: CfoArticle[]) => (
+    <div key={a.id} className="py-3 flex items-start gap-2 flex-wrap" style={{ borderBottom: '1px solid var(--nav-border-soft)' }}>
+      <div className="flex-1 min-w-[180px]">
+        <div className="text-sm font-medium" style={{ color: a.archived ? 'var(--nav-text-muted)' : 'var(--nav-text-primary)' }}>
+          {a.name}{a.archived && ' · в архиве'}
+        </div>
+        <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>
+          {ACTIVITY_LABEL[a.activity]} · {a.pnlGroup ? PNL_GROUP_LABEL[a.pnlGroup] : 'не идёт в БДР'}
+        </div>
+      </div>
+      <div className="flex gap-1 flex-wrap">
+        <GhostButton type="button" aria-label="Выше" onClick={() => void move('cfo_articles', list, i, -1)}>↑</GhostButton>
+        <GhostButton type="button" aria-label="Ниже" onClick={() => void move('cfo_articles', list, i, 1)}>↓</GhostButton>
+        <GhostButton type="button" onClick={() => setEditingArticle(a.id)}>Изменить</GhostButton>
+        <GhostButton type="button" onClick={() => void run(() => setArchived('cfo_articles', a.id, !a.archived))}>
+          {a.archived ? 'Вернуть' : 'В архив'}
+        </GhostButton>
+      </div>
+      {editingArticle === a.id && (
+        <div className="w-full pt-2">
+          <ArticleForm
+            initial={a}
+            onCancel={() => setEditingArticle(null)}
+            onSave={async (input) => {
+              try { await saveArticle(ws, { ...input, id: a.id }); setEditingArticle(null); await reload(); return null } catch (e) { return errText(e) }
+            }}
+          />
+        </div>
+      )}
+    </div>
+  )
+
+  return (
+    <CfoPage
+      title="Настройки"
+      actions={
+        <label className="flex items-center gap-2 text-sm min-h-[44px]" style={{ color: 'var(--nav-text-secondary)' }}>
+          <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
+          Показывать архив
+        </label>
+      }
+    >
+      <Card>
+        <SectionTitle>Компания</SectionTitle>
+        <form
+          className="flex gap-2 flex-wrap"
+          onSubmit={(e) => { e.preventDefault(); if (companyName.trim()) void run(() => saveCompanyName(ws, companyName.trim())) }}
+        >
+          <input className={`${inputClass} flex-1 min-w-[200px]`} style={inputStyle} value={companyName} onChange={(e) => setCompanyName(e.target.value)} aria-label="Название компании" />
+          <PrimaryButton type="submit">Сохранить</PrimaryButton>
+        </form>
+      </Card>
+
+      <Card>
+        <div className="flex items-center justify-between gap-2 mb-1">
+          <SectionTitle>Счета и кассы</SectionTitle>
+          {editingAccount !== 'new' && <PrimaryButton type="button" onClick={() => setEditingAccount('new')}>Добавить счёт</PrimaryButton>}
+        </div>
+        {editingAccount === 'new' && (
+          <div className="mb-3">
+            <AccountForm
+              operations={ws.operations}
+              submitLabel="Добавить"
+              onCancel={() => setEditingAccount(null)}
+              onSave={async (input) => {
+                try { await saveAccount(ws, input); setEditingAccount(null); await reload(); return null } catch (e) { return errText(e) }
+              }}
+            />
+          </div>
+        )}
+        {accounts.map((a, i, list) => accountRow(a, i, list))}
+      </Card>
+
+      <Card>
+        <div className="flex items-center justify-between gap-2 mb-1">
+          <SectionTitle>Статьи</SectionTitle>
+          {editingArticle !== 'new' && <PrimaryButton type="button" onClick={() => setEditingArticle('new')}>Добавить статью</PrimaryButton>}
+        </div>
+        {editingArticle === 'new' && (
+          <div className="mb-3">
+            <ArticleForm
+              onCancel={() => setEditingArticle(null)}
+              onSave={async (input) => {
+                try { await saveArticle(ws, input); setEditingArticle(null); await reload(); return null } catch (e) { return errText(e) }
+              }}
+            />
+          </div>
+        )}
+        {(['income', 'expense'] as ArticleKind[]).map((kind) => (
+          <div key={kind} className="mt-3">
+            <div className="text-xs font-semibold uppercase mb-1" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.08em' }}>
+              {kind === 'income' ? 'Доходы' : 'Расходы'}
+            </div>
+            {articleList(kind).map((a, i, list) => articleRow(a, i, list))}
+          </div>
+        ))}
+      </Card>
+      {dialogElement}
+    </CfoPage>
+  )
+}
