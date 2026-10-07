@@ -4,7 +4,7 @@ import SiteNav from '@/components/SiteNav'
 import { formatTenge } from '@/lib/cfo/money'
 
 export const inputClass = 'w-full min-h-[44px] rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]'
-export const inputStyle: React.CSSProperties = { background: 'var(--nav-surface-chrome)', color: 'var(--nav-text-primary)' }
+export const inputStyle: React.CSSProperties = { background: 'var(--nav-surface-chrome)', color: 'var(--nav-text-primary)', WebkitTextFillColor: 'var(--nav-text-primary)' }
 
 export function CfoPage({ title, actions, children }: { title: string; actions?: React.ReactNode; children: React.ReactNode }) {
   return (
