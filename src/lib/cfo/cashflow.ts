@@ -90,7 +90,11 @@ export function buildCashflow(input: {
 
   const rows: CashflowRow[] = [{
     key: 'b:opening', label: 'Остаток на начало', type: 'balance', activity: null, cells: opening,
-    total: { plan: null, fact: opening[months[0]].fact },
+    // За период: остаток на начало первого месяца плюс стартовые остатки счетов,
+    // открытых позже внутри периода, чтобы «Итого» тоже сходилось.
+    total: { plan: null, fact: opening[months[0]].fact + accounts
+      .filter((a) => a.openingDate > lastDay(months[0]) && a.openingDate <= lastDay(months[months.length - 1]))
+      .reduce((s, a) => s + a.openingBalance, 0) },
   }]
 
   const nets: Grid[] = []
