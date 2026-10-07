@@ -43,7 +43,12 @@ export default function CfoOperations() {
   }
 
   return (
-    <CfoPage title="Операции" actions={editing === null && <PrimaryButton type="button" onClick={() => setEditing('new')}>Добавить операцию</PrimaryButton>}>
+    <CfoPage title="Операции" actions={editing === null && (
+      <>
+        <a href="/cfo/import" className="inline-flex items-center min-h-[44px] rounded-xl px-4 text-sm font-medium transition-colors hover:bg-[var(--nav-surface-glass)]" style={{ border: '1px solid var(--nav-border)', color: 'var(--nav-text-secondary)' }}>Импорт выписки</a>
+        <PrimaryButton type="button" onClick={() => setEditing('new')}>Добавить операцию</PrimaryButton>
+      </>
+    )}>
       {editing !== null && (
         <Card>
           <SectionTitle>{editing === 'new' ? 'Новая операция' : 'Изменить операцию'}</SectionTitle>

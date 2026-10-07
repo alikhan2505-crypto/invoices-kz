@@ -11,6 +11,7 @@ export interface PlanInfo {
   canRecurring: boolean
   canEcp: boolean
   canAcquiring: boolean
+  canCfoPro: boolean
   canEsf: boolean
   canAiAgent: boolean
   canKaspiShop: boolean
@@ -39,7 +40,7 @@ function withAdminOverride(profile: any, result: PlanInfo): PlanInfo {
     isActive: true,
     invoiceLimit: null,
     canEmail: true, canSign: true, canKpAvrNakl: true, canTemplates: true,
-    canRecurring: true, canEcp: true, canAcquiring: true, canEsf: true,
+    canRecurring: true, canEcp: true, canAcquiring: true, canCfoPro: true, canEsf: true,
     canAiAgent: true, canKaspiShop: true,
   }
 }
@@ -54,7 +55,7 @@ function computeActivePlan(profile: any): PlanInfo {
     label: 'Бесплатный', isActive: false,
     invoiceLimit: 3,
     canEmail: false, canSign: false, canKpAvrNakl: false,
-    canTemplates: false, canRecurring: false, canEcp: false, canAcquiring: false, canEsf: false, canAiAgent: false, canKaspiShop: false,
+    canTemplates: false, canRecurring: false, canEcp: false, canAcquiring: false, canCfoPro: false, canEsf: false, canAiAgent: false, canKaspiShop: false,
   }
 
   const now = new Date()
@@ -71,7 +72,7 @@ function computeActivePlan(profile: any): PlanInfo {
         canTemplates: profile.plan === 'pro',
         canRecurring: profile.plan === 'pro',
         canEcp: profile.plan === 'pro',
-        canAcquiring: profile.plan === 'pro',
+        canAcquiring: profile.plan === 'pro', canCfoPro: profile.plan === 'pro',
         canEsf: profile.plan === 'pro',
         canAiAgent: profile.plan === 'pro',
         canKaspiShop: profile.plan === 'pro',
@@ -89,7 +90,7 @@ function computeActivePlan(profile: any): PlanInfo {
         canTemplates: profile.plan === 'pro',
         canRecurring: profile.plan === 'pro',
         canEcp: profile.plan === 'pro',
-        canAcquiring: profile.plan === 'pro',
+        canAcquiring: profile.plan === 'pro', canCfoPro: profile.plan === 'pro',
         canEsf: profile.plan === 'pro',
         canAiAgent: profile.plan === 'pro',
         canKaspiShop: profile.plan === 'pro',
@@ -107,7 +108,7 @@ function computeActivePlan(profile: any): PlanInfo {
         label: `Бонус (${daysLeft} дн.)`,
         invoiceLimit: 30,
         canEmail: true, canSign: true,
-        canKpAvrNakl: false, canTemplates: false, canRecurring: false, canEcp: false, canAcquiring: false, canEsf: false, canAiAgent: false, canKaspiShop: false,
+        canKpAvrNakl: false, canTemplates: false, canRecurring: false, canEcp: false, canAcquiring: false, canCfoPro: false, canEsf: false, canAiAgent: false, canKaspiShop: false,
       }
     }
   }
@@ -122,7 +123,7 @@ function computeActivePlan(profile: any): PlanInfo {
         label: `Пробный (${daysLeft} дн.)`,
         invoiceLimit: 10,
         canEmail: true, canSign: true,
-        canKpAvrNakl: false, canTemplates: false, canRecurring: false, canEcp: false, canAcquiring: false, canEsf: false, canAiAgent: false, canKaspiShop: false,
+        canKpAvrNakl: false, canTemplates: false, canRecurring: false, canEcp: false, canAcquiring: false, canCfoPro: false, canEsf: false, canAiAgent: false, canKaspiShop: false,
       }
     }
   }
@@ -132,6 +133,6 @@ function computeActivePlan(profile: any): PlanInfo {
     plan: 'free', isTrial: false, daysLeft: null, isActive: false,
     label: 'Бесплатный', invoiceLimit: 3,
     canEmail: false, canSign: false, canKpAvrNakl: false,
-    canTemplates: false, canRecurring: false, canEcp: false, canAcquiring: false, canEsf: false, canAiAgent: false, canKaspiShop: false,
+    canTemplates: false, canRecurring: false, canEcp: false, canAcquiring: false, canCfoPro: false, canEsf: false, canAiAgent: false, canKaspiShop: false,
   }
 }

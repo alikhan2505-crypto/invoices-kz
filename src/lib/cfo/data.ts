@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { toDbAmount, toTiyn } from './money'
 import type { AccountKind, Activity, ArticleKind, CfoAccount, CfoArticle, CfoOperation, CfoPlanItem, CfoRecurrence, Direction, OpStatus, PnlGroup } from './types'
 import type { OperationDraft, RecurrenceDraft } from './validate'
+import type { ImportDraft } from './statementImport'
 
 export type Workspace = {
   userId: string
@@ -182,6 +183,31 @@ export async function saveOperation(ws: Workspace, op: OperationDraft & { id?: s
   }
   const { error } = await supabase.from('cfo_operations').insert({ ...row, ...owned(ws) })
   check(error)
+}
+
+// Импорт выписки: пачками по 500 строк, каждая пачка — один insert (всё или ничего).
+// Возвращает, сколько строк успело записаться, чтобы при сбое сказать человеку правду.
+export async function importOperations(ws: Workspace, drafts: ImportDraft[]): Promise<number> {
+  let written = 0
+  for (let i = 0; i < drafts.length; i += 500) {
+    const rows = drafts.slice(i, i + 500).map((op) => ({
+      direction: op.direction,
+      amount: toDbAmount(op.amount),
+      account_id: op.accountId,
+      to_account_id: op.toAccountId,
+      article_id: op.articleId,
+      counterparty: op.counterparty,
+      comment: op.comment,
+      paid_on: op.paidOn,
+      accrued_on: op.accruedOn,
+      status: op.status,
+      ...owned(ws),
+    }))
+    const { error } = await supabase.from('cfo_operations').insert(rows)
+    if (error) throw new Error(`${written > 0 ? `Записано ${written} из ${drafts.length}, дальше ошибка: ` : ''}${error.message}`)
+    written += rows.length
+  }
+  return written
 }
 
 export async function deleteOperation(id: string): Promise<void> {

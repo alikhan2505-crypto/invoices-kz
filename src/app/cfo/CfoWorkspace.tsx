@@ -5,11 +5,13 @@ import { supabase } from '@/lib/supabase'
 import LoadingSpinner from '@/components/LoadingSpinner'
 import { setPostLoginRedirect } from '@/lib/postLoginRedirect'
 import { useEffectivePath } from '@/lib/useEffectivePath'
+import { getActivePlan } from '@/lib/plan'
 import { bootstrapWorkspace, loadWorkspace, type Workspace } from '@/lib/cfo/data'
 import FirstAccountWizard from './FirstAccountWizard'
 import { CfoPage, Card, PrimaryButton } from './ui'
 
-type Ctx = { ws: Workspace; reload: () => Promise<void> }
+// pro — функции этапа 2 (импорт выписки и др.); тот же набор возможностей, что у тарифа Про.
+type Ctx = { ws: Workspace; reload: () => Promise<void>; pro: boolean }
 const CfoContext = createContext<Ctx | null>(null)
 
 export function useCfo(): Ctx {
@@ -25,6 +27,7 @@ export default function CfoWorkspace({ children }: { children: React.ReactNode }
   const path = useEffectivePath()
   const [state, setState] = useState<State>({ status: 'loading' })
   const ids = useRef<{ companyId: string; userId: string } | null>(null)
+  const [pro, setPro] = useState(false)
 
   const init = useCallback(async () => {
     setState({ status: 'loading' })
@@ -38,12 +41,13 @@ export default function CfoWorkspace({ children }: { children: React.ReactNode }
       // Ворота на время ревью founder'а: продукт adminOnly. Открытие для всех —
       // убрать эту проверку (данные и так видны только владельцу через RLS).
       // Ошибка загрузки профиля — НЕ повод редиректить: падаем в error-состояние.
-      const { data: profile, error: profileError } = await supabase.from('profiles').select('is_admin').eq('id', user.id).single()
+      const { data: profile, error: profileError } = await supabase.from('profiles').select('is_admin, plan, plan_expires_at, trial_expires_at, bonus_expires_at').eq('id', user.id).single()
       if (profileError) throw new Error(profileError.message)
       if (profile?.is_admin !== true) {
         router.replace('/products')
         return
       }
+      setPro(getActivePlan(profile).canCfoPro)
       const companyId = await bootstrapWorkspace()
       ids.current = { companyId, userId: user.id }
       setState({ status: 'ready', ws: await loadWorkspace(companyId, user.id) })
@@ -74,7 +78,7 @@ export default function CfoWorkspace({ children }: { children: React.ReactNode }
 
   const needsAccount = state.ws.accounts.filter((a) => !a.archived).length === 0 && !path.startsWith('/cfo/settings')
   return (
-    <CfoContext.Provider value={{ ws: state.ws, reload }}>
+    <CfoContext.Provider value={{ ws: state.ws, reload, pro }}>
       {needsAccount ? <FirstAccountWizard /> : children}
     </CfoContext.Provider>
   )
