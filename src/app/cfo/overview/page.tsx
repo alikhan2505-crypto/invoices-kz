@@ -40,11 +40,14 @@ export default function CfoOverview() {
     return `план ${formatTenge(c.plan)} · ${pct > 0 ? '+' : ''}${pct}%`
   }
   const actual = ws.operations.filter((o) => o.status === 'actual')
-  const byAccount = ws.accounts
-    .filter((a) => !a.archived)
-    .map((a) => `${a.name} ${formatTenge(accountBalanceAt(a, actual, today))}`)
-    .join(' · ')
-  const breakeven = d.breakeven.kind === 'ok' ? formatTenge(d.breakeven.value) : d.breakeven.kind === 'unreachable' ? 'не достигается' : '—'
+  // The headline counts archived accounts too, so name their total — otherwise the parts don't add up.
+  const archivedTotal = ws.accounts.filter((a) => a.archived).reduce((s, a) => s + accountBalanceAt(a, actual, today), 0)
+  const byAccount = [
+    ...ws.accounts.filter((a) => !a.archived).map((a) => `${a.name} ${formatTenge(accountBalanceAt(a, actual, today))}`),
+    ...(archivedTotal !== 0 ? [`в архиве ${formatTenge(archivedTotal)}`] : []),
+  ].join(' · ')
+  // Break-even is an estimate — whole tenge, no kopecks.
+  const breakeven = d.breakeven.kind === 'ok' ? formatTenge(Math.round(d.breakeven.value / 100) * 100) : d.breakeven.kind === 'unreachable' ? 'не достигается' : '—'
   const breakevenSub = d.breakeven.kind === 'ok' ? 'выручка в месяц, при которой прибыль = 0' : d.breakeven.kind === 'unreachable' ? 'при текущей марже' : 'нет выручки за месяц'
   const maxExpense = d.expenseStructure[0]?.amount ?? 0
 

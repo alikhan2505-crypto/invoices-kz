@@ -71,19 +71,28 @@ export default function FirstAccountWizard() {
         <form onSubmit={submit} className="space-y-3">
           <div className="space-y-3">
             {rows.map((r) => (
-              <div key={r.key} className="grid grid-cols-2 sm:grid-cols-[160px_1fr_170px_auto] gap-2 items-end pb-3 sm:pb-0" style={{ borderBottom: '1px solid var(--nav-border-soft)' }}>
-                <Field label="Тип">
-                  <select className={inputClass} style={inputStyle} value={r.kind} onChange={(e) => patch(r.key, { kind: e.target.value as AccountKind })}>
-                    {(Object.keys(ACCOUNT_KIND_LABEL) as AccountKind[]).map((k) => <option key={k} value={k}>{ACCOUNT_KIND_LABEL[k]}</option>)}
-                  </select>
-                </Field>
-                <Field label="Название">
-                  <input className={inputClass} style={inputStyle} value={r.name} onChange={(e) => patch(r.key, { name: e.target.value })} placeholder="Например, Kaspi Gold" />
-                </Field>
-                <Field label="Остаток, ₸">
-                  <input className={inputClass} style={inputStyle} inputMode="decimal" value={r.balance} onChange={(e) => patch(r.key, { balance: e.target.value })} placeholder="нет" />
-                </Field>
-                <GhostButton type="button" aria-label={`Убрать строку «${r.name || ACCOUNT_KIND_LABEL[r.kind]}»`} onClick={() => removeRow(r.key)} disabled={rows.length === 1}>✕</GhostButton>
+              // Phone: name + ✕ on the first line, type + balance on the second; desktop: one line.
+              <div key={r.key} className="grid grid-cols-[1fr_1fr_auto] sm:grid-cols-[160px_1fr_170px_auto] gap-2 items-end pb-3 sm:pb-0" style={{ borderBottom: '1px solid var(--nav-border-soft)' }}>
+                <div className="order-3 sm:order-1">
+                  <Field label="Тип">
+                    <select className={inputClass} style={inputStyle} value={r.kind} onChange={(e) => patch(r.key, { kind: e.target.value as AccountKind })}>
+                      {(Object.keys(ACCOUNT_KIND_LABEL) as AccountKind[]).map((k) => <option key={k} value={k}>{ACCOUNT_KIND_LABEL[k]}</option>)}
+                    </select>
+                  </Field>
+                </div>
+                <div className="order-1 sm:order-2 col-span-2 sm:col-span-1">
+                  <Field label="Название">
+                    <input className={inputClass} style={inputStyle} value={r.name} onChange={(e) => patch(r.key, { name: e.target.value })} placeholder="Например, Kaspi Gold" />
+                  </Field>
+                </div>
+                <div className="order-4 sm:order-3 col-span-2 sm:col-span-1">
+                  <Field label="Остаток, ₸">
+                    <input className={inputClass} style={inputStyle} inputMode="decimal" value={r.balance} onChange={(e) => patch(r.key, { balance: e.target.value })} placeholder="нет" />
+                  </Field>
+                </div>
+                <div className="order-2 sm:order-4">
+                  <GhostButton type="button" aria-label={`Убрать строку «${r.name || ACCOUNT_KIND_LABEL[r.kind]}»`} onClick={() => removeRow(r.key)} disabled={rows.length === 1}>✕</GhostButton>
+                </div>
               </div>
             ))}
           </div>
