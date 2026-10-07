@@ -9,6 +9,7 @@ import { formatTenge } from '@/lib/cfo/money'
 import { isVirtual } from '@/lib/cfo/recurrence'
 import type { CfoOperation } from '@/lib/cfo/types'
 import { useCfo } from '../CfoWorkspace'
+import TaxSetup from '../TaxSetup'
 import { Badge, Card, CfoPage, GhostButton, Money, SectionTitle } from '../ui'
 
 export default function CfoCalendar() {
@@ -16,6 +17,7 @@ export default function CfoCalendar() {
   const { alert, dialogElement } = useAppDialog()
   const today = todayIso()
   const [showAll, setShowAll] = useState(false)
+  const [taxes, setTaxes] = useState(false)
   const cal = useMemo(() => buildCalendar({
     accounts: ws.accounts,
     operations: ws.operations,
@@ -55,12 +57,16 @@ export default function CfoCalendar() {
     <CfoPage
       title="Платёжный календарь"
       actions={
-        <label className="flex items-center gap-2 text-sm min-h-[44px]" style={{ color: 'var(--nav-text-secondary)' }}>
-          <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} />
-          Все дни
-        </label>
+        <>
+          {!taxes && <GhostButton type="button" onClick={() => setTaxes(true)}>Налоги РК</GhostButton>}
+          <label className="flex items-center gap-2 text-sm min-h-[44px]" style={{ color: 'var(--nav-text-secondary)' }}>
+            <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} />
+            Все дни
+          </label>
+        </>
       }
     >
+      {taxes && <TaxSetup onClose={() => setTaxes(false)} />}
       {cal.firstGap && (
         <Card className="!py-3">
           <p className="text-sm font-medium" style={{ color: 'var(--nav-critical)' }}>
