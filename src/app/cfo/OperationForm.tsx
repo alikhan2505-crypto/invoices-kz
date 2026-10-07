@@ -56,7 +56,7 @@ export default function OperationForm({ initial, onDone, onCancel }: { initial?:
         if (v) { setError(v); return }
         await saveRecurrence(ws, { ...rule, ...extra })
       } else {
-        const draft = { direction, amount: tiyn, accountId, toAccountId: toAccount, articleId: article, paidOn, accruedOn: separateAccrual ? accruedOn : paidOn, status }
+        const draft = { direction, amount: tiyn, accountId, toAccountId: toAccount, articleId: article, paidOn, accruedOn: separateAccrual && direction !== 'transfer' ? accruedOn : paidOn, status }
         const v = validateOperation(draft, ctx)
         if (v) { setError(v); return }
         await saveOperation(ws, { ...draft, ...extra, id: initial?.id })
@@ -90,7 +90,7 @@ export default function OperationForm({ initial, onDone, onCancel }: { initial?:
           <input className={inputClass} style={inputStyle} inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" />
         </Field>
         <Field label={direction === 'transfer' ? 'Со счёта' : 'Счёт'}>
-          <select className={inputClass} style={inputStyle} value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+          <select className={inputClass} style={inputStyle} value={accountId} onChange={(e) => { setAccountId(e.target.value); if (e.target.value === toAccountId) setToAccountId('') }}>
             {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
           </select>
         </Field>

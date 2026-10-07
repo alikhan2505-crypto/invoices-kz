@@ -33,7 +33,11 @@ export default function CfoOperations() {
     try { await action(); await reload() } catch (e) { await alert(e instanceof Error ? e.message : String(e)) }
   }
 
-  const done = async () => { setEditing(null); await reload() }
+  // reload first, then close: a failed reload must reach the user, not an unmounted form
+  const done = async () => {
+    try { await reload() } catch (e) { await alert(e instanceof Error ? e.message : String(e)) }
+    setEditing(null)
+  }
 
   return (
     <CfoPage title="Операции" actions={editing === null && <PrimaryButton type="button" onClick={() => setEditing('new')}>Добавить операцию</PrimaryButton>}>
