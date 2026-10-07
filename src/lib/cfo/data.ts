@@ -112,6 +112,17 @@ export async function saveAccount(ws: Workspace, a: { id?: string; name: string;
   check(error)
 }
 
+// Several accounts in one insert — all or nothing, so a failed first-run wizard never leaves half the accounts.
+export async function createAccounts(ws: Workspace, list: { name: string; kind: AccountKind; openingBalance: number; openingDate: string }[]): Promise<void> {
+  const base = Math.max(0, ...ws.accounts.map((x) => x.sort))
+  const rows = list.map((a, i) => ({
+    name: a.name, kind: a.kind, opening_balance: toDbAmount(a.openingBalance), opening_date: a.openingDate,
+    ...owned(ws), sort: base + (i + 1) * 10,
+  }))
+  const { error } = await supabase.from('cfo_accounts').insert(rows)
+  check(error)
+}
+
 // Every report relies on «direction matches article kind», so kind is frozen once referenced.
 export function articleInUse(ws: Workspace, articleId: string): boolean {
   return ws.operations.some((o) => o.articleId === articleId)

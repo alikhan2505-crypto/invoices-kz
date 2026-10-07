@@ -6,7 +6,7 @@ export type OpStatus = 'actual' | 'planned'
 export type ArticleKind = 'income' | 'expense'
 export type Activity = 'operating' | 'investing' | 'financing'
 export type PnlGroup = 'revenue' | 'cogs' | 'opex' | 'finance' | 'tax'
-export type AccountKind = 'bank' | 'cash' | 'card'
+export type AccountKind = 'bank' | 'cash' | 'card' | 'deposit'
 
 export type CfoAccount = {
   id: string

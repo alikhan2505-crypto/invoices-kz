@@ -1,6 +1,6 @@
 import type { AccountKind, Activity, ArticleKind, CfoAccount, CfoArticle, CfoOperation, Direction, PnlGroup } from './types'
 
-export const ACCOUNT_KIND_LABEL: Record<AccountKind, string> = { bank: 'Банковский счёт', card: 'Карта', cash: 'Наличные' }
+export const ACCOUNT_KIND_LABEL: Record<AccountKind, string> = { bank: 'Банковский счёт', card: 'Карта', cash: 'Наличные', deposit: 'Депозит' }
 export const ARTICLE_KIND_LABEL: Record<ArticleKind, string> = { income: 'Доход', expense: 'Расход' }
 export const ACTIVITY_LABEL: Record<Activity, string> = { operating: 'Операционная', investing: 'Инвестиционная', financing: 'Финансовая' }
 export const PNL_GROUP_LABEL: Record<PnlGroup, string> = {

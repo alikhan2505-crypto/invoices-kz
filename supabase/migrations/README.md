@@ -110,3 +110,5 @@ Click-to-WhatsApp click id, пишется только на первое соо
 создаёт компанию и 25 стартовых статей. Этап 1 — одна компания на пользователя
 (`cfo_companies_one_per_user`), этап 2 снимает ограничение. Дизайн:
 `docs/superpowers/specs/2026-10-07-cfo-cabinet-phase1-design.md`.
+
+`cfo_account_deposit.sql` (07.10.2026) — четвёртый вид счёта `deposit` (депозит).
