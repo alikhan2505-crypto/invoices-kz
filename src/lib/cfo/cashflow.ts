@@ -55,6 +55,7 @@ export function buildCashflow(input: {
   months: string[]
 }): CashflowRow[] {
   const { accounts, articles, operations, plan, months } = input
+  if (months.length === 0) return []
   const actual = operations.filter((o) => o.status === 'actual')
   const monthSet = new Set(months)
   const cells = new Map(articles.map((a) => [a.id, zero(months)]))

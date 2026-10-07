@@ -70,3 +70,71 @@ describe('buildCashflow', () => {
     expect(row('t:netflow').total.fact).toBe(t(500_000))
   })
 })
+
+describe('buildCashflow edge cases', () => {
+  it('empty months returns empty rows', () => {
+    const result = buildCashflow({ accounts: [kaspi, cash], articles, operations, plan, months: [] })
+    expect(result).toEqual([])
+  })
+
+  it('ignores planned operations as fact', () => {
+    const opsWithPlanned = [
+      ...operations,
+      op({ articleId: 'rent', amount: t(999_000), paidOn: '2026-01-15', status: 'planned' }),
+    ]
+    const result = buildCashflow({ accounts: [kaspi, cash], articles, operations: opsWithPlanned, plan, months: ['2026-01', '2026-02'] })
+    const row = (key: string) => result.find((r) => r.key === key)!
+    expect(row('a:rent').cells['2026-01'].fact).toBe(t(100_000))
+    expect(row('b:closing').cells['2026-01'].fact).toBe(t(700_000))
+  })
+
+  it('ignores operations and plan items outside months', () => {
+    const result = buildCashflow({ accounts: [kaspi, cash], articles, operations, plan, months: ['2026-02'] })
+    const row = (key: string) => result.find((r) => r.key === key)!
+    expect(row('a:rev').cells['2026-02'].fact).toBe(0)
+    expect(row('b:opening').cells['2026-02'].fact).toBe(t(700_000))
+  })
+
+  it('archived article with data is shown; without data is hidden', () => {
+    const articlesWithArchived = [
+      ...articles,
+      { ...art('oldRent', 'expense', 'operating', 6), archived: true },
+      { ...art('empty', 'expense', 'operating', 7), archived: true },
+    ]
+    const opsWithArchived = [
+      ...operations,
+      op({ articleId: 'oldRent', amount: t(10_000), paidOn: '2026-01-05' }),
+    ]
+    const result = buildCashflow({ accounts: [kaspi, cash], articles: articlesWithArchived, operations: opsWithArchived, plan, months: ['2026-01', '2026-02'] })
+    const row = (key: string) => result.find((r) => r.key === key)
+    expect(row('a:oldRent')).toBeDefined()
+    expect(row('a:oldRent')!.cells['2026-01'].fact).toBe(t(10_000))
+    expect(row('a:empty')).toBeUndefined()
+  })
+
+  it('plan on expense articles reduces activity planned net', () => {
+    const planWithExpense = [
+      { articleId: 'rev', month: '2026-01', amount: t(400_000) },
+      { articleId: 'rent', month: '2026-01', amount: t(150_000) },
+    ]
+    const result = buildCashflow({ accounts: [kaspi, cash], articles, operations, plan: planWithExpense, months: ['2026-01', '2026-02'] })
+    const row = (key: string) => result.find((r) => r.key === key)!
+    expect(row('act:operating').cells['2026-01'].plan).toBe(t(250_000))
+    expect(row('t:netflow').cells['2026-01'].plan).toBe(t(250_000))
+  })
+
+  it('activity with no visible articles produces no rows', () => {
+    const limitedArticles = [
+      art('rev', 'income', 'operating', 1),
+      art('rent', 'expense', 'operating', 2),
+    ]
+    const limitedOps = [
+      op({ direction: 'in', articleId: 'rev', amount: t(300_000), paidOn: '2026-01-10', accruedOn: '2025-12-20' }),
+      op({ articleId: 'rent', amount: t(100_000), paidOn: '2026-01-12' }),
+    ]
+    const result = buildCashflow({ accounts: [kaspi, cash], articles: limitedArticles, operations: limitedOps, plan: [], months: ['2026-01', '2026-02'] })
+    const activityRows = result.filter((r) => r.type === 'activity')
+    expect(activityRows.some((r) => r.key === 'act:investing')).toBe(false)
+    expect(activityRows.some((r) => r.key === 'act:financing')).toBe(false)
+  })
+})
