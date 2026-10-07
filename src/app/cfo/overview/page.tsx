@@ -8,6 +8,7 @@ import { dayLabel, monthTitle, opTitle, shortMonth } from '@/lib/cfo/labels'
 import { formatTenge } from '@/lib/cfo/money'
 import { useCfo } from '../CfoWorkspace'
 import AskCfo from '../AskCfo'
+import LimitsCard from '../LimitsCard'
 import { Card, CfoPage, EmptyState, Money, SectionTitle, inputClass, inputStyle } from '../ui'
 
 function Kpi({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: 'bad' | 'good' }) {
@@ -120,6 +121,8 @@ export default function CfoOverview() {
           </div>
         </Card>
       </div>
+
+      <LimitsCard month={month} />
 
       <Card>
         <SectionTitle>Платежи на 7 дней</SectionTitle>

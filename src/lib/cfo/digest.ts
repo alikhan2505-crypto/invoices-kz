@@ -9,6 +9,7 @@ import { dayLabel, opTitle } from './labels'
 import { formatTenge } from './money'
 import type { CfoOperation } from './types'
 import { forecastOperations, overdueReceivables } from './invoiceLink'
+import { monthLimits } from './limits'
 
 export const DIGEST_URL = 'https://cfo.invoices.kz/cfo/calendar'
 const LIST_LIMIT = 5
@@ -75,6 +76,9 @@ export function buildDigest(ws: Workspace, today: string): string {
   } else {
     lines.push(`✅ Кассовых разрывов в ближайшие ${CALENDAR_HORIZON_DAYS} дней нет`)
   }
+
+  const tight = monthLimits(ws, monthKey(today)).filter((r) => r.level !== 'ok').slice(0, 3)
+  if (tight.length > 0) lines.push(`📊 Лимиты месяца: ${tight.map((r) => `${esc(r.name)} ${Math.round(r.share * 100)}%`).join(', ')}`)
 
   const weekOut = sum(week.filter((o) => o.direction === 'out'))
   const weekIn = sum(week.filter((o) => o.direction === 'in'))
