@@ -10,6 +10,7 @@ import { isVirtual } from '@/lib/cfo/recurrence'
 import type { CfoOperation } from '@/lib/cfo/types'
 import { useCfo } from '../CfoWorkspace'
 import TaxSetup from '../TaxSetup'
+import ScenarioCard from '../ScenarioCard'
 import InvoicePanel, { invoiceHref } from '../InvoicePanel'
 import { forecastOperations, invoiceIdOf, isInvoiceVirtual } from '@/lib/cfo/invoiceLink'
 import { Badge, Card, CfoPage, GhostButton, Money, SectionTitle } from '../ui'
@@ -20,6 +21,7 @@ export default function CfoCalendar() {
   const today = todayIso()
   const [showAll, setShowAll] = useState(false)
   const [taxes, setTaxes] = useState(false)
+  const [whatIf, setWhatIf] = useState(false)
   const cal = useMemo(() => buildCalendar({
     accounts: ws.accounts,
     operations: forecastOperations(ws, today),
@@ -61,6 +63,7 @@ export default function CfoCalendar() {
       title="Платёжный календарь"
       actions={
         <>
+          {!whatIf && <GhostButton type="button" onClick={() => setWhatIf(true)}>Что если</GhostButton>}
           {!taxes && <GhostButton type="button" onClick={() => setTaxes(true)}>Налоги РК</GhostButton>}
           <label className="flex items-center gap-2 text-sm min-h-[44px]" style={{ color: 'var(--nav-text-secondary)' }}>
             <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} />
@@ -69,6 +72,7 @@ export default function CfoCalendar() {
         </>
       }
     >
+      {whatIf && <ScenarioCard today={today} onClose={() => setWhatIf(false)} />}
       {taxes && <TaxSetup onClose={() => setTaxes(false)} />}
       <InvoicePanel today={today} />
       {cal.firstGap && (
