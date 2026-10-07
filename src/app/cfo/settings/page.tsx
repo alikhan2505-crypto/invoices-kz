@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { useAppDialog } from '@/components/AppDialog'
-import { reorder, saveAccount, saveArticle, saveCompanyName, setArchived } from '@/lib/cfo/data'
+import { articleInUse, reorder, saveAccount, saveArticle, saveCompanyName, setArchived } from '@/lib/cfo/data'
 import { ACCOUNT_KIND_LABEL, ACTIVITY_LABEL, ARTICLE_KIND_LABEL, PNL_GROUP_LABEL } from '@/lib/cfo/labels'
 import { formatTenge } from '@/lib/cfo/money'
 import { validateArticle } from '@/lib/cfo/validate'
@@ -12,8 +12,9 @@ import { Card, CfoPage, ErrorText, Field, GhostButton, PrimaryButton, SectionTit
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
-function ArticleForm({ initial, onSave, onCancel }: {
+function ArticleForm({ initial, kindLocked = false, onSave, onCancel }: {
   initial?: CfoArticle
+  kindLocked?: boolean
   onSave: (a: { name: string; kind: ArticleKind; activity: Activity; pnlGroup: PnlGroup | null }) => Promise<string | null>
   onCancel: () => void
 }) {
@@ -42,8 +43,12 @@ function ArticleForm({ initial, onSave, onCancel }: {
         <input className={inputClass} style={inputStyle} value={name} onChange={(e) => setName(e.target.value)} />
       </Field>
       <div className="grid sm:grid-cols-3 gap-3">
-        <Field label="Тип">
-          <select className={inputClass} style={inputStyle} value={kind} onChange={(e) => setKind(e.target.value as ArticleKind)}>
+        <Field label="Тип" hint={kindLocked ? 'По статье уже есть операции — тип не меняется' : undefined}>
+          <select className={inputClass} style={inputStyle} value={kind} disabled={kindLocked} onChange={(e) => {
+            const k = e.target.value as ArticleKind
+            setKind(k)
+            setPnl(k === 'income' ? 'revenue' : 'opex')
+          }}>
             <option value="income">{ARTICLE_KIND_LABEL.income}</option>
             <option value="expense">{ARTICLE_KIND_LABEL.expense}</option>
           </select>
@@ -161,6 +166,7 @@ export default function CfoSettings() {
         <div className="w-full pt-2">
           <ArticleForm
             initial={a}
+            kindLocked={articleInUse(ws, a.id)}
             onCancel={() => setEditingArticle(null)}
             onSave={async (input) => {
               try { await saveArticle(ws, { ...input, id: a.id }); setEditingArticle(null); await reload(); return null } catch (e) { return errText(e) }

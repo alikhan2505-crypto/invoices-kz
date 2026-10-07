@@ -1,5 +1,5 @@
 'use client'
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useAppDialog } from '@/components/AppDialog'
 import { buildCalendar, CALENDAR_HORIZON_DAYS } from '@/lib/cfo/calendar'
 import { markPaid } from '@/lib/cfo/data'
@@ -25,8 +25,11 @@ export default function CfoCalendar() {
     to: addDays(today, CALENDAR_HORIZON_DAYS - 1),
   }), [ws, today])
 
+  const paying = useRef(false)
   async function pay(op: CfoOperation) {
-    try { await markPaid(ws, op, today); await reload() } catch (e) { await alert(e instanceof Error ? e.message : String(e)) }
+    if (paying.current) return // a double click would insert the same recurrence occurrence twice
+    paying.current = true
+    try { await markPaid(ws, op, today); await reload() } catch (e) { await alert(e instanceof Error ? e.message : String(e)) } finally { paying.current = false }
   }
 
   const item = (op: CfoOperation) => (

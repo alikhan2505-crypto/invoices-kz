@@ -1,5 +1,5 @@
 'use client'
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useAppDialog } from '@/components/AppDialog'
 import { deleteOperation, deleteRecurrence, markPaid } from '@/lib/cfo/data'
 import { monthKey, todayIso } from '@/lib/cfo/dates'
@@ -29,8 +29,11 @@ export default function CfoOperations() {
     .filter((o) => status === 'all' || o.status === status)
     .sort((a, b) => b.paidOn.localeCompare(a.paidOn)), [ws.operations, month, accountId, articleId, status])
 
+  const busy = useRef(false)
   async function run(action: () => Promise<void>) {
-    try { await action(); await reload() } catch (e) { await alert(e instanceof Error ? e.message : String(e)) }
+    if (busy.current) return // ignore double clicks on row actions while one is in flight
+    busy.current = true
+    try { await action(); await reload() } catch (e) { await alert(e instanceof Error ? e.message : String(e)) } finally { busy.current = false }
   }
 
   // reload first, then close: a failed reload must reach the user, not an unmounted form

@@ -112,9 +112,20 @@ export async function saveAccount(ws: Workspace, a: { id?: string; name: string;
   check(error)
 }
 
+// Every report relies on «direction matches article kind», so kind is frozen once referenced.
+export function articleInUse(ws: Workspace, articleId: string): boolean {
+  return ws.operations.some((o) => o.articleId === articleId)
+    || ws.recurrences.some((r) => r.articleId === articleId)
+    || ws.plan.some((p) => p.articleId === articleId)
+}
+
 export async function saveArticle(ws: Workspace, a: { id?: string; name: string; kind: ArticleKind; activity: Activity; pnlGroup: PnlGroup | null }): Promise<void> {
   const row = { name: a.name, kind: a.kind, activity: a.activity, pnl_group: a.pnlGroup }
   if (a.id) {
+    const before = ws.articles.find((x) => x.id === a.id)
+    if (before && before.kind !== a.kind && articleInUse(ws, a.id)) {
+      throw new Error('По статье уже есть операции, повторы или план — тип менять нельзя. Создайте новую статью.')
+    }
     const { error } = await supabase.from('cfo_articles').update(row).eq('id', a.id)
     check(error)
     return
