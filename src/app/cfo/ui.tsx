@@ -63,15 +63,14 @@ export function GhostButton({ className = '', style, ...props }: React.ButtonHTM
 
 export function Segmented<T extends string>({ value, options, onChange, label }: { value: T; options: { value: T; label: string }[]; onChange: (v: T) => void; label: string }) {
   return (
-    <div role="radiogroup" aria-label={label} className="inline-flex rounded-xl p-1 gap-1" style={{ background: 'var(--nav-surface-glass)' }}>
+    <div role="group" aria-label={label} className="inline-flex rounded-xl p-1 gap-1" style={{ background: 'var(--nav-surface-glass)' }}>
       {options.map((o) => (
         <button
           key={o.value}
           type="button"
-          role="radio"
-          aria-checked={o.value === value}
+          aria-pressed={o.value === value}
           onClick={() => onChange(o.value)}
-          className="min-h-[36px] px-3 rounded-lg text-sm font-medium transition-colors"
+          className="min-h-[44px] px-3 rounded-lg text-sm font-medium transition-colors"
           style={o.value === value
             ? { background: 'var(--nav-surface-chrome)', color: 'var(--nav-text-primary)', boxShadow: '0 1px 2px rgba(0,0,0,0.08)' }
             : { color: 'var(--nav-text-secondary)' }}

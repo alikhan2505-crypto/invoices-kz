@@ -28,20 +28,22 @@ export default function CfoWorkspace({ children }: { children: React.ReactNode }
 
   const init = useCallback(async () => {
     setState({ status: 'loading' })
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      setPostLoginRedirect('/cfo/overview')
-      router.replace('/login')
-      return
-    }
-    // Ворота на время ревью founder'а: продукт adminOnly. Открытие для всех —
-    // убрать эту проверку (данные и так видны только владельцу через RLS).
-    const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', user.id).single()
-    if (!profile?.is_admin) {
-      router.replace('/products')
-      return
-    }
     try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        setPostLoginRedirect('/cfo/overview')
+        router.replace('/login')
+        return
+      }
+      // Ворота на время ревью founder'а: продукт adminOnly. Открытие для всех —
+      // убрать эту проверку (данные и так видны только владельцу через RLS).
+      // Ошибка загрузки профиля — НЕ повод редиректить: падаем в error-состояние.
+      const { data: profile, error: profileError } = await supabase.from('profiles').select('is_admin').eq('id', user.id).single()
+      if (profileError) throw new Error(profileError.message)
+      if (profile?.is_admin !== true) {
+        router.replace('/products')
+        return
+      }
       const companyId = await bootstrapWorkspace()
       ids.current = { companyId, userId: user.id }
       setState({ status: 'ready', ws: await loadWorkspace(companyId, user.id) })

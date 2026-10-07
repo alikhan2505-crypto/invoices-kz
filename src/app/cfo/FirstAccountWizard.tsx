@@ -19,11 +19,17 @@ export default function FirstAccountWizard() {
           onSave={async (a) => {
             try {
               await saveAccount(ws, a)
-              await reload()
-              return null
             } catch (e) {
               return e instanceof Error ? e.message : String(e)
             }
+            // Счёт уже создан: при сбое перезагрузки повторная отправка дала бы дубль,
+            // поэтому просто перезагружаем страницу.
+            try {
+              await reload()
+            } catch {
+              window.location.reload()
+            }
+            return null
           }}
         />
       </Card>
