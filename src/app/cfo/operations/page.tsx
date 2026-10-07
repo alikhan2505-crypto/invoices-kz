@@ -8,6 +8,8 @@ import { formatTenge } from '@/lib/cfo/money'
 import type { CfoOperation, OpStatus } from '@/lib/cfo/types'
 import { useCfo } from '../CfoWorkspace'
 import OperationForm from '../OperationForm'
+import ExportButton from '../ExportButton'
+import { downloadWorkbook, operationsSheet } from '@/lib/cfo/exportXlsx'
 import { Badge, Card, CfoPage, EmptyState, GhostButton, Money, PrimaryButton, SectionTitle, Segmented, inputClass, inputStyle } from '../ui'
 
 const signedAmount = (op: CfoOperation) => (op.direction === 'in' ? op.amount : op.direction === 'out' ? -op.amount : 0)
@@ -46,6 +48,7 @@ export default function CfoOperations() {
     <CfoPage title="Операции" actions={editing === null && (
       <>
         <a href="/cfo/import" className="inline-flex items-center min-h-[44px] rounded-xl px-4 text-sm font-medium transition-colors hover:bg-[var(--nav-surface-glass)]" style={{ border: '1px solid var(--nav-border)', color: 'var(--nav-text-secondary)' }}>Импорт выписки</a>
+        <ExportButton onExport={() => downloadWorkbook(`Операции ${month} — ${ws.companyName}.xlsx`, { Операции: operationsSheet(list, ws.accounts, ws.articles) })} />
         <PrimaryButton type="button" onClick={() => setEditing('new')}>Добавить операцию</PrimaryButton>
       </>
     )}>

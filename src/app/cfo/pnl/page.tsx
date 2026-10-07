@@ -5,6 +5,8 @@ import { buildPnl, type PnlRow } from '@/lib/cfo/pnl'
 import { useCfo } from '../CfoWorkspace'
 import ReportTable, { MEASURE_OPTIONS, type Measure, type ReportRow } from '../ReportTable'
 import { CfoPage, Segmented, YearPicker } from '../ui'
+import ExportButton from '../ExportButton'
+import { downloadWorkbook, reportSheets } from '@/lib/cfo/exportXlsx'
 
 // Выше — лучше для выручки, прочих (они со знаком) и итогов; для расходов — наоборот.
 function higherIsBetter(r: PnlRow): boolean {
@@ -38,7 +40,7 @@ export default function CfoPnl() {
   })
 
   return (
-    <CfoPage title="БДР" actions={<><Segmented label="Показатель" value={measure} onChange={setMeasure} options={MEASURE_OPTIONS} /><YearPicker value={year} onChange={setYear} /></>}>
+    <CfoPage title="БДР" actions={<><ExportButton onExport={() => downloadWorkbook(`БДР ${year} — ${ws.companyName}.xlsx`, reportSheets(months, rows))} /><Segmented label="Показатель" value={measure} onChange={setMeasure} options={MEASURE_OPTIONS} /><YearPicker value={year} onChange={setYear} /></>}>
       <p className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
         Доходы и расходы по дате начисления. Кредиты, вложения и вывод денег собственником, покупка оборудования и переводы между счетами сюда не входят — они в БДДС.
       </p>
