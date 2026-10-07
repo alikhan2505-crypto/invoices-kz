@@ -306,11 +306,17 @@ function SiteNavBar({ desktopOnly = false }: { desktopOnly?: boolean }) {
     .filter(s => !s.adminOnly || perms?.isAdmin === true)
     .filter(s => onProductHost ? s.key === activeSection?.key : isSectionVisible(mine, s.key, activeSection?.key ?? null))
 
-  // Opening a product section connects it to the account.
+  // Opening a product section connects it to the account. An admin-only section
+  // (still under the founder's review) is never written into a non-admin's
+  // product list, even if they open its URL directly.
   const activeKey = activeSection?.key
+  const activeAdminOnly = activeSection?.adminOnly ?? false
+  const isAdmin = perms?.isAdmin === true
   useEffect(() => {
-    if (activeKey) void connectProduct(activeKey)
-  }, [activeKey])
+    if (!activeKey) return
+    if (activeAdminOnly && !isAdmin) return
+    void connectProduct(activeKey)
+  }, [activeKey, activeAdminOnly, isAdmin])
 
   return (
     <>
