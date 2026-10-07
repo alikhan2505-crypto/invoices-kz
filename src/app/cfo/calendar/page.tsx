@@ -10,6 +10,8 @@ import { isVirtual } from '@/lib/cfo/recurrence'
 import type { CfoOperation } from '@/lib/cfo/types'
 import { useCfo } from '../CfoWorkspace'
 import TaxSetup from '../TaxSetup'
+import InvoicePanel, { invoiceHref } from '../InvoicePanel'
+import { forecastOperations, invoiceIdOf, isInvoiceVirtual } from '@/lib/cfo/invoiceLink'
 import { Badge, Card, CfoPage, GhostButton, Money, SectionTitle } from '../ui'
 
 export default function CfoCalendar() {
@@ -20,7 +22,7 @@ export default function CfoCalendar() {
   const [taxes, setTaxes] = useState(false)
   const cal = useMemo(() => buildCalendar({
     accounts: ws.accounts,
-    operations: ws.operations,
+    operations: forecastOperations(ws, today),
     recurrences: ws.recurrences,
     today,
     from: firstDay(monthKey(today)),
@@ -43,11 +45,12 @@ export default function CfoCalendar() {
           {op.counterparty && ` · ${op.counterparty}`}
         </div>
       </div>
-      {op.status === 'actual' ? <Badge tone="fact">Факт</Badge> : isVirtual(op) ? <Badge tone="plan">Повтор</Badge> : <Badge tone="plan">План</Badge>}
+      {op.status === 'actual' ? <Badge tone="fact">Факт</Badge> : isInvoiceVirtual(op) ? <Badge tone="plan">Счёт</Badge> : isVirtual(op) ? <Badge tone="plan">Повтор</Badge> : <Badge tone="plan">План</Badge>}
       {op.direction === 'transfer'
         ? <span className="text-sm tabular-nums" style={{ color: 'var(--nav-text-secondary)' }}>{formatTenge(op.amount)}</span>
         : <Money value={op.direction === 'in' ? op.amount : -op.amount} signed className="text-sm font-semibold" />}
-      {op.status === 'planned' && <GhostButton type="button" aria-label={`Оплачено: ${opTitle(op, ws.accounts, ws.articles)}`} onClick={() => void pay(op)}>Оплачено</GhostButton>}
+      {isInvoiceVirtual(op) && <a href={invoiceHref(invoiceIdOf(op))} className="inline-flex items-center min-h-[44px] rounded-xl px-4 text-sm font-medium" style={{ border: '1px solid var(--nav-border)', color: 'var(--nav-text-secondary)' }}>Открыть счёт</a>}
+      {op.status === 'planned' && !isInvoiceVirtual(op) && <GhostButton type="button" aria-label={`Оплачено: ${opTitle(op, ws.accounts, ws.articles)}`} onClick={() => void pay(op)}>Оплачено</GhostButton>}
     </div>
   )
 
@@ -67,6 +70,7 @@ export default function CfoCalendar() {
       }
     >
       {taxes && <TaxSetup onClose={() => setTaxes(false)} />}
+      <InvoicePanel today={today} />
       {cal.firstGap && (
         <Card className="!py-3">
           <p className="text-sm font-medium" style={{ color: 'var(--nav-critical)' }}>

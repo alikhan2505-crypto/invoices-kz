@@ -8,12 +8,13 @@ import { addDays, firstDay, monthKey } from './dates'
 import { dayLabel, opTitle } from './labels'
 import { formatTenge } from './money'
 import type { CfoOperation } from './types'
+import { forecastOperations, overdueReceivables } from './invoiceLink'
 
 export const DIGEST_URL = 'https://cfo.invoices.kz/cfo/calendar'
 const LIST_LIMIT = 5
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-const sum = (ops: CfoOperation[]) => ops.reduce((s, o) => s + o.amount, 0)
+const sum = (ops: { amount: number }[]) => ops.reduce((s, o) => s + o.amount, 0)
 
 function daysBetween(from: string, to: string): number {
   const [y1, m1, d1] = from.split('-').map(Number)
@@ -35,7 +36,7 @@ export function buildDigest(ws: Workspace, today: string): string {
   const cash = totalBalanceAt(ws.accounts, actual, today)
   const cal = buildCalendar({
     accounts: ws.accounts,
-    operations: ws.operations,
+    operations: forecastOperations(ws, today),
     recurrences: ws.recurrences,
     today,
     from: firstDay(monthKey(today)),
@@ -63,6 +64,8 @@ export function buildDigest(ws: Workspace, today: string): string {
 
   const overdueOut = cal.overdue.filter((o) => o.direction === 'out')
   if (overdueOut.length > 0) lines.push(`⚠️ Просрочено: ${payments(overdueOut.length)} на ${formatTenge(sum(overdueOut))}`)
+  const unpaid = overdueReceivables(ws, today)
+  if (unpaid.length > 0) lines.push(`💸 Клиенты не оплатили в срок: ${unpaid.length} ${plural(unpaid.length, 'счёт', 'счёта', 'счетов')} на ${formatTenge(sum(unpaid))}`)
 
   if (cal.firstGap) {
     const gapDay = cal.days.find((d) => d.date === cal.firstGap)!

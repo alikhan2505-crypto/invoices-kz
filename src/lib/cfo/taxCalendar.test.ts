@@ -17,7 +17,7 @@ const op = (p: Partial<CfoOperation>): CfoOperation => ({
   paidOn: '2026-08-01', accruedOn: '2026-08-01', status: 'actual', recurrenceId: null, recurrenceDate: null, ...p,
 })
 const ws = (ops: CfoOperation[] = [], comments: string[] = []): Workspace => ({
-  userId: 'u', companyId: 'c', companyName: 'X', telegramDigest: false, accounts: [], articles, operations: ops, plan: [],
+  userId: 'u', companyId: 'c', companyName: 'X', telegramDigest: false, countInvoices: false, invoices: [], accounts: [], articles, operations: ops, plan: [],
   recurrences: comments.map((c, i) => ({ id: `r${i}`, direction: 'out', amount: 1, accountId: 'acc', toAccountId: null, articleId: 'pay', counterparty: null, comment: c, dayOfMonth: 25, startsOn: '2026-10-01', endsOn: null })),
 })
 

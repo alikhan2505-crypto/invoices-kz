@@ -3,7 +3,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { toDbAmount, toTiyn } from './money'
-import type { AccountKind, Activity, ArticleKind, CfoAccount, CfoArticle, CfoOperation, CfoPlanItem, CfoRecurrence, Direction, OpStatus, PnlGroup } from './types'
+import type { AccountKind, Activity, ArticleKind, CfoAccount, CfoArticle, CfoOperation, CfoPlanItem, CfoRecurrence, Direction, InvoiceLite, OpStatus, PnlGroup } from './types'
 import type { OperationDraft, RecurrenceDraft } from './validate'
 import type { ImportDraft } from './statementImport'
 
@@ -12,6 +12,8 @@ export type Workspace = {
   companyId: string
   companyName: string
   telegramDigest: boolean
+  countInvoices: boolean
+  invoices: InvoiceLite[]
   accounts: CfoAccount[]
   articles: CfoArticle[]
   operations: CfoOperation[]
@@ -59,7 +61,7 @@ const mapOperation = (r: Row): CfoOperation => ({
   id: r.id, direction: r.direction as Direction, amount: toTiyn(r.amount), accountId: r.account_id,
   toAccountId: r.to_account_id ?? null, articleId: r.article_id ?? null, counterparty: r.counterparty ?? null,
   comment: r.comment ?? null, paidOn: r.paid_on, accruedOn: r.accrued_on, status: r.status as OpStatus,
-  recurrenceId: r.recurrence_id ?? null, recurrenceDate: r.recurrence_date ?? null,
+  recurrenceId: r.recurrence_id ?? null, recurrenceDate: r.recurrence_date ?? null, invoiceId: r.invoice_id ?? null,
 })
 const mapRecurrence = (r: Row): CfoRecurrence => ({
   id: r.id, direction: r.direction as Direction, amount: toTiyn(r.amount), accountId: r.account_id,
@@ -67,6 +69,36 @@ const mapRecurrence = (r: Row): CfoRecurrence => ({
   comment: r.comment ?? null, dayOfMonth: r.day_of_month, startsOn: r.starts_on, endsOn: r.ends_on ?? null,
 })
 const mapPlan = (r: Row): CfoPlanItem => ({ articleId: r.article_id, month: String(r.month).slice(0, 7), amount: toTiyn(r.amount) })
+
+// Счета invoices.kz владельца за последние полгода (кроме отменённых) — для
+// ожидаемых поступлений и проведения оплат. user_id фильтруется явно: на сервере
+// (утренняя сводка) RLS нет.
+const INVOICE_WINDOW_DAYS = 183
+async function loadInvoices(db: SupabaseClient, userId: string): Promise<InvoiceLite[]> {
+  const since = new Date(Date.now() - INVOICE_WINDOW_DAYS * 86400000).toISOString()
+  const { data, error } = await db
+    .from('invoices')
+    .select('id, number, amount, status, due_date, created_at, client_name')
+    .eq('user_id', userId)
+    .neq('status', 'cancelled')
+    .gte('created_at', since)
+    .order('created_at', { ascending: false })
+    .limit(1000)
+  check(error)
+  const rows = (data ?? []) as Row[]
+  const paidIds = rows.filter((r) => r.status === 'paid').map((r) => r.id as string)
+  const paidOn = new Map<string, string>()
+  if (paidIds.length > 0) {
+    const { data: logs } = await db.from('invoice_logs').select('invoice_id, created_at').eq('status', 'paid').in('invoice_id', paidIds)
+    for (const l of (logs ?? []) as Row[]) paidOn.set(l.invoice_id, almatyDate(l.created_at))
+  }
+  return rows.map((r) => ({
+    id: r.id, number: String(r.number ?? ''), amount: toTiyn(r.amount ?? 0), status: r.status,
+    dueDate: r.due_date ?? null, createdOn: String(r.created_at).slice(0, 10), paidOn: paidOn.get(r.id) ?? null,
+    clientName: r.client_name ?? null,
+  }))
+}
+const almatyDate = (ts: string) => new Date(new Date(ts).getTime() + 5 * 3600 * 1000).toISOString().slice(0, 10)
 
 export async function bootstrapWorkspace(): Promise<string> {
   const { data, error } = await supabase.rpc('cfo_bootstrap')
@@ -76,13 +108,14 @@ export async function bootstrapWorkspace(): Promise<string> {
 
 // db — клиент браузера (RLS) по умолчанию; серверная рассылка передаёт service-role клиент.
 export async function loadWorkspace(companyId: string, userId: string, db: SupabaseClient = supabase): Promise<Workspace> {
-  const [company, accounts, articles, operations, recurrences, plan] = await Promise.all([
-    db.from('cfo_companies').select('name, telegram_digest').eq('id', companyId).single(),
+  const [company, accounts, articles, operations, recurrences, plan, invoices] = await Promise.all([
+    db.from('cfo_companies').select('name, telegram_digest, count_invoices').eq('id', companyId).single(),
     selectAll(db, 'cfo_accounts', 'id, name, kind, opening_balance, opening_date, archived, sort', companyId),
     selectAll(db, 'cfo_articles', 'id, name, kind, activity, pnl_group, archived, sort', companyId),
-    selectAll(db, 'cfo_operations', 'id, direction, amount, account_id, to_account_id, article_id, counterparty, comment, paid_on, accrued_on, status, recurrence_id, recurrence_date', companyId),
+    selectAll(db, 'cfo_operations', 'id, direction, amount, account_id, to_account_id, article_id, counterparty, comment, paid_on, accrued_on, status, recurrence_id, recurrence_date, invoice_id', companyId),
     selectAll(db, 'cfo_recurrences', 'id, direction, amount, account_id, to_account_id, article_id, counterparty, comment, day_of_month, starts_on, ends_on', companyId),
     selectAll(db, 'cfo_plan_items', 'id, article_id, month, amount', companyId),
+    loadInvoices(db, userId),
   ])
   check(company.error)
   return {
@@ -90,6 +123,8 @@ export async function loadWorkspace(companyId: string, userId: string, db: Supab
     companyId,
     companyName: (company.data as Row).name,
     telegramDigest: (company.data as Row).telegram_digest === true,
+    countInvoices: (company.data as Row).count_invoices !== false,
+    invoices,
     accounts: accounts.map(mapAccount).sort(bySort),
     articles: articles.map(mapArticle).sort(bySort),
     operations: operations.map(mapOperation).sort((a, b) => b.paidOn.localeCompare(a.paidOn)),
@@ -99,6 +134,22 @@ export async function loadWorkspace(companyId: string, userId: string, db: Supab
 }
 
 const owned = (ws: Workspace) => ({ user_id: ws.userId, company_id: ws.companyId })
+
+export async function setCountInvoices(ws: Workspace, on: boolean): Promise<void> {
+  const { error } = await supabase.from('cfo_companies').update({ count_invoices: on }).eq('id', ws.companyId)
+  check(error)
+}
+
+// Оплаченный счёт → фактический приход. Уникальный индекс (user_id, invoice_id) не
+// даёт провести один счёт дважды, даже из двух вкладок.
+export async function postInvoices(ws: Workspace, list: { invoice: InvoiceLite; accountId: string; articleId: string; paidOn: string }[]): Promise<void> {
+  const rows = list.map(({ invoice, accountId, articleId, paidOn }) => ({
+    ...owned(ws), direction: 'in', amount: toDbAmount(invoice.amount), account_id: accountId, article_id: articleId,
+    counterparty: invoice.clientName, comment: `Счёт №${invoice.number}`, paid_on: paidOn, accrued_on: paidOn, status: 'actual', invoice_id: invoice.id,
+  }))
+  const { error } = await supabase.from('cfo_operations').insert(rows)
+  check(error)
+}
 
 export async function setTelegramDigest(ws: Workspace, on: boolean): Promise<void> {
   const { error } = await supabase.from('cfo_companies').update({ telegram_digest: on }).eq('id', ws.companyId)

@@ -14,7 +14,7 @@ const op = (p: Partial<CfoOperation>): CfoOperation => ({
   paidOn: '2026-10-08', accruedOn: '2026-10-08', status: 'planned', recurrenceId: null, recurrenceDate: null, ...p,
 })
 const ws = (ops: CfoOperation[], recurrences: CfoRecurrence[] = []): Workspace => ({
-  userId: 'u', companyId: 'c', companyName: 'ТОО <Ромашка> & Ко', telegramDigest: true,
+  userId: 'u', companyId: 'c', companyName: 'ТОО <Ромашка> & Ко', telegramDigest: true, countInvoices: false, invoices: [],
   accounts: [account], articles: [rent, sales], operations: ops, recurrences, plan: [],
 })
 
@@ -49,6 +49,18 @@ describe('buildDigest', () => {
     const rec: CfoRecurrence = { id: 'r', direction: 'out', amount: 10_000_00, accountId: 'acc', toAccountId: null, articleId: 'rent', counterparty: null, comment: null, dayOfMonth: 10, startsOn: '2026-10-01', endsOn: null }
     const text = buildDigest(ws([], [rec]), '2026-10-08')
     expect(text).toContain('📆 Следующие 7 дней: выплаты 10 000 ₸, поступления 0 ₸')
+  })
+})
+
+describe('buildDigest with invoices.kz', () => {
+  it('counts expected invoices as today receipts and reports overdue receivables', () => {
+    const w = { ...ws([]), countInvoices: true, invoices: [
+      { id: 'a', number: '15', amount: 7_000_00, status: 'draft', dueDate: '2026-10-08', createdOn: '2026-10-01', paidOn: null, clientName: 'ТОО Альфа' },
+      { id: 'b', number: '9', amount: 3_000_00, status: 'overdue', dueDate: '2026-10-01', createdOn: '2026-09-20', paidOn: null, clientName: 'ТОО Бета' },
+    ] }
+    const text = buildDigest(w, '2026-10-08')
+    expect(text).toContain('📥 Сегодня ожидается: 7 000 ₸')
+    expect(text).toContain('💸 Клиенты не оплатили в срок: 1 счёт на 3 000 ₸')
   })
 })
 

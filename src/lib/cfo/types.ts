@@ -42,6 +42,19 @@ export type CfoOperation = {
   status: OpStatus
   recurrenceId: string | null
   recurrenceDate: string | null
+  invoiceId?: string | null // приход, проведённый из оплаченного счёта invoices.kz
+}
+
+// Счёт invoices.kz в том виде, что нужен кабинету: ожидаемые и проведённые поступления.
+export type InvoiceLite = {
+  id: string
+  number: string
+  amount: number // тиыны
+  status: string
+  dueDate: string | null
+  createdOn: string
+  paidOn: string | null // дата из журнала статусов, если есть
+  clientName: string | null
 }
 
 export type CfoRecurrence = {
