@@ -34,8 +34,6 @@ export async function POST(req: NextRequest) {
   const today = almatyToday()
   const used = company.ask_day === today ? company.ask_count : 0
   if (used >= DAILY_LIMIT) return NextResponse.json({ error: `На сегодня лимит ${DAILY_LIMIT} вопросов исчерпан — завтра снова можно` }, { status: 429 })
-  await supabase.from('cfo_companies').update({ ask_day: today, ask_count: used + 1 }).eq('id', company.id)
-
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) return NextResponse.json({ error: 'ИИ не настроен' }, { status: 500 })
   try {
@@ -43,11 +41,20 @@ export async function POST(req: NextRequest) {
     const client = new Anthropic({ apiKey })
     const message = await client.messages.create({
       model: 'claude-sonnet-5-5',
-      max_tokens: 1200,
+      // Модель думает перед ответом: без запаса токенов мысль съедала весь лимит и текста не было.
+      max_tokens: 8000,
+      thinking: { type: 'adaptive' },
+      output_config: { effort: 'low' },
       system: ASK_SYSTEM,
       messages: [{ role: 'user', content: `<данные_кабинета>\n${buildAskContext(ws, today)}\n</данные_кабинета>\n\nВопрос владельца: ${question}` }],
     })
     const answer = message.content.filter((b) => b.type === 'text').map((b) => (b.type === 'text' ? b.text : '')).join('\n').trim()
+    if (!answer) {
+      console.error('api/cfo/ask: empty answer, stop_reason', message.stop_reason, 'blocks', message.content.map((b) => b.type).join(','))
+      return NextResponse.json({ error: 'Модель не дала ответа — попробуйте переформулировать вопрос' }, { status: 502 })
+    }
+    // Считаем только состоявшиеся ответы.
+    await supabase.from('cfo_companies').update({ ask_day: today, ask_count: used + 1 }).eq('id', company.id)
     return NextResponse.json({ answer, left: DAILY_LIMIT - used - 1 })
   } catch (e) {
     console.error('api/cfo/ask failed for user', user.id, ':', e instanceof Error ? e.message : e)
