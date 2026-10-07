@@ -82,22 +82,30 @@ export default function CfoSettings() {
       await action()
       await reload()
     } catch (e) {
+      // a multi-row write (reorder) may have partially applied — resync before reporting
+      await reload().catch(() => {})
       await alert(errText(e))
     }
   }
 
-  async function move<T extends { id: string; sort: number }>(table: 'cfo_accounts' | 'cfo_articles', list: T[], index: number, dir: -1 | 1) {
-    const target = index + dir
-    if (target < 0 || target >= list.length) return
-    const ids = list.map((x) => x.id)
-    ;[ids[index], ids[target]] = [ids[target], ids[index]]
-    await run(() => reorder(table, ids, list))
+  // Reorders over the FULL list (archived rows included) so hidden rows keep their
+  // place; the item swaps with its nearest visible neighbour in that direction.
+  async function move<T extends { id: string; sort: number; archived: boolean }>(table: 'cfo_accounts' | 'cfo_articles', all: T[], id: string, dir: -1 | 1) {
+    const full = [...all].sort((a, b) => a.sort - b.sort)
+    const from = full.findIndex((x) => x.id === id)
+    if (from < 0) return
+    let to = from + dir
+    while (to >= 0 && to < full.length && !showArchived && full[to].archived) to += dir
+    if (to < 0 || to >= full.length) return
+    const ids = full.map((x) => x.id)
+    ;[ids[from], ids[to]] = [ids[to], ids[from]]
+    await run(() => reorder(table, ids, full))
   }
 
   const accounts = ws.accounts.filter((a) => showArchived || !a.archived)
   const articleList = (kind: ArticleKind) => ws.articles.filter((a) => a.kind === kind && (showArchived || !a.archived))
 
-  const accountRow = (a: CfoAccount, i: number, list: CfoAccount[]) => (
+  const accountRow = (a: CfoAccount) => (
     <div key={a.id} className="py-3 flex items-start gap-2 flex-wrap" style={{ borderBottom: '1px solid var(--nav-border-soft)' }}>
       <div className="flex-1 min-w-[180px]">
         <div className="text-sm font-medium" style={{ color: a.archived ? 'var(--nav-text-muted)' : 'var(--nav-text-primary)' }}>
@@ -108,8 +116,8 @@ export default function CfoSettings() {
         </div>
       </div>
       <div className="flex gap-1 flex-wrap">
-        <GhostButton type="button" aria-label="Выше" onClick={() => void move('cfo_accounts', list, i, -1)}>↑</GhostButton>
-        <GhostButton type="button" aria-label="Ниже" onClick={() => void move('cfo_accounts', list, i, 1)}>↓</GhostButton>
+        <GhostButton type="button" aria-label="Выше" onClick={() => void move('cfo_accounts', ws.accounts, a.id, -1)}>↑</GhostButton>
+        <GhostButton type="button" aria-label="Ниже" onClick={() => void move('cfo_accounts', ws.accounts, a.id, 1)}>↓</GhostButton>
         <GhostButton type="button" onClick={() => setEditingAccount(a.id)}>Изменить</GhostButton>
         <GhostButton type="button" onClick={() => void run(() => setArchived('cfo_accounts', a.id, !a.archived))}>
           {a.archived ? 'Вернуть' : 'В архив'}
@@ -131,7 +139,7 @@ export default function CfoSettings() {
     </div>
   )
 
-  const articleRow = (a: CfoArticle, i: number, list: CfoArticle[]) => (
+  const articleRow = (a: CfoArticle) => (
     <div key={a.id} className="py-3 flex items-start gap-2 flex-wrap" style={{ borderBottom: '1px solid var(--nav-border-soft)' }}>
       <div className="flex-1 min-w-[180px]">
         <div className="text-sm font-medium" style={{ color: a.archived ? 'var(--nav-text-muted)' : 'var(--nav-text-primary)' }}>
@@ -142,8 +150,8 @@ export default function CfoSettings() {
         </div>
       </div>
       <div className="flex gap-1 flex-wrap">
-        <GhostButton type="button" aria-label="Выше" onClick={() => void move('cfo_articles', list, i, -1)}>↑</GhostButton>
-        <GhostButton type="button" aria-label="Ниже" onClick={() => void move('cfo_articles', list, i, 1)}>↓</GhostButton>
+        <GhostButton type="button" aria-label="Выше" onClick={() => void move('cfo_articles', ws.articles.filter((x) => x.kind === a.kind), a.id, -1)}>↑</GhostButton>
+        <GhostButton type="button" aria-label="Ниже" onClick={() => void move('cfo_articles', ws.articles.filter((x) => x.kind === a.kind), a.id, 1)}>↓</GhostButton>
         <GhostButton type="button" onClick={() => setEditingArticle(a.id)}>Изменить</GhostButton>
         <GhostButton type="button" onClick={() => void run(() => setArchived('cfo_articles', a.id, !a.archived))}>
           {a.archived ? 'Вернуть' : 'В архив'}
@@ -201,7 +209,7 @@ export default function CfoSettings() {
             />
           </div>
         )}
-        {accounts.map((a, i, list) => accountRow(a, i, list))}
+        {accounts.map(accountRow)}
       </Card>
 
       <Card>
@@ -224,7 +232,7 @@ export default function CfoSettings() {
             <div className="text-xs font-semibold uppercase mb-1" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.08em' }}>
               {kind === 'income' ? 'Доходы' : 'Расходы'}
             </div>
-            {articleList(kind).map((a, i, list) => articleRow(a, i, list))}
+            {articleList(kind).map(articleRow)}
           </div>
         ))}
       </Card>
