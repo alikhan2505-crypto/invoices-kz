@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAppDialog } from '@/components/AppDialog'
 import { articleInUse, reorder, saveAccount, saveArticle, saveCompanyName, setArchived } from '@/lib/cfo/data'
 import { ACCOUNT_KIND_LABEL, ACTIVITY_LABEL, ARTICLE_KIND_LABEL, PNL_GROUP_LABEL } from '@/lib/cfo/labels'
@@ -81,6 +81,31 @@ export default function CfoSettings() {
   const [editingAccount, setEditingAccount] = useState<string | 'new' | null>(null)
   const [editingArticle, setEditingArticle] = useState<string | 'new' | null>(null)
   const [showArchived, setShowArchived] = useState(false)
+  const [nameError, setNameError] = useState<string | null>(null)
+  const [nameSaving, setNameSaving] = useState(false)
+  const [nameSaved, setNameSaved] = useState(false)
+  const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => () => { if (savedTimer.current) clearTimeout(savedTimer.current) }, [])
+
+  async function submitCompanyName(e: React.FormEvent) {
+    e.preventDefault()
+    const name = companyName.trim()
+    if (!name) { setNameError('Введите название компании'); setNameSaved(false); return }
+    setNameError(null)
+    setNameSaving(true)
+    try {
+      await saveCompanyName(ws, name)
+      await reload()
+      setNameSaved(true)
+      if (savedTimer.current) clearTimeout(savedTimer.current)
+      savedTimer.current = setTimeout(() => setNameSaved(false), 2000)
+    } catch (err) {
+      await reload().catch(() => {})
+      await alert(errText(err))
+    } finally {
+      setNameSaving(false)
+    }
+  }
 
   async function run(action: () => Promise<void>) {
     try {
@@ -121,10 +146,10 @@ export default function CfoSettings() {
         </div>
       </div>
       <div className="flex gap-1 flex-wrap">
-        <GhostButton type="button" aria-label="Выше" onClick={() => void move('cfo_accounts', ws.accounts, a.id, -1)}>↑</GhostButton>
-        <GhostButton type="button" aria-label="Ниже" onClick={() => void move('cfo_accounts', ws.accounts, a.id, 1)}>↓</GhostButton>
-        <GhostButton type="button" onClick={() => setEditingAccount(a.id)}>Изменить</GhostButton>
-        <GhostButton type="button" onClick={() => void run(() => setArchived('cfo_accounts', a.id, !a.archived))}>
+        <GhostButton type="button" className="!px-3 w-11" aria-label={`Выше: ${a.name}`} onClick={() => void move('cfo_accounts', ws.accounts, a.id, -1)}>↑</GhostButton>
+        <GhostButton type="button" className="!px-3 w-11" aria-label={`Ниже: ${a.name}`} onClick={() => void move('cfo_accounts', ws.accounts, a.id, 1)}>↓</GhostButton>
+        <GhostButton type="button" aria-label={`Изменить: ${a.name}`} onClick={() => setEditingAccount(a.id)}>Изменить</GhostButton>
+        <GhostButton type="button" aria-label={`${a.archived ? 'Вернуть' : 'В архив'}: ${a.name}`} onClick={() => void run(() => setArchived('cfo_accounts', a.id, !a.archived))}>
           {a.archived ? 'Вернуть' : 'В архив'}
         </GhostButton>
       </div>
@@ -155,10 +180,10 @@ export default function CfoSettings() {
         </div>
       </div>
       <div className="flex gap-1 flex-wrap">
-        <GhostButton type="button" aria-label="Выше" onClick={() => void move('cfo_articles', ws.articles.filter((x) => x.kind === a.kind), a.id, -1)}>↑</GhostButton>
-        <GhostButton type="button" aria-label="Ниже" onClick={() => void move('cfo_articles', ws.articles.filter((x) => x.kind === a.kind), a.id, 1)}>↓</GhostButton>
-        <GhostButton type="button" onClick={() => setEditingArticle(a.id)}>Изменить</GhostButton>
-        <GhostButton type="button" onClick={() => void run(() => setArchived('cfo_articles', a.id, !a.archived))}>
+        <GhostButton type="button" className="!px-3 w-11" aria-label={`Выше: ${a.name}`} onClick={() => void move('cfo_articles', ws.articles.filter((x) => x.kind === a.kind), a.id, -1)}>↑</GhostButton>
+        <GhostButton type="button" className="!px-3 w-11" aria-label={`Ниже: ${a.name}`} onClick={() => void move('cfo_articles', ws.articles.filter((x) => x.kind === a.kind), a.id, 1)}>↓</GhostButton>
+        <GhostButton type="button" aria-label={`Изменить: ${a.name}`} onClick={() => setEditingArticle(a.id)}>Изменить</GhostButton>
+        <GhostButton type="button" aria-label={`${a.archived ? 'Вернуть' : 'В архив'}: ${a.name}`} onClick={() => void run(() => setArchived('cfo_articles', a.id, !a.archived))}>
           {a.archived ? 'Вернуть' : 'В архив'}
         </GhostButton>
       </div>
@@ -189,13 +214,19 @@ export default function CfoSettings() {
     >
       <Card>
         <SectionTitle>Компания</SectionTitle>
-        <form
-          className="flex gap-2 flex-wrap"
-          onSubmit={(e) => { e.preventDefault(); if (companyName.trim()) void run(() => saveCompanyName(ws, companyName.trim())) }}
-        >
-          <input className={`${inputClass} flex-1 min-w-[200px]`} style={inputStyle} value={companyName} onChange={(e) => setCompanyName(e.target.value)} aria-label="Название компании" />
-          <PrimaryButton type="submit">Сохранить</PrimaryButton>
+        <form className="flex gap-2 flex-wrap items-center" onSubmit={(e) => void submitCompanyName(e)}>
+          <input
+            className={`${inputClass} flex-1 min-w-[200px]`}
+            style={inputStyle}
+            value={companyName}
+            onChange={(e) => { setCompanyName(e.target.value); setNameError(null) }}
+            aria-label="Название компании"
+            aria-invalid={nameError ? true : undefined}
+          />
+          <PrimaryButton type="submit" disabled={nameSaving}>{nameSaving ? 'Сохраняю…' : 'Сохранить'}</PrimaryButton>
+          {nameSaved && <span role="status" className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>Сохранено</span>}
         </form>
+        <ErrorText>{nameError}</ErrorText>
       </Card>
 
       <Card>
@@ -214,6 +245,11 @@ export default function CfoSettings() {
               }}
             />
           </div>
+        )}
+        {accounts.length === 0 && (
+          <p className="text-sm py-2" style={{ color: 'var(--nav-text-muted)' }}>
+            {ws.accounts.length > 0 ? 'Все счета в архиве — включите «Показывать архив» или добавьте счёт' : 'Счетов пока нет — добавьте первый счёт'}
+          </p>
         )}
         {accounts.map(accountRow)}
       </Card>
@@ -238,6 +274,13 @@ export default function CfoSettings() {
             <div className="text-xs font-semibold uppercase mb-1" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.08em' }}>
               {kind === 'income' ? 'Доходы' : 'Расходы'}
             </div>
+            {articleList(kind).length === 0 && (
+              <p className="text-sm py-2" style={{ color: 'var(--nav-text-muted)' }}>
+                {ws.articles.some((x) => x.kind === kind)
+                  ? `Все статьи ${kind === 'income' ? 'доходов' : 'расходов'} в архиве — включите «Показывать архив» или добавьте статью`
+                  : `Статей ${kind === 'income' ? 'доходов' : 'расходов'} пока нет`}
+              </p>
+            )}
             {articleList(kind).map(articleRow)}
           </div>
         ))}

@@ -45,7 +45,7 @@ export default function CfoCalendar() {
       {op.direction === 'transfer'
         ? <span className="text-sm tabular-nums" style={{ color: 'var(--nav-text-secondary)' }}>{formatTenge(op.amount)}</span>
         : <Money value={op.direction === 'in' ? op.amount : -op.amount} signed className="text-sm font-semibold" />}
-      {op.status === 'planned' && <GhostButton type="button" onClick={() => void pay(op)}>Оплачено</GhostButton>}
+      {op.status === 'planned' && <GhostButton type="button" aria-label={`Оплачено: ${opTitle(op, ws.accounts, ws.articles)}`} onClick={() => void pay(op)}>Оплачено</GhostButton>}
     </div>
   )
 

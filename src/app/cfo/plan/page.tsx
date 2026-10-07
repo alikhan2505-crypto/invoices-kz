@@ -1,5 +1,5 @@
 'use client'
-import { useMemo, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import { useAppDialog } from '@/components/AppDialog'
 import { setPlanCells } from '@/lib/cfo/data'
 import { addMonths, todayIso, yearMonths } from '@/lib/cfo/dates'
@@ -13,19 +13,24 @@ const show = (t: number) => (t === 0 ? '' : (t / 100).toLocaleString('ru-RU', { 
 
 function PlanCell({ value, label, onCommit, strong = false }: { value: number; label: string; onCommit: (tiyn: number) => void; strong?: boolean }) {
   const [text, setText] = useState(show(value))
+  const [invalid, setInvalid] = useState(false)
   return (
     <input
       aria-label={label}
+      aria-invalid={invalid ? true : undefined}
+      title={invalid ? 'Введите сумму, например 150000' : undefined}
       inputMode="decimal"
       value={text}
-      onChange={(e) => setText(e.target.value)}
+      onChange={(e) => { setText(e.target.value); setInvalid(false) }}
+      onKeyDown={(e) => { if (e.key === 'Escape') { setText(show(value)); setInvalid(false) } }}
       onBlur={() => {
         const parsed = text.trim() === '' ? 0 : parseAmountInput(text)
-        if (parsed === null) { setText(show(value)); return }
+        if (parsed === null) { setInvalid(true); return }
+        setInvalid(false)
         if (parsed !== value) onCommit(parsed)
       }}
-      className={`w-28 min-h-[44px] rounded-md px-2 text-right text-sm tabular-nums outline-none border border-transparent focus:border-[color:var(--nav-accent)] ${strong ? 'font-semibold' : ''}`}
-      style={{ background: 'transparent', color: 'var(--nav-text-primary)' }}
+      className={`w-28 min-h-[44px] rounded-md px-2 text-right text-sm tabular-nums outline-none border ${invalid ? 'border-[color:var(--nav-critical)]' : 'border-transparent focus:border-[color:var(--nav-accent)]'} ${strong ? 'font-semibold' : ''}`}
+      style={{ background: 'transparent', color: invalid ? 'var(--nav-critical)' : 'var(--nav-text-primary)' }}
     />
   )
 }
@@ -35,7 +40,7 @@ export default function CfoPlan() {
   const { alert, confirm, dialogElement } = useAppDialog()
   const [year, setYear] = useState(Number(todayIso().slice(0, 4)))
   const [resetNonce, setResetNonce] = useState(0)
-  const months = yearMonths(year)
+  const months = useMemo(() => yearMonths(year), [year])
   const planMap = useMemo(() => new Map(ws.plan.map((p) => [`${p.articleId}|${p.month}`, p.amount])), [ws.plan])
   const valueOf = (articleId: string, month: string) => planMap.get(`${articleId}|${month}`) ?? 0
 
@@ -60,10 +65,18 @@ export default function CfoPlan() {
   }
 
   // Годовая сумма делится поровну, остаток тиынов — в декабрь.
-  function distribute(articleId: string, total: number) {
+  async function distribute(articleId: string, total: number) {
+    const overwrites = months.some((m) => valueOf(articleId, m) !== 0)
+    if (overwrites) {
+      const name = ws.articles.find((a) => a.id === articleId)?.name ?? ''
+      if (!(await confirm(`Заменить план по статье «${name}» за все 12 месяцев ${year} года равными долями от новой суммы?`))) {
+        setResetNonce((n) => n + 1) // drop the typed draft
+        return
+      }
+    }
     const base = Math.floor(total / 12)
     const rest = total - base * 12
-    void commit(months.map((m, i) => ({ articleId, month: m, amount: base + (i === 11 ? rest : 0) })))
+    await commit(months.map((m, i) => ({ articleId, month: m, amount: base + (i === 11 ? rest : 0) })))
   }
 
   return (
@@ -90,9 +103,9 @@ export default function CfoPlan() {
           </thead>
           <tbody>
             {(['income', 'expense'] as ArticleKind[]).map((kind) => (
-              <PlanGroup key={kind}>
+              <Fragment key={kind}>
                 <tr>
-                  <td colSpan={14} className="sticky left-0 px-3 pt-4 pb-1 text-xs font-semibold uppercase" style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-muted)', letterSpacing: '0.08em' }}>
+                  <td colSpan={14} className="sticky left-0 z-10 px-3 pt-4 pb-1 text-xs font-semibold uppercase" style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-muted)', letterSpacing: '0.08em' }}>
                     {kind === 'income' ? 'Доходы' : 'Расходы'}
                   </td>
                 </tr>
@@ -107,12 +120,12 @@ export default function CfoPlan() {
                         </td>
                       ))}
                       <td className="px-1 py-1">
-                        <PlanCell key={`${a.id}|year|${total}|${resetNonce}`} label={`${a.name}, год`} value={total} strong onCommit={(v) => distribute(a.id, v)} />
+                        <PlanCell key={`${a.id}|year|${total}|${resetNonce}`} label={`${a.name}, год`} value={total} strong onCommit={(v) => void distribute(a.id, v)} />
                       </td>
                     </tr>
                   )
                 })}
-              </PlanGroup>
+              </Fragment>
             ))}
           </tbody>
         </table>
@@ -120,8 +133,4 @@ export default function CfoPlan() {
       {dialogElement}
     </CfoPage>
   )
-}
-
-function PlanGroup({ children }: { children: React.ReactNode }) {
-  return <>{children}</>
 }

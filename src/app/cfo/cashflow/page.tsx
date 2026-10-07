@@ -18,7 +18,7 @@ export default function CfoCashflow() {
   const [year, setYear] = useState(Number(todayIso().slice(0, 4)))
   const [measure, setMeasure] = useState<Measure>('fact')
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
-  const months = yearMonths(year)
+  const months = useMemo(() => yearMonths(year), [year])
 
   const rows: ReportRow[] = useMemo(() => {
     const raw = buildCashflow({ accounts: ws.accounts, articles: ws.articles, operations: ws.operations, plan: ws.plan, months })

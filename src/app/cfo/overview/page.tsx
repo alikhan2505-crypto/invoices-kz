@@ -37,7 +37,7 @@ export default function CfoOverview() {
   const planNote = (c: { plan: number; fact: number }) => {
     if (!c.plan) return 'плана нет'
     const pct = Math.round(((c.fact - c.plan) / Math.abs(c.plan)) * 100)
-    return `план ${formatTenge(c.plan)} · ${pct > 0 ? '+' : ''}${pct}%`
+    return `план ${formatTenge(c.plan)} · ${pct > 0 ? '+' : pct < 0 ? '−' : ''}${Math.abs(pct)}%`
   }
   const actual = ws.operations.filter((o) => o.status === 'actual')
   // The headline counts archived accounts too, so name their total — otherwise the parts don't add up.
@@ -59,7 +59,7 @@ export default function CfoOverview() {
       {d.firstGap && (
         <Card className="!py-3">
           <p className="text-sm font-medium" style={{ color: 'var(--nav-critical)' }}>
-            Кассовый разрыв {dayLabel(d.firstGap)} — по плановым платежам денег не хватит. <a href="/cfo/calendar" className="underline">Открыть календарь</a>
+            Кассовый разрыв {dayLabel(d.firstGap)} — по плановым платежам денег не хватит. <a href="/cfo/calendar" className="underline inline-flex min-h-[44px] items-center">Открыть календарь</a>
           </p>
         </Card>
       )}
@@ -69,7 +69,7 @@ export default function CfoOverview() {
         <Kpi label="Валовая маржа" value={d.grossMarginPct === null ? '—' : `${Math.round(d.grossMarginPct)}%`} sub="(выручка − себестоимость) ÷ выручка" />
         <Kpi label="Чистая прибыль" value={formatTenge(d.netProfit.fact)} sub={planNote(d.netProfit)} tone={d.netProfit.fact < 0 ? 'bad' : undefined} />
         <Kpi label="Деньги сейчас" value={formatTenge(d.cashNow)} sub={byAccount || 'на всех счетах и в кассах'} tone={d.cashNow < 0 ? 'bad' : undefined} />
-        <Kpi label="Запас денег" value={d.runwayDays === null ? '—' : `${d.runwayDays} дн.`} sub={d.runwayDays === null ? 'нет выплат за 90 дней' : 'без новых поступлений, по средним выплатам за 90 дней'} tone={d.runwayDays !== null && d.runwayDays < 30 ? 'bad' : undefined} />
+        <Kpi label="Запас денег" value={d.runwayDays === null ? '—' : d.cashNow <= 0 ? 'нет денег' : `${d.runwayDays} дн.`} sub={d.runwayDays === null ? 'нет выплат за 90 дней' : 'без новых поступлений, по средним выплатам за 90 дней'} tone={d.runwayDays !== null && (d.cashNow <= 0 || d.runwayDays < 30) ? 'bad' : undefined} />
         <Kpi label="Точка безубыточности" value={breakeven} sub={breakevenSub} />
       </div>
 
@@ -80,17 +80,17 @@ export default function CfoOverview() {
             <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm" style={{ background: 'var(--nav-success)' }} />Доходы</span>
             <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm" style={{ background: 'var(--nav-magenta)' }} />Расходы</span>
           </div>
-          <div style={{ height: 220 }}>
+          <div style={{ height: 220 }} role="img" aria-label="Доходы и расходы за 12 месяцев: столбчатая диаграмма по месяцам">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={d.monthly.map((x) => ({ name: shortMonth(x.month), income: x.income / 100, expense: x.expense / 100 }))}>
                 <XAxis dataKey="name" tick={{ fill: 'var(--nav-text-muted)', fontSize: 11 }} axisLine={false} tickLine={false} />
                 <Tooltip
-                  formatter={(v, name) => [formatTenge(Math.round(Number(v) * 100)), name === 'income' ? 'Доходы' : 'Расходы']}
+                  formatter={(v, name) => [formatTenge(Math.round(Number(v) * 100)), name]}
                   contentStyle={{ background: 'var(--nav-surface-chrome)', border: '1px solid var(--nav-border)', borderRadius: 12, color: 'var(--nav-text-primary)' }}
                   cursor={{ fill: 'var(--nav-surface-glass)' }}
                 />
-                <Bar dataKey="income" fill="var(--nav-success)" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="expense" fill="var(--nav-magenta)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="income" name="Доходы" fill="var(--nav-success)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="expense" name="Расходы" fill="var(--nav-magenta)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -111,6 +111,11 @@ export default function CfoOverview() {
                 </div>
               </div>
             ))}
+            {d.expenseStructure.length > 8 && (
+              <p className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>
+                ещё {d.expenseStructure.length - 8} {d.expenseStructure.length - 8 === 1 ? 'статья' : d.expenseStructure.length - 8 < 5 ? 'статьи' : 'статей'} — {formatTenge(d.expenseStructure.slice(8).reduce((s, x) => s + x.amount, 0))}
+              </p>
+            )}
           </div>
         </Card>
       </div>

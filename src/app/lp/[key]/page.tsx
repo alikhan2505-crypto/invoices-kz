@@ -18,7 +18,11 @@ export async function generateMetadata({ params }: { params: Promise<{ key: stri
   const { key } = await params
   if (!isLandingKey(key)) return {}
   const l = LANDINGS[key]
+  // CFO is in closed beta: keep it out of search until it opens. (Not keyed off access === 'invite' --
+  // salon is also invite-only but its indexing must stay as is.) Remove this when cfo goes 'open'.
+  const robots = key === 'cfo' ? { index: false } : undefined
   return {
+    ...(robots && { robots }),
     title: l.metaTitle,
     description: l.metaDescription,
     alternates: { canonical: `${l.origin}/` },

@@ -64,9 +64,9 @@ export default function ReportTable({ months, rows, measure, collapsed, onToggle
       <table className="text-sm border-collapse min-w-full">
         <thead>
           <tr style={{ borderBottom: '1px solid var(--nav-border)' }}>
-            <th className="sticky left-0 z-10 text-left font-semibold px-3 py-2 min-w-[240px]" style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-secondary)' }}>Статья</th>
-            {months.map((m) => <th key={m} className="px-3 py-2 font-semibold text-right whitespace-nowrap" style={{ color: 'var(--nav-text-secondary)' }}>{shortMonth(m)}</th>)}
-            <th className="px-3 py-2 font-semibold text-right whitespace-nowrap" style={{ color: 'var(--nav-text-secondary)' }}>{measure === 'diff' && elapsed.length > 0 && elapsed.length < months.length ? 'Итого с начала года' : 'Итого'}</th>
+            <th scope="col" className="sticky left-0 z-10 text-left font-semibold px-3 py-2 min-w-[240px]" style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-secondary)' }}>Статья</th>
+            {months.map((m) => <th scope="col" key={m} className="px-3 py-2 font-semibold text-right whitespace-nowrap" style={{ color: 'var(--nav-text-secondary)' }}>{shortMonth(m)}</th>)}
+            <th scope="col" className="px-3 py-2 font-semibold text-right whitespace-nowrap" style={{ color: 'var(--nav-text-secondary)' }}>{measure === 'diff' && elapsed.length > 0 && elapsed.length < months.length ? 'Итого с начала года' : 'Итого'}</th>
           </tr>
         </thead>
         <tbody>

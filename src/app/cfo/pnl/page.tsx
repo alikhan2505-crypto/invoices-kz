@@ -16,7 +16,7 @@ export default function CfoPnl() {
   const [year, setYear] = useState(Number(todayIso().slice(0, 4)))
   const [measure, setMeasure] = useState<Measure>('fact')
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
-  const months = yearMonths(year)
+  const months = useMemo(() => yearMonths(year), [year])
 
   const rows: ReportRow[] = useMemo(() => buildPnl({ articles: ws.articles, operations: ws.operations, plan: ws.plan, months }).map((r) => ({
     key: r.key,

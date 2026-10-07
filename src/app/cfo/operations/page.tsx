@@ -75,11 +75,11 @@ export default function CfoOperations() {
         <EmptyState title="Добавьте первую операцию" hint="Приход, расход или перевод между своими счетами — из них сами строятся БДР, БДДС и календарь." />
       ) : (
         <Card className="!p-0 overflow-hidden">
-          {list.length === 0 && <p className="p-4 text-sm" style={{ color: 'var(--nav-text-muted)' }}>За этот период операций нет.</p>}
+          {list.length === 0 && <p className="p-4 text-sm" style={{ color: 'var(--nav-text-muted)' }}>{accountId || articleId || status !== 'all' ? 'Нет операций по выбранным фильтрам' : 'За этот период операций нет.'}</p>}
           {list.map((op) => (
             <div key={op.id} className="px-4 py-3 flex items-start gap-3 flex-wrap" style={{ borderBottom: '1px solid var(--nav-border-soft)' }}>
-              <div className="w-28 flex-shrink-0 text-xs pt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{dayLabel(op.paidOn)}</div>
-              <div className="flex-1 min-w-[180px]">
+              <div className="order-1 w-28 flex-shrink-0 text-xs pt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{dayLabel(op.paidOn)}</div>
+              <div className="order-3 w-full sm:order-2 sm:w-auto sm:flex-1 sm:min-w-[180px]">
                 <div className="text-sm font-medium" style={{ color: 'var(--nav-text-primary)' }}>{opTitle(op, ws.accounts, ws.articles)}</div>
                 <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>
                   {op.direction !== 'transfer' && `${accountName(op.accountId, ws.accounts)} · `}
@@ -87,17 +87,18 @@ export default function CfoOperations() {
                   {op.accruedOn !== op.paidOn && ` · начисление ${op.accruedOn}`}
                 </div>
               </div>
-              <div className="text-right">
+              <div className="order-2 ml-auto sm:ml-0 sm:order-3 text-right">
                 {op.direction === 'transfer'
                   ? <span className="text-sm tabular-nums" style={{ color: 'var(--nav-text-secondary)' }}>{formatTenge(op.amount)}</span>
                   : <Money value={signedAmount(op)} signed className="text-sm font-semibold" />}
                 <div className="mt-1">{op.status === 'planned' ? <Badge tone="plan">План</Badge> : <Badge tone="fact">Факт</Badge>}</div>
               </div>
-              <div className="w-full flex gap-1 flex-wrap justify-end">
-                {op.status === 'planned' && <GhostButton type="button" onClick={() => void run(() => markPaid(ws, op, today))}>Оплачено</GhostButton>}
-                <GhostButton type="button" onClick={() => setEditing(op)}>Изменить</GhostButton>
+              <div className="order-4 w-full flex gap-1 flex-wrap justify-end">
+                {op.status === 'planned' && <GhostButton type="button" aria-label={`Оплачено: ${opTitle(op, ws.accounts, ws.articles)}`} onClick={() => void run(() => markPaid(ws, op, today))}>Оплачено</GhostButton>}
+                <GhostButton type="button" aria-label={`Изменить: ${opTitle(op, ws.accounts, ws.articles)}`} onClick={() => setEditing(op)}>Изменить</GhostButton>
                 <GhostButton
                   type="button"
+                  aria-label={`Удалить: ${opTitle(op, ws.accounts, ws.articles)}`}
                   onClick={async () => { if (await confirm('Удалить операцию?')) await run(() => deleteOperation(op.id)) }}
                 >
                   Удалить
