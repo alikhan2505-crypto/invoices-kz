@@ -45,4 +45,13 @@ export function apexToApiRedirect(hostname: string, pathname: string, baseDomain
   return Object.prototype.hasOwnProperty.call(APEX_TO_API, clean) ? `https://api.${baseDomain}${APEX_TO_API[clean]}` : null
 }
 
+// CFO-кабинет живёт на своём поддомене: старые адреса invoices.kz/cfo/... ведут туда
+// же с сохранением пути и параметров (как у остальных продуктов, куда попадают через
+// переключатель). Временный 307 — чтобы откат был простым.
+export function apexToCfoRedirect(hostname: string, pathname: string, search: string, baseDomain: string): string | null {
+  if (hostname !== baseDomain && hostname !== `www.${baseDomain}`) return null
+  if (pathname !== '/cfo' && !pathname.startsWith('/cfo/')) return null
+  return `https://cfo.${baseDomain}${pathname}${search}`
+}
+
 export const API_HOST_BASE = process.env.API_HOST_REDIRECT === '1' ? 'https://api.invoices.kz' : 'https://invoices.kz'

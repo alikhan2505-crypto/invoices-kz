@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { productHostRewrite, apexToApiRedirect, isProductHost } from './hostRouting'
+import { productHostRewrite, apexToApiRedirect, apexToCfoRedirect, isProductHost } from './hostRouting'
 
 describe('productHostRewrite', () => {
   it('api host: root shows the Cashier API landing, /docs the docs', () => {
@@ -80,5 +80,18 @@ describe('cfo host', () => {
     expect(productHostRewrite('cfo.invoices.kz', '/', 'invoices.kz')).toBe('/lp/cfo')
     expect(productHostRewrite('cfo.invoices.kz', '/cfo/overview', 'invoices.kz')).toBeNull()
     expect(isProductHost('cfo.invoices.kz', 'invoices.kz')).toBe(true)
+  })
+})
+
+describe('apexToCfoRedirect', () => {
+  it('sends apex and www /cfo paths to the cfo subdomain, keeping path and query', () => {
+    expect(apexToCfoRedirect('invoices.kz', '/cfo/operations', '?m=1', 'invoices.kz')).toBe('https://cfo.invoices.kz/cfo/operations?m=1')
+    expect(apexToCfoRedirect('www.invoices.kz', '/cfo', '', 'invoices.kz')).toBe('https://cfo.invoices.kz/cfo')
+  })
+  it('leaves everything else alone', () => {
+    expect(apexToCfoRedirect('invoices.kz', '/cfoo', '', 'invoices.kz')).toBeNull()
+    expect(apexToCfoRedirect('invoices.kz', '/create', '', 'invoices.kz')).toBeNull()
+    expect(apexToCfoRedirect('cfo.invoices.kz', '/cfo/overview', '', 'invoices.kz')).toBeNull()
+    expect(apexToCfoRedirect('localhost', '/cfo/overview', '', 'invoices.kz')).toBeNull()
   })
 })

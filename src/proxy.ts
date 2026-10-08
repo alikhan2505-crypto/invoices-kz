@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { productHostRewrite, apexToApiRedirect } from '@/lib/hostRouting'
+import { productHostRewrite, apexToApiRedirect, apexToCfoRedirect } from '@/lib/hostRouting'
 
 // Next 16 переименовал middleware в proxy -- см.
 // node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/proxy.md
@@ -12,13 +12,16 @@ const BASE_DOMAIN = process.env.NEXT_PUBLIC_SITE_DOMAIN || 'invoices.kz'
 // constraint salon_sites_slug_reserved в supabase/migrations/salon_sites.sql --
 // оба места решают один вопрос ("что зарезервировано"), и если бы списки
 // разошлись, один бы тихо пропускал то, что другой уже отсёк на входе.
-const PLATFORM_SUBDOMAINS = new Set(['www', 'api', 'app', 'admin', 'mail', 'smtp', 'ftp', 'cdn', 'static', 'invoices', 'shop', 'pay', 'kaspi', 'agent', 'salon', 'docs', 'my', 'wb', 'bot'])
+const PLATFORM_SUBDOMAINS = new Set(['www', 'api', 'app', 'admin', 'mail', 'smtp', 'ftp', 'cdn', 'static', 'invoices', 'shop', 'pay', 'kaspi', 'agent', 'salon', 'docs', 'my', 'wb', 'bot', 'cfo'])
 
 export function proxy(request: NextRequest) {
   const hostname = (request.headers.get('host') || '').split(':')[0].toLowerCase()
 
   const apexRedirect = apexToApiRedirect(hostname, request.nextUrl.pathname, BASE_DOMAIN, process.env.API_HOST_REDIRECT === '1')
   if (apexRedirect) return NextResponse.redirect(apexRedirect, 301)
+
+  const cfoRedirect = apexToCfoRedirect(hostname, request.nextUrl.pathname, request.nextUrl.search, BASE_DOMAIN)
+  if (cfoRedirect) return NextResponse.redirect(cfoRedirect, 307)
 
   const suffix = `.${BASE_DOMAIN}`
   if (!hostname.endsWith(suffix)) return NextResponse.next()
