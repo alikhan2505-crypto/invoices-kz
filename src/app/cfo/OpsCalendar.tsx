@@ -13,8 +13,8 @@ const net = (ops: CfoOperation[]) => ops.reduce((s, o) => s + (o.direction === '
 function short(t: number): string {
   const v = Math.abs(t) / 100
   const sign = t < 0 ? '−' : '+'
-  if (v >= 1_000_000) return `${sign}${(v / 1_000_000).toFixed(v >= 10_000_000 ? 0 : 2).replace(/\.?0+$/, '').replace('.', ',')} млн`
-  if (v >= 1_000) return `${sign}${Math.round(v / 1_000)} тыс`
+  if (v >= 1_000_000) return `${sign}${(v / 1_000_000).toFixed(v >= 10_000_000 ? 0 : 2).replace(/\.?0+$/, '').replace('.', ',')}м`
+  if (v >= 1_000) return `${sign}${Math.round(v / 1_000)}к`
   return `${sign}${Math.round(v)}`
 }
 
@@ -42,7 +42,7 @@ export default function OpsCalendar({ months, byDate, today, selected, onSelect,
         const monthOps = days.flatMap((d) => byDate.get(d) ?? [])
         const monthNet = net(monthOps.filter((o) => o.direction !== 'transfer'))
         return (
-          <section key={m} ref={m === scrollToMonth ? anchor : undefined} aria-label={monthTitle(m)} className="scroll-mt-4">
+          <section key={m} ref={m === scrollToMonth ? anchor : undefined} aria-label={monthTitle(m)} className="scroll-mt-20 lg:scroll-mt-4">
             <div className="flex items-baseline justify-between gap-2 mb-2 flex-wrap">
               <h2 className="text-lg font-bold" style={{ color: 'var(--nav-text-primary)' }}>{monthTitle(m)}</h2>
               {monthOps.length > 0 && (
@@ -75,10 +75,10 @@ export default function OpsCalendar({ months, byDate, today, selected, onSelect,
                       opacity: d < today && ops.length === 0 ? 0.7 : 1,
                     }}
                   >
-                    <span className="flex items-center justify-between gap-1">
+                    <span className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0 sm:gap-1 min-w-0">
                       <span className="text-xs font-semibold" style={{ color: isToday ? 'var(--nav-accent)' : 'var(--nav-text-primary)' }}>{Number(d.slice(8))}</span>
                       {ops.length > 0 && dayNet !== 0 && (
-                        <span className="text-[10px] sm:text-[11px] font-semibold tabular-nums truncate" style={{ color: dayNet < 0 ? 'var(--nav-critical)' : 'var(--nav-success)' }}>{short(dayNet)}</span>
+                        <span className="text-[10px] sm:text-[11px] font-semibold tabular-nums leading-tight" style={{ color: dayNet < 0 ? 'var(--nav-critical)' : 'var(--nav-success)' }}>{short(dayNet)}</span>
                       )}
                     </span>
                     {/* На телефоне в плитке только сумма дня — детали по нажатию. */}
