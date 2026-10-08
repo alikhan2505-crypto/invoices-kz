@@ -157,9 +157,7 @@ export default function CfoOperations() {
       {view === 'calendar' && (
         <>
           <div className="flex justify-center"><GhostButton type="button" onClick={() => setRange((r) => ({ ...r, from: addMonths(r.from, -1) }))}>↑ Показать предыдущий месяц</GhostButton></div>
-          <OpsCalendar months={monthRange(range.from, range.to)} byDate={byDate} today={today} selected={selected} onSelect={setSelected} accounts={ws.accounts} articles={ws.articles} scrollToMonth={monthKey(today)} />
-          <div className="flex justify-center"><GhostButton type="button" onClick={() => setRange((r) => ({ ...r, to: addMonths(r.to, 1) }))}>↓ Показать следующий месяц</GhostButton></div>
-          {selected && (
+          <OpsCalendar months={monthRange(range.from, range.to)} byDate={byDate} today={today} selected={selected} onSelect={setSelected} accounts={ws.accounts} articles={ws.articles} scrollToMonth={monthKey(today)} dayPanel={selected ? (
             <Card className="!p-0 overflow-hidden">
               <div className="px-4 py-3 flex items-center justify-between gap-2 flex-wrap" style={{ borderBottom: '1px solid var(--nav-border-soft)' }}>
                 <SectionTitle>{dayLabel(selected)}</SectionTitle>
@@ -168,7 +166,8 @@ export default function CfoOperations() {
               {(byDate.get(selected) ?? []).length === 0 && <p className="p-4 text-sm" style={{ color: 'var(--nav-text-muted)' }}>В этот день операций нет.</p>}
               {(byDate.get(selected) ?? []).map(row)}
             </Card>
-          )}
+          ) : null} />
+          <div className="flex justify-center"><GhostButton type="button" onClick={() => setRange((r) => ({ ...r, to: addMonths(r.to, 1) }))}>↓ Показать следующий месяц</GhostButton></div>
         </>
       )}
 

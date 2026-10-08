@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { daysInMonth } from '@/lib/cfo/dates'
 import { monthTitle, opTitle } from '@/lib/cfo/labels'
 import { formatTenge } from '@/lib/cfo/money'
@@ -19,7 +19,7 @@ function short(t: number): string {
 }
 
 // Месяцы плитками по 7 дней (с понедельника), друг под другом — листаются обычной прокруткой.
-export default function OpsCalendar({ months, byDate, today, selected, onSelect, accounts, articles, scrollToMonth }: {
+export default function OpsCalendar({ months, byDate, today, selected, onSelect, accounts, articles, scrollToMonth, dayPanel }: {
   months: string[]
   byDate: Map<string, CfoOperation[]>
   today: string
@@ -28,6 +28,7 @@ export default function OpsCalendar({ months, byDate, today, selected, onSelect,
   accounts: CfoAccount[]
   articles: CfoArticle[]
   scrollToMonth: string
+  dayPanel?: ReactNode // карточка выбранного дня — встаёт сразу под его месяцем
 }) {
   const anchor = useRef<HTMLDivElement | null>(null)
   useEffect(() => { anchor.current?.scrollIntoView({ block: 'start' }) }, [scrollToMonth])
@@ -97,6 +98,7 @@ export default function OpsCalendar({ months, byDate, today, selected, onSelect,
                 )
               })}
             </div>
+            {selected && selected.startsWith(m) && dayPanel && <div className="mt-3">{dayPanel}</div>}
           </section>
         )
       })}
