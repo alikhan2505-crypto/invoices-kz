@@ -86,7 +86,7 @@ export default function CfoOverview() {
         <Kpi label="Деньги сейчас" value={formatTenge(d.cashNow)} sub={byAccount || 'на всех счетах и в кассах'} tone={d.cashNow < 0 ? 'bad' : undefined} />
         <Kpi label="Запас денег" value={d.runwayDays === null ? '—' : d.cashNow <= 0 ? 'нет денег' : `${d.runwayDays} дн.`} sub={d.runwayDays === null ? 'нет выплат за 90 дней' : 'без новых поступлений, по средним выплатам за 90 дней'} tone={d.runwayDays !== null && (d.cashNow <= 0 || d.runwayDays < 30) ? 'bad' : undefined} />
         {family
-          ? <Kpi label="Средние траты в день" value={formatTenge(Math.round((d.revenue.fact - d.netProfit.fact) / Math.max(1, month === monthKey(todayIso()) ? Number(todayIso().slice(8)) : daysInMonth(month))))} sub="расходы месяца ÷ дни" />
+          ? <Kpi label="Средние траты в день" value={formatTenge(Math.round((d.revenue.fact - d.netProfit.fact) / Math.max(1, month === monthKey(todayIso()) ? Number(todayIso().slice(8)) : daysInMonth(month)) / 100) * 100)} sub="расходы месяца ÷ дни" />
           : <Kpi label="Точка безубыточности" value={breakeven} sub={breakevenSub} />}
       </div>
 
