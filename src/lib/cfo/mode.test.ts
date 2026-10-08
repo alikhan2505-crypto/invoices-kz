@@ -17,7 +17,7 @@ describe('planModeSwitch', () => {
     const articles = [a('1', 'Выручка от услуг', true, 'income'), a('2', 'Продукты'), a('3', 'Кафе и доставка еды'), a('4', 'Зарплата', false, 'income')]
     const plan = planModeSwitch(articles, new Set(['3']), 'business', BUSINESS_ARTICLE_NAMES)
     expect(plan.restore).toEqual(['1'])
-    expect(plan.archive).toEqual(['2']) // семейная «Зарплата» (доход) совпадает по имени с бизнес-статьёй — не трогаем
+    expect(plan.archive).toEqual(['2', '4']) // семейная «Зарплата» — доход, а в бизнесе «Зарплата» — расход: в архив
     expect(plan.add).toEqual([])
   })
 })

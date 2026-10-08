@@ -61,20 +61,24 @@ export function planModeSwitch(
   const have = new Set(articles.map((a) => key(a.name, a.kind)))
   const familyKeys = new Set(FAMILY_ARTICLES.map((a) => key(a.name, a.kind)))
   const isFamily = (a: { name: string; kind: ArticleKind }) => familyKeys.has(key(a.name, a.kind))
-  const isBusiness = (a: { name: string; kind: ArticleKind }) => businessNames.has(a.name.toLowerCase()) && !isFamily(a)
+  const isBusiness = (a: { name: string; kind: ArticleKind }) => businessNames.has(a.name.toLowerCase()) && businessKind(a.name) === a.kind
   if (target === 'family') {
     return {
       add: FAMILY_ARTICLES.filter((f) => !have.has(key(f.name, f.kind))),
-      archive: articles.filter((a) => !a.archived && !used.has(a.id) && isBusiness(a)).map((a) => a.id),
+      archive: articles.filter((a) => !a.archived && !used.has(a.id) && isBusiness(a) && !isFamily(a)).map((a) => a.id),
       restore: articles.filter((a) => a.archived && isFamily(a)).map((a) => a.id),
     }
   }
   return {
     add: [],
-    archive: articles.filter((a) => !a.archived && !used.has(a.id) && isFamily(a) && !businessNames.has(a.name.toLowerCase())).map((a) => a.id),
+    archive: articles.filter((a) => !a.archived && !used.has(a.id) && isFamily(a) && !isBusiness(a)).map((a) => a.id),
     restore: articles.filter((a) => a.archived && isBusiness(a)).map((a) => a.id),
   }
 }
+
+// Доходные статьи из стартового набора бизнеса; остальные стартовые — расходы.
+const BUSINESS_INCOME = new Set(['выручка от продажи товаров', 'выручка от услуг', 'прочие доходы', 'получение кредита / займа', 'вложения собственника', 'продажа оборудования и ос'])
+const businessKind = (name: string): ArticleKind => (BUSINESS_INCOME.has(name.toLowerCase()) ? 'income' : 'expense')
 
 // Стартовые статьи бизнеса — те же 25 названий, что заводит cfo_bootstrap().
 export const BUSINESS_ARTICLE_NAMES = new Set([
