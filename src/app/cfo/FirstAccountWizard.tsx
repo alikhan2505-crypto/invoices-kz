@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import type { AccountKind } from '@/lib/cfo/types'
-import { createAccounts } from '@/lib/cfo/data'
+import { createAccounts, loadDemo } from '@/lib/cfo/data'
 import { parseAmountInput } from '@/lib/cfo/money'
 import { isIsoDate, todayIso } from '@/lib/cfo/dates'
 import { ACCOUNT_KIND_LABEL } from '@/lib/cfo/labels'
@@ -24,6 +24,21 @@ export default function FirstAccountWizard() {
   const [date, setDate] = useState(`${todayIso().slice(0, 7)}-01`)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [demoBusy, setDemoBusy] = useState(false)
+
+  async function showDemo() {
+    if (demoBusy) return
+    setDemoBusy(true)
+    setError(null)
+    try {
+      await loadDemo(ws, todayIso())
+      await reload()
+    } catch (err) {
+      await reload().catch(() => {})
+      setError(err instanceof Error ? err.message : String(err))
+      setDemoBusy(false)
+    }
+  }
 
   const patch = (key: number, p: Partial<Row>) => setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...p } : r)))
   const addRow = () => setRows((rs) => [...rs, { key: Math.max(...rs.map((r) => r.key)) + 1, kind: 'bank', name: '', balance: '' }])
@@ -63,6 +78,14 @@ export default function FirstAccountWizard() {
 
   return (
     <CfoPage title="Начнём учёт">
+      <Card className="max-w-2xl">
+        <div className="flex items-center gap-3 flex-wrap">
+          <p className="text-sm flex-1 min-w-[200px]" style={{ color: 'var(--nav-text-secondary)' }}>
+            Сначала хотите посмотреть, как всё работает? Заполним кабинет примером небольшой компании — с отчётами, календарём и кассовым разрывом. Потом одной кнопкой очистите.
+          </p>
+          <GhostButton type="button" disabled={demoBusy} onClick={() => void showDemo()}>{demoBusy ? 'Заполняю…' : 'Посмотреть на примере'}</GhostButton>
+        </div>
+      </Card>
       <Card className="max-w-2xl">
         <p className="text-sm mb-4" style={{ color: 'var(--nav-text-secondary)' }}>
           Укажите, сколько денег сейчас на каждом счёте, карте, в кассе и на депозите — это стартовая точка для движения денег и платёжного календаря.

@@ -6,6 +6,7 @@ import { toDbAmount, toTiyn } from './money'
 import type { AccountKind, Activity, ArticleKind, CfoAccount, CfoArticle, CfoOperation, CfoPlanItem, CfoRecurrence, Direction, InvoiceLite, OpStatus, PnlGroup } from './types'
 import type { OperationDraft, RecurrenceDraft } from './validate'
 import type { ImportDraft } from './statementImport'
+import { buildDemo } from './demo'
 
 export type Workspace = {
   userId: string
@@ -13,6 +14,7 @@ export type Workspace = {
   companyName: string
   telegramDigest: boolean
   countInvoices: boolean
+  hasDemo?: boolean // в кабинете лежит «пример» — показываем плашку «очистить»
   invoices: InvoiceLite[]
   accounts: CfoAccount[]
   articles: CfoArticle[]
@@ -110,7 +112,7 @@ export async function bootstrapWorkspace(): Promise<string> {
 export async function loadWorkspace(companyId: string, userId: string, db: SupabaseClient = supabase): Promise<Workspace> {
   const [company, accounts, articles, operations, recurrences, plan, invoices] = await Promise.all([
     db.from('cfo_companies').select('name, telegram_digest, count_invoices').eq('id', companyId).single(),
-    selectAll(db, 'cfo_accounts', 'id, name, kind, opening_balance, opening_date, archived, sort', companyId),
+    selectAll(db, 'cfo_accounts', 'id, name, kind, opening_balance, opening_date, archived, sort, is_demo', companyId),
     selectAll(db, 'cfo_articles', 'id, name, kind, activity, pnl_group, archived, sort', companyId),
     selectAll(db, 'cfo_operations', 'id, direction, amount, account_id, to_account_id, article_id, counterparty, comment, paid_on, accrued_on, status, recurrence_id, recurrence_date, invoice_id', companyId),
     selectAll(db, 'cfo_recurrences', 'id, direction, amount, account_id, to_account_id, article_id, counterparty, comment, day_of_month, starts_on, ends_on', companyId),
@@ -124,6 +126,7 @@ export async function loadWorkspace(companyId: string, userId: string, db: Supab
     companyName: (company.data as Row).name,
     telegramDigest: (company.data as Row).telegram_digest === true,
     countInvoices: (company.data as Row).count_invoices !== false,
+    hasDemo: accounts.some((r) => r.is_demo === true),
     invoices,
     accounts: accounts.map(mapAccount).sort(bySort),
     articles: articles.map(mapArticle).sort(bySort),
@@ -134,6 +137,34 @@ export async function loadWorkspace(companyId: string, userId: string, db: Supab
 }
 
 const owned = (ws: Workspace) => ({ user_id: ws.userId, company_id: ws.companyId })
+
+// «Посмотреть на примере»: всё пишется с is_demo = true и потом целиком удаляется.
+export async function loadDemo(ws: Workspace, today: string): Promise<void> {
+  const demo = buildDemo(today, ws.articles, () => crypto.randomUUID())
+  if (!demo) throw new Error('Не нашли стартовые статьи — пример собирается на них. Верните их из архива в настройках.')
+  const mark = { ...owned(ws), is_demo: true }
+  const base = Math.max(0, ...ws.accounts.map((x) => x.sort))
+  check((await supabase.from('cfo_accounts').insert(demo.accounts.map((a, i) => ({ ...mark, id: a.id, name: a.name, kind: a.kind, opening_balance: toDbAmount(a.openingBalance), opening_date: a.openingDate, sort: base + (i + 1) * 10 })))).error)
+  check((await supabase.from('cfo_operations').insert(demo.operations.map((o) => ({ ...mark, direction: o.direction, amount: toDbAmount(o.amount), account_id: o.accountId, article_id: o.articleId, counterparty: o.counterparty, paid_on: o.paidOn, accrued_on: o.paidOn, status: o.status })))).error)
+  check((await supabase.from('cfo_recurrences').insert(demo.recurrences.map((r) => ({ ...mark, direction: r.direction, amount: toDbAmount(r.amount), account_id: r.accountId, article_id: r.articleId, counterparty: r.counterparty, day_of_month: r.dayOfMonth, starts_on: r.startsOn })))).error)
+  check((await supabase.from('cfo_plan_items').upsert(demo.plan.map((p) => ({ ...mark, article_id: p.articleId, month: `${p.month}-01`, amount: toDbAmount(p.amount) })), { onConflict: 'company_id,article_id,month' })).error)
+}
+
+export async function clearDemo(ws: Workspace): Promise<void> {
+  const { data: demoAccounts, error } = await supabase.from('cfo_accounts').select('id').eq('company_id', ws.companyId).eq('is_demo', true)
+  check(error)
+  const ids = (demoAccounts ?? []).map((a) => a.id as string)
+  // Сначала всё, что ссылается на счета примера (в т.ч. операции, внесённые поверх него), потом сами счета.
+  check((await supabase.from('cfo_operations').delete().eq('company_id', ws.companyId).eq('is_demo', true)).error)
+  check((await supabase.from('cfo_recurrences').delete().eq('company_id', ws.companyId).eq('is_demo', true)).error)
+  check((await supabase.from('cfo_plan_items').delete().eq('company_id', ws.companyId).eq('is_demo', true)).error)
+  if (ids.length > 0) {
+    const list = `(${ids.join(',')})`
+    check((await supabase.from('cfo_operations').delete().eq('company_id', ws.companyId).or(`account_id.in.${list},to_account_id.in.${list}`)).error)
+    check((await supabase.from('cfo_recurrences').delete().eq('company_id', ws.companyId).or(`account_id.in.${list},to_account_id.in.${list}`)).error)
+    check((await supabase.from('cfo_accounts').delete().in('id', ids)).error)
+  }
+}
 
 export async function setCountInvoices(ws: Workspace, on: boolean): Promise<void> {
   const { error } = await supabase.from('cfo_companies').update({ count_invoices: on }).eq('id', ws.companyId)

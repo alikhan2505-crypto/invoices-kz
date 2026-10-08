@@ -116,3 +116,5 @@ Click-to-WhatsApp click id, пишется только на первое соо
 `cfo_telegram_digest.sql` (07.10.2026) — флаг `telegram_digest` у компании: утренняя сводка в Telegram.
 
 `cfo_ask_quota.sql` (07.10.2026) — дневной лимит вопросов «Спроси CFO».
+
+`cfo_demo_flag.sql` (08.10.2026) — флаг `is_demo` для данных примера.

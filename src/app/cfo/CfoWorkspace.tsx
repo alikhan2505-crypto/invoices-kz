@@ -8,6 +8,7 @@ import { useEffectivePath } from '@/lib/useEffectivePath'
 import { getActivePlan } from '@/lib/plan'
 import { bootstrapWorkspace, loadWorkspace, type Workspace } from '@/lib/cfo/data'
 import FirstAccountWizard from './FirstAccountWizard'
+import DemoBanner from './DemoBanner'
 import { CfoPage, Card, PrimaryButton } from './ui'
 
 // pro — функции этапа 2 (импорт выписки и др.); тот же набор возможностей, что у тарифа Про.
@@ -80,6 +81,7 @@ export default function CfoWorkspace({ children }: { children: React.ReactNode }
   return (
     <CfoContext.Provider value={{ ws: state.ws, reload, pro }}>
       {needsAccount ? <FirstAccountWizard /> : children}
+      <DemoBanner />
     </CfoContext.Provider>
   )
 }
