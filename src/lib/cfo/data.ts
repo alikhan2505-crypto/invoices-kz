@@ -147,7 +147,10 @@ export async function loadDemo(ws: Workspace, today: string): Promise<void> {
   check((await supabase.from('cfo_accounts').insert(demo.accounts.map((a, i) => ({ ...mark, id: a.id, name: a.name, kind: a.kind, opening_balance: toDbAmount(a.openingBalance), opening_date: a.openingDate, sort: base + (i + 1) * 10 })))).error)
   check((await supabase.from('cfo_operations').insert(demo.operations.map((o) => ({ ...mark, direction: o.direction, amount: toDbAmount(o.amount), account_id: o.accountId, article_id: o.articleId, counterparty: o.counterparty, paid_on: o.paidOn, accrued_on: o.paidOn, status: o.status })))).error)
   check((await supabase.from('cfo_recurrences').insert(demo.recurrences.map((r) => ({ ...mark, direction: r.direction, amount: toDbAmount(r.amount), account_id: r.accountId, article_id: r.articleId, counterparty: r.counterparty, day_of_month: r.dayOfMonth, starts_on: r.startsOn })))).error)
-  check((await supabase.from('cfo_plan_items').upsert(demo.plan.map((p) => ({ ...mark, article_id: p.articleId, month: `${p.month}-01`, amount: toDbAmount(p.amount) })), { onConflict: 'company_id,article_id,month' })).error)
+  // Клетки плана, которые человек уже заполнил, не трогаем: иначе «очистить пример» удалил бы и их.
+  const taken = new Set(ws.plan.map((p) => `${p.articleId}|${p.month}`))
+  const freePlan = demo.plan.filter((p) => !taken.has(`${p.articleId}|${p.month}`))
+  if (freePlan.length > 0) check((await supabase.from('cfo_plan_items').insert(freePlan.map((p) => ({ ...mark, article_id: p.articleId, month: `${p.month}-01`, amount: toDbAmount(p.amount) })))).error)
 }
 
 export async function clearDemo(ws: Workspace): Promise<void> {
