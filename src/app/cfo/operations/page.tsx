@@ -44,7 +44,7 @@ export default function CfoOperations() {
     try {
       const url = await receiptUrl(path)
       if (w) w.location.href = url
-      else window.location.href = url
+      else window.location.assign(url)
     } catch (e) {
       w?.close()
       await alert(e instanceof Error ? e.message : String(e))
