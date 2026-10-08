@@ -9,6 +9,7 @@ import { PRODUCTS, SELECTABLE_KEYS, type ProductKey } from '@/lib/products'
 import { productCabinetHref } from '@/lib/crossProduct'
 import { useEffectivePath } from '@/lib/useEffectivePath'
 import { useMyProducts } from '@/lib/useMyProducts'
+import { useCfoMode } from '@/lib/cfo/modeStore'
 
 const TEXT: Record<Lang, { all: string; menu: string; close: string; balance: string; topup: string; connected: string; notConnected: string; notifications: string; help: string; account: string }> = {
   ru: { all: 'Все продукты', menu: 'Меню', close: 'Закрыть', balance: 'Баланс', topup: 'Пополнить баланс', connected: 'Магазин подключён', notConnected: 'Магазин не подключён', notifications: 'Уведомления', help: 'Помощь', account: 'Аккаунт' },
@@ -40,6 +41,7 @@ export default function ProductShell({ product, children }: { product: ProductKe
   const [balance, setBalance] = useState<number | null>(null)
   const [util, setUtil] = useState<{ unread: number; initials: string }>({ unread: 0, initials: '··' })
   const [mine] = useMyProducts()
+  const cfoMode = useCfoMode()
   const [hostname] = useState(() => (typeof window === 'undefined' ? '' : window.location.hostname))
   const switchRef = useRef<HTMLDivElement>(null)
   const t = TEXT[lang]
@@ -153,6 +155,7 @@ export default function ProductShell({ product, children }: { product: ProductKe
             <a
               key={l.href}
               href={l.href}
+              data-tour={l.href.slice(1).replace(/\//g, '-')}
               onClick={() => setOpen(false)}
               aria-current={active ? 'page' : undefined}
               className="flex items-center min-h-[40px] px-3 rounded-xl text-[14px] font-medium mb-0.5 transition-colors"
@@ -161,7 +164,7 @@ export default function ProductShell({ product, children }: { product: ProductKe
                 color: active ? 'var(--nav-accent)' : 'var(--nav-text-secondary)',
               }}
             >
-              {l.label[lang]}
+              {(product === 'cfo' && cfoMode === 'family' && l.family ? l.family : l.label)[lang]}
             </a>
           )
         })}

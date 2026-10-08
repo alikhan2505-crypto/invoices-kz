@@ -80,7 +80,7 @@ export default function CfoPlan() {
   }
 
   return (
-    <CfoPage title="План" actions={<YearPicker value={year} onChange={setYear} />}>
+    <CfoPage title={ws.mode === 'family' ? 'Бюджет' : 'План'} actions={<YearPicker value={year} onChange={setYear} />}>
       <p className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
         Бюджет по статьям на месяц — с ним сравниваются факт в БДР, БДДС и на обзоре. Конкретные будущие платежи по дням заводятся в «Операциях» как плановые.
         Сумма в колонке «Год» делится поровну на 12 месяцев.

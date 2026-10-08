@@ -8,6 +8,7 @@ import { useEffectivePath } from '@/lib/useEffectivePath'
 import { getActivePlan } from '@/lib/plan'
 import { bootstrapWorkspace, loadWorkspace, type Workspace } from '@/lib/cfo/data'
 import FirstAccountWizard from './FirstAccountWizard'
+import { publishCfoMode } from '@/lib/cfo/modeStore'
 import DemoBanner from './DemoBanner'
 import { CfoPage, Card, PrimaryButton } from './ui'
 
@@ -58,6 +59,10 @@ export default function CfoWorkspace({ children }: { children: React.ReactNode }
   }, [router])
 
   useEffect(() => { void init() }, [init])
+
+  // Меню продукта (вне этого провайдера) узнаёт режим через маленький стор.
+  const loadedMode = state.status === 'ready' ? state.ws.mode ?? 'business' : null
+  useEffect(() => { if (loadedMode) publishCfoMode(loadedMode) }, [loadedMode])
 
   const reload = useCallback(async () => {
     if (!ids.current) return

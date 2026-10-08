@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 import { getActivePlan } from '@/lib/plan'
 import { loadWorkspace } from '@/lib/cfo/data'
 import { almatyToday } from '@/lib/cfo/digest'
-import { ASK_SYSTEM, buildAskContext } from '@/lib/cfo/askContext'
+import { ASK_SYSTEM, ASK_SYSTEM_FAMILY, buildAskContext } from '@/lib/cfo/askContext'
 
 export const maxDuration = 60
 
@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
       max_tokens: 8000,
       thinking: { type: 'adaptive' },
       output_config: { effort: 'low' },
-      system: ASK_SYSTEM,
+      system: ws.mode === 'family' ? ASK_SYSTEM_FAMILY : ASK_SYSTEM,
       messages: [{ role: 'user', content: `<данные_кабинета>\n${buildAskContext(ws, today)}\n</данные_кабинета>\n\nВопрос владельца: ${question}` }],
     })
     const answer = message.content.filter((b) => b.type === 'text').map((b) => (b.type === 'text' ? b.text : '')).join('\n').trim()

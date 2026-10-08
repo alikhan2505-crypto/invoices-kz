@@ -7,6 +7,7 @@ import type { AccountKind, Activity, ArticleKind, CfoAccount, CfoArticle, CfoOpe
 import type { OperationDraft, RecurrenceDraft } from './validate'
 import type { ImportDraft } from './statementImport'
 import { buildDemo } from './demo'
+import { BUSINESS_ARTICLE_NAMES, planModeSwitch, type CfoMode } from './mode'
 
 export type Workspace = {
   userId: string
@@ -14,6 +15,8 @@ export type Workspace = {
   companyName: string
   telegramDigest: boolean
   countInvoices: boolean
+  mode?: CfoMode // нет в старых тестовых данных — считается «бизнес»
+  tourDone?: boolean
   hasDemo?: boolean // в кабинете лежит «пример» — показываем плашку «очистить»
   invoices: InvoiceLite[]
   accounts: CfoAccount[]
@@ -111,7 +114,7 @@ export async function bootstrapWorkspace(): Promise<string> {
 // db — клиент браузера (RLS) по умолчанию; серверная рассылка передаёт service-role клиент.
 export async function loadWorkspace(companyId: string, userId: string, db: SupabaseClient = supabase): Promise<Workspace> {
   const [company, accounts, articles, operations, recurrences, plan, invoices] = await Promise.all([
-    db.from('cfo_companies').select('name, telegram_digest, count_invoices').eq('id', companyId).single(),
+    db.from('cfo_companies').select('name, telegram_digest, count_invoices, mode, tour_done_at').eq('id', companyId).single(),
     selectAll(db, 'cfo_accounts', 'id, name, kind, opening_balance, opening_date, archived, sort, is_demo', companyId),
     selectAll(db, 'cfo_articles', 'id, name, kind, activity, pnl_group, archived, sort', companyId),
     selectAll(db, 'cfo_operations', 'id, direction, amount, account_id, to_account_id, article_id, counterparty, comment, paid_on, accrued_on, status, recurrence_id, recurrence_date, invoice_id, attachment_path', companyId),
@@ -126,6 +129,8 @@ export async function loadWorkspace(companyId: string, userId: string, db: Supab
     companyName: (company.data as Row).name,
     telegramDigest: (company.data as Row).telegram_digest === true,
     countInvoices: (company.data as Row).count_invoices !== false,
+    mode: (company.data as Row).mode === 'family' ? 'family' : 'business',
+    tourDone: !!(company.data as Row).tour_done_at,
     hasDemo: accounts.some((r) => r.is_demo === true),
     invoices,
     accounts: accounts.map(mapAccount).sort(bySort),
@@ -167,6 +172,28 @@ export async function clearDemo(ws: Workspace): Promise<void> {
     check((await supabase.from('cfo_recurrences').delete().eq('company_id', ws.companyId).or(`account_id.in.${list},to_account_id.in.${list}`)).error)
     check((await supabase.from('cfo_accounts').delete().in('id', ids)).error)
   }
+}
+
+// Смена режима: добавить недостающие статьи, убрать в архив неиспользуемые статьи
+// прежнего режима (используемые остаются — иначе выпадут из отчётов), потом сам флаг.
+export async function setMode(ws: Workspace, mode: CfoMode): Promise<void> {
+  const used = new Set<string>([
+    ...ws.operations.map((o) => o.articleId), ...ws.recurrences.map((r) => r.articleId), ...ws.plan.map((p) => p.articleId),
+  ].filter((x): x is string => !!x))
+  const plan = planModeSwitch(ws.articles, used, mode, BUSINESS_ARTICLE_NAMES)
+  if (plan.add.length > 0) {
+    const base = Math.max(0, ...ws.articles.map((x) => x.sort))
+    check((await supabase.from('cfo_articles').insert(plan.add.map((a, i) => ({
+      ...owned(ws), name: a.name, kind: a.kind, activity: a.activity, pnl_group: a.pnlGroup, sort: base + (i + 1) * 10,
+    })))).error)
+  }
+  if (plan.archive.length > 0) check((await supabase.from('cfo_articles').update({ archived: true }).in('id', plan.archive)).error)
+  if (plan.restore.length > 0) check((await supabase.from('cfo_articles').update({ archived: false }).in('id', plan.restore)).error)
+  check((await supabase.from('cfo_companies').update({ mode }).eq('id', ws.companyId)).error)
+}
+
+export async function markTourDone(ws: Workspace): Promise<void> {
+  check((await supabase.from('cfo_companies').update({ tour_done_at: new Date().toISOString() }).eq('id', ws.companyId)).error)
 }
 
 export async function setCountInvoices(ws: Workspace, on: boolean): Promise<void> {

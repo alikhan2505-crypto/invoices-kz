@@ -25,20 +25,21 @@ export function buildMonthlyReport(ws: Workspace, month: string): string {
   const cashStart = totalBalanceAt(ws.accounts, actual, addDays(firstDay(month), -1))
   const cashEnd = totalBalanceAt(ws.accounts, actual, lastDay(month))
 
+  const family = ws.mode === 'family'
   const lines = [`<b>CFO · ${esc(ws.companyName)} — итоги: ${monthTitle(month).toLowerCase()}</b>`, '']
   if (rev) {
     const f = rev.cells[month].fact
-    lines.push(`📈 Выручка: <b>${formatTenge(f)}</b>${rev.cells[month].plan ? ` · план ${formatTenge(rev.cells[month].plan)}${pct(f, rev.cells[month].plan)}` : ''}${rev.cells[prev].fact ? ` · к прошлому месяцу${pct(f, rev.cells[prev].fact)}` : ''}`)
+    lines.push(`📈 ${family ? 'Доходы' : 'Выручка'}: <b>${formatTenge(f)}</b>${rev.cells[month].plan ? ` · план ${formatTenge(rev.cells[month].plan)}${pct(f, rev.cells[month].plan)}` : ''}${rev.cells[prev].fact ? ` · к прошлому месяцу${pct(f, rev.cells[prev].fact)}` : ''}`)
   }
   if (net) {
     const f = net.cells[month].fact
-    lines.push(`${f < 0 ? '🔻' : '💼'} Чистая прибыль: <b>${formatTenge(f)}</b>${net.cells[month].plan ? ` · план ${formatTenge(net.cells[month].plan)}` : ''}`)
+    lines.push(`${f < 0 ? '🔻' : '💼'} ${family ? 'Сбережено' : 'Чистая прибыль'}: <b>${formatTenge(f)}</b>${net.cells[month].plan ? ` · план ${formatTenge(net.cells[month].plan)}` : ''}`)
   }
   lines.push(`💰 Деньги: ${formatTenge(cashStart)} → <b>${formatTenge(cashEnd)}</b> (${cashEnd >= cashStart ? '+' : '−'}${formatTenge(Math.abs(cashEnd - cashStart))})`)
 
   const over = monthLimits(ws, month).filter((r) => r.level === 'over')
   if (over.length > 0) lines.push(`📊 Перерасход: ${over.slice(0, 3).map((r) => `${esc(r.name)} +${formatTenge(r.fact - r.plan)}`).join(', ')}`)
 
-  lines.push('', 'Подробный разбор — «Спросите CFO» на обзоре: «Разбери прошлый месяц».', '<a href="https://cfo.invoices.kz/cfo/pnl">Открыть БДР</a>')
+  lines.push('', 'Подробный разбор — «Спросите CFO» на обзоре: «Разбери прошлый месяц».', `<a href="https://cfo.invoices.kz/cfo/pnl">Открыть ${family ? 'доходы и расходы' : 'БДР'}</a>`)
   return lines.join('\n')
 }

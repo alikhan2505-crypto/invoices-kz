@@ -23,8 +23,8 @@ export function CfoPage({ title, actions, children }: { title: string; actions?:
   )
 }
 
-export function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return <div className={`nav-glass rounded-2xl p-4 lg:p-5 ${className}`}>{children}</div>
+export function Card({ children, className = '', dataTour }: { children: React.ReactNode; className?: string; dataTour?: string }) {
+  return <div data-tour={dataTour} className={`nav-glass rounded-2xl p-4 lg:p-5 ${className}`}>{children}</div>
 }
 
 export function SectionTitle({ children }: { children: React.ReactNode }) {

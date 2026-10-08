@@ -9,6 +9,7 @@ import type { Activity, ArticleKind, CfoAccount, CfoArticle, PnlGroup } from '@/
 import { useCfo } from '../CfoWorkspace'
 import AccountForm from '../AccountForm'
 import DigestSettings from '../DigestSettings'
+import ModeSwitch from '../ModeSwitch'
 import { Card, CfoPage, ErrorText, Field, GhostButton, PrimaryButton, SectionTitle, inputClass, inputStyle } from '../ui'
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e))
@@ -214,14 +215,15 @@ export default function CfoSettings() {
       }
     >
       <Card>
-        <SectionTitle>Компания</SectionTitle>
+        <SectionTitle>{ws.mode === 'family' ? 'Семья' : 'Компания'}</SectionTitle>
+        <ModeSwitch />
         <form className="flex gap-2 flex-wrap items-center" onSubmit={(e) => void submitCompanyName(e)}>
           <input
             className={`${inputClass} flex-1 min-w-[200px]`}
             style={inputStyle}
             value={companyName}
             onChange={(e) => { setCompanyName(e.target.value); setNameError(null) }}
-            aria-label="Название компании"
+            aria-label={ws.mode === 'family' ? 'Название семейного бюджета' : 'Название компании'}
             aria-invalid={nameError ? true : undefined}
           />
           <PrimaryButton type="submit" disabled={nameSaving}>{nameSaving ? 'Сохраняю…' : 'Сохранить'}</PrimaryButton>

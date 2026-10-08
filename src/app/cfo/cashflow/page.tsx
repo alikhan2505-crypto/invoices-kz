@@ -49,7 +49,7 @@ export default function CfoCashflow() {
   })
 
   return (
-    <CfoPage title="БДДС" actions={<><ExportButton onExport={() => downloadWorkbook(`БДДС ${year} — ${ws.companyName}.xlsx`, reportSheets(months, rows))} /><Segmented label="Показатель" value={measure} onChange={setMeasure} options={MEASURE_OPTIONS} /><YearPicker value={year} onChange={setYear} /></>}>
+    <CfoPage title={ws.mode === 'family' ? 'Движение денег' : 'БДДС'} actions={<><ExportButton onExport={() => downloadWorkbook(`${ws.mode === 'family' ? 'Движение денег' : 'БДДС'} ${year} — ${ws.companyName}.xlsx`, reportSheets(months, rows))} /><Segmented label="Показатель" value={measure} onChange={setMeasure} options={MEASURE_OPTIONS} /><YearPicker value={year} onChange={setYear} /></>}>
       <p className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
         Деньги по дате оплаты, по видам деятельности. Остатки — по всем счетам и кассам, переводы между ними не считаются ни поступлением, ни выплатой.
       </p>

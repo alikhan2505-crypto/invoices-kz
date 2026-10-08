@@ -94,13 +94,14 @@ const wbLinks: { href: string; label: LocalizedLabel }[] = [
   { href: '/wildberries/orders', label: { ru: 'Заказы', kk: 'Тапсырыстар', en: 'Orders' } },
 ]
 
-const cfoLinks: { href: string; label: LocalizedLabel }[] = [
+// family — подпись для режима «семейный бюджет» (см. src/lib/cfo/mode.ts).
+const cfoLinks: { href: string; label: LocalizedLabel; family?: LocalizedLabel }[] = [
   { href: '/cfo/overview', label: { ru: 'Обзор', kk: 'Шолу', en: 'Overview' } },
   { href: '/cfo/operations', label: { ru: 'Операции', kk: 'Операциялар', en: 'Transactions' } },
-  { href: '/cfo/calendar', label: { ru: 'Календарь', kk: 'Күнтізбе', en: 'Calendar' } },
-  { href: '/cfo/pnl', label: { ru: 'БДР', kk: 'КШБ', en: 'P&L' } },
-  { href: '/cfo/cashflow', label: { ru: 'БДДС', kk: 'АҚБ', en: 'Cash flow' } },
-  { href: '/cfo/plan', label: { ru: 'План', kk: 'Жоспар', en: 'Plan' } },
+  { href: '/cfo/calendar', label: { ru: 'Календарь', kk: 'Күнтізбе', en: 'Calendar' }, family: { ru: 'Платежи', kk: 'Төлемдер', en: 'Payments' } },
+  { href: '/cfo/pnl', label: { ru: 'БДР', kk: 'КШБ', en: 'P&L' }, family: { ru: 'Доходы и расходы', kk: 'Кірістер мен шығыстар', en: 'Income & spending' } },
+  { href: '/cfo/cashflow', label: { ru: 'БДДС', kk: 'АҚБ', en: 'Cash flow' }, family: { ru: 'Движение денег', kk: 'Ақша қозғалысы', en: 'Money flow' } },
+  { href: '/cfo/plan', label: { ru: 'План', kk: 'Жоспар', en: 'Plan' }, family: { ru: 'Бюджет', kk: 'Бюджет', en: 'Budget' } },
   { href: '/cfo/settings', label: { ru: 'Настройки', kk: 'Баптаулар', en: 'Settings' } },
 ]
 
@@ -112,7 +113,7 @@ const cfoLinks: { href: string; label: LocalizedLabel }[] = [
 // to the section.
 export type Section = {
   key: 'invoices' | 'kaspiApi' | 'kaspiShop' | 'aiAgent' | 'wildberries' | 'cfo'
-  links: { href: string; label: LocalizedLabel }[]
+  links: { href: string; label: LocalizedLabel; family?: LocalizedLabel }[]
   adminOnly: boolean
   // Unlocked for an active Pro plan too, not just admins (2026-09-02
   // AI-агент, 2026-09-03 Kaspi Bot) -- only meaningful when adminOnly is

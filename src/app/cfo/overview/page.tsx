@@ -3,11 +3,12 @@ import { useMemo, useState } from 'react'
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
 import { accountBalanceAt } from '@/lib/cfo/balances'
 import { buildDashboard } from '@/lib/cfo/dashboard'
-import { monthKey, todayIso } from '@/lib/cfo/dates'
+import { daysInMonth, monthKey, todayIso } from '@/lib/cfo/dates'
 import { dayLabel, monthTitle, opTitle, shortMonth } from '@/lib/cfo/labels'
 import { formatTenge } from '@/lib/cfo/money'
 import { useCfo } from '../CfoWorkspace'
 import AskCfo from '../AskCfo'
+import CfoTour from '../CfoTour'
 import LimitsCard from '../LimitsCard'
 import { Card, CfoPage, EmptyState, Money, SectionTitle, inputClass, inputStyle } from '../ui'
 
@@ -23,6 +24,7 @@ function Kpi({ label, value, sub, tone }: { label: string; value: string; sub?: 
 
 export default function CfoOverview() {
   const { ws } = useCfo()
+  const family = ws.mode === 'family'
   const today = todayIso()
   const [month, setMonth] = useState(monthKey(today))
   const d = useMemo(() => buildDashboard({ accounts: ws.accounts, articles: ws.articles, operations: ws.operations, recurrences: ws.recurrences, plan: ws.plan, month, today }), [ws, month, today])
@@ -31,6 +33,7 @@ export default function CfoOverview() {
     return (
       <CfoPage title="Обзор">
         <EmptyState title="Добавьте первую операцию" hint="Как только появятся приходы и расходы, здесь будут выручка, прибыль, запас денег и ближайшие платежи." href="/cfo/operations" cta="Перейти к операциям" />
+        <CfoTour />
       </CfoPage>
     )
   }
@@ -66,13 +69,25 @@ export default function CfoOverview() {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        <Kpi label={`Выручка · ${monthTitle(month)}`} value={formatTenge(d.revenue.fact)} sub={planNote(d.revenue)} />
-        <Kpi label="Валовая маржа" value={d.grossMarginPct === null ? '—' : `${Math.round(d.grossMarginPct)}%`} sub="(выручка − себестоимость) ÷ выручка" />
-        <Kpi label="Чистая прибыль" value={formatTenge(d.netProfit.fact)} sub={planNote(d.netProfit)} tone={d.netProfit.fact < 0 ? 'bad' : undefined} />
+      <div data-tour="cfo-kpis" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {family ? (
+          <>
+            <Kpi label={`Доходы · ${monthTitle(month)}`} value={formatTenge(d.revenue.fact)} sub={planNote(d.revenue)} />
+            <Kpi label="Расходы" value={formatTenge(d.revenue.fact - d.netProfit.fact)} sub={d.revenue.plan - d.netProfit.plan ? `бюджет ${formatTenge(d.revenue.plan - d.netProfit.plan)}` : 'бюджет не задан'} tone={d.revenue.plan - d.netProfit.plan > 0 && d.revenue.fact - d.netProfit.fact > d.revenue.plan - d.netProfit.plan ? 'bad' : undefined} />
+            <Kpi label="Сбережено" value={formatTenge(d.netProfit.fact)} sub={d.revenue.fact > 0 ? `${Math.round((d.netProfit.fact / d.revenue.fact) * 100)}% от доходов` : 'доходы − расходы'} tone={d.netProfit.fact < 0 ? 'bad' : undefined} />
+          </>
+        ) : (
+          <>
+            <Kpi label={`Выручка · ${monthTitle(month)}`} value={formatTenge(d.revenue.fact)} sub={planNote(d.revenue)} />
+            <Kpi label="Валовая маржа" value={d.grossMarginPct === null ? '—' : `${Math.round(d.grossMarginPct)}%`} sub="(выручка − себестоимость) ÷ выручка" />
+            <Kpi label="Чистая прибыль" value={formatTenge(d.netProfit.fact)} sub={planNote(d.netProfit)} tone={d.netProfit.fact < 0 ? 'bad' : undefined} />
+          </>
+        )}
         <Kpi label="Деньги сейчас" value={formatTenge(d.cashNow)} sub={byAccount || 'на всех счетах и в кассах'} tone={d.cashNow < 0 ? 'bad' : undefined} />
         <Kpi label="Запас денег" value={d.runwayDays === null ? '—' : d.cashNow <= 0 ? 'нет денег' : `${d.runwayDays} дн.`} sub={d.runwayDays === null ? 'нет выплат за 90 дней' : 'без новых поступлений, по средним выплатам за 90 дней'} tone={d.runwayDays !== null && (d.cashNow <= 0 || d.runwayDays < 30) ? 'bad' : undefined} />
-        <Kpi label="Точка безубыточности" value={breakeven} sub={breakevenSub} />
+        {family
+          ? <Kpi label="Средние траты в день" value={formatTenge(Math.round((d.revenue.fact - d.netProfit.fact) / Math.max(1, month === monthKey(todayIso()) ? Number(todayIso().slice(8)) : daysInMonth(month))))} sub="расходы месяца ÷ дни" />
+          : <Kpi label="Точка безубыточности" value={breakeven} sub={breakevenSub} />}
       </div>
 
       <div className="grid lg:grid-cols-2 gap-3">
@@ -138,6 +153,7 @@ export default function CfoOverview() {
         ))}
       </Card>
       <AskCfo />
+      <CfoTour />
     </CfoPage>
   )
 }

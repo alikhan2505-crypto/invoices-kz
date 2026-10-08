@@ -120,3 +120,5 @@ Click-to-WhatsApp click id, пишется только на первое соо
 `cfo_demo_flag.sql` (08.10.2026) — флаг `is_demo` для данных примера.
 
 `cfo_receipts.sql` (08.10.2026) — приватный бакет `cfo-receipts` и `cfo_operations.attachment_path`.
+
+`cfo_mode_and_tour.sql` (08.10.2026) — `cfo_companies.mode` (business/family) и `tour_done_at`.

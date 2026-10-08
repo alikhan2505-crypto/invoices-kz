@@ -4,7 +4,8 @@ import { createPortal } from 'react-dom'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 
-type Step = { anchor: string; title: string; body: string }
+export type TourStep = { anchor: string; title: string; body: string }
+type Step = TourStep
 
 // Same easing curve used across the dashboard's own card entrances
 // (src/app/dashboard/page.tsx's EASE) -- kept identical rather than
@@ -20,7 +21,7 @@ const EASE = [0.16, 1, 0.3, 1] as const
 // Ordered as a narrative, not by screen position: make your first invoice,
 // see it land in the list, watch the numbers move, then the rest of the
 // furniture (navigation, alerts, help, the wallet everything bills to).
-const STEPS: Step[] = [
+const DASHBOARD_STEPS: Step[] = [
   {
     anchor: 'products',
     title: 'Четыре продукта на одной платформе',
@@ -88,7 +89,9 @@ function findAnchor(name: string): Element | null {
   return el && el.getClientRects().length > 0 ? el : null
 }
 
-export default function DashboardTour() {
+// Тур с подсветкой для любого экрана: шаги — data-tour якоря на уже отрисованных
+// элементах; показывать ли и как запомнить «пройден» — решает вызывающий.
+export function GuidedTour({ steps: STEPS, shouldStart, onFinish }: { steps: Step[]; shouldStart: () => Promise<boolean>; onFinish: () => Promise<void> }) {
   const [open, setOpen] = useState(false)
   const [i, setI] = useState(0)
   const [rect, setRect] = useState<DOMRect | null>(null)
@@ -132,14 +135,8 @@ export default function DashboardTour() {
   useEffect(() => {
     let cancelled = false
     ;(async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data } = await supabase
-        .from('profiles')
-        .select('tour_completed_at')
-        .eq('id', user.id)
-        .maybeSingle()
-      if (cancelled || !data || data.tour_completed_at) return
+      const go = await shouldStart().catch(() => false)
+      if (cancelled || !go) return
       // Start at the first step whose anchor is actually rendered on this
       // viewport (e.g. skip straight past "menu" on desktop, where that
       // anchor sits in the DOM behind `lg:hidden`). If nothing on this
@@ -161,6 +158,8 @@ export default function DashboardTour() {
       setOpen(true)
     })()
     return () => { cancelled = true }
+    // Решаем один раз при монтировании — шаги и проверка от вызывающего стабильны.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const measure = useCallback(() => {
@@ -170,7 +169,7 @@ export default function DashboardTour() {
     setVw(window.innerWidth)
     setVh(window.innerHeight)
     setRect(el ? el.getBoundingClientRect() : null)
-  }, [i])
+  }, [i, STEPS])
 
   useEffect(() => {
     if (!open) return
@@ -209,16 +208,10 @@ export default function DashboardTour() {
 
   const finish = useCallback(async () => {
     setOpen(false)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    const { error } = await supabase.from('profiles')
-      .update({ tour_completed_at: new Date().toISOString() })
-      .eq('id', user.id)
     // Close stays optimistic -- blocking the UI on this round-trip would be
-    // worse than a rare re-show -- but a silent failure here means the tour
-    // resurrects on next load with no trace, so at least log it.
-    if (error) console.error('DashboardTour: failed to save tour_completed_at', error)
-  }, [])
+    // worse than a rare re-show.
+    await onFinish().catch((e) => console.error('GuidedTour: failed to save completion', e))
+  }, [onFinish])
 
   const next = useCallback(() => {
     // Skip forward over any step whose anchor isn't rendered on this viewport.
@@ -226,7 +219,7 @@ export default function DashboardTour() {
       if (findAnchor(STEPS[j].anchor)) { setI(j); return }
     }
     finish()
-  }, [i, finish])
+  }, [i, finish, STEPS])
 
   useEffect(() => {
     if (!open) return
@@ -244,7 +237,7 @@ export default function DashboardTour() {
     el?.scrollIntoView({ block: 'center', behavior: reduce ? 'auto' : 'smooth' })
     const t = setTimeout(measure, reduce ? 0 : 400)
     return () => clearTimeout(t)
-  }, [open, i, measure, reduce])
+  }, [open, i, measure, reduce, STEPS])
 
   // The spotlight hole is a real hole -- the four scrim rectangles only cover
   // the area *around* the highlighted element, so it stays fully clickable by
@@ -261,7 +254,7 @@ export default function DashboardTour() {
     const onAnchorClick = () => finish()
     el.addEventListener('click', onAnchorClick, { capture: true, once: true })
     return () => el.removeEventListener('click', onAnchorClick, { capture: true })
-  }, [open, i, finish])
+  }, [open, i, finish, STEPS])
 
   if (!open || typeof document === 'undefined') return null
   const step = STEPS[i]
@@ -439,5 +432,28 @@ export default function DashboardTour() {
       </motion.div>
     </div>,
     document.body
+  )
+}
+
+export default function DashboardTour() {
+  return (
+    <GuidedTour
+      steps={DASHBOARD_STEPS}
+      shouldStart={async () => {
+        // A missing profile row (or any error) means "don't show" -- the tour is a
+        // nicety and must never be the thing that breaks a dashboard load.
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return false
+        const { data } = await supabase.from('profiles').select('tour_completed_at').eq('id', user.id).maybeSingle()
+        return !!data && !data.tour_completed_at
+      }}
+      onFinish={async () => {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+        const { error } = await supabase.from('profiles').update({ tour_completed_at: new Date().toISOString() }).eq('id', user.id)
+        // A silent failure here means the tour resurrects on next load with no trace, so at least surface it.
+        if (error) throw error
+      }}
+    />
   )
 }

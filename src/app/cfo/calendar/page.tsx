@@ -68,11 +68,11 @@ export default function CfoCalendar() {
 
   return (
     <CfoPage
-      title="Платёжный календарь"
+      title={ws.mode === 'family' ? 'Платежи' : 'Платёжный календарь'}
       actions={
         <>
           {!whatIf && <GhostButton type="button" onClick={() => setWhatIf(true)}>Что если</GhostButton>}
-          {!taxes && <GhostButton type="button" onClick={() => setTaxes(true)}>Налоги РК</GhostButton>}
+          {!taxes && ws.mode !== 'family' && <GhostButton type="button" onClick={() => setTaxes(true)}>Налоги РК</GhostButton>}
           <label className="flex items-center gap-2 text-sm min-h-[44px]" style={{ color: 'var(--nav-text-secondary)' }}>
             <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} />
             Все дни

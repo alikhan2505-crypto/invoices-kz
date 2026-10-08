@@ -5,6 +5,9 @@ import { buildPnl, type PnlRow } from '@/lib/cfo/pnl'
 import { useCfo } from '../CfoWorkspace'
 import ReportTable, { MEASURE_OPTIONS, type Measure, type ReportRow } from '../ReportTable'
 import { CfoPage, Segmented, YearPicker } from '../ui'
+import { VOCAB } from '@/lib/cfo/mode'
+
+const FAMILY_PNL_LABEL: Record<string, string> = { 'g:revenue': 'Доходы', 'g:opex': 'Расходы', 'g:finance': 'Прочее', 'g:tax': 'Налоги', 't:net': 'Сбережено' }
 import ExportButton from '../ExportButton'
 import { downloadWorkbook, reportSheets } from '@/lib/cfo/exportXlsx'
 
@@ -20,9 +23,14 @@ export default function CfoPnl() {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const months = useMemo(() => yearMonths(year), [year])
 
-  const rows: ReportRow[] = useMemo(() => buildPnl({ articles: ws.articles, operations: ws.operations, plan: ws.plan, months }).map((r) => ({
+  const family = ws.mode === 'family'
+  const v = VOCAB[family ? 'family' : 'business']
+  // В семейном режиме промежуточные бизнес-итоги (валовая и операционная прибыль) не нужны.
+  const rows: ReportRow[] = useMemo(() => buildPnl({ articles: ws.articles, operations: ws.operations, plan: ws.plan, months })
+    .filter((r) => !family || (r.key !== 't:gross' && r.key !== 't:operating'))
+    .map((r) => ({
     key: r.key,
-    label: r.label,
+    label: family ? (FAMILY_PNL_LABEL[r.key] ?? r.label) : r.label,
     level: r.type === 'article' ? 1 : 0,
     strong: r.type !== 'article',
     toggleKey: r.type === 'group' ? r.key : undefined,
@@ -30,7 +38,7 @@ export default function CfoPnl() {
     cells: r.cells,
     total: r.total,
     higherIsBetter: higherIsBetter(r),
-  })), [ws, months])
+  })), [ws, months, family])
 
   const toggle = (key: string) => setCollapsed((prev) => {
     const next = new Set(prev)
@@ -40,9 +48,9 @@ export default function CfoPnl() {
   })
 
   return (
-    <CfoPage title="БДР" actions={<><ExportButton onExport={() => downloadWorkbook(`БДР ${year} — ${ws.companyName}.xlsx`, reportSheets(months, rows))} /><Segmented label="Показатель" value={measure} onChange={setMeasure} options={MEASURE_OPTIONS} /><YearPicker value={year} onChange={setYear} /></>}>
+    <CfoPage title={v.pnl} actions={<><ExportButton onExport={() => downloadWorkbook(`${v.pnl} ${year} — ${ws.companyName}.xlsx`, reportSheets(months, rows))} /><Segmented label="Показатель" value={measure} onChange={setMeasure} options={MEASURE_OPTIONS} /><YearPicker value={year} onChange={setYear} /></>}>
       <p className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
-        Доходы и расходы по дате начисления. Кредиты, вложения и вывод денег собственником, покупка оборудования и переводы между счетами сюда не входят — они в БДДС.
+        {v.pnlHint}
       </p>
       <ReportTable months={months} rows={rows} measure={measure} collapsed={collapsed} onToggle={toggle} currentMonth={monthKey(todayIso())} />
     </CfoPage>

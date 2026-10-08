@@ -16,7 +16,7 @@ export type Parsed = { direction?: unknown; amount?: unknown; article_id?: unkno
 export function parsePrompt(ws: Workspace, today: string, text: string): string {
   const articles = ws.articles.filter((a) => !a.archived).map((a) => `${a.id} | ${a.kind === 'income' ? 'доход' : 'расход'} | ${a.name}`).join('\n')
   const accounts = ws.accounts.filter((a) => !a.archived).map((a) => `${a.id} | ${a.name}`).join('\n')
-  return `Разбери сообщение владельца бизнеса об операции с деньгами. Сегодня ${today} (Казахстан).
+  return `Разбери сообщение об операции с деньгами (бизнес или семейный бюджет). Сегодня ${today} (Казахстан).
 Статьи (id | вид | название):
 ${articles}
 Счета (id | название):
