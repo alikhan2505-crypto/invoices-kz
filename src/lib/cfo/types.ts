@@ -43,6 +43,7 @@ export type CfoOperation = {
   recurrenceId: string | null
   recurrenceDate: string | null
   invoiceId?: string | null // приход, проведённый из оплаченного счёта invoices.kz
+  attachmentPath?: string | null // фото чека в приватном бакете cfo-receipts
 }
 
 // Счёт invoices.kz в том виде, что нужен кабинету: ожидаемые и проведённые поступления.

@@ -118,3 +118,5 @@ Click-to-WhatsApp click id, пишется только на первое соо
 `cfo_ask_quota.sql` (07.10.2026) — дневной лимит вопросов «Спроси CFO».
 
 `cfo_demo_flag.sql` (08.10.2026) — флаг `is_demo` для данных примера.
+
+`cfo_receipts.sql` (08.10.2026) — приватный бакет `cfo-receipts` и `cfo_operations.attachment_path`.

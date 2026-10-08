@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import type { CfoOperation, Direction, OpStatus } from '@/lib/cfo/types'
-import { saveOperation, saveRecurrence } from '@/lib/cfo/data'
+import { removeReceipt, saveOperation, saveRecurrence, uploadReceipt } from '@/lib/cfo/data'
 import { parseAmountInput, tiynToNumber } from '@/lib/cfo/money'
 import { todayIso } from '@/lib/cfo/dates'
 import { validateOperation, validateRecurrence } from '@/lib/cfo/validate'
@@ -24,6 +24,8 @@ export default function OperationForm({ initial, onDone, onCancel }: { initial?:
   const [status, setStatus] = useState<OpStatus>(initial?.status ?? 'actual')
   const [counterparty, setCounterparty] = useState(initial?.counterparty ?? '')
   const [comment, setComment] = useState(initial?.comment ?? '')
+  const [receipt, setReceipt] = useState<File | null>(null)
+  const [dropReceipt, setDropReceipt] = useState(false)
   const [repeat, setRepeat] = useState(false)
   const [endsOn, setEndsOn] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -59,7 +61,17 @@ export default function OperationForm({ initial, onDone, onCancel }: { initial?:
         const draft = { direction, amount: tiyn, accountId, toAccountId: toAccount, articleId: article, paidOn, accruedOn: separateAccrual && direction !== 'transfer' ? accruedOn : paidOn, status }
         const v = validateOperation(draft, ctx)
         if (v) { setError(v); return }
-        await saveOperation(ws, { ...draft, ...extra, id: initial?.id })
+        // Чек: новый файл заменяет старый, «убрать» — отвязывает; старый файл удаляем только после успешного сохранения.
+        const old = initial?.attachmentPath ?? null
+        const uploaded = receipt ? await uploadReceipt(ws, receipt) : null
+        const attachmentPath = uploaded ?? (dropReceipt ? null : old)
+        try {
+          await saveOperation(ws, { ...draft, ...extra, id: initial?.id, attachmentPath })
+        } catch (err) {
+          if (uploaded) await removeReceipt(uploaded)
+          throw err
+        }
+        if (old && old !== attachmentPath) await removeReceipt(old)
       }
       await onDone()
     } catch (err) {
@@ -136,6 +148,17 @@ export default function OperationForm({ initial, onDone, onCancel }: { initial?:
           <input className={inputClass} style={inputStyle} value={comment} onChange={(e) => setComment(e.target.value)} />
         </Field>
       </div>
+
+      {!repeat && (
+        <div className="flex gap-2 items-end flex-wrap">
+          <div className="flex-1 min-w-[220px]">
+            <Field label={initial?.attachmentPath && !dropReceipt ? 'Чек приложен — можно заменить (фото или PDF)' : 'Чек (фото или PDF, до 5 МБ)'}>
+              <input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" className={inputClass} style={inputStyle} onChange={(e) => setReceipt(e.target.files?.[0] ?? null)} />
+            </Field>
+          </div>
+          {initial?.attachmentPath && !dropReceipt && !receipt && <GhostButton type="button" onClick={() => setDropReceipt(true)}>Убрать чек</GhostButton>}
+        </div>
+      )}
 
       {!initial && status === 'planned' && (
         <div className="space-y-2">

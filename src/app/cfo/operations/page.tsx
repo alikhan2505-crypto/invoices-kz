@@ -1,7 +1,7 @@
 'use client'
 import { useMemo, useRef, useState } from 'react'
 import { useAppDialog } from '@/components/AppDialog'
-import { deleteOperation, deleteRecurrence, markPaid } from '@/lib/cfo/data'
+import { deleteOperation, deleteRecurrence, markPaid, receiptUrl } from '@/lib/cfo/data'
 import { monthKey, todayIso } from '@/lib/cfo/dates'
 import { accountName, dayLabel, DIRECTION_LABEL, opTitle } from '@/lib/cfo/labels'
 import { formatTenge } from '@/lib/cfo/money'
@@ -36,6 +36,19 @@ export default function CfoOperations() {
     if (busy.current) return // ignore double clicks on row actions while one is in flight
     busy.current = true
     try { await action(); await reload() } catch (e) { await alert(e instanceof Error ? e.message : String(e)) } finally { busy.current = false }
+  }
+
+  // Ссылка на чек живёт 5 минут; окно открываем сразу, адрес подставляем после — иначе браузер сочтёт это всплывающим окном.
+  async function openReceipt(path: string) {
+    const w = window.open('', '_blank')
+    try {
+      const url = await receiptUrl(path)
+      if (w) w.location.href = url
+      else window.location.href = url
+    } catch (e) {
+      w?.close()
+      await alert(e instanceof Error ? e.message : String(e))
+    }
   }
 
   // reload first, then close: a failed reload must reach the user, not an unmounted form
@@ -97,12 +110,13 @@ export default function CfoOperations() {
                 <div className="mt-1">{op.status === 'planned' ? <Badge tone="plan">План</Badge> : <Badge tone="fact">Факт</Badge>}</div>
               </div>
               <div className="order-4 w-full flex gap-1 flex-wrap justify-end">
+                {op.attachmentPath && <GhostButton type="button" aria-label={`Чек: ${opTitle(op, ws.accounts, ws.articles)}`} onClick={() => void openReceipt(op.attachmentPath!)}>📎 Чек</GhostButton>}
                 {op.status === 'planned' && <GhostButton type="button" aria-label={`Оплачено: ${opTitle(op, ws.accounts, ws.articles)}`} onClick={() => void run(() => markPaid(ws, op, today))}>Оплачено</GhostButton>}
                 <GhostButton type="button" aria-label={`Изменить: ${opTitle(op, ws.accounts, ws.articles)}`} onClick={() => setEditing(op)}>Изменить</GhostButton>
                 <GhostButton
                   type="button"
                   aria-label={`Удалить: ${opTitle(op, ws.accounts, ws.articles)}`}
-                  onClick={async () => { if (await confirm('Удалить операцию?')) await run(() => deleteOperation(op.id)) }}
+                  onClick={async () => { if (await confirm('Удалить операцию?')) await run(() => deleteOperation(op.id, op.attachmentPath)) }}
                 >
                   Удалить
                 </GhostButton>

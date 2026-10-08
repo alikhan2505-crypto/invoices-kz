@@ -63,7 +63,7 @@ const mapOperation = (r: Row): CfoOperation => ({
   id: r.id, direction: r.direction as Direction, amount: toTiyn(r.amount), accountId: r.account_id,
   toAccountId: r.to_account_id ?? null, articleId: r.article_id ?? null, counterparty: r.counterparty ?? null,
   comment: r.comment ?? null, paidOn: r.paid_on, accruedOn: r.accrued_on, status: r.status as OpStatus,
-  recurrenceId: r.recurrence_id ?? null, recurrenceDate: r.recurrence_date ?? null, invoiceId: r.invoice_id ?? null,
+  recurrenceId: r.recurrence_id ?? null, recurrenceDate: r.recurrence_date ?? null, invoiceId: r.invoice_id ?? null, attachmentPath: r.attachment_path ?? null,
 })
 const mapRecurrence = (r: Row): CfoRecurrence => ({
   id: r.id, direction: r.direction as Direction, amount: toTiyn(r.amount), accountId: r.account_id,
@@ -114,7 +114,7 @@ export async function loadWorkspace(companyId: string, userId: string, db: Supab
     db.from('cfo_companies').select('name, telegram_digest, count_invoices').eq('id', companyId).single(),
     selectAll(db, 'cfo_accounts', 'id, name, kind, opening_balance, opening_date, archived, sort, is_demo', companyId),
     selectAll(db, 'cfo_articles', 'id, name, kind, activity, pnl_group, archived, sort', companyId),
-    selectAll(db, 'cfo_operations', 'id, direction, amount, account_id, to_account_id, article_id, counterparty, comment, paid_on, accrued_on, status, recurrence_id, recurrence_date, invoice_id', companyId),
+    selectAll(db, 'cfo_operations', 'id, direction, amount, account_id, to_account_id, article_id, counterparty, comment, paid_on, accrued_on, status, recurrence_id, recurrence_date, invoice_id, attachment_path', companyId),
     selectAll(db, 'cfo_recurrences', 'id, direction, amount, account_id, to_account_id, article_id, counterparty, comment, day_of_month, starts_on, ends_on', companyId),
     selectAll(db, 'cfo_plan_items', 'id, article_id, month, amount', companyId),
     loadInvoices(db, userId),
@@ -257,7 +257,7 @@ export async function reorder(table: 'cfo_accounts' | 'cfo_articles', orderedIds
   }
 }
 
-export async function saveOperation(ws: Workspace, op: OperationDraft & { id?: string; counterparty: string | null; comment: string | null }): Promise<void> {
+export async function saveOperation(ws: Workspace, op: OperationDraft & { id?: string; counterparty: string | null; comment: string | null; attachmentPath?: string | null }): Promise<void> {
   const row = {
     direction: op.direction,
     amount: toDbAmount(op.amount),
@@ -269,6 +269,7 @@ export async function saveOperation(ws: Workspace, op: OperationDraft & { id?: s
     paid_on: op.paidOn,
     accrued_on: op.accruedOn,
     status: op.status,
+    ...(op.attachmentPath !== undefined ? { attachment_path: op.attachmentPath } : {}),
   }
   if (op.id) {
     const { error } = await supabase.from('cfo_operations').update({ ...row, updated_at: new Date().toISOString() }).eq('id', op.id)
@@ -304,9 +305,35 @@ export async function importOperations(ws: Workspace, drafts: ImportDraft[]): Pr
   return written
 }
 
-export async function deleteOperation(id: string): Promise<void> {
+export async function deleteOperation(id: string, attachmentPath?: string | null): Promise<void> {
   const { error } = await supabase.from('cfo_operations').delete().eq('id', id)
   check(error)
+  if (attachmentPath) await removeReceipt(attachmentPath)
+}
+
+// ── Чеки: приватный бакет, папка = user_id (политики storage пускают только владельца) ──
+export const RECEIPT_BUCKET = 'cfo-receipts'
+const RECEIPT_TYPES: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'application/pdf': 'pdf' }
+
+export async function uploadReceipt(ws: Workspace, file: File): Promise<string> {
+  const ext = RECEIPT_TYPES[file.type]
+  if (!ext) throw new Error('Чек — фото (JPG, PNG, WebP) или PDF')
+  if (file.size > 5 * 1024 * 1024) throw new Error('Файл чека больше 5 МБ')
+  const path = `${ws.userId}/${crypto.randomUUID()}.${ext}`
+  const { error } = await supabase.storage.from(RECEIPT_BUCKET).upload(path, file, { contentType: file.type })
+  check(error)
+  return path
+}
+
+export async function receiptUrl(path: string): Promise<string> {
+  const { data, error } = await supabase.storage.from(RECEIPT_BUCKET).createSignedUrl(path, 300)
+  check(error)
+  return data!.signedUrl
+}
+
+export async function removeReceipt(path: string): Promise<void> {
+  // Файл без операции никому не мешает — сбой удаления не должен ломать удаление операции.
+  await supabase.storage.from(RECEIPT_BUCKET).remove([path]).catch(() => undefined)
 }
 
 // «Оплачено сегодня». Вхождение повтора становится отдельной фактической

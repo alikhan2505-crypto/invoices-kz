@@ -18,11 +18,12 @@ export async function handleCfoMessage(db: SupabaseClient, userId: string, text:
   const today = almatyToday()
 
   if (UNDO_WORDS.includes(text.trim().toLowerCase())) {
-    const { data: last } = await db.from('cfo_operations').select('id, created_at')
+    const { data: last } = await db.from('cfo_operations').select('id, created_at, attachment_path')
       .eq('user_id', userId).like('comment', `${TELEGRAM_MARK}%`)
       .order('created_at', { ascending: false }).limit(1).maybeSingle()
     if (!last || Date.now() - new Date(last.created_at).getTime() > UNDO_WINDOW_MS) return 'Отменять нечего: за последний час через Telegram операций не было.'
     const { error } = await db.from('cfo_operations').delete().eq('id', last.id).eq('user_id', userId)
+    if (!error && last.attachment_path) await db.storage.from('cfo-receipts').remove([last.attachment_path]).catch(() => undefined)
     return error ? 'Не удалось отменить — удалите операцию в кабинете.' : '↩️ Последняя операция отменена.'
   }
 
@@ -71,12 +72,22 @@ async function recordFromModel(db: SupabaseClient, userId: string, companyId: st
   const d = checked.draft
   const problem = validateOperation(d, { accounts: ws.accounts, articles: ws.articles, today })
   if (problem) return `Не записал: ${problem}.`
+  // Фото чека сохраняем к операции — его потом можно открыть из журнала на компьютере.
+  let attachmentPath: string | null = null
+  if (image) {
+    const path = `${userId}/${crypto.randomUUID()}.${image.media === 'image/png' ? 'png' : 'jpg'}`
+    const { error: upErr } = await db.storage.from('cfo-receipts').upload(path, Buffer.from(image.data, 'base64'), { contentType: image.media })
+    if (upErr) console.error('cfo receipt upload failed for', userId, ':', upErr.message)
+    else attachmentPath = path
+  }
   const { error } = await db.from('cfo_operations').insert({
+    attachment_path: attachmentPath,
     user_id: userId, company_id: companyId, direction: d.direction, amount: toDbAmount(d.amount), account_id: d.accountId,
     to_account_id: null, article_id: d.articleId, counterparty: d.counterparty, comment: d.comment,
     paid_on: d.paidOn, accrued_on: d.accruedOn, status: d.status,
   })
   if (error) {
+    if (attachmentPath) await db.storage.from('cfo-receipts').remove([attachmentPath]).catch(() => undefined)
     console.error('cfo telegram insert failed for', userId, ':', error.message)
     return 'Не удалось записать операцию — попробуйте ещё раз.'
   }
