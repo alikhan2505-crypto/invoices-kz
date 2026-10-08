@@ -2,7 +2,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { useAppDialog } from '@/components/AppDialog'
 import { deleteOperation, deleteRecurrence, markPaid, receiptUrl } from '@/lib/cfo/data'
-import { addMonths, firstDay, lastDay, monthKey, monthRange, todayIso } from '@/lib/cfo/dates'
+import { addMonths, firstDay, lastDay, monthKey, todayIso } from '@/lib/cfo/dates'
 import { expandRecurrences, isVirtual } from '@/lib/cfo/recurrence'
 import { accountName, dayLabel, DIRECTION_LABEL, opTitle } from '@/lib/cfo/labels'
 import { formatTenge } from '@/lib/cfo/money'
@@ -31,7 +31,7 @@ export default function CfoOperations() {
   const [view, setView] = useState<'calendar' | 'list'>(() => {
     try { return localStorage.getItem('cfo-ops-view') === 'list' ? 'list' : 'calendar' } catch { return 'calendar' }
   })
-  const [range, setRange] = useState(() => ({ from: addMonths(monthKey(today), -1), to: addMonths(monthKey(today), 1) }))
+  const [calMonth, setCalMonth] = useState(monthKey(today))
   const [selected, setSelected] = useState<string | null>(today)
 
   const switchView = (v: 'calendar' | 'list') => { setView(v); try { localStorage.setItem('cfo-ops-view', v) } catch { /* ignore */ } }
@@ -49,8 +49,8 @@ export default function CfoOperations() {
 
   // Календарь: свои операции плюс будущие вхождения повторов — чтобы были видны и плановые месяцы.
   const byDate = useMemo(() => {
-    const from = firstDay(range.from)
-    const to = lastDay(range.to)
+    const from = firstDay(calMonth)
+    const to = lastDay(calMonth)
     const virtual = expandRecurrences(ws.recurrences, ws.operations, today > from ? today : from, to)
     const map = new Map<string, CfoOperation[]>()
     for (const o of [...ws.operations, ...virtual]) {
@@ -60,7 +60,7 @@ export default function CfoOperations() {
       map.set(o.paidOn, day)
     }
     return map // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ws.operations, ws.recurrences, range, today, accountId, articleId, status])
+  }, [ws.operations, ws.recurrences, calMonth, today, accountId, articleId, status])
 
   const busy = useRef(false)
   async function run(action: () => Promise<void>) {
@@ -141,6 +141,14 @@ export default function CfoOperations() {
       <Card>
         <div className="flex gap-2 flex-wrap items-end">
           <Segmented label="Вид" value={view} onChange={switchView} options={[{ value: 'calendar', label: 'Календарь' }, { value: 'list', label: 'Список' }]} />
+          {view === 'calendar' && (
+            <span className="inline-flex items-center gap-1">
+              <GhostButton type="button" aria-label="Предыдущий месяц" onClick={() => { setCalMonth((m) => addMonths(m, -1)); setSelected(null) }}>‹</GhostButton>
+              <input type="month" aria-label="Месяц календаря" className={`${inputClass} max-w-[180px]`} style={inputStyle} value={calMonth} onChange={(e) => { if (e.target.value) { setCalMonth(e.target.value); setSelected(null) } }} />
+              <GhostButton type="button" aria-label="Следующий месяц" onClick={() => { setCalMonth((m) => addMonths(m, 1)); setSelected(null) }}>›</GhostButton>
+              {calMonth !== monthKey(today) && <GhostButton type="button" onClick={() => { setCalMonth(monthKey(today)); setSelected(today) }}>Сегодня</GhostButton>}
+            </span>
+          )}
           {view === 'list' && <input type="month" aria-label="Месяц" className={`${inputClass} max-w-[180px]`} style={inputStyle} value={month} onChange={(e) => setMonth(e.target.value)} />}
           <select aria-label="Счёт" className={`${inputClass} max-w-[200px]`} style={inputStyle} value={accountId} onChange={(e) => setAccountId(e.target.value)}>
             <option value="">Все счета</option>
@@ -156,8 +164,7 @@ export default function CfoOperations() {
 
       {view === 'calendar' && (
         <>
-          <div className="flex justify-center"><GhostButton type="button" onClick={() => setRange((r) => ({ ...r, from: addMonths(r.from, -1) }))}>↑ Показать предыдущий месяц</GhostButton></div>
-          <OpsCalendar months={monthRange(range.from, range.to)} byDate={byDate} today={today} selected={selected} onSelect={setSelected} accounts={ws.accounts} articles={ws.articles} scrollToMonth={monthKey(today)} dayPanel={selected ? (
+          <OpsCalendar months={[calMonth]} byDate={byDate} today={today} selected={selected} onSelect={setSelected} accounts={ws.accounts} articles={ws.articles} dayPanel={selected ? (
             <Card className="!p-0 overflow-hidden">
               <div className="px-4 py-3 flex items-center justify-between gap-2 flex-wrap" style={{ borderBottom: '1px solid var(--nav-border-soft)' }}>
                 <SectionTitle>{dayLabel(selected)}</SectionTitle>
@@ -167,7 +174,6 @@ export default function CfoOperations() {
               {(byDate.get(selected) ?? []).map(row)}
             </Card>
           ) : null} />
-          <div className="flex justify-center"><GhostButton type="button" onClick={() => setRange((r) => ({ ...r, to: addMonths(r.to, 1) }))}>↓ Показать следующий месяц</GhostButton></div>
         </>
       )}
 

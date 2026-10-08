@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useRef, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { daysInMonth } from '@/lib/cfo/dates'
 import { monthTitle, opTitle } from '@/lib/cfo/labels'
 import { formatTenge } from '@/lib/cfo/money'
@@ -18,8 +18,8 @@ function short(t: number): string {
   return `${sign}${Math.round(v)}`
 }
 
-// Месяцы плитками по 7 дней (с понедельника), друг под другом — листаются обычной прокруткой.
-export default function OpsCalendar({ months, byDate, today, selected, onSelect, accounts, articles, scrollToMonth, dayPanel }: {
+// Месяц плитками по 7 дней (с понедельника).
+export default function OpsCalendar({ months, byDate, today, selected, onSelect, accounts, articles, dayPanel }: {
   months: string[]
   byDate: Map<string, CfoOperation[]>
   today: string
@@ -27,12 +27,8 @@ export default function OpsCalendar({ months, byDate, today, selected, onSelect,
   onSelect: (date: string) => void
   accounts: CfoAccount[]
   articles: CfoArticle[]
-  scrollToMonth: string
   dayPanel?: ReactNode // карточка выбранного дня — встаёт сразу под его месяцем
 }) {
-  const anchor = useRef<HTMLDivElement | null>(null)
-  useEffect(() => { anchor.current?.scrollIntoView({ block: 'start' }) }, [scrollToMonth])
-
   return (
     <div className="space-y-6">
       {months.map((m) => {
@@ -42,7 +38,7 @@ export default function OpsCalendar({ months, byDate, today, selected, onSelect,
         const monthOps = days.flatMap((d) => byDate.get(d) ?? [])
         const monthNet = net(monthOps.filter((o) => o.direction !== 'transfer'))
         return (
-          <section key={m} ref={m === scrollToMonth ? anchor : undefined} aria-label={monthTitle(m)} className="scroll-mt-20 lg:scroll-mt-4">
+          <section key={m} aria-label={monthTitle(m)} className="scroll-mt-20 lg:scroll-mt-4">
             <div className="flex items-baseline justify-between gap-2 mb-2 flex-wrap">
               <h2 className="text-lg font-bold" style={{ color: 'var(--nav-text-primary)' }}>{monthTitle(m)}</h2>
               {monthOps.length > 0 && (
