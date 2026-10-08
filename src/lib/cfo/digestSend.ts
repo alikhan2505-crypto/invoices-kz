@@ -5,6 +5,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { sendTelegramNotification } from '@/lib/telegramNotify'
 import { loadWorkspace } from './data'
 import { almatyToday, buildDigest } from './digest'
+import { addMonths, monthKey } from './dates'
+import { buildMonthlyReport } from './monthlyReport'
 
 export type DigestResult = 'sent' | 'no_company' | 'no_telegram' | 'no_accounts'
 
@@ -19,6 +21,9 @@ export async function sendCfoDigest(db: SupabaseClient, userId: string, now: Dat
   if (!profile?.telegram_chat_id) return 'no_telegram'
   const ws = await loadWorkspace(company.id, userId, db)
   if (ws.accounts.length === 0) return 'no_accounts'
-  await sendTelegramNotification(profile.telegram_chat_id, buildDigest(ws, almatyToday(now)))
+  const today = almatyToday(now)
+  // 1-го числа сначала итоги прошлого месяца, потом обычная утренняя сводка.
+  if (today.endsWith('-01')) await sendTelegramNotification(profile.telegram_chat_id, buildMonthlyReport(ws, addMonths(monthKey(today), -1)))
+  await sendTelegramNotification(profile.telegram_chat_id, buildDigest(ws, today))
   return 'sent'
 }

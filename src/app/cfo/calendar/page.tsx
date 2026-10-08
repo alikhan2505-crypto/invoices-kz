@@ -2,7 +2,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { useAppDialog } from '@/components/AppDialog'
 import { buildCalendar, CALENDAR_HORIZON_DAYS } from '@/lib/cfo/calendar'
-import { markPaid } from '@/lib/cfo/data'
+import { markPaid, reschedule } from '@/lib/cfo/data'
 import { addDays, firstDay, monthKey, todayIso } from '@/lib/cfo/dates'
 import { accountName, dayLabel, opTitle } from '@/lib/cfo/labels'
 import { formatTenge } from '@/lib/cfo/money'
@@ -10,6 +10,7 @@ import { isVirtual } from '@/lib/cfo/recurrence'
 import type { CfoOperation } from '@/lib/cfo/types'
 import { useCfo } from '../CfoWorkspace'
 import TaxSetup from '../TaxSetup'
+import MoveButton from '../MoveButton'
 import ScenarioCard from '../ScenarioCard'
 import InvoicePanel, { invoiceHref } from '../InvoicePanel'
 import { forecastOperations, invoiceIdOf, isInvoiceVirtual } from '@/lib/cfo/invoiceLink'
@@ -38,6 +39,12 @@ export default function CfoCalendar() {
     try { await markPaid(ws, op, today); await reload() } catch (e) { await alert(e instanceof Error ? e.message : String(e)) } finally { paying.current = false }
   }
 
+  async function move(op: CfoOperation, date: string) {
+    const account = ws.accounts.find((a) => a.id === op.accountId)
+    if (account && date < account.openingDate) { await alert(`Дата раньше начала учёта по счёту «${account.name}»`); return }
+    try { await reschedule(ws, op, date); await reload() } catch (e) { await reload().catch(() => {}); await alert(e instanceof Error ? e.message : String(e)) }
+  }
+
   const item = (op: CfoOperation) => (
     <div key={op.id} className="flex items-center gap-3 py-2 flex-wrap">
       <div className="flex-1 min-w-[180px]">
@@ -52,6 +59,7 @@ export default function CfoCalendar() {
         ? <span className="text-sm tabular-nums" style={{ color: 'var(--nav-text-secondary)' }}>{formatTenge(op.amount)}</span>
         : <Money value={op.direction === 'in' ? op.amount : -op.amount} signed className="text-sm font-semibold" />}
       {isInvoiceVirtual(op) && <a href={invoiceHref(invoiceIdOf(op))} className="inline-flex items-center min-h-[44px] rounded-xl px-4 text-sm font-medium" style={{ border: '1px solid var(--nav-border)', color: 'var(--nav-text-secondary)' }}>Открыть счёт</a>}
+      {op.status === 'planned' && !isInvoiceVirtual(op) && <MoveButton op={op} today={today} title={opTitle(op, ws.accounts, ws.articles)} onMove={move} />}
       {op.status === 'planned' && !isInvoiceVirtual(op) && <GhostButton type="button" aria-label={`Оплачено: ${opTitle(op, ws.accounts, ws.articles)}`} onClick={() => void pay(op)}>Оплачено</GhostButton>}
     </div>
   )

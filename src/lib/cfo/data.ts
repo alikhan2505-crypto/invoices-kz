@@ -338,6 +338,24 @@ export async function markPaid(ws: Workspace, op: CfoOperation, today: string): 
   check(error)
 }
 
+// Перенос планового платежа на другую дату. Вхождение повтора становится
+// отдельной плановой операцией со ссылкой на правило (как при «Оплачено»), поэтому
+// правило дальше идёт своим чередом, а уникальный индекс не даст перенести дважды.
+export async function reschedule(ws: Workspace, op: CfoOperation, date: string): Promise<void> {
+  if (op.status !== 'planned') throw new Error('Переносить можно только плановые платежи')
+  if (op.id.startsWith('rec:')) {
+    const { error } = await supabase.from('cfo_operations').insert({
+      ...owned(ws), direction: op.direction, amount: toDbAmount(op.amount), account_id: op.accountId, to_account_id: op.toAccountId,
+      article_id: op.articleId, counterparty: op.counterparty, comment: op.comment, paid_on: date, accrued_on: op.accruedOn,
+      status: 'planned', recurrence_id: op.recurrenceId, recurrence_date: op.recurrenceDate,
+    })
+    check(error)
+    return
+  }
+  const { error } = await supabase.from('cfo_operations').update({ paid_on: date, updated_at: new Date().toISOString() }).eq('id', op.id)
+  check(error)
+}
+
 export async function saveRecurrence(ws: Workspace, r: RecurrenceDraft & { counterparty: string | null; comment: string | null }): Promise<void> {
   const { error } = await supabase.from('cfo_recurrences').insert({
     ...owned(ws),
