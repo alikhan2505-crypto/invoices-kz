@@ -26,18 +26,45 @@ export async function handleCfoMessage(db: SupabaseClient, userId: string, text:
     return error ? 'Не удалось отменить — удалите операцию в кабинете.' : '↩️ Последняя операция отменена.'
   }
 
+  return recordFromModel(db, userId, company.id, today, text, null)
+}
+
+const PHOTO_LIMIT = 5 * 1024 * 1024
+
+// Фото чека или накладной: берём самое крупное превью, отдаём модели вместе с подписью.
+export async function handleCfoPhoto(db: SupabaseClient, userId: string, fileId: string, caption: string): Promise<string | null> {
+  const { data: company } = await db.from('cfo_companies').select('id').eq('user_id', userId).maybeSingle()
+  if (!company) return null
+  const token = process.env.CUSTOMER_TELEGRAM_BOT_TOKEN
+  const info = await fetch(`https://api.telegram.org/bot${token}/getFile?file_id=${encodeURIComponent(fileId)}`).then((r) => r.json()).catch(() => null)
+  const path = info?.result?.file_path as string | undefined
+  if (!path || (info?.result?.file_size ?? 0) > PHOTO_LIMIT) return 'Не удалось получить фото — отправьте его ещё раз (до 5 МБ).'
+  const res = await fetch(`https://api.telegram.org/file/bot${token}/${path}`)
+  if (!res.ok) return 'Не удалось скачать фото — отправьте его ещё раз.'
+  const image = Buffer.from(await res.arrayBuffer()).toString('base64')
+  const media = path.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg'
+  return recordFromModel(db, userId, company.id, almatyToday(), `[фото чека] ${caption}`.trim(), { data: image, media })
+}
+
+async function recordFromModel(db: SupabaseClient, userId: string, companyId: string, today: string, text: string, image: { data: string; media: 'image/png' | 'image/jpeg' } | null): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) return 'Ввод через Telegram временно недоступен.'
-  const ws = await loadWorkspace(company.id, userId, db)
+  const ws = await loadWorkspace(companyId, userId, db)
+  const prompt = parsePrompt(ws, today, image ? `${text}
+На фото — чек, накладная или квитанция: возьми итоговую сумму к оплате, продавца как контрагента и дату с документа.` : text)
   const message = await new Anthropic({ apiKey }).messages.create({
     model: 'claude-haiku-4-5-20251001',
     max_tokens: 300,
-    messages: [{ role: 'user', content: parsePrompt(ws, today, text) }],
+    messages: [{ role: 'user', content: image
+      ? [{ type: 'image', source: { type: 'base64', media_type: image.media, data: image.data } }, { type: 'text', text: prompt }]
+      : prompt }],
   })
   const raw = message.content.filter((b) => b.type === 'text').map((b) => (b.type === 'text' ? b.text : '')).join('')
   const parsed = extractJson(raw)
   if (!parsed || (parsed as { error?: unknown }).error) {
-    return 'Это не похоже на операцию. Пример: «аренда 300 000», «пришло 450к от ТОО Ромашка», «такси 3500 вчера».'
+    return image
+      ? 'Не разобрал чек. Сфотографируйте ровнее или напишите сумму текстом: «закупка 45 000».'
+      : 'Это не похоже на операцию. Пример: «аренда 300 000», «пришло 450к от ТОО Ромашка», «такси 3500 вчера».'
   }
   const checked = checkParsed(parsed, ws, today, text)
   if (!checked.ok) return checked.error
@@ -45,7 +72,7 @@ export async function handleCfoMessage(db: SupabaseClient, userId: string, text:
   const problem = validateOperation(d, { accounts: ws.accounts, articles: ws.articles, today })
   if (problem) return `Не записал: ${problem}.`
   const { error } = await db.from('cfo_operations').insert({
-    user_id: userId, company_id: company.id, direction: d.direction, amount: toDbAmount(d.amount), account_id: d.accountId,
+    user_id: userId, company_id: companyId, direction: d.direction, amount: toDbAmount(d.amount), account_id: d.accountId,
     to_account_id: null, article_id: d.articleId, counterparty: d.counterparty, comment: d.comment,
     paid_on: d.paidOn, accrued_on: d.accruedOn, status: d.status,
   })

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { parseStartToken } from '@/lib/telegramNotify'
-import { handleCfoMessage } from '@/lib/cfo/telegramHandle'
+import { handleCfoMessage, handleCfoPhoto } from '@/lib/cfo/telegramHandle'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -31,6 +31,26 @@ export async function POST(req: NextRequest) {
 
   const update = await req.json()
   const msg = update.message
+  // Фото чека от привязанного чата — тоже в кабинет CFO (пока только админам).
+  const photos = msg?.photo
+  if (Array.isArray(photos) && photos.length > 0 && typeof msg?.chat?.id === 'number') {
+    const photoChat = msg.chat.id as number
+    const { data: linked } = await supabase.from('profiles').select('id, is_admin').eq('telegram_chat_id', String(photoChat))
+    for (const p of (linked ?? []).filter((p) => p.is_admin === true)) {
+      try {
+        const answer = await handleCfoPhoto(supabase, p.id, photos[photos.length - 1].file_id, typeof msg.caption === 'string' ? msg.caption : '')
+        if (answer) {
+          await reply(photoChat, answer)
+          return NextResponse.json({ ok: true })
+        }
+      } catch (e) {
+        console.error('telegram-notify-webhook: cfo photo failed for', p.id, ':', e instanceof Error ? e.message : e)
+        await reply(photoChat, 'Не удалось обработать фото — попробуйте ещё раз или напишите сумму текстом.')
+        return NextResponse.json({ ok: true })
+      }
+    }
+  }
+
   const text = msg?.text
   const chatId = msg?.chat?.id
   if (typeof text !== 'string' || typeof chatId !== 'number') {
