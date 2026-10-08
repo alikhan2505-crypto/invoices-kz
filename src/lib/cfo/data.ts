@@ -7,7 +7,7 @@ import type { AccountKind, Activity, ArticleKind, CfoAccount, CfoArticle, CfoOpe
 import type { OperationDraft, RecurrenceDraft } from './validate'
 import type { ImportDraft } from './statementImport'
 import { buildDemo } from './demo'
-import { BUSINESS_ARTICLE_NAMES, planModeSwitch, type CfoMode } from './mode'
+import { BUSINESS_ARTICLE_NAMES, familyRegroup, planModeSwitch, type CfoMode } from './mode'
 
 export type Workspace = {
   userId: string
@@ -189,6 +189,12 @@ export async function setMode(ws: Workspace, mode: CfoMode): Promise<void> {
   }
   if (plan.archive.length > 0) check((await supabase.from('cfo_articles').update({ archived: true }).in('id', plan.archive)).error)
   if (plan.restore.length > 0) check((await supabase.from('cfo_articles').update({ archived: false }).in('id', plan.restore)).error)
+  if (mode === 'family') {
+    const archived = new Set(plan.archive)
+    for (const g of familyRegroup(ws.articles.filter((a) => !archived.has(a.id)))) {
+      check((await supabase.from('cfo_articles').update({ pnl_group: g.pnlGroup }).eq('id', g.id)).error)
+    }
+  }
   check((await supabase.from('cfo_companies').update({ mode }).eq('id', ws.companyId)).error)
 }
 
