@@ -14,6 +14,9 @@ import ExportButton from '../ExportButton'
 import { downloadWorkbook, operationsSheet } from '@/lib/cfo/exportXlsx'
 import { Badge, Card, CfoPage, EmptyState, GhostButton, Money, PrimaryButton, SectionTitle, Segmented, inputClass, inputStyle } from '../ui'
 
+// Все элементы строки фильтров одной высоты с переключателями (у тех 44px кнопки + 4px отступы) — иначе ряд «пляшет».
+const CTL = '!min-h-[52px] h-[52px]'
+
 const signedAmount = (op: CfoOperation) => (op.direction === 'in' ? op.amount : op.direction === 'out' ? -op.amount : 0)
 
 export default function CfoOperations() {
@@ -139,22 +142,22 @@ export default function CfoOperations() {
       )}
 
       <Card>
-        <div className="flex gap-2 flex-wrap items-end">
+        <div className="flex gap-2 flex-wrap items-center">
           <Segmented label="Вид" value={view} onChange={switchView} options={[{ value: 'calendar', label: 'Календарь' }, { value: 'list', label: 'Список' }]} />
           {view === 'calendar' && (
-            <span className="inline-flex items-center gap-1">
-              <GhostButton type="button" aria-label="Предыдущий месяц" onClick={() => { setCalMonth((m) => addMonths(m, -1)); setSelected(null) }}>‹</GhostButton>
-              <input type="month" aria-label="Месяц календаря" className={`${inputClass} max-w-[180px]`} style={inputStyle} value={calMonth} onChange={(e) => { if (e.target.value) { setCalMonth(e.target.value); setSelected(null) } }} />
-              <GhostButton type="button" aria-label="Следующий месяц" onClick={() => { setCalMonth((m) => addMonths(m, 1)); setSelected(null) }}>›</GhostButton>
-              {calMonth !== monthKey(today) && <GhostButton type="button" onClick={() => { setCalMonth(monthKey(today)); setSelected(today) }}>Сегодня</GhostButton>}
+            <span className="inline-flex items-center gap-2">
+              <GhostButton type="button" className={`${CTL} w-[52px] !px-0 text-lg`} aria-label="Предыдущий месяц" onClick={() => { setCalMonth((m) => addMonths(m, -1)); setSelected(null) }}>‹</GhostButton>
+              <input type="month" aria-label="Месяц календаря" className={`${inputClass} ${CTL} max-w-[180px]`} style={inputStyle} value={calMonth} onChange={(e) => { if (e.target.value) { setCalMonth(e.target.value); setSelected(null) } }} />
+              <GhostButton type="button" className={`${CTL} w-[52px] !px-0 text-lg`} aria-label="Следующий месяц" onClick={() => { setCalMonth((m) => addMonths(m, 1)); setSelected(null) }}>›</GhostButton>
+              {calMonth !== monthKey(today) && <GhostButton type="button" className={CTL} onClick={() => { setCalMonth(monthKey(today)); setSelected(today) }}>Сегодня</GhostButton>}
             </span>
           )}
-          {view === 'list' && <input type="month" aria-label="Месяц" className={`${inputClass} max-w-[180px]`} style={inputStyle} value={month} onChange={(e) => setMonth(e.target.value)} />}
-          <select aria-label="Счёт" className={`${inputClass} max-w-[200px]`} style={inputStyle} value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+          {view === 'list' && <input type="month" aria-label="Месяц" className={`${inputClass} ${CTL} max-w-[180px]`} style={inputStyle} value={month} onChange={(e) => setMonth(e.target.value)} />}
+          <select aria-label="Счёт" className={`${inputClass} ${CTL} max-w-[200px]`} style={inputStyle} value={accountId} onChange={(e) => setAccountId(e.target.value)}>
             <option value="">Все счета</option>
             {ws.accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
           </select>
-          <select aria-label="Статья" className={`${inputClass} max-w-[240px]`} style={inputStyle} value={articleId} onChange={(e) => setArticleId(e.target.value)}>
+          <select aria-label="Статья" className={`${inputClass} ${CTL} max-w-[240px]`} style={inputStyle} value={articleId} onChange={(e) => setArticleId(e.target.value)}>
             <option value="">Все статьи</option>
             {ws.articles.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
           </select>
