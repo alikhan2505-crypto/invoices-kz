@@ -59,6 +59,7 @@ export default function DigestSettings() {
       <SectionTitle>Утренняя сводка в Telegram</SectionTitle>
       <p className="text-sm mb-3" style={{ color: 'var(--nav-text-secondary)' }}>
         Каждый день в 8:00 — сколько денег на счетах, что сегодня к оплате и к поступлению, просрочка и ближайший кассовый разрыв.
+        А ещё боту можно писать операции: «аренда 300 000», «пришло 450к от ТОО Ромашка», «такси 3500 вчера» — они сразу попадут в журнал. Ошиблись — напишите «отмена».
       </p>
       {telegram === 'missing' ? (
         <p className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>

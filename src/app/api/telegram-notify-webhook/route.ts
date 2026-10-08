@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { parseStartToken } from '@/lib/telegramNotify'
+import { handleCfoMessage } from '@/lib/cfo/telegramHandle'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -83,6 +84,25 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ ok: true })
+  }
+
+  // Обычное сообщение от уже привязанного чата — ввод операции в кабинет CFO.
+  // Пока продукт закрыт ревью founder'а, только для админов (как и сам кабинет).
+  if (!token && !text.startsWith('/start')) {
+    const { data: linked } = await supabase.from('profiles').select('id, is_admin').eq('telegram_chat_id', String(chatId))
+    for (const p of (linked ?? []).filter((p) => p.is_admin === true)) {
+      try {
+        const answer = await handleCfoMessage(supabase, p.id, text)
+        if (answer) {
+          await reply(chatId, answer)
+          return NextResponse.json({ ok: true })
+        }
+      } catch (e) {
+        console.error('telegram-notify-webhook: cfo input failed for', p.id, ':', e instanceof Error ? e.message : e)
+        await reply(chatId, 'Не удалось обработать сообщение — попробуйте ещё раз чуть позже.')
+        return NextResponse.json({ ok: true })
+      }
+    }
   }
 
   if (!token) {
