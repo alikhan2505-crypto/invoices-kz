@@ -393,7 +393,9 @@ describe('buildKeychainGeometries', () => {
       expect(() => buildKeychainGeometries({ font: loaded, text: 'Айгерим', size: 'M', ringAtEnd: false }),
         `font ${f.id} cannot render a multi-character name`).not.toThrow()
     }
-  })
+    // Строит полную геометрию для каждого шрифта — честно медленный тест (~6 с),
+    // со стандартными 5 с он падал по таймауту под нагрузкой.
+  }, 30_000)
 
   // --- Kazakh Cyrillic, digits and the hyphen ------------------------------
   // scripts/fetch-print-shop-fonts.mjs downloads these .ttf files through
