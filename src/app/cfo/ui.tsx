@@ -11,7 +11,7 @@ export function CfoPage({ title, actions, children }: { title: string; actions?:
     <DesktopShell>
       <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
         <SiteNav />
-        <div className="flex-1 min-w-0 p-4 lg:p-6 pb-6 space-y-5">
+        <div className="cfo-page-content flex-1 min-w-0 p-4 lg:p-6 pb-6 space-y-5">
           <div className="flex items-center gap-3 flex-wrap justify-between">
             <h1 className="text-2xl font-bold" style={{ color: 'var(--nav-text-primary)', letterSpacing: '-0.02em' }}>{title}</h1>
             {actions && <div className="flex items-center gap-2 flex-wrap">{actions}</div>}

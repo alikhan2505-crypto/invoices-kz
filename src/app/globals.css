@@ -1191,3 +1191,6 @@ body.product-shell-active [data-tour="wallet"] > button:first-child { display: n
 @media (prefers-reduced-motion: reduce) { .brand-loader-ch { animation: none; opacity: 1; } }
 
 /* rebuild marker: loader styles */
+
+/* CFO: пока внизу висит плашка «Это пример», конец страницы не прячется под ней. */
+body[data-cfo-demo] .cfo-page-content { padding-bottom: 7rem; }

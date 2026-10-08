@@ -45,7 +45,7 @@ export function buildDemo(today: string, articles: CfoArticle[], newId: () => st
     push({ direction: 'out', amount: 450 * K, accountId: bank.id, articleId: id.rent, counterparty: 'ИП Жумабаев', paidOn: day(5) })
     push({ direction: 'out', amount: 900 * K, accountId: bank.id, articleId: id.salary, counterparty: 'Сотрудники', paidOn: day(10) })
     push({ direction: 'out', amount: 150 * K, accountId: bank.id, articleId: id.ads, counterparty: 'Instagram / 2ГИС', paidOn: day(2) })
-    push({ direction: 'out', amount: 60 * K, accountId: cash.id, articleId: id.util, counterparty: 'Алматы Энергосбыт', paidOn: day(15) })
+    push({ direction: 'out', amount: 60 * K, accountId: bank.id, articleId: id.util, counterparty: 'Алматы Энергосбыт', paidOn: day(15) })
     push({ direction: 'out', amount: 25 * K, accountId: bank.id, articleId: id.net, counterparty: 'Казахтелеком', paidOn: day(8) })
     push({ direction: 'out', amount: 205 * K, accountId: bank.id, articleId: id.payroll, counterparty: 'Бюджет РК', paidOn: day(25) })
     push({ direction: 'out', amount: 12 * K, accountId: bank.id, articleId: id.fees, counterparty: 'Kaspi Bank', paidOn: day(28) })

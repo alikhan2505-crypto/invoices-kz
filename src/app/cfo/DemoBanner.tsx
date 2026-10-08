@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAppDialog } from '@/components/AppDialog'
 import { clearDemo } from '@/lib/cfo/data'
 import { useCfo } from './CfoWorkspace'
@@ -10,6 +10,12 @@ export default function DemoBanner() {
   const { confirm, dialogElement } = useAppDialog()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Пока плашка видна, страницы кабинета получают запас снизу (см. .cfo-page-content в globals.css).
+  useEffect(() => {
+    if (!ws.hasDemo) return
+    document.body.dataset.cfoDemo = '1'
+    return () => { delete document.body.dataset.cfoDemo }
+  }, [ws.hasDemo])
   if (!ws.hasDemo) return null
 
   async function clear() {
