@@ -8,7 +8,7 @@ import { validateOperation, validateRecurrence } from '@/lib/cfo/validate'
 import { useCfo } from './CfoWorkspace'
 import { ErrorText, Field, GhostButton, PrimaryButton, Segmented, inputClass, inputStyle } from './ui'
 
-export default function OperationForm({ initial, onDone, onCancel }: { initial?: CfoOperation; onDone: () => Promise<void>; onCancel: () => void }) {
+export default function OperationForm({ initial, defaultDate, onDone, onCancel }: { initial?: CfoOperation; defaultDate?: string; onDone: () => Promise<void>; onCancel: () => void }) {
   const { ws } = useCfo()
   const today = todayIso()
   const accounts = ws.accounts.filter((a) => !a.archived || a.id === initial?.accountId || a.id === initial?.toAccountId)
@@ -18,10 +18,11 @@ export default function OperationForm({ initial, onDone, onCancel }: { initial?:
   const [accountId, setAccountId] = useState(initial?.accountId ?? accounts[0]?.id ?? '')
   const [toAccountId, setToAccountId] = useState(initial?.toAccountId ?? '')
   const [articleId, setArticleId] = useState(initial?.articleId ?? '')
-  const [paidOn, setPaidOn] = useState(initial?.paidOn ?? today)
+  const startDate = defaultDate ?? today
+  const [paidOn, setPaidOn] = useState(initial?.paidOn ?? startDate)
   const [separateAccrual, setSeparateAccrual] = useState(!!initial && initial.accruedOn !== initial.paidOn)
-  const [accruedOn, setAccruedOn] = useState(initial?.accruedOn ?? today)
-  const [status, setStatus] = useState<OpStatus>(initial?.status ?? 'actual')
+  const [accruedOn, setAccruedOn] = useState(initial?.accruedOn ?? startDate)
+  const [status, setStatus] = useState<OpStatus>(initial?.status ?? (startDate > today ? 'planned' : 'actual'))
   const [counterparty, setCounterparty] = useState(initial?.counterparty ?? '')
   const [comment, setComment] = useState(initial?.comment ?? '')
   const [receipt, setReceipt] = useState<File | null>(null)

@@ -2,12 +2,14 @@
 import { useMemo, useRef, useState } from 'react'
 import { useAppDialog } from '@/components/AppDialog'
 import { deleteOperation, deleteRecurrence, markPaid, receiptUrl } from '@/lib/cfo/data'
-import { monthKey, todayIso } from '@/lib/cfo/dates'
+import { addMonths, firstDay, lastDay, monthKey, monthRange, todayIso } from '@/lib/cfo/dates'
+import { expandRecurrences, isVirtual } from '@/lib/cfo/recurrence'
 import { accountName, dayLabel, DIRECTION_LABEL, opTitle } from '@/lib/cfo/labels'
 import { formatTenge } from '@/lib/cfo/money'
 import type { CfoOperation, OpStatus } from '@/lib/cfo/types'
 import { useCfo } from '../CfoWorkspace'
 import OperationForm from '../OperationForm'
+import OpsCalendar from '../OpsCalendar'
 import ExportButton from '../ExportButton'
 import { downloadWorkbook, operationsSheet } from '@/lib/cfo/exportXlsx'
 import { Badge, Card, CfoPage, EmptyState, GhostButton, Money, PrimaryButton, SectionTitle, Segmented, inputClass, inputStyle } from '../ui'
@@ -23,13 +25,42 @@ export default function CfoOperations() {
   const [articleId, setArticleId] = useState('')
   const [status, setStatus] = useState<OpStatus | 'all'>('all')
   const [editing, setEditing] = useState<CfoOperation | 'new' | null>(null)
+  const [newDate, setNewDate] = useState<string | undefined>(undefined)
+  // Вид (календарь или список) запоминаем в этом браузере — мелкое удобство, без него всё работает.
+  // Страница рисуется только после загрузки кабинета в браузере, поэтому читать localStorage здесь безопасно.
+  const [view, setView] = useState<'calendar' | 'list'>(() => {
+    try { return localStorage.getItem('cfo-ops-view') === 'list' ? 'list' : 'calendar' } catch { return 'calendar' }
+  })
+  const [range, setRange] = useState(() => ({ from: addMonths(monthKey(today), -1), to: addMonths(monthKey(today), 1) }))
+  const [selected, setSelected] = useState<string | null>(today)
+
+  const switchView = (v: 'calendar' | 'list') => { setView(v); try { localStorage.setItem('cfo-ops-view', v) } catch { /* ignore */ } }
+
+  const matches = (o: Pick<CfoOperation, 'accountId' | 'toAccountId' | 'articleId' | 'status'>) =>
+    (!accountId || o.accountId === accountId || o.toAccountId === accountId) &&
+    (!articleId || o.articleId === articleId) &&
+    (status === 'all' || o.status === status)
 
   const list = useMemo(() => ws.operations
     .filter((o) => !month || monthKey(o.paidOn) === month)
-    .filter((o) => !accountId || o.accountId === accountId || o.toAccountId === accountId)
-    .filter((o) => !articleId || o.articleId === articleId)
-    .filter((o) => status === 'all' || o.status === status)
-    .sort((a, b) => b.paidOn.localeCompare(a.paidOn)), [ws.operations, month, accountId, articleId, status])
+    .filter(matches)
+    .sort((a, b) => b.paidOn.localeCompare(a.paidOn)), // eslint-disable-next-line react-hooks/exhaustive-deps
+  [ws.operations, month, accountId, articleId, status])
+
+  // Календарь: свои операции плюс будущие вхождения повторов — чтобы были видны и плановые месяцы.
+  const byDate = useMemo(() => {
+    const from = firstDay(range.from)
+    const to = lastDay(range.to)
+    const virtual = expandRecurrences(ws.recurrences, ws.operations, today > from ? today : from, to)
+    const map = new Map<string, CfoOperation[]>()
+    for (const o of [...ws.operations, ...virtual]) {
+      if (o.paidOn < from || o.paidOn > to || !matches(o)) continue
+      const day = map.get(o.paidOn) ?? []
+      day.push(o)
+      map.set(o.paidOn, day)
+    }
+    return map // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ws.operations, ws.recurrences, range, today, accountId, articleId, status])
 
   const busy = useRef(false)
   async function run(action: () => Promise<void>) {
@@ -57,42 +88,9 @@ export default function CfoOperations() {
     setEditing(null)
   }
 
-  return (
-    <CfoPage title="Операции" actions={editing === null && (
-      <>
-        <a href="/cfo/import" className="inline-flex items-center min-h-[44px] rounded-xl px-4 text-sm font-medium transition-colors hover:bg-[var(--nav-surface-glass)]" style={{ border: '1px solid var(--nav-border)', color: 'var(--nav-text-secondary)' }}>Импорт выписки</a>
-        <ExportButton onExport={() => downloadWorkbook(`Операции ${month} — ${ws.companyName}.xlsx`, { Операции: operationsSheet(list, ws.accounts, ws.articles) })} />
-        <PrimaryButton type="button" onClick={() => setEditing('new')}>Добавить операцию</PrimaryButton>
-      </>
-    )}>
-      {editing !== null && (
-        <Card>
-          <SectionTitle>{editing === 'new' ? 'Новая операция' : 'Изменить операцию'}</SectionTitle>
-          <OperationForm key={editing === 'new' ? 'new' : editing.id} initial={editing === 'new' ? undefined : editing} onDone={done} onCancel={() => setEditing(null)} />
-        </Card>
-      )}
-
-      <Card>
-        <div className="flex gap-2 flex-wrap items-end">
-          <input type="month" aria-label="Месяц" className={`${inputClass} max-w-[180px]`} style={inputStyle} value={month} onChange={(e) => setMonth(e.target.value)} />
-          <select aria-label="Счёт" className={`${inputClass} max-w-[200px]`} style={inputStyle} value={accountId} onChange={(e) => setAccountId(e.target.value)}>
-            <option value="">Все счета</option>
-            {ws.accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-          </select>
-          <select aria-label="Статья" className={`${inputClass} max-w-[240px]`} style={inputStyle} value={articleId} onChange={(e) => setArticleId(e.target.value)}>
-            <option value="">Все статьи</option>
-            {ws.articles.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-          </select>
-          <Segmented label="Статус" value={status} onChange={setStatus} options={[{ value: 'all', label: 'Все' }, { value: 'actual', label: 'Факт' }, { value: 'planned', label: 'План' }]} />
-        </div>
-      </Card>
-
-      {ws.operations.length === 0 && editing === null ? (
-        <EmptyState title="Добавьте первую операцию" hint="Приход, расход или перевод между своими счетами — из них сами строятся БДР, БДДС и календарь." />
-      ) : (
-        <Card className="!p-0 overflow-hidden">
-          {list.length === 0 && <p className="p-4 text-sm" style={{ color: 'var(--nav-text-muted)' }}>{accountId || articleId || status !== 'all' ? 'Нет операций по выбранным фильтрам' : 'За этот период операций нет.'}</p>}
-          {list.map((op) => (
+  const row = (op: CfoOperation) => {
+    const virtual = isVirtual(op)
+    return (
             <div key={op.id} className="px-4 py-3 flex items-start gap-3 flex-wrap" style={{ borderBottom: '1px solid var(--nav-border-soft)' }}>
               <div className="order-1 w-28 flex-shrink-0 text-xs pt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{dayLabel(op.paidOn)}</div>
               <div className="order-3 w-full sm:order-2 sm:w-auto sm:flex-1 sm:min-w-[180px]">
@@ -107,24 +105,81 @@ export default function CfoOperations() {
                 {op.direction === 'transfer'
                   ? <span className="text-sm tabular-nums" style={{ color: 'var(--nav-text-secondary)' }}>{formatTenge(op.amount)}</span>
                   : <Money value={signedAmount(op)} signed className="text-sm font-semibold" />}
-                <div className="mt-1">{op.status === 'planned' ? <Badge tone="plan">План</Badge> : <Badge tone="fact">Факт</Badge>}</div>
+                <div className="mt-1">{op.status === 'planned' ? <Badge tone="plan">{virtual ? 'Повтор' : 'План'}</Badge> : <Badge tone="fact">Факт</Badge>}</div>
               </div>
               <div className="order-4 w-full flex gap-1 flex-wrap justify-end">
                 {op.attachmentPath && <GhostButton type="button" aria-label={`Чек: ${opTitle(op, ws.accounts, ws.articles)}`} onClick={() => void openReceipt(op.attachmentPath!)}>📎 Чек</GhostButton>}
                 {op.status === 'planned' && <GhostButton type="button" aria-label={`Оплачено: ${opTitle(op, ws.accounts, ws.articles)}`} onClick={() => void run(() => markPaid(ws, op, today))}>Оплачено</GhostButton>}
-                <GhostButton type="button" aria-label={`Изменить: ${opTitle(op, ws.accounts, ws.articles)}`} onClick={() => setEditing(op)}>Изменить</GhostButton>
-                <GhostButton
+                {!virtual && <GhostButton type="button" aria-label={`Изменить: ${opTitle(op, ws.accounts, ws.articles)}`} onClick={() => { setEditing(op); window.scrollTo({ top: 0, behavior: 'smooth' }) }}>Изменить</GhostButton>}
+                {!virtual && <GhostButton
                   type="button"
                   aria-label={`Удалить: ${opTitle(op, ws.accounts, ws.articles)}`}
                   onClick={async () => { if (await confirm('Удалить операцию?')) await run(() => deleteOperation(op.id, op.attachmentPath)) }}
                 >
                   Удалить
-                </GhostButton>
+                </GhostButton>}
               </div>
             </div>
-          ))}
+    )
+  }
+
+  return (
+    <CfoPage title="Операции" actions={editing === null && (
+      <>
+        <a href="/cfo/import" className="inline-flex items-center min-h-[44px] rounded-xl px-4 text-sm font-medium transition-colors hover:bg-[var(--nav-surface-glass)]" style={{ border: '1px solid var(--nav-border)', color: 'var(--nav-text-secondary)' }}>Импорт выписки</a>
+        <ExportButton onExport={() => downloadWorkbook(`Операции ${month} — ${ws.companyName}.xlsx`, { Операции: operationsSheet(list, ws.accounts, ws.articles) })} />
+        <PrimaryButton type="button" onClick={() => { setNewDate(undefined); setEditing('new') }}>Добавить операцию</PrimaryButton>
+      </>
+    )}>
+      {editing !== null && (
+        <Card>
+          <SectionTitle>{editing === 'new' ? 'Новая операция' : 'Изменить операцию'}</SectionTitle>
+          <OperationForm key={editing === 'new' ? `new-${newDate ?? ''}` : editing.id} initial={editing === 'new' ? undefined : editing} defaultDate={editing === 'new' ? newDate : undefined} onDone={done} onCancel={() => setEditing(null)} />
         </Card>
       )}
+
+      <Card>
+        <div className="flex gap-2 flex-wrap items-end">
+          <Segmented label="Вид" value={view} onChange={switchView} options={[{ value: 'calendar', label: 'Календарь' }, { value: 'list', label: 'Список' }]} />
+          {view === 'list' && <input type="month" aria-label="Месяц" className={`${inputClass} max-w-[180px]`} style={inputStyle} value={month} onChange={(e) => setMonth(e.target.value)} />}
+          <select aria-label="Счёт" className={`${inputClass} max-w-[200px]`} style={inputStyle} value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+            <option value="">Все счета</option>
+            {ws.accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+          </select>
+          <select aria-label="Статья" className={`${inputClass} max-w-[240px]`} style={inputStyle} value={articleId} onChange={(e) => setArticleId(e.target.value)}>
+            <option value="">Все статьи</option>
+            {ws.articles.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+          </select>
+          <Segmented label="Статус" value={status} onChange={setStatus} options={[{ value: 'all', label: 'Все' }, { value: 'actual', label: 'Факт' }, { value: 'planned', label: 'План' }]} />
+        </div>
+      </Card>
+
+      {view === 'calendar' && (
+        <>
+          <div className="flex justify-center"><GhostButton type="button" onClick={() => setRange((r) => ({ ...r, from: addMonths(r.from, -1) }))}>↑ Показать предыдущий месяц</GhostButton></div>
+          <OpsCalendar months={monthRange(range.from, range.to)} byDate={byDate} today={today} selected={selected} onSelect={setSelected} accounts={ws.accounts} articles={ws.articles} scrollToMonth={monthKey(today)} />
+          <div className="flex justify-center"><GhostButton type="button" onClick={() => setRange((r) => ({ ...r, to: addMonths(r.to, 1) }))}>↓ Показать следующий месяц</GhostButton></div>
+          {selected && (
+            <Card className="!p-0 overflow-hidden">
+              <div className="px-4 py-3 flex items-center justify-between gap-2 flex-wrap" style={{ borderBottom: '1px solid var(--nav-border-soft)' }}>
+                <SectionTitle>{dayLabel(selected)}</SectionTitle>
+                <PrimaryButton type="button" onClick={() => { setNewDate(selected); setEditing('new'); window.scrollTo({ top: 0, behavior: 'smooth' }) }}>Добавить на эту дату</PrimaryButton>
+              </div>
+              {(byDate.get(selected) ?? []).length === 0 && <p className="p-4 text-sm" style={{ color: 'var(--nav-text-muted)' }}>В этот день операций нет.</p>}
+              {(byDate.get(selected) ?? []).map(row)}
+            </Card>
+          )}
+        </>
+      )}
+
+      {view === 'list' && (ws.operations.length === 0 && editing === null ? (
+        <EmptyState title="Добавьте первую операцию" hint="Приход, расход или перевод между своими счетами — из них сами строятся БДР, БДДС и календарь." />
+      ) : (
+        <Card className="!p-0 overflow-hidden">
+          {list.length === 0 && <p className="p-4 text-sm" style={{ color: 'var(--nav-text-muted)' }}>{accountId || articleId || status !== 'all' ? 'Нет операций по выбранным фильтрам' : 'За этот период операций нет.'}</p>}
+          {list.map(row)}
+        </Card>
+      ))}
 
       {ws.recurrences.length > 0 && (
         <Card>
