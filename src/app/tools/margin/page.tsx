@@ -13,15 +13,16 @@ const EASE = [0.16, 1, 0.3, 1] as const
 
 // 12.5% is the rate the large majority of Kaspi's top-level categories carry
 // (see KASPI_CATEGORY_COMMISSIONS, transcribed from Kaspi's own published
-// tariff). An ИП on упрощёнка in Kazakhstan pays 3% of turnover. Both are
-// pre-filled so the calculator answers before anything is typed, and both stay
-// editable because neither is universal.
+// tariff). An ИП on упрощёнка in Kazakhstan pays 4% of turnover since
+// 2026-01-01 (new Tax Code №214-VIII; a region's маслихат may shift it within
+// 2-6%). Both are pre-filled so the calculator answers before anything is
+// typed, and both stay editable because neither is universal.
 const DEFAULTS: MarginInput = {
   costPrice: 5000,
   sellPrice: 10000,
   commissionPercent: 12.5,
   deliveryCost: 800,
-  taxPercent: 3,
+  taxPercent: 4,
   otherCosts: 200,
   monthlyUnits: 30,
 }
@@ -90,7 +91,7 @@ const COPY: Record<Lang, Copy> = {
     },
     fieldHints: {
       commissionPercent: 'Выберите категорию выше — ставка подставится сама',
-      taxPercent: 'ИП на упрощёнке в РК — 3% с оборота',
+      taxPercent: 'ИП на упрощёнке в РК с 2026 года — 4% с оборота',
       otherCosts: 'Упаковка, реклама, возвраты',
     },
     unitTenge: '₸',
@@ -148,7 +149,7 @@ const COPY: Record<Lang, Copy> = {
     },
     fieldHints: {
       commissionPercent: 'Жоғарыда санатты таңдаңыз — мөлшерлеме өзі қойылады',
-      taxPercent: 'ҚР-дағы жеңілдетілген ЖК — айналымнан 3%',
+      taxPercent: 'ҚР-дағы жеңілдетілген ЖК 2026 жылдан — айналымнан 4%',
       otherCosts: 'Қаптама, жарнама, қайтарымдар',
     },
     unitTenge: '₸',
@@ -206,7 +207,7 @@ const COPY: Record<Lang, Copy> = {
     },
     fieldHints: {
       commissionPercent: 'Pick a category above and the rate fills itself in',
-      taxPercent: 'A simplified-regime sole trader in Kazakhstan pays 3%',
+      taxPercent: 'A simplified-regime sole trader in Kazakhstan pays 4% since 2026',
       otherCosts: 'Packaging, ads, returns',
     },
     unitTenge: '₸',
