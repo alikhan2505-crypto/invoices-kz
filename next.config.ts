@@ -25,6 +25,14 @@ const nextConfig: NextConfig = {
     '/api/print/orders/**': ['public/fonts/print-shop/**/*.ttf'],
     '/api/cron/kaspi-poll': ['public/fonts/print-shop/**/*.ttf'],
   },
+  // Короткие адреса для печатных QR (наклейки на машине и т.п.). QR напечатан навсегда,
+  // а куда он ведёт — меняется здесь; utm показывает в аналитике, сколько людей пришло с машины.
+  // permanent: false — браузеры не кешируют, поэтому цель можно поменять в любой момент.
+  redirects() {
+    return [
+      { source: '/car', destination: '/?utm_source=car&utm_medium=decal&utm_campaign=jetour', permanent: false },
+    ]
+  },
 };
 
 export default nextConfig;
