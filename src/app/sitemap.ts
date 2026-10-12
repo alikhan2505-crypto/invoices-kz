@@ -90,6 +90,21 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.7,
     },
     {
+      // Пятый инструмент: АВР — второй по частоте документ после счёта.
+      url: 'https://invoices.kz/tools/avr',
+      lastModified: new Date(),
+      changeFrequency: 'monthly',
+      priority: 0.7,
+    },
+    {
+      // Шестой: калькулятор налогов ИП по новому НК-2026 — у большинства
+      // конкурентов в выдаче до сих пор цифры старого кодекса.
+      url: 'https://invoices.kz/tools/nalogi',
+      lastModified: new Date(),
+      changeFrequency: 'monthly',
+      priority: 0.7,
+    },
+    {
       // Индекс инструментов: страница-указатель для набравших /tools руками.
       url: 'https://invoices.kz/tools',
       lastModified: new Date(),
