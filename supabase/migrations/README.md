@@ -122,3 +122,5 @@ Click-to-WhatsApp click id, пишется только на первое соо
 `cfo_receipts.sql` (08.10.2026) — приватный бакет `cfo-receipts` и `cfo_operations.attachment_path`.
 
 `cfo_mode_and_tour.sql` (08.10.2026) — `cfo_companies.mode` (business/family) и `tour_done_at`.
+
+`revoke_definer_rpc.sql` (12.10.2026) — SECURITY DEFINER функции закрыты от REST RPC (у anon был доступ через дефолтный грант PUBLIC); `is_admin_user` оставлена authenticated для RLS-политик.

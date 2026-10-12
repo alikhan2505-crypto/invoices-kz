@@ -7,6 +7,7 @@ import LoadingSpinner from '@/components/LoadingSpinner'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import { KASPI_SHOP_CONNECTIONS_CHANGED_EVENT } from '@/components/KaspiShopStoreSwitcher'
+import KaspiTour from './KaspiTour'
 import { getActivePlan } from '@/lib/plan'
 import { useAppDialog } from '@/components/AppDialog'
 
@@ -769,13 +770,15 @@ export default function KaspiShop() {
           </div>
         ) : (
           <>
+            {/* Тур первого входа — только когда магазин подключён. */}
+            <KaspiTour />
             {/* Top row (2026-08-21 founder layout request: "скомпанованнее"):
                 hero on the left (2/3), city picker beside it on the right --
                 the stats row below stays full-width as the second line. */}
             <div className="grid lg:grid-cols-3 gap-4 mb-4 items-stretch">
             {/* Hero: the one question this page answers, stated as three
                 numbers, not buried in per-product rows. */}
-            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}
+            <motion.div data-tour="kaspi-hero" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}
               className="nav-glass nav-card-accent rounded-[28px] p-6 lg:p-8 lg:col-span-2">
               <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
                 <div>
@@ -829,7 +832,7 @@ export default function KaspiShop() {
               </div>
             </motion.div>
 
-            <div className="nav-glass rounded-2xl p-4">
+            <div data-tour="kaspi-cities" className="nav-glass rounded-2xl p-4">
               <div className="text-sm font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>Города для отслеживания конкурентов</div>
               <div className="text-[11px] mb-3" style={{ color: 'var(--nav-text-muted)' }}>
                 {trackedCities.length === 0
@@ -879,7 +882,7 @@ export default function KaspiShop() {
               <div className="text-xs mb-4 px-1" style={{ color: 'var(--nav-text-muted)' }}>{products.length} товаров импортировано и на паузе — включите нужные ниже, чтобы демпинг начал работать.</div>
             )}
 
-            <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+            <div data-tour="kaspi-rules" className="flex items-center justify-between gap-3 mb-3 flex-wrap">
               <div className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>Правила демпинга</div>
               <div className="flex items-center gap-2 flex-wrap">
                 <button onClick={syncCatalog} disabled={syncingCatalog}
