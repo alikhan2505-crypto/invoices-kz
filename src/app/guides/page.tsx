@@ -77,6 +77,12 @@ export default function GuidesIndex() {
             Бесплатные инструменты
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
+            <Link href="/tools/schet" className="nav-glass rounded-xl p-4 block" style={{ color: 'var(--nav-text-primary)' }}>
+              <div className="text-sm font-semibold mb-1">Счёт на оплату онлайн</div>
+              <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>
+                Готовый счёт за минуту: БИК из справочника, сумма прописью, НДС
+              </div>
+            </Link>
             <Link href="/tools/kontragent" className="nav-glass rounded-xl p-4 block" style={{ color: 'var(--nav-text-primary)' }}>
               <div className="text-sm font-semibold mb-1">Проверка контрагента по БИН</div>
               <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>
