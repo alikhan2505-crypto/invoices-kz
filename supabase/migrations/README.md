@@ -124,3 +124,5 @@ Click-to-WhatsApp click id, пишется только на первое соо
 `cfo_mode_and_tour.sql` (08.10.2026) — `cfo_companies.mode` (business/family) и `tour_done_at`.
 
 `revoke_definer_rpc.sql` (12.10.2026) — SECURITY DEFINER функции закрыты от REST RPC (у anon был доступ через дефолтный грант PUBLIC); `is_admin_user` оставлена authenticated для RLS-политик.
+
+`tool_kontragent_checks.sql` (12.10.2026) — счётчик бесплатных проверок контрагента на /tools/kontragent (3/день на IP, ключ = sha256(ip|день)).

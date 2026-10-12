@@ -77,6 +77,12 @@ export default function GuidesIndexKk() {
             Тегін құралдар
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
+            <Link href="/tools/kontragent" className="nav-glass rounded-xl p-4 block" style={{ color: 'var(--nav-text-primary)' }}>
+              <div className="text-sm font-semibold mb-1">БСН бойынша контрагентті тексеру</div>
+              <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>
+                Сенімсіздік, тарату, салық қарызы және ҚҚС — МКК деректері бойынша
+              </div>
+            </Link>
             <Link href="/tools/margin" className="nav-glass rounded-xl p-4 block" style={{ color: 'var(--nav-text-primary)' }}>
               <div className="text-sm font-semibold mb-1">Kaspi маржа калькуляторы</div>
               <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>

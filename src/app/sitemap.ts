@@ -73,6 +73,22 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.7,
     },
     {
+      // Третий бесплатный инструмент: проверка контрагента по БИН. Самый
+      // частотный поисковый запрос из трёх — и единственный с жёстким лимитом
+      // (3/день), дальше воронка в регистрацию.
+      url: 'https://invoices.kz/tools/kontragent',
+      lastModified: new Date(),
+      changeFrequency: 'monthly',
+      priority: 0.7,
+    },
+    {
+      // Индекс инструментов: страница-указатель для набравших /tools руками.
+      url: 'https://invoices.kz/tools',
+      lastModified: new Date(),
+      changeFrequency: 'monthly',
+      priority: 0.5,
+    },
+    {
       // Guides index -- the organic entry point for search queries the product
       // answers ("комиссия Kaspi", "как выставить счёт ИП") rather than for the
       // brand name.

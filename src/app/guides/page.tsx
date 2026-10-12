@@ -77,6 +77,12 @@ export default function GuidesIndex() {
             Бесплатные инструменты
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
+            <Link href="/tools/kontragent" className="nav-glass rounded-xl p-4 block" style={{ color: 'var(--nav-text-primary)' }}>
+              <div className="text-sm font-semibold mb-1">Проверка контрагента по БИН</div>
+              <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>
+                Неблагонадёжность, ликвидация, долги по налогам и НДС — по данным КГД
+              </div>
+            </Link>
             <Link href="/tools/margin" className="nav-glass rounded-xl p-4 block" style={{ color: 'var(--nav-text-primary)' }}>
               <div className="text-sm font-semibold mb-1">Калькулятор маржи Kaspi</div>
               <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>
