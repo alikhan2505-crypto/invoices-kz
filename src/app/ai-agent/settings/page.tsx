@@ -1744,9 +1744,11 @@ export default function AiAgentSettings() {
                         granted instagram_business_basic and
                         instagram_business_manage_messages Advanced Access, so
                         this no longer only works for people with a role on the
-                        Meta app. WhatsApp below stays admin-only until
-                        public_profile reaches Advanced Access -- until then its
-                        popup refuses every external account. */}
+                        Meta app. WhatsApp got the same treatment on 2026-10-12:
+                        public_profile reached Advanced Access with the
+                        submission approved ~14.09 (verified via Meta DevTools),
+                        so its UI gate below was lifted too -- the server-side
+                        callback already allowed any active Pro plan. */}
                     {instagramConnection?.status === 'active' && (
                       <button onClick={disconnectInstagram} disabled={igBusy}
                         className="w-full nav-glass rounded-lg px-4 py-2.5 text-sm font-medium disabled:opacity-50"
@@ -1842,20 +1844,14 @@ export default function AiAgentSettings() {
                   <ChannelCard
                     icon={<WhatsAppIcon />}
                     name="WhatsApp"
-                    chip={!isAdmin
-                      ? <StatusChip kind="soon" label={t.chipComingSoon} />
-                      : whatsappConnection?.status === 'active'
+                    chip={whatsappConnection?.status === 'active'
                       ? <StatusChip kind="ok" label={t.chipConnected(whatsappConnection.external_account_name || 'WhatsApp')} />
                       : whatsappConnection?.status === 'token_expired'
                         ? <StatusChip kind="warn" label={t.chipReconnectNeeded} />
                         : <StatusChip kind="off" label={t.chipNotConnected} />}
                     description={t.channelWhatsappDesc}
                   >
-                    {!isAdmin ? (
-                      <button disabled className="w-full nav-glass rounded-lg px-4 py-2.5 text-sm font-medium opacity-50 cursor-not-allowed" style={{ color: 'var(--nav-text-primary)' }}>
-                        {t.chipComingSoon}
-                      </button>
-                    ) : <>
+                    <>
                     {whatsappConnection?.status === 'active' && (
                       <button onClick={disconnectWhatsApp} disabled={waBusy}
                         className="w-full nav-glass rounded-lg px-4 py-2.5 text-sm font-medium disabled:opacity-50"
@@ -1885,7 +1881,7 @@ export default function AiAgentSettings() {
                     {waError && (
                       <div className="text-xs mt-2" style={{ color: 'var(--nav-critical)' }}>{waError}</div>
                     )}
-                    </>}
+                    </>
                   </ChannelCard>
 
                   <ChannelCard
