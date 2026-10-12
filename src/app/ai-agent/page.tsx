@@ -10,6 +10,7 @@ import { getActivePlan } from '@/lib/plan'
 import { useLanguage } from '@/components/LanguageProvider'
 import { aiAgentDict, type AiAgentDict } from '@/lib/i18n/aiAgent'
 import BrandLoader from '@/components/BrandLoader'
+import AiAgentTour from './AiAgentTour'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -168,7 +169,10 @@ export default function AiAgentsList() {
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
       <div className="max-w-3xl mx-auto p-4 lg:p-6 pb-6">
+        {/* Тур — только когда есть агенты: пустое состояние говорит само за себя. */}
+        {agents.length > 0 && <AiAgentTour />}
         <motion.div
+          data-tour="ai-agents-head"
           className="flex items-start justify-between gap-3 mb-6"
           initial={reduceMotion ? false : { opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
@@ -208,7 +212,7 @@ export default function AiAgentsList() {
             </Link>
           </motion.div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div data-tour="ai-agents-list" className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {agents.map((agent, i) => {
               const instagram = agent.connections.find(c => c.channel === 'instagram')
               const agentStatusLabel = statusLabel(t, agent.status)
