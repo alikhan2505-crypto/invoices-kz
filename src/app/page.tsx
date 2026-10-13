@@ -20,8 +20,8 @@ const caveat = Caveat({ subsets: ['cyrillic', 'cyrillic-ext', 'latin'], weight: 
 export function generateMetadata(): Metadata {
   if (!ROOT_HUB_LIVE) return {}
   return {
-    title: 'invoices.kz — Қазақстандағы бизнеске арналған сервистер',
-    description: 'Счета, Kaspi, Kaspi Cashier API и AI-агент под одним аккаунтом. Оставьте в меню только то, что нужно вашему делу.',
+    title: 'invoices.kz — сервисы для бизнеса в Казахстане · бизнеске арналған сервистер',
+    description: 'Счета, Kaspi, Kaspi Cashier API, AI-агент и CFO-кабинет под одним аккаунтом. Шоттар, Kaspi, Kaspi Cashier API, AI-агент және CFO-кабинет — бір аккаунтта.',
     alternates: { canonical: 'https://invoices.kz' },
   }
 }
