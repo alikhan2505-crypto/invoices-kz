@@ -8,6 +8,7 @@ import ProductArt from '@/components/products/ProductArt'
 import { PRODUCT_I18N } from '@/lib/i18n/productsHub'
 import KaspiLiveScene from '@/components/products/KaspiLiveScene'
 import AgentLiveScene from '@/components/products/AgentLiveScene'
+import SalonLiveScene from '@/components/products/SalonLiveScene'
 import './landing-extras.css'
 import { useDropStaleFocus } from '@/lib/useDropStaleFocus'
 
@@ -51,7 +52,8 @@ export default function ProductLanding({ landing, fontClass }: { landing: Landin
   const applyHref = `mailto:mail@invoices.kz?subject=${encodeURIComponent(`${p.name}: заявка`)}`
   const canOpen = l.access === 'open' ? !!signedIn : isAdmin
 
-  const scene = landing === 'kaspi' ? <KaspiLiveScene lang={lang} /> : landing === 'agent' ? <AgentLiveScene lang={lang} /> : null
+  const scene = landing === 'kaspi' ? <KaspiLiveScene lang={lang} /> : landing === 'agent' ? <AgentLiveScene lang={lang} />
+    : landing === 'salon' ? <SalonLiveScene lang={lang} /> : null
 
   const hero = (
     <div className="lp-hero">

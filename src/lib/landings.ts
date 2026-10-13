@@ -93,7 +93,7 @@ export const LANDINGS: Record<LandingKey, LandingDef> = {
     audience: { ru: 'Салоны красоты и барбершопы', kk: 'Сұлулық салондары мен барбершоптар', en: 'Beauty salons and barbershops' },
     tagline: {
       ru: 'Записи клиентов, мастера и сайт салона',
-      kk: 'Клиент жазылулары, мастерлер және салон сайты',
+      kk: 'Жазылулар, мастерлер және салон сайты',
       en: 'Client bookings, masters and a salon website',
     },
     lead: {

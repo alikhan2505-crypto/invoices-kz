@@ -1,0 +1,90 @@
+/* «Живой планировщик» Салона (SalonLiveScene.tsx). Окно и декор — из
+   kaspi-scene.css, чат и черновик — из agent-scene.css (эталон 13.10.2026);
+   здесь палитра салона, календарь по мастерам и телефон с сайтом салона. */
+.lp-root .ks-wrap[data-theme="salon"] {
+  --ks-ink: #3B1030; --ks-paper: #FFF8FA; --ks-coral: #F7C6D4; --ks-blush: #FCE3EB;
+  --ks-row: #FBF0F4; --ks-row-done: #EFFAF5;
+}
+.lp-root .ks-wrap[data-theme="salon"] .ks-live { background: var(--ks-blush); color: var(--ks-ink); }
+.lp-root .ks-wrap[data-theme="salon"] .ks-live em { display: none; }
+
+@container (min-width: 600px) {
+  .lp-root .ks-wrap[data-theme="salon"] .ks-body { grid-template-columns: 1.15fr 1fr; align-items: stretch; }
+}
+
+/* Календарь по мастерам */
+.lp-root .sl-masters { display: grid; grid-template-columns: 42px repeat(3, 1fr); align-items: center; gap: 0; }
+.lp-root .sl-master { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--ks-ink); padding-left: 3px; min-width: 0; white-space: nowrap; }
+.lp-root .sl-master i { width: 22px; height: 22px; flex: none; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-size: 11px; font-weight: 700; color: var(--ks-ink); }
+.lp-root .sl-grid {
+  position: relative; height: 246px; border-radius: 12px;
+  background:
+    linear-gradient(90deg, transparent 41px, color-mix(in srgb, var(--ks-ink) 8%, transparent) 41px 42px, transparent 42px) ,
+    repeating-linear-gradient(180deg, transparent 0 7.5px, color-mix(in srgb, var(--ks-ink) 7%, transparent) 7.5px 8.5px, transparent 8.5px 34px) 0 0 / 100% 34px,
+    var(--ks-row);
+}
+.lp-root .sl-hour { position: absolute; left: 8px; transform: translateY(2px); font-size: 10.5px; font-weight: 600; color: var(--ks-muted); font-variant-numeric: tabular-nums; }
+.lp-root .sl-slot {
+  position: absolute; border-radius: 8px; padding: 4px 7px; overflow: hidden;
+  display: grid; align-content: start; gap: 1px; color: var(--ks-ink);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ks-ink) 6%, transparent);
+}
+.lp-root .sl-slot b { font-size: 10.5px; font-weight: 700; line-height: 1.2; color: inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lp-root .sl-slot span { font-size: 10px; line-height: 1.2; color: var(--ks-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Новая запись: пунктир «ждёт подтверждения» → встаёт тёмной плашкой. */
+.lp-root .sl-new { opacity: 0; transition: opacity 0.3s, background 0.35s, box-shadow 0.35s; }
+.lp-root .sl-new[data-state="pending"] { opacity: 1; background: transparent; box-shadow: inset 0 0 0 1.5px var(--ks-ink); border: 0; animation: sl-blink 1.2s ease-in-out infinite; }
+.lp-root .sl-new[data-state="pending"] b, .lp-root .sl-new[data-state="pending"] span { opacity: 0.55; }
+.lp-root .sl-new[data-state="booked"] { opacity: 1; background: var(--ks-ink); box-shadow: 0 8px 18px -8px color-mix(in srgb, var(--ks-ink) 60%, transparent); animation: ks-pop 0.45s cubic-bezier(0.16, 1, 0.3, 1); }
+.lp-root .sl-new[data-state="booked"] b { color: var(--ks-paper); }
+.lp-root .sl-new[data-state="booked"] span { color: color-mix(in srgb, var(--ks-paper) 75%, transparent); }
+@keyframes sl-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+
+/* Карточка клиентки: история визитов и статус «Постоянная». */
+.lp-root .sl-client {
+  position: absolute; left: calc(42px + (100% - 42px) / 3 + 6px); top: 190px; z-index: 2;
+  display: flex; align-items: center; gap: 8px; padding: 7px 10px 7px 7px; border-radius: 12px;
+  background: #fff; box-shadow: 0 10px 24px -10px color-mix(in srgb, var(--ks-ink) 45%, transparent);
+  opacity: 0; transform: translateY(8px) scale(0.94); transition: opacity 0.35s, transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.lp-root .sl-client[data-in="true"] { opacity: 1; transform: none; }
+.lp-root .sl-client > i { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-size: 12px; font-weight: 700; background: var(--ks-coral); color: var(--ks-ink); }
+.lp-root .sl-client > span { display: grid; gap: 3px; }
+.lp-root .sl-client b { font-size: 11.5px; font-weight: 700; color: var(--ks-ink); white-space: nowrap; }
+.lp-root .sl-client em { justify-self: start; font-style: normal; font-size: 10px; font-weight: 700; color: var(--ks-green-ink); background: var(--ks-mint); border-radius: 999px; padding: 2px 7px; }
+
+/* Правая колонка: короткий чат и черновик записи. */
+.lp-root .ks-wrap[data-theme="salon"] .sl-chat { height: 132px; min-height: 0; }
+.lp-root .sl-side { gap: 10px; }
+.lp-root .sl-side .ks-head { min-height: 22px; }
+.lp-root .sl-clock { width: 40px; height: 34px; flex: none; border-radius: 8px; display: grid; place-items: center; font: 700 10.5px/1 var(--font-unbounded), Arial, sans-serif; background: var(--ks-blush); color: var(--ks-ink); }
+
+/* Декор и финальный «телефон с сайтом» — как у агента. */
+.lp-root .ks-box.sl-art { width: 150px; }
+@media (max-width: 1179px) { .lp-root .ks-box.sl-art { width: 120px; } }
+@media (min-width: 1180px) {
+  .lp-root .ks-wrap[data-theme="salon"] { padding-bottom: 24px; }
+  .lp-root .ks-wrap[data-theme="salon"] .ks-box { bottom: -46px; }
+}
+@container (min-width: 600px) {
+  .lp-root .ks-wrap[data-theme="salon"] .ks-label { left: 7%; bottom: -150px; }
+}
+
+/* Телефон с сайтом салона (в рамке ks-label, 200×282 в масштабе --s). */
+.lp-root .ks-a6.sl-phone {
+  padding: 0; overflow: hidden; border-radius: 26px; border: 5px solid #1C0A16; background: #fff;
+  display: flex; flex-direction: column; font-family: var(--font-onest), Arial, sans-serif;
+}
+.lp-root .ks-a6.sl-phone .sl-ph-notch { position: absolute; top: 6px; left: 50%; width: 46px; height: 9px; margin-left: -23px; border-radius: 9px; background: #1C0A16; z-index: 1; }
+.lp-root .ks-a6.sl-phone .sl-ph-hero { display: grid; gap: 7px; padding: 26px 14px 14px; background: linear-gradient(160deg, #3B1030, #9B4374); }
+.lp-root .ks-a6.sl-phone .sl-ph-logo { font: 700 11px/1 var(--font-unbounded), Arial, sans-serif; color: #F7C6D4; }
+.lp-root .ks-a6.sl-phone .sl-ph-hero b { font-size: 13px; font-weight: 700; line-height: 1.2; color: #fff; }
+.lp-root .ks-a6.sl-phone .sl-ph-cta { justify-self: start; font-size: 9px; font-weight: 700; color: #3B1030; background: #fff; border-radius: 999px; padding: 5px 9px; }
+.lp-root .ks-a6.sl-phone .sl-ph-list { display: grid; gap: 7px; padding: 12px 14px 8px; }
+.lp-root .ks-a6.sl-phone .sl-ph-list span { display: flex; justify-content: space-between; gap: 6px; font-size: 9px; color: #3B1030; border-bottom: 1px dashed #F1D3DE; padding-bottom: 5px; }
+.lp-root .ks-a6.sl-phone .sl-ph-list i { font-style: normal; color: #3B1030; }
+.lp-root .ks-a6.sl-phone .sl-ph-list b { font-weight: 700; color: #3B1030; }
+.lp-root .ks-a6.sl-phone .sl-ph-rating { margin-top: auto; padding: 0 14px 12px; font-size: 10px; color: #F14635; }
+.lp-root .ks-a6.sl-phone .sl-ph-rating span { font-size: 9px; color: #7A5A6C; }
+.lp-root .ks-a6.sl-phone { position: relative; }
