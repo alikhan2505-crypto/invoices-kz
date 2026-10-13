@@ -38,7 +38,7 @@ export const LANDINGS: Record<LandingKey, LandingDef> = {
     audience: { ru: 'Продавцы Kaspi Магазина', kk: 'Kaspi Дүкені сатушылары', en: 'Kaspi Magazin sellers' },
     tagline: {
       ru: 'Демпинг цен и заказы Kaspi в одном кабинете',
-      kk: 'Kaspi бағаларын түсіру мен тапсырыстар бір кабинетте',
+      kk: 'Kaspi демпингі мен тапсырыстары бір кабинетте',
       en: 'Kaspi price undercutting and orders in one dashboard',
     },
     lead: {
@@ -63,9 +63,12 @@ export const LANDINGS: Record<LandingKey, LandingDef> = {
     soft: '#D2C7FF',
     audience: { ru: 'Бизнес, который живёт в переписке', kk: 'Жазысуда жұмыс істейтін бизнес', en: 'Businesses that live in chat' },
     tagline: {
-      ru: 'Отвечает клиентам в WhatsApp, Instagram и на сайте',
-      kk: 'WhatsApp, Instagram және сайтта клиенттерге жауап береді',
-      en: 'Answers customers on WhatsApp, Instagram and your website',
+      // Короче, чем было («…в WhatsApp, Instagram и на сайте»): в пять строк
+      // заголовок выталкивал страницу в прокрутку (правка основателя 13.10).
+      // Каналы по именам — в окне анимации, мета-тегах и описании.
+      ru: 'Отвечает клиентам в мессенджерах и на сайте',
+      kk: 'Клиенттерге мессенджер мен сайтта жауап береді',
+      en: 'Answers customers in messengers and on your site',
     },
     lead: {
       ru: 'Агент ведёт диалог по вашим правилам и передаёт человеку, когда нужно. Счёт или запись он готовит черновиком на подтверждение.',
