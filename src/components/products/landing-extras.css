@@ -12,3 +12,7 @@
    браузера (правка основателя 13.10: «что за белая окантовка у кнопки?»). */
 .lp-root :is(a, button):focus-visible { outline: 2px solid var(--ink-t); outline-offset: 3px; }
 .lp-root :is(a, button):focus:not(:focus-visible) { outline: none; }
+
+/* Текст на мягких стикерах — цветом softInk, если «чернила» продукта светлые
+   (у CFO светлый текст на светло-мятном стикере не читался). */
+.lp-root .lp-stk, .lp-root .lp-stk span { color: var(--soft-ink-t, var(--ink-t)) !important; }

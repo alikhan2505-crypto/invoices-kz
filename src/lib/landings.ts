@@ -16,6 +16,8 @@ export type LandingDef = {
   // 'invite': the product is not open to everyone yet -- the call to action is
   // an application by e-mail, and only admins are sent to the cabinet.
   access: 'open' | 'invite'
+  // Text colour on the soft stickers when the product ink is light (CFO): falls back to the product ink.
+  softInk?: string
   // Note under the call to action for 'invite' landings; falls back to LANDING_UI.inviteNote.
   inviteNote?: L10n
   soft: string
@@ -116,21 +118,23 @@ export const LANDINGS: Record<LandingKey, LandingDef> = {
     cabinet: '/cfo/overview',
     access: 'invite',
     soft: '#9BE3CF',
-    audience: { ru: 'Финдиректора и собственники бизнеса', kk: 'Қаржы директорлары мен бизнес иелері', en: 'CFOs and business owners' },
+    softInk: '#0E4D45',
+    // Семейный бюджет — тоже аудитория (правка основателя 13.10): в кабинете есть режим «Семья».
+    audience: { ru: 'Для бизнеса и семейного бюджета', kk: 'Бизнес пен отбасы бюджеті үшін', en: 'For business and family budgets' },
     tagline: {
-      ru: 'БДР, БДДС и платёжный календарь в одном кабинете',
-      kk: 'Кірістер мен шығыстар бюджеті, ақша ағыны және төлем күнтізбесі бір кабинетте',
-      en: 'P&L budget, cash flow and a payment calendar in one place',
+      ru: 'БДР, БДДС и платёжный календарь',
+      kk: 'Бюджет, ақша ағыны және төлем күнтізбесі',
+      en: 'P&L, cash flow and a payment calendar',
     },
     lead: {
-      ru: 'Заносите операции один раз — отчёт о прибылях, движение денег и прогноз остатка по дням строятся сами. Кассовый разрыв видно заранее.',
-      kk: 'Операцияларды бір рет енгізіңіз — пайда туралы есеп, ақша қозғалысы және күн сайынғы қалдық болжамы өздігінен құрылады. Кассалық үзіліс алдын ала көрінеді.',
-      en: 'Enter each transaction once — the P&L, cash flow and a day-by-day balance forecast build themselves. Cash gaps show up in advance.',
+      ru: 'Заносите операции один раз — прибыль, движение денег и прогноз остатка по дням строятся сами. Подходит и для семейного бюджета.',
+      kk: 'Операцияларды бір рет енгізіңіз — пайда, ақша қозғалысы және күн сайынғы қалдық болжамы өзі құрылады. Отбасы бюджетіне де жарайды.',
+      en: 'Enter each transaction once — profit, cash flow and a daily balance forecast build themselves. Works for a family budget too.',
     },
     points: {
-      ru: ['План и факт по статьям за каждый месяц', 'Платёжный календарь с прогнозом остатка', 'Выручка, маржа, точка безубыточности, запас денег'],
-      kk: ['Әр ай бойынша баптар бойынша жоспар мен факт', 'Қалдық болжамы бар төлем күнтізбесі', 'Түсім, маржа, залалсыздық нүктесі, ақша қоры'],
-      en: ['Plan vs actual by line item, every month', 'Payment calendar with a balance forecast', 'Revenue, margin, break-even and cash runway'],
+      ru: ['План и факт по статьям за каждый месяц', 'Платёжный календарь с прогнозом остатка', 'Режим «Семья» — тот же учёт для домашнего бюджета'],
+      kk: ['Әр ай бойынша баптар бойынша жоспар мен факт', 'Қалдық болжамы бар төлем күнтізбесі', '«Отбасы» режимі — үй бюджетіне сол есеп'],
+      en: ['Plan vs actual by line item, every month', 'Payment calendar with a balance forecast', '“Family” mode — the same tracking for a home budget'],
     },
     inviteNote: {
       ru: 'Сейчас в закрытом тесте — открываем по заявке',
@@ -138,7 +142,7 @@ export const LANDINGS: Record<LandingKey, LandingDef> = {
       en: 'In closed beta — access by request',
     },
     metaTitle: 'CFO — БДР, БДДС и платёжный календарь | invoices.kz',
-    metaDescription: 'Кабинет финансового директора: бюджет доходов и расходов, движение денежных средств, платёжный календарь с прогнозом кассовых разрывов и ключевые показатели.',
+    metaDescription: 'Кабинет финансового директора: бюджет доходов и расходов, движение денежных средств, платёжный календарь с прогнозом кассовых разрывов и ключевые показатели. Есть режим для семейного бюджета.',
   },
 }
 

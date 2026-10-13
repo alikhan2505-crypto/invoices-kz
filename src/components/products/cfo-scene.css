@@ -1,0 +1,123 @@
+/* «Живой CFO» (CfoLiveScene.tsx). Окно, кнопка, курсор, декор, рамка
+   документа — из kaspi-scene.css; черновик/«ждём» — из agent-scene.css
+   (эталон 13.10.2026). Здесь палитра CFO, переключатель «Бизнес/Семья»,
+   платёжный календарь с прогнозом остатка, показатели и мини-отчёт. */
+.lp-root .ks-wrap[data-theme="cfo"] {
+  --ks-ink: #0E3B35; --ks-paper: #F4FBF8; --ks-coral: #9BE3CF; --ks-blush: #DDF5EC;
+  --ks-row: #EEF8F4; --ks-row-done: #E3F7EE; --ks-red: #E5484D;
+}
+.lp-root .ks-wrap[data-theme="cfo"] .ks-win { border-color: #072B26; box-shadow: 0 34px 70px -24px rgba(0, 0, 0, 0.55); }
+
+@container (min-width: 600px) {
+  .lp-root .ks-wrap[data-theme="cfo"] .ks-body { grid-template-columns: 1.2fr 1fr; align-items: stretch; }
+}
+
+/* Переключатель «Бизнес | Семья» в шапке окна */
+.lp-root .cf-toggle { position: relative; margin-left: auto; display: inline-grid; grid-template-columns: 1fr 1fr; border-radius: 999px; padding: 3px; background: var(--ks-row); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ks-ink) 12%, transparent); }
+.lp-root .cf-toggle > span { position: relative; z-index: 1; padding: 5px 12px; font-size: 11.5px; font-weight: 700; text-align: center; color: var(--ks-ink); transition: color 0.35s; white-space: nowrap; }
+.lp-root .cf-toggle > em { position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc(50% - 3px); border-radius: 999px; background: var(--ks-ink); transition: transform 0.55s cubic-bezier(0.16, 1, 0.3, 1); }
+.lp-root .cf-toggle[data-family="true"] > em { transform: translateX(100%); }
+.lp-root .cf-toggle[data-family="false"] > span:first-child, .lp-root .cf-toggle[data-family="true"] > span:nth-child(2) { color: var(--ks-paper); }
+
+/* Подписи, меняющиеся при переключении режима, — мягко проявляются. */
+.lp-root .cf-swap { animation: cf-in 0.45s ease; }
+@keyframes cf-in { 0% { opacity: 0; transform: translateY(4px); } 100% { opacity: 1; transform: none; } }
+
+/* Платёжный календарь: прогноз остатка по дням */
+.lp-root .cf-flag { font-size: 11px; font-weight: 700; border-radius: 999px; padding: 4px 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; opacity: 0; transition: opacity 0.3s, background 0.3s, color 0.3s; }
+.lp-root .cf-flag[data-state="gap"] { opacity: 1; background: #FDE2E2; color: #B4232A; animation: ks-pop 0.45s cubic-bezier(0.16, 1, 0.3, 1); }
+.lp-root .cf-flag[data-state="ok"] { opacity: 1; background: var(--ks-mint); color: var(--ks-green-ink); }
+.lp-root .cf-chart { position: relative; border-radius: 12px; background: var(--ks-row); padding: 10px 10px 6px; }
+.lp-root .cf-chart svg { display: block; width: 100%; height: 150px; overflow: visible; }
+.lp-root .cf-zero { stroke: color-mix(in srgb, var(--ks-ink) 30%, transparent); stroke-width: 1; stroke-dasharray: 4 4; vector-effect: non-scaling-stroke; }
+.lp-root .cf-red { fill: var(--ks-red); opacity: 0; transition: opacity 0.35s; }
+.lp-root .cf-red[data-on="true"] { opacity: 0.16; }
+.lp-root .cf-fill { opacity: 0; transition: opacity 0.6s 0.6s; }
+.lp-root .cf-chart[data-drawn="true"] .cf-fill { opacity: 1; }
+.lp-root .cf-line { fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; opacity: 0; transition: opacity 0.4s; }
+.lp-root .cf-line-gap { stroke: var(--ks-ink); }
+.lp-root .cf-line-ok { stroke: #1F9E6E; }
+.lp-root .cf-chart[data-drawn="true"] .cf-line[data-on="true"] { opacity: 1; animation: cf-draw 1.1s ease-out forwards; }
+.lp-root .cf-chart[data-drawn="true"] .cf-line-ok[data-on="true"] { animation-duration: 0.7s; }
+@keyframes cf-draw { to { stroke-dashoffset: 0; } }
+.lp-root .cf-dot { fill: var(--ks-red); opacity: 0; transition: opacity 0.3s; }
+.lp-root .cf-dot[data-on="true"] { opacity: 1; animation: cf-blink 1s ease-in-out infinite; }
+@keyframes cf-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+.lp-root .cf-days { display: flex; justify-content: space-between; margin-top: 4px; font-size: 10px; font-weight: 600; color: var(--ks-muted); }
+
+/* Подсказка «перенести платёж» — место под неё зарезервировано (окно не прыгает). */
+.lp-root .cf-suggest {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px;
+  padding: 6px 6px 6px 12px; border-radius: 12px; background: #fff; border: 1.5px solid color-mix(in srgb, var(--ks-ink) 14%, transparent);
+  font-size: 12px; font-weight: 600; color: var(--ks-ink);
+  opacity: 0; transform: translateY(6px); transition: opacity 0.35s, transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.lp-root .cf-suggest[data-in="true"] { opacity: 1; transform: none; }
+.lp-root .cf-suggest > span:first-child { min-width: 0; line-height: 1.3; }
+
+/* Показатели и план/факт */
+.lp-root .cf-side { gap: 10px; }
+.lp-root .cf-side .ks-head { min-height: 22px; }
+.lp-root .cf-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.lp-root .cf-kpi { display: grid; gap: 4px; align-content: start; padding: 10px; border-radius: 12px; background: var(--ks-row); min-width: 0; opacity: 0; }
+.lp-root .cf-kpi[data-on="true"] { animation: cf-in 0.5s ease forwards; }
+.lp-root .cf-kpi em { font-style: normal; font-size: 10.5px; font-weight: 600; color: var(--ks-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lp-root .cf-kpi b { font: 700 14px/1.15 var(--font-unbounded), Arial, sans-serif; color: var(--ks-ink); white-space: nowrap; }
+.lp-root .cf-kpi i { justify-self: start; font-style: normal; font-size: 10px; font-weight: 700; color: var(--ks-green-ink); background: var(--ks-mint); border-radius: 999px; padding: 1px 6px; }
+.lp-root .cf-rows { display: grid; gap: 8px; }
+.lp-root .cf-row { display: grid; grid-template-columns: minmax(0, 1fr) 1.3fr 40px; align-items: center; gap: 10px; }
+.lp-root .cf-row em { font-style: normal; font-size: 12px; font-weight: 600; color: var(--ks-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lp-root .cf-bar { position: relative; height: 10px; border-radius: 999px; background: var(--ks-row); overflow: hidden; }
+.lp-root .cf-bar::after { content: ''; position: absolute; top: -2px; bottom: -2px; left: 78%; width: 2px; background: color-mix(in srgb, var(--ks-ink) 40%, transparent); }
+.lp-root .cf-bar i { display: block; height: 100%; border-radius: 999px; background: #2DC48D; transform-origin: left; transition: transform 0.9s cubic-bezier(0.16, 1, 0.3, 1); }
+.lp-root .cf-bar i[data-over="true"] { background: var(--ks-red); }
+.lp-root .cf-row b { font-size: 11.5px; font-weight: 700; text-align: right; color: var(--ks-green-ink); }
+.lp-root .cf-row b[data-over="true"] { color: #B4232A; }
+
+/* Декор и отчёт — как у агента/салона. */
+.lp-root .ks-box.cf-art { width: 140px; }
+@media (max-width: 1179px) { .lp-root .ks-box.cf-art { width: 112px; } }
+@media (min-width: 1180px) {
+  .lp-root .ks-wrap[data-theme="cfo"] { padding-bottom: 24px; }
+  .lp-root .ks-wrap[data-theme="cfo"] .ks-box { bottom: -46px; }
+}
+@container (min-width: 600px) {
+  .lp-root .ks-wrap[data-theme="cfo"] .ks-label { left: 7%; bottom: -150px; }
+}
+
+/* Мини-отчёт (рамка ks-label, 200×282 в масштабе --s) */
+.lp-root .ks-a6.cf-doc { padding: 14px 14px 12px; gap: 0; font-family: var(--font-onest), Arial, sans-serif; }
+.lp-root .ks-a6.cf-doc .cf-doc-title { font: 700 12px/1.25 var(--font-unbounded), Arial, sans-serif; color: #0E3B35; animation: cf-in 0.45s ease; }
+.lp-root .ks-a6.cf-doc .cf-doc-sub { margin-top: 4px; font-size: 8px; color: #6B8A84; }
+.lp-root .ks-a6.cf-doc .cf-doc-rows { display: grid; gap: 7px; margin-top: 14px; }
+.lp-root .ks-a6.cf-doc .cf-doc-rows span { display: flex; justify-content: space-between; gap: 6px; padding-bottom: 6px; border-bottom: 1px solid #E2EFEA; font-size: 9px; }
+.lp-root .ks-a6.cf-doc .cf-doc-rows span[data-total="true"] { border-bottom: 0; border-top: 1.5px solid #0E3B35; padding-top: 6px; }
+.lp-root .ks-a6.cf-doc .cf-doc-rows i { font-style: normal; color: #0E3B35; }
+.lp-root .ks-a6.cf-doc .cf-doc-rows b { font-weight: 700; color: #0E3B35; font-variant-numeric: tabular-nums; }
+.lp-root .ks-a6.cf-doc .cf-doc-bars { margin-top: auto; height: 56px; display: flex; align-items: flex-end; gap: 6px; }
+.lp-root .ks-a6.cf-doc .cf-doc-bars i { flex: 1; border-radius: 4px 4px 0 0; background: #9BE3CF; }
+.lp-root .ks-a6.cf-doc .cf-doc-bars i:last-child { background: #2DC48D; }
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-root .cf-line[data-on="true"] { stroke-dashoffset: 0; opacity: 1; }
+  .lp-root .cf-kpi { opacity: 1; }
+}
+
+/* После переноса — подсказка становится зелёной отметкой (место не пустеет). */
+.lp-root .cf-suggest[data-done="true"] { background: var(--ks-row-done); border-color: color-mix(in srgb, #2DC48D 55%, transparent); color: var(--ks-green-ink); }
+
+/* Ближайшие платежи (правая колонка, низ) */
+.lp-root .cf-pays { display: grid; gap: 6px; }
+.lp-root .cf-pay { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; align-items: center; gap: 8px; height: 30px; padding: 0 10px; border-radius: 10px; background: var(--ks-row); opacity: 0; transition: background 0.35s, box-shadow 0.35s; }
+.lp-root .cf-pay[data-on="true"] { animation: cf-in 0.5s ease forwards; }
+.lp-root .cf-pay[data-hl="true"] { background: #fff; box-shadow: inset 0 0 0 1.5px #2DC48D; }
+.lp-root .cf-pay i { font-style: normal; font-size: 11px; font-weight: 700; color: var(--ks-muted); white-space: nowrap; }
+.lp-root .cf-pay em { font-style: normal; font-size: 12px; font-weight: 600; color: var(--ks-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lp-root .cf-pay b { font-size: 11.5px; font-weight: 700; color: var(--ks-ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: reduce) { .lp-root .cf-pay { opacity: 1; } }
+.lp-root .ks-wrap[data-theme="cfo"] .ks-bar > b { white-space: nowrap; }
+@media (max-width: 480px) {
+  .lp-root .cf-toggle > span { padding: 5px 8px; font-size: 10.5px; }
+  .lp-root .ks-wrap[data-theme="cfo"] .ks-bar > i { display: none; }
+  .lp-root .ks-wrap[data-theme="cfo"] .ks-bar > b { margin-left: 0; }
+}

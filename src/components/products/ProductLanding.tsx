@@ -9,6 +9,7 @@ import { PRODUCT_I18N } from '@/lib/i18n/productsHub'
 import KaspiLiveScene from '@/components/products/KaspiLiveScene'
 import AgentLiveScene from '@/components/products/AgentLiveScene'
 import SalonLiveScene from '@/components/products/SalonLiveScene'
+import CfoLiveScene from '@/components/products/CfoLiveScene'
 import './landing-extras.css'
 import { useDropStaleFocus } from '@/lib/useDropStaleFocus'
 
@@ -44,7 +45,7 @@ export default function ProductLanding({ landing, fontClass }: { landing: Landin
     return () => { alive = false }
   }, [l.cabinet, l.access])
 
-  const vars = { '--bg-t': p.bg, '--ink-t': p.ink, '--soft-t': l.soft } as React.CSSProperties
+  const vars = { '--bg-t': p.bg, '--ink-t': p.ink, '--soft-t': l.soft, '--soft-ink-t': l.softInk ?? p.ink } as React.CSSProperties
 
   // Always the apex login: OAuth and e-mail links return there, and it hands the
   // destination over via ?next= (localStorage is per host, so it can't travel).
@@ -53,7 +54,8 @@ export default function ProductLanding({ landing, fontClass }: { landing: Landin
   const canOpen = l.access === 'open' ? !!signedIn : isAdmin
 
   const scene = landing === 'kaspi' ? <KaspiLiveScene lang={lang} /> : landing === 'agent' ? <AgentLiveScene lang={lang} />
-    : landing === 'salon' ? <SalonLiveScene lang={lang} /> : null
+    : landing === 'salon' ? <SalonLiveScene lang={lang} />
+    : landing === 'cfo' ? <CfoLiveScene lang={lang} /> : null
 
   const hero = (
     <div className="lp-hero">
