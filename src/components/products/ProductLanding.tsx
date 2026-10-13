@@ -9,6 +9,7 @@ import { PRODUCT_I18N } from '@/lib/i18n/productsHub'
 import KaspiLiveScene from '@/components/products/KaspiLiveScene'
 import AgentLiveScene from '@/components/products/AgentLiveScene'
 import './landing-extras.css'
+import { useDropStaleFocus } from '@/lib/useDropStaleFocus'
 
 export default function ProductLanding({ landing, fontClass }: { landing: LandingKey; fontClass: string }) {
   const { lang } = useLanguage()
@@ -18,6 +19,7 @@ export default function ProductLanding({ landing, fontClass }: { landing: Landin
   const p = PRODUCTS.find((x) => x.key === l.product)!
   const ui = LANDING_UI[lang]
 
+  useDropStaleFocus()
   useEffect(() => {
     let alive = true
     async function load() {

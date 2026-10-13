@@ -10,6 +10,7 @@ import { HUB_COPY, FOOTER_COPY, PERSONA_LABELS, PRODUCT_I18N } from '@/lib/i18n/
 import ProductArt from '@/components/products/ProductArt'
 import { BrandWordmarkSvg } from '@/components/BrandWordmark'
 import './hub-extras.css'
+import { useDropStaleFocus } from '@/lib/useDropStaleFocus'
 
 type Who = { state: 'loading' } | { state: 'guest' } | { state: 'user'; isAdmin: boolean; isPro: boolean }
 
@@ -54,6 +55,7 @@ export default function ProductsHub({ fontClass }: { fontClass: string }) {
   // сервер его не знает — поэтому серверный <title> лишь стартовый, а здесь
   // он подменяется под выбранный язык (ревизия 13.10: «почему вкладка
   // по-русски, когда страница на казахском?»).
+  useDropStaleFocus()
   useEffect(() => { document.title = t.docTitle }, [t.docTitle])
   // Шапка закреплена (sticky): после первого скролла под ней появляется
   // тонкая линия — граница «стекла» становится видна только когда есть что отделять.
