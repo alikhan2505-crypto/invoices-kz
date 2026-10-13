@@ -45,6 +45,15 @@ export default function ProductsHub({ fontClass }: { fontClass: string }) {
   const [persona, setPersona] = useState<string | null>(null)
   const { lang, setLang } = useLanguage()
   const t = HUB_COPY[lang]
+  // Шапка закреплена (sticky): после первого скролла под ней появляется
+  // тонкая линия — граница «стекла» становится видна только когда есть что отделять.
+  const [stuck, setStuck] = useState(false)
+  useEffect(() => {
+    const onScroll = () => setStuck(window.scrollY > 8)
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
 
   useEffect(() => {
     async function load() {
@@ -96,7 +105,7 @@ export default function ProductsHub({ fontClass }: { fontClass: string }) {
       </svg>
 
       <div className="prd-wrap">
-        <div className="prd-top">
+        <div className="prd-top" data-stuck={stuck}>
           <Link href="/" className="prd-mark" aria-label="invoices.kz"><BrandWordmarkSvg height={17} /></Link>
           <span style={{ flex: 1 }} />
           <div className="prd-lang" role="group" aria-label="Language">

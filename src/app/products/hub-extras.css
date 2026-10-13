@@ -45,6 +45,25 @@
 .prd-root .prd-auth-slot { display: flex; justify-content: flex-end; }
 @media (min-width: 640px) { .prd-root .prd-auth-slot { width: 132px; } }
 
+/* Закреплённая шапка (ревизия 13.10, вариант Б: «только шапка»). Три вещи:
+   1) overflow:hidden у .prd-root ломал sticky (корень становился scroll-
+      контейнером) — заменён на clip: так же обрезает размытые пятна фона, но
+      контейнером прокрутки не является. Двойной селектор — чтобы перебить
+      globals.css независимо от порядка чанков;
+   2) шапка sticky внутри .prd-wrap (он высотой во всю страницу), z-index выше
+      плиток и их обложек;
+   3) «стекло»: полупрозрачная заливка цветом страницы + размытие, растянутое
+      на всю ширину окна (псевдоэлемент шире контейнера; корень его обрежет). */
+.prd-root.prd-root { overflow: clip; }
+.prd-root .prd-top { position: sticky; top: 0; z-index: 40; }
+.prd-root .prd-top::before {
+  content: ''; position: absolute; z-index: -1; top: 0; bottom: 0; left: -100vw; right: -100vw;
+  background: color-mix(in srgb, var(--prd-bg) 72%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4); backdrop-filter: blur(14px) saturate(1.4);
+  transition: box-shadow 0.2s ease;
+}
+.prd-root .prd-top[data-stuck="true"]::before { box-shadow: 0 1px 0 var(--prd-line); }
+
 /* Футер хаба: реквизиты слева, документы и контакты справа; на телефоне —
    столбиком. Цвета приглушены, чтобы не спорить с плитками. */
 .prd-root .prd-footer {
