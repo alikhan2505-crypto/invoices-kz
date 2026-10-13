@@ -122,10 +122,10 @@
    и кнопку, переносы запрещаем. */
 @media (max-width: 480px) {
   .prd-root .prd-top { gap: 8px; flex-wrap: nowrap; }
-  .prd-root .prd-mark svg { height: 13px; width: auto; }
-  .prd-root .prd-lang { padding: 2px; }
-  .prd-root .prd-lang button { padding: 6px 8px; font-size: 12px; }
-  .prd-root .prd-btn { padding: 8px 14px; font-size: 13px; white-space: nowrap; }
+  .prd-root .prd-mark svg { height: 12px; width: auto; }
+  .prd-root .prd-lang { padding: 2px; border-width: 1.5px; }
+  .prd-root .prd-lang button { padding: 6px 6px; font-size: 12px; }
+  .prd-root .prd-btn { padding: 8px 12px; font-size: 13px; white-space: nowrap; }
 }
 
 .prd-root .prd-lang { display: flex; gap: 2px; border: 2px solid var(--prd-line); border-radius: 9999px; padding: 3px; }
