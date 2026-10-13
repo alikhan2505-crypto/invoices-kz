@@ -1,0 +1,9 @@
+/* Казахские буквы в заголовке лендинга: в Unbounded нет Ә Ғ Қ Ң Ө Ұ Ү Һ —
+   та же заплатка, что на хабе (scripts/kazakh-display-font, ревизия 13.10). */
+@font-face {
+  font-family: 'IKZ Kazakh Display';
+  src: url('/fonts/kazakh-display/ikz-kazakh-display-700.woff2') format('woff2');
+  font-weight: 700; font-style: normal; font-display: swap;
+  unicode-range: U+0492-0493, U+049A-049B, U+04A2-04A3, U+04AE-04B1, U+04BA-04BB, U+04D8-04D9, U+04E8-04E9;
+}
+.lp-root .lp-h1 { font-family: 'IKZ Kazakh Display', var(--font-unbounded), Arial, sans-serif; }

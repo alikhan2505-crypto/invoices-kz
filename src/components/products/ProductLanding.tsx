@@ -6,6 +6,8 @@ import { PRODUCTS } from '@/lib/products'
 import { LANDINGS, LANDING_UI, OTHER_PRODUCT_LINKS, type LandingKey } from '@/lib/landings'
 import ProductArt from '@/components/products/ProductArt'
 import { PRODUCT_I18N } from '@/lib/i18n/productsHub'
+import KaspiLiveScene from '@/components/products/KaspiLiveScene'
+import './landing-extras.css'
 
 export default function ProductLanding({ landing, fontClass }: { landing: LandingKey; fontClass: string }) {
   const { lang } = useLanguage()
@@ -72,7 +74,10 @@ export default function ProductLanding({ landing, fontClass }: { landing: Landin
         )}
       </div>
 
-      <span className="lp-art" aria-hidden="true"><ProductArt product={l.product} /></span>
+      {/* Kaspi: вместо статичной коробки — анимированный «живой кабинет». */}
+      {landing === 'kaspi'
+        ? <KaspiLiveScene lang={lang} />
+        : <span className="lp-art" aria-hidden="true"><ProductArt product={l.product} /></span>}
 
       <div className="lp-stickers">
         {l.points[lang].map((t) => <span key={t} className="lp-stk">{t}</span>)}
