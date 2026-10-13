@@ -48,6 +48,22 @@ export default function ProductLanding({ landing, fontClass }: { landing: Landin
   const applyHref = `mailto:mail@invoices.kz?subject=${encodeURIComponent(`${p.name}: заявка`)}`
   const canOpen = l.access === 'open' ? !!signedIn : isAdmin
 
+  const hero = (
+    <div className="lp-hero">
+      <p className="lp-eyebrow">{l.audience[lang]}</p>
+      <h1 className="lp-h1">{l.tagline[lang]}</h1>
+      <p className="lp-lead">{l.lead[lang]}</p>
+      {l.access === 'invite' && <p className="lp-note"><span>{l.inviteNote?.[lang] ?? ui.inviteNote}</span></p>}
+      {canOpen ? (
+        <a className="lp-cta" href={l.cabinet}><span>{ui.open}</span></a>
+      ) : l.access === 'invite' ? (
+        <a className="lp-cta" href={applyHref}><span>{ui.apply}</span></a>
+      ) : (
+        <a className="lp-cta" href={loginHref}><span>{ui.enter}</span></a>
+      )}
+    </div>
+  )
+
   return (
     <main className={`lp-root ${fontClass}`} style={vars}>
       <div className="lp-top">
@@ -60,24 +76,19 @@ export default function ProductLanding({ landing, fontClass }: { landing: Landin
         )}
       </div>
 
-      <div className="lp-hero">
-        <p className="lp-eyebrow">{l.audience[lang]}</p>
-        <h1 className="lp-h1">{l.tagline[lang]}</h1>
-        <p className="lp-lead">{l.lead[lang]}</p>
-        {l.access === 'invite' && <p className="lp-note"><span>{l.inviteNote?.[lang] ?? ui.inviteNote}</span></p>}
-        {canOpen ? (
-          <a className="lp-cta" href={l.cabinet}><span>{ui.open}</span></a>
-        ) : l.access === 'invite' ? (
-          <a className="lp-cta" href={applyHref}><span>{ui.apply}</span></a>
-        ) : (
-          <a className="lp-cta" href={loginHref}><span>{ui.enter}</span></a>
-        )}
-      </div>
-
-      {/* Kaspi: вместо статичной коробки — анимированный «живой кабинет». */}
-      {landing === 'kaspi'
-        ? <KaspiLiveScene lang={lang} />
-        : <span className="lp-art" aria-hidden="true"><ProductArt product={l.product} /></span>}
+      {/* Kaspi: текст и анимированный «живой кабинет» рядом (без пустоты между
+          ними); остальные лендинги — прежняя картинка продукта справа. */}
+      {landing === 'kaspi' ? (
+        <div className="lp-split">
+          {hero}
+          <KaspiLiveScene lang={lang} />
+        </div>
+      ) : (
+        <>
+          {hero}
+          <span className="lp-art" aria-hidden="true"><ProductArt product={l.product} /></span>
+        </>
+      )}
 
       <div className="lp-stickers">
         {l.points[lang].map((t) => <span key={t} className="lp-stk">{t}</span>)}

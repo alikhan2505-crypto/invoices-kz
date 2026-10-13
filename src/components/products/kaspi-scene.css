@@ -1,29 +1,34 @@
 /* «Живой кабинет» Kaspi Bot (см. KaspiLiveScene.tsx). Отдельный css-файл, не
    globals.css: свежий чанк не ловит залипший edge-кэш (ревизия 13.10).
    Селекторы с .lp-root — правило `.lp-root :is(div, span…) { color: inherit }`
-   иначе перебивает цвета. */
+   иначе перебивает цвета. Цвета — из палитры продукта Kaspi Bot (PRODUCTS). */
+
+/* Раскладка лендинга: текст и окно рядом, без пустоты между ними (ревизия
+   13.10: «излишняя пустота»). На узких экранах — окно под текстом. */
+.lp-root .lp-split { position: relative; z-index: 1; display: grid; gap: 8px; }
+@media (min-width: 1180px) {
+  .lp-root .lp-split { grid-template-columns: minmax(0, 600px) minmax(0, 940px); column-gap: 56px; align-items: start; }
+}
+@media (min-width: 1440px) { .lp-root .lp-split { align-items: center; } }
+
 .lp-root .ks-wrap {
   --ks-ink: #2A0B07; --ks-paper: #FFF8F5; --ks-coral: #FF6B57; --ks-blush: #FFE3DD;
-  --ks-green: #2DC48D; --ks-green-ink: #0B5E3C; --ks-mint: #D7F5E7;
-  position: relative; z-index: 0; pointer-events: none; user-select: none;
+  --ks-green: #2DC48D; --ks-green-ink: #0B5E3C; --ks-mint: #D7F5E7; --ks-muted: rgba(42, 11, 7, 0.55);
+  position: relative; pointer-events: none; user-select: none;
+  container-type: inline-size;
+  padding: 10px 0 70px;
   font-family: var(--font-onest), Arial, sans-serif;
 }
-@media (min-width: 1180px) {
-  .lp-root .ks-wrap { position: absolute; right: max(3%, calc((100% - 1500px) / 2)); top: 92px; width: clamp(390px, 31vw, 480px); }
-  .lp-root:has(.ks-wrap) { min-height: max(100vh, 780px); }
-}
 @media (max-width: 1179px) {
-  .lp-root .ks-wrap { width: 100%; max-width: 480px; margin: 18px 0 44px auto; }
+  .lp-root .ks-wrap { width: 100%; max-width: 520px; margin-left: auto; }
 }
 
 .lp-root .ks-win {
-  position: relative; background: var(--ks-paper); color: var(--ks-ink);
+  position: relative; z-index: 1; background: var(--ks-paper); color: var(--ks-ink);
   border-radius: 28px; border: 2px solid var(--ks-ink);
   box-shadow: 0 34px 60px -26px rgba(42, 11, 7, 0.55);
   transition: opacity 0.5s ease;
-  animation: ks-float 7s ease-in-out infinite;
 }
-@keyframes ks-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
 .lp-root .ks-win[data-fading="true"] { opacity: 0; }
 .lp-root .ks-win[data-reset="true"] * { transition: none !important; }
 
@@ -35,18 +40,30 @@
 @keyframes ks-pulse { 0% { box-shadow: 0 0 0 0 rgba(45, 196, 141, 0.7); } 100% { box-shadow: 0 0 0 7px rgba(45, 196, 141, 0); } }
 
 .lp-root .ks-body { display: grid; gap: 12px; padding: 14px; }
-.lp-root .ks-card { background: #fff; border: 1px solid rgba(42, 11, 7, 0.08); border-radius: 16px; padding: 14px; display: grid; gap: 12px; }
-.lp-root .ks-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.lp-root .ks-title { font-size: 13px; font-weight: 700; color: var(--ks-ink); }
+/* Горизонтальная раскладка, когда окну есть где развернуться. */
+@container (min-width: 640px) {
+  .lp-root .ks-body { grid-template-columns: 1.08fr 1fr; align-items: stretch; }
+  .lp-root .ks-photo { width: 92px; height: 92px; }
+}
+.lp-root .ks-card { background: #fff; border: 1px solid rgba(42, 11, 7, 0.08); border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.lp-root .ks-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 30px; }
+.lp-root .ks-title { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: var(--ks-ink); white-space: nowrap; }
 
-.lp-root .ks-floor { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; white-space: nowrap; color: rgba(42, 11, 7, 0.7); border: 1.5px dashed rgba(42, 11, 7, 0.3); border-radius: 999px; padding: 3px 9px; transition: background 0.3s, border-color 0.3s, color 0.3s; }
+.lp-root .ks-floor { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; white-space: nowrap; color: var(--ks-muted); border: 1.5px dashed rgba(42, 11, 7, 0.3); border-radius: 999px; padding: 3px 9px; transition: background 0.3s, border-color 0.3s, color 0.3s; }
 .lp-root .ks-floor[data-glow="true"] { background: var(--ks-blush); border: 1.5px solid var(--ks-coral); color: var(--ks-ink); }
 
-.lp-root .ks-product { display: flex; align-items: center; gap: 10px; }
-.lp-root .ks-thumb svg { display: block; width: 34px; height: 34px; }
-.lp-root .ks-pname { font-size: 14px; font-weight: 600; color: var(--ks-ink); }
+/* Карточка товара — как в магазине: фото, название, звёзды, цена. */
+.lp-root .ks-product { display: flex; align-items: center; gap: 12px; }
+.lp-root .ks-photo { flex: none; width: 76px; height: 76px; border-radius: 12px; overflow: hidden; box-shadow: inset 0 0 0 1px rgba(42, 11, 7, 0.06); }
+.lp-root .ks-photo svg { display: block; width: 100%; height: 100%; }
+.lp-root .ks-pinfo { display: grid; gap: 5px; min-width: 0; }
+.lp-root .ks-pname { font-size: 14px; font-weight: 600; line-height: 1.25; color: var(--ks-ink); }
+.lp-root .ks-stars { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: #2F6FD6; }
+.lp-root .ks-stars svg { display: block; }
+.lp-root .ks-pprice { overflow: hidden; height: 22px; font: 700 17px/22px var(--font-unbounded), Arial, sans-serif; color: var(--ks-ink); font-variant-numeric: tabular-nums; }
+.lp-root .ks-sub { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ks-muted); margin-bottom: -4px; }
 
-.lp-root .ks-rows { position: relative; height: 132px; }
+.lp-root .ks-rows { position: relative; height: 132px; flex: none; }
 .lp-root .ks-row {
   position: absolute; inset: 0 0 auto 0; height: 40px; display: flex; align-items: center; gap: 8px;
   padding: 0 12px 0 8px; border-radius: 12px; background: #FBF1EE; color: var(--ks-ink);
@@ -66,7 +83,16 @@
 .lp-root .ks-count { min-width: 22px; height: 22px; border-radius: 999px; display: grid; place-items: center; font-size: 11px; font-weight: 700; background: rgba(42, 11, 7, 0.08); color: var(--ks-ink); transition: background 0.3s; }
 .lp-root .ks-count[data-on="true"] { background: var(--ks-coral); }
 
-.lp-root .ks-orders { display: grid; gap: 6px; }
+/* Кнопка массового действия — в шапке блока заказов, курсор едет к ней. */
+.lp-root .ks-btnwrap { position: relative; flex: none; }
+.lp-root .ks-btn { display: block; font-size: 12.5px; font-weight: 700; color: var(--ks-paper); background: var(--ks-ink); border-radius: 999px; padding: 9px 16px; white-space: nowrap; transition: transform 0.15s, box-shadow 0.4s; }
+.lp-root .ks-btn[data-press="true"] { transform: scale(0.93); box-shadow: 0 0 0 8px rgba(255, 107, 87, 0.35); }
+.lp-root .ks-cursor { position: absolute; left: 55%; top: 55%; z-index: 3; opacity: 0; transform: translate(70px, 70px); transition: transform 0.8s cubic-bezier(0.5, 0, 0.2, 1), opacity 0.3s; filter: drop-shadow(0 3px 4px rgba(42, 11, 7, 0.3)); }
+.lp-root .ks-cursor svg { display: block; }
+.lp-root .ks-cursor[data-at="near"] { opacity: 1; transform: translate(34px, 40px); }
+.lp-root .ks-cursor[data-at="btn"] { opacity: 1; transform: translate(0, 0); }
+
+.lp-root .ks-orders { position: relative; display: grid; gap: 6px; align-content: start; min-height: 132px; }
 .lp-root .ks-order {
   height: 40px; display: flex; align-items: center; gap: 10px; padding: 0 8px 0 12px;
   border-radius: 12px; background: #FBF1EE; color: var(--ks-ink);
@@ -76,51 +102,88 @@
 .lp-root .ks-order[data-in="true"] { opacity: 1; transform: none; }
 .lp-root .ks-order[data-packed="true"] { background: #F1FBF6; }
 .lp-root .ks-onum { font: 700 12.5px/1 var(--font-unbounded), Arial, sans-serif; color: var(--ks-ink); white-space: nowrap; }
-.lp-root .ks-ocity { font-size: 12px; color: rgba(42, 11, 7, 0.65); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.lp-root .ks-ocity { font-size: 12px; color: var(--ks-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .lp-root .ks-status { margin-left: auto; flex: none; font-size: 11px; font-weight: 700; border-radius: 999px; padding: 4px 9px; background: var(--ks-blush); color: var(--ks-ink); transition: background 0.35s, color 0.35s; white-space: nowrap; }
 .lp-root .ks-order[data-packed="true"] .ks-status { background: var(--ks-mint); color: var(--ks-green-ink); }
 
-.lp-root .ks-actions { display: flex; justify-content: flex-end; }
-.lp-root .ks-btn { font-size: 13px; font-weight: 700; color: var(--ks-paper); background: var(--ks-ink); border-radius: 999px; padding: 10px 18px; transition: transform 0.15s, box-shadow 0.4s; }
-.lp-root .ks-btn[data-press="true"] { transform: scale(0.93); box-shadow: 0 0 0 8px rgba(255, 107, 87, 0.35); }
-
-.lp-root .ks-cursor { position: absolute; right: -30px; bottom: -30px; opacity: 0; transition: right 0.8s cubic-bezier(0.5, 0, 0.2, 1), bottom 0.8s cubic-bezier(0.5, 0, 0.2, 1), opacity 0.3s; filter: drop-shadow(0 3px 4px rgba(42, 11, 7, 0.3)); }
-.lp-root .ks-cursor svg { display: block; }
-.lp-root .ks-cursor[data-at="near"] { right: 20px; bottom: 6px; opacity: 1; }
-.lp-root .ks-cursor[data-at="btn"] { right: 74px; bottom: 22px; opacity: 1; }
-
-.lp-root .ks-waybill {
-  position: absolute; left: -46px; bottom: -34px; width: 150px; z-index: 2;
-  background: #fff; color: var(--ks-ink); border: 2px solid var(--ks-ink); border-radius: 12px; padding: 10px 12px;
-  display: grid; gap: 7px; box-shadow: 0 18px 30px -16px rgba(42, 11, 7, 0.55);
-  opacity: 0; transform: translateY(26px) rotate(2deg) scale(0.9);
-  transition: opacity 0.35s, transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.lp-root .ks-waybill[data-in="true"] { opacity: 1; transform: translateY(0) rotate(-7deg) scale(1); }
-.lp-root .ks-waybill b { font-size: 12px; font-weight: 700; color: var(--ks-ink); }
-.lp-root .ks-barcode { height: 26px; background: repeating-linear-gradient(90deg, var(--ks-ink) 0 2px, transparent 2px 4px, var(--ks-ink) 4px 5px, transparent 5px 8px, var(--ks-ink) 8px 11px, transparent 11px 12px); }
-.lp-root .ks-lines { display: grid; gap: 4px; }
-.lp-root .ks-lines i { display: block; height: 5px; border-radius: 3px; background: rgba(42, 11, 7, 0.14); }
-.lp-root .ks-lines i:nth-child(2) { width: 80%; }
-.lp-root .ks-lines i:nth-child(3) { width: 55%; }
-@media (max-width: 1179px) { .lp-root .ks-waybill { left: -6px; bottom: -30px; } }
-@media (max-width: 480px) {
-  .lp-root .ks-body { padding: 10px; gap: 10px; }
-  .lp-root .ks-card { padding: 12px; }
-  .lp-root .ks-floor { font-size: 10px; padding: 3px 7px; }
-  .lp-root .ks-waybill { width: 128px; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .lp-root .ks-win, .lp-root .ks-live em { animation: none; }
-  .lp-root .ks-wrap * { transition: none !important; animation: none !important; }
-}
-
 /* Пока заказов нет — тихая подсказка «ждём», чтобы блок не выглядел пустым. */
-.lp-root .ks-orders { position: relative; }
-.lp-root .ks-wait { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 12.5px; font-weight: 500; color: rgba(42, 11, 7, 0.45); transition: opacity 0.3s; }
+.lp-root .ks-wait { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 12.5px; font-weight: 500; color: var(--ks-muted); transition: opacity 0.3s; }
 .lp-root .ks-wait[data-on="false"] { opacity: 0; }
 .lp-root .ks-wait i { display: inline-block; width: 4px; height: 4px; margin-left: 3px; border-radius: 50%; background: currentColor; animation: ks-dot 1.2s ease-in-out infinite; }
 .lp-root .ks-wait i:nth-child(2) { animation-delay: 0.15s; }
 .lp-root .ks-wait i:nth-child(3) { animation-delay: 0.3s; }
 @keyframes ks-dot { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
+
+/* Коробка с «−8 %» — у правого нижнего угла окна, на «Упаковать все»
+   вздрагивает. Белая бирка «−8 %» читается только на цветном фоне страницы. */
+.lp-root .ks-box { position: absolute; z-index: 2; right: 18px; bottom: -14px; width: 140px; animation: ks-bob 5s ease-in-out infinite; }
+.lp-root .ks-box svg { display: block; width: 100%; height: auto; }
+.lp-root .ks-box[data-shake="true"] svg { animation: ks-shake 0.5s ease-in-out; }
+@keyframes ks-bob { 0%, 100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-6px) rotate(1.2deg); } }
+@keyframes ks-shake { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-5deg) scale(1.04); } 60% { transform: rotate(4deg); } }
+
+/* Накладная — уменьшенная копия настоящей Kaspi-накладной A6 (200×282 в
+   масштабе --s), выезжает у левого нижнего угла окна. */
+.lp-root .ks-label {
+  --s: 0.55;
+  position: absolute; z-index: 2; left: -6px; bottom: -14px; width: calc(200px * var(--s)); height: calc(282px * var(--s));
+  opacity: 0; transform: translateY(40px) rotate(4deg) scale(0.9);
+  transition: opacity 0.35s, transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  filter: drop-shadow(0 16px 18px rgba(42, 11, 7, 0.35));
+}
+.lp-root .ks-label[data-in="true"] { opacity: 1; transform: translateY(0) rotate(-6deg) scale(1); }
+.lp-root .ks-a6 {
+  width: 200px; height: 282px; transform: scale(var(--s)); transform-origin: 0 0;
+  background: #fff; color: #000; border-radius: 6px; padding: 10px 11px; box-sizing: border-box;
+  display: flex; flex-direction: column; font-family: Roboto, Arial, sans-serif; line-height: 1.15;
+}
+.lp-root .ks-a6 :is(div, span, b) { color: #000; }
+.lp-root .ks-a6-top { display: flex; align-items: flex-start; gap: 7px; }
+.lp-root .ks-a6-num { width: 40px; height: 44px; flex: none; display: grid; place-items: center; background: #000; color: #fff !important; font: 700 34px/1 Roboto, Arial, sans-serif; }
+.lp-root .ks-a6-code { display: grid; gap: 2px; justify-items: center; }
+.lp-root .ks-a6-code svg { display: block; }
+.lp-root .ks-a6-code b { font-size: 11px; font-weight: 700; letter-spacing: 0.02em; white-space: nowrap; }
+.lp-root .ks-a6-frac { margin-left: auto; font-size: 8px; font-weight: 700; }
+.lp-root .ks-a6-city { display: flex; align-items: flex-end; justify-content: space-between; margin-top: 7px; padding-bottom: 2px; border-bottom: 1px solid #000; }
+.lp-root .ks-a6-city b { font-size: 17px; font-weight: 700; }
+.lp-root .ks-a6-inv { background: #000; color: #fff !important; font-weight: 700; font-size: 15px; padding: 1px 4px; }
+.lp-root .ks-a6-route { text-align: center; font-size: 9px; margin-top: 4px; }
+.lp-root .ks-a6-route b { font-weight: 700; }
+.lp-root .ks-a6-item { display: flex; justify-content: space-between; gap: 6px; font-size: 6.5px; margin-top: 5px; }
+.lp-root .ks-a6-item span:first-child { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.lp-root .ks-a6-shop { font-size: 8px; margin-top: 12px; }
+.lp-root .ks-a6-bar2 { display: flex; justify-content: flex-end; margin-top: 4px; }
+.lp-root .ks-a6-bar2 svg { display: block; }
+.lp-root .ks-a6-city2 { margin-top: 0; border-bottom: 0; border-top: 1px solid #000; padding-top: 1px; }
+.lp-root .ks-a6-city2 b { font-size: 14px; }
+.lp-root .ks-a6-addr { display: flex; justify-content: space-between; gap: 6px; font-size: 7px; margin-top: 7px; }
+.lp-root .ks-a6-addr b { font-weight: 700; }
+.lp-root .ks-a6-foot { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; justify-items: center; margin-top: auto; }
+.lp-root .ks-a6-foot > b { font-size: 19px; font-weight: 700; }
+.lp-root .ks-a6-foot svg { display: block; }
+.lp-root .ks-a6-big { font-size: 15px; padding: 2px 4px; }
+.lp-root .ks-a6-date { display: grid; grid-template-columns: 1fr auto 1fr; align-items: baseline; gap: 4px; font-size: 5.5px; margin-top: 3px; }
+.lp-root .ks-a6-date b { font-size: 10px; font-weight: 700; text-align: center; }
+.lp-root .ks-a6-date span:last-child { text-align: right; }
+
+@media (max-width: 1179px) {
+  .lp-root .ks-box { width: 112px; right: 6px; bottom: 18px; }
+  .lp-root .ks-wrap { padding-bottom: 120px; }
+}
+@media (max-width: 480px) {
+  .lp-root .ks-body { padding: 10px; gap: 10px; }
+  .lp-root .ks-card { padding: 12px; }
+  .lp-root .ks-floor { font-size: 10px; padding: 3px 7px; }
+  .lp-root .ks-btn { padding: 8px 12px; font-size: 12px; }
+}
+
+/* Широкое окно: накладная «печатается» в пустой низ колонки заказов
+   (объявлено после базового .ks-label, чтобы перебить его). */
+@container (min-width: 640px) {
+  .lp-root .ks-label { --s: 0.66; left: calc(52% + 34px); bottom: 14px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-root .ks-live em, .lp-root .ks-box { animation: none; }
+  .lp-root .ks-wrap * { transition: none !important; animation: none !important; }
+}
