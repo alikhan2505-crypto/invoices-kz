@@ -34,7 +34,7 @@ export const HUB_COPY: Record<Lang, HubCopy> = {
   ru: {
     signIn: 'Войти',
     dashboard: 'Дашборд',
-    eyebrowGuest: 'Счета, Kaspi, API, агенты',
+    eyebrowGuest: 'Счета, Kaspi, API, агенты, CFO-кабинет',
     eyebrowUser: 'Ваши продукты',
     h1Guest: 'Один аккаунт. Каждый инструмент — отдельно.',
     h1User: 'Что показывать в меню',
@@ -57,7 +57,7 @@ export const HUB_COPY: Record<Lang, HubCopy> = {
   kk: {
     signIn: 'Кіру',
     dashboard: 'Дашборд',
-    eyebrowGuest: 'Шоттар, Kaspi, API, агенттер',
+    eyebrowGuest: 'Шоттар, Kaspi, API, агенттер, CFO-кабинет',
     eyebrowUser: 'Сіздің өнімдеріңіз',
     h1Guest: 'Бір аккаунт. Әр құрал — бөлек.',
     h1User: 'Мәзірде нені көрсету керек',
@@ -80,7 +80,7 @@ export const HUB_COPY: Record<Lang, HubCopy> = {
   en: {
     signIn: 'Sign in',
     dashboard: 'Dashboard',
-    eyebrowGuest: 'Invoices, Kaspi, API, agents',
+    eyebrowGuest: 'Invoices, Kaspi, API, agents, CFO',
     eyebrowUser: 'Your products',
     h1Guest: 'One account. Every tool on its own.',
     h1User: 'What to show in the menu',
