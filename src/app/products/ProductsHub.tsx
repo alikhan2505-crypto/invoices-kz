@@ -172,17 +172,30 @@ export default function ProductsHub({ fontClass }: { fontClass: string }) {
         </div>
 
         {askPersona && (
-          <div className="prd-persona" role="group" aria-label={t.personaHand}>
-            <span className="prd-hand">{t.personaHand}</span>
-            <span className="prd-persona-hint">{t.personaHint}</span>
-            {PERSONAS.map((x) => (
-              <button key={x.key} type="button" className="prd-chip" data-on={persona.includes(x.key)} aria-pressed={persona.includes(x.key)} onClick={() => togglePersona(x.key)}>
-                <span>{PERSONA_LABELS[lang][x.key] ?? x.label}</span>
-              </button>
-            ))}
-            {who.state === 'guest' && persona.length > 0 && (
-              <button type="button" className="prd-chip prd-chip-quiet" onClick={clearPersona}><span>{t.showAll}</span></button>
-            )}
+          /* Тот же приём, что у заголовка: ряд чипов трёх языков стопкой в
+             одной ячейке, виден один. Надписи разной длины переносятся в
+             разное число строк (казахские длиннее) — без стопки сетка плиток
+             сдвигалась на ширинах <1100px. Скрытые копии: visibility:hidden —
+             их кнопки не кликаются и не попадают в Tab. */
+          <div className="prd-persona-stack">
+            {(['ru', 'kk', 'en'] as Lang[]).map((l) => {
+              const active = l === lang
+              const c = HUB_COPY[l]
+              return (
+                <div key={l} className="prd-persona" data-active={active} aria-hidden={!active} lang={l} role="group" aria-label={c.personaHand}>
+                  <span className="prd-hand">{c.personaHand}</span>
+                  <span className="prd-persona-hint">{c.personaHint}</span>
+                  {PERSONAS.map((x) => (
+                    <button key={x.key} type="button" tabIndex={active ? 0 : -1} className="prd-chip" data-on={persona.includes(x.key)} aria-pressed={persona.includes(x.key)} onClick={() => togglePersona(x.key)}>
+                      <span>{PERSONA_LABELS[l][x.key] ?? x.label}</span>
+                    </button>
+                  ))}
+                  {who.state === 'guest' && persona.length > 0 && (
+                    <button type="button" tabIndex={active ? 0 : -1} className="prd-chip prd-chip-quiet" onClick={clearPersona}><span>{c.showAll}</span></button>
+                  )}
+                </div>
+              )
+            })}
           </div>
         )}
 

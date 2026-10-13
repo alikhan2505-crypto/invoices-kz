@@ -52,6 +52,11 @@
 .prd-root .prd-hero-lang { grid-area: 1 / 1; display: grid; gap: 16px; align-content: start; }
 .prd-root .prd-hero-lang[data-active="false"] { visibility: hidden; pointer-events: none; user-select: none; }
 
+/* Ряд чипов — тоже стопкой по языкам (см. комментарий в ProductsHub.tsx). */
+.prd-root .prd-persona-stack { display: grid; }
+.prd-root .prd-persona-stack > .prd-persona { grid-area: 1 / 1; align-content: start; }
+.prd-root .prd-persona[data-active="false"] { visibility: hidden; pointer-events: none; user-select: none; }
+
 /* Чипы «чем занимаетесь?» — матовые, а не прозрачные: исполинская цифра за
    ними иначе перечёркивала текст подписей. */
 .prd-root .prd-chip {
