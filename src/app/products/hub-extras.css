@@ -5,6 +5,20 @@
    с новым именем, кэшу неоткуда взяться. Дубликаты правил с globals.css не
    страшны: эти объявлены позже и специфичнее. */
 
+/* Казахские буквы для Unbounded (ревизия 13.10: «буквы прыгают»). В Unbounded
+   НЕТ Ә Ғ Қ Ң Ө Ұ Ү Һ — браузер брал их из Arial. Заплатка собрана из деталей
+   самого Unbounded (scripts/kazakh-display-font/build.py, OFL рядом со шрифтом).
+   unicode-range только на эти 16 кодов: шрифт качается лишь при казахском
+   тексте (1.5 КБ), а стоя ПЕРВЫМ в font-family, для любых других символов
+   пропускается — им достаётся обычный Unbounded. */
+@font-face {
+  font-family: 'IKZ Kazakh Display';
+  src: url('/fonts/kazakh-display/ikz-kazakh-display-700.woff2') format('woff2');
+  font-weight: 700; font-style: normal; font-display: swap;
+  unicode-range: U+0492-0493, U+049A-049B, U+04A2-04A3, U+04AE-04B1, U+04BA-04BB, U+04D8-04D9, U+04E8-04E9;
+}
+.prd-root .prd-h1, .prd-root .prd-tn { font-family: 'IKZ Kazakh Display', var(--font-unbounded), Arial, sans-serif; }
+
 .prd-root .prd-ghost {
   /* top: 30 → 80px (ревизия 13.10): цифра «прилипла» к шапке вплотную под
      переключателем языка. Сдвиг ровно +50px по выбору основателя: вариант

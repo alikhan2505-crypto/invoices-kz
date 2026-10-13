@@ -5,8 +5,8 @@ import ProductsHub from './ProductsHub'
 // Marketing-surface fonts (DESIGN.md §7). Loaded here, on the one route that
 // uses them, so the cabinets keep shipping only Geist.
 const unbounded = Unbounded({ subsets: ['cyrillic', 'latin'], weight: ['700'], variable: '--font-unbounded', display: 'swap' })
-const onest = Onest({ subsets: ['cyrillic', 'latin'], variable: '--font-onest', display: 'swap' })
-const caveat = Caveat({ subsets: ['cyrillic', 'latin'], weight: ['600'], variable: '--font-caveat', display: 'swap' })
+const onest = Onest({ subsets: ['cyrillic', 'cyrillic-ext', 'latin'], variable: '--font-onest', display: 'swap' })
+const caveat = Caveat({ subsets: ['cyrillic', 'cyrillic-ext', 'latin'], weight: ['600'], variable: '--font-caveat', display: 'swap' })
 
 export const metadata: Metadata = {
   title: 'Продукты — invoices.kz',

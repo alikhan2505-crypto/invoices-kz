@@ -8,8 +8,8 @@ import { ROOT_HUB_LIVE } from '@/lib/rootHub'
 // live here -- module-scope is the only place next/font/google can be
 // called, so this can't itself be behind the flag.
 const unbounded = Unbounded({ subsets: ['cyrillic', 'latin'], weight: ['700'], variable: '--font-unbounded', display: 'swap' })
-const onest = Onest({ subsets: ['cyrillic', 'latin'], variable: '--font-onest', display: 'swap' })
-const caveat = Caveat({ subsets: ['cyrillic', 'latin'], weight: ['600'], variable: '--font-caveat', display: 'swap' })
+const onest = Onest({ subsets: ['cyrillic', 'cyrillic-ext', 'latin'], variable: '--font-onest', display: 'swap' })
+const caveat = Caveat({ subsets: ['cyrillic', 'cyrillic-ext', 'latin'], weight: ['600'], variable: '--font-caveat', display: 'swap' })
 
 // Stage 5 of the product split (21.09.2026): '/' switches from the Счета
 // pitch to the Products Hub once NEXT_PUBLIC_ROOT_HUB_LIVE=1 (see
