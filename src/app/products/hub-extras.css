@@ -1,0 +1,30 @@
+/* Стили ревизии хаба 13.10.2026 (переключатель языка + прорисовка цифры).
+   ОТДЕЛЬНЫЙ файл, а не globals.css — намеренно: на проде поймали залипший
+   edge-кэш immutable-чанка globals (имя чанка не сменилось, Vercel отдавал
+   CSS прошлого деплоя с Age ~28ч при новом HTML). Новый import — новый чанк
+   с новым именем, кэшу неоткуда взяться. Дубликаты правил с globals.css не
+   страшны: эти объявлены позже и специфичнее. */
+
+.prd-root .prd-ghost {
+  position: absolute; z-index: -1; right: max(2vw, calc((100% - 1160px) / 2 - 20px)); top: 30px;
+  width: clamp(220px, 34vw, 420px); height: clamp(220px, 34vw, 420px);
+  overflow: visible; user-select: none; pointer-events: none;
+}
+.prd-root .prd-ghost text {
+  font: 700 clamp(220px, 34vw, 420px)/0.8 var(--font-unbounded), Arial, sans-serif;
+  fill: none; stroke: var(--prd-line); stroke-width: 2;
+  /* Запас больше длины контура любой цифры на максимальном размере: штрих
+     «от руки» за ~2 секунды; key на svg перезапускает анимацию при смене
+     числа — выбор персоны перерисовывает цифру заново. */
+  stroke-dasharray: 4600; stroke-dashoffset: 4600;
+  animation: prd-draw 2s ease-out forwards;
+}
+@keyframes prd-draw { to { stroke-dashoffset: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .prd-root .prd-ghost text { animation: none; stroke-dashoffset: 0; }
+}
+
+.prd-root .prd-lang { display: flex; gap: 2px; border: 2px solid var(--prd-line); border-radius: 9999px; padding: 3px; }
+.prd-root .prd-lang button { border: 0; background: transparent; border-radius: 9999px; padding: 6px 12px; font: 600 13px/1 var(--font-onest), Arial, sans-serif; color: var(--prd-ink2); cursor: pointer; }
+.prd-root .prd-lang button[data-on="true"] { background: var(--prd-ink); }
+.prd-root .prd-lang button[data-on="true"], .prd-root .prd-lang button[data-on="true"] span { color: var(--prd-bg) !important; }
