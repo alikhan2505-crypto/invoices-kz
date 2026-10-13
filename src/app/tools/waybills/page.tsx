@@ -1,6 +1,7 @@
 'use client'
 import { useState, useRef } from 'react'
 import Link from 'next/link'
+import BrandWordmark from '@/components/BrandWordmark'
 import { FEATURES_HREF } from '@/lib/rootHub'
 import { motion, useReducedMotion } from 'framer-motion'
 import { track } from '@vercel/analytics'
@@ -205,8 +206,7 @@ export default function WaybillMergerTool() {
         >
           <div className="flex items-center justify-between gap-2.5 mb-6">
             <div className="flex items-center gap-2.5">
-              <img src="/icon.svg" alt="" className="w-7 h-7 rounded-lg" />
-              <Link href="/" className="text-sm font-semibold" style={{ color: 'var(--nav-text-secondary)' }}>invoices.kz</Link>
+              <BrandWordmark height={15} />
             </div>
             <div className="flex rounded-full p-0.5" style={{ background: 'var(--nav-surface-glass)', border: '1px solid var(--nav-border)' }}>
               {(['ru', 'kk', 'en'] as const).map(l => (

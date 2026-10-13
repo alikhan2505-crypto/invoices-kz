@@ -8,6 +8,7 @@ import { useMyProducts } from '@/lib/useMyProducts'
 import { useLanguage, type Lang } from '@/components/LanguageProvider'
 import { HUB_COPY, PERSONA_LABELS, PRODUCT_I18N } from '@/lib/i18n/productsHub'
 import ProductArt from '@/components/products/ProductArt'
+import { BrandWordmarkSvg } from '@/components/BrandWordmark'
 import './hub-extras.css'
 
 type Who = { state: 'loading' } | { state: 'guest' } | { state: 'user'; isAdmin: boolean; isPro: boolean }
@@ -96,7 +97,7 @@ export default function ProductsHub({ fontClass }: { fontClass: string }) {
 
       <div className="prd-wrap">
         <div className="prd-top">
-          <Link href="/" className="prd-mark"><i />invoices.kz</Link>
+          <Link href="/" className="prd-mark" aria-label="invoices.kz"><BrandWordmarkSvg height={17} /></Link>
           <span style={{ flex: 1 }} />
           <div className="prd-lang" role="group" aria-label="Language">
             {LANGS.map((l) => (

@@ -1,6 +1,7 @@
 'use client'
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
+import BrandWordmark from '@/components/BrandWordmark'
 import { track } from '@vercel/analytics'
 import { calculateIpTaxes, MZP_2026 } from '@/lib/ipTaxes'
 import ToolCta from '../ToolCta'
@@ -38,8 +39,7 @@ export default function NalogiTool() {
     <div className="min-h-screen" style={{ background: 'var(--nav-bg)' }}>
       <div className="max-w-3xl mx-auto p-4 lg:p-6">
         <div className="flex items-center gap-2.5 mb-6">
-          <img src="/icon.svg" alt="" className="w-7 h-7 rounded-lg" />
-          <Link href="/" className="text-sm font-semibold" style={{ color: 'var(--nav-text-secondary)' }}>invoices.kz</Link>
+          <BrandWordmark height={15} />
         </div>
 
         <h1 className="text-2xl lg:text-3xl font-bold mb-2" style={{ color: 'var(--nav-text-primary)' }}>

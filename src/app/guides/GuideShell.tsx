@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import BrandWordmark from '@/components/BrandWordmark'
 import { FEATURES_HREF } from '@/lib/rootHub'
 import { Guide, GuideLang, guidePath, guidesIndexPath, otherGuides } from '@/lib/guides'
 
@@ -108,10 +109,7 @@ export default function GuideShell({
       <div className="max-w-3xl mx-auto p-4 lg:p-6">
         <div className="flex items-center justify-between gap-3 mb-6">
           <div className="flex items-center gap-2.5 min-w-0">
-            <img src="/icon.svg" alt="" className="w-7 h-7 rounded-lg flex-shrink-0" />
-            <Link href="/" className="text-sm font-semibold" style={{ color: 'var(--nav-text-secondary)' }}>
-              invoices.kz
-            </Link>
+            <BrandWordmark height={15} />
             <span className="text-sm" style={{ color: 'var(--nav-text-muted)' }}>/</span>
             <Link
               href={guidesIndexPath(lang)}

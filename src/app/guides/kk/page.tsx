@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import BrandWordmark from '@/components/BrandWordmark'
 import { GUIDES } from '@/lib/guides'
 
 export const metadata: Metadata = {
@@ -30,10 +31,7 @@ export default function GuidesIndexKk() {
       <div className="max-w-3xl mx-auto p-4 lg:p-6">
         <div className="flex items-center justify-between gap-3 mb-6">
           <div className="flex items-center gap-2.5">
-            <img src="/icon.svg" alt="" className="w-7 h-7 rounded-lg" />
-            <Link href="/" className="text-sm font-semibold" style={{ color: 'var(--nav-text-secondary)' }}>
-              invoices.kz
-            </Link>
+            <BrandWordmark height={15} />
           </div>
           <Link
             href="/guides"
