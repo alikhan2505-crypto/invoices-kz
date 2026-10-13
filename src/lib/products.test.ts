@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { personaProducts, homeFor, parseMyProducts, toggleProduct, isInMyProducts, isSectionVisible, SELECTABLE_KEYS } from './products'
+import { personaProducts, personasProducts, selectablePersonaProducts, parsePersonaKeys, PERSONAS, PRODUCTS, homeFor, parseMyProducts, toggleProduct, isInMyProducts, isSectionVisible, SELECTABLE_KEYS } from './products'
 
 describe('parseMyProducts', () => {
   it('null means never chose', () => {
@@ -78,5 +78,44 @@ describe('personaProducts', () => {
     expect(personaProducts('salon')).toEqual(['salon', 'aiAgent'])
     expect(personaProducts('hacker')).toBeNull()
     expect(personaProducts(null)).toBeNull()
+  })
+})
+
+describe('every product is reachable by some answer', () => {
+  it('no product is left without a persona (the gap the founder spotted 13.10)', () => {
+    const reachable = new Set(PERSONAS.flatMap((p) => p.products))
+    for (const p of PRODUCTS) expect(reachable.has(p.key)).toBe(true)
+  })
+})
+
+describe('personasProducts (several answers)', () => {
+  it('adds products up, without duplicates, in the hub order', () => {
+    expect(personasProducts(['ip', 'kaspi'])).toEqual(['invoices', 'kaspiShop'])
+    expect(personasProducts(['messengers', 'salon'])).toEqual(['invoices', 'aiAgent', 'salon'])
+  })
+  it('nothing picked (or only unknown answers) means show everything', () => {
+    expect(personasProducts([])).toBeNull()
+    expect(personasProducts(['hacker'])).toBeNull()
+  })
+})
+
+describe('selectablePersonaProducts (what goes into an account menu)', () => {
+  it('never puts the locked WB or the admin-only CFO into a regular menu', () => {
+    expect(selectablePersonaProducts(['finance'])).toEqual(['invoices'])
+    expect(selectablePersonaProducts(['wb'])).toBeNull()
+    expect(selectablePersonaProducts(['wb', 'kaspi'])).toEqual(['kaspiShop'])
+  })
+  it('an admin does get CFO', () => {
+    expect(selectablePersonaProducts(['finance'], true)).toEqual(['invoices', 'cfo'])
+  })
+})
+
+describe('parsePersonaKeys (pending answers across /login)', () => {
+  it('reads the comma list and the old single value alike, dropping unknowns', () => {
+    expect(parsePersonaKeys('kaspi,ip')).toEqual(['kaspi', 'ip'])
+    expect(parsePersonaKeys('kaspi')).toEqual(['kaspi'])
+    expect(parsePersonaKeys('kaspi,hacker, dev')).toEqual(['kaspi', 'dev'])
+    expect(parsePersonaKeys(null)).toEqual([])
+    expect(parsePersonaKeys('')).toEqual([])
   })
 })

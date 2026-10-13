@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { getActivePlan } from '@/lib/plan'
-import { PRODUCTS, PERSONAS, PENDING_PERSONA_KEY, personaProducts, isInMyProducts, toggleProduct, type ProductDef } from '@/lib/products'
+import { PRODUCTS, PERSONAS, PENDING_PERSONA_KEY, personasProducts, selectablePersonaProducts, isInMyProducts, toggleProduct, type ProductDef } from '@/lib/products'
 import { useMyProducts } from '@/lib/useMyProducts'
 import { useLanguage, type Lang } from '@/components/LanguageProvider'
 import { HUB_COPY, FOOTER_COPY, PERSONA_LABELS, PRODUCT_I18N } from '@/lib/i18n/productsHub'
@@ -41,8 +41,13 @@ const LANGS: { key: Lang; label: string }[] = [
 export default function ProductsHub({ fontClass }: { fontClass: string }) {
   const [who, setWho] = useState<Who>({ state: 'loading' })
   const [mine, saveMine] = useMyProducts()
-  // Guest's answer to "what do you do?" (narrows the tiles, applied after sign-in).
-  const [persona, setPersona] = useState<string | null>(null)
+  // Answers to "what do you do?" — several at once since 13.10.2026 (their
+  // products add up). A guest's answers narrow the tiles and are applied to
+  // the account after sign-in; a signed-in person's answers fill their menu.
+  const [persona, setPersona] = useState<string[]>([])
+  // Signed-in, menu not chosen yet: the row stays while they keep picking
+  // (the first pick already fills the menu, which would otherwise hide it).
+  const [personaTouched, setPersonaTouched] = useState(false)
   const { lang, setLang } = useLanguage()
   const t = HUB_COPY[lang]
   // Шапка закреплена (sticky): после первого скролла под ней появляется
@@ -68,28 +73,37 @@ export default function ProductsHub({ fontClass }: { fontClass: string }) {
   const logged = who.state === 'user'
   const isAdmin = who.state === 'user' && who.isAdmin
   const isPro = who.state === 'user' && who.isPro
-  const personaKeys = who.state === 'guest' ? personaProducts(persona) : null
+  const personaKeys = who.state === 'guest' ? personasProducts(persona) : null
   // teaser-карточки (сейчас CFO) видят все: доступ закрыт, но витрина есть.
   const shown = PRODUCTS.filter((p) => (!p.adminOnly || isAdmin || p.teaser) && (!personaKeys || personaKeys.includes(p.key)))
   // Asked of guests and of signed-in people who have not chosen products yet.
-  const askPersona = who.state === 'guest' || (logged && mine === null)
+  const askPersona = who.state === 'guest' || (logged && (mine === null || personaTouched))
 
   const pName = (p: ProductDef) => PRODUCT_I18N[p.key]?.name[lang] ?? p.name
   const pBlurb = (p: ProductDef) => PRODUCT_I18N[p.key]?.blurb[lang] ?? p.blurb
 
-  function choosePersona(key: string | null) {
+  function togglePersona(key: string) {
+    const next = persona.includes(key) ? persona.filter((k) => k !== key) : [...persona, key]
+    setPersona(next)
     if (logged) {
-      const keys = personaProducts(key)
+      setPersonaTouched(true)
+      // Only products this person can open go into the menu; un-picking the
+      // last answer keeps the menu as it is rather than emptying it.
+      const keys = selectablePersonaProducts(next, isAdmin)
       if (keys) saveMine(keys)
       return
     }
-    setPersona(key)
     try {
-      if (key) localStorage.setItem(PENDING_PERSONA_KEY, key)
+      if (next.length) localStorage.setItem(PENDING_PERSONA_KEY, next.join(','))
       else localStorage.removeItem(PENDING_PERSONA_KEY)
     } catch {
       // Blocked storage: the tiles still narrow, the account just stays unchosen.
     }
+  }
+
+  function clearPersona() {
+    setPersona([])
+    try { localStorage.removeItem(PENDING_PERSONA_KEY) } catch { /* see above */ }
   }
 
   return (
@@ -138,14 +152,17 @@ export default function ProductsHub({ fontClass }: { fontClass: string }) {
         </div>
 
         {askPersona && (
-          <div className="prd-persona">
+          <div className="prd-persona" role="group" aria-label={t.personaHand}>
             <span className="prd-hand">{t.personaHand}</span>
+            <span className="prd-persona-hint">{t.personaHint}</span>
             {PERSONAS.map((x) => (
-              <button key={x.key} type="button" className="prd-chip" data-on={persona === x.key} onClick={() => choosePersona(x.key)}>
+              <button key={x.key} type="button" className="prd-chip" data-on={persona.includes(x.key)} aria-pressed={persona.includes(x.key)} onClick={() => togglePersona(x.key)}>
                 <span>{PERSONA_LABELS[lang][x.key] ?? x.label}</span>
               </button>
             ))}
-            {persona && <button type="button" className="prd-chip prd-chip-quiet" onClick={() => choosePersona(null)}><span>{t.showAll}</span></button>}
+            {who.state === 'guest' && persona.length > 0 && (
+              <button type="button" className="prd-chip prd-chip-quiet" onClick={clearPersona}><span>{t.showAll}</span></button>
+            )}
           </div>
         )}
 

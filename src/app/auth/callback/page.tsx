@@ -6,7 +6,7 @@ import { useLanguage } from '@/components/LanguageProvider'
 import { authDict } from '@/lib/i18n/auth'
 import { hasPendingUpgrade } from '@/lib/pendingUpgrade'
 import { consumePostLoginRedirect } from '@/lib/postLoginRedirect'
-import { homeFor, personaProducts, PENDING_PERSONA_KEY } from '@/lib/products'
+import { homeFor, selectablePersonaProducts, parsePersonaKeys, PENDING_PERSONA_KEY } from '@/lib/products'
 
 export default function AuthCallback() {
   const router = useRouter()
@@ -68,7 +68,7 @@ export default function AuthCallback() {
         // the one-time bootstrap below, which these three columns record.
         const { data: profile } = await supabase
           .from('profiles')
-          .select('trial_expires_at, promo_granted_at, referred_by, enabled_products')
+          .select('trial_expires_at, promo_granted_at, referred_by, enabled_products, is_admin')
           .eq('id', session.user.id)
           .maybeSingle()
 
@@ -85,7 +85,9 @@ export default function AuthCallback() {
         // chosen yet -- it never overwrites an existing account's list.
         let enabledProducts: unknown = profile?.enabled_products
         try {
-          const persona = personaProducts(localStorage.getItem(PENDING_PERSONA_KEY))
+          // Several answers may have been picked: their products add up;
+          // locked / admin-only ones are left out of a fresh account's menu.
+          const persona = selectablePersonaProducts(parsePersonaKeys(localStorage.getItem(PENDING_PERSONA_KEY)), !!profile?.is_admin)
           localStorage.removeItem(PENDING_PERSONA_KEY)
           if (persona && !Array.isArray(enabledProducts)) {
             await supabase.from('profiles').update({ enabled_products: persona }).eq('id', session.user.id)

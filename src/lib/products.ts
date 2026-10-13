@@ -124,9 +124,15 @@ export function homeFor(list: unknown): string {
 
 // "What do you do?" on the start page (founder's mock, 21.09.2026): one tap
 // connects the products that fit. Salon comes with the AI agent, as in the mock.
+// Extended 13.10.2026 (founder's revision, variant «Б»): every product is now
+// reachable by some answer (AI agent was only behind «салон», CFO and WB had
+// none), and several answers can be picked at once — their products add up.
 export const PERSONAS: { key: string; label: string; products: ProductKey[] }[] = [
   { key: 'kaspi', label: 'Продаю на Kaspi', products: ['kaspiShop'] },
+  { key: 'wb', label: 'Продаю на Wildberries', products: ['wildberries'] },
   { key: 'ip', label: 'Я ИП или ТОО', products: ['invoices'] },
+  { key: 'messengers', label: 'Продаю в Instagram и WhatsApp', products: ['aiAgent', 'invoices'] },
+  { key: 'finance', label: 'Слежу за финансами', products: ['cfo', 'invoices'] },
   { key: 'dev', label: 'Пишу код', products: ['kaspiApi'] },
   { key: 'salon', label: 'У меня салон', products: ['salon', 'aiAgent'] },
 ]
@@ -135,5 +141,34 @@ export function personaProducts(key: string | null): ProductKey[] | null {
   return PERSONAS.find((p) => p.key === key)?.products ?? null
 }
 
+// Several answers -> the union of their products, in the hub's own order.
+// null when no known answer is picked (the hub then shows every tile).
+export function personasProducts(keys: readonly string[]): ProductKey[] | null {
+  const wanted = new Set<ProductKey>()
+  for (const k of keys) for (const p of personaProducts(k) ?? []) wanted.add(p)
+  const list = PRODUCTS.map((p) => p.key).filter((k) => wanted.has(k))
+  return list.length > 0 ? list : null
+}
+
+// What an answer may actually put into an account's menu: only products that
+// person can open today — never the locked WB, and the admin-only CFO only for
+// an admin. A guest still SEES those tiles (as «Скоро»), they just don't become
+// menu entries. null when nothing openable remains, so the account stays
+// "unchosen" (shows everything) instead of getting an empty or useless menu.
+export function selectablePersonaProducts(keys: readonly string[], isAdmin = false): ProductKey[] | null {
+  const list = (personasProducts(keys) ?? []).filter((k) => {
+    const p = findProduct(k)
+    return !!p && !p.locked && (!p.adminOnly || isAdmin)
+  })
+  return list.length > 0 ? list : null
+}
+
 // Remembered across the trip through /login (same origin, so localStorage works).
+// Stored as a comma list ("kaspi,ip"); a value saved before multi-select
+// existed ("kaspi") parses the same way. Unknown answers are dropped.
 export const PENDING_PERSONA_KEY = 'pending_persona'
+
+export function parsePersonaKeys(raw: string | null): string[] {
+  if (!raw) return []
+  return raw.split(',').map((s) => s.trim()).filter((k) => PERSONAS.some((p) => p.key === k))
+}

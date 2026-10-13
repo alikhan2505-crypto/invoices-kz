@@ -16,6 +16,7 @@ export type HubCopy = {
   subGuest: string
   subUser: string
   personaHand: string
+  personaHint: string
   showAll: string
   soon: string
   soonFoot: string
@@ -41,6 +42,7 @@ export const HUB_COPY: Record<Lang, HubCopy> = {
     subGuest: 'Не продаёте на Kaspi — не увидите его в меню. Понадобится позже — добавите в один клик.',
     subUser: 'Отметьте продукты, которые нужны вам. Остальные уйдут из меню, но по прямой ссылке откроются — ничего не удаляется.',
     personaHand: 'чем занимаетесь?',
+    personaHint: 'можно несколько',
     showAll: 'Показать все',
     soon: 'Скоро',
     soonFoot: 'Раздел дорабатывается',
@@ -64,6 +66,7 @@ export const HUB_COPY: Record<Lang, HubCopy> = {
     subGuest: 'Kaspi-де сатпасаңыз — оны мәзірден көрмейсіз. Кейін керек болса — бір рет басып қосасыз.',
     subUser: 'Өзіңізге қажет өнімдерді белгілеңіз. Қалғандары мәзірден кетеді, бірақ тікелей сілтемемен ашылады — ештеңе өшірілмейді.',
     personaHand: 'немен айналысасыз?',
+    personaHint: 'бірнешеуін таңдауға болады',
     showAll: 'Барлығын көрсету',
     soon: 'Жақында',
     soonFoot: 'Бөлім әзірленуде',
@@ -87,6 +90,7 @@ export const HUB_COPY: Record<Lang, HubCopy> = {
     subGuest: 'Not selling on Kaspi? You won’t see it in your menu. Need it later — add it in one click.',
     subUser: 'Pick the products you need. The rest leave your menu but still open by direct link — nothing gets deleted.',
     personaHand: 'what do you do?',
+    personaHint: 'pick all that fit',
     showAll: 'Show all',
     soon: 'Soon',
     soonFoot: 'Section in progress',
@@ -135,9 +139,9 @@ export const FOOTER_COPY: Record<Lang, FooterCopy> = {
 }
 
 export const PERSONA_LABELS: Record<Lang, Record<string, string>> = {
-  ru: { kaspi: 'Продаю на Kaspi', ip: 'Я ИП или ТОО', dev: 'Пишу код', salon: 'У меня салон' },
-  kk: { kaspi: 'Kaspi-де сатамын', ip: 'Мен ЖК немесе ЖШС', dev: 'Код жазамын', salon: 'Менде салон бар' },
-  en: { kaspi: 'I sell on Kaspi', ip: 'I’m a business', dev: 'I write code', salon: 'I run a salon' },
+  ru: { kaspi: 'Продаю на Kaspi', wb: 'Продаю на Wildberries', ip: 'Я ИП или ТОО', messengers: 'Продаю в Instagram и WhatsApp', finance: 'Слежу за финансами', dev: 'Пишу код', salon: 'У меня салон' },
+  kk: { kaspi: 'Kaspi-де сатамын', wb: 'Wildberries-те сатамын', ip: 'Мен ЖК немесе ЖШС', messengers: 'Instagram мен WhatsApp-та сатамын', finance: 'Қаржыны бақылаймын', dev: 'Код жазамын', salon: 'Менде салон бар' },
+  en: { kaspi: 'I sell on Kaspi', wb: 'I sell on Wildberries', ip: 'I’m a business', messengers: 'I sell via Instagram & WhatsApp', finance: 'I manage the finances', dev: 'I write code', salon: 'I run a salon' },
 }
 
 export const PRODUCT_I18N: Record<ProductKey, { name: Record<Lang, string>; blurb: Record<Lang, string> }> = {
