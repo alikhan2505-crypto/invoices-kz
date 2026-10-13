@@ -184,7 +184,6 @@ export default function ProductsHub({ fontClass }: { fontClass: string }) {
               return (
                 <div key={l} className="prd-persona" data-active={active} aria-hidden={!active} lang={l} role="group" aria-label={c.personaHand}>
                   <span className="prd-hand">{c.personaHand}</span>
-                  <span className="prd-persona-hint">{c.personaHint}</span>
                   {PERSONAS.map((x) => (
                     <button key={x.key} type="button" tabIndex={active ? 0 : -1} className="prd-chip" data-on={persona.includes(x.key)} aria-pressed={persona.includes(x.key)} onClick={() => togglePersona(x.key)}>
                       <span>{PERSONA_LABELS[l][x.key] ?? x.label}</span>

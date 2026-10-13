@@ -17,7 +17,6 @@ export type HubCopy = {
   subGuest: string
   subUser: string
   personaHand: string
-  personaHint: string
   showAll: string
   soon: string
   soonFoot: string
@@ -44,7 +43,6 @@ export const HUB_COPY: Record<Lang, HubCopy> = {
     subGuest: 'Не продаёте на Kaspi — не увидите его в меню. Понадобится позже — добавите в один клик.',
     subUser: 'Отметьте продукты, которые нужны вам. Остальные уйдут из меню, но по прямой ссылке откроются — ничего не удаляется.',
     personaHand: 'чем занимаетесь?',
-    personaHint: 'можно несколько',
     showAll: 'Показать все',
     soon: 'Скоро',
     soonFoot: 'Раздел дорабатывается',
@@ -69,7 +67,6 @@ export const HUB_COPY: Record<Lang, HubCopy> = {
     subGuest: 'Kaspi-де сатпасаңыз — оны мәзірден көрмейсіз. Кейін керек болса — бір рет басып қосасыз.',
     subUser: 'Өзіңізге қажет өнімдерді белгілеңіз. Қалғандары мәзірден кетеді, бірақ тікелей сілтемемен ашылады — ештеңе өшірілмейді.',
     personaHand: 'немен айналысасыз?',
-    personaHint: 'бірнешеуін таңдауға болады',
     showAll: 'Барлығын көрсету',
     soon: 'Жақында',
     soonFoot: 'Бөлім әзірленуде',
@@ -94,7 +91,6 @@ export const HUB_COPY: Record<Lang, HubCopy> = {
     subGuest: 'Not selling on Kaspi? You won’t see it in your menu. Need it later — add it in one click.',
     subUser: 'Pick the products you need. The rest leave your menu but still open by direct link — nothing gets deleted.',
     personaHand: 'what do you do?',
-    personaHint: 'pick all that fit',
     showAll: 'Show all',
     soon: 'Soon',
     soonFoot: 'Section in progress',
