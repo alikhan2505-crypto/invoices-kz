@@ -17,7 +17,9 @@
      «от руки» за ~2 секунды; key на svg перезапускает анимацию при смене
      числа — выбор персоны перерисовывает цифру заново. */
   stroke-dasharray: 4600; stroke-dashoffset: 4600;
-  animation: prd-draw 2s ease-out forwards;
+  /* ×3 по просьбе основателя (ревизия 13.10): штрих ползёт ~6 секунд,
+     прорисовка читается как процесс, а не вспышка. */
+  animation: prd-draw 6s ease-out forwards;
 }
 @keyframes prd-draw { to { stroke-dashoffset: 0; } }
 @media (prefers-reduced-motion: reduce) {
