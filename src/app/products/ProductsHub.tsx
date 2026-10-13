@@ -50,6 +50,11 @@ export default function ProductsHub({ fontClass }: { fontClass: string }) {
   const [personaTouched, setPersonaTouched] = useState(false)
   const { lang, setLang } = useLanguage()
   const t = HUB_COPY[lang]
+  // Заголовок вкладки на языке страницы. Язык живёт в браузере (localStorage),
+  // сервер его не знает — поэтому серверный <title> лишь стартовый, а здесь
+  // он подменяется под выбранный язык (ревизия 13.10: «почему вкладка
+  // по-русски, когда страница на казахском?»).
+  useEffect(() => { document.title = t.docTitle }, [t.docTitle])
   // Шапка закреплена (sticky): после первого скролла под ней появляется
   // тонкая линия — граница «стекла» становится видна только когда есть что отделять.
   const [stuck, setStuck] = useState(false)

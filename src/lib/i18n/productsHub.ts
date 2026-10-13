@@ -7,6 +7,7 @@ import type { ProductKey } from '@/lib/products'
 // Названия-бренды (Kaspi Bot, CFO, AI-агент…) намеренно не переводятся.
 
 export type HubCopy = {
+  docTitle: string
   signIn: string
   dashboard: string
   eyebrowGuest: string
@@ -33,6 +34,7 @@ export type HubCopy = {
 
 export const HUB_COPY: Record<Lang, HubCopy> = {
   ru: {
+    docTitle: 'invoices.kz — сервисы для бизнеса в Казахстане',
     signIn: 'Войти',
     dashboard: 'Дашборд',
     eyebrowGuest: 'Счета, Kaspi, API, агенты, CFO-кабинет',
@@ -57,6 +59,7 @@ export const HUB_COPY: Record<Lang, HubCopy> = {
     noteUser: 'Меню — это только ваш выбор, что показывать. Доступ к продуктам он не меняет: тариф и права остаются прежними.',
   },
   kk: {
+    docTitle: 'invoices.kz — Қазақстандағы бизнеске арналған сервистер',
     signIn: 'Кіру',
     dashboard: 'Дашборд',
     eyebrowGuest: 'Шоттар, Kaspi, API, агенттер, CFO-кабинет',
@@ -81,6 +84,7 @@ export const HUB_COPY: Record<Lang, HubCopy> = {
     noteUser: 'Мәзір — тек нені көрсету туралы таңдауыңыз. Өнімдерге қолжетімділікті өзгертпейді: тариф пен құқықтар сол күйінде қалады.',
   },
   en: {
+    docTitle: 'invoices.kz — business tools for Kazakhstan',
     signIn: 'Sign in',
     dashboard: 'Dashboard',
     eyebrowGuest: 'Invoices, Kaspi, API, agents, CFO',
