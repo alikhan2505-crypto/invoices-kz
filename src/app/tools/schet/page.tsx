@@ -66,6 +66,32 @@ export default function SchetTool() {
   const [f, setF] = useState<Form>(EMPTY)
   const [used, setUsed] = useState(0)
   const [error, setError] = useState('')
+  const [binLookup, setBinLookup] = useState<'idle' | 'loading' | 'found' | 'miss'>('idle')
+
+  // Подстановка названия клиента из уже накопленного кэша реестров —
+  // bin-cache не тратит квоту КГД и не трогает лимит проверок, поэтому
+  // кнопка бесплатная и безлимитная.
+  const lookupClient = async () => {
+    if (binLookup === 'loading') return
+    setBinLookup('loading')
+    track('tool_schet_bin_lookup')
+    try {
+      const res = await fetch('/api/tools/bin-cache', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bin: f.clientBin }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok && data?.found && typeof data.name === 'string') {
+        setF(prev => ({ ...prev, clientName: data.name }))
+        setBinLookup('found')
+      } else {
+        setBinLookup('miss')
+      }
+    } catch {
+      setBinLookup('miss')
+    }
+  }
 
   // Черновик переживает перезагрузку: заполнять реквизиты заново — главная
   // причина бросить такой инструмент на середине.
@@ -229,7 +255,21 @@ export default function SchetTool() {
             </div>
             <div>
               <label className={label} style={labelStyle}>БИН / ИИН клиента *</label>
-              <input className={input} style={inputStyle} inputMode="numeric" placeholder="12 цифр" value={f.clientBin} onChange={e => set({ clientBin: digits(e.target.value).slice(0, 12) })} />
+              <div className="flex gap-2">
+                <input className={input} style={inputStyle} inputMode="numeric" placeholder="12 цифр" value={f.clientBin}
+                  onChange={e => { set({ clientBin: digits(e.target.value).slice(0, 12) }); setBinLookup('idle') }} />
+                <button onClick={lookupClient} disabled={f.clientBin.length !== 12 || binLookup === 'loading'}
+                  className="nav-glass rounded-xl px-3 text-[13px] font-semibold flex-shrink-0 disabled:opacity-50"
+                  style={{ color: 'var(--nav-accent)' }}>
+                  {binLookup === 'loading' ? '…' : 'Найти'}
+                </button>
+              </div>
+              {binLookup === 'found' && (
+                <div className="text-[11px] mt-1" style={{ color: 'var(--nav-success)' }}>Название подставлено из реестра</div>
+              )}
+              {binLookup === 'miss' && (
+                <div className="text-[11px] mt-1" style={{ color: 'var(--nav-text-muted)' }}>В нашей базе пока нет — введите название вручную</div>
+              )}
             </div>
           </div>
           <div className="text-[11px] mt-2" style={{ color: 'var(--nav-text-muted)' }}>

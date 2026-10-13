@@ -17,13 +17,13 @@ export const metadata: Metadata = {
     siteName: 'INVOICES.KZ',
     title: 'Счёт на оплату онлайн — бесплатно за минуту',
     description: 'Реквизиты, БИН, банк из справочника, НДС 16% или без, сумма прописью. PDF без регистрации.',
-    images: [{ url: 'https://invoices.kz/og-image.png', width: 1200, height: 630, alt: 'Счёт на оплату онлайн — invoices.kz' }],
+    images: [{ url: 'https://invoices.kz/og/tool-schet.png', width: 1200, height: 630, alt: 'Счёт на оплату онлайн — invoices.kz' }],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Счёт на оплату онлайн — бесплатно за минуту',
     description: 'Реквизиты, БИН, банк из справочника, НДС 16% или без, сумма прописью. PDF без регистрации.',
-    images: ['https://invoices.kz/og-image.png'],
+    images: ['https://invoices.kz/og/tool-schet.png'],
   },
 }
 

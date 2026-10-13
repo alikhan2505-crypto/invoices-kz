@@ -17,13 +17,13 @@ export const metadata: Metadata = {
     siteName: 'INVOICES.KZ',
     title: 'Калькулятор налогов ИП 2026 — упрощёнка 4% и взносы',
     description: 'Налог 4% и взносы за себя по новому Налоговому кодексу 2026. Бесплатно, без регистрации.',
-    images: [{ url: 'https://invoices.kz/og-image.png', width: 1200, height: 630, alt: 'Калькулятор налогов ИП — invoices.kz' }],
+    images: [{ url: 'https://invoices.kz/og/tool-nalogi.png', width: 1200, height: 630, alt: 'Калькулятор налогов ИП — invoices.kz' }],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Калькулятор налогов ИП 2026 — упрощёнка 4% и взносы',
     description: 'Налог 4% и взносы за себя по новому Налоговому кодексу 2026.',
-    images: ['https://invoices.kz/og-image.png'],
+    images: ['https://invoices.kz/og/tool-nalogi.png'],
   },
 }
 

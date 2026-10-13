@@ -16,13 +16,13 @@ export const metadata: Metadata = {
     siteName: 'INVOICES.KZ',
     title: 'АВР онлайн — акт выполненных работ за минуту',
     description: 'Реквизиты сторон, договор, НДС, сумма прописью. PDF без регистрации.',
-    images: [{ url: 'https://invoices.kz/og-image.png', width: 1200, height: 630, alt: 'АВР онлайн — invoices.kz' }],
+    images: [{ url: 'https://invoices.kz/og/tool-avr.png', width: 1200, height: 630, alt: 'АВР онлайн — invoices.kz' }],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'АВР онлайн — акт выполненных работ за минуту',
     description: 'Реквизиты сторон, договор, НДС, сумма прописью. PDF без регистрации.',
-    images: ['https://invoices.kz/og-image.png'],
+    images: ['https://invoices.kz/og/tool-avr.png'],
   },
 }
 

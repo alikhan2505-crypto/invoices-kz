@@ -18,13 +18,13 @@ export const metadata: Metadata = {
     title: 'Проверка контрагента по БИН — бесплатно',
     description:
       'Неблагонадёжность, ликвидация, налоговая задолженность и НДС — по официальным реестрам КГД РК. Без регистрации.',
-    images: [{ url: 'https://invoices.kz/og-image.png', width: 1200, height: 630, alt: 'Проверка контрагента — invoices.kz' }],
+    images: [{ url: 'https://invoices.kz/og/tool-kontragent.png', width: 1200, height: 630, alt: 'Проверка контрагента — invoices.kz' }],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Проверка контрагента по БИН — бесплатно',
     description: 'Неблагонадёжность, ликвидация, налоговая задолженность и НДС по официальным реестрам КГД РК.',
-    images: ['https://invoices.kz/og-image.png'],
+    images: ['https://invoices.kz/og/tool-kontragent.png'],
   },
 }
 

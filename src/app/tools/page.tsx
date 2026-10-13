@@ -15,7 +15,7 @@ export const metadata: Metadata = {
     siteName: 'INVOICES.KZ',
     title: 'Бесплатные инструменты для продавцов Kaspi — invoices.kz',
     description: 'Калькулятор маржи Kaspi и склейка накладных в один PDF. Бесплатно, без регистрации.',
-    images: [{ url: 'https://invoices.kz/og-image.png', width: 1200, height: 630, alt: 'Инструменты — invoices.kz' }],
+    images: [{ url: 'https://invoices.kz/og/tools-index.png', width: 1200, height: 630, alt: 'Инструменты — invoices.kz' }],
   },
 }
 

@@ -15,13 +15,13 @@ export const metadata: Metadata = {
     siteName: 'INVOICES.KZ',
     title: 'Коммерческое предложение онлайн — за минуту',
     description: 'Позиции с ценами, срок действия, НДС, реквизиты. PDF без регистрации.',
-    images: [{ url: 'https://invoices.kz/og-image.png', width: 1200, height: 630, alt: 'КП онлайн — invoices.kz' }],
+    images: [{ url: 'https://invoices.kz/og/tool-kp.png', width: 1200, height: 630, alt: 'КП онлайн — invoices.kz' }],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Коммерческое предложение онлайн — за минуту',
     description: 'Позиции с ценами, срок действия, НДС, реквизиты. PDF без регистрации.',
-    images: ['https://invoices.kz/og-image.png'],
+    images: ['https://invoices.kz/og/tool-kp.png'],
   },
 }
 
