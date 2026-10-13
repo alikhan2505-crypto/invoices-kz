@@ -24,6 +24,13 @@
   .prd-root .prd-ghost text { animation: none; stroke-dashoffset: 0; }
 }
 
+/* Слот под кнопку входа: на десктопе ширина зафиксирована под самую длинную
+   подпись (Dashboard/Дашборд), кнопка прижата к правому краю слота и меняет
+   размер внутри него — пилюля языка слева не сдвигается. На телефоне слот
+   остаётся резиновым: фикс съедал бы дефицитную ширину. */
+.prd-root .prd-auth-slot { display: flex; justify-content: flex-end; }
+@media (min-width: 640px) { .prd-root .prd-auth-slot { width: 132px; } }
+
 .prd-root .prd-lang { display: flex; gap: 2px; border: 2px solid var(--prd-line); border-radius: 9999px; padding: 3px; }
 .prd-root .prd-lang button { border: 0; background: transparent; border-radius: 9999px; padding: 6px 12px; font: 600 13px/1 var(--font-onest), Arial, sans-serif; color: var(--prd-ink2); cursor: pointer; }
 .prd-root .prd-lang button[data-on="true"] { background: var(--prd-ink); }

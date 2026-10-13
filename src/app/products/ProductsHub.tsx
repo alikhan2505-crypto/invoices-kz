@@ -99,16 +99,18 @@ export default function ProductsHub({ fontClass }: { fontClass: string }) {
         <div className="prd-top">
           <Link href="/" className="prd-mark" aria-label="invoices.kz"><BrandWordmarkSvg height={17} /></Link>
           <span style={{ flex: 1 }} />
-          {/* Кнопка входа — ЛЕВЕЕ переключателя языка: её ширина меняется с
-              языком (Войти/Кіру/Sign in), и в этом порядке она растёт в
-              свободное место слева, а переключатель остаётся прибит к правому
-              краю и не прыгает (замечание основателя, ревизия 13.10). */}
-          {who.state === 'guest' && <Link href="/login" className="prd-btn"><span>{t.signIn}</span></Link>}
-          {logged && <Link href="/dashboard" className="prd-btn prd-alt"><span>{t.dashboard}</span></Link>}
           <div className="prd-lang" role="group" aria-label="Language">
             {LANGS.map((l) => (
               <button key={l.key} type="button" data-on={lang === l.key} onClick={() => setLang(l.key)}><span>{l.label}</span></button>
             ))}
+          </div>
+          {/* Слот фиксированной ширины под самый длинный вариант подписи
+              (Dashboard): кнопка меняет свою ширину ВНУТРИ слота, поэтому
+              переключатель языка слева от неё не сдвигается ни на пиксель
+              (замечание основателя, ревизия 13.10 — язык слева, но на месте). */}
+          <div className="prd-auth-slot">
+            {who.state === 'guest' && <Link href="/login" className="prd-btn"><span>{t.signIn}</span></Link>}
+            {logged && <Link href="/dashboard" className="prd-btn prd-alt"><span>{t.dashboard}</span></Link>}
           </div>
         </div>
 
