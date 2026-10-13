@@ -5,6 +5,8 @@ import { supabase } from '@/lib/supabase'
 import { getActivePlan } from '@/lib/plan'
 import { PRODUCTS, PERSONAS, PENDING_PERSONA_KEY, personaProducts, isInMyProducts, toggleProduct, type ProductDef } from '@/lib/products'
 import { useMyProducts } from '@/lib/useMyProducts'
+import { useLanguage, type Lang } from '@/components/LanguageProvider'
+import { HUB_COPY, PERSONA_LABELS, PRODUCT_I18N } from '@/lib/i18n/productsHub'
 import ProductArt from '@/components/products/ProductArt'
 
 type Who = { state: 'loading' } | { state: 'guest' } | { state: 'user'; isAdmin: boolean; isPro: boolean }
@@ -28,11 +30,19 @@ function tileVars(p: ProductDef): React.CSSProperties {
   return { '--bg-t': p.bg, '--ink-t': p.ink } as React.CSSProperties
 }
 
+const LANGS: { key: Lang; label: string }[] = [
+  { key: 'ru', label: 'Рус' },
+  { key: 'kk', label: 'Қаз' },
+  { key: 'en', label: 'Eng' },
+]
+
 export default function ProductsHub({ fontClass }: { fontClass: string }) {
   const [who, setWho] = useState<Who>({ state: 'loading' })
   const [mine, saveMine] = useMyProducts()
   // Guest's answer to "what do you do?" (narrows the tiles, applied after sign-in).
   const [persona, setPersona] = useState<string | null>(null)
+  const { lang, setLang } = useLanguage()
+  const t = HUB_COPY[lang]
 
   useEffect(() => {
     async function load() {
@@ -48,9 +58,13 @@ export default function ProductsHub({ fontClass }: { fontClass: string }) {
   const isAdmin = who.state === 'user' && who.isAdmin
   const isPro = who.state === 'user' && who.isPro
   const personaKeys = who.state === 'guest' ? personaProducts(persona) : null
-  const shown = PRODUCTS.filter((p) => (!p.adminOnly || isAdmin) && (!personaKeys || personaKeys.includes(p.key)))
+  // teaser-карточки (сейчас CFO) видят все: доступ закрыт, но витрина есть.
+  const shown = PRODUCTS.filter((p) => (!p.adminOnly || isAdmin || p.teaser) && (!personaKeys || personaKeys.includes(p.key)))
   // Asked of guests and of signed-in people who have not chosen products yet.
   const askPersona = who.state === 'guest' || (logged && mine === null)
+
+  const pName = (p: ProductDef) => PRODUCT_I18N[p.key]?.name[lang] ?? p.name
+  const pBlurb = (p: ProductDef) => PRODUCT_I18N[p.key]?.blurb[lang] ?? p.blurb
 
   function choosePersona(key: string | null) {
     if (logged) {
@@ -72,33 +86,41 @@ export default function ProductsHub({ fontClass }: { fontClass: string }) {
       <span className="prd-blob prd-b1" />
       <span className="prd-blob prd-b2" />
       <span className="prd-blob prd-b3" />
-      <span className="prd-ghost" aria-hidden="true">{shown.length}</span>
+      {/* Цифра — число видимых карточек. SVG-текст вместо span: только у него
+          штрих можно «прорисовать» (stroke-dasharray); key перезапускает
+          анимацию при каждой смене числа — выбор персоны перерисовывает цифру. */}
+      <svg key={shown.length} className="prd-ghost" aria-hidden="true">
+        <text x="100%" y="0.84em" textAnchor="end">{shown.length}</text>
+      </svg>
 
       <div className="prd-wrap">
         <div className="prd-top">
           <Link href="/" className="prd-mark"><i />invoices.kz</Link>
           <span style={{ flex: 1 }} />
-          {who.state === 'guest' && <Link href="/login" className="prd-btn"><span>Войти</span></Link>}
-          {logged && <Link href="/dashboard" className="prd-btn prd-alt"><span>Дашборд</span></Link>}
+          <div className="prd-lang" role="group" aria-label="Language">
+            {LANGS.map((l) => (
+              <button key={l.key} type="button" data-on={lang === l.key} onClick={() => setLang(l.key)}><span>{l.label}</span></button>
+            ))}
+          </div>
+          {who.state === 'guest' && <Link href="/login" className="prd-btn"><span>{t.signIn}</span></Link>}
+          {logged && <Link href="/dashboard" className="prd-btn prd-alt"><span>{t.dashboard}</span></Link>}
         </div>
 
         <div className="prd-hero">
-          <p className="prd-eyebrow">{logged ? 'Ваши продукты' : 'Счета, Kaspi, API, агенты'}</p>
-          <h1 className="prd-h1">{logged ? 'Что показывать в меню' : 'Один аккаунт. Каждый инструмент — отдельно.'}</h1>
-          <p className="prd-sub">
-            {logged
-              ? 'Отметьте продукты, которые нужны вам. Остальные уйдут из меню, но по прямой ссылке откроются — ничего не удаляется.'
-              : 'Не продаёте на Kaspi — не увидите его в меню. Понадобится позже — добавите в один клик.'}
-          </p>
+          <p className="prd-eyebrow">{logged ? t.eyebrowUser : t.eyebrowGuest}</p>
+          <h1 className="prd-h1">{logged ? t.h1User : t.h1Guest}</h1>
+          <p className="prd-sub">{logged ? t.subUser : t.subGuest}</p>
         </div>
 
         {askPersona && (
           <div className="prd-persona">
-            <span className="prd-hand">чем занимаетесь?</span>
+            <span className="prd-hand">{t.personaHand}</span>
             {PERSONAS.map((x) => (
-              <button key={x.key} type="button" className="prd-chip" data-on={persona === x.key} onClick={() => choosePersona(x.key)}><span>{x.label}</span></button>
+              <button key={x.key} type="button" className="prd-chip" data-on={persona === x.key} onClick={() => choosePersona(x.key)}>
+                <span>{PERSONA_LABELS[lang][x.key] ?? x.label}</span>
+              </button>
             ))}
-            {persona && <button type="button" className="prd-chip prd-chip-quiet" onClick={() => choosePersona(null)}><span>Показать все</span></button>}
+            {persona && <button type="button" className="prd-chip prd-chip-quiet" onClick={() => choosePersona(null)}><span>{t.showAll}</span></button>}
           </div>
         )}
 
@@ -106,13 +128,15 @@ export default function ProductsHub({ fontClass }: { fontClass: string }) {
           {shown.map((p, i) => {
             const style = { ...tileVars(p), gridColumn: `span ${spanFor(i, shown.length)}` }
             const big = i < 2
-            if (p.locked) {
+            // «Скоро»: заблокированные продукты и teaser-карточки для тех,
+            // кому доступ ещё не открыт (CFO до клик-ревью основателя).
+            if (p.locked || (p.adminOnly && !isAdmin)) {
               return (
-                <div key={p.key} className="prd-tile" style={style} data-big={big} data-locked="true" aria-disabled="true" title="Раздел ещё дорабатывается">
-                  <span className="prd-pill prd-on">Скоро</span>
-                  <span className="prd-tn">{p.name}</span>
-                  <span className="prd-tl">{p.blurb}</span>
-                  <span className="prd-foot"><span className="prd-go"><span>Раздел дорабатывается</span></span></span>
+                <div key={p.key} className="prd-tile" style={style} data-big={big} data-locked="true" aria-disabled="true" title={t.soonFoot}>
+                  <span className="prd-pill prd-on">{t.soon}</span>
+                  <span className="prd-tn">{pName(p)}</span>
+                  <span className="prd-tl">{pBlurb(p)}</span>
+                  <span className="prd-foot"><span className="prd-go"><span>{t.soonFoot}</span></span></span>
                   <span className="prd-art"><ProductArt product={p.key} /></span>
                 </div>
               )
@@ -123,15 +147,15 @@ export default function ProductsHub({ fontClass }: { fontClass: string }) {
             const proTag = p.proOnly && who.state === 'user' && !isPro && !isAdmin
             return (
               <div key={p.key} className="prd-tile" style={style} data-big={big} data-out={logged && !inMenu}>
-                <Link href={target} className="prd-cover" aria-label={`Открыть: ${p.name}`} />
-                {logged && <span className={`prd-pill${inMenu ? ' prd-on' : ''}`}><span>{inMenu ? 'В меню' : 'Не в меню'}</span></span>}
-                <span className="prd-tn">{p.name}</span>
-                <span className="prd-tl">{p.blurb}{proTag ? ' · тариф Про' : ''}</span>
+                <Link href={target} className="prd-cover" aria-label={`${t.open}: ${pName(p)}`} />
+                {logged && <span className={`prd-pill${inMenu ? ' prd-on' : ''}`}><span>{inMenu ? t.inMenu : t.notInMenu}</span></span>}
+                <span className="prd-tn">{pName(p)}</span>
+                <span className="prd-tl">{pBlurb(p)}{proTag ? t.proTag : ''}</span>
                 <span className="prd-foot">
-                  <span className="prd-go"><span>{logged ? 'Открыть' : 'Что внутри'} →</span></span>
+                  <span className="prd-go"><span>{logged ? t.open : t.whatsInside} →</span></span>
                   {logged && (
                     <button type="button" className="prd-toggle" onClick={() => saveMine(toggleProduct(mine, p.key))}>
-                      <span>{inMenu ? 'Убрать из меню' : 'Добавить в меню'}</span>
+                      <span>{inMenu ? t.removeFromMenu : t.addToMenu}</span>
                     </button>
                   )}
                 </span>
@@ -141,11 +165,7 @@ export default function ProductsHub({ fontClass }: { fontClass: string }) {
           })}
         </div>
 
-        <p className="prd-note">
-          {logged
-            ? 'Меню — это только ваш выбор, что показывать. Доступ к продуктам он не меняет: тариф и права остаются прежними.'
-            : 'Аккаунт, тариф и кошелёк — общие для всех продуктов. Войдёте один раз — дальше не нужно.'}
-        </p>
+        <p className="prd-note">{logged ? t.noteUser : t.noteGuest}</p>
       </div>
     </main>
   )

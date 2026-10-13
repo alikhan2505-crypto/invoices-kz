@@ -7,6 +7,7 @@ import Link from 'next/link'
 import QRCode from 'qrcode'
 import { supabase } from '@/lib/supabase'
 import { getActivePlan } from '@/lib/plan'
+import { useLanguage, type Lang } from '@/components/LanguageProvider'
 
 type WalletKey = 'unified'
 type Panel = 'wallet' | 'notifications' | 'help' | 'account' | null
@@ -656,6 +657,8 @@ export default function TopUtilityBar() {
           </span>
         </button>
 
+        <LangCycleButton />
+
         <button data-tour="notifications" onClick={() => openPanel('notifications')} title="Уведомления"
           className="relative w-11 h-11 flex items-center justify-center rounded-full hover:bg-gray-50 transition-colors">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
@@ -1103,5 +1106,25 @@ export default function TopUtilityBar() {
         </div>
       )}
     </>
+  )
+}
+
+// Переключатель языка: ru → kk → en по кругу. Бар висит на всех внутренних
+// страницах, поэтому выбор глобальный; его уже понимают хаб продуктов и
+// бесплатные инструменты, остальные разделы переводятся поэтапно
+// (ревизия основателя 13.10.2026, пункт 1Б).
+function LangCycleButton() {
+  const { lang, setLang } = useLanguage()
+  const next: Record<Lang, Lang> = { ru: 'kk', kk: 'en', en: 'ru' }
+  const label: Record<Lang, string> = { ru: 'РУ', kk: 'ҚЗ', en: 'EN' }
+  return (
+    <button
+      onClick={() => setLang(next[lang])}
+      title="Язык · Тіл · Language"
+      className="w-11 h-11 flex items-center justify-center rounded-full hover:bg-gray-50 transition-colors text-[11px] font-bold"
+      style={{ color: 'var(--nav-accent)' }}
+    >
+      {label[lang]}
+    </button>
   )
 }

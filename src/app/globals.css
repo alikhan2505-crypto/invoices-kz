@@ -1048,7 +1048,9 @@ html {
 /* The reset above (0,1,1) would beat .prd-tile's own colour (0,1,0) and paint light-ink tiles
    (Счета) with the page's dark ink; this restores the tile's colour. */
 .prd-root .prd-tile { color: var(--ink-t); }
-.prd-root .prd-ghost { color: transparent; }
+/* Ghost-цифра теперь SVG-текст (у span контур не «прорисуешь»): цвет живёт в
+   stroke, поэтому реset выше её не красит; fill выключен совсем. */
+.prd-root .prd-ghost text { fill: none; }
 
 .prd-blob { position: absolute; border-radius: 50%; filter: blur(70px); z-index: -1; pointer-events: none; }
 .prd-b1 { width: 420px; height: 420px; background: var(--prd-b1); top: -120px; left: -80px; }
@@ -1056,9 +1058,26 @@ html {
 .prd-b3 { width: 320px; height: 320px; background: var(--prd-b3); top: 620px; left: 30%; }
 .prd-ghost {
   position: absolute; z-index: -1; right: max(2vw, calc((100% - 1160px) / 2 - 20px)); top: 30px;
-  font: 700 clamp(220px, 34vw, 420px)/0.8 var(--font-unbounded), Arial, sans-serif;
-  color: transparent; -webkit-text-stroke: 2px var(--prd-line); user-select: none; pointer-events: none;
+  width: clamp(220px, 34vw, 420px); height: clamp(220px, 34vw, 420px);
+  overflow: visible; user-select: none; pointer-events: none;
 }
+.prd-ghost text {
+  font: 700 clamp(220px, 34vw, 420px)/0.8 var(--font-unbounded), Arial, sans-serif;
+  stroke: var(--prd-line); stroke-width: 2;
+  /* Запас больше длины контура любой цифры на максимальном размере: штрих
+     «от руки» за ~2 секунды; key на svg перезапускает анимацию при смене
+     числа — выбор персоны перерисовывает цифру заново. */
+  stroke-dasharray: 4600; stroke-dashoffset: 4600;
+  animation: prd-draw 2s ease-out forwards;
+}
+@keyframes prd-draw { to { stroke-dashoffset: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .prd-ghost text { animation: none; stroke-dashoffset: 0; }
+}
+.prd-lang { display: flex; gap: 2px; border: 2px solid var(--prd-line); border-radius: 9999px; padding: 3px; }
+.prd-lang button { border: 0; background: transparent; border-radius: 9999px; padding: 6px 12px; font: 600 13px/1 var(--font-onest), Arial, sans-serif; color: var(--prd-ink2); cursor: pointer; }
+.prd-lang button[data-on="true"] { background: var(--prd-ink); }
+.prd-lang button[data-on="true"], .prd-lang button[data-on="true"] span { color: var(--prd-bg) !important; }
 .prd-wrap { max-width: 1160px; margin-inline: auto; }
 .prd-top { display: flex; align-items: center; gap: 12px; padding-block: 18px; }
 .prd-mark { display: inline-flex; align-items: center; gap: 10px; font: 700 17px/1 var(--font-unbounded), Arial, sans-serif; letter-spacing: -0.02em; text-decoration: none; }
