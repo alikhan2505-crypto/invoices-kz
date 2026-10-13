@@ -6,10 +6,12 @@
 /* Раскладка лендинга: текст и окно рядом, без пустоты между ними (ревизия
    13.10: «излишняя пустота»). На узких экранах — окно под текстом. */
 .lp-root .lp-split { position: relative; z-index: 1; display: grid; gap: 8px; }
+.lp-root .lp-split .lp-hero { padding-block: 24px 16px; }
 @media (min-width: 1180px) {
   .lp-root .lp-split { grid-template-columns: minmax(0, 600px) minmax(0, 940px); column-gap: 56px; align-items: start; }
+  /* start, не center: заголовок на всех лендингах начинается на одной высоте
+     (правка основателя 13.10 — у агента текст «съезжал» вниз). */
 }
-@media (min-width: 1440px) { .lp-root .lp-split { align-items: center; } }
 
 .lp-root .ks-wrap {
   --ks-ink: #2A0B07; --ks-paper: #FFF8F5; --ks-coral: #FF6B57; --ks-blush: #FFE3DD;
@@ -17,7 +19,7 @@
   --ks-row: #FBF1EE; --ks-row-done: #F1FBF6;
   position: relative; pointer-events: none; user-select: none;
   container-type: inline-size;
-  padding: 10px 0 70px;
+  padding: 10px 0 56px;
   font-family: var(--font-onest), Arial, sans-serif;
 }
 @media (max-width: 1179px) {
@@ -181,7 +183,7 @@
 /* Широкое окно: накладная «печатается» в пустой низ колонки заказов
    (объявлено после базового .ks-label, чтобы перебить его). */
 @container (min-width: 640px) {
-  .lp-root .ks-label { --s: 0.66; left: calc(52% + 34px); bottom: 14px; }
+  .lp-root .ks-label { --s: 0.66; left: calc(52% + 34px); bottom: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {

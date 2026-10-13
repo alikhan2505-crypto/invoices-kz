@@ -13,7 +13,7 @@
 .lp-root .as-state[data-on="true"] { opacity: 1; }
 .lp-root .as-chat {
   display: flex; flex-direction: column; justify-content: flex-end; gap: 0;
-  height: 292px; overflow: hidden; padding: 10px; border-radius: 12px;
+  flex: 1; height: 236px; min-height: 236px; overflow: hidden; padding: 10px; border-radius: 12px;
   background: var(--ks-row);
 }
 .lp-root .as-msg {
@@ -42,13 +42,13 @@
 
 /* Каналы */
 .lp-root .as-channels { display: grid; gap: 6px; }
-.lp-root .as-ch { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 10px; border-radius: 10px; background: var(--ks-row); font-size: 12.5px; font-weight: 600; color: var(--ks-ink); transition: background 0.3s, box-shadow 0.3s; }
+.lp-root .as-ch { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 10px; border-radius: 10px; background: var(--ks-row); font-size: 12.5px; font-weight: 600; color: var(--ks-ink); transition: background 0.3s, box-shadow 0.3s; }
 .lp-root .as-ch[data-hot="true"] { background: #fff; box-shadow: inset 0 0 0 1.5px var(--ks-green); }
 .lp-root .as-ch em { width: 8px; height: 8px; border-radius: 50%; }
 .lp-root .as-ch b { margin-left: auto; min-width: 22px; height: 20px; border-radius: 999px; display: grid; place-items: center; font-size: 11px; background: color-mix(in srgb, var(--ks-ink) 8%, transparent); color: var(--ks-ink); animation: ks-pop 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
 
 /* Черновик счёта на подтверждение */
-.lp-root .as-queue { position: relative; min-height: 112px; flex: 1; }
+.lp-root .as-queue { position: relative; min-height: 100px; flex: 1; }
 .lp-root .as-draft {
   border: 1.5px solid color-mix(in srgb, var(--ks-ink) 14%, transparent); border-radius: 16px; padding: 10px; background: #fff;
   display: grid; gap: 10px;
@@ -103,7 +103,7 @@
 /* Счёт выезжает у левого нижнего угла окна (под чатом, где в финале пусто),
    а не поверх черновика справа. Объявлено после правил kaspi-scene.css. */
 @container (min-width: 600px) {
-  .lp-root .ks-wrap[data-theme="agent"] .ks-label { left: 5%; bottom: -26px; }
+  .lp-root .ks-wrap[data-theme="agent"] .ks-label { left: 5%; bottom: -44px; }
 }
 
 /* Заголовок AI-агента длинный: на широком экране — колонка шире и кегль
@@ -118,3 +118,8 @@
   .lp-root .lp-split[data-landing="agent"] .lp-h1 { font-size: clamp(36px, 3.5vw, 52px); }
   .lp-root .lp-split[data-landing="agent"] .lp-lead { max-width: 52ch; }
 }
+
+/* Правая колонка не выше, чем у Kaspi Bot: окна на обоих лендингах одной
+   высоты (~400px) и страница помещается без прокрутки (правка 13.10). */
+.lp-root .as-side .ks-head { min-height: 22px; }
+.lp-root .as-side { gap: 10px; }
