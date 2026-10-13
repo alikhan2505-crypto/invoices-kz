@@ -128,3 +128,5 @@ Click-to-WhatsApp click id, пишется только на первое соо
 `tool_kontragent_checks.sql` (12.10.2026) — счётчик бесплатных проверок контрагента на /tools/kontragent (3/день на IP, ключ = sha256(ip|день)).
 
 `welcome_email_drips.sql` (12.10.2026) — welcome-цепочка: `email_drips` + `profiles.email_optout`; письма только новым аккаунтам (после 12.10), с suppression-проверкой и ссылкой отписки.
+
+`signup_instant_ping.sql` (13.10.2026) — pg_net-триггер на INSERT profiles → /api/hooks/new-signup → мгновенный Telegram-пинг админам; идемпотентность через `profiles.signup_notified_at`.

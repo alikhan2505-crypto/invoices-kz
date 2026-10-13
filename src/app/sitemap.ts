@@ -105,6 +105,21 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.7,
     },
     {
+      // Накладная (З-2) — вместе со счётом, АВР и КП закрывает весь
+      // документный комплект казахстанского малого бизнеса.
+      url: 'https://invoices.kz/tools/nakladnaya',
+      lastModified: new Date(),
+      changeFrequency: 'monthly',
+      priority: 0.7,
+    },
+    {
+      // Коммерческое предложение — вход в воронку ещё до счёта.
+      url: 'https://invoices.kz/tools/kp',
+      lastModified: new Date(),
+      changeFrequency: 'monthly',
+      priority: 0.7,
+    },
+    {
       // Индекс инструментов: страница-указатель для набравших /tools руками.
       url: 'https://invoices.kz/tools',
       lastModified: new Date(),
