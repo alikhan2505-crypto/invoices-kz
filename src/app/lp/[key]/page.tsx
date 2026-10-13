@@ -21,12 +21,16 @@ export async function generateMetadata({ params }: { params: Promise<{ key: stri
   // CFO is in closed beta: keep it out of search until it opens. (Not keyed off access === 'invite' --
   // salon is also invite-only but its indexing must stay as is.) Remove this when cfo goes 'open'.
   const robots = key === 'cfo' ? { index: false } : undefined
+  // Поисковикам — русский + казахский сразу (язык страницы живёт в браузере,
+  // сервер его не знает); как на хабе /products. Бренд — один раз, в конце.
+  const title = `${l.metaTitle.replace(/\s*\|\s*invoices\.kz$/, '')} · ${l.metaTitleKk} | invoices.kz`
+  const description = `${l.metaDescription} ${l.metaDescriptionKk}`
   return {
     ...(robots && { robots }),
-    title: l.metaTitle,
-    description: l.metaDescription,
+    title,
+    description,
     alternates: { canonical: `${l.origin}/` },
-    openGraph: { type: 'website', url: `${l.origin}/`, siteName: 'INVOICES.KZ', title: l.metaTitle, description: l.metaDescription },
+    openGraph: { type: 'website', url: `${l.origin}/`, siteName: 'INVOICES.KZ', title, description },
   }
 }
 

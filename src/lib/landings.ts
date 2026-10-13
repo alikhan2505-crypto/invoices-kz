@@ -25,8 +25,16 @@ export type LandingDef = {
   tagline: L10n
   lead: L10n
   points: Record<Lang, [string, string, string]>
+  // Заголовок вкладки на языке страницы: язык живёт в браузере (cookie), сервер
+  // его не знает, поэтому клиент подменяет серверный <title> (как на хабе).
+  title: L10n
+  // Для поисковиков — русский + казахский (решение основателя, как на хабе):
+  // <title> = metaTitle (без «| invoices.kz») · metaTitleKk | invoices.kz,
+  // description = metaDescription + metaDescriptionKk.
   metaTitle: string
+  metaTitleKk: string
   metaDescription: string
+  metaDescriptionKk: string
 }
 
 export const LANDINGS: Record<LandingKey, LandingDef> = {
@@ -53,8 +61,15 @@ export const LANDINGS: Record<LandingKey, LandingDef> = {
       kk: ['Бағаны төменгі шекке дейін автоматты түсіру', 'Орау, тапсыру, жүкқұжаттар — барлық тапсырыс бірден', 'Комиссиядан кейінгі әр тауар бойынша пайда'],
       en: ['Automatic price cuts down to your floor', 'Packing, handover, waybills — all orders at once', 'Profit per product after commissions'],
     },
+    title: {
+      ru: 'Kaspi Bot — демпинг цен и заказы Kaspi | invoices.kz',
+      kk: 'Kaspi Bot — Kaspi-дегі баға демпингі мен тапсырыстар | invoices.kz',
+      en: 'Kaspi Bot — Kaspi price undercutting and orders | invoices.kz',
+    },
     metaTitle: 'Kaspi Bot — демпинг цен и заказы Kaspi | invoices.kz',
+    metaTitleKk: 'Kaspi-дегі баға демпингі мен тапсырыстар',
     metaDescription: 'Цена на Kaspi сама следует за конкурентами, но не падает ниже вашей границы. Заказы, накладные, финансы и прибыль по товарам в одном кабинете.',
+    metaDescriptionKk: 'Kaspi-дегі баға бәсекелестерге ілесіп өзі өзгереді, бірақ сіз белгілеген шектен төмен түспейді. Тапсырыстар, жүкқұжаттар, қаржы және әр тауар бойынша пайда — бір кабинетте.',
   },
   agent: {
     key: 'agent',
@@ -82,8 +97,15 @@ export const LANDINGS: Record<LandingKey, LandingDef> = {
       kk: ['Кодсыз сценарийлер мен түймелер', 'Диалогты қажет сәтте адамға береді', 'Шот немесе жазылу — жоба, сіз растайсыз'],
       en: ['Scenarios and buttons without code', 'Hands the chat to a person at the right moment', 'Invoice or booking as a draft, you approve'],
     },
+    title: {
+      ru: 'AI-агент — ответы клиентам в WhatsApp и Instagram | invoices.kz',
+      kk: 'AI-агент — WhatsApp пен Instagram-да клиенттерге жауап береді | invoices.kz',
+      en: 'AI Agent — replies to customers on WhatsApp and Instagram | invoices.kz',
+    },
     metaTitle: 'AI-агент — ответы клиентам в WhatsApp и Instagram | invoices.kz',
+    metaTitleKk: 'WhatsApp пен Instagram-да клиенттерге жауап береді',
     metaDescription: 'AI-агент отвечает клиентам в WhatsApp, Instagram и на сайте, готовит счета и записи черновиком на подтверждение и передаёт диалог человеку.',
+    metaDescriptionKk: 'AI-агент WhatsApp, Instagram және сайттағы клиенттерге жауап береді, шот пен жазылуды растауға жоба ретінде дайындайды және қажет кезде диалогты адамға өткізеді.',
   },
   salon: {
     key: 'salon',
@@ -108,8 +130,15 @@ export const LANDINGS: Record<LandingKey, LandingDef> = {
       kk: ['Мастерлер мен қызмет санаттары бойынша күнтізбе', 'Жазысудан келген жазылулар — растауға', 'Клиенттер және «Тұрақты» мәртебесі'],
       en: ['Calendar by master and service category', 'Bookings from chats wait for your approval', 'Clients and a "Regular" status'],
     },
+    title: {
+      ru: 'Салон — записи клиентов, мастера и сайт салона | invoices.kz',
+      kk: 'Салон — клиенттердің жазылуы, мастерлер және салон сайты | invoices.kz',
+      en: 'Salon — client bookings, staff and a salon website | invoices.kz',
+    },
     metaTitle: 'Салон — записи клиентов, мастера и сайт салона | invoices.kz',
+    metaTitleKk: 'жазылулар, мастерлер және салон сайты',
     metaDescription: 'Календарь по мастерам, записи из переписки на подтверждение владельцу, история клиентов и сайт салона. Подключаем салоны по заявке.',
+    metaDescriptionKk: 'Мастерлер бойынша күнтізбе, хат алмасудан келген жазылулар — салон иесінің растауына, клиенттер тарихы және салон сайты. Салондарды өтінім бойынша қосамыз.',
   },
   cfo: {
     key: 'cfo',
@@ -141,8 +170,15 @@ export const LANDINGS: Record<LandingKey, LandingDef> = {
       kk: 'Қазір жабық сынақта — өтінім бойынша ашамыз',
       en: 'In closed beta — access by request',
     },
+    title: {
+      ru: 'CFO — БДР, БДДС и платёжный календарь | invoices.kz',
+      kk: 'CFO — кіріс-шығыс бюджеті, ақша ағыны және төлем күнтізбесі | invoices.kz',
+      en: 'CFO — P&L, cash flow and a payment calendar | invoices.kz',
+    },
     metaTitle: 'CFO — БДР, БДДС и платёжный календарь | invoices.kz',
+    metaTitleKk: 'кіріс-шығыс бюджеті, ақша ағыны және төлем күнтізбесі',
     metaDescription: 'Кабинет финансового директора: бюджет доходов и расходов, движение денежных средств, платёжный календарь с прогнозом кассовых разрывов и ключевые показатели. Есть режим для семейного бюджета.',
+    metaDescriptionKk: 'Қаржы директорының кабинеті: кірістер мен шығыстар бюджеті, ақша қаражатының қозғалысы, кассалық алшақтықты алдын ала көрсететін төлем күнтізбесі және негізгі көрсеткіштер. Отбасы бюджетіне арналған режимі де бар.',
   },
 }
 

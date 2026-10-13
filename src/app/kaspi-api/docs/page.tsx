@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
-import { useLanguage } from '@/components/LanguageProvider'
+import { useLanguage, type Lang } from '@/components/LanguageProvider'
 import { setPostLoginRedirect } from '@/lib/postLoginRedirect'
 import ApiDocsViewer from '@/components/ApiDocsViewer'
 import { CASHIER_API_THEMED as C, CASHIER_API_FONT_SANS as FONT_SANS, CASHIER_API_FONT_MONO as FONT_MONO } from '@/lib/kaspiCashierApi/theme'
@@ -30,7 +30,7 @@ interface DocsCopy {
   quickStartSteps: string[]
 }
 
-const DOCS_COPY: Record<'ru' | 'en', DocsCopy> = {
+const DOCS_COPY: Record<Lang, DocsCopy> = {
   ru: {
     loading: 'Загрузка…',
     title: 'Kaspi Cashier API — документация',
@@ -61,6 +61,38 @@ const isValid = signature === req.headers['x-kaspi-pay-signature'];`,
       'В блоке «Request Body» замените example-значения на свои: amount — сумма в тенге, order_id — ваш уникальный ID заказа, callback_url — необязательно.',
       'Блоки Cookies, Headers и Query Parameters трогать не нужно — для этого запроса они не используются, оставьте как есть.',
       'Нажмите зелёную кнопку Send — в панели Response справа появится ссылка/QR для оплаты клиентом.',
+    ],
+  },
+  kk: {
+    loading: 'Жүктелуде…',
+    title: 'Kaspi Cashier API — құжаттама',
+    liveWarning: 'Төмендегі «Try it» сұраныстарының бәрі нақты продакшн-API-ға жіберіледі — Kaspi Pay-де тест режимі жоқ. Төлем құру сұранысы сәтті орындалса, клиент төлеген кезде балансыңыздан 2% комиссия алынады.',
+    i18nNote: 'Анықтамалықтың өзі (эндпоинттер сипаттамасы) әзірге орыс тілінде, ал оның кейбір интерфейс элементтері (мысалы, Authorize және Send Request түймелері) таңдалған тілге қарамастан ағылшынша көрсетіледі — бұл аударманың олқылығы емес, Scalar кітапханасының шектеуі.',
+    webhookTitle: 'Вебхуктер (webhook)',
+    webhookIntro: 'Төлем құрған кезде callback_url көрсетілсе (тек https://, localhost пен жеке желі мекенжайлары жарамайды), invoices.kz төлем расталған сәтте оған POST-сұраныс жібереді — яғни сіз GET /api/kaspi/pay/status шақырғанда немесе күнделікті ішкі салыстыру кезінде. Вебхук — жалғыз әрі лезде келетін белгі емес: жылдамдық маңызды болса, мәртебе эндпоинтін өзіңіз сұрап тұрыңыз.',
+    webhookPayloadLabel: 'Вебхук денесі (JSON):',
+    webhookHeaderLabel: 'Қолтаңба тақырыбы (header):',
+    webhookVerifyTitle: 'Қолтаңбаны тексеру',
+    webhookVerifyIntro: 'Сұраныс денесінің өңделмеген JSON-ынан webhook-құпияңызбен HMAC-SHA256 есептеп, нәтижені X-Kaspi-Pay-Signature тақырыбымен салыстырыңыз. Node.js-тегі мысал:',
+    webhookVerifyCode: `const crypto = require('crypto');
+
+// rawBody — сұраныс денесінен алынған JSON жолы, ешбір өзгеріссіз
+// secret — қосылу кезінде бір рет көрсетілген webhook-құпияңыз
+const signature = crypto
+  .createHmac('sha256', secret)
+  .update(rawBody)
+  .digest('hex');
+
+const isValid = signature === req.headers['x-kaspi-pay-signature'];`,
+    disclosureTitle: 'Білген жөн',
+    disclosureBody: 'Бұл Kaspi-дің ресми merchant API-ы емес — интеграция Kaspi Pay Cashier мобильді қосымшасы қалай жұмыс істесе, сол қағидамен жасалған. Үйлесімділікті біз қадағалаймыз және Kaspi өз тарапында бір нәрсені өзгертсе, сізге хабарлаймыз.',
+    supportTitle: 'Қолдау',
+    quickStartTitle: 'Алғашқы сұранысты қалай жіберуге болады',
+    quickStartSteps: [
+      '«Authentication» блогындағы Bearer Token өрісіне Kaspi Cashier API-токеніңізді қойыңыз (ол /kaspi-api бетінде «Кассир» рөлін қосқанда бір рет беріледі).',
+      '«Request Body» блогында мысал мәндерін өзіңіздікіне ауыстырыңыз: amount — теңгемен сома, order_id — тапсырысыңыздың бірегей идентификаторы, callback_url — міндетті емес.',
+      'Cookies, Headers және Query Parameters блоктарын өзгертудің қажеті жоқ — бұл сұраныста олар қолданылмайды, сол күйінде қалдырыңыз.',
+      'Жасыл Send түймесін басыңыз — оң жақтағы Response панелінде клиент төлейтін сілтеме/QR пайда болады.',
     ],
   },
   en: {
@@ -134,12 +166,16 @@ export default function KaspiApiDocsPage() {
   const router = useRouter()
   const { lang } = useLanguage()
   // Follows the site-wide language directly -- no page-local override or
-  // toggle. The docs body only ever has a RU/EN copy (see DOCS_COPY above),
-  // so a kk (or any non-en) global preference falls back to ru.
-  const docsLang: 'ru' | 'en' = lang === 'en' ? 'en' : 'ru'
-  const d = DOCS_COPY[docsLang]
+  // toggle. Наш текст страницы есть на ru/kk/en (DOCS_COPY выше), а сам
+  // OpenAPI-справочник в ApiDocsViewer — только ru/en, поэтому для него
+  // kk откатывается на ru (об этом честно говорит kk-версия i18nNote).
+  const d = DOCS_COPY[lang]
+  const viewerLang: 'ru' | 'en' = lang === 'en' ? 'en' : 'ru'
 
   const [loading, setLoading] = useState(true)
+
+  // Серверный <title> из layout.tsx один (ru); на клиенте — по выбранному языку.
+  useEffect(() => { document.title = d.title }, [d.title])
 
   useEffect(() => {
     load()
@@ -206,7 +242,7 @@ export default function KaspiApiDocsPage() {
       <div className="min-h-screen lg:min-h-full" style={{ background: 'transparent', color: C.text, fontFamily: FONT_SANS }}>
         {/* Title + the Scalar-limitation caption that used to live in the
             standalone header's sticky bar. The page's own language follows
-            the site-wide switcher (docsLang above) -- no independent toggle
+            the site-wide switcher (DOCS_COPY[lang] above) -- no independent toggle
             here anymore. */}
         <div className="mx-auto max-w-6xl px-5 pt-6 sm:px-8">
           <span className="text-[12px]" style={{ color: C.muted, fontFamily: FONT_MONO }}>
@@ -246,7 +282,7 @@ export default function KaspiApiDocsPage() {
         </div>
 
         <div className="mx-auto max-w-6xl sm:px-8">
-          <ApiDocsViewer lang={docsLang} />
+          <ApiDocsViewer lang={viewerLang} />
         </div>
 
         <div className="mx-auto max-w-6xl space-y-8 px-5 py-10 sm:px-8">

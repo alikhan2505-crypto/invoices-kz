@@ -12,7 +12,9 @@ const PAGE_URL = API_HOST_BASE === 'https://api.invoices.kz' ? 'https://api.invo
 // Kaspi Pay), so it needs its own segment-level override.
 export const metadata: Metadata = {
   title: 'Kaspi Cashier API — invoices.kz',
-  description: 'Принимайте Kaspi Pay на своём сайте: создание платежа, QR-ссылка и вебхук об оплате. 2% с оплаченного — без абонплаты и минимального оборота.',
+  // ru + kk в одной строке (как у хаба, src/app/page.tsx): api.invoices.kz
+  // выходит в поиске отдельным лендингом, а язык по умолчанию — казахский.
+  description: 'Принимайте Kaspi Pay на своём сайте: создание платежа, QR-ссылка и вебхук об оплате. 2% с оплаченного — без абонплаты и минимального оборота. Сайтыңызда Kaspi Pay қабылдаңыз: төлем құру, QR-сілтеме және төлем туралы вебхук. Төленген сомадан 2% — абоненттік төлемсіз және ең аз айналым талабынсыз.',
   // Without its own canonical this page inherited the root's, which pointed
   // at the homepage and asked search engines not to index this page at all.
   alternates: { canonical: PAGE_URL },
@@ -24,13 +26,13 @@ export const metadata: Metadata = {
     url: PAGE_URL,
     siteName: 'INVOICES.KZ',
     title: 'Kaspi Cashier API — invoices.kz',
-    description: 'Kaspi Pay на вашем сайте: создание платежа, QR-ссылка и вебхук об оплате. 2% с оплаченного, без абонплаты и минимального оборота.',
+    description: 'Kaspi Pay на вашем сайте: создание платежа, QR-ссылка и вебхук об оплате. 2% с оплаченного, без абонплаты и минимального оборота. Сайтыңыздағы Kaspi Pay: төлем құру, QR-сілтеме және төлем туралы вебхук. Төленген сомадан 2%, абоненттік төлемсіз.',
     images: [{ url: 'https://invoices.kz/og-cashier-api.png', width: 1200, height: 630, alt: 'Kaspi Cashier API — invoices.kz' }],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Kaspi Cashier API — invoices.kz',
-    description: 'Kaspi Pay на вашем сайте: 2% с оплаченного, без абонплаты и минимального оборота.',
+    description: 'Kaspi Pay на вашем сайте: 2% с оплаченного, без абонплаты и минимального оборота. Сайтыңыздағы Kaspi Pay: төленген сомадан 2%, абоненттік төлемсіз.',
     images: ['https://invoices.kz/og-cashier-api.png'],
   },
 }

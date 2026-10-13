@@ -16,3 +16,65 @@
 /* Текст на мягких стикерах — цветом softInk, если «чернила» продукта светлые
    (у CFO светлый текст на светло-мятном стикере не читался). */
 .lp-root .lp-stk, .lp-root .lp-stk span { color: var(--soft-ink-t, var(--ink-t)) !important; }
+
+/* Переключатель языка в шапке (как на хабе, но в цветах продукта): лендинги
+   поддоменов отдельно выходят в поиске, язык меняется прямо на них. Стоит
+   слева от «Войти» — правило основателя. Высота совпадает с пилюлями .lp-back. */
+.lp-root .lp-lang { display: flex; gap: 2px; flex: none; border: 2px solid var(--ink-t); border-radius: 9999px; padding: 3px; }
+.lp-root .lp-lang button { border: 0; background: transparent; border-radius: 9999px; padding: 6px 11px; font: 600 13px/1 var(--font-onest), Arial, sans-serif; cursor: pointer; }
+.lp-root .lp-lang button:not([data-on="true"]):hover { background: color-mix(in srgb, var(--ink-t) 14%, transparent); }
+.lp-root .lp-lang button[data-on="true"] { background: var(--ink-t); }
+.lp-root .lp-lang button[data-on="true"], .lp-root .lp-lang button[data-on="true"] span { color: var(--bg-t) !important; }
+.lp-root .lp-top .lp-back { white-space: nowrap; }
+/* Ширина под самую длинную подпись входа (Log in / Войти / Кіру) — переключатель
+   не двигается при смене языка; «Открыть кабинет» просто шире слота. */
+.lp-root .lp-auth-slot { display: flex; justify-content: flex-end; flex: none; }
+@media (min-width: 640px) { .lp-root .lp-auth-slot { min-width: 92px; } }
+
+/* Футер: реквизиты слева, политики и контакты справа — одной строкой на
+   десктопе, чтобы страница по-прежнему помещалась без прокрутки от 1440×760
+   (футер добавляет ~36px). */
+.lp-root .lp-footer {
+  position: relative; z-index: 1; display: flex; flex-wrap: wrap; align-items: baseline;
+  justify-content: space-between; gap: 4px 20px; margin-top: 12px; padding-top: 10px;
+  border-top: 1.5px solid color-mix(in srgb, var(--ink-t) 18%, transparent);
+  font: 500 12.5px/1.4 var(--font-onest), Arial, sans-serif;
+}
+.lp-root .lp-footer-co { opacity: 0.75; }
+.lp-root .lp-footer-links { display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.lp-root .lp-footer-links a { opacity: 0.75; text-decoration: none; }
+.lp-root .lp-footer-links a:hover { opacity: 1; text-decoration: underline; }
+
+/* Телефон: назад, язык и вход — в одну строку, без переносов. */
+@media (max-width: 480px) {
+  .lp-root .lp-top { gap: 8px; flex-wrap: nowrap; }
+  .lp-root .lp-top .lp-back { padding: 7px 11px; font-size: 12.5px; border-width: 1.5px; }
+  .lp-root .lp-lang { padding: 2px; border-width: 1.5px; }
+  .lp-root .lp-lang button { padding: 5px 6px; font-size: 11.5px; }
+  /* Футер в колонку: реквизиты, под ними ссылки. */
+  .lp-root .lp-footer { flex-direction: column; align-items: flex-start; gap: 6px; }
+  .lp-root .lp-footer-links { gap: 4px 14px; }
+}
+/* Подпись «Все продукты» на узком телефоне не влезает рядом с языком и
+   «Открыть кабинет» — остаётся одна стрелка. */
+@media (max-width: 440px) {
+  .lp-root .lp-back-txt { display: none; }
+}
+/* Совсем узкие (≤360px, вплоть до 320): ещё на ступень компактнее. */
+@media (max-width: 360px) {
+  .lp-root .lp-top { gap: 6px; }
+  .lp-root .lp-top .lp-back { padding: 7px 9px; font-size: 12px; }
+  .lp-root .lp-lang button { padding: 5px 4.5px; font-size: 11px; }
+}
+
+/* Футер добавил ~40px высоты — на десктопе компенсируем вертикальные отступы,
+   чтобы лендинг по-прежнему помещался в один экран от 1440×760 (правка
+   основателя 13.10: прокрутка мешает). */
+@media (min-width: 1180px) {
+  .lp-root.lp-root { padding-bottom: 14px; }
+  .lp-root .lp-top { padding-block: 14px; }
+  .lp-root .lp-stickers { padding-top: 12px; }
+  .lp-root .lp-stk { padding: 10px 14px; }
+  .lp-root .lp-bar { padding-top: 12px; margin-top: 6px; }
+  .lp-root .lp-footer { margin-top: 8px; padding-top: 8px; }
+}

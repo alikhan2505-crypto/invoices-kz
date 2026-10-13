@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useLanguage } from '@/components/LanguageProvider'
+import { useLanguage, type Lang } from '@/components/LanguageProvider'
+import { FOOTER_COPY } from '@/lib/i18n/productsHub'
 import { CASHIER_API_COLOR as C, CASHIER_API_FONT_SANS as FONT_SANS, CASHIER_API_FONT_MONO as FONT_MONO } from '@/lib/kaspiCashierApi/theme'
 
 type CodeLang = 'curl' | 'javascript' | 'python'
@@ -18,7 +19,11 @@ interface FeatureRow {
 }
 
 interface Copy {
+  docTitle: string
   navCta: string
+  // Короткая подпись той же кнопки для телефона: на 360px в шапке рядом
+  // с логотипом и тумблером RU/KZ/EN полная фраза не помещается.
+  navCtaShort: string
   heroTitle: string
   heroSubtitle: string
   heroPrimaryCta: string
@@ -38,12 +43,15 @@ interface Copy {
   finalCtaTitle: string
   finalCtaButton: string
   footerDocsLabel: string
-  footerBottom: string
 }
 
-const COPY: Record<'ru' | 'en', Copy> = {
+// Реквизиты и подписи ссылок на документы в футере — из FOOTER_COPY
+// (src/lib/i18n/productsHub.ts), общего с хабом invoices.kz, не дублируем.
+const COPY: Record<Lang, Copy> = {
   ru: {
+    docTitle: 'Kaspi Cashier API — приём Kaspi Pay на вашем сайте | invoices.kz',
     navCta: 'Получить доступ к API',
+    navCtaShort: 'API-доступ',
     heroTitle: 'Kaspi Pay на вашем сайте — три запроса, без интеграции с банком',
     heroSubtitle: 'Создание платежа, QR-ссылка и вебхук об оплате. 2% с оплаченного — без абонплаты и минимального оборота.',
     heroPrimaryCta: 'Получить доступ к API',
@@ -76,10 +84,48 @@ const COPY: Record<'ru' | 'en', Copy> = {
     finalCtaTitle: 'Готовы принимать Kaspi Pay?',
     finalCtaButton: 'Получить доступ к API',
     footerDocsLabel: 'Документация API',
-    footerBottom: '© 2026 INVOICES.KZ · ИП First Project · БИН 890525350143 · г. Астана',
+  },
+  kk: {
+    docTitle: 'Kaspi Cashier API — сайтыңызда Kaspi Pay қабылдау | invoices.kz',
+    navCta: 'API-ға қол жеткізу',
+    navCtaShort: 'API алу',
+    heroTitle: 'Сайтыңыздағы Kaspi Pay — үш сұраныс, банкпен интеграциясыз',
+    heroSubtitle: 'Төлем құру, QR-сілтеме және төлем туралы вебхук. Төленген сомадан 2% — абоненттік төлемсіз және ең аз айналым талабынсыз.',
+    heroPrimaryCta: 'API-ға қол жеткізу',
+    heroSecondaryCta: 'Құжаттаманы қарау',
+    codeResponseLabel: 'Жауап',
+    stepsEyebrow: 'Қалай қосылады',
+    stepsTitle: 'Алғашқы төлемге дейін төрт қадам',
+    steps: [
+      { title: 'Cashier-ді қосыңыз', desc: 'Телефон нөмірі + SMS-код, Kaspi Pay қосымшасындағыдай.' },
+      { title: 'Токен алыңыз', desc: 'API-токен мен вебхук құпиясы — бір рет қана көрсетіледі.' },
+      { title: 'API-ды шақырыңыз', desc: 'POST /api/kaspi/pay — сілтеме мен QR аласыз.' },
+      { title: 'Вебхук қабылдаңыз', desc: 'Хабарлама callback_url мекенжайыңызға келеді — мәртебені өзіңіз тексергенде немесе күнделікті салыстыру кезінде.' },
+    ],
+    pricingEyebrow: 'Баға',
+    pricingCaption: 'әр төленген төлем сомасынан. Төлем болмаса — ештеңе алынбайды.',
+    pricingUsLabel: 'invoices.kz Kaspi Cashier API',
+    pricingUsValue: 'Төленген сомадан 2%, абоненттік төлемсіз және ең аз айналым талабынсыз',
+    pricingExamples: [
+      { label: '3 000 ₸-ден төленген 50 шот', value: '× 2% = 3 000 ₸' },
+      { label: '2 000 ₸-ден төленген 300 шот', value: '× 2% = 12 000 ₸' },
+    ],
+    featuresEyebrow: 'Мүмкіндіктер',
+    featuresTitle: 'API-ға не кіреді',
+    features: [
+      { label: 'Төлем құру', value: 'POST /api/kaspi/pay' },
+      { label: 'QR-код және төлем сілтемесі', value: 'payment_link, qr_token' },
+      { label: 'Төлем туралы вебхук', value: 'callback_url' },
+      { label: 'Мәртебені тексеру', value: 'GET /api/kaspi/pay/status' },
+    ],
+    finalCtaTitle: 'Kaspi Pay қабылдауға дайынсыз ба?',
+    finalCtaButton: 'API-ға қол жеткізу',
+    footerDocsLabel: 'API құжаттамасы',
   },
   en: {
+    docTitle: 'Kaspi Cashier API — accept Kaspi Pay on your site | invoices.kz',
     navCta: 'Get API access',
+    navCtaShort: 'Get API',
     heroTitle: 'Kaspi Pay on your site — three requests, no bank integration',
     heroSubtitle: 'Create a payment, get a QR link, and receive a payment webhook. 2% of what actually gets paid — no subscription, no minimum volume.',
     heroPrimaryCta: 'Get API access',
@@ -112,7 +158,6 @@ const COPY: Record<'ru' | 'en', Copy> = {
     finalCtaTitle: 'Ready to accept Kaspi Pay?',
     finalCtaButton: 'Get API access',
     footerDocsLabel: 'API documentation',
-    footerBottom: '© 2026 INVOICES.KZ · First Project Sole Proprietorship · BIN 890525350143 · Astana, Kazakhstan',
   },
 }
 
@@ -232,8 +277,11 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
 export default function CashierApiPage() {
   const router = useRouter()
   const { lang, setLang } = useLanguage()
-  const activeLang: 'ru' | 'en' = lang === 'en' ? 'en' : 'ru'
-  const t = COPY[activeLang]
+  const t = COPY[lang]
+  const f = FOOTER_COPY[lang]
+
+  // Серверный <title> из layout.tsx один (ru); на клиенте — по выбранному языку.
+  useEffect(() => { document.title = t.docTitle }, [t.docTitle])
 
   const goLogin = () => router.push('/login')
   const goDocs = () => router.push('/kaspi-api/docs')
@@ -245,26 +293,32 @@ export default function CashierApiPage() {
           <a href="/" className="flex min-h-11 items-center text-[14px] font-bold tracking-[0.08em]" style={{ color: C.text }}>
             invoices<span style={{ color: C.accent }}>.kz</span>
           </a>
-          <div className="flex items-center gap-3">
-            <div className="flex overflow-hidden rounded-lg" style={{ border: `1px solid ${C.border}` }}>
-              {(['ru', 'en'] as const).map((l) => (
+          {/* Тумблер языка — слева от кнопки входа (правило основателя).
+              На телефоне (<sm) всё ужато: кнопки языка 36px шириной (высота
+              по-прежнему 44px), короткая подпись CTA — иначе логотип +
+              RU/KZ/EN + CTA не помещаются в 360px. */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div role="group" aria-label="Language / Тіл / Язык" className="flex overflow-hidden rounded-lg" style={{ border: `1px solid ${C.border}` }}>
+              {(['ru', 'kk', 'en'] as const).map((l) => (
                 <button
                   key={l}
                   onClick={() => setLang(l)}
-                  className="min-h-11 min-w-11 px-2 text-[11px] font-semibold uppercase transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-                  style={{ background: activeLang === l ? C.bg2 : 'transparent', color: activeLang === l ? C.accent : C.muted }}
-                  aria-pressed={activeLang === l}
+                  className="min-h-11 min-w-9 px-1.5 text-[11px] font-semibold uppercase transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 sm:min-w-11 sm:px-2"
+                  style={{ background: lang === l ? C.bg2 : 'transparent', color: lang === l ? C.accent : C.muted }}
+                  aria-pressed={lang === l}
+                  lang={l}
                 >
-                  {l}
+                  {l === 'kk' ? 'KZ' : l}
                 </button>
               ))}
             </div>
             <button
               onClick={goLogin}
-              className="min-h-11 motion-safe:transition-transform motion-safe:duration-150 motion-safe:hover:-translate-y-0.5 motion-safe:active:scale-[0.97] rounded-lg px-4 text-[13px] font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+              className="min-h-11 whitespace-nowrap motion-safe:transition-transform motion-safe:duration-150 motion-safe:hover:-translate-y-0.5 motion-safe:active:scale-[0.97] rounded-lg px-3 text-[13px] font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 sm:px-4"
               style={{ background: C.button }}
             >
-              {t.navCta}
+              <span className="sm:hidden">{t.navCtaShort}</span>
+              <span className="hidden sm:inline">{t.navCta}</span>
             </button>
           </div>
         </div>
@@ -351,14 +405,14 @@ export default function CashierApiPage() {
           <Eyebrow>{t.featuresEyebrow}</Eyebrow>
           <h2 className="mt-3 text-[clamp(1.5rem,3vw,2rem)] font-semibold tracking-[-0.01em]">{t.featuresTitle}</h2>
           <div className="mt-8">
-            {t.features.map((f, i) => (
+            {t.features.map((feat, i) => (
               <div
-                key={f.label}
+                key={feat.label}
                 className="flex flex-wrap items-center justify-between gap-3 py-4"
                 style={{ borderTop: i === 0 ? 'none' : `1px solid ${C.border}` }}
               >
-                <span className="text-[14px] font-medium">{f.label}</span>
-                <span className="text-[13px]" style={{ color: C.accent, fontFamily: FONT_MONO }}>{f.value}</span>
+                <span className="text-[14px] font-medium">{feat.label}</span>
+                <span className="text-[13px]" style={{ color: C.accent, fontFamily: FONT_MONO }}>{feat.value}</span>
               </div>
             ))}
           </div>
@@ -385,7 +439,31 @@ export default function CashierApiPage() {
             {t.footerDocsLabel}
           </a>
         </div>
-        <div className="mt-4 text-center text-[11px]" style={{ color: C.muted }}>{t.footerBottom}</div>
+        {/* Документы и контакты — как в футере хаба invoices.kz. Страницы
+            политик живут только на apex, поэтому ссылки абсолютные: с
+            api.invoices.kz относительный /privacy увёл бы не туда. */}
+        <nav className="mt-3 flex flex-wrap justify-center gap-x-5 gap-y-1" aria-label="Documents and contacts">
+          {[
+            { href: 'https://invoices.kz/privacy', label: f.privacy },
+            { href: 'https://invoices.kz/terms', label: f.terms },
+            { href: 'https://invoices.kz/data-deletion', label: f.dataDeletion },
+            { href: 'mailto:mail@invoices.kz', label: `${f.contacts}: mail@invoices.kz` },
+          ].map((link) => (
+            <a key={link.href} href={link.href} className="flex min-h-9 items-center text-[12px]" style={{ color: C.muted }}>
+              {link.label}
+            </a>
+          ))}
+          <a
+            href="https://www.instagram.com/invoices.kz/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex min-h-9 items-center text-[12px]"
+            style={{ color: C.muted }}
+          >
+            Instagram
+          </a>
+        </nav>
+        <div className="mt-4 text-center text-[11px]" style={{ color: C.muted }}>© 2026 INVOICES.KZ · {f.company}</div>
       </footer>
     </div>
   )

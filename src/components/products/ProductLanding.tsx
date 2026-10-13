@@ -1,11 +1,11 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { useLanguage } from '@/components/LanguageProvider'
+import { useLanguage, type Lang } from '@/components/LanguageProvider'
 import { PRODUCTS } from '@/lib/products'
 import { LANDINGS, LANDING_UI, OTHER_PRODUCT_LINKS, type LandingKey } from '@/lib/landings'
 import ProductArt from '@/components/products/ProductArt'
-import { PRODUCT_I18N } from '@/lib/i18n/productsHub'
+import { FOOTER_COPY, PRODUCT_I18N } from '@/lib/i18n/productsHub'
 import KaspiLiveScene from '@/components/products/KaspiLiveScene'
 import AgentLiveScene from '@/components/products/AgentLiveScene'
 import SalonLiveScene from '@/components/products/SalonLiveScene'
@@ -13,8 +13,17 @@ import CfoLiveScene from '@/components/products/CfoLiveScene'
 import './landing-extras.css'
 import { useDropStaleFocus } from '@/lib/useDropStaleFocus'
 
+// Тот же переключатель, что на хабе /products: лендинг поддомена отдельно
+// выходит в поиске, поэтому язык меняется прямо здесь (выбор общий для всех
+// *.invoices.kz через cookie — это делает setLang).
+const LANGS: { key: Lang; label: string }[] = [
+  { key: 'ru', label: 'Рус' },
+  { key: 'kk', label: 'Қаз' },
+  { key: 'en', label: 'Eng' },
+]
+
 export default function ProductLanding({ landing, fontClass }: { landing: LandingKey; fontClass: string }) {
-  const { lang } = useLanguage()
+  const { lang, setLang } = useLanguage()
   const [signedIn, setSignedIn] = useState<boolean | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const l = LANDINGS[landing]
@@ -22,6 +31,10 @@ export default function ProductLanding({ landing, fontClass }: { landing: Landin
   const ui = LANDING_UI[lang]
 
   useDropStaleFocus()
+  // Серверный <title> двуязычный (для поисковиков), вкладка — на языке страницы.
+  const docTitle = l.title[lang]
+  const foot = FOOTER_COPY[lang]
+  useEffect(() => { document.title = docTitle }, [docTitle])
   useEffect(() => {
     let alive = true
     async function load() {
@@ -76,13 +89,26 @@ export default function ProductLanding({ landing, fontClass }: { landing: Landin
   return (
     <main className={`lp-root ${fontClass}`} style={vars}>
       <div className="lp-top">
-        <a className="lp-back" href="https://invoices.kz/products"><span>← {ui.allProducts}</span></a>
+        {/* На узком телефоне подпись прячется (остаётся «←»), чтобы назад, язык
+            и вход уместились в одну строку; aria-label держит имя ссылки. */}
+        <a className="lp-back" href="https://invoices.kz/products" aria-label={ui.allProducts}><span>←<span className="lp-back-txt"> {ui.allProducts}</span></span></a>
         <span style={{ flex: 1 }} />
-        {canOpen ? (
-          <a className="lp-back" href={l.cabinet}><span>{ui.open}</span></a>
-        ) : (
-          <a className="lp-back" href={loginHref}><span>{ui.login}</span></a>
-        )}
+        {/* Язык — слева от «Войти», не справа (правило основателя). */}
+        <div className="lp-lang" role="group" aria-label="Language">
+          {LANGS.map((x) => (
+            <button key={x.key} type="button" data-on={lang === x.key} aria-pressed={lang === x.key} onClick={() => setLang(x.key)}><span>{x.label}</span></button>
+          ))}
+        </div>
+        {/* Слот под кнопку входа: «Войти» / «Кіру» / «Log in» разной ширины, и без
+            слота переключатель языка съезжал бы под курсором при смене языка
+            (то же замечание основателя, что на хабе, — язык слева, но на месте). */}
+        <div className="lp-auth-slot">
+          {canOpen ? (
+            <a className="lp-back" href={l.cabinet}><span>{ui.open}</span></a>
+          ) : (
+            <a className="lp-back" href={loginHref}><span>{ui.login}</span></a>
+          )}
+        </div>
       </div>
 
       {/* Живая сцена продукта рядом с текстом, без пустоты между ними (эталон —
@@ -117,6 +143,19 @@ export default function ProductLanding({ landing, fontClass }: { landing: Landin
           )
         })}
       </div>
+
+      {/* Реквизиты, политики и контакты — как в футере хаба. Страницы политик
+          живут только на основном домене, поэтому ссылки абсолютные. */}
+      <footer className="lp-footer">
+        <span className="lp-footer-co">{foot.company}</span>
+        <nav className="lp-footer-links" aria-label="Documents and contacts">
+          <a href="https://invoices.kz/privacy">{foot.privacy}</a>
+          <a href="https://invoices.kz/terms">{foot.terms}</a>
+          <a href="https://invoices.kz/data-deletion">{foot.dataDeletion}</a>
+          <a href="mailto:mail@invoices.kz">{foot.contacts}: mail@invoices.kz</a>
+          <a href="https://www.instagram.com/invoices.kz/" target="_blank" rel="noopener noreferrer">Instagram</a>
+        </nav>
+      </footer>
     </main>
   )
 }
