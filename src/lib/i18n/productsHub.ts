@@ -102,6 +102,38 @@ export const HUB_COPY: Record<Lang, HubCopy> = {
   },
 }
 
+export type FooterCopy = {
+  privacy: string
+  terms: string
+  dataDeletion: string
+  contacts: string
+  company: string
+}
+
+export const FOOTER_COPY: Record<Lang, FooterCopy> = {
+  ru: {
+    privacy: 'Политика конфиденциальности',
+    terms: 'Условия сервиса',
+    dataDeletion: 'Удаление данных',
+    contacts: 'Связаться',
+    company: 'ИП First Project · БИН 890525350143 · Астана, Казахстан',
+  },
+  kk: {
+    privacy: 'Құпиялылық саясаты',
+    terms: 'Қызмет шарттары',
+    dataDeletion: 'Деректерді жою',
+    contacts: 'Байланысу',
+    company: 'ЖК First Project · БСН 890525350143 · Астана, Қазақстан',
+  },
+  en: {
+    privacy: 'Privacy policy',
+    terms: 'Terms of service',
+    dataDeletion: 'Data deletion',
+    contacts: 'Contact',
+    company: 'IE First Project · BIN 890525350143 · Astana, Kazakhstan',
+  },
+}
+
 export const PERSONA_LABELS: Record<Lang, Record<string, string>> = {
   ru: { kaspi: 'Продаю на Kaspi', ip: 'Я ИП или ТОО', dev: 'Пишу код', salon: 'У меня салон' },
   kk: { kaspi: 'Kaspi-де сатамын', ip: 'Мен ЖК немесе ЖШС', dev: 'Код жазамын', salon: 'Менде салон бар' },

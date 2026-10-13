@@ -42,6 +42,19 @@
 .prd-root .prd-auth-slot { display: flex; justify-content: flex-end; }
 @media (min-width: 640px) { .prd-root .prd-auth-slot { width: 132px; } }
 
+/* Футер хаба: реквизиты слева, документы и контакты справа; на телефоне —
+   столбиком. Цвета приглушены, чтобы не спорить с плитками. */
+.prd-root .prd-footer {
+  display: flex; flex-wrap: wrap; gap: 10px 24px; align-items: baseline;
+  justify-content: space-between; margin-top: 34px; padding-top: 18px;
+  border-top: 2px solid var(--prd-line);
+  font: 500 13px/1.6 var(--font-onest), Arial, sans-serif;
+}
+.prd-root .prd-footer-co { color: var(--prd-ink2) !important; }
+.prd-root .prd-footer-links { display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.prd-root .prd-footer-links a { color: var(--prd-ink2) !important; text-decoration: none; }
+.prd-root .prd-footer-links a:hover { color: var(--prd-ink) !important; text-decoration: underline; }
+
 .prd-root .prd-lang { display: flex; gap: 2px; border: 2px solid var(--prd-line); border-radius: 9999px; padding: 3px; }
 .prd-root .prd-lang button { border: 0; background: transparent; border-radius: 9999px; padding: 6px 12px; font: 600 13px/1 var(--font-onest), Arial, sans-serif; color: var(--prd-ink2); cursor: pointer; }
 .prd-root .prd-lang button[data-on="true"] { background: var(--prd-ink); }

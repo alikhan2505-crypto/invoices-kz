@@ -6,7 +6,7 @@ import { getActivePlan } from '@/lib/plan'
 import { PRODUCTS, PERSONAS, PENDING_PERSONA_KEY, personaProducts, isInMyProducts, toggleProduct, type ProductDef } from '@/lib/products'
 import { useMyProducts } from '@/lib/useMyProducts'
 import { useLanguage, type Lang } from '@/components/LanguageProvider'
-import { HUB_COPY, PERSONA_LABELS, PRODUCT_I18N } from '@/lib/i18n/productsHub'
+import { HUB_COPY, FOOTER_COPY, PERSONA_LABELS, PRODUCT_I18N } from '@/lib/i18n/productsHub'
 import ProductArt from '@/components/products/ProductArt'
 import { BrandWordmarkSvg } from '@/components/BrandWordmark'
 import './hub-extras.css'
@@ -182,6 +182,19 @@ export default function ProductsHub({ fontClass }: { fontClass: string }) {
         </div>
 
         <p className="prd-note">{logged ? t.noteUser : t.noteGuest}</p>
+
+        {/* Футер: политики, реквизиты и контакты (ревизия 13.10). Страницы
+            /privacy, /terms и /data-deletion существуют и заявлены в Meta App. */}
+        <footer className="prd-footer">
+          <span className="prd-footer-co">{FOOTER_COPY[lang].company}</span>
+          <nav className="prd-footer-links" aria-label="Documents and contacts">
+            <Link href="/privacy">{FOOTER_COPY[lang].privacy}</Link>
+            <Link href="/terms">{FOOTER_COPY[lang].terms}</Link>
+            <Link href="/data-deletion">{FOOTER_COPY[lang].dataDeletion}</Link>
+            <a href="mailto:mail@invoices.kz">{FOOTER_COPY[lang].contacts}: mail@invoices.kz</a>
+            <a href="https://www.instagram.com/invoices.kz/" target="_blank" rel="noopener noreferrer">Instagram</a>
+          </nav>
+        </footer>
       </div>
     </main>
   )
