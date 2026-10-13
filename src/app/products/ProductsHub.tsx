@@ -144,16 +144,31 @@ export default function ProductsHub({ fontClass }: { fontClass: string }) {
 
         <div className="prd-hero">
           <p className="prd-eyebrow">{logged ? t.eyebrowUser : t.eyebrowGuest}</p>
-          {/* Второе предложение заголовка — всегда с новой строки (ревизия
-              13.10): balance-перенос склеивал «Бір аккаунт. Әр / Құрал…»,
-              разрывая смысл посреди фразы. */}
-          <h1 className="prd-h1">{(() => {
-            const s = logged ? t.h1User : t.h1Guest
-            const i = s.indexOf('. ')
-            if (i === -1) return s
-            return <>{s.slice(0, i + 1)}<br />{s.slice(i + 2)}</>
-          })()}</h1>
-          <p className="prd-sub">{logged ? t.subUser : t.subGuest}</p>
+          {/* Заголовок и подзаголовок всех трёх языков лежат стопкой в одной
+              ячейке сетки; видим только активный, остальные visibility:hidden,
+              но высоту занимают. Ячейка автоматически равна самому высокому
+              варианту — плитки ниже стоят на одном уровне при любом языке и
+              ширине экрана, а пустота (если она есть) оказывается ПОД
+              подзаголовком, а не разрезает заголовок (ревизия 13.10: резерв
+              «на 3 строки» оставлял дыру между ними в казахском/английском).
+              Настоящий <h1> — только у активного языка. Второе предложение
+              заголовка — всегда с новой строки: balance-перенос рвал фразу. */}
+          <div className="prd-hero-stack">
+            {(['ru', 'kk', 'en'] as Lang[]).map((l) => {
+              const c = HUB_COPY[l]
+              const active = l === lang
+              const text = logged ? c.h1User : c.h1Guest
+              const i = text.indexOf('. ')
+              const heading = i === -1 ? text : <>{text.slice(0, i + 1)}<br />{text.slice(i + 2)}</>
+              const Head = active ? 'h1' : 'div'
+              return (
+                <div key={l} className="prd-hero-lang" data-active={active} aria-hidden={!active} lang={l}>
+                  <Head className="prd-h1">{heading}</Head>
+                  <p className="prd-sub">{logged ? c.subUser : c.subGuest}</p>
+                </div>
+              )
+            })}
+          </div>
         </div>
 
         {askPersona && (
