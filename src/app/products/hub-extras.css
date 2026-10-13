@@ -52,17 +52,25 @@
       globals.css независимо от порядка чанков;
    2) шапка sticky внутри .prd-wrap (он высотой во всю страницу), z-index выше
       плиток и их обложек;
-   3) «стекло»: полупрозрачная заливка цветом страницы + размытие, растянутое
-      на всю ширину окна (псевдоэлемент шире контейнера; корень его обрежет). */
+   3) «стекло»: полупрозрачная заливка цветом страницы + размытие, в форме
+      капсулы по ширине содержимого шапки (см. ::before ниже). */
 .prd-root.prd-root { overflow: clip; }
 .prd-root .prd-top { position: sticky; top: 0; z-index: 40; }
 .prd-root .prd-top::before {
-  content: ''; position: absolute; z-index: -1; top: 0; bottom: 0; left: -100vw; right: -100vw;
-  background: color-mix(in srgb, var(--prd-bg) 72%, transparent);
+  /* Капсула «от логотипа до Войти» (правка основателя 13.10): стекло не на всю
+     ширину окна, а плавающая плашка чуть шире содержимого шапки. Пока страница
+     не прокручена — невидима (шапка выглядит как раньше), после первого
+     скролла плавно проявляется вместе с рамкой и мягкой тенью. */
+  content: ''; position: absolute; z-index: -1; top: 6px; bottom: 6px; left: -18px; right: -18px;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--prd-bg) 78%, transparent);
   -webkit-backdrop-filter: blur(14px) saturate(1.4); backdrop-filter: blur(14px) saturate(1.4);
-  transition: box-shadow 0.2s ease;
+  border: 1px solid var(--prd-line);
+  box-shadow: 0 10px 30px -14px rgba(20, 22, 58, 0.35);
+  opacity: 0; transition: opacity 0.25s ease;
 }
-.prd-root .prd-top[data-stuck="true"]::before { box-shadow: 0 1px 0 var(--prd-line); }
+.prd-root .prd-top[data-stuck="true"]::before { opacity: 1; }
+@media (max-width: 640px) { .prd-root .prd-top::before { left: -12px; right: -12px; } }
 
 /* Футер хаба: реквизиты слева, документы и контакты справа; на телефоне —
    столбиком. Цвета приглушены, чтобы не спорить с плитками. */
