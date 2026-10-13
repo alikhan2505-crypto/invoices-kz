@@ -116,7 +116,15 @@ export default function ProductsHub({ fontClass }: { fontClass: string }) {
 
         <div className="prd-hero">
           <p className="prd-eyebrow">{logged ? t.eyebrowUser : t.eyebrowGuest}</p>
-          <h1 className="prd-h1">{logged ? t.h1User : t.h1Guest}</h1>
+          {/* Второе предложение заголовка — всегда с новой строки (ревизия
+              13.10): balance-перенос склеивал «Бір аккаунт. Әр / Құрал…»,
+              разрывая смысл посреди фразы. */}
+          <h1 className="prd-h1">{(() => {
+            const s = logged ? t.h1User : t.h1Guest
+            const i = s.indexOf('. ')
+            if (i === -1) return s
+            return <>{s.slice(0, i + 1)}<br />{s.slice(i + 2)}</>
+          })()}</h1>
           <p className="prd-sub">{logged ? t.subUser : t.subGuest}</p>
         </div>
 
