@@ -13,7 +13,8 @@
 
 .lp-root .ks-wrap {
   --ks-ink: #2A0B07; --ks-paper: #FFF8F5; --ks-coral: #FF6B57; --ks-blush: #FFE3DD;
-  --ks-green: #2DC48D; --ks-green-ink: #0B5E3C; --ks-mint: #D7F5E7; --ks-muted: rgba(42, 11, 7, 0.55);
+  --ks-green: #2DC48D; --ks-green-ink: #0B5E3C; --ks-mint: #D7F5E7; --ks-muted: color-mix(in srgb, var(--ks-ink) 55%, transparent);
+  --ks-row: #FBF1EE; --ks-row-done: #F1FBF6;
   position: relative; pointer-events: none; user-select: none;
   container-type: inline-size;
   padding: 10px 0 70px;
@@ -26,14 +27,14 @@
 .lp-root .ks-win {
   position: relative; z-index: 1; background: var(--ks-paper); color: var(--ks-ink);
   border-radius: 28px; border: 2px solid var(--ks-ink);
-  box-shadow: 0 34px 60px -26px rgba(42, 11, 7, 0.55);
+  box-shadow: 0 34px 60px -26px color-mix(in srgb, var(--ks-ink) 55%, transparent);
   transition: opacity 0.5s ease;
 }
 .lp-root .ks-win[data-fading="true"] { opacity: 0; }
 .lp-root .ks-win[data-reset="true"] * { transition: none !important; }
 
-.lp-root .ks-bar { display: flex; align-items: center; gap: 6px; padding: 12px 16px; border-bottom: 1.5px solid rgba(42, 11, 7, 0.1); }
-.lp-root .ks-bar > i { width: 10px; height: 10px; border-radius: 50%; background: rgba(42, 11, 7, 0.16); }
+.lp-root .ks-bar { display: flex; align-items: center; gap: 6px; padding: 12px 16px; border-bottom: 1.5px solid color-mix(in srgb, var(--ks-ink) 10%, transparent); }
+.lp-root .ks-bar > i { width: 10px; height: 10px; border-radius: 50%; background: color-mix(in srgb, var(--ks-ink) 16%, transparent); }
 .lp-root .ks-bar > b { margin-left: 8px; font: 700 13px/1 var(--font-unbounded), Arial, sans-serif; letter-spacing: -0.01em; color: var(--ks-ink); }
 .lp-root .ks-live { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--ks-green-ink); background: var(--ks-mint); border-radius: 999px; padding: 4px 10px 4px 8px; }
 .lp-root .ks-live em { width: 7px; height: 7px; border-radius: 50%; background: var(--ks-green); animation: ks-pulse 1.6s ease-out infinite; }
@@ -45,16 +46,16 @@
   .lp-root .ks-body { grid-template-columns: 1.08fr 1fr; align-items: stretch; }
   .lp-root .ks-photo { width: 92px; height: 92px; }
 }
-.lp-root .ks-card { background: #fff; border: 1px solid rgba(42, 11, 7, 0.08); border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.lp-root .ks-card { background: #fff; border: 1px solid color-mix(in srgb, var(--ks-ink) 8%, transparent); border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .lp-root .ks-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 30px; }
 .lp-root .ks-title { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: var(--ks-ink); white-space: nowrap; }
 
-.lp-root .ks-floor { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; white-space: nowrap; color: var(--ks-muted); border: 1.5px dashed rgba(42, 11, 7, 0.3); border-radius: 999px; padding: 3px 9px; transition: background 0.3s, border-color 0.3s, color 0.3s; }
+.lp-root .ks-floor { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; white-space: nowrap; color: var(--ks-muted); border: 1.5px dashed color-mix(in srgb, var(--ks-ink) 30%, transparent); border-radius: 999px; padding: 3px 9px; transition: background 0.3s, border-color 0.3s, color 0.3s; }
 .lp-root .ks-floor[data-glow="true"] { background: var(--ks-blush); border: 1.5px solid var(--ks-coral); color: var(--ks-ink); }
 
 /* Карточка товара — как в магазине: фото, название, звёзды, цена. */
 .lp-root .ks-product { display: flex; align-items: center; gap: 12px; }
-.lp-root .ks-photo { flex: none; width: 76px; height: 76px; border-radius: 12px; overflow: hidden; box-shadow: inset 0 0 0 1px rgba(42, 11, 7, 0.06); }
+.lp-root .ks-photo { flex: none; width: 76px; height: 76px; border-radius: 12px; overflow: hidden; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ks-ink) 6%, transparent); }
 .lp-root .ks-photo svg { display: block; width: 100%; height: 100%; }
 .lp-root .ks-pinfo { display: grid; gap: 5px; min-width: 0; }
 .lp-root .ks-pname { font-size: 14px; font-weight: 600; line-height: 1.25; color: var(--ks-ink); }
@@ -66,11 +67,11 @@
 .lp-root .ks-rows { position: relative; height: 132px; flex: none; }
 .lp-root .ks-row {
   position: absolute; inset: 0 0 auto 0; height: 40px; display: flex; align-items: center; gap: 8px;
-  padding: 0 12px 0 8px; border-radius: 12px; background: #FBF1EE; color: var(--ks-ink);
+  padding: 0 12px 0 8px; border-radius: 12px; background: var(--ks-row); color: var(--ks-ink);
   transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1), background 0.3s;
 }
 .lp-root .ks-row[data-me="true"] { background: var(--ks-ink); color: var(--ks-paper); z-index: 1; }
-.lp-root .ks-rank { width: 22px; height: 22px; flex: none; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 700; background: rgba(42, 11, 7, 0.08); color: inherit; }
+.lp-root .ks-rank { width: 22px; height: 22px; flex: none; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 700; background: color-mix(in srgb, var(--ks-ink) 8%, transparent); color: inherit; }
 .lp-root .ks-row[data-me="true"] .ks-rank { background: rgba(255, 248, 245, 0.16); }
 .lp-root .ks-shop { font-size: 13px; font-weight: 600; color: inherit; white-space: nowrap; }
 .lp-root .ks-delta { font-size: 11px; font-weight: 700; color: var(--ks-ink); background: var(--ks-coral); border-radius: 999px; padding: 3px 7px; animation: ks-pop 0.45s cubic-bezier(0.16, 1, 0.3, 1); white-space: nowrap; }
@@ -80,14 +81,14 @@
 .lp-root .ks-roll { display: block; color: inherit; animation: ks-roll 0.4s cubic-bezier(0.2, 0.9, 0.3, 1); }
 @keyframes ks-roll { 0% { transform: translateY(-100%); opacity: 0; } 100% { transform: translateY(0); opacity: 1; } }
 
-.lp-root .ks-count { min-width: 22px; height: 22px; border-radius: 999px; display: grid; place-items: center; font-size: 11px; font-weight: 700; background: rgba(42, 11, 7, 0.08); color: var(--ks-ink); transition: background 0.3s; }
+.lp-root .ks-count { min-width: 22px; height: 22px; border-radius: 999px; display: grid; place-items: center; font-size: 11px; font-weight: 700; background: color-mix(in srgb, var(--ks-ink) 8%, transparent); color: var(--ks-ink); transition: background 0.3s; }
 .lp-root .ks-count[data-on="true"] { background: var(--ks-coral); }
 
 /* Кнопка массового действия — в шапке блока заказов, курсор едет к ней. */
 .lp-root .ks-btnwrap { position: relative; flex: none; }
 .lp-root .ks-btn { display: block; font-size: 12.5px; font-weight: 700; color: var(--ks-paper); background: var(--ks-ink); border-radius: 999px; padding: 9px 16px; white-space: nowrap; transition: transform 0.15s, box-shadow 0.4s; }
 .lp-root .ks-btn[data-press="true"] { transform: scale(0.93); box-shadow: 0 0 0 8px rgba(255, 107, 87, 0.35); }
-.lp-root .ks-cursor { position: absolute; left: 55%; top: 55%; z-index: 3; opacity: 0; transform: translate(70px, 70px); transition: transform 0.8s cubic-bezier(0.5, 0, 0.2, 1), opacity 0.3s; filter: drop-shadow(0 3px 4px rgba(42, 11, 7, 0.3)); }
+.lp-root .ks-cursor { position: absolute; left: 55%; top: 55%; z-index: 3; opacity: 0; transform: translate(70px, 70px); transition: transform 0.8s cubic-bezier(0.5, 0, 0.2, 1), opacity 0.3s; filter: drop-shadow(0 3px 4px color-mix(in srgb, var(--ks-ink) 30%, transparent)); }
 .lp-root .ks-cursor svg { display: block; }
 .lp-root .ks-cursor[data-at="near"] { opacity: 1; transform: translate(34px, 40px); }
 .lp-root .ks-cursor[data-at="btn"] { opacity: 1; transform: translate(0, 0); }
@@ -95,12 +96,12 @@
 .lp-root .ks-orders { position: relative; display: grid; gap: 6px; align-content: start; min-height: 132px; }
 .lp-root .ks-order {
   height: 40px; display: flex; align-items: center; gap: 10px; padding: 0 8px 0 12px;
-  border-radius: 12px; background: #FBF1EE; color: var(--ks-ink);
+  border-radius: 12px; background: var(--ks-row); color: var(--ks-ink);
   opacity: 0; transform: translateY(-12px) scale(0.97);
   transition: opacity 0.4s ease, transform 0.55s cubic-bezier(0.16, 1, 0.3, 1), background 0.35s;
 }
 .lp-root .ks-order[data-in="true"] { opacity: 1; transform: none; }
-.lp-root .ks-order[data-packed="true"] { background: #F1FBF6; }
+.lp-root .ks-order[data-packed="true"] { background: var(--ks-row-done); }
 .lp-root .ks-onum { font: 700 12.5px/1 var(--font-unbounded), Arial, sans-serif; color: var(--ks-ink); white-space: nowrap; }
 .lp-root .ks-ocity { font-size: 12px; color: var(--ks-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .lp-root .ks-status { margin-left: auto; flex: none; font-size: 11px; font-weight: 700; border-radius: 999px; padding: 4px 9px; background: var(--ks-blush); color: var(--ks-ink); transition: background 0.35s, color 0.35s; white-space: nowrap; }
@@ -129,7 +130,7 @@
   position: absolute; z-index: 2; left: -6px; bottom: -14px; width: calc(200px * var(--s)); height: calc(282px * var(--s));
   opacity: 0; transform: translateY(40px) rotate(4deg) scale(0.9);
   transition: opacity 0.35s, transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
-  filter: drop-shadow(0 16px 18px rgba(42, 11, 7, 0.35));
+  filter: drop-shadow(0 16px 18px color-mix(in srgb, var(--ks-ink) 35%, transparent));
 }
 .lp-root .ks-label[data-in="true"] { opacity: 1; transform: translateY(0) rotate(-6deg) scale(1); }
 .lp-root .ks-a6 {

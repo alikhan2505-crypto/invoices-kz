@@ -1,0 +1,120 @@
+/* «Живой агент» (AgentLiveScene.tsx). Окно, шапка, карточки, кнопка, курсор,
+   декор и накладная-лейбл — общие из kaspi-scene.css (эталон 13.10.2026);
+   здесь только палитра AI-агента и то, чего у Kaspi нет: чат, каналы,
+   черновик счёта и сам счёт. */
+.lp-root .ks-wrap[data-theme="agent"] {
+  --ks-ink: #1D1140; --ks-paper: #FAF8FF; --ks-coral: #B7A6FF; --ks-blush: #EAE4FF;
+  --ks-row: #F4F1FF; --ks-row-done: #EFFAF5;
+}
+
+/* Чат */
+.lp-root .as-wa { width: 9px; height: 9px; border-radius: 50%; background: var(--ks-green); }
+.lp-root .as-state { font-size: 11px; font-weight: 600; color: var(--ks-muted); opacity: 0; transition: opacity 0.25s; white-space: nowrap; }
+.lp-root .as-state[data-on="true"] { opacity: 1; }
+.lp-root .as-chat {
+  display: flex; flex-direction: column; justify-content: flex-end; gap: 0;
+  height: 292px; overflow: hidden; padding: 10px; border-radius: 12px;
+  background: var(--ks-row);
+}
+.lp-root .as-msg {
+  max-width: 82%; display: flex; flex-direction: column; gap: 3px;
+  opacity: 0; max-height: 0; margin-top: 0; transform: translateY(10px);
+  transition: opacity 0.35s ease, max-height 0.45s cubic-bezier(0.16, 1, 0.3, 1), margin-top 0.45s cubic-bezier(0.16, 1, 0.3, 1), transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.lp-root .as-msg[data-in="true"] { opacity: 1; max-height: 120px; margin-top: 8px; transform: none; }
+.lp-root .as-msg[data-side="in"] { align-self: flex-start; }
+.lp-root .as-msg[data-side="out"] { align-self: flex-end; align-items: flex-end; }
+.lp-root .as-text { font-size: 12.5px; line-height: 1.35; padding: 8px 11px; border-radius: 16px; color: var(--ks-ink); }
+.lp-root .as-msg[data-side="in"] .as-text { background: #fff; border-bottom-left-radius: 4px; box-shadow: 0 1px 0 color-mix(in srgb, var(--ks-ink) 8%, transparent); }
+.lp-root .as-msg[data-side="out"] .as-text { background: var(--ks-coral); border-bottom-right-radius: 4px; }
+.lp-root .as-meta { font-size: 10px; font-weight: 600; color: var(--ks-green-ink); background: var(--ks-mint); border-radius: 999px; padding: 2px 7px; }
+.lp-root .as-msg[data-pdf="true"] { flex-direction: row; align-items: center; gap: 8px; background: #fff; border-radius: 16px; border-bottom-right-radius: 4px; padding: 6px 10px 6px 6px; box-shadow: 0 1px 0 color-mix(in srgb, var(--ks-ink) 8%, transparent); }
+.lp-root .as-msg[data-pdf="true"] .as-text { padding: 0; background: none; font-weight: 600; }
+.lp-root .as-pdf-ico { width: 30px; height: 34px; border-radius: 6px; display: grid; place-items: center; background: #E5484D; color: #fff !important; font: 700 9px/1 var(--font-onest), Arial, sans-serif; }
+.lp-root .as-typing {
+  align-self: flex-end; display: flex; gap: 4px; padding: 0 12px; border-radius: 16px; background: var(--ks-coral);
+  max-height: 0; opacity: 0; margin-top: 0; overflow: hidden; transition: max-height 0.3s, opacity 0.3s, margin-top 0.3s, padding 0.3s;
+}
+.lp-root .as-typing[data-on="true"] { max-height: 40px; opacity: 1; margin-top: 8px; padding: 11px 12px; }
+.lp-root .as-typing i { width: 6px; height: 6px; border-radius: 50%; background: var(--ks-ink); animation: ks-dot 1s ease-in-out infinite; }
+.lp-root .as-typing i:nth-child(2) { animation-delay: 0.15s; }
+.lp-root .as-typing i:nth-child(3) { animation-delay: 0.3s; }
+
+/* Каналы */
+.lp-root .as-channels { display: grid; gap: 6px; }
+.lp-root .as-ch { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 10px; border-radius: 10px; background: var(--ks-row); font-size: 12.5px; font-weight: 600; color: var(--ks-ink); transition: background 0.3s, box-shadow 0.3s; }
+.lp-root .as-ch[data-hot="true"] { background: #fff; box-shadow: inset 0 0 0 1.5px var(--ks-green); }
+.lp-root .as-ch em { width: 8px; height: 8px; border-radius: 50%; }
+.lp-root .as-ch b { margin-left: auto; min-width: 22px; height: 20px; border-radius: 999px; display: grid; place-items: center; font-size: 11px; background: color-mix(in srgb, var(--ks-ink) 8%, transparent); color: var(--ks-ink); animation: ks-pop 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+
+/* Черновик счёта на подтверждение */
+.lp-root .as-queue { position: relative; min-height: 112px; flex: 1; }
+.lp-root .as-draft {
+  border: 1.5px solid color-mix(in srgb, var(--ks-ink) 14%, transparent); border-radius: 16px; padding: 10px; background: #fff;
+  display: grid; gap: 10px;
+  opacity: 0; transform: translateY(-12px) scale(0.97);
+  transition: opacity 0.4s, transform 0.55s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s, background 0.3s;
+}
+.lp-root .as-draft[data-in="true"] { opacity: 1; transform: none; }
+.lp-root .as-draft[data-sent="true"] { background: var(--ks-row-done); border-color: color-mix(in srgb, var(--ks-green) 60%, transparent); }
+.lp-root .as-draft-top { display: flex; align-items: center; gap: 10px; }
+.lp-root .as-doc-ico { width: 28px; height: 34px; flex: none; border-radius: 5px; background: repeating-linear-gradient(180deg, transparent 0 9px, color-mix(in srgb, var(--ks-ink) 22%, transparent) 9px 11px) 5px 4px / 18px 28px no-repeat, var(--ks-blush); }
+.lp-root .as-draft-name { display: grid; gap: 2px; min-width: 0; }
+.lp-root .as-draft-name b { font: 700 12.5px/1.2 var(--font-unbounded), Arial, sans-serif; color: var(--ks-ink); }
+.lp-root .as-draft-name span { font-size: 12px; color: var(--ks-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lp-root .as-actions { display: flex; align-items: center; gap: 8px; }
+.lp-root .as-ghost { font-size: 12.5px; font-weight: 700; color: var(--ks-ink); border: 1.5px solid color-mix(in srgb, var(--ks-ink) 25%, transparent); border-radius: 999px; padding: 7.5px 14px; }
+.lp-root .as-sent { justify-self: start; font-size: 12px; font-weight: 700; color: var(--ks-green-ink); background: var(--ks-mint); border-radius: 999px; padding: 6px 11px; animation: ks-pop 0.45s cubic-bezier(0.16, 1, 0.3, 1); }
+
+/* Пузыри — визуально размером с коробку Kaspi Bot (у них в кадре больше
+   «мяса», поэтому сам блок уже). */
+.lp-root .ks-box.as-bubbles { width: 118px; }
+@media (max-width: 1179px) { .lp-root .ks-box.as-bubbles { width: 96px; } }
+
+/* Счёт на оплату — мини-копия А4 (в той же рамке, что накладная у Kaspi). */
+.lp-root .as-label { height: calc(283px * var(--s)); }
+.lp-root .ks-a6.as-doc { height: 283px; padding: 12px 12px 10px; gap: 0; font-family: Arial, Helvetica, sans-serif; }
+.lp-root .as-doc-warn { font-size: 5px; text-align: center; line-height: 1.25; }
+.lp-root .as-doc table { width: 100%; border-collapse: collapse; color: #000; }
+.lp-root .as-doc td, .lp-root .as-doc th { border: 0.6px solid #000; padding: 2px 3px; text-align: left; vertical-align: top; color: #000; }
+.lp-root .as-doc-bank { margin-top: 5px; font-size: 5.5px; }
+.lp-root .as-doc-title { margin: 9px 0 5px; padding-bottom: 3px; border-bottom: 1.2px solid #000; font-size: 9px; font-weight: 700; }
+.lp-root .as-doc-party { font-size: 6px; margin-top: 3px; }
+.lp-root .as-doc-party span { font-weight: 700; }
+.lp-root .as-doc-items { margin-top: 7px; font-size: 6px; }
+.lp-root .as-doc-items th { background: #EEE; font-weight: 700; }
+.lp-root .as-doc-items td:last-child, .lp-root .as-doc-items th:last-child { text-align: right; }
+.lp-root .as-doc-total { margin-top: 5px; text-align: right; font-size: 8px; }
+.lp-root .as-doc-total b { font-weight: 700; }
+.lp-root .as-doc-words { font-size: 5.5px; margin-top: 3px; }
+.lp-root .as-doc-sign { margin-top: auto; display: flex; align-items: center; justify-content: space-between; font-size: 6px; }
+.lp-root .ks-a6 .as-doc-stamp {
+  width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; text-align: center;
+  border: 1.5px solid #2B4BCF; color: #2B4BCF; font-size: 5.5px; font-weight: 700; line-height: 1.2;
+  transform: rotate(-14deg); opacity: 0.85; margin-right: 6px;
+}
+
+/* У агента две колонки уже с 600px: на ноутбуке 1280 окно не вытягивается
+   в высокую башню. */
+@container (min-width: 600px) {
+  .lp-root .ks-wrap[data-theme="agent"] .ks-body { grid-template-columns: 1.08fr 1fr; align-items: stretch; }
+}
+
+/* Счёт выезжает у левого нижнего угла окна (под чатом, где в финале пусто),
+   а не поверх черновика справа. Объявлено после правил kaspi-scene.css. */
+@container (min-width: 600px) {
+  .lp-root .ks-wrap[data-theme="agent"] .ks-label { left: 5%; bottom: -26px; }
+}
+
+/* Заголовок AI-агента длинный: на широком экране — колонка шире и кегль
+   меньше, чтобы строки были длиннее, а строк меньше (правка основателя 13.10). */
+@media (min-width: 1180px) {
+  .lp-root .lp-split[data-landing="agent"] { grid-template-columns: minmax(0, 520px) minmax(0, 1fr); column-gap: 44px; }
+  .lp-root .lp-split[data-landing="agent"] .lp-h1 { font-size: clamp(34px, 3.3vw, 44px); }
+}
+@media (min-width: 1440px) {
+  .lp-root .lp-split[data-landing="agent"] { grid-template-columns: minmax(0, 680px) minmax(0, 900px); column-gap: 56px; }
+  .lp-root .lp-split[data-landing="agent"] .lp-hero { max-width: 680px; }
+  .lp-root .lp-split[data-landing="agent"] .lp-h1 { font-size: clamp(36px, 3.5vw, 52px); }
+  .lp-root .lp-split[data-landing="agent"] .lp-lead { max-width: 52ch; }
+}

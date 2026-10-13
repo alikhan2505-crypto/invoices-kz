@@ -7,6 +7,7 @@ import { LANDINGS, LANDING_UI, OTHER_PRODUCT_LINKS, type LandingKey } from '@/li
 import ProductArt from '@/components/products/ProductArt'
 import { PRODUCT_I18N } from '@/lib/i18n/productsHub'
 import KaspiLiveScene from '@/components/products/KaspiLiveScene'
+import AgentLiveScene from '@/components/products/AgentLiveScene'
 import './landing-extras.css'
 
 export default function ProductLanding({ landing, fontClass }: { landing: LandingKey; fontClass: string }) {
@@ -48,6 +49,8 @@ export default function ProductLanding({ landing, fontClass }: { landing: Landin
   const applyHref = `mailto:mail@invoices.kz?subject=${encodeURIComponent(`${p.name}: заявка`)}`
   const canOpen = l.access === 'open' ? !!signedIn : isAdmin
 
+  const scene = landing === 'kaspi' ? <KaspiLiveScene lang={lang} /> : landing === 'agent' ? <AgentLiveScene lang={lang} /> : null
+
   const hero = (
     <div className="lp-hero">
       <p className="lp-eyebrow">{l.audience[lang]}</p>
@@ -76,12 +79,12 @@ export default function ProductLanding({ landing, fontClass }: { landing: Landin
         )}
       </div>
 
-      {/* Kaspi: текст и анимированный «живой кабинет» рядом (без пустоты между
-          ними); остальные лендинги — прежняя картинка продукта справа. */}
-      {landing === 'kaspi' ? (
-        <div className="lp-split">
+      {/* Живая сцена продукта рядом с текстом, без пустоты между ними (эталон —
+          Kaspi Bot, 13.10.2026); у кого сцены ещё нет — прежняя картинка справа. */}
+      {scene ? (
+        <div className="lp-split" data-landing={landing}>
           {hero}
-          <KaspiLiveScene lang={lang} />
+          {scene}
         </div>
       ) : (
         <>

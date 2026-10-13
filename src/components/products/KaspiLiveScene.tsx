@@ -1,7 +1,7 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
 import type { Lang } from '@/components/LanguageProvider'
 import ProductArt from '@/components/products/ProductArt'
+import { useSceneStep } from '@/components/products/useSceneStep'
 import './kaspi-scene.css'
 
 // «Живой кабинет» на лендинге Kaspi Bot (ревизия 13.10.2026, вариант А):
@@ -45,20 +45,7 @@ const fmt = (n: number) => n.toLocaleString('ru-RU').replace(/ /g, ' ') + ' ₸
 
 export default function KaspiLiveScene({ lang }: { lang: Lang }) {
   const t = T[lang]
-  const [step, setStep] = useState(0)
-  const rootRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { setStep(FINAL); return }
-    let visible = true
-    const io = new IntersectionObserver(([e]) => { visible = e.isIntersecting })
-    if (rootRef.current) io.observe(rootRef.current)
-    const id = window.setInterval(() => {
-      if (!visible || document.hidden) return
-      setStep((s) => (s + 1) % STEPS)
-    }, STEP_MS)
-    return () => { window.clearInterval(id); io.disconnect() }
-  }, [])
+  const { step, ref: rootRef } = useSceneStep(STEPS, FINAL, STEP_MS)
 
   const price = ourPrice(step)
   const rows = [...RIVALS.map((r) => ({ ...r, me: false })), { name: t.you, price, me: true }]
