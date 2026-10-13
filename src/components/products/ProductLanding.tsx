@@ -5,6 +5,7 @@ import { useLanguage } from '@/components/LanguageProvider'
 import { PRODUCTS } from '@/lib/products'
 import { LANDINGS, LANDING_UI, OTHER_PRODUCT_LINKS, type LandingKey } from '@/lib/landings'
 import ProductArt from '@/components/products/ProductArt'
+import { PRODUCT_I18N } from '@/lib/i18n/productsHub'
 
 export default function ProductLanding({ landing, fontClass }: { landing: LandingKey; fontClass: string }) {
   const { lang } = useLanguage()
@@ -23,12 +24,11 @@ export default function ProductLanding({ landing, fontClass }: { landing: Landin
       if (!user) return
       // A product still open by application only has no dashboard for ordinary
       // accounts: only admins are sent in, everyone else keeps the pitch.
-      let allowed = l.access === 'open'
-      if (l.access === 'invite') {
-        const { data } = await supabase.from('profiles').select('is_admin').eq('id', user.id).single()
-        allowed = !!data?.is_admin
-        if (alive) setIsAdmin(allowed)
-      }
+      // is_admin also unlocks admin-only products in the "other products" bar.
+      const { data } = await supabase.from('profiles').select('is_admin').eq('id', user.id).single()
+      const admin = !!data?.is_admin
+      if (alive) setIsAdmin(admin)
+      const allowed = l.access === 'open' || admin
       // Someone who can open the dashboard came for it, not the pitch.
       if (allowed && new URLSearchParams(window.location.search).get('view') !== 'landing') {
         window.location.replace(l.cabinet)
@@ -83,10 +83,12 @@ export default function ProductLanding({ landing, fontClass }: { landing: Landin
         {OTHER_PRODUCT_LINKS.filter((o) => o.product !== l.product).map((o) => {
           const def = PRODUCTS.find((x) => x.key === o.product)!
           const dot = { '--dot': def.bg } as React.CSSProperties
-          return o.url ? (
-            <a key={o.product} className="lp-mini" style={dot} href={o.url}><i /><span>{o.label}</span></a>
+          const name = PRODUCT_I18N[o.product].name[lang]
+          const open = o.url && !def.locked && (!def.adminOnly || isAdmin)
+          return open ? (
+            <a key={o.product} className="lp-mini" style={dot} href={o.url!}><i /><span>{name}</span></a>
           ) : (
-            <span key={o.product} className="lp-mini" style={dot} title={ui.lockedHint} data-locked="true"><i /><span>{o.label} · {ui.soon}</span></span>
+            <span key={o.product} className="lp-mini" style={dot} title={ui.lockedHint} data-locked="true"><i /><span>{name} · {ui.soon}</span></span>
           )
         })}
       </div>

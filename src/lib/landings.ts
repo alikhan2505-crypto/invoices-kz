@@ -149,12 +149,15 @@ export const LANDING_UI: Record<Lang, { allProducts: string; login: string; open
   en: { allProducts: 'All products', login: 'Log in', open: 'Open dashboard', enter: 'Log in and open', apply: 'Request access', inviteNote: 'We onboard salons by request', others: 'Other products', soon: 'soon', lockedHint: 'This section is still in progress' },
 }
 
-// Public addresses shown in the "other products" bar.
-export const OTHER_PRODUCT_LINKS: { product: ProductKey; label: string; url: string | null }[] = [
-  { product: 'invoices', label: 'Счета', url: 'https://invoices.kz' },
-  { product: 'kaspiShop', label: 'Kaspi Bot', url: 'https://kaspi.invoices.kz' },
-  { product: 'kaspiApi', label: 'Kaspi Cashier API', url: 'https://api.invoices.kz' },
-  { product: 'aiAgent', label: 'AI-агент', url: 'https://agent.invoices.kz' },
-  { product: 'salon', label: 'Салон', url: 'https://salon.invoices.kz' },
-  { product: 'wildberries', label: 'WB Bot', url: null },
+// Public addresses shown in the "other products" bar (names come from
+// PRODUCT_I18N in the page's language). All seven products, same set as the hub:
+// CFO is a "скоро" teaser for everyone but admins (adminOnly in PRODUCTS).
+export const OTHER_PRODUCT_LINKS: { product: ProductKey; url: string | null }[] = [
+  { product: 'invoices', url: 'https://invoices.kz' },
+  { product: 'kaspiShop', url: 'https://kaspi.invoices.kz' },
+  { product: 'kaspiApi', url: 'https://api.invoices.kz' },
+  { product: 'aiAgent', url: 'https://agent.invoices.kz' },
+  { product: 'salon', url: 'https://salon.invoices.kz' },
+  { product: 'cfo', url: 'https://cfo.invoices.kz' },
+  { product: 'wildberries', url: null },
 ]
