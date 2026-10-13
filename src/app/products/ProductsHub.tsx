@@ -143,7 +143,6 @@ export default function ProductsHub({ fontClass }: { fontClass: string }) {
         </div>
 
         <div className="prd-hero">
-          <p className="prd-eyebrow">{logged ? t.eyebrowUser : t.eyebrowGuest}</p>
           {/* Заголовок и подзаголовок всех трёх языков лежат стопкой в одной
               ячейке сетки; видим только активный, остальные visibility:hidden,
               но высоту занимают. Ячейка автоматически равна самому высокому
@@ -163,6 +162,7 @@ export default function ProductsHub({ fontClass }: { fontClass: string }) {
               const Head = active ? 'h1' : 'div'
               return (
                 <div key={l} className="prd-hero-lang" data-active={active} aria-hidden={!active} lang={l}>
+                  <p className="prd-eyebrow">{logged ? c.eyebrowUser : c.eyebrowGuest}</p>
                   <Head className="prd-h1">{heading}</Head>
                   <p className="prd-sub">{logged ? c.subUser : c.subGuest}</p>
                 </div>
