@@ -3,16 +3,22 @@ import { createContext, useContext, useEffect, useState } from 'react'
 
 export type Lang = 'ru' | 'kk' | 'en'
 
+// Язык по умолчанию — казахский (решение основателя 13.10.2026: «мы в
+// Казахстане»). Касается только тех, кто язык ещё не выбирал: явный выбор
+// человека хранится в localStorage 'lang' и всегда побеждает.
+export const DEFAULT_LANG: Lang = 'kk'
+
 const LanguageContext = createContext<{ lang: Lang; setLang: (l: Lang) => void }>({
-  lang: 'ru',
+  lang: DEFAULT_LANG,
   setLang: () => {},
 })
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [lang, setLangState] = useState<Lang>('ru')
+  const [lang, setLangState] = useState<Lang>(DEFAULT_LANG)
 
   useEffect(() => {
-    const saved = (localStorage.getItem('lang') as Lang) || 'ru'
+    const raw = localStorage.getItem('lang')
+    const saved: Lang = raw === 'ru' || raw === 'kk' || raw === 'en' ? raw : DEFAULT_LANG
     setLangState(saved)
     document.documentElement.setAttribute('lang', saved)
   }, [])
