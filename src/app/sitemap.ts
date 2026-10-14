@@ -1,6 +1,10 @@
 import { MetadataRoute } from 'next'
 import { GUIDES, guideAlternates } from '@/lib/guides'
 import { ROOT_HUB_LIVE } from '@/lib/rootHub'
+import { TOOL_LANGS, isToolLocalized, toolAlternates, toolUrl, toolsIndexAlternates, toolsIndexUrl } from '@/lib/tools-i18n'
+
+// Все инструменты /tools, которые есть в sitemap (переведённые и нет).
+const TOOL_SLUGS_IN_SITEMAP = ['waybills', 'margin', 'kontragent', 'schet', 'avr', 'nalogi', 'nakladnaya', 'kp'] as const
 
 export default function sitemap(): MetadataRoute.Sitemap {
   return [
@@ -55,77 +59,41 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: 'monthly',
       priority: 0.6,
     },
-    {
-      // Free no-signup tool -- exists partly as an organic entry point for
-      // Kaspi sellers searching for waybill printing, so it belongs here.
-      url: 'https://invoices.kz/tools/waybills',
+    // Бесплатные инструменты /tools. Порядок — как в индексе. У переведённых
+    // (LOCALIZED_TOOL_SLUGS в src/lib/tools-i18n) три адреса — ru /tools/<slug>,
+    // kk /tools/kk/<slug>, en /tools/en/<slug> — и каждый перечисляет все три
+    // через alternates.languages (hreflang), как у /guides ниже. Непереведённые
+    // (schet, avr на 14.10.2026) — только русский адрес, без hreflang.
+    //   waybills, margin — органический вход для продавцов Kaspi;
+    //   kontragent — самый частотный запрос, лимит 3/день, дальше регистрация;
+    //   schet — «счёт на оплату», лид-магнит; avr — второй документ после счёта;
+    //   nalogi — налоги ИП по НК-2026; nakladnaya (З-2) и kp закрывают
+    //   документный комплект малого бизнеса.
+    ...TOOL_SLUGS_IN_SITEMAP.flatMap(slug =>
+      isToolLocalized(slug)
+        ? TOOL_LANGS.map(lang => ({
+            url: toolUrl(slug, lang),
+            lastModified: new Date(),
+            changeFrequency: 'monthly' as const,
+            priority: 0.7,
+            alternates: { languages: toolAlternates(slug) },
+          }))
+        : [{
+            url: toolUrl(slug, 'ru'),
+            lastModified: new Date(),
+            changeFrequency: 'monthly' as const,
+            priority: 0.7,
+          }],
+    ),
+    // Индекс инструментов: страница-указатель для набравших /tools руками,
+    // на трёх языках.
+    ...TOOL_LANGS.map(lang => ({
+      url: toolsIndexUrl(lang),
       lastModified: new Date(),
-      changeFrequency: 'monthly',
-      priority: 0.7,
-    },
-    {
-      // Second free no-signup tool, same purpose as the one above: an organic
-      // entry point for a Kaspi seller searching for what they actually earn
-      // per sale.
-      url: 'https://invoices.kz/tools/margin',
-      lastModified: new Date(),
-      changeFrequency: 'monthly',
-      priority: 0.7,
-    },
-    {
-      // Третий бесплатный инструмент: проверка контрагента по БИН. Самый
-      // частотный поисковый запрос из трёх — и единственный с жёстким лимитом
-      // (3/день), дальше воронка в регистрацию.
-      url: 'https://invoices.kz/tools/kontragent',
-      lastModified: new Date(),
-      changeFrequency: 'monthly',
-      priority: 0.7,
-    },
-    {
-      // Четвёртый бесплатный инструмент и самый частотный запрос из всех:
-      // «счёт на оплату» — лид-магнит, 3 счёта в день, дальше регистрация.
-      url: 'https://invoices.kz/tools/schet',
-      lastModified: new Date(),
-      changeFrequency: 'monthly',
-      priority: 0.7,
-    },
-    {
-      // Пятый инструмент: АВР — второй по частоте документ после счёта.
-      url: 'https://invoices.kz/tools/avr',
-      lastModified: new Date(),
-      changeFrequency: 'monthly',
-      priority: 0.7,
-    },
-    {
-      // Шестой: калькулятор налогов ИП по новому НК-2026 — у большинства
-      // конкурентов в выдаче до сих пор цифры старого кодекса.
-      url: 'https://invoices.kz/tools/nalogi',
-      lastModified: new Date(),
-      changeFrequency: 'monthly',
-      priority: 0.7,
-    },
-    {
-      // Накладная (З-2) — вместе со счётом, АВР и КП закрывает весь
-      // документный комплект казахстанского малого бизнеса.
-      url: 'https://invoices.kz/tools/nakladnaya',
-      lastModified: new Date(),
-      changeFrequency: 'monthly',
-      priority: 0.7,
-    },
-    {
-      // Коммерческое предложение — вход в воронку ещё до счёта.
-      url: 'https://invoices.kz/tools/kp',
-      lastModified: new Date(),
-      changeFrequency: 'monthly',
-      priority: 0.7,
-    },
-    {
-      // Индекс инструментов: страница-указатель для набравших /tools руками.
-      url: 'https://invoices.kz/tools',
-      lastModified: new Date(),
-      changeFrequency: 'monthly',
+      changeFrequency: 'monthly' as const,
       priority: 0.5,
-    },
+      alternates: { languages: toolsIndexAlternates() },
+    })),
     {
       // Guides index -- the organic entry point for search queries the product
       // answers ("комиссия Kaspi", "как выставить счёт ИП") rather than for the

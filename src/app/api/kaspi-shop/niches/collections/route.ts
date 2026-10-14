@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { buildCollections, addDays, type NicheSnapshotRow } from '@/lib/kaspiShop/nicheCollections'
-import { getActivePlan } from '@/lib/plan'
+import { kaspiShopPlanGate } from '@/lib/kaspiShop/planGate'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -12,25 +12,29 @@ const supabaseAuth = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-// Same admin gate as the sibling trends route: snapshots are global
-// shared Kaspi catalog data (no owner column, RLS with no policies,
-// service-role only) and the whole «Ниши» page is admin-only today.
-async function requireAdmin(req: NextRequest) {
+// Same gate as the sibling trends route: snapshots are global shared
+// Kaspi catalog data (no owner column, RLS with no policies, service-role
+// only), shown to anyone with Kaspi Bot access (admin or Pro).
+// 401 only for a missing/invalid token; a logged-in user without Kaspi Bot
+// access (admin or canKaspiShop) gets the shared 403 { errorCode:'not_pro' }
+// from kaspiShopPlanGate (14.10.2026 -- this used to answer a non-Pro seller
+// with a misleading 401 "Unauthorized").
+async function requireUser(req: NextRequest) {
   const accessToken = req.headers.get('authorization')?.replace('Bearer ', '')
   const { data: { user } } = accessToken
     ? await supabaseAuth.auth.getUser(accessToken)
     : { data: { user: null } }
-  if (!user) return null
-  const { data: profile } = await supabase.from('profiles').select('is_admin, plan, plan_expires_at, bonus_expires_at, trial_expires_at').eq('id', user.id).single()
-  return (profile?.is_admin || getActivePlan(profile).canKaspiShop) ? user : null
+  return user
 }
 
 // Collections are computed here at read time from the raw snapshot
 // history (see nicheCollections.ts's header for why not precomputed in
 // deliver). Volume is trivial: one day's snapshot is ~650 rows.
 export async function GET(req: NextRequest) {
-  const user = await requireAdmin(req)
+  const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const notPro = await kaspiShopPlanGate(user.id)
+  if (notPro) return notPro
 
   const { data: latestRow, error: latestError } = await supabase
     .from('kaspi_shop_niche_product_snapshots')

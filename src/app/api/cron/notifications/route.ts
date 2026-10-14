@@ -5,6 +5,7 @@ import { sendTelegramNotification } from '@/lib/telegramNotify'
 import { createNotification } from '@/lib/notifications'
 import { addDaysToDateString, todayDateString } from '@/lib/dueDate'
 import { loadDigestData, formatDigest } from '@/lib/kaspiShop/dailyDigest'
+import { hasKaspiShopAccess, KASPI_SHOP_PROFILE_COLUMNS } from '@/lib/kaspiShop/planGate'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -226,14 +227,30 @@ export async function GET(request: Request) {
   // audience. Split into its own toggle only if that turns out to annoy
   // someone. formatDigest returns null on a genuinely quiet day, so silence
   // is the default and nobody gets a daily "ничего не произошло".
+  //
+  // Kaspi Bot is a Pro feature (founder decision, 14.10.2026): once a
+  // seller's Pro has ended the digest simply stops -- same rule as the
+  // cabinet API gate and the repricer (hasKaspiShopAccess: admin or
+  // canKaspiShop). The plan columns ride the same profiles query, so no
+  // per-seller lookup. Only this section is gated: the invoice reminders,
+  // overdue notices and weekly report above still go to everyone who asked.
+  // Renewing Pro resumes the digest on the next run; nothing is changed.
   let digests = 0
-  const { data: shopOwners } = await supabase
+  let digestsSkippedNoPlan = 0
+  const { data: shopOwners, error: shopOwnersError } = await supabase
     .from('profiles')
-    .select('id, telegram_chat_id')
+    .select(`id, telegram_chat_id, ${KASPI_SHOP_PROFILE_COLUMNS}`)
     .eq('notify_telegram', true)
     .not('telegram_chat_id', 'is', null)
+  if (shopOwnersError) console.error('cron/notifications: kaspi digest recipients lookup failed:', shopOwnersError.message)
 
-  for (const owner of shopOwners || []) {
+  const digestRecipients = (shopOwners || []).filter(owner => {
+    if (hasKaspiShopAccess(owner)) return true
+    digestsSkippedNoPlan++
+    return false
+  })
+
+  for (const owner of digestRecipients) {
     try {
       const digestData = await loadDigestData(supabase, owner.id, startOfDayAgo(1))
       const text = formatDigest(digestData)
@@ -247,5 +264,5 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.json({ success: true, reminders, overdue, reports, unpaidBells, digests })
+  return NextResponse.json({ success: true, reminders, overdue, reports, unpaidBells, digests, digestsSkippedNoPlan })
 }

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { KASPI_TRENDING_CATEGORIES, type TrendProduct } from '@/lib/kaspiShop/nicheTrends'
-import { getActivePlan } from '@/lib/plan'
+import { kaspiShopPlanGate } from '@/lib/kaspiShop/planGate'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -14,18 +14,18 @@ const supabaseAuth = createClient(
 
 // kaspi_shop_niche_trends has no owner column (it's global/shared Kaspi
 // catalog data, same for every customer) and RLS with no policies
-// (service-role only) -- requiring is_admin here matches the same gate
-// the rest of this feature already uses (see
-// src/app/api/kaspi-shop/niches/request/route.ts's requireAdmin comment),
-// since the whole "Ниши" page is admin-only in practice today.
-async function requireAdmin(req: NextRequest) {
+// (service-role only) -- shown to anyone with Kaspi Bot access (admin or
+// Pro), the same gate as the rest of this feature.
+// 401 only for a missing/invalid token; a logged-in user without Kaspi Bot
+// access (admin or canKaspiShop) gets the shared 403 { errorCode:'not_pro' }
+// from kaspiShopPlanGate (14.10.2026 -- this used to answer a non-Pro seller
+// with a misleading 401 "Unauthorized").
+async function requireUser(req: NextRequest) {
   const accessToken = req.headers.get('authorization')?.replace('Bearer ', '')
   const { data: { user } } = accessToken
     ? await supabaseAuth.auth.getUser(accessToken)
     : { data: { user: null } }
-  if (!user) return null
-  const { data: profile } = await supabase.from('profiles').select('is_admin, plan, plan_expires_at, bonus_expires_at, trial_expires_at').eq('id', user.id).single()
-  return (profile?.is_admin || getActivePlan(profile).canKaspiShop) ? user : null
+  return user
 }
 
 const PAGE_SIZE = 5
@@ -43,8 +43,10 @@ type Row = {
 }
 
 export async function GET(req: NextRequest) {
-  const user = await requireAdmin(req)
+  const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const notPro = await kaspiShopPlanGate(user.id)
+  if (notPro) return notPro
 
   const page = Math.max(1, Number(req.nextUrl.searchParams.get('page')) || 1)
   const categoryParam = req.nextUrl.searchParams.get('category')

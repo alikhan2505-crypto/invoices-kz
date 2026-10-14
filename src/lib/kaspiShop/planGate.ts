@@ -120,3 +120,14 @@ export async function ownerHasKaspiShopAccess(userId: string | null | undefined)
   if (error) throw new Error(`owner plan lookup failed for ${userId}: ${error.message}`)
   return hasKaspiShopAccess(data)
 }
+
+// Pure, unit-tested: whose plan decides for a tracked product. The
+// CONNECTION owner wins (that's the seller who pays for Kaspi Bot), falling
+// back to the product row's own user_id for a row whose connection join came
+// back empty -- the same rule the repricer's due list uses (checkCycle.ts).
+// Accepts the joined connection as an object or a one-element array, since
+// PostgREST's embed shape depends on how the FK is declared.
+export function trackedProductOwnerId(row: any): string | null {
+  const conn = Array.isArray(row?.kaspi_shop_connections) ? row.kaspi_shop_connections[0] : row?.kaspi_shop_connections
+  return conn?.user_id ?? row?.user_id ?? null
+}

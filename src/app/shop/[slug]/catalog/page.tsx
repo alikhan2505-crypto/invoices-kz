@@ -3,6 +3,8 @@ import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import { motion, useReducedMotion } from 'framer-motion'
 import WholesaleCartBar from '@/components/kaspiShop/WholesaleCartBar'
+import { StorefrontLangSwitch, StorefrontStatus, useStorefrontT } from '@/components/shop/StorefrontChrome'
+import { formatStorefrontPrice as formatPrice } from '@/lib/i18n/storefront'
 
 type Variant = { id: string; size: string; color: string; stockCount: number | null }
 type Model = { id: string; name: string; price: number; imageUrl: string | null; categoryId: string | null; variants: Variant[] }
@@ -14,26 +16,23 @@ function LogoMark() {
   return <img src="/icon.svg" alt="" className="w-7 h-7 rounded-lg" style={{ boxShadow: '0 6px 14px -6px var(--nav-accent)' }} />
 }
 
-function formatPrice(price: number): string {
-  return new Intl.NumberFormat('ru-KZ').format(price) + ' ₸'
-}
-
 // Same grouping shape as the existing flat storefront's groupProducts
 // (shop/[slug]/page.tsx) -- pure, no I/O. A model with no category goes into
-// a trailing "Другое" group; a seller who never made a category gets one
-// flat "Все" group.
-function groupModels(models: Model[], categories: Category[]): { id: string | null; name: string; models: Model[] }[] {
+// a trailing "Другое" group (label from the storefront dictionary); a seller
+// who never made a category gets one flat untitled group.
+function groupModels(models: Model[], categories: Category[], otherLabel: string): { id: string | null; name: string; models: Model[] }[] {
   if (categories.length === 0) return [{ id: null, name: '', models }]
   const sorted = [...categories].sort((a, b) => a.sortOrder - b.sortOrder)
   const groups = sorted.map(c => ({ id: c.id as string | null, name: c.name, models: models.filter(m => m.categoryId === c.id) }))
   const uncategorized = models.filter(m => !sorted.some(c => c.id === m.categoryId))
-  if (uncategorized.length > 0) groups.push({ id: null, name: 'Другое', models: uncategorized })
+  if (uncategorized.length > 0) groups.push({ id: null, name: otherLabel, models: uncategorized })
   return groups.filter(g => g.models.length > 0)
 }
 
 export default function WholesaleCatalogPage() {
   const params = useParams<{ slug: string }>()
   const reduceMotion = !!useReducedMotion()
+  const t = useStorefrontT()
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   // The seller's Pro has lapsed -- the API answers 404 'unavailable'. Shown
@@ -58,11 +57,11 @@ export default function WholesaleCatalogPage() {
       .finally(() => setLoading(false))
   }, [params.slug])
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Загрузка…</div>
-  if (unavailable) return <div className="min-h-screen flex items-center justify-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Магазин временно недоступен</div>
-  if (notFound) return <div className="min-h-screen flex items-center justify-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Витрина не найдена</div>
+  if (loading) return <StorefrontStatus text={t.loading} />
+  if (unavailable) return <StorefrontStatus text={t.unavailable} hint={t.unavailableHint} />
+  if (notFound) return <StorefrontStatus text={t.notFound} />
 
-  const groups = groupModels(models, categories)
+  const groups = groupModels(models, categories, t.otherCategory)
   const visibleGroups = activeCategory ? groups.filter(g => g.id === activeCategory) : groups
 
   return (
@@ -70,7 +69,8 @@ export default function WholesaleCatalogPage() {
       <div className="max-w-6xl mx-auto p-4 lg:p-6 pb-32">
         <div className="flex items-center gap-2.5 mb-6">
           <LogoMark />
-          <h1 className="text-lg font-bold" style={{ color: 'var(--nav-text-primary)' }}>{companyName}</h1>
+          <h1 className="text-lg font-bold min-w-0 truncate" style={{ color: 'var(--nav-text-primary)' }}>{companyName}</h1>
+          <StorefrontLangSwitch className="ml-auto" />
         </div>
 
         {categories.length > 0 && (
@@ -78,7 +78,7 @@ export default function WholesaleCatalogPage() {
             <button onClick={() => setActiveCategory(null)}
               className="flex-shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold"
               style={{ background: activeCategory === null ? 'var(--nav-accent)' : 'var(--nav-surface-glass)', color: activeCategory === null ? 'var(--nav-accent-ink)' : 'var(--nav-text-secondary)' }}>
-              Все
+              {t.allCategories}
             </button>
             {[...categories].sort((a, b) => a.sortOrder - b.sortOrder).map(c => (
               <button key={c.id} onClick={() => setActiveCategory(c.id)}
@@ -91,7 +91,7 @@ export default function WholesaleCatalogPage() {
         )}
 
         {models.length === 0 ? (
-          <div className="text-sm text-center py-16" style={{ color: 'var(--nav-text-muted)' }}>Пока нет моделей в каталоге</div>
+          <div className="text-sm text-center py-16" style={{ color: 'var(--nav-text-muted)' }}>{t.noModels}</div>
         ) : (
           <div className="space-y-8">
             {visibleGroups.map(group => (

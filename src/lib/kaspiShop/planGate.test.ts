@@ -12,7 +12,7 @@ vi.mock('@supabase/supabase-js', () => ({
 
 import {
   hasKaspiShopAccess, kaspiShopPlanGate, KASPI_SHOP_NOT_PRO_BODY, KASPI_SHOP_PROFILE_COLUMNS,
-  filterByOwnerAccess, loadOwnerPlanProfiles, ownerHasKaspiShopAccess,
+  filterByOwnerAccess, loadOwnerPlanProfiles, ownerHasKaspiShopAccess, trackedProductOwnerId,
 } from './planGate'
 
 const future = () => new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString()
@@ -170,5 +170,26 @@ describe('ownerHasKaspiShopAccess', () => {
   it('throws on a read error so the caller picks how to fail closed', async () => {
     mockMaybeSingle.mockResolvedValueOnce({ data: null, error: { message: 'boom' } })
     await expect(ownerHasKaspiShopAccess('u5')).rejects.toThrow('boom')
+  })
+})
+
+describe('trackedProductOwnerId', () => {
+  it('prefers the connection owner over the product row user_id', () => {
+    expect(trackedProductOwnerId({ user_id: 'row', kaspi_shop_connections: { user_id: 'conn' } })).toBe('conn')
+  })
+
+  it('accepts the joined connection as a one-element array', () => {
+    expect(trackedProductOwnerId({ user_id: 'row', kaspi_shop_connections: [{ user_id: 'conn' }] })).toBe('conn')
+  })
+
+  it('falls back to the product row user_id when the join is empty', () => {
+    expect(trackedProductOwnerId({ user_id: 'row', kaspi_shop_connections: null })).toBe('row')
+    expect(trackedProductOwnerId({ user_id: 'row', kaspi_shop_connections: [] })).toBe('row')
+    expect(trackedProductOwnerId({ user_id: 'row' })).toBe('row')
+  })
+
+  it('returns null when nothing names an owner (callers then fail closed)', () => {
+    expect(trackedProductOwnerId({})).toBeNull()
+    expect(trackedProductOwnerId(null)).toBeNull()
   })
 })

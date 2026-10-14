@@ -123,3 +123,12 @@
   .lp-root .ks-wrap[data-theme="agent"] { padding-bottom: 24px; }
   .lp-root .ks-wrap[data-theme="agent"] .ks-box { bottom: -46px; }
 }
+
+/* Невысокий экран ноутбука (1180–1439 × ≤740, напр. 1280×720): окно агента
+   на ~20px выше, чем помещается, — чат чуть ниже, нижний запас под декор
+   меньше. Переписка по-прежнему прижата к низу, верх уходит «за край», как в
+   настоящем мессенджере. Тот же запас — у салона и CFO (они грузят этот файл). */
+@media (min-width: 1180px) and (max-width: 1439px) and (max-height: 740px) {
+  .lp-root .ks-wrap.ks-wrap[data-theme] { padding-bottom: 12px; }
+  .lp-root .ks-wrap[data-theme="agent"] .as-chat { height: 284px; }
+}

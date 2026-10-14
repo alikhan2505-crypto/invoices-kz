@@ -132,3 +132,9 @@
 @media (min-width: 1180px) and (max-width: 1439px) {
   .lp-root .ks-wrap[data-theme="cfo"] .ks-label { bottom: -64px; }
 }
+/* Окно уже 700px (ноутбук 1180–1279): «820 000 ₸» в показателях не обрезается. */
+@container (max-width: 700px) {
+  .lp-root .cf-kpis { gap: 6px; }
+  .lp-root .cf-kpi { padding: 7px 6px; }
+  .lp-root .cf-kpi b { font-size: 10.5px; letter-spacing: -0.02em; }
+}

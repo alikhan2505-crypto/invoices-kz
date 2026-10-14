@@ -4,6 +4,8 @@ import { useParams } from 'next/navigation'
 import { motion, useReducedMotion, AnimatePresence } from 'framer-motion'
 import Script from 'next/script'
 import QRCode from 'qrcode'
+import { StorefrontLangSwitch, StorefrontStatus, useStorefrontT } from '@/components/shop/StorefrontChrome'
+import { formatStorefrontPrice as formatPrice, storefrontApiErrorKey, type StorefrontErrorKey } from '@/lib/i18n/storefront'
 
 type Product = { id: string; name: string; brand: string; price: number; imageUrl: string | null; categoryId: string | null }
 type Category = { id: string; name: string; sortOrder: number }
@@ -19,10 +21,6 @@ function LogoMark() {
   )
 }
 
-function formatPrice(price: number): string {
-  return new Intl.NumberFormat('ru-KZ').format(price) + ' ₸'
-}
-
 function cartStorageKey(slug: string): string {
   return `invoiceskz_shop_cart_${slug}`
 }
@@ -30,19 +28,21 @@ function cartStorageKey(slug: string): string {
 // Pure -- no I/O. Sellers who never touched Разделы get the plain flat grid
 // (no heading at all, same as before this feature existed); once at least
 // one category exists, products group under it in sortOrder, with anything
-// left uncategorized collected into a trailing "Другое" section.
-function groupProducts(products: Product[], categories: Category[]): { id: string | null; name: string; products: Product[] }[] {
+// left uncategorized collected into a trailing "Другое" section (label comes
+// from the storefront dictionary in the buyer's language).
+function groupProducts(products: Product[], categories: Category[], otherLabel: string): { id: string | null; name: string; products: Product[] }[] {
   if (categories.length === 0) return [{ id: null, name: '', products }]
   const sorted = [...categories].sort((a, b) => a.sortOrder - b.sortOrder)
   const groups = sorted.map(c => ({ id: c.id as string | null, name: c.name, products: products.filter(p => p.categoryId === c.id) }))
   const uncategorized = products.filter(p => !sorted.some(c => c.id === p.categoryId))
-  if (uncategorized.length > 0) groups.push({ id: null, name: 'Другое', products: uncategorized })
+  if (uncategorized.length > 0) groups.push({ id: null, name: otherLabel, products: uncategorized })
   return groups.filter(g => g.products.length > 0)
 }
 
 export default function StorefrontPage() {
   const params = useParams<{ slug: string }>()
   const reduceMotion = !!useReducedMotion()
+  const t = useStorefrontT()
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   // The seller's Pro has lapsed -- the API answers 404 'unavailable'. Shown
@@ -74,7 +74,7 @@ export default function StorefrontPage() {
   const [orderId, setOrderId] = useState<string | null>(null)
   const [payment, setPayment] = useState<Payment | null>(null)
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<StorefrontErrorKey | null>(null)
 
   useEffect(() => {
     fetch(`/api/shop/${params.slug}`)
@@ -192,19 +192,19 @@ export default function StorefrontPage() {
           buyerName, buyerPhone, buyerAddress,
         }),
       })
-      const data = await res.json()
-      if (!res.ok) { setError(data.error || 'Не удалось оформить заказ'); return }
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) { setError(storefrontApiErrorKey(data.error, 'orderFailed')); return }
       // A created order with no payment (Kaspi mint failed, wallet balance
       // too low, etc.) must not silently fall back to showing the form
       // again with orderId already set -- the buyer would see nothing wrong
       // and resubmit, creating a duplicate order for the same purchase.
-      if (!data.payment) { setError('Не удалось создать оплату. Попробуйте ещё раз чуть позже.'); return }
+      if (!data.payment) { setError('paymentFailed'); return }
       setSubmittedTotal(cartTotal)
       setOrderId(data.orderId)
       setPayment(data.payment)
       setCart({})
     } catch {
-      setError('Ошибка сети. Проверьте соединение и попробуйте ещё раз.')
+      setError('network')
     } finally {
       setSubmitting(false)
     }
@@ -216,39 +216,40 @@ export default function StorefrontPage() {
     setOrderId(null); setPayment(null); setQrDataUrl(null); setError(null)
   }
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Загрузка…</div>
-  if (unavailable) return <div className="min-h-screen flex items-center justify-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Магазин временно недоступен</div>
-  if (notFound) return <div className="min-h-screen flex items-center justify-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Витрина не найдена</div>
+  if (loading) return <StorefrontStatus text={t.loading} />
+  if (unavailable) return <StorefrontStatus text={t.unavailable} hint={t.unavailableHint} />
+  if (notFound) return <StorefrontStatus text={t.notFound} />
 
   if (landingEnabled) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: backgroundColor || 'var(--nav-bg)' }}>
-        <div className="max-w-2xl mx-auto p-6 text-center">
+      <div className="min-h-screen flex items-center justify-center relative" style={{ background: backgroundColor || 'var(--nav-bg)' }}>
+        <StorefrontLangSwitch className="absolute top-4 right-4" />
+        <div className="max-w-2xl mx-auto p-6 pt-16 text-center">
           <div className="flex items-center justify-center gap-2.5 mb-6">
             <LogoMark />
             <h1 className="text-2xl font-bold" style={{ color: 'var(--nav-text-primary)' }}>{companyName}</h1>
           </div>
           {landingHistory && (
             <div className="nav-glass rounded-2xl p-5 mb-4 text-left">
-              <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--nav-text-muted)' }}>История</div>
+              <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--nav-text-muted)' }}>{t.landingHistory}</div>
               <div className="text-sm whitespace-pre-wrap" style={{ color: 'var(--nav-text-secondary)' }}>{landingHistory}</div>
             </div>
           )}
           {landingCapacity && (
             <div className="nav-glass rounded-2xl p-5 mb-4 text-left">
-              <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--nav-text-muted)' }}>Мощности</div>
+              <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--nav-text-muted)' }}>{t.landingCapacity}</div>
               <div className="text-sm whitespace-pre-wrap" style={{ color: 'var(--nav-text-secondary)' }}>{landingCapacity}</div>
             </div>
           )}
           {landingAnnualVolume && (
             <div className="nav-glass rounded-2xl p-5 mb-6 text-left">
-              <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--nav-text-muted)' }}>Годовые объёмы</div>
+              <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--nav-text-muted)' }}>{t.landingAnnualVolume}</div>
               <div className="text-sm whitespace-pre-wrap" style={{ color: 'var(--nav-text-secondary)' }}>{landingAnnualVolume}</div>
             </div>
           )}
           <a href={`/shop/${params.slug}/catalog`}
             className="inline-block rounded-xl px-6 py-3 text-sm font-semibold" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-            Перейти в каталог →
+            {t.goToCatalog}
           </a>
         </div>
       </div>
@@ -263,21 +264,22 @@ export default function StorefrontPage() {
       <div className="max-w-6xl mx-auto p-4 lg:p-6 pb-32 lg:pb-32">
         <div className="flex items-center gap-2.5 mb-6">
           <LogoMark />
-          <h1 className="text-lg font-bold" style={{ color: 'var(--nav-text-primary)' }}>{companyName}</h1>
+          <h1 className="text-lg font-bold min-w-0 truncate" style={{ color: 'var(--nav-text-primary)' }}>{companyName}</h1>
+          <StorefrontLangSwitch className="ml-auto" />
         </div>
 
         {deliveryInfo && (
           <div className="nav-glass rounded-2xl p-4 mb-6">
-            <div className="text-xs font-semibold mb-1" style={{ color: 'var(--nav-text-muted)' }}>Доставка</div>
+            <div className="text-xs font-semibold mb-1" style={{ color: 'var(--nav-text-muted)' }}>{t.delivery}</div>
             <div className="text-sm whitespace-pre-wrap" style={{ color: 'var(--nav-text-secondary)' }}>{deliveryInfo}</div>
           </div>
         )}
 
         {products.length === 0 ? (
-          <div className="text-sm text-center py-16" style={{ color: 'var(--nav-text-muted)' }}>Пока нет товаров в наличии</div>
+          <div className="text-sm text-center py-16" style={{ color: 'var(--nav-text-muted)' }}>{t.noProducts}</div>
         ) : (
           <div className="space-y-8">
-            {groupProducts(products, categories).map(group => (
+            {groupProducts(products, categories, t.otherCategory).map(group => (
               <div key={group.id || group.name || 'all'}>
                 {group.name && (
                   <h2 className="text-lg font-bold mb-4 pb-2 border-b" style={{ color: 'var(--nav-text-primary)', borderColor: 'var(--nav-border)' }}>{group.name}</h2>
@@ -309,13 +311,13 @@ export default function StorefrontPage() {
                               className="rounded-lg px-3 sm:px-4 py-2 text-sm font-semibold"
                               style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}
                             >
-                              В корзину
+                              {t.addToCart}
                             </button>
                           ) : (
                             <div className="flex items-center justify-between rounded-lg overflow-hidden" style={{ background: 'var(--nav-accent)' }}>
-                              <button onClick={() => setQty(p.id, qty - 1)} className="px-3 sm:px-4 py-2 text-sm font-bold" style={{ color: 'var(--nav-accent-ink)' }} aria-label="Уменьшить количество">−</button>
+                              <button onClick={() => setQty(p.id, qty - 1)} className="px-3 sm:px-4 py-2 text-sm font-bold" style={{ color: 'var(--nav-accent-ink)' }} aria-label={t.decreaseQty}>−</button>
                               <span className="text-sm font-semibold" style={{ color: 'var(--nav-accent-ink)' }}>{qty}</span>
-                              <button onClick={() => setQty(p.id, qty + 1)} className="px-3 sm:px-4 py-2 text-sm font-bold" style={{ color: 'var(--nav-accent-ink)' }} aria-label="Увеличить количество">+</button>
+                              <button onClick={() => setQty(p.id, qty + 1)} className="px-3 sm:px-4 py-2 text-sm font-bold" style={{ color: 'var(--nav-accent-ink)' }} aria-label={t.increaseQty}>+</button>
                             </div>
                           )}
                         </div>
@@ -343,8 +345,8 @@ export default function StorefrontPage() {
               className="w-full nav-glass rounded-2xl px-5 py-3.5 flex items-center justify-between shadow-lg"
               style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}
             >
-              <span className="text-sm font-semibold">Корзина: {cartCount} {cartCount === 1 ? 'товар' : 'товара'}</span>
-              <span className="text-sm font-bold">{formatPrice(cartTotal)} · Оформить →</span>
+              <span className="text-sm font-semibold">{t.cartBar(cartCount)}</span>
+              <span className="text-sm font-bold">{formatPrice(cartTotal)} · {t.checkoutCta}</span>
             </button>
           </motion.div>
         )}
@@ -354,22 +356,22 @@ export default function StorefrontPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.5)' }} onClick={closeModal}>
           <div className="nav-glass rounded-2xl p-5 w-full max-w-sm" style={{ background: 'var(--nav-bg)' }} onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between gap-3 mb-4">
-              <div className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>Ваш заказ</div>
-              <button onClick={closeModal} className="text-sm flex-shrink-0" style={{ color: 'var(--nav-text-muted)' }}>✕</button>
+              <div className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{t.yourOrder}</div>
+              <button onClick={closeModal} aria-label={t.close} className="text-sm flex-shrink-0" style={{ color: 'var(--nav-text-muted)' }}>✕</button>
             </div>
 
             {payment ? (
               <div className="text-center">
                 {payment.status === 'paid' ? (
-                  <div className="py-6 text-sm font-semibold" style={{ color: 'var(--nav-success)' }}>Заказ оплачен! Продавец свяжется с вами.</div>
+                  <div className="py-6 text-sm font-semibold" style={{ color: 'var(--nav-success)' }}>{t.orderPaid}</div>
                 ) : (
                   <>
                     {qrDataUrl && <img src={qrDataUrl} alt="Kaspi QR" className="mx-auto mb-3 rounded-lg" width={160} height={160} />}
                     <a href={payment.payment_link || '#'} target="_blank" rel="noopener noreferrer"
                       className="inline-block rounded-lg px-4 py-2 text-sm font-semibold" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-                      Оплатить {formatPrice(submittedTotal)} через Kaspi
+                      {t.payViaKaspi(formatPrice(submittedTotal))}
                     </a>
-                    <div className="text-xs mt-3" style={{ color: 'var(--nav-text-muted)' }}>Ждём подтверждение оплаты…</div>
+                    <div className="text-xs mt-3" style={{ color: 'var(--nav-text-muted)' }}>{t.waitingPayment}</div>
                   </>
                 )}
               </div>
@@ -384,24 +386,24 @@ export default function StorefrontPage() {
                   ))}
                 </ul>
                 <div className="flex items-center justify-between text-sm font-bold mb-4 pt-2 border-t" style={{ color: 'var(--nav-text-primary)', borderColor: 'var(--nav-border)' }}>
-                  <span>Итого</span>
+                  <span>{t.total}</span>
                   <span>{formatPrice(cartTotal)}</span>
                 </div>
                 <div className="space-y-2 mb-4">
-                  <input value={buyerName} onChange={e => setBuyerName(e.target.value)} placeholder="Имя"
+                  <input value={buyerName} onChange={e => setBuyerName(e.target.value)} placeholder={t.namePlaceholder} autoComplete="name"
                     className="w-full rounded-lg px-3 py-2 text-sm outline-none border border-[color:var(--nav-border)]"
                     style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
-                  <input value={buyerPhone} onChange={e => setBuyerPhone(e.target.value)} placeholder="Телефон"
+                  <input value={buyerPhone} onChange={e => setBuyerPhone(e.target.value)} placeholder={t.phonePlaceholder} type="tel" inputMode="tel" autoComplete="tel"
                     className="w-full rounded-lg px-3 py-2 text-sm outline-none border border-[color:var(--nav-border)]"
                     style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
-                  <input value={buyerAddress} onChange={e => setBuyerAddress(e.target.value)} placeholder="Адрес доставки"
+                  <input value={buyerAddress} onChange={e => setBuyerAddress(e.target.value)} placeholder={t.addressPlaceholder} autoComplete="street-address"
                     className="w-full rounded-lg px-3 py-2 text-sm outline-none border border-[color:var(--nav-border)]"
                     style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }} />
                 </div>
-                {error && <div className="text-xs mb-3" style={{ color: 'var(--nav-critical)' }}>{error}</div>}
+                {error && <div role="alert" className="text-xs mb-3" style={{ color: 'var(--nav-critical)' }}>{t.errors[error]}</div>}
                 <button onClick={submitOrder} disabled={submitting || cartLines.length === 0 || !buyerName.trim() || !buyerPhone.trim() || !buyerAddress.trim()}
                   className="w-full rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-                  {submitting ? 'Оформляем…' : 'Оформить и оплатить'}
+                  {submitting ? t.submitting : t.placeAndPay}
                 </button>
               </>
             )}

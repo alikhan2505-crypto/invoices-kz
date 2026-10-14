@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createNicheCheck, failNicheCheck } from '@/lib/kaspiShop/nicheChecks'
 import { getKaspiShopWalletBalance, KASPI_SHOP_CREDIT_PRICE_TENGE } from '@/lib/kaspiShop/wallet'
-import { getActivePlan } from '@/lib/plan'
+import { kaspiShopPlanGate } from '@/lib/kaspiShop/planGate'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -13,21 +13,19 @@ const supabaseAuth = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-// checkId is an opaque identifier with no owner column -- unlike the other
-// kaspi-shop routes (which only ever return the CALLER's own connected
-// shop's data via loadConnection(user.id)), any authenticated user could
-// otherwise poll another user's checkId. Requiring is_admin closes that gap
-// server-side, matching the requireAdmin pattern already used by
-// src/app/api/kaspi/admin-stats/route.ts, widened to admin-OR-Pro
-// (2026-09-03) since the page itself now gates the same way.
-async function requireAdmin(req: NextRequest) {
+// Kaspi Bot access (admin or Pro, widened from admin-only 2026-09-03) is
+// required to start a check; the check row records who asked (user_id), and
+// the result route only hands it back to that same user.
+// 401 only for a missing/invalid token; a logged-in user without Kaspi Bot
+// access (admin or canKaspiShop) gets the shared 403 { errorCode:'not_pro' }
+// from kaspiShopPlanGate (14.10.2026 -- this used to answer a non-Pro seller
+// with a misleading 401 "Unauthorized").
+async function requireUser(req: NextRequest) {
   const accessToken = req.headers.get('authorization')?.replace('Bearer ', '')
   const { data: { user } } = accessToken
     ? await supabaseAuth.auth.getUser(accessToken)
     : { data: { user: null } }
-  if (!user) return null
-  const { data: profile } = await supabase.from('profiles').select('is_admin, plan, plan_expires_at, bonus_expires_at, trial_expires_at').eq('id', user.id).single()
-  return (profile?.is_admin || getActivePlan(profile).canKaspiShop) ? user : null
+  return user
 }
 
 // Static -- this repo never changes owner/name, so these are constants,
@@ -37,8 +35,10 @@ const GITHUB_REPO = 'invoices-kz'
 const GITHUB_WORKFLOW = 'kaspi-shop-niche-check.yml'
 
 export async function POST(req: NextRequest) {
-  const user = await requireAdmin(req)
+  const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const notPro = await kaspiShopPlanGate(user.id)
+  if (notPro) return notPro
 
   const body = await req.json().catch(() => null)
   const query = body?.query?.trim()

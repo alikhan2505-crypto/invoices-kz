@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { mapReviewsResponse } from '@/lib/kaspiShop/reviews'
+import { ownerHasKaspiShopAccess, trackedProductOwnerId } from '@/lib/kaspiShop/planGate'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -24,6 +25,31 @@ export async function POST(req: NextRequest) {
   const upstreamStatus = Number(body?.upstreamStatus) || 0
   const upstreamBodyText = typeof body?.upstreamBodyText === 'string' ? body.upstreamBodyText : ''
   if (!trackedProductId) return NextResponse.json({ error: 'trackedProductId обязателен' }, { status: 400 })
+
+  // Kaspi Bot is a Pro feature (founder decision, 14.10.2026): when the
+  // product's owner no longer has Pro, nothing is written -- a run that was
+  // dispatched while they were still Pro (or a stale manual re-run of the
+  // workflow) must not keep refreshing their cache. Answered 200 with
+  // skipped so the relay doesn't log it as a failure. The cached reviews
+  // already stored stay as they are (nothing is deleted); renewing Pro and
+  // pressing «Обновить» again refreshes them. A failed plan lookup fails
+  // closed (500, no write) -- same contract as the repricer.
+  const { data: product, error: productError } = await supabase
+    .from('kaspi_shop_tracked_products')
+    .select('id, user_id, kaspi_shop_connections(user_id)')
+    .eq('id', trackedProductId)
+    .maybeSingle()
+  if (productError) return NextResponse.json({ error: productError.message }, { status: 500 })
+  if (!product) return NextResponse.json({ error: 'Товар не найден' }, { status: 404 })
+
+  let ownerHasAccess: boolean
+  try {
+    ownerHasAccess = await ownerHasKaspiShopAccess(trackedProductOwnerId(product))
+  } catch (e: any) {
+    console.error(`kaspi-shop reviews ingest: owner plan lookup failed for product ${trackedProductId}:`, e.message)
+    return NextResponse.json({ error: 'Не удалось проверить тариф' }, { status: 500 })
+  }
+  if (!ownerHasAccess) return NextResponse.json({ ok: true, skipped: 'not_pro' })
 
   const fetchedAt = new Date().toISOString()
 

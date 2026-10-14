@@ -205,3 +205,36 @@
 /* Узкая правая колонка (ноутбук 1280): строки заказов не вылезают за карточку. */
 .lp-root .ks-orders { grid-template-columns: minmax(0, 1fr); min-width: 0; }
 .lp-root .ks-order { min-width: 0; overflow: hidden; }
+
+/* Ноутбуки 1180–1279px (бэклог 14.10, трек D): при колонке текста 520px окну
+   доставалось 540–599px, карточки внутри вставали столбиком и страница
+   прокручивалась. Здесь колонка текста 480px, зазор и поля страницы чуть уже,
+   заголовок мельче — окну остаётся ≥600px, и оно держит две колонки, как на
+   1280+. Правила для 1280px и шире не тронуты. */
+@media (min-width: 1180px) and (max-width: 1279px) {
+  .lp-root.lp-root { padding-inline: 32px; }
+  .lp-root .lp-split { grid-template-columns: minmax(0, 480px) minmax(0, 1fr); column-gap: 28px; }
+  .lp-root .lp-split .lp-h1 { font-size: 44px; }
+  .lp-root .lp-split .lp-lead { font-size: 16px; }
+}
+/* Окно 600–639px (ноутбук 1180–1279): накладная «печатается» в пустой низ
+   колонки заказов, как в широком окне, а не поверх списка продавцов. */
+@container (min-width: 600px) {
+  .lp-root .ks-wrap:not([data-theme]) .ks-label { --s: 0.66; left: calc(52% + 34px); bottom: 0; }
+}
+/* Узкое горизонтальное окно (600–760px, ноутбуки 1180–1439): если подпись
+   длиннее места (казахские «4 800 ₸-ден төмен емес», «Барлығын орау»),
+   плашка/кнопка переносится под заголовок, а не вылезает за край карточки и
+   окна. По-русски и по-английски всё помещается в строку — перенос не срабатывает. */
+@container (min-width: 600px) and (max-width: 760px) {
+  .lp-root .ks-wrap:not([data-theme]) .ks-head { flex-wrap: wrap; row-gap: 6px; }
+}
+/* Окно 600–639px (только ноутбук 1180–1279): карточки чуть компактнее. */
+@container (min-width: 600px) and (max-width: 639px) {
+  .lp-root .ks-wrap:not([data-theme]) .ks-body { padding: 12px; gap: 10px; }
+  .lp-root .ks-wrap:not([data-theme]) .ks-card { padding: 12px; gap: 10px; }
+  .lp-root .ks-wrap:not([data-theme]) .ks-title { font-size: 12.5px; }
+  .lp-root .ks-wrap:not([data-theme]) .ks-floor { font-size: 10.5px; padding: 3px 8px; }
+  .lp-root .ks-wrap:not([data-theme]) .ks-btn { font-size: 12px; padding: 8px 13px; }
+  .lp-root .ks-wrap:not([data-theme]) .ks-photo { width: 72px; height: 72px; }
+}

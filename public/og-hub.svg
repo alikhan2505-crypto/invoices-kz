@@ -1,0 +1,123 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
+  <!-- OG-картинка хаба продуктов (invoices.kz и invoices.kz/products), 14.10.2026:
+       в стиле самого хаба — светло-лавандовый фон с размытыми пятнами, словесный
+       знак INVOICES.KZ, плитки продуктов в их собственных цветах (PRODUCTS в
+       src/lib/products.ts). PNG собирается: node scripts/build-og-hub.mjs -->
+  <defs>
+    <radialGradient id="b1" cx="0.08" cy="0.02" r="0.5">
+      <stop offset="0" stop-color="#5B67E8" stop-opacity="0.30"/>
+      <stop offset="1" stop-color="#5B67E8" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="b2" cx="0.95" cy="0.28" r="0.42">
+      <stop offset="0" stop-color="#2DC48D" stop-opacity="0.24"/>
+      <stop offset="1" stop-color="#2DC48D" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="b3" cx="0.55" cy="1.05" r="0.45">
+      <stop offset="0" stop-color="#FF6B57" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#FF6B57" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="sh" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="14" stdDeviation="12" flood-color="#14163A" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="630" fill="#E9ECF7"/>
+  <rect width="1200" height="630" fill="url(#b1)"/>
+  <rect width="1200" height="630" fill="url(#b2)"/>
+  <rect width="1200" height="630" fill="url(#b3)"/>
+
+  <!-- Ghost-цифра, как на хабе: шесть продуктов -->
+  <text x="1146" y="336" text-anchor="end" font-family="Arial, sans-serif" font-weight="900" font-size="315" fill="none" stroke="#14163A" stroke-opacity="0.07" stroke-width="5">6</text>
+
+  <!-- Словесный знак -->
+  <text x="64" y="86" font-family="Arial, sans-serif" font-weight="900" font-size="30" letter-spacing="1" fill="#14163A">INVOICES<tspan fill="#5B67E8">.KZ</tspan></text>
+  <text x="1136" y="84" text-anchor="end" font-family="Arial, sans-serif" font-weight="700" font-size="16" letter-spacing="2.5" fill="#4A4F7A">ОДИН АККАУНТ · БІР АККАУНТ</text>
+
+  <!-- Заголовок -->
+  <text x="64" y="178" font-family="Arial, sans-serif" font-weight="900" font-size="62" letter-spacing="-1.5" fill="#14163A">Сервисы для бизнеса</text>
+  <text x="64" y="248" font-family="Arial, sans-serif" font-weight="900" font-size="62" letter-spacing="-1.5" fill="#14163A">в Казахстане</text>
+  <text x="64" y="302" font-family="Arial, sans-serif" font-weight="700" font-size="27" fill="#4A4F7A">Қазақстандағы бизнеске арналған сервистер</text>
+
+  <!-- Плитки продуктов: 6 × 166px, шаг 15px, x от 64 до 1136 -->
+  <g font-family="Arial, sans-serif" filter="url(#sh)">
+    <!-- Счета -->
+    <g transform="translate(64 356)">
+      <rect width="166" height="210" rx="24" fill="#1C2056"/>
+      <text x="18" y="40" font-weight="900" font-size="24" fill="#F4F6FF">Счета</text>
+      <text x="18" y="64" font-size="14.5" fill="#F4F6FF" fill-opacity="0.78">Счёт, КП и АВР</text>
+      <rect x="70" y="102" width="62" height="80" rx="9" fill="#7C83F2" transform="rotate(-8 101 142)"/>
+      <rect x="78" y="98" width="62" height="80" rx="9" fill="#F4F6FF"/>
+      <rect x="88" y="112" width="30" height="7" rx="3.5" fill="#1C2056"/>
+      <rect x="88" y="128" width="42" height="5" rx="2.5" fill="#A9ADCF"/>
+      <rect x="88" y="140" width="36" height="5" rx="2.5" fill="#A9ADCF"/>
+      <circle cx="136" cy="172" r="17" fill="#2DC48D"/>
+      <path d="M128 172 l6 6 l11 -12" fill="none" stroke="#0C2A1F" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+    <!-- Kaspi Bot -->
+    <g transform="translate(245 356)">
+      <rect width="166" height="210" rx="24" fill="#FF6B57"/>
+      <text x="18" y="40" font-weight="900" font-size="24" fill="#2A0B07">Kaspi Bot</text>
+      <text x="18" y="64" font-size="14.5" fill="#2A0B07" fill-opacity="0.8">Демпинг и заказы</text>
+      <rect x="40" y="128" width="78" height="56" rx="6" fill="#2A0B07"/>
+      <rect x="34" y="116" width="90" height="18" rx="5" fill="#4A1A12"/>
+      <rect x="72" y="116" width="14" height="68" fill="#FFD9D1"/>
+      <rect x="92" y="88" width="62" height="30" rx="15" fill="#FFFFFF" transform="rotate(-6 123 103)"/>
+      <text x="123" y="109" text-anchor="middle" font-weight="900" font-size="17" fill="#2A0B07" transform="rotate(-6 123 103)">−8 %</text>
+      <path d="M140 140 v32 m-9 -9 l9 9 l9 -9" fill="none" stroke="#2A0B07" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+    <!-- Kaspi Cashier API -->
+    <g transform="translate(426 356)">
+      <rect width="166" height="210" rx="24" fill="#F5E663"/>
+      <text x="18" y="40" font-weight="900" font-size="24" fill="#14130A">Kaspi</text>
+      <text x="18" y="66" font-weight="900" font-size="20" fill="#14130A">Cashier API</text>
+      <rect x="22" y="100" width="122" height="84" rx="12" fill="#14130A"/>
+      <circle cx="36" cy="113" r="3.5" fill="#F5E663"/>
+      <circle cx="47" cy="113" r="3.5" fill="#F5E663" fill-opacity="0.6"/>
+      <circle cx="58" cy="113" r="3.5" fill="#F5E663" fill-opacity="0.35"/>
+      <text x="83" y="158" text-anchor="middle" font-family="Consolas, 'Courier New', monospace" font-weight="700" font-size="30" fill="#F5E663">&lt;/&gt;</text>
+    </g>
+    <!-- AI-агент -->
+    <g transform="translate(607 356)">
+      <rect width="166" height="210" rx="24" fill="#B7A6FF"/>
+      <text x="18" y="40" font-weight="900" font-size="24" fill="#1D1140">AI-агент</text>
+      <text x="18" y="64" font-size="14.5" fill="#1D1140" fill-opacity="0.8">Ответы клиентам</text>
+      <path d="M26 100 h86 a12 12 0 0 1 12 12 v26 a12 12 0 0 1 -12 12 h-62 l-14 12 v-12 h-10 a12 12 0 0 1 -12 -12 v-26 a12 12 0 0 1 12 -12 z" fill="#FFFFFF"/>
+      <circle cx="52" cy="125" r="5" fill="#1D1140"/>
+      <circle cx="69" cy="125" r="5" fill="#1D1140"/>
+      <circle cx="86" cy="125" r="5" fill="#1D1140"/>
+      <path d="M68 150 h70 a10 10 0 0 1 10 10 v14 a10 10 0 0 1 -10 10 h-6 v10 l-12 -10 h-52 a10 10 0 0 1 -10 -10 v-14 a10 10 0 0 1 10 -10 z" fill="#1D1140"/>
+      <circle cx="90" cy="167" r="4" fill="#B7A6FF"/>
+      <circle cx="104" cy="167" r="4" fill="#B7A6FF"/>
+      <circle cx="118" cy="167" r="4" fill="#B7A6FF"/>
+    </g>
+    <!-- Салон -->
+    <g transform="translate(788 356)">
+      <rect width="166" height="210" rx="24" fill="#F7C6D4"/>
+      <text x="18" y="40" font-weight="900" font-size="24" fill="#3B1030">Салон</text>
+      <text x="18" y="64" font-size="14.5" fill="#3B1030" fill-opacity="0.8">Записи и сайт</text>
+      <rect x="30" y="100" width="106" height="86" rx="14" fill="#3B1030"/>
+      <rect x="30" y="100" width="106" height="22" rx="11" fill="#5A1E4A"/>
+      <circle cx="52" cy="140" r="5" fill="#F7C6D4" fill-opacity="0.55"/>
+      <circle cx="70" cy="140" r="5" fill="#F7C6D4" fill-opacity="0.55"/>
+      <circle cx="88" cy="140" r="5" fill="#F7C6D4"/>
+      <circle cx="106" cy="140" r="5" fill="#F7C6D4" fill-opacity="0.55"/>
+      <circle cx="52" cy="162" r="5" fill="#F7C6D4" fill-opacity="0.55"/>
+      <circle cx="70" cy="162" r="5" fill="#F7C6D4"/>
+      <circle cx="88" cy="162" r="5" fill="#F7C6D4" fill-opacity="0.55"/>
+      <rect x="92" y="170" width="58" height="26" rx="13" fill="#FFFFFF"/>
+      <text x="121" y="188" text-anchor="middle" font-weight="900" font-size="14" fill="#3B1030">15:00</text>
+    </g>
+    <!-- CFO -->
+    <g transform="translate(969 356)">
+      <rect width="167" height="210" rx="24" fill="#0E4D45"/>
+      <text x="18" y="40" font-weight="900" font-size="24" fill="#DFFAF1">CFO</text>
+      <text x="18" y="64" font-size="14.5" fill="#DFFAF1" fill-opacity="0.78">БДР и БДДС</text>
+      <rect x="30" y="98" width="108" height="88" rx="14" fill="#DFFAF1"/>
+      <rect x="46" y="150" width="14" height="24" rx="3" fill="#0E4D45"/>
+      <rect x="68" y="136" width="14" height="38" rx="3" fill="#0E4D45"/>
+      <rect x="90" y="142" width="14" height="32" rx="3" fill="#0E4D45"/>
+      <rect x="112" y="124" width="14" height="50" rx="3" fill="#0E4D45"/>
+      <path d="M44 132 L66 118 L90 124 L124 106" fill="none" stroke="#2DC48D" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+  </g>
+</svg>

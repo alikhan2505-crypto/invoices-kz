@@ -30,20 +30,25 @@ export const metadata: Metadata = {
   robots: 'index, follow',
   alternates: { canonical: 'https://invoices.kz' },
   appleWebApp: { capable: true, statusBarStyle: 'default', title: 'INVOICES.KZ' },
+  // Карточка по умолчанию для страниц без своей OG (инструменты, вход, тарифы…).
+  // Корень invoices.kz теперь хаб продуктов, поэтому и запасная карточка — про
+  // всю платформу, а не про одни Счета (старая og-image.png). Лендинги, гайды
+  // и витрины задают свою OG сами (14.10.2026).
   openGraph: {
     type: 'website',
     locale: 'ru_KZ',
+    alternateLocale: ['kk_KZ'],
     url: 'https://invoices.kz',
     siteName: 'INVOICES.KZ',
-    title: 'INVOICES.KZ — Не только счета. Вся автоматизация бизнеса',
-    description: 'Счета с оплатой Kaspi, демпинг-бот и витрина для Kaspi Магазина, AI-агент и ЭЦП — одна платформа, один кошелёк. 3 документа бесплатно.',
-    images: [{ url: 'https://invoices.kz/og-image.png', width: 1200, height: 630, alt: 'INVOICES.KZ — платформа автоматизации бизнеса Казахстана' }],
+    title: 'INVOICES.KZ — сервисы для бизнеса в Казахстане',
+    description: 'Счета, Kaspi Bot, Kaspi Cashier API, AI-агент и CFO-кабинет под одним аккаунтом. Қазақстандағы бизнеске арналған сервистер — бір аккаунтта.',
+    images: [{ url: 'https://invoices.kz/og-hub.png', width: 1200, height: 630, alt: 'INVOICES.KZ — сервисы для бизнеса в Казахстане · бизнеске арналған сервистер' }],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'INVOICES.KZ — Не только счета. Вся автоматизация бизнеса',
-    description: 'Счета, оплата Kaspi, Kaspi Bot и AI-агент на одной платформе с единым кошельком.',
-    images: ['https://invoices.kz/og-image.png'],
+    title: 'INVOICES.KZ — сервисы для бизнеса в Казахстане',
+    description: 'Счета, Kaspi Bot, Kaspi Cashier API, AI-агент и CFO-кабинет под одним аккаунтом.',
+    images: ['https://invoices.kz/og-hub.png'],
   },
 }
 

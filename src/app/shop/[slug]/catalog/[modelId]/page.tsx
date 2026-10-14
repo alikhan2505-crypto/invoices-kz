@@ -3,17 +3,16 @@ import { useState, useEffect, useMemo } from 'react'
 import { useParams } from 'next/navigation'
 import WholesaleCartBar from '@/components/kaspiShop/WholesaleCartBar'
 import { useWholesaleCart } from '@/lib/kaspiShop/useWholesaleCart'
+import { StorefrontLangSwitch, StorefrontStatus, useStorefrontT } from '@/components/shop/StorefrontChrome'
+import { formatStorefrontPrice as formatPrice } from '@/lib/i18n/storefront'
 
 type Variant = { id: string; size: string; color: string; stockCount: number | null }
 type Model = { id: string; name: string; price: number; imageUrl: string | null; categoryId: string | null; variants: Variant[] }
 
-function formatPrice(price: number): string {
-  return new Intl.NumberFormat('ru-KZ').format(price) + ' ₸'
-}
-
 export default function WholesaleModelPage() {
   const params = useParams<{ slug: string; modelId: string }>()
   const cart = useWholesaleCart(params.slug)
+  const t = useStorefrontT()
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [unavailable, setUnavailable] = useState(false)
@@ -54,9 +53,9 @@ export default function WholesaleModelPage() {
     setSelectedSize(null)
   }, [selectedColor])
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Загрузка…</div>
-  if (unavailable) return <div className="min-h-screen flex items-center justify-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Магазин временно недоступен</div>
-  if (notFound || !model) return <div className="min-h-screen flex items-center justify-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Модель не найдена</div>
+  if (loading) return <StorefrontStatus text={t.loading} />
+  if (unavailable) return <StorefrontStatus text={t.unavailable} hint={t.unavailableHint} />
+  if (notFound || !model) return <StorefrontStatus text={t.modelNotFound} />
 
   const inStock = selectedVariant && selectedVariant.stockCount !== null && selectedVariant.stockCount > 0
   const isCustomOrder = !!selectedVariant && !inStock
@@ -81,7 +80,10 @@ export default function WholesaleModelPage() {
   return (
     <div className="min-h-screen" style={{ background: 'var(--nav-bg)' }}>
       <div className="max-w-2xl mx-auto p-4 lg:p-6 pb-32">
-        <a href={`/shop/${params.slug}/catalog`} className="text-sm mb-4 inline-block" style={{ color: 'var(--nav-text-muted)' }}>← В каталог</a>
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <a href={`/shop/${params.slug}/catalog`} className="text-sm" style={{ color: 'var(--nav-text-muted)' }}>{t.backToCatalog}</a>
+          <StorefrontLangSwitch />
+        </div>
 
         {model.imageUrl ? (
           <img src={model.imageUrl} alt={model.name} className="w-full aspect-square object-cover rounded-2xl mb-4" style={{ background: 'var(--nav-surface-glass)' }} />
@@ -94,7 +96,7 @@ export default function WholesaleModelPage() {
 
         {colors.length > 0 && (
           <div className="mb-4">
-            <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--nav-text-muted)' }}>Цвет</div>
+            <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--nav-text-muted)' }}>{t.color}</div>
             <div className="flex flex-wrap gap-2">
               {colors.map(c => (
                 <button key={c} onClick={() => setSelectedColor(c)}
@@ -109,7 +111,7 @@ export default function WholesaleModelPage() {
 
         {sizesForColor.length > 0 && (
           <div className="mb-4">
-            <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--nav-text-muted)' }}>Размер</div>
+            <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--nav-text-muted)' }}>{t.size}</div>
             <div className="flex flex-wrap gap-2">
               {sizesForColor.map(v => (
                 <button key={v.size} onClick={() => setSelectedSize(v.size)}
@@ -124,14 +126,14 @@ export default function WholesaleModelPage() {
 
         {selectedVariant && (
           <div className="mb-4 text-sm" style={{ color: inStock ? 'var(--nav-success)' : 'var(--nav-text-muted)' }}>
-            {inStock ? `На складе: ${selectedVariant.stockCount} шт.` : 'Нет в наличии — доступен пошив на заказ'}
+            {inStock ? t.inStock(selectedVariant.stockCount ?? 0) : t.customOrderAvailable}
           </div>
         )}
 
         <button onClick={addToCart} disabled={!selectedVariant}
           className="w-full rounded-xl py-3.5 font-medium text-sm disabled:opacity-50"
           style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-          {added ? 'Добавлено ✓' : isCustomOrder ? 'Оформить пошив на заказ' : 'В корзину'}
+          {added ? t.added : isCustomOrder ? t.orderCustom : t.addToCart}
         </button>
       </div>
 
