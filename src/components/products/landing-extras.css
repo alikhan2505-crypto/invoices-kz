@@ -78,3 +78,25 @@
   .lp-root .lp-bar { padding-top: 12px; margin-top: 6px; }
   .lp-root .lp-footer { margin-top: 8px; padding-top: 8px; }
 }
+
+/* Одна честная строка о цене под кнопкой (решение основателя «1А», 14.10):
+   тариф Про и расход из кошелька + ссылка на полную таблицу тарифов на
+   лендинге Счетов. Мелко и приглушённо, как подпись к кнопке; на десктопе —
+   одна строка, на телефоне может переноситься (ссылка не разрывается). */
+.lp-root .lp-price { margin: -4px 0 0; max-width: 600px; font: 500 13px/1.35 var(--font-onest), Arial, sans-serif; }
+.lp-root .lp-price > span { opacity: 0.72; }
+.lp-root .lp-price a { margin-left: 2px; font-weight: 600; white-space: nowrap; text-decoration: underline; text-decoration-thickness: 1.5px; text-underline-offset: 3px; }
+.lp-root .lp-price a > span:last-child { display: inline-block; transition: transform 0.15s; }
+.lp-root .lp-price a:hover > span:last-child { transform: translateX(3px); }
+@media (prefers-reduced-motion: reduce) {
+  .lp-root .lp-price a > span:last-child { transition: none; }
+  .lp-root .lp-price a:hover > span:last-child { transform: none; }
+}
+/* Строка добавила ~25px в колонку текста — на десктопе забираем их у
+   промежутков и нижнего отступа героя (верх не трогаем: заголовок на всех
+   лендингах начинается на одной высоте), чтобы страница по-прежнему
+   помещалась в один экран от 1440×760. */
+@media (min-width: 1180px) {
+  .lp-root .lp-split .lp-hero[data-price="true"] { gap: 14px; padding-bottom: 2px; }
+  .lp-root .lp-split .lp-hero[data-price="true"] .lp-price { margin-top: -6px; }
+}

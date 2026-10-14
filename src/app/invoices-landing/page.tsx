@@ -7,28 +7,35 @@ import InvoicesLandingPage from '@/components/marketing/InvoicesLandingPage'
 // path also stays live at invoices.kz/invoices-landing, which is fine to
 // leave unlinked rather than gated, same as every other product's /lp/*.
 //
-// Metadata mirrors the layout's own default tags byte for byte (title,
-// description, keywords, OG/Twitter) -- that copy was written for exactly
-// this page and must not silently change when '/' starts inheriting the
-// Hub's own metadata instead.
+// Metadata is about Счета only (14.10.2026): Kaspi Bot, AI-агент, Cashier API,
+// Салон and CFO each have their own landing now. Title/description are ru + kk
+// at once, same format as src/app/lp/[key]/page.tsx (the page's language lives
+// in the browser, the server can't know it). NOTE: apex '/' (while
+// ROOT_HUB_LIVE is off) still inherits the layout's own default tags, not these.
+const TITLE = 'Счета, АВР и КП с оплатой Kaspi · Kaspi арқылы төленетін шот, ОҚА және КҰ | invoices.kz'
+const DESCRIPTION =
+  'Счета, КП, АВР и накладные за минуту: PDF с подписью и печатью, ссылка и QR Kaspi Pay прямо в счёте, оплата подтверждается сама. ЭЦП, ЭСФ и сверка оплат по выписке — для ИП и ТОО Казахстана. ' +
+  'Шот, КҰ, ОҚА және жүкқұжат бір минутта: қолтаңба мен мөрі бар PDF, шоттың өзінде Kaspi Pay сілтемесі мен QR коды, төлем өздігінен расталады. ЖК мен ЖШС үшін.'
+
 export const metadata: Metadata = {
-  title: 'INVOICES.KZ — Счета, оплата Kaspi, Kaspi Bot и AI-агент для бизнеса Казахстана',
-  description: 'Счета, АВР, накладные и КП с оплатой через Kaspi Pay — плюс демпинг-бот и публичная витрина для Kaspi Магазина и AI-агент для клиентов. Одна платформа, один кошелёк. Для ИП и ТОО Казахстана.',
-  keywords: 'счет на оплату казахстан, оплата Kaspi Pay для бизнеса, kaspi bot демпинг цен, витрина kaspi магазина, AI агент для бизнеса казахстан, АВР казахстан, акт выполненных работ онлайн, накладная на отпуск запасов, коммерческое предложение, счет фактура кз, документы для налоговой ИП, ТОО счет БИН ИИН, invoices kz, онлайн бухгалтерия казахстан',
+  title: TITLE,
+  description: DESCRIPTION,
+  keywords: 'счет на оплату казахстан, выставить счет онлайн, счет с оплатой kaspi pay, kaspi qr в счете, АВР казахстан, акт выполненных работ онлайн, накладная на отпуск запасов, коммерческое предложение, счет с НДС 16%, ЭСФ из счета, ЭЦП подпись документов, сверка оплат по выписке, счет ИП ТОО БИН, шот жазу онлайн, төлем шоты, орындалған жұмыстар актісі, жүкқұжат, invoices kz',
   alternates: { canonical: 'https://docs.invoices.kz/' },
   openGraph: {
     type: 'website',
     locale: 'ru_KZ',
+    alternateLocale: ['kk_KZ'],
     url: 'https://docs.invoices.kz/',
     siteName: 'INVOICES.KZ',
-    title: 'INVOICES.KZ — Не только счета. Вся автоматизация бизнеса',
-    description: 'Счета с оплатой Kaspi, демпинг-бот и витрина для Kaspi Магазина, AI-агент и ЭЦП — одна платформа, один кошелёк. 3 документа бесплатно.',
-    images: [{ url: 'https://invoices.kz/og-image.png', width: 1200, height: 630, alt: 'INVOICES.KZ — платформа автоматизации бизнеса Казахстана' }],
+    title: TITLE,
+    description: DESCRIPTION,
+    images: [{ url: 'https://invoices.kz/og-image.png', width: 1200, height: 630, alt: 'INVOICES.KZ — счета, АВР и КП с оплатой Kaspi' }],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'INVOICES.KZ — Не только счета. Вся автоматизация бизнеса',
-    description: 'Счета, оплата Kaspi, Kaspi Bot и AI-агент на одной платформе с единым кошельком.',
+    title: TITLE,
+    description: DESCRIPTION,
     images: ['https://invoices.kz/og-image.png'],
   },
 }

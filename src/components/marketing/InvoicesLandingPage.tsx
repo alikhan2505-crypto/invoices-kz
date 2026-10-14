@@ -2,11 +2,20 @@
 
 import { Component, useEffect, useRef, useState, type ComponentType, type ReactNode } from 'react'
 import dynamic from 'next/dynamic'
-import { AnimatePresence, motion, useInView, useReducedMotion } from 'framer-motion'
+import { MotionConfig, motion, useInView, useReducedMotion } from 'framer-motion'
 import { useLanguage, type Lang } from '@/components/LanguageProvider'
-import { BentoCard, BentoGrid, type BentoItem } from '@/components/ui/bento-grid'
+import { BentoGrid } from '@/components/ui/bento-grid'
 import { PLAN_PRICES, type BillingPeriod } from '@/lib/plans/pricing'
 import { miscDict } from '@/lib/i18n/misc'
+import { findProduct, type ProductKey } from '@/lib/products'
+import { InvoiceStoryCard, type StoryMockCopy } from './invoicesLanding/InvoiceStoryCard'
+import { HeroStoryChips } from './invoicesLanding/HeroStoryChips'
+import { StatCounter, type StatCopy } from './invoicesLanding/StatCounters'
+import { StepFormArt, StepPaidArt, StepScanArt } from './invoicesLanding/StepIllustrations'
+import { BentoMotionTile } from './invoicesLanding/BentoMotion'
+import { DigitRoll } from './invoicesLanding/DigitRoll'
+import { groupThousands } from './invoicesLanding/useLoopStep'
+import './invoicesLanding/invoices-landing.css'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -27,6 +36,9 @@ const COLOR = {
 // Spline 3D block's lazy-load/error fallback, defined at module scope).
 const SURFACE = 'rgba(20,23,46,0.86)'
 const BORDER = 'rgba(255,255,255,0.12)'
+// SURFACE, уже наложенный на COLOR.ground, но непрозрачный: подложка
+// карточки Про должна закрывать вращающийся градиент блика под собой.
+const PRO_PANEL = '#13162C'
 
 const ICON_PROPS = {
   viewBox: '0 0 24 24',
@@ -39,25 +51,6 @@ const ICON_PROPS = {
 
 /* ---------------------------------------------------------------- icons */
 
-function BoltIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} aria-hidden="true" {...ICON_PROPS}>
-      <path d="M12.5 2 4 13.5h6.2L11 22l8.5-11.5H13.3L12.5 2Z" />
-    </svg>
-  )
-}
-
-function PaymentIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} aria-hidden="true" {...ICON_PROPS}>
-      <rect x="2.5" y="6" width="19" height="13" rx="2.5" />
-      <path d="M2.5 10.5h19" />
-      <path d="M6.5 15h4" />
-      <path d="M15.5 3.5 18 6l-2.5 2.5" transform="translate(1 -1)" />
-    </svg>
-  )
-}
-
 function ApiIcon({ className }: { className?: string }) {
   return (
     <svg className={className} aria-hidden="true" {...ICON_PROPS}>
@@ -68,19 +61,11 @@ function ApiIcon({ className }: { className?: string }) {
   )
 }
 
-function PenIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} aria-hidden="true" {...ICON_PROPS}>
-      <path d="M4 20l.9-4L15.3 5.6a2.1 2.1 0 0 1 3 0l.1.1a2.1 2.1 0 0 1 0 3L8 19.1 4 20Z" />
-      <path d="M13.2 7.7l3 3" />
-    </svg>
-  )
-}
+/* Иконки плиток «Всё для счетов» -- анимированные, в
+   invoicesLanding/BentoMotion.tsx. */
 
-/* Re-added from commit 1da2e2c (`git show 1da2e2c` -- removed there when the
-   old "coming soon" placeholder cards were replaced by the live BotShowcase
-   demo below). Restored verbatim for the bento grid's Kaspi Bot / AI-agent
-   cards (see src/components/ui/bento-grid.tsx + BENTO_ICONS). */
+/* Иконки карточек «Другие продукты» (Kaspi Bot / AI-агент / Cashier API /
+   Салон / CFO). StoreIcon и BotIcon -- из коммита 1da2e2c. */
 function StoreIcon({ className }: { className?: string }) {
   return (
     <svg className={className} aria-hidden="true" {...ICON_PROPS}>
@@ -99,6 +84,27 @@ function BotIcon({ className }: { className?: string }) {
       <path d="M9 20.5 11.2 16h1.6L15 20.5" />
       <circle cx="9.2" cy="10.5" r="1" fill="currentColor" stroke="none" />
       <circle cx="14.8" cy="10.5" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}
+
+function CalendarIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} aria-hidden="true" {...ICON_PROPS}>
+      <rect x="3.5" y="5" width="17" height="15.5" rx="2.5" />
+      <path d="M3.5 10h17" />
+      <path d="M8 3v4" />
+      <path d="M16 3v4" />
+      <circle cx="12" cy="15" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}
+
+function ChartIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} aria-hidden="true" {...ICON_PROPS}>
+      <path d="M4 4v16h16" />
+      <path d="M7.5 15l3.5-4 3 2.5L19 8" />
     </svg>
   )
 }
@@ -196,18 +202,19 @@ function CheckIcon({ className }: { className?: string }) {
 
 /* -------------------------------------------------------------- content */
 
-type BentoKey = 'invoice' | 'kaspi' | 'kaspibot' | 'aiagent' | 'esign' | 'api'
-type BotTabKey = 'kaspibot' | 'aiagent'
+type BentoKey = 'invoice' | 'kaspi' | 'esign' | 'esf' | 'acquiring' | 'templates'
+// Продукты из блока «Другие продукты invoices.kz»: цвет и адрес лендинга
+// берутся из PRODUCTS (src/lib/products.ts), здесь только тексты.
+type OtherKey = Extract<ProductKey, 'kaspiShop' | 'aiAgent' | 'kaspiApi' | 'salon' | 'cfo'>
 type AuthKey = 'google' | 'facebook' | 'faceid' | 'mail'
 type ExtraKey = 'globe' | 'wallet' | 'gift'
 
-const BENTO_ICONS: Record<BentoKey, ComponentType<{ className?: string }>> = {
-  invoice: BoltIcon,
-  kaspi: PaymentIcon,
-  kaspibot: StoreIcon,
-  aiagent: BotIcon,
-  esign: PenIcon,
-  api: ApiIcon,
+const OTHER_ICONS: Record<OtherKey, ComponentType<{ className?: string }>> = {
+  kaspiShop: StoreIcon,
+  aiAgent: BotIcon,
+  kaspiApi: ApiIcon,
+  salon: CalendarIcon,
+  cfo: ChartIcon,
 }
 const AUTH_ICONS: Record<AuthKey, ComponentType<{ className?: string }>> = {
   google: GoogleIcon,
@@ -229,48 +236,20 @@ interface Copy {
   heroPrimaryCta: string
   heroSecondaryCta: string
   heroNote: string
-  heroChip1: string
+  // история счёта в плашке у робота: создан -> отправлен -> оплачен
+  heroStory: readonly [string, string, string]
   heroChip2: string
-  stats: { value: number; suffix: string; label: string }[]
-  mock: { url: string; number: string; client: string; service: string; vat: string; total: string; paid: string }
+  stats: StatCopy[]
+  mock: StoryMockCopy
   stepsEyebrow: string
   stepsTitle: string
   steps: { title: string; desc: string }[]
   bentoTitle: string
   bentoSubtitle: string
   bento: { icon: BentoKey; title: string; desc: string; chip: string; href?: string }[]
-  botTitle: string
-  botSubtitle: string
-  botAvailabilityNote: string
-  botTabs: { key: BotTabKey; label: string }[]
-  botKaspi: {
-    stat: string
-    statCaption: string
-    yourPriceLabel: string
-    yourPrice: string
-    yourPriceDropped: string
-    competitorLabel: string
-    competitorPrice: string
-    competitorPriceDropped: string
-    statusText: string
-    statusCompetitorDropped: string
-    statusBotResponded: string
-  }
-  botAgent: {
-    stat: string
-    statCaption: string
-    messages: { from: 'customer' | 'agent'; text: string }[]
-    typingLabel: string
-    leadTitle: string
-    leadStatus: string
-    leadRequestLabel: string
-    leadRequest: string
-    leadNameLabel: string
-    leadName: string
-    leadPhoneLabel: string
-    leadPhone: string
-    leadCaption: string
-  }
+  othersTitle: string
+  othersSubtitle: string
+  others: { key: OtherKey; name: string; pitch: string; tag: string }[]
   pricing: {
     title: string
     subtitle: string
@@ -302,20 +281,23 @@ interface Copy {
 const COPY: Record<Lang, Copy> = {
   ru: {
     navCta: 'Войти',
-    heroTitleLine1: 'Не только счета.',
-    heroTitleLine2: 'Вся автоматизация бизнеса',
-    heroSubtitle: 'Счета с оплатой Kaspi, демпинг-бот для Kaspi Магазина, AI-агент для клиентов и ЭЦП для любых документов — одна платформа, один кошелёк.',
+    heroTitleLine1: 'Счёт за минуту.',
+    heroTitleLine2: 'Оплата — через Kaspi',
+    heroSubtitle: 'Счета, КП, АВР и накладные за минуту — PDF с подписью и печатью. Ссылка и QR Kaspi Pay прямо в счёте, оплата подтверждается сама.',
     heroPrimaryCta: 'Начать бесплатно',
     heroSecondaryCta: 'Как это работает',
-    heroNote: '7 дней бесплатно на тарифе Базовый',
-    heroChip1: 'Счёт оплачен · 12 000 ₸',
-    heroChip2: '2% комиссия',
+    heroNote: '7 дней тарифа Базовый бесплатно — до 10 счетов',
+    heroStory: ['Счёт № 2461 создан', 'Отправлен клиенту в WhatsApp', 'Оплачено через Kaspi · 174 000 ₸'],
+    heroChip2: '2% — только с оплаченного',
     stats: [
-      { value: 1, suffix: ' минута', label: 'от создания до отправки счёта' },
-      { value: 2, suffix: '%', label: 'комиссия — только с оплаченных через Kaspi счетов' },
-      { value: 0, suffix: ' ₸', label: 'чтобы начать — бесплатно' },
+      { kind: 'timer', value: 1, suffix: ' минута', unit: 'мин', label: 'от создания до отправки счёта' },
+      { kind: 'ramp', value: 2, suffix: '%', label: 'комиссия — только с оплаченных через Kaspi счетов' },
+      { kind: 'slot', value: 0, suffix: ' ₸', label: 'чтобы начать — бесплатно' },
     ],
-    mock: { url: 'invoices.kz/i/2461', number: '№ 2461', client: 'ТОО «Ромашка»', service: 'Консалтинговые услуги', vat: 'НДС 12%', total: 'Итого', paid: 'Оплачено · Kaspi' },
+    mock: {
+      url: 'invoices.kz/i/2461', number: '№ 2461', client: 'ТОО «Ромашка»', service: 'Консалтинговые услуги', vat: 'НДС 16%', total: 'Итого', paid: 'Оплачено · Kaspi',
+      draft: 'Черновик', awaiting: 'Ожидает оплаты', payQr: 'Оплатите по Kaspi QR', stamp: 'Оплачено',
+    },
     stepsEyebrow: 'Как это работает',
     stepsTitle: 'Три шага до оплаты',
     steps: [
@@ -323,56 +305,25 @@ const COPY: Record<Lang, Copy> = {
       { title: 'Клиент оплачивает через Kaspi', desc: 'Отправьте ссылку — клиент платит по Kaspi QR прямо со страницы счёта, без регистрации.' },
       { title: 'Оплата подтверждается сама', desc: 'Платформа сама видит оплату и помечает счёт оплаченным — сверять вручную ничего не нужно.' },
     ],
-    bentoTitle: 'Вся платформа',
-    bentoSubtitle: 'Каждый модуль работает сам по себе — и ещё лучше вместе, на одном кошельке.',
+    bentoTitle: 'Всё для счетов',
+    bentoSubtitle: 'От счёта до подписи, ЭСФ и сверки оплат — в одном кабинете.',
     bento: [
-      { icon: 'invoice', title: 'Счета и документы', desc: 'Счета, АВР, КП и накладные за минуту — PDF с подписью и печатью, НДС, отправка ссылкой или на email.', chip: '1 минута' },
-      { icon: 'kaspi', title: 'Оплата через Kaspi', desc: 'Ссылка и QR Kaspi Pay прямо в счёте, платформа сама подтверждает оплату.', chip: '2% только с оплаченных' },
-      { icon: 'kaspibot', title: 'Kaspi Bot', desc: 'Демпинг-бот держит цены в топе, но никогда не опускает ниже вашего минимума — и сам поднимает обратно, когда конкурент ушёл. Плюс заказы, склейка накладных на А4, финансы, аналитика ниш и качество магазина.', chip: 'проверка каждые 15 мин' },
-      { icon: 'aiagent', title: 'AI-агент', desc: 'Отвечает клиентам в Instagram, Telegram и на сайте, собирает заявки в базу.', chip: '5₸ за ответ' },
-      { icon: 'esign', title: 'ЭЦП и договоры', desc: 'Подписывайте любые документы ЭЦП — счета, договоры, АВР, КП и накладные — через QR или eGov mobile. Юридически значимо, без визита в офис. Обе стороны подписывают онлайн.', chip: 'eGov mobile / QR' },
-      { icon: 'api', title: 'Cashier API', desc: 'Принимайте Kaspi Pay на своём сайте по API — для разработчиков.', chip: '2%, без абонплаты', href: '/cashier-api' },
+      { icon: 'invoice', title: 'Счета и документы', desc: 'Счета, КП, АВР и накладные за минуту — PDF с подписью и печатью, НДС 16%, отправка ссылкой или на email.', chip: '1 минута' },
+      { icon: 'kaspi', title: 'Оплата через Kaspi в счёте', desc: 'Ссылка и QR Kaspi Pay прямо в счёте: клиент платит без регистрации, а счёт сам становится оплаченным.', chip: '2% только с оплаченных' },
+      { icon: 'esign', title: 'ЭЦП и договоры', desc: 'Подписывайте счета, договоры, АВР и накладные ЭЦП через QR или eGov mobile. Клиент подписывает со своей стороны онлайн — без визита в офис.', chip: 'eGov mobile / QR' },
+      { icon: 'esf', title: 'ЭСФ из счёта', desc: 'Выставляйте электронный счёт-фактуру в ИС ЭСФ прямо из готового счёта — без повторного ввода данных.', chip: 'ИС ЭСФ' },
+      { icon: 'acquiring', title: 'Сверка оплат по выписке', desc: 'Загрузите выписку банка в Excel — платформа найдёт оплаты по БИН и сумме и сопоставит их со счетами.', chip: 'Excel-выписка' },
+      { icon: 'templates', title: 'Шаблоны и повторяющиеся счета', desc: 'Сохраните счёт как шаблон или включите повтор — ежемесячные счета постоянным клиентам выставляются сами.', chip: 'автоматически' },
     ],
-    botTitle: 'Ещё два сотрудника, которым не нужна зарплата',
-    botSubtitle: 'Kaspi Bot держит цены под контролем, AI-агент отвечает клиентам — 24/7, без вашего участия.',
-    botAvailabilityNote: 'Сейчас в раннем доступе, открываем для всех на тарифе Про постепенно',
-    botTabs: [
-      { key: 'kaspibot', label: 'Kaspi Bot' },
-      { key: 'aiagent', label: 'AI-агент' },
+    othersTitle: 'Другие продукты invoices.kz',
+    othersSubtitle: 'Тот же аккаунт и тот же кошелёк — подключайте, когда понадобится.',
+    others: [
+      { key: 'kaspiShop', name: 'Kaspi Bot', pitch: 'Демпинг цен и заказы Kaspi Магазина в одном кабинете', tag: 'Входит в Про' },
+      { key: 'aiAgent', name: 'AI-агент', pitch: 'Отвечает клиентам в WhatsApp, Instagram и на сайте', tag: 'Входит в Про' },
+      { key: 'kaspiApi', name: 'Kaspi Cashier API', pitch: 'Приём оплат Kaspi Pay на вашем сайте через API', tag: '2% с платежа' },
+      { key: 'salon', name: 'Салон', pitch: 'Записи клиентов, мастера и сайт салона', tag: 'По заявке' },
+      { key: 'cfo', name: 'CFO', pitch: 'БДР, БДДС и платёжный календарь', tag: 'Закрытый тест' },
     ],
-    botKaspi: {
-      stat: '15 мин',
-      statCaption: 'между проверками цен конкурентов — Kaspi Bot держит вас на первой позиции без ручной работы',
-      yourPriceLabel: 'Ваша цена',
-      yourPrice: '14 900 ₸ ↓',
-      yourPriceDropped: '14 800 ₸ ↓',
-      competitorLabel: 'Конкурент',
-      competitorPrice: '15 000 ₸',
-      competitorPriceDropped: '14 900 ₸',
-      statusText: 'Проверка каждые 15 минут, без вашего участия',
-      statusCompetitorDropped: 'Конкурент снизил цену',
-      statusBotResponded: 'Kaspi Bot снизил цену — вы снова первые',
-    },
-    botAgent: {
-      stat: '5₸',
-      statCaption: 'за автоответ клиенту в Instagram, Telegram и на сайте',
-      messages: [
-        { from: 'customer', text: 'Здравствуйте, сколько стоит доставка до Астаны?' },
-        { from: 'agent', text: 'Добрый день! Доставка по Астане — бесплатно от 10 000 ₸, иначе 1 500 ₸. Хотите оформить заказ?' },
-        { from: 'customer', text: 'Да, давайте. Я Айгерим, 8 701 *** 45 67' },
-        { from: 'agent', text: 'Записал! Менеджер свяжется с вами в течение 10 минут 🙂' },
-      ],
-      typingLabel: 'печатает',
-      leadTitle: 'Новая заявка',
-      leadStatus: 'В работе',
-      leadRequestLabel: 'Запрос',
-      leadRequest: 'доставка, оформление заказа',
-      leadNameLabel: 'Имя',
-      leadName: 'Айгерим',
-      leadPhoneLabel: 'Телефон',
-      leadPhone: '8 701 *** 45 67',
-      leadCaption: 'Каждый диалог сам превращается в заявку в вашей базе',
-    },
     pricing: {
       title: 'Прозрачные цены',
       subtitle: 'Начните бесплатно — растите, когда будете готовы.',
@@ -385,7 +336,7 @@ const COPY: Record<Lang, Copy> = {
       free: { name: 'Бесплатно', cta: 'Начать бесплатно' },
       basic: { name: 'Базовый', cta: 'Подключить' },
       pro: { name: 'Про', badge: 'Максимум', cta: 'Подключить' },
-      footnote: 'Kaspi Bot и AI-агент оплачиваются с предоплаченного кошелька по факту использования — 5 ₸ за ответ ИИ, проверки цен каждые 15 минут — после открытия для всех Pro. Kaspi Cashier API доступен на любом тарифе — 2% с платежа, без абонплаты.',
+      footnote: 'Kaspi Bot и AI-агент открыты всем на тарифе Про и сверх тарифа списывают с кошелька: 5 ₸ за проверку цены и 5 ₸ за ответ AI-агента. Оплата Kaspi Pay по ссылке в счёте и Kaspi Cashier API работают на любом тарифе — 2% от оплаченной суммы, с кошелька.',
     },
     authEyebrow: 'Доступ',
     authTitle: 'Вход без паролей',
@@ -402,7 +353,7 @@ const COPY: Record<Lang, Copy> = {
       { icon: 'gift', label: 'Реферальная программа' },
     ],
     ctaTitle: 'Готовы избавиться от бумажной волокиты?',
-    ctaSubtitle: 'Зарегистрируйтесь и получите 7 дней бесплатного доступа.',
+    ctaSubtitle: 'Зарегистрируйтесь — 7 дней тарифа Базовый бесплатно, до 10 счетов.',
     ctaButton: 'Начать бесплатно',
     ctaNote: 'Отмена в любое время',
     footerLinks: [
@@ -412,7 +363,7 @@ const COPY: Record<Lang, Copy> = {
       { label: 'Бесплатно → Склейка накладных', href: '/tools/waybills' },
       { label: 'Бесплатно → Калькулятор маржи', href: '/tools/margin' },
       { label: 'Полезное → Гайды для бизнеса', href: '/guides' },
-      { label: 'Для разработчиков → Cashier API', href: '/cashier-api' },
+      { label: 'Для разработчиков → Cashier API', href: 'https://api.invoices.kz' },
     ],
     footerContact: [
       { label: 'Email', href: 'mailto:support@invoices.kz' },
@@ -421,20 +372,23 @@ const COPY: Record<Lang, Copy> = {
   },
   kk: {
     navCta: 'Кіру',
-    heroTitleLine1: 'Тек шоттар емес.',
-    heroTitleLine2: 'Бизнесті толық автоматтандыру',
-    heroSubtitle: 'Kaspi арқылы төленетін шоттар, Kaspi Магазинге арналған демпинг-бот, клиенттерге жауап беретін AI-агент және кез келген құжатқа ЭЦҚ — бір платформа, бір әмиян.',
+    heroTitleLine1: 'Шот бір минутта.',
+    heroTitleLine2: 'Төлем — Kaspi арқылы',
+    heroSubtitle: 'Шот, КҰ, ОҚА және жүкқұжат бір минутта — қолтаңба мен мөрі бар PDF. Kaspi Pay сілтемесі мен QR коды шоттың өзінде, төлем өздігінен расталады.',
     heroPrimaryCta: 'Тегін бастау',
     heroSecondaryCta: 'Бұл қалай жұмыс істейді',
-    heroNote: 'Тіркелгенде 7 күн тегін (Негізгі тариф)',
-    heroChip1: 'Шот төленді · 12 000 ₸',
-    heroChip2: '2% комиссия',
+    heroNote: 'Базалық тариф 7 күн тегін — 10 шотқа дейін',
+    heroStory: ['№ 2461 шот жасалды', 'Клиентке WhatsApp арқылы жіберілді', 'Kaspi арқылы төленді · 174 000 ₸'],
+    heroChip2: '2% — тек төленген шоттан',
     stats: [
-      { value: 1, suffix: ' минут', label: 'шот жасаудан жіберуге дейін' },
-      { value: 2, suffix: '%', label: 'тек Kaspi арқылы төленген шоттан алынатын комиссия' },
-      { value: 0, suffix: ' ₸', label: 'бастау үшін — тегін' },
+      { kind: 'timer', value: 1, suffix: ' минут', unit: 'мин', label: 'шот жасаудан жіберуге дейін' },
+      { kind: 'ramp', value: 2, suffix: '%', label: 'тек Kaspi арқылы төленген шоттан алынатын комиссия' },
+      { kind: 'slot', value: 0, suffix: ' ₸', label: 'бастау үшін — тегін' },
     ],
-    mock: { url: 'invoices.kz/i/2461', number: '№ 2461', client: '«Ромашка» ЖШС', service: 'Кеңес беру қызметтері', vat: 'ҚҚС 12%', total: 'Барлығы', paid: 'Төленді · Kaspi' },
+    mock: {
+      url: 'invoices.kz/i/2461', number: '№ 2461', client: '«Ромашка» ЖШС', service: 'Кеңес беру қызметтері', vat: 'ҚҚС 16%', total: 'Барлығы', paid: 'Төленді · Kaspi',
+      draft: 'Жоба', awaiting: 'Төлем күтілуде', payQr: 'Kaspi QR арқылы төлеңіз', stamp: 'Төленді',
+    },
     stepsEyebrow: 'Қалай жұмыс істейді',
     stepsTitle: 'Төлемге дейін үш қадам',
     steps: [
@@ -442,56 +396,25 @@ const COPY: Record<Lang, Copy> = {
       { title: 'Клиент Kaspi арқылы төлейді', desc: 'Сілтемені жіберіңіз — клиент тіркелусіз, тікелей шот бетінен Kaspi QR арқылы төлейді.' },
       { title: 'Төлем өздігінен расталады', desc: 'Платформа төлемді өзі көріп, шотты төленді деп белгілейді — қолмен тексерудің қажеті жоқ.' },
     ],
-    bentoTitle: 'Толық платформа',
-    bentoSubtitle: 'Әр модуль өз алдына жұмыс істейді — ал бірге, бір әмиянмен, одан да жақсы.',
+    bentoTitle: 'Шотқа қажеттінің бәрі',
+    bentoSubtitle: 'Шоттан бастап қолтаңбаға, ЭШФ мен төлемдерді салыстыруға дейін — бір кабинетте.',
     bento: [
-      { icon: 'invoice', title: 'Шоттар мен құжаттар', desc: 'Шот, ОҚА, КҰ және жүкқұжат бір минутта — қолтаңба мен мөрі бар PDF, ҚҚС, сілтемемен немесе email арқылы жіберу.', chip: '1 минут' },
-      { icon: 'kaspi', title: 'Kaspi арқылы төлем', desc: 'Шоттың өзінде Kaspi Pay сілтемесі мен QR коды, платформа төлемді өзі растайды.', chip: 'тек төленгеннен 2%' },
-      { icon: 'kaspibot', title: 'Kaspi Bot', desc: 'Демпинг-бот бағаны топта ұстайды, бірақ сіз белгілеген минимумнан төмен түсірмейді — бәсекелес кеткенде өзі қайта көтереді. Әрі тапсырыстар, жүкқұжаттарды А4-ке біріктіру, қаржы, ниша аналитикасы және дүкен сапасы.', chip: 'әр 15 минут сайын тексеру' },
-      { icon: 'aiagent', title: 'AI-агент', desc: 'Instagram, Telegram және сайтта клиенттерге жауап береді, өтінімдерді дерекқорға жинайды.', chip: 'жауап үшін 5₸' },
-      { icon: 'esign', title: 'ЭЦҚ және келісімшарттар', desc: 'Кез келген құжатқа ЭЦҚ қойыңыз — шоттар, келісімшарттар, ОҚА, КҰ және жүкқұжаттар — QR немесе eGov mobile арқылы. Заңды күші бар, кеңсеге барудың қажеті жоқ. Екі тарап та онлайн қол қояды.', chip: 'eGov mobile / QR' },
-      { icon: 'api', title: 'Cashier API', desc: 'Kaspi Pay төлемдерін өз сайтыңызда API арқылы қабылдаңыз — әзірлеушілерге арналған.', chip: '2%, абонплатасыз', href: '/cashier-api' },
+      { icon: 'invoice', title: 'Шоттар мен құжаттар', desc: 'Шот, КҰ, ОҚА және жүкқұжат бір минутта — қолтаңба мен мөрі бар PDF, ҚҚС 16%, сілтемемен немесе email арқылы жіберу.', chip: '1 минут' },
+      { icon: 'kaspi', title: 'Шоттың ішінде Kaspi төлемі', desc: 'Kaspi Pay сілтемесі мен QR коды шоттың өзінде: клиент тіркелмей төлейді, ал шот өзі төленді деп белгіленеді.', chip: 'тек төленгеннен 2%' },
+      { icon: 'esign', title: 'ЭЦҚ және шарттар', desc: 'Шотқа, шартқа, ОҚА мен жүкқұжатқа QR немесе eGov mobile арқылы ЭЦҚ қойыңыз. Клиент те өз тарапынан онлайн қол қояды — кеңсеге барудың қажеті жоқ.', chip: 'eGov mobile / QR' },
+      { icon: 'esf', title: 'Шоттан ЭШФ', desc: 'Дайын шоттан электрондық шот-фактураны ЭШФ ақпараттық жүйесіне бірден жіберіңіз — деректерді қайта енгізбей-ақ.', chip: 'ЭШФ АЖ' },
+      { icon: 'acquiring', title: 'Төлемдерді үзінді көшірмемен салыстыру', desc: 'Банк үзінді көшірмесін Excel-ден жүктеңіз — платформа төлемдерді БСН мен сома бойынша тауып, шоттармен сәйкестендіреді.', chip: 'Excel үзінді көшірме' },
+      { icon: 'templates', title: 'Үлгілер мен қайталанатын шоттар', desc: 'Шотты үлгі ретінде сақтаңыз немесе қайталауды қосыңыз — тұрақты клиенттерге ай сайынғы шоттар өздігінен жазылады.', chip: 'автоматты түрде' },
     ],
-    botTitle: 'Жалақы сұрамайтын тағы екі қызметкер',
-    botSubtitle: 'Kaspi Bot бағаны бақылауда ұстайды, AI-агент клиенттерге жауап береді — 24/7, сіздің қатысуыңызсыз.',
-    botAvailabilityNote: 'Қазір ерте қолжетімділікте, Про тарифіндегі барлығына бірте-бірте ашамыз',
-    botTabs: [
-      { key: 'kaspibot', label: 'Kaspi Bot' },
-      { key: 'aiagent', label: 'AI-агент' },
+    othersTitle: 'invoices.kz-тің басқа өнімдері',
+    othersSubtitle: 'Аккаунт та, әмиян да ортақ — қажет болғанда қосыңыз.',
+    others: [
+      { key: 'kaspiShop', name: 'Kaspi Bot', pitch: 'Kaspi Дүкеніндегі баға демпингі мен тапсырыстар бір кабинетте', tag: 'Про тарифіне кіреді' },
+      { key: 'aiAgent', name: 'AI-агент', pitch: 'Клиенттерге WhatsApp, Instagram және сайтта жауап береді', tag: 'Про тарифіне кіреді' },
+      { key: 'kaspiApi', name: 'Kaspi Cashier API', pitch: 'Kaspi Pay төлемдерін сайтыңызда API арқылы қабылдау', tag: 'Төлемнен 2%' },
+      { key: 'salon', name: 'Салон', pitch: 'Клиенттерді жазу, шеберлер және салон сайты', tag: 'Өтінім бойынша' },
+      { key: 'cfo', name: 'CFO', pitch: 'Бюджет, ақша ағыны және төлем күнтізбесі', tag: 'Жабық сынақ' },
     ],
-    botKaspi: {
-      stat: '15 мин',
-      statCaption: 'бәсекелестердің бағасын тексеру аралығы — Kaspi Bot сізді қолмен әрекетсіз бірінші орында ұстайды',
-      yourPriceLabel: 'Сіздің бағаңыз',
-      yourPrice: '14 900 ₸ ↓',
-      yourPriceDropped: '14 800 ₸ ↓',
-      competitorLabel: 'Бәсекелес',
-      competitorPrice: '15 000 ₸',
-      competitorPriceDropped: '14 900 ₸',
-      statusText: 'Әр 15 минут сайын тексеріледі, сіздің қатысуыңызсыз',
-      statusCompetitorDropped: 'Бәсекелес бағаны төмендетті',
-      statusBotResponded: 'Kaspi Bot бағаны төмендетті — сіз қайта бірінші орындасыз',
-    },
-    botAgent: {
-      stat: '5₸',
-      statCaption: 'Instagram, Telegram және сайттағы бір автожауап үшін',
-      messages: [
-        { from: 'customer', text: 'Сәлеметсіз бе, Астанаға дейінгі жеткізу қанша тұрады?' },
-        { from: 'agent', text: 'Қайырлы күн! Астана бойынша жеткізу 10 000 ₸-ден бастап тегін, болмаса 1 500 ₸. Тапсырыс рәсімдегіңіз келе ме?' },
-        { from: 'customer', text: 'Иә, келісемін. Мен Айгеріммін, 8 701 *** 45 67' },
-        { from: 'agent', text: 'Жаздым! Менеджер 10 минут ішінде сізге хабарласады 🙂' },
-      ],
-      typingLabel: 'жазып жатыр',
-      leadTitle: 'Жаңа өтінім',
-      leadStatus: 'Жұмыста',
-      leadRequestLabel: 'Сұраныс',
-      leadRequest: 'жеткізу, тапсырысты рәсімдеу',
-      leadNameLabel: 'Аты',
-      leadName: 'Айгерім',
-      leadPhoneLabel: 'Телефон',
-      leadPhone: '8 701 *** 45 67',
-      leadCaption: 'Әр диалог дерекқорыңызда өтінімге өздігінен айналады',
-    },
     pricing: {
       title: 'Ашық бағалар',
       subtitle: 'Тегін бастаңыз — дайын болған кезде өсіңіз.',
@@ -504,7 +427,7 @@ const COPY: Record<Lang, Copy> = {
       free: { name: 'Тегін', cta: 'Тегін бастау' },
       basic: { name: 'Базалық', cta: 'Қосылу' },
       pro: { name: 'Про', badge: 'Максимум', cta: 'Қосылу' },
-      footnote: 'Kaspi Bot және AI-агент пайдалану бойынша алдын ала толтырылған әмияннан төленеді — AI жауабы үшін 5 ₸, бағаларды әр 15 минут сайын тексереді — барлық Pro үшін ашылғаннан кейін. Kaspi Cashier API кез келген тарифте қолжетімді — төлемнен 2%, абонплатасыз.',
+      footnote: 'Kaspi Bot пен AI-агент Про тарифіндегі барлық пайдаланушыға ашық, тарифтен бөлек әмияннан төленеді: бағаны бір тексеру — 5 ₸, AI-агенттің бір жауабы — 5 ₸. Шоттағы Kaspi Pay сілтемесі арқылы төлем және Kaspi Cashier API кез келген тарифте жұмыс істейді — төленген соманың 2%-ы әмияннан алынады.',
     },
     authEyebrow: 'Кіру',
     authTitle: 'Құпия сөзсіз кіру',
@@ -521,7 +444,7 @@ const COPY: Record<Lang, Copy> = {
       { icon: 'gift', label: 'Реферал бағдарламасы' },
     ],
     ctaTitle: 'Қағаз әуреден құтылуға дайынсыз ба?',
-    ctaSubtitle: 'Тіркеліп, 7 күн тегін қолжетімділік алыңыз.',
+    ctaSubtitle: 'Тіркеліңіз — Базалық тариф 7 күн тегін, 10 шотқа дейін.',
     ctaButton: 'Тегін бастау',
     ctaNote: 'Кез келген уақытта бас тартуға болады',
     footerLinks: [
@@ -531,7 +454,7 @@ const COPY: Record<Lang, Copy> = {
       { label: 'Тегін → Жүкқұжаттарды желімдеу', href: '/tools/waybills' },
       { label: 'Тегін → Маржа калькуляторы', href: '/tools/margin' },
       { label: 'Пайдалы → Бизнеске арналған нұсқаулар', href: '/guides/kk' },
-      { label: 'Әзірлеушілерге → Cashier API', href: '/cashier-api' },
+      { label: 'Әзірлеушілерге → Cashier API', href: 'https://api.invoices.kz' },
     ],
     footerContact: [
       { label: 'Email', href: 'mailto:support@invoices.kz' },
@@ -540,20 +463,23 @@ const COPY: Record<Lang, Copy> = {
   },
   en: {
     navCta: 'Log in',
-    heroTitleLine1: 'More than invoicing.',
-    heroTitleLine2: 'Your whole business, automated',
-    heroSubtitle: 'Invoices with Kaspi payments, a repricing bot for Kaspi Shop, an AI agent for your customers, and digital signatures for any document — one platform, one wallet.',
+    heroTitleLine1: 'Invoice in a minute.',
+    heroTitleLine2: 'Get paid via Kaspi',
+    heroSubtitle: 'Invoices, quotes, acts and delivery notes in a minute — a PDF with your signature and stamp. A Kaspi Pay link and QR code right in the invoice; payment confirms itself.',
     heroPrimaryCta: 'Start for free',
     heroSecondaryCta: 'How it works',
-    heroNote: '7 days free on the Basic plan',
-    heroChip1: 'Invoice paid · ₸12,000',
-    heroChip2: '2% fee',
+    heroNote: 'Basic plan free for 7 days — up to 10 invoices',
+    heroStory: ['Invoice No. 2461 created', 'Sent to the client on WhatsApp', 'Paid via Kaspi · 174 000 ₸'],
+    heroChip2: '2% — only on paid invoices',
     stats: [
-      { value: 1, suffix: ' minute', label: 'from creating to sending an invoice' },
-      { value: 2, suffix: '%', label: 'fee — only on invoices actually paid via Kaspi' },
-      { value: 0, suffix: ' ₸', label: 'to get started — free' },
+      { kind: 'timer', value: 1, suffix: ' minute', unit: 'min', label: 'from creating to sending an invoice' },
+      { kind: 'ramp', value: 2, suffix: '%', label: 'fee — only on invoices actually paid via Kaspi' },
+      { kind: 'slot', value: 0, suffix: ' ₸', label: 'to get started — free' },
     ],
-    mock: { url: 'invoices.kz/i/2461', number: 'No. 2461', client: 'Romashka LLP', service: 'Consulting services', vat: 'VAT 12%', total: 'Total', paid: 'Paid · Kaspi' },
+    mock: {
+      url: 'invoices.kz/i/2461', number: 'No. 2461', client: 'Romashka LLP', service: 'Consulting services', vat: 'VAT 16%', total: 'Total', paid: 'Paid · Kaspi',
+      draft: 'Draft', awaiting: 'Awaiting payment', payQr: 'Pay with Kaspi QR', stamp: 'Paid',
+    },
     stepsEyebrow: 'How it works',
     stepsTitle: 'Three steps to get paid',
     steps: [
@@ -561,56 +487,25 @@ const COPY: Record<Lang, Copy> = {
       { title: 'Client pays via Kaspi', desc: 'Send the link — the client pays with a Kaspi QR code right from the invoice page, no signup required.' },
       { title: 'Payment confirms itself', desc: 'The platform detects the payment and marks the invoice paid automatically — nothing to reconcile by hand.' },
     ],
-    bentoTitle: 'The whole platform',
-    bentoSubtitle: 'Every module works on its own — and even better together, on one wallet.',
+    bentoTitle: 'Everything for invoicing',
+    bentoSubtitle: 'From the invoice to signatures, e-invoices and payment matching — in one dashboard.',
     bento: [
-      { icon: 'invoice', title: 'Invoices & documents', desc: 'Invoices, acts, quotes, and delivery notes in a minute — a signed and stamped PDF, VAT, sent by link or email.', chip: '1 minute' },
-      { icon: 'kaspi', title: 'Payment via Kaspi', desc: 'A Kaspi Pay link and QR code right in the invoice — the platform confirms payment on its own.', chip: '2% on paid invoices only' },
-      { icon: 'kaspibot', title: 'Kaspi Bot', desc: 'A repricing bot keeps your prices on top, plus orders, waybills, finances, niche analytics, and shop quality — your whole Kaspi cabinet in one place.', chip: 'checks every 15 min' },
-      { icon: 'aiagent', title: 'AI Agent', desc: 'Replies to customers on Instagram, Telegram, and your website, and collects leads into your database.', chip: '₸5 per reply' },
-      { icon: 'esign', title: 'Digital signatures & contracts', desc: 'Sign any document with a digital signature — invoices, contracts, acts, quotes, and delivery notes — via QR or eGov mobile. Legally binding, no office visit needed. Both sides sign online.', chip: 'eGov mobile / QR' },
-      { icon: 'api', title: 'Cashier API', desc: 'Accept Kaspi Pay payments on your own website via API — built for developers.', chip: '2%, no subscription fee', href: '/cashier-api' },
+      { icon: 'invoice', title: 'Invoices & documents', desc: 'Invoices, quotes, acts and delivery notes in a minute — a signed and stamped PDF, 16% VAT, sent by link or email.', chip: '1 minute' },
+      { icon: 'kaspi', title: 'Kaspi payment in the invoice', desc: 'A Kaspi Pay link and QR code right in the invoice: the client pays without signing up, and the invoice marks itself paid.', chip: '2% on paid invoices only' },
+      { icon: 'esign', title: 'E-signature & contracts', desc: 'Sign invoices, contracts, acts and delivery notes with a digital signature via QR or eGov mobile. Your client signs online too — no office visit.', chip: 'eGov mobile / QR' },
+      { icon: 'esf', title: 'E-invoices (ESF)', desc: 'Issue an electronic VAT invoice to the ESF system straight from a finished invoice — no retyping.', chip: 'ESF system' },
+      { icon: 'acquiring', title: 'Bank statement matching', desc: 'Upload your bank statement in Excel — payments are found by BIN and amount and matched to your invoices.', chip: 'Excel statement' },
+      { icon: 'templates', title: 'Templates & recurring invoices', desc: 'Save an invoice as a template or switch on repeats — monthly invoices to regular clients go out on their own.', chip: 'on autopilot' },
     ],
-    botTitle: 'Two more employees who never ask for a salary',
-    botSubtitle: 'Kaspi Bot keeps your prices in check, the AI agent replies to customers — 24/7, with no effort from you.',
-    botAvailabilityNote: 'Currently in early access — rolling out to all Pro plans gradually',
-    botTabs: [
-      { key: 'kaspibot', label: 'Kaspi Bot' },
-      { key: 'aiagent', label: 'AI Agent' },
+    othersTitle: 'More from invoices.kz',
+    othersSubtitle: 'Same account, same wallet — add them when you need them.',
+    others: [
+      { key: 'kaspiShop', name: 'Kaspi Bot', pitch: 'Kaspi Shop repricing and orders in one dashboard', tag: 'Included in Pro' },
+      { key: 'aiAgent', name: 'AI agent', pitch: 'Answers customers on WhatsApp, Instagram and your website', tag: 'Included in Pro' },
+      { key: 'kaspiApi', name: 'Kaspi Cashier API', pitch: 'Accept Kaspi Pay on your own website via API', tag: '2% per payment' },
+      { key: 'salon', name: 'Salon', pitch: 'Client bookings, staff schedules and a salon website', tag: 'By request' },
+      { key: 'cfo', name: 'CFO', pitch: 'P&L, cash flow and a payment calendar', tag: 'Closed beta' },
     ],
-    botKaspi: {
-      stat: '15 min',
-      statCaption: 'between competitor price checks — Kaspi Bot keeps you in first place with zero manual work',
-      yourPriceLabel: 'Your price',
-      yourPrice: '14 900 ₸ ↓',
-      yourPriceDropped: '14 800 ₸ ↓',
-      competitorLabel: 'Competitor',
-      competitorPrice: '15 000 ₸',
-      competitorPriceDropped: '14 900 ₸',
-      statusText: 'Checked every 15 minutes, with no effort from you',
-      statusCompetitorDropped: 'Competitor dropped their price',
-      statusBotResponded: 'Kaspi Bot dropped the price — you’re back in first place',
-    },
-    botAgent: {
-      stat: '5₸',
-      statCaption: 'per automatic reply on Instagram, Telegram, and your website',
-      messages: [
-        { from: 'customer', text: 'Hi, how much does delivery to Astana cost?' },
-        { from: 'agent', text: 'Hello! Delivery within Astana is free from ₸10,000, otherwise ₸1,500. Would you like to place an order?' },
-        { from: 'customer', text: "Yes, let's do it. I'm Aigerim, 8 701 *** 45 67" },
-        { from: 'agent', text: 'Got it! A manager will call you within 10 minutes 🙂' },
-      ],
-      typingLabel: 'typing',
-      leadTitle: 'New lead',
-      leadStatus: 'In progress',
-      leadRequestLabel: 'Request',
-      leadRequest: 'delivery, placing an order',
-      leadNameLabel: 'Name',
-      leadName: 'Aigerim',
-      leadPhoneLabel: 'Phone',
-      leadPhone: '8 701 *** 45 67',
-      leadCaption: 'Every conversation turns itself into a lead in your database',
-    },
     pricing: {
       title: 'Transparent pricing',
       subtitle: "Start for free — grow when you're ready.",
@@ -623,7 +518,7 @@ const COPY: Record<Lang, Copy> = {
       free: { name: 'Free', cta: 'Start for free' },
       basic: { name: 'Basic', cta: 'Subscribe' },
       pro: { name: 'Pro', badge: 'Maximum', cta: 'Subscribe' },
-      footnote: 'Kaspi Bot and the AI agent are billed from your prepaid wallet based on actual usage — ₸5 per AI reply, price checks every 15 minutes — once opened to all Pro plans. Kaspi Cashier API is available on any plan — 2% per payment, no subscription fee.',
+      footnote: 'Kaspi Bot and the AI agent are open to every Pro user and, on top of the plan, draw from your wallet: ₸5 per price check and ₸5 per AI-agent reply. Kaspi Pay links in invoices and the Kaspi Cashier API work on any plan — 2% of the paid amount, charged to your wallet.',
     },
     authEyebrow: 'Access',
     authTitle: 'Sign in without passwords',
@@ -640,7 +535,7 @@ const COPY: Record<Lang, Copy> = {
       { icon: 'gift', label: 'Referral program' },
     ],
     ctaTitle: 'Ready to drop the paperwork?',
-    ctaSubtitle: 'Sign up and get 7 days of free access.',
+    ctaSubtitle: 'Sign up — 7 days of the Basic plan free, up to 10 invoices.',
     ctaButton: 'Start for free',
     ctaNote: 'Cancel anytime',
     footerLinks: [
@@ -650,7 +545,7 @@ const COPY: Record<Lang, Copy> = {
       { label: 'Free → Waybill Merger', href: '/tools/waybills' },
       { label: 'Free → Margin Calculator', href: '/tools/margin' },
       { label: 'Guides → For business', href: '/guides' },
-      { label: 'For Developers → Cashier API', href: '/cashier-api' },
+      { label: 'For Developers → Cashier API', href: 'https://api.invoices.kz' },
     ],
     footerContact: [
       { label: 'Email', href: 'mailto:support@invoices.kz' },
@@ -687,103 +582,17 @@ function Reveal({
   )
 }
 
-function CountUp({ value, suffix, reduce }: { value: number; suffix: string; reduce: boolean }) {
-  const ref = useRef<HTMLSpanElement>(null)
-  const inView = useInView(ref, { once: true, margin: '-40px' })
-  const [display, setDisplay] = useState(reduce ? value : 0)
-
-  useEffect(() => {
-    if (!inView) return
-    if (reduce) {
-      setDisplay(value)
-      return
-    }
-    let raf = 0
-    const duration = 900
-    const start = performance.now()
-    const tick = (now: number) => {
-      const p = Math.min((now - start) / duration, 1)
-      const eased = 1 - Math.pow(1 - p, 3)
-      setDisplay(Math.round(eased * value))
-      if (p < 1) raf = requestAnimationFrame(tick)
-    }
-    raf = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(raf)
-  }, [inView, reduce, value])
-
-  return (
-    <span ref={ref}>
-      {display}
-      {suffix}
-    </span>
-  )
-}
-
 /* The invoice/Kaspi mockup card that used to be the hero's only visual. It
    now also does double duty as the lazy-loaded 3D scene's loading and
    error fallback (see Spline3D/SplineErrorBoundary below), so it's a
    standalone component that fetches its own copy via useLanguage() rather
    than a prop, since next/dynamic's `loading` option and a class-based
    error boundary can't easily be handed Home()'s local `t`. */
-function HeroMockupCard({ compact = false }: { compact?: boolean } = {}) {
+function HeroMockupCard() {
   const { lang } = useLanguage()
-  const t = COPY[lang].mock
-  const reduce = useReducedMotion()
-
-  return (
-    <motion.div
-      initial={reduce ? false : { opacity: 0, y: 30, scale: 0.97 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: reduce ? 0 : 0.7, ease: EASE }}
-      className={compact ? 'relative mx-auto w-full max-w-[260px]' : 'relative mx-auto w-full max-w-md'}
-    >
-      <div
-        aria-hidden="true"
-        className={compact ? 'pointer-events-none absolute -inset-8 rounded-full' : 'pointer-events-none absolute -inset-16 rounded-full'}
-        style={{ background: `radial-gradient(closest-side, ${COLOR.violet}33, transparent 72%)`, filter: compact ? 'blur(18px)' : 'blur(30px)' }}
-      />
-      <motion.div
-        animate={reduce ? undefined : { y: [0, -10, 0] }}
-        transition={reduce ? undefined : { duration: 6, repeat: Infinity, ease: 'easeInOut' }}
-        className="relative overflow-hidden rounded-3xl text-left"
-        style={{ background: SURFACE, border: `1px solid ${BORDER}`, boxShadow: '0 40px 80px rgba(0,0,0,0.55)' }}
-      >
-        <div className={compact ? 'flex items-center gap-1.5 px-4 py-2.5' : 'flex items-center gap-2 px-5 py-3'} style={{ borderBottom: `1px solid ${BORDER}` }}>
-          <span className="h-2.5 w-2.5 rounded-full" style={{ background: COLOR.magenta, opacity: 0.7 }} />
-          <span className="h-2.5 w-2.5 rounded-full" style={{ background: COLOR.violet, opacity: 0.7 }} />
-          <span className="h-2.5 w-2.5 rounded-full" style={{ background: COLOR.teal, opacity: 0.7 }} />
-          <span className="ml-2 truncate text-[11px]" style={{ color: 'rgba(255,255,255,0.68)' }}>
-            {t.url}
-          </span>
-        </div>
-        <div className={compact ? 'p-4' : 'p-5'}>
-          <div className="flex items-start justify-between">
-            <div>
-              <div className={compact ? 'text-[10px]' : 'text-[11px]'} style={{ color: 'rgba(255,255,255,0.68)' }}>{t.number}</div>
-              <div className={compact ? 'mt-0.5 text-[14px] font-semibold' : 'mt-0.5 text-[16px] font-semibold'}>{t.client}</div>
-            </div>
-            <span className={compact ? 'rounded-lg px-2 py-0.5 text-[9px] font-bold text-white' : 'rounded-lg px-2.5 py-1 text-[10px] font-bold text-white'} style={{ background: COLOR.teal }}>
-              {t.paid}
-            </span>
-          </div>
-          <div className={compact ? 'mt-3 space-y-1.5 text-[11px]' : 'mt-4 space-y-2 text-[12px]'} style={{ color: 'rgba(255,255,255,0.82)' }}>
-            <div className="flex justify-between">
-              <span>{t.service}</span>
-              <span>150 000 ₸</span>
-            </div>
-            <div className="flex justify-between">
-              <span>{t.vat}</span>
-              <span>18 000 ₸</span>
-            </div>
-          </div>
-          <div className={compact ? 'mt-3 flex items-center justify-between border-t pt-3' : 'mt-4 flex items-center justify-between border-t pt-4'} style={{ borderColor: BORDER }}>
-            <span className={compact ? 'text-[11px]' : 'text-[12px]'} style={{ color: 'rgba(255,255,255,0.82)' }}>{t.total}</span>
-            <span className={compact ? 'text-[17px] font-bold' : 'text-[20px] font-bold'} style={{ color: COLOR.teal }}>168 000 ₸</span>
-          </div>
-        </div>
-      </motion.div>
-    </motion.div>
-  )
+  // Сама карточка-история (строки -> итог с НДС -> Kaspi QR -> штамп
+  // «Оплачено», по кругу) -- в invoicesLanding/InvoiceStoryCard.tsx.
+  return <InvoiceStoryCard t={COPY[lang].mock} />
 }
 
 /* Desktop-only interactive 3D hero visual — vendored from 21st.dev
@@ -853,6 +662,9 @@ export default function InvoicesLandingPage() {
   const reduce = useReducedMotion()
   const [scrolled, setScrolled] = useState(false)
   const isDesktop = useIsDesktop()
+  // пятна за hero дрейфуют только пока hero на экране (см. AmbientBlobs)
+  const heroRef = useRef<HTMLElement>(null)
+  const heroInView = useInView(heroRef, { margin: '0px' })
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24)
@@ -875,6 +687,10 @@ export default function InvoicesLandingPage() {
   const border = BORDER
 
   return (
+    // reducedMotion="user": при prefers-reduced-motion framer-motion сам
+    // гасит transform-анимации (въезды, барабаны, штампы), оставляя только
+    // opacity; зацикленные сценки при этом стоят на финальном кадре.
+    <MotionConfig reducedMotion="user">
     <div
       className="min-h-screen overflow-x-hidden text-white"
       style={{ background: COLOR.ground, fontFamily: 'ui-sans-serif, -apple-system, "Segoe UI Variable", "Segoe UI", Roboto, sans-serif' }}
@@ -922,8 +738,8 @@ export default function InvoicesLandingPage() {
 
       <main>
       {/* --------------------------------------------------------- hero */}
-      <section className="relative overflow-hidden pt-32 pb-20 sm:pt-40 sm:pb-28">
-        <AmbientBlobs reduce={!!reduce} />
+      <section ref={heroRef} className="relative overflow-hidden pt-32 pb-20 sm:pt-40 sm:pb-28">
+        <AmbientBlobs paused={!heroInView} />
 
         <div className="relative z-10 mx-auto max-w-6xl px-5 sm:px-8">
           <div className="flex flex-col items-center text-center lg:flex-row lg:items-center lg:gap-14 lg:text-left">
@@ -1004,27 +820,10 @@ export default function InvoicesLandingPage() {
                   />
                 </SplineErrorBoundary>
 
-                {/* real-data chips, tying the demo scene back to the product */}
-                <motion.div
-                  initial={reduce ? false : { opacity: 0, y: -10 }}
-                  animate={reduce ? { opacity: 1, y: 0 } : { opacity: 1, y: [0, -8, 0] }}
-                  transition={reduce ? { duration: 0 } : { opacity: { duration: 0.5, delay: 0.6 }, y: { duration: 5, repeat: Infinity, ease: 'easeInOut', delay: 0.6 } }}
-                  className="pointer-events-none absolute left-2 top-8 flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-[12.5px] font-semibold"
-                  style={{ background: surface, border: `1px solid ${border}`, color: 'rgba(255,255,255,0.9)' }}
-                >
-                  <span className="inline-block h-2 w-2 rounded-full" style={{ background: COLOR.teal }} />
-                  {t.heroChip1}
-                </motion.div>
-                <motion.div
-                  initial={reduce ? false : { opacity: 0, y: 10 }}
-                  animate={reduce ? { opacity: 1, y: 0 } : { opacity: 1, y: [0, 8, 0] }}
-                  transition={reduce ? { duration: 0 } : { opacity: { duration: 0.5, delay: 0.8 }, y: { duration: 6, repeat: Infinity, ease: 'easeInOut', delay: 0.8 } }}
-                  className="pointer-events-none absolute bottom-10 right-2 flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-[12.5px] font-semibold"
-                  style={{ background: surface, border: `1px solid ${border}`, color: 'rgba(255,255,255,0.9)' }}
-                >
-                  <span className="inline-block h-2 w-2 rounded-full" style={{ background: COLOR.violet }} />
-                  {t.heroChip2}
-                </motion.div>
+                {/* плашки у робота: история одного счёта по кругу
+                    (создан -> отправлен в WhatsApp -> оплачен через Kaspi)
+                    + «2% только с оплаченного», вспыхивает в момент оплаты */}
+                <HeroStoryChips story={t.heroStory} feeChip={t.heroChip2} />
               </div>
             )}
           </div>
@@ -1042,13 +841,8 @@ export default function InvoicesLandingPage() {
       <Reveal className="relative z-10" as="div">
         <div className="mx-auto max-w-5xl px-5 py-10 sm:px-8" style={{ borderTop: `1px solid ${border}`, borderBottom: `1px solid ${border}` }}>
           <div className="grid grid-cols-1 gap-8 sm:grid-cols-3">
-            {t.stats.map((s, i) => (
-              <div key={i} className="text-center">
-                <div className="text-[clamp(2rem,4vw,2.75rem)] font-bold tracking-[-0.02em]" style={{ color: COLOR.violet }}>
-                  <CountUp value={s.value} suffix={s.suffix} reduce={!!reduce} />
-                </div>
-                <div className="mt-2 text-[13px]" style={{ color: 'rgba(255,255,255,0.82)' }}>{s.label}</div>
-              </div>
+            {t.stats.map((s) => (
+              <StatCounter key={s.kind} stat={s} decimalSep={lang === 'en' ? '.' : ','} />
             ))}
           </div>
         </div>
@@ -1064,19 +858,28 @@ export default function InvoicesLandingPage() {
         <div className="mt-12 flex flex-col gap-4">
           {t.steps.map((s, i) => (
             <Reveal key={s.title} delay={Math.min(i * 0.05, 0.2)}>
+              {/* у каждого шага -- своя маленькая зацикленная сценка справа
+                  (на телефоне -- под текстом), коробка фиксированного размера */}
               <div
-                className="motion-safe:transition-transform motion-safe:duration-200 motion-safe:hover:translate-x-1.5 flex items-start gap-5 rounded-2xl p-6"
+                className="motion-safe:transition-transform motion-safe:duration-200 motion-safe:hover:translate-x-1.5 flex flex-col gap-5 rounded-2xl p-6 sm:flex-row sm:items-center"
                 style={{ background: surface, border: `1px solid ${border}` }}
               >
-                <div
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[16px] font-bold"
-                  style={{ background: `linear-gradient(135deg, ${COLOR.violet}, ${COLOR.teal})` }}
-                >
-                  {i + 1}
+                <div className="flex flex-1 items-start gap-5">
+                  <div
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[16px] font-bold"
+                    style={{ background: `linear-gradient(135deg, ${COLOR.violet}, ${COLOR.teal})` }}
+                  >
+                    {i + 1}
+                  </div>
+                  <div>
+                    <h3 className="text-[16px] font-semibold">{s.title}</h3>
+                    <p className="mt-1.5 text-[13.5px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.82)' }}>{s.desc}</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-[16px] font-semibold">{s.title}</h3>
-                  <p className="mt-1.5 text-[13.5px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.82)' }}>{s.desc}</p>
+                <div className="shrink-0">
+                  {i === 0 && <StepFormArt />}
+                  {i === 1 && <StepScanArt />}
+                  {i === 2 && <StepPaidArt t={t.mock} />}
                 </div>
               </div>
             </Reveal>
@@ -1098,27 +901,22 @@ export default function InvoicesLandingPage() {
 
         <div className="mt-12">
           <BentoGrid>
-            {t.bento.map((item, i) => {
-              const Icon = BENTO_ICONS[item.icon]
-              const card: BentoItem = {
-                title: item.title,
-                description: item.desc,
-                chip: item.chip,
-                href: item.href,
-                icon: <Icon className="h-5 w-5" />,
-              }
-              return (
-                <Reveal key={item.title} delay={Math.min(i * 0.06, 0.3)} className="h-full">
-                  <BentoCard item={card} />
-                </Reveal>
-              )
-            })}
+            {t.bento.map((item, i) => (
+              <Reveal key={item.title} delay={Math.min(i * 0.06, 0.3)} className="h-full">
+                {/* иконка плитки оживает по смыслу фичи при появлении и при
+                    наведении -- см. invoicesLanding/BentoMotion.tsx */}
+                <BentoMotionTile
+                  kind={item.icon}
+                  item={{ title: item.title, description: item.desc, chip: item.chip, href: item.href }}
+                />
+              </Reveal>
+            ))}
           </BentoGrid>
         </div>
       </section>
 
-      {/* ---------------------------------------------- kaspi bot / ai agent */}
-      <BotShowcase t={t} />
+      {/* ------------------------------------------------ other products */}
+      <OtherProducts t={t} />
 
       {/* -------------------------------------------------------- pricing */}
       <PricingSection t={t} lang={lang} goLogin={goLogin} />
@@ -1235,6 +1033,7 @@ export default function InvoicesLandingPage() {
         </div>
       </footer>
     </div>
+    </MotionConfig>
   )
 }
 
@@ -1247,400 +1046,108 @@ function Eyebrow({ children, color }: { children: React.ReactNode; color: string
   )
 }
 
-function AmbientBlobs({ reduce }: { reduce: boolean }) {
-  const drift = (dx: number, dy: number, scale: number, duration: number) =>
-    reduce
-      ? undefined
-      : { x: [0, dx, dx * 0.4, 0], y: [0, dy, dy * 0.5, 0], scale: [1, scale, 1.02, 1], transition: { duration, repeat: Infinity, ease: 'easeInOut' as const } }
-
+/* Цветовые пятна за hero. Дрейф перенесён с framer-motion на CSS
+   (invoices-landing.css): на телефонах (до lg) пятна стоят на месте и
+   размыты слабее, вне экрана дрейф на паузе, при reduced motion -- стоят. */
+function AmbientBlobs({ paused }: { paused: boolean }) {
   return (
-    <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
-      <motion.div
-        className="absolute -left-32 -top-24 h-[520px] w-[520px] rounded-full"
-        style={{ background: COLOR.violet, opacity: 0.32, filter: 'blur(110px)' }}
-        animate={drift(60, 40, 1.08, 22)}
-      />
-      <motion.div
-        className="absolute -right-24 top-10 h-[460px] w-[460px] rounded-full"
-        style={{ background: COLOR.teal, opacity: 0.28, filter: 'blur(110px)' }}
-        animate={drift(-50, 55, 1.06, 27)}
-      />
-      <motion.div
-        className="absolute bottom-[-140px] left-1/3 h-[300px] w-[300px] rounded-full"
-        style={{ background: COLOR.magenta, opacity: 0.16, filter: 'blur(100px)' }}
-        animate={drift(40, -35, 1.1, 24)}
-      />
+    <div aria-hidden="true" data-paused={paused ? 'true' : undefined} className="pointer-events-none absolute inset-0 overflow-hidden">
+      <div className="inv-blob -left-32 -top-24 h-[520px] w-[520px]" style={{ background: COLOR.violet, opacity: 0.32 }} />
+      <div className="inv-blob inv-blob-b -right-24 top-10 h-[460px] w-[460px]" style={{ background: COLOR.teal, opacity: 0.28 }} />
+      <div className="inv-blob inv-blob-c bottom-[-140px] left-1/3 h-[300px] w-[300px]" style={{ background: COLOR.magenta, opacity: 0.16 }} />
     </div>
   )
 }
 
-/* A single AI-agent lead-card row: label + value, fading in once `show`
-   flips true (see the reveal timeline in BotShowcase below). Renders
-   nothing beforehand rather than an empty/skeleton row -- the card grows
-   as the "заявка" fills in, which is the point being demonstrated. */
-function LeadField({ label, value, show, reduce }: { label: string; value: string; show: boolean; reduce: boolean }) {
-  if (!show) return null
+/* «Другие продукты invoices.kz» -- заменил BotShowcase (14.10.2026): у Kaspi
+   Bot и AI-агента теперь свои лендинги с живыми демо, дублировать их здесь
+   незачем. Компактные карточки-ссылки на поддомены продуктов; цвет и адрес
+   берутся из PRODUCTS (src/lib/products.ts), чтобы не разъезжались с хабом
+   и самими лендингами. Акцент продукта -- полоска сверху, плитка иконки и
+   рамка при наведении (через CSS-переменную --glow: инлайновый
+   border перебил бы hover-правило). Наведение: подъём, свечение цветом
+   продукта, иконка чуть поворачивается (invoices-landing.css, движение --
+   только без prefers-reduced-motion). */
+function OtherProducts({ t }: { t: Copy }) {
+  return (
+    <section id="products" className="relative z-10 mx-auto max-w-6xl px-5 py-14 sm:px-8 sm:py-20">
+      <Reveal className="max-w-2xl">
+        <h2 className="text-[clamp(1.9rem,4vw,2.75rem)] font-semibold leading-[1.08] tracking-[-0.02em]">{t.othersTitle}</h2>
+        <p className="mt-4 text-[15px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.82)' }}>{t.othersSubtitle}</p>
+      </Reveal>
+
+      <ul className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        {t.others.map((o, i) => {
+          const product = findProduct(o.key)
+          if (!product?.landing) return null
+          const Icon = OTHER_ICONS[o.key]
+          const glow = glowColor(product.bg, product.ink)
+          return (
+            <Reveal key={o.key} as="li" delay={Math.min(i * 0.05, 0.2)} className="h-full">
+              <a
+                href={product.landing}
+                className="inv-other group relative flex h-full flex-col overflow-hidden rounded-2xl border border-[rgba(255,255,255,0.12)] p-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                style={{ background: SURFACE, '--glow': glow } as React.CSSProperties}
+              >
+                <span aria-hidden="true" className="absolute inset-x-0 top-0 h-1" style={{ background: glow }} />
+                {/* мягкое свечение цветом продукта сверху -- только opacity */}
+                <span
+                  aria-hidden="true"
+                  className="inv-other-glow pointer-events-none absolute inset-x-0 top-0 h-28"
+                  style={{ background: `radial-gradient(120% 100% at 50% 0%, color-mix(in srgb, ${glow} 26%, transparent), transparent 70%)` }}
+                />
+                <div className="relative flex items-center justify-between gap-2">
+                  <span className="inv-other-icon flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: product.bg, color: product.ink }}>
+                    <Icon className="h-5 w-5" />
+                  </span>
+                  <span className="inv-other-arrow" style={{ color: 'rgba(255,255,255,0.6)' }}>
+                    <ArrowRightIcon className="h-4 w-4" />
+                  </span>
+                </div>
+                <h3 className="relative mt-4 text-[15px] font-semibold text-white">{o.name}</h3>
+                <p className="relative mt-1.5 flex-1 text-[13px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.78)' }}>{o.pitch}</p>
+                <span
+                  className="relative mt-4 self-start rounded-lg px-2.5 py-1 text-[11px] font-semibold"
+                  style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.82)' }}
+                >
+                  {o.tag}
+                </span>
+              </a>
+            </Reveal>
+          )
+        })}
+      </ul>
+    </section>
+  )
+}
+
+/* «Экономия N ₸/год» под ценой: строка есть всегда (место под неё
+   зарезервировано), на «Месяц» она просто прозрачная -- переключатель
+   больше не сдвигает списки фич вниз-вверх. */
+function SavingsLine({ show, label }: { show: boolean; label: string }) {
   return (
     <motion.div
-      initial={reduce ? false : { opacity: 0, y: 4 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: reduce ? 0 : 0.3, ease: EASE }}
-      className="flex items-center justify-between gap-3 text-[12.5px]"
+      aria-hidden={!show}
+      className="mt-1 text-[12px] font-medium"
+      style={{ color: '#5EEAD4' }}
+      initial={false}
+      animate={{ opacity: show ? 1 : 0, y: show ? 0 : -4 }}
+      transition={{ duration: 0.3, ease: EASE }}
     >
-      <span style={{ color: 'rgba(255,255,255,0.6)' }}>{label}</span>
-      <span className="text-right font-medium text-white">{value}</span>
+      {label}
     </motion.div>
   )
 }
 
-/* One price/value in the Kaspi Bot demo card -- crossfades or slides
-   between values as `value` changes (driven by BotShowcase's `kaspiPhase`).
-   `mode: 'wipe'` is the left-to-right repricing move: the incoming value
-   enters from the left, the outgoing one exits to the right, both via a
-   plain x-transform inside an `overflow-hidden` box so it reads as the
-   number wiping across the card. `mode: 'fade'` is the loop's soft reset
-   back to the initial state -- opacity only, no slide. The CSS-grid
-   stacking trick (`grid` + every child on `col/row-start-1`) overlaps the
-   entering/exiting spans without absolute positioning so the box sizes
-   itself to whichever value is currently widest. */
-function SlidingValue({
-  value,
-  mode,
-  reduce,
-  color,
-  className,
-}: {
-  value: string
-  mode: 'wipe' | 'fade'
-  reduce: boolean
-  color?: string
-  className?: string
-}) {
-  return (
-    <span className="relative inline-grid overflow-hidden">
-      <AnimatePresence mode="popLayout" initial={false}>
-        <motion.span
-          key={value}
-          initial={reduce ? false : mode === 'wipe' ? { x: '-100%', opacity: 0 } : { opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          exit={reduce ? { opacity: 1 } : mode === 'wipe' ? { x: '100%', opacity: 0 } : { opacity: 0 }}
-          transition={{ duration: reduce ? 0 : 0.5, ease: EASE }}
-          className={`col-start-1 row-start-1 whitespace-nowrap text-[15px] font-semibold${className ? ` ${className}` : ''}`}
-          style={color ? { color } : undefined}
-        >
-          {value}
-        </motion.span>
-      </AnimatePresence>
-    </span>
-  )
-}
-
-/* Replaces the old static "soon" placeholder cards for Kaspi Bot and the
-   AI agent -- both are live products now, so this shows an honest demo
-   instead of a "coming soon" badge. Tab switch uses framer-motion's
-   AnimatePresence for a fade-swap (not the raw CSS @keyframes strings
-   from the throwaway brainstorm mockup) so the whole file stays on one
-   animation system. "15 min" is the product's real competitor-price
-   check interval (matches the /kaspi-shop UI); the AI agent's price
-   mirrors AI_AGENT_CREDIT_PRICE_TENGE from src/lib/aiAgent/wallet.ts --
-   both are real numbers, not marketing stats. The only looping animation
-   is the functional status-pulse dot (motion-safe:animate-ping) -- no
-   decorative infinite glow.
-
-   The AI-agent tab plays a 4-message dialog plus a "Новая заявка" lead
-   card that fills in as the conversation progresses -- the real "Заявки"
-   (Kanban) feature the demo is illustrating. `visibleMessages`/`typing`/
-   `leadStage` drive that timeline; every timer is collected in one array
-   and cleared by the effect's cleanup, which fires both on unmount and on
-   every dependency change (i.e. switching tabs), and the same cleanup
-   path resets state to 0 so re-entering the tab always replays from the
-   start. Reduced motion short-circuits straight to the end state. */
-function BotShowcase({ t }: { t: Copy }) {
-  const reduce = useReducedMotion()
-  const [active, setActive] = useState<BotTabKey>('kaspibot')
-
-  const [visibleMessages, setVisibleMessages] = useState(0)
-  const [typing, setTyping] = useState(false)
-  const [leadStage, setLeadStage] = useState<0 | 1 | 2>(0)
-  const messageCount = t.botAgent.messages.length
-
-  // Kaspi Bot repricing demo: 0 = idle (competitor 15 000 / us 14 900),
-  // 1 = competitor just matched us at 14 900, 2 = we've dropped to 14 800
-  // and are back in the lead. `kaspiMode` picks which transition the
-  // *next* phase change plays: 'wipe' for the two live repricing moves
-  // (left-to-right slide, see SlidingValue below), 'fade' for the loop's
-  // reset back to phase 0 (a soft crossfade, not a wipe, per spec).
-  const [kaspiPhase, setKaspiPhase] = useState<0 | 1 | 2>(0)
-  const [kaspiMode, setKaspiMode] = useState<'wipe' | 'fade'>('wipe')
-
-  useEffect(() => {
-    if (active !== 'kaspibot') {
-      setKaspiPhase(0)
-      setKaspiMode('wipe')
-      return
-    }
-    if (reduce) {
-      // Final state, statically -- no timers at all for reduced motion.
-      setKaspiPhase(2)
-      setKaspiMode('wipe')
-      return
-    }
-    setKaspiPhase(0)
-    setKaspiMode('wipe')
-
-    let cancelled = false
-    let timeoutId: ReturnType<typeof setTimeout>
-    const schedule = (fn: () => void, delay: number) => {
-      timeoutId = setTimeout(() => {
-        if (!cancelled) fn()
-      }, delay)
-    }
-    const runCycle = () => {
-      schedule(() => {
-        setKaspiMode('wipe')
-        setKaspiPhase(1) // competitor drops to 14 900
-        schedule(() => {
-          setKaspiMode('wipe')
-          setKaspiPhase(2) // we drop to 14 800, back in the lead
-          schedule(() => {
-            setKaspiMode('fade')
-            setKaspiPhase(0) // soft crossfade back to the initial state
-            schedule(runCycle, 600)
-          }, 3000)
-        }, 1200)
-      }, 2500)
-    }
-    runCycle()
-
-    return () => {
-      cancelled = true
-      clearTimeout(timeoutId)
-    }
-  }, [active, reduce])
-
-  useEffect(() => {
-    if (active !== 'aiagent') {
-      setVisibleMessages(0)
-      setTyping(false)
-      setLeadStage(0)
-      return
-    }
-    if (reduce) {
-      setVisibleMessages(messageCount)
-      setTyping(false)
-      setLeadStage(2)
-      return
-    }
-    setVisibleMessages(0)
-    setTyping(false)
-    setLeadStage(0)
-    const timers = [
-      setTimeout(() => setVisibleMessages(1), 200), // customer asks about delivery
-      setTimeout(() => setLeadStage(1), 500), // "Запрос" known from the first message
-      setTimeout(() => setVisibleMessages(2), 800), // agent answers
-      setTimeout(() => setVisibleMessages(3), 1400), // customer agrees, gives name + phone
-      setTimeout(() => setLeadStage(2), 1700), // "Имя"/"Телефон" known
-      setTimeout(() => setTyping(true), 2000),
-      setTimeout(() => {
-        setTyping(false)
-        setVisibleMessages(4) // agent confirms
-      }, 3400), // ~1.4s of typing
-    ]
-    return () => timers.forEach(clearTimeout)
-  }, [active, reduce, messageCount])
-
-  return (
-    <section id="bot-showcase" className="relative z-10 mx-auto max-w-6xl px-5 py-14 sm:px-8 sm:py-20">
-      <Reveal className="max-w-2xl">
-        <h2 className="text-[clamp(1.9rem,4vw,2.75rem)] font-semibold leading-[1.08] tracking-[-0.02em]">{t.botTitle}</h2>
-        <p className="mt-4 text-[15px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.82)' }}>{t.botSubtitle}</p>
-        <span
-          className="mt-4 inline-flex items-center rounded-full px-3 py-1 text-[12px] font-medium"
-          style={{ background: 'rgba(94,234,212,0.12)', color: '#5EEAD4', border: '1px solid rgba(94,234,212,0.28)' }}
-        >
-          {t.botAvailabilityNote}
-        </span>
-      </Reveal>
-
-      <Reveal delay={0.08} className="mt-8">
-        <div
-          className="inline-flex gap-2 rounded-2xl p-1.5"
-          style={{ background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORDER}` }}
-        >
-          {t.botTabs.map((tab) => (
-            <button
-              key={tab.key}
-              type="button"
-              onClick={() => setActive(tab.key)}
-              aria-pressed={active === tab.key}
-              className="flex min-h-[44px] items-center justify-center rounded-xl px-5 text-[13px] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-              style={{
-                background: active === tab.key ? COLOR.violet : 'transparent',
-                color: active === tab.key ? '#fff' : 'rgba(255,255,255,0.68)',
-              }}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </Reveal>
-
-      <Reveal delay={0.14} className="mt-6">
-        <div className="overflow-hidden rounded-3xl p-6 sm:p-10" style={{ background: SURFACE, border: `1px solid ${BORDER}` }}>
-          <AnimatePresence mode="wait">
-            {active === 'kaspibot' ? (
-              <motion.div
-                key="kaspibot"
-                initial={reduce ? false : { opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={reduce ? { opacity: 1 } : { opacity: 0, y: -8 }}
-                transition={{ duration: reduce ? 0 : 0.35, ease: EASE }}
-                className="grid grid-cols-1 gap-8 lg:grid-cols-2 lg:items-center"
-              >
-                <div>
-                  <div className="text-[clamp(2.75rem,6vw,4rem)] font-bold tracking-tight" style={{ color: '#5EEAD4' }}>
-                    {t.botKaspi.stat}
-                  </div>
-                  <p className="mt-3 max-w-sm text-[14.5px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.82)' }}>
-                    {t.botKaspi.statCaption}
-                  </p>
-                </div>
-                <div className="rounded-2xl p-5" style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORDER}` }}>
-                  <div className="flex items-center justify-between text-[13px]" style={{ color: 'rgba(255,255,255,0.68)' }}>
-                    <span>{t.botKaspi.competitorLabel}</span>
-                    <SlidingValue
-                      value={kaspiPhase === 0 ? t.botKaspi.competitorPrice : t.botKaspi.competitorPriceDropped}
-                      mode={kaspiMode}
-                      reduce={!!reduce}
-                      className="text-white"
-                    />
-                  </div>
-                  {/* Competitor on top, your (lower) price below it, in the accent
-                      teal -- reads as "the bot just answered and took the lead",
-                      not a warning. #5EEAD4 already carries that positive meaning
-                      elsewhere in this card (the stat figure, the status dot). */}
-                  <div className="mt-3 flex items-center justify-between text-[13px]" style={{ color: 'rgba(255,255,255,0.68)' }}>
-                    <span>{t.botKaspi.yourPriceLabel}</span>
-                    <SlidingValue
-                      value={kaspiPhase === 2 ? t.botKaspi.yourPriceDropped : t.botKaspi.yourPrice}
-                      mode={kaspiMode}
-                      reduce={!!reduce}
-                      color="#5EEAD4"
-                    />
-                  </div>
-                  <div className="mt-5 flex items-center gap-2 border-t pt-4 text-[12px]" style={{ borderColor: BORDER, color: 'rgba(255,255,255,0.68)' }}>
-                    <span className="relative flex h-2 w-2">
-                      <span
-                        className="motion-safe:animate-ping absolute inline-flex h-full w-full rounded-full"
-                        style={{ background: '#5EEAD4', opacity: 0.6 }}
-                      />
-                      <span className="relative inline-flex h-2 w-2 rounded-full" style={{ background: '#5EEAD4' }} />
-                    </span>
-                    {/* Simultaneous crossfade (no `mode="wait"`) -- the outgoing and
-                        incoming status lines overlap in time so there's no blank
-                        gap, and the grid-stack trick (as in SlidingValue above)
-                        keeps them from stacking as two separate flow lines while
-                        both are mounted. */}
-                    <span className="relative inline-grid overflow-hidden">
-                      <AnimatePresence initial={false}>
-                        <motion.span
-                          key={kaspiPhase}
-                          initial={reduce ? false : { opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={reduce ? { opacity: 1 } : { opacity: 0 }}
-                          transition={{ duration: reduce ? 0 : 0.3, ease: EASE }}
-                          className="col-start-1 row-start-1 whitespace-nowrap"
-                        >
-                          {kaspiPhase === 0
-                            ? t.botKaspi.statusText
-                            : kaspiPhase === 1
-                              ? t.botKaspi.statusCompetitorDropped
-                              : t.botKaspi.statusBotResponded}
-                        </motion.span>
-                      </AnimatePresence>
-                    </span>
-                  </div>
-                </div>
-              </motion.div>
-            ) : (
-              <motion.div
-                key="aiagent"
-                initial={reduce ? false : { opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={reduce ? { opacity: 1 } : { opacity: 0, y: -8 }}
-                transition={{ duration: reduce ? 0 : 0.35, ease: EASE }}
-                className="grid grid-cols-1 gap-8 lg:grid-cols-2 lg:items-start"
-              >
-                <div>
-                  <div className="text-[clamp(2.75rem,6vw,4rem)] font-bold tracking-tight" style={{ color: '#5EEAD4' }}>
-                    {t.botAgent.stat}
-                  </div>
-                  <p className="mt-3 max-w-sm text-[14.5px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.82)' }}>
-                    {t.botAgent.statCaption}
-                  </p>
-                </div>
-                {/* Chat stacks above the lead card by default; side-by-side only
-                    once there's real room for both (xl:), never squeezed at lg. */}
-                <div className="flex flex-col gap-4 xl:flex-row xl:items-start">
-                  <div className="min-w-0 flex-1 space-y-3 rounded-2xl p-5" style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORDER}` }}>
-                    {t.botAgent.messages.slice(0, visibleMessages).map((msg, i) => (
-                      <div key={i} className={msg.from === 'customer' ? 'flex justify-start' : 'flex justify-end'}>
-                        <motion.div
-                          initial={reduce ? false : { opacity: 0, y: 6 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ duration: reduce ? 0 : 0.3, ease: EASE }}
-                          className={
-                            msg.from === 'customer'
-                              ? 'max-w-[85%] rounded-2xl rounded-bl-sm px-3.5 py-2.5 text-[13px]'
-                              : 'max-w-[85%] rounded-2xl rounded-br-sm px-3.5 py-2.5 text-[13px] text-white'
-                          }
-                          style={msg.from === 'customer' ? { background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.9)' } : { background: COLOR.violet }}
-                        >
-                          {msg.text}
-                        </motion.div>
-                      </div>
-                    ))}
-                    {typing ? (
-                      <div className="flex justify-end">
-                        <div
-                          role="status"
-                          aria-label={t.botAgent.typingLabel}
-                          className="flex items-center gap-1 rounded-2xl rounded-br-sm px-3.5 py-3"
-                          style={{ background: COLOR.violet }}
-                        >
-                          <span className="h-1.5 w-1.5 rounded-full bg-white motion-safe:animate-bounce" style={{ animationDelay: '0ms' }} />
-                          <span className="h-1.5 w-1.5 rounded-full bg-white motion-safe:animate-bounce" style={{ animationDelay: '150ms' }} />
-                          <span className="h-1.5 w-1.5 rounded-full bg-white motion-safe:animate-bounce" style={{ animationDelay: '300ms' }} />
-                        </div>
-                      </div>
-                    ) : null}
-                  </div>
-                  <div className="w-full xl:w-[240px] xl:flex-shrink-0">
-                    <div className="rounded-2xl p-4" style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORDER}` }}>
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-[12px] font-semibold text-white">{t.botAgent.leadTitle}</span>
-                        <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ background: 'rgba(94,234,212,0.16)', color: '#5EEAD4' }}>
-                          {t.botAgent.leadStatus}
-                        </span>
-                      </div>
-                      <div className="mt-3 space-y-2">
-                        <LeadField label={t.botAgent.leadRequestLabel} value={t.botAgent.leadRequest} show={leadStage >= 1} reduce={!!reduce} />
-                        <LeadField label={t.botAgent.leadNameLabel} value={t.botAgent.leadName} show={leadStage >= 2} reduce={!!reduce} />
-                        <LeadField label={t.botAgent.leadPhoneLabel} value={t.botAgent.leadPhone} show={leadStage >= 2} reduce={!!reduce} />
-                      </div>
-                    </div>
-                    <p className="mt-3 text-[12px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.6)' }}>
-                      {t.botAgent.leadCaption}
-                    </p>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      </Reveal>
-    </section>
-  )
+/* Цвет свечения карточки продукта: сам цвет продукта, а если он слишком
+   тёмный для тёмной страницы (CFO -- #0E4D45) -- смесь с его светлым ink,
+   иначе рамка и свечение при наведении почти не видны. */
+function glowColor(bg: string, ink: string) {
+  const hex = bg.replace('#', '')
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+  const lin = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
+  const lum = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
+  return lum < 0.12 ? `color-mix(in srgb, ${bg} 45%, ${ink})` : bg
 }
 
 /* A single check-list row shared by all three plan cards -- the inline
@@ -1664,8 +1171,8 @@ function FeatureRow({ label, emphasized }: { label: string; emphasized?: boolean
 
 /* Section 3 of the pricing/annual-billing spec (docs/superpowers/specs/
    2026-08-30-pricing-section-annual-billing-design.md) -- the landing's
-   own pricing table, placed between the Kaspi Bot/AI-agent showcase and
-   the passwordless-auth section. Prices come from PLAN_PRICES (the same
+   own pricing table, placed between the «Другие продукты» block and the
+   passwordless-auth section. Prices come from PLAN_PRICES (the same
    server-side source of truth /upgrade and the payment routes use) so a
    price change never needs to touch this file; feature lists come from
    miscDict so they never drift from /upgrade's lists. Everything else
@@ -1679,20 +1186,17 @@ function FeatureRow({ label, emphasized }: { label: string; emphasized?: boolean
    grid look the spec calls out. Pro also naturally reads taller since it
    lists more features (8 vs 6 vs 4), with no layout hacks needed for that. */
 function PricingSection({ t, lang, goLogin }: { t: Copy; lang: Lang; goLogin: (plan?: 'basic' | 'pro', period?: BillingPeriod) => void }) {
-  const reduce = useReducedMotion()
   const [period, setPeriod] = useState<BillingPeriod>('monthly')
+  // бегущий блик рамки Про крутится, только пока карточка на экране
+  const proRef = useRef<HTMLDivElement>(null)
+  const proInView = useInView(proRef, { margin: '0px' })
   const misc = miscDict[lang]
   const suffix = period === 'monthly' ? t.pricing.suffixMonth : t.pricing.suffixYear
-  const formatPrice = (plan: 'basic' | 'pro') => `${PLAN_PRICES[plan][period].toLocaleString('ru-KZ')} ₸`
+  // groupThousands, не toLocaleString: разделитель тысяч одинаковый на
+  // сервере и в браузере (DigitRoll режет цену посимвольно)
+  const formatPrice = (plan: 'basic' | 'pro') => `${groupThousands(PLAN_PRICES[plan][period])} ₸`
   const annualSavings = (plan: 'basic' | 'pro') =>
-    (PLAN_PRICES[plan].monthly * 12 - PLAN_PRICES[plan].annual).toLocaleString('ru-KZ')
-
-  const priceTransition = {
-    initial: reduce ? false : { opacity: 0, y: 4 },
-    animate: { opacity: 1, y: 0 },
-    exit: reduce ? { opacity: 1 } : { opacity: 0, y: -4 },
-    transition: { duration: reduce ? 0 : 0.2, ease: EASE },
-  } as const
+    groupThousands(PLAN_PRICES[plan].monthly * 12 - PLAN_PRICES[plan].annual)
 
   return (
     <section id="pricing" className="relative z-10 mx-auto max-w-6xl px-5 py-14 sm:px-8 sm:py-20">
@@ -1771,20 +1275,13 @@ function PricingSection({ t, lang, goLogin }: { t: Copy; lang: Lang; goLogin: (p
               {t.pricing.basic.name}
             </div>
             <div className="mt-4 flex items-baseline gap-1.5">
-              <AnimatePresence mode="wait">
-                <motion.span key={period} className="text-[2.25rem] font-bold tracking-tight" {...priceTransition}>
-                  {formatPrice('basic')}
-                </motion.span>
-              </AnimatePresence>
+              {/* смена Месяц/Год -- цифры прокручиваются барабаном */}
+              <DigitRoll value={formatPrice('basic')} className="text-[2.25rem] font-bold tracking-tight" />
               <span className="text-[14px] font-normal" style={{ color: 'rgba(255,255,255,0.6)' }}>
                 {suffix}
               </span>
             </div>
-            {period === 'annual' && (
-              <div className="mt-1 text-[12px] font-medium" style={{ color: '#5EEAD4' }}>
-                {t.pricing.annualSavingsLabel(annualSavings('basic'))}
-              </div>
-            )}
+            <SavingsLine show={period === 'annual'} label={t.pricing.annualSavingsLabel(annualSavings('basic'))} />
             <ul className="mt-6 flex-1 space-y-3">
               {misc.basicFeatures.map((f) => (
                 <FeatureRow key={f} label={f} />
@@ -1805,35 +1302,37 @@ function PricingSection({ t, lang, goLogin }: { t: Copy; lang: Lang; goLogin: (p
             since it has the most features -- no negative-margin layout
             trick needed to make it "pop". */}
         <Reveal delay={0.22}>
+          {/* Рамка Про -- медленный бегущий блик: под непрозрачной подложкой
+              (inset 1.5px) вращается conic-gradient, виден только край.
+              Вне экрана -- пауза, при reduced motion -- статичная рамка. */}
           <div
             id="plan-pro"
-            className="relative flex h-full flex-col rounded-3xl p-8"
-            style={{ background: SURFACE, border: `1.5px solid ${COLOR.violet}`, boxShadow: `0 28px 70px -28px ${COLOR.violet}` }}
+            ref={proRef}
+            data-paused={proInView ? undefined : 'true'}
+            className="relative h-full rounded-3xl"
+            style={{ boxShadow: `0 28px 70px -28px ${COLOR.violet}` }}
           >
+            <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-3xl">
+              <div className="inv-shimmer-spin" />
+            </div>
+            <div aria-hidden="true" className="pointer-events-none absolute inset-[1.5px] rounded-[calc(1.5rem-1.5px)]" style={{ background: PRO_PANEL }} />
             <span
-              className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full px-3 py-1 text-[11px] font-bold text-white"
+              className="absolute -top-3 left-1/2 z-[2] -translate-x-1/2 rounded-full px-3 py-1 text-[11px] font-bold text-white"
               style={{ background: COLOR.violet }}
             >
               {t.pricing.pro.badge}
             </span>
+            <div className="relative z-[1] flex h-full flex-col p-8">
             <div className="text-[14px] font-semibold" style={{ color: 'rgba(255,255,255,0.82)' }}>
               {t.pricing.pro.name}
             </div>
             <div className="mt-4 flex items-baseline gap-1.5">
-              <AnimatePresence mode="wait">
-                <motion.span key={period} className="text-[2.5rem] font-bold tracking-tight" style={{ color: '#5EEAD4' }} {...priceTransition}>
-                  {formatPrice('pro')}
-                </motion.span>
-              </AnimatePresence>
+              <DigitRoll value={formatPrice('pro')} className="text-[2.5rem] font-bold tracking-tight" style={{ color: '#5EEAD4' }} />
               <span className="text-[14px] font-normal" style={{ color: 'rgba(255,255,255,0.6)' }}>
                 {suffix}
               </span>
             </div>
-            {period === 'annual' && (
-              <div className="mt-1 text-[12px] font-medium" style={{ color: '#5EEAD4' }}>
-                {t.pricing.annualSavingsLabel(annualSavings('pro'))}
-              </div>
-            )}
+            <SavingsLine show={period === 'annual'} label={t.pricing.annualSavingsLabel(annualSavings('pro'))} />
             <ul className="mt-6 flex-1 space-y-3">
               {misc.proFeatures.map((f) => (
                 <FeatureRow key={f} label={f} emphasized />
@@ -1846,6 +1345,7 @@ function PricingSection({ t, lang, goLogin }: { t: Copy; lang: Lang; goLogin: (p
             >
               {t.pricing.pro.cta}
             </button>
+            </div>
           </div>
         </Reveal>
       </div>

@@ -1,0 +1,128 @@
+/* Анимации лендинга Счетов (InvoicesLandingPage.tsx). Отдельный css-файл,
+   не globals.css: свежий чанк не ловит залипший edge-кэш (ловушка 13.10).
+   Только бесконечные декоративные петли и микро-анимации иконок -- то, что
+   дешевле отдать CSS, чем держать в JS. Сюжетные сценки -- на framer-motion.
+   Всё движение -- под prefers-reduced-motion: no-preference; при reduce
+   элементы стоят в финальном (статичном) виде. Анимируются transform и
+   opacity; stroke-dashoffset -- только на иконках 20px. */
+
+/* ---------------------------------------------------------- hero: пятна */
+/* Размытые цветовые пятна за hero. На телефонах (до lg) стоят на месте и
+   размыты слабее -- blur(110px) на анимируемом слое дорог для мобильного GPU.
+   Вне экрана -- пауза (data-paused ставит React по useInView). */
+.inv-blob { position: absolute; border-radius: 9999px; filter: blur(64px); }
+@media (min-width: 1024px) {
+  .inv-blob { filter: blur(110px); }
+}
+@media (min-width: 1024px) and (prefers-reduced-motion: no-preference) {
+  .inv-blob { will-change: transform; animation: inv-drift-a 22s ease-in-out infinite; }
+  .inv-blob.inv-blob-b { animation-name: inv-drift-b; animation-duration: 27s; }
+  .inv-blob.inv-blob-c { animation-name: inv-drift-c; animation-duration: 24s; }
+  [data-paused="true"] > .inv-blob { animation-play-state: paused; }
+}
+@keyframes inv-drift-a {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  33% { transform: translate3d(60px, 40px, 0) scale(1.08); }
+  66% { transform: translate3d(24px, 20px, 0) scale(1.02); }
+}
+@keyframes inv-drift-b {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  33% { transform: translate3d(-50px, 55px, 0) scale(1.06); }
+  66% { transform: translate3d(-20px, 27px, 0) scale(1.02); }
+}
+@keyframes inv-drift-c {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  33% { transform: translate3d(40px, -35px, 0) scale(1.1); }
+  66% { transform: translate3d(16px, -17px, 0) scale(1.02); }
+}
+
+/* ------------------------------------------------- bento: иконки плиток */
+/* Статичный вид (и reduced motion): всё нарисовано, вспышки/кольца скрыты. */
+.inv-ic svg { overflow: visible; }
+.inv-ic .inv-draw { stroke-dasharray: 1; stroke-dashoffset: 0; }
+.inv-ic .inv-flash,
+.inv-ic .inv-ring { opacity: 0; }
+.inv-ic .inv-pen,
+.inv-ic .inv-lift,
+.inv-ic .inv-lens,
+.inv-ic .inv-ring,
+.inv-ic .inv-pop,
+.inv-ic .inv-spin-once { transform-box: fill-box; transform-origin: center; }
+
+@media (prefers-reduced-motion: no-preference) {
+  /* счёт за минуту: молния прорисовывается и вспыхивает */
+  .inv-ic[data-play] .inv-pop { animation: inv-pop 0.7s cubic-bezier(0.22, 1, 0.36, 1) both; }
+  .inv-ic[data-play] .inv-draw { animation: inv-draw 0.7s cubic-bezier(0.22, 1, 0.36, 1) both; }
+  .inv-ic[data-play] .inv-flash { animation: inv-flash 0.9s ease-out 0.45s both; }
+  /* Kaspi QR: два расходящихся кольца-пульса */
+  .inv-ic[data-play] .inv-ring { animation: inv-ring 1.1s ease-out 2 both; }
+  /* ЭЦП: ручка ведёт подпись */
+  .inv-ic[data-play] .inv-draw-slow { animation-duration: 1s; animation-timing-function: ease-in-out; }
+  .inv-ic[data-play] .inv-pen { animation: inv-pen 1.05s ease-in-out both; }
+  /* ЭСФ: документ подпрыгивает, галочка ставится следом */
+  .inv-ic[data-play] .inv-lift { animation: inv-lift 0.6s cubic-bezier(0.22, 1, 0.36, 1) both; }
+  .inv-ic[data-play] .inv-draw-late { animation-delay: 0.25s; animation-duration: 0.55s; }
+  /* сверка: лупа проходит по строкам выписки, строки подсвечиваются */
+  .inv-ic[data-play] .inv-lens { animation: inv-lens 1.2s cubic-bezier(0.45, 0, 0.2, 1) both; }
+  .inv-ic[data-play] .inv-row { animation: inv-row 0.5s ease-out both; }
+  .inv-ic[data-play] .inv-row-1 { animation-delay: 0.1s; }
+  .inv-ic[data-play] .inv-row-2 { animation-delay: 0.35s; }
+  .inv-ic[data-play] .inv-row-3 { animation-delay: 0.6s; }
+  /* повторяющиеся счета: стрелки делают оборот */
+  .inv-ic[data-play] .inv-spin-once { animation: inv-spin-once 0.95s cubic-bezier(0.65, 0, 0.35, 1) both; }
+}
+@keyframes inv-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes inv-pop { 0% { transform: scale(0.8); } 60% { transform: scale(1.12); } 100% { transform: scale(1); } }
+@keyframes inv-flash { 0% { opacity: 0; } 35% { opacity: 0.45; } 100% { opacity: 0; } }
+@keyframes inv-ring { 0% { opacity: 0.85; transform: scale(0.55); } 100% { opacity: 0; transform: scale(1.35); } }
+@keyframes inv-pen {
+  0% { transform: translate(-9px, 4px); }
+  85% { transform: translate(3px, 4px); }
+  100% { transform: translate(0, 0); }
+}
+@keyframes inv-lift { 0% { transform: translateY(3px); } 55% { transform: translateY(-1.5px); } 100% { transform: translateY(0); } }
+@keyframes inv-lens {
+  0% { transform: translate(-6px, -10px); }
+  35% { transform: translate(-8px, -6px); }
+  70% { transform: translate(-9px, -1.5px); }
+  100% { transform: translate(0, 0); }
+}
+@keyframes inv-row { 0% { opacity: 0.25; } 60% { opacity: 1; } 100% { opacity: 1; } }
+@keyframes inv-spin-once { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+/* ------------------------------------------- «Другие продукты»: свечение */
+/* --accent -- цвет продукта, --glow -- его осветлённая версия (у CFO свой
+   цвет почти чёрно-зелёный, на тёмной странице рамка иначе не видна). */
+.inv-other { transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s, box-shadow 0.3s; }
+.inv-other:hover,
+.inv-other:focus-visible { border-color: var(--glow); box-shadow: 0 22px 44px -22px var(--glow); }
+.inv-other .inv-other-glow { opacity: 0; transition: opacity 0.35s ease; }
+.inv-other:hover .inv-other-glow,
+.inv-other:focus-visible .inv-other-glow { opacity: 1; }
+@media (prefers-reduced-motion: no-preference) {
+  .inv-other:hover,
+  .inv-other:focus-visible { transform: translateY(-4px); }
+  .inv-other .inv-other-icon { transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1); }
+  .inv-other:hover .inv-other-icon,
+  .inv-other:focus-visible .inv-other-icon { transform: scale(1.08) rotate(-4deg); }
+  .inv-other .inv-other-arrow { transition: transform 0.25s ease; }
+  .inv-other:hover .inv-other-arrow,
+  .inv-other:focus-visible .inv-other-arrow { transform: translateX(3px); }
+}
+
+/* ------------------------------------------- тариф Про: бегущий блик рамки */
+/* Огромный квадрат с conic-gradient вращается под непрозрачной подложкой
+   карточки -- по краю (1.5px) виден бегущий блик. Только transform. */
+.inv-shimmer-spin {
+  position: absolute; left: 50%; top: 50%; width: 300%; aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  background: conic-gradient(from 0deg, #6E5ED8 0deg, #6E5ED8 250deg, #9C90FF 290deg, #5EEAD4 318deg, #ffffff 326deg, #9C90FF 340deg, #6E5ED8 360deg);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .inv-shimmer-spin { will-change: transform; animation: inv-shimmer 7s linear infinite; }
+  [data-paused="true"] .inv-shimmer-spin { animation-play-state: paused; }
+}
+@keyframes inv-shimmer {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}

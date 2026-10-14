@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useLanguage, type Lang } from '@/components/LanguageProvider'
 import { PRODUCTS } from '@/lib/products'
-import { LANDINGS, LANDING_UI, OTHER_PRODUCT_LINKS, type LandingKey } from '@/lib/landings'
+import { LANDINGS, LANDING_UI, OTHER_PRODUCT_LINKS, PRICING_URL, type LandingKey } from '@/lib/landings'
 import ProductArt from '@/components/products/ProductArt'
 import { FOOTER_COPY, PRODUCT_I18N } from '@/lib/i18n/productsHub'
 import KaspiLiveScene from '@/components/products/KaspiLiveScene'
@@ -71,7 +71,7 @@ export default function ProductLanding({ landing, fontClass }: { landing: Landin
     : landing === 'cfo' ? <CfoLiveScene lang={lang} /> : null
 
   const hero = (
-    <div className="lp-hero">
+    <div className="lp-hero" data-price={l.priceNote ? 'true' : undefined}>
       <p className="lp-eyebrow">{l.audience[lang]}</p>
       <h1 className="lp-h1">{l.tagline[lang]}</h1>
       <p className="lp-lead">{l.lead[lang]}</p>
@@ -82,6 +82,14 @@ export default function ProductLanding({ landing, fontClass }: { landing: Landin
         <a className="lp-cta" href={applyHref}><span>{ui.apply}</span></a>
       ) : (
         <a className="lp-cta" href={loginHref}><span>{ui.enter}</span></a>
+      )}
+      {/* Одна честная строка о цене (решение «1А»): тариф и расход из кошелька,
+          полная таблица — по ссылке на лендинге Счетов. */}
+      {l.priceNote && (
+        <p className="lp-price">
+          <span>{l.priceNote[lang]}</span>{' '}
+          <a href={PRICING_URL}><span>{ui.pricing}</span><span aria-hidden="true">{'\u00A0→'}</span></a>
+        </p>
       )}
     </div>
   )

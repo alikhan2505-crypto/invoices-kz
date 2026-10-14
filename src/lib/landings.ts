@@ -1,5 +1,12 @@
 import type { Lang } from '@/components/LanguageProvider'
 import type { ProductKey } from './products'
+import { PLAN_PRICES } from './plans/pricing'
+
+// «5 990» с неразрывным пробелом — сумма Про берётся из PLAN_PRICES (единый
+// источник цен), чтобы строка на лендинге не разошлась с тарифами. Свой
+// форматтер, а не toLocaleString: одинаковый результат на сервере и в браузере.
+const tenge = (n: number) => `${String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0')}\u00A0₸`
+const PRO_MONTHLY = tenge(PLAN_PRICES.pro.monthly)
 
 // Content of the public product landings (stage 4 of the product split).
 // Colours come from the PRODUCTS registry; only the softer sticker tint lives
@@ -20,6 +27,10 @@ export type LandingDef = {
   softInk?: string
   // Note under the call to action for 'invite' landings; falls back to LANDING_UI.inviteNote.
   inviteNote?: L10n
+  // Одна честная строка о цене под кнопкой (решение основателя «1А», 14.10):
+  // полная таблица тарифов — только на лендинге Счетов, здесь — тариф и
+  // расход из кошелька + ссылка «Тарифы →». У salon/cfo нет (заявка/закрытый тест).
+  priceNote?: L10n
   soft: string
   audience: L10n
   tagline: L10n
@@ -61,6 +72,11 @@ export const LANDINGS: Record<LandingKey, LandingDef> = {
       kk: ['Бағаны төменгі шекке дейін автоматты түсіру', 'Орау, тапсыру, жүкқұжаттар — барлық тапсырыс бірден', 'Комиссиядан кейінгі әр тауар бойынша пайда'],
       en: ['Automatic price cuts down to your floor', 'Packing, handover, waybills — all orders at once', 'Profit per product after commissions'],
     },
+    priceNote: {
+      ru: `Входит в тариф Про — ${PRO_MONTHLY}/мес. Каждая проверка цены — 5\u00A0₸ из кошелька.`,
+      kk: `Про тарифіне кіреді — ${PRO_MONTHLY}/ай. Бағаны әр тексеру — әмияннан 5\u00A0₸.`,
+      en: `Included in the Pro plan — ${PRO_MONTHLY}/mo. Each price check takes 5\u00A0₸ from your wallet.`,
+    },
     title: {
       ru: 'Kaspi Bot — демпинг цен и заказы Kaspi | invoices.kz',
       kk: 'Kaspi Bot — Kaspi-дегі баға демпингі мен тапсырыстар | invoices.kz',
@@ -96,6 +112,11 @@ export const LANDINGS: Record<LandingKey, LandingDef> = {
       ru: ['Сценарии и кнопки без кода', 'Передаёт диалог человеку в нужный момент', 'Счёт или запись — черновиком, вы подтверждаете'],
       kk: ['Кодсыз сценарийлер мен түймелер', 'Диалогты қажет сәтте адамға береді', 'Шот немесе жазылу — жоба, сіз растайсыз'],
       en: ['Scenarios and buttons without code', 'Hands the chat to a person at the right moment', 'Invoice or booking as a draft, you approve'],
+    },
+    priceNote: {
+      ru: `Входит в тариф Про — ${PRO_MONTHLY}/мес. Каждый ответ агента — 5\u00A0₸ из кошелька.`,
+      kk: `Про тарифіне кіреді — ${PRO_MONTHLY}/ай. Агенттің әр жауабы — әмияннан 5\u00A0₸.`,
+      en: `Included in the Pro plan — ${PRO_MONTHLY}/mo. Each agent reply takes 5\u00A0₸ from your wallet.`,
     },
     title: {
       ru: 'AI-агент — ответы клиентам в WhatsApp и Instagram | invoices.kz',
@@ -186,11 +207,14 @@ export function isLandingKey(v: string): v is LandingKey {
   return Object.prototype.hasOwnProperty.call(LANDINGS, v)
 }
 
-export const LANDING_UI: Record<Lang, { allProducts: string; login: string; open: string; enter: string; apply: string; inviteNote: string; others: string; soon: string; lockedHint: string }> = {
-  ru: { allProducts: 'Все продукты', login: 'Войти', open: 'Открыть кабинет', enter: 'Войти и открыть', apply: 'Оставить заявку', inviteNote: 'Салоны подключаем по заявке', others: 'Другие продукты', soon: 'скоро', lockedHint: 'Раздел ещё дорабатывается' },
-  kk: { allProducts: 'Барлық өнімдер', login: 'Кіру', open: 'Кабинетті ашу', enter: 'Кіріп ашу', apply: 'Өтінім қалдыру', inviteNote: 'Салондарды өтінім бойынша қосамыз', others: 'Басқа өнімдер', soon: 'жақында', lockedHint: 'Бөлім әлі дайындалуда' },
-  en: { allProducts: 'All products', login: 'Log in', open: 'Open dashboard', enter: 'Log in and open', apply: 'Request access', inviteNote: 'We onboard salons by request', others: 'Other products', soon: 'soon', lockedHint: 'This section is still in progress' },
+export const LANDING_UI: Record<Lang, { allProducts: string; login: string; open: string; enter: string; apply: string; inviteNote: string; others: string; soon: string; lockedHint: string; pricing: string }> = {
+  ru: { allProducts: 'Все продукты', login: 'Войти', open: 'Открыть кабинет', enter: 'Войти и открыть', apply: 'Оставить заявку', inviteNote: 'Салоны подключаем по заявке', others: 'Другие продукты', soon: 'скоро', lockedHint: 'Раздел ещё дорабатывается', pricing: 'Тарифы' },
+  kk: { allProducts: 'Барлық өнімдер', login: 'Кіру', open: 'Кабинетті ашу', enter: 'Кіріп ашу', apply: 'Өтінім қалдыру', inviteNote: 'Салондарды өтінім бойынша қосамыз', others: 'Басқа өнімдер', soon: 'жақында', lockedHint: 'Бөлім әлі дайындалуда', pricing: 'Тарифтер' },
+  en: { allProducts: 'All products', login: 'Log in', open: 'Open dashboard', enter: 'Log in and open', apply: 'Request access', inviteNote: 'We onboard salons by request', others: 'Other products', soon: 'soon', lockedHint: 'This section is still in progress', pricing: 'Pricing' },
 }
+
+// Полная таблица тарифов живёт на лендинге Счетов (docs.invoices.kz).
+export const PRICING_URL = 'https://docs.invoices.kz/#pricing'
 
 // Public addresses shown in the "other products" bar (names come from
 // PRODUCT_I18N in the page's language). All seven products, same set as the hub:
