@@ -396,7 +396,7 @@ export const profileCoreDict: Record<'ru' | 'kk' | 'en', ProfileCoreContent> = {
     defaultNoteFieldLabel: 'Стандартты ескертпе',
     defaultNotePlaceholder: 'Төлем 3 жұмыс күні ішінде...',
     kpNumberingSectionLabel: 'КҰ нөмірлеу',
-    avrNumberingSectionLabel: 'ОҚА нөмірлеу',
+    avrNumberingSectionLabel: 'ОЖА нөмірлеу',
     nakladnayaNumberingSectionLabel: 'Жүкқұжаттарды нөмірлеу',
     vatStatusSectionLabel: 'ҚҚС мәртебесі',
     vatNoLabel: 'ҚҚС-сыз',
