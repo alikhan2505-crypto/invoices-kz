@@ -79,15 +79,15 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
     },
     h1: 'Проверка контрагента по БИН',
     intro:
-      'Неблагонадёжность, ликвидация, налоговая задолженность и НДС — по официальным данным КГД РК и реестра юридических лиц. Бесплатно: 3 проверки в день.',
+      'Неблагонадёжность, ликвидация, налоговая задолженность и НДС — по официальным данным КГД РК и реестра юридических лиц. Бесплатно: 3 проверки в квартал.',
     binLabel: 'БИН / ИИН контрагента',
     binPlaceholder: '12 цифр',
     check: 'Проверить',
     checking: 'Проверяем…',
     remaining: n =>
       n > 0
-        ? `Осталось ${n} из 3 бесплатных проверок сегодня`
-        : 'Бесплатные проверки на сегодня закончились — следующие после полуночи по Алматы',
+        ? `Осталось ${n} из 3 бесплатных проверок в этом квартале`
+        : 'Бесплатные проверки в этом квартале закончились — следующие с начала нового квартала',
     errGeneric: 'Не получилось проверить, попробуйте ещё раз',
     errNetwork: 'Не получилось проверить — проверьте интернет и попробуйте ещё раз',
     errUnavailable: 'Сервис временно недоступен, попробуйте позже',
@@ -96,7 +96,7 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
     notFoundTitle: 'По этому БИН ничего не нашлось',
     notFoundBody:
       'Ни в реестре юридических лиц, ни в базе КГД. Проверьте цифры — или это очень свежая регистрация, реестры обновляются с задержкой до суток.',
-    limitTitle: '3 бесплатные проверки на сегодня закончились',
+    limitTitle: '3 бесплатные проверки в этом квартале закончились',
     limitBody:
       'В кабинете invoices.kz проверки без лимита — плюс полная карточка контрагента (адрес, руководитель, вид деятельности) и автозаполнение реквизитов прямо в счёте. Регистрация бесплатная, по ссылке на почту.',
     limitButton: 'Зарегистрироваться бесплатно',
@@ -162,7 +162,7 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
         },
         {
           q: 'Сколько проверок бесплатно?',
-          a: '3 проверки в день с одного подключения к интернету (IP-адреса); счётчик обнуляется в полночь по времени Алматы. В кабинете invoices.kz проверки без лимита, регистрация бесплатная.',
+          a: '3 проверки в квартал с одного подключения к интернету (IP-адреса); счётчик обнуляется 1 января, 1 апреля, 1 июля и 1 октября по времени Алматы. В кабинете invoices.kz проверки без лимита, регистрация бесплатная.',
         },
       ],
     },
@@ -182,15 +182,15 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
     },
     h1: 'Контрагентті БСН бойынша тексеру',
     intro:
-      'Сенімсіз салық төлеуші мәртебесі, тарату, салық берешегі және ҚҚС — ҚР МКК мен заңды тұлғалар тізілімінің ресми деректері бойынша. Тегін: күніне 3 тексеру.',
+      'Сенімсіз салық төлеуші мәртебесі, тарату, салық берешегі және ҚҚС — ҚР МКК мен заңды тұлғалар тізілімінің ресми деректері бойынша. Тегін: тоқсанына 3 тексеру.',
     binLabel: 'Контрагенттің БСН / ЖСН',
     binPlaceholder: '12 цифр',
     check: 'Тексеру',
     checking: 'Тексеріп жатырмыз…',
     remaining: n =>
       n > 0
-        ? `Бүгін тағы ${n} тегін тексеру қалды (күніне 3)`
-        : 'Бүгінгі тегін тексерулер таусылды — келесілері Алматы уақытымен түн ортасынан кейін',
+        ? `Осы тоқсанда тағы ${n} тегін тексеру қалды (тоқсанына 3)`
+        : 'Осы тоқсандағы тегін тексерулер таусылды — келесілері жаңа тоқсаннан басталады',
     errGeneric: 'Тексеру мүмкін болмады, қайталап көріңіз',
     errNetwork: 'Тексеру мүмкін болмады — интернетті тексеріп, қайталап көріңіз',
     errUnavailable: 'Сервис уақытша қолжетімсіз, сәл кейінірек қайталап көріңіз',
@@ -199,7 +199,7 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
     notFoundTitle: 'Бұл БСН бойынша ештеңе табылмады',
     notFoundBody:
       'Заңды тұлғалар тізілімінде де, МКК базасында да жоқ. Сандарды тексеріңіз — немесе бұл жаңа ғана тіркелген компания: тізілімдер бір тәулікке дейін кешігіп жаңарады.',
-    limitTitle: 'Бүгінгі 3 тегін тексеру таусылды',
+    limitTitle: 'Осы тоқсандағы 3 тегін тексеру таусылды',
     limitBody:
       'invoices.kz кабинетінде тексеру шектеусіз — оған қоса контрагенттің толық карточкасы (мекенжайы, басшысы, қызмет түрі) бар, ал деректемелер шотқа өзі толтырылады. Тіркелу тегін, поштаға келген сілтеме арқылы.',
     limitButton: 'Тегін тіркелу',
@@ -265,7 +265,7 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
         },
         {
           q: 'Қанша тексеру тегін?',
-          a: 'Бір интернет қосылымынан (IP-мекенжайдан) күніне 3 тексеру; есептегіш Алматы уақытымен түн ортасында нөлденеді. invoices.kz кабинетінде тексеру шектеусіз, тіркелу тегін.',
+          a: 'Бір интернет қосылымынан (IP-мекенжайдан) тоқсанына 3 тексеру; есептегіш Алматы уақытымен 1 қаңтарда, 1 сәуірде, 1 шілдеде және 1 қазанда нөлденеді. invoices.kz кабинетінде тексеру шектеусіз, тіркелу тегін.',
         },
       ],
     },
@@ -285,15 +285,15 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
     },
     h1: 'Check a Kazakhstan company by BIN',
     intro:
-      'Enter a 12-digit BIN (company ID) or IIN (sole proprietor ID) to see unreliable-taxpayer status, liquidation, tax debt and VAT registration — from official data of the State Revenue Committee (KGD) and the legal entity register. Free: 3 checks per day.',
+      'Enter a 12-digit BIN (company ID) or IIN (sole proprietor ID) to see unreliable-taxpayer status, liquidation, tax debt and VAT registration — from official data of the State Revenue Committee (KGD) and the legal entity register. Free: 3 checks per quarter.',
     binLabel: 'Company BIN / IIN',
     binPlaceholder: '12 digits',
     check: 'Check',
     checking: 'Checking…',
     remaining: n =>
       n > 0
-        ? `${n} of 3 free checks left today`
-        : 'No free checks left today — more after midnight Almaty time',
+        ? `${n} of 3 free checks left this quarter`
+        : 'No free checks left this quarter — more when the next quarter starts',
     errGeneric: 'The check failed, please try again',
     errNetwork: 'The check failed — check your connection and try again',
     errUnavailable: 'The service is temporarily unavailable, please try later',
@@ -302,7 +302,7 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
     notFoundTitle: 'Nothing found for this BIN',
     notFoundBody:
       'Neither the legal entity register nor the KGD database knows it. Double-check the digits — or this is a very recent registration: the registers update with up to a one-day delay.',
-    limitTitle: 'Your 3 free checks for today are used up',
+    limitTitle: 'Your 3 free checks for this quarter are used up',
     limitBody:
       'Inside an invoices.kz account checks are unlimited — plus the full company card (address, director, line of business) and the company details filled into your invoice automatically. Sign-up is free, via an email link.',
     limitButton: 'Sign up for free',
@@ -368,7 +368,7 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
         },
         {
           q: 'How many checks are free?',
-          a: '3 checks a day per internet connection (IP address); the counter resets at midnight Almaty time. Inside an invoices.kz account checks are unlimited, and sign-up is free.',
+          a: '3 checks a quarter per internet connection (IP address); the counter resets on 1 January, 1 April, 1 July and 1 October, Almaty time. Inside an invoices.kz account checks are unlimited, and sign-up is free.',
         },
       ],
     },

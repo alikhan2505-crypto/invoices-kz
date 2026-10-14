@@ -10,10 +10,11 @@ const supabase = createClient(
 )
 
 // Публичная проверка контрагента на /tools/kontragent — без входа, но не
-// открытый прокси: 3 проверки на IP в день (решение основателя, 12.10.2026)
-// плюс общий дневной предохранитель, чтобы страница не выжгла квоту КГД
-// (40 запросов в минуту на токен) и ключ egov.
-const DAILY_PER_IP = 3
+// открытый прокси: 3 проверки на IP в КВАРТАЛ (решение основателя 14.10.2026,
+// было 3 в день: маленькой компании хватает, остальным — кабинет) плюс общий
+// дневной предохранитель, чтобы страница не выжгла квоту КГД (40 запросов в
+// минуту на токен) и ключ egov.
+const QUARTER_PER_IP = 3
 const DAILY_GLOBAL = 300
 
 // День считаем по Казахстану (единый UTC+5 по всей стране), чтобы «3 в день»
@@ -22,11 +23,19 @@ function almatyDay(): string {
   return new Date(Date.now() + 5 * 3600_000).toISOString().slice(0, 10)
 }
 
+// Квартал по Алматы: '2026-Q4'. Счётчик на IP живёт весь квартал.
+function almatyQuarter(now = Date.now()): string {
+  const d = new Date(now + 5 * 3600_000)
+  return `${d.getUTCFullYear()}-Q${Math.floor(d.getUTCMonth() / 3) + 1}`
+}
+
 export async function POST(req: NextRequest) {
-  // Сырой IP в базу не пишем — только хэш с днём, этого достаточно для лимита.
+  // Сырой IP в базу не пишем — только хэш с кварталом, этого достаточно для лимита.
+  // Колонка day у строки = день последней проверки (для дневного предохранителя:
+  // он чуть завышает счёт, это безопасная сторона).
   const ip = (req.headers.get('x-forwarded-for') || '').split(',')[0].trim() || 'unknown'
   const day = almatyDay()
-  const key = createHash('sha256').update(`${ip}|${day}`).digest('hex')
+  const key = createHash('sha256').update(`${ip}|${almatyQuarter()}`).digest('hex')
 
   const { data: row, error: readError } = await supabase
     .from('tool_kontragent_checks')
@@ -40,7 +49,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Сервис временно недоступен, попробуйте позже' }, { status: 503 })
   }
   const used = row?.count ?? 0
-  if (used >= DAILY_PER_IP) {
+  if (used >= QUARTER_PER_IP) {
     return NextResponse.json({ error: 'limit', remaining: 0 }, { status: 429 })
   }
 
@@ -68,7 +77,7 @@ export async function POST(req: NextRequest) {
     .from('tool_kontragent_checks')
     .upsert({ key, day, count: used + 1 })
   if (cntError) console.error('tools/kontragent: counter write failed:', cntError.message)
-  const remaining = Math.max(0, DAILY_PER_IP - used - 1)
+  const remaining = Math.max(0, QUARTER_PER_IP - used - 1)
 
   if (!result.found) return NextResponse.json({ found: false, remaining })
 
