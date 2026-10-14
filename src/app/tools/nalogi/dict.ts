@@ -39,6 +39,16 @@ export interface NalogiDict {
   soRow: string
   vosmsRow: string
   contributionsRow: string
+  /** Подписи к формулам во всплывающей подсказке строки (правка основателя 14.10). */
+  formula: {
+    hint: string
+    noIncome: string
+    before1975: string
+    fixed: string
+    pensionCorridor: string
+    soCorridor: string
+    entered: (amount: string) => string
+  }
   halfYear: (amount: string) => RichLine
   /** Годовая выручка при таком темпе выше порога ҚҚС / НДС (10 000 МРП).
    *  В числах порогов ниже — неразрывный пробел (U+00A0), чтобы «10 000» не рвалось. */
@@ -96,6 +106,15 @@ export const nalogiDict: Record<ToolLang, NalogiDict> = {
     soRow: 'СО — соцотчисления, 5%',
     vosmsRow: 'ВОСМС — медстрахование, фикс.',
     contributionsRow: 'Взносы за себя, всего',
+    formula: {
+      hint: 'Наведите или нажмите на строку — покажем формулу',
+      noIncome: 'дохода для взносов не было — можно не платить',
+      before1975: 'родились до 1975 года — ОПВР не платится',
+      fixed: 'не зависит от дохода',
+      pensionCorridor: 'база в коридоре 1–50 МЗП',
+      soCorridor: 'база в коридоре 1–7 МЗП',
+      entered: a => `введено ${a}`,
+    },
     halfYear: a => ({
       pre: 'Налог платится раз в полугодие с формой 910: за 6 месяцев при таком доходе — ',
       b: a,
@@ -177,6 +196,15 @@ export const nalogiDict: Record<ToolLang, NalogiDict> = {
     soRow: 'ӘА — әлеуметтік аударымдар, 5%',
     vosmsRow: 'МӘМС — медициналық сақтандыру, тіркелген сома',
     contributionsRow: 'Өзі үшін жарналар, барлығы',
+    formula: {
+      hint: 'Жолды меңзеңіз не басыңыз — формуласын көрсетеміз',
+      noIncome: 'жарнаға табыс болмады — төлемеуге болады',
+      before1975: '1975 жылға дейін туғансыз — ЖМЗЖ төленбейді',
+      fixed: 'табысқа байланысты емес',
+      pensionCorridor: 'база 1–50 ЕТЖ аралығында',
+      soCorridor: 'база 1–7 ЕТЖ аралығында',
+      entered: a => `енгізілгені ${a}`,
+    },
     halfYear: a => ({
       pre: 'Салық 910 нысанымен жарты жылда бір рет төленеді: осындай табыспен 6 айға — ',
       b: a,
@@ -258,6 +286,15 @@ export const nalogiDict: Record<ToolLang, NalogiDict> = {
     soRow: 'SO — social contributions, 5%',
     vosmsRow: 'VOSMS — health insurance, fixed',
     contributionsRow: 'Contributions for yourself, total',
+    formula: {
+      hint: 'Hover or tap a line to see the formula',
+      noIncome: 'no income declared for contributions, can be skipped',
+      before1975: 'born before 1975, no OPVR',
+      fixed: 'does not depend on income',
+      pensionCorridor: 'base kept within 1 to 50 minimum wages',
+      soCorridor: 'base kept within 1 to 7 minimum wages',
+      entered: a => `you entered ${a}`,
+    },
     halfYear: a => ({
       pre: 'The tax is paid every six months with form 910: for 6 months at this income it comes to ',
       b: a,

@@ -37,6 +37,9 @@ export interface IpTaxResult {
   totalMonthly: number
   /** Доля всех платежей от выручки, % (null при нулевой выручке). */
   effectivePercent: number | null
+  /** Базы, которые расчёт реально взял (после коридоров МЗП) — для показа формулы. */
+  pensionBase: number
+  soBase: number
 }
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
@@ -72,5 +75,7 @@ export function calculateIpTaxes(input: IpTaxInput): IpTaxResult {
     contributionsMonthly,
     totalMonthly,
     effectivePercent: income > 0 ? Math.round(totalMonthly / income * 1000) / 10 : null,
+    pensionBase,
+    soBase,
   }
 }

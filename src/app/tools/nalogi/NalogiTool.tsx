@@ -73,13 +73,50 @@ export default function NalogiTool({ lang }: { lang: ToolLang }) {
   const row = 'flex items-center justify-between gap-3 py-2 text-sm'
   const hint = 'text-[11px] mt-1'
 
-  const rows: Array<{ label: string; value: number; strong?: boolean }> = [
-    { label: t.taxRow(rate), value: r.taxMonthly, strong: true },
-    { label: t.opvRow, value: r.opv },
-    { label: t.opvrRow, value: r.opvr },
-    { label: t.soRow, value: r.so },
-    { label: t.vosmsRow, value: r.vosms },
+  // Формула каждой строки с реальными числами — во всплывающей подсказке
+  // (правка основателя 14.10.2026: «при наведении показывать формулу»).
+  // На телефоне наведения нет — касание фокусирует строку, и подсказка
+  // открывается по фокусу; касание в другом месте её закрывает.
+  const f = t.formula
+  const sep = t.decimalSeparator
+  const pct = (v: number) => `${String(v).replace('.', sep)}%`
+  const incomeNum = Number(income) || 0
+  const corridorNote = (used: number, corridor: string) =>
+    baseNum > 0 && used !== baseNum ? ` (${f.entered(formatTenge(baseNum))}; ${corridor})` : ''
+  const rows: Array<{ key: string; label: string; value: number; strong?: boolean; formula: string }> = [
+    { key: 'tax', label: t.taxRow(rate), value: r.taxMonthly, strong: true,
+      formula: `${formatTenge(incomeNum)} × ${pct(Number(rate) || 4)} = ${formatTenge(r.taxMonthly)}` },
+    { key: 'opv', label: t.opvRow, value: r.opv,
+      formula: r.pensionBase === 0 ? `0 — ${f.noIncome}`
+        : `${formatTenge(r.pensionBase)} × ${pct(10)} = ${formatTenge(r.opv)}${corridorNote(r.pensionBase, f.pensionCorridor)}` },
+    { key: 'opvr', label: t.opvrRow, value: r.opvr,
+      formula: before1975 ? `0 — ${f.before1975}`
+        : r.pensionBase === 0 ? `0 — ${f.noIncome}`
+        : `${formatTenge(r.pensionBase)} × ${pct(3.5)} = ${formatTenge(r.opvr)}${corridorNote(r.pensionBase, f.pensionCorridor)}` },
+    { key: 'so', label: t.soRow, value: r.so,
+      formula: r.soBase === 0 ? `0 — ${f.noIncome}`
+        : `${formatTenge(r.soBase)} × ${pct(5)} = ${formatTenge(r.so)}${corridorNote(r.soBase, f.soCorridor)}` },
+    { key: 'vosms', label: t.vosmsRow, value: r.vosms,
+      formula: `${String(1.4).replace('.', sep)} × ${formatTenge(MZP_2026)} × ${pct(5)} = ${formatTenge(r.vosms)} — ${f.fixed}` },
   ]
+  const contribFormula = `${[r.opv, r.opvr, r.so, r.vosms].map(v => formatTenge(v)).join(' + ')} = ${formatTenge(r.contributionsMonthly)}`
+  const totalFormula = `${formatTenge(r.taxMonthly)} + ${formatTenge(r.contributionsMonthly)} = ${formatTenge(r.totalMonthly)}`
+  const [openRow, setOpenRow] = useState<string | null>(null)
+  const rowHandlers = (key: string) => ({
+    onMouseEnter: () => setOpenRow(key),
+    onMouseLeave: () => setOpenRow(o => (o === key ? null : o)),
+    onFocus: () => setOpenRow(key),
+    onBlur: () => setOpenRow(o => (o === key ? null : o)),
+    tabIndex: 0,
+    'aria-describedby': `nalogi-f-${key}`,
+  })
+  const Formula = ({ id, text }: { id: string; text: string }) => (
+    <div id={`nalogi-f-${id}`} role="tooltip" hidden={openRow !== id}
+      className="absolute right-0 top-full z-20 mt-1 max-w-[min(100%,460px)] rounded-xl px-3 py-2 text-[12px] font-mono tabular-nums shadow-lg"
+      style={{ background: 'var(--nav-text-primary)', color: 'var(--nav-bg)' }}>
+      {text}
+    </div>
+  )
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--nav-bg)' }}>
@@ -135,29 +172,39 @@ export default function NalogiTool({ lang }: { lang: ToolLang }) {
 
         <div className="nav-glass nav-card-accent rounded-2xl p-5 mb-4">
           <div className="text-sm font-bold mb-2" style={{ color: 'var(--nav-text-primary)' }}>{t.totalTitle}</div>
-          <div className="text-3xl font-black font-mono tabular-nums mb-1" style={{ color: 'var(--nav-text-primary)' }}>
-            {formatTenge(r.totalMonthly)}
+          <div className="relative inline-block cursor-help rounded-md outline-none focus-visible:ring-2 mb-1" {...rowHandlers('total')}>
+            <div className="text-3xl font-black font-mono tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>
+              {formatTenge(r.totalMonthly)}
+            </div>
+            <div id="nalogi-f-total" role="tooltip" hidden={openRow !== 'total'}
+              className="absolute left-0 top-full z-20 mt-1 whitespace-nowrap rounded-xl px-3 py-2 text-[12px] font-mono tabular-nums shadow-lg"
+              style={{ background: 'var(--nav-text-primary)', color: 'var(--nav-bg)' }}>
+              {totalFormula}
+            </div>
           </div>
           <div className="text-xs mb-4" style={{ color: 'var(--nav-text-muted)' }}>
             {r.effectivePercent !== null
               ? t.effective(String(r.effectivePercent).replace('.', t.decimalSeparator))
               : t.noIncome}
+            <span className="ml-2 opacity-80">· {f.hint}</span>
           </div>
 
           <div className="divide-y" style={{ borderColor: 'var(--nav-border)' }}>
             {rows.map(item => (
-              <div key={item.label} className={row}>
-                <span style={{ color: 'var(--nav-text-secondary)' }}>{item.label}</span>
+              <div key={item.key} className={`${row} relative cursor-help rounded-md outline-none focus-visible:ring-2`} {...rowHandlers(item.key)}>
+                <span style={{ color: 'var(--nav-text-secondary)', textDecoration: 'underline dotted', textUnderlineOffset: 3 }}>{item.label}</span>
                 <span className={`font-mono tabular-nums whitespace-nowrap${item.strong ? ' font-semibold' : ''}`} style={{ color: 'var(--nav-text-primary)' }}>
                   {formatTenge(item.value)}
                 </span>
+                <Formula id={item.key} text={item.formula} />
               </div>
             ))}
-            <div className={row}>
-              <span className="font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{t.contributionsRow}</span>
+            <div className={`${row} relative cursor-help rounded-md outline-none focus-visible:ring-2`} {...rowHandlers('contrib')}>
+              <span className="font-semibold" style={{ color: 'var(--nav-text-primary)', textDecoration: 'underline dotted', textUnderlineOffset: 3 }}>{t.contributionsRow}</span>
               <span className="font-mono tabular-nums font-semibold whitespace-nowrap" style={{ color: 'var(--nav-text-primary)' }}>
                 {formatTenge(r.contributionsMonthly)}
               </span>
+              <Formula id="contrib" text={contribFormula} />
             </div>
           </div>
 
