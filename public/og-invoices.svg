@@ -40,8 +40,8 @@
   <!-- Плашки -->
   <rect x="72" y="478" width="262" height="52" rx="26" fill="#6D4CFF"/>
   <text x="203" y="511" text-anchor="middle" font-family="Arial, sans-serif" font-weight="700" font-size="21" fill="#FFFFFF">7 дней бесплатно</text>
-  <rect x="350" y="478" width="210" height="52" rx="26" fill="none" stroke="#3A3470" stroke-width="2"/>
-  <text x="455" y="511" text-anchor="middle" font-family="Arial, sans-serif" font-weight="700" font-size="21" fill="#E7E4FF">НДС 16% сам</text>
+  <rect x="350" y="478" width="236" height="52" rx="26" fill="none" stroke="#3A3470" stroke-width="2"/>
+  <text x="468" y="511" text-anchor="middle" font-family="Arial, sans-serif" font-weight="700" font-size="21" fill="#E7E4FF">Расчёт НДС 16%</text>
   <text x="72" y="590" font-family="Arial, sans-serif" font-weight="700" font-size="22" fill="#8B7BFF">docs.invoices.kz</text>
 
   <!-- Карточка счёта -->
