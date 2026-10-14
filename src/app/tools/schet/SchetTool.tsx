@@ -14,6 +14,7 @@ import {
   digits, documentRows, documentTotal, localToday, resolveBank, ruDate, validateForm, vatIncluded,
   VAT_TYPES, type Form, type Row, type VatType,
 } from './calc'
+import { TOOL_UNITS, DEFAULT_UNIT, UNIT_LABELS, unitAria } from '@/lib/tools-i18n/units'
 
 // Бесплатный генератор счёта на оплату — лид-магнит под самый частотный
 // документный запрос («счёт на оплату образец/скачать»). Правило основателя
@@ -37,7 +38,7 @@ const EMPTY: Form = {
   number: '1', date: '', dueDate: '',
   vatType: 'no_vat',
   note: '',
-  rows: [{ name: '', qty: '1', price: '' }],
+  rows: [{ name: '', qty: '1', unit: DEFAULT_UNIT, price: '' }],
 }
 
 function readCount(): number {
@@ -321,9 +322,12 @@ export default function SchetTool({ lang }: { lang: ToolLang }) {
           </div>
 
           {f.rows.map((r, i) => (
-            <div key={i} className="grid grid-cols-[minmax(0,1fr)_64px_96px_28px] sm:grid-cols-[minmax(0,1fr)_72px_110px_32px] gap-2 mb-2 items-center">
-              <input className={input} style={inputStyle} aria-label={t.itemAria(i + 1)} placeholder={t.itemPlaceholder(i + 1)} value={r.name} onChange={e => setRow(i, { name: e.target.value })} />
+            <div key={i} className="grid grid-cols-[64px_92px_1fr_28px] sm:grid-cols-[minmax(0,1fr)_72px_100px_110px_32px] gap-2 mb-3 sm:mb-2 items-center">
+              <input className={`${input} col-span-4 sm:col-span-1`} style={inputStyle} aria-label={t.itemAria(i + 1)} placeholder={t.itemPlaceholder(i + 1)} value={r.name} onChange={e => setRow(i, { name: e.target.value })} />
               <input className={input} style={inputStyle} inputMode="numeric" aria-label={t.qtyAria(i + 1)} placeholder={t.qtyPlaceholder} value={r.qty} onChange={e => setRow(i, { qty: digits(e.target.value).slice(0, 6) })} />
+              <select className={`${input} px-2`} style={inputStyle} aria-label={unitAria(lang, i + 1)} value={r.unit || DEFAULT_UNIT} onChange={e => setRow(i, { unit: e.target.value })}>
+                {TOOL_UNITS.map(u => <option key={u} value={u}>{UNIT_LABELS[lang][u]}</option>)}
+              </select>
               <input className={input} style={inputStyle} inputMode="numeric" aria-label={t.priceAria(i + 1)} placeholder={t.pricePlaceholder} value={r.price} onChange={e => setRow(i, { price: digits(e.target.value).slice(0, 10) })} />
               <button
                 type="button"
@@ -333,7 +337,7 @@ export default function SchetTool({ lang }: { lang: ToolLang }) {
             </div>
           ))}
           <div className="flex items-start justify-between flex-wrap gap-2 mt-3">
-            <button type="button" onClick={() => setF(prev => ({ ...prev, rows: [...prev.rows, { name: '', qty: '1', price: '' }] }))}
+            <button type="button" onClick={() => setF(prev => ({ ...prev, rows: [...prev.rows, { name: '', qty: '1', unit: DEFAULT_UNIT, price: '' }] }))}
               className="text-sm font-semibold" style={accentLink}>{t.addRow}</button>
             <div className="text-right" aria-live="polite">
               <div className="text-sm font-bold" style={{ color: 'var(--nav-text-primary)' }}>

@@ -108,7 +108,7 @@ describe('schet totals match the document', () => {
       { name: 'A', qty: '2', price: '1500' },
       { name: '  ', qty: '1', price: '9999' },
     ])).toBe(3000)
-    expect(documentRows([{ name: ' A ', qty: '2', price: '10' }])).toEqual([{ name: 'A', qty: 2, price: 10 }])
+    expect(documentRows([{ name: ' A ', qty: '2', price: '10' }])).toEqual([{ name: 'A', qty: 2, unit: 'шт', price: 10 }])
   })
 
   it('extracts 16% VAT the same way generateInvoicePDF does', () => {

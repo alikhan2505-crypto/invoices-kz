@@ -12,7 +12,7 @@ export type VatType = 'no_vat' | 'vat_16' | 'vat_0'
 
 export const VAT_TYPES: VatType[] = ['no_vat', 'vat_16', 'vat_0']
 
-export type Row = { name: string; qty: string; price: string }
+export type Row = { name: string; qty: string; unit?: string; price: string }
 
 export type Form = {
   companyName: string; binIin: string; address: string; director: string; phone: string
@@ -55,7 +55,7 @@ export function resolveBank(f: Pick<Form, 'bankBik' | 'otherBankName' | 'otherBa
 export function documentRows(rows: Row[]) {
   return rows
     .filter(r => r.name.trim())
-    .map(r => ({ name: r.name.trim(), qty: Number(r.qty) || 0, price: Number(r.price) || 0 }))
+    .map(r => ({ name: r.name.trim(), qty: Number(r.qty) || 0, unit: r.unit || 'шт', price: Number(r.price) || 0 }))
 }
 
 /** Итог ровно как в документе: Σ qty × price по строкам с наименованием. */

@@ -8,12 +8,9 @@ export type KpRow = { name: string; qty: string; unit?: string; price: string }
 
 export interface KpLine { name: string; qty: number; unit: string; price: number }
 
-/** Единицы измерения строки КП (правка основателя 14.10.2026). Значение —
- *  русское сокращение: оно печатается в документе, который всегда русский;
- *  подписи в списке на kk/en — в dict.ts (unitLabels). Список продукта
- *  (/create) плюс «т», «компл.», «упак.» — для стройматериалов и опта. */
-export const KP_UNITS = ['шт', 'кг', 'т', 'л', 'м', 'м²', 'м³', 'компл.', 'упак.', 'час', 'день', 'месяц', 'услуга', 'работа'] as const
-export const KP_DEFAULT_UNIT = 'шт'
+// Единицы измерения — общий список бесплатных документов (src/lib/tools-i18n/units.ts).
+export { TOOL_UNITS as KP_UNITS, DEFAULT_UNIT as KP_DEFAULT_UNIT } from '@/lib/tools-i18n/units'
+import { DEFAULT_UNIT as KP_DEFAULT_UNIT } from '@/lib/tools-i18n/units'
 
 const num = (s: string) => Number(s) || 0
 

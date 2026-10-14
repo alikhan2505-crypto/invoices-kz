@@ -9,6 +9,7 @@ import { formatTenge, isToolLocalized, toolLinkPath, toolsIndexPath, TOOL_CHROME
 import ToolLangSwitch from '@/lib/tools-i18n/ToolLangSwitch'
 import ToolCta from '@/lib/tools-i18n/ToolCta'
 import { kpDict } from './dict'
+import { UNIT_LABELS, unitAria } from '@/lib/tools-i18n/units'
 import { kpLines, kpRowProblem, kpTotal, kpVatIncluded, localIsoDate, ruDate, KP_UNITS, KP_DEFAULT_UNIT, type KpRow } from './calc'
 
 // Бесплатный генератор коммерческого предложения — близнец /tools/avr:
@@ -362,8 +363,8 @@ export default function KpTool({ lang }: { lang: ToolLang }) {
             <div key={i} className="grid grid-cols-[64px_92px_1fr_28px] sm:grid-cols-[1fr_72px_100px_110px_32px] gap-2 mb-3 sm:mb-2 items-center">
               <input className={`${input} col-span-4 sm:col-span-1`} style={inputStyle} aria-label={t.rowPlaceholder(i + 1)} placeholder={t.rowPlaceholder(i + 1)} value={r.name} onChange={e => setRow(i, { name: e.target.value })} />
               <input className={input} style={inputStyle} inputMode="numeric" aria-label={`${t.qtyPlaceholder} — ${i + 1}`} placeholder={t.qtyPlaceholder} value={r.qty} onChange={e => setRow(i, { qty: digits(e.target.value).slice(0, 6) })} />
-              <select className={`${input} px-2`} style={inputStyle} aria-label={t.unitAria(i + 1)} value={r.unit || KP_DEFAULT_UNIT} onChange={e => setRow(i, { unit: e.target.value })}>
-                {KP_UNITS.map(u => <option key={u} value={u}>{t.unitLabels[u] ?? u}</option>)}
+              <select className={`${input} px-2`} style={inputStyle} aria-label={unitAria(lang, i + 1)} value={r.unit || KP_DEFAULT_UNIT} onChange={e => setRow(i, { unit: e.target.value })}>
+                {KP_UNITS.map(u => <option key={u} value={u}>{UNIT_LABELS[lang][u]}</option>)}
               </select>
               <input className={input} style={inputStyle} inputMode="numeric" aria-label={`${t.pricePlaceholder} — ${i + 1}`} placeholder={t.pricePlaceholder} value={r.price} onChange={e => setRow(i, { price: digits(e.target.value).slice(0, 10) })} />
               <button

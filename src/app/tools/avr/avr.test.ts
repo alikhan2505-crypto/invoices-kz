@@ -103,7 +103,7 @@ describe('avr totals match the document', () => {
       { name: 'Дизайн', qty: '2', price: '1500' },
       { name: '  ', qty: '1', price: '9999' },
     ]
-    expect(documentRows(rows)).toEqual([{ name: 'Дизайн', qty: 2, price: 1500 }])
+    expect(documentRows(rows)).toEqual([{ name: 'Дизайн', qty: 2, unit: 'шт', price: 1500 }])
     expect(documentTotal(rows)).toBe(3000)
   })
 

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { toolMetadata } from '@/lib/tools-i18n'
 import { kpDict, quarterStartLabel } from './dict'
+import { UNIT_LABELS } from '@/lib/tools-i18n/units'
 import { kpLines, kpRowProblem, kpTotal, kpVatIncluded, localIsoDate, ruDate, KP_UNITS } from './calc'
 
 describe('kp calc', () => {
@@ -17,7 +18,7 @@ describe('kp calc', () => {
   it('passes the chosen unit to the document and labels every unit in every language', () => {
     expect(kpLines([{ name: 'Кирпич', qty: '3', unit: 'т', price: '40000' }])).toEqual([{ name: 'Кирпич', qty: 3, unit: 'т', price: 40000 }])
     for (const lang of ['ru', 'kk', 'en'] as const) {
-      for (const u of KP_UNITS) expect(kpDict[lang].unitLabels[u]).toBeTruthy()
+      for (const u of KP_UNITS) expect(UNIT_LABELS[lang][u]).toBeTruthy()
     }
   })
 
