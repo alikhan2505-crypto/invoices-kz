@@ -35,6 +35,8 @@ export interface KpDict {
   directorPlaceholder: string
   addressLabel: string
   emailLabel: string
+  marketingConsent: string
+  privacyLink: string
   clientAddressLabel: string
   clientPhoneLabel: string
   clientEmailLabel: string
@@ -121,6 +123,8 @@ export const kpDict: Record<ToolLang, KpDict> = {
     directorPlaceholder: 'для строки подписи',
     addressLabel: 'Адрес',
     emailLabel: 'Email',
+    marketingConsent: 'Присылать мне советы и новости invoices.kz на этот email (отписаться можно в любом письме).',
+    privacyLink: 'Политика конфиденциальности',
     clientAddressLabel: 'Адрес покупателя',
     clientPhoneLabel: 'Телефон покупателя',
     clientEmailLabel: 'Email покупателя',
@@ -220,6 +224,8 @@ export const kpDict: Record<ToolLang, KpDict> = {
     directorPlaceholder: 'қол қою жолы үшін',
     addressLabel: 'Мекенжай',
     emailLabel: 'Email',
+    marketingConsent: 'Осы email-ге invoices.kz кеңестері мен жаңалықтарын жіберіп тұрыңыз (кез келген хаттан бас тартуға болады).',
+    privacyLink: 'Құпиялылық саясаты',
     clientAddressLabel: 'Сатып алушының мекенжайы',
     clientPhoneLabel: 'Сатып алушының телефоны',
     clientEmailLabel: 'Сатып алушының email-і',
@@ -319,6 +325,8 @@ export const kpDict: Record<ToolLang, KpDict> = {
     directorPlaceholder: 'for the signature line',
     addressLabel: 'Address',
     emailLabel: 'Email',
+    marketingConsent: 'Send me invoices.kz tips and news at this email (unsubscribe from any email).',
+    privacyLink: 'Privacy policy',
     clientAddressLabel: 'Buyer address',
     clientPhoneLabel: 'Buyer phone',
     clientEmailLabel: 'Buyer email',

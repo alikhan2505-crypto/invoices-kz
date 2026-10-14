@@ -18,6 +18,9 @@ import { createClient } from '@supabase/supabase-js'
 const TOOL_LABELS: Record<string, string> = {
   waybills: 'Склейка накладных',
   margin: 'Калькулятор маржи',
+  // КП: email поставщика — только с галочкой согласия на рассылку (14.10.2026).
+  // Email покупателя сюда НЕ отправляется: это данные третьего лица без согласия.
+  kp: 'Коммерческое предложение (email с согласием на рассылку)',
 }
 
 const RATE_WINDOW_MS = 10 * 60 * 1000

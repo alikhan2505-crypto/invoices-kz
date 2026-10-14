@@ -111,6 +111,10 @@ export default function KpTool({ lang }: { lang: ToolLang }) {
   }, [f, ready])
 
   const set = (patch: Partial<Form>) => setF(prev => ({ ...prev, ...patch }))
+  // Согласие на рассылку для email поставщика — галочка стоит по умолчанию
+  // (решение основателя 14.10.2026); снять можно здесь и по ссылке
+  // «Отписаться» в любом письме (политика конфиденциальности, раздел целей).
+  const [marketingConsent, setMarketingConsent] = useState(true)
 
   // Название клиента по БИН — ТОЛЬКО по кнопке «Найти» (решение основателя
   // 14.10.2026: без автоподбора — нажал, значит уверен в цифрах). Кнопка
@@ -245,6 +249,16 @@ export default function KpTool({ lang }: { lang: ToolLang }) {
           director_name: f.director.trim() || undefined,
         },
       }, win)
+      // Email поставщика — в базу контактов только с согласием. Email
+      // покупателя не сохраняется никогда. Ошибка записи КП не ломает.
+      const email = f.email.trim()
+      if (marketingConsent && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        fetch('/api/tools/lead', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tool: 'kp', contact: email }),
+        }).catch(() => {})
+      }
     } finally {
       setGenerating(false)
     }
@@ -307,14 +321,18 @@ export default function KpTool({ lang }: { lang: ToolLang }) {
             <div>
               <label htmlFor="kp-email" className={label} style={labelStyle}>{t.emailLabel}</label>
               <input id="kp-email" type="email" className={input} style={inputStyle} autoComplete="email" value={f.email} onChange={e => set({ email: e.target.value })} />
+              <label className="flex items-start gap-2 mt-1.5 text-[11px] cursor-pointer" style={{ color: 'var(--nav-text-muted)' }}>
+                <input type="checkbox" className="mt-0.5 w-3.5 h-3.5 accent-[#5B4CE0] flex-shrink-0" checked={marketingConsent} onChange={e => setMarketingConsent(e.target.checked)} />
+                <span>{t.marketingConsent}{' '}<a href="https://invoices.kz/privacy" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--nav-accent)' }}>{t.privacyLink}</a></span>
+              </label>
             </div>
           </div>
         </div>
 
         <div className="nav-glass rounded-2xl p-5 mb-4">
           <h2 className="text-sm font-bold mb-3" style={{ color: 'var(--nav-text-primary)' }}>{t.offerTitle}</h2>
-          <div className="grid sm:grid-cols-2 gap-3 mb-3">
-            <div>
+          <div className="grid gap-3 mb-3">
+            <div className="sm:max-w-[50%]">
               <label htmlFor="kp-client-bin" className={label} style={labelStyle}>{t.clientBinLabel}</label>
               <div className="flex gap-2">
                 <input id="kp-client-bin" className={input} style={inputStyle} inputMode="numeric" autoComplete="off" placeholder={t.binPlaceholder} value={f.clientBin}
