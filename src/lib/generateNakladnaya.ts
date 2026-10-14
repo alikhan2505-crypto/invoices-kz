@@ -31,6 +31,7 @@ interface NakladnayaData {
 }
 
 import { resizeToFit } from './imageResize'
+import { docFitScript } from './docFit'
 import { watermarkCss, watermarkBodyClass } from './docWatermark'
 import { escapeHtml, escapeAttr } from './htmlEscape'
 
@@ -449,13 +450,15 @@ function downloadPDF() {
   const spacer = toolbar?.nextElementSibling
   if (toolbar) toolbar.style.display = 'none'
   if (spacer) spacer.style.display = 'none'
-  html2pdf().set({
+  if (window.__ikzUnfit) window.__ikzUnfit()
+          html2pdf().set({
     margin: 0,
     filename: ${jsString('Накладная-' + data.number + '.pdf')},
     image: { type: 'jpeg', quality: 0.98 },
     html2canvas: { scale: 2, useCORS: true, logging: false, windowWidth: 1123, scrollX: 0, scrollY: 0, x: 0, y: 0 },
     jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
   }).from(document.body).save().then(() => {
+            if (window.__ikzFit) window.__ikzFit()
     if (toolbar) toolbar.style.display = 'flex'
     if (spacer) spacer.style.display = 'block'
     btn.textContent = '💾 Скачать PDF'
@@ -463,7 +466,8 @@ function downloadPDF() {
   })
 }
 <\/script>
-</body>
+${docFitScript(1123)}
+    </body>
 </html>`
 
   return html

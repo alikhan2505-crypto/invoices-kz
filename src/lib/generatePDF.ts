@@ -1,4 +1,5 @@
 import QRCode from 'qrcode'
+import { docFitScript } from './docFit'
 import { watermarkCss, watermarkBodyClass } from './docWatermark'
 import { resizeToFit } from './imageResize'
 import { escapeHtml, escapeAttr } from './htmlEscape'
@@ -399,13 +400,15 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<string> {
             const spacer = toolbar?.nextElementSibling
             if (toolbar) toolbar.style.display = 'none'
             if (spacer) spacer.style.display = 'none'
-            html2pdf().set({
+            if (window.__ikzUnfit) window.__ikzUnfit()
+          html2pdf().set({
             margin: 0,
             filename: ${jsString('Счёт-' + String(data.number ?? '') + '.pdf')},
             image: { type: 'jpeg', quality: 0.98 },
             html2canvas: { scale: 2, useCORS: true, logging: false },
             jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
           }).from(document.body).save().then(() => {
+            if (window.__ikzFit) window.__ikzFit()
               if (toolbar) toolbar.style.display = 'flex'
               if (spacer) spacer.style.display = 'block'
               btn.textContent = '💾 Скачать PDF'
@@ -421,6 +424,7 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<string> {
         </div>
     ` : ''}
 
+    ${docFitScript(794)}
     </body>
     </html>
   `

@@ -42,6 +42,7 @@ export interface KPData {
 }
 
 import { resizeToFit } from './imageResize'
+import { docFitScript } from './docFit'
 import { watermarkCss, watermarkBodyClass } from './docWatermark'
 import { escapeHtml, escapeAttr } from './htmlEscape'
 
@@ -478,6 +479,7 @@ export function buildKPHtml(data: KPData, images: KPImages = {}): string {
           const spacer = toolbar?.nextElementSibling
           if (toolbar) toolbar.style.display = 'none'
           if (spacer) spacer.style.display = 'none'
+          if (window.__ikzUnfit) window.__ikzUnfit()
           html2pdf().set({
             margin: 0,
             filename: ${jsString('КП-' + data.number + '.pdf')},
@@ -485,6 +487,7 @@ export function buildKPHtml(data: KPData, images: KPImages = {}): string {
             html2canvas: { scale: 2, useCORS: true, logging: false },
             jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
           }).from(document.body).save().then(() => {
+            if (window.__ikzFit) window.__ikzFit()
             if (toolbar) toolbar.style.display = 'flex'
             if (spacer) spacer.style.display = 'block'
             btn.textContent = '💾 Скачать PDF'
@@ -492,6 +495,7 @@ export function buildKPHtml(data: KPData, images: KPImages = {}): string {
           })
         }
       <\/script>
+    ${docFitScript(794)}
     </body>
     </html>
   `
