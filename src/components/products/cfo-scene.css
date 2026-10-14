@@ -121,3 +121,14 @@
   .lp-root .ks-wrap[data-theme="cfo"] .ks-bar > i { display: none; }
   .lp-root .ks-wrap[data-theme="cfo"] .ks-bar > b { margin-left: 0; }
 }
+/* Узкое окно (ноутбук): суммы показателей не обрезаются. */
+@container (max-width: 760px) {
+  .lp-root .cf-kpi { padding: 8px; }
+  .lp-root .cf-kpi b { font-size: 11.5px; }
+}
+
+/* Ноутбук 1180–1439: документ из сцены не закрывает стикеры и «Другие продукты»
+   (объявлено после правила с bottom: -150px, чтобы перебить его). */
+@media (min-width: 1180px) and (max-width: 1439px) {
+  .lp-root .ks-wrap[data-theme="cfo"] .ks-label { bottom: -64px; }
+}

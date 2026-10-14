@@ -88,3 +88,9 @@
 .lp-root .ks-a6.sl-phone .sl-ph-rating { margin-top: auto; padding: 0 14px 12px; font-size: 10px; color: #F14635; }
 .lp-root .ks-a6.sl-phone .sl-ph-rating span { font-size: 9px; color: #7A5A6C; }
 .lp-root .ks-a6.sl-phone { position: relative; }
+
+/* Ноутбук 1180–1439: документ из сцены не закрывает стикеры и «Другие продукты»
+   (объявлено после правила с bottom: -150px, чтобы перебить его). */
+@media (min-width: 1180px) and (max-width: 1439px) {
+  .lp-root .ks-wrap[data-theme="salon"] .ks-label { bottom: -64px; }
+}

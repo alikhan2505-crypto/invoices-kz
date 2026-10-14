@@ -190,3 +190,18 @@
   .lp-root .ks-live em, .lp-root .ks-box { animation: none; }
   .lp-root .ks-wrap * { transition: none !important; animation: none !important; }
 }
+
+/* Ноутбуки 1180–1439px: колонка текста уже и заголовок мельче, чтобы окно
+   анимации справа получило ≥600px и встало горизонтально, как на большом
+   экране, — без высокой «башни» и прокрутки страницы (бэклог 14.10). */
+@media (min-width: 1180px) and (max-width: 1439px) {
+  .lp-root .lp-split { grid-template-columns: minmax(0, 520px) minmax(0, 1fr); column-gap: 40px; }
+  .lp-root .lp-split .lp-h1 { font-size: 50px; }
+  .lp-root .lp-split .lp-lead { font-size: 17px; }
+}
+@container (min-width: 600px) {
+  .lp-root .ks-wrap:not([data-theme]) .ks-body { grid-template-columns: 1.08fr 1fr; align-items: stretch; }
+}
+/* Узкая правая колонка (ноутбук 1280): строки заказов не вылезают за карточку. */
+.lp-root .ks-orders { grid-template-columns: minmax(0, 1fr); min-width: 0; }
+.lp-root .ks-order { min-width: 0; overflow: hidden; }
