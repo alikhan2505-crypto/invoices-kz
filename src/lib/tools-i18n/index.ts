@@ -172,10 +172,12 @@ export const TOOL_CHROME: Record<ToolLang, ToolChromeCopy> = {
     allTools: '← Все инструменты',
     guides: 'Гайды по документам →',
     langSwitchAria: 'Язык страницы',
-    ctaTitle: 'Инструменты бесплатные. Платформа — тоже.',
+    // Честно (правка основателя 14.10): «платформа — тоже бесплатная» было
+    // неправдой — бесплатный тариф даёт 3 счёта в месяц, остальное платное.
+    ctaTitle: 'Понравилось? В кабинете — больше.',
     ctaBody:
-      'Счета за минуту, приём оплат Kaspi, проверка контрагентов без лимита и учёт финансов — в одном кабинете invoices.kz. Регистрация по ссылке на почту, карта не нужна.',
-    ctaButton: 'Начать бесплатно',
+      'Счета с оплатой Kaspi прямо в счёте, клиенты и история, проверка контрагентов без лимита. Бесплатный тариф — 3 счёта в месяц, а первые 7 дней — тариф Базовый бесплатно. Вход по ссылке на почту, карта не нужна.',
+    ctaButton: 'Попробовать бесплатно',
     breadcrumbHome: 'Главная',
     breadcrumbTools: 'Бесплатные инструменты',
   },
@@ -183,10 +185,10 @@ export const TOOL_CHROME: Record<ToolLang, ToolChromeCopy> = {
     allTools: '← Барлық құралдар',
     guides: 'Құжаттар бойынша нұсқаулықтар →',
     langSwitchAria: 'Бет тілі',
-    ctaTitle: 'Құралдар тегін. Платформа да тегін.',
+    ctaTitle: 'Ұнады ма? Кабинетте мүмкіндік көбірек.',
     ctaBody:
-      'Бір минутта шот жазу, Kaspi арқылы төлем қабылдау, контрагенттерді шектеусіз тексеру және қаржы есебі — бәрі invoices.kz бір кабинетінде. Тіркелу поштаға келген сілтеме арқылы, карта қажет емес.',
-    ctaButton: 'Тегін бастау',
+      'Kaspi төлемі тікелей шоттың ішінде, клиенттер мен тарих, контрагенттерді шектеусіз тексеру. Тегін тариф — айына 3 шот, ал алғашқы 7 күн Базалық тариф тегін. Кіру поштаға келген сілтеме арқылы, карта қажет емес.',
+    ctaButton: 'Тегін байқап көру',
     breadcrumbHome: 'Басты бет',
     breadcrumbTools: 'Тегін құралдар',
   },
@@ -194,10 +196,10 @@ export const TOOL_CHROME: Record<ToolLang, ToolChromeCopy> = {
     allTools: '← All tools',
     guides: 'Document guides (in Russian) →',
     langSwitchAria: 'Page language',
-    ctaTitle: 'The tools are free. So is the platform.',
+    ctaTitle: 'Like it? There is more in your account.',
     ctaBody:
-      'Invoices in a minute, Kaspi payments, unlimited counterparty checks and finance tracking — all in one invoices.kz account. Sign up with an email link, no card required.',
-    ctaButton: 'Start for free',
+      'Kaspi payment right inside the invoice, clients and history, unlimited counterparty checks. The free plan gives 3 invoices a month, and your first 7 days are on the Basic plan for free. Sign in with an email link, no card required.',
+    ctaButton: 'Try it free',
     breadcrumbHome: 'Home',
     breadcrumbTools: 'Free tools',
   },
