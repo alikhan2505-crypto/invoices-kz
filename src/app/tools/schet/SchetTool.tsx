@@ -9,6 +9,7 @@ import { useLanguage } from '@/components/LanguageProvider'
 import { formatTenge, toolLinkPath, toolsIndexPath, TOOL_CHROME, type ToolLang } from '@/lib/tools-i18n'
 import ToolLangSwitch from '@/lib/tools-i18n/ToolLangSwitch'
 import ToolCta from '@/lib/tools-i18n/ToolCta'
+import BinNameField from '@/lib/tools-i18n/BinNameField'
 import { schetDict } from './dict'
 import {
   digits, documentRows, documentTotal, localToday, resolveBank, ruDate, validateForm, vatIncluded,
@@ -65,36 +66,10 @@ export default function SchetTool({ lang }: { lang: ToolLang }) {
   const [f, setF] = useState<Form>(EMPTY)
   const [used, setUsed] = useState(0)
   const [error, setError] = useState('')
-  const [binLookup, setBinLookup] = useState<'idle' | 'loading' | 'found' | 'miss'>('idle')
   // Черновик пишем только после того, как прочитали сохранённый, — иначе
   // первый же эффект сохранения затёр бы его пустой формой (в dev React
   // запускает эффекты дважды, и черновик терялся бы).
   const [ready, setReady] = useState(false)
-
-  // Подстановка названия клиента из уже накопленного кэша реестров —
-  // bin-cache не тратит квоту КГД и не трогает лимит проверок, поэтому
-  // кнопка бесплатная и безлимитная.
-  const lookupClient = async () => {
-    if (binLookup === 'loading') return
-    setBinLookup('loading')
-    track('tool_schet_bin_lookup', { lang })
-    try {
-      const res = await fetch('/api/tools/bin-cache', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bin: f.clientBin }),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (res.ok && data?.found && typeof data.name === 'string') {
-        setF(prev => ({ ...prev, clientName: data.name }))
-        setBinLookup('found')
-      } else {
-        setBinLookup('miss')
-      }
-    } catch {
-      setBinLookup('miss')
-    }
-  }
 
   // Черновик переживает перезагрузку: заполнять реквизиты заново — главная
   // причина бросить такой инструмент на середине.
@@ -217,13 +192,15 @@ export default function SchetTool({ lang }: { lang: ToolLang }) {
         <div className="nav-glass rounded-2xl p-5 mb-4">
           <div className="text-sm font-bold mb-3" style={{ color: 'var(--nav-text-primary)' }}>{t.supplierTitle}</div>
           <div className="grid sm:grid-cols-2 gap-3">
+            {/* Сначала БИН/ИИН с «Найти», под ним название — его и подставит поиск. */}
+            <BinNameField id="sc-bin" tool="schet" role="seller" lang={lang}
+              className="sm:col-span-2 sm:max-w-[calc(50%-0.375rem)]"
+              label={t.binLabel} placeholder={t.binPlaceholder}
+              value={f.binIin} onChange={bin => set({ binIin: bin })} onName={name => set({ companyName: name })}
+              inputClass={input} inputStyle={inputStyle} labelClass={label} labelStyle={labelStyle} />
             <div className="sm:col-span-2">
               <label htmlFor="sc-company" className={label} style={labelStyle}>{t.companyLabel}</label>
               <input id="sc-company" className={input} style={inputStyle} placeholder={t.companyPlaceholder} autoComplete="organization" value={f.companyName} onChange={e => set({ companyName: e.target.value })} />
-            </div>
-            <div>
-              <label htmlFor="sc-bin" className={label} style={labelStyle}>{t.binLabel}</label>
-              <input id="sc-bin" className={input} style={inputStyle} inputMode="numeric" autoComplete="off" placeholder={t.binPlaceholder} value={f.binIin} onChange={e => set({ binIin: digits(e.target.value).slice(0, 12) })} />
             </div>
             <div>
               <label htmlFor="sc-bank" className={label} style={labelStyle}>{t.bankLabel}</label>
@@ -266,31 +243,15 @@ export default function SchetTool({ lang }: { lang: ToolLang }) {
 
         <div className="nav-glass rounded-2xl p-5 mb-4">
           <div className="text-sm font-bold mb-3" style={{ color: 'var(--nav-text-primary)' }}>{t.clientTitle}</div>
-          <div className="grid sm:grid-cols-2 gap-3">
+          <div className="grid gap-3">
+            <BinNameField id="sc-client-bin" tool="schet" role="client" lang={lang}
+              className="sm:max-w-[calc(50%-0.375rem)]"
+              label={t.clientBinLabel} placeholder={t.binPlaceholder}
+              value={f.clientBin} onChange={bin => set({ clientBin: bin })} onName={name => set({ clientName: name })}
+              inputClass={input} inputStyle={inputStyle} labelClass={label} labelStyle={labelStyle} />
             <div>
               <label htmlFor="sc-client" className={label} style={labelStyle}>{t.clientNameLabel}</label>
               <input id="sc-client" className={input} style={inputStyle} autoComplete="off" value={f.clientName} onChange={e => set({ clientName: e.target.value })} />
-            </div>
-            <div>
-              <label htmlFor="sc-client-bin" className={label} style={labelStyle}>{t.clientBinLabel}</label>
-              <div className="flex gap-2">
-                <input id="sc-client-bin" className={input} style={inputStyle} inputMode="numeric" autoComplete="off" placeholder={t.binPlaceholder} value={f.clientBin}
-                  onChange={e => { set({ clientBin: digits(e.target.value).slice(0, 12) }); setBinLookup('idle') }} />
-                <button type="button" onClick={lookupClient} disabled={f.clientBin.length !== 12 || binLookup === 'loading'}
-                  aria-label={t.lookupAria}
-                  className="nav-glass rounded-xl px-3 text-[13px] font-semibold flex-shrink-0 disabled:opacity-50"
-                  style={accentLink}>
-                  {binLookup === 'loading' ? '…' : t.lookupButton}
-                </button>
-              </div>
-              <div aria-live="polite">
-                {binLookup === 'found' && (
-                  <div className="text-[11px] mt-1" style={{ color: 'var(--nav-success)' }}>{t.lookupFound}</div>
-                )}
-                {binLookup === 'miss' && (
-                  <div className="text-[11px] mt-1" style={{ color: 'var(--nav-text-muted)' }}>{t.lookupMiss}</div>
-                )}
-              </div>
             </div>
           </div>
           <div className="text-[11px] mt-2" style={{ color: 'var(--nav-text-muted)' }}>

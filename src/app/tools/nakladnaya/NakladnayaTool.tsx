@@ -8,6 +8,7 @@ import { useLanguage } from '@/components/LanguageProvider'
 import { formatTenge, guidesIndexPath, toolPath, toolsIndexPath, TOOL_CHROME, type ToolLang } from '@/lib/tools-i18n'
 import ToolLangSwitch from '@/lib/tools-i18n/ToolLangSwitch'
 import ToolCta from '@/lib/tools-i18n/ToolCta'
+import BinNameField from '@/lib/tools-i18n/BinNameField'
 import { nakladnayaDict } from './dict'
 import {
   digits, documentRows, documentTotal, localToday, ruDate, validateForm, vatIncluded,
@@ -171,13 +172,15 @@ export default function NakladnayaTool({ lang }: { lang: ToolLang }) {
         <div className="nav-glass rounded-2xl p-5 mb-4">
           <div className="text-sm font-bold mb-3" style={{ color: 'var(--nav-text-primary)' }}>{t.supplierTitle}</div>
           <div className="grid sm:grid-cols-2 gap-3">
+            {/* Сначала БИН/ИИН с «Найти», под ним название — его и подставит поиск. */}
+            <BinNameField id="nk-bin" tool="nakladnaya" role="seller" lang={lang}
+              className="sm:col-span-2 sm:max-w-[calc(50%-0.375rem)]"
+              label={t.binLabel} placeholder={t.binPlaceholder}
+              value={f.binIin} onChange={bin => set({ binIin: bin })} onName={name => set({ companyName: name })}
+              inputClass={input} inputStyle={inputStyle} labelClass={label} labelStyle={labelStyle} />
             <div className="sm:col-span-2">
               <label htmlFor="nk-company" className={label} style={labelStyle}>{t.companyLabel}</label>
               <input id="nk-company" className={input} style={inputStyle} placeholder={t.companyPlaceholder} autoComplete="organization" value={f.companyName} onChange={e => set({ companyName: e.target.value })} />
-            </div>
-            <div>
-              <label htmlFor="nk-bin" className={label} style={labelStyle}>{t.binLabel}</label>
-              <input id="nk-bin" className={input} style={inputStyle} inputMode="numeric" autoComplete="off" placeholder={t.binPlaceholder} value={f.binIin} onChange={e => set({ binIin: digits(e.target.value).slice(0, 12) })} />
             </div>
             <div>
               <label htmlFor="nk-director" className={label} style={labelStyle}>{t.directorLabel}</label>
@@ -193,13 +196,14 @@ export default function NakladnayaTool({ lang }: { lang: ToolLang }) {
         <div className="nav-glass rounded-2xl p-5 mb-4">
           <div className="text-sm font-bold mb-3" style={{ color: 'var(--nav-text-primary)' }}>{t.recipientTitle}</div>
           <div className="grid sm:grid-cols-2 gap-3">
-            <div>
+            <BinNameField id="nk-client-bin" tool="nakladnaya" role="client" lang={lang}
+              className="sm:col-span-2 sm:max-w-[calc(50%-0.375rem)]"
+              label={t.clientBinLabel} placeholder={t.binPlaceholder}
+              value={f.clientBin} onChange={bin => set({ clientBin: bin })} onName={name => set({ clientName: name })}
+              inputClass={input} inputStyle={inputStyle} labelClass={label} labelStyle={labelStyle} />
+            <div className="sm:col-span-2">
               <label htmlFor="nk-client" className={label} style={labelStyle}>{t.clientNameLabel}</label>
               <input id="nk-client" className={input} style={inputStyle} autoComplete="off" value={f.clientName} onChange={e => set({ clientName: e.target.value })} />
-            </div>
-            <div>
-              <label htmlFor="nk-client-bin" className={label} style={labelStyle}>{t.clientBinLabel}</label>
-              <input id="nk-client-bin" className={input} style={inputStyle} inputMode="numeric" autoComplete="off" placeholder={t.binPlaceholder} value={f.clientBin} onChange={e => set({ clientBin: digits(e.target.value).slice(0, 12) })} />
             </div>
           </div>
         </div>

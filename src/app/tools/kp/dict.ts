@@ -45,18 +45,6 @@ export interface KpDict {
   clientPlaceholder: string
   /** БИН клиента необязателен: по нему подставляем название из реестра. */
   clientBinLabel: string
-  lookupButton: string
-  lookupAria: string
-  sellerLookupAria: string
-  /** Поиск идёт сам, как только в поле 12 цифр. */
-  lookupLoading: string
-  lookupFound: string
-  /** Ни в кэше, ни в реестре не нашли. */
-  lookupMiss: string
-  /** Живые поиски в реестре на этот квартал кончились. */
-  lookupLimit: string
-  /** Реестр занят / счётчик не читается. */
-  lookupUnavailable: string
   errClientBin: string
   numberLabel: string
   dateLabel: string
@@ -133,14 +121,6 @@ export const kpDict: Record<ToolLang, KpDict> = {
     clientLabel: 'Кому *',
     clientPlaceholder: 'ТОО «Клиент»',
     clientBinLabel: 'БИН / ИИН клиента (необязательно)',
-    lookupButton: 'Найти',
-    lookupAria: 'Найти название клиента по БИН',
-    sellerLookupAria: 'Найти название своей компании по БИН',
-    lookupLoading: 'Ищем название по БИН…',
-    lookupFound: 'Название подставлено из реестра',
-    lookupMiss: 'По этому БИН ничего не нашли — введите название вручную',
-    lookupLimit: 'Автопоиск на этот квартал исчерпан — введите название вручную',
-    lookupUnavailable: 'Автопоиск сейчас недоступен — введите название вручную',
     errClientBin: 'БИН/ИИН клиента — 12 цифр (или оставьте поле пустым)',
     numberLabel: 'Номер *',
     dateLabel: 'Дата *',
@@ -196,7 +176,7 @@ export const kpDict: Record<ToolLang, KpDict> = {
       },
       {
         q: 'Сколько КП можно создать бесплатно?',
-        a: 'Три КП в квартал с одного подключения (IP-адреса), без регистрации. Счётчик обнуляется 1 января, 1 апреля, 1 июля и 1 октября. Название клиента подставляется по БИН кнопкой «Найти». Нужно чаще — зарегистрируйтесь: в кабинете КП сохраняются и превращаются в счёт одним кликом.',
+        a: 'Три КП в квартал с одного подключения (IP-адреса), без регистрации. Счётчик обнуляется 1 января, 1 апреля, 1 июля и 1 октября. Название своей компании и клиента подставляется по БИН/ИИН кнопкой «Найти». Нужно чаще — зарегистрируйтесь: в кабинете КП сохраняются и превращаются в счёт одним кликом.',
       },
     ],
   },
@@ -235,14 +215,6 @@ export const kpDict: Record<ToolLang, KpDict> = {
     clientLabel: 'Кімге *',
     clientPlaceholder: '«Клиент» ЖШС',
     clientBinLabel: 'Клиенттің БСН / ЖСН (міндетті емес)',
-    lookupButton: 'Табу',
-    lookupAria: 'Клиенттің атауын БСН бойынша табу',
-    sellerLookupAria: 'Өз компанияңыздың атауын БСН бойынша табу',
-    lookupLoading: 'Атауын БСН бойынша іздеп жатырмыз…',
-    lookupFound: 'Атауы тізілімнен қойылды',
-    lookupMiss: 'Бұл БСН бойынша ештеңе табылмады — атауын қолмен енгізіңіз',
-    lookupLimit: 'Осы тоқсандағы автоіздеу таусылды — атауын қолмен енгізіңіз',
-    lookupUnavailable: 'Автоіздеу қазір қолжетімсіз — атауын қолмен енгізіңіз',
     errClientBin: 'Клиенттің БСН/ЖСН-і — 12 цифр (немесе өрісті бос қалдырыңыз)',
     numberLabel: 'Нөмірі *',
     dateLabel: 'Күні *',
@@ -298,7 +270,7 @@ export const kpDict: Record<ToolLang, KpDict> = {
       },
       {
         q: 'Қанша КҰ тегін жасауға болады?',
-        a: 'Бір қосылымнан (IP-мекенжайдан) тоқсанына үш КҰ, тіркелусіз. Есептегіш 1 қаңтарда, 1 сәуірде, 1 шілдеде және 1 қазанда нөлденеді. Клиенттің атауы БСН бойынша «Табу» түймесімен қойылады. Жиірек керек болса — тіркеліңіз: кабинетте КҰ сақталады және бір басумен шотқа айналады.',
+        a: 'Бір қосылымнан (IP-мекенжайдан) тоқсанына үш КҰ, тіркелусіз. Есептегіш 1 қаңтарда, 1 сәуірде, 1 шілдеде және 1 қазанда нөлденеді. Өз компанияңыздың және клиенттің атауы БСН/ЖСН бойынша «Табу» түймесімен қойылады. Жиірек керек болса — тіркеліңіз: кабинетте КҰ сақталады және бір басумен шотқа айналады.',
       },
     ],
   },
@@ -337,14 +309,6 @@ export const kpDict: Record<ToolLang, KpDict> = {
     clientLabel: 'To (client) *',
     clientPlaceholder: 'e.g. ТОО «Client»',
     clientBinLabel: 'Client BIN / IIN (optional)',
-    lookupButton: 'Find',
-    lookupAria: 'Find the client name by BIN',
-    sellerLookupAria: 'Find your company name by BIN',
-    lookupLoading: 'Looking up the name by BIN…',
-    lookupFound: 'Name filled in from the registry',
-    lookupMiss: 'Nothing found for this BIN — type the name manually',
-    lookupLimit: 'Auto-lookup is used up for this quarter — type the name manually',
-    lookupUnavailable: 'Auto-lookup is unavailable right now — type the name manually',
     errClientBin: 'Client BIN/IIN must be 12 digits (or leave it empty)',
     numberLabel: 'Number *',
     dateLabel: 'Date *',
@@ -400,7 +364,7 @@ export const kpDict: Record<ToolLang, KpDict> = {
       },
       {
         q: 'How many proposals can I create for free?',
-        a: 'Three per quarter from one connection (IP address), no sign-up. The counter resets on 1 January, 1 April, 1 July and 1 October. The client name is filled in from the BIN with the Find button. Need more? Sign up: in your account proposals are saved and turn into an invoice in one click.',
+        a: 'Three per quarter from one connection (IP address), no sign-up. The counter resets on 1 January, 1 April, 1 July and 1 October. Your company name and the client name are filled in from the BIN/IIN with the Find button. Need more? Sign up: in your account proposals are saved and turn into an invoice in one click.',
       },
     ],
   },

@@ -37,10 +37,6 @@ export interface SchetDict {
   clientTitle: string
   clientNameLabel: string
   clientBinLabel: string
-  lookupButton: string
-  lookupAria: string
-  lookupFound: string
-  lookupMiss: string
   /** «Не уверены в контрагенте? …» + ссылка + хвост после неё. */
   checkHint: string
   checkLink: string
@@ -122,10 +118,6 @@ export const schetDict: Record<ToolLang, SchetDict> = {
     clientTitle: 'Клиент — кому счёт',
     clientNameLabel: 'Название клиента *',
     clientBinLabel: 'БИН / ИИН клиента *',
-    lookupButton: 'Найти',
-    lookupAria: 'Найти название клиента по БИН',
-    lookupFound: 'Название подставлено из реестра',
-    lookupMiss: 'В нашей базе пока нет — введите название вручную',
     checkHint: 'Не уверены в контрагенте? Проверьте его бесплатно: ',
     checkLink: 'проверка по БИН',
     checkAfter: '.',
@@ -183,7 +175,7 @@ export const schetDict: Record<ToolLang, SchetDict> = {
       },
       {
         q: 'Куда сохраняются мои данные?',
-        a: 'Реквизиты и позиции хранятся только в вашем браузере — чтобы не заполнять их заново для следующего счёта. Сам счёт формируется на этом устройстве и на наш сервер не отправляется. На сервер уходит только БИН клиента, если нажать «Найти».',
+        a: 'Реквизиты и позиции хранятся только в вашем браузере — чтобы не заполнять их заново для следующего счёта. Сам счёт формируется на этом устройстве и на наш сервер не отправляется. На сервер уходит только БИН/ИИН, и только если нажать «Найти».',
       },
     ],
   },
@@ -223,10 +215,6 @@ export const schetDict: Record<ToolLang, SchetDict> = {
     clientTitle: 'Клиент — шот кімге',
     clientNameLabel: 'Клиенттің атауы *',
     clientBinLabel: 'Клиенттің БСН / ЖСН *',
-    lookupButton: 'Табу',
-    lookupAria: 'Клиенттің атауын БСН бойынша табу',
-    lookupFound: 'Атауы тізілімнен қойылды',
-    lookupMiss: 'Біздің базада әзірге жоқ — атауын қолмен енгізіңіз',
     checkHint: 'Контрагентке күмәніңіз бар ма? Оны тегін тексеріңіз: ',
     checkLink: 'БСН бойынша тексеру',
     checkAfter: '.',
@@ -284,7 +272,7 @@ export const schetDict: Record<ToolLang, SchetDict> = {
       },
       {
         q: 'Деректерім қайда сақталады?',
-        a: 'Деректемелер мен позициялар тек сіздің браузеріңізде сақталады — келесі шот үшін қайта толтырмау үшін. Шот осы құрылғыда жасалады және біздің серверге жіберілмейді. «Табу» батырмасын басқанда ғана серверге клиенттің БСН-і жіберіледі.',
+        a: 'Деректемелер мен позициялар тек сіздің браузеріңізде сақталады — келесі шот үшін қайта толтырмау үшін. Шот осы құрылғыда жасалады және біздің серверге жіберілмейді. «Табу» батырмасын басқанда ғана серверге БСН/ЖСН жіберіледі.',
       },
     ],
   },
@@ -324,10 +312,6 @@ export const schetDict: Record<ToolLang, SchetDict> = {
     clientTitle: 'Client — who the invoice is for',
     clientNameLabel: 'Client name *',
     clientBinLabel: 'Client BIN / IIN *',
-    lookupButton: 'Find',
-    lookupAria: 'Find the client name by BIN',
-    lookupFound: 'Name filled in from the registry',
-    lookupMiss: 'Not in our database yet — type the name manually',
     checkHint: 'Not sure about this counterparty? Check it for free: ',
     checkLink: 'BIN check',
     checkAfter: '.',
@@ -385,7 +369,7 @@ export const schetDict: Record<ToolLang, SchetDict> = {
       },
       {
         q: 'Where is my data stored?',
-        a: 'Your details and items stay only in your browser, so you don’t have to retype them for the next invoice. The invoice itself is built on this device and is not sent to our server. Only the client’s BIN is sent to the server, and only when you click “Find”.',
+        a: 'Your details and items stay only in your browser, so you don’t have to retype them for the next invoice. The invoice itself is built on this device and is not sent to our server. Only the BIN/IIN is sent to the server, and only when you click “Find”.',
       },
     ],
   },

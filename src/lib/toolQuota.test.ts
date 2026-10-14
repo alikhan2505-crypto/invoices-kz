@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import { createHash } from 'crypto'
 import {
-  almatyDay, almatyQuarter, nextQuarterStart, kpClaimKey, kpLookupKey, remainingOf,
-  clientIp, cleanCompanyName, KP_CLAIM_PREFIX, KP_LOOKUP_PREFIX, KP_QUARTER_LIMIT, KP_LOOKUP_QUARTER_LIMIT,
+  almatyDay, almatyQuarter, nextQuarterStart, kpClaimKey, nameLookupKey, parseNameLookupTarget, remainingOf,
+  clientIp, cleanCompanyName, KP_CLAIM_PREFIX, NAME_LOOKUP_PREFIX, NAME_LOOKUP_ROLES, NAME_LOOKUP_TOOLS,
+  KP_QUARTER_LIMIT, NAME_LOOKUP_QUARTER_LIMIT, claimCounterSlot,
 } from './toolQuota'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 const utc = (iso: string) => Date.parse(iso)
 
@@ -43,17 +45,59 @@ describe('quota keys', () => {
     expect(k).not.toBe(kpClaimKey('203.0.113.8', '2026-Q4'))
   })
 
-  it('keeps kp, kp-lookup and kontragent keys in separate namespaces', () => {
+  it('keeps kp, name-lookup and kontragent keys in separate namespaces', () => {
     const kontragent = createHash('sha256').update('203.0.113.7|2026-Q4').digest('hex')
     const claim = kpClaimKey('203.0.113.7', '2026-Q4')
-    const lookup = kpLookupKey('203.0.113.7', '2026-Q4')
+    const lookup = nameLookupKey('kp', 'client', '203.0.113.7', '2026-Q4')
     expect(claim.startsWith(KP_CLAIM_PREFIX)).toBe(true)
-    expect(lookup.startsWith(KP_LOOKUP_PREFIX)).toBe(true)
+    expect(lookup.startsWith(NAME_LOOKUP_PREFIX)).toBe(true)
     // Предохранитель реестров исключает строки по префиксу 'kp:' — живые
-    // поиски названия ('kp-lookup:') под него попадать не должны.
+    // поиски названия ('lookup:') под него попадать не должны.
     expect(lookup.startsWith(KP_CLAIM_PREFIX)).toBe(false)
     expect(new Set([kontragent, claim, lookup]).size).toBe(3)
     expect(claim.slice(KP_CLAIM_PREFIX.length)).toMatch(/^[0-9a-f]{64}$/)
+    expect(lookup.slice(NAME_LOOKUP_PREFIX.length)).toMatch(/^[0-9a-f]{64}$/)
+    // weekly-digest считает проверки контрагента как ключи без «:».
+    expect(kontragent).not.toContain(':')
+    expect(claim).toContain(':')
+    expect(lookup).toContain(':')
+  })
+})
+
+describe('name lookup quota', () => {
+  it('gives every tool+field pair its own counter', () => {
+    const keys = new Set<string>()
+    for (const tool of NAME_LOOKUP_TOOLS) {
+      for (const role of NAME_LOOKUP_ROLES) keys.add(nameLookupKey(tool, role, '203.0.113.7', '2026-Q4'))
+    }
+    expect(keys.size).toBe(NAME_LOOKUP_TOOLS.length * NAME_LOOKUP_ROLES.length)
+    expect(NAME_LOOKUP_TOOLS.length * NAME_LOOKUP_ROLES.length).toBe(8)
+  })
+
+  it('is stable per quarter and IP, changes with either, never stores the raw IP', () => {
+    const k = nameLookupKey('schet', 'seller', '203.0.113.7', '2026-Q4')
+    expect(k).toBe(nameLookupKey('schet', 'seller', '203.0.113.7', '2026-Q4'))
+    expect(k).not.toBe(nameLookupKey('schet', 'seller', '203.0.113.7', '2027-Q1'))
+    expect(k).not.toBe(nameLookupKey('schet', 'seller', '203.0.113.8', '2026-Q4'))
+    expect(k).not.toContain('203.0.113.7')
+    expect(k).toBe(NAME_LOOKUP_PREFIX + createHash('sha256').update('lookup|schet|seller|203.0.113.7|2026-Q4').digest('hex'))
+  })
+
+  it('allows 3 live registry lookups per field per quarter', () => {
+    expect(NAME_LOOKUP_QUARTER_LIMIT).toBe(3)
+  })
+
+  it('accepts only whitelisted tool and role', () => {
+    expect(parseNameLookupTarget('kp', 'seller')).toEqual({ tool: 'kp', role: 'seller' })
+    expect(parseNameLookupTarget('nakladnaya', 'client')).toEqual({ tool: 'nakladnaya', role: 'client' })
+    expect(parseNameLookupTarget('avr', 'client')).toEqual({ tool: 'avr', role: 'client' })
+    expect(parseNameLookupTarget('schet', 'seller')).toEqual({ tool: 'schet', role: 'seller' })
+    expect(parseNameLookupTarget('kontragent', 'client')).toBeNull()
+    expect(parseNameLookupTarget('kp', 'buyer')).toBeNull()
+    expect(parseNameLookupTarget('KP', 'seller')).toBeNull()
+    expect(parseNameLookupTarget(undefined, undefined)).toBeNull()
+    expect(parseNameLookupTarget(['kp'], 'seller')).toBeNull()
+    expect(parseNameLookupTarget('kp|x', 'seller')).toBeNull()
   })
 })
 
@@ -65,10 +109,6 @@ describe('remainingOf', () => {
     expect(remainingOf(9, KP_QUARTER_LIMIT)).toBe(0)
     expect(remainingOf(-1, KP_QUARTER_LIMIT)).toBe(3)
     expect(remainingOf(Number.NaN, KP_QUARTER_LIMIT)).toBe(3)
-  })
-
-  it('gives two live lookups per allowed proposal', () => {
-    expect(KP_LOOKUP_QUARTER_LIMIT).toBe(KP_QUARTER_LIMIT)
   })
 })
 
@@ -85,5 +125,63 @@ describe('cleanCompanyName', () => {
     expect(cleanCompanyName('   ')).toBeNull()
     expect(cleanCompanyName(null)).toBeNull()
     expect(cleanCompanyName(42)).toBeNull()
+  })
+})
+
+// Мини-подделка tool_kontragent_checks: update().eq().eq().select() и insert()
+// с первичным ключом по key — ровно то, чем пользуется claimCounterSlot.
+function fakeCounters(rows: Record<string, number>, opts: { failUpdate?: boolean } = {}) {
+  const client = {
+    from: () => ({
+      update: (patch: { count: number }) => {
+        const filters: Record<string, unknown> = {}
+        const chain = {
+          eq: (col: string, v: unknown) => { filters[col] = v; return chain },
+          select: async () => {
+            if (opts.failUpdate) return { data: null, error: { message: 'boom' } }
+            const k = filters.key as string
+            if (k in rows && rows[k] === filters.count) { rows[k] = patch.count; return { data: [{ key: k }], error: null } }
+            return { data: [], error: null }
+          },
+        }
+        return chain
+      },
+      insert: async (row: { key: string; count: number }) => {
+        if (row.key in rows) return { error: { code: '23505', message: 'duplicate key' } }
+        rows[row.key] = row.count
+        return { error: null }
+      },
+    }),
+  }
+  return client as unknown as SupabaseClient
+}
+
+describe('claimCounterSlot (atomic name-lookup budget)', () => {
+  it('creates the row on the first lookup and bumps it on the next ones', async () => {
+    const rows: Record<string, number> = {}
+    const db = fakeCounters(rows)
+    expect(await claimCounterSlot(db, 'lookup:a', 0)).toBe('claimed')
+    expect(rows['lookup:a']).toBe(1)
+    expect(await claimCounterSlot(db, 'lookup:a', 1)).toBe('claimed')
+    expect(rows['lookup:a']).toBe(2)
+  })
+
+  it('lets only one of several parallel requests with the same stale count through', async () => {
+    const rows: Record<string, number> = {}
+    const db = fakeCounters(rows)
+    const results = await Promise.all([0, 0, 0, 0, 0].map(u => claimCounterSlot(db, 'lookup:b', u)))
+    expect(results.filter(r => r === 'claimed')).toHaveLength(1)
+    expect(results.filter(r => r === 'raced')).toHaveLength(4)
+    expect(rows['lookup:b']).toBe(1)
+
+    const rows2: Record<string, number> = { 'lookup:c': 2 }
+    const db2 = fakeCounters(rows2)
+    const r2 = await Promise.all([2, 2, 2].map(u => claimCounterSlot(db2, 'lookup:c', u)))
+    expect(r2.filter(r => r === 'claimed')).toHaveLength(1)
+    expect(rows2['lookup:c']).toBe(3)
+  })
+
+  it('reports a database error instead of claiming', async () => {
+    expect(await claimCounterSlot(fakeCounters({}, { failUpdate: true }), 'lookup:d', 0)).toBe('error')
   })
 })

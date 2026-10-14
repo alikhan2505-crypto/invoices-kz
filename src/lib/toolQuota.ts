@@ -2,8 +2,11 @@
 // tool_kontragent_checks (key, day, count). Им пользуются:
 //   - /api/tools/kontragent      — 3 проверки контрагента на IP в квартал;
 //   - /api/tools/kp/quota        — 3 коммерческих предложения на IP в квартал;
-//   - /api/tools/kp/client-name  — 3 живых запроса в реестр на IP в квартал
-//                                  (решение основателя 14.10.2026: столько же, сколько КП).
+//   - /api/tools/name-lookup     — название по БИН/ИИН для /tools/kp, schet, avr,
+//                                  nakladnaya: 3 живых запроса в реестр на IP в квартал
+//                                  НА КАЖДОЕ ПОЛЕ КАЖДОГО ИНСТРУМЕНТА (КП-поставщик 3,
+//                                  КП-клиент 3, Счёт-поставщик 3, … — решение основателя
+//                                  14.10.2026). Поиск по нашему кэшу счётчик не трогает.
 // Сырой IP в базу не пишем — только sha256 от строки с пространством имён и
 // кварталом. Колонка day = день последнего списания; по ней считается общий
 // дневной предохранитель квоты КГД/egov.
@@ -18,16 +21,30 @@ export const REGISTRY_DAILY_GLOBAL = 300
 
 /** КП: бесплатных предложений на IP в квартал (решение основателя 14.10.2026). */
 export const KP_QUARTER_LIMIT = 3
-/** КП: живых поисков названия клиента в реестре на IP в квартал — по 2 на КП. */
-export const KP_LOOKUP_QUARTER_LIMIT = 3
+/** Поиск названия по БИН/ИИН: живых запросов в реестр на IP в квартал — на одно поле одного инструмента. */
+export const NAME_LOOKUP_QUARTER_LIMIT = 3
 
 /**
- * Строки КП-счётчика помечены видимым префиксом: сами КП реестры не трогают,
- * поэтому дневной предохранитель их не считает. Живые поиски названия для КП
- * (kp-lookup:) — считает, они тратят ту же квоту, что и проверка контрагента.
+ * Строки счётчика помечены видимым префиксом. Сами КП (kp:) реестры не трогают,
+ * поэтому дневной предохранитель их не считает. Живые поиски названия (lookup:)
+ * — считает, они тратят ту же квоту, что и проверка контрагента. Ключи самой
+ * проверки контрагента — голый sha256 без двоеточия (см. weekly-digest).
  */
 export const KP_CLAIM_PREFIX = 'kp:'
-export const KP_LOOKUP_PREFIX = 'kp-lookup:'
+export const NAME_LOOKUP_PREFIX = 'lookup:'
+
+/** Инструменты и поля, для которых работает поиск названия, — белый список. */
+export const NAME_LOOKUP_TOOLS = ['kp', 'schet', 'avr', 'nakladnaya'] as const
+export const NAME_LOOKUP_ROLES = ['seller', 'client'] as const
+export type NameLookupTool = (typeof NAME_LOOKUP_TOOLS)[number]
+export type NameLookupRole = (typeof NAME_LOOKUP_ROLES)[number]
+
+/** tool/role из тела запроса — только из белого списка, иначе null (роут отвечает 400). */
+export function parseNameLookupTarget(tool: unknown, role: unknown): { tool: NameLookupTool; role: NameLookupRole } | null {
+  const okTool = (NAME_LOOKUP_TOOLS as readonly unknown[]).includes(tool)
+  const okRole = (NAME_LOOKUP_ROLES as readonly unknown[]).includes(role)
+  return okTool && okRole ? { tool: tool as NameLookupTool, role: role as NameLookupRole } : null
+}
 
 const ALMATY_OFFSET_MS = 5 * 3600_000 // Казахстан — единый UTC+5
 
@@ -56,15 +73,17 @@ export function sha256Hex(s: string): string {
 }
 
 /**
- * Ключ счётчика КП и поиска названия для КП. Хэшируется строка с пространством
- * имён ('kp|ip|квартал'), так что с ключами контрагента (sha256('ip|квартал'))
- * она не совпадёт никогда, а видимый префикс отделяет строки для предохранителя.
+ * Ключ счётчика КП. Хэшируется строка с пространством имён ('kp|ip|квартал'),
+ * так что с ключами контрагента (sha256('ip|квартал')) она не совпадёт никогда,
+ * а видимый префикс отделяет строки для предохранителя.
  */
 export function kpClaimKey(ip: string, quarter: string): string {
   return KP_CLAIM_PREFIX + sha256Hex(`kp|${ip}|${quarter}`)
 }
-export function kpLookupKey(ip: string, quarter: string): string {
-  return KP_LOOKUP_PREFIX + sha256Hex(`kp-lookup|${ip}|${quarter}`)
+
+/** Ключ счётчика живых поисков названия: свой на каждую пару инструмент+поле. */
+export function nameLookupKey(tool: NameLookupTool, role: NameLookupRole, ip: string, quarter: string): string {
+  return NAME_LOOKUP_PREFIX + sha256Hex(`lookup|${tool}|${role}|${ip}|${quarter}`)
 }
 
 /** Сколько осталось при used из limit; никогда не меньше нуля. */
@@ -103,9 +122,37 @@ export async function writeCounter(supabase: SupabaseClient, key: string, count:
   return !error
 }
 
+export type CounterClaim = 'claimed' | 'raced' | 'error'
+
 /**
- * Нагрузка на реестры за сегодня: сумма счётчиков строк, списанных сегодня,
- * кроме КП-строк (они реестры не трогают). Завышает счёт (квартальные счётчики
+ * Атомарно занять слот: count used → used+1, только если в базе всё ещё used
+ * (compare-and-swap). Обычный read→write (writeCounter) пропускает пачку
+ * параллельных запросов: все читают used=0 и все идут в реестр. 'raced' —
+ * слот перехватил параллельный запрос, надо перечитать счётчик.
+ */
+export async function claimCounterSlot(supabase: SupabaseClient, key: string, used: number, now = Date.now()): Promise<CounterClaim> {
+  const day = almatyDay(now)
+  const { data, error } = await supabase.from(COUNTER_TABLE)
+    .update({ day, count: used + 1 }).eq('key', key).eq('count', used).select('key')
+  if (error) {
+    console.error('toolQuota: counter claim failed:', error.message)
+    return 'error'
+  }
+  if ((data ?? []).length > 0) return 'claimed'
+  if (used !== 0) return 'raced'
+  // Строки ещё нет — первая попытка в квартале. Первичный ключ по key не даст
+  // вставить её дважды: проигравший параллельный запрос получит 23505.
+  const ins = await supabase.from(COUNTER_TABLE).insert({ key, day, count: 1 })
+  if (!ins.error) return 'claimed'
+  if (ins.error.code === '23505') return 'raced'
+  console.error('toolQuota: counter claim insert failed:', ins.error.message)
+  return 'error'
+}
+
+/**
+ * Нагрузка на реестры за сегодня: сумма счётчиков строк, списанных сегодня
+ * (проверки контрагента и живые поиски названия lookup:), кроме КП-строк
+ * (они реестры не трогают). Завышает счёт (квартальные счётчики
  * целиком) — это безопасная сторона. Ошибку чтения трактуем как 0, как и раньше
  * в /api/tools/kontragent: сам лимит на IP уже прочитан успешно.
  */

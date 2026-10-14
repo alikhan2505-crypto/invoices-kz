@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import BrandWordmark from '@/components/BrandWordmark'
 import { track } from '@vercel/analytics'
@@ -8,6 +8,7 @@ import { useLanguage } from '@/components/LanguageProvider'
 import { formatTenge, isToolLocalized, toolLinkPath, toolsIndexPath, TOOL_CHROME, type ToolLang } from '@/lib/tools-i18n'
 import ToolLangSwitch from '@/lib/tools-i18n/ToolLangSwitch'
 import ToolCta from '@/lib/tools-i18n/ToolCta'
+import BinNameField from '@/lib/tools-i18n/BinNameField'
 import { kpDict } from './dict'
 import { UNIT_LABELS, unitAria } from '@/lib/tools-i18n/units'
 import { kpLines, kpRowProblem, kpTotal, kpVatIncluded, localIsoDate, ruDate, KP_UNITS, KP_DEFAULT_UNIT, type KpRow } from './calc'
@@ -19,9 +20,9 @@ import { kpLines, kpRowProblem, kpTotal, kpVatIncluded, localIsoDate, ruDate, KP
 //
 // Лимит — 3 КП на IP в квартал, считает СЕРВЕР (/api/tools/kp/quota, решение
 // основателя 14.10.2026; раньше было 3 в день в localStorage, который
-// очищается одной кнопкой). Название клиента по БИН ищется само
-// (/api/tools/kp/client-name): кэш реестров, затем живой реестр в пределах
-// своего квартального бюджета.
+// очищается одной кнопкой). Название своей компании и клиента по БИН/ИИН —
+// по кнопке «Найти» (BinNameField → /api/tools/name-lookup): кэш реестров,
+// затем живой реестр, 3 раза в квартал на каждое из двух полей.
 //
 // Один компонент на /tools/kp, /tools/kk/kp и /tools/en/kp: язык интерфейса
 // приходит пропсом из page.tsx (из адреса). Сам документ печатается по-русски
@@ -30,7 +31,6 @@ const DEFAULT_LIMIT = 3
 const DRAFT_KEY = 'tool-kp-draft'
 
 type Quota = { remaining: number; limit: number; resetsAt: string }
-type Lookup = 'idle' | 'loading' | 'found' | 'miss' | 'limit' | 'unavailable'
 
 type Form = {
   companyName: string; binIin: string; address: string; director: string; phone: string; email: string
@@ -71,12 +71,6 @@ export default function KpTool({ lang }: { lang: ToolLang }) {
   // а кнопка всё равно спросит сервер при нажатии.
   const [quota, setQuota] = useState<Quota | null>(null)
   const [generating, setGenerating] = useState(false)
-  // Последний набранный БИН: ответ на устаревший БИН (пользователь уже
-  // поменял поле) не должен перезаписать название.
-  const latestBin = useRef('')
-  // БИН, по которым в этой вкладке уже ничего не нашли: автопоиск их повторно
-  // не шлёт (стёр цифру и набрал снова — не тратим живой бюджет 6/квартал).
-  // Ручная «Найти» спрашивает сервер всегда.
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -101,7 +95,6 @@ export default function KpTool({ lang }: { lang: ToolLang }) {
         if (next.validUntil && next.validUntil < next.date) next.validUntil = ''
       }
     } catch {}
-    latestBin.current = next.clientBin
     setF(next)
     setReady(true)
   }, [])
@@ -116,69 +109,6 @@ export default function KpTool({ lang }: { lang: ToolLang }) {
   // «Отписаться» в любом письме (политика конфиденциальности, раздел целей).
   const [marketingConsent, setMarketingConsent] = useState(true)
 
-  // Название клиента по БИН — ТОЛЬКО по кнопке «Найти» (решение основателя
-  // 14.10.2026: без автоподбора — нажал, значит уверен в цифрах). Кнопка
-  // активна при ровно 12 цифрах. Сервер отдаёт только название: сначала кэш
-  // реестров (бесплатно), затем живой реестр — не больше 3 раз на IP в квартал.
-  const [binLookup, setBinLookup] = useState<Lookup>('idle')
-  // Один запрос «название по БИН» для покупателя и поставщика: тот же
-  // эндпоинт и тот же квартальный бюджет живых запросов в реестр (3 на IP).
-  const fetchName = async (bin: string): Promise<{ next: Lookup; name: string | null }> => {
-    let next: Lookup = 'unavailable'
-    let name: string | null = null
-    try {
-      const res = await fetch('/api/tools/kp/client-name', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bin }),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (res.ok && data?.found && typeof data.name === 'string' && data.name.trim()) {
-        name = data.name.trim()
-        next = 'found'
-      } else if (res.ok && data?.reason === 'not_found') {
-        next = 'miss'
-      } else if (res.ok && data?.reason === 'limit') {
-        next = 'limit'
-      }
-    } catch {}
-    return { next, name }
-  }
-  const lookupClient = async (bin: string) => {
-    if (bin.length !== 12) return
-    setBinLookup('loading')
-    track('tool_kp_bin_lookup', { lang })
-    const { next, name } = await fetchName(bin)
-    if (latestBin.current !== bin) return
-    if (name) {
-      const found = name
-      setF(prev => ({ ...prev, clientName: found }))
-    }
-    setBinLookup(next)
-  }
-  const onClientBinChange = (raw: string) => {
-    const bin = digits(raw).slice(0, 12)
-    const changed = bin !== latestBin.current
-    latestBin.current = bin
-    set({ clientBin: bin })
-    if (!changed) return
-    setBinLookup('idle')
-  }
-  // Поиск названия своей компании («От кого») по БИН/ИИН — по кнопке, как у
-  // покупателя (предложение основателя 14.10.2026).
-  const [sellerLookup, setSellerLookup] = useState<Lookup>('idle')
-  const lookupSeller = async () => {
-    const bin = digits(f.binIin)
-    if (bin.length !== 12) return
-    setSellerLookup('loading')
-    track('tool_kp_seller_lookup', { lang })
-    const { next, name } = await fetchName(bin)
-    if (name) {
-      const found = name
-      setF(prev => (digits(prev.binIin) === bin ? { ...prev, companyName: found } : prev))
-    }
-    setSellerLookup(next)
-  }
   const setRow = (i: number, patch: Partial<KpRow>) =>
     setF(prev => ({ ...prev, rows: prev.rows.map((r, j) => (j === i ? { ...r, ...patch } : r)) }))
 
@@ -319,27 +249,15 @@ export default function KpTool({ lang }: { lang: ToolLang }) {
         <div className="nav-glass rounded-2xl p-5 mb-4">
           <h2 className="text-sm font-bold mb-3" style={{ color: 'var(--nav-text-primary)' }}>{t.fromTitle}</h2>
           <div className="grid sm:grid-cols-2 gap-3">
+            {/* Сначала БИН/ИИН с «Найти», под ним название — его и подставит поиск. */}
+            <BinNameField id="kp-bin" tool="kp" role="seller" lang={lang}
+              className="sm:col-span-2 sm:max-w-[calc(50%-0.375rem)]"
+              label={t.binLabel} placeholder={t.binPlaceholder}
+              value={f.binIin} onChange={bin => set({ binIin: bin })} onName={name => set({ companyName: name })}
+              inputClass={input} inputStyle={inputStyle} labelClass={label} labelStyle={labelStyle} />
             <div className="sm:col-span-2">
               <label htmlFor="kp-company" className={label} style={labelStyle}>{t.companyLabel}</label>
               <input id="kp-company" className={input} style={inputStyle} autoComplete="organization" placeholder={t.companyPlaceholder} value={f.companyName} onChange={e => set({ companyName: e.target.value })} />
-            </div>
-            <div>
-              <label htmlFor="kp-bin" className={label} style={labelStyle}>{t.binLabel}</label>
-              <div className="flex gap-2">
-                <input id="kp-bin" className={input} style={inputStyle} inputMode="numeric" autoComplete="off" placeholder={t.binPlaceholder} value={f.binIin} onChange={e => { set({ binIin: digits(e.target.value).slice(0, 12) }); setSellerLookup('idle') }} />
-                <button type="button" onClick={() => void lookupSeller()} disabled={digits(f.binIin).length !== 12 || sellerLookup === 'loading'}
-                  aria-label={t.sellerLookupAria}
-                  className="nav-glass rounded-xl px-3 text-[13px] font-semibold flex-shrink-0 disabled:opacity-50"
-                  style={{ color: 'var(--nav-accent)' }}>
-                  {sellerLookup === 'loading' ? '…' : t.lookupButton}
-                </button>
-              </div>
-              <div aria-live="polite">
-                {sellerLookup === 'found' && <div className="text-[11px] mt-1" style={{ color: 'var(--nav-success)' }}>{t.lookupFound}</div>}
-                {sellerLookup === 'miss' && <div className="text-[11px] mt-1" style={hintStyle}>{t.lookupMiss}</div>}
-                {sellerLookup === 'limit' && <div className="text-[11px] mt-1" style={hintStyle}>{t.lookupLimit}</div>}
-                {sellerLookup === 'unavailable' && <div className="text-[11px] mt-1" style={hintStyle}>{t.lookupUnavailable}</div>}
-              </div>
             </div>
             <div>
               <label htmlFor="kp-phone" className={label} style={labelStyle}>{t.phoneLabel}</label>
@@ -367,26 +285,11 @@ export default function KpTool({ lang }: { lang: ToolLang }) {
         <div className="nav-glass rounded-2xl p-5 mb-4">
           <h2 className="text-sm font-bold mb-3" style={{ color: 'var(--nav-text-primary)' }}>{t.offerTitle}</h2>
           <div className="grid gap-3 mb-3">
-            <div className="sm:max-w-[50%]">
-              <label htmlFor="kp-client-bin" className={label} style={labelStyle}>{t.clientBinLabel}</label>
-              <div className="flex gap-2">
-                <input id="kp-client-bin" className={input} style={inputStyle} inputMode="numeric" autoComplete="off" placeholder={t.binPlaceholder} value={f.clientBin}
-                  onChange={e => onClientBinChange(e.target.value)} />
-                <button type="button" onClick={() => void lookupClient(f.clientBin)} disabled={f.clientBin.length !== 12 || binLookup === 'loading'}
-                  aria-label={t.lookupAria}
-                  className="nav-glass rounded-xl px-3 text-[13px] font-semibold flex-shrink-0 disabled:opacity-50"
-                  style={{ color: 'var(--nav-accent)' }}>
-                  {binLookup === 'loading' ? '…' : t.lookupButton}
-                </button>
-              </div>
-              <div aria-live="polite">
-                {binLookup === 'loading' && <div className="text-[11px] mt-1" style={hintStyle}>{t.lookupLoading}</div>}
-                {binLookup === 'found' && <div className="text-[11px] mt-1" style={{ color: 'var(--nav-success)' }}>{t.lookupFound}</div>}
-                {binLookup === 'miss' && <div className="text-[11px] mt-1" style={hintStyle}>{t.lookupMiss}</div>}
-                {binLookup === 'limit' && <div className="text-[11px] mt-1" style={hintStyle}>{t.lookupLimit}</div>}
-                {binLookup === 'unavailable' && <div className="text-[11px] mt-1" style={hintStyle}>{t.lookupUnavailable}</div>}
-              </div>
-            </div>
+            <BinNameField id="kp-client-bin" tool="kp" role="client" lang={lang}
+              className="sm:max-w-[calc(50%-0.375rem)]"
+              label={t.clientBinLabel} placeholder={t.binPlaceholder}
+              value={f.clientBin} onChange={bin => set({ clientBin: bin })} onName={name => set({ clientName: name })}
+              inputClass={input} inputStyle={inputStyle} labelClass={label} labelStyle={labelStyle} />
             <div>
               <label htmlFor="kp-client" className={label} style={labelStyle}>{t.clientLabel}</label>
               <input id="kp-client" className={input} style={inputStyle} autoComplete="off" placeholder={t.clientPlaceholder} value={f.clientName} onChange={e => set({ clientName: e.target.value })} />

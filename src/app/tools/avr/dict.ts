@@ -155,7 +155,7 @@ export const avrDict: Record<ToolLang, AvrDict> = {
       },
       {
         q: 'Куда сохраняются мои данные?',
-        a: 'Только в ваш браузер: черновик хранится на этом устройстве, чтобы не заполнять реквизиты заново. На наш сервер данные акта не отправляются.',
+        a: 'Только в ваш браузер: черновик хранится на этом устройстве, чтобы не заполнять реквизиты заново. На наш сервер данные акта не отправляются — уходит только БИН/ИИН, если нажать «Найти».',
       },
     ],
   },
@@ -244,7 +244,7 @@ export const avrDict: Record<ToolLang, AvrDict> = {
       },
       {
         q: 'Деректерім қайда сақталады?',
-        a: 'Тек сіздің браузеріңізде: деректемелерді қайта толтырмау үшін нобай осы құрылғыда сақталады. Акт деректері біздің серверге жіберілмейді.',
+        a: 'Тек сіздің браузеріңізде: деректемелерді қайта толтырмау үшін нобай осы құрылғыда сақталады. Акт деректері біздің серверге жіберілмейді — «Табу» батырмасын басқанда ғана БСН/ЖСН жіберіледі.',
       },
     ],
   },
@@ -333,7 +333,7 @@ export const avrDict: Record<ToolLang, AvrDict> = {
       },
       {
         q: 'Where is my data stored?',
-        a: 'Only in your browser: the draft stays on this device so you don’t have to retype your details. Certificate data is never sent to our server.',
+        a: 'Only in your browser: the draft stays on this device so you don’t have to retype your details. Certificate data is never sent to our server — only the BIN/IIN, and only when you click “Find”.',
       },
     ],
   },

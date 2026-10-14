@@ -99,3 +99,9 @@ export default function Page() {
 - Переведены все восемь инструментов (ru/kk/en, в `LOCALIZED_TOOL_SLUGS`): avr, kontragent, kp, margin, nakladnaya, nalogi, schet, waybills. Индекс `/tools` — на трёх языках, все карточки ведут на версию своего языка (пометка «орысша» / «in Russian» в индексе осталась только как механизм для будущих инструментов). Sitemap отдаёт все 24 адреса инструментов с взаимным hreflang.
 - schet и avr переведены последними: сами документы (счёт `generateInvoicePDF`, АВР `generateAVR` по форме Р-1) по-прежнему печатаются на русском, на kk/en-страницах это сказано одной строкой. Ссылки «Выставить счёт» в nalogi/kp идут через `toolLinkPath` и теперь ведут на `/tools/kk|en/schet`.
 - Вне `/tools`: казахские гайды (`src/app/guides/kk/**`) ещё ссылаются на русские адреса инструментов — заменить на `/tools/kk/<slug>`. Корневой layout отдаёт серверный `<html lang="kk">` на всех страницах; на `/tools` ru/en его поправляет только клиент (`useToolDocumentLang`).
+
+## Поиск названия по БИН/ИИН (kp, schet, avr, nakladnaya)
+
+- Поле — `BinNameField` из `@/lib/tools-i18n/BinNameField` (`tool`, `role: 'seller' | 'client'`). Ставится ПЕРЕД полем названия: человек вводит БИН, название подставляется ниже. Поиск только по кнопке «Найти»/«Табу»/«Find», кнопка активна при ровно 12 цифрах.
+- Тексты статусов общие для всех инструментов — `NAME_LOOKUP_TEXT` в `nameLookup.ts`; подписи самих полей БИН — в `dict.ts` инструмента.
+- Сервер — `POST /api/tools/name-lookup { bin, tool, role }` (белый список в `src/lib/toolQuota.ts`): сначала наш кэш `bin_lookup_cache` (бесплатно, без лимита), затем живой реестр — 3 раза на IP в квартал на КАЖДОЕ поле каждого инструмента (ключ `lookup:` + sha256), плюс общий дневной предохранитель `REGISTRY_DAILY_GLOBAL`. Отдаёт только название.

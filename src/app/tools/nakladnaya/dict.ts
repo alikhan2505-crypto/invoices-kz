@@ -142,7 +142,7 @@ export const nakladnayaDict: Record<ToolLang, NakladnayaDict> = {
       },
       {
         q: 'Куда сохраняются мои данные?',
-        a: 'Только в ваш браузер: черновик хранится на этом устройстве, чтобы не заполнять реквизиты заново. На наш сервер данные накладной не отправляются.',
+        a: 'Только в ваш браузер: черновик хранится на этом устройстве, чтобы не заполнять реквизиты заново. На наш сервер данные накладной не отправляются — уходит только БИН/ИИН, если нажать «Найти».',
       },
     ],
   },
@@ -223,7 +223,7 @@ export const nakladnayaDict: Record<ToolLang, NakladnayaDict> = {
       },
       {
         q: 'Деректерім қайда сақталады?',
-        a: 'Тек сіздің браузеріңізде: деректемелерді қайта толтырмау үшін нобай осы құрылғыда сақталады. Жүкқұжат деректері біздің серверге жіберілмейді.',
+        a: 'Тек сіздің браузеріңізде: деректемелерді қайта толтырмау үшін нобай осы құрылғыда сақталады. Жүкқұжат деректері біздің серверге жіберілмейді — «Табу» батырмасын басқанда ғана БСН/ЖСН жіберіледі.',
       },
     ],
   },
@@ -304,7 +304,7 @@ export const nakladnayaDict: Record<ToolLang, NakladnayaDict> = {
       },
       {
         q: 'Where is my data stored?',
-        a: 'Only in your browser: the draft stays on this device so you don’t have to retype your details. Delivery note data is never sent to our server.',
+        a: 'Only in your browser: the draft stays on this device so you don’t have to retype your details. Delivery note data is never sent to our server — only the BIN/IIN, and only when you click “Find”.',
       },
     ],
   },
