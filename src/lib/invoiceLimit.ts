@@ -1,10 +1,11 @@
-import type { PlanInfo } from './plan'
+import { getActivePlan, parseDbTimestamp, type PlanInfo } from './plan'
 
-// Месячный лимит счетов на стороне браузера. Настоящая граница — триггер
+// Лимит счетов на стороне браузера. Настоящая граница — триггер
 // enforce_invoice_limit_trigger в базе (см. supabase/migrations/README.md);
 // здесь только быстрая и понятная проверка до запроса, поэтому правила обязаны
-// совпадать с базой: те же лимиты (через getActivePlan ↔ invoice_limit_for)
-// и то же окно — календарный месяц по времени Алматы.
+// совпадать с базой: те же лимиты (getActivePlan ↔ invoice_limit_window) и то
+// же окно подсчёта (invoiceLimitWindow ↔ invoice_limit_window, см.
+// supabase/migrations/invoice_limit_fair_windows.sql).
 
 const ALMATY_TZ = 'Asia/Almaty'
 
@@ -40,13 +41,79 @@ export function almatyMonthStart(now: Date = new Date()): Date {
   return new Date(wallMidnightAsUtc - tzOffsetMs(new Date(wallMidnightAsUtc), ALMATY_TZ))
 }
 
+/**
+ * Длина пробного периода. /api/onboarding/grant выдаёт его как
+ * trial_expires_at = момент выдачи + 7 суток, а начало нигде не хранится —
+ * поэтому начало = trial_expires_at − 7 суток. Тот же интервал (168 часов)
+ * стоит в invoice_limit_window() в базе; менять только вместе.
+ */
+export const TRIAL_DAYS = 7
+const DAY_MS = 24 * 60 * 60 * 1000
+
+export type InvoiceLimitKind = 'unlimited' | 'free' | 'trial' | 'basic'
+
+export type InvoiceLimitWindow =
+  | { kind: 'unlimited'; limit: null; windowStart: null }
+  | { kind: 'free' | 'trial' | 'basic'; limit: number; windowStart: Date }
+
+/**
+ * Сколько счетов можно создать и с какого момента их считать.
+ * Подсчёт: все счета пользователя (отменённые тоже) с created_at >= windowStart.
+ *
+ * - Про, админ — без лимита.
+ * - Базовый и бонусные дни — 30 за календарный месяц по Алматы.
+ * - Пробный — 10 за сам пробный период (с его начала, а не с 1-го числа):
+ *   раньше пробная неделя на стыке месяцев давала до 20 счетов.
+ * - Бесплатный — 3 за календарный месяц по Алматы, но отсчёт не раньше
+ *   момента, когда закончился последний пробный/бонусный/платный период:
+ *   счета, созданные на большем тарифе, не съедают бесплатные 3. Раньше
+ *   человек, сделавший 5 счетов на пробном, до конца месяца не мог создать
+ *   ни одного бесплатного.
+ *
+ * Та же логика — в invoice_limit_window() в базе; менять только вместе.
+ */
+export function invoiceLimitWindow(profile: any, now: Date = new Date()): InvoiceLimitWindow {
+  const plan = getActivePlan(profile, now)
+  if (plan.invoiceLimit === null) return { kind: 'unlimited', limit: null, windowStart: null }
+
+  const monthStart = almatyMonthStart(now)
+  if (plan.plan !== 'free' && !plan.isTrial) {
+    return { kind: 'basic', limit: plan.invoiceLimit, windowStart: monthStart }
+  }
+
+  // Последний уже закончившийся период на большем тарифе (платный — какое бы
+  // значение ни стояло в plan, бонус, пробный). Ещё идущие не учитываются.
+  let lastEnded = -Infinity
+  for (const column of ['plan_expires_at', 'bonus_expires_at', 'trial_expires_at'] as const) {
+    const end = parseDbTimestamp(profile?.[column])
+    if (end && end.getTime() <= now.getTime()) lastEnded = Math.max(lastEnded, end.getTime())
+  }
+
+  if (plan.isTrial) {
+    const trialEnd = parseDbTimestamp(profile?.trial_expires_at)!
+    const trialStart = trialEnd.getTime() - TRIAL_DAYS * DAY_MS
+    return { kind: 'trial', limit: plan.invoiceLimit, windowStart: new Date(Math.max(trialStart, lastEnded)) }
+  }
+  return { kind: 'free', limit: plan.invoiceLimit, windowStart: new Date(Math.max(monthStart.getTime(), lastEnded)) }
+}
+
+/** Сколько счетов из списка попадает в окно лимита (для страниц, у которых список уже загружен). */
+export function countInvoicesInWindow(invoices: { created_at?: unknown }[], w: InvoiceLimitWindow): number {
+  if (!w.windowStart) return 0
+  const since = w.windowStart.getTime()
+  return invoices.filter(inv => {
+    const at = parseDbTimestamp(inv.created_at)
+    return !!at && at.getTime() >= since
+  }).length
+}
+
 export type InvoiceLimitCheck =
   | { allowed: true }
   | { allowed: false; kind: 'free' | 'trial' | 'basic'; limit: number }
 
 /**
- * Можно ли создать ещё один счёт при `monthCount` уже созданных в этом месяце
- * (отменённые тоже считаются — как и в базе).
+ * Можно ли создать ещё один счёт при `monthCount` уже созданных в окне
+ * invoiceLimitWindow() (отменённые тоже считаются — как и в базе).
  *
  * Бесплатный тариф — НЕ причина отказа сам по себе: Free обещает 3 счёта в
  * месяц, и отправлять на /upgrade можно только когда они израсходованы.
@@ -59,7 +126,7 @@ export function checkInvoiceLimit(plan: PlanInfo, monthCount: number): InvoiceLi
 }
 
 /**
- * Сколько счетов ещё можно создать в этом месяце: null — лимита нет (Про,
+ * Сколько счетов ещё можно создать в окне лимита: null — лимита нет (Про,
  * админ). Никогда не уходит ниже нуля: счётчик может быть больше лимита
  * (отменённые счета считаются; тариф истёк посреди месяца с 10 счетами).
  */

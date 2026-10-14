@@ -45,11 +45,34 @@ function withAdminOverride(profile: any, result: PlanInfo): PlanInfo {
   }
 }
 
-export function getActivePlan(profile: any): PlanInfo {
-  return withAdminOverride(profile, computeActivePlan(profile))
+/**
+ * Время из колонки profiles/invoices как настоящий момент.
+ *
+ * `plan_expires_at`, `bonus_expires_at` (и `invoices.created_at`) — timestamp
+ * WITHOUT time zone, хранят время UTC, и PostgREST отдаёт их без смещения:
+ * «2026-11-13T10:00:00». `new Date()` читает такую строку как МЕСТНОЕ время
+ * устройства — в Алматы это на 5 часов раньше, чем считает база (у неё сессия
+ * в UTC). Тогда последние 5 часов тарифа браузер уже считал Free, а триггер
+ * лимита — ещё Базовым/Про. Строка без смещения здесь читается как UTC;
+ * `trial_expires_at` (timestamptz) приходит со смещением и читается как есть.
+ */
+export function parseDbTimestamp(value: unknown): Date | null {
+  if (value === null || value === undefined || value === '') return null
+  if (value instanceof Date) return isNaN(value.getTime()) ? null : value
+  let iso = String(value).trim().replace(' ', 'T')
+  // Postgres отдаёт микросекунды; не каждый движок JS разбирает больше трёх цифр.
+  iso = iso.replace(/(\.\d{3})\d+/, '$1')
+  const time = iso.match(/T(.*)$/)
+  if (time && !/(?:Z|[+-]\d{2}(?::?\d{2})?)$/i.test(time[1])) iso += 'Z'
+  const d = new Date(iso)
+  return isNaN(d.getTime()) ? null : d
 }
 
-function computeActivePlan(profile: any): PlanInfo {
+export function getActivePlan(profile: any, now: Date = new Date()): PlanInfo {
+  return withAdminOverride(profile, computeActivePlan(profile, now))
+}
+
+function computeActivePlan(profile: any, now: Date): PlanInfo {
   if (!profile) return {
     plan: 'free', isTrial: false, daysLeft: null,
     label: 'Бесплатный', isActive: false,
@@ -57,8 +80,6 @@ function computeActivePlan(profile: any): PlanInfo {
     canEmail: false, canSign: false, canKpAvrNakl: false,
     canTemplates: false, canRecurring: false, canEcp: false, canAcquiring: false, canCfoPro: false, canEsf: false, canAiAgent: false, canKaspiShop: false,
   }
-
-  const now = new Date()
 
   // 1. Платный план
   if (profile.plan && profile.plan !== 'free') {
@@ -78,8 +99,8 @@ function computeActivePlan(profile: any): PlanInfo {
         canKaspiShop: profile.plan === 'pro',
       }
     }
-    const planEnd = new Date(profile.plan_expires_at)
-    if (planEnd > now) {
+    const planEnd = parseDbTimestamp(profile.plan_expires_at)
+    if (planEnd && planEnd > now) {
       const daysLeft = Math.ceil((planEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
       return {
         plan: profile.plan, isTrial: false, daysLeft, isActive: true,
@@ -100,8 +121,8 @@ function computeActivePlan(profile: any): PlanInfo {
 
   // 2. Бонусные дни = Базовый
   if (profile.bonus_expires_at) {
-    const bonusEnd = new Date(profile.bonus_expires_at)
-    if (bonusEnd > now) {
+    const bonusEnd = parseDbTimestamp(profile.bonus_expires_at)
+    if (bonusEnd && bonusEnd > now) {
       const daysLeft = Math.ceil((bonusEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
       return {
         plan: 'basic', isTrial: false, daysLeft, isActive: true,
@@ -115,8 +136,8 @@ function computeActivePlan(profile: any): PlanInfo {
 
   // 3. Пробный период = Базовый (10 счетов за 7 дней)
   if (profile.trial_expires_at) {
-    const trialEnd = new Date(profile.trial_expires_at)
-    if (trialEnd > now) {
+    const trialEnd = parseDbTimestamp(profile.trial_expires_at)
+    if (trialEnd && trialEnd > now) {
       const daysLeft = Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
       return {
         plan: 'basic', isTrial: true, daysLeft, isActive: true,

@@ -7,7 +7,7 @@ import Link from 'next/link'
 import QRCode from 'qrcode'
 import { supabase } from '@/lib/supabase'
 import { getActivePlan } from '@/lib/plan'
-import { almatyMonthStart } from '@/lib/invoiceLimit'
+import { invoiceLimitWindow } from '@/lib/invoiceLimit'
 import { useLanguage, type Lang } from '@/components/LanguageProvider'
 
 type WalletKey = 'unified'
@@ -119,6 +119,9 @@ export default function TopUtilityBar() {
   const [panel, setPanel] = useState<Panel>(null)
   const [userId, setUserId] = useState<string | null>(null)
   const [profile, setProfile] = useState<any>(null)
+  // loadWalletExtras() runs from closures (init, openPanel) that still see the
+  // previous `profile` state — the quota window needs the current one.
+  const profileRef = useRef<any>(null)
   const [bonusClaimMessage, setBonusClaimMessage] = useState<string | null>(null)
 
   // Wallet state
@@ -231,6 +234,7 @@ export default function TopUtilityBar() {
       setIsAdmin(admin)
       setCompanyName(profileData?.company_name || '')
       setProfile(profileData)
+      profileRef.current = profileData
       const headers = await authHeader()
       const visible = WALLETS.filter(w => !w.adminOnly || admin)
       refreshBalances(visible, headers)
@@ -272,16 +276,19 @@ export default function TopUtilityBar() {
   }, [refreshBalances, refreshUnreadCount])
 
   // "Заработано через Kaspi" (sum of PAID invoices, last 30 days) and the
-  // tariff row's "used this month" count (all invoices, any status, since
-  // the 1st of the current calendar month -- same window create/page.tsx's
-  // own monthCount uses, so the two "N/limit" numbers agree everywhere;
-  // Almaty time, like the DB trigger that actually enforces the limit).
+  // tariff row's "used" count (all invoices, any status) in the quota window
+  // from invoiceLimitWindow() -- the same window create/page.tsx's monthCount
+  // and the DB trigger use, so the "N/limit" numbers agree everywhere (trial:
+  // since the trial started; Free: since the 1st in Almaty, but not before the
+  // last trial/bonus/paid period ended). No limit -- nothing to count.
   async function loadWalletExtras(uid: string) {
     const since30 = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString()
-    const monthStart = almatyMonthStart()
+    const { windowStart } = invoiceLimitWindow(profileRef.current)
     const [{ data: paidInvoices }, { count }] = await Promise.all([
       supabase.from('invoices').select('amount').eq('user_id', uid).eq('status', 'paid').gte('created_at', since30),
-      supabase.from('invoices').select('*', { count: 'exact', head: true }).eq('user_id', uid).gte('created_at', monthStart.toISOString()),
+      windowStart
+        ? supabase.from('invoices').select('*', { count: 'exact', head: true }).eq('user_id', uid).gte('created_at', windowStart.toISOString())
+        : Promise.resolve({ count: 0 }),
     ])
     setKaspiEarned30d((paidInvoices || []).reduce((sum, inv: any) => sum + Number(inv.amount), 0))
     setMonthInvoiceCount(count || 0)

@@ -9,7 +9,7 @@ import DesktopShell from '@/components/DesktopShell'
 import InvoiceLivePreview from '@/components/InvoiceLivePreview'
 import { cacheGet, cacheSet } from '@/lib/cache'
 import { getActivePlan } from '@/lib/plan'
-import { almatyMonthStart, checkInvoiceLimit, invoicesLeft, isInvoiceLimitError, invoiceLimitFromError } from '@/lib/invoiceLimit'
+import { almatyMonthStart, invoiceLimitWindow, checkInvoiceLimit, invoicesLeft, isInvoiceLimitError, invoiceLimitFromError } from '@/lib/invoiceLimit'
 import { formatDate, formatDateSafe } from '@/lib/date'
 import { computeDefaultDueDate, todayDateString } from '@/lib/dueDate'
 import { useLanguage } from '@/components/LanguageProvider'
@@ -244,18 +244,28 @@ export default function CreateInvoicePage() {
         .catch(() => setKaspiCashierConnected(false))
     })
 
-    // Same window as the DB trigger (calendar month in Almaty time), so the
-    // browser's «N из лимита» never disagrees with what the insert will hit.
-    const monthStart = almatyMonthStart()
-
-    const { count, error: countError } = await supabase
-      .from('invoices').select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id).gte('created_at', monthStart.toISOString())
+    // monthCount = счета в окне лимита — том же, по которому считает триггер
+    // в базе (invoiceLimitWindow ↔ invoice_limit_window): пробный — с начала
+    // пробного периода, Free — с 1-го числа по Алматы, но не раньше конца
+    // последнего пробного/бонусного/платного периода. Без лимита — не считаем.
+    const limitWindow = invoiceLimitWindow(p)
+    let count: number | null = 0
+    let countError: unknown = null
+    if (limitWindow.windowStart) {
+      const res = await supabase
+        .from('invoices').select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id).gte('created_at', limitWindow.windowStart.toISOString())
+      count = res.count
+      countError = res.error
+    }
     setMonthCount(count || 0)
     // A failed count is not «0 used»: keep the Free banner on its neutral text
     // instead of promising the full quota.
     if (!countError && count !== null) setMonthCountLoaded(true)
 
+    // Month stats below stay on the calendar month (Almaty) — they are
+    // statistics, not the quota.
+    const monthStart = almatyMonthStart()
     const { data: monthInvoices } = await supabase
       .from('invoices').select('amount, status')
       .eq('user_id', user.id).gte('created_at', monthStart.toISOString())
@@ -265,7 +275,7 @@ export default function CreateInvoicePage() {
       .reduce((sum: number, i: any) => sum + Number(i.amount), 0)
     setMonthStats({ paid, total: monthInvoices?.length || 0, amount })
 
-    if ((count || 0) === 0 && !p?.company_name) setShowOnboarding(true)
+    if ((monthInvoices?.length ?? 0) === 0 && !p?.company_name) setShowOnboarding(true)
 
     setSavedServices(s || [])
 

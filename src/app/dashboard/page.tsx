@@ -10,7 +10,8 @@ import { formatDateTime } from '@/lib/date'
 import Skeleton from '@/components/Skeleton'
 import Link from 'next/link'
 import { useLanguage } from '@/components/LanguageProvider'
-import { getActivePlan } from '@/lib/plan'
+import { getActivePlan, parseDbTimestamp } from '@/lib/plan'
+import { invoiceLimitWindow, countInvoicesInWindow, invoicesLeft, type InvoiceLimitWindow } from '@/lib/invoiceLimit'
 import { useMyProducts } from '@/lib/useMyProducts'
 import { supportDict } from '@/lib/i18n/support'
 import { invoiceFlowDict } from '@/lib/i18n/invoiceFlow'
@@ -582,6 +583,9 @@ export default function DashboardPage() {
   // shown on /create, but the reason to act today belongs on the first
   // screen, not one click in.
   const [plan, setPlan] = useState<ReturnType<typeof getActivePlan> | null>(null)
+  // Окно лимита счетов (invoiceLimitWindow — то же, что на /create и в триггере
+  // базы): пробный считает 10 счетов с начала пробного периода.
+  const [quotaWindow, setQuotaWindow] = useState<InvoiceLimitWindow | null>(null)
 
   useEffect(() => { load() }, [])
 
@@ -597,6 +601,7 @@ export default function DashboardPage() {
     setIsAdmin(!!profile?.is_admin)
     const activePlan = getActivePlan(profile)
     setPlan(activePlan)
+    setQuotaWindow(invoiceLimitWindow(profile))
     setCanTelegramSupport(!!profile?.is_admin || (activePlan.isActive && activePlan.plan !== 'free'))
     setLoading(false)
 
@@ -618,7 +623,8 @@ export default function DashboardPage() {
   const now = new Date()
   const monthInvoices = useMemo(
     () => invoices.filter(inv => {
-      const d = new Date(inv.created_at)
+      const d = parseDbTimestamp(inv.created_at)
+      if (!d) return false
       return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -627,7 +633,8 @@ export default function DashboardPage() {
   const prevMonthInvoices = useMemo(() => {
     const pm = new Date(now.getFullYear(), now.getMonth() - 1, 1)
     return invoices.filter(inv => {
-      const d = new Date(inv.created_at)
+      const d = parseDbTimestamp(inv.created_at)
+      if (!d) return false
       return d.getMonth() === pm.getMonth() && d.getFullYear() === pm.getFullYear()
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -649,7 +656,8 @@ export default function DashboardPage() {
     }
     const indexByDay = new Map(days.map((d, i) => [d.date.toDateString(), i]))
     invoices.forEach(inv => {
-      const d = new Date(inv.created_at)
+      const d = parseDbTimestamp(inv.created_at)
+      if (!d) return
       d.setHours(0, 0, 0, 0)
       const idx = indexByDay.get(d.toDateString())
       if (idx === undefined) return
@@ -672,6 +680,13 @@ export default function DashboardPage() {
   const trend = computeDelta(totalPeriod, prevTotalPeriod)
 
   const last14CreatedCounts = useMemo(() => dailyRaw.slice(46, 60).map(d => d.createdCount), [dailyRaw])
+
+  // Сколько счетов осталось в окне лимита — для плашки пробного периода.
+  // Список счетов уже загружен целиком, отдельный запрос не нужен.
+  const quotaLeft = useMemo(
+    () => (plan && quotaWindow ? invoicesLeft(plan, countInvoicesInWindow(invoices, quotaWindow)) : null),
+    [plan, quotaWindow, invoices]
+  )
 
   const recentInvoices = invoices.slice(0, 5)
   const hasAnyInvoices = invoices.length > 0
@@ -748,7 +763,7 @@ export default function DashboardPage() {
             <div className="nav-glass flex items-center justify-between rounded-xl px-4 py-3 mb-5" style={{ background: 'var(--nav-success-soft)' }}>
               <div>
                 <div className="text-sm font-medium" style={{ color: 'var(--nav-success)' }}>{tf.trialPlanTitle}</div>
-                <div className="text-xs mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{tf.daysLeftLabel(plan.daysLeft!)}</div>
+                <div className="text-xs mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{quotaLeft !== null ? tf.trialDaysLeftLabel(plan.daysLeft!, quotaLeft) : tf.daysLeftLabel(plan.daysLeft!)}</div>
               </div>
               <button onClick={() => router.push('/upgrade')} className="text-xs font-semibold px-3 py-1.5 rounded-lg flex-shrink-0" style={{ background: 'var(--nav-success)', color: '#fff' }}>{tf.buyButton}</button>
             </div>

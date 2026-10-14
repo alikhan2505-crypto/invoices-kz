@@ -9,7 +9,7 @@ import { generateKP } from '@/lib/generateKP'
 import { generateAVR } from '@/lib/generateAVR'
 import { generateNakladnaya } from '@/lib/generateNakladnaya'
 import { getActivePlan } from '@/lib/plan'
-import { isInvoiceLimitError, invoiceLimitFromError } from '@/lib/invoiceLimit'
+import { isInvoiceLimitError, invoiceLimitFromError, invoiceLimitWindow, checkInvoiceLimit } from '@/lib/invoiceLimit'
 import { useLanguage } from '@/components/LanguageProvider'
 import { backLabel } from '@/lib/a11yLabels'
 import { invoiceFlowDict } from '@/lib/i18n/invoiceFlow'
@@ -417,6 +417,29 @@ export default function InvoicePage() {
   async function duplicateInvoice() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
+    // Та же проверка лимита, что и в /create, до того как тратить номер счёта:
+    // окно invoiceLimitWindow() совпадает с триггером в базе (пробный — с начала
+    // пробного периода, Free — не раньше конца последнего большего тарифа).
+    // Админа getActivePlan() не ограничивает. Профиль ещё не загружен или
+    // подсчёт не удался — не блокируем: база всё равно проверит и вернёт
+    // понятную ошибку ниже (без профиля любой выглядел бы как Free).
+    const limitWindow = invoiceLimitWindow(profile)
+    if (profile && limitWindow.windowStart) {
+      const { count, error: countError } = await supabase
+        .from('invoices').select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id).gte('created_at', limitWindow.windowStart.toISOString())
+      if (!countError && count !== null) {
+        const ap = getActivePlan(profile)
+        const limitCheck = checkInvoiceLimit(ap, count)
+        if (!limitCheck.allowed) {
+          await alert(limitCheck.kind === 'free' ? t.planLimitFreeMessage(limitCheck.limit)
+              : limitCheck.kind === 'trial' ? t.planLimitTrialMessage(limitCheck.limit)
+              : t.planLimitBasicMessage(limitCheck.limit))
+          router.push('/upgrade')
+          return
+        }
+      }
+    }
     const { data: invoiceNumber, error: numberError } = await supabase.rpc('claim_invoice_number', { p_user_id: user.id })
     if (numberError) { alert(t.errorPrefix(numberError.message)); return }
     const { data, error } = await supabase.from('invoices').insert({
