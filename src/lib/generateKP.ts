@@ -306,8 +306,11 @@ export function buildKPHtml(data: KPData, images: KPImages = {}): string {
         @media print {
           .toolbar { display: none !important; }
           html { background: white; }
-          /* A4 по высоте минус поля печати: футер внизу листа, без лишней страницы. */
-          body { margin: 0; box-shadow: none; min-height: 277mm; }
+          /* Как в «Скачать PDF»: лист без полей принтера, шапка и футер до краёв,
+             футер внизу листа; чуть ниже A4 — без лишней страницы. Без полей
+             браузер не печатает и свои колонтитулы (about:blank, дата). */
+          @page { size: A4; margin: 0; }
+          body { margin: 0; box-shadow: none; min-height: 296mm; }
         }
         /* Скачивание PDF: лист чуть ниже A4 (1122,5px) — ровно 1123px давали
            полпикселя на вторую страницу. */
@@ -478,11 +481,13 @@ export function buildKPHtml(data: KPData, images: KPImages = {}): string {
           const btn = document.getElementById('dlBtn')
           btn.textContent = '⏳ Загрузка...'
           btn.disabled = true
+          // Сначала снимок прокрутки (__ikzUnfit), потом прятать панель — иначе
+          // страница короче и после скачивания окно не возвращается на место.
+          if (window.__ikzUnfit) window.__ikzUnfit()
           const toolbar = document.querySelector('.toolbar')
           const spacer = toolbar?.nextElementSibling
           if (toolbar) toolbar.style.display = 'none'
           if (spacer) spacer.style.display = 'none'
-          if (window.__ikzUnfit) window.__ikzUnfit()
           html2pdf().set({
             margin: 0,
             filename: ${jsString('КП-' + data.number + '.pdf')},

@@ -346,13 +346,18 @@ export function buildAVRHtml(data: AVRData, images: AVRImages = {}): string | nu
           const btn = document.getElementById('dlBtn')
           btn.textContent = '⏳ Загрузка...'
           btn.disabled = true
+          // Сначала снимок прокрутки (__ikzUnfit), потом прятать панель — иначе
+          // страница короче и после скачивания окно не возвращается на место.
+          if (window.__ikzUnfit) window.__ikzUnfit()
           const toolbar = document.querySelector('.toolbar')
           const spacer = toolbar?.nextElementSibling
           if (toolbar) toolbar.style.display = 'none'
           if (spacer) spacer.style.display = 'none'
-          if (window.__ikzUnfit) window.__ikzUnfit()
           html2pdf().set({
-            margin: [8, 8, 8, 8],
+            // Без полей: лист 1123px = ровно A4 альбомный, свои отступы у него
+            // внутри. С полями 8 мм в PDF помещалось 281 мм из 297 — правый край
+            // («Приложение 50…», суммы) срезался.
+            margin: 0,
             filename: ${jsString('АВР-' + String(data.number ?? '') + '.pdf')},
             image: { type: 'jpeg', quality: 0.98 },
             html2canvas: { scale: 2, useCORS: true, logging: false },

@@ -446,11 +446,13 @@ function downloadPDF() {
   const btn = document.getElementById('dlBtn')
   btn.textContent = '⏳ Загрузка...'
   btn.disabled = true
+  // Сначала снимок прокрутки (__ikzUnfit), потом прятать панель — иначе
+  // страница короче и после скачивания окно не возвращается на место.
+  if (window.__ikzUnfit) window.__ikzUnfit()
   const toolbar = document.querySelector('.toolbar')
   const spacer = toolbar?.nextElementSibling
   if (toolbar) toolbar.style.display = 'none'
   if (spacer) spacer.style.display = 'none'
-  if (window.__ikzUnfit) window.__ikzUnfit()
           html2pdf().set({
     margin: 0,
     filename: ${jsString('Накладная-' + data.number + '.pdf')},
