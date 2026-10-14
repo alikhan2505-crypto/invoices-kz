@@ -55,10 +55,9 @@ describe('buildNakladnayaHtml — экранирование', () => {
     expect(html).not.toMatch(/<[a-z]+[^>]*\son(error|load|mouseover)=/i)
     expect(html).not.toContain('<svg')
     expect(html).not.toContain('<b>c</b>')
-    // Только наши два <script> (html2pdf с CDN и downloadPDF) и ни одного '</script' в JS-строке имени файла.
-    expect(scriptTags(html)).toHaveLength(2)
-    const inline = html.slice(html.lastIndexOf('<script>'))
-    const filenameLine = inline.split('\n').find(l => l.includes('filename:'))!
+    // Только наши три <script> (html2pdf с CDN, downloadPDF, docFit) и ни одного '</script' в JS-строке имени файла.
+    expect(scriptTags(html)).toHaveLength(3) // + docFit
+    const filenameLine = html.split('\n').find(l => l.includes('filename:'))!
     expect(filenameLine).not.toMatch(/<\/script/i)
     expect(filenameLine).toContain(String.fromCharCode(92) + 'u003c/script>')
   })

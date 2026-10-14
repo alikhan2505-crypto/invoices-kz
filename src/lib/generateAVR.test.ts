@@ -43,7 +43,7 @@ describe('buildAVRHtml — экранирование', () => {
     expect(html).not.toMatch(/<[a-z][^<>]*onerror=/i)
     expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;')
     expect(html).toContain('&lt;/td&gt;&lt;script&gt;alert(1)&lt;/script&gt;')
-    expect(countScriptTags(html)).toBe(2)
+    expect(countScriptTags(html)).toBe(3) // html2pdf + downloadPDF + docFit (подгонка под ширину телефона)
   })
 
   it('escapes every other user field', () => {
@@ -70,7 +70,7 @@ describe('buildAVRHtml — экранирование', () => {
 
   it('cannot break out of the PDF filename JS string', () => {
     const html = build({ number: "1'); alert(1); ('</script><script>alert(2)//" })
-    expect(countScriptTags(html)).toBe(2)
+    expect(countScriptTags(html)).toBe(3) // html2pdf + downloadPDF + docFit (подгонка под ширину телефона)
     const BS = String.fromCharCode(92) // обратный слэш
     expect(html).toContain(`filename: "АВР-1'); alert(1); ('${BS}u003c/script>${BS}u003cscript>alert(2)//.pdf"`)
   })
@@ -85,7 +85,7 @@ describe('buildAVRHtml — экранирование', () => {
     expect(html).not.toContain('data:text/html')
     expect(html).not.toContain('" onerror="')
     expect(html).toContain('src="https://x.test/a.png&quot; onerror=&quot;alert(1)"')
-    expect(countScriptTags(html)).toBe(2)
+    expect(countScriptTags(html)).toBe(3) // html2pdf + downloadPDF + docFit (подгонка под ширину телефона)
   })
 
   it('keeps our own data:image URLs', () => {

@@ -33,7 +33,7 @@ const base = {
   bank: { bank_name: 'АО «Kaspi Bank»', iik: 'KZ00722S000000000000', bik: 'CASPKZKA', kbe: '19' },
 }
 
-const OUR_SCRIPTS = 3 // html2pdf в <head> + html2pdf у тулбара + downloadPDF()
+const OUR_SCRIPTS = 4 // html2pdf в <head> + html2pdf у тулбара + downloadPDF() + docFit (ширина телефона)
 
 function scriptOpenTags(html: string): string[] {
   return html.match(/<script[^>]*>/gi) || []
