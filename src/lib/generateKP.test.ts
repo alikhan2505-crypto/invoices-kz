@@ -119,3 +119,20 @@ describe('buildKPHtml — экранирование пользовательс�
     expect(html).toContain('ИП Иванов &amp; Ко')
   })
 })
+
+describe('buildKPHtml — примечание', () => {
+  it('печатает примечание (условия, сроки, доставка) и экранирует его', () => {
+    const html = buildKPHtml(baseData({ note: 'Пакет документов предоставим вместе с товаром.' }))
+    expect(html).toContain('<div class="section-title">Примечание</div>')
+    expect(html).toContain('<div class="note-block">Пакет документов предоставим вместе с товаром.</div>')
+
+    const hostile = buildKPHtml(baseData({ note: '<img src=x onerror=alert(1)>' }))
+    expect(hostile).toContain('<div class="note-block">&lt;img src=x onerror=alert(1)&gt;</div>')
+    expect(hostile).not.toContain('<img src=x')
+  })
+
+  it('без примечания блока нет', () => {
+    expect(buildKPHtml(baseData({ note: '' }))).not.toContain('class="note-block"')
+    expect(buildKPHtml(baseData({ note: '   ' }))).not.toContain('class="note-block"')
+  })
+})

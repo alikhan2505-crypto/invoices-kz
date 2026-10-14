@@ -274,6 +274,20 @@ export function buildKPHtml(data: KPData, images: KPImages = {}): string {
           padding: 14px;
           margin-bottom: 24px;
         }
+        /* Примечание (условия, сроки, доставка) — до 14.10.2026 поле было в форме,
+           но в документ не попадало. */
+        .note-block {
+          background: #f8f9fa;
+          border-left: 3px solid #2DC48D;
+          border-radius: 6px;
+          padding: 10px 14px;
+          margin-bottom: 24px;
+          font-size: 11px;
+          color: #333;
+          line-height: 1.5;
+          white-space: pre-line;
+          overflow-wrap: anywhere;
+        }
         .bank-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
         .bank-item label { font-size: 9px; color: #888; display: block; margin-bottom: 2px; }
         .bank-item span { font-size: 10px; color: #1C2056; font-weight: 500; }
@@ -421,6 +435,12 @@ export function buildKPHtml(data: KPData, images: KPImages = {}): string {
             ${totalsHTML}
           </div>
         </div>
+
+        ${data.note && data.note.trim() ? `
+        <!-- Note -->
+        <div class="section-title">Примечание</div>
+        <div class="note-block">${escapeHtml(data.note.trim())}</div>
+        ` : ''}
 
         ${b ? `
         <!-- Bank -->
