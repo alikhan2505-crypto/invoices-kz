@@ -579,7 +579,9 @@ export default function CreateInvoicePage() {
       const limitCheck = checkInvoiceLimit(activePlan, monthCount)
       if (!limitCheck.allowed) {
         setLoading(false)
-        alert(limitCheck.kind === 'free' ? t.planLimitFreeMessage(limitCheck.limit)
+        // await: AppDialog — портал внутри страницы, без ожидания router.push
+        // уводил на /upgrade раньше, чем человек видел сообщение (живой тест 14.10).
+        await alert(limitCheck.kind === 'free' ? t.planLimitFreeMessage(limitCheck.limit)
             : limitCheck.kind === 'trial' ? t.planLimitTrialMessage(limitCheck.limit)
             : t.planLimitBasicMessage(limitCheck.limit))
         router.push('/upgrade')
@@ -621,11 +623,11 @@ export default function CreateInvoicePage() {
       // browser check says instead of showing a Postgres message.
       if (isInvoiceLimitError(error.message)) {
         const limit = invoiceLimitFromError(error.message) ?? activePlan.invoiceLimit ?? 0
-        alert(activePlan.plan === 'free' ? t.planLimitFreeMessage(limit)
+        setLoading(false)
+        await alert(activePlan.plan === 'free' ? t.planLimitFreeMessage(limit)
             : activePlan.isTrial ? t.planLimitTrialMessage(limit)
             : t.planLimitBasicMessage(limit))
         router.push('/upgrade')
-        setLoading(false)
         return
       }
       alert(t.errorPrefix(error.message))

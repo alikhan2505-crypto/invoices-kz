@@ -434,7 +434,7 @@ export default function InvoicePage() {
       if (isInvoiceLimitError(error.message)) {
         const ap = getActivePlan(profile)
         const limit = invoiceLimitFromError(error.message) ?? ap.invoiceLimit ?? 0
-        alert(ap.plan === 'free' ? t.planLimitFreeMessage(limit)
+        await alert(ap.plan === 'free' ? t.planLimitFreeMessage(limit)
             : ap.isTrial ? t.planLimitTrialMessage(limit)
             : t.planLimitBasicMessage(limit))
         router.push('/upgrade')
