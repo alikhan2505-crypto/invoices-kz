@@ -40,7 +40,7 @@
 сообщение, что и собственная проверка. Браузерная сторона живёт в
 `src/lib/invoiceLimit.ts` (`checkInvoiceLimit`, `almatyMonthStart`).
 
-`invoice_limit_pin_created_at.sql` (14.10.2026, **ещё не применена**) — для
+`invoice_limit_pin_created_at.sql` (14.10.2026, применена основателем через SQL Editor 14.10, проверена вживую) — для
 обычной сессии `created_at` на INSERT принудительно `now()`, а на UPDATE не
 меняется: иначе счёт с датой задним числом выпадал из окна месяца и лимит
 обходился прямым запросом. Там же `pg_advisory_xact_lock` по `user_id` перед
@@ -138,3 +138,5 @@ Click-to-WhatsApp click id, пишется только на первое соо
 `welcome_email_drips.sql` (12.10.2026) — welcome-цепочка: `email_drips` + `profiles.email_optout`; письма только новым аккаунтам (после 12.10), с suppression-проверкой и ссылкой отписки.
 
 `signup_instant_ping.sql` (13.10.2026) — pg_net-триггер на INSERT profiles → /api/hooks/new-signup → мгновенный Telegram-пинг админам; идемпотентность через `profiles.signup_notified_at`.
+
+`invoices_drop_user_delete_policy.sql` (14.10.2026, применена основателем через SQL Editor 14.10) — убрана политика «Users can delete own invoices»: удалением своих счетов прямым запросом можно было освобождать место в месячном лимите. Проверено вживую: DELETE пользователем возвращает 0 строк.
