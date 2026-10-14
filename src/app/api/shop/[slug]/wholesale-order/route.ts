@@ -26,6 +26,9 @@ interface CartLineInput { modelId: string; size: string; color: string; qty: num
 // invoices, public_token comes from that row's own column default.
 export async function POST(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
+  // Null also when the owner's Pro has lapsed (resolvePublicStorefront) --
+  // this route creates a real счёт with the service role, so a lapsed
+  // seller's storefront must not keep issuing invoices on their behalf.
   const storefront = await resolveStorefrontBySlug(slug)
   if (!storefront) return NextResponse.json({ error: 'not_found' }, { status: 404 })
 

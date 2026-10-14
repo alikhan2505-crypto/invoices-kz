@@ -6,6 +6,7 @@ import { decryptAtRest } from '@/lib/kaspiPay/crypto'
 import { isWithinBudget, KASPI_RATE_LIMIT_WINDOW_MS } from './rateLimitBudget'
 import { pushOfferState } from './cabinetPricePush'
 import { fetchOfferDetails } from './cabinetApi'
+import { filterByOwnerAccess, loadOwnerPlanProfiles, ownerHasKaspiShopAccess } from './planGate'
 
 // All of the offer's bare point codes, read from the offer details (deep
 // scan for storeId-carrying objects -- no guessed key paths). Falls back to
@@ -59,18 +60,28 @@ export function isCheckDue(lastCheckedAt: string | null, checkFrequencyMinutes: 
 // .github/workflows/kaspi-shop-price-check.yml and its script). This
 // function only reports which products are due; applyPriceCheckResult below
 // takes the already-fetched competitor price and does the rest.
+//
+// Pro gate (founder decision 14.10.2026): a product whose connection owner
+// is neither admin nor on an active Pro plan is left out of the due list --
+// no Kaspi price change, no wallet charge. Nothing is flipped (enabled /
+// paused stay as the seller set them), so renewing Pro resumes the bot by
+// itself. Owner profiles are loaded once for the whole due batch. A failed
+// profile read throws (the cron route 500s, the GitHub Actions run fails
+// loudly) rather than either charging everyone or silently skipping all.
 export async function getDueTrackedProducts(): Promise<DueTrackedProduct[]> {
   const { data: due } = await supabase
     .from('kaspi_shop_tracked_products')
-    .select('id, kaspi_sku, kaspi_master_sku, last_checked_at, check_frequency_minutes, enabled, excluded_city_codes, point_city_codes, kaspi_shop_connections(paused, tracked_city_codes)')
+    .select('id, user_id, kaspi_sku, kaspi_master_sku, last_checked_at, check_frequency_minutes, enabled, excluded_city_codes, point_city_codes, kaspi_shop_connections(user_id, paused, tracked_city_codes)')
     .eq('enabled', true)
 
   const now = Date.now()
-  return (due || [])
-    .filter((p: any) => {
-      if (p.kaspi_shop_connections?.paused) return false
-      return isCheckDue(p.last_checked_at, p.check_frequency_minutes, now)
-    })
+  const dueNow = (due || []).filter((p: any) => {
+    if (p.kaspi_shop_connections?.paused) return false
+    return isCheckDue(p.last_checked_at, p.check_frequency_minutes, now)
+  })
+  const ownerOf = (p: any): string | null => p.kaspi_shop_connections?.user_id ?? p.user_id ?? null
+  const ownerProfiles = await loadOwnerPlanProfiles(dueNow.map(ownerOf))
+  return filterByOwnerAccess(dueNow, ownerOf, ownerProfiles)
     .map((p: any) => {
       let targetCities = resolveTargetCities(p.kaspi_shop_connections?.tracked_city_codes || [], p.excluded_city_codes || [])
       // Auto mode (2026-08-21): with no manually tracked cities, check the
@@ -234,6 +245,18 @@ export async function applyPriceCheckResult(
   if (connection?.paused) return
 
   const userId = product.user_id
+
+  // Defence in depth for the Pro gate in getDueTrackedProducts: a product
+  // put on the due list a moment before its owner's Pro lapsed must still
+  // not be repriced or charged. Checked against the connection owner (the
+  // seller the wallet belongs to), falling back to the product row's own
+  // user_id. A failed read skips this cycle -- this function never throws.
+  try {
+    if (!(await ownerHasKaspiShopAccess(connection?.user_id ?? userId))) return
+  } catch (err: any) {
+    console.error('kaspi-shop checkCycle: owner plan check failed for product', trackedProductId, ':', err.message)
+    return
+  }
 
   // Founder's explicit ask: extend the same negative-balance protection
   // Kaspi Cashier's invoice-payment path already had to every unified-

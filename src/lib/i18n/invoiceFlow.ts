@@ -1,3 +1,5 @@
+import { ruPlural } from '@/lib/invoiceLimit'
+
 interface KnpOption { value: string; label: string }
 interface StatusChangeOption { status: string; label: string }
 
@@ -66,7 +68,10 @@ export interface InvoiceFlowContent {
   statsPaidLabel: string
   statsIncomeLabel: string
   freePlanTitle: string
-  freePlanSubtitle: string
+  // left = сколько счетов ещё можно создать в этом месяце (null — счётчик
+  // ещё не загружен), limit = лимит Free (getActivePlan().invoiceLimit).
+  freePlanSubtitle: (left: number | null, limit: number) => string
+  freePlanUpsell: string
   ratesButton: string
   trialPlanTitle: string
   trialDaysLeftLabel: (days: number, invoicesLeft: number) => string
@@ -281,13 +286,18 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     statsPaidLabel: 'Оплачено',
     statsIncomeLabel: 'Доход ₸',
     freePlanTitle: 'Бесплатный тариф',
-    freePlanSubtitle: 'Перейдите на платный для безлимитных счетов',
+    freePlanSubtitle: (left: number | null, limit: number) =>
+      left === null ? `${limit} ${ruPlural(limit, 'счёт', 'счёта', 'счетов')} в месяц бесплатно`
+      : left === 0 ? `Лимит на этот месяц исчерпан: ${limit} из ${limit}`
+      : `${ruPlural(left, 'Остался', 'Осталось', 'Осталось')} ${left} ${ruPlural(left, 'счёт', 'счёта', 'счетов')} из ${limit} в этом месяце`,
+    freePlanUpsell: 'Больше счетов — на тарифе Базовый или Про',
     ratesButton: 'Тарифы',
     trialPlanTitle: '🎉 Пробный период',
-    trialDaysLeftLabel: (days: number, invoicesLeft: number) => `Осталось ${days} дней · осталось ${invoicesLeft} счетов`,
+    trialDaysLeftLabel: (days: number, invoicesLeft: number) =>
+      `${ruPlural(days, 'Остался', 'Осталось', 'Осталось')} ${days} ${ruPlural(days, 'день', 'дня', 'дней')} · ${ruPlural(invoicesLeft, 'остался', 'осталось', 'осталось')} ${invoicesLeft} ${ruPlural(invoicesLeft, 'счёт', 'счёта', 'счетов')}`,
     buyButton: 'Купить',
     expiringPlanTitle: '⚠️ Тариф истекает',
-    daysLeftLabel: (days: number) => `Осталось ${days} дней`,
+    daysLeftLabel: (days: number) => `${ruPlural(days, 'Остался', 'Осталось', 'Осталось')} ${days} ${ruPlural(days, 'день', 'дня', 'дней')}`,
     extendButton: 'Продлить',
     onboardingTitle: '🚀 Начало работы',
     onboardingStep1Title: 'Заполните реквизиты',
@@ -504,7 +514,11 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     statsPaidLabel: 'Төленді',
     statsIncomeLabel: 'Табыс ₸',
     freePlanTitle: 'Тегін тариф',
-    freePlanSubtitle: 'Шексіз шоттар үшін ақылы тарифке өтіңіз',
+    freePlanSubtitle: (left: number | null, limit: number) =>
+      left === null ? `Айына ${limit} шот тегін`
+      : left === 0 ? `Осы айдағы ${limit} тегін шот таусылды`
+      : `Осы айда ${limit} шоттан ${left} шот қалды`,
+    freePlanUpsell: 'Көбірек шот — Базалық немесе Про тарифінде',
     ratesButton: 'Тарифтер',
     trialPlanTitle: '🎉 Сынақ мерзімі',
     trialDaysLeftLabel: (days: number, invoicesLeft: number) => `${days} күн қалды · ${invoicesLeft} шот қалды`,
@@ -727,13 +741,18 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     statsPaidLabel: 'Paid',
     statsIncomeLabel: 'Income ₸',
     freePlanTitle: 'Free plan',
-    freePlanSubtitle: 'Upgrade to a paid plan for unlimited invoices',
+    freePlanSubtitle: (left: number | null, limit: number) =>
+      left === null ? `${limit} free ${limit === 1 ? 'invoice' : 'invoices'} per month`
+      : left === 0 ? `You've used all ${limit} free ${limit === 1 ? 'invoice' : 'invoices'} this month`
+      : `${left} of ${limit} ${limit === 1 ? 'invoice' : 'invoices'} left this month`,
+    freePlanUpsell: 'More invoices on the Basic or Pro plan',
     ratesButton: 'Pricing',
     trialPlanTitle: '🎉 Trial period',
-    trialDaysLeftLabel: (days: number, invoicesLeft: number) => `${days} days left · ${invoicesLeft} invoices left`,
+    trialDaysLeftLabel: (days: number, invoicesLeft: number) =>
+      `${days} ${days === 1 ? 'day' : 'days'} left · ${invoicesLeft} ${invoicesLeft === 1 ? 'invoice' : 'invoices'} left`,
     buyButton: 'Buy',
     expiringPlanTitle: '⚠️ Plan expiring',
-    daysLeftLabel: (days: number) => `${days} days left`,
+    daysLeftLabel: (days: number) => `${days} ${days === 1 ? 'day' : 'days'} left`,
     extendButton: 'Renew',
     onboardingTitle: '🚀 Getting started',
     onboardingStep1Title: 'Fill in your details',

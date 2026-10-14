@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { almatyMonthStart, checkInvoiceLimit, isInvoiceLimitError, invoiceLimitFromError } from './invoiceLimit'
+import { almatyMonthStart, checkInvoiceLimit, invoicesLeft, ruPlural, isInvoiceLimitError, invoiceLimitFromError } from './invoiceLimit'
+import { invoiceFlowDict } from './i18n/invoiceFlow'
 import { getActivePlan } from './plan'
 
 const DAY = 24 * 60 * 60 * 1000
@@ -86,5 +87,66 @@ describe('invoiceLimitFromError', () => {
   it('returns null for anything else', () => {
     expect(invoiceLimitFromError('duplicate key value violates unique constraint')).toBeNull()
     expect(invoiceLimitFromError(null)).toBeNull()
+  })
+})
+
+describe('invoicesLeft', () => {
+  const free = getActivePlan({})
+
+  it('counts down the Free quota of 3 and never goes negative', () => {
+    expect(invoicesLeft(free, 0)).toBe(3)
+    expect(invoicesLeft(free, 2)).toBe(1)
+    expect(invoicesLeft(free, 3)).toBe(0)
+    // e.g. a Basic plan lapsed mid-month with 10 invoices already made
+    expect(invoicesLeft(free, 10)).toBe(0)
+  })
+
+  it('is null when there is no limit (Pro, admin)', () => {
+    expect(invoicesLeft(getActivePlan({ plan: 'pro' }), 5)).toBeNull()
+    expect(invoicesLeft(getActivePlan({ is_admin: true }), 5)).toBeNull()
+  })
+})
+
+describe('ruPlural', () => {
+  const word = (n: number) => ruPlural(n, 'счёт', 'счёта', 'счетов')
+  it('picks счёт / счёта / счетов by Russian rules', () => {
+    expect([0, 1, 2, 3, 4, 5, 11, 12, 14, 21, 22, 25, 101, 111, 112].map(word)).toEqual([
+      'счетов', 'счёт', 'счёта', 'счёта', 'счёта', 'счетов', 'счетов', 'счетов', 'счетов',
+      'счёт', 'счёта', 'счетов', 'счёт', 'счетов', 'счетов',
+    ])
+  })
+})
+
+describe('Free plan banner text on /create', () => {
+  const { ru, kk, en } = invoiceFlowDict
+
+  it('shows the remaining quota instead of promising unlimited invoices', () => {
+    expect(ru.freePlanSubtitle(3, 3)).toBe('Осталось 3 счёта из 3 в этом месяце')
+    expect(ru.freePlanSubtitle(2, 3)).toBe('Осталось 2 счёта из 3 в этом месяце')
+    expect(ru.freePlanSubtitle(1, 3)).toBe('Остался 1 счёт из 3 в этом месяце')
+    expect(ru.freePlanSubtitle(0, 3)).toBe('Лимит на этот месяц исчерпан: 3 из 3')
+    expect(kk.freePlanSubtitle(1, 3)).toBe('Осы айда 3 шоттан 1 шот қалды')
+    expect(kk.freePlanSubtitle(0, 3)).toBe('Осы айдағы 3 тегін шот таусылды')
+    expect(en.freePlanSubtitle(1, 3)).toBe('1 of 3 invoices left this month')
+    expect(en.freePlanSubtitle(0, 3)).toBe("You've used all 3 free invoices this month")
+  })
+
+  it('stays neutral while the month count is still loading', () => {
+    expect(ru.freePlanSubtitle(null, 3)).toBe('3 счёта в месяц бесплатно')
+    expect(en.freePlanSubtitle(null, 3)).toBe('3 free invoices per month')
+  })
+
+  it('never mentions unlimited invoices for the Free → paid upsell', () => {
+    for (const t of [ru, kk, en]) {
+      const all = [t.freePlanSubtitle(2, 3), t.freePlanSubtitle(0, 3), t.freePlanSubtitle(null, 3), t.freePlanUpsell].join(' ')
+      expect(all).not.toMatch(/безлимит|шексіз|unlimited/i)
+    }
+  })
+
+  it('agrees the trial counters in number', () => {
+    expect(ru.trialDaysLeftLabel(1, 1)).toBe('Остался 1 день · остался 1 счёт')
+    expect(ru.trialDaysLeftLabel(3, 5)).toBe('Осталось 3 дня · осталось 5 счетов')
+    expect(ru.daysLeftLabel(21)).toBe('Остался 21 день')
+    expect(en.trialDaysLeftLabel(1, 1)).toBe('1 day left · 1 invoice left')
   })
 })

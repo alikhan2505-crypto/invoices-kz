@@ -18,6 +18,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
   const orderId = req.nextUrl.searchParams.get('orderId')
   if (!orderId) return NextResponse.json({ error: 'orderId required' }, { status: 400 })
 
+  // Null also when the owner's Pro has lapsed: no new payment is minted and
+  // no live check runs here. A payment already pending at that moment is
+  // still settled by the daily /api/cron/kaspi-poll sweep (it settles every
+  // pending kaspi_payment_requests row regardless of plan), so a buyer who
+  // already paid is never lost.
   const storefront = await resolveStorefrontBySlug(slug)
   if (!storefront) return NextResponse.json({ payment: null })
 

@@ -9,7 +9,7 @@ import DesktopShell from '@/components/DesktopShell'
 import InvoiceLivePreview from '@/components/InvoiceLivePreview'
 import { cacheGet, cacheSet } from '@/lib/cache'
 import { getActivePlan } from '@/lib/plan'
-import { almatyMonthStart, checkInvoiceLimit, isInvoiceLimitError, invoiceLimitFromError } from '@/lib/invoiceLimit'
+import { almatyMonthStart, checkInvoiceLimit, invoicesLeft, isInvoiceLimitError, invoiceLimitFromError } from '@/lib/invoiceLimit'
 import { formatDate, formatDateSafe } from '@/lib/date'
 import { computeDefaultDueDate, todayDateString } from '@/lib/dueDate'
 import { useLanguage } from '@/components/LanguageProvider'
@@ -87,6 +87,9 @@ export default function CreateInvoicePage() {
   // least once.
   const [profileLoaded, setProfileLoaded] = useState(false)
   const [monthCount, setMonthCount] = useState(0)
+  // Until the month's count arrives, the Free banner must not claim «осталось
+  // 3 из 3» (a cached profile renders it before the count query resolves).
+  const [monthCountLoaded, setMonthCountLoaded] = useState(false)
   const [monthStats, setMonthStats] = useState({ paid: 0, total: 0, amount: 0 })
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [bankAccounts, setBankAccounts] = useState<any[]>([])
@@ -245,10 +248,13 @@ export default function CreateInvoicePage() {
     // browser's «N из лимита» never disagrees with what the insert will hit.
     const monthStart = almatyMonthStart()
 
-    const { count } = await supabase
+    const { count, error: countError } = await supabase
       .from('invoices').select('*', { count: 'exact', head: true })
       .eq('user_id', user.id).gte('created_at', monthStart.toISOString())
     setMonthCount(count || 0)
+    // A failed count is not «0 used»: keep the Free banner on its neutral text
+    // instead of promising the full quota.
+    if (!countError && count !== null) setMonthCountLoaded(true)
 
     const { data: monthInvoices } = await supabase
       .from('invoices').select('amount, status')
@@ -766,11 +772,15 @@ export default function CreateInvoicePage() {
 
         {(() => {
           const activePlan = getActivePlan(profile)
-          if (activePlan.plan === 'free') return (
-            <div className="nav-glass flex items-center justify-between rounded-xl px-4 py-3 mb-4" style={{ background: 'var(--nav-accent-soft)' }}>
+          // invoiceLimit === null here means an admin on Free — no quota to show.
+          // profile === null before the first load would read as Free for
+          // everyone (Pro included) — wait for the real profile.
+          if ((profile || profileLoaded) && activePlan.plan === 'free' && activePlan.invoiceLimit !== null) return (
+            <div className="nav-glass flex items-center justify-between gap-3 rounded-xl px-4 py-3 mb-4" style={{ background: 'var(--nav-accent-soft)' }}>
               <div>
                 <div className="text-sm font-medium" style={{ color: 'var(--nav-text-primary)' }}>{t.freePlanTitle}</div>
-                <div className="text-xs mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{t.freePlanSubtitle}</div>
+                <div className="text-xs mt-0.5 tabular-nums" style={{ color: 'var(--nav-text-muted)' }}>{t.freePlanSubtitle(monthCountLoaded ? invoicesLeft(activePlan, monthCount) : null, activePlan.invoiceLimit)}</div>
+                <div className="text-xs mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{t.freePlanUpsell}</div>
               </div>
               <button onClick={() => router.push('/upgrade')} className="text-xs font-semibold px-3 py-1.5 rounded-lg flex-shrink-0" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>{t.ratesButton}</button>
             </div>
@@ -779,7 +789,7 @@ export default function CreateInvoicePage() {
             <div className="nav-glass flex items-center justify-between rounded-xl px-4 py-3 mb-4" style={{ background: 'var(--nav-success-soft)' }}>
               <div>
                 <div className="text-sm font-medium" style={{ color: 'var(--nav-success)' }}>{t.trialPlanTitle}</div>
-                <div className="text-xs mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{t.trialDaysLeftLabel(activePlan.daysLeft!, activePlan.invoiceLimit! - monthCount)}</div>
+                <div className="text-xs mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{t.trialDaysLeftLabel(activePlan.daysLeft!, invoicesLeft(activePlan, monthCount) ?? 0)}</div>
               </div>
               <button onClick={() => router.push('/upgrade')} className="text-xs font-semibold px-3 py-1.5 rounded-lg flex-shrink-0" style={{ background: 'var(--nav-success)', color: '#fff' }}>{t.buyButton}</button>
             </div>

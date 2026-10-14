@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { ownerHasKaspiShopAccess } from './planGate'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -245,12 +246,7 @@ export async function saveStorefrontSettings(
   return { ok: true }
 }
 
-// The PUBLIC resolution path -- deliberately independent of is_active, per
-// the design doc: a seller switching which store is "active" in the
-// multi-store switcher (for repricer/orders/etc.) must never change what an
-// already-shared storefront link shows. Unpublished and never-claimed slugs
-// resolve identically (both null) -- a stale/guessed slug reveals nothing.
-export async function resolveStorefrontBySlug(slug: string): Promise<{
+export interface PublicStorefront {
   connectionId: string
   userId: string
   companyName: string
@@ -261,7 +257,23 @@ export async function resolveStorefrontBySlug(slug: string): Promise<{
   landingHistory: string | null
   landingCapacity: string | null
   landingAnnualVolume: string | null
-} | null> {
+}
+
+// The PUBLIC resolution path -- deliberately independent of is_active, per
+// the design doc: a seller switching which store is "active" in the
+// multi-store switcher (for repricer/orders/etc.) must never change what an
+// already-shared storefront link shows. Unpublished and never-claimed slugs
+// resolve identically ('not_found') -- a stale/guessed slug reveals nothing.
+//
+// Pro gate (founder decision 14.10.2026): the storefront closes together
+// with Kaspi Bot when the owner is neither admin nor on an active Pro plan
+// -- 'unavailable', which every public /api/shop/[slug]/* route treats as a
+// 404 (no products, no checkout, no wholesale invoice). Nothing is
+// unpublished or deleted, so renewing Pro reopens the same link by itself.
+// A failed owner-plan read throws, like the slug lookup itself.
+export async function resolvePublicStorefront(slug: string): Promise<
+  { status: 'ok'; storefront: PublicStorefront } | { status: 'not_found' } | { status: 'unavailable' }
+> {
   const { data, error } = await supabase
     .from('kaspi_shop_connections')
     .select('id, user_id, company_name, storefront_background_color, storefront_delivery_info, storefront_chat_widget_enabled, storefront_landing_enabled, storefront_landing_history, storefront_landing_capacity, storefront_landing_annual_volume')
@@ -269,7 +281,9 @@ export async function resolveStorefrontBySlug(slug: string): Promise<{
     .eq('storefront_published', true)
     .maybeSingle()
   if (error) throw new Error(`storefront resolve by slug failed: ${error.message}`)
-  return data ? {
+  if (!data) return { status: 'not_found' }
+  if (!(await ownerHasKaspiShopAccess(data.user_id))) return { status: 'unavailable' }
+  return { status: 'ok', storefront: {
     connectionId: data.id,
     userId: data.user_id,
     companyName: data.company_name,
@@ -280,7 +294,14 @@ export async function resolveStorefrontBySlug(slug: string): Promise<{
     landingHistory: data.storefront_landing_history,
     landingCapacity: data.storefront_landing_capacity,
     landingAnnualVolume: data.storefront_landing_annual_volume,
-  } : null
+  } }
+}
+
+// Null for not-found AND for a lapsed owner -- the safe default for every
+// route that only needs "may this storefront be used right now".
+export async function resolveStorefrontBySlug(slug: string): Promise<PublicStorefront | null> {
+  const resolved = await resolvePublicStorefront(slug)
+  return resolved.status === 'ok' ? resolved.storefront : null
 }
 
 export async function loadStorefrontProducts(connectionId: string): Promise<StorefrontProduct[]> {

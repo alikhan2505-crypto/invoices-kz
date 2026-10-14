@@ -58,6 +58,29 @@ export function checkInvoiceLimit(plan: PlanInfo, monthCount: number): InvoiceLi
   return { allowed: false, kind, limit: plan.invoiceLimit }
 }
 
+/**
+ * Сколько счетов ещё можно создать в этом месяце: null — лимита нет (Про,
+ * админ). Никогда не уходит ниже нуля: счётчик может быть больше лимита
+ * (отменённые счета считаются; тариф истёк посреди месяца с 10 счетами).
+ */
+export function invoicesLeft(plan: PlanInfo, monthCount: number): number | null {
+  if (plan.invoiceLimit === null) return null
+  return Math.max(0, plan.invoiceLimit - Math.max(0, monthCount))
+}
+
+/**
+ * Русская форма слова по числу: 1 счёт / 2 счёта / 5 счетов
+ * (21 счёт, 22 счёта, 11–14 счетов, 111 счетов).
+ */
+export function ruPlural(n: number, one: string, few: string, many: string): string {
+  const abs = Math.abs(Math.trunc(n))
+  const m10 = abs % 10
+  const m100 = abs % 100
+  if (m10 === 1 && m100 !== 11) return one
+  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few
+  return many
+}
+
 /** Ошибка вставки, которую бросает триггер enforce_invoice_limit(). */
 export function isInvoiceLimitError(message: string | null | undefined): boolean {
   return !!message && message.includes('invoice_limit_reached')

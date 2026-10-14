@@ -76,6 +76,7 @@ async function resolveLine(connectionId: string, productId: string, qty: number)
 // short summary, price becomes the cart total.
 export async function POST(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
+  // Null also when the owner's Pro has lapsed -- checkout closes with the bot.
   const storefront = await resolveStorefrontBySlug(slug)
   if (!storefront) return NextResponse.json({ error: 'not_found' }, { status: 404 })
 

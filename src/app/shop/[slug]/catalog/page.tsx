@@ -36,6 +36,9 @@ export default function WholesaleCatalogPage() {
   const reduceMotion = !!useReducedMotion()
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
+  // The seller's Pro has lapsed -- the API answers 404 'unavailable'. Shown
+  // as a neutral «временно недоступен», nothing else about the seller.
+  const [unavailable, setUnavailable] = useState(false)
   const [companyName, setCompanyName] = useState('')
   const [models, setModels] = useState<Model[]>([])
   const [categories, setCategories] = useState<Category[]>([])
@@ -45,6 +48,7 @@ export default function WholesaleCatalogPage() {
     fetch(`/api/shop/${params.slug}/wholesale`)
       .then(r => r.json())
       .then(data => {
+        if (data.error === 'unavailable') { setUnavailable(true); return }
         if (data.error) { setNotFound(true); return }
         setCompanyName(data.companyName || '')
         setModels(Array.isArray(data.models) ? data.models : [])
@@ -55,6 +59,7 @@ export default function WholesaleCatalogPage() {
   }, [params.slug])
 
   if (loading) return <div className="min-h-screen flex items-center justify-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Загрузка…</div>
+  if (unavailable) return <div className="min-h-screen flex items-center justify-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Магазин временно недоступен</div>
   if (notFound) return <div className="min-h-screen flex items-center justify-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Витрина не найдена</div>
 
   const groups = groupModels(models, categories)

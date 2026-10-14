@@ -16,6 +16,7 @@ export default function WholesaleModelPage() {
   const cart = useWholesaleCart(params.slug)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
+  const [unavailable, setUnavailable] = useState(false)
   const [model, setModel] = useState<Model | null>(null)
   const [selectedColor, setSelectedColor] = useState<string | null>(null)
   const [selectedSize, setSelectedSize] = useState<string | null>(null)
@@ -25,6 +26,8 @@ export default function WholesaleModelPage() {
     fetch(`/api/shop/${params.slug}/wholesale`)
       .then(r => r.json())
       .then(data => {
+        // Seller's Pro lapsed -- same neutral state as the catalog page.
+        if (data.error === 'unavailable') { setUnavailable(true); return }
         const found: Model | undefined = (data.models || []).find((m: Model) => m.id === params.modelId)
         if (!found) { setNotFound(true); return }
         setModel(found)
@@ -52,6 +55,7 @@ export default function WholesaleModelPage() {
   }, [selectedColor])
 
   if (loading) return <div className="min-h-screen flex items-center justify-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Загрузка…</div>
+  if (unavailable) return <div className="min-h-screen flex items-center justify-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Магазин временно недоступен</div>
   if (notFound || !model) return <div className="min-h-screen flex items-center justify-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Модель не найдена</div>
 
   const inStock = selectedVariant && selectedVariant.stockCount !== null && selectedVariant.stockCount > 0

@@ -2,14 +2,18 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const mockMaybeSingle = vi.fn()
 const mockEq = vi.fn(() => ({ maybeSingle: mockMaybeSingle }))
-const mockSelect = vi.fn(() => ({ eq: mockEq }))
+const mockIn = vi.fn()
+const mockSelect = vi.fn(() => ({ eq: mockEq, in: mockIn }))
 vi.mock('@supabase/supabase-js', () => ({
   createClient: () => ({
     from: () => ({ select: mockSelect }),
   }),
 }))
 
-import { hasKaspiShopAccess, kaspiShopPlanGate, KASPI_SHOP_NOT_PRO_BODY, KASPI_SHOP_PROFILE_COLUMNS } from './planGate'
+import {
+  hasKaspiShopAccess, kaspiShopPlanGate, KASPI_SHOP_NOT_PRO_BODY, KASPI_SHOP_PROFILE_COLUMNS,
+  filterByOwnerAccess, loadOwnerPlanProfiles, ownerHasKaspiShopAccess,
+} from './planGate'
 
 const future = () => new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString()
 const past = () => new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
@@ -79,5 +83,92 @@ describe('kaspiShopPlanGate', () => {
     const res = await kaspiShopPlanGate('user-4')
     expect(res?.status).toBe(403)
     expect(await res?.json()).toEqual(KASPI_SHOP_NOT_PRO_BODY)
+  })
+})
+
+describe('filterByOwnerAccess', () => {
+  type Item = { id: string; owner: string | null }
+  const ownerOf = (i: Item) => i.owner
+  const profiles = new Map<string, any>([
+    ['pro', { plan: 'pro' }],
+    ['lapsed', { plan: 'pro', plan_expires_at: past() }],
+    ['basic', { plan: 'basic' }],
+    ['admin', { is_admin: true, plan: 'free' }],
+  ])
+
+  it('keeps only items whose owner is Pro or admin, in their original order', () => {
+    const items: Item[] = [
+      { id: '1', owner: 'lapsed' },
+      { id: '2', owner: 'pro' },
+      { id: '3', owner: 'basic' },
+      { id: '4', owner: 'admin' },
+      { id: '5', owner: 'pro' },
+    ]
+    expect(filterByOwnerAccess(items, ownerOf, profiles).map(i => i.id)).toEqual(['2', '4', '5'])
+  })
+
+  it('drops items with no owner id or an owner missing from the map (fail closed)', () => {
+    const items: Item[] = [{ id: '1', owner: null }, { id: '2', owner: 'ghost' }, { id: '3', owner: 'pro' }]
+    expect(filterByOwnerAccess(items, ownerOf, profiles).map(i => i.id)).toEqual(['3'])
+  })
+
+  it('returns an empty list for an empty batch', () => {
+    expect(filterByOwnerAccess([], ownerOf, profiles)).toEqual([])
+  })
+})
+
+describe('loadOwnerPlanProfiles', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('reads each distinct owner once, keyed by id, skipping empty ids', async () => {
+    mockIn.mockResolvedValue({ data: [{ id: 'a', plan: 'pro' }, { id: 'b', plan: 'basic' }], error: null })
+    const map = await loadOwnerPlanProfiles(['a', 'b', 'a', null, undefined, ''])
+    expect(mockIn).toHaveBeenCalledTimes(1)
+    expect(mockIn).toHaveBeenCalledWith('id', ['a', 'b'])
+    expect(mockSelect).toHaveBeenCalledWith(`id, ${KASPI_SHOP_PROFILE_COLUMNS}`)
+    expect(map.get('a')).toEqual({ id: 'a', plan: 'pro' })
+    expect(map.get('b')).toEqual({ id: 'b', plan: 'basic' })
+  })
+
+  it('makes no query for an empty batch', async () => {
+    const map = await loadOwnerPlanProfiles([])
+    expect(mockIn).not.toHaveBeenCalled()
+    expect(map.size).toBe(0)
+  })
+
+  it('chunks a large batch', async () => {
+    mockIn.mockResolvedValue({ data: [], error: null })
+    const ids = Array.from({ length: 450 }, (_, i) => `u${i}`)
+    await loadOwnerPlanProfiles(ids)
+    expect(mockIn).toHaveBeenCalledTimes(3)
+  })
+
+  it('throws on a read error instead of returning a partial map', async () => {
+    mockIn.mockResolvedValue({ data: null, error: { message: 'boom' } })
+    await expect(loadOwnerPlanProfiles(['a'])).rejects.toThrow('boom')
+  })
+})
+
+describe('ownerHasKaspiShopAccess', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('is true for a Pro owner and for an admin owner', async () => {
+    mockMaybeSingle.mockResolvedValueOnce({ data: { plan: 'pro' }, error: null })
+    expect(await ownerHasKaspiShopAccess('u1')).toBe(true)
+    mockMaybeSingle.mockResolvedValueOnce({ data: { is_admin: true }, error: null })
+    expect(await ownerHasKaspiShopAccess('u2')).toBe(true)
+  })
+
+  it('is false for a lapsed Pro owner, a missing profile, or no owner id', async () => {
+    mockMaybeSingle.mockResolvedValueOnce({ data: { plan: 'pro', plan_expires_at: past() }, error: null })
+    expect(await ownerHasKaspiShopAccess('u3')).toBe(false)
+    mockMaybeSingle.mockResolvedValueOnce({ data: null, error: null })
+    expect(await ownerHasKaspiShopAccess('u4')).toBe(false)
+    expect(await ownerHasKaspiShopAccess(null)).toBe(false)
+  })
+
+  it('throws on a read error so the caller picks how to fail closed', async () => {
+    mockMaybeSingle.mockResolvedValueOnce({ data: null, error: { message: 'boom' } })
+    await expect(ownerHasKaspiShopAccess('u5')).rejects.toThrow('boom')
   })
 })
