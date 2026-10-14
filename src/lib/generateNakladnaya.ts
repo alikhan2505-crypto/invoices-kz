@@ -180,13 +180,13 @@ ${watermarkCss(data.showWatermark)}
 <body${watermarkBodyClass(data.showWatermark)}>
 
 <!-- Toolbar -->
-<div class="toolbar" style="position:fixed;top:0;left:0;right:0;background:white;border-bottom:1px solid #e5e7eb;padding:8px 16px;z-index:999;display:flex;align-items:center;justify-content:space-between;">
+<div class="toolbar" style="position:fixed;top:0;left:0;right:0;background:white;border-bottom:1px solid #e5e7eb;padding:8px 16px;z-index:999;display:flex;align-items:center;justify-content:flex-start;gap:6px;">
+  <!-- Кнопки слева: на телефоне документ не масштабируется, и правый
+       край панели (где были «Печать» и «Скачать PDF») уходил за экран. -->
   <button onclick="window.close()" style="background:#f3f4f6;border:none;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px;">← Назад</button>
-  <span style="font-size:11px;color:#6b7280;font-weight:600;">Накладная №${number}</span>
-  <div style="display:flex;gap:6px;">
-    <button onclick="window.print()" style="background:#1C2056;color:white;border:none;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px;">🖨️ Печать</button>
-    <button id="dlBtn" onclick="downloadPDF()" style="background:#2DC48D;color:white;border:none;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px;">💾 Скачать PDF</button>
-  </div>
+  <button onclick="window.print()" style="background:#1C2056;color:white;border:none;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px;">🖨️ Печать</button>
+  <button id="dlBtn" onclick="downloadPDF()" style="background:#2DC48D;color:white;border:none;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px;">💾 Скачать PDF</button>
+  <span style="margin-left:auto; white-space:nowrap; font-size:11px;color:#6b7280;font-weight:600;">Накладная №${number}</span>
 </div>
 <div style="height:44px;"></div>
 
