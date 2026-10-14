@@ -121,10 +121,9 @@ export default function KpTool({ lang }: { lang: ToolLang }) {
   // активна при ровно 12 цифрах. Сервер отдаёт только название: сначала кэш
   // реестров (бесплатно), затем живой реестр — не больше 3 раз на IP в квартал.
   const [binLookup, setBinLookup] = useState<Lookup>('idle')
-  const lookupClient = async (bin: string) => {
-    if (bin.length !== 12) return
-    setBinLookup('loading')
-    track('tool_kp_bin_lookup', { lang })
+  // Один запрос «название по БИН» для покупателя и поставщика: тот же
+  // эндпоинт и тот же квартальный бюджет живых запросов в реестр (3 на IP).
+  const fetchName = async (bin: string): Promise<{ next: Lookup; name: string | null }> => {
     let next: Lookup = 'unavailable'
     let name: string | null = null
     try {
@@ -143,6 +142,13 @@ export default function KpTool({ lang }: { lang: ToolLang }) {
         next = 'limit'
       }
     } catch {}
+    return { next, name }
+  }
+  const lookupClient = async (bin: string) => {
+    if (bin.length !== 12) return
+    setBinLookup('loading')
+    track('tool_kp_bin_lookup', { lang })
+    const { next, name } = await fetchName(bin)
     if (latestBin.current !== bin) return
     if (name) {
       const found = name
@@ -157,6 +163,21 @@ export default function KpTool({ lang }: { lang: ToolLang }) {
     set({ clientBin: bin })
     if (!changed) return
     setBinLookup('idle')
+  }
+  // Поиск названия своей компании («От кого») по БИН/ИИН — по кнопке, как у
+  // покупателя (предложение основателя 14.10.2026).
+  const [sellerLookup, setSellerLookup] = useState<Lookup>('idle')
+  const lookupSeller = async () => {
+    const bin = digits(f.binIin)
+    if (bin.length !== 12) return
+    setSellerLookup('loading')
+    track('tool_kp_seller_lookup', { lang })
+    const { next, name } = await fetchName(bin)
+    if (name) {
+      const found = name
+      setF(prev => (digits(prev.binIin) === bin ? { ...prev, companyName: found } : prev))
+    }
+    setSellerLookup(next)
   }
   const setRow = (i: number, patch: Partial<KpRow>) =>
     setF(prev => ({ ...prev, rows: prev.rows.map((r, j) => (j === i ? { ...r, ...patch } : r)) }))
@@ -304,7 +325,21 @@ export default function KpTool({ lang }: { lang: ToolLang }) {
             </div>
             <div>
               <label htmlFor="kp-bin" className={label} style={labelStyle}>{t.binLabel}</label>
-              <input id="kp-bin" className={input} style={inputStyle} inputMode="numeric" autoComplete="off" placeholder={t.binPlaceholder} value={f.binIin} onChange={e => set({ binIin: digits(e.target.value).slice(0, 12) })} />
+              <div className="flex gap-2">
+                <input id="kp-bin" className={input} style={inputStyle} inputMode="numeric" autoComplete="off" placeholder={t.binPlaceholder} value={f.binIin} onChange={e => { set({ binIin: digits(e.target.value).slice(0, 12) }); setSellerLookup('idle') }} />
+                <button type="button" onClick={() => void lookupSeller()} disabled={digits(f.binIin).length !== 12 || sellerLookup === 'loading'}
+                  aria-label={t.sellerLookupAria}
+                  className="nav-glass rounded-xl px-3 text-[13px] font-semibold flex-shrink-0 disabled:opacity-50"
+                  style={{ color: 'var(--nav-accent)' }}>
+                  {sellerLookup === 'loading' ? '…' : t.lookupButton}
+                </button>
+              </div>
+              <div aria-live="polite">
+                {sellerLookup === 'found' && <div className="text-[11px] mt-1" style={{ color: 'var(--nav-success)' }}>{t.lookupFound}</div>}
+                {sellerLookup === 'miss' && <div className="text-[11px] mt-1" style={hintStyle}>{t.lookupMiss}</div>}
+                {sellerLookup === 'limit' && <div className="text-[11px] mt-1" style={hintStyle}>{t.lookupLimit}</div>}
+                {sellerLookup === 'unavailable' && <div className="text-[11px] mt-1" style={hintStyle}>{t.lookupUnavailable}</div>}
+              </div>
             </div>
             <div>
               <label htmlFor="kp-phone" className={label} style={labelStyle}>{t.phoneLabel}</label>

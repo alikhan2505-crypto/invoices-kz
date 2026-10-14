@@ -47,6 +47,7 @@ export interface KpDict {
   clientBinLabel: string
   lookupButton: string
   lookupAria: string
+  sellerLookupAria: string
   /** Поиск идёт сам, как только в поле 12 цифр. */
   lookupLoading: string
   lookupFound: string
@@ -134,6 +135,7 @@ export const kpDict: Record<ToolLang, KpDict> = {
     clientBinLabel: 'БИН / ИИН клиента (необязательно)',
     lookupButton: 'Найти',
     lookupAria: 'Найти название клиента по БИН',
+    sellerLookupAria: 'Найти название своей компании по БИН',
     lookupLoading: 'Ищем название по БИН…',
     lookupFound: 'Название подставлено из реестра',
     lookupMiss: 'По этому БИН ничего не нашли — введите название вручную',
@@ -235,6 +237,7 @@ export const kpDict: Record<ToolLang, KpDict> = {
     clientBinLabel: 'Клиенттің БСН / ЖСН (міндетті емес)',
     lookupButton: 'Табу',
     lookupAria: 'Клиенттің атауын БСН бойынша табу',
+    sellerLookupAria: 'Өз компанияңыздың атауын БСН бойынша табу',
     lookupLoading: 'Атауын БСН бойынша іздеп жатырмыз…',
     lookupFound: 'Атауы тізілімнен қойылды',
     lookupMiss: 'Бұл БСН бойынша ештеңе табылмады — атауын қолмен енгізіңіз',
@@ -336,6 +339,7 @@ export const kpDict: Record<ToolLang, KpDict> = {
     clientBinLabel: 'Client BIN / IIN (optional)',
     lookupButton: 'Find',
     lookupAria: 'Find the client name by BIN',
+    sellerLookupAria: 'Find your company name by BIN',
     lookupLoading: 'Looking up the name by BIN…',
     lookupFound: 'Name filled in from the registry',
     lookupMiss: 'Nothing found for this BIN — type the name manually',
