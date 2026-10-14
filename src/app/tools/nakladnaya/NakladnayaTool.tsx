@@ -110,6 +110,7 @@ export default function NakladnayaTool({ lang }: { lang: ToolLang }) {
     }
     track('tool_nakladnaya_generate', { lang })
     await generateNakladnaya({
+      showWatermark: true,
       number: f.number.trim() || '1',
       date: ruDate(f.date || localToday()),
       clientName: f.clientName.trim(),

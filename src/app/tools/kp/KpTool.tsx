@@ -127,6 +127,7 @@ export default function KpTool({ lang }: { lang: ToolLang }) {
     }
     track('tool_kp_generate', { lang, vat: f.vatType })
     await generateKP({
+      showWatermark: true,
       number: f.number.trim() || '1',
       date: ruDate(f.date || localIsoDate()),
       validUntil: f.validUntil ? ruDate(f.validUntil) : undefined,

@@ -17,8 +17,8 @@ import {
 // Бесплатный генератор АВР — близнец /tools/schet: тот же лимит 3 в день
 // на браузер, тот же черновик в localStorage, рендер — продуктовым
 // generateAVR (форма Р-1 с суммой прописью и кнопкой «Скачать PDF» в окне).
-// Водяной строки у шаблона АВР нет (generateAVR не умеет showWatermark —
-// в рабочий шаблон платящих не лезем); крючки — лимит и CTA.
+// Бледный знак INVOICES.KZ фоном (showWatermark, docWatermark.ts) — как на
+// счёте бесплатного тарифа; у платящих в кабинете его нет. Крючки — лимит и CTA.
 // Один и тот же инструмент для /tools/avr, /tools/kk/avr и /tools/en/avr:
 // язык интерфейса приходит пропсом (из адреса), а сам бланк всегда русский —
 // см. docs/tools-i18n-pattern.md.
@@ -115,6 +115,7 @@ export default function AvrTool({ lang }: { lang: ToolLang }) {
     }
     track('tool_avr_generate', { lang })
     await generateAVR({
+      showWatermark: true,
       number: f.number.trim() || '1',
       date: ruDate(f.date || localToday()),
       contractNumber: f.contractNumber.trim() || undefined,

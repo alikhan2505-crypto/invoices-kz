@@ -1,4 +1,5 @@
 import QRCode from 'qrcode'
+import { watermarkCss, watermarkBodyClass } from './docWatermark'
 import { resizeToFit } from './imageResize'
 import { escapeHtml, escapeAttr } from './htmlEscape'
 
@@ -234,9 +235,10 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<string> {
           body { margin: 0; box-shadow: none; padding: 15mm; }
           .toolbar { display: none !important; }
         }
-      </style>
+      ${watermarkCss(data.showWatermark)}
+</style>
     </head>
-    <body>
+    <body${watermarkBodyClass(data.showWatermark)}>
 
       ${logoBase64 ? `
       <div style="text-align:center; margin:-15mm 0 8mm;">

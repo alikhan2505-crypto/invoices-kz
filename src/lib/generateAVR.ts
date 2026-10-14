@@ -8,6 +8,8 @@ interface AVRService {
 }
 
 interface AVRData {
+  // Бледный знак INVOICES.KZ фоном — бесплатные /tools (см. docWatermark.ts).
+  showWatermark?: boolean
   number: string
   date: string
   contractNumber?: string
@@ -33,6 +35,7 @@ interface AVRData {
 }
 
 import { resizeToFit } from './imageResize'
+import { watermarkCss, watermarkBodyClass } from './docWatermark'
 import { escapeHtml, escapeAttr } from './htmlEscape'
 
 export interface AVRImages {
@@ -122,9 +125,10 @@ export function buildAVRHtml(data: AVRData, images: AVRImages = {}): string | nu
           body { margin: 0; box-shadow: none; padding: 10mm; width: 100%; }
           .toolbar { display: none !important; }
         }
-      </style>
+      ${watermarkCss(data.showWatermark)}
+</style>
     </head>
-    <body>
+    <body${watermarkBodyClass(data.showWatermark)}>
 
       <!-- Toolbar -->
       <div class="toolbar" style="position:fixed; top:0; left:0; right:0; background:white; border-bottom:1px solid #e5e7eb; padding:10px 16px; z-index:999; display:flex; align-items:center; justify-content:space-between;">

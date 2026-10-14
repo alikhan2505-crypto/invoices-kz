@@ -8,6 +8,8 @@ interface NakladnayaService {
 }
 
 interface NakladnayaData {
+  // Бледный знак INVOICES.KZ фоном — бесплатные /tools (см. docWatermark.ts).
+  showWatermark?: boolean
   number: string
   date: string
   clientName: string
@@ -29,6 +31,7 @@ interface NakladnayaData {
 }
 
 import { resizeToFit } from './imageResize'
+import { watermarkCss, watermarkBodyClass } from './docWatermark'
 import { escapeHtml, escapeAttr } from './htmlEscape'
 
 // URL картинки (логотип/подпись/печать) в src: resizeToFit при ошибке загрузки
@@ -171,9 +174,10 @@ td, th { border: 1px solid #000; padding: 3px 4px; vertical-align: middle; word-
   body { margin:0; box-shadow:none; padding:8mm; width:100%; }
   .toolbar { display:none !important; }
 }
+${watermarkCss(data.showWatermark)}
 </style>
 </head>
-<body>
+<body${watermarkBodyClass(data.showWatermark)}>
 
 <!-- Toolbar -->
 <div class="toolbar" style="position:fixed;top:0;left:0;right:0;background:white;border-bottom:1px solid #e5e7eb;padding:8px 16px;z-index:999;display:flex;align-items:center;justify-content:space-between;">
