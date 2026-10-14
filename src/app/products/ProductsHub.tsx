@@ -6,7 +6,8 @@ import { getActivePlan } from '@/lib/plan'
 import { PRODUCTS, PERSONAS, PENDING_PERSONA_KEY, personasProducts, selectablePersonaProducts, isInMyProducts, toggleProduct, type ProductDef } from '@/lib/products'
 import { useMyProducts } from '@/lib/useMyProducts'
 import { useLanguage, type Lang } from '@/components/LanguageProvider'
-import { HUB_COPY, FOOTER_COPY, PERSONA_LABELS, PRODUCT_I18N } from '@/lib/i18n/productsHub'
+import { HUB_COPY, FOOTER_COPY, PERSONA_LABELS, PRODUCT_I18N, FREE_TOOLS, FREE_TOOLS_COPY } from '@/lib/i18n/productsHub'
+import { toolLinkPath, toolsIndexPath, guidesIndexPath } from '@/lib/tools-i18n'
 import ProductArt from '@/components/products/ProductArt'
 import { BrandWordmarkSvg } from '@/components/BrandWordmark'
 import './hub-extras.css'
@@ -240,6 +241,25 @@ export default function ProductsHub({ fontClass }: { fontClass: string }) {
             )
           })}
         </div>
+
+        {/* Бесплатные инструменты и гайды (решение основателя 14.10, вариант А):
+            до этого на хабе не было ни одной ссылки на /tools. Ссылки ведут на
+            версию на языке страницы, если она есть. */}
+        <section className="prd-free" aria-label={FREE_TOOLS_COPY[lang].title}>
+          <div className="prd-free-head">
+            <span className="prd-free-title">{FREE_TOOLS_COPY[lang].title}</span>
+            <span className="prd-free-sub">{FREE_TOOLS_COPY[lang].sub}</span>
+          </div>
+          <div className="prd-free-chips">
+            {FREE_TOOLS.map((slug) => (
+              <Link key={slug} href={toolLinkPath(slug, lang)} className="prd-free-chip"><span>{FREE_TOOLS_COPY[lang].tools[slug]}</span></Link>
+            ))}
+          </div>
+          <div className="prd-free-more">
+            <Link href={toolsIndexPath(lang)}><span>{FREE_TOOLS_COPY[lang].all} →</span></Link>
+            <Link href={guidesIndexPath(lang)}><span>{FREE_TOOLS_COPY[lang].guides} →</span></Link>
+          </div>
+        </section>
 
         <p className="prd-note">{logged ? t.noteUser : t.noteGuest}</p>
 

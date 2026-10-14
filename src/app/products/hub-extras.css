@@ -138,3 +138,31 @@
   .prd-root .prd-lang button { padding: 5px 4px; font-size: 10.5px; }
   .prd-root .prd-btn { padding: 7px 8px; font-size: 11.5px; }
 }
+
+/* Полоса бесплатных инструментов под плитками (14.10, вариант А). */
+.prd-root .prd-free {
+  margin-top: 22px; padding: 16px 18px; border-radius: 22px;
+  border: 2px solid var(--prd-line);
+  background: color-mix(in srgb, var(--prd-bg) 70%, transparent);
+  display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px 22px;
+}
+.prd-root .prd-free-head { display: grid; gap: 2px; }
+.prd-root .prd-free-title { font: 700 15px/1.2 var(--font-onest), Arial, sans-serif; color: var(--prd-ink) !important; }
+.prd-root .prd-free-sub { font: 500 12.5px/1.3 var(--font-onest), Arial, sans-serif; color: var(--prd-ink2) !important; }
+.prd-root .prd-free-chips { display: flex; flex-wrap: wrap; gap: 6px 8px; }
+.prd-root .prd-free-chip {
+  border: 1.5px solid var(--prd-line); border-radius: 9999px; padding: 6px 12px;
+  font: 600 13px/1 var(--font-onest), Arial, sans-serif; text-decoration: none;
+  background: var(--prd-bg); transition: border-color 0.15s, transform 0.15s;
+}
+.prd-root .prd-free-chip, .prd-root .prd-free-chip span { color: var(--prd-ink) !important; }
+.prd-root .prd-free-chip:hover { border-color: var(--prd-ink); transform: translateY(-1px); }
+.prd-root .prd-free-more { display: grid; gap: 6px; justify-items: end; white-space: nowrap; }
+.prd-root .prd-free-more a { font: 700 13px/1 var(--font-onest), Arial, sans-serif; text-decoration: none; }
+.prd-root .prd-free-more a, .prd-root .prd-free-more a span { color: var(--prd-ink) !important; }
+.prd-root .prd-free-more a:hover span { text-decoration: underline; }
+@media (max-width: 900px) {
+  .prd-root .prd-free { grid-template-columns: 1fr; }
+  .prd-root .prd-free-more { display: flex; gap: 18px; justify-items: start; }
+}
+@media (prefers-reduced-motion: reduce) { .prd-root .prd-free-chip { transition: none; } }
