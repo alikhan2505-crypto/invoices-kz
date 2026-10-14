@@ -5,6 +5,20 @@ import type { ToolLang, ToolSeoCopy } from '@/lib/tools-i18n'
 // выдачу. Сам документ (generateKP) печатается только по-русски — это
 // юридическая форма, а не язык страницы (docs/tools-i18n-pattern.md).
 
+// Дата обнуления квартала словами: '2027-01-01' → «1 января» / «1 қаңтарда» /
+// «1 January». Квартал всегда начинается первого числа одного из четырёх месяцев.
+const QUARTER_MONTHS: Record<ToolLang, Record<string, string>> = {
+  ru: { '01': 'января', '04': 'апреля', '07': 'июля', '10': 'октября' },
+  kk: { '01': 'қаңтарда', '04': 'сәуірде', '07': 'шілдеде', '10': 'қазанда' },
+  en: { '01': 'January', '04': 'April', '07': 'July', '10': 'October' },
+}
+
+export function quarterStartLabel(lang: ToolLang, iso: string): string {
+  const s = String(iso)
+  const month = s.slice(8, 10) === '01' ? QUARTER_MONTHS[lang][s.slice(5, 7)] : undefined
+  return month ? `1 ${month}` : s
+}
+
 export interface KpDict {
   seo: ToolSeoCopy
   h1: string
@@ -27,8 +41,15 @@ export interface KpDict {
   clientBinLabel: string
   lookupButton: string
   lookupAria: string
+  /** Поиск идёт сам, как только в поле 12 цифр. */
+  lookupLoading: string
   lookupFound: string
+  /** Ни в кэше, ни в реестре не нашли. */
   lookupMiss: string
+  /** Живые поиски в реестре на этот квартал кончились. */
+  lookupLimit: string
+  /** Реестр занят / счётчик не читается. */
+  lookupUnavailable: string
   errClientBin: string
   numberLabel: string
   dateLabel: string
@@ -56,9 +77,13 @@ export interface KpDict {
   errTotal: string
   /** Браузер не дал открыть окно с КП — попытка не списана. */
   errPopup: string
+  /** Счётчик КП не читается (503) — КП не создано и не списано. */
+  errUnavailable: string
   generate: string
   remaining: (left: number, limit: number) => string
   limitTitle: (limit: number) => string
+  /** Когда откроются новые бесплатные КП: iso — '2027-01-01'. */
+  limitReset: (iso: string) => string
   limitBody: string
   limitButton: string
   nextStep: string
@@ -71,7 +96,7 @@ export const kpDict: Record<ToolLang, KpDict> = {
     seo: {
       title: 'Коммерческое предложение онлайн — КП бесплатно за минуту',
       description:
-        'Создайте коммерческое предложение для клиента онлайн: позиции с ценами, срок действия, НДС, реквизиты. Готовый PDF за минуту, без регистрации — 3 КП в день бесплатно.',
+        'Создайте коммерческое предложение для клиента онлайн: позиции с ценами, срок действия, НДС, реквизиты. Готовый PDF за минуту, без регистрации — 3 КП в квартал бесплатно.',
       keywords:
         'коммерческое предложение образец казахстан, кп скачать бесплатно, коммерческое предложение ип, как составить кп, коммерческое предложение на услуги образец',
       ogTitle: 'Коммерческое предложение онлайн — за минуту',
@@ -80,7 +105,7 @@ export const kpDict: Record<ToolLang, KpDict> = {
     },
     h1: 'Коммерческое предложение — онлайн, бесплатно',
     intro:
-      'Заполните позиции и цены — получите аккуратное КП с итоговой суммой и сроком действия. Без регистрации, 3 предложения в день.',
+      'Заполните позиции и цены — получите аккуратное КП с итоговой суммой и сроком действия. Без регистрации, 3 предложения в квартал.',
     docLangNote: '',
     fromTitle: 'От кого',
     companyLabel: 'Название ИП / ТОО *',
@@ -97,8 +122,11 @@ export const kpDict: Record<ToolLang, KpDict> = {
     clientBinLabel: 'БИН / ИИН клиента (необязательно)',
     lookupButton: 'Найти',
     lookupAria: 'Найти название клиента по БИН',
+    lookupLoading: 'Ищем название по БИН…',
     lookupFound: 'Название подставлено из реестра',
-    lookupMiss: 'В нашей базе пока нет — введите название вручную',
+    lookupMiss: 'По этому БИН ничего не нашли — введите название вручную',
+    lookupLimit: 'Автопоиск на этот квартал исчерпан — введите название вручную',
+    lookupUnavailable: 'Автопоиск сейчас недоступен — введите название вручную',
     errClientBin: 'БИН/ИИН клиента — 12 цифр (или оставьте поле пустым)',
     numberLabel: 'Номер *',
     dateLabel: 'Дата *',
@@ -125,9 +153,11 @@ export const kpDict: Record<ToolLang, KpDict> = {
     errRowQty: n => `Позиция ${n}: количество должно быть больше нуля`,
     errTotal: 'Сумма предложения должна быть больше нуля',
     errPopup: 'Браузер заблокировал окно с КП — разрешите всплывающие окна для invoices.kz и нажмите ещё раз. Эта попытка не засчитана.',
+    errUnavailable: 'Сервис временно недоступен — попробуйте через минуту. КП не создано и не засчитано.',
     generate: 'Создать КП — откроется для печати и скачивания',
-    remaining: (left, limit) => `Осталось ${left} из ${limit} бесплатных КП сегодня`,
-    limitTitle: limit => `${limit} бесплатных КП на сегодня созданы`,
+    remaining: (left, limit) => `Осталось ${left} из ${limit} бесплатных КП в этом квартале`,
+    limitTitle: limit => `Все ${limit} бесплатных КП в этом квартале уже созданы`,
+    limitReset: iso => `Новые бесплатные КП откроются ${quarterStartLabel('ru', iso)}.`,
     limitBody:
       'В кабинете invoices.kz КП превращается в счёт одним кликом, когда клиент согласился: реквизиты сохранены, номера считаются сами, а оплату можно принять через Kaspi. Регистрация бесплатная.',
     limitButton: 'Зарегистрироваться бесплатно',
@@ -150,6 +180,10 @@ export const kpDict: Record<ToolLang, KpDict> = {
         q: 'Клиент согласился — что дальше?',
         a: 'Выставить счёт на оплату, а после выполнения работ или отгрузки — оформить АВР или накладную. Счёт можно сделать здесь же, бесплатно.',
       },
+      {
+        q: 'Сколько КП можно создать бесплатно?',
+        a: 'Три КП в квартал с одного подключения (IP-адреса), без регистрации. Счётчик обнуляется 1 января, 1 апреля, 1 июля и 1 октября. Название клиента подставляется по БИН кнопкой «Найти». Нужно чаще — зарегистрируйтесь: в кабинете КП сохраняются и превращаются в счёт одним кликом.',
+      },
     ],
   },
 
@@ -157,7 +191,7 @@ export const kpDict: Record<ToolLang, KpDict> = {
     seo: {
       title: 'Коммерциялық ұсыныс онлайн — бір минутта, тегін',
       description:
-        'Клиентке коммерциялық ұсынысты онлайн жасаңыз: бағасы көрсетілген позициялар, қолданылу мерзімі, ҚҚС, деректемелер. Дайын PDF бір минутта, тіркелусіз — күніне 3 ұсыныс тегін.',
+        'Клиентке коммерциялық ұсынысты онлайн жасаңыз: бағасы көрсетілген позициялар, қолданылу мерзімі, ҚҚС, деректемелер. Дайын PDF бір минутта, тіркелусіз — тоқсанына 3 ұсыныс тегін.',
       keywords:
         'коммерциялық ұсыныс үлгісі, коммерциялық ұсыныс жазу, коммерциялық ұсыныс қазақша, коммерциялық ұсыныс тегін, ЖК коммерциялық ұсыныс, қызмет көрсетуге коммерциялық ұсыныс үлгісі, КҰ жасау онлайн',
       ogTitle: 'Коммерциялық ұсыныс онлайн — бір минутта',
@@ -166,7 +200,7 @@ export const kpDict: Record<ToolLang, KpDict> = {
     },
     h1: 'Коммерциялық ұсыныс — онлайн, тегін',
     intro:
-      'Позициялар мен бағаларды толтырыңыз — жалпы сомасы мен қолданылу мерзімі көрсетілген ұқыпты коммерциялық ұсыныс (КҰ) аласыз. Тіркелусіз, күніне 3 ұсыныс.',
+      'Позициялар мен бағаларды толтырыңыз — жалпы сомасы мен қолданылу мерзімі көрсетілген ұқыпты коммерциялық ұсыныс (КҰ) аласыз. Тіркелусіз, тоқсанына 3 ұсыныс.',
     docLangNote: 'Ұсыныстың өзі орыс тілінде жасалады — Қазақстанда іскерлік құжаттарға кеңінен қабылданған үлгі.',
     fromTitle: 'Кімнен',
     companyLabel: 'ЖК / ЖШС атауы *',
@@ -183,8 +217,11 @@ export const kpDict: Record<ToolLang, KpDict> = {
     clientBinLabel: 'Клиенттің БСН / ЖСН (міндетті емес)',
     lookupButton: 'Табу',
     lookupAria: 'Клиенттің атауын БСН бойынша табу',
+    lookupLoading: 'Атауын БСН бойынша іздеп жатырмыз…',
     lookupFound: 'Атауы тізілімнен қойылды',
-    lookupMiss: 'Біздің базада әзірге жоқ — атауын қолмен енгізіңіз',
+    lookupMiss: 'Бұл БСН бойынша ештеңе табылмады — атауын қолмен енгізіңіз',
+    lookupLimit: 'Осы тоқсандағы автоіздеу таусылды — атауын қолмен енгізіңіз',
+    lookupUnavailable: 'Автоіздеу қазір қолжетімсіз — атауын қолмен енгізіңіз',
     errClientBin: 'Клиенттің БСН/ЖСН-і — 12 цифр (немесе өрісті бос қалдырыңыз)',
     numberLabel: 'Нөмірі *',
     dateLabel: 'Күні *',
@@ -211,9 +248,11 @@ export const kpDict: Record<ToolLang, KpDict> = {
     errRowQty: n => `${n}-позиция: саны нөлден көп болуы керек`,
     errTotal: 'Ұсыныс сомасы нөлден көп болуы керек',
     errPopup: 'Браузер КҰ терезесін бұғаттап тастады — invoices.kz үшін қалқымалы терезелерге рұқсат беріп, қайта басыңыз. Бұл әрекет есепке алынбады.',
+    errUnavailable: 'Сервис уақытша қолжетімсіз — бір минуттан соң қайталап көріңіз. КҰ жасалған жоқ және есепке алынбады.',
     generate: 'КҰ жасау — басып шығаруға және жүктеп алуға ашылады',
-    remaining: (left, limit) => `Бүгінге қалған тегін КҰ: ${left} / ${limit}`,
-    limitTitle: limit => `Бүгінгі ${limit} тегін КҰ жасалып қойды`,
+    remaining: (left, limit) => `Осы тоқсанда қалған тегін КҰ: ${left} / ${limit}`,
+    limitTitle: limit => `Осы тоқсандағы ${limit} тегін КҰ-ның бәрі жасалып қойды`,
+    limitReset: iso => `Жаңа тегін КҰ ${quarterStartLabel('kk', iso)} ашылады.`,
     limitBody:
       'invoices.kz кабинетінде клиент келіскен соң КҰ бір басумен шотқа айналады: деректемелер сақталады, нөмірлер өзі қойылады, ал төлемді Kaspi арқылы қабылдауға болады. Тіркелу тегін.',
     limitButton: 'Тегін тіркелу',
@@ -236,6 +275,10 @@ export const kpDict: Record<ToolLang, KpDict> = {
         q: 'Клиент келісті — әрі қарай не істеймін?',
         a: 'Төлемге шот жазыңыз, ал жұмыс орындалған немесе тауар жөнелтілген соң Орындалған жұмыстар актісін (ОЖА) не жүкқұжатты ресімдеңіз. Шотты осы жерде тегін жасауға болады.',
       },
+      {
+        q: 'Қанша КҰ тегін жасауға болады?',
+        a: 'Бір қосылымнан (IP-мекенжайдан) тоқсанына үш КҰ, тіркелусіз. Есептегіш 1 қаңтарда, 1 сәуірде, 1 шілдеде және 1 қазанда нөлденеді. Клиенттің атауы БСН бойынша «Табу» түймесімен қойылады. Жиірек керек болса — тіркеліңіз: кабинетте КҰ сақталады және бір басумен шотқа айналады.',
+      },
     ],
   },
 
@@ -243,7 +286,7 @@ export const kpDict: Record<ToolLang, KpDict> = {
     seo: {
       title: 'Commercial Proposal Generator for Kazakhstan — Free PDF in a Minute',
       description:
-        'Create a commercial proposal (quote) for a client in Kazakhstan online: items with prices in tenge, validity date, VAT and your business details. Ready PDF in a minute, no sign-up — 3 free proposals a day.',
+        'Create a commercial proposal (quote) for a client in Kazakhstan online: items with prices in tenge, validity date, VAT and your business details. Ready PDF in a minute, no sign-up — 3 free proposals per quarter.',
       keywords:
         'commercial proposal template kazakhstan, quotation template kazakhstan, free quote generator pdf, price quote kazakhstan tenge, business proposal kazakhstan, kommercheskoe predlozhenie template',
       ogTitle: 'Commercial proposal generator for Kazakhstan',
@@ -252,7 +295,7 @@ export const kpDict: Record<ToolLang, KpDict> = {
     },
     h1: 'Commercial proposal — online, free',
     intro:
-      'Fill in items and prices to get a clean commercial proposal (quote) with a total and a validity date. No sign-up, 3 proposals a day.',
+      'Fill in items and prices to get a clean commercial proposal (quote) with a total and a validity date. No sign-up, 3 proposals per quarter.',
     docLangNote: 'The proposal itself is generated in Russian, the standard language for business paperwork in Kazakhstan.',
     fromTitle: 'From',
     companyLabel: 'Your business name *',
@@ -269,8 +312,11 @@ export const kpDict: Record<ToolLang, KpDict> = {
     clientBinLabel: 'Client BIN / IIN (optional)',
     lookupButton: 'Find',
     lookupAria: 'Find the client name by BIN',
+    lookupLoading: 'Looking up the name by BIN…',
     lookupFound: 'Name filled in from the registry',
-    lookupMiss: 'Not in our database yet — type the name manually',
+    lookupMiss: 'Nothing found for this BIN — type the name manually',
+    lookupLimit: 'Auto-lookup is used up for this quarter — type the name manually',
+    lookupUnavailable: 'Auto-lookup is unavailable right now — type the name manually',
     errClientBin: 'Client BIN/IIN must be 12 digits (or leave it empty)',
     numberLabel: 'Number *',
     dateLabel: 'Date *',
@@ -297,9 +343,11 @@ export const kpDict: Record<ToolLang, KpDict> = {
     errRowQty: n => `Item ${n}: quantity must be greater than zero`,
     errTotal: 'The proposal total must be greater than zero',
     errPopup: 'Your browser blocked the proposal window — allow pop-ups for invoices.kz and click again. This attempt was not counted.',
+    errUnavailable: 'The service is temporarily unavailable — try again in a minute. No proposal was created or counted.',
     generate: 'Create proposal — opens for printing and download',
-    remaining: (left, limit) => `${left} of ${limit} free proposals left today`,
-    limitTitle: limit => `You've used all ${limit} free proposals for today`,
+    remaining: (left, limit) => `${left} of ${limit} free proposals left this quarter`,
+    limitTitle: limit => `You've used all ${limit} free proposals for this quarter`,
+    limitReset: iso => `New free proposals unlock on ${quarterStartLabel('en', iso)}.`,
     limitBody:
       'In an invoices.kz account a proposal becomes an invoice in one click once the client agrees: your details are saved, numbering is automatic, and you can accept payment via Kaspi. Sign-up is free.',
     limitButton: 'Sign up for free',
@@ -321,6 +369,10 @@ export const kpDict: Record<ToolLang, KpDict> = {
       {
         q: 'The client agreed — what next?',
         a: 'Issue an invoice for payment, and once the work is done or the goods are shipped, a certificate of completed work (AVR) or a delivery note (form Z-2). You can create the invoice here for free.',
+      },
+      {
+        q: 'How many proposals can I create for free?',
+        a: 'Three per quarter from one connection (IP address), no sign-up. The counter resets on 1 January, 1 April, 1 July and 1 October. The client name is filled in from the BIN with the Find button. Need more? Sign up: in your account proposals are saved and turn into an invoice in one click.',
       },
     ],
   },

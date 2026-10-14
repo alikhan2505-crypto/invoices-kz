@@ -160,7 +160,7 @@ Click-to-WhatsApp click id, пишется только на первое соо
 
 `revoke_definer_rpc.sql` (12.10.2026) — SECURITY DEFINER функции закрыты от REST RPC (у anon был доступ через дефолтный грант PUBLIC); `is_admin_user` оставлена authenticated для RLS-политик.
 
-`tool_kontragent_checks.sql` (12.10.2026) — счётчик бесплатных проверок контрагента на /tools/kontragent (3/день на IP, ключ = sha256(ip|день)).
+`tool_kontragent_checks.sql` (12.10.2026) — счётчик бесплатных проверок контрагента на /tools/kontragent (с 14.10 — 3 в квартал на IP, ключ = sha256(ip|квартал)). С 14.10 в той же таблице без изменения схемы живут счётчики /tools/kp: `kp:`+sha256(kp|ip|квартал) — 3 КП в квартал (в дневной предохранитель реестров не входят) и `kp-lookup:`+sha256(kp-lookup|ip|квартал) — 6 живых поисков названия в квартал (входят). Код — src/lib/toolQuota.ts.
 
 `welcome_email_drips.sql` (12.10.2026) — welcome-цепочка: `email_drips` + `profiles.email_optout`; письма только новым аккаунтам (после 12.10), с suppression-проверкой и ссылкой отписки.
 

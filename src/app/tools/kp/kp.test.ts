@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { toolMetadata } from '@/lib/tools-i18n'
-import { kpDict } from './dict'
+import { kpDict, quarterStartLabel } from './dict'
 import { kpLines, kpRowProblem, kpTotal, kpVatIncluded, localIsoDate, ruDate } from './calc'
 
 describe('kp calc', () => {
@@ -64,5 +64,24 @@ describe('kp dictionary', () => {
     expect(kk).toMatch(/ҚҚС/)
     expect(kk).toMatch(/КҰ/)
     expect(kk).toMatch(/жүкқұжат/)
+  })
+
+  it('describes the limit per quarter, never per day, in every language', () => {
+    expect(kpDict.ru.remaining(2, 3)).toBe('Осталось 2 из 3 бесплатных КП в этом квартале')
+    expect(kpDict.kk.remaining(2, 3)).toMatch(/тоқсан/)
+    expect(kpDict.en.remaining(2, 3)).toMatch(/this quarter/)
+    for (const lang of ['ru', 'kk', 'en'] as const) {
+      const d = kpDict[lang]
+      const limitTexts = [d.seo.description, d.intro, d.remaining(1, 3), d.limitTitle(3), d.limitReset('2027-01-01')].join(' ')
+      expect(limitTexts).not.toMatch(/в день|сегодня|күніне|бүгін|a day|today/i)
+    }
+  })
+
+  it('names the quarter reset date in words', () => {
+    expect(quarterStartLabel('ru', '2027-01-01')).toBe('1 января')
+    expect(quarterStartLabel('kk', '2026-10-01')).toBe('1 қазанда')
+    expect(quarterStartLabel('en', '2027-04-01')).toBe('1 April')
+    expect(kpDict.ru.limitReset('2027-07-01')).toBe('Новые бесплатные КП откроются 1 июля.')
+    expect(quarterStartLabel('ru', 'garbage')).toBe('garbage')
   })
 })

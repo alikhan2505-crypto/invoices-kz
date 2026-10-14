@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import BrandWordmark from '@/components/BrandWordmark'
 import { track } from '@vercel/analytics'
@@ -12,17 +12,24 @@ import { kpDict } from './dict'
 import { kpLines, kpRowProblem, kpTotal, kpVatIncluded, localIsoDate, ruDate, type KpRow } from './calc'
 
 // Бесплатный генератор коммерческого предложения — близнец /tools/avr:
-// лимит 3 в день на браузер, черновик в localStorage, рендер — продуктовым
-// generateKP (окно с кнопкой «Скачать PDF»). Банк в КП намеренно не
-// спрашиваем: предложение обычно уходит без платёжных реквизитов, а для
-// оплаты есть генератор счёта.
+// черновик в localStorage, рендер — продуктовым generateKP (окно с кнопкой
+// «Скачать PDF»). Банк в КП намеренно не спрашиваем: предложение обычно уходит
+// без платёжных реквизитов, а для оплаты есть генератор счёта.
+//
+// Лимит — 3 КП на IP в квартал, считает СЕРВЕР (/api/tools/kp/quota, решение
+// основателя 14.10.2026; раньше было 3 в день в localStorage, который
+// очищается одной кнопкой). Название клиента по БИН ищется само
+// (/api/tools/kp/client-name): кэш реестров, затем живой реестр в пределах
+// своего квартального бюджета.
 //
 // Один компонент на /tools/kp, /tools/kk/kp и /tools/en/kp: язык интерфейса
 // приходит пропсом из page.tsx (из адреса). Сам документ печатается по-русски
 // на любом языке страницы — см. docs/tools-i18n-pattern.md.
-const LIMIT = 3
-const COUNT_KEY = 'tool-kp-count'
+const DEFAULT_LIMIT = 3
 const DRAFT_KEY = 'tool-kp-draft'
+
+type Quota = { remaining: number; limit: number; resetsAt: string }
+type Lookup = 'idle' | 'loading' | 'found' | 'miss' | 'limit' | 'unavailable'
 
 type Form = {
   companyName: string; binIin: string; address: string; director: string; phone: string
@@ -44,17 +51,10 @@ const EMPTY: Form = {
   rows: [{ name: '', qty: '1', price: '' }],
 }
 
-function readCount(): number {
-  try {
-    const raw = JSON.parse(localStorage.getItem(COUNT_KEY) || 'null')
-    return raw && raw.d === localIsoDate() ? Number(raw.n) || 0 : 0
-  } catch { return 0 }
-}
-
-function bumpCount(): number {
-  const n = readCount() + 1
-  try { localStorage.setItem(COUNT_KEY, JSON.stringify({ d: localIsoDate(), n })) } catch {}
-  return n
+function parseQuota(data: unknown): Quota | null {
+  const d = data as Partial<Quota> | null
+  if (!d || typeof d.remaining !== 'number' || typeof d.resetsAt !== 'string') return null
+  return { remaining: d.remaining, limit: typeof d.limit === 'number' ? d.limit : DEFAULT_LIMIT, resetsAt: d.resetsAt }
 }
 
 const digits = (s: string) => s.replace(/\D/g, '')
@@ -65,11 +65,28 @@ export default function KpTool({ lang }: { lang: ToolLang }) {
   const { setLang } = useLanguage()
   const [f, setF] = useState<Form>(EMPTY)
   const [ready, setReady] = useState(false)
-  const [used, setUsed] = useState(0)
+  // null — квота ещё не пришла (или сервер не ответил): подсказку не рисуем,
+  // а кнопка всё равно спросит сервер при нажатии.
+  const [quota, setQuota] = useState<Quota | null>(null)
+  const [generating, setGenerating] = useState(false)
+  // Последний набранный БИН: ответ на устаревший БИН (пользователь уже
+  // поменял поле) не должен перезаписать название.
+  const latestBin = useRef('')
+  // БИН, по которым в этой вкладке уже ничего не нашли: автопоиск их повторно
+  // не шлёт (стёр цифру и набрал снова — не тратим живой бюджет 6/квартал).
+  // Ручная «Найти» спрашивает сервер всегда.
   const [error, setError] = useState('')
 
   useEffect(() => {
-    setUsed(readCount())
+    let cancelled = false
+    fetch('/api/tools/kp/quota', { cache: 'no-store' })
+      .then(res => (res.ok ? res.json() : null))
+      .then(data => { if (!cancelled) setQuota(parseQuota(data)) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
+
+  useEffect(() => {
     const today = localIsoDate()
     let next: Form = { ...EMPTY, date: today }
     try {
@@ -82,6 +99,7 @@ export default function KpTool({ lang }: { lang: ToolLang }) {
         if (next.validUntil && next.validUntil < next.date) next.validUntil = ''
       }
     } catch {}
+    latestBin.current = next.clientBin
     setF(next)
     setReady(true)
   }, [])
@@ -92,30 +110,47 @@ export default function KpTool({ lang }: { lang: ToolLang }) {
 
   const set = (patch: Partial<Form>) => setF(prev => ({ ...prev, ...patch }))
 
-  // Название клиента по БИН — из накопленного кэша реестров, как в
-  // /tools/schet (правка основателя 14.10): bin-cache не тратит квоту КГД и не
-  // трогает лимит проверок контрагента, поэтому кнопка бесплатная.
-  const [binLookup, setBinLookup] = useState<'idle' | 'loading' | 'found' | 'miss'>('idle')
-  const lookupClient = async () => {
-    if (binLookup === 'loading') return
+  // Название клиента по БИН — ТОЛЬКО по кнопке «Найти» (решение основателя
+  // 14.10.2026: без автоподбора — нажал, значит уверен в цифрах). Кнопка
+  // активна при ровно 12 цифрах. Сервер отдаёт только название: сначала кэш
+  // реестров (бесплатно), затем живой реестр — не больше 3 раз на IP в квартал.
+  const [binLookup, setBinLookup] = useState<Lookup>('idle')
+  const lookupClient = async (bin: string) => {
+    if (bin.length !== 12) return
     setBinLookup('loading')
     track('tool_kp_bin_lookup', { lang })
+    let next: Lookup = 'unavailable'
+    let name: string | null = null
     try {
-      const res = await fetch('/api/tools/bin-cache', {
+      const res = await fetch('/api/tools/kp/client-name', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bin: f.clientBin }),
+        body: JSON.stringify({ bin }),
       })
       const data = await res.json().catch(() => ({}))
-      if (res.ok && data?.found && typeof data.name === 'string') {
-        setF(prev => ({ ...prev, clientName: data.name }))
-        setBinLookup('found')
-      } else {
-        setBinLookup('miss')
+      if (res.ok && data?.found && typeof data.name === 'string' && data.name.trim()) {
+        name = data.name.trim()
+        next = 'found'
+      } else if (res.ok && data?.reason === 'not_found') {
+        next = 'miss'
+      } else if (res.ok && data?.reason === 'limit') {
+        next = 'limit'
       }
-    } catch {
-      setBinLookup('miss')
+    } catch {}
+    if (latestBin.current !== bin) return
+    if (name) {
+      const found = name
+      setF(prev => ({ ...prev, clientName: found }))
     }
+    setBinLookup(next)
+  }
+  const onClientBinChange = (raw: string) => {
+    const bin = digits(raw).slice(0, 12)
+    const changed = bin !== latestBin.current
+    latestBin.current = bin
+    set({ clientBin: bin })
+    if (!changed) return
+    setBinLookup('idle')
   }
   const setRow = (i: number, patch: Partial<KpRow>) =>
     setF(prev => ({ ...prev, rows: prev.rows.map((r, j) => (j === i ? { ...r, ...patch } : r)) }))
@@ -123,7 +158,7 @@ export default function KpTool({ lang }: { lang: ToolLang }) {
   // Итог считается ровно по тем строкам, что попадут в документ (calc.ts).
   const total = useMemo(() => kpTotal(f.rows), [f.rows])
 
-  const limitReached = used >= LIMIT
+  const limitReached = quota !== null && quota.remaining <= 0
 
   const validate = (): string => {
     if (!f.companyName.trim()) return t.errCompany
@@ -139,7 +174,7 @@ export default function KpTool({ lang }: { lang: ToolLang }) {
   }
 
   const generate = async () => {
-    if (limitReached) return
+    if (limitReached || generating) return
     const problem = validate()
     setError(problem)
     if (problem) return
@@ -153,29 +188,61 @@ export default function KpTool({ lang }: { lang: ToolLang }) {
       track('tool_kp_popup_blocked', { lang })
       return
     }
+    setGenerating(true)
+    // Заглушку закрываем (document.close): иначе поток документа остаётся
+    // открытым, и generateKP дописал бы КП ПОСЛЕ «…» — заглушка попала бы
+    // в начало КП и в PDF. После close следующий write начинает документ заново.
+    try {
+      win.document.write('<!doctype html><meta charset="utf-8"><p style="font:14px system-ui,sans-serif;padding:24px;color:#555">…</p>')
+      win.document.close()
+    } catch {}
+    // Списываем КП на сервере ДО генерации: лимит 3 в квартал на IP держит
+    // только сервер. Отказ — закрываем пустое окно и показываем карточку лимита.
+    let claimed: Quota | null = null
+    let status = 0
+    try {
+      const res = await fetch('/api/tools/kp/quota', { method: 'POST', cache: 'no-store' })
+      status = res.status
+      const data = await res.json().catch(() => null)
+      if (res.ok) claimed = parseQuota(data)
+      else if (res.status === 429) setQuota(parseQuota(data) ?? { remaining: 0, limit: DEFAULT_LIMIT, resetsAt: quota?.resetsAt ?? '' })
+    } catch {}
+    if (!claimed) {
+      try { win.close() } catch {}
+      setGenerating(false)
+      if (status === 429) {
+        track('tool_kp_limit', { lang })
+      } else {
+        setError(t.errUnavailable)
+      }
+      return
+    }
+    setQuota(claimed)
     track('tool_kp_generate', { lang, vat: f.vatType })
-    await generateKP({
-      showWatermark: true,
-      number: f.number.trim() || '1',
-      date: ruDate(f.date || localIsoDate()),
-      validUntil: f.validUntil ? ruDate(f.validUntil) : undefined,
-      clientName: f.clientName.trim(),
-      clientBin: digits(f.clientBin) || undefined,
-      note: f.note.trim() || undefined,
-      services: kpLines(f.rows),
-      total,
-      vatType: f.vatType,
-      profile: {
-        company_name: f.companyName.trim(),
-        bin_iin: digits(f.binIin),
-        address: f.address.trim(),
-        phone: f.phone.trim() || undefined,
-        director_name: f.director.trim() || undefined,
-      },
-    }, win)
-    const n = bumpCount()
-    setUsed(n)
-    if (n >= LIMIT) track('tool_kp_limit', { lang })
+    try {
+      await generateKP({
+        showWatermark: true,
+        number: f.number.trim() || '1',
+        date: ruDate(f.date || localIsoDate()),
+        validUntil: f.validUntil ? ruDate(f.validUntil) : undefined,
+        clientName: f.clientName.trim(),
+        clientBin: digits(f.clientBin) || undefined,
+        note: f.note.trim() || undefined,
+        services: kpLines(f.rows),
+        total,
+        vatType: f.vatType,
+        profile: {
+          company_name: f.companyName.trim(),
+          bin_iin: digits(f.binIin),
+          address: f.address.trim(),
+          phone: f.phone.trim() || undefined,
+          director_name: f.director.trim() || undefined,
+        },
+      }, win)
+    } finally {
+      setGenerating(false)
+    }
+    if (claimed.remaining <= 0) track('tool_kp_limit', { lang })
   }
 
   const input = 'w-full min-w-0 rounded-xl px-3 py-2.5 text-sm outline-none'
@@ -241,8 +308,8 @@ export default function KpTool({ lang }: { lang: ToolLang }) {
               <label htmlFor="kp-client-bin" className={label} style={labelStyle}>{t.clientBinLabel}</label>
               <div className="flex gap-2">
                 <input id="kp-client-bin" className={input} style={inputStyle} inputMode="numeric" autoComplete="off" placeholder={t.binPlaceholder} value={f.clientBin}
-                  onChange={e => { set({ clientBin: digits(e.target.value).slice(0, 12) }); setBinLookup('idle') }} />
-                <button type="button" onClick={lookupClient} disabled={f.clientBin.length !== 12 || binLookup === 'loading'}
+                  onChange={e => onClientBinChange(e.target.value)} />
+                <button type="button" onClick={() => void lookupClient(f.clientBin)} disabled={f.clientBin.length !== 12 || binLookup === 'loading'}
                   aria-label={t.lookupAria}
                   className="nav-glass rounded-xl px-3 text-[13px] font-semibold flex-shrink-0 disabled:opacity-50"
                   style={{ color: 'var(--nav-accent)' }}>
@@ -250,8 +317,11 @@ export default function KpTool({ lang }: { lang: ToolLang }) {
                 </button>
               </div>
               <div aria-live="polite">
+                {binLookup === 'loading' && <div className="text-[11px] mt-1" style={hintStyle}>{t.lookupLoading}</div>}
                 {binLookup === 'found' && <div className="text-[11px] mt-1" style={{ color: 'var(--nav-success)' }}>{t.lookupFound}</div>}
                 {binLookup === 'miss' && <div className="text-[11px] mt-1" style={hintStyle}>{t.lookupMiss}</div>}
+                {binLookup === 'limit' && <div className="text-[11px] mt-1" style={hintStyle}>{t.lookupLimit}</div>}
+                {binLookup === 'unavailable' && <div className="text-[11px] mt-1" style={hintStyle}>{t.lookupUnavailable}</div>}
               </div>
             </div>
             <div>
@@ -324,10 +394,10 @@ export default function KpTool({ lang }: { lang: ToolLang }) {
         {limitReached ? (
           <div className="nav-glass nav-card-accent rounded-2xl p-6 mb-4">
             <div className="text-base font-bold mb-1.5" style={{ color: 'var(--nav-text-primary)' }}>
-              {t.limitTitle(LIMIT)}
+              {t.limitTitle(quota?.limit ?? DEFAULT_LIMIT)}
             </div>
             <p className="text-sm mb-4" style={{ color: 'var(--nav-text-secondary)' }}>
-              {t.limitBody}
+              {quota?.resetsAt ? `${t.limitReset(quota.resetsAt)} ` : ''}{t.limitBody}
             </p>
             <a href="/login?utm_source=tools&utm_medium=limit&utm_campaign=kp"
               onClick={() => { setLang(lang); track('tool_kp_signup_click', { lang }) }}
@@ -338,14 +408,16 @@ export default function KpTool({ lang }: { lang: ToolLang }) {
           </div>
         ) : (
           <div className="mb-4">
-            <button type="button" onClick={generate}
-              className="w-full sm:w-auto rounded-xl px-8 py-3.5 text-sm font-semibold transition-transform hover:-translate-y-0.5"
+            <button type="button" onClick={generate} disabled={generating} aria-busy={generating}
+              className="w-full sm:w-auto rounded-xl px-8 py-3.5 text-sm font-semibold transition-transform hover:-translate-y-0.5 disabled:opacity-60 disabled:hover:translate-y-0"
               style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
               {t.generate}
             </button>
-            <div className="text-[11px] mt-2" style={hintStyle}>
-              {t.remaining(LIMIT - used, LIMIT)}
-            </div>
+            {quota && (
+              <div className="text-[11px] mt-2" style={hintStyle}>
+                {t.remaining(quota.remaining, quota.limit)}
+              </div>
+            )}
           </div>
         )}
 

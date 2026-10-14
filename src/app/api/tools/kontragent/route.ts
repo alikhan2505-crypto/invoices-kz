@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { createHash } from 'crypto'
 import { isValidBin, normalizeBin } from '@/lib/binLookup'
 import { performBinLookup } from '@/lib/binLookupServer'
+import { almatyQuarter, clientIp, readCounter, registryLoadToday, REGISTRY_DAILY_GLOBAL, sha256Hex, writeCounter } from '@/lib/toolQuota'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -15,50 +15,31 @@ const supabase = createClient(
 // дневной предохранитель, чтобы страница не выжгла квоту КГД (40 запросов в
 // минуту на токен) и ключ egov.
 const QUARTER_PER_IP = 3
-const DAILY_GLOBAL = 300
-
-// День считаем по Казахстану (единый UTC+5 по всей стране), чтобы «3 в день»
-// обнулялось в местную полночь, а не в 06:00 утра.
-function almatyDay(): string {
-  return new Date(Date.now() + 5 * 3600_000).toISOString().slice(0, 10)
-}
-
-// Квартал по Алматы: '2026-Q4'. Счётчик на IP живёт весь квартал.
-function almatyQuarter(now = Date.now()): string {
-  const d = new Date(now + 5 * 3600_000)
-  return `${d.getUTCFullYear()}-Q${Math.floor(d.getUTCMonth() / 3) + 1}`
-}
+// Общий дневной предохранитель (REGISTRY_DAILY_GLOBAL) делится с живым
+// поиском названия клиента в /tools/kp — оба тратят одну квоту реестров.
+// Квартал/день по Алматы и чтение счётчика — в src/lib/toolQuota.ts.
 
 export async function POST(req: NextRequest) {
   // Сырой IP в базу не пишем — только хэш с кварталом, этого достаточно для лимита.
   // Колонка day у строки = день последней проверки (для дневного предохранителя:
   // он чуть завышает счёт, это безопасная сторона).
-  const ip = (req.headers.get('x-forwarded-for') || '').split(',')[0].trim() || 'unknown'
-  const day = almatyDay()
-  const key = createHash('sha256').update(`${ip}|${almatyQuarter()}`).digest('hex')
+  const ip = clientIp(req.headers)
+  // Формат ключа прежний — sha256('ip|квартал'), чтобы смена кода не обнулила
+  // уже накопленные за квартал счётчики. Ключи КП живут в своём пространстве имён.
+  const key = sha256Hex(`${ip}|${almatyQuarter()}`)
 
-  const { data: row, error: readError } = await supabase
-    .from('tool_kontragent_checks')
-    .select('count')
-    .eq('key', key)
-    .maybeSingle()
+  const counter = await readCounter(supabase, key)
   // Если счётчик не читается, честнее отказать, чем раздавать без лимита:
   // лимит — продуктовое решение, а не только защита квоты.
-  if (readError) {
-    console.error('tools/kontragent: counter read failed:', readError.message)
+  if (!counter.ok) {
     return NextResponse.json({ error: 'Сервис временно недоступен, попробуйте позже' }, { status: 503 })
   }
-  const used = row?.count ?? 0
+  const used = counter.used
   if (used >= QUARTER_PER_IP) {
     return NextResponse.json({ error: 'limit', remaining: 0 }, { status: 429 })
   }
 
-  const { data: dayRows } = await supabase
-    .from('tool_kontragent_checks')
-    .select('count')
-    .eq('day', day)
-  const totalToday = (dayRows ?? []).reduce((sum, r) => sum + (r.count || 0), 0)
-  if (totalToday >= DAILY_GLOBAL) {
+  if ((await registryLoadToday(supabase)) >= REGISTRY_DAILY_GLOBAL) {
     return NextResponse.json({ error: 'busy' }, { status: 429 })
   }
 
@@ -73,10 +54,7 @@ export async function POST(req: NextRequest) {
   // Попытка списывается и за «не найдено»: реестры мы уже спросили. Ошибки
   // валидации выше не считаются. Гонка двух одновременных запросов может
   // недосчитать единицу — на этом масштабе безвредно.
-  const { error: cntError } = await supabase
-    .from('tool_kontragent_checks')
-    .upsert({ key, day, count: used + 1 })
-  if (cntError) console.error('tools/kontragent: counter write failed:', cntError.message)
+  await writeCounter(supabase, key, used + 1)
   const remaining = Math.max(0, QUARTER_PER_IP - used - 1)
 
   if (!result.found) return NextResponse.json({ found: false, remaining })

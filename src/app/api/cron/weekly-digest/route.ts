@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { sendTelegramNotification } from '@/lib/telegramNotify'
+import { KP_CLAIM_PREFIX, KP_LOOKUP_PREFIX } from '@/lib/toolQuota'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -50,7 +51,10 @@ export async function GET(request: Request) {
 
   let kontragentChecks: number | null = null
   try {
+    // С 14.10 в той же таблице живут счётчики /tools/kp (kp:, kp-lookup:) —
+    // в «проверки контрагента» их не считаем.
     const { data, error } = await supabase.from('tool_kontragent_checks').select('count').gte('day', sinceDay)
+      .not('key', 'like', `${KP_CLAIM_PREFIX}%`).not('key', 'like', `${KP_LOOKUP_PREFIX}%`)
     kontragentChecks = error ? null : (data ?? []).reduce((s, r) => s + (Number(r.count) || 0), 0)
   } catch { /* н/д */ }
 
