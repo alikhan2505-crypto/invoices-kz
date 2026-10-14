@@ -33,9 +33,10 @@ type Quota = { remaining: number; limit: number; resetsAt: string }
 type Lookup = 'idle' | 'loading' | 'found' | 'miss' | 'limit' | 'unavailable'
 
 type Form = {
-  companyName: string; binIin: string; address: string; director: string; phone: string
+  companyName: string; binIin: string; address: string; director: string; phone: string; email: string
   clientName: string
   clientBin: string
+  clientAddress: string; clientPhone: string; clientEmail: string
   number: string; date: string; validUntil: string; note: string
   vatType: 'no_vat' | 'vat_16' | 'vat_0'
   rows: KpRow[]
@@ -45,8 +46,8 @@ type Form = {
 // (Алматы, UTC+5) до пяти утра — разные дни, и поле расходилось бы при
 // гидрации. Ставим её в эффекте по часам посетителя.
 const EMPTY: Form = {
-  companyName: '', binIin: '', address: '', director: '', phone: '',
-  clientName: '', clientBin: '',
+  companyName: '', binIin: '', address: '', director: '', phone: '', email: '',
+  clientName: '', clientBin: '', clientAddress: '', clientPhone: '', clientEmail: '',
   number: '1', date: '', validUntil: '', note: '',
   vatType: 'no_vat',
   rows: [{ name: '', qty: '1', unit: KP_DEFAULT_UNIT, price: '' }],
@@ -228,6 +229,9 @@ export default function KpTool({ lang }: { lang: ToolLang }) {
         validUntil: f.validUntil ? ruDate(f.validUntil) : undefined,
         clientName: f.clientName.trim(),
         clientBin: digits(f.clientBin) || undefined,
+      clientAddress: f.clientAddress.trim() || undefined,
+      clientPhone: f.clientPhone.trim() || undefined,
+      clientEmail: f.clientEmail.trim() || undefined,
         note: f.note.trim() || undefined,
         services: kpLines(f.rows),
         total,
@@ -237,6 +241,7 @@ export default function KpTool({ lang }: { lang: ToolLang }) {
           bin_iin: digits(f.binIin),
           address: f.address.trim(),
           phone: f.phone.trim() || undefined,
+          email: f.email.trim() || undefined,
           director_name: f.director.trim() || undefined,
         },
       }, win)
@@ -299,6 +304,10 @@ export default function KpTool({ lang }: { lang: ToolLang }) {
               <label htmlFor="kp-address" className={label} style={labelStyle}>{t.addressLabel}</label>
               <input id="kp-address" className={input} style={inputStyle} autoComplete="street-address" value={f.address} onChange={e => set({ address: e.target.value })} />
             </div>
+            <div>
+              <label htmlFor="kp-email" className={label} style={labelStyle}>{t.emailLabel}</label>
+              <input id="kp-email" type="email" className={input} style={inputStyle} autoComplete="email" value={f.email} onChange={e => set({ email: e.target.value })} />
+            </div>
           </div>
         </div>
 
@@ -328,6 +337,21 @@ export default function KpTool({ lang }: { lang: ToolLang }) {
             <div>
               <label htmlFor="kp-client" className={label} style={labelStyle}>{t.clientLabel}</label>
               <input id="kp-client" className={input} style={inputStyle} autoComplete="off" placeholder={t.clientPlaceholder} value={f.clientName} onChange={e => set({ clientName: e.target.value })} />
+            </div>
+          </div>
+          {/* Адрес, телефон и email покупателя — как у поставщика (правка основателя 14.10). */}
+          <div className="grid sm:grid-cols-3 gap-3 mb-3">
+            <div>
+              <label htmlFor="kp-client-address" className={label} style={labelStyle}>{t.clientAddressLabel}</label>
+              <input id="kp-client-address" className={input} style={inputStyle} autoComplete="off" value={f.clientAddress} onChange={e => set({ clientAddress: e.target.value })} />
+            </div>
+            <div>
+              <label htmlFor="kp-client-phone" className={label} style={labelStyle}>{t.clientPhoneLabel}</label>
+              <input id="kp-client-phone" type="tel" className={input} style={inputStyle} autoComplete="off" value={f.clientPhone} onChange={e => set({ clientPhone: e.target.value })} />
+            </div>
+            <div>
+              <label htmlFor="kp-client-email" className={label} style={labelStyle}>{t.clientEmailLabel}</label>
+              <input id="kp-client-email" type="email" className={input} style={inputStyle} autoComplete="off" value={f.clientEmail} onChange={e => set({ clientEmail: e.target.value })} />
             </div>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">

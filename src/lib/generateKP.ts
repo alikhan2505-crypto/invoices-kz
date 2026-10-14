@@ -15,6 +15,9 @@ export interface KPData {
   validUntil?: string
   clientName: string
   clientBin?: string
+  clientAddress?: string
+  clientPhone?: string
+  clientEmail?: string
   services: KPService[]
   total: number
   note?: string
@@ -187,6 +190,8 @@ export function buildKPHtml(data: KPData, images: KPImages = {}): string {
           color: #1a1a1a;
           width: 794px;
           min-height: 1123px;
+          display: flex;
+          flex-direction: column;
           margin: 20px auto;
           background: white;
           box-shadow: 0 0 20px rgba(0,0,0,0.3);
@@ -205,7 +210,7 @@ export function buildKPHtml(data: KPData, images: KPImages = {}): string {
         .header-right .kp-number { font-size: 22px; font-weight: bold; color: white; }
         .header-right .kp-date { font-size: 10px; color: rgba(255,255,255,0.6); margin-top: 4px; }
         .accent-bar { background: #2DC48D; height: 6px; }
-        .content { padding: 30px 40px; }
+        .content { padding: 30px 40px; flex: 1 0 auto; }
         .title-block { margin-bottom: 24px; padding-bottom: 20px; border-bottom: 2px solid #f0f0f0; }
         .title-block h1 { font-size: 18px; color: #1C2056; margin-bottom: 6px; }
         .title-block .subtitle { font-size: 11px; color: #666; }
@@ -280,8 +285,12 @@ export function buildKPHtml(data: KPData, images: KPImages = {}): string {
           border-top: 1px solid #e0e0e0;
         }
         .sig-left { width: 45%; }
-        .sig-label { font-size: 10px; color: #888; margin-bottom: 40px; }
-        .sig-line { position: relative; min-height: 60px; border-bottom: 1px solid #333; }
+        /* Подпись — сразу под заголовком (правка основателя 14.10: строка и ФИО
+           были далеко от «Руководитель / Представитель»). Место под картинку
+           подписи/печати — только когда она есть. */
+        .sig-label { font-size: 10px; color: #888; margin-bottom: 6px; }
+        .sig-line { position: relative; min-height: 28px; border-bottom: 1px solid #333; }
+        .sig-line.has-img { min-height: 56px; }
         .sig-name { font-size: 10px; color: #333; padding-top: 4px; }
         .footer {
           background: #1C2056;
@@ -296,7 +305,8 @@ export function buildKPHtml(data: KPData, images: KPImages = {}): string {
         @media print {
           .toolbar { display: none !important; }
           html { background: white; }
-          body { margin: 0; box-shadow: none; }
+          /* A4 по высоте минус поля печати: футер внизу листа, без лишней страницы. */
+          body { margin: 0; box-shadow: none; min-height: 277mm; }
         }
       ${watermarkCss(data.showWatermark)}
 </style>
@@ -352,16 +362,19 @@ export function buildKPHtml(data: KPData, images: KPImages = {}): string {
             <div class="party-label">Поставщик</div>
             <div class="party-name">${companyName}</div>
             <div class="party-detail">
-              БИН: ${binIin}<br>
-              ${address}<br>
-              ${phone ? 'Тел: ' + phone : ''}
+              ${[binIin ? 'БИН: ' + binIin : '', address, phone ? 'Тел: ' + phone : '', email ? 'Email: ' + email : ''].filter(Boolean).join('<br>')}
             </div>
           </div>
           <div class="party client">
             <div class="party-label">Покупатель</div>
             <div class="party-name">${escapeHtml(data.clientName)}</div>
             <div class="party-detail">
-              ${data.clientBin ? 'БИН/ИИН: ' + escapeHtml(data.clientBin) : ''}
+              ${[
+                data.clientBin ? 'БИН: ' + escapeHtml(data.clientBin) : '',
+                escapeHtml(data.clientAddress || ''),
+                data.clientPhone ? 'Тел: ' + escapeHtml(data.clientPhone) : '',
+                data.clientEmail ? 'Email: ' + escapeHtml(data.clientEmail) : '',
+              ].filter(Boolean).join('<br>')}
             </div>
           </div>
         </div>
@@ -431,7 +444,7 @@ export function buildKPHtml(data: KPData, images: KPImages = {}): string {
         <div class="signature-block">
           <div class="sig-left">
             <div class="sig-label">Руководитель / Представитель</div>
-            <div class="sig-line">
+            <div class="sig-line${signatureBase64 || stampBase64 ? ' has-img' : ''}">
               ${signatureBase64 ? `<img src="${signatureBase64}" style="position:absolute; bottom:8px; left:10px; height:45px; max-width:150px; object-fit:contain;">` : ''}
               ${stampBase64 ? `<img src="${stampBase64}" style="position:absolute; bottom:-10px; left:60px; height:90px; width:90px; object-fit:contain; opacity:0.85;">` : ''}
             </div>

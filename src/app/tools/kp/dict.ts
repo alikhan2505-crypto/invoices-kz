@@ -34,6 +34,10 @@ export interface KpDict {
   directorLabel: string
   directorPlaceholder: string
   addressLabel: string
+  emailLabel: string
+  clientAddressLabel: string
+  clientPhoneLabel: string
+  clientEmailLabel: string
   offerTitle: string
   clientLabel: string
   clientPlaceholder: string
@@ -116,6 +120,10 @@ export const kpDict: Record<ToolLang, KpDict> = {
     directorLabel: 'Руководитель',
     directorPlaceholder: 'для строки подписи',
     addressLabel: 'Адрес',
+    emailLabel: 'Email',
+    clientAddressLabel: 'Адрес покупателя',
+    clientPhoneLabel: 'Телефон покупателя',
+    clientEmailLabel: 'Email покупателя',
     offerTitle: 'Предложение',
     clientLabel: 'Кому *',
     clientPlaceholder: 'ТОО «Клиент»',
@@ -211,6 +219,10 @@ export const kpDict: Record<ToolLang, KpDict> = {
     directorLabel: 'Басшы',
     directorPlaceholder: 'қол қою жолы үшін',
     addressLabel: 'Мекенжай',
+    emailLabel: 'Email',
+    clientAddressLabel: 'Сатып алушының мекенжайы',
+    clientPhoneLabel: 'Сатып алушының телефоны',
+    clientEmailLabel: 'Сатып алушының email-і',
     offerTitle: 'Ұсыныс',
     clientLabel: 'Кімге *',
     clientPlaceholder: '«Клиент» ЖШС',
@@ -306,6 +318,10 @@ export const kpDict: Record<ToolLang, KpDict> = {
     directorLabel: 'Director',
     directorPlaceholder: 'for the signature line',
     addressLabel: 'Address',
+    emailLabel: 'Email',
+    clientAddressLabel: 'Buyer address',
+    clientPhoneLabel: 'Buyer phone',
+    clientEmailLabel: 'Buyer email',
     offerTitle: 'Proposal',
     clientLabel: 'To (client) *',
     clientPlaceholder: 'e.g. ТОО «Client»',
