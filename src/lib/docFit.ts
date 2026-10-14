@@ -4,10 +4,12 @@
 // применяют ненадёжно, поэтому масштаб ставим скриптом через CSS zoom.
 // Панель с кнопками компенсируется обратным zoom и остаётся обычного размера.
 // Перед «Скачать PDF» масштаб снимается (html2canvas снимает лист 1:1), при
-// печати — тоже (правило @media print ниже).
+// печати — тоже (правило @media print ниже). На время скачивания у листа
+// убираются экранные поля и тень (класс ikz-pdf): html2pdf снимает body вместе
+// с margin, и эти 20–40px сверху и снизу выталкивали футер на вторую страницу.
 export function docFitScript(docWidthPx: number): string {
   return `
-<style>.toolbar button { white-space: nowrap; } @media print { body { zoom: 1 !important; } .toolbar { zoom: 1 !important; } }</style>
+<style>.toolbar button { white-space: nowrap; } @media print { body { zoom: 1 !important; } .toolbar { zoom: 1 !important; } } body.ikz-pdf { margin: 0 !important; box-shadow: none !important; }</style>
 <script>
 (function () {
   var W = ${Math.round(docWidthPx)} + 8;
@@ -31,8 +33,9 @@ export function docFitScript(docWidthPx: number): string {
       if (title) title.style.display = s < 1 && vw < 480 ? 'none' : '';
     }
   }
-  window.__ikzFit = fit;
+  window.__ikzFit = function () { document.body.classList.remove('ikz-pdf'); fit(); };
   window.__ikzUnfit = function () {
+    document.body.classList.add('ikz-pdf');
     document.body.style.zoom = '';
     var tb = document.querySelector('.toolbar');
     if (tb) { tb.style.zoom = ''; if (tb.nextElementSibling) tb.nextElementSibling.style.zoom = ''; }

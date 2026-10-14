@@ -309,6 +309,9 @@ export function buildKPHtml(data: KPData, images: KPImages = {}): string {
           /* A4 по высоте минус поля печати: футер внизу листа, без лишней страницы. */
           body { margin: 0; box-shadow: none; min-height: 277mm; }
         }
+        /* Скачивание PDF: лист чуть ниже A4 (1122,5px) — ровно 1123px давали
+           полпикселя на вторую страницу. */
+        body.ikz-pdf { min-height: 1118px; }
       ${watermarkCss(data.showWatermark)}
 </style>
     </head>
