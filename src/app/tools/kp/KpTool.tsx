@@ -27,6 +27,7 @@ const DRAFT_KEY = 'tool-kp-draft'
 type Form = {
   companyName: string; binIin: string; address: string; director: string; phone: string
   clientName: string
+  clientBin: string
   number: string; date: string; validUntil: string; note: string
   vatType: 'no_vat' | 'vat_16' | 'vat_0'
   rows: KpRow[]
@@ -37,7 +38,7 @@ type Form = {
 // гидрации. Ставим её в эффекте по часам посетителя.
 const EMPTY: Form = {
   companyName: '', binIin: '', address: '', director: '', phone: '',
-  clientName: '',
+  clientName: '', clientBin: '',
   number: '1', date: '', validUntil: '', note: '',
   vatType: 'no_vat',
   rows: [{ name: '', qty: '1', price: '' }],
@@ -90,6 +91,32 @@ export default function KpTool({ lang }: { lang: ToolLang }) {
   }, [f, ready])
 
   const set = (patch: Partial<Form>) => setF(prev => ({ ...prev, ...patch }))
+
+  // Название клиента по БИН — из накопленного кэша реестров, как в
+  // /tools/schet (правка основателя 14.10): bin-cache не тратит квоту КГД и не
+  // трогает лимит проверок контрагента, поэтому кнопка бесплатная.
+  const [binLookup, setBinLookup] = useState<'idle' | 'loading' | 'found' | 'miss'>('idle')
+  const lookupClient = async () => {
+    if (binLookup === 'loading') return
+    setBinLookup('loading')
+    track('tool_kp_bin_lookup', { lang })
+    try {
+      const res = await fetch('/api/tools/bin-cache', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bin: f.clientBin }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok && data?.found && typeof data.name === 'string') {
+        setF(prev => ({ ...prev, clientName: data.name }))
+        setBinLookup('found')
+      } else {
+        setBinLookup('miss')
+      }
+    } catch {
+      setBinLookup('miss')
+    }
+  }
   const setRow = (i: number, patch: Partial<KpRow>) =>
     setF(prev => ({ ...prev, rows: prev.rows.map((r, j) => (j === i ? { ...r, ...patch } : r)) }))
 
@@ -101,6 +128,7 @@ export default function KpTool({ lang }: { lang: ToolLang }) {
   const validate = (): string => {
     if (!f.companyName.trim()) return t.errCompany
     if (digits(f.binIin).length !== 12) return t.errBin
+    if (f.clientBin && digits(f.clientBin).length !== 12) return t.errClientBin
     if (!f.clientName.trim()) return t.errClient
     const rowProblem = kpRowProblem(f.rows)
     if (rowProblem?.kind === 'noRows') return t.errNoRows
@@ -132,6 +160,7 @@ export default function KpTool({ lang }: { lang: ToolLang }) {
       date: ruDate(f.date || localIsoDate()),
       validUntil: f.validUntil ? ruDate(f.validUntil) : undefined,
       clientName: f.clientName.trim(),
+      clientBin: digits(f.clientBin) || undefined,
       note: f.note.trim() || undefined,
       services: kpLines(f.rows),
       total,
@@ -207,11 +236,30 @@ export default function KpTool({ lang }: { lang: ToolLang }) {
 
         <div className="nav-glass rounded-2xl p-5 mb-4">
           <h2 className="text-sm font-bold mb-3" style={{ color: 'var(--nav-text-primary)' }}>{t.offerTitle}</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-            <div className="col-span-2 sm:col-span-1">
+          <div className="grid sm:grid-cols-2 gap-3 mb-3">
+            <div>
+              <label htmlFor="kp-client-bin" className={label} style={labelStyle}>{t.clientBinLabel}</label>
+              <div className="flex gap-2">
+                <input id="kp-client-bin" className={input} style={inputStyle} inputMode="numeric" autoComplete="off" placeholder={t.binPlaceholder} value={f.clientBin}
+                  onChange={e => { set({ clientBin: digits(e.target.value).slice(0, 12) }); setBinLookup('idle') }} />
+                <button type="button" onClick={lookupClient} disabled={f.clientBin.length !== 12 || binLookup === 'loading'}
+                  aria-label={t.lookupAria}
+                  className="nav-glass rounded-xl px-3 text-[13px] font-semibold flex-shrink-0 disabled:opacity-50"
+                  style={{ color: 'var(--nav-accent)' }}>
+                  {binLookup === 'loading' ? '…' : t.lookupButton}
+                </button>
+              </div>
+              <div aria-live="polite">
+                {binLookup === 'found' && <div className="text-[11px] mt-1" style={{ color: 'var(--nav-success)' }}>{t.lookupFound}</div>}
+                {binLookup === 'miss' && <div className="text-[11px] mt-1" style={hintStyle}>{t.lookupMiss}</div>}
+              </div>
+            </div>
+            <div>
               <label htmlFor="kp-client" className={label} style={labelStyle}>{t.clientLabel}</label>
               <input id="kp-client" className={input} style={inputStyle} autoComplete="off" placeholder={t.clientPlaceholder} value={f.clientName} onChange={e => set({ clientName: e.target.value })} />
             </div>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
             <div>
               <label htmlFor="kp-number" className={label} style={labelStyle}>{t.numberLabel}</label>
               <input id="kp-number" className={input} style={inputStyle} autoComplete="off" value={f.number} onChange={e => set({ number: e.target.value })} />

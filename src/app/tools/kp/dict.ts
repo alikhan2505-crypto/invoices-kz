@@ -23,6 +23,13 @@ export interface KpDict {
   offerTitle: string
   clientLabel: string
   clientPlaceholder: string
+  /** БИН клиента необязателен: по нему подставляем название из реестра. */
+  clientBinLabel: string
+  lookupButton: string
+  lookupAria: string
+  lookupFound: string
+  lookupMiss: string
+  errClientBin: string
   numberLabel: string
   dateLabel: string
   validLabel: string
@@ -87,6 +94,12 @@ export const kpDict: Record<ToolLang, KpDict> = {
     offerTitle: 'Предложение',
     clientLabel: 'Кому *',
     clientPlaceholder: 'ТОО «Клиент»',
+    clientBinLabel: 'БИН / ИИН клиента (необязательно)',
+    lookupButton: 'Найти',
+    lookupAria: 'Найти название клиента по БИН',
+    lookupFound: 'Название подставлено из реестра',
+    lookupMiss: 'В нашей базе пока нет — введите название вручную',
+    errClientBin: 'БИН/ИИН клиента — 12 цифр (или оставьте поле пустым)',
     numberLabel: 'Номер *',
     dateLabel: 'Дата *',
     validLabel: 'Действует до',
@@ -167,6 +180,12 @@ export const kpDict: Record<ToolLang, KpDict> = {
     offerTitle: 'Ұсыныс',
     clientLabel: 'Кімге *',
     clientPlaceholder: '«Клиент» ЖШС',
+    clientBinLabel: 'Клиенттің БСН / ЖСН (міндетті емес)',
+    lookupButton: 'Табу',
+    lookupAria: 'Клиенттің атауын БСН бойынша табу',
+    lookupFound: 'Атауы тізілімнен қойылды',
+    lookupMiss: 'Біздің базада әзірге жоқ — атауын қолмен енгізіңіз',
+    errClientBin: 'Клиенттің БСН/ЖСН-і — 12 цифр (немесе өрісті бос қалдырыңыз)',
     numberLabel: 'Нөмірі *',
     dateLabel: 'Күні *',
     validLabel: 'Қай күнге дейін жарамды',
@@ -247,6 +266,12 @@ export const kpDict: Record<ToolLang, KpDict> = {
     offerTitle: 'Proposal',
     clientLabel: 'To (client) *',
     clientPlaceholder: 'e.g. ТОО «Client»',
+    clientBinLabel: 'Client BIN / IIN (optional)',
+    lookupButton: 'Find',
+    lookupAria: 'Find the client name by BIN',
+    lookupFound: 'Name filled in from the registry',
+    lookupMiss: 'Not in our database yet — type the name manually',
+    errClientBin: 'Client BIN/IIN must be 12 digits (or leave it empty)',
     numberLabel: 'Number *',
     dateLabel: 'Date *',
     validLabel: 'Valid until',
