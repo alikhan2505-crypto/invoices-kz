@@ -7,6 +7,7 @@ import Link from 'next/link'
 import QRCode from 'qrcode'
 import { supabase } from '@/lib/supabase'
 import { getActivePlan } from '@/lib/plan'
+import { almatyMonthStart } from '@/lib/invoiceLimit'
 import { useLanguage, type Lang } from '@/components/LanguageProvider'
 
 type WalletKey = 'unified'
@@ -273,12 +274,11 @@ export default function TopUtilityBar() {
   // "Заработано через Kaspi" (sum of PAID invoices, last 30 days) and the
   // tariff row's "used this month" count (all invoices, any status, since
   // the 1st of the current calendar month -- same window create/page.tsx's
-  // own monthCount uses, so the two "N/limit" numbers agree everywhere).
+  // own monthCount uses, so the two "N/limit" numbers agree everywhere;
+  // Almaty time, like the DB trigger that actually enforces the limit).
   async function loadWalletExtras(uid: string) {
     const since30 = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString()
-    const monthStart = new Date()
-    monthStart.setDate(1)
-    monthStart.setHours(0, 0, 0, 0)
+    const monthStart = almatyMonthStart()
     const [{ data: paidInvoices }, { count }] = await Promise.all([
       supabase.from('invoices').select('amount').eq('user_id', uid).eq('status', 'paid').gte('created_at', since30),
       supabase.from('invoices').select('*', { count: 'exact', head: true }).eq('user_id', uid).gte('created_at', monthStart.toISOString()),

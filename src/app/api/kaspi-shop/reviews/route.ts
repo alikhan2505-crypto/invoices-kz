@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { kaspiShopPlanGate } from '@/lib/kaspiShop/planGate'
 import { computeReviewStats, filterByStars, RawReview } from '@/lib/kaspiShop/reviews'
 import { loadConnection } from '@/lib/kaspiShop/connection'
 
@@ -67,6 +68,8 @@ async function loadAggregatedReviews(userId: string) {
 export async function GET(req: NextRequest) {
   const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const notPro = await kaspiShopPlanGate(user.id)
+  if (notPro) return notPro
 
   const starsParam = req.nextUrl.searchParams.get('stars')
   const stars = starsParam ? Number(starsParam) : null
@@ -112,6 +115,8 @@ const GITHUB_WORKFLOW = 'kaspi-shop-reviews-check.yml'
 export async function POST(req: NextRequest) {
   const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const notPro = await kaspiShopPlanGate(user.id)
+  if (notPro) return notPro
 
   const connection = await loadConnection(user.id)
   if (!connection) return NextResponse.json({ error: 'Kaspi Магазин не подключён' }, { status: 400 })

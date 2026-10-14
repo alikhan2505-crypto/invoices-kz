@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { kaspiShopPlanGate } from '@/lib/kaspiShop/planGate'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -30,6 +31,14 @@ export async function POST(req: NextRequest) {
   }
   const { paused } = body
   if (typeof paused !== 'boolean') return NextResponse.json({ error: 'paused (boolean) required' }, { status: 400 })
+  // Pausing is allowed on any plan, resuming needs Pro: the background
+  // repricer (cron/due -> cron/apply) doesn't check the plan and keeps
+  // debiting the shared wallet, so a seller whose Pro lapsed must still be
+  // able to stop it. Same reason DELETE (disconnect) below stays ungated.
+  if (!paused) {
+    const notPro = await kaspiShopPlanGate(user.id)
+    if (notPro) return notPro
+  }
 
   const { error } = await supabase
     .from('kaspi_shop_connections')
@@ -45,7 +54,9 @@ export async function POST(req: NextRequest) {
 // cookies, so a later reconnect starts from a clean re-import instead of
 // resurrecting settings tied to a cabinet the seller may have deliberately
 // walked away from. Deleted explicitly in dependency order rather than
-// relying on an assumed ON DELETE CASCADE.
+// relying on an assumed ON DELETE CASCADE. Not Pro-gated on purpose: a
+// seller whose Pro lapsed must still be able to disconnect their cabinet
+// (which also stops the repricer and drops the stored session cookies).
 export async function DELETE(req: NextRequest) {
   const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { kaspiShopPlanGate } from '@/lib/kaspiShop/planGate'
 import { DEFAULT_TARGET_MARGIN_PERCENT } from '@/lib/kaspiShop/margin'
 
 const supabase = createClient(
@@ -12,9 +13,9 @@ const supabaseAuth = createClient(
 )
 
 // Same auth gate as the rest of Kaspi Shop's API routes (products, profit,
-// etc.): any authenticated user, no is_admin check at the route level -- the
-// is_admin gate lives client-side in the page (see products/route.ts,
-// profit/cogs/route.ts for the identical pattern). Not scoped to a Kaspi
+// etc.): an authenticated user, then the shared Pro gate
+// (kaspiShopPlanGate -- is_admin || canKaspiShop) in each handler, matching
+// the client-side redirect to /upgrade in the page. Not scoped to a Kaspi
 // Shop connection either, unlike products/POST -- this tool is useful even
 // before a seller has connected a cabinet (it's a pre-listing sourcing
 // decision, not something that needs live Kaspi data).
@@ -33,6 +34,8 @@ async function requireUser(req: NextRequest) {
 export async function GET(req: NextRequest) {
   const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const notPro = await kaspiShopPlanGate(user.id)
+  if (notPro) return notPro
 
   const [evalRes, profileRes] = await Promise.all([
     supabase
@@ -62,6 +65,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const notPro = await kaspiShopPlanGate(user.id)
+  if (notPro) return notPro
 
   let body: any
   try {
@@ -117,6 +122,8 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const notPro = await kaspiShopPlanGate(user.id)
+  if (notPro) return notPro
 
   const body = await req.json().catch(() => null)
   const targetMarginPercent = Number(body?.targetMarginPercent)
@@ -136,6 +143,8 @@ export async function PATCH(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const notPro = await kaspiShopPlanGate(user.id)
+  if (notPro) return notPro
 
   let body: any
   try {

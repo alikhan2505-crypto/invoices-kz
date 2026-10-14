@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { kaspiShopPlanGate } from '@/lib/kaspiShop/planGate'
 import { loadConnection, markSessionExpired } from '@/lib/kaspiShop/connection'
 import { computeProfitSummary } from '@/lib/kaspiShop/profit'
 
@@ -25,6 +26,8 @@ const VALID_DAYS = [7, 30, 90]
 export async function GET(req: NextRequest) {
   const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const notPro = await kaspiShopPlanGate(user.id)
+  if (notPro) return notPro
 
   const daysParam = Number(req.nextUrl.searchParams.get('days')) || 30
   const days = VALID_DAYS.includes(daysParam) ? daysParam : 30

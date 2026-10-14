@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { kaspiShopPlanGate } from '@/lib/kaspiShop/planGate'
 import { loadConnection } from '@/lib/kaspiShop/connection'
 
 const supabase = createClient(
@@ -24,6 +25,8 @@ const VALID_DAYS = [7, 30, 90]
 export async function PATCH(req: NextRequest) {
   const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const notPro = await kaspiShopPlanGate(user.id)
+  if (notPro) return notPro
 
   const body = await req.json().catch(() => null)
   const days = Number(body?.days)

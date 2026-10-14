@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { kaspiShopPlanGate } from '@/lib/kaspiShop/planGate'
 import { listConnections } from '@/lib/kaspiShop/connection'
 
 const supabaseAuth = createClient(
@@ -21,6 +22,8 @@ async function requireUser(req: NextRequest) {
 export async function GET(req: NextRequest) {
   const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const notPro = await kaspiShopPlanGate(user.id)
+  if (notPro) return notPro
 
   const connections = await listConnections(user.id)
   return NextResponse.json({ connections })

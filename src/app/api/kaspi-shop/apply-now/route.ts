@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { kaspiShopPlanGate } from '@/lib/kaspiShop/planGate'
 import { loadConnection } from '@/lib/kaspiShop/connection'
 
 const supabase = createClient(
@@ -54,6 +55,8 @@ const GITHUB_WORKFLOW = 'kaspi-shop-price-check.yml'
 export async function POST(req: NextRequest) {
   const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const notPro = await kaspiShopPlanGate(user.id)
+  if (notPro) return notPro
 
   const connection = await loadConnection(user.id)
   if (!connection) return NextResponse.json({ error: 'Kaspi Shop не подключён' }, { status: 400 })

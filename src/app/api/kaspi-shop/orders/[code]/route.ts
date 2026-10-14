@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { kaspiShopPlanGate } from '@/lib/kaspiShop/planGate'
 import { loadConnection } from '@/lib/kaspiShop/connection'
 import { getOrderDetail } from '@/lib/kaspiShop/cabinetApi'
 
@@ -19,6 +20,8 @@ async function requireUser(req: NextRequest) {
 export async function GET(req: NextRequest, { params }: { params: Promise<{ code: string }> }) {
   const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const notPro = await kaspiShopPlanGate(user.id)
+  if (notPro) return notPro
 
   const { code } = await params
 

@@ -9,6 +9,7 @@ import DesktopShell from '@/components/DesktopShell'
 import InvoiceLivePreview from '@/components/InvoiceLivePreview'
 import { cacheGet, cacheSet } from '@/lib/cache'
 import { getActivePlan } from '@/lib/plan'
+import { almatyMonthStart, checkInvoiceLimit, isInvoiceLimitError, invoiceLimitFromError } from '@/lib/invoiceLimit'
 import { formatDate, formatDateSafe } from '@/lib/date'
 import { computeDefaultDueDate, todayDateString } from '@/lib/dueDate'
 import { useLanguage } from '@/components/LanguageProvider'
@@ -240,9 +241,9 @@ export default function CreateInvoicePage() {
         .catch(() => setKaspiCashierConnected(false))
     })
 
-    const monthStart = new Date()
-    monthStart.setDate(1)
-    monthStart.setHours(0, 0, 0, 0)
+    // Same window as the DB trigger (calendar month in Almaty time), so the
+    // browser's «N из лимита» never disagrees with what the insert will hit.
+    const monthStart = almatyMonthStart()
 
     const { count } = await supabase
       .from('invoices').select('*', { count: 'exact', head: true })
@@ -557,31 +558,25 @@ export default function CreateInvoicePage() {
 
     // is_admin bypasses plan gating entirely server-side too (enforce_invoice_limit()
     // trigger returns NEW immediately for an admin, before even computing a limit) --
-    // these two browser-side checks exist purely to give a non-admin a fast,
+    // the browser-side check below exists purely to give a non-admin a fast,
     // friendly message instead of waiting on the DB round-trip, and must mirror
     // that same bypass. Without it, an admin account whose plan/trial has simply
     // lapsed (getActivePlan falls through to the Free branch) gets bounced to
     // /upgrade on every attempt, even though the server would have let them
     // through -- confirmed live 2026-10-05 (founder's sister's admin account).
     if (!profile?.is_admin) {
-      if (activePlan.invoiceLimit !== null && monthCount >= activePlan.invoiceLimit) {
+      // Only the monthly limit sends someone to /upgrade. Free is a real plan
+      // with 3 invoices a month (pricing, landing, DB trigger all agree) --
+      // until 2026-10-14 a leftover `!isActive && plan === 'free'` check here,
+      // from the May 2026 days when Free meant "no invoices at all", bounced
+      // every Free user to /upgrade on their very first invoice, silently.
+      const limitCheck = checkInvoiceLimit(activePlan, monthCount)
+      if (!limitCheck.allowed) {
         setLoading(false)
-        if (activePlan.plan === 'free') {
-          alert(t.planLimitFreeMessage(activePlan.invoiceLimit!))
-          router.push('/upgrade')
-        } else if (activePlan.isTrial) {
-          alert(t.planLimitTrialMessage(activePlan.invoiceLimit!))
-          router.push('/upgrade')
-        } else {
-          alert(t.planLimitBasicMessage(activePlan.invoiceLimit!))
-          router.push('/upgrade')
-        }
-        return
-      }
-
-      if (!activePlan.isActive && activePlan.plan === 'free') {
+        alert(limitCheck.kind === 'free' ? t.planLimitFreeMessage(limitCheck.limit)
+            : limitCheck.kind === 'trial' ? t.planLimitTrialMessage(limitCheck.limit)
+            : t.planLimitBasicMessage(limitCheck.limit))
         router.push('/upgrade')
-        setLoading(false)
         return
       }
     }
@@ -618,8 +613,8 @@ export default function CreateInvoicePage() {
       // browser and anyone holding their own session could go around it.
       // When the backstop is what stopped us, say the same thing the
       // browser check says instead of showing a Postgres message.
-      if (error.message.includes('invoice_limit_reached')) {
-        const limit = getActivePlan(profile).invoiceLimit ?? 0
+      if (isInvoiceLimitError(error.message)) {
+        const limit = invoiceLimitFromError(error.message) ?? activePlan.invoiceLimit ?? 0
         alert(activePlan.plan === 'free' ? t.planLimitFreeMessage(limit)
             : activePlan.isTrial ? t.planLimitTrialMessage(limit)
             : t.planLimitBasicMessage(limit))

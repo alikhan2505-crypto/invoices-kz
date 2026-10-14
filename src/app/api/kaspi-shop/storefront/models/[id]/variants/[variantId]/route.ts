@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { kaspiShopPlanGate } from '@/lib/kaspiShop/planGate'
 import { loadStorefrontSettings } from '@/lib/kaspiShop/storefront'
 import { updateWholesaleVariant, deleteWholesaleVariant } from '@/lib/kaspiShop/wholesaleStorefront'
 
@@ -20,6 +21,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { id: modelId, variantId } = await params
   const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const notPro = await kaspiShopPlanGate(user.id)
+  if (notPro) return notPro
 
   const settings = await loadStorefrontSettings(user.id)
   if (!settings) return NextResponse.json({ error: 'no_connection' }, { status: 404 })
@@ -58,6 +61,8 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   const { id: modelId, variantId } = await params
   const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const notPro = await kaspiShopPlanGate(user.id)
+  if (notPro) return notPro
 
   const settings = await loadStorefrontSettings(user.id)
   if (!settings) return NextResponse.json({ error: 'no_connection' }, { status: 404 })

@@ -11,6 +11,9 @@ const supabaseAuth = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
+// Deliberately NOT behind kaspiShopPlanGate (unlike the cabinet routes):
+// the balance is the shared tenge wallet, and the wallet/* routes only read
+// it, list its ledger, or top it up -- none of that is a Pro feature.
 export async function GET(req: NextRequest) {
   const accessToken = req.headers.get('authorization')?.replace('Bearer ', '')
   const { data: { user } } = accessToken

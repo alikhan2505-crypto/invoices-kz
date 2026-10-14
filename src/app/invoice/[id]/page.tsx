@@ -9,6 +9,7 @@ import { generateKP } from '@/lib/generateKP'
 import { generateAVR } from '@/lib/generateAVR'
 import { generateNakladnaya } from '@/lib/generateNakladnaya'
 import { getActivePlan } from '@/lib/plan'
+import { isInvoiceLimitError, invoiceLimitFromError } from '@/lib/invoiceLimit'
 import { useLanguage } from '@/components/LanguageProvider'
 import { backLabel } from '@/lib/a11yLabels'
 import { invoiceFlowDict } from '@/lib/i18n/invoiceFlow'
@@ -426,7 +427,21 @@ export default function InvoicePage() {
       note: invoice.note, contract_number: invoice.contract_number,
       contract_date: invoice.contract_date, created_at: new Date().toISOString(),
     }).select().single()
-    if (error) { alert(t.errorPrefix(error.message)); return }
+    if (error) {
+      // «Дублировать» тоже создаёт счёт, и база считает его в месячный лимит
+      // (enforce_invoice_limit_trigger). Тот же понятный текст и путь на
+      // /upgrade, что и в /create, вместо сырого «invoice_limit_reached: 3 of 3».
+      if (isInvoiceLimitError(error.message)) {
+        const ap = getActivePlan(profile)
+        const limit = invoiceLimitFromError(error.message) ?? ap.invoiceLimit ?? 0
+        alert(ap.plan === 'free' ? t.planLimitFreeMessage(limit)
+            : ap.isTrial ? t.planLimitTrialMessage(limit)
+            : t.planLimitBasicMessage(limit))
+        router.push('/upgrade')
+        return
+      }
+      alert(t.errorPrefix(error.message)); return
+    }
     await supabase.from('invoice_logs').insert({ invoice_id: data.id, status: 'draft' })
     router.push('/invoice/' + data.id)
   }

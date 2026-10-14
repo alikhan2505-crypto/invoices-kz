@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { kaspiShopPlanGate } from '@/lib/kaspiShop/planGate'
 import { loadStorefrontSettings, deleteCustomProduct } from '@/lib/kaspiShop/storefront'
 
 const supabaseAuth = createClient(
@@ -21,6 +22,8 @@ async function requireUser(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const notPro = await kaspiShopPlanGate(user.id)
+  if (notPro) return notPro
 
   const settings = await loadStorefrontSettings(user.id)
   if (!settings) return NextResponse.json({ error: 'no_connection' }, { status: 404 })

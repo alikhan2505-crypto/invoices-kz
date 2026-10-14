@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { kaspiShopPlanGate } from '@/lib/kaspiShop/planGate'
 import { fetchCityNames } from '@/lib/kaspiShop/cabinetApi'
 import { getKey } from '@/lib/kaspiShop/connection'
 import { decryptAtRest } from '@/lib/kaspiPay/crypto'
@@ -66,6 +67,8 @@ async function fallbackCityCodes(connectionId: string): Promise<string[]> {
 export async function GET(req: NextRequest) {
   const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const notPro = await kaspiShopPlanGate(user.id)
+  if (notPro) return notPro
 
   const { data: connection, error } = await supabase
     .from('kaspi_shop_connections')
@@ -113,6 +116,8 @@ export async function GET(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const notPro = await kaspiShopPlanGate(user.id)
+  if (notPro) return notPro
 
   const body = await req.json().catch(() => null)
   const trackedCityCodes = body?.trackedCityCodes

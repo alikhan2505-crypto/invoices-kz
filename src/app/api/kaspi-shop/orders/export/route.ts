@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { kaspiShopPlanGate } from '@/lib/kaspiShop/planGate'
 import { loadConnection, markSessionExpired } from '@/lib/kaspiShop/connection'
 import { listOrders } from '@/lib/kaspiShop/cabinetApi'
 import { buildOrdersWorkbookBuffer } from '@/lib/kaspiShop/ordersExport'
@@ -30,6 +31,8 @@ export const maxDuration = 60
 export async function GET(req: NextRequest) {
   const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const notPro = await kaspiShopPlanGate(user.id)
+  if (notPro) return notPro
 
   const status = req.nextUrl.searchParams.get('status') || 'NEW'
   if (!ORDER_STATUS_TABS.some(t => t.value === status)) {
