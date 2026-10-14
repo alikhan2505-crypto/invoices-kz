@@ -4,9 +4,16 @@
 // строки (в том числе без названия), а в КП попадали только строки с
 // названием, да ещё с количеством «1» вместо пустого — суммы расходились.
 
-export type KpRow = { name: string; qty: string; price: string }
+export type KpRow = { name: string; qty: string; unit?: string; price: string }
 
-export interface KpLine { name: string; qty: number; price: number }
+export interface KpLine { name: string; qty: number; unit: string; price: number }
+
+/** Единицы измерения строки КП (правка основателя 14.10.2026). Значение —
+ *  русское сокращение: оно печатается в документе, который всегда русский;
+ *  подписи в списке на kk/en — в dict.ts (unitLabels). Список продукта
+ *  (/create) плюс «т», «компл.», «упак.» — для стройматериалов и опта. */
+export const KP_UNITS = ['шт', 'кг', 'т', 'л', 'м', 'м²', 'м³', 'компл.', 'упак.', 'час', 'день', 'месяц', 'услуга', 'работа'] as const
+export const KP_DEFAULT_UNIT = 'шт'
 
 const num = (s: string) => Number(s) || 0
 
@@ -14,7 +21,7 @@ const num = (s: string) => Number(s) || 0
 export function kpLines(rows: KpRow[]): KpLine[] {
   return rows
     .filter(r => r.name.trim())
-    .map(r => ({ name: r.name.trim(), qty: num(r.qty), price: num(r.price) }))
+    .map(r => ({ name: r.name.trim(), qty: num(r.qty), unit: r.unit || KP_DEFAULT_UNIT, price: num(r.price) }))
 }
 
 /** Итог — ровно по тем строкам, что уйдут в документ (qty × price, как в generateKP). */

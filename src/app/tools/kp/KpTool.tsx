@@ -9,7 +9,7 @@ import { formatTenge, isToolLocalized, toolLinkPath, toolsIndexPath, TOOL_CHROME
 import ToolLangSwitch from '@/lib/tools-i18n/ToolLangSwitch'
 import ToolCta from '@/lib/tools-i18n/ToolCta'
 import { kpDict } from './dict'
-import { kpLines, kpRowProblem, kpTotal, kpVatIncluded, localIsoDate, ruDate, type KpRow } from './calc'
+import { kpLines, kpRowProblem, kpTotal, kpVatIncluded, localIsoDate, ruDate, KP_UNITS, KP_DEFAULT_UNIT, type KpRow } from './calc'
 
 // Бесплатный генератор коммерческого предложения — близнец /tools/avr:
 // черновик в localStorage, рендер — продуктовым generateKP (окно с кнопкой
@@ -48,7 +48,7 @@ const EMPTY: Form = {
   clientName: '', clientBin: '',
   number: '1', date: '', validUntil: '', note: '',
   vatType: 'no_vat',
-  rows: [{ name: '', qty: '1', price: '' }],
+  rows: [{ name: '', qty: '1', unit: KP_DEFAULT_UNIT, price: '' }],
 }
 
 function parseQuota(data: unknown): Quota | null {
@@ -357,11 +357,14 @@ export default function KpTool({ lang }: { lang: ToolLang }) {
           </div>
 
           {f.rows.map((r, i) => (
-            // На телефоне название — на всю ширину, под ним «кол-во / цена / ×»;
-            // с sm — всё в одну строку, как раньше.
-            <div key={i} className="grid grid-cols-[72px_1fr_32px] sm:grid-cols-[1fr_72px_110px_32px] gap-2 mb-3 sm:mb-2 items-center">
-              <input className={`${input} col-span-3 sm:col-span-1`} style={inputStyle} aria-label={t.rowPlaceholder(i + 1)} placeholder={t.rowPlaceholder(i + 1)} value={r.name} onChange={e => setRow(i, { name: e.target.value })} />
+            // На телефоне название — на всю ширину, под ним «кол-во / ед. / цена / ×»;
+            // с sm — всё в одну строку.
+            <div key={i} className="grid grid-cols-[64px_92px_1fr_28px] sm:grid-cols-[1fr_72px_100px_110px_32px] gap-2 mb-3 sm:mb-2 items-center">
+              <input className={`${input} col-span-4 sm:col-span-1`} style={inputStyle} aria-label={t.rowPlaceholder(i + 1)} placeholder={t.rowPlaceholder(i + 1)} value={r.name} onChange={e => setRow(i, { name: e.target.value })} />
               <input className={input} style={inputStyle} inputMode="numeric" aria-label={`${t.qtyPlaceholder} — ${i + 1}`} placeholder={t.qtyPlaceholder} value={r.qty} onChange={e => setRow(i, { qty: digits(e.target.value).slice(0, 6) })} />
+              <select className={`${input} px-2`} style={inputStyle} aria-label={t.unitAria(i + 1)} value={r.unit || KP_DEFAULT_UNIT} onChange={e => setRow(i, { unit: e.target.value })}>
+                {KP_UNITS.map(u => <option key={u} value={u}>{t.unitLabels[u] ?? u}</option>)}
+              </select>
               <input className={input} style={inputStyle} inputMode="numeric" aria-label={`${t.pricePlaceholder} — ${i + 1}`} placeholder={t.pricePlaceholder} value={r.price} onChange={e => setRow(i, { price: digits(e.target.value).slice(0, 10) })} />
               <button
                 type="button"
@@ -370,7 +373,7 @@ export default function KpTool({ lang }: { lang: ToolLang }) {
             </div>
           ))}
           <div className="flex items-start justify-between flex-wrap gap-2 mt-3">
-            <button type="button" onClick={() => setF(prev => ({ ...prev, rows: [...prev.rows, { name: '', qty: '1', price: '' }] }))}
+            <button type="button" onClick={() => setF(prev => ({ ...prev, rows: [...prev.rows, { name: '', qty: '1', unit: KP_DEFAULT_UNIT, price: '' }] }))}
               className="text-sm font-semibold" style={{ color: 'var(--nav-accent)' }}>{t.addRow}</button>
             <div className="text-right">
               <div className="text-sm font-bold" style={{ color: 'var(--nav-text-primary)' }}>

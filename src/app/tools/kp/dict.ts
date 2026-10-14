@@ -62,6 +62,9 @@ export interface KpDict {
   vat16Hint: string
   rowPlaceholder: (n: number) => string
   qtyPlaceholder: string
+  unitAria: (n: number) => string
+  /** Подписи единиц в списке (значение всегда русское — см. KP_UNITS). */
+  unitLabels: Record<string, string>
   pricePlaceholder: string
   removeRow: (n: number) => string
   addRow: string
@@ -139,6 +142,8 @@ export const kpDict: Record<ToolLang, KpDict> = {
     vat16Hint: 'Цены указывайте с НДС — сумма налога выделится в итоге КП.',
     rowPlaceholder: n => `Товар или услуга ${n}`,
     qtyPlaceholder: 'Кол-во',
+    unitAria: n => `Единица измерения — позиция ${n}`,
+    unitLabels: { 'шт': 'шт', 'кг': 'кг', 'т': 'т', 'л': 'л', 'м': 'м', 'м²': 'м²', 'м³': 'м³', 'компл.': 'компл.', 'упак.': 'упак.', 'час': 'час', 'день': 'день', 'месяц': 'месяц', 'услуга': 'услуга', 'работа': 'работа' },
     pricePlaceholder: 'Цена, ₸',
     removeRow: n => `Удалить позицию ${n}`,
     addRow: '+ Добавить позицию',
@@ -234,6 +239,8 @@ export const kpDict: Record<ToolLang, KpDict> = {
     vat16Hint: 'Бағаларды ҚҚС-ты қоса жазыңыз — салық сомасы КҰ қорытындысында бөлек көрсетіледі.',
     rowPlaceholder: n => `Тауар немесе қызмет ${n}`,
     qtyPlaceholder: 'Саны',
+    unitAria: n => `Өлшем бірлігі — ${n}-позиция`,
+    unitLabels: { 'шт': 'дана', 'кг': 'кг', 'т': 'т', 'л': 'л', 'м': 'м', 'м²': 'м²', 'м³': 'м³', 'компл.': 'жиынтық', 'упак.': 'қаптама', 'час': 'сағат', 'день': 'күн', 'месяц': 'ай', 'услуга': 'қызмет', 'работа': 'жұмыс' },
     pricePlaceholder: 'Бағасы, ₸',
     removeRow: n => `${n}-позицияны жою`,
     addRow: '+ Позиция қосу',
@@ -329,6 +336,8 @@ export const kpDict: Record<ToolLang, KpDict> = {
     vat16Hint: 'Enter prices including VAT — the tax amount is shown separately in the proposal total.',
     rowPlaceholder: n => `Item or service ${n}`,
     qtyPlaceholder: 'Qty',
+    unitAria: n => `Unit — item ${n}`,
+    unitLabels: { 'шт': 'pcs', 'кг': 'kg', 'т': 't', 'л': 'l', 'м': 'm', 'м²': 'm²', 'м³': 'm³', 'компл.': 'set', 'упак.': 'pack', 'час': 'hour', 'день': 'day', 'месяц': 'month', 'услуга': 'service', 'работа': 'job' },
     pricePlaceholder: 'Price, ₸',
     removeRow: n => `Remove item ${n}`,
     addRow: '+ Add item',

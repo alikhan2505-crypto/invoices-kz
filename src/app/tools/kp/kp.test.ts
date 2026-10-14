@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { toolMetadata } from '@/lib/tools-i18n'
 import { kpDict, quarterStartLabel } from './dict'
-import { kpLines, kpRowProblem, kpTotal, kpVatIncluded, localIsoDate, ruDate } from './calc'
+import { kpLines, kpRowProblem, kpTotal, kpVatIncluded, localIsoDate, ruDate, KP_UNITS } from './calc'
 
 describe('kp calc', () => {
   it('totals only the rows that reach the document', () => {
@@ -9,8 +9,16 @@ describe('kp calc', () => {
       { name: 'Дизайн', qty: '2', price: '10000' },
       { name: '', qty: '1', price: '5000' }, // без названия — в КП не попадёт
     ]
-    expect(kpLines(rows)).toEqual([{ name: 'Дизайн', qty: 2, price: 10000 }])
+    // Без выбранной единицы (старый черновик) — «шт».
+    expect(kpLines(rows)).toEqual([{ name: 'Дизайн', qty: 2, unit: 'шт', price: 10000 }])
     expect(kpTotal(rows)).toBe(20000)
+  })
+
+  it('passes the chosen unit to the document and labels every unit in every language', () => {
+    expect(kpLines([{ name: 'Кирпич', qty: '3', unit: 'т', price: '40000' }])).toEqual([{ name: 'Кирпич', qty: 3, unit: 'т', price: 40000 }])
+    for (const lang of ['ru', 'kk', 'en'] as const) {
+      for (const u of KP_UNITS) expect(kpDict[lang].unitLabels[u]).toBeTruthy()
+    }
   })
 
   it('flags a priced row without a name and a named row without quantity', () => {
