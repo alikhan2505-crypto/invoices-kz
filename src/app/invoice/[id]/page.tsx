@@ -948,7 +948,23 @@ export default function InvoicePage() {
             payer (is_vat_payer === false). A `null` value might still turn
             out to be a VAT payer per /api/esf/prepare's own fresh-lookup
             re-check, so it stays visible in that case. */}
-        {invoice.is_vat_payer !== false && (
+        {/* ЭСФ ещё не проверена на стенде КГД (14.10.2026: ждём регистрации
+            основателя на test3-портале). Решение основателя: клиентам — серая
+            неактивная карточка «скоро», чтобы не вести в тупик; админам — рабочая
+            кнопка для проверки. Когда сквозной тест пройдёт — вернуть ap.canEsf. */}
+        {invoice.is_vat_payer !== false && !profile?.is_admin && (
+          <div className="nav-glass rounded-2xl p-4 opacity-60 cursor-not-allowed select-none" aria-disabled="true">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'var(--nav-surface-glass)', color: 'var(--nav-text-muted)' }}><EsfIcon /></div>
+              <div className="flex-1 text-left">
+                <div className="text-sm font-medium" style={{ color: 'var(--nav-text-muted)' }}>{lang === 'kk' ? 'ЭШФ жазу' : lang === 'en' ? 'Issue e-invoice (ESF)' : 'Выставить ЭСФ'}</div>
+                <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>{lang === 'kk' ? 'ЭШФ АЖ-ға қосылуды аяқтап жатырмыз' : lang === 'en' ? 'We are finishing the ESF connection' : 'Заканчиваем подключение к ИС ЭСФ'}</div>
+              </div>
+              <span className="text-xs px-2 py-0.5 rounded-full flex-shrink-0" style={{ background: 'var(--nav-surface-glass)', color: 'var(--nav-text-muted)' }}>{lang === 'kk' ? 'Жақында' : lang === 'en' ? 'Soon' : 'Скоро'}</span>
+            </div>
+          </div>
+        )}
+        {invoice.is_vat_payer !== false && !!profile?.is_admin && (
           ap.canEsf ? (
             <motion.div
               className={`nav-glass nav-card-accent rounded-2xl p-4 ${CARD_HOVER}`}
