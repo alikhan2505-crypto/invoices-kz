@@ -62,8 +62,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
     // Бесплатные инструменты /tools. Порядок — как в индексе. У переведённых
     // (LOCALIZED_TOOL_SLUGS в src/lib/tools-i18n) три адреса — ru /tools/<slug>,
     // kk /tools/kk/<slug>, en /tools/en/<slug> — и каждый перечисляет все три
-    // через alternates.languages (hreflang), как у /guides ниже. Непереведённые
-    // (schet, avr на 14.10.2026) — только русский адрес, без hreflang.
+    // через alternates.languages (hreflang), как у /guides ниже. Непереведённый
+    // инструмент шёл бы только русским адресом, без hreflang (с 14.10.2026
+    // переведены все восемь).
     //   waybills, margin — органический вход для продавцов Kaspi;
     //   kontragent — самый частотный запрос, лимит 3/день, дальше регистрация;
     //   schet — «счёт на оплату», лид-магнит; avr — второй документ после счёта;

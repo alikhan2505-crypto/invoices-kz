@@ -8,8 +8,8 @@ import {
 // Тексты и <head> индекса бесплатных инструментов на трёх языках:
 //   ru /tools   kk /tools/kk   en /tools/en
 // Сама страница — ToolsIndexView.tsx. Карточка инструмента без языковой
-// версии (schet, avr на 14.10.2026) на kk/en ведёт на русский адрес и
-// помечается «орысша» / «in Russian» — см. isToolLocalized().
+// версии на kk/en ведёт на русский адрес и помечается «орысша» / «in Russian»
+// — см. isToolLocalized(). С 14.10.2026 переведены все восемь, пометок нет.
 
 export interface ToolCard { slug: string; title: string; text: string }
 export interface ToolGroup { title: string; tools: ToolCard[] }
@@ -72,7 +72,7 @@ export const toolsIndexDict: Record<ToolLang, ToolsIndexDict> = {
       description:
         'Төлем шоты, орындалған жұмыстар актісі, жүкқұжат және коммерциялық ұсыныс онлайн, 2026 жылғы ЖК салығының калькуляторы, контрагентті БСН бойынша тексеру, Kaspi маржа калькуляторы және жүкқұжаттарды біріктіру. Тегін, тіркелусіз.',
       keywords:
-        'жк үшін тегін құралдар, төлем шоты онлайн, жүкқұжат онлайн, жк салығы калькулятор 2026, контрагентті бсн бойынша тексеру, kaspi маржа калькуляторы, kaspi жүкқұжаттарын біріктіру, коммерциялық ұсыныс онлайн',
+        'жк үшін тегін құралдар, төлем шоты онлайн, орындалған жұмыстар актісі онлайн, жүкқұжат онлайн, жк салығы калькулятор 2026, контрагентті бсн бойынша тексеру, kaspi маржа калькуляторы, kaspi жүкқұжаттарын біріктіру, коммерциялық ұсыныс онлайн',
       ogTitle: 'Кәсіпкерге арналған тегін құралдар — invoices.kz',
       ogDescription: 'Құжаттар, ЖК салықтары, контрагентті тексеру және Kaspi сатушыларына арналған құралдар. Тегін, тіркелусіз.',
       ogImageAlt: 'Тегін құралдар — invoices.kz',
@@ -111,9 +111,9 @@ export const toolsIndexDict: Record<ToolLang, ToolsIndexDict> = {
     seo: {
       title: 'Free Business Tools for Kazakhstan — Invoices, Taxes, Company Check',
       description:
-        'Free online tools for small businesses in Kazakhstan: sole proprietor tax calculator 2026, company check by BIN, delivery note and commercial proposal generators, Kaspi margin calculator and waybill merger. No sign-up.',
+        'Free online tools for small businesses in Kazakhstan: invoice for payment, certificate of completed work (AVR), delivery note and commercial proposal generators, sole proprietor tax calculator 2026, company check by BIN, Kaspi margin calculator and waybill merger. No sign-up.',
       keywords:
-        'kazakhstan business tools free, kazakhstan invoice generator, kazakhstan sole proprietor tax calculator 2026, check company by bin kazakhstan, kaspi margin calculator, kaspi waybill merge pdf, kazakhstan delivery note z-2',
+        'kazakhstan business tools free, kazakhstan invoice generator, kazakhstan certificate of completed work avr, kazakhstan sole proprietor tax calculator 2026, check company by bin kazakhstan, kaspi margin calculator, kaspi waybill merge pdf, kazakhstan delivery note z-2',
       ogTitle: 'Free business tools for Kazakhstan — invoices.kz',
       ogDescription: 'Documents, sole proprietor taxes, company checks and tools for Kaspi sellers. Free, no sign-up.',
       ogImageAlt: 'Free tools — invoices.kz',

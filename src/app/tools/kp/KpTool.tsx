@@ -156,9 +156,8 @@ export default function KpTool({ lang }: { lang: ToolLang }) {
   const label = 'text-[11px] font-semibold uppercase tracking-wide block mb-1.5'
   const labelStyle = { color: 'var(--nav-text-muted)' } as const
   const hintStyle = { color: 'var(--nav-text-muted)' } as const
-  // Ссылка «Выставить счёт»: пока schet есть только на русском, toolLinkPath
-  // ведёт с kk/en на русский адрес, а не в 404; сам переключится, когда schet
-  // попадёт в LOCALIZED_TOOL_SLUGS.
+  // Ссылка «Выставить счёт»: toolLinkPath ведёт на языковую версию schet
+  // (переведён 14.10.2026); непереведённый инструмент открылся бы по-русски.
   const schetLang: ToolLang = isToolLocalized('schet') ? lang : 'ru'
 
   return (

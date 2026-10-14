@@ -75,25 +75,25 @@ export default function GuidesIndexKk() {
             Тегін құралдар
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            <Link href="/tools/schet" className="nav-glass rounded-xl p-4 block" style={{ color: 'var(--nav-text-primary)' }}>
+            <Link href="/tools/kk/schet" className="nav-glass rounded-xl p-4 block" style={{ color: 'var(--nav-text-primary)' }}>
               <div className="text-sm font-semibold mb-1">Төлемге шот онлайн</div>
               <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>
                 Бір минутта дайын шот: анықтамалықтан БСК, жазбаша сома, ҚҚС
               </div>
             </Link>
-            <Link href="/tools/kontragent" className="nav-glass rounded-xl p-4 block" style={{ color: 'var(--nav-text-primary)' }}>
+            <Link href="/tools/kk/kontragent" className="nav-glass rounded-xl p-4 block" style={{ color: 'var(--nav-text-primary)' }}>
               <div className="text-sm font-semibold mb-1">БСН бойынша контрагентті тексеру</div>
               <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>
                 Сенімсіздік, тарату, салық қарызы және ҚҚС — МКК деректері бойынша
               </div>
             </Link>
-            <Link href="/tools/margin" className="nav-glass rounded-xl p-4 block" style={{ color: 'var(--nav-text-primary)' }}>
+            <Link href="/tools/kk/margin" className="nav-glass rounded-xl p-4 block" style={{ color: 'var(--nav-text-primary)' }}>
               <div className="text-sm font-semibold mb-1">Kaspi маржа калькуляторы</div>
               <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>
                 Комиссия, жеткізу және салықтан кейін сатудан қанша қалады
               </div>
             </Link>
-            <Link href="/tools/waybills" className="nav-glass rounded-xl p-4 block" style={{ color: 'var(--nav-text-primary)' }}>
+            <Link href="/tools/kk/waybills" className="nav-glass rounded-xl p-4 block" style={{ color: 'var(--nav-text-primary)' }}>
               <div className="text-sm font-semibold mb-1">Kaspi жүкқұжаттарын желімдеу</div>
               <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>
                 Жүкқұжаттар бір PDF-те: А4 парағына 4-тен немесе термопринтерге А6

@@ -2,11 +2,13 @@ import { describe, it, expect } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
 import sitemap from '@/app/sitemap'
+import { avrDict } from '@/app/tools/avr/dict'
 import { kontragentDict } from '@/app/tools/kontragent/dict'
 import { kpDict } from '@/app/tools/kp/dict'
 import { marginDict } from '@/app/tools/margin/dict'
 import { nakladnayaDict } from '@/app/tools/nakladnaya/dict'
 import { nalogiDict } from '@/app/tools/nalogi/dict'
+import { schetDict } from '@/app/tools/schet/dict'
 import { waybillsDict } from '@/app/tools/waybills/dict'
 import {
   LOCALIZED_TOOL_SLUGS, TOOL_LANGS, isToolLocalized, toolAlternates, toolLinkPath,
@@ -21,11 +23,13 @@ import { toolsIndexCards, toolsIndexDict, toolsIndexMetadata } from './toolsInde
 
 type SeoDict = Record<ToolLang, { seo: ToolSeoCopy; h1: string }>
 const DICTS: Record<string, SeoDict> = {
+  avr: avrDict,
   kontragent: kontragentDict,
   kp: kpDict,
   margin: marginDict,
   nakladnaya: nakladnayaDict,
   nalogi: nalogiDict,
+  schet: schetDict,
   waybills: waybillsDict,
 }
 

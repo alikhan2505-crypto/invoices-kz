@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   toolPath, toolUrl, toolAlternates, toolMetadata, toolsIndexPath, guidesIndexPath,
-  formatIsoDate, formatTenge, toolJsonLd, TOOL_LANGS,
+  formatIsoDate, formatTenge, toolJsonLd, toolLinkPath, TOOL_LANGS,
 } from './index'
 import { kontragentDict } from '@/app/tools/kontragent/dict'
 
@@ -20,6 +20,14 @@ describe('tools-i18n paths', () => {
       en: 'https://invoices.kz/tools/en/schet',
       'x-default': 'https://invoices.kz/tools/schet',
     })
+  })
+
+  it('links schet and avr to their own language version (translated 14.10.2026)', () => {
+    for (const slug of ['schet', 'avr']) {
+      expect(toolLinkPath(slug, 'ru')).toBe(`/tools/${slug}`)
+      expect(toolLinkPath(slug, 'kk')).toBe(`/tools/kk/${slug}`)
+      expect(toolLinkPath(slug, 'en')).toBe(`/tools/en/${slug}`)
+    }
   })
 
   it('links each language to its own tools index', () => {

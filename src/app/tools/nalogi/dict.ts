@@ -271,7 +271,7 @@ export const nalogiDict: Record<ToolLang, NalogiDict> = {
       'Based on 2026 rates (Tax Code No. 214-VIII, minimum wage 85 000 ₸; MCI is the monthly calculation index, 4 325 ₸). Check your region’s rate in the local council (maslikhat) decision. This is an estimate, not tax advice. Full breakdown —',
     guideLink: 'in our guide to IE taxes (in Russian)',
     guideHref: '/guides/nalogi-ip-uproshchenka-2026',
-    schetLink: 'Create an invoice online (in Russian) →',
+    schetLink: 'Create an invoice online →',
     faqTitle: 'Frequently asked questions',
     faq: [
       {

@@ -278,7 +278,7 @@ export const kpDict: Record<ToolLang, KpDict> = {
     limitBody:
       'In an invoices.kz account a proposal becomes an invoice in one click once the client agrees: your details are saved, numbering is automatic, and you can accept payment via Kaspi. Sign-up is free.',
     limitButton: 'Sign up for free',
-    nextStep: 'Client agreed? Issue an invoice (in Russian) →',
+    nextStep: 'Client agreed? Issue an invoice →',
     faqTitle: 'Commercial proposals in Kazakhstan: the basics',
     faq: [
       {

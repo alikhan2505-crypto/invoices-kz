@@ -197,9 +197,7 @@ export default function NalogiTool({ lang }: { lang: ToolLang }) {
 
         <div className="mt-6 flex gap-4 flex-wrap">
           <Link href={toolsIndexPath(lang)} className="text-sm font-semibold" style={{ color: 'var(--nav-accent)' }}>{chrome.allTools}</Link>
-          {/* Счёт пока только на русском адресе: toolLinkPath ведёт на него, а
-              сам переключится на kk/en, когда schet попадёт в LOCALIZED_TOOL_SLUGS
-              (тогда же убрать «(in Russian)» из en-подписи в dict.ts). */}
+          {/* toolLinkPath ведёт на языковую версию schet (переведён 14.10.2026). */}
           <Link href={toolLinkPath('schet', lang)} hrefLang={isToolLocalized('schet') ? lang : 'ru'} className="text-sm font-semibold" style={{ color: 'var(--nav-accent)' }}>{t.schetLink}</Link>
         </div>
       </div>
