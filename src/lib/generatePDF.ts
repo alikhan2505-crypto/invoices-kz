@@ -1,5 +1,6 @@
 import QRCode from 'qrcode'
 import { resizeToFit } from './imageResize'
+import { escapeHtml, escapeAttr } from './htmlEscape'
 
 interface Service {
   name: string
@@ -93,35 +94,69 @@ function numberToWords(n: number): string {
   return result.trim()
 }
 
+// Картинка в src: только наши data:image/ (ресайз подписи/печати/логотипа,
+// QR) либо http(s)-ссылка — resizeToFit при ошибке загрузки возвращает
+// исходный URL как есть. Всё остальное (javascript:, data:text/html, …)
+// выбрасываем, а оставшееся экранируем под атрибут.
+export function safeImageSrc(url: unknown): string {
+  if (typeof url !== 'string') return ''
+  const trimmed = url.trim()
+  if (!/^(https?:|data:image\/)/i.test(trimmed)) return ''
+  return escapeAttr(trimmed)
+}
+
+// Значение для встраивания в инлайн-<script>: JSON-строка, а «<» заменён на JS-эскейп
+// (обратный слэш + u003c), чтобы «</script>» из пользовательского текста не закрыл тег.
+function jsString(value: string): string {
+  return JSON.stringify(value).replace(/</g, '\\u003c')
+}
+
+// Сборка HTML печатной формы счёта (чистая функция, без window). Весь текст
+// продавца/клиента/реестра экранируется: форма открывается на invoices.kz,
+// в том числе клиенту продавца на публичной /view/[token].
 export async function generateInvoicePDF(data: InvoiceData): Promise<string> {
 
 
   const p = data.profile
   const b = data.bank
 
-  const companyName = p?.company_name || ''
-  const binIin = p?.bin_iin || ''
-  const address = p?.address || ''
-  const phone = p?.phone || ''
-  const director = p?.director_name || ''
+  const companyName = escapeHtml(p?.company_name || '')
+  const binIin = escapeHtml(p?.bin_iin || '')
+  const address = escapeHtml(p?.address || '')
+  const phone = escapeHtml(p?.phone || '')
+  const director = escapeHtml(p?.director_name || '')
   const signatureUrl = p?.signature_url || ''
   const stampUrl = p?.stamp_url || ''
   const logoUrl = p?.logo_url || ''
 
   // Подпись — сохраняем пропорции, максимум 200x60
-  const signatureBase64 = signatureUrl ? await resizeToFit(signatureUrl, 200, 60) : ''
+  const signatureBase64 = safeImageSrc(signatureUrl ? await resizeToFit(signatureUrl, 200, 60) : '')
   // Печать — квадрат 110x110
-  const stampBase64 = stampUrl ? await resizeToFit(stampUrl, 110, 110) : ''
-  const logoBase64 = logoUrl ? await resizeToFit(logoUrl, 180, 48) : ''
+  const stampBase64 = safeImageSrc(stampUrl ? await resizeToFit(stampUrl, 110, 110) : '')
+  const logoBase64 = safeImageSrc(logoUrl ? await resizeToFit(logoUrl, 180, 48) : '')
 
-  const bankName = b?.bank_name || p?.bank_name || '—'
-  const iik = b?.iik || p?.iik || '—'
-  const bik = b?.bik || p?.bik || '—'
-  const kbe = b?.kbe || p?.kbe || '19'
+  const bankName = escapeHtml(b?.bank_name || p?.bank_name || '—')
+  const iik = escapeHtml(b?.iik || p?.iik || '—')
+  const bik = escapeHtml(b?.bik || p?.bik || '—')
+  const kbe = escapeHtml(b?.kbe || p?.kbe || '19')
 
+  // Для числа результат — цифры, пробелы и запятая, экранирование ничего не
+  // меняет; но если из БД вдруг придёт строка, toLocaleString вернёт её как
+  // есть — поэтому результат всё равно экранируем.
   function formatMoney(n: number): string {
-    return n.toLocaleString('ru-KZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace('.', ',')
+    return escapeHtml(n.toLocaleString('ru-KZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace('.', ','))
   }
+
+  const number = escapeHtml(data.number)
+  const date = escapeHtml(data.date)
+  const clientBin = escapeHtml(data.clientBin)
+  const clientName = escapeHtml(data.clientName)
+  const clientAddress = escapeHtml(data.clientAddress)
+  const clientPhone = escapeHtml(data.clientPhone)
+  const contractNumber = escapeHtml(data.contractNumber)
+  const contractDate = escapeHtml(data.contractDate)
+  const note = escapeHtml(data.note)
+  const knp = escapeHtml(data.knp || '849')
 
   // QR для оплаты рисуем локально, а не через api.qrserver.com, как было
   // раньше. Тот вариант отправлял ссылку на счёт (data.viewUrl — публичный
@@ -131,9 +166,9 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<string> {
   // используется во всех остальных местах — печатная форма была последней,
   // где осталась внешняя зависимость.
   const qrTarget = data.viewUrl || data.kaspiPayLink || ''
-  const qrDataUrl = qrTarget
+  const qrDataUrl = safeImageSrc(qrTarget
     ? await QRCode.toDataURL(qrTarget, { width: 200, margin: 1 }).catch(() => '')
-    : ''
+    : '')
 
   const totalWords = numberToWords(Math.floor(data.total)) + ' тенге 00 тиын'
   const vatType = data.vatType || 'no_vat'
@@ -225,11 +260,11 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<string> {
         <tr>
           <td><b>Банк бенефициара:</b><br>${bankName}</td>
           <td style="text-align:center"><b>БИК</b><br><br>${bik}</td>
-          <td style="text-align:center"><b>Код назначения платежа</b><br>${data.knp || '849'}</td>
+          <td style="text-align:center"><b>Код назначения платежа</b><br>${knp}</td>
         </tr>
       </table>
 
-      <div class="title">Счет на оплату №${data.number} от ${data.date}</div>
+      <div class="title">Счет на оплату №${number} от ${date}</div>
 
       <table style="width:100%; border-collapse:collapse; margin-bottom:10px;">
         <tr>
@@ -238,11 +273,11 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<string> {
         </tr>
         <tr>
           <td style="font-weight:bold; vertical-align:top; padding:3px 0;">Покупатель:</td>
-          <td style="padding:3px 0;">${data.clientBin ? 'ИИН/БИН: ' + data.clientBin + ', ' : ''}${data.clientName}${data.clientAddress ? ', ' + data.clientAddress : ''}${data.clientPhone ? ', тел: ' + data.clientPhone : ''}</td>
+          <td style="padding:3px 0;">${clientBin ? 'ИИН/БИН: ' + clientBin + ', ' : ''}${clientName}${clientAddress ? ', ' + clientAddress : ''}${clientPhone ? ', тел: ' + clientPhone : ''}</td>
         </tr>
         <tr>
           <td style="font-weight:bold; vertical-align:top; padding:3px 0;">Договор:</td>
-          <td style="padding:3px 0;">${data.contractNumber ? '№' + data.contractNumber + (data.contractDate ? ' от ' + data.contractDate : '') : '—'}</td>
+          <td style="padding:3px 0;">${contractNumber ? '№' + contractNumber + (contractDate ? ' от ' + contractDate : '') : '—'}</td>
         </tr>
       </table>
 
@@ -262,10 +297,10 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<string> {
           ${data.services.map((s, i) => `
             <tr>
               <td>${i + 1}</td>
-              <td>${s.code || (i + 1)}</td>
-              <td class="left">${s.name}</td>
-              <td>${s.qty}</td>
-              <td>${s.unit || 'шт'}</td>
+              <td>${escapeHtml(s.code || (i + 1))}</td>
+              <td class="left">${escapeHtml(s.name)}</td>
+              <td>${escapeHtml(s.qty)}</td>
+              <td>${escapeHtml(s.unit || 'шт')}</td>
               <td style="text-align:right">${formatMoney(Number(s.price))}</td>
               <td style="text-align:right">${formatMoney(s.qty * s.price)}</td>
             </tr>
@@ -280,7 +315,7 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<string> {
         Всего к оплате: ${totalWords}<br>
       </div>
 
-      ${data.note ? `<div class="note"><b>Примечание:</b> ${data.note}</div>` : ''}
+      ${note ? `<div class="note"><b>Примечание:</b> ${note}</div>` : ''}
 
       <hr>
 
@@ -345,7 +380,7 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<string> {
       ` : `
         <div class="toolbar" style="position:fixed; top:0; left:0; right:0; background:white; border-bottom:1px solid #e5e7eb; padding:10px 16px; z-index:999; display:flex; align-items:center; justify-content:space-between; gap:8px;">
           <button onclick="window.close()" style="background:#f3f4f6; color:#374151; border:none; padding:8px 14px; border-radius:8px; cursor:pointer; font-size:13px;">← Назад</button>
-          <span style="font-size:12px; color:#6b7280; font-weight:600;">Счёт №${data.number}</span>
+          <span style="font-size:12px; color:#6b7280; font-weight:600;">Счёт №${number}</span>
           <div style="display:flex; gap:6px;">
             <button onclick="window.print()" style="background:#1C2056; color:white; border:none; padding:8px 14px; border-radius:8px; cursor:pointer; font-size:13px;">🖨️ Печать</button>
             <button id="dlBtn" onclick="downloadPDF()" style="background:#2DC48D; color:white; border:none; padding:8px 14px; border-radius:8px; cursor:pointer; font-size:13px;">💾 Скачать PDF</button>
@@ -364,7 +399,7 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<string> {
             if (spacer) spacer.style.display = 'none'
             html2pdf().set({
             margin: 0,
-            filename: 'Счёт-${data.number}.pdf',
+            filename: ${jsString('Счёт-' + String(data.number ?? '') + '.pdf')},
             image: { type: 'jpeg', quality: 0.98 },
             html2canvas: { scale: 2, useCORS: true, logging: false },
             jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }

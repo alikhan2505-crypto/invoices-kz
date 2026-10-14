@@ -33,35 +33,60 @@ interface AVRData {
 }
 
 import { resizeToFit } from './imageResize'
+import { escapeHtml, escapeAttr } from './htmlEscape'
 
-export async function generateAVR(data: AVRData, existingWin?: Window | null) {
-  const win = existingWin || window.open('', '_blank')
+export interface AVRImages {
+  signature?: string
+  stamp?: string
+  logo?: string
+}
 
+// URL картинки (подпись/печать/логотип) идёт в src="…": пропускаем только
+// http(s) и data:image/ (наш же canvas.toDataURL), остальное (javascript:,
+// data:text/html и т.п.) отбрасываем, затем экранируем для атрибута.
+function safeImageSrc(url: string | undefined): string {
+  const u = (url || '').trim()
+  if (!u) return ''
+  if (!/^(https?:|data:image\/)/i.test(u)) return ''
+  return escapeAttr(u)
+}
+
+// Значение для вставки внутрь inline-<script>: JSON-строка, из которой нельзя
+// выйти ни кавычкой, ни '</script>'.
+function jsString(value: string): string {
+  return JSON.stringify(value)
+    .replace(/</g, '\\u003c')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029')
+}
+
+function formatMoney(n: number): string {
+  return escapeHtml(n.toLocaleString('ru-KZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
+}
+
+/**
+ * Чистая сборка HTML акта (форма Р-1). Возвращает null, если в документе нет
+ * услуг (АВР формируется только для услуг). Весь пользовательский текст
+ * экранируется — документ открывается на домене invoices.kz.
+ */
+export function buildAVRHtml(data: AVRData, images: AVRImages = {}): string | null {
   const p = data.profile
-  const companyName = p?.company_name || ''
-  const binIin = p?.bin_iin || ''
-  const address = p?.address || ''
-  const phone = p?.phone || ''
-  const director = p?.director_name || ''
-  const signatureUrl = p?.signature_url || ''
-  const stampUrl = p?.stamp_url || ''
-  const logoUrl = p?.logo_url || ''
+  const companyName = escapeHtml(p?.company_name || '')
+  const binIin = escapeHtml(p?.bin_iin || '')
+  const address = escapeHtml(p?.address || '')
+  const phone = escapeHtml(p?.phone || '')
+  const director = escapeHtml(p?.director_name || '')
 
-  const signatureBase64 = signatureUrl ? await resizeToFit(signatureUrl, 200, 60) : ''
-  const stampBase64 = stampUrl ? await resizeToFit(stampUrl, 100, 100) : ''
-  const logoBase64 = logoUrl ? await resizeToFit(logoUrl, 180, 48) : ''
+  const signatureBase64 = safeImageSrc(images.signature)
+  const stampBase64 = safeImageSrc(images.stamp)
+  const logoBase64 = safeImageSrc(images.logo)
 
-  function formatMoney(n: number): string {
-    return n.toLocaleString('ru-KZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  }
+  const number = escapeHtml(data.number)
+  const date = escapeHtml(data.date)
 
   const servicesOnly = data.services.filter(s => !s.type || s.type === 'service')
 
-  if (servicesOnly.length === 0) {
-    alert('В счёте нет услуг. АВР формируется только для услуг.')
-    if (win) win.close()
-    return
-  }
+  if (servicesOnly.length === 0) return null
 
   const totalAmount = servicesOnly.reduce((sum, s) => sum + s.qty * s.price, 0)
   const vatType = data.vatType || 'no_vat'
@@ -104,7 +129,7 @@ export async function generateAVR(data: AVRData, existingWin?: Window | null) {
       <!-- Toolbar -->
       <div class="toolbar" style="position:fixed; top:0; left:0; right:0; background:white; border-bottom:1px solid #e5e7eb; padding:10px 16px; z-index:999; display:flex; align-items:center; justify-content:space-between;">
         <button onclick="window.close()" style="background:#f3f4f6; border:none; padding:8px 14px; border-radius:8px; cursor:pointer; font-size:13px;">← Назад</button>
-        <span style="font-size:12px; color:#6b7280; font-weight:600;">АВР №${data.number}</span>
+        <span style="font-size:12px; color:#6b7280; font-weight:600;">АВР №${number}</span>
         <div style="display:flex; gap:6px;">
           <button onclick="window.print()" style="background:#1C2056; color:white; border:none; padding:8px 14px; border-radius:8px; cursor:pointer; font-size:13px;">🖨️ Печать</button>
           <button id="dlBtn" onclick="downloadPDF()" style="background:#2DC48D; color:white; border:none; padding:8px 14px; border-radius:8px; cursor:pointer; font-size:13px;">💾 Скачать PDF</button>
@@ -140,10 +165,10 @@ export async function generateAVR(data: AVRData, existingWin?: Window | null) {
         </colgroup>
         <tr>
           <td style="border:none; font-weight:bold; vertical-align:middle;">Заказчик</td>
-          <td style="border:none; border-bottom:1px solid #000; padding-right:20px;">${data.clientName}${data.clientAddress ? ', ' + data.clientAddress : ''}</td>
+          <td style="border:none; border-bottom:1px solid #000; padding-right:20px;">${escapeHtml(data.clientName)}${data.clientAddress ? ', ' + escapeHtml(data.clientAddress) : ''}</td>
           <td style="border:none;"></td>
           <td style="border:1px solid #000; text-align:center; font-size:9px;">ИИН/БИН</td>
-          <td style="border:1px solid #000; text-align:center;">${data.clientBin || ''}</td>
+          <td style="border:1px solid #000; text-align:center;">${escapeHtml(data.clientBin || '')}</td>
         </tr>
         <tr>
           <td style="border:none;"></td>
@@ -166,7 +191,7 @@ export async function generateAVR(data: AVRData, existingWin?: Window | null) {
         <tr style="height:6px;"><td colspan="5" style="border:none;"></td></tr>
         <tr>
           <td style="border:none; font-weight:bold; vertical-align:top; line-height:1.4;">Договор<br>(контракт)</td>
-          <td style="border:none; border-bottom:1px solid #000; padding-right:20px; vertical-align:middle;">${data.contractNumber ? '№' + data.contractNumber + (data.contractDate ? ' от ' + data.contractDate + ' года' : '') : ''}</td>
+          <td style="border:none; border-bottom:1px solid #000; padding-right:20px; vertical-align:middle;">${data.contractNumber ? '№' + escapeHtml(data.contractNumber) + (data.contractDate ? ' от ' + escapeHtml(data.contractDate) + ' года' : '') : ''}</td>
           <td style="border:none;"></td>
           <td style="border:1px solid #000; text-align:center; font-size:9px; vertical-align:middle;">Номер<br>документа</td>
           <td style="border:1px solid #000; text-align:center; font-size:9px; vertical-align:middle;">Дата<br>составления</td>
@@ -175,7 +200,7 @@ export async function generateAVR(data: AVRData, existingWin?: Window | null) {
           <td style="border:none;"></td>
           <td style="border:none;"></td>
           <td style="border:none;"></td>
-          <td style="border:1px solid #000; text-align:center;">${data.number}</td>
+          <td style="border:1px solid #000; text-align:center;">${number}</td>
           <td style="border:1px solid #000; text-align:center;">${new Date().toLocaleDateString('ru-KZ')}</td>
         </tr>
       </table>
@@ -216,11 +241,11 @@ export async function generateAVR(data: AVRData, existingWin?: Window | null) {
           ${servicesOnly.map((s, i) => `
             <tr>
               <td style="text-align:center;">${i + 1}</td>
-              <td>${s.name}</td>
-              <td style="text-align:center;">${data.date}</td>
+              <td>${escapeHtml(s.name)}</td>
+              <td style="text-align:center;">${date}</td>
               <td style="text-align:center;">—</td>
-              <td style="text-align:center;">${s.unit || 'шт'}</td>
-              <td style="text-align:center;">${s.qty}</td>
+              <td style="text-align:center;">${escapeHtml(s.unit || 'шт')}</td>
+              <td style="text-align:center;">${escapeHtml(s.qty)}</td>
               <td style="text-align:right;">${formatMoney(Number(s.price))}</td>
               <td style="text-align:right;">${formatMoney(s.qty * s.price)}</td>
             </tr>
@@ -322,7 +347,7 @@ export async function generateAVR(data: AVRData, existingWin?: Window | null) {
           if (spacer) spacer.style.display = 'none'
           html2pdf().set({
             margin: [8, 8, 8, 8],
-            filename: 'АВР-${data.number}.pdf',
+            filename: ${jsString('АВР-' + String(data.number ?? '') + '.pdf')},
             image: { type: 'jpeg', quality: 0.98 },
             html2canvas: { scale: 2, useCORS: true, logging: false },
             jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
@@ -337,6 +362,28 @@ export async function generateAVR(data: AVRData, existingWin?: Window | null) {
     </body>
     </html>
   `
+  return html
+}
+
+export async function generateAVR(data: AVRData, existingWin?: Window | null) {
+  const win = existingWin || window.open('', '_blank')
+
+  const p = data.profile
+  const signatureUrl = p?.signature_url || ''
+  const stampUrl = p?.stamp_url || ''
+  const logoUrl = p?.logo_url || ''
+
+  const signature = signatureUrl ? await resizeToFit(signatureUrl, 200, 60) : ''
+  const stamp = stampUrl ? await resizeToFit(stampUrl, 100, 100) : ''
+  const logo = logoUrl ? await resizeToFit(logoUrl, 180, 48) : ''
+
+  const html = buildAVRHtml(data, { signature, stamp, logo })
+
+  if (html === null) {
+    alert('В счёте нет услуг. АВР формируется только для услуг.')
+    if (win) win.close()
+    return
+  }
 
   if (win) {
     win.document.write(html)

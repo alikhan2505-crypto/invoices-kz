@@ -7,7 +7,7 @@ interface KPService {
   description?: string
 }
 
-interface KPData {
+export interface KPData {
   number: string
   date: string
   validUntil?: string
@@ -37,17 +37,34 @@ interface KPData {
 }
 
 import { resizeToFit } from './imageResize'
+import { escapeHtml, escapeAttr } from './htmlEscape'
+
+/** Картинки (подпись/печать/логотип) после resizeToFit: обычно data:image/png, но при ошибке загрузки — исходный URL из профиля. */
+export interface KPImages {
+  signature?: string
+  stamp?: string
+  logo?: string
+}
+
+// В src="" пускаем только http(s) и наши data:image/ — всё остальное
+// (javascript:, data:text/html, мусор) выбрасываем. Плюс экранирование атрибута.
+function safeImageSrc(url: string | undefined): string {
+  const u = (url || '').trim()
+  if (!u) return ''
+  if (!/^(https?:|data:image\/)/i.test(u)) return ''
+  return escapeAttr(u)
+}
+
+// Значение для строкового литерала внутри инлайн-<script>: JSON.stringify
+// закрывает кавычки/обратные слэши, а «<» превращается в JS-эскейп
+// (обратный слэш + u003c), чтобы текст не закрыл </script> и не открыл <!--.
+const JS_LT = String.fromCharCode(92) + 'u003c'
+function jsString(value: string): string {
+  return JSON.stringify(value).replace(/</g, JS_LT)
+}
 
 export async function generateKP(data: KPData, existingWin?: Window | null) {
   const p = data.profile
-  const b = data.bank
-
-  const companyName = p?.company_name || 'ИП First Project'
-  const binIin = p?.bin_iin || ''
-  const address = p?.address || ''
-  const phone = p?.phone || ''
-  const email = p?.email || ''
-  const director = p?.director_name || ''
   const signatureUrl = p?.signature_url || ''
   const stampUrl = p?.stamp_url || ''
   const logoUrl = p?.logo_url || ''
@@ -58,15 +75,45 @@ export async function generateKP(data: KPData, existingWin?: Window | null) {
   const stampBase64 = stampUrl ? await resizeToFit(stampUrl, 110, 110) : ''
   const logoBase64 = logoUrl ? await resizeToFit(logoUrl, 180, 48) : ''
 
+  const html = buildKPHtml(data, { signature: signatureBase64, stamp: stampBase64, logo: logoBase64 })
+
+  const win = existingWin || window.open('', '_blank')
+  if (win) {
+    win.document.write(html)
+    win.document.close()
+  }
+}
+
+/**
+ * Чистая сборка HTML коммерческого предложения. Весь пользовательский текст
+ * (профиль продавца, клиент — в т.ч. из госреестра, позиции, банк) экранируется.
+ */
+export function buildKPHtml(data: KPData, images: KPImages = {}): string {
+  const p = data.profile
+  const b = data.bank
+
+  const companyName = escapeHtml(p?.company_name || 'ИП First Project')
+  const binIin = escapeHtml(p?.bin_iin || '')
+  const address = escapeHtml(p?.address || '')
+  const phone = escapeHtml(p?.phone || '')
+  const email = escapeHtml(p?.email || '')
+  const director = escapeHtml(p?.director_name || '')
+  const kpNumber = escapeHtml(data.number)
+  const kpDate = escapeHtml(data.date)
+
+  const signatureBase64 = safeImageSrc(images.signature)
+  const stampBase64 = safeImageSrc(images.stamp)
+  const logoBase64 = safeImageSrc(images.logo)
+
   function formatMoney(n: number): string {
-    return n.toLocaleString('ru-KZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    return escapeHtml(n.toLocaleString('ru-KZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
   }
 
-  const validDate = data.validUntil || (() => {
+  const validDate = escapeHtml(data.validUntil || (() => {
     const d = new Date()
     d.setDate(d.getDate() + 30)
     return d.toLocaleDateString('ru-KZ')
-  })()
+  })())
 
   // НДС расчёт
   const vatType = data.vatType || 'no_vat'
@@ -255,7 +302,7 @@ export async function generateKP(data: KPData, existingWin?: Window | null) {
       <!-- Toolbar -->
       <div class="toolbar" style="position:fixed; top:0; left:0; right:0; background:white; border-bottom:1px solid #e5e7eb; padding:10px 16px; z-index:999; display:flex; align-items:center; justify-content:space-between; gap:8px;">
         <button onclick="window.close()" style="background:#f3f4f6; color:#374151; border:none; padding:8px 14px; border-radius:8px; cursor:pointer; font-size:13px;">← Назад</button>
-        <span style="font-size:12px; color:#6b7280; font-weight:600;">КП №${data.number}</span>
+        <span style="font-size:12px; color:#6b7280; font-weight:600;">КП №${kpNumber}</span>
         <div style="display:flex; gap:6px;">
           <button onclick="window.print()" style="background:#1C2056; color:white; border:none; padding:8px 14px; border-radius:8px; cursor:pointer; font-size:13px;">🖨️ Печать</button>
           <button id="dlBtn" onclick="downloadPDF()" style="background:#2DC48D; color:white; border:none; padding:8px 14px; border-radius:8px; cursor:pointer; font-size:13px;">💾 Скачать PDF</button>
@@ -281,8 +328,8 @@ export async function generateKP(data: KPData, existingWin?: Window | null) {
         </div>
         <div class="header-right">
           <div class="kp-label">КОММЕРЧЕСКОЕ ПРЕДЛОЖЕНИЕ</div>
-          <div class="kp-number">№ ${data.number}</div>
-          <div class="kp-date">от ${data.date}</div>
+          <div class="kp-number">№ ${kpNumber}</div>
+          <div class="kp-date">от ${kpDate}</div>
         </div>
       </div>
       <div class="accent-bar"></div>
@@ -308,9 +355,9 @@ export async function generateKP(data: KPData, existingWin?: Window | null) {
           </div>
           <div class="party client">
             <div class="party-label">Покупатель</div>
-            <div class="party-name">${data.clientName}</div>
+            <div class="party-name">${escapeHtml(data.clientName)}</div>
             <div class="party-detail">
-              ${data.clientBin ? 'БИН/ИИН: ' + data.clientBin : ''}
+              ${data.clientBin ? 'БИН/ИИН: ' + escapeHtml(data.clientBin) : ''}
             </div>
           </div>
         </div>
@@ -333,10 +380,10 @@ export async function generateKP(data: KPData, existingWin?: Window | null) {
             ${data.services.map((s, i) => `
               <tr>
                 <td>${i + 1}</td>
-                <td>${s.code || (i + 1)}</td>
-                <td class="name">${s.name}</td>
-                <td>${s.qty}</td>
-                <td>${s.unit || 'шт'}</td>
+                <td>${escapeHtml(s.code || (i + 1))}</td>
+                <td class="name">${escapeHtml(s.name)}</td>
+                <td>${escapeHtml(s.qty)}</td>
+                <td>${escapeHtml(s.unit || 'шт')}</td>
                 <td class="right">${formatMoney(Number(s.price))} ₸</td>
                 <td class="right">${formatMoney(s.qty * s.price)} ₸</td>
               </tr>
@@ -358,19 +405,19 @@ export async function generateKP(data: KPData, existingWin?: Window | null) {
           <div class="bank-grid">
             <div class="bank-item">
               <label>Банк</label>
-              <span>${b.bank_name}</span>
+              <span>${escapeHtml(b.bank_name)}</span>
             </div>
             <div class="bank-item">
               <label>ИИК</label>
-              <span>${b.iik}</span>
+              <span>${escapeHtml(b.iik)}</span>
             </div>
             <div class="bank-item">
               <label>БИК</label>
-              <span>${b.bik}</span>
+              <span>${escapeHtml(b.bik)}</span>
             </div>
             <div class="bank-item">
               <label>КБе</label>
-              <span>${b.kbe || '19'}</span>
+              <span>${escapeHtml(b.kbe || '19')}</span>
             </div>
           </div>
         </div>
@@ -388,7 +435,7 @@ export async function generateKP(data: KPData, existingWin?: Window | null) {
           </div>
           <div style="width:45%; text-align:right;">
             <div style="font-size:10px; color:#888; margin-bottom:8px;">Дата составления</div>
-            <div style="font-size:12px; font-weight:bold; color:#1C2056;">${data.date}</div>
+            <div style="font-size:12px; font-weight:bold; color:#1C2056;">${kpDate}</div>
             <div style="font-size:10px; color:#888; margin-top:12px;">Действителен до</div>
             <div style="font-size:12px; font-weight:bold; color:#2DC48D;">${validDate}</div>
           </div>
@@ -416,7 +463,7 @@ export async function generateKP(data: KPData, existingWin?: Window | null) {
           if (spacer) spacer.style.display = 'none'
           html2pdf().set({
             margin: 0,
-            filename: 'КП-${data.number}.pdf',
+            filename: ${jsString('КП-' + data.number + '.pdf')},
             image: { type: 'jpeg', quality: 0.98 },
             html2canvas: { scale: 2, useCORS: true, logging: false },
             jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
@@ -432,9 +479,5 @@ export async function generateKP(data: KPData, existingWin?: Window | null) {
     </html>
   `
 
-  const win = existingWin || window.open('', '_blank')
-  if (win) {
-    win.document.write(html)
-    win.document.close()
-  }
+  return html
 }

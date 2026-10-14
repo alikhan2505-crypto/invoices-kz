@@ -2,6 +2,7 @@
 import QRCode from 'qrcode'
 import { QRSigningClientCMS } from 'sigex-qr-signing-client'
 import { supabase } from './supabase'
+import { escapeHtml } from './htmlEscape'
 
 // Renders the same HTML `generateInvoicePDF()` produces into a real PDF Blob
 // (client-side, via html2canvas+jsPDF under the hood) instead of opening the
@@ -86,10 +87,10 @@ export async function buildAttestationHtml(params: {
     <div style="margin-top:16px; padding:12px 16px; border:1px solid #2DC48D; border-radius:8px; background:rgba(45,196,141,0.06); display:flex; gap:14px; align-items:center;">
       <img src="${qrDataUrl}" style="width:64px; height:64px; flex-shrink:0;" />
       <div style="font-size:10px; color:#333; line-height:1.6;">
-        <div style="font-size:11px; font-weight:bold; color:#1C2056; margin-bottom:4px;">✅ ${title}</div>
-        ${signerName}${onBehalfOfText ? `, ${onBehalfOfText}` : ''}${iinText ? ` · ${iinText}` : ''}<br>
-        ${dateLabel} ${date}<br>
-        ${verifyCodeLabel} ${sigexDocumentId}
+        <div style="font-size:11px; font-weight:bold; color:#1C2056; margin-bottom:4px;">✅ ${escapeHtml(title)}</div>
+        ${escapeHtml(signerName)}${onBehalfOfText ? `, ${escapeHtml(onBehalfOfText)}` : ''}${iinText ? ` · ${escapeHtml(iinText)}` : ''}<br>
+        ${escapeHtml(dateLabel)} ${escapeHtml(date)}<br>
+        ${escapeHtml(verifyCodeLabel)} ${escapeHtml(sigexDocumentId)}
       </div>
     </div>
   `

@@ -29,6 +29,23 @@ interface NakladnayaData {
 }
 
 import { resizeToFit } from './imageResize'
+import { escapeHtml, escapeAttr } from './htmlEscape'
+
+// URL картинки (логотип/подпись/печать) в src: resizeToFit при ошибке загрузки
+// возвращает исходный URL из профиля как есть, поэтому пропускаем только
+// http(s) и наши data:image/ — всё остальное (javascript: и т. п.) выбрасываем.
+function safeImageSrc(url: string): string {
+  const u = (url || '').trim()
+  if (!u) return ''
+  if (/^https?:/i.test(u) || /^data:image\//i.test(u)) return escapeAttr(u)
+  return ''
+}
+
+// Строка для вставки внутрь inline <script>: JSON-литерал, «<» как JS-эскейп (обратный слэш + u003c),
+// чтобы «</script» из пользовательского текста не закрыл тег.
+function jsString(value: string): string {
+  return JSON.stringify(value).replace(/</g, '\\u003c')
+}
 
 function numToWordsNakl(n: number): string {
   const ones = ['','один','два','три','четыре','пять','шесть','семь','восемь','девять',
@@ -67,11 +84,6 @@ export async function generateNakladnaya(data: NakladnayaData, existingWin?: Win
   const win = existingWin || window.open('', '_blank')
 
   const p = data.profile
-  const companyName = p?.company_name || ''
-  const binIin = p?.bin_iin || ''
-  const address = p?.address || ''
-  const phone = p?.phone || ''
-  const director = p?.director_name || ''
   const signatureUrl = p?.signature_url || ''
   const stampUrl = p?.stamp_url || ''
   const logoUrl = p?.logo_url || ''
@@ -80,17 +92,49 @@ export async function generateNakladnaya(data: NakladnayaData, existingWin?: Win
   const stampBase64 = stampUrl ? await resizeToFit(stampUrl, 90, 90) : ''
   const logoBase64 = logoUrl ? await resizeToFit(logoUrl, 180, 48) : ''
 
-  function formatMoney(n: number): string {
-    return n.toLocaleString('ru-KZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  }
+  const html = buildNakladnayaHtml(data, { signatureBase64, stampBase64, logoBase64 })
 
-  const productsOnly = data.services.filter(s => s.type === 'product')
-
-  if (productsOnly.length === 0) {
+  if (html === null) {
     alert('В счёте нет товаров. Накладная формируется только для товаров.')
     if (win) win.close()
     return
   }
+
+  if (win) {
+    win.document.write(html)
+    win.document.close()
+  }
+}
+
+/**
+ * Чистая сборка HTML накладной (без окна) — весь пользовательский текст
+ * экранируется. Возвращает null, если в счёте нет товаров.
+ */
+export function buildNakladnayaHtml(
+  data: NakladnayaData,
+  images: { signatureBase64?: string; stampBase64?: string; logoBase64?: string } = {},
+): string | null {
+  const p = data.profile
+  const companyName = escapeHtml(p?.company_name || '')
+  const binIin = escapeHtml(p?.bin_iin || '')
+  const address = escapeHtml(p?.address || '')
+  const phone = escapeHtml(p?.phone || '')
+  const director = escapeHtml(p?.director_name || '')
+  const number = escapeHtml(data.number)
+  const clientName = escapeHtml(data.clientName)
+  const clientBin = escapeHtml(data.clientBin || '')
+
+  const signatureBase64 = safeImageSrc(images.signatureBase64 || '')
+  const stampBase64 = safeImageSrc(images.stampBase64 || '')
+  const logoBase64 = safeImageSrc(images.logoBase64 || '')
+
+  function formatMoney(n: number): string {
+    return escapeHtml(n.toLocaleString('ru-KZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
+  }
+
+  const productsOnly = data.services.filter(s => s.type === 'product')
+
+  if (productsOnly.length === 0) return null
 
   const totalAmount = productsOnly.reduce((sum, s) => sum + s.qty * s.price, 0)
   const vatType = data.vatType || 'no_vat'
@@ -134,7 +178,7 @@ td, th { border: 1px solid #000; padding: 3px 4px; vertical-align: middle; word-
 <!-- Toolbar -->
 <div class="toolbar" style="position:fixed;top:0;left:0;right:0;background:white;border-bottom:1px solid #e5e7eb;padding:8px 16px;z-index:999;display:flex;align-items:center;justify-content:space-between;">
   <button onclick="window.close()" style="background:#f3f4f6;border:none;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px;">← Назад</button>
-  <span style="font-size:11px;color:#6b7280;font-weight:600;">Накладная №${data.number}</span>
+  <span style="font-size:11px;color:#6b7280;font-weight:600;">Накладная №${number}</span>
   <div style="display:flex;gap:6px;">
     <button onclick="window.print()" style="background:#1C2056;color:white;border:none;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px;">🖨️ Печать</button>
     <button id="dlBtn" onclick="downloadPDF()" style="background:#2DC48D;color:white;border:none;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px;">💾 Скачать PDF</button>
@@ -198,8 +242,8 @@ ${logoBase64 ? `
   <tr>
     <td class="nb"></td>
     <td class="nb"></td>
-    <td style="text-align:center;">${data.number}</td>
-    <td style="text-align:center;">${data.date || new Date().toLocaleDateString('ru-KZ')}</td>
+    <td style="text-align:center;">${number}</td>
+    <td style="text-align:center;">${escapeHtml(data.date || new Date().toLocaleDateString('ru-KZ'))}</td>
   </tr>
 </table>
 
@@ -219,7 +263,7 @@ ${logoBase64 ? `
   </tr>
   <tr>
     <td style="text-align:center;padding:4px;">${companyName}<br>${binIin ? 'БИН: ' + binIin : ''}</td>
-    <td style="text-align:center;padding:4px;">${data.clientName}<br>${data.clientBin ? 'БИН: ' + data.clientBin : ''}</td>
+    <td style="text-align:center;padding:4px;">${clientName}<br>${clientBin ? 'БИН: ' + clientBin : ''}</td>
     <td style="text-align:center;padding:4px;">${director}</td>
     <td></td>
     <td></td>
@@ -254,11 +298,11 @@ ${logoBase64 ? `
       const itemVat = vatType === 'vat_16' ? Math.round(itemTotal - itemTotal / 1.16) : 0
       return `<tr>
         <td style="text-align:center;">${i + 1}</td>
-        <td>${s.name}</td>
-        <td style="text-align:center;">${s.code || (i + 1)}</td>
-        <td style="text-align:center;">${s.unit || 'шт'}</td>
-        <td style="text-align:center;">${s.qty}</td>
-        <td style="text-align:center;">${s.qty}</td>
+        <td>${escapeHtml(s.name)}</td>
+        <td style="text-align:center;">${escapeHtml(s.code || (i + 1))}</td>
+        <td style="text-align:center;">${escapeHtml(s.unit || 'шт')}</td>
+        <td style="text-align:center;">${escapeHtml(s.qty)}</td>
+        <td style="text-align:center;">${escapeHtml(s.qty)}</td>
         <td style="text-align:right;">${formatMoney(Number(s.price))}</td>
         <td style="text-align:right;">${formatMoney(itemTotal)}</td>
         <td style="text-align:right;">${formatMoney(itemVat)}</td>
@@ -403,7 +447,7 @@ function downloadPDF() {
   if (spacer) spacer.style.display = 'none'
   html2pdf().set({
     margin: 0,
-    filename: 'Накладная-${data.number}.pdf',
+    filename: ${jsString('Накладная-' + data.number + '.pdf')},
     image: { type: 'jpeg', quality: 0.98 },
     html2canvas: { scale: 2, useCORS: true, logging: false, windowWidth: 1123, scrollX: 0, scrollY: 0, x: 0, y: 0 },
     jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
@@ -418,8 +462,5 @@ function downloadPDF() {
 </body>
 </html>`
 
-  if (win) {
-    win.document.write(html)
-    win.document.close()
-  }
+  return html
 }
