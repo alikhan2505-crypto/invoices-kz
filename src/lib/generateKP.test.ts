@@ -136,3 +136,11 @@ describe('buildKPHtml — примечание', () => {
     expect(buildKPHtml(baseData({ note: '   ' }))).not.toContain('class="note-block"')
   })
 })
+
+describe('buildKPHtml — футер', () => {
+  it('слоган как на машине: «Сервисы для бизнеса в Казахстане»', () => {
+    const html = buildKPHtml(baseData())
+    expect(html).toContain('<div class="footer-sub">Сервисы для бизнеса в Казахстане</div>')
+    expect(html).not.toContain('Профессиональные счета')
+  })
+})

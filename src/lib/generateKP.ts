@@ -491,7 +491,7 @@ export function buildKPHtml(data: KPData, images: KPImages = {}): string {
       <div class="footer">
         <div>
           <div class="footer-brand">INVOICES.KZ</div>
-          <div class="footer-sub">Профессиональные счета для казахстанского бизнеса</div>
+          <div class="footer-sub">Сервисы для бизнеса в Казахстане</div>
         </div>
         <div class="footer-sub">invoices.kz</div>
       </div>
