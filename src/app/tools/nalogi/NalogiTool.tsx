@@ -1,5 +1,5 @@
 'use client'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import BrandWordmark from '@/components/BrandWordmark'
 import { track } from '@vercel/analytics'
@@ -7,6 +7,8 @@ import { calculateIpTaxes, MRP_2026, MZP_2026 } from '@/lib/ipTaxes'
 import { formatTenge, isToolLocalized, toolLinkPath, toolsIndexPath, TOOL_CHROME, type ToolLang } from '@/lib/tools-i18n'
 import ToolLangSwitch from '@/lib/tools-i18n/ToolLangSwitch'
 import ToolCta from '@/lib/tools-i18n/ToolCta'
+import { logToolEvent } from '@/lib/tools-i18n/toolEvents'
+import { useToolView } from '@/lib/tools-i18n/useToolEvents'
 import { nalogiDict, type RichLine } from './dict'
 
 // Калькулятор налогов ИП на упрощёнке — 2026, один и тот же для
@@ -47,6 +49,17 @@ export default function NalogiTool({ lang }: { lang: ToolLang }) {
   }), [income, base, before1975, rate])
 
   const onChange = (fn: () => void) => { fn(); if (!touched) { setTouched(true); track('tool_nalogi_calc', { lang }) } }
+
+  useToolView('nalogi', lang)
+  // «Документ» калькулятора — первый расчёт по своим цифрам за загрузку
+  // страницы: когда человек что-то поменял и полторы секунды не печатает
+  // (не на каждую нажатую цифру). Расчёт по умолчанию не считается.
+  const docSent = useRef(false)
+  useEffect(() => {
+    if (!touched || docSent.current) return
+    const timer = setTimeout(() => { docSent.current = true; logToolEvent('doc', 'nalogi', { lang }) }, 1500)
+    return () => clearTimeout(timer)
+  }, [touched, income, base, before1975, rate, lang])
 
   // Что расчёт на самом деле взял за базу взносов — чтобы цифра в итоге не
   // выглядела ошибкой, когда введённая база вышла за коридор МЗП.

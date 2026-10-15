@@ -9,6 +9,8 @@ import { formatTenge, guidesIndexPath, toolPath, toolsIndexPath, TOOL_CHROME, ty
 import ToolLangSwitch from '@/lib/tools-i18n/ToolLangSwitch'
 import ToolCta from '@/lib/tools-i18n/ToolCta'
 import { useToolSession } from '@/lib/tools-i18n/useToolSession'
+import { logToolEvent } from '@/lib/tools-i18n/toolEvents'
+import { useToolLimitEvent, useToolView } from '@/lib/tools-i18n/useToolEvents'
 import { anonymousToolHref, signedInToolHref } from '@/lib/tools-i18n/signedInDestination'
 import BinNameField from '@/lib/tools-i18n/BinNameField'
 import { claimDocSlot, DOC_QUOTA_DEFAULT_LIMIT, useDocQuota } from '@/lib/tools-i18n/docQuota'
@@ -105,6 +107,8 @@ export default function NakladnayaTool({ lang }: { lang: ToolLang }) {
   const vat = vatIncluded(total, f.vatType)
 
   const limitReached = quota !== null && quota.remaining <= 0
+  useToolView('nakladnaya', lang)
+  useToolLimitEvent('nakladnaya', lang, limitReached)
 
   const generate = async () => {
     if (limitReached || busy.current) return
@@ -162,6 +166,7 @@ export default function NakladnayaTool({ lang }: { lang: ToolLang }) {
           director_name: f.director.trim() || undefined,
         },
       }, win)
+      logToolEvent('doc', 'nakladnaya', { lang })
       // Email продавца — в базу контактов только с согласием и только после того,
       // как документ открылся. Данные покупателя не отправляются никогда. Ошибка
       // записи документу не мешает. Сам email в бланк не печатается.
@@ -171,7 +176,7 @@ export default function NakladnayaTool({ lang }: { lang: ToolLang }) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ tool: 'nakladnaya', contact: email }),
-        }).catch(() => {})
+        }).then(r => { if (r.ok) logToolEvent('lead', 'nakladnaya', { lang }) }).catch(() => {})
       }
       if (claim.quota.remaining <= 0) track('tool_nakladnaya_limit', { lang })
     } catch {
@@ -188,7 +193,7 @@ export default function NakladnayaTool({ lang }: { lang: ToolLang }) {
   }
 
   // Клик в регистрацию запоминает язык страницы — /login откроется на нём же.
-  const signupClick = () => { setLang(lang); track('tool_nakladnaya_signup_click', { lang, signedIn }) }
+  const signupClick = () => { setLang(lang); track('tool_nakladnaya_signup_click', { lang, signedIn }); logToolEvent('cta', 'nakladnaya', { lang, medium: 'limit' }) }
 
   const input = 'w-full min-w-0 rounded-xl px-3 py-2.5 text-sm outline-none'
   // WebkitTextFillColor обязателен: глобальное `input { -webkit-text-fill-color:

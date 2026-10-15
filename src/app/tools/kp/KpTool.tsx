@@ -9,6 +9,8 @@ import { formatTenge, isToolLocalized, toolLinkPath, toolsIndexPath, TOOL_CHROME
 import ToolLangSwitch from '@/lib/tools-i18n/ToolLangSwitch'
 import ToolCta from '@/lib/tools-i18n/ToolCta'
 import { useToolSession } from '@/lib/tools-i18n/useToolSession'
+import { logToolEvent } from '@/lib/tools-i18n/toolEvents'
+import { useToolLimitEvent, useToolView } from '@/lib/tools-i18n/useToolEvents'
 import { anonymousToolHref, signedInToolHref } from '@/lib/tools-i18n/signedInDestination'
 import BinNameField from '@/lib/tools-i18n/BinNameField'
 import { kpDict } from './dict'
@@ -120,6 +122,8 @@ export default function KpTool({ lang }: { lang: ToolLang }) {
   const total = useMemo(() => kpTotal(f.rows), [f.rows])
 
   const limitReached = quota !== null && quota.remaining <= 0
+  useToolView('kp', lang)
+  useToolLimitEvent('kp', lang, limitReached)
 
   const validate = (): string => {
     if (!f.companyName.trim()) return t.errCompany
@@ -204,6 +208,7 @@ export default function KpTool({ lang }: { lang: ToolLang }) {
           director_name: f.director.trim() || undefined,
         },
       }, win)
+      logToolEvent('doc', 'kp', { lang })
       // Email поставщика — в базу контактов только с согласием. Email
       // покупателя не сохраняется никогда. Ошибка записи КП не ломает.
       const email = f.email.trim()
@@ -212,7 +217,7 @@ export default function KpTool({ lang }: { lang: ToolLang }) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ tool: 'kp', contact: email }),
-        }).catch(() => {})
+        }).then(r => { if (r.ok) logToolEvent('lead', 'kp', { lang }) }).catch(() => {})
       }
     } finally {
       setGenerating(false)
@@ -388,7 +393,7 @@ export default function KpTool({ lang }: { lang: ToolLang }) {
               {quota?.resetsAt ? `${t.limitReset(quota.resetsAt)} ` : ''}{signedIn ? t.limitBodySignedIn : t.limitBody}
             </p>
             <a href={signedIn ? signedInToolHref('kp', 'limit') : anonymousToolHref('kp', 'limit')}
-              onClick={() => { setLang(lang); track('tool_kp_signup_click', { lang, signedIn }) }}
+              onClick={() => { setLang(lang); track('tool_kp_signup_click', { lang, signedIn }); logToolEvent('cta', 'kp', { lang, medium: 'limit' }) }}
               className="inline-block rounded-xl px-5 py-2.5 text-sm font-semibold transition-transform hover:-translate-y-0.5"
               style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
               {signedIn ? chrome.ctaSignedInButton : t.limitButton}

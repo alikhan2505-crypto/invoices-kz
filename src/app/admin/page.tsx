@@ -9,6 +9,8 @@ import { deleteLabel } from '@/lib/a11yLabels'
 import { miscDict } from '@/lib/i18n/misc'
 import { getActivePlan } from '@/lib/plan'
 import { useAppDialog } from '@/components/AppDialog'
+import { INTERNAL_KEY } from '@/lib/tools-i18n/toolEvents'
+import ToolFunnelTab from './ToolFunnelTab'
 
 export default function Admin() {
   const router = useRouter()
@@ -24,7 +26,7 @@ export default function Admin() {
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({ users: 0, invoices: 0, paid: 0 })
   const [search, setSearch] = useState('')
-  const [tab, setTab] = useState<'users' | 'promos' | 'stats' | 'payments'>('payments')
+  const [tab, setTab] = useState<'users' | 'promos' | 'stats' | 'payments' | 'tools'>('payments')
   const [newPromo, setNewPromo] = useState({ code: '', plan: 'basic', days: 30, max_uses: 100 })
   const [savingPromo, setSavingPromo] = useState(false)
   const [regChart, setRegChart] = useState<{ day: string; count: number }[]>([])
@@ -42,6 +44,10 @@ export default function Admin() {
       .from('profiles').select('is_admin').eq('id', user.id).single()
 
     if (!profile?.is_admin) { router.push('/dashboard'); return }
+
+    // Браузер админа — «наш»: его визиты в бесплатные инструменты (и до, и
+    // после этого момента) не попадают в воронку вкладки «Инструменты».
+    try { localStorage.setItem(INTERNAL_KEY, '1') } catch {}
 
     const [{ data: allUsers }, { data: allInvoices }, { data: allPromos }, { data: allPayments }, { data: allWebhookLogs }, { data: allKp }, { data: allAvr }, { data: allNakladnaya }] = await Promise.all([
       supabase.from('profiles').select('*').order('created_at', { ascending: false }),
@@ -315,7 +321,13 @@ export default function Admin() {
             className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap ${tab === 'stats' ? 'bg-[#1C2056] text-white' : 'bg-gray-800 text-gray-400'}`}>
             {t.statsTabLabel}
           </button>
+          <button onClick={() => setTab('tools')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap ${tab === 'tools' ? 'bg-[#1C2056] text-white' : 'bg-gray-800 text-gray-400'}`}>
+            Инструменты
+          </button>
         </div>
+
+        {tab === 'tools' && <ToolFunnelTab />}
 
         {tab === 'payments' && (
           <div className="space-y-3">

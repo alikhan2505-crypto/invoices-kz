@@ -6,6 +6,7 @@ import { useLanguage } from '@/components/LanguageProvider'
 import { authDict } from '@/lib/i18n/auth'
 import { choosePostLoginDestination, readPostLoginIntents } from '@/lib/postLoginDestination'
 import { selectablePersonaProducts, parsePersonaKeys, PENDING_PERSONA_KEY } from '@/lib/products'
+import { logToolEvent, readFirstTouch } from '@/lib/tools-i18n/toolEvents'
 
 export default function AuthCallback() {
   const router = useRouter()
@@ -235,6 +236,16 @@ export default function AuthCallback() {
               }),
             })
           } catch {}
+
+          // Своя аналитика бесплатных инструментов: регистрация засчитывается
+          // инструменту первого касания этого браузера (младше 30 дней), иначе
+          // tool='none'. Выстрелил и забыл (fetch keepalive с токеном — сервер
+          // берёт из него user_id): переход ниже не ждёт и не может сломаться.
+          const firstTouch = readFirstTouch()
+          logToolEvent('signup', firstTouch?.tool ?? 'none', {
+            accessToken: session.access_token,
+            utm: { source: firstTouch?.utm_source, medium: firstTouch?.utm_medium, campaign: firstTouch?.utm_campaign },
+          })
 
           goToDestination()
         } else {

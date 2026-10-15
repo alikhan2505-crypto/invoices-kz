@@ -12,6 +12,8 @@ import { KASPI_CATEGORY_COMMISSIONS } from '@/lib/kaspiShop/margin'
 import { formatTenge, guidesIndexPath, toolPath, toolsIndexPath, TOOL_CHROME, type ToolLang } from '@/lib/tools-i18n'
 import ToolLangSwitch from '@/lib/tools-i18n/ToolLangSwitch'
 import ToolCta from '@/lib/tools-i18n/ToolCta'
+import { logToolEvent } from '@/lib/tools-i18n/toolEvents'
+import { useToolView } from '@/lib/tools-i18n/useToolEvents'
 import { marginDict, type MarginFieldKey } from './dict'
 import { formatPercent, parseAmount } from './numbers'
 
@@ -90,6 +92,10 @@ export default function MarginTool({ lang }: { lang: ToolLang }) {
   // would drown the real numbers we are trying to learn from.
   const touched = useRef(false)
   const statTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Своя аналитика (tool_events): 'doc' — первый расчёт по своим цифрам за
+  // загрузку страницы (на том же дебаунсе, что и статистика), и каждая выгрузка Excel.
+  const docSent = useRef(false)
+  useToolView('margin', lang)
 
   // parseAmount, not Number(): «12,5» and «10 000» are how people here type
   // numbers, and Number() turned both into 0 without a word. lang matters on
@@ -156,9 +162,12 @@ export default function MarginTool({ lang }: { lang: ToolLang }) {
   useEffect(() => {
     if (!touched.current) return
     if (statTimer.current) clearTimeout(statTimer.current)
-    statTimer.current = setTimeout(() => sendStat(false), 2500)
+    statTimer.current = setTimeout(() => {
+      sendStat(false)
+      if (!docSent.current) { docSent.current = true; logToolEvent('doc', 'margin', { lang }) }
+    }, 2500)
     return () => { if (statTimer.current) clearTimeout(statTimer.current) }
-  }, [sendStat])
+  }, [sendStat, lang])
 
   function exportExcel() {
     const row = (param: string, value: string | number) => ({ [t.excelHeaderParam]: param, [t.excelHeaderValue]: value })
@@ -192,6 +201,7 @@ export default function MarginTool({ lang }: { lang: ToolLang }) {
     // file is the strongest signal the tool produced something useful, and
     // the visitor often leaves right after.
     sendStat(true)
+    logToolEvent('doc', 'margin', { lang, medium: 'export' })
     setExported(true)
   }
 
@@ -200,11 +210,12 @@ export default function MarginTool({ lang }: { lang: ToolLang }) {
     if (!contact) return
     setLeadStatus('sending')
     try {
-      await fetch('/api/tools/lead', {
+      const res = await fetch('/api/tools/lead', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contact, tool: 'margin' }),
       })
+      if (res.ok) logToolEvent('lead', 'margin', { lang })
     } catch {
       // Optional and low-stakes -- a failed send here isn't worth troubling
       // someone who already got what they came for with a retry prompt.
@@ -441,7 +452,7 @@ export default function MarginTool({ lang }: { lang: ToolLang }) {
                   so the landing (another subdomain, shared cookie) opens in it.
                   Ведёт на лендинг Kaspi Bot, а не на #features лендинга счетов
                   (правка основателя 15.10.2026), как в склейке накладных. */}
-              <a href={KASPI_BOT_LANDING} onClick={() => { setLang(lang); track('margin_to_product', { lang }) }}
+              <a href={KASPI_BOT_LANDING} onClick={() => { setLang(lang); track('margin_to_product', { lang }); logToolEvent('cta', 'margin', { lang, medium: 'product' }) }}
                 className="text-sm font-semibold" style={{ color: 'var(--nav-accent)' }}>
                 {t.ctaLink}
               </a>

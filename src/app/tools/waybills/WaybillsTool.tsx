@@ -9,6 +9,8 @@ import { PRODUCTS } from '@/lib/products'
 import { supabase } from '@/lib/supabase'
 import { guidesIndexPath, toolsIndexPath, TOOL_CHROME, type ToolLang } from '@/lib/tools-i18n'
 import ToolLangSwitch from '@/lib/tools-i18n/ToolLangSwitch'
+import { logToolEvent } from '@/lib/tools-i18n/toolEvents'
+import { useToolLimitEvent, useToolView } from '@/lib/tools-i18n/useToolEvents'
 import { waybillsDict } from './dict'
 import { MAX_FILES, MAX_TOTAL_BYTES, addToQueue, expandUploads, sheetCount, totalBytes } from './uploads'
 
@@ -110,6 +112,8 @@ export default function WaybillsTool({ lang }: { lang: ToolLang }) {
 
   const limitReached = quota !== null && !quota.unlimited && quota.remaining <= 0
   const limitInfo = quota !== null && !quota.unlimited ? quota : null
+  useToolView('waybills', lang)
+  useToolLimitEvent('waybills', lang, limitReached && !!limitInfo)
 
   const replaceFiles = (next: File[]) => {
     filesRef.current = next
@@ -223,6 +227,7 @@ export default function WaybillsTool({ lang }: { lang: ToolLang }) {
       // инструмент сделал работу. Число файлов — грубый признак «настоящий
       // продавец или любопытный клик»; имён файлов и ничего личного не шлём.
       track('waybills_merged', { format, files: files.length, lang })
+      logToolEvent('doc', 'waybills', { lang })
       setDone(t.done(files.length, sheetCount(files.length, format)))
       setJustMerged(true)
     } catch {
@@ -237,11 +242,12 @@ export default function WaybillsTool({ lang }: { lang: ToolLang }) {
     if (!contact) return
     setLeadStatus('sending')
     try {
-      await fetch('/api/tools/waybills/lead', {
+      const res = await fetch('/api/tools/waybills/lead', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contact }),
       })
+      if (res.ok) logToolEvent('lead', 'waybills', { lang })
     } catch {
       // Необязательно и без последствий: человек уже получил свой PDF, не
       // стоит дёргать его просьбой повторить.
@@ -360,7 +366,7 @@ export default function WaybillsTool({ lang }: { lang: ToolLang }) {
               {/* Без ограничений — только Kaspi Bot на Про: вошедшего сразу на
                   /upgrade, без сессии — через /login?next=/upgrade. */}
               <a href={signedIn ? UPGRADE_HREF : LOGIN_TO_UPGRADE_HREF}
-                onClick={() => { setLang(lang); track('tool_waybills_upgrade_click', { lang, signedIn }) }}
+                onClick={() => { setLang(lang); track('tool_waybills_upgrade_click', { lang, signedIn }); logToolEvent('cta', 'waybills', { lang, medium: 'upgrade' }) }}
                 className="inline-block rounded-xl px-5 py-2.5 text-sm font-semibold transition-transform hover:-translate-y-0.5"
                 style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                 {t.limitCta}
@@ -448,7 +454,7 @@ export default function WaybillsTool({ lang }: { lang: ToolLang }) {
               {t.ctaBody}
             </p>
             {/* Лендинг на поддомене берёт язык из общей куки — клик запоминает язык страницы. */}
-            <a href={KASPI_BOT_LANDING} onClick={() => { setLang(lang); track('waybills_to_product', { lang }) }}
+            <a href={KASPI_BOT_LANDING} onClick={() => { setLang(lang); track('waybills_to_product', { lang }); logToolEvent('cta', 'waybills', { lang, medium: 'product' }) }}
               className="text-sm font-semibold" style={{ color: 'var(--nav-accent)' }}>
               {t.ctaLink}
             </a>

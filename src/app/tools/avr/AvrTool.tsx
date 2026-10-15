@@ -9,6 +9,8 @@ import { formatTenge, guidesIndexPath, toolsIndexPath, TOOL_CHROME, type ToolLan
 import ToolLangSwitch from '@/lib/tools-i18n/ToolLangSwitch'
 import ToolCta from '@/lib/tools-i18n/ToolCta'
 import { useToolSession } from '@/lib/tools-i18n/useToolSession'
+import { logToolEvent } from '@/lib/tools-i18n/toolEvents'
+import { useToolLimitEvent, useToolView } from '@/lib/tools-i18n/useToolEvents'
 import { anonymousToolHref, signedInToolHref } from '@/lib/tools-i18n/signedInDestination'
 import BinNameField from '@/lib/tools-i18n/BinNameField'
 import { claimDocSlot, DOC_QUOTA_DEFAULT_LIMIT, useDocQuota } from '@/lib/tools-i18n/docQuota'
@@ -110,6 +112,8 @@ export default function AvrTool({ lang }: { lang: ToolLang }) {
   const vat = vatIncluded(total, f.vatType)
 
   const limitReached = quota !== null && quota.remaining <= 0
+  useToolView('avr', lang)
+  useToolLimitEvent('avr', lang, limitReached)
 
   const generate = async () => {
     if (limitReached || busy.current) return
@@ -171,6 +175,7 @@ export default function AvrTool({ lang }: { lang: ToolLang }) {
           director_name: f.director.trim() || undefined,
         },
       }, win)
+      logToolEvent('doc', 'avr', { lang })
       // Email продавца — в базу контактов только с согласием и только после того,
       // как документ открылся. Данные покупателя не отправляются никогда. Ошибка
       // записи документу не мешает. Сам email в бланк не печатается.
@@ -180,7 +185,7 @@ export default function AvrTool({ lang }: { lang: ToolLang }) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ tool: 'avr', contact: email }),
-        }).catch(() => {})
+        }).then(r => { if (r.ok) logToolEvent('lead', 'avr', { lang }) }).catch(() => {})
       }
       if (claim.quota.remaining <= 0) track('tool_avr_limit', { lang })
     } catch {
@@ -197,7 +202,7 @@ export default function AvrTool({ lang }: { lang: ToolLang }) {
   }
 
   // Клик в регистрацию запоминает язык страницы — /login откроется на нём же.
-  const signupClick = () => { setLang(lang); track('tool_avr_signup_click', { lang, signedIn }) }
+  const signupClick = () => { setLang(lang); track('tool_avr_signup_click', { lang, signedIn }); logToolEvent('cta', 'avr', { lang, medium: 'limit' }) }
 
   const guidePath = lang === 'kk' ? `/guides/kk/${GUIDE_SLUG}` : `/guides/${GUIDE_SLUG}`
 

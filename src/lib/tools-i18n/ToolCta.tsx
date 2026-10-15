@@ -4,6 +4,8 @@ import { useLanguage } from '@/components/LanguageProvider'
 import { TOOL_CHROME, type ToolLang } from './index'
 import { anonymousToolHref, signedInToolHref } from './signedInDestination'
 import { useToolSession } from './useToolSession'
+import { logToolEvent } from './toolEvents'
+import { isToolEventTool } from '@/lib/toolEvents/schema'
 
 // Языковая версия src/app/tools/ToolCta.tsx (тот же текст на ru, тот же
 // трекинг-эвент tool_cta_click, плюс lang). Клик запоминает язык страницы в
@@ -33,7 +35,10 @@ export default function ToolCta({ source, lang }: { source: string; lang: ToolLa
       </p>
       <a
         href={href}
-        onClick={() => { setLang(lang); track('tool_cta_click', { source, lang, signedIn }) }}
+        onClick={() => {
+          setLang(lang); track('tool_cta_click', { source, lang, signedIn })
+          if (isToolEventTool(source)) logToolEvent('cta', source, { lang, medium: 'cta' })
+        }}
         className="inline-block rounded-xl px-5 py-2.5 text-sm font-semibold transition-transform hover:-translate-y-0.5"
         style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}
       >

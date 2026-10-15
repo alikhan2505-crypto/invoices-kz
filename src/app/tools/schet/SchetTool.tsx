@@ -10,6 +10,8 @@ import { formatTenge, toolLinkPath, toolsIndexPath, TOOL_CHROME, type ToolLang }
 import ToolLangSwitch from '@/lib/tools-i18n/ToolLangSwitch'
 import ToolCta from '@/lib/tools-i18n/ToolCta'
 import { useToolSession } from '@/lib/tools-i18n/useToolSession'
+import { logToolEvent } from '@/lib/tools-i18n/toolEvents'
+import { useToolLimitEvent, useToolView } from '@/lib/tools-i18n/useToolEvents'
 import { anonymousToolHref, signedInToolHref } from '@/lib/tools-i18n/signedInDestination'
 import BinNameField from '@/lib/tools-i18n/BinNameField'
 import { claimDocSlot, DOC_QUOTA_DEFAULT_LIMIT, useDocQuota } from '@/lib/tools-i18n/docQuota'
@@ -117,6 +119,8 @@ export default function SchetTool({ lang }: { lang: ToolLang }) {
   const vat = vatIncluded(total, f.vatType)
 
   const limitReached = quota !== null && quota.remaining <= 0
+  useToolView('schet', lang)
+  useToolLimitEvent('schet', lang, limitReached)
 
   const generate = async () => {
     if (limitReached || busy.current) return
@@ -185,6 +189,7 @@ export default function SchetTool({ lang }: { lang: ToolLang }) {
       })
       win.document.write(html)
       win.document.close()
+      logToolEvent('doc', 'schet', { lang })
       // Email продавца — в базу контактов только с согласием и только после того,
       // как документ открылся. Данные покупателя не отправляются никогда. Ошибка
       // записи документу не мешает. Сам email в бланк не печатается.
@@ -194,7 +199,7 @@ export default function SchetTool({ lang }: { lang: ToolLang }) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ tool: 'schet', contact: email }),
-        }).catch(() => {})
+        }).then(r => { if (r.ok) logToolEvent('lead', 'schet', { lang }) }).catch(() => {})
       }
       if (claim.quota.remaining <= 0) track('tool_schet_limit', { lang })
     } catch {
@@ -211,7 +216,7 @@ export default function SchetTool({ lang }: { lang: ToolLang }) {
   }
 
   // Клик в регистрацию запоминает язык страницы — /login откроется на нём же.
-  const signupClick = () => { setLang(lang); track('tool_schet_signup_click', { lang, signedIn }) }
+  const signupClick = () => { setLang(lang); track('tool_schet_signup_click', { lang, signedIn }); logToolEvent('cta', 'schet', { lang, medium: 'limit' }) }
 
   const input = 'w-full min-w-0 rounded-xl px-3 py-2.5 text-sm outline-none'
   // WebkitTextFillColor обязателен: глобальное `input { -webkit-text-fill-color:

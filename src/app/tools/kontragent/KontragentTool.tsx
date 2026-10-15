@@ -10,6 +10,9 @@ import { formatIsoDate, formatTenge, guidesIndexPath, toolsIndexPath, TOOL_CHROM
 import ToolLangSwitch from '@/lib/tools-i18n/ToolLangSwitch'
 import ToolCta from '@/lib/tools-i18n/ToolCta'
 import { useToolSession } from '@/lib/tools-i18n/useToolSession'
+import { logToolEvent } from '@/lib/tools-i18n/toolEvents'
+import { useToolLimitEvent, useToolView } from '@/lib/tools-i18n/useToolEvents'
+import type { ToolEventMedium } from '@/lib/toolEvents/schema'
 import { anonymousToolHref, signedInToolHref } from '@/lib/tools-i18n/signedInDestination'
 import { kontragentDict } from './dict'
 
@@ -87,6 +90,8 @@ export default function KontragentTool({ lang }: { lang: ToolLang }) {
   const [bin, setBin] = useState('')
   const [outcome, setOutcome] = useState<Outcome>({ kind: 'idle' })
   const valid = isValidBin(bin)
+  useToolView('kontragent', lang)
+  useToolLimitEvent('kontragent', lang, outcome.kind === 'limit')
 
   const check = async () => {
     if (!valid || outcome.kind === 'loading') return
@@ -118,6 +123,8 @@ export default function KontragentTool({ lang }: { lang: ToolLang }) {
         return
       }
       const remaining = typeof data?.remaining === 'number' ? data.remaining : null
+      // Проверка прошла и результат показан (найдена или «не найдена») — это и есть «документ» инструмента.
+      logToolEvent('doc', 'kontragent', { lang })
       if (!data?.found) { setOutcome({ kind: 'notFound', remaining }); return }
       setOutcome({ kind: 'found', company: data.company as PublicCompany, remaining })
     } catch {
@@ -128,7 +135,10 @@ export default function KontragentTool({ lang }: { lang: ToolLang }) {
   const remaining = outcome.kind === 'found' || outcome.kind === 'notFound' ? outcome.remaining : null
 
   // Клик в регистрацию запоминает язык страницы — /login откроется на нём же.
-  const signupClick = (event: string) => () => { setLang(lang); track(event, { lang, signedIn }) }
+  const signupClick = (event: string, medium: ToolEventMedium) => () => {
+    setLang(lang); track(event, { lang, signedIn })
+    logToolEvent('cta', 'kontragent', { lang, medium })
+  }
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--nav-bg)' }}>
@@ -208,7 +218,7 @@ export default function KontragentTool({ lang }: { lang: ToolLang }) {
               </p>
               <a
                 href={signedIn ? signedInToolHref('kontragent', 'limit') : anonymousToolHref('kontragent', 'limit')}
-                onClick={signupClick('tool_kontragent_signup_click')}
+                onClick={signupClick('tool_kontragent_signup_click', 'limit')}
                 className="inline-block rounded-xl px-5 py-2.5 text-sm font-semibold transition-transform hover:-translate-y-0.5"
                 style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}
               >
@@ -281,7 +291,7 @@ export default function KontragentTool({ lang }: { lang: ToolLang }) {
                     </p>
                     <a
                       href={signedIn ? signedInToolHref('kontragent', 'fullcard') : anonymousToolHref('kontragent', 'fullcard')}
-                      onClick={signupClick('tool_kontragent_fullcard_click')}
+                      onClick={signupClick('tool_kontragent_fullcard_click', 'fullcard')}
                       className="text-[13px] font-semibold"
                       style={{ color: 'var(--nav-accent)' }}
                     >
