@@ -6,6 +6,9 @@ describe('postLoginRedirectFromSearch', () => {
     expect(postLoginRedirectFromSearch('?next=/kaspi-shop')).toBe('/kaspi-shop')
     expect(postLoginRedirectFromSearch('?ref=x&next=/ai-agent')).toBe('/ai-agent')
   })
+  it('sends the waybills limit CTA (anonymous visitor) to /upgrade after login, utm params around next', () => {
+    expect(postLoginRedirectFromSearch('?next=/upgrade&utm_source=tools&utm_medium=limit&utm_campaign=waybills')).toBe('/upgrade')
+  })
   it('drops anything else (no open redirect)', () => {
     expect(postLoginRedirectFromSearch('?next=https://evil.com')).toBeNull()
     expect(postLoginRedirectFromSearch('?next=//evil.com')).toBeNull()

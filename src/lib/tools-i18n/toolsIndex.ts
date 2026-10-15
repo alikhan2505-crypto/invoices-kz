@@ -59,7 +59,7 @@ export const toolsIndexDict: Record<ToolLang, ToolsIndexDict> = {
         title: 'Для продавцов Kaspi',
         tools: [
           { slug: 'margin', title: 'Калькулятор маржи Kaspi', text: 'Сколько остаётся с продажи после комиссии категории, доставки и налога — и сколько это в месяц.' },
-          { slug: 'waybills', title: 'Склейка накладных Kaspi', text: 'Накладные одним PDF: 4 на лист А4 или А6 на термопринтер — без ножниц и возни.' },
+          { slug: 'waybills', title: 'Склейка накладных Kaspi', text: 'Накладные одним PDF: 4 на лист А4 или А6 на термопринтер — без ножниц и возни. 5 склеек в месяц бесплатно, без ограничений — в Kaspi Bot (Про).' },
         ],
       },
     ],
@@ -100,7 +100,7 @@ export const toolsIndexDict: Record<ToolLang, ToolsIndexDict> = {
         title: 'Kaspi сатушыларына',
         tools: [
           { slug: 'margin', title: 'Kaspi маржа калькуляторы', text: 'Санат комиссиясы, жеткізу және салық шегерілгеннен кейін бір сатылымнан қанша қалады — және бұл айына қанша болады.' },
-          { slug: 'waybills', title: 'Kaspi жүкқұжаттарын біріктіру', text: 'Жүкқұжаттар бір PDF-те: А4 парағына 4-тен немесе термопринтерге А6 — қайшысыз, әурешіліксіз.' },
+          { slug: 'waybills', title: 'Kaspi жүкқұжаттарын біріктіру', text: 'Жүкқұжаттар бір PDF-те: А4 парағына 4-тен немесе термопринтерге А6 — қайшысыз, әурешіліксіз. Айына 5 рет тегін, шектеусіз — Kaspi Bot-та (Про).' },
         ],
       },
     ],
@@ -141,7 +141,7 @@ export const toolsIndexDict: Record<ToolLang, ToolsIndexDict> = {
         title: 'For Kaspi sellers',
         tools: [
           { slug: 'margin', title: 'Kaspi margin calculator', text: 'What you keep from a sale after the category commission, delivery and tax — and what that adds up to per month.' },
-          { slug: 'waybills', title: 'Kaspi waybill merger', text: 'Waybills in one PDF: 4 per A4 sheet, or A6 for a thermal printer — no scissors, no fuss.' },
+          { slug: 'waybills', title: 'Kaspi waybill merger', text: 'Waybills in one PDF: 4 per A4 sheet, or A6 for a thermal printer — no scissors, no fuss. 5 free merges a month, unlimited in Kaspi Bot (Pro).' },
         ],
       },
     ],

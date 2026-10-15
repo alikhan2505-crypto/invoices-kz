@@ -1,9 +1,25 @@
 import type { ToolLang, ToolSeoCopy } from '@/lib/tools-i18n'
 
 // Все тексты /tools/waybills на трёх языках: и <head> (seo), и интерфейс.
-// ru-metadata, H1 и подзаголовок — дословно прежние, чтобы не сбить уже
-// набранную выдачу (тест в dict.test.ts). Сами накладные не переводятся и не
-// меняются — это PDF, который выдал Kaspi, мы только раскладываем их по листам.
+// Сами накладные не переводятся и не меняются — это PDF, который выдал Kaspi,
+// мы только раскладываем их по листам. С 15.10.2026 у склейки лимит («5 → сразу
+// Про»): 5 в календарный месяц на IP всем, у кого нет Kaspi Bot, — регистрация
+// ничего не добавляет; без ограничений — только в Kaspi Bot на тарифе Про.
+// Заголовки и описания, где раньше было «без регистрации» без оговорок, — честно.
+
+// Дата обнуления месяца словами: '2026-11-01' → «1 ноября» / «1 қарашада» /
+// «1 November». Месяц всегда начинается первого числа.
+const MONTHS: Record<ToolLang, string[]> = {
+  ru: ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'],
+  kk: ['қаңтарда', 'ақпанда', 'наурызда', 'сәуірде', 'мамырда', 'маусымда', 'шілдеде', 'тамызда', 'қыркүйекте', 'қазанда', 'қарашада', 'желтоқсанда'],
+  en: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
+}
+
+export function monthStartLabel(lang: ToolLang, iso: string): string {
+  const s = String(iso)
+  const month = s.slice(8, 10) === '01' ? MONTHS[lang][Number(s.slice(5, 7)) - 1] : undefined
+  return month ? `1 ${month}` : s
+}
 
 export interface WaybillsDict {
   seo: ToolSeoCopy
@@ -33,6 +49,16 @@ export interface WaybillsDict {
   errUnreadable: string
   errGeneric: string
   networkError: string
+  /** 503 от склейки: счётчик лимита не читается. */
+  errUnavailable: string
+  /** Подсказка под кнопкой для всех без Kaspi Bot (и без входа, и вошедшим на Free/Базовом/триале): «Осталось 3 из 5 бесплатных склеек в этом месяце». */
+  remaining: (n: number, limit: number) => string
+  /** Подсказка под кнопкой для того, у кого есть Kaspi Bot (Про или админ). */
+  unlimited: string
+  limitTitle: (limit: number) => string
+  /** resetsAt — ISO первого дня следующего месяца ('2026-11-01'); пусто — без даты. */
+  limitText: (resetsAt: string) => string
+  limitCta: string
   merge: string
   merging: string
   done: (files: number, sheets: number) => string
@@ -65,19 +91,19 @@ const pluralEn = (n: number, word: string) => (n === 1 ? word : `${word}s`)
 export const waybillsDict: Record<ToolLang, WaybillsDict> = {
   ru: {
     seo: {
-      title: 'Склейка накладных Kaspi — бесплатно, без регистрации',
+      title: 'Склейка накладных Kaspi — бесплатно онлайн',
       description:
-        'Соберите накладные Kaspi Магазина в один PDF: по 4 на лист А4 или по одной в А6 для термопринтера. Бесплатно, без регистрации, файлы нигде не сохраняются.',
+        'Соберите накладные Kaspi Магазина в один PDF: по 4 на лист А4 или по одной в А6 для термопринтера. 5 склеек в месяц бесплатно, без ограничений — в Kaspi Bot (Про). Файлы нигде не сохраняются.',
       keywords:
         'склейка накладных kaspi, печать накладных kaspi магазин, накладные 4 на лист а4, накладные а6 термопринтер, объединить pdf накладные, kaspi магазин накладные распечатать',
-      ogTitle: 'Склейка накладных Kaspi — бесплатно, без регистрации',
+      ogTitle: 'Склейка накладных Kaspi — бесплатно онлайн',
       ogDescription:
-        'Накладные Kaspi одним файлом: по 4 на лист А4 или по одной в А6 на термопринтер. Без регистрации, файлы не сохраняются.',
+        'Накладные Kaspi одним файлом: по 4 на лист А4 или по одной в А6 на термопринтер. 5 склеек в месяц бесплатно, без ограничений — в Kaspi Bot (Про).',
       ogImageAlt: 'Склейка накладных Kaspi — invoices.kz',
     },
     h1: 'Склейка накладных Kaspi',
     intro:
-      'Соберите накладные из Kaspi Магазина в один PDF, чтобы не печатать каждую отдельно: по 4 на лист А4 для обычного принтера или по одной в А6, если у вас есть термопринтер. Бесплатно и без регистрации — файлы нигде не сохраняются.',
+      'Соберите накладные из Kaspi Магазина в один PDF, чтобы не печатать каждую отдельно: по 4 на лист А4 для обычного принтера или по одной в А6, если у вас есть термопринтер. Бесплатно и без регистрации — 5 склеек в месяц, без ограничений — в Kaspi Bot на тарифе Про. Файлы нигде не сохраняются.',
     dropzoneTitle: 'Выберите PDF-накладные или ZIP-архив',
     dropzoneActive: 'Отпустите файлы здесь',
     dropzoneHint: max => `нажмите здесь или перетащите файлы · до ${max} файлов`,
@@ -102,6 +128,14 @@ export const waybillsDict: Record<ToolLang, WaybillsDict> = {
     errUnreadable: 'Не удалось прочитать один из файлов. Убедитесь, что загружаете именно PDF-накладные из Kaspi.',
     errGeneric: 'Не удалось склеить файлы',
     networkError: 'Ошибка сети. Проверьте соединение и попробуйте ещё раз.',
+    errUnavailable: 'Не удалось проверить лимит склеек. Попробуйте через минуту.',
+    remaining: (n, limit) =>
+      `${n === 1 ? 'Осталась' : 'Осталось'} ${n} из ${limit} ${pluralRu(limit, 'бесплатной склейки', 'бесплатных склеек', 'бесплатных склеек')} в этом месяце`,
+    unlimited: 'Kaspi Bot на тарифе Про — склейка без ограничений',
+    limitTitle: limit => `Все ${limit} бесплатных склеек в этом месяце использованы`,
+    limitText: iso =>
+      `${iso ? `Новые бесплатные склейки откроются ${monthStartLabel('ru', iso)}. ` : ''}Без ограничений — в Kaspi Bot на тарифе Про: там накладные приходят из Kaspi сами, без скачивания и склейки.`,
+    limitCta: 'Подключить Kaspi Bot',
     merge: 'Склеить и скачать PDF',
     merging: 'Склеиваем…',
     done: (files, sheets) =>
@@ -124,7 +158,11 @@ export const waybillsDict: Record<ToolLang, WaybillsDict> = {
       },
       {
         q: 'Куда попадают мои файлы?',
-        a: 'Никуда. Файлы склеиваются в памяти сервера и сразу возвращаются вам — мы их не сохраняем и регистрацию не просим. ZIP-архив распаковывается прямо в вашем браузере.',
+        a: 'Никуда. Файлы склеиваются в памяти сервера и сразу возвращаются вам — мы их не сохраняем. ZIP-архив распаковывается прямо в вашем браузере.',
+      },
+      {
+        q: 'Есть ли ограничения?',
+        a: '5 склеек в месяц с одной сети (IP) — бесплатно и без регистрации. Регистрация лимит не меняет. Без ограничений — в Kaspi Bot на тарифе Про: там накладные приходят из Kaspi сами. Лимит обновляется 1-го числа.',
       },
       {
         q: 'Сколько накладных можно склеить за раз?',
@@ -145,19 +183,19 @@ export const waybillsDict: Record<ToolLang, WaybillsDict> = {
 
   kk: {
     seo: {
-      title: 'Kaspi жүкқұжаттарын бір PDF-ке біріктіру — тегін, тіркелусіз',
+      title: 'Kaspi жүкқұжаттарын бір PDF-ке біріктіру — тегін, онлайн',
       description:
-        'Kaspi Магазин жүкқұжаттарын бір PDF файлға біріктіріңіз: А4 парағына 4-тен немесе термопринтерге А6 форматында бір-бірден. Тегін, тіркелусіз, файлдар ешқайда сақталмайды.',
+        'Kaspi Магазин жүкқұжаттарын бір PDF файлға біріктіріңіз: А4 парағына 4-тен немесе термопринтерге А6 форматында бір-бірден. Айына 5 рет тегін, шектеусіз — Про тарифіндегі Kaspi Bot-та. Файлдар ешқайда сақталмайды.',
       keywords:
         'kaspi жүкқұжат басып шығару, kaspi жүкқұжаттарын біріктіру, kaspi магазин жүкқұжат, жүкқұжат а4 парағына 4, жүкқұжат а6 термопринтер, pdf файлдарды біріктіру тегін, kaspi накладная басып шығару',
-      ogTitle: 'Kaspi жүкқұжаттарын біріктіру — тегін, тіркелусіз',
+      ogTitle: 'Kaspi жүкқұжаттарын біріктіру — тегін, онлайн',
       ogDescription:
-        'Kaspi жүкқұжаттары бір файлда: А4 парағына 4-тен немесе термопринтерге А6. Тіркелусіз, файлдар сақталмайды.',
+        'Kaspi жүкқұжаттары бір файлда: А4 парағына 4-тен немесе термопринтерге А6. Айына 5 рет тегін, шектеусіз — Kaspi Bot-та (Про).',
       ogImageAlt: 'Kaspi жүкқұжаттарын біріктіру — invoices.kz',
     },
     h1: 'Kaspi жүкқұжаттарын біріктіру',
     intro:
-      'Kaspi Магазин жүкқұжаттарын әрқайсысын бөлек басып шығармас үшін бір PDF файлға жинаңыз: кәдімгі принтерге А4 парағына 4-тен немесе термопринтеріңіз болса, А6 форматында бір-бірден. Тегін әрі тіркелусіз — файлдар ешқайда сақталмайды.',
+      'Kaspi Магазин жүкқұжаттарын әрқайсысын бөлек басып шығармас үшін бір PDF файлға жинаңыз: кәдімгі принтерге А4 парағына 4-тен немесе термопринтеріңіз болса, А6 форматында бір-бірден. Тегін және тіркелусіз — айына 5 рет, шектеусіз — Про тарифіндегі Kaspi Bot-та. Файлдар ешқайда сақталмайды.',
     dropzoneTitle: 'PDF-жүкқұжаттарды немесе ZIP-архивті таңдаңыз',
     dropzoneActive: 'Файлдарды осында тастаңыз',
     dropzoneHint: max => `осы жерді басыңыз немесе файлдарды сүйреп әкеліңіз · ${max} файлға дейін`,
@@ -182,6 +220,13 @@ export const waybillsDict: Record<ToolLang, WaybillsDict> = {
     errUnreadable: 'Файлдардың бірін оқу мүмкін болмады. Kaspi-ден алынған PDF-жүкқұжаттарды жүктеп отырғаныңызға көз жеткізіңіз.',
     errGeneric: 'Файлдарды біріктіру мүмкін болмады. Қайталап көріңіз.',
     networkError: 'Желі қатесі. Байланысты тексеріп, қайталап көріңіз.',
+    errUnavailable: 'Біріктіру шегін тексеру мүмкін болмады. Бір минуттан кейін қайталап көріңіз.',
+    remaining: (n, limit) => `Осы айда қалған тегін біріктіру: ${n} / ${limit}`,
+    unlimited: 'Про тарифіндегі Kaspi Bot — біріктіру шектеусіз',
+    limitTitle: limit => `Осы айдағы ${limit} тегін біріктірудің бәрі пайдаланылды`,
+    limitText: iso =>
+      `${iso ? `Жаңа тегін біріктірулер ${monthStartLabel('kk', iso)} ашылады. ` : ''}Шектеусіз — Про тарифіндегі Kaspi Bot-та: онда жүкқұжаттар Kaspi-ден өздігінен келеді, оларды жүктеп алып, біріктірудің қажеті жоқ.`,
+    limitCta: 'Kaspi Bot-ты қосу',
     merge: 'Біріктіріп, PDF жүктеп алу',
     merging: 'Біріктіріп жатырмыз…',
     done: (files, sheets) => `Дайын: ${files} жүкқұжат ${sheets} параққа орналасты — файл жүктелді.`,
@@ -203,7 +248,11 @@ export const waybillsDict: Record<ToolLang, WaybillsDict> = {
       },
       {
         q: 'Файлдарым қайда сақталады?',
-        a: 'Ешқайда. Файлдар сервер жадында біріктіріліп, бірден өзіңізге қайтарылады — біз оларды сақтамаймыз әрі тіркелуді сұрамаймыз. ZIP-архив тікелей браузеріңізде ашылады.',
+        a: 'Ешқайда. Файлдар сервер жадында біріктіріліп, бірден өзіңізге қайтарылады — біз оларды сақтамаймыз. ZIP-архив тікелей браузеріңізде ашылады.',
+      },
+      {
+        q: 'Шектеу бар ма?',
+        a: 'Бір желіден (IP мекенжайынан) айына 5 рет — тегін және тіркелусіз. Тіркелу шектеуді өзгертпейді. Шектеусіз — Про тарифіндегі Kaspi Bot-та: онда жүкқұжаттар Kaspi-ден өздігінен келеді. Шектеу әр айдың 1-күні жаңарады.',
       },
       {
         q: 'Бір ретте қанша жүкқұжат біріктіруге болады?',
@@ -226,17 +275,17 @@ export const waybillsDict: Record<ToolLang, WaybillsDict> = {
     seo: {
       title: 'Merge Kaspi Waybills into One PDF — Free Tool for Kazakhstan Sellers',
       description:
-        'Merge Kaspi Shop waybills (shipping labels from the Kaspi.kz marketplace, Kazakhstan) into one PDF: 4 per A4 sheet or one per A6 label for a thermal printer. Free, no signup, files are never stored.',
+        'Merge Kaspi Shop waybills (shipping labels from the Kaspi.kz marketplace, Kazakhstan) into one PDF: 4 per A4 sheet or one per A6 label for a thermal printer. 5 free merges a month, unlimited in Kaspi Bot on the Pro plan. Files are never stored.',
       keywords:
         'kaspi waybill print, merge kaspi waybills, kaspi shop shipping labels, kaspi.kz seller tools, merge pdf shipping labels a4, a6 thermal printer shipping label, kazakhstan marketplace seller tools',
-      ogTitle: 'Merge Kaspi Waybills into One PDF — Free, No Signup',
+      ogTitle: 'Merge Kaspi Waybills into One PDF — Free Online',
       ogDescription:
-        'Kaspi waybills in a single file: 4 per A4 sheet or one per A6 label for a thermal printer. No signup, files are never stored.',
+        'Kaspi waybills in a single file: 4 per A4 sheet or one per A6 label for a thermal printer. 5 free merges a month, unlimited in Kaspi Bot (Pro).',
       ogImageAlt: 'Kaspi Waybill Merger — invoices.kz',
     },
     h1: 'Kaspi Waybill Merger',
     intro:
-      "Combine your Kaspi Shop waybills (the shipping labels of Kazakhstan's Kaspi.kz marketplace) into one PDF so you don't print each one separately: 4 per A4 sheet for a regular printer, or one per A6 label if you have a thermal printer. Free, no signup — files are never stored.",
+      "Combine your Kaspi Shop waybills (the shipping labels of Kazakhstan's Kaspi.kz marketplace) into one PDF so you don't print each one separately: 4 per A4 sheet for a regular printer, or one per A6 label if you have a thermal printer. Free with no signup — 5 merges a month; unlimited in Kaspi Bot on the Pro plan. Files are never stored.",
     dropzoneTitle: 'Choose PDF waybills or a ZIP archive',
     dropzoneActive: 'Drop the files here',
     dropzoneHint: max => `tap here or drop files · up to ${max} files`,
@@ -261,6 +310,13 @@ export const waybillsDict: Record<ToolLang, WaybillsDict> = {
     errUnreadable: "One of the files couldn't be read. Make sure you're uploading PDF waybills downloaded from Kaspi.",
     errGeneric: "Couldn't merge the files. Please try again.",
     networkError: 'Network error. Check your connection and try again.',
+    errUnavailable: "Couldn't check the merge limit. Try again in a minute.",
+    remaining: (n, limit) => `${n} of ${limit} free ${pluralEn(limit, 'merge')} left this month`,
+    unlimited: 'Kaspi Bot on the Pro plan — unlimited merges',
+    limitTitle: limit => `All ${limit} free merges for this month are used up`,
+    limitText: iso =>
+      `${iso ? `Your free merges reset on ${monthStartLabel('en', iso)}. ` : ''}For unlimited merges, use Kaspi Bot on the Pro plan: there the waybills come from Kaspi on their own, with nothing to download or merge.`,
+    limitCta: 'Connect Kaspi Bot',
     merge: 'Merge and download PDF',
     merging: 'Merging…',
     done: (files, sheets) =>
@@ -283,7 +339,11 @@ export const waybillsDict: Record<ToolLang, WaybillsDict> = {
       },
       {
         q: 'Where do my files go?',
-        a: "Nowhere. The files are merged in server memory and sent straight back to you — we don't store them and don't ask you to sign up. A ZIP archive is unpacked right in your browser.",
+        a: "Nowhere. The files are merged in server memory and sent straight back to you — we don't store them. A ZIP archive is unpacked right in your browser.",
+      },
+      {
+        q: 'Are there any limits?',
+        a: "5 merges a month per network (IP address) — free, no signup. Signing up doesn't change the limit. Unlimited merges come with Kaspi Bot on the Pro plan, where waybills arrive from Kaspi on their own. The limit resets on the 1st of every month.",
       },
       {
         q: 'How many waybills can I merge at once?',

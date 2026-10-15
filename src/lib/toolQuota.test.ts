@@ -4,7 +4,10 @@ import {
   almatyDay, almatyQuarter, nextQuarterStart, kpClaimKey, nameLookupKey, parseNameLookupTarget, remainingOf,
   clientIp, cleanCompanyName, KP_CLAIM_PREFIX, NAME_LOOKUP_PREFIX, NAME_LOOKUP_ROLES, NAME_LOOKUP_TOOLS,
   KP_QUARTER_LIMIT, NAME_LOOKUP_QUARTER_LIMIT, claimCounterSlot,
+  almatyMonth, nextMonthStart, waybillsKey, WAYBILLS_PREFIX, WAYBILLS_MONTH_LIMIT, bearerUserId,
+  quotaIp, releaseCounterSlot, waybillsUnlimited,
 } from './toolQuota'
+import { KASPI_SHOP_PROFILE_COLUMNS } from '@/lib/kaspiShop/planGate'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 const utc = (iso: string) => Date.parse(iso)
@@ -36,6 +39,28 @@ describe('almaty calendar', () => {
   })
 })
 
+describe('almaty month (waybills limit)', () => {
+  it('switches the month at Almaty midnight, not UTC midnight', () => {
+    expect(almatyMonth(utc('2026-10-15T00:00:00Z'))).toBe('2026-10')
+    expect(almatyMonth(utc('2026-10-31T18:59:00Z'))).toBe('2026-10')
+    // 31.10 19:30 UTC = 01.11 00:30 в Алматы — уже ноябрь.
+    expect(almatyMonth(utc('2026-10-31T19:30:00Z'))).toBe('2026-11')
+    expect(almatyMonth(utc('2026-12-31T19:30:00Z'))).toBe('2027-01')
+  })
+
+  it('names the first day of the next Almaty month, rolling December into January', () => {
+    expect(nextMonthStart(utc('2026-10-15T00:00:00Z'))).toBe('2026-11-01')
+    expect(nextMonthStart(utc('2026-10-31T19:30:00Z'))).toBe('2026-12-01')
+    expect(nextMonthStart(utc('2026-12-10T00:00:00Z'))).toBe('2027-01-01')
+    expect(nextMonthStart(utc('2026-12-31T19:30:00Z'))).toBe('2027-02-01')
+    expect(nextMonthStart(utc('2027-01-31T12:00:00Z'))).toBe('2027-02-01')
+  })
+
+  it('limits anonymous merges to 5 a month', () => {
+    expect(WAYBILLS_MONTH_LIMIT).toBe(5)
+  })
+})
+
 describe('quota keys', () => {
   it('never stores the raw IP and is stable within a quarter', () => {
     const k = kpClaimKey('203.0.113.7', '2026-Q4')
@@ -61,6 +86,122 @@ describe('quota keys', () => {
     expect(kontragent).not.toContain(':')
     expect(claim).toContain(':')
     expect(lookup).toContain(':')
+  })
+
+  it('gives waybills its own wb: namespace, per IP and per month', () => {
+    const k = waybillsKey('203.0.113.7', '2026-10')
+    expect(k.startsWith(WAYBILLS_PREFIX)).toBe(true)
+    expect(WAYBILLS_PREFIX).toBe('wb:')
+    expect(k.slice(WAYBILLS_PREFIX.length)).toMatch(/^[0-9a-f]{64}$/)
+    expect(k).not.toContain('203.0.113.7')
+    expect(k).toBe(waybillsKey('203.0.113.7', '2026-10'))
+    expect(k).not.toBe(waybillsKey('203.0.113.7', '2026-11'))
+    expect(k).not.toBe(waybillsKey('203.0.113.8', '2026-10'))
+    expect(k).not.toBe(kpClaimKey('203.0.113.7', '2026-10'))
+    expect(k.startsWith(KP_CLAIM_PREFIX)).toBe(false)
+  })
+})
+
+describe('quotaIp (IPv6 по /64)', () => {
+  it('keeps IPv4 as is and unwraps IPv4-mapped IPv6', () => {
+    expect(quotaIp('203.0.113.7')).toBe('203.0.113.7')
+    expect(quotaIp('::ffff:203.0.113.7')).toBe('203.0.113.7')
+    expect(quotaIp('0:0:0:0:0:ffff:203.0.113.7')).toBe('203.0.113.7')
+  })
+
+  it('cuts IPv6 to its /64 prefix whatever the notation', () => {
+    expect(quotaIp('2a02:2168:8f1:5a00:1:2:3:4')).toBe('2a02:2168:8f1:5a00::/64')
+    expect(quotaIp('2A02:2168:08F1:5A00:abcd::1')).toBe('2a02:2168:8f1:5a00::/64')
+    expect(quotaIp('[2a02:2168:8f1:5a00::9]')).toBe('2a02:2168:8f1:5a00::/64')
+    expect(quotaIp('fe80::1%eth0')).toBe('fe80:0:0:0::/64')
+    expect(quotaIp('2001:db8::')).toBe('2001:db8:0:0::/64')
+  })
+
+  it('returns unparsable strings unchanged', () => {
+    expect(quotaIp('unknown')).toBe('unknown')
+    expect(quotaIp('1::2::3')).toBe('1::2::3')
+    expect(quotaIp('zz:1::')).toBe('zz:1::')
+  })
+
+  it('gives every address of one /64 the same waybills key, another /64 a different one', () => {
+    const a = waybillsKey('2a02:2168:8f1:5a00::1', '2026-10')
+    expect(waybillsKey('2a02:2168:8f1:5a00:dead:beef:0:2', '2026-10')).toBe(a)
+    expect(waybillsKey('2a02:2168:8f1:5a01::1', '2026-10')).not.toBe(a)
+  })
+})
+
+describe('bearerUserId', () => {
+  const client = (getUser: (token: string) => unknown) =>
+    ({ auth: { getUser: async (token: string) => getUser(token) } }) as unknown as SupabaseClient
+  const ok = client(token => (token === 'good' ? { data: { user: { id: 'u1' } }, error: null } : { data: { user: null }, error: { message: 'bad jwt' } }))
+
+  it('returns the user id for a valid Bearer token', async () => {
+    expect(await bearerUserId(ok, new Headers({ authorization: 'Bearer good' }))).toBe('u1')
+  })
+
+  it('returns null without a header, with a bad token or when Supabase throws', async () => {
+    expect(await bearerUserId(ok, new Headers())).toBeNull()
+    expect(await bearerUserId(ok, new Headers({ authorization: 'Bearer nope' }))).toBeNull()
+    expect(await bearerUserId(ok, new Headers({ authorization: 'Basic good' }))).toBeNull()
+    expect(await bearerUserId(client(() => { throw new Error('down') }), new Headers({ authorization: 'Bearer good' }))).toBeNull()
+  })
+})
+
+describe('waybillsUnlimited (5 → сразу Про: безлимит только с Kaspi Bot)', () => {
+  const future = () => new Date(Date.now() + 10 * 86400_000).toISOString()
+  const past = () => new Date(Date.now() - 10 * 86400_000).toISOString()
+  // profile: строка профиля, 'error' — Postgrest вернул ошибку, 'throw' — запрос упал.
+  const client = (profile: unknown, seen: { columns?: string; id?: unknown } = {}) =>
+    ({
+      auth: {
+        getUser: async (token: string) =>
+          token === 'good' ? { data: { user: { id: 'u1' } }, error: null } : { data: { user: null }, error: { message: 'bad jwt' } },
+      },
+      from: (table: string) => {
+        expect(table).toBe('profiles')
+        return {
+          select: (columns: string) => {
+            seen.columns = columns
+            return {
+              eq: (col: string, id: unknown) => {
+                expect(col).toBe('id')
+                seen.id = id
+                return {
+                  maybeSingle: async () => {
+                    if (profile === 'throw') throw new Error('down')
+                    if (profile === 'error') return { data: null, error: { message: 'boom' } }
+                    return { data: profile, error: null }
+                  },
+                }
+              },
+            }
+          },
+        }
+      },
+    }) as unknown as SupabaseClient
+  const signedIn = new Headers({ authorization: 'Bearer good' })
+
+  it('is unlimited for an active Pro plan and for admins, reading the Kaspi Bot plan columns of the token owner', async () => {
+    const seen: { columns?: string; id?: unknown } = {}
+    expect(await waybillsUnlimited(client({ plan: 'pro', plan_expires_at: future() }, seen), signedIn)).toBe(true)
+    expect(seen).toEqual({ columns: KASPI_SHOP_PROFILE_COLUMNS, id: 'u1' })
+    expect(await waybillsUnlimited(client({ plan: 'free', is_admin: true }), signedIn)).toBe(true)
+  })
+
+  it('counts free, basic, trial and lapsed Pro accounts like anonymous visitors', async () => {
+    expect(await waybillsUnlimited(client({ plan: 'free' }), signedIn)).toBe(false)
+    expect(await waybillsUnlimited(client({ plan: 'basic', plan_expires_at: future() }), signedIn)).toBe(false)
+    expect(await waybillsUnlimited(client({ plan: 'free', trial_expires_at: future() }), signedIn)).toBe(false)
+    expect(await waybillsUnlimited(client({ plan: 'pro', plan_expires_at: past() }), signedIn)).toBe(false)
+  })
+
+  it('never grants unlimited without a valid session or when the profile cannot be read', async () => {
+    const pro = { plan: 'pro' }
+    expect(await waybillsUnlimited(client(pro), new Headers())).toBe(false)
+    expect(await waybillsUnlimited(client(pro), new Headers({ authorization: 'Bearer nope' }))).toBe(false)
+    expect(await waybillsUnlimited(client(null), signedIn)).toBe(false)
+    expect(await waybillsUnlimited(client('error'), signedIn)).toBe(false)
+    expect(await waybillsUnlimited(client('throw'), signedIn)).toBe(false)
   })
 })
 
@@ -133,6 +274,12 @@ describe('cleanCompanyName', () => {
 function fakeCounters(rows: Record<string, number>, opts: { failUpdate?: boolean } = {}) {
   const client = {
     from: () => ({
+      // readCounter: select('count').eq('key', k).maybeSingle()
+      select: () => ({
+        eq: (_col: string, k: string) => ({
+          maybeSingle: async () => ({ data: k in rows ? { count: rows[k] } : null, error: null }),
+        }),
+      }),
       update: (patch: { count: number }) => {
         const filters: Record<string, unknown> = {}
         const chain = {
@@ -183,5 +330,45 @@ describe('claimCounterSlot (atomic name-lookup budget)', () => {
 
   it('reports a database error instead of claiming', async () => {
     expect(await claimCounterSlot(fakeCounters({}, { failUpdate: true }), 'lookup:d', 0)).toBe('error')
+  })
+})
+
+describe('releaseCounterSlot (waybills: failed merge gives the slot back)', () => {
+  it('decrements the claimed slot', async () => {
+    const rows: Record<string, number> = { 'wb:a': 3 }
+    expect(await releaseCounterSlot(fakeCounters(rows), 'wb:a', 3)).toBe(true)
+    expect(rows['wb:a']).toBe(2)
+  })
+
+  it('re-reads and still decrements when a parallel merge moved the counter', async () => {
+    const rows: Record<string, number> = { 'wb:b': 4 }
+    expect(await releaseCounterSlot(fakeCounters(rows), 'wb:b', 3)).toBe(true)
+    expect(rows['wb:b']).toBe(3)
+  })
+
+  it('never goes below zero and reports a database error', async () => {
+    const rows: Record<string, number> = { 'wb:c': 0 }
+    expect(await releaseCounterSlot(fakeCounters(rows), 'wb:c', 1)).toBe(true)
+    expect(rows['wb:c']).toBe(0)
+    expect(await releaseCounterSlot(fakeCounters({ 'wb:d': 1 }, { failUpdate: true }), 'wb:d', 1)).toBe(false)
+  })
+
+  it('a burst of parallel claims for one key lets exactly LIMIT through', async () => {
+    const rows: Record<string, number> = {}
+    const db = fakeCounters(rows)
+    // Как в роуте: claim → на 'raced' перечитать → до LIMIT+1 попыток.
+    const claimOne = async () => {
+      let used = 0
+      for (let attempt = 0; attempt <= WAYBILLS_MONTH_LIMIT; attempt++) {
+        const c = await claimCounterSlot(db, 'wb:e', used)
+        if (c === 'claimed') return true
+        used = rows['wb:e'] ?? 0
+        if (used >= WAYBILLS_MONTH_LIMIT) return false
+      }
+      return false
+    }
+    const results = await Promise.all(Array.from({ length: 10 }, claimOne))
+    expect(results.filter(Boolean)).toHaveLength(WAYBILLS_MONTH_LIMIT)
+    expect(rows['wb:e']).toBe(WAYBILLS_MONTH_LIMIT)
   })
 })

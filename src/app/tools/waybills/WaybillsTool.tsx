@@ -1,11 +1,12 @@
 'use client'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import BrandWordmark from '@/components/BrandWordmark'
 import { motion, useReducedMotion } from 'framer-motion'
 import { track } from '@vercel/analytics'
 import { useLanguage } from '@/components/LanguageProvider'
 import { PRODUCTS } from '@/lib/products'
+import { supabase } from '@/lib/supabase'
 import { guidesIndexPath, toolsIndexPath, TOOL_CHROME, type ToolLang } from '@/lib/tools-i18n'
 import ToolLangSwitch from '@/lib/tools-i18n/ToolLangSwitch'
 import { waybillsDict } from './dict'
@@ -28,6 +29,35 @@ const KASPI_BOT_LANDING =
 
 type Notice = { tone: 'error' | 'info'; text: string }
 
+// Лимит склейки (с 15.10.2026, «5 → сразу Про»): 5 в месяц на IP всем, у кого
+// нет Kaspi Bot, — и без входа, и вошедшим на Free/Базовом/триале; без
+// ограничений — только с Kaspi Bot (Про или админ). Сервер — единственный судья: подсказка под кнопкой и блок
+// «лимит исчерпан» только отражают его ответ. Если /quota не ответил (503,
+// сеть) — кнопку не прячем, POST решит сам.
+type Quota = { unlimited: true } | { unlimited: false; remaining: number; limit: number; resetsAt: string | null }
+const DEFAULT_LIMIT = 5
+
+// Кнопка блока «лимит исчерпан» ведёт на тариф Про. Без сессии — через вход:
+// /login вернёт на /upgrade (он в ALLOWED_POST_LOGIN_REDIRECTS).
+const UPGRADE_UTM = 'utm_source=tools&utm_medium=limit&utm_campaign=waybills'
+const UPGRADE_HREF = `/upgrade?${UPGRADE_UTM}`
+const LOGIN_TO_UPGRADE_HREF = `/login?next=/upgrade&${UPGRADE_UTM}`
+
+// Токен сессии Supabase, если человек вошёл, — для заголовка Authorization
+// (сервер по нему смотрит, есть ли Kaspi Bot).
+async function accessToken(): Promise<string | null> {
+  try {
+    const { data } = await supabase.auth.getSession()
+    return data.session?.access_token ?? null
+  } catch {
+    return null
+  }
+}
+
+function authHeaders(token: string | null): Record<string, string> {
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
 export default function WaybillsTool({ lang }: { lang: ToolLang }) {
   const t = waybillsDict[lang]
   const chrome = TOOL_CHROME[lang]
@@ -43,11 +73,43 @@ export default function WaybillsTool({ lang }: { lang: ToolLang }) {
   const [justMerged, setJustMerged] = useState(false)
   const [leadContact, setLeadContact] = useState('')
   const [leadStatus, setLeadStatus] = useState<'idle' | 'sending' | 'sent'>('idle')
+  const [quota, setQuota] = useState<Quota | null>(null)
+  // Есть ли сессия — только чтобы выбрать адрес кнопки «Подключить Kaspi Bot».
+  const [signedIn, setSignedIn] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   // Состояние очереди для асинхронного addFiles: пока распаковывается архив,
   // человек может успеть нажать «Очистить» или убрать файл.
   const filesRef = useRef<File[]>([])
   filesRef.current = files
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const token = await accessToken()
+        if (!cancelled) setSignedIn(!!token)
+        const res = await fetch('/api/tools/waybills/quota', { headers: authHeaders(token), cache: 'no-store' })
+        if (!res.ok) return
+        const data = await res.json()
+        if (cancelled) return
+        if (data?.unlimited === true) setQuota({ unlimited: true })
+        else if (typeof data?.remaining === 'number') {
+          setQuota({
+            unlimited: false,
+            remaining: data.remaining,
+            limit: typeof data.limit === 'number' ? data.limit : DEFAULT_LIMIT,
+            resetsAt: typeof data.resetsAt === 'string' ? data.resetsAt : null,
+          })
+        }
+      } catch {
+        // Нет ответа — не блокируем: лимит проверит сам POST.
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  const limitReached = quota !== null && !quota.unlimited && quota.remaining <= 0
+  const limitInfo = quota !== null && !quota.unlimited ? quota : null
 
   const replaceFiles = (next: File[]) => {
     filesRef.current = next
@@ -94,7 +156,7 @@ export default function WaybillsTool({ lang }: { lang: ToolLang }) {
   }
 
   async function merge() {
-    if (files.length === 0 || busy) return
+    if (files.length === 0 || busy || limitReached) return
     // Больше предела платформы — сервер ответил бы 413, не дойдя до роута.
     if (totalBytes(files) > MAX_TOTAL_BYTES) {
       setDone(null)
@@ -108,20 +170,44 @@ export default function WaybillsTool({ lang }: { lang: ToolLang }) {
       const body = new FormData()
       body.append('format', format)
       for (const f of files) body.append('files', f)
-      const res = await fetch('/api/tools/waybills', { method: 'POST', body })
+      const token = await accessToken()
+      setSignedIn(!!token)
+      const res = await fetch('/api/tools/waybills', { method: 'POST', body, headers: authHeaders(token) })
       if (!res.ok) {
         const data = await res.json().catch(() => null)
-        // Роут отвечает текстом ошибки по-русски; на ru показываем его как
-        // есть, на kk/en — свой перевод по коду ответа. 413 приходит не от
-        // роута, а от платформы (лимит тела запроса), без JSON.
-        const serverText = typeof data?.error === 'string' ? data.error : null
+        // Месяц исчерпан — вместо кнопки блок про Kaspi Bot на Про, без строки ошибки.
+        if (res.status === 429 && data?.error === 'limit') {
+          setQuota({
+            unlimited: false,
+            remaining: 0,
+            limit: typeof data.limit === 'number' ? data.limit : DEFAULT_LIMIT,
+            resetsAt: typeof data.resetsAt === 'string' ? data.resetsAt : null,
+          })
+          return
+        }
+        // На 400 роут отвечает текстом ошибки по-русски; на ru показываем его
+        // как есть, на kk/en — свой перевод по коду ответа. 429 (частые
+        // запросы) и 503 (лимит не читается) приходят кодами. 413 приходит не
+        // от роута, а от платформы (лимит тела запроса), без JSON.
+        const serverText = res.status === 400 && typeof data?.error === 'string' ? data.error : null
         const text = res.status === 413 ? t.errTooLarge
-          : lang === 'ru' && serverText ? serverText
           : res.status === 429 ? t.errTooMany
+          : res.status === 503 ? t.errUnavailable
+          : lang === 'ru' && serverText ? serverText
           : res.status === 400 ? t.errUnreadable
           : t.errGeneric
         setNotices([{ tone: 'error', text }])
         return
+      }
+      // Сколько осталось после этой склейки — только у тех, кого считаем (без Kaspi Bot).
+      const left = Number.parseInt(res.headers.get('X-Waybills-Remaining') ?? '', 10)
+      if (Number.isFinite(left)) {
+        setQuota(prev => ({
+          unlimited: false,
+          remaining: Math.max(0, left),
+          limit: prev && !prev.unlimited ? prev.limit : DEFAULT_LIMIT,
+          resetsAt: prev && !prev.unlimited ? prev.resetsAt : null,
+        }))
       }
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
@@ -263,11 +349,37 @@ export default function WaybillsTool({ lang }: { lang: ToolLang }) {
             {done && <div className="text-sm mb-3" style={{ color: 'var(--nav-success)' }}>{done}</div>}
           </div>
 
-          <button type="button" onClick={merge} disabled={pickerBusy || files.length === 0}
-            className="w-full rounded-lg px-4 py-3 text-sm font-semibold disabled:opacity-50 mt-1"
-            style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-            {busy ? t.merging : t.merge}
-          </button>
+          {limitReached && limitInfo ? (
+            <div className="nav-glass nav-card-accent rounded-2xl p-6 mt-1">
+              <div className="text-base font-bold mb-1.5" style={{ color: 'var(--nav-text-primary)' }}>
+                {t.limitTitle(limitInfo.limit)}
+              </div>
+              <p className="text-sm mb-4" style={{ color: 'var(--nav-text-secondary)' }}>
+                {t.limitText(limitInfo.resetsAt ?? '')}
+              </p>
+              {/* Без ограничений — только Kaspi Bot на Про: вошедшего сразу на
+                  /upgrade, без сессии — через /login?next=/upgrade. */}
+              <a href={signedIn ? UPGRADE_HREF : LOGIN_TO_UPGRADE_HREF}
+                onClick={() => { setLang(lang); track('tool_waybills_upgrade_click', { lang, signedIn }) }}
+                className="inline-block rounded-xl px-5 py-2.5 text-sm font-semibold transition-transform hover:-translate-y-0.5"
+                style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                {t.limitCta}
+              </a>
+            </div>
+          ) : (
+            <>
+              <button type="button" onClick={merge} disabled={pickerBusy || files.length === 0}
+                className="w-full rounded-lg px-4 py-3 text-sm font-semibold disabled:opacity-50 mt-1"
+                style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                {busy ? t.merging : t.merge}
+              </button>
+              {quota && (
+                <div className="text-[11px] mt-2 text-center" style={{ color: 'var(--nav-text-muted)' }}>
+                  {quota.unlimited ? t.unlimited : t.remaining(quota.remaining, quota.limit)}
+                </div>
+              )}
+            </>
+          )}
 
           {justMerged && (
             <div className="nav-glass rounded-2xl p-4 mt-4">
