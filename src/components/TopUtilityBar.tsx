@@ -644,8 +644,8 @@ export default function TopUtilityBar() {
           top bar: 6 + 44 + 6 = 56. lg:top-[21px] (not top-2.5): DesktopShell's card went back to a lg:top-3 gap
           (floating/"парение" effect on all 4 sides), which shifts SiteNav's sticky bar
           — and everything in it — 12px lower on the 5 DesktopShell pages. The bar now
-          spans roughly y=12..~77 there, and centering the ~46px pill in that range
-          works out to top-[21px]. The 9 standalone kaspi-shop/ai-agent pages don't use
+          spans y=12..88 there (SiteNav row py-5 since 15.10.2026), and the 58px pill
+          at top-[21px] sits exactly in its middle (21..79). The 9 standalone kaspi-shop/ai-agent pages don't use
           DesktopShell, so their bar still starts at y=0 -- this pill sits ~11px low on
           those. Left as-is: those pages are admin-locked for regular users right now,
           so it's not worth a page-aware split for a gap only admins see. lg:right-6

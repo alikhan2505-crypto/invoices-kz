@@ -401,7 +401,7 @@ export default function EditInvoice() {
         initial={reduceMotion ? false : { opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ ease: EASE, duration: reduceMotion ? 0 : 0.4 }}
-        className="hidden lg:block lg:w-[380px] lg:sticky lg:top-[110px]"
+        className="hidden lg:block lg:w-[380px] lg:sticky lg:top-[121px]"
       >
         <InvoiceLivePreview
           invoiceNumber={invoiceNumber}
