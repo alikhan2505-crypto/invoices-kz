@@ -1,8 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { kaspiShopPlanGate } from '@/lib/kaspiShop/planGate'
 import { getMerchantInfo } from '@/lib/kaspiShop/cabinetApi'
 import { finalizeConnection } from '@/lib/kaspiShop/finalizeConnection'
+
+// Время на фоновое обновление каталога после ответа (after() в finalizeConnection).
+export const maxDuration = 300
 
 const supabaseAuth = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -50,6 +53,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Не удалось получить данные выбранного магазина' }, { status: 400 })
   }
 
-  const { importedProducts } = await finalizeConnection(user.id, sessionCookies, merchantId, merchant.name)
+  const { importedProducts } = await finalizeConnection(user.id, sessionCookies, merchantId, merchant.name, { runInBackground: after })
   return NextResponse.json({ status: 'connected', companyName: merchant.name, importedProducts })
 }

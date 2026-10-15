@@ -44,7 +44,9 @@ const invoicesLinks: { href: string; label: LocalizedLabel }[] = [
   { href: '/profile/templates', label: { ru: 'Шаблоны', kk: 'Үлгілер', en: 'Templates' } },
 ]
 
-const kaspiShopLinks: { href: string; label: LocalizedLabel }[] = [
+// soon: пункт виден, но неактивен (серый, «скоро») -- 15.10.2026 так
+// выключена Витрина до доработки, по решению основателя.
+const kaspiShopLinks: { href: string; label: LocalizedLabel; soon?: boolean }[] = [
   { href: '/kaspi-shop/overview', label: { ru: 'Обзор', kk: 'Шолу', en: 'Overview' } },
   { href: '/kaspi-shop', label: { ru: 'Демпинг', kk: 'Демпинг', en: 'Repricer' } },
   { href: '/kaspi-shop/orders', label: { ru: 'Заказы', kk: 'Тапсырыстар', en: 'Orders' } },
@@ -58,8 +60,8 @@ const kaspiShopLinks: { href: string; label: LocalizedLabel }[] = [
   { href: '/kaspi-shop/reviews', label: { ru: 'Отзывы', kk: 'Пікірлер', en: 'Reviews' } },
   { href: '/kaspi-shop/quality', label: { ru: 'Качество', kk: 'Сапа', en: 'Quality' } },
   { href: '/kaspi-shop/nkt', label: { ru: 'Каталог НКТ', kk: 'ҰТК каталогы', en: 'NKT catalog' } },
-  { href: '/kaspi-shop/storefront', label: { ru: 'Витрина', kk: 'Витрина', en: 'Storefront' } },
-  { href: '/kaspi-shop/storefront-orders', label: { ru: 'Заказы витрины', kk: 'Витрина тапсырыстары', en: 'Storefront orders' } },
+  { href: '/kaspi-shop/storefront', label: { ru: 'Витрина', kk: 'Витрина', en: 'Storefront' }, soon: true },
+  { href: '/kaspi-shop/storefront-orders', label: { ru: 'Заказы витрины', kk: 'Витрина тапсырыстары', en: 'Storefront orders' }, soon: true },
 ]
 
 // /ai-agent/settings deliberately has no pill of its own here -- it only
@@ -113,7 +115,7 @@ const cfoLinks: { href: string; label: LocalizedLabel; family?: LocalizedLabel }
 // to the section.
 export type Section = {
   key: 'invoices' | 'kaspiApi' | 'kaspiShop' | 'aiAgent' | 'wildberries' | 'cfo'
-  links: { href: string; label: LocalizedLabel; family?: LocalizedLabel }[]
+  links: { href: string; label: LocalizedLabel; family?: LocalizedLabel; soon?: boolean }[]
   adminOnly: boolean
   // Unlocked for an active Pro plan too, not just admins (2026-09-02
   // AI-агент, 2026-09-03 Kaspi Bot) -- only meaningful when adminOnly is
@@ -454,7 +456,7 @@ function SiteNavBar({ desktopOnly = false }: { desktopOnly?: boolean }) {
                             </div>
                           )
                         ) : active && (
-                          s.links.map(l => {
+                          s.links.filter(l => !l.soon).map(l => {
                             const bestMatch = s.links
                               .filter(x => path === x.href || path.startsWith(x.href + '/'))
                               .sort((a, b) => b.href.length - a.href.length)[0]?.href
@@ -593,7 +595,7 @@ function SiteNavBar({ desktopOnly = false }: { desktopOnly?: boolean }) {
               const bestMatch = activeSection.links
                 .filter(l => path === l.href || path.startsWith(l.href + '/'))
                 .sort((a, b) => b.href.length - a.href.length)[0]?.href
-              return activeSection.links.map(l => {
+              return activeSection.links.filter(l => !l.soon).map(l => {
               const linkActive = l.href === bestMatch
               return (
                 <button

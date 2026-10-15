@@ -203,6 +203,26 @@ function StatCard({ label, value, accent }: { label: string; value: number; acce
   )
 }
 
+// Шаг подключения магазина: кнопка никогда не остаётся навсегда на
+// «Проверяем...». Сеть упала, сервер вернул не-JSON или ответ не пришёл за
+// 2 минуты -- показываем понятную ошибку вместо вечного ожидания.
+async function postConnectStep(url: string, headers: HeadersInit, body: unknown): Promise<{ ok: boolean; data: any; error?: string }> {
+  try {
+    const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body), signal: AbortSignal.timeout(120_000) })
+    const data = await res.json().catch(() => ({}))
+    return { ok: res.ok, data, error: res.ok ? undefined : data.error }
+  } catch (err: any) {
+    const timedOut = err?.name === 'TimeoutError' || err?.name === 'AbortError'
+    return {
+      ok: false,
+      data: {},
+      error: timedOut
+        ? 'Kaspi долго не отвечает. Обновите страницу -- если магазин уже подключился, он появится сам.'
+        : 'Нет связи с сервером. Проверьте интернет и попробуйте ещё раз.',
+    }
+  }
+}
+
 export default function KaspiShop() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -401,10 +421,10 @@ export default function KaspiShop() {
     // tells the API to auto-pick the already-connected merchant instead of
     // showing the same picker used for genuinely adding a new store.
     const isReconnect = connected && sessionStatus === 'session_expired'
-    const res = await fetch('/api/kaspi-shop/connect/otp', { method: 'POST', headers, body: JSON.stringify({ otpToken, code: otpCode, isReconnect }) })
-    const data = await res.json()
+    const r = await postConnectStep('/api/kaspi-shop/connect/otp', headers, { otpToken, code: otpCode, isReconnect })
     setConnecting(false)
-    if (!res.ok) { setConnectError(data.error || 'Не удалось подтвердить код'); return }
+    if (!r.ok) { setConnectError(r.error || 'Не удалось подтвердить код'); return }
+    const data = r.data
     setOtpToken(null)
     setOtpCode('')
     if (data.status === 'merchant_required') {
@@ -423,10 +443,9 @@ export default function KaspiShop() {
     setConnecting(true)
     setConnectError('')
     const headers = await authHeader()
-    const res = await fetch('/api/kaspi-shop/connect/select-merchant', { method: 'POST', headers, body: JSON.stringify({ sessionToken, merchantId }) })
-    const data = await res.json()
+    const r = await postConnectStep('/api/kaspi-shop/connect/select-merchant', headers, { sessionToken, merchantId })
     setConnecting(false)
-    if (!res.ok) { setConnectError(data.error || 'Не удалось подключить магазин'); return }
+    if (!r.ok) { setConnectError(r.error || 'Не удалось подключить магазин'); return }
     setSessionToken(null)
     setMerchantChoices(null)
     setConnected(true)

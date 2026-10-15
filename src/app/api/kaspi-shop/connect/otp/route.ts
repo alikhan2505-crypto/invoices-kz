@@ -1,10 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { kaspiShopPlanGate } from '@/lib/kaspiShop/planGate'
 import { submitOtp } from '@/lib/kaspiShop/cabinetAuth'
 import { listMerchants, getMerchantInfo } from '@/lib/kaspiShop/cabinetApi'
 import { finalizeConnection } from '@/lib/kaspiShop/finalizeConnection'
 import { listConnections } from '@/lib/kaspiShop/connection'
+
+// Время на фоновое обновление каталога после ответа (after() в finalizeConnection).
+export const maxDuration = 300
 
 const supabaseAuth = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -79,13 +82,13 @@ export async function POST(req: NextRequest) {
       const toRefresh = named.filter(m => existing.some(c => c.merchantId === m.id))
       if (toRefresh.length > 0) {
         const results = await Promise.all(
-          toRefresh.map(m => finalizeConnection(user.id, sessionCookies, m.id, m.name))
+          toRefresh.map(m => finalizeConnection(user.id, sessionCookies, m.id, m.name, { runInBackground: after }))
         )
         return NextResponse.json({
           status: 'connected',
           companyName: toRefresh.map(m => m.name).join(', '),
           refreshedCount: toRefresh.length,
-          importedProducts: results.reduce((sum, r) => sum + r.importedProducts, 0),
+          importedProducts: results.reduce((sum, r) => sum + (r.importedProducts ?? 0), 0),
         })
       }
     }
@@ -96,6 +99,6 @@ export async function POST(req: NextRequest) {
     })
   }
 
-  const { importedProducts } = await finalizeConnection(user.id, sessionCookies, named[0].id, named[0].name)
+  const { importedProducts } = await finalizeConnection(user.id, sessionCookies, named[0].id, named[0].name, { runInBackground: after })
   return NextResponse.json({ status: 'connected', companyName: named[0].name, importedProducts })
 }

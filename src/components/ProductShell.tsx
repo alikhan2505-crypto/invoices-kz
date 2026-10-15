@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import { useLanguage, type Lang } from '@/components/LanguageProvider'
 import { SECTIONS } from '@/components/SiteNav'
 import KaspiShopStoreSwitcher, { type StoreState } from '@/components/KaspiShopStoreSwitcher'
@@ -11,10 +12,10 @@ import { useEffectivePath } from '@/lib/useEffectivePath'
 import { useMyProducts } from '@/lib/useMyProducts'
 import { useCfoMode } from '@/lib/cfo/modeStore'
 
-const TEXT: Record<Lang, { all: string; menu: string; close: string; balance: string; topup: string; connected: string; notConnected: string; notifications: string; help: string; account: string }> = {
-  ru: { all: 'Все продукты', menu: 'Меню', close: 'Закрыть', balance: 'Баланс', topup: 'Пополнить баланс', connected: 'Магазин подключён', notConnected: 'Магазин не подключён', notifications: 'Уведомления', help: 'Помощь', account: 'Аккаунт' },
-  kk: { all: 'Барлық өнімдер', menu: 'Мәзір', close: 'Жабу', balance: 'Баланс', topup: 'Балансты толтыру', connected: 'Дүкен қосылған', notConnected: 'Дүкен қосылмаған', notifications: 'Хабарландырулар', help: 'Көмек', account: 'Аккаунт' },
-  en: { all: 'All products', menu: 'Menu', close: 'Close', balance: 'Balance', topup: 'Top up balance', connected: 'Store connected', notConnected: 'Store not connected', notifications: 'Notifications', help: 'Help', account: 'Account' },
+const TEXT: Record<Lang, { all: string; menu: string; close: string; balance: string; topup: string; connected: string; notConnected: string; notifications: string; help: string; account: string; soon: string }> = {
+  ru: { all: 'Все продукты', menu: 'Меню', close: 'Закрыть', balance: 'Баланс', topup: 'Пополнить баланс', connected: 'Магазин подключён', notConnected: 'Магазин не подключён', notifications: 'Уведомления', help: 'Помощь', account: 'Аккаунт', soon: 'скоро' },
+  kk: { all: 'Барлық өнімдер', menu: 'Мәзір', close: 'Жабу', balance: 'Баланс', topup: 'Балансты толтыру', connected: 'Дүкен қосылған', notConnected: 'Дүкен қосылмаған', notifications: 'Хабарландырулар', help: 'Көмек', account: 'Аккаунт', soon: 'жақында' },
+  en: { all: 'All products', menu: 'Menu', close: 'Close', balance: 'Balance', topup: 'Top up balance', connected: 'Store connected', notConnected: 'Store not connected', notifications: 'Notifications', help: 'Help', account: 'Account', soon: 'soon' },
 }
 
 function openUtility(panel: 'notifications' | 'help' | 'account') {
@@ -151,8 +152,23 @@ export default function ProductShell({ product, children }: { product: ProductKe
       <nav aria-label={def.name} className="flex-1 min-h-0 overflow-y-auto hide-scrollbar px-2 pb-3">
         {links.map((l) => {
           const active = l.href === bestMatch
+          if ('soon' in l && l.soon) {
+            return (
+              <span
+                key={l.href}
+                aria-disabled="true"
+                className="flex items-center justify-between gap-2 min-h-[40px] px-3 rounded-xl text-[14px] font-medium mb-0.5 cursor-not-allowed select-none"
+                style={{ color: 'var(--nav-text-muted)', opacity: 0.55 }}
+              >
+                {l.label[lang]}
+                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: 'var(--nav-surface-glass)', border: '1px solid var(--nav-border)' }}>{t.soon}</span>
+              </span>
+            )
+          }
+          // Link, а не <a>: переход между разделами без перезагрузки
+          // страницы -- меню и шапка остаются, меняется только правая часть.
           return (
-            <a
+            <Link
               key={l.href}
               href={l.href}
               data-tour={l.href.slice(1).replace(/\//g, '-')}
@@ -165,7 +181,7 @@ export default function ProductShell({ product, children }: { product: ProductKe
               }}
             >
               {(product === 'cfo' && cfoMode === 'family' && l.family ? l.family : l.label)[lang]}
-            </a>
+            </Link>
           )
         })}
       </nav>

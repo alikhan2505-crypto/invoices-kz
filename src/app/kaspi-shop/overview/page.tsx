@@ -137,9 +137,11 @@ export default function KaspiShopOverview() {
           </div>
 
           {sessionExpired && (
-            <div className="nav-glass rounded-2xl p-4 flex items-center gap-3 flex-wrap text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
-              <span>Сессия Kaspi истекла, заказы и прибыль недоступны, пока вы не переподключите магазин.</span>
-              <a href="/kaspi-shop?addStore=1" className="font-semibold" style={{ color: 'var(--nav-accent)' }}>Переподключить →</a>
+            <div role="alert" className="rounded-2xl p-4 flex items-center gap-3 flex-wrap text-sm font-medium"
+              style={{ background: 'color-mix(in srgb, var(--nav-critical) 12%, transparent)', border: '1px solid var(--nav-critical)', color: 'var(--nav-critical)' }}>
+              <span aria-hidden="true" className="w-2.5 h-2.5 rounded-full flex-shrink-0 animate-pulse" style={{ background: 'var(--nav-critical)' }} />
+              <span className="flex-1 min-w-[200px]">Сессия Kaspi истекла, заказы и прибыль недоступны, пока вы не переподключите магазин.</span>
+              <a href="/kaspi-shop?addStore=1" className="font-semibold px-3 py-1.5 rounded-lg flex-shrink-0" style={{ background: 'var(--nav-critical)', color: '#fff' }}>Переподключить →</a>
             </div>
           )}
 

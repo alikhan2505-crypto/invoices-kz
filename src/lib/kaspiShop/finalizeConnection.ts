@@ -11,7 +11,19 @@ const supabase = createClient(
 // explicit merchant-picker selection) -- saves the connection, then
 // auto-imports the seller's existing catalog (disabled by default, same as
 // before: the seller reviews and turns tracking on deliberately).
-export async function finalizeConnection(userId: string, sessionCookies: string, merchantId: string, companyName: string): Promise<{ importedProducts: number }> {
+// runInBackground (Next's after() из роута): переподключение магазина, у
+// которого товары уже есть, отвечает сразу после сохранения сессии, а
+// обновление каталога доделывает после ответа. Раньше человек после ввода
+// кода из SMS ждал на «Проверяем...» минуту-две, пока шёл импорт всех
+// товаров (живой случай 15.10.2026: 212 товаров). Новый магазин импортируется
+// как раньше, до ответа: странице сразу нужен его список товаров.
+export async function finalizeConnection(
+  userId: string,
+  sessionCookies: string,
+  merchantId: string,
+  companyName: string,
+  opts: { runInBackground?: (task: () => Promise<unknown>) => void } = {},
+): Promise<{ importedProducts: number | null }> {
   await saveConnection({ userId, sessionCookies, merchantId, companyName })
   // Not loadConnection(userId): a 2nd+ store saves as inactive (see
   // saveConnection), so "the active one" would resolve to a DIFFERENT,
@@ -19,8 +31,26 @@ export async function finalizeConnection(userId: string, sessionCookies: string,
   const connection = await loadConnectionByMerchant(userId, merchantId)
   if (!connection) throw new Error('Подключение не удалось сохранить')
 
-  const imported = await importCatalogProducts(connection.id, userId, sessionCookies, merchantId)
+  if (opts.runInBackground) {
+    const { count } = await supabase
+      .from('kaspi_shop_tracked_products')
+      .select('id', { count: 'exact', head: true })
+      .eq('connection_id', connection.id)
+    if ((count ?? 0) > 0) {
+      opts.runInBackground(async () => {
+        await importCatalogProducts(connection.id, userId, sessionCookies, merchantId)
+        await seedCityNames(connection.id, sessionCookies, merchantId)
+      })
+      return { importedProducts: null }
+    }
+  }
 
+  const imported = await importCatalogProducts(connection.id, userId, sessionCookies, merchantId)
+  await seedCityNames(connection.id, sessionCookies, merchantId)
+  return { importedProducts: imported }
+}
+
+async function seedCityNames(connectionId: string, sessionCookies: string, merchantId: string) {
   // Best-effort seed of the city-name cache so the city picker on
   // /kaspi-shop has real names to render right after connecting, instead
   // of depending entirely on the lazy on-demand refresh in
@@ -33,13 +63,26 @@ export async function finalizeConnection(userId: string, sessionCookies: string,
   try {
     const cityNames = await fetchCityNames(sessionCookies, merchantId)
     if (Object.keys(cityNames).length > 0) {
-      await supabase.from('kaspi_shop_connections').update({ city_lookup_cache: cityNames }).eq('id', connection.id)
+      await supabase.from('kaspi_shop_connections').update({ city_lookup_cache: cityNames }).eq('id', connectionId)
     }
   } catch (err: any) {
     console.error('kaspi-shop finalizeConnection: city name cache seed failed (non-fatal)', err.message)
   }
+}
 
-  return { importedProducts: imported }
+// Сколько товаров обрабатываем одновременно. Раньше шли строго по одному
+// (2–3 запроса к базе на товар последовательно) -- 200 товаров ≈ минута.
+const IMPORT_CONCURRENCY = 8
+
+async function forEachConcurrent<T>(items: T[], limit: number, fn: (item: T) => Promise<void>) {
+  let next = 0
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) {
+      const item = items[next++]
+      await fn(item)
+    }
+  })
+  await Promise.all(workers)
 }
 
 // The catalog-import loop, shared by finalizeConnection (connect-time) and
@@ -73,7 +116,10 @@ export async function importCatalogProducts(connectionId: string, userId: string
       console.error('kaspi-shop importCatalogProducts: details batch failed (non-fatal, point cities skipped)', err.message)
     }
 
-    for (const offer of offers) {
+    const importOne = async (offer: (typeof offers)[number]) => {
+      // Kaspi изредка отдаёт товар без названия -- product_name NOT NULL, и
+      // такой товар раньше молча не импортировался.
+      const productName = offer.title || offer.sku
       // Reconnecting (e.g. after a session expiry) used to blind-INSERT a
       // fresh row per offer every time, producing real duplicate rows per
       // (connection_id, kaspi_master_sku) in production -- confirmed live
@@ -96,7 +142,7 @@ export async function importCatalogProducts(connectionId: string, userId: string
         .maybeSingle()
       if (lookupError) {
         console.error('kaspi-shop finalizeConnection: failed to check for an existing row for', offer.sku, lookupError.message)
-        continue
+        return
       }
 
       if (existing) {
@@ -104,7 +150,7 @@ export async function importCatalogProducts(connectionId: string, userId: string
           .from('kaspi_shop_tracked_products')
           .update({
             kaspi_sku: offer.sku,
-            product_name: offer.title,
+            product_name: productName,
             brand: offer.brandName || offer.brandCode || '',
             store_id: offer.points[0] || '',
             kaspi_brand: offer.brandName || offer.brandCode || null,
@@ -124,10 +170,10 @@ export async function importCatalogProducts(connectionId: string, userId: string
           .eq('id', existing.id)
         if (updateError) {
           console.error('kaspi-shop finalizeConnection: failed to refresh existing offer', offer.sku, updateError.message)
-          continue
+          return
         }
         imported += 1
-        continue
+        return
       }
 
       const { data: product, error: productError } = await supabase
@@ -136,7 +182,7 @@ export async function importCatalogProducts(connectionId: string, userId: string
           connection_id: connectionId,
           user_id: userId,
           kaspi_sku: offer.sku,
-          product_name: offer.title,
+          product_name: productName,
           brand: offer.brandName || offer.brandCode || '',
           store_id: offer.points[0] || '',
           stock_count: totalStock(offer),
@@ -155,7 +201,7 @@ export async function importCatalogProducts(connectionId: string, userId: string
         .single()
       if (productError || !product) {
         console.error('kaspi-shop finalizeConnection: failed to import offer', offer.sku, productError?.message)
-        continue
+        return
       }
 
       const cityRows = Object.entries(offer.allCityPrices).map(([cityCode, entry]) => ({
@@ -169,6 +215,24 @@ export async function importCatalogProducts(connectionId: string, userId: string
       }
       imported += 1
     }
+
+    // Офферы одного kaspi_master_sku идут строго по очереди внутри своей
+    // группы: второй должен увидеть строку, вставленную первым, и обновить
+    // её, а не упереться в уникальный индекс (connection_id, kaspi_master_sku).
+    const groups = new Map<string, typeof offers>()
+    for (const offer of offers) {
+      const key = offer.masterSku || `sku:${offer.sku}`
+      const g = groups.get(key)
+      if (g) g.push(offer)
+      else groups.set(key, [offer])
+    }
+    await forEachConcurrent([...groups.values()], IMPORT_CONCURRENCY, async group => {
+      for (const offer of group) {
+        try { await importOne(offer) } catch (err: any) {
+          console.error('kaspi-shop importCatalogProducts: offer import threw', offer.sku, err?.message)
+        }
+      }
+    })
   } catch (err: any) {
     // The connection itself is already saved and valid -- a partial or
     // failed catalog import is a recoverable follow-up, not a reason to
