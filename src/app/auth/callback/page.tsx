@@ -144,7 +144,10 @@ export default function AuthCallback() {
             return
           }
 
-          const refCode = localStorage.getItem('referral_code') || ''
+          // Запасной источник — метаданные из signInWithOtp: письмо могли
+          // открыть в другом браузере, где localStorage пуст.
+          const metaRef = session.user.user_metadata?.referral_code
+          const refCode = localStorage.getItem('referral_code') || (typeof metaRef === 'string' ? metaRef : '')
           if (refCode) {
             try {
               await fetch('/api/referral', {

@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { useLanguage } from '@/components/LanguageProvider'
 import { backLabel } from '@/lib/a11yLabels'
 import { profileContentDict } from '@/lib/i18n/profileContent'
+import { parseDbTimestamp } from '@/lib/plan'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 
@@ -94,6 +95,8 @@ export default function Referral() {
     transition: { delay: reduceMotion ? 0 : i * 0.05, duration: reduceMotion ? 0 : 0.4, ease: EASE },
   })
 
+  const bonusEnd = parseDbTimestamp(profile?.bonus_expires_at)
+
   const steps = [
     { step: '1', text: t.referralStep1 },
     { step: '2', text: t.referralStep2 },
@@ -107,11 +110,16 @@ export default function Referral() {
       <SiteNav />
       <div className="max-w-lg lg:max-w-2xl mx-auto p-4 space-y-4">
 
-        <motion.div {...fadeIn(0)} className="nav-glass rounded-2xl px-4 py-4 flex items-center gap-3">
-          <button onClick={() => router.push('/profile')} className="back-btn transition-colors flex-shrink-0" style={{ color: 'var(--nav-text-muted)' }} aria-label={backLabel(lang)}>
+        <motion.div {...fadeIn(0)} className="flex items-center gap-3 mb-1">
+          <button
+            onClick={() => router.push('/profile')}
+            aria-label={backLabel(lang)}
+            className="w-11 h-11 flex items-center justify-center rounded-xl flex-shrink-0 transition-colors hover:bg-[var(--nav-surface-glass)]"
+            style={{ color: 'var(--nav-text-muted)' }}
+          >
             <ChevronLeftIcon />
           </button>
-          <span className="font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{t.referralHeaderLabel}</span>
+          <h2 className="text-xl font-bold truncate" style={{ color: 'var(--nav-text-primary)' }}>{t.referralHeaderLabel}</h2>
         </motion.div>
 
         <motion.div {...fadeIn(1)} className={`nav-glass nav-card-accent rounded-2xl p-6 text-center ${CARD_HOVER}`}>
@@ -137,9 +145,11 @@ export default function Referral() {
           </div>
           <div className={`nav-glass rounded-2xl p-4 text-center ${CARD_HOVER}`}>
             <div className="text-2xl font-bold" style={{ color: 'var(--nav-success)' }}>
-              {profile?.bonus_expires_at && new Date(profile.bonus_expires_at) > new Date()
-                ? Math.ceil((new Date(profile.bonus_expires_at).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
-                : (profile?.referral_count || 0) * 7}
+              {/* Только реально оставшиеся дни: раньше при истёкшем бонусе
+                  показывали «приглашено × 7» — дни, которых у человека уже нет. */}
+              {bonusEnd && bonusEnd.getTime() > Date.now()
+                ? Math.ceil((bonusEnd.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+                : 0}
             </div>
             <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>{t.bonusDaysLabel}</div>
           </div>

@@ -164,9 +164,17 @@ export default function Login() {
       // Same rule: a broken check never becomes a second locked door.
     }
 
+    // Реферальный код едет и в метаданных пользователя: ссылку из письма часто
+    // открывают в другом браузере (почтовое приложение на телефоне), где
+    // localStorage пуст, и бонус молча терялся. /auth/callback читает оттуда.
+    let refCode = ''
+    try { refCode = localStorage.getItem('referral_code') || '' } catch {}
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: 'https://invoices.kz/auth/callback' }
+      options: {
+        emailRedirectTo: 'https://invoices.kz/auth/callback',
+        ...(refCode ? { data: { referral_code: refCode } } : {}),
+      }
     })
     if (error) {
       alert(t.errorPrefix(error.message === 'Invalid email' ? t.invalidEmailMessage : error.message))
