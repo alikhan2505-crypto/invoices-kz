@@ -143,3 +143,18 @@ describe('safeImageSrc', () => {
     expect(safeImageSrc(undefined)).toBe('')
   })
 })
+
+describe('generateInvoicePDF — автопечать', () => {
+  it('без флага открывает страницу с кнопками, а не диалог печати', async () => {
+    const { autoPrint: _omit, ...noFlag } = base
+    const html = await generateInvoicePDF(noFlag)
+    expect(html).toContain('id="dlBtn"')
+    expect(html).not.toContain('window.onload = function()')
+  })
+
+  it('autoPrint: true — сразу печать, без панели', async () => {
+    const html = await generateInvoicePDF({ ...base, autoPrint: true })
+    expect(html).toContain('window.onload = function()')
+    expect(html).not.toContain('id="dlBtn"')
+  })
+})

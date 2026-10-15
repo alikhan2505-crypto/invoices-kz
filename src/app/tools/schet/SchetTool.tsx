@@ -157,6 +157,8 @@ export default function SchetTool({ lang }: { lang: ToolLang }) {
     try {
       const bank = resolveBank(f)
       const html = await generateInvoicePDF({
+        // Страница с кнопками «Назад / Печать / Скачать PDF», как у КП, АВР и накладной.
+        autoPrint: false,
         number: f.number.trim() || '1',
         date: ruDate(f.date || localToday()),
         clientName: f.clientName.trim(),

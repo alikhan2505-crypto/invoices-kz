@@ -48,6 +48,9 @@ interface InvoiceData {
   profile?: ProfileData
   bank?: BankData
   knp?: string
+  /** true — сразу открыть диалог печати, без панели кнопок. По умолчанию
+   *  выключено (15.10.2026): бесплатный /tools/schet не передавал флаг и вместо
+   *  страницы с «Назад / Печать / Скачать PDF» сразу открывал печать. */
   autoPrint?: boolean
   vatType?: 'no_vat' | 'vat_0' | 'vat_16'
   contractNumber?: string
@@ -365,7 +368,7 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<string> {
         </div>
       ` : ''}
 
-      ${data.autoPrint !== false ? `
+      ${data.autoPrint === true ? `
         <script>
           window.onload = function() {
             const images = document.querySelectorAll('img')
