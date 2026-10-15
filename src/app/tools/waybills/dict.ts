@@ -77,7 +77,7 @@ export const waybillsDict: Record<ToolLang, WaybillsDict> = {
     },
     h1: 'Склейка накладных Kaspi',
     intro:
-      'Соберите накладные из Kaspi Магазина в один PDF: по 4 на лист А4, чтобы не печатать каждую отдельно. Бесплатно и без регистрации — файлы нигде не сохраняются.',
+      'Соберите накладные из Kaspi Магазина в один PDF, чтобы не печатать каждую отдельно: по 4 на лист А4 для обычного принтера или по одной в А6, если у вас есть термопринтер. Бесплатно и без регистрации — файлы нигде не сохраняются.',
     dropzoneTitle: 'Выберите PDF-накладные или ZIP-архив',
     dropzoneActive: 'Отпустите файлы здесь',
     dropzoneHint: max => `нажмите здесь или перетащите файлы · до ${max} файлов`,
@@ -157,7 +157,7 @@ export const waybillsDict: Record<ToolLang, WaybillsDict> = {
     },
     h1: 'Kaspi жүкқұжаттарын біріктіру',
     intro:
-      'Kaspi Магазин жүкқұжаттарын бір PDF файлға жинаңыз: әрқайсысын бөлек басып шығармас үшін А4 парағына 4-тен орналастырамыз. Тегін әрі тіркелусіз — файлдар ешқайда сақталмайды.',
+      'Kaspi Магазин жүкқұжаттарын әрқайсысын бөлек басып шығармас үшін бір PDF файлға жинаңыз: кәдімгі принтерге А4 парағына 4-тен немесе термопринтеріңіз болса, А6 форматында бір-бірден. Тегін әрі тіркелусіз — файлдар ешқайда сақталмайды.',
     dropzoneTitle: 'PDF-жүкқұжаттарды немесе ZIP-архивті таңдаңыз',
     dropzoneActive: 'Файлдарды осында тастаңыз',
     dropzoneHint: max => `осы жерді басыңыз немесе файлдарды сүйреп әкеліңіз · ${max} файлға дейін`,
@@ -236,7 +236,7 @@ export const waybillsDict: Record<ToolLang, WaybillsDict> = {
     },
     h1: 'Kaspi Waybill Merger',
     intro:
-      "Combine your Kaspi Shop waybills (the shipping labels of Kazakhstan's Kaspi.kz marketplace) into one PDF: 4 per A4 sheet, so you don't print each one separately. Free, no signup — files are never stored.",
+      "Combine your Kaspi Shop waybills (the shipping labels of Kazakhstan's Kaspi.kz marketplace) into one PDF so you don't print each one separately: 4 per A4 sheet for a regular printer, or one per A6 label if you have a thermal printer. Free, no signup — files are never stored.",
     dropzoneTitle: 'Choose PDF waybills or a ZIP archive',
     dropzoneActive: 'Drop the files here',
     dropzoneHint: max => `tap here or drop files · up to ${max} files`,
