@@ -46,7 +46,7 @@ export interface NakladnayaDict {
   removeRow: (n: number) => string
   addRow: string
   total: (amount: string) => string
-  vatIncluded: (amount: string) => string
+  vatIncluded: (amount: string, rate: number) => string
   errors: {
     company: string
     bin: string
@@ -113,7 +113,7 @@ export const nakladnayaDict: Record<ToolLang, NakladnayaDict> = {
     removeRow: n => `Удалить строку ${n}`,
     addRow: '+ Добавить товар / услугу',
     total: s => `Итого: ${s}`,
-    vatIncluded: s => `в т. ч. НДС 16%: ${s}`,
+    vatIncluded: (s, rate) => `в т.ч. НДС ${rate}%: ${s}`,
     errors: {
       company: 'Укажите название вашего ИП или ТОО (поставщик)',
       bin: 'БИН/ИИН поставщика — 12 цифр',
@@ -197,7 +197,7 @@ export const nakladnayaDict: Record<ToolLang, NakladnayaDict> = {
     removeRow: n => `${n}-жолды өшіру`,
     addRow: '+ Тауар / қызмет қосу',
     total: s => `Барлығы: ${s}`,
-    vatIncluded: s => `оның ішінде ҚҚС 16%: ${s}`,
+    vatIncluded: (s, rate) => `оның ішінде ҚҚС ${rate}%: ${s}`,
     errors: {
       company: 'ЖК немесе ЖШС атауын көрсетіңіз (жеткізуші)',
       bin: 'Жеткізушінің БСН/ЖСН-і — 12 цифр',
@@ -281,7 +281,7 @@ export const nakladnayaDict: Record<ToolLang, NakladnayaDict> = {
     removeRow: n => `Remove row ${n}`,
     addRow: '+ Add product / service',
     total: s => `Total: ${s}`,
-    vatIncluded: s => `incl. VAT 16%: ${s}`,
+    vatIncluded: (s, rate) => `incl. VAT ${rate}%: ${s}`,
     errors: {
       company: 'Enter the name of your sole proprietorship or LLP (supplier)',
       bin: 'Supplier BIN/IIN must be 12 digits',

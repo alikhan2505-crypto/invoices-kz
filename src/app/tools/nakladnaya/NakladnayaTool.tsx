@@ -293,9 +293,9 @@ export default function NakladnayaTool({ lang }: { lang: ToolLang }) {
               <div className="text-sm font-bold" style={{ color: 'var(--nav-text-primary)' }}>
                 {t.total(formatTenge(total))}
               </div>
-              {f.vatType === 'vat_16' && total > 0 && (
+              {(f.vatType === 'vat_16' || f.vatType === 'vat_0') && total > 0 && (
                 <div className="text-[11px]" style={{ color: 'var(--nav-text-muted)' }}>
-                  {t.vatIncluded(formatTenge(vat))}
+                  {t.vatIncluded(formatTenge(vat), f.vatType === 'vat_16' ? 16 : 0)}
                 </div>
               )}
             </div>

@@ -61,7 +61,7 @@ export interface KpDict {
   removeRow: (n: number) => string
   addRow: string
   totalLabel: string
-  vatIncluded: (amount: string) => string
+  vatIncluded: (amount: string, rate: number) => string
   noteLabel: string
   errCompany: string
   errBin: string
@@ -137,7 +137,7 @@ export const kpDict: Record<ToolLang, KpDict> = {
     removeRow: n => `Удалить позицию ${n}`,
     addRow: '+ Добавить товар / услугу',
     totalLabel: 'Итого',
-    vatIncluded: a => `в т.ч. НДС 16%: ${a}`,
+    vatIncluded: (a, rate) => `в т.ч. НДС ${rate}%: ${a}`,
     noteLabel: 'Примечание (условия, сроки, доставка)',
     errCompany: 'Укажите название вашего ИП или ТОО',
     errBin: 'БИН/ИИН — 12 цифр',
@@ -231,7 +231,7 @@ export const kpDict: Record<ToolLang, KpDict> = {
     removeRow: n => `${n}-позицияны жою`,
     addRow: '+ Тауар / қызмет қосу',
     totalLabel: 'Барлығы',
-    vatIncluded: a => `оның ішінде ҚҚС 16%: ${a}`,
+    vatIncluded: (a, rate) => `оның ішінде ҚҚС ${rate}%: ${a}`,
     noteLabel: 'Ескертпе (шарттар, мерзімдер, жеткізу)',
     errCompany: 'ЖК немесе ЖШС атауын көрсетіңіз',
     errBin: 'БСН/ЖСН — 12 цифр',
@@ -325,7 +325,7 @@ export const kpDict: Record<ToolLang, KpDict> = {
     removeRow: n => `Remove item ${n}`,
     addRow: '+ Add product / service',
     totalLabel: 'Total',
-    vatIncluded: a => `incl. VAT 16%: ${a}`,
+    vatIncluded: (a, rate) => `incl. VAT ${rate}%: ${a}`,
     noteLabel: 'Note (terms, timelines, delivery)',
     errCompany: 'Enter your business name',
     errBin: 'BIN/IIN must be 12 digits',

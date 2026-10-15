@@ -360,8 +360,8 @@ export default function KpTool({ lang }: { lang: ToolLang }) {
               <div className="text-sm font-bold" style={{ color: 'var(--nav-text-primary)' }}>
                 {t.totalLabel}: {formatTenge(total)}
               </div>
-              {f.vatType === 'vat_16' && total > 0 && (
-                <div className="text-[11px] mt-0.5" style={hintStyle}>{t.vatIncluded(formatTenge(kpVatIncluded(total)))}</div>
+              {(f.vatType === 'vat_16' || f.vatType === 'vat_0') && total > 0 && (
+                <div className="text-[11px] mt-0.5" style={hintStyle}>{t.vatIncluded(formatTenge(f.vatType === 'vat_16' ? kpVatIncluded(total) : 0), f.vatType === 'vat_16' ? 16 : 0)}</div>
               )}
             </div>
           </div>

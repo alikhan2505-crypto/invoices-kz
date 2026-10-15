@@ -182,3 +182,13 @@ describe('schet marketing email', () => {
     expect(schetDict.en.emailLabel).toBe('Your email (optional)')
   })
 })
+
+describe('schet — подсказка НДС под итогом', () => {
+  it('для НДС 0% тоже пишет «в т.ч. НДС 0%: 0 ₸» на всех языках', async () => {
+    const { schetDict } = await import('./dict')
+    expect(schetDict.ru.vatIncluded('0 ₸', 0)).toBe('в т.ч. НДС 0%: 0 ₸')
+    expect(schetDict.ru.vatIncluded('1 600 ₸', 16)).toBe('в т.ч. НДС 16%: 1 600 ₸')
+    expect(schetDict.kk.vatIncluded('0 ₸', 0)).toBe('оның ішінде ҚҚС 0%: 0 ₸')
+    expect(schetDict.en.vatIncluded('0 ₸', 0)).toBe('incl. VAT 0%: 0 ₸')
+  })
+})
