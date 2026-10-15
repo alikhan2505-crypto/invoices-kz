@@ -186,7 +186,7 @@ export default function AiAgentsList() {
             <Link href="/ai-agent/settings?new=1"
               className="flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-semibold flex-shrink-0 transition-transform hover:-translate-y-0.5"
               style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)', boxShadow: '0 10px 24px -10px var(--nav-accent)' }}>
-              <PlusIcon /> {t.createAgentButton}
+              <PlusIcon /> {t.createAgentButton.replace(/^\+\s*/, '')}{/* иконка уже «+» — без второго плюса из текста */}
             </Link>
           )}
         </motion.div>
