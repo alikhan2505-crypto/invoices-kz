@@ -1,4 +1,4 @@
-import { toolUrl, TOOL_LOCALE, type ToolLang, type ToolSeoCopy } from '@/lib/tools-i18n'
+import { quarterStartLabel, toolUrl, TOOL_LOCALE, type ToolLang, type ToolSeoCopy } from '@/lib/tools-i18n'
 
 // Все тексты /tools/schet на трёх языках: и <head> (seo), и интерфейс.
 // Русский — дословно прежний текст страницы (metadata из старого layout.tsx),
@@ -75,8 +75,13 @@ export interface SchetDict {
     rowPrice: (name: string) => string
     zero: string
     popup: string
+    /** Сервер лимита недоступен — документ не создан и не засчитан. */
+    unavailable: string
+    failed: string
   }
   limitTitle: (limit: number) => string
+  /** Когда откроются новые бесплатные документы: начало следующего квартала словами. */
+  limitReset: (iso: string) => string
   limitBody: string
   limitButton: string
   generate: string
@@ -91,7 +96,7 @@ export const schetDict: Record<ToolLang, SchetDict> = {
     seo: {
       title: 'Счёт на оплату онлайн — создать бесплатно за минуту',
       description:
-        'Создайте счёт на оплату для ИП или ТОО Казахстана онлайн: реквизиты, БИН, банк и БИК из справочника, НДС 16% или без НДС, сумма прописью. Готовый PDF за минуту, без регистрации — 3 счёта в день бесплатно.',
+        'Создайте счёт на оплату для ИП или ТОО Казахстана онлайн: реквизиты, БИН, банк и БИК из справочника, НДС 16% или без НДС, сумма прописью. Готовый PDF за минуту, без регистрации — 3 счёта в квартал бесплатно.',
       keywords:
         'счет на оплату образец казахстан, счет на оплату скачать, выставить счет онлайн бесплатно, счет на оплату ип образец, счет на оплату тоо, создать счет на оплату, счет с ндс 16 казахстан',
       ogTitle: 'Счёт на оплату онлайн — бесплатно за минуту',
@@ -100,7 +105,7 @@ export const schetDict: Record<ToolLang, SchetDict> = {
     },
     h1: 'Счёт на оплату — онлайн, бесплатно',
     intro: n =>
-      `Заполните реквизиты — получите готовый счёт по форме, принятой в Казахстане: с БИК из справочника банков, суммой прописью и НДС, если нужен. Без регистрации, ${n} счёта в день.`,
+      `Заполните реквизиты — получите готовый счёт по форме, принятой в Казахстане: с БИК из справочника банков, суммой прописью и НДС, если нужен. Без регистрации, ${n} счёта в квартал.`,
     docLangNote: '',
     supplierTitle: 'Поставщик — вы',
     companyLabel: 'Название ИП / ТОО *',
@@ -158,13 +163,16 @@ export const schetDict: Record<ToolLang, SchetDict> = {
       rowPrice: name => `Укажите цену для «${name}»`,
       zero: 'Сумма счёта должна быть больше нуля',
       popup: 'Браузер заблокировал окно со счётом — разрешите всплывающие окна для invoices.kz и нажмите ещё раз. Попытка не списана.',
+      unavailable: 'Сервис временно недоступен — попробуйте через минуту. Счёт не создан и не засчитан.',
+      failed: 'Не удалось сформировать счёт — попробуйте ещё раз.',
     },
-    limitTitle: n => `${n} бесплатных счёта на сегодня созданы`,
+    limitTitle: n => `Все ${n} бесплатных счёта в этом квартале уже созданы`,
+    limitReset: iso => `Новые бесплатные счета откроются ${quarterStartLabel('ru', iso)}.`,
     limitBody:
       'В кабинете invoices.kz счета без лимита и без водяного знака: реквизиты сохраняются один раз, номера считаются сами, видно, когда клиент открыл счёт, а оплату можно принять через Kaspi. Регистрация бесплатная, по ссылке на почту.',
     limitButton: 'Зарегистрироваться бесплатно',
     generate: 'Создать счёт — откроется для печати и скачивания',
-    remaining: (left, n) => `Осталось ${left} из ${n} бесплатных счётов сегодня · в счёте будет строка «Создано на invoices.kz»`,
+    remaining: (left, n) => `Осталось ${left} из ${n} бесплатных счетов в этом квартале · в счёте будет строка «Создано на invoices.kz»`,
     guideLink: 'Что обязательно должно быть в счёте →',
     faqTitle: 'Частые вопросы',
     faq: [
@@ -182,7 +190,7 @@ export const schetDict: Record<ToolLang, SchetDict> = {
       },
       {
         q: 'Куда сохраняются мои данные?',
-        a: 'Реквизиты и позиции хранятся только в вашем браузере — чтобы не заполнять их заново для следующего счёта. Сам счёт формируется на этом устройстве и на наш сервер не отправляется. На сервер уходит только БИН/ИИН (если нажать «Найти») и ваш email — если вы его указали и оставили галочку согласия на рассылку: тогда мы присылаем советы и новости invoices.kz, отписаться можно в любом письме.',
+        a: 'Реквизиты и позиции хранятся только в вашем браузере — чтобы не заполнять их заново для следующего счёта. Сам счёт формируется на этом устройстве и на наш сервер не отправляется. Из того, что вы вводите, на сервер уходит только БИН/ИИН (если нажать «Найти») и ваш email — если вы его указали и оставили галочку согласия на рассылку: тогда мы присылаем советы и новости invoices.kz, отписаться можно в любом письме. Лимит — 3 счёта в квартал с одного подключения (IP-адреса) — считает сервер: адрес в открытом виде не хранится — только его хэш. Счётчик обнуляется 1 января, 1 апреля, 1 июля и 1 октября.',
       },
     ],
   },
@@ -191,7 +199,7 @@ export const schetDict: Record<ToolLang, SchetDict> = {
     seo: {
       title: 'Төлем шоты онлайн — бір минутта тегін жасау',
       description:
-        'Қазақстандағы ЖК немесе ЖШС үшін төлем шотын онлайн жасаңыз: деректемелер, БСН, банк пен БСК анықтамалықтан, ҚҚС 16% немесе ҚҚС-сыз, сомасы жазбаша. Тіркелусіз бір минутта дайын PDF — күніне 3 шот тегін.',
+        'Қазақстандағы ЖК немесе ЖШС үшін төлем шотын онлайн жасаңыз: деректемелер, БСН, банк пен БСК анықтамалықтан, ҚҚС 16% немесе ҚҚС-сыз, сомасы жазбаша. Тіркелусіз бір минутта дайын PDF — тоқсанына 3 шот тегін.',
       keywords:
         'төлем шоты үлгісі, төлемге шот үлгісі, төлем шоты онлайн, шот жазу тегін, жк төлем шоты, жшс төлем шоты, төлем шотын жасау, төлем шоты pdf жүктеу, ққс 16 шот',
       ogTitle: 'Төлем шоты онлайн — бір минутта, тегін',
@@ -200,7 +208,7 @@ export const schetDict: Record<ToolLang, SchetDict> = {
     },
     h1: 'Төлем шоты — онлайн, тегін',
     intro: n =>
-      `Деректемелерді толтырыңыз — Қазақстанда қабылданған нысандағы дайын шот аласыз: БСК банктер анықтамалығынан алынады, сомасы жазбаша көрсетіледі, қажет болса ҚҚС-пен. Тіркелусіз, күніне ${n} шот.`,
+      `Деректемелерді толтырыңыз — Қазақстанда қабылданған нысандағы дайын шот аласыз: БСК банктер анықтамалығынан алынады, сомасы жазбаша көрсетіледі, қажет болса ҚҚС-пен. Тіркелусіз, тоқсанына ${n} шот.`,
     docLangNote: 'Шот бланкісі орыс тілінде шығады — бухгалтерия мен банк қабылдайтын үйреншікті нысан.',
     supplierTitle: 'Жеткізуші — сіз',
     companyLabel: 'ЖК / ЖШС атауы *',
@@ -258,13 +266,16 @@ export const schetDict: Record<ToolLang, SchetDict> = {
       rowPrice: name => `«${name}» үшін бағасын көрсетіңіз`,
       zero: 'Шот сомасы нөлден көп болуы керек',
       popup: 'Браузер шот терезесін бұғаттап тастады — invoices.kz үшін қалқымалы терезелерге рұқсат беріп, қайта басыңыз. Бұл әрекет есепке алынбады.',
+      unavailable: 'Сервис уақытша қолжетімсіз — бір минуттан соң қайталап көріңіз. Шот жасалған жоқ және есепке алынбады.',
+      failed: 'Шотты жасау мүмкін болмады — қайталап көріңіз.',
     },
-    limitTitle: n => `Бүгінгі ${n} тегін шоттың бәрі пайдаланылды`,
+    limitTitle: n => `Осы тоқсандағы ${n} тегін шоттың бәрі жасалып қойды`,
+    limitReset: iso => `Жаңа тегін шоттар ${quarterStartLabel('kk', iso)} ашылады.`,
     limitBody:
       'invoices.kz кабинетінде шоттар шектеусіз және су белгісіз: деректемелер бір рет сақталады, нөмірлер өздігінен қойылады, клиенттің шотты қашан ашқаны көрінеді, ал төлемді Kaspi арқылы қабылдауға болады. Тіркелу тегін, поштаға келген сілтеме арқылы.',
     limitButton: 'Тегін тіркелу',
     generate: 'Шот жасау — басып шығаруға және жүктеуге ашылады',
-    remaining: (left, n) => `Бүгін тағы ${left} тегін шот қалды (күніне ${n}) · шоттың төменгі жағында invoices.kz белгісі бар жол болады`,
+    remaining: (left, n) => `Осы тоқсанда қалған тегін шот: ${left} / ${n} · шоттың төменгі жағында invoices.kz белгісі бар жол болады`,
     guideLink: 'Шотта міндетті түрде не болуы керек →',
     faqTitle: 'Жиі қойылатын сұрақтар',
     faq: [
@@ -282,7 +293,7 @@ export const schetDict: Record<ToolLang, SchetDict> = {
       },
       {
         q: 'Деректерім қайда сақталады?',
-        a: 'Деректемелер мен позициялар тек сіздің браузеріңізде сақталады — келесі шот үшін қайта толтырмау үшін. Шот осы құрылғыда жасалады және біздің серверге жіберілмейді. Серверге тек БСН/ЖСН («Табу» батырмасын басқанда) және сіздің email жіберіледі — егер оны көрсетіп, таратылымға келісім белгісін қалдырсаңыз: сонда біз invoices.kz кеңестері мен жаңалықтарын жібереміз, кез келген хаттан бас тартуға болады.',
+        a: 'Деректемелер мен позициялар тек сіздің браузеріңізде сақталады — келесі шот үшін қайта толтырмау үшін. Шот осы құрылғыда жасалады және біздің серверге жіберілмейді. Сіз енгізген деректерден серверге тек БСН/ЖСН («Табу» батырмасын басқанда) және сіздің email жіберіледі — егер оны көрсетіп, таратылымға келісім белгісін қалдырсаңыз: сонда біз invoices.kz кеңестері мен жаңалықтарын жібереміз, кез келген хаттан бас тартуға болады. Шектеуді — бір қосылымнан (IP-мекенжайдан) тоқсанына 3 шот — сервер санайды: мекенжай ашық түрде сақталмайды — оның орнына хэші сақталады. Есептегіш 1 қаңтарда, 1 сәуірде, 1 шілдеде және 1 қазанда нөлденеді.',
       },
     ],
   },
@@ -291,7 +302,7 @@ export const schetDict: Record<ToolLang, SchetDict> = {
     seo: {
       title: 'Kazakhstan Invoice Generator (Invoice for Payment) — Free PDF',
       description:
-        'Create a Kazakhstan invoice for payment online for a sole proprietor (IE) or LLP: BIN, bank and BIC from the directory, 16% VAT or no VAT, amount in words. Ready PDF in a minute, no sign-up — 3 invoices a day free.',
+        'Create a Kazakhstan invoice for payment online for a sole proprietor (IE) or LLP: BIN, bank and BIC from the directory, 16% VAT or no VAT, amount in words. Ready PDF in a minute, no sign-up — 3 free invoices per quarter.',
       keywords:
         'kazakhstan invoice template, invoice generator kazakhstan, kazakhstan invoice for payment, invoice for payment template kazakhstan, schet na oplatu, kazakhstan invoice pdf free, kazakhstan vat 16 invoice, llp invoice kazakhstan, sole proprietor invoice kazakhstan',
       ogTitle: 'Kazakhstan invoice for payment — free, in a minute',
@@ -300,7 +311,7 @@ export const schetDict: Record<ToolLang, SchetDict> = {
     },
     h1: 'Kazakhstan invoice for payment — online, free',
     intro: n =>
-      `Fill in your details — BIN/IIN (business or individual identification number), bank and account — to get a ready invoice on the standard Kazakhstan form: the bank code (BIC) comes from the bank directory, the amount is written out in words, VAT is added if you need it. No sign-up, ${n} invoices per day.`,
+      `Fill in your details — BIN/IIN (business or individual identification number), bank and account — to get a ready invoice on the standard Kazakhstan form: the bank code (BIC) comes from the bank directory, the amount is written out in words, VAT is added if you need it. No sign-up, ${n} invoices per quarter.`,
     docLangNote: 'The invoice is generated in Russian — the standard form that accountants and banks in Kazakhstan accept.',
     supplierTitle: 'Supplier — you',
     companyLabel: 'Sole proprietor (IE) / LLP name *',
@@ -358,13 +369,16 @@ export const schetDict: Record<ToolLang, SchetDict> = {
       rowPrice: name => `Enter a price for “${name}”`,
       zero: 'The invoice total must be greater than zero',
       popup: 'Your browser blocked the invoice window — allow pop-ups for invoices.kz and click again. This attempt was not counted.',
+      unavailable: 'The service is temporarily unavailable — try again in a minute. No invoice was created or counted.',
+      failed: 'Could not build the invoice — please try again.',
     },
-    limitTitle: n => `All ${n} free invoices for today are used`,
+    limitTitle: n => `You've used all ${n} free invoices for this quarter`,
+    limitReset: iso => `New free invoices unlock on ${quarterStartLabel('en', iso)}.`,
     limitBody:
       'In an invoices.kz account invoices are unlimited and watermark-free: your details are saved once, numbering is automatic, you can see when the client opened the invoice, and you can accept payment via Kaspi. Sign-up is free, with an email link.',
     limitButton: 'Sign up for free',
     generate: 'Create the invoice — opens for printing and download',
-    remaining: (left, n) => `${left} of ${n} free invoices left today · the invoice carries a small invoices.kz footer line`,
+    remaining: (left, n) => `${left} of ${n} free invoices left this quarter · the invoice carries a small invoices.kz footer line`,
     guideLink: 'What an invoice must include (in Russian) →',
     faqTitle: 'FAQ',
     faq: [
@@ -382,7 +396,7 @@ export const schetDict: Record<ToolLang, SchetDict> = {
       },
       {
         q: 'Where is my data stored?',
-        a: 'Your details and items stay only in your browser, so you don’t have to retype them for the next invoice. The invoice itself is built on this device and is not sent to our server. Only the BIN/IIN (when you click “Find”) and your email are sent to the server — the email only if you entered it and left the newsletter consent box ticked, so we can send you invoices.kz tips and news; you can unsubscribe from any email.',
+        a: 'Your details and items stay only in your browser, so you don’t have to retype them for the next invoice. The invoice itself is built on this device and is not sent to our server. Of what you type, only the BIN/IIN (when you click “Find”) and your email are sent to the server — the email only if you entered it and left the newsletter consent box ticked, so we can send you invoices.kz tips and news; you can unsubscribe from any email. The limit — 3 invoices per quarter per connection (IP address) — is counted on our server: the address is not stored in plain form, only a hash of it. The counter resets on 1 January, 1 April, 1 July and 1 October.',
       },
     ],
   },

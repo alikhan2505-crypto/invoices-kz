@@ -54,6 +54,28 @@ describe('nakladnaya dictionary', () => {
   })
 })
 
+describe('nakladnayaDict limit copy (3 в квартал на IP, решение основателя 15.10.2026)', () => {
+  it('describes the limit per quarter, never per day, in every language', () => {
+    expect(nakladnayaDict.ru.remaining(2, 3)).toBe('Осталось 2 из 3 бесплатных накладных в этом квартале')
+    expect(nakladnayaDict.ru.limitTitle(3)).toBe('Все 3 бесплатные накладные в этом квартале уже созданы')
+    expect(nakladnayaDict.ru.limitReset('2027-01-01')).toBe('Новые бесплатные накладные откроются 1 января.')
+    expect(nakladnayaDict.kk.remaining(2, 3)).toMatch(/тоқсан/)
+    expect(nakladnayaDict.kk.limitReset('2027-04-01')).toMatch(/1 сәуірде/)
+    expect(nakladnayaDict.en.remaining(2, 3)).toMatch(/this quarter/)
+    expect(nakladnayaDict.en.limitReset('2026-10-01')).toBe('New free notes unlock on 1 October.')
+    for (const lang of TOOL_LANGS) {
+      const d = nakladnayaDict[lang]
+      const limitTexts = [
+        d.seo.description, d.intro(3), d.remaining(1, 3), d.limitTitle(3), d.limitReset('2027-01-01'),
+        d.errors.unavailable, ...d.faq.map(item => item.a),
+      ].join(' ')
+      expect(limitTexts).not.toMatch(/в день|сегодня|күніне|бүгін|a day|per day|today/i)
+      expect(d.seo.description).toMatch(/квартал|тоқсан|quarter/)
+      expect(d.intro(3)).toMatch(/квартал|тоқсан|quarter/)
+    }
+  })
+})
+
 describe('nakladnaya totals match the document', () => {
   it('counts only rows that will be printed (with a name)', () => {
     expect(documentTotal([

@@ -2,6 +2,10 @@
 // tool_kontragent_checks (key, day, count). Им пользуются:
 //   - /api/tools/kontragent      — 3 проверки контрагента на IP в квартал;
 //   - /api/tools/kp/quota        — 3 коммерческих предложения на IP в квартал;
+//   - /api/tools/doc-quota       — Счёт, АВР и накладная: по 3 документа на IP в
+//                                  квартал, у каждого инструмента свой счётчик
+//                                  (решение основателя 15.10.2026, «как в КП»;
+//                                  раньше — 3 в день в localStorage браузера);
 //   - /api/tools/name-lookup     — название по БИН/ИИН для /tools/kp, schet, avr,
 //                                  nakladnaya: 3 живых запроса в реестр на IP в квартал
 //                                  НА КАЖДОЕ ПОЛЕ КАЖДОГО ИНСТРУМЕНТА (КП-поставщик 3,
@@ -30,6 +34,8 @@ export const REGISTRY_DAILY_GLOBAL = 300
 export const KP_QUARTER_LIMIT = 3
 /** Поиск названия по БИН/ИИН: живых запросов в реестр на IP в квартал — на одно поле одного инструмента. */
 export const NAME_LOOKUP_QUARTER_LIMIT = 3
+/** Счёт, АВР, накладная: бесплатных документов на IP в квартал — на каждый инструмент свой (решение основателя 15.10.2026). */
+export const DOC_TOOL_QUARTER_LIMIT = 3
 /** Склейка накладных Kaspi: бесплатных склеек на IP в календарный месяц для всех без Kaspi Bot (решение основателя 15.10.2026). */
 export const WAYBILLS_MONTH_LIMIT = 5
 
@@ -43,6 +49,20 @@ export const KP_CLAIM_PREFIX = 'kp:'
 export const NAME_LOOKUP_PREFIX = 'lookup:'
 /** Склейки накладных (wb:) реестры тоже не трогают — предохранитель их не считает. */
 export const WAYBILLS_PREFIX = 'wb:'
+
+/**
+ * Документные инструменты с квартальным лимитом на сервере (/api/tools/doc-quota).
+ * Ключ каждого — '<инструмент>:' + sha256: двоеточие в ключе держит их вне
+ * weekly-digest (тот считает только голые ключи проверки контрагента), а
+ * registryLoadToday исключает эти префиксы — реестры документы не трогают.
+ */
+export const DOC_QUOTA_TOOLS = ['schet', 'avr', 'nakladnaya'] as const
+export type DocQuotaTool = (typeof DOC_QUOTA_TOOLS)[number]
+
+/** tool из запроса — только из белого списка, иначе null (роут отвечает 400). */
+export function parseDocQuotaTool(tool: unknown): DocQuotaTool | null {
+  return (DOC_QUOTA_TOOLS as readonly unknown[]).includes(tool) ? (tool as DocQuotaTool) : null
+}
 
 /** Инструменты и поля, для которых работает поиск названия, — белый список. */
 export const NAME_LOOKUP_TOOLS = ['kp', 'schet', 'avr', 'nakladnaya'] as const
@@ -150,6 +170,11 @@ export function quotaIp(ip: string): string {
 /** Ключ счётчика склеек накладных: 'wb:' + sha256('wb|ip|месяц'), IPv6 — по /64 (см. quotaIp). */
 export function waybillsKey(ip: string, month: string): string {
   return WAYBILLS_PREFIX + sha256Hex(`wb|${quotaIp(ip)}|${month}`)
+}
+
+/** Ключ счётчика документа: '<tool>:' + sha256('<tool>|ip|квартал'), IPv6 — по /64 (см. quotaIp). */
+export function docToolKey(tool: DocQuotaTool, ip: string, quarter: string): string {
+  return `${tool}:` + sha256Hex(`${tool}|${quotaIp(ip)}|${quarter}`)
 }
 
 /** Сколько осталось при used из limit; никогда не меньше нуля. */
@@ -283,17 +308,19 @@ export async function releaseCounterSlot(supabase: SupabaseClient, key: string, 
 
 /**
  * Нагрузка на реестры за сегодня: сумма счётчиков строк, списанных сегодня
- * (проверки контрагента и живые поиски названия lookup:), кроме КП-строк
- * и склеек накладных wb: (они реестры не трогают). Завышает счёт (квартальные счётчики
+ * (проверки контрагента и живые поиски названия lookup:), кроме КП-строк,
+ * склеек накладных wb: и документов schet:/avr:/nakladnaya: (они реестры не трогают). Завышает счёт (квартальные счётчики
  * целиком) — это безопасная сторона. Ошибку чтения трактуем как 0, как и раньше
  * в /api/tools/kontragent: сам лимит на IP уже прочитан успешно.
  */
 export async function registryLoadToday(supabase: SupabaseClient, now = Date.now()): Promise<number> {
-  const { data } = await supabase
+  let query = supabase
     .from(COUNTER_TABLE)
     .select('count')
     .eq('day', almatyDay(now))
     .not('key', 'like', `${KP_CLAIM_PREFIX}%`)
     .not('key', 'like', `${WAYBILLS_PREFIX}%`)
+  for (const tool of DOC_QUOTA_TOOLS) query = query.not('key', 'like', `${tool}:%`)
+  const { data } = await query
   return ((data ?? []) as Array<{ count: number | null }>).reduce((sum, r) => sum + (r.count || 0), 0)
 }

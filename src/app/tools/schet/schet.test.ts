@@ -21,11 +21,11 @@ const L = 'A-Za-zА-Яа-яЁёӘәҒғҚқҢңӨөҰұҮүҺһІі'
 const RU_ABBR_ON_KK = new RegExp(`(?<![${L}])(БИН|ИИН|НДС|ИП|ТОО|АВР|КП|КГД|ЭСФ|БИК|ИИК|КНП)(?![${L}])`)
 
 describe('schet metadata', () => {
-  it('keeps the ru head exactly as it was before the split', () => {
+  it('keeps the ru head as it was before the split (limit wording: per quarter since 15.10.2026)', () => {
     const m = toolMetadata('schet', 'ru', schetDict.ru.seo)
     expect(m.title).toBe('Счёт на оплату онлайн — создать бесплатно за минуту | invoices.kz')
     expect(m.description).toBe(
-      'Создайте счёт на оплату для ИП или ТОО Казахстана онлайн: реквизиты, БИН, банк и БИК из справочника, НДС 16% или без НДС, сумма прописью. Готовый PDF за минуту, без регистрации — 3 счёта в день бесплатно.',
+      'Создайте счёт на оплату для ИП или ТОО Казахстана онлайн: реквизиты, БИН, банк и БИК из справочника, НДС 16% или без НДС, сумма прописью. Готовый PDF за минуту, без регистрации — 3 счёта в квартал бесплатно.',
     )
     expect(m.alternates?.canonical).toBe('https://invoices.kz/tools/schet')
   })
@@ -99,6 +99,28 @@ describe('schet dictionary', () => {
 
   it('has no Cyrillic in the en copy', () => {
     expect(flat(schetDict.en)).not.toMatch(/[А-Яа-яЁёӘәҒғҚқҢңӨөҰұҮүҺһІі]/)
+  })
+})
+
+describe('schetDict limit copy (3 в квартал на IP, решение основателя 15.10.2026)', () => {
+  it('describes the limit per quarter, never per day, in every language', () => {
+    expect(schetDict.ru.remaining(2, 3)).toBe('Осталось 2 из 3 бесплатных счетов в этом квартале · в счёте будет строка «Создано на invoices.kz»')
+    expect(schetDict.ru.limitTitle(3)).toBe('Все 3 бесплатных счёта в этом квартале уже созданы')
+    expect(schetDict.ru.limitReset('2027-01-01')).toBe('Новые бесплатные счета откроются 1 января.')
+    expect(schetDict.kk.remaining(2, 3)).toMatch(/тоқсан/)
+    expect(schetDict.kk.limitReset('2027-04-01')).toMatch(/1 сәуірде/)
+    expect(schetDict.en.remaining(2, 3)).toMatch(/this quarter/)
+    expect(schetDict.en.limitReset('2026-10-01')).toBe('New free invoices unlock on 1 October.')
+    for (const lang of TOOL_LANGS) {
+      const d = schetDict[lang]
+      const limitTexts = [
+        d.seo.description, d.intro(3), d.remaining(1, 3), d.limitTitle(3), d.limitReset('2027-01-01'),
+        d.errors.unavailable, ...d.faq.map(item => item.a),
+      ].join(' ')
+      expect(limitTexts).not.toMatch(/в день|сегодня|күніне|бүгін|a day|per day|today/i)
+      expect(d.seo.description).toMatch(/квартал|тоқсан|quarter/)
+      expect(d.intro(3)).toMatch(/квартал|тоқсан|quarter/)
+    }
   })
 })
 

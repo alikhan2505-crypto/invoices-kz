@@ -1,23 +1,13 @@
-import type { ToolLang, ToolSeoCopy } from '@/lib/tools-i18n'
+import { quarterStartLabel, type ToolLang, type ToolSeoCopy } from '@/lib/tools-i18n'
 
 // Все тексты /tools/kp на трёх языках: и <head> (seo), и интерфейс.
 // Русский seo — дословно прежний layout.tsx, чтобы не сбить уже набранную
 // выдачу. Сам документ (generateKP) печатается только по-русски — это
 // юридическая форма, а не язык страницы (docs/tools-i18n-pattern.md).
 
-// Дата обнуления квартала словами: '2027-01-01' → «1 января» / «1 қаңтарда» /
-// «1 January». Квартал всегда начинается первого числа одного из четырёх месяцев.
-const QUARTER_MONTHS: Record<ToolLang, Record<string, string>> = {
-  ru: { '01': 'января', '04': 'апреля', '07': 'июля', '10': 'октября' },
-  kk: { '01': 'қаңтарда', '04': 'сәуірде', '07': 'шілдеде', '10': 'қазанда' },
-  en: { '01': 'January', '04': 'April', '07': 'July', '10': 'October' },
-}
-
-export function quarterStartLabel(lang: ToolLang, iso: string): string {
-  const s = String(iso)
-  const month = s.slice(8, 10) === '01' ? QUARTER_MONTHS[lang][s.slice(5, 7)] : undefined
-  return month ? `1 ${month}` : s
-}
+// Дата обнуления квартала словами живёт в общем tools-i18n (её же берут Счёт,
+// АВР и накладная); реэкспорт — чтобы прежний импорт из './dict' не сломался.
+export { quarterStartLabel }
 
 export interface KpDict {
   seo: ToolSeoCopy

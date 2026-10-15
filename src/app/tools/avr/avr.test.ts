@@ -21,11 +21,11 @@ const RU_ABBR = new RegExp(`${NB}(БИН|ИИН|НДС|ИП|ТОО|АВР|КП|�
 const CYRILLIC = /[А-Яа-яЁёӘәҒғҚқҢңӨөҰұҮүҺһІі]/
 
 describe('avr metadata', () => {
-  it('keeps the ru head exactly as it was before the split', () => {
+  it('keeps the ru head as it was before the split (limit wording: per quarter since 15.10.2026)', () => {
     const m = toolMetadata('avr', 'ru', avrDict.ru.seo)
     expect(m.title).toBe('АВР онлайн — акт выполненных работ бесплатно за минуту | invoices.kz')
     expect(m.description).toBe(
-      'Создайте акт выполненных работ (оказанных услуг) для ИП или ТОО Казахстана онлайн: реквизиты сторон, договор, НДС, сумма прописью. Готовый PDF за минуту, без регистрации — 3 акта в день бесплатно.',
+      'Создайте акт выполненных работ (оказанных услуг) для ИП или ТОО Казахстана онлайн: реквизиты сторон, договор, НДС, сумма прописью. Готовый PDF за минуту, без регистрации — 3 акта в квартал бесплатно.',
     )
     expect(m.openGraph?.title).toBe('АВР онлайн — акт выполненных работ за минуту')
   })
@@ -93,6 +93,28 @@ describe('avr dictionary', () => {
     const en = avrDict.en
     for (const s of [en.h1, en.seo.title, en.seo.description, en.seo.keywords, en.seo.ogTitle, en.seo.ogDescription, en.seo.ogImageAlt]) {
       expect(s).not.toMatch(CYRILLIC)
+    }
+  })
+})
+
+describe('avrDict limit copy (3 в квартал на IP, решение основателя 15.10.2026)', () => {
+  it('describes the limit per quarter, never per day, in every language', () => {
+    expect(avrDict.ru.remaining(2, 3)).toBe('Осталось 2 из 3 бесплатных актов в этом квартале')
+    expect(avrDict.ru.limitTitle(3)).toBe('Все 3 бесплатных акта в этом квартале уже созданы')
+    expect(avrDict.ru.limitReset('2027-01-01')).toBe('Новые бесплатные акты откроются 1 января.')
+    expect(avrDict.kk.remaining(2, 3)).toMatch(/тоқсан/)
+    expect(avrDict.kk.limitReset('2027-04-01')).toMatch(/1 сәуірде/)
+    expect(avrDict.en.remaining(2, 3)).toMatch(/this quarter/)
+    expect(avrDict.en.limitReset('2026-10-01')).toBe('New free certificates unlock on 1 October.')
+    for (const lang of TOOL_LANGS) {
+      const d = avrDict[lang]
+      const limitTexts = [
+        d.seo.description, d.intro(3), d.remaining(1, 3), d.limitTitle(3), d.limitReset('2027-01-01'),
+        d.errors.unavailable, ...d.faq.map(item => item.a),
+      ].join(' ')
+      expect(limitTexts).not.toMatch(/в день|сегодня|күніне|бүгін|a day|per day|today/i)
+      expect(d.seo.description).toMatch(/квартал|тоқсан|quarter/)
+      expect(d.intro(3)).toMatch(/квартал|тоқсан|quarter/)
     }
   })
 })

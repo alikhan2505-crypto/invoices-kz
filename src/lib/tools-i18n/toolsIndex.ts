@@ -42,9 +42,9 @@ export const toolsIndexDict: Record<ToolLang, ToolsIndexDict> = {
       {
         title: 'Документы',
         tools: [
-          { slug: 'schet', title: 'Счёт на оплату онлайн', text: 'Готовый счёт по казахстанской форме за минуту: БИК из справочника, сумма прописью, НДС 16% или без. 3 счёта в день бесплатно.' },
-          { slug: 'avr', title: 'Акт выполненных работ онлайн', text: 'Готовый АВР по привычной форме: стороны, договор, сумма прописью, НДС. 3 акта в день бесплатно.' },
-          { slug: 'nakladnaya', title: 'Накладная онлайн', text: 'Накладная на отпуск запасов (З-2): стороны, товары, сумма прописью. 3 накладные в день бесплатно.' },
+          { slug: 'schet', title: 'Счёт на оплату онлайн', text: 'Готовый счёт по казахстанской форме за минуту: БИК из справочника, сумма прописью, НДС 16% или без. 3 счёта в квартал бесплатно.' },
+          { slug: 'avr', title: 'Акт выполненных работ онлайн', text: 'Готовый АВР по привычной форме: стороны, договор, сумма прописью, НДС. 3 акта в квартал бесплатно.' },
+          { slug: 'nakladnaya', title: 'Накладная онлайн', text: 'Накладная на отпуск запасов (З-2): стороны, товары, сумма прописью. 3 накладные в квартал бесплатно.' },
           { slug: 'kp', title: 'Коммерческое предложение', text: 'Аккуратное КП с позициями, итогом и сроком действия — отправьте клиенту за минуту. 3 КП в квартал бесплатно.' },
         ],
       },
@@ -83,9 +83,9 @@ export const toolsIndexDict: Record<ToolLang, ToolsIndexDict> = {
       {
         title: 'Құжаттар',
         tools: [
-          { slug: 'schet', title: 'Төлем шоты онлайн', text: 'Қазақстандық үлгідегі дайын шот бір минутта: БСК анықтамалықтан, сомасы жазбаша, ҚҚС 16% немесе ҚҚС-сыз. Күніне 3 шот тегін.' },
-          { slug: 'avr', title: 'Орындалған жұмыстар актісі онлайн', text: 'Үйреншікті үлгідегі дайын ОЖА: тараптар, шарт, сомасы жазбаша, ҚҚС. Күніне 3 акт тегін.' },
-          { slug: 'nakladnaya', title: 'Жүкқұжат онлайн', text: 'Қорларды жағына босатуға арналған жүкқұжат (З-2): тараптар, тауарлар, сомасы жазбаша. Күніне 3 жүкқұжат тегін.' },
+          { slug: 'schet', title: 'Төлем шоты онлайн', text: 'Қазақстандық үлгідегі дайын шот бір минутта: БСК анықтамалықтан, сомасы жазбаша, ҚҚС 16% немесе ҚҚС-сыз. Тоқсанына 3 шот тегін.' },
+          { slug: 'avr', title: 'Орындалған жұмыстар актісі онлайн', text: 'Үйреншікті үлгідегі дайын ОЖА: тараптар, шарт, сомасы жазбаша, ҚҚС. Тоқсанына 3 акт тегін.' },
+          { slug: 'nakladnaya', title: 'Жүкқұжат онлайн', text: 'Қорларды жағына босатуға арналған жүкқұжат (З-2): тараптар, тауарлар, сомасы жазбаша. Тоқсанына 3 жүкқұжат тегін.' },
           { slug: 'kp', title: 'Коммерциялық ұсыныс', text: 'Позициялары, жалпы сомасы және қолданылу мерзімі бар ұқыпты КҰ — клиентке бір минутта жіберіңіз. Тоқсанына 3 КҰ тегін.' },
         ],
       },
@@ -124,9 +124,9 @@ export const toolsIndexDict: Record<ToolLang, ToolsIndexDict> = {
       {
         title: 'Documents',
         tools: [
-          { slug: 'schet', title: 'Invoice for payment', text: 'A ready invoice in the standard Kazakhstan format in a minute: bank code from the directory, amount in words, with or without 16% VAT. 3 invoices a day free.' },
-          { slug: 'avr', title: 'Certificate of completed work (AVR)', text: 'A ready AVR in the familiar format: parties, contract, amount in words, VAT. 3 certificates a day free.' },
-          { slug: 'nakladnaya', title: 'Delivery note (form Z-2)', text: 'Inventory release note: parties, goods, amount in words. 3 notes a day free.' },
+          { slug: 'schet', title: 'Invoice for payment', text: 'A ready invoice in the standard Kazakhstan format in a minute: bank code from the directory, amount in words, with or without 16% VAT. 3 free invoices per quarter.' },
+          { slug: 'avr', title: 'Certificate of completed work (AVR)', text: 'A ready AVR in the familiar format: parties, contract, amount in words, VAT. 3 free certificates per quarter.' },
+          { slug: 'nakladnaya', title: 'Delivery note (form Z-2)', text: 'Inventory release note: parties, goods, amount in words. 3 free notes per quarter.' },
           { slug: 'kp', title: 'Commercial proposal', text: 'A clean proposal with line items, total and validity date — send it to your client in a minute. 3 free proposals per quarter.' },
         ],
       },

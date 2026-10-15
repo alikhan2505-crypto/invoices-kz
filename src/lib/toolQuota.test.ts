@@ -6,6 +6,7 @@ import {
   KP_QUARTER_LIMIT, NAME_LOOKUP_QUARTER_LIMIT, claimCounterSlot,
   almatyMonth, nextMonthStart, waybillsKey, WAYBILLS_PREFIX, WAYBILLS_MONTH_LIMIT, bearerUserId,
   quotaIp, releaseCounterSlot, waybillsUnlimited,
+  docToolKey, DOC_QUOTA_TOOLS, DOC_TOOL_QUARTER_LIMIT, parseDocQuotaTool, registryLoadToday,
 } from './toolQuota'
 import { KASPI_SHOP_PROFILE_COLUMNS } from '@/lib/kaspiShop/planGate'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -99,6 +100,62 @@ describe('quota keys', () => {
     expect(k).not.toBe(waybillsKey('203.0.113.8', '2026-10'))
     expect(k).not.toBe(kpClaimKey('203.0.113.7', '2026-10'))
     expect(k.startsWith(KP_CLAIM_PREFIX)).toBe(false)
+  })
+})
+
+describe('doc tool quota keys (Счёт, АВР, накладная: 3 в квартал на IP)', () => {
+  it('limits each document tool to 3 per quarter', () => {
+    expect(DOC_TOOL_QUARTER_LIMIT).toBe(3)
+    expect([...DOC_QUOTA_TOOLS]).toEqual(['schet', 'avr', 'nakladnaya'])
+  })
+
+  it('prefixes every key with the tool name and a colon (weekly-digest skips keys with ":")', () => {
+    for (const tool of DOC_QUOTA_TOOLS) {
+      const k = docToolKey(tool, '203.0.113.7', '2026-Q4')
+      expect(k.startsWith(`${tool}:`)).toBe(true)
+      expect(k.slice(tool.length + 1)).toMatch(/^[0-9a-f]{64}$/)
+      expect(k).not.toContain('203.0.113.7')
+      expect(k).toBe(`${tool}:` + createHash('sha256').update(`${tool}|203.0.113.7|2026-Q4`).digest('hex'))
+    }
+  })
+
+  it('gives different tools, quarters and IPs different keys', () => {
+    const keys = DOC_QUOTA_TOOLS.map(tool => docToolKey(tool, '203.0.113.7', '2026-Q4'))
+    expect(new Set(keys).size).toBe(3)
+    expect(docToolKey('schet', '203.0.113.7', '2026-Q4')).not.toBe(docToolKey('schet', '203.0.113.7', '2027-Q1'))
+    expect(docToolKey('schet', '203.0.113.7', '2026-Q4')).not.toBe(docToolKey('schet', '203.0.113.8', '2026-Q4'))
+    expect(docToolKey('avr', '203.0.113.7', '2026-Q4')).not.toBe(kpClaimKey('203.0.113.7', '2026-Q4'))
+    expect(docToolKey('schet', '203.0.113.7', '2026-Q4')).toBe(docToolKey('schet', '203.0.113.7', '2026-Q4'))
+  })
+
+  it('counts an IPv6 /64 as one visitor', () => {
+    expect(docToolKey('nakladnaya', '2001:db8:1:2:aaaa::1', '2026-Q4'))
+      .toBe(docToolKey('nakladnaya', '2001:db8:1:2:bbbb:cccc:dddd:eeee', '2026-Q4'))
+  })
+
+  it('accepts only whitelisted tools', () => {
+    expect(parseDocQuotaTool('schet')).toBe('schet')
+    expect(parseDocQuotaTool('avr')).toBe('avr')
+    expect(parseDocQuotaTool('nakladnaya')).toBe('nakladnaya')
+    expect(parseDocQuotaTool('kp')).toBeNull()
+    expect(parseDocQuotaTool('')).toBeNull()
+    expect(parseDocQuotaTool(undefined)).toBeNull()
+    expect(parseDocQuotaTool(['schet'])).toBeNull()
+  })
+})
+
+describe('registryLoadToday', () => {
+  it('skips rows that never touch the registries: kp:, wb: and the document tools', async () => {
+    const excluded: string[] = []
+    const q: any = {
+      select: () => q,
+      eq: () => q,
+      not: (_col: string, _op: string, v: string) => { excluded.push(v); return q },
+      then: (resolve: (r: unknown) => void) => resolve({ data: [{ count: 2 }, { count: 3 }] }),
+    }
+    const load = await registryLoadToday({ from: () => q } as unknown as SupabaseClient)
+    expect(load).toBe(5)
+    expect(excluded.sort()).toEqual(['avr:%', 'kp:%', 'nakladnaya:%', 'schet:%', 'wb:%'])
   })
 })
 

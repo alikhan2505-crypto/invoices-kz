@@ -1,4 +1,4 @@
-import type { ToolLang, ToolSeoCopy } from '@/lib/tools-i18n'
+import { quarterStartLabel, type ToolLang, type ToolSeoCopy } from '@/lib/tools-i18n'
 
 // Все тексты /tools/nakladnaya на трёх языках: и <head> (seo), и интерфейс.
 // Русский — дословно прежний текст страницы (metadata из старого layout.tsx),
@@ -58,8 +58,13 @@ export interface NakladnayaDict {
     rowPrice: (name: string) => string
     zero: string
     popup: string
+    /** Сервер лимита недоступен — документ не создан и не засчитан. */
+    unavailable: string
+    failed: string
   }
   limitTitle: (limit: number) => string
+  /** Когда откроются новые бесплатные документы: начало следующего квартала словами. */
+  limitReset: (iso: string) => string
   limitBody: string
   limitButton: string
   generate: string
@@ -74,7 +79,7 @@ export const nakladnayaDict: Record<ToolLang, NakladnayaDict> = {
     seo: {
       title: 'Накладная онлайн — накладная на отпуск запасов бесплатно',
       description:
-        'Создайте накладную на отпуск запасов на сторону (З-2) для ИП или ТОО Казахстана онлайн: стороны, товары, сумма прописью. Готовый PDF за минуту, без регистрации — 3 накладные в день бесплатно.',
+        'Создайте накладную на отпуск запасов на сторону (З-2) для ИП или ТОО Казахстана онлайн: стороны, товары, сумма прописью. Готовый PDF за минуту, без регистрации — 3 накладные в квартал бесплатно.',
       keywords:
         'накладная на отпуск запасов образец, накладная з-2 казахстан, накладная скачать бесплатно, расходная накладная ип, накладная на товар казахстан',
       ogTitle: 'Накладная онлайн — за минуту, бесплатно',
@@ -83,7 +88,7 @@ export const nakladnayaDict: Record<ToolLang, NakladnayaDict> = {
     },
     h1: 'Накладная на отпуск запасов — онлайн, бесплатно',
     intro: n =>
-      `Заполните стороны и товары — получите накладную по привычной форме З-2 с суммой прописью. Без регистрации, ${n} накладные в день.`,
+      `Заполните стороны и товары — получите накладную по привычной форме З-2 с суммой прописью. Без регистрации, ${n} накладные в квартал.`,
     docLangNote: '',
     supplierTitle: 'Поставщик — вы',
     companyLabel: 'Название ИП / ТОО *',
@@ -125,13 +130,16 @@ export const nakladnayaDict: Record<ToolLang, NakladnayaDict> = {
       rowPrice: name => `Укажите цену для «${name}»`,
       zero: 'Сумма накладной должна быть больше нуля',
       popup: 'Браузер заблокировал окно с накладной — разрешите всплывающие окна для invoices.kz и нажмите ещё раз. Попытка не списана.',
+      unavailable: 'Сервис временно недоступен — попробуйте через минуту. Накладная не создана и не засчитана.',
+      failed: 'Не удалось сформировать накладную — попробуйте ещё раз.',
     },
-    limitTitle: n => `${n} бесплатные накладные на сегодня созданы`,
+    limitTitle: n => `Все ${n} бесплатные накладные в этом квартале уже созданы`,
+    limitReset: iso => `Новые бесплатные накладные откроются ${quarterStartLabel('ru', iso)}.`,
     limitBody:
       'В кабинете invoices.kz накладная создаётся из счёта в один клик: реквизиты и товары уже заполнены, номера считаются сами, подпись и печать — внутри PDF. Регистрация бесплатная.',
     limitButton: 'Зарегистрироваться бесплатно',
     generate: 'Создать накладную — откроется для печати и скачивания',
-    remaining: (left, n) => `Осталось ${left} из ${n} бесплатных накладных сегодня`,
+    remaining: (left, n) => `Осталось ${left} из ${n} бесплатных накладных в этом квартале`,
     waybillsLink: 'Накладные Kaspi одним PDF →',
     faqTitle: 'Частые вопросы',
     faq: [
@@ -149,7 +157,7 @@ export const nakladnayaDict: Record<ToolLang, NakladnayaDict> = {
       },
       {
         q: 'Куда сохраняются мои данные?',
-        a: 'Только в ваш браузер: черновик хранится на этом устройстве, чтобы не заполнять реквизиты заново. На наш сервер данные накладной не отправляются — уходит только БИН/ИИН, если нажать «Найти», и ваш email — если вы его указали и оставили галочку согласия на рассылку (советы и новости invoices.kz, отписаться можно в любом письме).',
+        a: 'Только в ваш браузер: черновик хранится на этом устройстве, чтобы не заполнять реквизиты заново. На наш сервер данные накладной не отправляются — из введённого уходит только БИН/ИИН, если нажать «Найти», и ваш email — если вы его указали и оставили галочку согласия на рассылку (советы и новости invoices.kz, отписаться можно в любом письме). Лимит — 3 накладные в квартал с одного подключения (IP-адреса) — считает сервер: адрес в открытом виде не хранится — только его хэш. Счётчик обнуляется 1 января, 1 апреля, 1 июля и 1 октября.',
       },
     ],
   },
@@ -158,7 +166,7 @@ export const nakladnayaDict: Record<ToolLang, NakladnayaDict> = {
     seo: {
       title: 'Жүкқұжат онлайн — қорларды жағына босатуға арналған жүкқұжат тегін',
       description:
-        'Қазақстандағы ЖК немесе ЖШС үшін қорларды жағына босатуға арналған жүкқұжатты (З-2 нысаны) онлайн жасаңыз: тараптар, тауарлар, сомасы жазбаша. Тіркелусіз бір минутта дайын PDF — күніне 3 жүкқұжат тегін.',
+        'Қазақстандағы ЖК немесе ЖШС үшін қорларды жағына босатуға арналған жүкқұжатты (З-2 нысаны) онлайн жасаңыз: тараптар, тауарлар, сомасы жазбаша. Тіркелусіз бір минутта дайын PDF — тоқсанына 3 жүкқұжат тегін.',
       keywords:
         'жүкқұжат үлгісі, жүкқұжат з-2, қорларды жағына босатуға арналған жүкқұжат, жүкқұжат онлайн, жүкқұжат жасау тегін, жк жүкқұжат, тауарға жүкқұжат, жүкқұжат pdf жүктеу',
       ogTitle: 'Жүкқұжат онлайн — бір минутта, тегін',
@@ -167,7 +175,7 @@ export const nakladnayaDict: Record<ToolLang, NakladnayaDict> = {
     },
     h1: 'Қорларды жағына босатуға арналған жүкқұжат — онлайн, тегін',
     intro: n =>
-      `Тараптар мен тауарларды толтырыңыз — таныс З-2 нысанындағы, сомасы жазбаша көрсетілген жүкқұжат аласыз. Тіркелусіз, күніне ${n} жүкқұжат.`,
+      `Тараптар мен тауарларды толтырыңыз — таныс З-2 нысанындағы, сомасы жазбаша көрсетілген жүкқұжат аласыз. Тіркелусіз, тоқсанына ${n} жүкқұжат.`,
     docLangNote: 'Жүкқұжат бланкісі орыс тілінде шығады — бухгалтерия қабылдайтын үйреншікті нысан.',
     supplierTitle: 'Жеткізуші — сіз',
     companyLabel: 'ЖК / ЖШС атауы *',
@@ -209,13 +217,16 @@ export const nakladnayaDict: Record<ToolLang, NakladnayaDict> = {
       rowPrice: name => `«${name}» тауарының бағасын көрсетіңіз`,
       zero: 'Жүкқұжат сомасы нөлден көп болуы керек',
       popup: 'Браузер жүкқұжат терезесін бұғаттап тастады — invoices.kz үшін қалқымалы терезелерге рұқсат беріп, қайта басыңыз. Бұл әрекет есепке алынбады.',
+      unavailable: 'Сервис уақытша қолжетімсіз — бір минуттан соң қайталап көріңіз. Жүкқұжат жасалған жоқ және есепке алынбады.',
+      failed: 'Жүкқұжатты жасау мүмкін болмады — қайталап көріңіз.',
     },
-    limitTitle: n => `Бүгінгі ${n} тегін жүкқұжат жасалды`,
+    limitTitle: n => `Осы тоқсандағы ${n} тегін жүкқұжаттың бәрі жасалып қойды`,
+    limitReset: iso => `Жаңа тегін жүкқұжаттар ${quarterStartLabel('kk', iso)} ашылады.`,
     limitBody:
       'invoices.kz кабинетінде жүкқұжат шоттан бір басумен жасалады: деректемелер мен тауарлар толтырылып тұрады, нөмірлер өздігінен қойылады, қолтаңба мен мөр PDF ішінде. Тіркелу тегін.',
     limitButton: 'Тегін тіркелу',
     generate: 'Жүкқұжат жасау — басып шығаруға және жүктеуге ашылады',
-    remaining: (left, n) => `Бүгін тағы ${left} тегін жүкқұжат қалды (күніне ${n})`,
+    remaining: (left, n) => `Осы тоқсанда қалған тегін жүкқұжат: ${left} / ${n}`,
     waybillsLink: 'Kaspi жүкқұжаттары бір PDF-те →',
     faqTitle: 'Жиі қойылатын сұрақтар',
     faq: [
@@ -233,7 +244,7 @@ export const nakladnayaDict: Record<ToolLang, NakladnayaDict> = {
       },
       {
         q: 'Деректерім қайда сақталады?',
-        a: 'Тек сіздің браузеріңізде: деректемелерді қайта толтырмау үшін нобай осы құрылғыда сақталады. Жүкқұжат деректері біздің серверге жіберілмейді — «Табу» батырмасын басқанда ғана БСН/ЖСН жіберіледі, сондай-ақ сіздің email — егер оны көрсетіп, таратылымға келісім белгісін қалдырсаңыз (invoices.kz кеңестері мен жаңалықтары, кез келген хаттан бас тартуға болады).',
+        a: 'Тек сіздің браузеріңізде: деректемелерді қайта толтырмау үшін нобай осы құрылғыда сақталады. Жүкқұжат деректері біздің серверге жіберілмейді — енгізген деректеріңізден «Табу» батырмасын басқанда ғана БСН/ЖСН жіберіледі, сондай-ақ сіздің email — егер оны көрсетіп, таратылымға келісім белгісін қалдырсаңыз (invoices.kz кеңестері мен жаңалықтары, кез келген хаттан бас тартуға болады). Шектеуді — бір қосылымнан (IP-мекенжайдан) тоқсанына 3 жүкқұжат — сервер санайды: мекенжай ашық түрде сақталмайды — оның орнына хэші сақталады. Есептегіш 1 қаңтарда, 1 сәуірде, 1 шілдеде және 1 қазанда нөлденеді.',
       },
     ],
   },
@@ -242,7 +253,7 @@ export const nakladnayaDict: Record<ToolLang, NakladnayaDict> = {
     seo: {
       title: 'Kazakhstan Delivery Note (Form Z-2) Generator — Free PDF',
       description:
-        'Create a Kazakhstan goods delivery note — the standard form Z-2 for issuing inventory to third parties — online for a sole proprietor (IE) or LLP: parties, goods, total in words. Ready PDF in a minute, no sign-up, 3 notes a day free.',
+        'Create a Kazakhstan goods delivery note — the standard form Z-2 for issuing inventory to third parties — online for a sole proprietor (IE) or LLP: parties, goods, total in words. Ready PDF in a minute, no sign-up, 3 free notes per quarter.',
       keywords:
         'kazakhstan delivery note template, delivery note generator kazakhstan, waybill kazakhstan, z-2 form kazakhstan, goods issue note kazakhstan, nakladnaya kazakhstan, kazakhstan delivery note pdf free',
       ogTitle: 'Kazakhstan delivery note (Z-2) — free, in a minute',
@@ -251,7 +262,7 @@ export const nakladnayaDict: Record<ToolLang, NakladnayaDict> = {
     },
     h1: 'Kazakhstan delivery note (form Z-2) — online, free',
     intro: n =>
-      `Fill in the parties and goods to get a delivery note on the standard Kazakhstan form Z-2, with the total written out in words. No sign-up, ${n} notes per day.`,
+      `Fill in the parties and goods to get a delivery note on the standard Kazakhstan form Z-2, with the total written out in words. No sign-up, ${n} notes per quarter.`,
     docLangNote: 'The note is generated in Russian — the standard form that accountants and counterparties in Kazakhstan accept.',
     supplierTitle: 'Supplier — you',
     companyLabel: 'Sole proprietor (IE) / LLP name *',
@@ -293,13 +304,16 @@ export const nakladnayaDict: Record<ToolLang, NakladnayaDict> = {
       rowPrice: name => `Enter a price for “${name}”`,
       zero: 'The delivery note total must be greater than zero',
       popup: 'Your browser blocked the delivery note window — allow pop-ups for invoices.kz and click again. This attempt was not counted.',
+      unavailable: 'The service is temporarily unavailable — try again in a minute. No delivery note was created or counted.',
+      failed: 'Could not build the delivery note — please try again.',
     },
-    limitTitle: n => `All ${n} free notes for today are used`,
+    limitTitle: n => `You've used all ${n} free notes for this quarter`,
+    limitReset: iso => `New free notes unlock on ${quarterStartLabel('en', iso)}.`,
     limitBody:
       'In an invoices.kz account a delivery note is created from an invoice in one click: requisites and goods are already filled in, numbering is automatic, and the signature and stamp are inside the PDF. Sign-up is free.',
     limitButton: 'Sign up for free',
     generate: 'Create the delivery note — opens for printing and download',
-    remaining: (left, n) => `${left} of ${n} free notes left today`,
+    remaining: (left, n) => `${left} of ${n} free notes left this quarter`,
     waybillsLink: 'All Kaspi waybills in one PDF →',
     faqTitle: 'FAQ',
     faq: [
@@ -317,7 +331,7 @@ export const nakladnayaDict: Record<ToolLang, NakladnayaDict> = {
       },
       {
         q: 'Where is my data stored?',
-        a: 'Only in your browser: the draft stays on this device so you don’t have to retype your details. Delivery note data is never sent to our server — only the BIN/IIN when you click “Find”, plus your email if you entered it and left the newsletter consent box ticked (invoices.kz tips and news; unsubscribe from any email).',
+        a: 'Only in your browser: the draft stays on this device so you don’t have to retype your details. Delivery note data is never sent to our server — of what you type, only the BIN/IIN when you click “Find”, plus your email if you entered it and left the newsletter consent box ticked (invoices.kz tips and news; unsubscribe from any email). The limit — 3 delivery notes per quarter per connection (IP address) — is counted on our server: the address is not stored in plain form, only a hash of it. The counter resets on 1 January, 1 April, 1 July and 1 October.',
       },
     ],
   },

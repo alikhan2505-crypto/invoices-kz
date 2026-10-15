@@ -1,4 +1,4 @@
-import type { ToolLang, ToolSeoCopy } from '@/lib/tools-i18n'
+import { quarterStartLabel, type ToolLang, type ToolSeoCopy } from '@/lib/tools-i18n'
 
 // Все тексты /tools/avr на трёх языках: и <head> (seo), и интерфейс.
 // Русский — дословно прежний текст страницы (metadata из старого layout.tsx),
@@ -62,8 +62,13 @@ export interface AvrDict {
     rowPrice: (name: string) => string
     zero: string
     popup: string
+    /** Сервер лимита недоступен — документ не создан и не засчитан. */
+    unavailable: string
+    failed: string
   }
   limitTitle: (limit: number) => string
+  /** Когда откроются новые бесплатные документы: начало следующего квартала словами. */
+  limitReset: (iso: string) => string
   limitBody: string
   limitButton: string
   generate: string
@@ -79,7 +84,7 @@ export const avrDict: Record<ToolLang, AvrDict> = {
     seo: {
       title: 'АВР онлайн — акт выполненных работ бесплатно за минуту',
       description:
-        'Создайте акт выполненных работ (оказанных услуг) для ИП или ТОО Казахстана онлайн: реквизиты сторон, договор, НДС, сумма прописью. Готовый PDF за минуту, без регистрации — 3 акта в день бесплатно.',
+        'Создайте акт выполненных работ (оказанных услуг) для ИП или ТОО Казахстана онлайн: реквизиты сторон, договор, НДС, сумма прописью. Готовый PDF за минуту, без регистрации — 3 акта в квартал бесплатно.',
       keywords:
         'авр образец казахстан, акт выполненных работ скачать, акт оказанных услуг ип, авр онлайн бесплатно, акт выполненных работ тоо, р-1 акт казахстан',
       ogTitle: 'АВР онлайн — акт выполненных работ за минуту',
@@ -88,7 +93,7 @@ export const avrDict: Record<ToolLang, AvrDict> = {
     },
     h1: 'Акт выполненных работ — онлайн, бесплатно',
     intro: n =>
-      `Заполните стороны и работы — получите готовый АВР по привычной казахстанской форме, с суммой прописью и НДС, если нужен. Без регистрации, ${n} акта в день.`,
+      `Заполните стороны и работы — получите готовый АВР по привычной казахстанской форме, с суммой прописью и НДС, если нужен. Без регистрации, ${n} акта в квартал.`,
     docLangNote: '',
     executorTitle: 'Исполнитель — вы',
     companyLabel: 'Название ИП / ТОО *',
@@ -134,13 +139,16 @@ export const avrDict: Record<ToolLang, AvrDict> = {
       rowPrice: name => `Укажите цену для «${name}»`,
       zero: 'Сумма акта должна быть больше нуля',
       popup: 'Браузер заблокировал окно с актом — разрешите всплывающие окна для invoices.kz и нажмите ещё раз. Попытка не списана.',
+      unavailable: 'Сервис временно недоступен — попробуйте через минуту. Акт не создан и не засчитан.',
+      failed: 'Не удалось сформировать акт — попробуйте ещё раз.',
     },
-    limitTitle: n => `${n} бесплатных акта на сегодня созданы`,
+    limitTitle: n => `Все ${n} бесплатных акта в этом квартале уже созданы`,
+    limitReset: iso => `Новые бесплатные акты откроются ${quarterStartLabel('ru', iso)}.`,
     limitBody:
       'В кабинете invoices.kz АВР создаётся из счёта в один клик: реквизиты и работы уже заполнены, номера считаются сами, подпись и печать — внутри PDF, подписание ЭЦП. Регистрация бесплатная.',
     limitButton: 'Зарегистрироваться бесплатно',
     generate: 'Создать АВР — откроется для печати и скачивания',
-    remaining: (left, n) => `Осталось ${left} из ${n} бесплатных актов сегодня`,
+    remaining: (left, n) => `Осталось ${left} из ${n} бесплатных актов в этом квартале`,
     guideLink: 'Чем АВР отличается от счёта и накладной →',
     faqTitle: 'Частые вопросы',
     faq: [
@@ -162,7 +170,7 @@ export const avrDict: Record<ToolLang, AvrDict> = {
       },
       {
         q: 'Куда сохраняются мои данные?',
-        a: 'Только в ваш браузер: черновик хранится на этом устройстве, чтобы не заполнять реквизиты заново. На наш сервер данные акта не отправляются — уходит только БИН/ИИН, если нажать «Найти», и ваш email — если вы его указали и оставили галочку согласия на рассылку (советы и новости invoices.kz, отписаться можно в любом письме).',
+        a: 'Только в ваш браузер: черновик хранится на этом устройстве, чтобы не заполнять реквизиты заново. На наш сервер данные акта не отправляются — из введённого уходит только БИН/ИИН, если нажать «Найти», и ваш email — если вы его указали и оставили галочку согласия на рассылку (советы и новости invoices.kz, отписаться можно в любом письме). Лимит — 3 акта в квартал с одного подключения (IP-адреса) — считает сервер: адрес в открытом виде не хранится — только его хэш. Счётчик обнуляется 1 января, 1 апреля, 1 июля и 1 октября.',
       },
     ],
   },
@@ -171,7 +179,7 @@ export const avrDict: Record<ToolLang, AvrDict> = {
     seo: {
       title: 'Орындалған жұмыстар актісі (ОЖА) онлайн — тегін, бір минутта',
       description:
-        'Қазақстандағы ЖК немесе ЖШС үшін Орындалған жұмыстар (көрсетілген қызметтер) актісін онлайн жасаңыз: тараптардың деректемелері, шарт, ҚҚС, сомасы жазбаша. Тіркелусіз бір минутта дайын PDF — күніне 3 акт тегін.',
+        'Қазақстандағы ЖК немесе ЖШС үшін Орындалған жұмыстар (көрсетілген қызметтер) актісін онлайн жасаңыз: тараптардың деректемелері, шарт, ҚҚС, сомасы жазбаша. Тіркелусіз бір минутта дайын PDF — тоқсанына 3 акт тегін.',
       keywords:
         'орындалған жұмыстар актісі, орындалған жұмыстар актісі үлгісі, көрсетілген қызметтер актісі, ожа онлайн, р-1 нысаны акт, жк орындалған жұмыстар актісі, жшс акт үлгісі, орындалған жұмыстар актісі pdf жүктеу',
       ogTitle: 'Орындалған жұмыстар актісі — бір минутта, тегін',
@@ -180,7 +188,7 @@ export const avrDict: Record<ToolLang, AvrDict> = {
     },
     h1: 'Орындалған жұмыстар актісі — онлайн, тегін',
     intro: n =>
-      `Тараптар мен жұмыстарды толтырыңыз — таныс қазақстандық нысандағы дайын актіні аласыз: сомасы жазбаша, қажет болса ҚҚС-пен. Тіркелусіз, күніне ${n} акт.`,
+      `Тараптар мен жұмыстарды толтырыңыз — таныс қазақстандық нысандағы дайын актіні аласыз: сомасы жазбаша, қажет болса ҚҚС-пен. Тіркелусіз, тоқсанына ${n} акт.`,
     docLangNote: 'Акт бланкісі (Р-1 нысаны) орыс тілінде шығады — бухгалтерия қабылдайтын үйреншікті нысан.',
     executorTitle: 'Орындаушы — сіз',
     companyLabel: 'ЖК / ЖШС атауы *',
@@ -226,13 +234,16 @@ export const avrDict: Record<ToolLang, AvrDict> = {
       rowPrice: name => `«${name}» үшін бағасын көрсетіңіз`,
       zero: 'Акт сомасы нөлден көп болуы керек',
       popup: 'Браузер акт терезесін бұғаттап тастады — invoices.kz үшін қалқымалы терезелерге рұқсат беріп, қайта басыңыз. Бұл әрекет есепке алынбады.',
+      unavailable: 'Сервис уақытша қолжетімсіз — бір минуттан соң қайталап көріңіз. Акт жасалған жоқ және есепке алынбады.',
+      failed: 'Актіні жасау мүмкін болмады — қайталап көріңіз.',
     },
-    limitTitle: n => `Бүгінгі ${n} тегін актінің бәрі пайдаланылды`,
+    limitTitle: n => `Осы тоқсандағы ${n} тегін актінің бәрі жасалып қойды`,
+    limitReset: iso => `Жаңа тегін актілер ${quarterStartLabel('kk', iso)} ашылады.`,
     limitBody:
       'invoices.kz кабинетінде акт шоттан бір басумен жасалады: деректемелер мен жұмыстар толтырылып тұрады, нөмірлер өздігінен қойылады, қолтаңба мен мөр PDF ішінде, ЭЦҚ-мен қол қоюға болады. Тіркелу тегін.',
     limitButton: 'Тегін тіркелу',
     generate: 'Акт жасау — басып шығаруға және жүктеуге ашылады',
-    remaining: (left, n) => `Бүгін тағы ${left} тегін акт қалды (күніне ${n})`,
+    remaining: (left, n) => `Осы тоқсанда қалған тегін акт: ${left} / ${n}`,
     guideLink: 'ОЖА төлем шоты мен жүкқұжаттан немен ерекшеленеді →',
     faqTitle: 'Жиі қойылатын сұрақтар',
     faq: [
@@ -254,7 +265,7 @@ export const avrDict: Record<ToolLang, AvrDict> = {
       },
       {
         q: 'Деректерім қайда сақталады?',
-        a: 'Тек сіздің браузеріңізде: деректемелерді қайта толтырмау үшін нобай осы құрылғыда сақталады. Акт деректері біздің серверге жіберілмейді — «Табу» батырмасын басқанда ғана БСН/ЖСН жіберіледі, сондай-ақ сіздің email — егер оны көрсетіп, таратылымға келісім белгісін қалдырсаңыз (invoices.kz кеңестері мен жаңалықтары, кез келген хаттан бас тартуға болады).',
+        a: 'Тек сіздің браузеріңізде: деректемелерді қайта толтырмау үшін нобай осы құрылғыда сақталады. Акт деректері біздің серверге жіберілмейді — енгізген деректеріңізден «Табу» батырмасын басқанда ғана БСН/ЖСН жіберіледі, сондай-ақ сіздің email — егер оны көрсетіп, таратылымға келісім белгісін қалдырсаңыз (invoices.kz кеңестері мен жаңалықтары, кез келген хаттан бас тартуға болады). Шектеуді — бір қосылымнан (IP-мекенжайдан) тоқсанына 3 акт — сервер санайды: мекенжай ашық түрде сақталмайды — оның орнына хэші сақталады. Есептегіш 1 қаңтарда, 1 сәуірде, 1 шілдеде және 1 қазанда нөлденеді.',
       },
     ],
   },
@@ -263,7 +274,7 @@ export const avrDict: Record<ToolLang, AvrDict> = {
     seo: {
       title: 'Kazakhstan Certificate of Completed Works (AVR) Generator — Free PDF',
       description:
-        'Create a Kazakhstan certificate of completed works or services rendered (AVR, form R-1) online for a sole proprietor (IE) or LLP: party details, contract, VAT, total in words. Ready PDF in a minute, no sign-up, 3 certificates a day free.',
+        'Create a Kazakhstan certificate of completed works or services rendered (AVR, form R-1) online for a sole proprietor (IE) or LLP: party details, contract, VAT, total in words. Ready PDF in a minute, no sign-up, 3 free certificates per quarter.',
       keywords:
         'kazakhstan certificate of completed works, avr kazakhstan, act of completed works kazakhstan template, acceptance certificate kazakhstan, services rendered act kazakhstan, r-1 form kazakhstan, kazakhstan avr pdf free',
       ogTitle: 'Kazakhstan certificate of completed works (AVR) — free, in a minute',
@@ -272,7 +283,7 @@ export const avrDict: Record<ToolLang, AvrDict> = {
     },
     h1: 'Kazakhstan certificate of completed works (AVR) — online, free',
     intro: n =>
-      `Fill in the parties and the work done to get a ready AVR — the act of completed works (services rendered) on the familiar Kazakhstan form, with the total in words and VAT if needed. You will need your 12-digit BIN or IIN (business / individual identification number). No sign-up, ${n} certificates per day.`,
+      `Fill in the parties and the work done to get a ready AVR — the act of completed works (services rendered) on the familiar Kazakhstan form, with the total in words and VAT if needed. You will need your 12-digit BIN or IIN (business / individual identification number). No sign-up, ${n} certificates per quarter.`,
     docLangNote: 'The certificate is generated in Russian (form R-1) — the standard form that accountants and counterparties in Kazakhstan accept.',
     executorTitle: 'Contractor — you',
     companyLabel: 'Sole proprietor (IE) / LLP name *',
@@ -318,13 +329,16 @@ export const avrDict: Record<ToolLang, AvrDict> = {
       rowPrice: name => `Enter a price for “${name}”`,
       zero: 'The certificate total must be greater than zero',
       popup: 'Your browser blocked the certificate window — allow pop-ups for invoices.kz and click again. This attempt was not counted.',
+      unavailable: 'The service is temporarily unavailable — try again in a minute. No certificate was created or counted.',
+      failed: 'Could not build the certificate — please try again.',
     },
-    limitTitle: n => `All ${n} free certificates for today are used`,
+    limitTitle: n => `You've used all ${n} free certificates for this quarter`,
+    limitReset: iso => `New free certificates unlock on ${quarterStartLabel('en', iso)}.`,
     limitBody:
       'In an invoices.kz account an AVR is created from an invoice in one click: your details and services are already filled in, numbering is automatic, the signature and stamp are inside the PDF, and it can be signed with a digital signature (EDS). Sign-up is free.',
     limitButton: 'Sign up for free',
     generate: 'Create the AVR — opens for printing and download',
-    remaining: (left, n) => `${left} of ${n} free certificates left today`,
+    remaining: (left, n) => `${left} of ${n} free certificates left this quarter`,
     guideLink: 'AVR vs invoice vs delivery note (in Russian) →',
     faqTitle: 'FAQ',
     faq: [
@@ -346,7 +360,7 @@ export const avrDict: Record<ToolLang, AvrDict> = {
       },
       {
         q: 'Where is my data stored?',
-        a: 'Only in your browser: the draft stays on this device so you don’t have to retype your details. Certificate data is never sent to our server — only the BIN/IIN when you click “Find”, plus your email if you entered it and left the newsletter consent box ticked (invoices.kz tips and news; unsubscribe from any email).',
+        a: 'Only in your browser: the draft stays on this device so you don’t have to retype your details. Certificate data is never sent to our server — of what you type, only the BIN/IIN when you click “Find”, plus your email if you entered it and left the newsletter consent box ticked (invoices.kz tips and news; unsubscribe from any email). The limit — 3 certificates per quarter per connection (IP address) — is counted on our server: the address is not stored in plain form, only a hash of it. The counter resets on 1 January, 1 April, 1 July and 1 October.',
       },
     ],
   },

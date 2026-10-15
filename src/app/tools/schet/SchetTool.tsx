@@ -10,6 +10,7 @@ import { formatTenge, toolLinkPath, toolsIndexPath, TOOL_CHROME, type ToolLang }
 import ToolLangSwitch from '@/lib/tools-i18n/ToolLangSwitch'
 import ToolCta from '@/lib/tools-i18n/ToolCta'
 import BinNameField from '@/lib/tools-i18n/BinNameField'
+import { claimDocSlot, DOC_QUOTA_DEFAULT_LIMIT, useDocQuota } from '@/lib/tools-i18n/docQuota'
 import { schetDict } from './dict'
 import {
   digits, documentRows, documentTotal, localToday, resolveBank, ruDate, validateForm, vatIncluded,
@@ -20,14 +21,14 @@ import { TOOL_UNITS, DEFAULT_UNIT, UNIT_LABELS, unitAria } from '@/lib/tools-i18
 // Бесплатный генератор счёта на оплату — лид-магнит под самый частотный
 // документный запрос («счёт на оплату образец/скачать»). Правило основателя
 // для бесплатных тулов (12.10.2026): цеплять на регистрацию и ограничивать —
-// 3 счёта в день на браузер (localStorage), в самом счёте — водяная строка
+// 3 счёта на IP в квартал, считает СЕРВЕР (/api/tools/doc-quota, решение
+// основателя 15.10.2026 — как у КП; раньше было 3 в день в localStorage,
+// который очищается одной кнопкой), в самом счёте — водяная строка
 // invoices.kz (showWatermark у общего generateInvoicePDF, тот же шаблон, что
 // печатает продукт).
 // Один и тот же инструмент для /tools/schet, /tools/kk/schet и
 // /tools/en/schet: язык интерфейса приходит пропсом (из адреса), а сам счёт
 // всегда русский — см. docs/tools-i18n-pattern.md.
-const LIMIT = 3
-const COUNT_KEY = 'tool-schet-count'
 const DRAFT_KEY = 'tool-schet-draft'
 // Снятая галочка рассылки хранится отдельно от черновика: email из черновика
 // возвращается после перезагрузки, и без этого ключа галочка вставала бы
@@ -46,19 +47,6 @@ const EMPTY: Form = {
   rows: [{ name: '', qty: '1', unit: DEFAULT_UNIT, price: '' }],
 }
 
-function readCount(): number {
-  try {
-    const raw = JSON.parse(localStorage.getItem(COUNT_KEY) || 'null')
-    return raw && raw.d === localToday() ? Number(raw.n) || 0 : 0
-  } catch { return 0 }
-}
-
-function bumpCount(): number {
-  const n = readCount() + 1
-  try { localStorage.setItem(COUNT_KEY, JSON.stringify({ d: localToday(), n })) } catch {}
-  return n
-}
-
 // Статья о реквизитах счёта есть на ru и kk; английской нет — en ведёт на русскую.
 const guidePath = (lang: ToolLang) =>
   lang === 'kk' ? '/guides/kk/kak-vystavit-schet-ip' : '/guides/kak-vystavit-schet-ip'
@@ -68,7 +56,8 @@ export default function SchetTool({ lang }: { lang: ToolLang }) {
   const chrome = TOOL_CHROME[lang]
   const { setLang } = useLanguage()
   const [f, setF] = useState<Form>(EMPTY)
-  const [used, setUsed] = useState(0)
+  // Остаток на квартал — с сервера (/api/tools/doc-quota); null — ещё не пришёл.
+  const [quota, setQuota] = useDocQuota('schet')
   const [error, setError] = useState('')
   // Черновик пишем только после того, как прочитали сохранённый, — иначе
   // первый же эффект сохранения затёр бы его пустой формой (в dev React
@@ -78,7 +67,6 @@ export default function SchetTool({ lang }: { lang: ToolLang }) {
   // Черновик переживает перезагрузку: заполнять реквизиты заново — главная
   // причина бросить такой инструмент на середине.
   useEffect(() => {
-    setUsed(readCount())
     try { if (localStorage.getItem(CONSENT_KEY) === '0') setMarketingConsent(false) } catch {}
     let draft: Partial<Form> | null = null
     try {
@@ -124,7 +112,7 @@ export default function SchetTool({ lang }: { lang: ToolLang }) {
   const total = useMemo(() => documentTotal(f.rows), [f.rows])
   const vat = vatIncluded(total, f.vatType)
 
-  const limitReached = used >= LIMIT
+  const limitReached = quota !== null && quota.remaining <= 0
 
   const generate = async () => {
     if (limitReached || busy.current) return
@@ -142,6 +130,29 @@ export default function SchetTool({ lang }: { lang: ToolLang }) {
     }
     busy.current = true
     setGenerating(true)
+    // Заглушку закрываем (document.close), как в /tools/kp: следующий write
+    // начнёт документ заново, а не допишет его после «…».
+    try {
+      win.document.write('<!doctype html><meta charset="utf-8"><p style="font:14px system-ui,sans-serif;padding:24px;color:#555">…</p>')
+      win.document.close()
+    } catch {}
+    // Занимаем документ на сервере ДО генерации: лимит 3 в квартал на IP
+    // держит только сервер. Квартал исчерпан — закрываем пустое окно и
+    // показываем карточку лимита; сервер/сеть недоступны — документ не делаем.
+    const claim = await claimDocSlot('schet')
+    if (claim.kind !== 'ok') {
+      try { win.close() } catch {}
+      busy.current = false
+      setGenerating(false)
+      if (claim.kind === 'limit') {
+        setQuota(claim.quota ?? { remaining: 0, limit: quota?.limit ?? DOC_QUOTA_DEFAULT_LIMIT, resetsAt: quota?.resetsAt ?? '' })
+        track('tool_schet_limit', { lang })
+      } else {
+        setError(t.errors.unavailable)
+      }
+      return
+    }
+    setQuota(claim.quota)
     track('tool_schet_generate', { lang })
     try {
       const bank = resolveBank(f)
@@ -179,9 +190,14 @@ export default function SchetTool({ lang }: { lang: ToolLang }) {
           body: JSON.stringify({ tool: 'schet', contact: email }),
         }).catch(() => {})
       }
-      const n = bumpCount()
-      setUsed(n)
-      if (n >= LIMIT) track('tool_schet_limit', { lang })
+      if (claim.quota.remaining <= 0) track('tool_schet_limit', { lang })
+    } catch {
+      // Сборка документа упала уже после того, как слот занят: закрываем
+      // окно с «…» и говорим об ошибке, а не оставляем человека с пустой
+      // вкладкой. Слот не возвращаем — генерация идёт в браузере, и «вернуть»
+      // по запросу клиента значило бы обнулять лимит одним вызовом.
+      try { win.close() } catch {}
+      setError(t.errors.failed)
     } finally {
       busy.current = false
       setGenerating(false)
@@ -216,7 +232,7 @@ export default function SchetTool({ lang }: { lang: ToolLang }) {
         </h1>
         <div className="mb-6">
           <p className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
-            {t.intro(LIMIT)}
+            {t.intro(DOC_QUOTA_DEFAULT_LIMIT)}
           </p>
           {t.docLangNote && (
             <p className="text-[12px] mt-2" style={{ color: 'var(--nav-text-muted)' }}>
@@ -368,10 +384,10 @@ export default function SchetTool({ lang }: { lang: ToolLang }) {
         {limitReached ? (
           <div className="nav-glass nav-card-accent rounded-2xl p-6 mb-4">
             <div className="text-base font-bold mb-1.5" style={{ color: 'var(--nav-text-primary)' }}>
-              {t.limitTitle(LIMIT)}
+              {t.limitTitle(quota?.limit ?? DOC_QUOTA_DEFAULT_LIMIT)}
             </div>
             <p className="text-sm mb-4" style={{ color: 'var(--nav-text-secondary)' }}>
-              {t.limitBody}
+              {quota?.resetsAt ? `${t.limitReset(quota.resetsAt)} ` : ''}{t.limitBody}
             </p>
             <a href="/login?utm_source=tools&utm_medium=limit&utm_campaign=schet"
               onClick={signupClick}
@@ -387,9 +403,11 @@ export default function SchetTool({ lang }: { lang: ToolLang }) {
               style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
               {t.generate}
             </button>
-            <div className="text-[11px] mt-2" style={{ color: 'var(--nav-text-muted)' }}>
-              {t.remaining(LIMIT - used, LIMIT)}
-            </div>
+            {quota && (
+              <div className="text-[11px] mt-2" style={{ color: 'var(--nav-text-muted)' }}>
+                {t.remaining(quota.remaining, quota.limit)}
+              </div>
+            )}
           </div>
         )}
 
