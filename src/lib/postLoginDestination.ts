@@ -20,10 +20,25 @@ export interface PostLoginIntents {
 
 // Pure, unit-tested. Never returns /login (nothing in the allowlist or in
 // homeFor() is /login), so a caller on /login can't loop.
-export function choosePostLoginDestination(intents: PostLoginIntents, enabledProducts: unknown): string {
+//
+// tourDone === false (profiles.tour_completed_at is null — a newcomer, решение
+// основателя 15.10.2026 «полную экскурсию»): first the dashboard with its
+// tour, even if a product landing (/login?next=/kaspi-shop/overview) or the
+// start-page persona would send them into a product they may not have yet
+// (Kaspi Bot without Pro bounced newcomers to /upgrade, past the tour). An
+// explicit wish to pay still wins: a pending upgrade or next=/upgrade.
+// tourDone undefined (unknown) changes nothing.
+export function choosePostLoginDestination(intents: PostLoginIntents, enabledProducts: unknown, tourDone?: boolean): string {
   if (intents.hasPendingUpgrade) return '/upgrade'
+  if (intents.postLoginRedirect === '/upgrade') return '/upgrade'
+  if (tourDone === false) return '/dashboard'
   if (intents.postLoginRedirect) return intents.postLoginRedirect
   return homeFor(enabledProducts)
+}
+
+export interface OwnProfileForDestination {
+  enabled_products?: unknown
+  tour_completed_at?: string | null
 }
 
 // Reads the stored intents. Consumes postLoginRedirect exactly once,
@@ -35,17 +50,19 @@ export function readPostLoginIntents(): PostLoginIntents {
   return { hasPendingUpgrade: hasPendingUpgrade(), postLoginRedirect }
 }
 
-// Convenience for callers that don't have the profile yet: enabled_products
-// is only fetched when neither intent applies. A failed fetch falls back to
-// homeFor(undefined) = /dashboard.
-export async function resolvePostLoginDestination(loadEnabledProducts: () => Promise<unknown>): Promise<string> {
+// Convenience for callers that don't have the profile yet: the own profile
+// (enabled_products, tour_completed_at) is fetched unless a purchase intent
+// decides. A failed fetch falls back to the intent / homeFor(undefined).
+export async function resolvePostLoginDestination(loadOwnProfile: () => Promise<OwnProfileForDestination | null>): Promise<string> {
   const intents = readPostLoginIntents()
-  if (intents.hasPendingUpgrade || intents.postLoginRedirect) return choosePostLoginDestination(intents, null)
-  let enabledProducts: unknown = null
+  if (intents.hasPendingUpgrade || intents.postLoginRedirect === '/upgrade') return choosePostLoginDestination(intents, null)
+  let profile: OwnProfileForDestination | null = null
   try {
-    enabledProducts = await loadEnabledProducts()
+    profile = await loadOwnProfile()
   } catch {
-    enabledProducts = null
+    profile = null
   }
-  return choosePostLoginDestination(intents, enabledProducts)
+  // No profile (load failed) -> tour state unknown -> previous behaviour.
+  const tourDone = profile ? !!profile.tour_completed_at : undefined
+  return choosePostLoginDestination(intents, profile?.enabled_products ?? null, tourDone)
 }

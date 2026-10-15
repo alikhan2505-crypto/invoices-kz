@@ -11,13 +11,13 @@ import { resolvePostLoginDestination } from '@/lib/postLoginDestination'
 import { SIGNED_OUT_PARAM } from '@/lib/signOut'
 import { useAppDialog } from '@/components/AppDialog'
 
-// enabled_products of the signed-in user, for homeFor() -- only fetched when
-// no stored intent decides the destination (see postLoginDestination.ts).
-async function loadOwnEnabledProducts(userId?: string): Promise<unknown> {
+// The signed-in user's enabled_products (for homeFor) and tour state (a
+// newcomer goes to the dashboard tour first) -- see postLoginDestination.ts.
+async function loadOwnProfile(userId?: string) {
   const id = userId ?? (await supabase.auth.getUser()).data.user?.id
   if (!id) return null
-  const { data: prof } = await supabase.from('profiles').select('enabled_products').eq('id', id).maybeSingle()
-  return prof?.enabled_products
+  const { data: prof } = await supabase.from('profiles').select('enabled_products, tour_completed_at').eq('id', id).maybeSingle()
+  return prof ?? null
 }
 
 const SESSION_CHECK_TIMEOUT_MS = 4500
@@ -87,7 +87,7 @@ export default function Login() {
           // /login forever. Any failure here shows the form, as before.
           const { data: { user }, error } = await supabase.auth.getUser()
           if (user && !error && !formTouched.current) {
-            const destination = await resolvePostLoginDestination(() => loadOwnEnabledProducts(user.id))
+            const destination = await resolvePostLoginDestination(() => loadOwnProfile(user.id))
             if (!formTouched.current) {
               window.clearTimeout(timer)
               router.replace(destination)
@@ -130,7 +130,7 @@ export default function Login() {
       // postLoginRedirect -> homeFor), shared with /auth/callback: see
       // src/lib/postLoginDestination.ts. It consumes the stored
       // postLoginRedirect exactly once, whichever branch wins.
-      router.replace(await resolvePostLoginDestination(() => loadOwnEnabledProducts()))
+      router.replace(await resolvePostLoginDestination(() => loadOwnProfile()))
     } catch (e: any) {
       if (e?.name !== 'NotAllowedError') alert(t.errorPrefix(e?.message || String(e)))
     } finally {

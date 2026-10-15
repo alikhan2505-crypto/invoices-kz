@@ -37,7 +37,7 @@ describe('reading stored intents', () => {
     const old = Date.now() - 2 * 24 * 3600_000
     setPostLoginRedirect('/upgrade', old)
     setPendingUpgrade('pro', 'annual', old)
-    const load = vi.fn(async () => ['invoices'])
+    const load = vi.fn(async () => ({ enabled_products: ['invoices'], tour_completed_at: '2026-10-01T00:00:00Z' }))
     expect(await resolvePostLoginDestination(load)).toBe('/dashboard')
     expect(load).toHaveBeenCalledOnce()
     expect(store.m.has(POST_LOGIN_REDIRECT_KEY)).toBe(false)
@@ -57,11 +57,29 @@ describe('reading stored intents', () => {
 
   it('a fresh redirect is used exactly once', async () => {
     setPostLoginRedirect('/ai-agent')
-    expect(await resolvePostLoginDestination(async () => null)).toBe('/ai-agent')
+    expect(await resolvePostLoginDestination(async () => ({ tour_completed_at: '2026-10-01T00:00:00Z' }))).toBe('/ai-agent')
     expect(readPostLoginIntents()).toEqual({ hasPendingUpgrade: false, postLoginRedirect: null })
   })
 
   it('a failing profile load falls back to /dashboard', async () => {
     expect(await resolvePostLoginDestination(async () => { throw new Error('network') })).toBe('/dashboard')
+  })
+})
+
+describe('newcomer gets the dashboard tour first (15.10.2026)', () => {
+  const none = { hasPendingUpgrade: false, postLoginRedirect: null }
+  it('tour not done -> /dashboard, whatever the persona or product landing', () => {
+    expect(choosePostLoginDestination(none, ['kaspiShop'], false)).toBe('/dashboard')
+    expect(choosePostLoginDestination({ hasPendingUpgrade: false, postLoginRedirect: '/kaspi-shop/overview' }, null, false)).toBe('/dashboard')
+    expect(choosePostLoginDestination({ hasPendingUpgrade: false, postLoginRedirect: '/ai-agent/overview' }, ['aiAgent'], false)).toBe('/dashboard')
+  })
+  it('an explicit wish to pay still wins over the tour', () => {
+    expect(choosePostLoginDestination({ hasPendingUpgrade: true, postLoginRedirect: null }, null, false)).toBe('/upgrade')
+    expect(choosePostLoginDestination({ hasPendingUpgrade: false, postLoginRedirect: '/upgrade' }, null, false)).toBe('/upgrade')
+  })
+  it('tour done or unknown -> behaviour unchanged', () => {
+    expect(choosePostLoginDestination(none, ['kaspiShop'], true)).toBe('/kaspi-shop/overview')
+    expect(choosePostLoginDestination(none, ['kaspiShop'])).toBe('/kaspi-shop/overview')
+    expect(choosePostLoginDestination({ hasPendingUpgrade: false, postLoginRedirect: '/cfo/overview' }, null, true)).toBe('/cfo/overview')
   })
 })

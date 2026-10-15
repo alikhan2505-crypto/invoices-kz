@@ -67,7 +67,7 @@ export default function AuthCallback() {
         // the one-time bootstrap below, which these three columns record.
         const { data: profile } = await supabase
           .from('profiles')
-          .select('trial_expires_at, promo_granted_at, referred_by, enabled_products, is_admin')
+          .select('trial_expires_at, promo_granted_at, referred_by, enabled_products, is_admin, tour_completed_at')
           .eq('id', session.user.id)
           .maybeSingle()
 
@@ -110,7 +110,8 @@ export default function AuthCallback() {
         // /login. replace, not push: /login and this page should not stay in
         // history behind the destination.
         const goToDestination = () => {
-          router.replace(choosePostLoginDestination(intents, enabledProducts))
+          // Newcomer (tour not done; no profile row = brand new too) -> dashboard tour first.
+          router.replace(choosePostLoginDestination(intents, enabledProducts, profile ? !!profile.tour_completed_at : false))
         }
 
         const needsBootstrap =
