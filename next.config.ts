@@ -1,6 +1,11 @@
 import type { NextConfig } from "next";
 
+// Дата выкладки для «О сервисе» → «Обновлено ДД.ММ.ГГГГ» (по Алматы, UTC+5):
+// вычисляется один раз при сборке, поэтому всегда совпадает с последним деплоем.
+const BUILD_DATE = new Date(Date.now() + 5 * 3600_000).toISOString().slice(0, 10).split('-').reverse().join('.')
+
 const nextConfig: NextConfig = {
+  env: { NEXT_PUBLIC_BUILD_DATE: BUILD_DATE },
   // /print's server side reads the curated keychain fonts straight off disk
   // from public/ at runtime -- public/fonts/print-shop/<id>.ttf -- in
   // /api/print/orders (glyph + geometry pre-check) and inside

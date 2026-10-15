@@ -86,7 +86,7 @@ export interface ProfileMiscContent {
 
   // «О сервисе» — блок на support/page.tsx (бывшая about/page.tsx)
   appTaglineLabel: string
-  versionLabel: string
+  versionLabel: (date: string) => string
   websiteLabel: string
   privacyPolicyLabel: string
   termsOfUseLabel: string
@@ -199,8 +199,8 @@ export const profileContentDict: Record<'ru' | 'kk' | 'en', ProfileMiscContent> 
     deleteTitleLabel: 'Удалить',
     deleteDocumentConfirm: 'Удалить документ?',
     totalDocumentsLabel: (count: number) => `Итого: ${count} документов`,
-    appTaglineLabel: 'Счета на оплату за 1 минуту',
-    versionLabel: 'Версия 1.0.0',
+    appTaglineLabel: 'Сервисы для бизнеса в Казахстане',
+    versionLabel: d => `Обновлено ${d}`,
     websiteLabel: 'Сайт',
     privacyPolicyLabel: 'Политика конфиденциальности',
     termsOfUseLabel: 'Условия использования',
@@ -305,8 +305,8 @@ export const profileContentDict: Record<'ru' | 'kk' | 'en', ProfileMiscContent> 
     deleteTitleLabel: 'Жою',
     deleteDocumentConfirm: 'Құжатты жоясыз ба?',
     totalDocumentsLabel: (count: number) => `Барлығы: ${count} құжат`,
-    appTaglineLabel: 'Төлемге арналған шоттар 1 минутта',
-    versionLabel: 'Нұсқа 1.0.0',
+    appTaglineLabel: 'Қазақстандағы бизнеске арналған сервистер',
+    versionLabel: d => `Жаңартылды: ${d}`,
     websiteLabel: 'Сайт',
     privacyPolicyLabel: 'Құпиялылық саясаты',
     termsOfUseLabel: 'Пайдалану шарттары',
@@ -411,8 +411,8 @@ export const profileContentDict: Record<'ru' | 'kk' | 'en', ProfileMiscContent> 
     deleteTitleLabel: 'Delete',
     deleteDocumentConfirm: 'Delete this document?',
     totalDocumentsLabel: (count: number) => `Total: ${count} documents`,
-    appTaglineLabel: 'Invoices for payment in 1 minute',
-    versionLabel: 'Version 1.0.0',
+    appTaglineLabel: 'Services for business in Kazakhstan',
+    versionLabel: d => `Updated ${d}`,
     websiteLabel: 'Website',
     privacyPolicyLabel: 'Privacy Policy',
     termsOfUseLabel: 'Terms of Use',

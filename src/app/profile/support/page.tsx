@@ -187,7 +187,7 @@ export default function Support() {
           <div className="text-2xl font-bold mb-1" style={{ color: 'var(--nav-text-primary)' }}>INVOICES.KZ</div>
           <div className="text-sm mb-3" style={{ color: 'var(--nav-text-muted)' }}>{t.appTaglineLabel}</div>
           <span className="inline-block text-xs px-3 py-1.5 rounded-full font-medium" style={{ background: 'var(--nav-border-soft)', color: 'var(--nav-text-secondary)' }}>
-            {t.versionLabel}
+            {t.versionLabel(process.env.NEXT_PUBLIC_BUILD_DATE || '')}
           </span>
         </motion.div>
 
