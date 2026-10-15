@@ -8,20 +8,40 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-// Отписка от welcome-цепочки по подписанной ссылке из письма. GET, потому
-// что по ссылке из почтового клиента приходят именно GET'ом; действие
-// идемпотентное и безвредное (только выключает письма).
-export async function GET(req: NextRequest) {
+// u/t из ссылки → id аккаунта, если подпись верна; иначе null.
+function verifiedUserId(req: NextRequest): string | null {
   const u = req.nextUrl.searchParams.get('u') || ''
   const t = req.nextUrl.searchParams.get('t') || ''
   const expected = u ? unsubToken(u) : ''
   const ok =
     !!u && !!t && t.length === expected.length &&
     timingSafeEqual(Buffer.from(t), Buffer.from(expected))
-  if (!ok) return new NextResponse('Ссылка недействительна', { status: 400 })
+  return ok ? u : null
+}
 
-  const { error } = await supabase.from('profiles').update({ email_optout: true }).eq('id', u)
-  if (error) return new NextResponse('Не получилось, попробуйте позже', { status: 500 })
+async function optOut(userId: string): Promise<boolean> {
+  const { error } = await supabase.from('profiles').update({ email_optout: true }).eq('id', userId)
+  return !error
+}
+
+// Кнопка «Отписаться» в самом Gmail/Yahoo/Apple Mail (RFC 8058): письмо
+// несёт List-Unsubscribe-Post: List-Unsubscribe=One-Click, и почтовый клиент
+// шлёт сюда POST на тот же URL (u/t в query, тело «List-Unsubscribe=One-Click»).
+// Без этого обработчика Next отвечал 405 и отписка молча не срабатывала.
+export async function POST(req: NextRequest) {
+  const u = verifiedUserId(req)
+  if (!u) return new NextResponse('Invalid link', { status: 400 })
+  if (!(await optOut(u))) return new NextResponse('Try again later', { status: 500 })
+  return new NextResponse(null, { status: 200 })
+}
+
+// Отписка от welcome-цепочки по подписанной ссылке из письма. GET, потому
+// что по ссылке из почтового клиента приходят именно GET'ом; действие
+// идемпотентное и безвредное (только выключает письма).
+export async function GET(req: NextRequest) {
+  const u = verifiedUserId(req)
+  if (!u) return new NextResponse('Ссылка недействительна', { status: 400 })
+  if (!(await optOut(u))) return new NextResponse('Не получилось, попробуйте позже', { status: 500 })
 
   return new NextResponse(
     `<!doctype html><html lang="ru"><meta charset="utf-8"><title>Отписка — invoices.kz</title>
