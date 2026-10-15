@@ -4,7 +4,7 @@ import { nakladnayaDict } from './dict'
 import { documentTotal, localToday, validateForm, vatIncluded, type Form } from './calc'
 
 const base: Form = {
-  companyName: 'ИП Тест', binIin: '123456789012', address: '', director: '',
+  companyName: 'ИП Тест', binIin: '123456789012', address: '', director: '', email: '',
   clientName: 'ТОО Клиент', clientBin: '',
   number: '1', date: '2026-10-14', vatType: 'no_vat',
   rows: [{ name: 'Товар', qty: '2', price: '1500' }],
@@ -103,5 +103,21 @@ describe('nakladnaya validation', () => {
   it('returns errors in the page language', () => {
     expect(validateForm({ ...base, companyName: '' }, nakladnayaDict.kk.errors)).toBe(nakladnayaDict.kk.errors.company)
     expect(validateForm({ ...base, companyName: '' }, nakladnayaDict.en.errors)).toBe(nakladnayaDict.en.errors.company)
+  })
+})
+
+describe('nakladnaya marketing email', () => {
+  it('has the optional email label, consent text and privacy link in every language', () => {
+    for (const lang of TOOL_LANGS) {
+      const d = nakladnayaDict[lang]
+      expect(d.emailLabel, `${lang}.emailLabel`).toMatch(/email/i)
+      expect(d.marketingConsent, `${lang}.marketingConsent`).toMatch(/invoices\.kz/)
+      expect(d.privacyLink, `${lang}.privacyLink`).not.toBe('')
+      // FAQ «куда уходят данные» обязан честно упоминать email для рассылки.
+      expect(d.faq.some(q => /email/i.test(q.a)), `${lang}.faq mentions email`).toBe(true)
+    }
+    expect(nakladnayaDict.ru.emailLabel).toBe('Ваш email (необязательно)')
+    expect(nakladnayaDict.kk.emailLabel).toBe('Сіздің email (міндетті емес)')
+    expect(nakladnayaDict.en.emailLabel).toBe('Your email (optional)')
   })
 })

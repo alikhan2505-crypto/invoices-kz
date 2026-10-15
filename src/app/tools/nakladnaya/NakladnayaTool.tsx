@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import BrandWordmark from '@/components/BrandWordmark'
 import { track } from '@vercel/analytics'
@@ -25,12 +25,16 @@ import { TOOL_UNITS, DEFAULT_UNIT, UNIT_LABELS, unitAria } from '@/lib/tools-i18
 const LIMIT = 3
 const COUNT_KEY = 'tool-nakladnaya-count'
 const DRAFT_KEY = 'tool-nakladnaya-draft'
+// Снятая галочка рассылки хранится отдельно от черновика: email из черновика
+// возвращается после перезагрузки, и без этого ключа галочка вставала бы
+// обратно — следующий документ отправил бы email вопреки отказу.
+const CONSENT_KEY = 'tool-nakladnaya-consent'
 const VAT_TYPES: VatType[] = ['no_vat', 'vat_16', 'vat_0']
 
 // Дата заполняется на клиенте после монтирования: сервер и браузер живут в
 // разных часовых поясах, а модуль на сервере может жить сутками.
 const EMPTY: Form = {
-  companyName: '', binIin: '', address: '', director: '',
+  companyName: '', binIin: '', address: '', director: '', email: '',
   clientName: '', clientBin: '',
   number: '1', date: '',
   vatType: 'no_vat',
@@ -64,6 +68,7 @@ export default function NakladnayaTool({ lang }: { lang: ToolLang }) {
 
   useEffect(() => {
     setUsed(readCount())
+    try { if (localStorage.getItem(CONSENT_KEY) === '0') setMarketingConsent(false) } catch {}
     let draft: Partial<Form> | null = null
     try {
       const raw = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null')
@@ -88,6 +93,19 @@ export default function NakladnayaTool({ lang }: { lang: ToolLang }) {
   }, [f, ready])
 
   const set = (patch: Partial<Form>) => setF(prev => ({ ...prev, ...patch }))
+  // Согласие на рассылку для email продавца — галочка стоит по умолчанию
+  // (решение основателя 14.10.2026, как в /tools/kp); снять можно здесь и по
+  // ссылке «Отписаться» в любом письме (политика конфиденциальности).
+  const [marketingConsent, setMarketingConsent] = useState(true)
+  const changeConsent = (on: boolean) => {
+    setMarketingConsent(on)
+    try { localStorage.setItem(CONSENT_KEY, on ? '1' : '0') } catch {}
+  }
+  // Пока документ собирается (generate асинхронный), второй клик игнорируем:
+  // иначе двойной клик открыл бы два окна, списал две попытки и дважды
+  // записал email. Ref — чтобы защита не зависела от перерисовки.
+  const [generating, setGenerating] = useState(false)
+  const busy = useRef(false)
   const setRow = (i: number, patch: Partial<Row>) =>
     setF(prev => ({ ...prev, rows: prev.rows.map((r, j) => (j === i ? { ...r, ...patch } : r)) }))
 
@@ -98,7 +116,7 @@ export default function NakladnayaTool({ lang }: { lang: ToolLang }) {
   const limitReached = used >= LIMIT
 
   const generate = async () => {
-    if (limitReached) return
+    if (limitReached || busy.current) return
     const problem = validateForm(f, t.errors)
     setError(problem)
     if (problem) return
@@ -110,26 +128,44 @@ export default function NakladnayaTool({ lang }: { lang: ToolLang }) {
       track('tool_nakladnaya_popup_blocked', { lang })
       return
     }
+    busy.current = true
+    setGenerating(true)
     track('tool_nakladnaya_generate', { lang })
-    await generateNakladnaya({
-      showWatermark: true,
-      number: f.number.trim() || '1',
-      date: ruDate(f.date || localToday()),
-      clientName: f.clientName.trim(),
-      clientBin: digits(f.clientBin) || undefined,
-      services: documentRows(f.rows).map(r => ({ ...r, type: 'product' as const })),
-      total,
-      vatType: f.vatType,
-      profile: {
-        company_name: f.companyName.trim(),
-        bin_iin: digits(f.binIin),
-        address: f.address.trim(),
-        director_name: f.director.trim() || undefined,
-      },
-    }, win)
-    const n = bumpCount()
-    setUsed(n)
-    if (n >= LIMIT) track('tool_nakladnaya_limit', { lang })
+    try {
+      await generateNakladnaya({
+        showWatermark: true,
+        number: f.number.trim() || '1',
+        date: ruDate(f.date || localToday()),
+        clientName: f.clientName.trim(),
+        clientBin: digits(f.clientBin) || undefined,
+        services: documentRows(f.rows).map(r => ({ ...r, type: 'product' as const })),
+        total,
+        vatType: f.vatType,
+        profile: {
+          company_name: f.companyName.trim(),
+          bin_iin: digits(f.binIin),
+          address: f.address.trim(),
+          director_name: f.director.trim() || undefined,
+        },
+      }, win)
+      // Email продавца — в базу контактов только с согласием и только после того,
+      // как документ открылся. Данные покупателя не отправляются никогда. Ошибка
+      // записи документу не мешает. Сам email в бланк не печатается.
+      const email = f.email.trim()
+      if (marketingConsent && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        fetch('/api/tools/lead', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tool: 'nakladnaya', contact: email }),
+        }).catch(() => {})
+      }
+      const n = bumpCount()
+      setUsed(n)
+      if (n >= LIMIT) track('tool_nakladnaya_limit', { lang })
+    } finally {
+      busy.current = false
+      setGenerating(false)
+    }
   }
 
   // Клик в регистрацию запоминает язык страницы — /login откроется на нём же.
@@ -185,6 +221,14 @@ export default function NakladnayaTool({ lang }: { lang: ToolLang }) {
             <div>
               <label htmlFor="nk-director" className={label} style={labelStyle}>{t.directorLabel}</label>
               <input id="nk-director" className={input} style={inputStyle} placeholder={t.directorPlaceholder} autoComplete="name" value={f.director} onChange={e => set({ director: e.target.value })} />
+            </div>
+            <div>
+              <label htmlFor="nk-email" className={label} style={labelStyle}>{t.emailLabel}</label>
+              <input id="nk-email" type="email" className={input} style={inputStyle} autoComplete="email" value={f.email} onChange={e => set({ email: e.target.value })} />
+              <label className="flex items-start gap-2 mt-1.5 text-[11px] cursor-pointer" style={{ color: 'var(--nav-text-muted)' }}>
+                <input type="checkbox" className="mt-0.5 w-3.5 h-3.5 accent-[#5B4CE0] flex-shrink-0" checked={marketingConsent} onChange={e => changeConsent(e.target.checked)} />
+                <span>{t.marketingConsent}{' '}<a href="https://invoices.kz/privacy" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--nav-accent)' }}>{t.privacyLink}</a></span>
+              </label>
             </div>
             <div className="sm:col-span-2">
               <label htmlFor="nk-address" className={label} style={labelStyle}>{t.addressLabel}</label>
@@ -279,8 +323,8 @@ export default function NakladnayaTool({ lang }: { lang: ToolLang }) {
           </div>
         ) : (
           <div className="mb-4">
-            <button type="button" onClick={generate}
-              className="w-full sm:w-auto rounded-xl px-8 py-3.5 text-sm font-semibold transition-transform hover:-translate-y-0.5"
+            <button type="button" onClick={generate} disabled={generating} aria-busy={generating}
+              className="w-full sm:w-auto rounded-xl px-8 py-3.5 text-sm font-semibold transition-transform hover:-translate-y-0.5 disabled:opacity-60 disabled:hover:translate-y-0"
               style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
               {t.generate}
             </button>

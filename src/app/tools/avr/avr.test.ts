@@ -4,7 +4,7 @@ import { avrDict } from './dict'
 import { documentRows, documentTotal, localToday, ruDate, validateForm, vatIncluded, type Form } from './calc'
 
 const base: Form = {
-  companyName: 'ИП Тест', binIin: '123456789012', address: '', director: '', phone: '',
+  companyName: 'ИП Тест', binIin: '123456789012', address: '', director: '', phone: '', email: '',
   clientName: 'ТОО Клиент', clientBin: '', clientAddress: '',
   number: '1', date: '2026-10-14', contractNumber: '', contractDate: '', vatType: 'no_vat',
   rows: [{ name: 'Разработка сайта', qty: '1', price: '150000' }],
@@ -147,5 +147,21 @@ describe('avr validation', () => {
   it('returns errors in the page language', () => {
     expect(validateForm({ ...base, companyName: '' }, avrDict.kk.errors)).toBe(avrDict.kk.errors.company)
     expect(validateForm({ ...base, companyName: '' }, avrDict.en.errors)).toBe(avrDict.en.errors.company)
+  })
+})
+
+describe('avr marketing email', () => {
+  it('has the optional email label, consent text and privacy link in every language', () => {
+    for (const lang of TOOL_LANGS) {
+      const d = avrDict[lang]
+      expect(d.emailLabel, `${lang}.emailLabel`).toMatch(/email/i)
+      expect(d.marketingConsent, `${lang}.marketingConsent`).toMatch(/invoices\.kz/)
+      expect(d.privacyLink, `${lang}.privacyLink`).not.toBe('')
+      // FAQ «куда уходят данные» обязан честно упоминать email для рассылки.
+      expect(d.faq.some(q => /email/i.test(q.a)), `${lang}.faq mentions email`).toBe(true)
+    }
+    expect(avrDict.ru.emailLabel).toBe('Ваш email (необязательно)')
+    expect(avrDict.kk.emailLabel).toBe('Сіздің email (міндетті емес)')
+    expect(avrDict.en.emailLabel).toBe('Your email (optional)')
   })
 })

@@ -14,13 +14,20 @@ import { createClient } from '@supabase/supabase-js'
 // build.
 
 // Whitelisted rather than stored as given, so a public endpoint cannot write
-// arbitrary strings into the column the funnel is grouped by.
-const TOOL_LABELS: Record<string, string> = {
+// arbitrary strings into the column the funnel is grouped by. Exported only so
+// the whitelist can be unit-tested; an unknown tool silently falls back to the
+// route's fallbackTool, so a new tool MUST be added here.
+export const TOOL_LABELS: Record<string, string> = {
   waybills: 'Склейка накладных',
   margin: 'Калькулятор маржи',
   // КП: email поставщика — только с галочкой согласия на рассылку (14.10.2026).
   // Email покупателя сюда НЕ отправляется: это данные третьего лица без согласия.
   kp: 'Коммерческое предложение (email с согласием на рассылку)',
+  // Счёт, АВР, накладная: тот же email продавца с галочкой согласия (15.10.2026).
+  // В сам бланк email не печатается; данные покупателя сюда НЕ отправляются.
+  schet: 'Счёт на оплату (email с согласием на рассылку)',
+  avr: 'АВР (email с согласием на рассылку)',
+  nakladnaya: 'Накладная (email с согласием на рассылку)',
 }
 
 const RATE_WINDOW_MS = 10 * 60 * 1000

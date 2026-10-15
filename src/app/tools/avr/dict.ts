@@ -25,6 +25,10 @@ export interface AvrDict {
   directorLabel: string
   directorPlaceholder: string
   addressLabel: string
+  /** Email продавца для рассылки — в документ НЕ печатается (только /api/tools/lead). */
+  emailLabel: string
+  marketingConsent: string
+  privacyLink: string
   phoneLabel: string
   customerTitle: string
   clientNameLabel: string
@@ -94,6 +98,9 @@ export const avrDict: Record<ToolLang, AvrDict> = {
     directorLabel: 'Руководитель',
     directorPlaceholder: 'для строки подписи',
     addressLabel: 'Адрес',
+    emailLabel: 'Ваш email (необязательно)',
+    marketingConsent: 'Присылать мне советы и новости invoices.kz на этот email (отписаться можно в любом письме).',
+    privacyLink: 'Политика конфиденциальности',
     phoneLabel: 'Телефон',
     customerTitle: 'Заказчик',
     clientNameLabel: 'Название заказчика *',
@@ -155,7 +162,7 @@ export const avrDict: Record<ToolLang, AvrDict> = {
       },
       {
         q: 'Куда сохраняются мои данные?',
-        a: 'Только в ваш браузер: черновик хранится на этом устройстве, чтобы не заполнять реквизиты заново. На наш сервер данные акта не отправляются — уходит только БИН/ИИН, если нажать «Найти».',
+        a: 'Только в ваш браузер: черновик хранится на этом устройстве, чтобы не заполнять реквизиты заново. На наш сервер данные акта не отправляются — уходит только БИН/ИИН, если нажать «Найти», и ваш email — если вы его указали и оставили галочку согласия на рассылку (советы и новости invoices.kz, отписаться можно в любом письме).',
       },
     ],
   },
@@ -183,6 +190,9 @@ export const avrDict: Record<ToolLang, AvrDict> = {
     directorLabel: 'Басшы',
     directorPlaceholder: 'қол қою жолы үшін',
     addressLabel: 'Мекенжай',
+    emailLabel: 'Сіздің email (міндетті емес)',
+    marketingConsent: 'Осы email-ге invoices.kz кеңестері мен жаңалықтарын жіберіп тұрыңыз (кез келген хаттан бас тартуға болады).',
+    privacyLink: 'Құпиялылық саясаты',
     phoneLabel: 'Телефон',
     customerTitle: 'Тапсырыс беруші',
     clientNameLabel: 'Тапсырыс берушінің атауы *',
@@ -244,7 +254,7 @@ export const avrDict: Record<ToolLang, AvrDict> = {
       },
       {
         q: 'Деректерім қайда сақталады?',
-        a: 'Тек сіздің браузеріңізде: деректемелерді қайта толтырмау үшін нобай осы құрылғыда сақталады. Акт деректері біздің серверге жіберілмейді — «Табу» батырмасын басқанда ғана БСН/ЖСН жіберіледі.',
+        a: 'Тек сіздің браузеріңізде: деректемелерді қайта толтырмау үшін нобай осы құрылғыда сақталады. Акт деректері біздің серверге жіберілмейді — «Табу» батырмасын басқанда ғана БСН/ЖСН жіберіледі, сондай-ақ сіздің email — егер оны көрсетіп, таратылымға келісім белгісін қалдырсаңыз (invoices.kz кеңестері мен жаңалықтары, кез келген хаттан бас тартуға болады).',
       },
     ],
   },
@@ -272,6 +282,9 @@ export const avrDict: Record<ToolLang, AvrDict> = {
     directorLabel: 'Director',
     directorPlaceholder: 'for the signature line',
     addressLabel: 'Address',
+    emailLabel: 'Your email (optional)',
+    marketingConsent: 'Send me invoices.kz tips and news at this email (unsubscribe from any email).',
+    privacyLink: 'Privacy policy',
     phoneLabel: 'Phone',
     customerTitle: 'Customer',
     clientNameLabel: 'Customer name *',
@@ -333,7 +346,7 @@ export const avrDict: Record<ToolLang, AvrDict> = {
       },
       {
         q: 'Where is my data stored?',
-        a: 'Only in your browser: the draft stays on this device so you don’t have to retype your details. Certificate data is never sent to our server — only the BIN/IIN, and only when you click “Find”.',
+        a: 'Only in your browser: the draft stays on this device so you don’t have to retype your details. Certificate data is never sent to our server — only the BIN/IIN when you click “Find”, plus your email if you entered it and left the newsletter consent box ticked (invoices.kz tips and news; unsubscribe from any email).',
       },
     ],
   },

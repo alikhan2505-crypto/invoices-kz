@@ -5,7 +5,7 @@ import { schetDict, schetFaqJsonLd } from './dict'
 import { documentRows, documentTotal, localToday, resolveBank, validateForm, vatIncluded, type Form } from './calc'
 
 const base: Form = {
-  companyName: 'ИП Тест', binIin: '123456789012', address: '', director: '', phone: '',
+  companyName: 'ИП Тест', binIin: '123456789012', address: '', director: '', phone: '', email: '',
   bankBik: 'CASPKZKA', otherBankName: '', otherBankBik: '', iik: 'KZ123456789012345678', kbe: '19',
   clientName: 'ТОО Клиент', clientBin: '210987654321',
   number: '1', date: '2026-10-14', dueDate: '', vatType: 'no_vat', note: '',
@@ -164,5 +164,21 @@ describe('schet validation', () => {
   it('returns errors in the page language', () => {
     expect(validateForm({ ...base, companyName: '' }, schetDict.kk.errors)).toBe(schetDict.kk.errors.company)
     expect(validateForm({ ...base, companyName: '' }, schetDict.en.errors)).toBe(schetDict.en.errors.company)
+  })
+})
+
+describe('schet marketing email', () => {
+  it('has the optional email label, consent text and privacy link in every language', () => {
+    for (const lang of TOOL_LANGS) {
+      const d = schetDict[lang]
+      expect(d.emailLabel, `${lang}.emailLabel`).toMatch(/email/i)
+      expect(d.marketingConsent, `${lang}.marketingConsent`).toMatch(/invoices\.kz/)
+      expect(d.privacyLink, `${lang}.privacyLink`).not.toBe('')
+      // FAQ «куда уходят данные» обязан честно упоминать email для рассылки.
+      expect(d.faq.some(q => /email/i.test(q.a)), `${lang}.faq mentions email`).toBe(true)
+    }
+    expect(schetDict.ru.emailLabel).toBe('Ваш email (необязательно)')
+    expect(schetDict.kk.emailLabel).toBe('Сіздің email (міндетті емес)')
+    expect(schetDict.en.emailLabel).toBe('Your email (optional)')
   })
 })

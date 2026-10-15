@@ -34,6 +34,10 @@ export interface SchetDict {
   directorLabel: string
   directorPlaceholder: string
   addressLabel: string
+  /** Email продавца для рассылки — в документ НЕ печатается (только /api/tools/lead). */
+  emailLabel: string
+  marketingConsent: string
+  privacyLink: string
   clientTitle: string
   clientNameLabel: string
   clientBinLabel: string
@@ -115,6 +119,9 @@ export const schetDict: Record<ToolLang, SchetDict> = {
     directorLabel: 'Руководитель',
     directorPlaceholder: 'для строки подписи',
     addressLabel: 'Адрес',
+    emailLabel: 'Ваш email (необязательно)',
+    marketingConsent: 'Присылать мне советы и новости invoices.kz на этот email (отписаться можно в любом письме).',
+    privacyLink: 'Политика конфиденциальности',
     clientTitle: 'Клиент — кому счёт',
     clientNameLabel: 'Название клиента *',
     clientBinLabel: 'БИН / ИИН клиента *',
@@ -175,7 +182,7 @@ export const schetDict: Record<ToolLang, SchetDict> = {
       },
       {
         q: 'Куда сохраняются мои данные?',
-        a: 'Реквизиты и позиции хранятся только в вашем браузере — чтобы не заполнять их заново для следующего счёта. Сам счёт формируется на этом устройстве и на наш сервер не отправляется. На сервер уходит только БИН/ИИН, и только если нажать «Найти».',
+        a: 'Реквизиты и позиции хранятся только в вашем браузере — чтобы не заполнять их заново для следующего счёта. Сам счёт формируется на этом устройстве и на наш сервер не отправляется. На сервер уходит только БИН/ИИН (если нажать «Найти») и ваш email — если вы его указали и оставили галочку согласия на рассылку: тогда мы присылаем советы и новости invoices.kz, отписаться можно в любом письме.',
       },
     ],
   },
@@ -212,6 +219,9 @@ export const schetDict: Record<ToolLang, SchetDict> = {
     directorLabel: 'Басшы',
     directorPlaceholder: 'қол қою жолы үшін',
     addressLabel: 'Мекенжай',
+    emailLabel: 'Сіздің email (міндетті емес)',
+    marketingConsent: 'Осы email-ге invoices.kz кеңестері мен жаңалықтарын жіберіп тұрыңыз (кез келген хаттан бас тартуға болады).',
+    privacyLink: 'Құпиялылық саясаты',
     clientTitle: 'Клиент — шот кімге',
     clientNameLabel: 'Клиенттің атауы *',
     clientBinLabel: 'Клиенттің БСН / ЖСН *',
@@ -272,7 +282,7 @@ export const schetDict: Record<ToolLang, SchetDict> = {
       },
       {
         q: 'Деректерім қайда сақталады?',
-        a: 'Деректемелер мен позициялар тек сіздің браузеріңізде сақталады — келесі шот үшін қайта толтырмау үшін. Шот осы құрылғыда жасалады және біздің серверге жіберілмейді. «Табу» батырмасын басқанда ғана серверге БСН/ЖСН жіберіледі.',
+        a: 'Деректемелер мен позициялар тек сіздің браузеріңізде сақталады — келесі шот үшін қайта толтырмау үшін. Шот осы құрылғыда жасалады және біздің серверге жіберілмейді. Серверге тек БСН/ЖСН («Табу» батырмасын басқанда) және сіздің email жіберіледі — егер оны көрсетіп, таратылымға келісім белгісін қалдырсаңыз: сонда біз invoices.kz кеңестері мен жаңалықтарын жібереміз, кез келген хаттан бас тартуға болады.',
       },
     ],
   },
@@ -309,6 +319,9 @@ export const schetDict: Record<ToolLang, SchetDict> = {
     directorLabel: 'Director',
     directorPlaceholder: 'for the signature line',
     addressLabel: 'Address',
+    emailLabel: 'Your email (optional)',
+    marketingConsent: 'Send me invoices.kz tips and news at this email (unsubscribe from any email).',
+    privacyLink: 'Privacy policy',
     clientTitle: 'Client — who the invoice is for',
     clientNameLabel: 'Client name *',
     clientBinLabel: 'Client BIN / IIN *',
@@ -369,7 +382,7 @@ export const schetDict: Record<ToolLang, SchetDict> = {
       },
       {
         q: 'Where is my data stored?',
-        a: 'Your details and items stay only in your browser, so you don’t have to retype them for the next invoice. The invoice itself is built on this device and is not sent to our server. Only the BIN/IIN is sent to the server, and only when you click “Find”.',
+        a: 'Your details and items stay only in your browser, so you don’t have to retype them for the next invoice. The invoice itself is built on this device and is not sent to our server. Only the BIN/IIN (when you click “Find”) and your email are sent to the server — the email only if you entered it and left the newsletter consent box ticked, so we can send you invoices.kz tips and news; you can unsubscribe from any email.',
       },
     ],
   },

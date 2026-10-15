@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import BrandWordmark from '@/components/BrandWordmark'
 import { track } from '@vercel/analytics'
@@ -29,11 +29,15 @@ import { TOOL_UNITS, DEFAULT_UNIT, UNIT_LABELS, unitAria } from '@/lib/tools-i18
 const LIMIT = 3
 const COUNT_KEY = 'tool-schet-count'
 const DRAFT_KEY = 'tool-schet-draft'
+// Снятая галочка рассылки хранится отдельно от черновика: email из черновика
+// возвращается после перезагрузки, и без этого ключа галочка вставала бы
+// обратно — следующий документ отправил бы email вопреки отказу.
+const CONSENT_KEY = 'tool-schet-consent'
 
 // Дата заполняется на клиенте после монтирования: сервер и браузер живут в
 // разных часовых поясах, а модуль на сервере может жить сутками.
 const EMPTY: Form = {
-  companyName: '', binIin: '', address: '', director: '', phone: '',
+  companyName: '', binIin: '', address: '', director: '', phone: '', email: '',
   bankBik: '', otherBankName: '', otherBankBik: '', iik: '', kbe: '19',
   clientName: '', clientBin: '',
   number: '1', date: '', dueDate: '',
@@ -75,6 +79,7 @@ export default function SchetTool({ lang }: { lang: ToolLang }) {
   // причина бросить такой инструмент на середине.
   useEffect(() => {
     setUsed(readCount())
+    try { if (localStorage.getItem(CONSENT_KEY) === '0') setMarketingConsent(false) } catch {}
     let draft: Partial<Form> | null = null
     try {
       const raw = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null')
@@ -99,6 +104,19 @@ export default function SchetTool({ lang }: { lang: ToolLang }) {
   }, [f, ready])
 
   const set = (patch: Partial<Form>) => setF(prev => ({ ...prev, ...patch }))
+  // Согласие на рассылку для email продавца — галочка стоит по умолчанию
+  // (решение основателя 14.10.2026, как в /tools/kp); снять можно здесь и по
+  // ссылке «Отписаться» в любом письме (политика конфиденциальности).
+  const [marketingConsent, setMarketingConsent] = useState(true)
+  const changeConsent = (on: boolean) => {
+    setMarketingConsent(on)
+    try { localStorage.setItem(CONSENT_KEY, on ? '1' : '0') } catch {}
+  }
+  // Пока документ собирается (generate асинхронный), второй клик игнорируем:
+  // иначе двойной клик открыл бы два окна, списал две попытки и дважды
+  // записал email. Ref — чтобы защита не зависела от перерисовки.
+  const [generating, setGenerating] = useState(false)
+  const busy = useRef(false)
   const setRow = (i: number, patch: Partial<Row>) =>
     setF(prev => ({ ...prev, rows: prev.rows.map((r, j) => (j === i ? { ...r, ...patch } : r)) }))
 
@@ -109,7 +127,7 @@ export default function SchetTool({ lang }: { lang: ToolLang }) {
   const limitReached = used >= LIMIT
 
   const generate = async () => {
-    if (limitReached) return
+    if (limitReached || busy.current) return
     const problem = validateForm(f, t.errors)
     setError(problem)
     if (problem) return
@@ -122,34 +140,52 @@ export default function SchetTool({ lang }: { lang: ToolLang }) {
       track('tool_schet_popup_blocked', { lang })
       return
     }
+    busy.current = true
+    setGenerating(true)
     track('tool_schet_generate', { lang })
-    const bank = resolveBank(f)
-    const html = await generateInvoicePDF({
-      number: f.number.trim() || '1',
-      date: ruDate(f.date || localToday()),
-      clientName: f.clientName.trim(),
-      clientBin: digits(f.clientBin),
-      clientEmail: '',
-      services: documentRows(f.rows),
-      total,
-      note: f.note.trim() || undefined,
-      vatType: f.vatType,
-      dueDate: f.dueDate ? ruDate(f.dueDate) : undefined,
-      profile: {
-        company_name: f.companyName.trim(),
-        bin_iin: digits(f.binIin),
-        address: f.address.trim(),
-        director_name: f.director.trim(),
-        phone: f.phone.trim() || undefined,
-      },
-      bank: { bank_name: bank.name, iik: f.iik.trim().toUpperCase(), bik: bank.bik, kbe: f.kbe.trim() || '19' },
-      showWatermark: true,
-    })
-    win.document.write(html)
-    win.document.close()
-    const n = bumpCount()
-    setUsed(n)
-    if (n >= LIMIT) track('tool_schet_limit', { lang })
+    try {
+      const bank = resolveBank(f)
+      const html = await generateInvoicePDF({
+        number: f.number.trim() || '1',
+        date: ruDate(f.date || localToday()),
+        clientName: f.clientName.trim(),
+        clientBin: digits(f.clientBin),
+        clientEmail: '',
+        services: documentRows(f.rows),
+        total,
+        note: f.note.trim() || undefined,
+        vatType: f.vatType,
+        dueDate: f.dueDate ? ruDate(f.dueDate) : undefined,
+        profile: {
+          company_name: f.companyName.trim(),
+          bin_iin: digits(f.binIin),
+          address: f.address.trim(),
+          director_name: f.director.trim(),
+          phone: f.phone.trim() || undefined,
+        },
+        bank: { bank_name: bank.name, iik: f.iik.trim().toUpperCase(), bik: bank.bik, kbe: f.kbe.trim() || '19' },
+        showWatermark: true,
+      })
+      win.document.write(html)
+      win.document.close()
+      // Email продавца — в базу контактов только с согласием и только после того,
+      // как документ открылся. Данные покупателя не отправляются никогда. Ошибка
+      // записи документу не мешает. Сам email в бланк не печатается.
+      const email = f.email.trim()
+      if (marketingConsent && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        fetch('/api/tools/lead', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tool: 'schet', contact: email }),
+        }).catch(() => {})
+      }
+      const n = bumpCount()
+      setUsed(n)
+      if (n >= LIMIT) track('tool_schet_limit', { lang })
+    } finally {
+      busy.current = false
+      setGenerating(false)
+    }
   }
 
   // Клик в регистрацию запоминает язык страницы — /login откроется на нём же.
@@ -237,6 +273,14 @@ export default function SchetTool({ lang }: { lang: ToolLang }) {
             <div className="sm:col-span-2">
               <label htmlFor="sc-address" className={label} style={labelStyle}>{t.addressLabel}</label>
               <input id="sc-address" className={input} style={inputStyle} autoComplete="street-address" value={f.address} onChange={e => set({ address: e.target.value })} />
+            </div>
+            <div>
+              <label htmlFor="sc-email" className={label} style={labelStyle}>{t.emailLabel}</label>
+              <input id="sc-email" type="email" className={input} style={inputStyle} autoComplete="email" value={f.email} onChange={e => set({ email: e.target.value })} />
+              <label className="flex items-start gap-2 mt-1.5 text-[11px] cursor-pointer" style={{ color: 'var(--nav-text-muted)' }}>
+                <input type="checkbox" className="mt-0.5 w-3.5 h-3.5 accent-[#5B4CE0] flex-shrink-0" checked={marketingConsent} onChange={e => changeConsent(e.target.checked)} />
+                <span>{t.marketingConsent}{' '}<a href="https://invoices.kz/privacy" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--nav-accent)' }}>{t.privacyLink}</a></span>
+              </label>
             </div>
           </div>
         </div>
@@ -338,8 +382,8 @@ export default function SchetTool({ lang }: { lang: ToolLang }) {
           </div>
         ) : (
           <div className="mb-4">
-            <button type="button" onClick={generate}
-              className="w-full sm:w-auto rounded-xl px-8 py-3.5 text-sm font-semibold transition-transform hover:-translate-y-0.5"
+            <button type="button" onClick={generate} disabled={generating} aria-busy={generating}
+              className="w-full sm:w-auto rounded-xl px-8 py-3.5 text-sm font-semibold transition-transform hover:-translate-y-0.5 disabled:opacity-60 disabled:hover:translate-y-0"
               style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
               {t.generate}
             </button>

@@ -16,6 +16,8 @@ export type Row = { name: string; qty: string; unit?: string; price: string }
 
 export type Form = {
   companyName: string; binIin: string; address: string; director: string; phone: string
+  /** Email продавца для рассылки invoices.kz (только с галочкой согласия) — в документ НЕ печатается. */
+  email: string
   bankBik: string; otherBankName: string; otherBankBik: string; iik: string; kbe: string
   clientName: string; clientBin: string
   number: string; date: string; dueDate: string
