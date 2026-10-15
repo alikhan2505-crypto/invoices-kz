@@ -2,7 +2,7 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import BrandWordmark from '@/components/BrandWordmark'
-import { FEATURES_HREF } from '@/lib/rootHub'
+import { PRODUCTS } from '@/lib/products'
 import { motion, useReducedMotion } from 'framer-motion'
 import { track } from '@vercel/analytics'
 import * as XLSX from 'xlsx'
@@ -14,6 +14,10 @@ import ToolLangSwitch from '@/lib/tools-i18n/ToolLangSwitch'
 import ToolCta from '@/lib/tools-i18n/ToolCta'
 import { marginDict, type MarginFieldKey } from './dict'
 import { formatPercent, parseAmount } from './numbers'
+
+const KASPI_BOT_LANDING =
+  (PRODUCTS.find(p => p.key === 'kaspiShop')?.landing ?? 'https://kaspi.invoices.kz') +
+  '/?utm_source=tools&utm_medium=cta&utm_campaign=margin'
 
 // Один и тот же калькулятор для /tools/margin, /tools/kk/margin и
 // /tools/en/margin: язык приходит пропсом из page.tsx (то есть из адреса), а
@@ -434,11 +438,13 @@ export default function MarginTool({ lang }: { lang: ToolLang }) {
                 {t.ctaBody(money(result.breakEvenPrice))}
               </p>
               {/* Clicking through to the product remembers the page language,
-                  so the landing (another subdomain, shared cookie) opens in it. */}
-              <Link href={FEATURES_HREF} onClick={() => { setLang(lang); track('margin_to_product', { lang }) }}
+                  so the landing (another subdomain, shared cookie) opens in it.
+                  Ведёт на лендинг Kaspi Bot, а не на #features лендинга счетов
+                  (правка основателя 15.10.2026), как в склейке накладных. */}
+              <a href={KASPI_BOT_LANDING} onClick={() => { setLang(lang); track('margin_to_product', { lang }) }}
                 className="text-sm font-semibold" style={{ color: 'var(--nav-accent)' }}>
                 {t.ctaLink}
-              </Link>
+              </a>
             </div>
           )}
 
