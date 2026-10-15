@@ -416,6 +416,11 @@ html {
   --nav-magenta-soft: rgba(178, 58, 112, 0.14);
   --nav-success: #12946B;
   --nav-success-soft: rgba(18, 148, 107, 0.12);
+  /* Solid success fill + the ink that reads on it (WCAG AA for 14px text):
+     light darkens the fill under white (5.3:1), dark keeps the bright fill
+     under near-black ink (9.5:1) -- white on #3ED598 was 1.9:1. */
+  --nav-success-solid: #0E7A58;
+  --nav-success-ink: #FFFFFF;
   --nav-critical: #DC2626;
   --nav-text-primary: #14162A;
   --nav-text-secondary: #565C7E;
@@ -462,6 +467,8 @@ html {
     --nav-magenta-soft: rgba(206, 76, 134, 0.24);
     --nav-success: #3ED598;
     --nav-success-soft: rgba(62, 213, 152, 0.18);
+    --nav-success-solid: #3ED598;
+    --nav-success-ink: #14162A;
     --nav-critical: #F87171;
     --nav-text-primary: #F2F3FA;
     --nav-text-secondary: #A6ACC9;
@@ -504,6 +511,8 @@ html {
   --nav-magenta-soft: rgba(206, 76, 134, 0.24);
   --nav-success: #3ED598;
   --nav-success-soft: rgba(62, 213, 152, 0.18);
+  --nav-success-solid: #3ED598;
+  --nav-success-ink: #14162A;
   --nav-critical: #F87171;
   --nav-text-primary: #F2F3FA;
   --nav-text-secondary: #A6ACC9;
@@ -544,6 +553,8 @@ html {
   --nav-magenta-soft: rgba(178, 58, 112, 0.14);
   --nav-success: #12946B;
   --nav-success-soft: rgba(18, 148, 107, 0.12);
+  --nav-success-solid: #0E7A58;
+  --nav-success-ink: #FFFFFF;
   --nav-critical: #DC2626;
   --nav-text-primary: #14162A;
   --nav-text-secondary: #565C7E;

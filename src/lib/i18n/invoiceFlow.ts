@@ -221,6 +221,23 @@ export interface InvoiceFlowContent {
   fillAllServicesAlert: string
   savingButtonLabel: string
   saveChangesButton: string
+
+  // /create: readiness indicator, registry check mark, success card (15.10.2026)
+  readinessAriaLabel: string
+  readinessClient: string
+  readinessItems: string
+  readinessReady: string
+  readinessStepDone: string
+  readinessStepTodo: string
+  binVerifiedLabel: string
+  createdTitle: (invoiceNumber: string) => string
+  createdSubtitle: string
+  createdDownloadPdf: string
+  createdSendWhatsApp: string
+  createdCopyLink: string
+  createdLinkCopied: string
+  createdOpenInvoice: string
+  createdCreateAnother: string
 }
 
 export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
@@ -452,6 +469,22 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     fillAllServicesAlert: 'Заполните все услуги',
     savingButtonLabel: 'Сохраняем...',
     saveChangesButton: '💾 Сохранить изменения',
+
+    readinessAriaLabel: 'Готовность счёта',
+    readinessClient: 'Клиент',
+    readinessItems: 'Позиции',
+    readinessReady: 'Готово',
+    readinessStepDone: 'заполнено',
+    readinessStepTodo: 'не заполнено',
+    binVerifiedLabel: 'Название из госреестра',
+    createdTitle: (invoiceNumber: string) => `Счёт №${invoiceNumber} готов`,
+    createdSubtitle: 'Отправьте его клиенту или скачайте PDF.',
+    createdDownloadPdf: 'Скачать PDF',
+    createdSendWhatsApp: 'Отправить в WhatsApp',
+    createdCopyLink: 'Скопировать ссылку',
+    createdLinkCopied: 'Ссылка скопирована',
+    createdOpenInvoice: 'Открыть счёт',
+    createdCreateAnother: 'Создать ещё',
   },
   kk: {
     errorPrefix: (message: string) => `Қате: ${message}`,
@@ -680,6 +713,22 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     fillAllServicesAlert: 'Барлық қызметтерді толтырыңыз',
     savingButtonLabel: 'Сақталуда...',
     saveChangesButton: '💾 Өзгерістерді сақтау',
+
+    readinessAriaLabel: 'Шоттың дайындығы',
+    readinessClient: 'Клиент',
+    readinessItems: 'Позициялар',
+    readinessReady: 'Дайын',
+    readinessStepDone: 'толтырылған',
+    readinessStepTodo: 'толтырылмаған',
+    binVerifiedLabel: 'Атауы мемлекеттік тізілімнен алынды',
+    createdTitle: (invoiceNumber: string) => `№${invoiceNumber} шот дайын`,
+    createdSubtitle: 'Оны клиентке жіберіңіз немесе PDF күйінде жүктеп алыңыз.',
+    createdDownloadPdf: 'PDF жүктеу',
+    createdSendWhatsApp: 'WhatsApp-қа жіберу',
+    createdCopyLink: 'Сілтемені көшіру',
+    createdLinkCopied: 'Сілтеме көшірілді',
+    createdOpenInvoice: 'Шотты ашу',
+    createdCreateAnother: 'Тағы біреуін жасау',
   },
   en: {
     errorPrefix: (message: string) => `Error: ${message}`,
@@ -909,5 +958,21 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     fillAllServicesAlert: 'Fill in all services',
     savingButtonLabel: 'Saving...',
     saveChangesButton: '💾 Save changes',
+
+    readinessAriaLabel: 'Invoice readiness',
+    readinessClient: 'Client',
+    readinessItems: 'Items',
+    readinessReady: 'Ready',
+    readinessStepDone: 'filled in',
+    readinessStepTodo: 'not filled in',
+    binVerifiedLabel: 'Name from the state register',
+    createdTitle: (invoiceNumber: string) => `Invoice No. ${invoiceNumber} is ready`,
+    createdSubtitle: 'Send it to your client or download the PDF.',
+    createdDownloadPdf: 'Download PDF',
+    createdSendWhatsApp: 'Send via WhatsApp',
+    createdCopyLink: 'Copy link',
+    createdLinkCopied: 'Link copied',
+    createdOpenInvoice: 'Open invoice',
+    createdCreateAnother: 'Create another',
   },
 }

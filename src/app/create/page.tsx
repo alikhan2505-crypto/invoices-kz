@@ -1,12 +1,15 @@
 'use client'
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, type RefObject } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
-import { motion, useReducedMotion } from 'framer-motion'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { generateInvoicePDF } from '@/lib/generatePDF'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
-import InvoiceLivePreview from '@/components/InvoiceLivePreview'
+import InvoiceLivePreview, { type PreviewHighlight } from '@/components/InvoiceLivePreview'
+import { useTweenedNumber } from '@/components/useTweenedNumber'
+import { computeInvoiceReadiness } from '@/lib/invoiceReadiness'
 import { cacheGet, cacheSet } from '@/lib/cache'
 import { getActivePlan } from '@/lib/plan'
 import { almatyMonthStart, invoiceLimitWindow, checkInvoiceLimit, invoicesLeft, isInvoiceLimitError, invoiceLimitFromError } from '@/lib/invoiceLimit'
@@ -55,6 +58,199 @@ function PeopleIcon() {
       <path d="M15 13.7c2.7.5 4.5 2.4 4.5 5.3" />
     </svg>
   )
+}
+
+function CheckIcon({ size = 12, strokeWidth = 3 }: { size?: number; strokeWidth?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M5 12.5 10 17.5 19 7" />
+    </svg>
+  )
+}
+
+function DownloadIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 4v11" /><path d="m7 10.5 5 5 5-5" /><path d="M5 19.5h14" />
+    </svg>
+  )
+}
+
+function ChatIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20 11.5a8 8 0 0 1-11.8 7L4 19.6l1.2-4A8 8 0 1 1 20 11.5Z" />
+    </svg>
+  )
+}
+
+function LinkIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1" />
+      <path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1" />
+    </svg>
+  )
+}
+
+function DocIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M14 3.5H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.5Z" /><path d="M14 3.5v5h5" /><path d="M9 13h6M9 16.5h4" />
+    </svg>
+  )
+}
+
+function PlusIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  )
+}
+
+/** A money figure on the app's own surfaces that counts to each new value. */
+function TweenedMoney({ value }: { value: number }) {
+  const shown = useTweenedNumber(value)
+  // At rest it prints the value exactly as this block always did (no rounding
+  // of a fractional quantity's kopecks); only in-between frames are whole.
+  return <>{(shown === value ? value : Math.round(shown)).toLocaleString('ru-KZ')} ₸</>
+}
+
+/**
+ * The company name the register just put into the field, "typed" in letter by
+ * letter over the real input for a moment. Purely an overlay: the field's
+ * value is already the full name from the first frame (so a submit mid-way, a
+ * draft or the preview all see the real text), the input's own text is only
+ * made transparent underneath while this plays.
+ *
+ * The overlay copies the input's computed text colour, font and left inset
+ * instead of assuming them: globals.css paints input text with
+ * -webkit-text-fill-color (with !important in the dark theme) and floors
+ * inputs at 16px on phones, so a hard-coded copy would jump on hand-off.
+ * For the same reason the input is hidden with an inline !important, the
+ * only thing that outranks those rules; both are undone on unmount.
+ */
+function RegistryTypeIn({ text, inputRef, onDone }: { text: string; inputRef: RefObject<HTMLInputElement | null>; onDone: () => void }) {
+  const chars = Array.from(text)
+  const step = Math.min(0.018, 0.42 / Math.max(chars.length, 1))
+  const overlayRef = useRef<HTMLSpanElement>(null)
+  useLayoutEffect(() => {
+    const input = inputRef.current
+    const overlay = overlayRef.current
+    if (!input || !overlay) return
+    const cs = getComputedStyle(input)
+    overlay.style.color = cs.getPropertyValue('-webkit-text-fill-color') || cs.color
+    overlay.style.font = cs.font
+    overlay.style.fontSize = cs.fontSize
+    overlay.style.fontFamily = cs.fontFamily
+    overlay.style.left = (parseFloat(cs.borderLeftWidth) || 0) + (parseFloat(cs.paddingLeft) || 0) + 'px'
+    input.style.setProperty('-webkit-text-fill-color', 'transparent', 'important')
+    input.style.setProperty('color', 'transparent', 'important')
+    return () => {
+      input.style.removeProperty('-webkit-text-fill-color')
+      input.style.removeProperty('color')
+    }
+  }, [inputRef])
+  return (
+    <span ref={overlayRef} aria-hidden="true"
+      className="pointer-events-none absolute inset-y-0 left-[13px] right-9 flex items-center overflow-hidden whitespace-pre text-sm">
+      {chars.map((ch, i) => (
+        <motion.span key={i}
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+          transition={{ duration: 0.12, delay: i * step }}
+          onAnimationComplete={i === chars.length - 1 ? onDone : undefined}>
+          {ch}
+        </motion.span>
+      ))}
+    </span>
+  )
+}
+
+/**
+ * «Клиент → Позиции → Готово»: each step's circle fills with a check as the
+ * form's own required fields become valid (see computeInvoiceReadiness).
+ * Fixed-size circles and connectors -- filling them never moves anything.
+ */
+function ReadinessSteps({ client, items, ready, reduceMotion, labels }: {
+  client: boolean; items: boolean; ready: boolean; reduceMotion: boolean
+  labels: { aria: string; client: string; items: string; ready: string; done: string; todo: string }
+}) {
+  const steps = [
+    { label: labels.client, done: client },
+    { label: labels.items, done: items },
+    { label: labels.ready, done: ready },
+  ]
+  const tween = { duration: reduceMotion ? 0 : 0.28, ease: EASE }
+  // Polite announcement of whichever steps just flipped («Клиент: заполнено»).
+  // Derived during render from the previous flags (React's "adjust state when
+  // a prop changes" pattern) -- nothing is said on mount, and the list itself
+  // stays non-live so it does not chatter on every keystroke.
+  const [prevFlags, setPrevFlags] = useState({ client, items, ready })
+  const [announcement, setAnnouncement] = useState('')
+  if (prevFlags.client !== client || prevFlags.items !== items || prevFlags.ready !== ready) {
+    const before = [prevFlags.client, prevFlags.items, prevFlags.ready]
+    const changed = steps.filter((step, i) => before[i] !== step.done)
+    setPrevFlags({ client, items, ready })
+    setAnnouncement(changed.map(step => `${step.label}: ${step.done ? labels.done : labels.todo}`).join('. '))
+  }
+  return (
+    <>
+    <span role="status" aria-live="polite" className="sr-only">{announcement}</span>
+    <ol aria-label={labels.aria} className="flex items-center gap-2 mb-3 px-1">
+      {steps.map((step, i) => (
+        <li key={i} className={'flex items-center gap-2 min-w-0 ' + (i < steps.length - 1 ? 'flex-1' : '')}>
+          <span className="relative w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center text-[10px] font-semibold"
+            style={{ border: '1.5px solid var(--nav-border)', color: 'var(--nav-text-secondary)' }}>
+            {i + 1}
+            <motion.span aria-hidden="true"
+              className="absolute -inset-[1.5px] rounded-full flex items-center justify-center"
+              style={{ background: 'var(--nav-success-solid, var(--nav-success))', color: 'var(--nav-success-ink, #fff)' }}
+              initial={false}
+              animate={step.done ? { opacity: 1, scale: 1 } : { opacity: 0, scale: reduceMotion ? 1 : 0.5 }}
+              transition={tween}>
+              <CheckIcon size={11} strokeWidth={3.2} />
+            </motion.span>
+          </span>
+          <span className="text-xs font-medium whitespace-nowrap transition-colors"
+            style={{ color: step.done ? 'var(--nav-text-primary)' : 'var(--nav-text-secondary)', transitionDuration: reduceMotion ? '0ms' : '200ms' }}>
+            {step.label}
+            <span className="sr-only">: {step.done ? labels.done : labels.todo}</span>
+          </span>
+          {i < steps.length - 1 && (
+            <span aria-hidden="true" className="relative flex-1 min-w-3 h-[2px] rounded-full overflow-hidden" style={{ background: 'var(--nav-border-soft)' }}>
+              <motion.span className="absolute inset-0 origin-left rounded-full" style={{ background: 'var(--nav-success)' }}
+                initial={false}
+                animate={{ scaleX: step.done ? 1 : 0 }}
+                transition={tween} />
+            </span>
+          )}
+        </li>
+      ))}
+    </ol>
+    </>
+  )
+}
+
+/**
+ * Keyboard handling for this page's own modal dialogs (success card,
+ * signature choice): Tab / Shift+Tab wrap inside the dialog instead of
+ * walking out to the form behind the backdrop, and Escape runs `onEscape`.
+ * Bound with onKeyDown on the dialog, so AppDialog's alerts -- their own
+ * portal, not children of these dialogs in the React tree -- are untouched.
+ */
+function dialogKeyDown(e: React.KeyboardEvent<HTMLElement>, onEscape: () => void) {
+  if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); onEscape(); return }
+  if (e.key !== 'Tab') return
+  const nodes = Array.from(e.currentTarget.querySelectorAll<HTMLElement>(
+    'button:not([disabled]), a[href], input:not([disabled]), [tabindex]:not([tabindex="-1"])'))
+  if (!nodes.length) return
+  const first = nodes[0]
+  const last = nodes[nodes.length - 1]
+  const active = document.activeElement
+  const inside = !!active && e.currentTarget.contains(active)
+  if (e.shiftKey && (active === first || !inside)) { e.preventDefault(); last.focus() }
+  else if (!e.shiftKey && (active === last || !inside)) { e.preventDefault(); first.focus() }
 }
 
 export default function CreateInvoicePage() {
@@ -109,6 +305,28 @@ export default function CreateInvoicePage() {
   const [clientBin, setClientBin] = useState('')
   const { binLookup, lookupBin, resetBinLookup } = useBinLookup()
 
+  // The name the state register last put into «Название», for the БИН it
+  // belongs to. Drives the green check beside the field: it shows only while
+  // the field still holds exactly that name under exactly that БИН, so editing
+  // either one takes the check away -- it vouches for the register's text,
+  // not for whatever is typed there afterwards.
+  const [registryName, setRegistryName] = useState<{ bin: string; name: string } | null>(null)
+  // A fresh registry fill to "type in" over the field once (see RegistryTypeIn).
+  // `n` re-keys the overlay so a second «Проверить» replays it.
+  const [typeIn, setTypeIn] = useState<{ name: string; n: number } | null>(null)
+  const clientNameInputRef = useRef<HTMLInputElement>(null)
+  // Backstop: the overlay hides the input's own text while it plays, so it
+  // must end even if its completion callback never arrives.
+  useEffect(() => {
+    if (!typeIn) return
+    const id = setTimeout(() => setTypeIn(null), 1500)
+    return () => clearTimeout(id)
+  }, [typeIn])
+  function markRegistryFill(bin: string, name: string) {
+    setRegistryName({ bin, name })
+    if (!reduceMotion && name) setTypeIn(prev => ({ name, n: (prev?.n ?? 0) + 1 }))
+  }
+
   // The БИН these client fields currently describe. Empty when they were
   // typed by hand rather than filled from a lookup.
   const appliedBinRef = useRef('')
@@ -148,6 +366,7 @@ export default function CreateInvoicePage() {
     appliedBinRef.current = bin
     setClientName(company.name)
     setClientAddress(company.address || '')
+    markRegistryFill(bin, company.name)
   }
 
   /** Fills the client fields from a registry answer. */
@@ -159,6 +378,9 @@ export default function CreateInvoicePage() {
     // survives, which is the case the rule was written for.
     setClientName(prev => prev.trim() ? prev : company.name)
     setClientAddress(prev => prev.trim() ? prev : (company.address || ''))
+    // Check mark and type-in render only while the field equals this name,
+    // so a hand-typed name that survived the rule above gets neither.
+    markRegistryFill(bin, company.name)
   }
   const [clientEmail, setClientEmail] = useState('')
   const [clientAddress, setClientAddress] = useState('')
@@ -176,7 +398,24 @@ export default function CreateInvoicePage() {
   const dueDateTouched = useRef(false)
   const [clientKnp, setClientKnp] = useState('849')
   const [note, setNote] = useState('')
-  const [services, setServices] = useState<any[]>([{ name: '', qty: 1, price: 0, unit: 'шт', code: '', type: 'service' }])
+  const [services, setServicesState] = useState<any[]>([{ name: '', qty: 1, price: 0, unit: 'шт', code: '', type: 'service' }])
+  // A stable React key per line, kept beside `services` rather than inside
+  // it: `services` is inserted into the invoice row verbatim, and a UI-only id
+  // must not end up in the database. Positional keys made the enter animation
+  // (form and live preview alike) play on the last row when «+ Добавить»
+  // inserted a new line at the top.
+  const keySeq = useRef(1)
+  const [serviceKeys, setServiceKeys] = useState<string[]>(['svc-0'])
+  const newServiceKey = () => 'svc-' + keySeq.current++
+  /** Replaces the whole list (prefill, draft, reset): every line gets a fresh key. */
+  const setServices = useCallback((next: typeof services) => {
+    setServicesState(next)
+    setServiceKeys(next.map(() => 'svc-' + keySeq.current++))
+  }, [])
+  // Which part of the live preview mirrors the field in focus.
+  const [previewFocus, setPreviewFocus] = useState<PreviewHighlight>(null)
+  const focusPreview = (h: PreviewHighlight) => () => setPreviewFocus(h)
+  const blurPreview = () => setPreviewFocus(null)
 
   // load() re-runs on every window focus, not just on mount, so a parked draft
   // has to be restored exactly once -- otherwise switching to another tab and
@@ -203,6 +442,15 @@ export default function CreateInvoicePage() {
   const vatType = profile?.vat_type || 'no_vat'
   const vatAmount = vatType === 'vat_16' ? Math.round(total - total / 1.16) : 0
   const totalWithoutVat = vatType === 'vat_16' ? Math.round(total / 1.16) : total
+  // Same rules createInvoice() enforces, from the same function -- the
+  // indicator can never call a form ready that the button would then refuse.
+  const readiness = computeInvoiceReadiness({ clientName, clientBin, services })
+
+  // After creation: the success card, and the button inside it that copied
+  // the public link (shows «Ссылка скопирована» for a moment).
+  const [showCreatedCard, setShowCreatedCard] = useState(false)
+  const [linkCopied, setLinkCopied] = useState(false)
+  const createdCardRef = useRef<HTMLDivElement>(null)
 
   const load = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -407,7 +655,7 @@ export default function CreateInvoicePage() {
         // editable fields they were last looking at.
       }
     }
-  }, [router])
+  }, [router, setServices])
 
   useEffect(() => {
     load()
@@ -484,6 +732,10 @@ export default function CreateInvoicePage() {
     setContractDate('')
     setClientKnp('849')
     setClientSelected(false)
+    // The БИН field is empty now, so no lookup describes these fields any
+    // more. Left set, the first digit typed into the empty БИН would make
+    // clearClientFields() wipe a name/email/phone typed by hand after this.
+    appliedBinRef.current = ''
     setDueDate(computeDefaultDueDate(todayDateString(), profile?.default_due_days))
     dueDateTouched.current = false
     // Same reason as in selectClient(): the БИН field is now empty, so any
@@ -494,25 +746,31 @@ export default function CreateInvoicePage() {
   function selectService(svc: any) {
     const exists = services.find(s => s.name === svc.name)
     if (exists) { setShowServicePicker(false); return }
-    const updated = services[0].name === '' ? [] : [...services]
-    setServices([...updated, { name: svc.name, qty: 1, price: svc.price, unit: svc.unit || 'шт', code: svc.code || '', type: 'service' }])
+    const dropFirst = services[0].name === ''
+    const updated = dropFirst ? [] : [...services]
+    setServicesState([...updated, { name: svc.name, qty: 1, price: svc.price, unit: svc.unit || 'шт', code: svc.code || '', type: 'service' }])
+    setServiceKeys(prev => [...(dropFirst ? [] : prev), newServiceKey()])
     setShowServicePicker(false)
   }
 
   function addService() {
-    setServices([{ name: '', qty: 1, price: 0, unit: 'шт', code: '', type: 'service' }, ...services])
+    setServicesState([{ name: '', qty: 1, price: 0, unit: 'шт', code: '', type: 'service' }, ...services])
+    setServiceKeys(prev => [newServiceKey(), ...prev])
     setTimeout(() => {
       const el = document.getElementById('services-list')
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }, 100)
   }
 
-  function removeService(idx: number) { setServices(services.filter((_, i) => i !== idx)) }
+  function removeService(idx: number) {
+    setServicesState(services.filter((_, i) => i !== idx))
+    setServiceKeys(prev => prev.filter((_, i) => i !== idx))
+  }
 
   function updateService(idx: number, field: string, value: any) {
     const updated = [...services]
     updated[idx] = { ...updated[idx], [field]: value }
-    setServices(updated)
+    setServicesState(updated)
   }
 
   async function saveClientToDirectory() {
@@ -570,13 +828,14 @@ export default function CreateInvoicePage() {
       return
     }
 
-    if (!clientName) { alert(t.enterClientNameAlert); return }
-    if (!clientBin) { alert(t.enterClientBinAlert); return }
-    if (services.length === 0 || services.some(s => !s.name)) {
-      alert(t.addAtLeastOneServiceAlert); return
-    }
-    if (services.some(s => s.price === 0)) {
-      alert(t.specifyPriceForAllServicesAlert); return
+    // The same four checks, in the same order, with the same messages as
+    // before -- now read from computeInvoiceReadiness(), which the readiness
+    // indicator above the button uses too.
+    switch (readiness.firstProblem) {
+      case 'clientName': alert(t.enterClientNameAlert); return
+      case 'clientBin': alert(t.enterClientBinAlert); return
+      case 'itemName': alert(t.addAtLeastOneServiceAlert); return
+      case 'itemPrice': alert(t.specifyPriceForAllServicesAlert); return
     }
     if (lastCreated && Date.now() - lastCreated < 180000) {
       if (!(await confirm(t.recentInvoiceConfirm))) return
@@ -670,37 +929,148 @@ export default function CreateInvoicePage() {
     setLastCreated(Date.now())
     setLoading(false)
 
-    // /invoice/[id] already has the full set of ways to get an invoice to a
-    // client (WhatsApp first, then copy link, PDF, email) plus the Kaspi Pay
-    // section, so every path below ends there instead of stopping at a bare
-    // PDF popup with no mention that the service could send it. What's kept
-    // from the old flow is choosing a bank (when there's more than one --
-    // the row above already defaults bank_id to the main account, same as
-    // /invoice/[id]'s own fallback) and choosing signature/stamp, each its
-    // own step, ending in the same immediate PDF popup as before.
+    // Since 15.10.2026 creation ends on a success card («Счёт №… готов»)
+    // instead of going straight into the signature choice and the PDF popup.
+    // Everything above -- the invoice row, its log entry, the spent draft, the
+    // quota counter, the 3-minute double-submit guard -- happens exactly as
+    // before; only what is shown next changed. The bank choice (when there
+    // is more than one -- the row above already defaults bank_id to the main
+    // account, same as /invoice/[id]'s own fallback) still comes first,
+    // because the PDF the card offers is printed with that bank. «Скачать PDF»
+    // on the card opens the same signature/stamp modal as before, whose
+    // buttons still call window.open synchronously from the click.
     setPendingInvoice(data)
     setPendingBank(banks[0])
+    setLinkCopied(false)
     if (banks.length > 1) {
       setBankAccounts(banks)
       setShowBankPicker(true)
       return
     }
-    setShowSignModal(true)
+    setShowCreatedCard(true)
   }
 
   async function chooseBank(bank: any) {
     await supabase.from('invoices').update({ bank_id: bank.id }).eq('id', pendingInvoice.id)
     setPendingBank(bank)
     setShowBankPicker(false)
-    setShowSignModal(true)
+    setShowCreatedCard(true)
   }
 
   function closeBankPicker() {
     // Дефолтный bank_id (основной счёт) уже сохранён при создании -- закрытие
-    // модалки без выбора просто оставляет его и идёт дальше к выбору подписи.
+    // модалки без выбора просто оставляет его и идёт дальше к карточке «Счёт готов».
     setShowBankPicker(false)
-    setShowSignModal(true)
+    setShowCreatedCard(true)
   }
+
+  // The public /view/[token] link, built exactly like /invoice/[id] builds it
+  // for «Скопировать ссылку» and WhatsApp. The token normally came back with
+  // the insert; if not, it is read once from the row, as that page does.
+  async function createdPublicLink(): Promise<string | null> {
+    if (!pendingInvoice) return null
+    let token: string | null = pendingInvoice.public_token || null
+    if (!token) {
+      const { data } = await supabase.from('invoices').select('public_token').eq('id', pendingInvoice.id).single()
+      token = data?.public_token || null
+      if (token) setPendingInvoice((prev: typeof pendingInvoice) => (prev ? { ...prev, public_token: token } : prev))
+    }
+    return token ? `https://invoices.kz/view/${token}` : null
+  }
+
+  // Same message and the same «sent» bookkeeping as /invoice/[id]'s WhatsApp
+  // button (status update + invoice_logs row), done before leaving the page
+  // so the navigation to wa.me cannot cut it short.
+  async function sendCreatedToWhatsApp() {
+    const link = await createdPublicLink()
+    if (!link) { alert(t.genericErrorLabel); return }
+    const text = t.whatsappShareMessage(pendingInvoice.number, Number(pendingInvoice.amount).toLocaleString('ru-KZ'), link)
+    await supabase.from('invoices').update({ status: 'sent' }).eq('id', pendingInvoice.id)
+    await supabase.from('invoice_logs').insert({ invoice_id: pendingInvoice.id, status: 'sent' })
+    window.location.href = `https://wa.me/?text=${encodeURIComponent(text)}`
+  }
+
+  const linkCopiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  async function copyCreatedLink() {
+    const link = await createdPublicLink()
+    if (!link) { alert(t.tokenNotFoundAlert); return }
+    try {
+      await navigator.clipboard.writeText(link)
+    } catch {
+      // Same fallback as /invoice/[id] for browsers without the async clipboard.
+      const el = document.createElement('textarea')
+      el.value = link
+      document.body.appendChild(el)
+      el.select()
+      document.execCommand('copy')
+      document.body.removeChild(el)
+    }
+    setLinkCopied(true)
+    if (linkCopiedTimer.current) clearTimeout(linkCopiedTimer.current)
+    linkCopiedTimer.current = setTimeout(() => setLinkCopied(false), 2400)
+  }
+  useEffect(() => () => { if (linkCopiedTimer.current) clearTimeout(linkCopiedTimer.current) }, [])
+
+  // «Создать ещё»: a clean form for the next invoice. The same reset as
+  // discarding a restored draft, plus a fresh load() so the preview shows the
+  // next invoice number (claim_invoice_number has just moved it on) and the
+  // quota is re-counted from the database.
+  function createAnother() {
+    clearClient()
+    // The note effect only re-runs when dueDate changes, and clearClient()
+    // usually sets the same default date again -- so rebuild the note here,
+    // as a fresh /create mount would, instead of carrying an edited one over.
+    const dueDefault = computeDefaultDueDate(todayDateString(), profile?.default_due_days)
+    setNote(dueDefault ? t.paymentDueNote(formatDate(dueDefault)) : '')
+    // An explicitly requested new invoice is not a double submit: a fresh
+    // mount (the old way here) started with no lastCreated either.
+    setLastCreated(null)
+    setServices([{ name: '', qty: 1, price: 0, unit: 'шт', code: '', type: 'service' }])
+    setNoContract(false)
+    setDraftRestoredNotice(false)
+    setRegistryName(null)
+    setTypeIn(null)
+    setShowCreatedCard(false)
+    setLinkCopied(false)
+    setPendingInvoice(null)
+    setPendingBank(null)
+    // The page scrolls inside DesktopShell, not the window -- scroll the
+    // page's own top into view (same reason addService() uses scrollIntoView).
+    document.getElementById('create-page-top')?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' })
+    // Focus would otherwise fall back to <body> when the card's button
+    // unmounts; put it on the first field of the new form instead.
+    requestAnimationFrame(() => document.getElementById('create-client-bin')?.focus({ preventScroll: true }))
+    load()
+  }
+
+  // Keyboard and screen-reader users land on the card's first action.
+  useEffect(() => {
+    if (!showCreatedCard) return
+    const id = requestAnimationFrame(() => createdCardRef.current?.querySelector<HTMLButtonElement>('button')?.focus())
+    return () => cancelAnimationFrame(id)
+  }, [showCreatedCard])
+
+  // The signature modal takes focus when it opens and hands it back to the
+  // card's «Скачать PDF» when it closes (if the card is still up).
+  const signModalRef = useRef<HTMLDivElement>(null)
+  const createdDownloadRef = useRef<HTMLButtonElement>(null)
+  const signModalWasOpen = useRef(false)
+  useEffect(() => {
+    if (showSignModal) {
+      signModalWasOpen.current = true
+      const id = requestAnimationFrame(() => signModalRef.current?.querySelector<HTMLButtonElement>('button')?.focus())
+      return () => cancelAnimationFrame(id)
+    }
+    if (!signModalWasOpen.current) return
+    signModalWasOpen.current = false
+    const id = requestAnimationFrame(() => createdDownloadRef.current?.focus())
+    return () => cancelAnimationFrame(id)
+  }, [showSignModal])
+
+  // The post-create modals are portaled to document.body (see the success
+  // card below); document.body exists only once the client has mounted.
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
 
   function buildPDFProfile(withSign: boolean) {
     const canSign = !!profile?.is_admin || getActivePlan(profile).canSign
@@ -737,7 +1107,8 @@ export default function CreateInvoicePage() {
       showWatermark: !profile?.is_admin && !getActivePlan(profile).isActive,
     })
     if (win) { win.document.write(html); win.document.close() }
-    router.push('/invoice/' + pendingInvoice.id)
+    // No redirect to /invoice/[id] any more: the PDF opens in its own tab and
+    // this one returns to the success card, which has «Открыть счёт».
   }
 
   function chooseSignature(withSign: boolean) {
@@ -753,14 +1124,15 @@ export default function CreateInvoicePage() {
     generateAndOpenPDF(withSign, win)
   }
 
+  // The signature modal is opened from the success card now, so leaving it
+  // without a choice goes back to that card rather than off the page.
   function skipSignatureChoice() {
     setShowSignModal(false)
-    router.push('/invoice/' + pendingInvoice.id)
   }
 
   return (
     <DesktopShell>
-    <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
+    <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full" inert={showCreatedCard}>
       <SiteNav />
       <div className="max-w-lg lg:max-w-7xl mx-auto p-4">
         <motion.div
@@ -768,7 +1140,7 @@ export default function CreateInvoicePage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE }}
         >
-          <h2 className="text-xl font-bold mb-1" style={{ color: 'var(--nav-text-primary)' }}>{t.newInvoiceTitle}</h2>
+          <h2 id="create-page-top" className="text-xl font-bold mb-1 scroll-mt-32" style={{ color: 'var(--nav-text-primary)' }}>{t.newInvoiceTitle}</h2>
           <p className="text-sm mb-4" style={{ color: 'var(--nav-text-secondary)' }}>{t.newInvoiceSubtitle}</p>
         </motion.div>
 
@@ -945,7 +1317,8 @@ export default function CreateInvoicePage() {
                 <div>
                   <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.dueDateLabel}</label>
                   <input type="date" className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
-                    value={dueDate} onChange={e => { setDueDate(e.target.value); dueDateTouched.current = true }} />
+                    value={dueDate} onChange={e => { setDueDate(e.target.value); dueDateTouched.current = true }}
+                    onFocus={focusPreview({ kind: 'due' })} onBlur={blurPreview} />
                 </div>
               </div>
             ) : (
@@ -958,10 +1331,11 @@ export default function CreateInvoicePage() {
                     publishes them; they come only from a client already
                     saved in the user's own directory. */}
                 <div>
-                  <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.binIinLabel}</label>
+                  <label htmlFor="create-client-bin" className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.binIinLabel}</label>
                   <div className="flex gap-2">
-                  <input className="flex-1 rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
+                  <input id="create-client-bin" className="flex-1 rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
                       placeholder={t.binIinPlaceholder} value={clientBin}
+                      onFocus={focusPreview({ kind: 'client' })} onBlur={blurPreview}
                       onChange={async e => {
                         const bin = e.target.value
                         setClientBin(bin)
@@ -1066,9 +1440,40 @@ export default function CreateInvoicePage() {
                     )}
                 </div>
                 <div>
-                  <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.companyNameLabel}</label>
-                  <input className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
-                    placeholder={t.companyNamePlaceholder} value={clientName} onChange={e => setClientName(e.target.value)} />
+                  <label htmlFor="create-client-name" className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.companyNameLabel}</label>
+                  {(() => {
+                    // The green check vouches for the register's text only:
+                    // gone as soon as the name or the БИН under it is edited.
+                    const verified = !!registryName && registryName.bin === clientBin && registryName.name === clientName && !!clientName
+                    const typing = !reduceMotion && !!typeIn && typeIn.name === clientName && verified
+                    return (
+                      <div className="relative">
+                        <input id="create-client-name" ref={clientNameInputRef}
+                          className="w-full rounded-lg pl-3 pr-9 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
+                          placeholder={t.companyNamePlaceholder} value={clientName}
+                          aria-describedby={verified ? 'create-client-name-verified' : undefined}
+                          onFocus={() => { setTypeIn(null); setPreviewFocus({ kind: 'client' }) }} onBlur={blurPreview}
+                          onChange={e => { setTypeIn(null); setClientName(e.target.value) }} />
+                        {typing && typeIn && (
+                          <RegistryTypeIn key={typeIn.n} text={typeIn.name} inputRef={clientNameInputRef} onDone={() => setTypeIn(null)} />
+                        )}
+                        <AnimatePresence initial={false}>
+                          {verified && (
+                            <motion.span key="ok" id="create-client-name-verified"
+                              role="img" aria-label={t.binVerifiedLabel} title={t.binVerifiedLabel}
+                              className="absolute right-2.5 top-1/2 -mt-[9px] w-[18px] h-[18px] rounded-full flex items-center justify-center"
+                              style={{ background: 'var(--nav-success-solid, var(--nav-success))', color: 'var(--nav-success-ink, #fff)' }}
+                              initial={reduceMotion ? false : { opacity: 0, scale: 0.6 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              exit={reduceMotion ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, scale: 0.6 }}
+                              transition={{ duration: reduceMotion ? 0 : 0.22, ease: EASE, delay: reduceMotion || !typing ? 0 : 0.3 }}>
+                              <CheckIcon size={11} strokeWidth={3.2} />
+                            </motion.span>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    )
+                  })()}
                 </div>
                 <div>
                   <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.addressLabelDashboard}</label>
@@ -1108,7 +1513,8 @@ export default function CreateInvoicePage() {
                 <div>
                   <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.dueDateLabel}</label>
                   <input type="date" className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
-                    value={dueDate} onChange={e => { setDueDate(e.target.value); dueDateTouched.current = true }} />
+                    value={dueDate} onChange={e => { setDueDate(e.target.value); dueDateTouched.current = true }}
+                    onFocus={focusPreview({ kind: 'due' })} onBlur={blurPreview} />
                 </div>
                 <div>
                   <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.knpLabel}</label>
@@ -1148,7 +1554,9 @@ export default function CreateInvoicePage() {
             <div className="space-y-4" id="services-list">
               {services.map((svc, idx) => (
                 <motion.div
-                  key={idx}
+                  key={serviceKeys[idx] ?? 'svc-pos-' + idx}
+                  onFocusCapture={() => setPreviewFocus({ kind: 'row', key: serviceKeys[idx] ?? String(idx) })}
+                  onBlurCapture={blurPreview}
                   initial={reduceMotion ? false : { opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: reduceMotion ? 0 : 0.18, ease: EASE }}
@@ -1211,9 +1619,11 @@ export default function CreateInvoicePage() {
             </div>
           </motion.div>
 
-          {/* Total */}
+          {/* Total -- phones only since 15.10.2026. On lg+ the live preview
+              sits right beside the form and carries the same lines (VAT
+              breakdown included), so this block was a duplicate there. */}
           <motion.div
-            className="rounded-2xl p-5 mb-4"
+            className="rounded-2xl p-5 mb-4 lg:hidden"
             style={{ background: 'var(--nav-accent)' }}
             initial={reduceMotion ? false : { opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
@@ -1222,7 +1632,7 @@ export default function CreateInvoicePage() {
             {vatType === 'vat_16' ? (
               <>
                 <div className="flex justify-between text-sm text-white/70 mb-2 tabular-nums">
-                  <span>{t.amountWithoutVatLabel}</span><span>{totalWithoutVat.toLocaleString('ru-KZ')} ₸</span>
+                  <span>{t.amountWithoutVatLabel}</span><span><TweenedMoney value={totalWithoutVat} /></span>
                 </div>
                 <div className="flex justify-between text-sm text-white/70 mb-3 tabular-nums">
                   <span ref={vatHintRef} className="relative flex items-center gap-1.5">
@@ -1241,7 +1651,7 @@ export default function CreateInvoicePage() {
                       </div>
                     )}
                   </span>
-                  <span>{vatAmount.toLocaleString('ru-KZ')} ₸</span>
+                  <span><TweenedMoney value={vatAmount} /></span>
                 </div>
               </>
             ) : vatType === 'vat_0' ? (
@@ -1255,26 +1665,54 @@ export default function CreateInvoicePage() {
             )}
             <div className="flex justify-between font-medium text-white border-t border-white/20 pt-3">
               <span>{t.amountDueLabel}</span>
-              <span className="text-lg tabular-nums">{total.toLocaleString('ru-KZ')} ₸</span>
+              <span className="text-lg tabular-nums"><TweenedMoney value={total} /></span>
             </div>
           </motion.div>
           </div>
           </div>
 
-          <motion.button
-            onClick={createInvoice} disabled={loading}
-            initial={reduceMotion ? false : { opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.25 }}
-            className="w-full rounded-xl py-4 font-medium text-sm transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0 disabled:hover:translate-y-0"
-            style={{
-              background: loading ? 'var(--nav-text-muted)' : 'var(--nav-success)',
-              color: '#fff',
-              boxShadow: loading ? 'none' : '0 10px 24px -10px var(--nav-success)',
+          <ReadinessSteps
+            client={readiness.client} items={readiness.items} ready={readiness.ready}
+            reduceMotion={reduceMotion}
+            labels={{
+              aria: t.readinessAriaLabel, client: t.readinessClient, items: t.readinessItems,
+              ready: t.readinessReady, done: t.readinessStepDone, todo: t.readinessStepTodo,
             }}
-          >
-            {loading ? t.creatingButton : t.createButton}
-          </motion.button>
+          />
+
+          {/* isolate keeps the glow's -z-10 inside this wrapper: behind the
+              button, never behind the page. */}
+          <div className="relative isolate">
+            {/* The "ready" glow: only when the form has everything it checks
+                for. A not-ready button looks and behaves exactly as before --
+                still clickable, still answering with the same alerts. Under
+                reduced motion the glow is a steady one, no pulse. */}
+            <motion.span aria-hidden="true"
+              className="pointer-events-none absolute inset-x-4 top-2 -bottom-1 -z-10 rounded-xl blur-lg"
+              style={{ background: 'var(--nav-success)' }}
+              initial={false}
+              animate={readiness.ready && !loading
+                ? (reduceMotion ? { opacity: 0.45 } : { opacity: [0.28, 0.62, 0.28] })
+                : { opacity: 0 }}
+              transition={readiness.ready && !loading && !reduceMotion
+                ? { duration: 2.6, repeat: Infinity, ease: 'easeInOut' }
+                : { duration: reduceMotion ? 0 : 0.25 }}
+            />
+            <motion.button
+              onClick={createInvoice} disabled={loading}
+              initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.25 }}
+              className="w-full rounded-xl py-4 font-medium text-sm transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0 disabled:hover:translate-y-0"
+              style={{
+                background: loading ? 'var(--nav-text-muted)' : 'var(--nav-success)',
+                color: '#fff',
+                boxShadow: loading ? 'none' : '0 10px 24px -10px var(--nav-success)',
+              }}
+            >
+              {loading ? t.creatingButton : t.createButton}
+            </motion.button>
+          </div>
         </div>
 
         <motion.div
@@ -1295,7 +1733,21 @@ export default function CreateInvoicePage() {
             note={note}
             vatType={vatType}
             total={total}
+            serviceKeys={serviceKeys}
+            highlight={previewFocus}
+            skeletonWhenEmpty
           />
+          {/* The VAT-rate hint used to live behind the «i» in the totals block,
+              which is phones-only now -- on a desktop it sits here instead,
+              under the preview's own VAT lines. */}
+          {vatType === 'vat_16' && (
+            <div className="mt-4 rounded-xl p-4 text-xs leading-relaxed" style={{ background: 'var(--nav-surface-glass)', border: '1px solid var(--nav-border-soft)', color: 'var(--nav-text-secondary)' }}>
+              {t.vatHintText}
+              <button type="button" onClick={() => router.push('/profile/settings')} className="block mt-2 font-semibold text-left" style={{ color: 'var(--nav-accent)' }}>
+                {t.vatHintLink}
+              </button>
+            </div>
+          )}
           {kaspiCashierConnected === false && (
             <div className="mt-4 rounded-xl p-4 text-xs leading-relaxed" style={{ background: 'var(--nav-surface-glass)', border: '1px solid var(--nav-border-soft)', color: 'var(--nav-text-secondary)' }}>
               {t.kaspiCashierHintText}
@@ -1356,8 +1808,10 @@ export default function CreateInvoicePage() {
       )}
 
       {/* Bank picker modal -- invoice already exists (bank_id defaulted to
-          the main account on insert); picking here just overrides it. */}
-      {showBankPicker && (
+          the main account on insert); picking here just overrides it.
+          Portaled to document.body like the success card below, for the
+          same WebKit containing-block reason. */}
+      {mounted && showBankPicker && createPortal(
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-3">
           <div className="w-full max-w-lg rounded-3xl p-5 max-h-[80vh] overflow-y-auto" style={{ background: 'var(--nav-surface-chrome)' }}>
             <div className="flex items-center justify-between mb-4">
@@ -1383,20 +1837,124 @@ export default function CreateInvoicePage() {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* Signature/stamp choice -- same modal as /invoice/[id]'s PDF button,
-          but here it always fires right after creation and ends in the same
-          immediate PDF popup + redirect as the bank picker above. */}
+      {/* Success card -- what creation ends on since 15.10.2026. Every exit is
+          one of its actions; there is deliberately no close button, because
+          closing back onto the just-submitted form is how a second copy of
+          the same invoice gets made. For the same reason Escape does not
+          dismiss it: it only brings focus back to the first action.
+
+          Portaled to document.body together with the signature modal, not
+          rendered inside <main>: below lg, .page-surface-in-shell puts
+          backdrop-filter on <main>, which (WebKit) makes <main> the
+          containing block for `fixed` -- the card would be centred on the
+          whole tall page, off-screen after scrolling down to the submit
+          button -- and (every browser) a stacking context, so TopUtilityBar's
+          z-50 pill outside <main> would sit above the backdrop. Same trap
+          and same fix as SiteNav's mobile drawer. <main> is inert while the
+          card is up, so nothing behind the backdrop is reachable. */}
+      {mounted && createPortal(<>
+      <AnimatePresence>
+        {showCreatedCard && pendingInvoice && (
+          <motion.div key="created"
+            className="fixed inset-0 bg-black/40 z-[60] flex items-center justify-center p-3"
+            onMouseDown={e => { if (e.target === e.currentTarget) e.preventDefault() }}
+            initial={reduceMotion ? false : { opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0, transition: { duration: reduceMotion ? 0 : 0.15 } }}
+            transition={{ duration: reduceMotion ? 0 : 0.2 }}
+          >
+            <motion.div ref={createdCardRef}
+              role="dialog" aria-modal={!showSignModal} aria-labelledby="created-card-title" aria-describedby="created-card-subtitle"
+              inert={showSignModal}
+              onKeyDown={e => dialogKeyDown(e, () => createdCardRef.current?.querySelector<HTMLButtonElement>('button')?.focus())}
+              className="w-full max-w-md rounded-3xl p-6 max-h-[90vh] overflow-y-auto"
+              style={{ background: 'var(--nav-surface-chrome)' }}
+              initial={reduceMotion ? false : { opacity: 0, y: 16, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ duration: reduceMotion ? 0 : 0.32, ease: EASE }}
+            >
+              <div className="flex flex-col items-center text-center mb-5">
+                {/* Checkmark: the ring draws, then the tick. Reduced motion
+                    shows both finished from the first frame. */}
+                <svg width="56" height="56" viewBox="0 0 56 56" fill="none" aria-hidden="true" className="mb-3">
+                  <circle cx="28" cy="28" r="28" style={{ fill: 'var(--nav-success-soft)' }} />
+                  <motion.circle cx="28" cy="28" r="21" strokeWidth="2.5" strokeLinecap="round"
+                    style={{ stroke: 'var(--nav-success)', rotate: -90, transformOrigin: '50% 50%' }}
+                    initial={reduceMotion ? false : { pathLength: 0 }}
+                    animate={{ pathLength: 1 }}
+                    transition={{ duration: reduceMotion ? 0 : 0.5, ease: EASE, delay: reduceMotion ? 0 : 0.1 }} />
+                  <motion.path d="M19 28.5 25 34.5 37 22" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"
+                    style={{ stroke: 'var(--nav-success)' }}
+                    initial={reduceMotion ? false : { pathLength: 0 }}
+                    animate={{ pathLength: 1 }}
+                    transition={{ duration: reduceMotion ? 0 : 0.32, ease: EASE, delay: reduceMotion ? 0 : 0.45 }} />
+                </svg>
+                <div id="created-card-title" className="text-lg font-semibold" style={{ color: 'var(--nav-text-primary)' }}>
+                  {t.createdTitle(String(pendingInvoice.number))}
+                </div>
+                <div className="text-sm mt-1 tabular-nums break-words max-w-full" style={{ color: 'var(--nav-text-secondary)' }}>
+                  {pendingInvoice.client_name} · {Number(pendingInvoice.amount).toLocaleString('ru-KZ')} ₸
+                </div>
+                <div id="created-card-subtitle" className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>{t.createdSubtitle}</div>
+              </div>
+
+              <div className="space-y-2">
+                {/* Opens the same signature/stamp modal as before; its buttons
+                    are what call window.open, synchronously, from the click. */}
+                <button type="button" ref={createdDownloadRef} onClick={() => setShowSignModal(true)}
+                  className="w-full min-h-[48px] rounded-xl px-4 text-sm font-semibold flex items-center justify-center gap-2 transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0"
+                  style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                  <DownloadIcon />{t.createdDownloadPdf}
+                </button>
+                <button type="button" onClick={sendCreatedToWhatsApp}
+                  className="w-full min-h-[48px] rounded-xl px-4 text-sm font-semibold flex items-center justify-center gap-2 transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0"
+                  style={{ background: 'var(--nav-success-solid, var(--nav-success))', color: 'var(--nav-success-ink, #fff)' }}>
+                  <ChatIcon />{t.createdSendWhatsApp}
+                </button>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <button type="button" onClick={copyCreatedLink} aria-live="polite"
+                    className="min-h-[44px] rounded-xl px-3 text-sm font-medium flex items-center justify-center gap-2 border border-[color:var(--nav-border)] transition-colors hover:border-[color:var(--nav-accent)]"
+                    style={{ color: linkCopied ? 'var(--nav-success)' : 'var(--nav-text-primary)' }}>
+                    {linkCopied ? <CheckIcon size={15} strokeWidth={2.6} /> : <LinkIcon />}
+                    {linkCopied ? t.createdLinkCopied : t.createdCopyLink}
+                  </button>
+                  <button type="button" onClick={() => router.push('/invoice/' + pendingInvoice.id)}
+                    className="min-h-[44px] rounded-xl px-3 text-sm font-medium flex items-center justify-center gap-2 border border-[color:var(--nav-border)] transition-colors hover:border-[color:var(--nav-accent)]"
+                    style={{ color: 'var(--nav-text-primary)' }}>
+                    <DocIcon />{t.createdOpenInvoice}
+                  </button>
+                </div>
+                <button type="button" onClick={createAnother}
+                  className="w-full min-h-[44px] rounded-xl px-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors"
+                  style={{ color: 'var(--nav-accent)' }}>
+                  <PlusIcon />{t.createdCreateAnother}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Signature/stamp choice -- same modal as /invoice/[id]'s PDF button.
+          Opened from the success card's «Скачать PDF»; picking a variant
+          opens the PDF popup synchronously from that click (iOS Safari), and
+          closing it goes back to the card. Rendered after the card so it
+          stacks above it. */}
       {showSignModal && (() => {
         const canSign = !!profile?.is_admin || getActivePlan(profile).canSign
         return (
-          <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-3">
-            <div className="w-full max-w-lg rounded-3xl p-6" style={{ background: 'var(--nav-surface-chrome)' }}>
+          <div className="fixed inset-0 bg-black/40 z-[70] flex items-center justify-center p-3"
+            onMouseDown={e => { if (e.target === e.currentTarget) e.preventDefault() }}>
+            <div ref={signModalRef} role="dialog" aria-modal="true" aria-labelledby="sign-modal-title" aria-describedby="sign-modal-subtitle"
+              onKeyDown={e => dialogKeyDown(e, skipSignatureChoice)}
+              className="w-full max-w-lg rounded-3xl p-6" style={{ background: 'var(--nav-surface-chrome)' }}>
               <div className="text-center mb-5">
-                <div className="font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>{t.documentFormatModalTitle}</div>
-                <div className="text-sm" style={{ color: 'var(--nav-text-muted)' }}>{t.chooseDownloadVariantSubtitle}</div>
+                <div id="sign-modal-title" className="font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>{t.documentFormatModalTitle}</div>
+                <div id="sign-modal-subtitle" className="text-sm" style={{ color: 'var(--nav-text-muted)' }}>{t.chooseDownloadVariantSubtitle}</div>
               </div>
               <div className="space-y-3 mb-4">
                 <button onClick={() => chooseSignature(true)}
@@ -1412,11 +1970,12 @@ export default function CreateInvoicePage() {
                 </button>
               </div>
               <button onClick={skipSignatureChoice}
-                className="w-full text-sm py-2" style={{ color: 'var(--nav-text-muted)' }}>{t.skipButton}</button>
+                className="w-full text-sm py-2" style={{ color: 'var(--nav-text-muted)' }}>{t.cancelButton}</button>
             </div>
           </div>
         )
       })()}
+      </>, document.body)}
 
     {dialogElement}
     </main>
