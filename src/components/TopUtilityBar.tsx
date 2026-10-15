@@ -6,6 +6,7 @@ import { useEffectivePath } from '@/lib/useEffectivePath'
 import Link from 'next/link'
 import QRCode from 'qrcode'
 import { supabase } from '@/lib/supabase'
+import { signOutForLogin } from '@/lib/signOut'
 import { getActivePlan } from '@/lib/plan'
 import { invoiceLimitWindow } from '@/lib/invoiceLimit'
 import { useLanguage, type Lang } from '@/components/LanguageProvider'
@@ -575,8 +576,7 @@ export default function TopUtilityBar() {
   }, [topupPending, topupPhoneSent])
 
   async function signOut() {
-    await supabase.auth.signOut()
-    router.push('/login')
+    router.push(await signOutForLogin())
   }
 
   // App chrome has no business on public/marketing pages: the landing, auth,

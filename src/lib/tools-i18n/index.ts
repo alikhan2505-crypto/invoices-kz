@@ -179,6 +179,17 @@ export interface ToolChromeCopy {
   ctaTitle: string
   ctaBody: string
   ctaButton: string
+  /** Та же карточка для вошедшего (с 15.10.2026): не «попробуйте», а «вы уже здесь». */
+  ctaSignedInTitle: string
+  ctaSignedInBody: string
+  /** Кнопка вошедшего — и в карточке, и в блоках «лимит исчерпан». */
+  ctaSignedInButton: string
+  /** Карточка маржи для вошедшего — про Kaspi Bot, а не про счета: с доступом к боту (Про/админ)… */
+  ctaSignedInKaspiBody: string
+  ctaSignedInKaspiButton: string
+  /** …и без доступа (ведёт на лендинг Kaspi Bot, не в кабинет). */
+  ctaSignedInKaspiLandingBody: string
+  ctaSignedInKaspiLandingButton: string
   breadcrumbHome: string
   breadcrumbTools: string
 }
@@ -194,6 +205,13 @@ export const TOOL_CHROME: Record<ToolLang, ToolChromeCopy> = {
     ctaBody:
       'Счета с оплатой Kaspi прямо в счёте, клиенты и история, проверка контрагентов без лимита. Бесплатный тариф — 3 счёта в месяц, а первые 7 дней — тариф Базовый бесплатно. Вход по ссылке на почту, карта не нужна.',
     ctaButton: 'Попробовать бесплатно',
+    ctaSignedInTitle: 'Вы уже в invoices.kz',
+    ctaSignedInBody: 'Продолжите в кабинете: счета с оплатой Kaspi, клиенты и история документов.',
+    ctaSignedInButton: 'Открыть кабинет',
+    ctaSignedInKaspiBody: 'Задайте товарам минимальную цену в Kaspi Bot — бот будет держать вас в топе Kaspi и не опустится ниже порога.',
+    ctaSignedInKaspiButton: 'Открыть Kaspi Bot',
+    ctaSignedInKaspiLandingBody: 'Kaspi Bot держит ваши цены в топе Kaspi и не опускает их ниже заданного вами порога. Он входит в тариф Про.',
+    ctaSignedInKaspiLandingButton: 'Посмотреть Kaspi Bot',
     breadcrumbHome: 'Главная',
     breadcrumbTools: 'Бесплатные инструменты',
   },
@@ -205,6 +223,13 @@ export const TOOL_CHROME: Record<ToolLang, ToolChromeCopy> = {
     ctaBody:
       'Kaspi төлемі тікелей шоттың ішінде, клиенттер мен тарих, контрагенттерді шектеусіз тексеру. Тегін тариф — айына 3 шот, ал алғашқы 7 күн Базалық тариф тегін. Кіру поштаға келген сілтеме арқылы, карта қажет емес.',
     ctaButton: 'Тегін байқап көру',
+    ctaSignedInTitle: 'Сіз invoices.kz жүйесіне кіріп тұрсыз',
+    ctaSignedInBody: 'Жұмысты кабинетте жалғастырыңыз: Kaspi арқылы төленетін шоттар, клиенттер және құжаттар тарихы.',
+    ctaSignedInButton: 'Кабинетті ашу',
+    ctaSignedInKaspiBody: 'Kaspi Bot-та тауарларға ең төменгі бағаны белгілеңіз — бот сізді Kaspi-де ұсыныстар тізімінің басында ұстап тұрады және шектен төмен түспейді.',
+    ctaSignedInKaspiButton: 'Kaspi Bot-ты ашу',
+    ctaSignedInKaspiLandingBody: 'Kaspi Bot бағаларыңызды Kaspi-де ұсыныстар тізімінің басында ұстап тұрады және сіз белгілеген шектен төмен түсірмейді. Ол Про тарифіне кіреді.',
+    ctaSignedInKaspiLandingButton: 'Kaspi Bot туралы толығырақ',
     breadcrumbHome: 'Басты бет',
     breadcrumbTools: 'Тегін құралдар',
   },
@@ -216,6 +241,13 @@ export const TOOL_CHROME: Record<ToolLang, ToolChromeCopy> = {
     ctaBody:
       'Kaspi payment right inside the invoice, clients and history, unlimited counterparty checks. The free plan gives 3 invoices a month, and your first 7 days are on the Basic plan for free. Sign in with an email link, no card required.',
     ctaButton: 'Try it free',
+    ctaSignedInTitle: 'You are already signed in to invoices.kz',
+    ctaSignedInBody: 'Carry on in your account: invoices with Kaspi payment, clients and your document history.',
+    ctaSignedInButton: 'Open my account',
+    ctaSignedInKaspiBody: 'Set a floor price for your products in Kaspi Bot — it keeps you at the top of the Kaspi offer list and never goes below that floor.',
+    ctaSignedInKaspiButton: 'Open Kaspi Bot',
+    ctaSignedInKaspiLandingBody: 'Kaspi Bot keeps your prices at the top of the Kaspi offer list and never drops below the floor you set. It comes with the Pro plan.',
+    ctaSignedInKaspiLandingButton: 'See Kaspi Bot',
     breadcrumbHome: 'Home',
     breadcrumbTools: 'Free tools',
   },

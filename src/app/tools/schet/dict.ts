@@ -84,6 +84,8 @@ export interface SchetDict {
   limitReset: (iso: string) => string
   limitBody: string
   limitButton: string
+  /** Тот же блок для вошедшего (с 15.10.2026): вместо фразы о регистрации — «продолжите в кабинете». */
+  limitBodySignedIn: string
   generate: string
   remaining: (left: number, limit: number) => string
   guideLink: string
@@ -171,6 +173,8 @@ export const schetDict: Record<ToolLang, SchetDict> = {
     limitBody:
       'В кабинете invoices.kz реквизиты сохраняются один раз, номера считаются сами, видно, когда клиент открыл счёт, а оплату можно принять через Kaspi. Регистрация бесплатная, по ссылке на почту.',
     limitButton: 'Зарегистрироваться бесплатно',
+    limitBodySignedIn:
+      'В кабинете invoices.kz реквизиты сохраняются один раз, номера считаются сами, видно, когда клиент открыл счёт, а оплату можно принять через Kaspi. Счета есть и на бесплатном тарифе — 3 в месяц. Продолжите в кабинете invoices.kz.',
     generate: 'Создать счёт — откроется для печати и скачивания',
     remaining: (left, n) => `Осталось ${left} из ${n} бесплатных счетов в этом квартале · в счёте будет строка «Создано на invoices.kz»`,
     guideLink: 'Что обязательно должно быть в счёте →',
@@ -274,6 +278,8 @@ export const schetDict: Record<ToolLang, SchetDict> = {
     limitBody:
       'invoices.kz кабинетінде деректемелер бір рет сақталады, нөмірлер өздігінен қойылады, клиенттің шотты қашан ашқаны көрінеді, ал төлемді Kaspi арқылы қабылдауға болады. Тіркелу тегін, поштаға келген сілтеме арқылы.',
     limitButton: 'Тегін тіркелу',
+    limitBodySignedIn:
+      'invoices.kz кабинетінде деректемелер бір рет сақталады, нөмірлер өздігінен қойылады, клиенттің шотты қашан ашқаны көрінеді, ал төлемді Kaspi арқылы қабылдауға болады. Шот тегін тарифте де бар — айына 3. Жұмысты invoices.kz кабинетінде жалғастырыңыз.',
     generate: 'Шот жасау — басып шығаруға және жүктеуге ашылады',
     remaining: (left, n) => `Осы тоқсанда қалған тегін шот: ${left} / ${n} · шоттың төменгі жағында invoices.kz белгісі бар жол болады`,
     guideLink: 'Шотта міндетті түрде не болуы керек →',
@@ -377,6 +383,8 @@ export const schetDict: Record<ToolLang, SchetDict> = {
     limitBody:
       'In an invoices.kz account your details are saved once, numbering is automatic, you can see when the client opened the invoice, and you can accept payment via Kaspi. Sign-up is free, with an email link.',
     limitButton: 'Sign up for free',
+    limitBodySignedIn:
+      'In your invoices.kz account your details are saved once, numbering is automatic, you can see when the client opened the invoice, and you can accept payment via Kaspi. Invoices are on the free plan too — 3 a month. Continue in your invoices.kz account.',
     generate: 'Create the invoice — opens for printing and download',
     remaining: (left, n) => `${left} of ${n} free invoices left this quarter · the invoice carries a small invoices.kz footer line`,
     guideLink: 'What an invoice must include (in Russian) →',

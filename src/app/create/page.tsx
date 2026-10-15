@@ -1012,6 +1012,12 @@ export default function CreateInvoicePage() {
                               {c.activity && (
                                 <div style={{ color: 'var(--nav-text-secondary)' }}>{t.binLookupActivity(c.activity)}</div>
                               )}
+                              {/* Руководитель — его обещает публичная /tools/kontragent
+                                  («полная карточка: адрес, руководитель, вид
+                                  деятельности»); адрес уже подставляется в поле. */}
+                              {c.director && (
+                                <div style={{ color: 'var(--nav-text-secondary)' }}>{t.binLookupDirector(c.director)}</div>
+                              )}
                               {c.isVatPayer !== null && c.isVatPayer !== undefined && (
                                 <div style={{ color: 'var(--nav-text-secondary)' }}>
                                   {c.isVatPayer ? t.binLookupVatYes(c.vatRegisteredAt || null) : t.binLookupVatNo}

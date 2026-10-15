@@ -1,3 +1,5 @@
+import { isFreshIntent, parseIntentJson } from './storedIntent'
+
 // Generalizes the pending-upgrade mechanism (see src/lib/pendingUpgrade.ts)
 // into a small "send the user back to where they actually wanted to go"
 // helper. Concrete bug this fixes: the founder clicked the public
@@ -13,6 +15,11 @@
 // same reasoning as PENDING_UPGRADE_KEY -- it has to survive a full
 // navigation to /login and, for the OAuth/magic-link paths, a second
 // navigation through /auth/callback.
+//
+// Stored as JSON { path, at } and honored only for STORED_INTENT_TTL_MS (30
+// minutes) after it was saved -- see src/lib/storedIntent.ts for the stale-
+// intent bug that rule fixes. A legacy bare-path entry (no timestamp) is
+// treated as stale.
 export const POST_LOGIN_REDIRECT_KEY = 'invoices.postLoginRedirect'
 
 // Exact paths only -- never arbitrary URLs, never external hosts. Add a
@@ -26,9 +33,9 @@ function isAllowedPath(value: unknown): value is PostLoginRedirectPath {
   return typeof value === 'string' && (ALLOWED_POST_LOGIN_REDIRECTS as readonly string[]).includes(value)
 }
 
-export function setPostLoginRedirect(path: PostLoginRedirectPath) {
+export function setPostLoginRedirect(path: PostLoginRedirectPath, now: number = Date.now()) {
   try {
-    localStorage.setItem(POST_LOGIN_REDIRECT_KEY, path)
+    localStorage.setItem(POST_LOGIN_REDIRECT_KEY, JSON.stringify({ path, at: now }))
   } catch {
     // Storage disabled/unavailable (private mode, quota, etc) or no `window`
     // (SSR). The auth guard still navigates to /login as before -- just
@@ -42,13 +49,16 @@ export function setPostLoginRedirect(path: PostLoginRedirectPath) {
 // and /auth/callback's post-auth branches, so a stale entry can never be
 // replayed on a later, unrelated sign-in. Re-validates against the
 // allowlist on read too, not just on write, in case a stored value ever
-// predates a narrower allowlist.
-export function consumePostLoginRedirect(): PostLoginRedirectPath | null {
+// predates a narrower allowlist. A stale (older than 30 minutes), legacy
+// (no timestamp) or unparseable entry is removed and yields null.
+export function consumePostLoginRedirect(now: number = Date.now()): PostLoginRedirectPath | null {
   try {
     const raw = localStorage.getItem(POST_LOGIN_REDIRECT_KEY)
     if (!raw) return null
     localStorage.removeItem(POST_LOGIN_REDIRECT_KEY)
-    return isAllowedPath(raw) ? raw : null
+    const entry = parseIntentJson(raw)
+    if (!entry || !isFreshIntent(entry.at, now)) return null
+    return isAllowedPath(entry.path) ? entry.path : null
   } catch {
     return null
   }

@@ -1,0 +1,67 @@
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { choosePostLoginDestination, readPostLoginIntents, resolvePostLoginDestination } from './postLoginDestination'
+import { POST_LOGIN_REDIRECT_KEY, setPostLoginRedirect } from './postLoginRedirect'
+import { PENDING_UPGRADE_KEY, setPendingUpgrade } from './pendingUpgrade'
+
+function makeLocal() {
+  const m = new Map<string, string>()
+  return {
+    m,
+    getItem: (k: string) => (m.has(k) ? m.get(k)! : null),
+    setItem: (k: string, v: string) => void m.set(k, String(v)),
+    removeItem: (k: string) => void m.delete(k),
+  }
+}
+
+describe('choosePostLoginDestination', () => {
+  it('pending upgrade wins, then the redirect, then homeFor', () => {
+    expect(choosePostLoginDestination({ hasPendingUpgrade: true, postLoginRedirect: '/kaspi-shop' }, ['kaspiShop'])).toBe('/upgrade')
+    expect(choosePostLoginDestination({ hasPendingUpgrade: false, postLoginRedirect: '/kaspi-api/docs' }, null)).toBe('/kaspi-api/docs')
+    expect(choosePostLoginDestination({ hasPendingUpgrade: false, postLoginRedirect: null }, null)).toBe('/dashboard')
+    expect(choosePostLoginDestination({ hasPendingUpgrade: false, postLoginRedirect: null }, ['kaspiShop'])).toBe('/kaspi-shop/overview')
+    expect(choosePostLoginDestination({ hasPendingUpgrade: false, postLoginRedirect: null }, ['invoices', 'aiAgent'])).toBe('/products')
+  })
+  it('never sends anyone to /login (no loop from the /login page)', () => {
+    for (const enabled of [null, undefined, [], ['invoices'], ['kaspiShop'], ['cfo'], ['x'], 'garbage']) {
+      expect(choosePostLoginDestination({ hasPendingUpgrade: false, postLoginRedirect: null }, enabled)).not.toBe('/login')
+    }
+  })
+})
+
+describe('reading stored intents', () => {
+  let store: ReturnType<typeof makeLocal>
+  beforeEach(() => { store = makeLocal(); vi.stubGlobal('localStorage', store) })
+  afterEach(() => { vi.unstubAllGlobals() })
+
+  it('stale intents (the 15.10 bug) fall through to the home page', async () => {
+    const old = Date.now() - 2 * 24 * 3600_000
+    setPostLoginRedirect('/upgrade', old)
+    setPendingUpgrade('pro', 'annual', old)
+    const load = vi.fn(async () => ['invoices'])
+    expect(await resolvePostLoginDestination(load)).toBe('/dashboard')
+    expect(load).toHaveBeenCalledOnce()
+    expect(store.m.has(POST_LOGIN_REDIRECT_KEY)).toBe(false)
+    expect(store.m.has(PENDING_UPGRADE_KEY)).toBe(false)
+  })
+
+  it('fresh pending upgrade wins and the redirect is still consumed', async () => {
+    setPostLoginRedirect('/kaspi-shop')
+    setPendingUpgrade('pro', 'monthly')
+    const load = vi.fn(async () => null)
+    expect(await resolvePostLoginDestination(load)).toBe('/upgrade')
+    expect(load).not.toHaveBeenCalled()
+    expect(store.m.has(POST_LOGIN_REDIRECT_KEY)).toBe(false)
+    // /upgrade's own mount effect consumes the plan+period payload.
+    expect(store.m.has(PENDING_UPGRADE_KEY)).toBe(true)
+  })
+
+  it('a fresh redirect is used exactly once', async () => {
+    setPostLoginRedirect('/ai-agent')
+    expect(await resolvePostLoginDestination(async () => null)).toBe('/ai-agent')
+    expect(readPostLoginIntents()).toEqual({ hasPendingUpgrade: false, postLoginRedirect: null })
+  })
+
+  it('a failing profile load falls back to /dashboard', async () => {
+    expect(await resolvePostLoginDestination(async () => { throw new Error('network') })).toBe('/dashboard')
+  })
+})

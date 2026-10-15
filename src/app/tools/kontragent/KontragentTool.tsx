@@ -9,6 +9,8 @@ import { useLanguage } from '@/components/LanguageProvider'
 import { formatIsoDate, formatTenge, guidesIndexPath, toolsIndexPath, TOOL_CHROME, type ToolLang } from '@/lib/tools-i18n'
 import ToolLangSwitch from '@/lib/tools-i18n/ToolLangSwitch'
 import ToolCta from '@/lib/tools-i18n/ToolCta'
+import { useToolSession } from '@/lib/tools-i18n/useToolSession'
+import { anonymousToolHref, signedInToolHref } from '@/lib/tools-i18n/signedInDestination'
 import { kontragentDict } from './dict'
 
 // Один и тот же инструмент для /tools/kontragent, /tools/kk/kontragent и
@@ -78,6 +80,9 @@ function Verdict({ ok, label, okText, badText, unknownText }: {
 export default function KontragentTool({ lang }: { lang: ToolLang }) {
   const t = kontragentDict[lang]
   const chrome = TOOL_CHROME[lang]
+  // Вошедшему блок лимита и «полная карточка» ведут в кабинет (проверка по
+  // БИН — поле клиента в /create), а не на /login (15.10.2026).
+  const { signedIn } = useToolSession()
   const { setLang } = useLanguage()
   const [bin, setBin] = useState('')
   const [outcome, setOutcome] = useState<Outcome>({ kind: 'idle' })
@@ -123,7 +128,7 @@ export default function KontragentTool({ lang }: { lang: ToolLang }) {
   const remaining = outcome.kind === 'found' || outcome.kind === 'notFound' ? outcome.remaining : null
 
   // Клик в регистрацию запоминает язык страницы — /login откроется на нём же.
-  const signupClick = (event: string) => () => { setLang(lang); track(event, { lang }) }
+  const signupClick = (event: string) => () => { setLang(lang); track(event, { lang, signedIn }) }
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--nav-bg)' }}>
@@ -199,15 +204,15 @@ export default function KontragentTool({ lang }: { lang: ToolLang }) {
                 {t.limitTitle}
               </div>
               <p className="text-sm mb-4" style={{ color: 'var(--nav-text-secondary)' }}>
-                {t.limitBody}
+                {signedIn ? t.limitBodySignedIn : t.limitBody}
               </p>
               <a
-                href="/login?utm_source=tools&utm_medium=limit&utm_campaign=kontragent"
+                href={signedIn ? signedInToolHref('kontragent', 'limit') : anonymousToolHref('kontragent', 'limit')}
                 onClick={signupClick('tool_kontragent_signup_click')}
                 className="inline-block rounded-xl px-5 py-2.5 text-sm font-semibold transition-transform hover:-translate-y-0.5"
                 style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}
               >
-                {t.limitButton}
+                {signedIn ? chrome.ctaSignedInButton : t.limitButton}
               </a>
             </motion.div>
           )}
@@ -269,18 +274,18 @@ export default function KontragentTool({ lang }: { lang: ToolLang }) {
                 {c.hasFullCard && (
                   <div className="rounded-xl p-4 mt-3" style={{ background: 'var(--nav-surface-glass)', border: '1px dashed var(--nav-border)' }}>
                     <div className="text-[13px] font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>
-                      {t.fullCardTitle}
+                      {signedIn ? t.fullCardTitleSignedIn : t.fullCardTitle}
                     </div>
                     <p className="text-[12px] mb-2.5" style={{ color: 'var(--nav-text-secondary)' }}>
-                      {t.fullCardBody}
+                      {signedIn ? t.fullCardBodySignedIn : t.fullCardBody}
                     </p>
                     <a
-                      href="/login?utm_source=tools&utm_medium=fullcard&utm_campaign=kontragent"
+                      href={signedIn ? signedInToolHref('kontragent', 'fullcard') : anonymousToolHref('kontragent', 'fullcard')}
                       onClick={signupClick('tool_kontragent_fullcard_click')}
                       className="text-[13px] font-semibold"
                       style={{ color: 'var(--nav-accent)' }}
                     >
-                      {t.fullCardLink}
+                      {signedIn ? t.fullCardLinkSignedIn : t.fullCardLink}
                     </a>
                   </div>
                 )}

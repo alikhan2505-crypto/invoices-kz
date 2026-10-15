@@ -9,6 +9,8 @@ import { useLanguage } from '@/components/LanguageProvider'
 import { formatTenge, toolLinkPath, toolsIndexPath, TOOL_CHROME, type ToolLang } from '@/lib/tools-i18n'
 import ToolLangSwitch from '@/lib/tools-i18n/ToolLangSwitch'
 import ToolCta from '@/lib/tools-i18n/ToolCta'
+import { useToolSession } from '@/lib/tools-i18n/useToolSession'
+import { anonymousToolHref, signedInToolHref } from '@/lib/tools-i18n/signedInDestination'
 import BinNameField from '@/lib/tools-i18n/BinNameField'
 import { claimDocSlot, DOC_QUOTA_DEFAULT_LIMIT, useDocQuota } from '@/lib/tools-i18n/docQuota'
 import { schetDict } from './dict'
@@ -54,6 +56,8 @@ const guidePath = (lang: ToolLang) =>
 export default function SchetTool({ lang }: { lang: ToolLang }) {
   const t = schetDict[lang]
   const chrome = TOOL_CHROME[lang]
+  // Вошедшему блок лимита ведёт в кабинет, а не на /login (15.10.2026).
+  const { signedIn } = useToolSession()
   const { setLang } = useLanguage()
   const [f, setF] = useState<Form>(EMPTY)
   // Остаток на квартал — с сервера (/api/tools/doc-quota); null — ещё не пришёл.
@@ -207,7 +211,7 @@ export default function SchetTool({ lang }: { lang: ToolLang }) {
   }
 
   // Клик в регистрацию запоминает язык страницы — /login откроется на нём же.
-  const signupClick = () => { setLang(lang); track('tool_schet_signup_click', { lang }) }
+  const signupClick = () => { setLang(lang); track('tool_schet_signup_click', { lang, signedIn }) }
 
   const input = 'w-full min-w-0 rounded-xl px-3 py-2.5 text-sm outline-none'
   // WebkitTextFillColor обязателен: глобальное `input { -webkit-text-fill-color:
@@ -389,13 +393,13 @@ export default function SchetTool({ lang }: { lang: ToolLang }) {
               {t.limitTitle(quota?.limit ?? DOC_QUOTA_DEFAULT_LIMIT)}
             </div>
             <p className="text-sm mb-4" style={{ color: 'var(--nav-text-secondary)' }}>
-              {quota?.resetsAt ? `${t.limitReset(quota.resetsAt)} ` : ''}{t.limitBody}
+              {quota?.resetsAt ? `${t.limitReset(quota.resetsAt)} ` : ''}{signedIn ? t.limitBodySignedIn : t.limitBody}
             </p>
-            <a href="/login?utm_source=tools&utm_medium=limit&utm_campaign=schet"
+            <a href={signedIn ? signedInToolHref('schet', 'limit') : anonymousToolHref('schet', 'limit')}
               onClick={signupClick}
               className="inline-block rounded-xl px-5 py-2.5 text-sm font-semibold transition-transform hover:-translate-y-0.5"
               style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-              {t.limitButton}
+              {signedIn ? chrome.ctaSignedInButton : t.limitButton}
             </a>
           </div>
         ) : (

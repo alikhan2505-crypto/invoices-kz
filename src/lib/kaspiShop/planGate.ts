@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import { getActivePlan } from '@/lib/plan'
 
 // Server-side Pro gate for the Kaspi Bot cabinet API (/api/kaspi-shop/**).
 // Every /kaspi-shop page already redirects a non-Pro user to /upgrade on the
@@ -21,19 +20,15 @@ import { getActivePlan } from '@/lib/plan'
 // connection OWNER instead (no session there) -- see the owner-side helpers
 // at the bottom of this file.
 
-export const KASPI_SHOP_PROFILE_COLUMNS = 'is_admin, plan, plan_expires_at, bonus_expires_at, trial_expires_at'
+// Pure part (columns + hasKaspiShopAccess) lives in ./access.ts so client
+// components can use it too; re-exported here for existing server callers.
+import { KASPI_SHOP_PROFILE_COLUMNS, hasKaspiShopAccess } from './access'
+export { KASPI_SHOP_PROFILE_COLUMNS, hasKaspiShopAccess }
 
 // Same { error, errorCode } shape the ЭСФ routes use for their Pro gate
 // (src/app/api/esf/*), so the client can tell "needs Pro" apart from a
 // logged-out 401 without parsing Russian text.
 export const KASPI_SHOP_NOT_PRO_BODY = { error: 'Kaspi Bot доступен на тарифе Про', errorCode: 'not_pro' } as const
-
-// Pure part, unit-tested: admins always pass (getActivePlan's own admin
-// override grants every flag too; the explicit is_admin is kept so this
-// reads the same as every sibling gate in the codebase).
-export function hasKaspiShopAccess(profile: any): boolean {
-  return !!profile?.is_admin || getActivePlan(profile).canKaspiShop
-}
 
 // Created lazily, not at module load, so importing this file (e.g. from a
 // unit test of hasKaspiShopAccess) doesn't need Supabase env vars.

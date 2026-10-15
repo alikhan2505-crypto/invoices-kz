@@ -71,6 +71,8 @@ export interface KpDict {
   limitReset: (iso: string) => string
   limitBody: string
   limitButton: string
+  /** Тот же блок для вошедшего (с 15.10.2026): вместо фразы о регистрации — «продолжите в кабинете». */
+  limitBodySignedIn: string
   nextStep: string
   faqTitle: string
   faq: Array<{ q: string; a: string }>
@@ -145,6 +147,8 @@ export const kpDict: Record<ToolLang, KpDict> = {
     limitBody:
       'В кабинете invoices.kz КП превращается в счёт одним кликом, когда клиент согласился: реквизиты сохранены, номера считаются сами, а оплату можно принять через Kaspi. Регистрация бесплатная.',
     limitButton: 'Зарегистрироваться бесплатно',
+    limitBodySignedIn:
+      'В кабинете invoices.kz на тарифе Про КП превращается в счёт одним кликом, когда клиент согласился: реквизиты сохранены, номера считаются сами, а оплату можно принять через Kaspi. Продолжите в кабинете invoices.kz.',
     nextStep: 'Клиент согласился? Выставить счёт →',
     faqTitle: 'Коротко о КП',
     faq: [
@@ -239,6 +243,8 @@ export const kpDict: Record<ToolLang, KpDict> = {
     limitBody:
       'invoices.kz кабинетінде клиент келіскен соң КҰ бір басумен шотқа айналады: деректемелер сақталады, нөмірлер өзі қойылады, ал төлемді Kaspi арқылы қабылдауға болады. Тіркелу тегін.',
     limitButton: 'Тегін тіркелу',
+    limitBodySignedIn:
+      'invoices.kz кабинетінде Про тарифінде клиент келіскен соң КҰ бір басумен шотқа айналады: деректемелер сақталады, нөмірлер өзі қойылады, ал төлемді Kaspi арқылы қабылдауға болады. Жұмысты invoices.kz кабинетінде жалғастырыңыз.',
     nextStep: 'Клиент келісті ме? Шот жазу →',
     faqTitle: 'КҰ туралы қысқаша',
     faq: [
@@ -333,6 +339,8 @@ export const kpDict: Record<ToolLang, KpDict> = {
     limitBody:
       'In an invoices.kz account a proposal becomes an invoice in one click once the client agrees: your details are saved, numbering is automatic, and you can accept payment via Kaspi. Sign-up is free.',
     limitButton: 'Sign up for free',
+    limitBodySignedIn:
+      'On the Pro plan in your invoices.kz account a proposal becomes an invoice in one click once the client agrees: your details are saved, numbering is automatic, and you can accept payment via Kaspi. Continue in your invoices.kz account.',
     nextStep: 'Client agreed? Issue an invoice →',
     faqTitle: 'Commercial proposals in Kazakhstan: the basics',
     faq: [

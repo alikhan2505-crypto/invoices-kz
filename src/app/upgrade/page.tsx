@@ -11,11 +11,22 @@ import { getActivePlan } from '@/lib/plan'
 import { PLAN_PRICES, type BillingPeriod } from '@/lib/plans/pricing'
 import { consumePendingUpgrade } from '@/lib/pendingUpgrade'
 import { useAppDialog } from '@/components/AppDialog'
+import { homeFor } from '@/lib/products'
+import { formatDateNumeric } from '@/lib/date'
 
 // How long an untouched QR is shown before it is retired for a fresh one.
 // Kaspi's own window is ~5 minutes; /kaspi-api shortens the visible wait to a
 // minute on the founder's ask, and this page follows it.
 const IDLE_QR_MS = 60_000
+
+// Admin, or a real paid Pro (trial/bonus are never 'pro' in getActivePlan):
+// these get the "you already have it" card at the top of /upgrade.
+function hasOwnedCard(p: { is_admin?: boolean | null } | null): boolean {
+  if (!p) return false
+  if (p.is_admin) return true
+  const info = getActivePlan(p)
+  return info.plan === 'pro' && !info.isTrial
+}
 
 export default function Upgrade() {
   const router = useRouter()
@@ -29,6 +40,13 @@ export default function Upgrade() {
   const [promoSuccess, setPromoSuccess] = useState('')
   const [promoError, setPromoError] = useState('')
   const [plan, setPlan] = useState('free')
+  // The whole profile row, for the "you already have it" card at the top
+  // (Pro end date, is_admin, enabled_products for «В кабинет»).
+  const [profile, setProfile] = useState<{ is_admin?: boolean | null; plan_expires_at?: string | null; enabled_products?: unknown } | null>(null)
+  // Set once loadData() finished (with or without a profile) -- gates the
+  // pending-plan scroll below.
+  const [profileChecked, setProfileChecked] = useState(false)
+  const [pendingScrollPlan, setPendingScrollPlan] = useState<string | null>(null)
   const [userId, setUserId] = useState('')
   const [period, setPeriod] = useState<BillingPeriod>('monthly')
   const [showModal, setShowModal] = useState(false)
@@ -86,14 +104,26 @@ export default function Upgrade() {
   // pricing CTA before /login sent them here with `period` defaulted back
   // to 'monthly'. Consumed (read + removed) exactly once so a stale value
   // can never be replayed on a later, unrelated visit.
+  // The scroll to the picked plan waits for the profile: a Pro user or admin
+  // gets the "you already have it" card at the very top instead, and
+  // scrolling the price card to the centre would push that card off-screen
+  // on a phone -- exactly the visitor who needs it (15.10.2026).
   useEffect(() => {
     const pending = consumePendingUpgrade()
     if (!pending) return
     setPeriod(pending.period)
-    requestAnimationFrame(() => {
-      document.getElementById(`plan-${pending.plan}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    })
+    setPendingScrollPlan(pending.plan)
   }, [])
+
+  useEffect(() => {
+    if (!pendingScrollPlan || !profileChecked) return
+    const target = pendingScrollPlan
+    setPendingScrollPlan(null)
+    if (hasOwnedCard(profile)) return
+    requestAnimationFrame(() => {
+      document.getElementById(`plan-${target}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    })
+  }, [pendingScrollPlan, profileChecked, profile])
 
   // Live-polls the in-house Kaspi rail's own settlement status by order_id,
   // in parallel with checkPaymentStatus's profile-based check above — this
@@ -115,17 +145,23 @@ export default function Upgrade() {
   }, [qrToken])
 
   async function loadData() {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    setUserId(user.id)
-    const { data: p } = await supabase.from('profiles').select('*').eq('id', user.id).single()
-    setPlan(getActivePlan(p).plan)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      setUserId(user.id)
+      const { data: p } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+      setProfile(p)
+      setPlan(getActivePlan(p).plan)
+    } finally {
+      setProfileChecked(true)
+    }
   }
 
   async function reloadPlan() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     const { data: p } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+    setProfile(p)
     setPlan(getActivePlan(p).plan)
   }
 
@@ -490,11 +526,11 @@ export default function Upgrade() {
   // openModal/period flow as a fresh purchase; settlePlanPayment.ts and
   // admin/page.tsx's activatePayment stack the new period on top of the
   // remaining days rather than restarting from today.
-  function RenewButton({ planName, amount, planKey, dark }: {
-    planName: string; amount: number; planKey: string; dark?: boolean
+  function RenewButton({ planName, amount, planKey, dark, id }: {
+    planName: string; amount: number; planKey: string; dark?: boolean; id?: string
   }) {
     return (
-      <button onClick={() => openModal(planName, amount, planKey, period)}
+      <button id={id} onClick={() => openModal(planName, amount, planKey, period)}
         className={`w-full rounded-xl py-3 font-medium text-sm ${dark
           ? 'bg-white/10 text-white border border-white/20'
           : 'border-2 border-[#1C2056] text-[#1C2056]'
@@ -502,6 +538,24 @@ export default function Upgrade() {
         {t.renewButtonLabel(period)}
       </button>
     )
+  }
+
+  // "You already have it" card (founder, 15.10.2026): a signed-in Pro user or
+  // admin who ended up here -- e.g. via a stale post-login intent -- used to
+  // see only the price cards with a small «Текущий» badge, a dead end. Admin
+  // wins over plan (all features are open regardless of billing); Pro means a
+  // real paid Pro (trial/bonus are Базовый in getActivePlan, never 'pro').
+  const ownedCard: null | { kind: 'admin' } | { kind: 'pro'; until: string | null } =
+    !hasOwnedCard(profile) ? null
+    : profile?.is_admin ? { kind: 'admin' }
+    : { kind: 'pro', until: profile?.plan_expires_at ? formatDateNumeric(profile.plan_expires_at) : null }
+
+  // «Продлить» leads to the existing renew flow on the Pro card (period
+  // toggle + price are right there) rather than opening a payment silently.
+  function scrollToRenew() {
+    const card = document.getElementById('plan-pro')
+    card?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    ;(document.getElementById('renew-pro') as HTMLButtonElement | null)?.focus({ preventScroll: true })
   }
 
   return (
@@ -512,6 +566,26 @@ export default function Upgrade() {
       </div>
 
       <div className="max-w-lg mx-auto p-6 flex-1">
+        {ownedCard && (
+          <div className="bg-white border-2 border-[#2DC48D] rounded-2xl p-5 mb-6 shadow-sm" role="status">
+            <div className="font-bold text-[#1C2056] text-base mb-4">
+              {ownedCard.kind === 'admin' ? t.adminAccessTitle : t.proActiveTitle(ownedCard.until)}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {ownedCard.kind === 'pro' && (
+                <button type="button" onClick={scrollToRenew}
+                  className="flex-1 min-w-[140px] min-h-[44px] rounded-xl border-2 border-[#1C2056] text-[#1C2056] text-sm font-medium">
+                  {t.renewShortButton}
+                </button>
+              )}
+              <button type="button" onClick={() => router.push(homeFor(profile?.enabled_products))}
+                className="flex-1 min-w-[140px] min-h-[44px] rounded-xl bg-[#1C2056] text-white text-sm font-medium">
+                {t.toCabinetButton}
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="text-center mb-8">
           <div className="text-5xl mb-4">🚀</div>
           <h1 className="text-2xl font-bold text-[#1C2056] mb-2">{t.heroTitle}</h1>
@@ -630,7 +704,7 @@ export default function Upgrade() {
           {plan === 'pro' && (
             <div>
               <div className="text-center text-sm text-white/60 py-1">{t.activeLabel}</div>
-              <RenewButton planName={t.proPlanName} amount={PLAN_PRICES.pro[period]} planKey="pro" dark />
+              <RenewButton planName={t.proPlanName} amount={PLAN_PRICES.pro[period]} planKey="pro" dark id="renew-pro" />
             </div>
           )}
         </div>

@@ -21,6 +21,17 @@ export function formatDate(dateStr: string) {
   })
 }
 
+// «17.10.2026» — day.month.year in digits, same zone rule as formatDate.
+// Used where a plan end date is quoted in a sentence («У вас тариф Про до …»).
+export function formatDateNumeric(dateStr: string) {
+  return toDate(dateStr).toLocaleDateString('ru-RU', {
+    timeZone: userTimeZone,
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  })
+}
+
 // contract_date is a free-text column: newer invoices store a real ISO date
 // (native date-picker input), older ones store whatever the user typed into
 // the old freeform text field (e.g. "20082026"). Format only when it parses

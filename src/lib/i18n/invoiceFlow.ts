@@ -23,6 +23,7 @@ export interface InvoiceFlowContent {
   binLookupNoTaxDebt: string
   binLookupRegisteredAt: (date: string) => string
   binLookupActivity: (activity: string) => string
+  binLookupDirector: (director: string) => string
   binLookupChecking: string
   binLookupSourceKgd: string
   binLookupNotFound: string
@@ -245,6 +246,7 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     binLookupNoTaxDebt: 'Налоговой задолженности нет',
     binLookupRegisteredAt: (date: string) => `Зарегистрирован ${date}`,
     binLookupActivity: (activity: string) => `Вид деятельности: ${activity}`,
+    binLookupDirector: (director: string) => `Руководитель: ${director}`,
     binLookupChecking: 'Проверяем по данным КГД…',
     binLookupFound: (name: string, status: string | null) => status ? `${name} · ${status}` : name,
     binIinPlaceholder: '123456789012',
@@ -473,6 +475,7 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     binLookupNoTaxDebt: 'Салық берешегі жоқ',
     binLookupRegisteredAt: (date: string) => `${date} тіркелген`,
     binLookupActivity: (activity: string) => `Қызмет түрі: ${activity}`,
+    binLookupDirector: (director: string) => `Басшысы: ${director}`,
     binLookupChecking: 'МКК деректері бойынша тексерудеміз…',
     binLookupFound: (name: string, status: string | null) => status ? `${name} · ${status}` : name,
     binIinPlaceholder: '123456789012',
@@ -700,6 +703,7 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     binLookupNoTaxDebt: 'No tax arrears',
     binLookupRegisteredAt: (date: string) => `Registered ${date}`,
     binLookupActivity: (activity: string) => `Activity: ${activity}`,
+    binLookupDirector: (director: string) => `Director: ${director}`,
     binLookupChecking: 'Checking with the State Revenue Committee…',
     binLookupFound: (name: string, status: string | null) => status ? `${name} · ${status}` : name,
     binIinPlaceholder: '123456789012',

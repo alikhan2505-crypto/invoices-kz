@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
+import { signOutForLogin } from '@/lib/signOut'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import { AreaChart, Area, ResponsiveContainer, Tooltip } from 'recharts'
@@ -329,8 +330,7 @@ export default function Profile() {
   async function signOut() {
     const { data: { user } } = await supabase.auth.getUser()
     if (user) cacheClear('profile_' + user.id)
-    await supabase.auth.signOut()
-    router.push('/login')
+    router.push(await signOutForLogin())
   }
 
   const DELETE_CONFIRM_PHRASE = 'INVOICES.KZ'
@@ -353,8 +353,7 @@ export default function Profile() {
         return
       }
       if (profile?.id) cacheClear('profile_' + profile.id)
-      await supabase.auth.signOut()
-      router.push('/login')
+      router.push(await signOutForLogin())
     } catch (e: any) {
       setDeleteError(t.errorPrefix(e.message || ''))
       setDeleting(false)

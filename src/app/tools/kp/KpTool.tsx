@@ -8,6 +8,8 @@ import { useLanguage } from '@/components/LanguageProvider'
 import { formatTenge, isToolLocalized, toolLinkPath, toolsIndexPath, TOOL_CHROME, type ToolLang } from '@/lib/tools-i18n'
 import ToolLangSwitch from '@/lib/tools-i18n/ToolLangSwitch'
 import ToolCta from '@/lib/tools-i18n/ToolCta'
+import { useToolSession } from '@/lib/tools-i18n/useToolSession'
+import { anonymousToolHref, signedInToolHref } from '@/lib/tools-i18n/signedInDestination'
 import BinNameField from '@/lib/tools-i18n/BinNameField'
 import { kpDict } from './dict'
 import { UNIT_LABELS, unitAria } from '@/lib/tools-i18n/units'
@@ -64,6 +66,8 @@ const digits = (s: string) => s.replace(/\D/g, '')
 export default function KpTool({ lang }: { lang: ToolLang }) {
   const t = kpDict[lang]
   const chrome = TOOL_CHROME[lang]
+  // Вошедшему блок лимита ведёт в кабинет, а не на /login (15.10.2026).
+  const { signedIn } = useToolSession()
   const { setLang } = useLanguage()
   const [f, setF] = useState<Form>(EMPTY)
   const [ready, setReady] = useState(false)
@@ -381,13 +385,13 @@ export default function KpTool({ lang }: { lang: ToolLang }) {
               {t.limitTitle(quota?.limit ?? DEFAULT_LIMIT)}
             </div>
             <p className="text-sm mb-4" style={{ color: 'var(--nav-text-secondary)' }}>
-              {quota?.resetsAt ? `${t.limitReset(quota.resetsAt)} ` : ''}{t.limitBody}
+              {quota?.resetsAt ? `${t.limitReset(quota.resetsAt)} ` : ''}{signedIn ? t.limitBodySignedIn : t.limitBody}
             </p>
-            <a href="/login?utm_source=tools&utm_medium=limit&utm_campaign=kp"
-              onClick={() => { setLang(lang); track('tool_kp_signup_click', { lang }) }}
+            <a href={signedIn ? signedInToolHref('kp', 'limit') : anonymousToolHref('kp', 'limit')}
+              onClick={() => { setLang(lang); track('tool_kp_signup_click', { lang, signedIn }) }}
               className="inline-block rounded-xl px-5 py-2.5 text-sm font-semibold transition-transform hover:-translate-y-0.5"
               style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-              {t.limitButton}
+              {signedIn ? chrome.ctaSignedInButton : t.limitButton}
             </a>
           </div>
         ) : (

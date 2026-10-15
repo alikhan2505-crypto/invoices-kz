@@ -1,14 +1,26 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { startAuthentication } from '@simplewebauthn/browser'
 import { supabase } from '@/lib/supabase'
 import { useLanguage, type Lang } from '@/components/LanguageProvider'
 import { authDict } from '@/lib/i18n/auth'
-import { hasPendingUpgrade, pendingUpgradeFromSearch, setPendingUpgrade } from '@/lib/pendingUpgrade'
-import { consumePostLoginRedirect, postLoginRedirectFromSearch, setPostLoginRedirect } from '@/lib/postLoginRedirect'
+import { pendingUpgradeFromSearch, setPendingUpgrade } from '@/lib/pendingUpgrade'
+import { postLoginRedirectFromSearch, setPostLoginRedirect } from '@/lib/postLoginRedirect'
+import { resolvePostLoginDestination } from '@/lib/postLoginDestination'
+import { SIGNED_OUT_PARAM } from '@/lib/signOut'
 import { useAppDialog } from '@/components/AppDialog'
-import { homeFor } from '@/lib/products'
+
+// enabled_products of the signed-in user, for homeFor() -- only fetched when
+// no stored intent decides the destination (see postLoginDestination.ts).
+async function loadOwnEnabledProducts(userId?: string): Promise<unknown> {
+  const id = userId ?? (await supabase.auth.getUser()).data.user?.id
+  if (!id) return null
+  const { data: prof } = await supabase.from('profiles').select('enabled_products').eq('id', id).maybeSingle()
+  return prof?.enabled_products
+}
+
+const SESSION_CHECK_TIMEOUT_MS = 4500
 
 export default function Login() {
   const router = useRouter()
@@ -25,6 +37,22 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const [passkeySupported, setPasskeySupported] = useState(false)
   const [passkeyLoading, setPasskeyLoading] = useState(false)
+  // True until we know there is no valid session. An already-signed-in
+  // visitor (founder's admin, 15.10.2026: «Попробовать бесплатно» on a free
+  // tool) used to get the login form here, sign in again and be thrown to a
+  // stale /upgrade intent. Now they are sent straight on and never see the
+  // form; everyone else sees a neutral loader for the instant the local
+  // session read takes, never a flash of the form followed by a redirect.
+  // Starts true on the server too, so SSR and the first client render match.
+  const [checkingSession, setCheckingSession] = useState(true)
+  // Effects run twice in dev StrictMode; the destination read consumes the
+  // stored postLoginRedirect, so it must run once per mount, not be
+  // cancelled-and-repeated (the second run would find the intent gone).
+  const sessionCheckStarted = useRef(false)
+  // Set as soon as the visitor touches the form (types an email, presses
+  // the passkey button). A session check that finishes after the timeout
+  // below must not yank them away mid-typing.
+  const formTouched = useRef(false)
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -35,9 +63,48 @@ export default function Login() {
     const pending = pendingUpgradeFromSearch(window.location.search)
     if (pending) setPendingUpgrade(pending.plan, pending.period)
     setPasskeySupported(typeof window !== 'undefined' && !!window.PublicKeyCredential)
-  }, [])
+
+    // Runs AFTER ?next= / ?plan=&period= above were stored, exactly as for a
+    // fresh sign-in, so a signed-in visitor arriving from a product landing
+    // (/login?next=/kaspi-shop) or a pricing card still lands where they meant.
+    if (sessionCheckStarted.current) return
+    sessionCheckStarted.current = true
+    // «Выйти» whose sign-out request failed (see src/lib/signOut.ts): the
+    // local session may still be there, but the person asked to leave.
+    if (params.get(SIGNED_OUT_PARAM)) { setCheckingSession(false); return }
+    // getUser() is a network round trip (and getSession() may wait on a
+    // token refresh): on a stalled connection the form must still appear, so
+    // after SESSION_CHECK_TIMEOUT_MS the loader gives way to the form. A
+    // check that completes later still redirects -- unless the visitor has
+    // started using the form by then.
+    const timer = window.setTimeout(() => setCheckingSession(false), SESSION_CHECK_TIMEOUT_MS)
+    ;(async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session) {
+          // getSession() only reads storage; getUser() asks the server, so a
+          // revoked/deleted account doesn't bounce /login -> dashboard ->
+          // /login forever. Any failure here shows the form, as before.
+          const { data: { user }, error } = await supabase.auth.getUser()
+          if (user && !error && !formTouched.current) {
+            const destination = await resolvePostLoginDestination(() => loadOwnEnabledProducts(user.id))
+            if (!formTouched.current) {
+              window.clearTimeout(timer)
+              router.replace(destination)
+              return
+            }
+          }
+        }
+      } catch {
+        // fall through to the form
+      }
+      window.clearTimeout(timer)
+      setCheckingSession(false)
+    })()
+  }, [router])
 
   async function loginWithPasskey() {
+    formTouched.current = true
     setPasskeyLoading(true)
     try {
       const optRes = await fetch('/api/webauthn/login-options', { method: 'POST' })
@@ -57,31 +124,13 @@ export default function Login() {
       const { error } = await supabase.auth.verifyOtp({ token_hash: verifyJson.tokenHash, type: 'email' })
       if (error) { alert(t.errorPrefix(error.message)); return }
 
-      // Consume the stored postLoginRedirect exactly once, unconditionally,
-      // regardless of which branch below ultimately fires -- otherwise a
-      // stale key left behind by an untaken branch (e.g. hasPendingUpgrade()
-      // winning this time) could hijack a completely unrelated later sign-in
-      // that never went through the guard that set it. See
-      // src/lib/postLoginRedirect.ts.
-      const postLoginRedirect = consumePostLoginRedirect()
-
       // A passkey login only ever exists for an already-registered,
       // already-onboarded account, so there is no onboarding branch to
-      // preserve here -- safe to send straight to /upgrade when the landing
-      // page's pricing CTA left one pending (see src/lib/pendingUpgrade.ts).
-      // pendingUpgrade is checked first and unchanged from before -- it
-      // carries a plan+period payload that /upgrade's own mount effect
-      // still needs to consume, so it must keep taking priority over the
-      // generic postLoginRedirect, which only ever holds a bare path.
-      // Default destination unchanged (router.push('/dashboard')) when
-      // neither is set.
-      if (hasPendingUpgrade()) router.replace('/upgrade')
-      else if (postLoginRedirect) router.replace(postLoginRedirect)
-      else {
-        const { data: { user } } = await supabase.auth.getUser()
-        const { data: prof } = user ? await supabase.from('profiles').select('enabled_products').eq('id', user.id).maybeSingle() : { data: null }
-        router.push(homeFor(prof?.enabled_products))
-      }
+      // preserve here. Destination rule (fresh pending upgrade -> fresh
+      // postLoginRedirect -> homeFor), shared with /auth/callback: see
+      // src/lib/postLoginDestination.ts. It consumes the stored
+      // postLoginRedirect exactly once, whichever branch wins.
+      router.replace(await resolvePostLoginDestination(() => loadOwnEnabledProducts()))
     } catch (e: any) {
       if (e?.name !== 'NotAllowedError') alert(t.errorPrefix(e?.message || String(e)))
     } finally {
@@ -140,6 +189,15 @@ export default function Login() {
       provider: 'facebook',
       options: { redirectTo: 'https://invoices.kz/auth/callback' }
     })
+  }
+
+  if (checkingSession) {
+    return (
+      <main className="min-h-screen bg-gray-50 flex items-center justify-center p-4" aria-busy="true">
+        <div className="w-8 h-8 border-2 border-[#1C2056] border-t-transparent rounded-full animate-spin" />
+        {dialogElement}
+      </main>
+    )
   }
 
   return (
@@ -205,7 +263,7 @@ export default function Login() {
               placeholder={t.emailPlaceholder}
               type="email"
               value={email}
-              onChange={e => setEmail(e.target.value)}
+              onChange={e => { formTouched.current = true; setEmail(e.target.value) }}
               onKeyDown={e => e.key === 'Enter' && sendLink()}
             />
             <button onClick={() => sendLink()} disabled={loading}

@@ -42,6 +42,11 @@ export interface MiscContent {
   activeLabel: string
   higherPlanNotice: string
   renewButtonLabel: (period: 'monthly' | 'annual') => string
+  /** Карточка вверху /upgrade для того, у кого Про уже есть (15.10.2026). date — 'ДД.ММ.ГГГГ' или null (бессрочно). */
+  proActiveTitle: (date: string | null) => string
+  adminAccessTitle: string
+  renewShortButton: string
+  toCabinetButton: string
   connectButtonLabel: (amount: string, suffix: string) => string
   questionsText: string
   telegramLinkLabel: string
@@ -181,6 +186,10 @@ export const miscDict: Record<'ru' | 'kk' | 'en', MiscContent> = {
     activeLabel: '✓ Активен',
     higherPlanNotice: 'У вас более высокий тариф',
     renewButtonLabel: (period) => period === 'annual' ? 'Продлить на год' : 'Продлить на месяц',
+    proActiveTitle: (date) => date ? `У вас тариф Про до ${date}` : 'У вас тариф Про',
+    adminAccessTitle: 'У вас доступ администратора — все функции открыты',
+    renewShortButton: 'Продлить',
+    toCabinetButton: 'В кабинет',
     connectButtonLabel: (amount, suffix) => `Подключить за ${amount} ₸${suffix}`,
     questionsText: 'Вопросы?',
     telegramLinkLabel: 'Написать в Telegram',
@@ -317,6 +326,10 @@ export const miscDict: Record<'ru' | 'kk' | 'en', MiscContent> = {
     activeLabel: '✓ Белсенді',
     higherPlanNotice: 'Сізде жоғарырақ тариф бар',
     renewButtonLabel: (period) => period === 'annual' ? 'Бір жылға ұзарту' : 'Бір айға ұзарту',
+    proActiveTitle: (date) => date ? `Сізде Про тарифі ${date} дейін қосулы` : 'Сізде Про тарифі қосулы',
+    adminAccessTitle: 'Сізде әкімші қолжетімділігі бар — барлық мүмкіндік ашық',
+    renewShortButton: 'Ұзарту',
+    toCabinetButton: 'Кабинетке өту',
     connectButtonLabel: (amount, suffix) => `${amount} ₸${suffix} — қосылу`,
     questionsText: 'Сұрақтар бар ма?',
     telegramLinkLabel: 'Telegram-ға жазу',
@@ -453,6 +466,10 @@ export const miscDict: Record<'ru' | 'kk' | 'en', MiscContent> = {
     activeLabel: '✓ Active',
     higherPlanNotice: 'You already have a higher plan',
     renewButtonLabel: (period) => period === 'annual' ? 'Extend by a year' : 'Extend by a month',
+    proActiveTitle: (date) => date ? `You are on Pro until ${date}` : 'You are on Pro',
+    adminAccessTitle: 'You have admin access — every feature is unlocked',
+    renewShortButton: 'Extend',
+    toCabinetButton: 'Go to my account',
     connectButtonLabel: (amount, suffix) => `Subscribe for ${amount} ₸${suffix}`,
     questionsText: 'Questions?',
     telegramLinkLabel: 'Message us on Telegram',

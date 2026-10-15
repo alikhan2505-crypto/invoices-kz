@@ -24,6 +24,8 @@ export interface KontragentDict {
   limitTitle: string
   limitBody: string
   limitButton: string
+  /** Тот же блок для вошедшего (с 15.10.2026): вместо фразы о регистрации — «продолжите в кабинете». */
+  limitBodySignedIn: string
   binPrefix: string
   registered: (date: string) => string
   kgdNote: string
@@ -41,6 +43,10 @@ export interface KontragentDict {
   fullCardTitle: string
   fullCardBody: string
   fullCardLink: string
+  /** Для вошедшего: без «после регистрации», ссылка ведёт в счёт кабинета. */
+  fullCardTitleSignedIn: string
+  fullCardBodySignedIn: string
+  fullCardLinkSignedIn: string
   sources: string
   /** Статус из реестра приходит по-русски (statusru) — переводим известные. */
   status: (raw: string) => string
@@ -100,6 +106,8 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
     limitBody:
       'В кабинете invoices.kz проверки без лимита — плюс полная карточка контрагента (адрес, руководитель, вид деятельности) и автозаполнение реквизитов прямо в счёте. Регистрация бесплатная, по ссылке на почту.',
     limitButton: 'Зарегистрироваться бесплатно',
+    limitBodySignedIn:
+      'В кабинете invoices.kz проверка по БИН — без лимита, прямо в счёте: введите БИН клиента, и реквизиты подставятся сами, а налоговый долг и риски будут видны сразу. Продолжите в кабинете invoices.kz.',
     binPrefix: 'БИН',
     registered: d => `зарегистрирован ${d}`,
     kgdNote: 'Данные КГД: для ИП государство публикует только имя и дату регистрации — пустые поля здесь не ошибка.',
@@ -130,6 +138,9 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
     fullCardTitle: '🔒 Адрес, руководитель и вид деятельности — в полной карточке',
     fullCardBody: 'После бесплатной регистрации реквизиты контрагента подставляются в счёт автоматически.',
     fullCardLink: 'Открыть полную карточку →',
+    fullCardTitleSignedIn: 'Адрес, руководитель и вид деятельности — в кабинете, в форме счёта',
+    fullCardBodySignedIn: 'В кабинете введите БИН клиента при создании счёта — реквизиты подставятся автоматически.',
+    fullCardLinkSignedIn: 'Открыть в кабинете →',
     sources:
       'Источники: ГБД «Юридические лица» (data.egov.kz) и сервисы портала КГД РК. Данные обновляются реестрами с задержкой до суток; результат носит справочный характер.',
     status: raw => raw,
@@ -203,6 +214,8 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
     limitBody:
       'invoices.kz кабинетінде тексеру шектеусіз — оған қоса контрагенттің толық карточкасы (мекенжайы, басшысы, қызмет түрі) бар, ал деректемелер шотқа өзі толтырылады. Тіркелу тегін, поштаға келген сілтеме арқылы.',
     limitButton: 'Тегін тіркелу',
+    limitBodySignedIn:
+      'invoices.kz кабинетінде БСН бойынша тексеру шектеусіз, тікелей шоттың ішінде: клиенттің БСН-ін енгізсеңіз, деректемелері өзі толтырылады, ал салық қарызы мен тәуекелдер бірден көрінеді. Жұмысты invoices.kz кабинетінде жалғастырыңыз.',
     binPrefix: 'БСН',
     registered: d => `тіркелген күні ${d}`,
     kgdNote: 'МКК деректері: ЖК бойынша мемлекет тек аты-жөні мен тіркелген күнін жариялайды — мұндағы бос өрістер қате емес.',
@@ -233,6 +246,9 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
     fullCardTitle: '🔒 Мекенжайы, басшысы және қызмет түрі — толық карточкада',
     fullCardBody: 'Тегін тіркелгеннен кейін контрагенттің деректемелері шотқа автоматты түрде қойылады.',
     fullCardLink: 'Толық карточканы ашу →',
+    fullCardTitleSignedIn: 'Мекенжайы, басшысы және қызмет түрі — кабинетте, шот жасау бетінде',
+    fullCardBodySignedIn: 'Кабинетте шот жасағанда клиенттің БСН-ін енгізіңіз — деректемелері автоматты түрде қойылады.',
+    fullCardLinkSignedIn: 'Кабинетте ашу →',
     sources:
       'Дереккөздер: «Заңды тұлғалар» мемлекеттік деректер базасы (data.egov.kz) және ҚР МКК порталының сервистері. Тізілімдер бір тәулікке дейін кешігіп жаңарады; нәтиже анықтамалық сипатта. Компания атауы мен мәртебесі тізілімде қалай жазылса, солай көрсетіледі — көбіне орыс тілінде.',
     status: translateStatus('kk'),
@@ -306,6 +322,8 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
     limitBody:
       'Inside an invoices.kz account checks are unlimited — plus the full company card (address, director, line of business) and the company details filled into your invoice automatically. Sign-up is free, via an email link.',
     limitButton: 'Sign up for free',
+    limitBodySignedIn:
+      'In your invoices.kz account BIN checks are unlimited, right inside the invoice: enter the client’s BIN and their details fill in automatically, with tax debt and risks shown at once. Continue in your invoices.kz account.',
     binPrefix: 'BIN',
     registered: d => `registered ${d}`,
     kgdNote: 'KGD data: for sole proprietors the state publishes only the name and registration date — empty fields here are not an error.',
@@ -336,6 +354,9 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
     fullCardTitle: '🔒 Address, director and line of business are in the full card',
     fullCardBody: 'After a free sign-up, a counterparty’s company details are filled into your invoice automatically.',
     fullCardLink: 'Open the full card →',
+    fullCardTitleSignedIn: 'Address, director and line of business are in your account, on the invoice form',
+    fullCardBodySignedIn: 'In your account, enter the client’s BIN when creating an invoice and their details fill in automatically.',
+    fullCardLinkSignedIn: 'Open in my account →',
     sources:
       'Sources: the “Legal Entities” state database (data.egov.kz) and KGD portal services. Registers update with up to a one-day delay; results are for reference only. Company names and statuses are shown as they appear in the register, usually in Russian.',
     status: translateStatus('en'),

@@ -67,6 +67,8 @@ export interface NakladnayaDict {
   limitReset: (iso: string) => string
   limitBody: string
   limitButton: string
+  /** Тот же блок для вошедшего (с 15.10.2026): вместо фразы о регистрации — «продолжите в кабинете». */
+  limitBodySignedIn: string
   generate: string
   remaining: (left: number, limit: number) => string
   waybillsLink: string
@@ -138,6 +140,8 @@ export const nakladnayaDict: Record<ToolLang, NakladnayaDict> = {
     limitBody:
       'В кабинете invoices.kz на тарифе Про накладная создаётся из счёта в один клик: реквизиты и товары уже заполнены, номера считаются сами, подпись и печать — внутри PDF. Регистрация бесплатная.',
     limitButton: 'Зарегистрироваться бесплатно',
+    limitBodySignedIn:
+      'В кабинете invoices.kz на тарифе Про накладная создаётся из счёта в один клик: реквизиты и товары уже заполнены, номера считаются сами, подпись и печать — внутри PDF. Продолжите в кабинете invoices.kz.',
     generate: 'Создать накладную — откроется для печати и скачивания',
     remaining: (left, n) => `Осталось ${left} из ${n} бесплатных накладных в этом квартале`,
     waybillsLink: 'Накладные Kaspi одним PDF →',
@@ -225,6 +229,8 @@ export const nakladnayaDict: Record<ToolLang, NakladnayaDict> = {
     limitBody:
       'invoices.kz кабинетінде Про тарифінде жүкқұжат шоттан бір басумен жасалады: деректемелер мен тауарлар толтырылып тұрады, нөмірлер өздігінен қойылады, қолтаңба мен мөр PDF ішінде. Тіркелу тегін.',
     limitButton: 'Тегін тіркелу',
+    limitBodySignedIn:
+      'invoices.kz кабинетінде Про тарифінде жүкқұжат шоттан бір басумен жасалады: деректемелер мен тауарлар толтырылып тұрады, нөмірлер өздігінен қойылады, қолтаңба мен мөр PDF ішінде. Жұмысты invoices.kz кабинетінде жалғастырыңыз.',
     generate: 'Жүкқұжат жасау — басып шығаруға және жүктеуге ашылады',
     remaining: (left, n) => `Осы тоқсанда қалған тегін жүкқұжат: ${left} / ${n}`,
     waybillsLink: 'Kaspi жүкқұжаттары бір PDF-те →',
@@ -312,6 +318,8 @@ export const nakladnayaDict: Record<ToolLang, NakladnayaDict> = {
     limitBody:
       'On the Pro plan in an invoices.kz account a delivery note is created from an invoice in one click: requisites and goods are already filled in, numbering is automatic, and the signature and stamp are inside the PDF. Sign-up is free.',
     limitButton: 'Sign up for free',
+    limitBodySignedIn:
+      'On the Pro plan in your invoices.kz account a delivery note is created from an invoice in one click: requisites and goods are already filled in, numbering is automatic, and the signature and stamp are inside the PDF. Continue in your invoices.kz account.',
     generate: 'Create the delivery note — opens for printing and download',
     remaining: (left, n) => `${left} of ${n} free notes left this quarter`,
     waybillsLink: 'All Kaspi waybills in one PDF →',

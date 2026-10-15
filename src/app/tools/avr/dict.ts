@@ -71,6 +71,8 @@ export interface AvrDict {
   limitReset: (iso: string) => string
   limitBody: string
   limitButton: string
+  /** Тот же блок для вошедшего (с 15.10.2026): вместо фразы о регистрации — «продолжите в кабинете». */
+  limitBodySignedIn: string
   generate: string
   remaining: (left: number, limit: number) => string
   /** Ссылка на гайд «документы ИП»; на en гайд русский — это помечено в тексте. */
@@ -147,6 +149,8 @@ export const avrDict: Record<ToolLang, AvrDict> = {
     limitBody:
       'В кабинете invoices.kz на тарифе Про АВР создаётся из счёта в один клик: реквизиты и работы уже заполнены, номера считаются сами, подпись и печать — внутри PDF, подписание ЭЦП. Регистрация бесплатная.',
     limitButton: 'Зарегистрироваться бесплатно',
+    limitBodySignedIn:
+      'В кабинете invoices.kz на тарифе Про АВР создаётся из счёта в один клик: реквизиты и работы уже заполнены, номера считаются сами, подпись и печать — внутри PDF, подписание ЭЦП. Продолжите в кабинете invoices.kz.',
     generate: 'Создать АВР — откроется для печати и скачивания',
     remaining: (left, n) => `Осталось ${left} из ${n} бесплатных актов в этом квартале`,
     guideLink: 'Чем АВР отличается от счёта и накладной →',
@@ -242,6 +246,8 @@ export const avrDict: Record<ToolLang, AvrDict> = {
     limitBody:
       'invoices.kz кабинетінде Про тарифінде акт шоттан бір басумен жасалады: деректемелер мен жұмыстар толтырылып тұрады, нөмірлер өздігінен қойылады, қолтаңба мен мөр PDF ішінде, ЭЦҚ-мен қол қоюға болады. Тіркелу тегін.',
     limitButton: 'Тегін тіркелу',
+    limitBodySignedIn:
+      'invoices.kz кабинетінде Про тарифінде акт шоттан бір басумен жасалады: деректемелер мен жұмыстар толтырылып тұрады, нөмірлер өздігінен қойылады, қолтаңба мен мөр PDF ішінде, ЭЦҚ-мен қол қоюға болады. Жұмысты invoices.kz кабинетінде жалғастырыңыз.',
     generate: 'Акт жасау — басып шығаруға және жүктеуге ашылады',
     remaining: (left, n) => `Осы тоқсанда қалған тегін акт: ${left} / ${n}`,
     guideLink: 'ОЖА төлем шоты мен жүкқұжаттан немен ерекшеленеді →',
@@ -337,6 +343,8 @@ export const avrDict: Record<ToolLang, AvrDict> = {
     limitBody:
       'On the Pro plan in an invoices.kz account an AVR is created from an invoice in one click: your details and services are already filled in, numbering is automatic, the signature and stamp are inside the PDF, and it can be signed with a digital signature (EDS). Sign-up is free.',
     limitButton: 'Sign up for free',
+    limitBodySignedIn:
+      'On the Pro plan in your invoices.kz account an AVR is created from an invoice in one click: your details and services are already filled in, numbering is automatic, the signature and stamp are inside the PDF, and it can be signed with a digital signature (EDS). Continue in your invoices.kz account.',
     generate: 'Create the AVR — opens for printing and download',
     remaining: (left, n) => `${left} of ${n} free certificates left this quarter`,
     guideLink: 'AVR vs invoice vs delivery note (in Russian) →',

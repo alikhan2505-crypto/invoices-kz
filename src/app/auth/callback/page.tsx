@@ -4,9 +4,8 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useLanguage } from '@/components/LanguageProvider'
 import { authDict } from '@/lib/i18n/auth'
-import { hasPendingUpgrade } from '@/lib/pendingUpgrade'
-import { consumePostLoginRedirect } from '@/lib/postLoginRedirect'
-import { homeFor, selectablePersonaProducts, parsePersonaKeys, PENDING_PERSONA_KEY } from '@/lib/products'
+import { choosePostLoginDestination, readPostLoginIntents } from '@/lib/postLoginDestination'
+import { selectablePersonaProducts, parsePersonaKeys, PENDING_PERSONA_KEY } from '@/lib/products'
 
 export default function AuthCallback() {
   const router = useRouter()
@@ -77,8 +76,11 @@ export default function AuthCallback() {
         // stale key left behind by an untaken branch (e.g. onboarding or
         // hasPendingUpgrade() winning this time) could hijack a completely
         // unrelated later sign-in that never went through the guard that set
-        // it. See src/lib/postLoginRedirect.ts.
-        const postLoginRedirect = consumePostLoginRedirect()
+        // it. See src/lib/postLoginRedirect.ts. readPostLoginIntents() does
+        // that consume and also peeks at a (fresh) pending upgrade; stale
+        // entries -- older than 30 minutes -- are dropped there (see
+        // src/lib/storedIntent.ts).
+        const intents = readPostLoginIntents()
 
         // Start-page answer ("what do you do?") given before signing in: it
         // connects the matching products, but only for an account that has not
@@ -103,20 +105,12 @@ export default function AuthCallback() {
         // on a failed profile upsert), so the highest-intent user in the
         // funnel (landing page's "Подключить Pro" -> setPendingUpgrade() ->
         // /login) still reaches /upgrade no matter which of those ran.
+        // Priority (fresh pending upgrade -> fresh postLoginRedirect ->
+        // homeFor) lives in src/lib/postLoginDestination.ts, shared with
+        // /login. replace, not push: /login and this page should not stay in
+        // history behind the destination.
         const goToDestination = () => {
-          if (hasPendingUpgrade()) {
-            // Checked before the generic postLoginRedirect below since it
-            // carries a plan+period payload /upgrade's own mount effect
-            // still needs to consume (see src/lib/pendingUpgrade.ts).
-            router.replace('/upgrade')
-          } else if (postLoginRedirect) {
-            // Generic "return to the page that sent the user to /login" --
-            // e.g. /kaspi-api/docs's auth guard (see
-            // src/lib/postLoginRedirect.ts).
-            router.replace(postLoginRedirect)
-          } else {
-            router.push(homeFor(enabledProducts))
-          }
+          router.replace(choosePostLoginDestination(intents, enabledProducts))
         }
 
         const needsBootstrap =
