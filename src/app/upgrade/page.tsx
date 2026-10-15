@@ -560,7 +560,8 @@ export default function Upgrade() {
 
   return (
     <main className="min-h-screen bg-gray-50 flex flex-col">
-      <div className="bg-white border-b px-4 py-3 flex items-center gap-3">
+      {/* h-14 / lg:h-20: плашка кошелька (TopUtilityBar) стоит посередине шапки. */}
+      <div className="bg-white border-b px-4 h-14 lg:h-20 flex items-center gap-3">
         <button onClick={() => router.back()} className="back-btn text-gray-400 text-xl" aria-label={backLabel(lang)}>‹</button>
         <span className="font-semibold text-[#1C2056]">{t.pageTitle}</span>
       </div>

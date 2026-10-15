@@ -273,7 +273,10 @@ export default function Admin() {
 
   return (
     <main className="min-h-screen bg-gray-900 text-white">
-      <div className="bg-gray-800 border-b border-gray-700 px-6 py-4 flex items-center justify-between">
+      {/* «На сайт» — слева, рядом с названием: справа его закрывала плашка
+          кошелька (TopUtilityBar). На телефоне шапка ниже плашки (pt-14),
+          на компьютере — высотой 80px, плашка посередине. */}
+      <div className="bg-gray-800 border-b border-gray-700 px-6 pt-14 pb-4 lg:py-0 lg:h-20 flex items-center gap-4">
         <div>
           <div className="font-bold text-lg">{t.adminBrandLabel}</div>
           <div className="text-xs text-gray-400">{t.controlPanelLabel}</div>

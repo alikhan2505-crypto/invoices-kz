@@ -597,7 +597,12 @@ export default function TopUtilityBar() {
     pathname.startsWith('/verify/') ||
     pathname.startsWith('/promo/') ||
     pathname.startsWith('/shop/') ||
-    pathname.startsWith('/tools/')
+    pathname.startsWith('/tools/') ||
+    // Гайды — публичные статьи со своей шапкой: плашка закрывала там
+    // переключатель «Қазақша» у вошедших (15.10.2026).
+    pathname === '/tools' ||
+    pathname === '/guides' ||
+    pathname.startsWith('/guides/')
   if (isPublicPage) return null
 
   // Founder-requested 2026-09-17: not a public page (opposite reason from
@@ -622,6 +627,10 @@ export default function TopUtilityBar() {
   if (pathname === '/products') return null
 
   if (!loggedIn) return null
+  // Страницы без DesktopShell со своей шапкой высотой 80px на компьютере
+  // (/upgrade, /admin): там бар начинается с y=0, и плашка (58px) стоит
+  // посередине при top 11px, а не 21px, как в карточке DesktopShell.
+  const ownHeaderPage = pathname === '/upgrade' || pathname === '/admin'
 
   const visibleWallets = WALLETS.filter(w => !w.adminOnly || isAdmin)
   const wallet = visibleWallets.find(w => w.key === activeWallet) ?? visibleWallets[0]
@@ -652,7 +661,7 @@ export default function TopUtilityBar() {
           (not right-3): DesktopShell's card has a 28px corner radius at the same
           right-3 edge -- right-3 crowded the pill right into that curve, reading as
           jammed into the corner rather than sitting in the bar. right-6 clears it. */}
-      <div data-tour="wallet" className="fixed top-1.5 lg:top-[21px] right-3 lg:right-6 z-50 flex items-center gap-1.5 nav-glass rounded-full px-1.5 py-0 lg:py-1.5"
+      <div data-tour="wallet" className={`fixed top-1.5 ${ownHeaderPage ? 'lg:top-[11px]' : 'lg:top-[21px]'} right-3 lg:right-6 z-50 flex items-center gap-1.5 nav-glass rounded-full px-1.5 py-0 lg:py-1.5`}
         style={{ boxShadow: `0 12px 30px -14px rgba(10,10,15,0.35), var(--nav-card-glow)` }}>
         <button onClick={() => openPanel('wallet')} title="Кошелёк"
           className="flex items-center gap-1.5 rounded-full pl-2 pr-2.5 py-1.5 hover:bg-gray-50 transition-colors">
