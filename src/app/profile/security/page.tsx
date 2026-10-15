@@ -31,16 +31,6 @@ function KeyIcon() {
     </svg>
   )
 }
-function InfoIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 11v6" />
-      <path d="M12 7.5h.01" />
-    </svg>
-  )
-}
-
 type Passkey = { id: string; device_label: string | null; created_at: string; last_used_at: string | null }
 
 function guessDeviceLabel() {
@@ -194,17 +184,6 @@ export default function Security() {
               </div>
             </motion.div>
 
-            {/* ЭЦП здесь не настраивается — только напоминание, где её искать. */}
-            <motion.p
-              initial={reduceMotion ? false : { opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.12 }}
-              className="flex items-start gap-2 text-xs px-1 leading-relaxed"
-              style={{ color: 'var(--nav-text-muted)' }}
-            >
-              <span className="flex-shrink-0" style={{ color: 'var(--nav-text-muted)' }}><InfoIcon /></span>
-              <span>{t.ecpWhereNote}</span>
-            </motion.p>
           </div>
         </div>
       {dialogElement}

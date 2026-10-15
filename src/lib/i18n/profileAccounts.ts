@@ -46,7 +46,6 @@ export interface ProfileAccountsContent {
   passkeyNoneHint: string
   passkeyNotSupportedHint: string
   passkeyRemoveConfirm: string
-  ecpWhereNote: string
 
   // connectors page (connectors/page.tsx)
   connectorsHeaderLabel: string
@@ -152,7 +151,6 @@ export const profileAccountsDict: Record<'ru' | 'kk' | 'en', ProfileAccountsCont
     passkeyNoneHint: 'Пока нет ни одного устройства — вход только по email',
     passkeyNotSupportedHint: 'Этот браузер не поддерживает вход по Face ID / Touch ID',
     passkeyRemoveConfirm: 'Убрать это устройство?',
-    ecpWhereNote: 'ЭЦП-подпись ставится на странице счёта, на тарифе Про.',
 
     connectorsHeaderLabel: 'Кнопки оплаты и контакты',
     emptyLinkLabel: 'Ссылка',
@@ -253,7 +251,6 @@ export const profileAccountsDict: Record<'ru' | 'kk' | 'en', ProfileAccountsCont
     passkeyNoneHint: 'Әзірге бірде-бір құрылғы жоқ — тек email арқылы кіру',
     passkeyNotSupportedHint: 'Бұл браузер Face ID / Touch ID арқылы кіруді қолдамайды',
     passkeyRemoveConfirm: 'Бұл құрылғыны алып тастау керек пе?',
-    ecpWhereNote: 'ЭЦҚ-мен қол шот бетінде қойылады, Про тарифінде.',
 
     connectorsHeaderLabel: 'Төлем батырмалары мен байланыстар',
     emptyLinkLabel: 'Сілтеме',
@@ -354,7 +351,6 @@ export const profileAccountsDict: Record<'ru' | 'kk' | 'en', ProfileAccountsCont
     passkeyNoneHint: 'No devices added yet — signing in still requires email',
     passkeyNotSupportedHint: 'This browser doesn’t support Face ID / Touch ID sign-in',
     passkeyRemoveConfirm: 'Remove this device?',
-    ecpWhereNote: 'A digital signature is added on the invoice page, on the Pro plan.',
 
     connectorsHeaderLabel: 'Payment buttons and contacts',
     emptyLinkLabel: 'Link',
