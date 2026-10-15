@@ -14,8 +14,8 @@
   <text x="122" y="414" font-family="Arial, sans-serif" font-size="24" fill="rgba(255,255,255,0.45)">А6 — по одной, на термопринтер</text>
   <text x="122" y="450" font-family="Arial, sans-serif" font-size="24" fill="rgba(255,255,255,0.45)">Файлы нигде не сохраняются</text>
 
-  <rect x="122" y="484" width="330" height="52" rx="26" fill="#2DC48D"/>
-  <text x="287" y="518" text-anchor="middle" font-family="Arial, sans-serif" font-weight="700" font-size="21" fill="#ffffff">Бесплатно, без регистрации</text>
+  <rect x="122" y="484" width="470" height="52" rx="26" fill="#2DC48D"/>
+  <text x="357" y="518" text-anchor="middle" font-family="Arial, sans-serif" font-weight="700" font-size="21" fill="#ffffff">5 в месяц бесплатно, без регистрации</text>
 
   <circle cx="920" cy="290" r="190" fill="rgba(45,196,141,0.06)"/>
   <circle cx="920" cy="290" r="138" fill="rgba(45,196,141,0.09)"/>

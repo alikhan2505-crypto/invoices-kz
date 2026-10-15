@@ -10,7 +10,7 @@ import { waybillsDict } from '../../waybills/dict'
 const LANG = 'kk' as const
 const t = waybillsDict[LANG]
 
-export const metadata: Metadata = toolMetadata('waybills', LANG, t.seo)
+export const metadata: Metadata = toolMetadata('waybills', LANG, t.seo, '/og/tool-waybills.png?v=2') // v=2: «5 в месяц» вместо «без регистрации» — сброс кэша превью соцсетей
 
 export default function Page() {
   return (
