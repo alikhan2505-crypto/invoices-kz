@@ -1,8 +1,12 @@
 'use client'
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, type CSSProperties, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
+import { motion, useReducedMotion } from 'framer-motion'
 import QRCode from 'qrcode'
 import { supabase } from '@/lib/supabase'
+import SiteNav from '@/components/SiteNav'
+import DesktopShell from '@/components/DesktopShell'
 import { useLanguage } from '@/components/LanguageProvider'
 import { backLabel, closeLabel } from '@/lib/a11yLabels'
 import { miscDict } from '@/lib/i18n/misc'
@@ -30,9 +34,164 @@ function hasOwnedCard(p: { is_admin?: boolean | null } | null): boolean {
   return info.plan === 'pro' && !info.isTrial
 }
 
+// Same easing curve used across the redesigned cabinet (see
+// src/app/profile/contracts/page.tsx) -- not a second "house" ease.
+const EASE = [0.16, 1, 0.3, 1] as const
+
+// Lift-on-hover used by the cabinet's buttons; off under reduced motion.
+const PRESS = 'transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0 motion-reduce:transition-none motion-reduce:hover:translate-y-0'
+// Same 1.5px border as BTN_OUTLINE (transparent) so a filled and an outlined
+// CTA are the same height and line up across the plan row.
+const BTN_PRIMARY: CSSProperties = { background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)', border: '1.5px solid transparent' }
+const BTN_OUTLINE: CSSProperties = { border: '1.5px solid var(--nav-accent)', color: 'var(--nav-accent)', background: 'transparent' }
+const BTN_GHOST: CSSProperties = { background: 'var(--nav-surface-glass)', color: 'var(--nav-text-secondary)', border: '1px solid var(--nav-border-soft)' }
+// Inline background/colour (not bg-white): the legacy [data-theme="dark"]
+// .bg-white override and the browser's default white field would otherwise
+// fight the tokens in dark mode.
+const inputClass = 'w-full rounded-lg px-3 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]'
+// WebkitTextFillColor: globals.css paints every input's glyphs #111827 via
+// -webkit-text-fill-color (beats `color` in Blink/WebKit), which is invisible
+// on the dark surface when dark comes from the OS (no data-theme attribute).
+const INPUT_STYLE: CSSProperties = { background: 'var(--nav-surface-glass)', color: 'var(--nav-text-primary)', WebkitTextFillColor: 'var(--nav-text-primary)' }
+const ROW_STYLE: CSSProperties = { background: 'var(--nav-surface-glass)' }
+
+function ChevronLeftIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="m15 6-6 6 6 6" />
+    </svg>
+  )
+}
+function XIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M18 6 6 18M6 6l12 12" />
+    </svg>
+  )
+}
+function CheckIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="m5 12.5 4.5 4.5L19 7.5" />
+    </svg>
+  )
+}
+
+// Bottom sheet on a phone, centred dialog from lg up. Portalled to <body>:
+// the page now sits inside DesktopShell / .page-surface-in-shell, whose
+// backdrop-filter makes it the containing block for `position: fixed` -- an
+// in-tree overlay would be pinned to the (tall) page, not the viewport.
+// Module-level so it is never re-created (and its content remounted) on a
+// re-render of the page.
+function Sheet({ children, zClass, labelledBy, onBackdrop }: {
+  children: ReactNode; zClass: string; labelledBy?: string; onBackdrop?: () => void
+}) {
+  if (typeof document === 'undefined') return null
+  return createPortal(
+    <div className={`fixed inset-0 ${zClass} flex items-end lg:items-center justify-center lg:p-6`}
+      style={{ background: 'rgba(15, 17, 23, 0.55)' }}
+      onClick={onBackdrop}>
+      <div role="dialog" aria-modal="true" aria-labelledby={labelledBy}
+        className="w-full max-w-lg lg:max-w-md max-h-[92dvh] overflow-y-auto overscroll-contain rounded-t-3xl lg:rounded-3xl px-6 pt-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-2xl"
+        style={{ background: 'var(--nav-surface-chrome)', color: 'var(--nav-text-primary)', border: '1px solid var(--nav-border-soft)' }}
+        onClick={e => e.stopPropagation()}>
+        {children}
+      </div>
+    </div>,
+    document.body,
+  )
+}
+
+function SheetCloseButton({ onClick, label }: { onClick: () => void; label: string }) {
+  return (
+    <button type="button" onClick={onClick} aria-label={label}
+      className="w-11 h-11 -mr-2 flex items-center justify-center rounded-xl flex-shrink-0 transition-colors hover:bg-[var(--nav-surface-glass)]"
+      style={{ color: 'var(--nav-text-muted)' }}>
+      <XIcon />
+    </button>
+  )
+}
+
+function Spinner({ size = 'lg' }: { size?: 'lg' | 'sm' }) {
+  return (
+    <div className={`${size === 'lg' ? 'w-10 h-10' : 'w-3 h-3'} border-2 rounded-full animate-spin flex-shrink-0`}
+      style={{ borderColor: 'var(--nav-accent)', borderTopColor: 'transparent' }} aria-hidden="true" />
+  )
+}
+
+function OrDivider({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <div className="flex-1 h-px" style={{ background: 'var(--nav-border)' }} />
+      <span className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>{label}</span>
+      <div className="flex-1 h-px" style={{ background: 'var(--nav-border)' }} />
+    </div>
+  )
+}
+
+// The entrance `initial` is the same on the server and the client on purpose:
+// `initial={reduceMotion ? false : ...}` (the pattern on /profile/contracts)
+// renders differently once useReducedMotion() resolves on the client and
+// trips a hydration mismatch. Reduced motion zeroes the duration instead.
+// One price card. All three share the same 2px border so their content lines
+// up across the desktop row; Pro alone gets the accent border, the soft
+// accent wash and the top gradient bar (.nav-card-accent).
+function PlanCard({ id, tone, current, index, reduceMotion, children }: {
+  id?: string; tone: 'free' | 'basic' | 'pro'; current: boolean; index: number
+  reduceMotion: boolean; children: ReactNode
+}) {
+  const style: CSSProperties = tone === 'pro'
+    ? {
+        border: '2px solid var(--nav-accent)',
+        background: 'linear-gradient(180deg, var(--nav-accent-soft) 0%, transparent 55%), var(--nav-surface-chrome)',
+        boxShadow: 'var(--nav-card-glow)',
+      }
+    : {
+        border: `2px solid ${current ? 'var(--nav-accent)' : tone === 'basic' ? 'var(--nav-border)' : 'var(--nav-border-soft)'}`,
+        background: 'var(--nav-surface-chrome)',
+      }
+  return (
+    <motion.div id={id}
+      initial={{ opacity: 0, y: 14 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: reduceMotion ? 0 : 0.06 + index * 0.05, duration: reduceMotion ? 0 : 0.35, ease: EASE }}
+      className={`h-full flex flex-col rounded-2xl p-6 ${tone === 'pro' ? 'nav-card-accent' : ''}`}
+      style={style}>
+      {children}
+    </motion.div>
+  )
+}
+
+function PlanBadge({ solid, children }: { solid?: boolean; children: ReactNode }) {
+  return (
+    // Weight inline, not font-semibold: the legacy [data-theme="dark"]
+    // span.font-semibold rule would force the text white with !important.
+    <span className="text-xs px-2.5 py-1 rounded-full whitespace-nowrap"
+      style={solid
+        ? { fontWeight: 600, background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }
+        : { fontWeight: 600, background: 'var(--nav-accent-soft)', color: 'var(--nav-accent)' }}>
+      {children}
+    </span>
+  )
+}
+
+function FeatureList({ items }: { items: string[] }) {
+  return (
+    <ul className="space-y-2.5 flex-1">
+      {items.map(f => (
+        <li key={f} className="flex items-start gap-2 text-sm leading-snug" style={{ color: 'var(--nav-text-secondary)' }}>
+          <span className="mt-px flex-shrink-0" style={{ color: 'var(--nav-success)' }}><CheckIcon /></span>
+          <span>{f}</span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 export default function Upgrade() {
   const router = useRouter()
   const { lang } = useLanguage()
+  const reduceMotion = useReducedMotion()
   const t = miscDict[lang]
   // Shadows window.alert for this component -- see src/components/AppDialog.tsx.
   const { alert, dialogElement } = useAppDialog()
@@ -132,7 +291,8 @@ export default function Upgrade() {
     setPendingScrollPlan(null)
     if (hasOwnedCard(profile)) return
     requestAnimationFrame(() => {
-      document.getElementById(`plan-${target}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      document.getElementById(`plan-${target}`)?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' })
     })
   }, [pendingScrollPlan, profileChecked, profile])
 
@@ -635,16 +795,16 @@ export default function Upgrade() {
     setPromoLoading(false)
   }
 
-  function ConnectButton({ planName, amount, planKey, dark }: {
-    planName: string; amount: number; planKey: string; dark?: boolean
+  // `primary` -- the highlighted Pro card's filled accent CTA; otherwise an
+  // accent outline (Базовый). Tokens, not #1C2056, so dark mode works.
+  function ConnectButton({ planName, amount, planKey, primary }: {
+    planName: string; amount: number; planKey: string; primary?: boolean
   }) {
     const suffix = period === 'annual' ? t.perYearSuffix : t.perMonthSuffix
     return (
-      <button onClick={() => startPurchase(planName, amount, planKey, period)} disabled={walletQuoteLoading}
-        className={`w-full rounded-xl py-3.5 font-medium text-sm disabled:opacity-60 ${dark
-          ? 'bg-[#2DC48D] text-white'
-          : 'border-2 border-[#1C2056] text-[#1C2056]'
-        }`}>
+      <button type="button" onClick={() => startPurchase(planName, amount, planKey, period)} disabled={walletQuoteLoading}
+        className={`w-full min-h-[48px] rounded-xl py-3.5 px-4 text-sm font-semibold disabled:opacity-60 ${PRESS}`}
+        style={primary ? BTN_PRIMARY : BTN_OUTLINE}>
         {t.connectButtonLabel(amount.toLocaleString('ru-KZ'), suffix)}
       </button>
     )
@@ -656,15 +816,13 @@ export default function Upgrade() {
   // openModal/period flow as a fresh purchase; settlePlanPayment.ts and
   // admin/page.tsx's activatePayment stack the new period on top of the
   // remaining days rather than restarting from today.
-  function RenewButton({ planName, amount, planKey, dark, id }: {
-    planName: string; amount: number; planKey: string; dark?: boolean; id?: string
+  function RenewButton({ planName, amount, planKey, id }: {
+    planName: string; amount: number; planKey: string; id?: string
   }) {
     return (
-      <button id={id} onClick={() => startPurchase(planName, amount, planKey, period)} disabled={walletQuoteLoading}
-        className={`w-full rounded-xl py-3 font-medium text-sm disabled:opacity-60 ${dark
-          ? 'bg-white/10 text-white border border-white/20'
-          : 'border-2 border-[#1C2056] text-[#1C2056]'
-        }`}>
+      <button type="button" id={id} onClick={() => startPurchase(planName, amount, planKey, period)} disabled={walletQuoteLoading}
+        className={`w-full min-h-[48px] rounded-xl py-3 px-4 text-sm font-semibold disabled:opacity-60 ${PRESS}`}
+        style={BTN_OUTLINE}>
         {t.renewButtonLabel(period)}
       </button>
     )
@@ -690,294 +848,318 @@ export default function Upgrade() {
   // toggle + price are right there) rather than opening a payment silently.
   function scrollToRenew() {
     const card = document.getElementById('plan-pro')
-    card?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    card?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'center' })
     ;(document.getElementById('renew-pro') as HTMLButtonElement | null)?.focus({ preventScroll: true })
   }
 
+  // Opened straight from a link (new tab, email) there is no history entry to
+  // go back to -- land on the profile, where «Тариф» lives, instead of nowhere.
+  function goBack() {
+    if (typeof window !== 'undefined' && window.history.length > 1) router.back()
+    else router.push('/profile')
+  }
+
+  // ✕ on the payment sheet. Частичная оплата: удержание с кошелька вернуть сразу.
+  function closeQrModal() {
+    clearInterval(statusInterval.current)
+    if (walletInUse && extTranId) void releaseWalletHold(extTranId)
+    setShowModal(false)
+  }
+
+  const suffixFor = (p: BillingPeriod | undefined) => p === 'annual' ? t.perYearSuffix : t.perMonthSuffix
+  const priceSuffix = suffixFor(period)
+
   return (
-    <main className="min-h-screen bg-gray-50 flex flex-col">
-      {/* h-14 / lg:h-20: плашка кошелька (TopUtilityBar) стоит посередине шапки. */}
-      <div className="bg-white border-b px-4 h-14 lg:h-20 flex items-center gap-3">
-        <button onClick={() => router.back()} className="back-btn text-gray-400 text-xl" aria-label={backLabel(lang)}>‹</button>
-        <span className="font-semibold text-[#1C2056]">{t.pageTitle}</span>
-      </div>
-
-      <div className="max-w-lg mx-auto p-6 flex-1">
-        {ownedCard && (
-          <div className="bg-white border-2 border-[#2DC48D] rounded-2xl p-5 mb-6 shadow-sm" role="status">
-            <div className="font-bold text-[#1C2056] text-base mb-4">
-              {ownedCard.kind === 'admin' ? t.adminAccessTitle : t.proActiveTitle(ownedCard.until)}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {ownedCard.kind === 'pro' && (
-                <button type="button" onClick={scrollToRenew}
-                  className="flex-1 min-w-[140px] min-h-[44px] rounded-xl border-2 border-[#1C2056] text-[#1C2056] text-sm font-medium">
-                  {t.renewShortButton}
-                </button>
-              )}
-              <button type="button" onClick={() => router.push(homeFor(profile?.enabled_products))}
-                className="flex-1 min-w-[140px] min-h-[44px] rounded-xl bg-[#1C2056] text-white text-sm font-medium">
-                {t.toCabinetButton}
-              </button>
-            </div>
-          </div>
-        )}
-
-        <div className="text-center mb-8">
-          <div className="text-5xl mb-4">🚀</div>
-          <h1 className="text-2xl font-bold text-[#1C2056] mb-2">{t.heroTitle}</h1>
-          <p className="text-gray-400 text-sm">{t.heroSubtitle}</p>
-        </div>
-
-        {/* Promo */}
-        <div className="bg-white rounded-2xl p-4 mb-6 shadow-sm">
-          <div className="text-sm font-medium text-[#1C2056] mb-3">{t.promoSectionLabel}</div>
-          <div className="flex gap-2">
-            <input
-              className="flex-1 border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1C2056] uppercase"
-              placeholder={t.promoPlaceholder}
-              value={promoCode}
-              onChange={e => { setPromoCode(e.target.value.toUpperCase()); setPromoError(''); setPromoSuccess('') }}
-            />
-            <button onClick={applyPromo} disabled={promoLoading}
-              className="bg-[#1C2056] text-white px-4 py-2.5 rounded-lg text-sm font-medium">
-              {promoLoading ? t.applyingButtonLabel : t.applyButtonLabel}
+    <DesktopShell>
+      <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
+        <SiteNav />
+        <div className="max-w-lg lg:max-w-5xl mx-auto p-4">
+          <motion.div
+            className="flex items-center gap-3 mb-5"
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE }}
+          >
+            <button
+              type="button"
+              onClick={goBack}
+              aria-label={backLabel(lang)}
+              className="w-11 h-11 flex items-center justify-center rounded-xl flex-shrink-0 transition-colors hover:bg-[var(--nav-surface-glass)]"
+              style={{ color: 'var(--nav-text-muted)' }}
+            >
+              <ChevronLeftIcon />
             </button>
-          </div>
-          {promoError && <p className="text-xs text-red-500 mt-2">{promoError}</p>}
-          {promoSuccess && <p className="text-xs text-[#2DC48D] mt-2 font-medium">{promoSuccess}</p>}
-        </div>
+            <h1 className="text-xl lg:text-2xl font-bold truncate" style={{ color: 'var(--nav-text-primary)' }}>{t.pageTitle}</h1>
+          </motion.div>
 
-        {walletBalance > 0 && (
-          <div className="flex items-center justify-between gap-3 bg-white rounded-2xl px-4 py-3 mb-4 shadow-sm text-sm">
-            <span className="text-gray-500">{tw.walletBalanceLine(walletBalance.toLocaleString('ru-KZ'))}</span>
-            <span className="text-xs text-gray-400 text-right">{tw.cardWalletHint}</span>
-          </div>
-        )}
+          {/* Narrow column: owned card, hero, promo, wallet, period toggle. */}
+          <div className="max-w-xl mx-auto">
+            {ownedCard && (
+              <div className="nav-glass nav-card-accent rounded-2xl p-5 mb-6" role="status"
+                style={{ boxShadow: 'var(--nav-card-glow)' }}>
+                <div className="font-bold text-base mb-4" style={{ color: 'var(--nav-text-primary)' }}>
+                  {ownedCard.kind === 'admin' ? t.adminAccessTitle : t.proActiveTitle(ownedCard.until)}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {ownedCard.kind === 'pro' && (
+                    <button type="button" onClick={scrollToRenew}
+                      className={`flex-1 min-w-[140px] min-h-[44px] rounded-xl text-sm font-semibold ${PRESS}`}
+                      style={BTN_OUTLINE}>
+                      {t.renewShortButton}
+                    </button>
+                  )}
+                  <button type="button" onClick={() => router.push(homeFor(profile?.enabled_products))}
+                    className={`flex-1 min-w-[140px] min-h-[44px] rounded-xl text-sm font-semibold ${PRESS}`}
+                    style={BTN_PRIMARY}>
+                    {t.toCabinetButton}
+                  </button>
+                </div>
+              </div>
+            )}
 
-        {/* Billing period toggle */}
-        <div className="bg-gray-100 rounded-2xl p-1 flex gap-1 mb-6">
-          <button
-            type="button"
-            onClick={() => setPeriod('monthly')}
-            aria-pressed={period === 'monthly'}
-            className={`flex-1 min-h-[44px] rounded-xl text-sm font-semibold transition-colors ${
-              period === 'monthly' ? 'bg-white text-[#1C2056] shadow-sm' : 'text-gray-500'
-            }`}
-          >
-            {t.monthlyToggleLabel}
-          </button>
-          <button
-            type="button"
-            onClick={() => setPeriod('annual')}
-            aria-pressed={period === 'annual'}
-            className={`flex-1 min-h-[44px] rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2 ${
-              period === 'annual' ? 'bg-white text-[#1C2056] shadow-sm' : 'text-gray-500'
-            }`}
-          >
-            {t.annualToggleLabel}
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-[#2DC48D] text-white whitespace-nowrap">
-              {t.annualBadgeLabel}
-            </span>
-          </button>
-        </div>
-
-        {/* Free */}
-        <div className={`bg-white border-2 rounded-2xl p-6 mb-4 ${plan === 'free' ? 'border-[#1C2056]' : 'border-gray-100'}`}>
-          <div className="flex items-center justify-between mb-3">
-            <div className="font-bold text-[#1C2056] text-lg">{t.freePlanName}</div>
-            {plan === 'free' && <span className="text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded-full">{t.currentBadge}</span>}
-          </div>
-          <div className="text-3xl font-bold text-[#1C2056] mb-4">0 ₸</div>
-          <ul className="space-y-2">
-            {t.freeFeatures.map(f => (
-              <li key={f} className="flex items-center gap-2 text-sm text-gray-600">
-                <span className="text-[#2DC48D]">✓</span> {f}
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        {/* Basic */}
-        <div id="plan-basic" className={`bg-white border-2 rounded-2xl p-6 mb-4 ${plan === 'basic' ? 'border-[#1C2056]' : 'border-[#1C2056]/20'}`}>
-          <div className="flex items-center justify-between mb-3">
-            <div className="font-bold text-[#1C2056] text-lg">{t.basicPlanName}</div>
-            {plan === 'basic'
-              ? <span className="text-xs bg-[#1C2056] text-white px-2 py-1 rounded-full">{t.currentBadge}</span>
-              : <span className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded-full">{t.popularBadge}</span>}
-          </div>
-          <div className="text-3xl font-bold text-[#1C2056] mb-4">
-            {PLAN_PRICES.basic[period].toLocaleString('ru-KZ')} ₸<span className="text-sm font-normal text-gray-400">{period === 'annual' ? t.perYearSuffix : t.perMonthSuffix}</span>
-          </div>
-          <ul className="space-y-2 mb-5">
-            {t.basicFeatures.map(f => (
-              <li key={f} className="flex items-center gap-2 text-sm text-gray-600">
-                <span className="text-[#2DC48D]">✓</span> {f}
-              </li>
-            ))}
-          </ul>
-          {plan !== 'basic' && plan !== 'pro' && <ConnectButton planName={t.basicPlanName} amount={PLAN_PRICES.basic[period]} planKey="basic" />}
-          {plan === 'basic' && (
-            <div>
-              <div className="text-center text-sm text-gray-400 py-1">{t.activeLabel}</div>
-              <RenewButton planName={t.basicPlanName} amount={PLAN_PRICES.basic[period]} planKey="basic" />
+            <div className="text-center mb-6">
+              <h2 className="text-lg lg:text-xl font-bold mb-1" style={{ color: 'var(--nav-text-primary)' }}>{t.heroTitle}</h2>
+              <p className="text-sm" style={{ color: 'var(--nav-text-muted)' }}>{t.heroSubtitle}</p>
             </div>
-          )}
-          {plan === 'pro' && <div className="text-center text-sm text-gray-400 py-2">{t.higherPlanNotice}</div>}
-        </div>
 
-        {/* Pro */}
-        <div id="plan-pro" className={`rounded-2xl p-6 mb-6 bg-[#1C2056] ${plan === 'pro' ? 'ring-2 ring-[#2DC48D]' : ''}`}>
-          <div className="flex items-center justify-between mb-3">
-            <div className="font-bold text-white text-lg">{t.proPlanName}</div>
-            {plan === 'pro'
-              ? <span className="text-xs bg-[#2DC48D] text-white px-2 py-1 rounded-full">{t.currentBadge}</span>
-              : <span className="text-xs bg-[#2DC48D] text-white px-2 py-1 rounded-full">{t.maxBadge}</span>}
-          </div>
-          <div className="text-3xl font-bold text-white mb-4">
-            {PLAN_PRICES.pro[period].toLocaleString('ru-KZ')} ₸<span className="text-sm font-normal text-white/60">{period === 'annual' ? t.perYearSuffix : t.perMonthSuffix}</span>
-          </div>
-          <ul className="space-y-2 mb-5">
-            {t.proFeatures.map(f => (
-              <li key={f} className="flex items-center gap-2 text-sm text-white/80">
-                <span className="text-[#2DC48D]">✓</span> {f}
-              </li>
-            ))}
-          </ul>
-          {plan !== 'pro' && <ConnectButton planName={t.proPlanName} amount={PLAN_PRICES.pro[period]} planKey="pro" dark />}
-          {plan === 'pro' && (
-            <div>
-              <div className="text-center text-sm text-white/60 py-1">{t.activeLabel}</div>
-              <RenewButton planName={t.proPlanName} amount={PLAN_PRICES.pro[period]} planKey="pro" dark id="renew-pro" />
+            {/* Promo */}
+            {/* One line on a computer (label · field · button) to keep the
+                plan row above the fold; label on top on a phone. */}
+            <div className="nav-glass rounded-2xl p-4 mb-4">
+              <div className="lg:flex lg:items-center lg:gap-4">
+              <label htmlFor="upgrade-promo" className="block text-sm font-medium mb-3 lg:mb-0 lg:flex-shrink-0" style={{ color: 'var(--nav-text-primary)' }}>{t.promoSectionLabel}</label>
+              <div className="flex gap-2 lg:flex-1 lg:min-w-0">
+                <input
+                  id="upgrade-promo"
+                  className={`${inputClass} flex-1 min-w-0 min-h-[44px] uppercase`}
+                  style={INPUT_STYLE}
+                  placeholder={t.promoPlaceholder}
+                  value={promoCode}
+                  autoComplete="off"
+                  onChange={e => { setPromoCode(e.target.value.toUpperCase()); setPromoError(''); setPromoSuccess('') }}
+                  onKeyDown={e => { if (e.key === 'Enter' && !promoLoading) applyPromo() }}
+                />
+                <button type="button" onClick={applyPromo} disabled={promoLoading}
+                  className={`flex-shrink-0 min-h-[44px] px-4 rounded-lg text-sm font-semibold disabled:opacity-60 ${PRESS}`}
+                  style={BTN_PRIMARY}>
+                  {promoLoading ? t.applyingButtonLabel : t.applyButtonLabel}
+                </button>
+              </div>
+              </div>
+              {promoError && <p className="text-xs mt-2" style={{ color: 'var(--nav-critical)' }} role="alert">{promoError}</p>}
+              {promoSuccess && <p className="text-xs mt-2 font-medium" style={{ color: 'var(--nav-success)' }} role="status">{promoSuccess}</p>}
             </div>
-          )}
+
+            {walletBalance > 0 && (
+              <div className="nav-glass flex items-center justify-between gap-3 rounded-2xl px-4 py-3 mb-4 text-sm">
+                <span style={{ color: 'var(--nav-text-secondary)' }}>{tw.walletBalanceLine(walletBalance.toLocaleString('ru-KZ'))}</span>
+                <span className="text-xs text-right" style={{ color: 'var(--nav-text-muted)' }}>{tw.cardWalletHint}</span>
+              </div>
+            )}
+
+            {/* Billing period toggle */}
+            <div className="rounded-2xl p-1 flex gap-1 mb-6 lg:max-w-md lg:mx-auto"
+              style={{ background: 'var(--nav-surface-glass)', border: '1px solid var(--nav-border-soft)' }}>
+              {(['monthly', 'annual'] as const).map(p => {
+                const on = period === p
+                return (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setPeriod(p)}
+                    aria-pressed={on}
+                    className={`flex-1 min-h-[44px] rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2 px-2 ${on ? 'shadow-sm' : ''}`}
+                    style={on
+                      ? { background: 'var(--nav-surface-chrome)', color: 'var(--nav-text-primary)' }
+                      : { color: 'var(--nav-text-muted)' }}
+                  >
+                    {p === 'monthly' ? t.monthlyToggleLabel : t.annualToggleLabel}
+                    {p === 'annual' && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full whitespace-nowrap"
+                        style={{ fontWeight: 700, background: 'var(--nav-success)', color: 'var(--nav-bg)' }}>
+                        {t.annualBadgeLabel}
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Plans: stacked on a phone, one equal-height row from lg up. */}
+          <div className="grid gap-4 lg:grid-cols-3 lg:gap-5 items-stretch mb-6">
+            {/* Free */}
+            <PlanCard tone="free" current={plan === 'free'} index={0} reduceMotion={!!reduceMotion}>
+              <div className="flex items-center justify-between gap-2 min-h-[28px] mb-3">
+                <h3 className="font-bold text-lg" style={{ color: 'var(--nav-text-primary)' }}>{t.freePlanName}</h3>
+                {plan === 'free' && <PlanBadge solid>{t.currentBadge}</PlanBadge>}
+              </div>
+              <div className="text-3xl font-bold tabular-nums whitespace-nowrap mb-5" style={{ color: 'var(--nav-text-primary)' }}>0 ₸</div>
+              <FeatureList items={t.freeFeatures} />
+            </PlanCard>
+
+            {/* Basic */}
+            <PlanCard id="plan-basic" tone="basic" current={plan === 'basic'} index={1} reduceMotion={!!reduceMotion}>
+              <div className="flex items-center justify-between gap-2 min-h-[28px] mb-3">
+                <h3 className="font-bold text-lg" style={{ color: 'var(--nav-text-primary)' }}>{t.basicPlanName}</h3>
+                {plan === 'basic'
+                  ? <PlanBadge solid>{t.currentBadge}</PlanBadge>
+                  : <PlanBadge>{t.popularBadge}</PlanBadge>}
+              </div>
+              <div className="text-3xl font-bold tabular-nums whitespace-nowrap mb-5" style={{ color: 'var(--nav-text-primary)' }}>
+                {PLAN_PRICES.basic[period].toLocaleString('ru-KZ')} ₸<span className="text-sm font-normal" style={{ color: 'var(--nav-text-muted)' }}>{priceSuffix}</span>
+              </div>
+              <FeatureList items={t.basicFeatures} />
+              <div className="mt-6">
+                {plan !== 'basic' && plan !== 'pro' && <ConnectButton planName={t.basicPlanName} amount={PLAN_PRICES.basic[period]} planKey="basic" />}
+                {plan === 'basic' && (
+                  <div>
+                    <div className="text-center text-sm py-1 mb-1" style={{ color: 'var(--nav-success)' }}>{t.activeLabel}</div>
+                    <RenewButton planName={t.basicPlanName} amount={PLAN_PRICES.basic[period]} planKey="basic" />
+                  </div>
+                )}
+                {plan === 'pro' && <div className="text-center text-sm py-2" style={{ color: 'var(--nav-text-muted)' }}>{t.higherPlanNotice}</div>}
+              </div>
+            </PlanCard>
+
+            {/* Pro */}
+            <PlanCard id="plan-pro" tone="pro" current={plan === 'pro'} index={2} reduceMotion={!!reduceMotion}>
+              <div className="flex items-center justify-between gap-2 min-h-[28px] mb-3">
+                <h3 className="font-bold text-lg" style={{ color: 'var(--nav-text-primary)' }}>{t.proPlanName}</h3>
+                {plan === 'pro'
+                  ? <PlanBadge solid>{t.currentBadge}</PlanBadge>
+                  : <PlanBadge>{t.maxBadge}</PlanBadge>}
+              </div>
+              <div className="text-3xl font-bold tabular-nums whitespace-nowrap mb-5" style={{ color: 'var(--nav-text-primary)' }}>
+                {PLAN_PRICES.pro[period].toLocaleString('ru-KZ')} ₸<span className="text-sm font-normal" style={{ color: 'var(--nav-text-muted)' }}>{priceSuffix}</span>
+              </div>
+              <FeatureList items={t.proFeatures} />
+              <div className="mt-6">
+                {plan !== 'pro' && <ConnectButton planName={t.proPlanName} amount={PLAN_PRICES.pro[period]} planKey="pro" primary />}
+                {plan === 'pro' && (
+                  <div>
+                    <div className="text-center text-sm py-1 mb-1" style={{ color: 'var(--nav-success)' }}>{t.activeLabel}</div>
+                    <RenewButton planName={t.proPlanName} amount={PLAN_PRICES.pro[period]} planKey="pro" id="renew-pro" />
+                  </div>
+                )}
+              </div>
+            </PlanCard>
+          </div>
+
+          <p className="text-center text-xs" style={{ color: 'var(--nav-text-muted)' }}>
+            {plan !== 'free' ? (
+              <>
+                {t.questionsText}{' '}
+                <a href="https://t.me/invoiceskz_support" target="_blank" rel="noopener noreferrer" className="underline font-medium" style={{ color: 'var(--nav-accent)' }}>
+                  {t.telegramLinkLabel}
+                </a>
+              </>
+            ) : (
+              <>
+                {s.upgradeFooterEmailPrefix}
+                <a href="mailto:support@invoices.kz" className="underline font-medium" style={{ color: 'var(--nav-accent)' }}>
+                  support@invoices.kz
+                </a>
+              </>
+            )}
+          </p>
         </div>
 
-        <p className="text-center text-xs text-gray-400">
-          {plan !== 'free' ? (
-            <>
-              {t.questionsText}{' '}
-              <a href="https://t.me/invoiceskz_support" target="_blank" className="text-[#1C2056] underline">
-                {t.telegramLinkLabel}
-              </a>
-            </>
-          ) : (
-            <>
-              {s.upgradeFooterEmailPrefix}
-              <a href="mailto:support@invoices.kz" className="text-[#1C2056] underline">
-                support@invoices.kz
-              </a>
-            </>
-          )}
-        </p>
-      </div>
-
-      {/* Modal QR */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-end">
-          <div className="bg-white w-full max-w-lg mx-auto rounded-t-3xl p-6">
+        {/* Modal QR */}
+        {showModal && (
+          <Sheet zClass="z-[70]" labelledBy={!submitting && step === 'pending' ? 'upgrade-pay-title' : undefined}>
 
             {submitting && (
-              <div className="text-center py-8">
-                <div className="w-10 h-10 border-2 border-[#1C2056] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                <div className="font-semibold text-[#1C2056] mb-1">{selectedPlan?.useWallet && !extTranId && walletPaid >= (selectedPlan?.amount ?? 0) ? tw.walletPayingLabel : t.creatingPaymentLabel}</div>
-                <div className="text-xs text-gray-400">{t.pleaseWaitLabel}</div>
+              <div className="text-center py-8" role="status">
+                <div className="flex justify-center mb-4"><Spinner /></div>
+                <div className="font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>{selectedPlan?.useWallet && !extTranId && walletPaid >= (selectedPlan?.amount ?? 0) ? tw.walletPayingLabel : t.creatingPaymentLabel}</div>
+                <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>{t.pleaseWaitLabel}</div>
               </div>
             )}
 
             {!submitting && step === 'pending' && (
               <>
-                <div className="flex items-center justify-between mb-5">
-                  <div className="font-semibold text-[#1C2056]">{t.paymentForLabel(selectedPlan?.name || '')}</div>
-                  <button onClick={() => {
-                    clearInterval(statusInterval.current)
-                    // Частичная оплата: удержание с кошелька вернуть сразу.
-                    if (walletInUse && extTranId) void releaseWalletHold(extTranId)
-                    setShowModal(false)
-                  }} className="back-btn text-gray-400 text-xl" aria-label={closeLabel(lang)}>✕</button>
+                <div className="flex items-center justify-between gap-3 mb-4 -mt-2">
+                  <div id="upgrade-pay-title" className="font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{t.paymentForLabel(selectedPlan?.name || '')}</div>
+                  <SheetCloseButton onClick={closeQrModal} label={closeLabel(lang)} />
                 </div>
 
                 {phoneDeclined ? (
                   <div className="text-center py-6">
-                    <div className="text-4xl mb-3">🚫</div>
-                    <div className="text-sm text-gray-500 mb-4">{t.phoneRequestDeclinedNote}</div>
-                    <button onClick={() => selectedPlan && openModal(selectedPlan.name, selectedPlan.amount, selectedPlan.plan, selectedPlan.period)}
-                      className="w-full bg-[#1C2056] text-white rounded-xl py-3.5 font-medium text-sm">
+                    <div className="text-4xl mb-3" aria-hidden="true">🚫</div>
+                    <div className="text-sm mb-4" style={{ color: 'var(--nav-text-secondary)' }}>{t.phoneRequestDeclinedNote}</div>
+                    <button type="button" onClick={() => selectedPlan && openModal(selectedPlan.name, selectedPlan.amount, selectedPlan.plan, selectedPlan.period)}
+                      className={`w-full min-h-[48px] rounded-xl py-3.5 text-sm font-semibold ${PRESS}`}
+                      style={BTN_PRIMARY}>
                       {t.retryPaymentButton}
                     </button>
                   </div>
                 ) : phoneRequested ? (
                   <div className="text-center py-6">
-                    <div className="text-4xl mb-3">📲</div>
-                    <div className="text-sm text-gray-500">{t.phoneRequestPendingNote}</div>
+                    <div className="text-4xl mb-3" aria-hidden="true">📲</div>
+                    <div className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>{t.phoneRequestPendingNote}</div>
                   </div>
                 ) : isMobile ? (
                   <div className="text-center py-4">
-                    <div className="text-5xl mb-4">📱</div>
-                    <div className="font-semibold text-[#1C2056] mb-2">{t.redirectingKaspiLabel}</div>
-                    <div className="text-sm text-gray-400 mb-4">
+                    <div className="text-5xl mb-4" aria-hidden="true">📱</div>
+                    <div className="font-semibold mb-2" style={{ color: 'var(--nav-text-primary)' }}>{t.redirectingKaspiLabel}</div>
+                    <div className="text-sm mb-4" style={{ color: 'var(--nav-text-muted)' }}>
                       {t.appNotOpenedHint}
                     </div>
-                    <a href={qrToken} target="_blank"
-                      className="block w-full bg-[#2DC48D] text-white rounded-xl py-4 font-medium text-sm mb-3">
+                    <a href={qrToken} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center justify-center w-full min-h-[48px] rounded-xl py-3.5 text-sm font-semibold mb-3"
+                      style={BTN_PRIMARY}>
                       {t.openKaspiButton}
                     </a>
                     {/* Пуш по телефону выпускает отдельный платёж на полную цену —
                         при частичной оплате кошельком его не предлагаем. */}
                     {!walletInUse && (
-                      <>
-                        <div className="flex items-center gap-2 mb-3">
-                          <div className="flex-1 h-px bg-gray-100"></div>
-                          <span className="text-xs text-gray-400">{t.orLabel}</span>
-                          <div className="flex-1 h-px bg-gray-100"></div>
-                        </div>
-                        <button onClick={() => setShowPhoneModal(true)}
-                          className="w-full border border-[#1C2056] text-[#1C2056] rounded-xl py-3 text-sm font-medium">
+                      <div className="flex flex-col gap-3">
+                        <OrDivider label={t.orLabel} />
+                        <button type="button" onClick={() => setShowPhoneModal(true)}
+                          className="w-full min-h-[48px] rounded-xl py-3 text-sm font-semibold"
+                          style={BTN_OUTLINE}>
                           {t.sendPhoneRequestButton}
                         </button>
-                      </>
+                      </div>
                     )}
                   </div>
                 ) : (
                   <div className="text-center py-2">
-                    <div className="font-semibold text-[#1C2056] mb-1">{t.scanQrTitle}</div>
-                    <div className="text-xs text-gray-400 mb-4">{t.otherMethodHint}</div>
-                    {qrDataUrl && (
-                      <div className="flex justify-center mb-2">
-                        <img
-                          src={qrDataUrl}
-                          alt={t.qrCodeAltText}
-                          className="rounded-xl border border-gray-100"
-                          width={200}
-                          height={200}
-                        />
+                    <div className="font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>{t.scanQrTitle}</div>
+                    <div className="text-xs mb-4" style={{ color: 'var(--nav-text-muted)' }}>{t.otherMethodHint}</div>
+                    {/* Fixed 200x200 slot (no jump when the code arrives or is
+                        re-minted); white plate so the code scans in dark mode. */}
+                    <div className="flex justify-center mb-2">
+                      <div className="w-[218px] h-[218px] rounded-xl p-2 flex items-center justify-center"
+                        style={{ background: '#FFFFFF', border: '1px solid var(--nav-border-soft)' }}>
+                        {qrDataUrl
+                          ? <img src={qrDataUrl} alt={t.qrCodeAltText} width={200} height={200} className="block" />
+                          : <Spinner size="sm" />}
                       </div>
-                    )}
+                    </div>
                     <div className="text-xs mb-4 h-4" aria-live="polite">
                       {qrScanning ? (
-                        <span className="text-[#2DC48D]">Подтвердите оплату в приложении Kaspi…</span>
+                        <span style={{ color: 'var(--nav-success)' }}>Подтвердите оплату в приложении Kaspi…</span>
                       ) : refreshingQr ? (
-                        <span className="text-gray-400">Обновляем код…</span>
+                        <span style={{ color: 'var(--nav-text-muted)' }}>Обновляем код…</span>
                       ) : secondsLeft > 0 ? (
-                        <span className="text-gray-400">
+                        <span className="tabular-nums" style={{ color: 'var(--nav-text-muted)' }}>
                           QR действителен ещё {Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, '0')}
                         </span>
                       ) : null}
                     </div>
-                    <div className="flex flex-col gap-2">
-                      <a href={qrToken} target="_blank"
-                        className="text-xs text-gray-400 underline">
+                    <div className="flex flex-col gap-3">
+                      <a href={qrToken} target="_blank" rel="noopener noreferrer"
+                        className="text-xs underline" style={{ color: 'var(--nav-text-muted)' }}>
                         {t.openLinkDirectlyLabel}
                       </a>
                       {!walletInUse && (
                         <>
-                          <div className="flex items-center gap-2">
-                            <div className="flex-1 h-px bg-gray-100"></div>
-                            <span className="text-xs text-gray-400">{t.orLabel}</span>
-                            <div className="flex-1 h-px bg-gray-100"></div>
-                          </div>
-                          <button onClick={() => setShowPhoneModal(true)}
-                            className="w-full border border-[#1C2056] text-[#1C2056] rounded-xl py-3 text-sm font-medium">
+                          <OrDivider label={t.orLabel} />
+                          <button type="button" onClick={() => setShowPhoneModal(true)}
+                            className="w-full min-h-[48px] rounded-xl py-3 text-sm font-semibold"
+                            style={BTN_OUTLINE}>
                             {t.sendPhoneRequestButton}
                           </button>
                         </>
@@ -987,72 +1169,72 @@ export default function Upgrade() {
                 )}
 
                 {walletInUse && (
-                  <div className="bg-gray-50 rounded-xl px-4 py-3 mt-4 flex items-center justify-between">
-                    <span className="text-sm text-gray-500">{tw.fromWalletLabel}</span>
-                    <span className="text-sm font-semibold text-[#2DC48D] tabular-nums">−{walletPaid.toLocaleString('ru-KZ')} ₸</span>
+                  <div className="rounded-xl px-4 py-3 mt-4 flex items-center justify-between" style={ROW_STYLE}>
+                    <span className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>{tw.fromWalletLabel}</span>
+                    <span className="text-sm tabular-nums" style={{ fontWeight: 600, color: 'var(--nav-success)' }}>−{walletPaid.toLocaleString('ru-KZ')} ₸</span>
                   </div>
                 )}
-                <div className={`bg-gray-50 rounded-xl px-4 py-3 ${walletInUse ? 'mt-2' : 'mt-4'} mb-3 flex items-center justify-between`}>
-                  <span className="text-sm text-gray-500">{walletInUse ? tw.viaKaspiLabel : t.toPayLabel}</span>
-                  <span className="text-sm font-bold text-[#1C2056] tabular-nums">{(walletInUse ? kaspiToPay : selectedPlan?.amount ?? 0).toLocaleString('ru-KZ')} ₸{walletInUse ? '' : (selectedPlan?.period === 'annual' ? t.perYearSuffix : t.perMonthSuffix)}</span>
+                <div className={`rounded-xl px-4 py-3 ${walletInUse ? 'mt-2' : 'mt-4'} mb-3 flex items-center justify-between`} style={ROW_STYLE}>
+                  <span className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>{walletInUse ? tw.viaKaspiLabel : t.toPayLabel}</span>
+                  <span className="text-sm font-bold tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{(walletInUse ? kaspiToPay : selectedPlan?.amount ?? 0).toLocaleString('ru-KZ')} ₸{walletInUse ? '' : suffixFor(selectedPlan?.period)}</span>
                 </div>
                 {walletInUse && (
-                  <p className="text-xs text-gray-400 text-center -mt-1 mb-3">{tw.walletHoldNote(walletPaid.toLocaleString('ru-KZ'))}</p>
+                  <p className="text-xs text-center -mt-1 mb-3" style={{ color: 'var(--nav-text-muted)' }}>{tw.walletHoldNote(walletPaid.toLocaleString('ru-KZ'))}</p>
                 )}
 
-                <div className="flex items-center justify-center gap-2 text-xs text-gray-400 mb-3">
-                  <div className="w-3 h-3 border-2 border-[#1C2056] border-t-transparent rounded-full animate-spin"></div>
+                <div className="flex items-center justify-center gap-2 text-xs mb-3" style={{ color: 'var(--nav-text-muted)' }}>
+                  <Spinner size="sm" />
                   {checkingStatus ? t.checkingPaymentLabel : t.awaitingConfirmationLabel}
                 </div>
 
-                <button onClick={() => checkPaymentStatus(selectedPlan?.plan || '')}
-                  className="w-full border border-gray-200 text-gray-500 rounded-xl py-3 text-sm">
+                <button type="button" onClick={() => checkPaymentStatus(selectedPlan?.plan || '')}
+                  className="w-full min-h-[48px] rounded-xl py-3 text-sm font-medium transition-colors"
+                  style={BTN_GHOST}>
                   {t.checkManuallyButton}
                 </button>
               </>
             )}
 
             {step === 'success' && (
-              <div className="text-center py-6">
-                <div className="text-5xl mb-4">🎉</div>
-                <div className="font-bold text-[#1C2056] text-xl mb-2">{t.paymentSuccessTitle}</div>
-                <div className="text-sm text-gray-400 mb-6">
-                  {t.planActivatedPrefixLabel}<strong>{selectedPlan?.name}</strong>{t.planActivatedSuffixLabel}
+              <div className="text-center py-6" role="status">
+                <div className="text-5xl mb-4" aria-hidden="true">🎉</div>
+                <div className="font-bold text-xl mb-2" style={{ color: 'var(--nav-text-primary)' }}>{t.paymentSuccessTitle}</div>
+                <div className="text-sm mb-6" style={{ color: 'var(--nav-text-secondary)' }}>
+                  {t.planActivatedPrefixLabel}<strong style={{ color: 'var(--nav-text-primary)' }}>{selectedPlan?.name}</strong>{t.planActivatedSuffixLabel}
                 </div>
-                <div className="bg-green-50 rounded-2xl p-4 mb-6">
-                  <div className="text-sm text-green-700">{t.subscriptionActiveLabel(selectedPlan?.period ?? 'monthly')}</div>
+                <div className="rounded-2xl p-4 mb-6" style={{ background: 'var(--nav-success-soft)' }}>
+                  <div className="text-sm" style={{ fontWeight: 500, color: 'var(--nav-success)' }}>{t.subscriptionActiveLabel(selectedPlan?.period ?? 'monthly')}</div>
                 </div>
-                <button onClick={() => {
+                <button type="button" onClick={() => {
                   setShowModal(false)
                   router.push('/dashboard')
                 }}
-                  className="w-full bg-[#1C2056] text-white rounded-xl py-4 font-medium text-sm">
+                  className={`w-full min-h-[48px] rounded-xl py-4 text-sm font-semibold ${PRESS}`}
+                  style={BTN_PRIMARY}>
                   {t.goToWorkButton}
                 </button>
               </div>
             )}
 
-          </div>
-        </div>
-      )}
+          </Sheet>
+        )}
 
-      {/* Выбор: целиком с кошелька / частью / только Kaspi */}
-      {walletChoice && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-end" onClick={() => setWalletChoice(null)}>
-          <div className="bg-white w-full max-w-lg mx-auto rounded-t-3xl p-6" role="dialog" aria-modal="true" aria-labelledby="wallet-choice-title"
-            onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-2">
-              <div id="wallet-choice-title" className="font-semibold text-[#1C2056]">{tw.walletChoiceTitle}</div>
-              <button onClick={() => setWalletChoice(null)} className="back-btn text-gray-400 text-xl" aria-label={closeLabel(lang)}>✕</button>
+        {/* Выбор: целиком с кошелька / частью / только Kaspi */}
+        {walletChoice && (
+          <Sheet zClass="z-[70]" labelledBy="wallet-choice-title" onBackdrop={() => setWalletChoice(null)}>
+            <div className="flex items-center justify-between gap-3 mb-1 -mt-2">
+              <div id="wallet-choice-title" className="font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{tw.walletChoiceTitle}</div>
+              <SheetCloseButton onClick={() => setWalletChoice(null)} label={closeLabel(lang)} />
             </div>
-            <div className="text-sm text-gray-500 mb-5">
-              {t.paymentForLabel(walletChoice.name)} · {walletChoice.amount.toLocaleString('ru-KZ')} ₸{walletChoice.period === 'annual' ? t.perYearSuffix : t.perMonthSuffix}
-              <div className="text-xs text-gray-400 mt-1">{tw.walletBalanceLine(walletBalance.toLocaleString('ru-KZ'))}</div>
+            <div className="text-sm mb-5" style={{ color: 'var(--nav-text-secondary)' }}>
+              {t.paymentForLabel(walletChoice.name)} · <span className="tabular-nums">{walletChoice.amount.toLocaleString('ru-KZ')} ₸{suffixFor(walletChoice.period)}</span>
+              <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>{tw.walletBalanceLine(walletBalance.toLocaleString('ru-KZ'))}</div>
             </div>
             <div className="flex flex-col gap-2">
               {walletChoice.split.mode === 'wallet_full' ? (
                 <button type="button" onClick={() => payFullyFromWallet(walletChoice)}
-                  className="w-full min-h-[48px] rounded-xl bg-[#2DC48D] text-white text-sm font-semibold px-4 py-3">
+                  className={`w-full min-h-[48px] rounded-xl text-sm font-semibold px-4 py-3 ${PRESS}`}
+                  style={BTN_PRIMARY}>
                   {tw.payFullyFromWalletButton(walletChoice.split.wallet.toLocaleString('ru-KZ'))}
                 </button>
               ) : (
@@ -1061,7 +1243,8 @@ export default function Upgrade() {
                     setWalletChoice(null)
                     openModal(c.name, c.amount, c.plan, c.period, true)
                   }}
-                  className="w-full min-h-[48px] rounded-xl bg-[#2DC48D] text-white text-sm font-semibold px-4 py-3 leading-snug">
+                  className={`w-full min-h-[48px] rounded-xl text-sm font-semibold px-4 py-3 leading-snug ${PRESS}`}
+                  style={BTN_PRIMARY}>
                   {tw.payPartlyFromWalletButton(walletChoice.split.wallet.toLocaleString('ru-KZ'), walletChoice.split.kaspi.toLocaleString('ru-KZ'))}
                 </button>
               )}
@@ -1070,57 +1253,62 @@ export default function Upgrade() {
                   setWalletChoice(null)
                   openModal(c.name, c.amount, c.plan, c.period)
                 }}
-                className="w-full min-h-[48px] rounded-xl border-2 border-[#1C2056] text-[#1C2056] text-sm font-medium px-4 py-3">
+                className="w-full min-h-[48px] rounded-xl text-sm font-semibold px-4 py-3"
+                style={BTN_OUTLINE}>
                 {tw.payOnlyKaspiButton}
               </button>
             </div>
-          </div>
-        </div>
-      )}
+          </Sheet>
+        )}
 
-      {/* Модал ввода телефона */}
-      {showPhoneModal && (
-        <div className="fixed inset-0 bg-black/40 z-[60] flex items-end">
-          <div className="bg-white w-full max-w-lg mx-auto rounded-t-3xl p-6">
-            <div className="flex items-center justify-between mb-5">
-              <div className="font-semibold text-[#1C2056]">{t.phonePaymentTitle}</div>
-              <button onClick={() => setShowPhoneModal(false)} className="back-btn text-gray-400 text-xl" aria-label={closeLabel(lang)}>✕</button>
+        {/* Модал ввода телефона (поверх окна оплаты) */}
+        {showPhoneModal && (
+          <Sheet zClass="z-[80]" labelledBy="phone-pay-title">
+            <div className="flex items-center justify-between gap-3 mb-4 -mt-2">
+              <div id="phone-pay-title" className="font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{t.phonePaymentTitle}</div>
+              <SheetCloseButton onClick={() => setShowPhoneModal(false)} label={closeLabel(lang)} />
             </div>
 
-            <div className="bg-blue-50 rounded-2xl p-4 mb-5">
-              <div className="text-xs text-gray-500 leading-relaxed">
+            <div className="rounded-2xl p-4 mb-5" style={{ background: 'var(--nav-accent-soft)' }}>
+              <div className="text-xs leading-relaxed" style={{ color: 'var(--nav-text-secondary)' }}>
                 {t.phoneInstructionText}
               </div>
             </div>
 
-            <label className="text-xs text-gray-500 mb-1 block">{t.phoneNumberLabel}</label>
+            <label htmlFor="upgrade-pay-phone" className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.phoneNumberLabel}</label>
             <input
-              className="w-full border rounded-lg px-3 py-3 text-sm outline-none focus:border-[#1C2056] mb-3"
+              id="upgrade-pay-phone"
+              className={`${inputClass} py-3 mb-3`}
+              style={INPUT_STYLE}
               placeholder="+7 777 123 45 67"
               value={payPhone}
               onChange={e => setPayPhone(formatPhone(e.target.value))}
               type="tel"
+              inputMode="tel"
+              autoComplete="tel"
               maxLength={16}
             />
 
-            <div className="bg-gray-50 rounded-xl px-4 py-3 mb-4 flex items-center justify-between">
-              <span className="text-sm text-gray-500">{t.toPayLabel}</span>
-              <span className="text-sm font-bold text-[#1C2056]">{selectedPlan?.amount.toLocaleString('ru-KZ')} ₸{selectedPlan?.period === 'annual' ? t.perYearSuffix : t.perMonthSuffix}</span>
+            <div className="rounded-xl px-4 py-3 mb-4 flex items-center justify-between" style={ROW_STYLE}>
+              <span className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>{t.toPayLabel}</span>
+              <span className="text-sm font-bold tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{selectedPlan?.amount.toLocaleString('ru-KZ')} ₸{suffixFor(selectedPlan?.period)}</span>
             </div>
 
-            <button onClick={createPhonePayment} disabled={phoneSubmitting}
-              className="w-full bg-[#2DC48D] text-white rounded-xl py-4 font-medium text-sm mb-2">
+            <button type="button" onClick={createPhonePayment} disabled={phoneSubmitting}
+              className={`w-full min-h-[48px] rounded-xl py-3.5 text-sm font-semibold mb-2 disabled:opacity-60 ${PRESS}`}
+              style={BTN_PRIMARY}>
               {t.sendKaspiRequestButton(phoneSubmitting)}
             </button>
-            <button onClick={() => setShowPhoneModal(false)}
-              className="w-full text-gray-400 text-sm py-2">
+            <button type="button" onClick={() => setShowPhoneModal(false)}
+              className="w-full min-h-[44px] text-sm py-2 rounded-xl transition-colors hover:bg-[var(--nav-surface-glass)]"
+              style={{ color: 'var(--nav-text-muted)' }}>
               {t.cancelButton}
             </button>
-          </div>
-        </div>
-      )}
-      {dialogElement}
+          </Sheet>
+        )}
+        {dialogElement}
 
-    </main>
+      </main>
+    </DesktopShell>
   )
 }

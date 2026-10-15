@@ -627,10 +627,11 @@ export default function TopUtilityBar() {
   if (pathname === '/products') return null
 
   if (!loggedIn) return null
-  // Страницы без DesktopShell со своей шапкой высотой 80px на компьютере
-  // (/upgrade, /admin): там бар начинается с y=0, и плашка (58px) стоит
-  // посередине при top 11px, а не 21px, как в карточке DesktopShell.
-  const ownHeaderPage = pathname === '/upgrade' || pathname === '/admin'
+  // Страница без DesktopShell со своей шапкой высотой 80px на компьютере
+  // (/admin): там бар начинается с y=0, и плашка (58px) стоит посередине
+  // при top 11px, а не 21px, как в карточке DesktopShell. /upgrade с
+  // 15.10.2026 сама в DesktopShell + SiteNav — плашка стоит как везде.
+  const ownHeaderPage = pathname === '/admin'
 
   const visibleWallets = WALLETS.filter(w => !w.adminOnly || isAdmin)
   const wallet = visibleWallets.find(w => w.key === activeWallet) ?? visibleWallets[0]
