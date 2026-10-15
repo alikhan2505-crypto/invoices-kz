@@ -13,6 +13,8 @@ import { consumePendingUpgrade } from '@/lib/pendingUpgrade'
 import { useAppDialog } from '@/components/AppDialog'
 import { homeFor } from '@/lib/products'
 import { formatDateNumeric } from '@/lib/date'
+import { profileBonusDict } from '@/lib/i18n/profileBonus'
+import type { PlanPaymentSplit } from '@/lib/plans/planActivation'
 
 // How long an untouched QR is shown before it is retired for a fresh one.
 // Kaspi's own window is ~5 minutes; /kaspi-api shortens the visible wait to a
@@ -35,6 +37,7 @@ export default function Upgrade() {
   // Shadows window.alert for this component -- see src/components/AppDialog.tsx.
   const { alert, dialogElement } = useAppDialog()
   const s = supportDict[lang]
+  const tw = profileBonusDict[lang]
   const [promoCode, setPromoCode] = useState('')
   const [promoLoading, setPromoLoading] = useState(false)
   const [promoSuccess, setPromoSuccess] = useState('')
@@ -50,7 +53,15 @@ export default function Upgrade() {
   const [userId, setUserId] = useState('')
   const [period, setPeriod] = useState<BillingPeriod>('monthly')
   const [showModal, setShowModal] = useState(false)
-  const [selectedPlan, setSelectedPlan] = useState<{ name: string; amount: number; plan: string; period: BillingPeriod } | null>(null)
+  const [selectedPlan, setSelectedPlan] = useState<{ name: string; amount: number; plan: string; period: BillingPeriod; useWallet?: boolean } | null>(null)
+  // Оплата с кошелька (15.10.2026). walletChoice — выбор «целиком / частью /
+  // только Kaspi» перед оплатой; walletPaid — сколько реально удержано с
+  // кошелька под текущий Kaspi-платёж (сервер мог списать меньше, чем
+  // показывали, если баланс успел измениться).
+  const [walletChoice, setWalletChoice] = useState<{ name: string; amount: number; plan: string; period: BillingPeriod; split: PlanPaymentSplit } | null>(null)
+  const [walletPaid, setWalletPaid] = useState(0)
+  const [walletQuoteLoading, setWalletQuoteLoading] = useState(false)
+  const [walletInfo, setWalletInfo] = useState<{ available: boolean; balance: number } | null>(null)
   const [step, setStep] = useState<'pending' | 'success'>('pending')
   const [submitting, setSubmitting] = useState(false)
   const [qrToken, setQrToken] = useState('')
@@ -152,9 +163,46 @@ export default function Upgrade() {
       const { data: p } = await supabase.from('profiles').select('*').eq('id', user.id).single()
       setProfile(p)
       setPlan(getActivePlan(p).plan)
+      void refreshWalletInfo()
     } finally {
       setProfileChecked(true)
     }
+  }
+
+  // Доступна ли оплата с кошелька и сколько на нём (вместе со своими
+  // удержаниями под неоплаченный тариф — они вернутся перед новой покупкой).
+  // Пока миграция не применена, сервер отвечает available: false — и ни
+  // строки про кошелёк, ни выбора способа оплаты нет.
+  async function refreshWalletInfo() {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) return
+      const res = await fetch('/api/payment/wallet?plan=pro&period=monthly', {
+        headers: { 'Authorization': `Bearer ${session.access_token}` },
+        cache: 'no-store',
+      })
+      if (!res.ok) { setWalletInfo({ available: false, balance: 0 }); return }
+      const q = await res.json()
+      setWalletInfo({ available: !!q?.available, balance: Number(q?.balance) || 0 })
+    } catch {
+      // Не узнали — кошелёк просто не предлагаем.
+    }
+  }
+
+  // Окно частичной оплаты закрыли (или перестали ждать) — закрыть платёж
+  // сейчас, а не ночным кроном: сервер сначала спросит Kaspi (вдруг оплачено
+  // в эту секунду), иначе пометит истёкшим и вернёт удержание на кошелёк.
+  async function releaseWalletHold(orderId: string) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      await fetch(`/api/payment/status?order_id=${encodeURIComponent(orderId)}&force=true`, {
+        headers: { 'Authorization': `Bearer ${session?.access_token}` },
+      })
+    } catch {
+      // Не дошло — вернёт следующая попытка оплаты или ночной крон.
+    }
+    await reloadPlan()
+    await refreshWalletInfo()
   }
 
   async function reloadPlan() {
@@ -187,6 +235,7 @@ export default function Upgrade() {
   const requestPayment = useCallback(async (
     planKey: string,
     billingPeriod: BillingPeriod,
+    useWallet = false,
   ): Promise<{ link: string; settled: boolean }> => {
     const { data: { session } } = await supabase.auth.getSession()
     const res = await fetch('/api/payment/create', {
@@ -195,7 +244,7 @@ export default function Upgrade() {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${session?.access_token}`,
       },
-      body: JSON.stringify({ userId, plan: planKey, period: billingPeriod })
+      body: JSON.stringify({ userId, plan: planKey, period: billingPeriod, ...(useWallet ? { useWallet: true } : {}) })
     })
     const data = await res.json()
 
@@ -207,10 +256,15 @@ export default function Upgrade() {
         setStep('success')
         return { link: '', settled: true }
       }
-      alert(data.error === 'already_pending' ? t.alreadyPendingAlert : t.errorPrefix(data.error || t.tryAgainDefault))
+      const walletError = data.error === 'wallet_changed' || data.error === 'wallet_covers_full' ? tw.walletErrors.changed
+        : data.error === 'wallet_unavailable' ? tw.walletErrors.unavailable
+        : typeof data.error === 'string' && data.error.startsWith('wallet_') ? tw.walletErrors.generic
+        : null
+      alert(walletError ?? (data.error === 'already_pending' ? t.alreadyPendingAlert : t.errorPrefix(data.error || t.tryAgainDefault)))
       return { link: '', settled: false }
     }
 
+    setWalletPaid(Number(data.wallet_amount) || 0)
     setQrToken(data.qr_token)
     setExtTranId(data.ext_tran_id)
     setQrExpiresAt(data.expire_date ? new Date(data.expire_date).getTime() : 0)
@@ -219,7 +273,7 @@ export default function Upgrade() {
     scanningRef.current = false
     qrCreatedAtRef.current = Date.now()
     return { link: data.qr_token as string, settled: false }
-  }, [userId, t])
+  }, [userId, t, tw])
 
   // Live-polls the in-house Kaspi rail's own settlement status by order_id.
   // Idle refresh is folded into this SAME recurring tick rather than a
@@ -245,7 +299,12 @@ export default function Upgrade() {
     let polls = 0
     const interval = setInterval(async () => {
       polls++
-      if (polls > 150 || cancelled) { clearInterval(interval); return }
+      if (polls > 150 || cancelled) {
+        clearInterval(interval)
+        // Перестали ждать оплату с удержанием — вернуть его сейчас.
+        if (!cancelled && selectedPlan?.useWallet) void releaseWalletHold(extTranId)
+        return
+      }
       const idleOverdue = !phoneRequested && !scanningRef.current
         && qrCreatedAtRef.current > 0
         && Date.now() - qrCreatedAtRef.current >= IDLE_QR_MS
@@ -299,7 +358,7 @@ export default function Upgrade() {
           }
           setRefreshingQr(true)
           try {
-            if (selectedPlan) await requestPayment(selectedPlan.plan, selectedPlan.period)
+            if (selectedPlan) await requestPayment(selectedPlan.plan, selectedPlan.period, !!selectedPlan.useWallet)
           } finally {
             setRefreshingQr(false)
           }
@@ -333,8 +392,9 @@ export default function Upgrade() {
     return () => clearInterval(timer)
   }, [qrExpiresAt, showModal, step, phoneRequested])
 
-  async function openModal(planName: string, amount: number, planKey: string, billingPeriod: BillingPeriod) {
-    setSelectedPlan({ name: planName, amount, plan: planKey, period: billingPeriod })
+  async function openModal(planName: string, amount: number, planKey: string, billingPeriod: BillingPeriod, useWallet = false) {
+    setSelectedPlan({ name: planName, amount, plan: planKey, period: billingPeriod, useWallet })
+    setWalletPaid(0)
     setQrToken('')
     setExtTranId('')
     setQrExpiresAt(0)
@@ -352,7 +412,7 @@ export default function Upgrade() {
         : { data: null }
       baselineExpiresRef.current = p?.plan === planKey && p?.plan_expires_at ? new Date(p.plan_expires_at).getTime() : 0
 
-      const { link, settled } = await requestPayment(planKey, billingPeriod)
+      const { link, settled } = await requestPayment(planKey, billingPeriod, useWallet)
       if (!link) {
         // settled === true keeps the modal up on its success screen; only a
         // real failure closes it.
@@ -457,6 +517,76 @@ export default function Upgrade() {
     setPhoneSubmitting(false)
   }
 
+  // Кнопка тарифа: есть деньги в кошельке — сначала спрашиваем, как платить
+  // (сумму делит сервер, по PLAN_PRICES и текущему балансу); нет — сразу Kaspi.
+  async function startPurchase(planName: string, amount: number, planKey: string, billingPeriod: BillingPeriod) {
+    // Кошелёк недоступен (миграция не применена) или пуст — сразу Kaspi.
+    if (!userId || !walletInfo?.available || walletInfo.balance < 1) { openModal(planName, amount, planKey, billingPeriod); return }
+    setWalletQuoteLoading(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch(`/api/payment/wallet?plan=${planKey}&period=${billingPeriod}`, {
+        headers: { 'Authorization': `Bearer ${session?.access_token}` },
+      })
+      const quote = res.ok ? await res.json() : null
+      if (quote?.available && quote.split && quote.split.mode !== 'kaspi_only') {
+        setWalletChoice({ name: planName, amount, plan: planKey, period: billingPeriod, split: quote.split })
+        return
+      }
+    } catch {
+      // Не смогли спросить про кошелёк — платим как обычно, через Kaspi.
+    } finally {
+      setWalletQuoteLoading(false)
+    }
+    openModal(planName, amount, planKey, billingPeriod)
+  }
+
+  async function payFullyFromWallet(choice: NonNullable<typeof walletChoice>) {
+    setWalletChoice(null)
+    setSelectedPlan({ name: choice.name, amount: choice.amount, plan: choice.plan, period: choice.period, useWallet: true })
+    setWalletPaid(choice.amount)
+    setQrToken('')
+    setExtTranId('')
+    setStep('pending')
+    setShowModal(true)
+    setSubmitting(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/payment/wallet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ plan: choice.plan, period: choice.period }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (data.error === 'already_paid') {
+        // Прошлый Kaspi-платёж, оказывается, оплачен — тариф уже продлён,
+        // с кошелька ничего не списано.
+        setWalletPaid(0)
+        await reloadPlan()
+        await refreshWalletInfo()
+        setStep('success')
+        return
+      }
+      if (!res.ok || !data.ok) {
+        setShowModal(false)
+        void refreshWalletInfo()
+        alert(data.error === 'insufficient_funds' ? tw.walletErrors.insufficient
+          : data.error === 'busy' ? tw.walletErrors.busy
+          : data.error === 'unavailable' ? tw.walletErrors.unavailable
+          : tw.walletErrors.generic)
+        return
+      }
+      await reloadPlan()
+      await refreshWalletInfo()
+      setStep('success')
+    } catch {
+      setShowModal(false)
+      alert(tw.walletErrors.generic)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   async function applyPromo() {
     if (!promoCode.trim()) { setPromoError(t.enterPromoCodeError); return }
     setPromoLoading(true)
@@ -510,8 +640,8 @@ export default function Upgrade() {
   }) {
     const suffix = period === 'annual' ? t.perYearSuffix : t.perMonthSuffix
     return (
-      <button onClick={() => openModal(planName, amount, planKey, period)}
-        className={`w-full rounded-xl py-3.5 font-medium text-sm ${dark
+      <button onClick={() => startPurchase(planName, amount, planKey, period)} disabled={walletQuoteLoading}
+        className={`w-full rounded-xl py-3.5 font-medium text-sm disabled:opacity-60 ${dark
           ? 'bg-[#2DC48D] text-white'
           : 'border-2 border-[#1C2056] text-[#1C2056]'
         }`}>
@@ -530,8 +660,8 @@ export default function Upgrade() {
     planName: string; amount: number; planKey: string; dark?: boolean; id?: string
   }) {
     return (
-      <button id={id} onClick={() => openModal(planName, amount, planKey, period)}
-        className={`w-full rounded-xl py-3 font-medium text-sm ${dark
+      <button id={id} onClick={() => startPurchase(planName, amount, planKey, period)} disabled={walletQuoteLoading}
+        className={`w-full rounded-xl py-3 font-medium text-sm disabled:opacity-60 ${dark
           ? 'bg-white/10 text-white border border-white/20'
           : 'border-2 border-[#1C2056] text-[#1C2056]'
         }`}>
@@ -549,6 +679,12 @@ export default function Upgrade() {
     !hasOwnedCard(profile) ? null
     : profile?.is_admin ? { kind: 'admin' }
     : { kind: 'pro', until: profile?.plan_expires_at ? formatDateNumeric(profile.plan_expires_at) : null }
+
+  // Только когда оплата с кошелька действительно доступна: обещать «оплатить
+  // тариф кошельком» до применения миграции нельзя.
+  const walletBalance = walletInfo?.available ? Math.max(0, Math.floor(walletInfo.balance)) : 0
+  const walletInUse = !!selectedPlan?.useWallet && walletPaid > 0
+  const kaspiToPay = selectedPlan ? Math.max(0, selectedPlan.amount - (walletInUse ? walletPaid : 0)) : 0
 
   // «Продлить» leads to the existing renew flow on the Pro card (period
   // toggle + price are right there) rather than opening a payment silently.
@@ -611,6 +747,13 @@ export default function Upgrade() {
           {promoError && <p className="text-xs text-red-500 mt-2">{promoError}</p>}
           {promoSuccess && <p className="text-xs text-[#2DC48D] mt-2 font-medium">{promoSuccess}</p>}
         </div>
+
+        {walletBalance > 0 && (
+          <div className="flex items-center justify-between gap-3 bg-white rounded-2xl px-4 py-3 mb-4 shadow-sm text-sm">
+            <span className="text-gray-500">{tw.walletBalanceLine(walletBalance.toLocaleString('ru-KZ'))}</span>
+            <span className="text-xs text-gray-400 text-right">{tw.cardWalletHint}</span>
+          </div>
+        )}
 
         {/* Billing period toggle */}
         <div className="bg-gray-100 rounded-2xl p-1 flex gap-1 mb-6">
@@ -737,7 +880,7 @@ export default function Upgrade() {
             {submitting && (
               <div className="text-center py-8">
                 <div className="w-10 h-10 border-2 border-[#1C2056] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                <div className="font-semibold text-[#1C2056] mb-1">{t.creatingPaymentLabel}</div>
+                <div className="font-semibold text-[#1C2056] mb-1">{selectedPlan?.useWallet && !extTranId && walletPaid >= (selectedPlan?.amount ?? 0) ? tw.walletPayingLabel : t.creatingPaymentLabel}</div>
                 <div className="text-xs text-gray-400">{t.pleaseWaitLabel}</div>
               </div>
             )}
@@ -748,6 +891,8 @@ export default function Upgrade() {
                   <div className="font-semibold text-[#1C2056]">{t.paymentForLabel(selectedPlan?.name || '')}</div>
                   <button onClick={() => {
                     clearInterval(statusInterval.current)
+                    // Частичная оплата: удержание с кошелька вернуть сразу.
+                    if (walletInUse && extTranId) void releaseWalletHold(extTranId)
                     setShowModal(false)
                   }} className="back-btn text-gray-400 text-xl" aria-label={closeLabel(lang)}>✕</button>
                 </div>
@@ -777,15 +922,21 @@ export default function Upgrade() {
                       className="block w-full bg-[#2DC48D] text-white rounded-xl py-4 font-medium text-sm mb-3">
                       {t.openKaspiButton}
                     </a>
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className="flex-1 h-px bg-gray-100"></div>
-                      <span className="text-xs text-gray-400">{t.orLabel}</span>
-                      <div className="flex-1 h-px bg-gray-100"></div>
-                    </div>
-                    <button onClick={() => setShowPhoneModal(true)}
-                      className="w-full border border-[#1C2056] text-[#1C2056] rounded-xl py-3 text-sm font-medium">
-                      {t.sendPhoneRequestButton}
-                    </button>
+                    {/* Пуш по телефону выпускает отдельный платёж на полную цену —
+                        при частичной оплате кошельком его не предлагаем. */}
+                    {!walletInUse && (
+                      <>
+                        <div className="flex items-center gap-2 mb-3">
+                          <div className="flex-1 h-px bg-gray-100"></div>
+                          <span className="text-xs text-gray-400">{t.orLabel}</span>
+                          <div className="flex-1 h-px bg-gray-100"></div>
+                        </div>
+                        <button onClick={() => setShowPhoneModal(true)}
+                          className="w-full border border-[#1C2056] text-[#1C2056] rounded-xl py-3 text-sm font-medium">
+                          {t.sendPhoneRequestButton}
+                        </button>
+                      </>
+                    )}
                   </div>
                 ) : (
                   <div className="text-center py-2">
@@ -818,23 +969,36 @@ export default function Upgrade() {
                         className="text-xs text-gray-400 underline">
                         {t.openLinkDirectlyLabel}
                       </a>
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 h-px bg-gray-100"></div>
-                        <span className="text-xs text-gray-400">{t.orLabel}</span>
-                        <div className="flex-1 h-px bg-gray-100"></div>
-                      </div>
-                      <button onClick={() => setShowPhoneModal(true)}
-                        className="w-full border border-[#1C2056] text-[#1C2056] rounded-xl py-3 text-sm font-medium">
-                        {t.sendPhoneRequestButton}
-                      </button>
+                      {!walletInUse && (
+                        <>
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 h-px bg-gray-100"></div>
+                            <span className="text-xs text-gray-400">{t.orLabel}</span>
+                            <div className="flex-1 h-px bg-gray-100"></div>
+                          </div>
+                          <button onClick={() => setShowPhoneModal(true)}
+                            className="w-full border border-[#1C2056] text-[#1C2056] rounded-xl py-3 text-sm font-medium">
+                            {t.sendPhoneRequestButton}
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 )}
 
-                <div className="bg-gray-50 rounded-xl px-4 py-3 mt-4 mb-3 flex items-center justify-between">
-                  <span className="text-sm text-gray-500">{t.toPayLabel}</span>
-                  <span className="text-sm font-bold text-[#1C2056]">{selectedPlan?.amount.toLocaleString('ru-KZ')} ₸{selectedPlan?.period === 'annual' ? t.perYearSuffix : t.perMonthSuffix}</span>
+                {walletInUse && (
+                  <div className="bg-gray-50 rounded-xl px-4 py-3 mt-4 flex items-center justify-between">
+                    <span className="text-sm text-gray-500">{tw.fromWalletLabel}</span>
+                    <span className="text-sm font-semibold text-[#2DC48D] tabular-nums">−{walletPaid.toLocaleString('ru-KZ')} ₸</span>
+                  </div>
+                )}
+                <div className={`bg-gray-50 rounded-xl px-4 py-3 ${walletInUse ? 'mt-2' : 'mt-4'} mb-3 flex items-center justify-between`}>
+                  <span className="text-sm text-gray-500">{walletInUse ? tw.viaKaspiLabel : t.toPayLabel}</span>
+                  <span className="text-sm font-bold text-[#1C2056] tabular-nums">{(walletInUse ? kaspiToPay : selectedPlan?.amount ?? 0).toLocaleString('ru-KZ')} ₸{walletInUse ? '' : (selectedPlan?.period === 'annual' ? t.perYearSuffix : t.perMonthSuffix)}</span>
                 </div>
+                {walletInUse && (
+                  <p className="text-xs text-gray-400 text-center -mt-1 mb-3">{tw.walletHoldNote(walletPaid.toLocaleString('ru-KZ'))}</p>
+                )}
 
                 <div className="flex items-center justify-center gap-2 text-xs text-gray-400 mb-3">
                   <div className="w-3 h-3 border-2 border-[#1C2056] border-t-transparent rounded-full animate-spin"></div>
@@ -868,6 +1032,48 @@ export default function Upgrade() {
               </div>
             )}
 
+          </div>
+        </div>
+      )}
+
+      {/* Выбор: целиком с кошелька / частью / только Kaspi */}
+      {walletChoice && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-end" onClick={() => setWalletChoice(null)}>
+          <div className="bg-white w-full max-w-lg mx-auto rounded-t-3xl p-6" role="dialog" aria-modal="true" aria-labelledby="wallet-choice-title"
+            onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-2">
+              <div id="wallet-choice-title" className="font-semibold text-[#1C2056]">{tw.walletChoiceTitle}</div>
+              <button onClick={() => setWalletChoice(null)} className="back-btn text-gray-400 text-xl" aria-label={closeLabel(lang)}>✕</button>
+            </div>
+            <div className="text-sm text-gray-500 mb-5">
+              {t.paymentForLabel(walletChoice.name)} · {walletChoice.amount.toLocaleString('ru-KZ')} ₸{walletChoice.period === 'annual' ? t.perYearSuffix : t.perMonthSuffix}
+              <div className="text-xs text-gray-400 mt-1">{tw.walletBalanceLine(walletBalance.toLocaleString('ru-KZ'))}</div>
+            </div>
+            <div className="flex flex-col gap-2">
+              {walletChoice.split.mode === 'wallet_full' ? (
+                <button type="button" onClick={() => payFullyFromWallet(walletChoice)}
+                  className="w-full min-h-[48px] rounded-xl bg-[#2DC48D] text-white text-sm font-semibold px-4 py-3">
+                  {tw.payFullyFromWalletButton(walletChoice.split.wallet.toLocaleString('ru-KZ'))}
+                </button>
+              ) : (
+                <button type="button" onClick={() => {
+                    const c = walletChoice
+                    setWalletChoice(null)
+                    openModal(c.name, c.amount, c.plan, c.period, true)
+                  }}
+                  className="w-full min-h-[48px] rounded-xl bg-[#2DC48D] text-white text-sm font-semibold px-4 py-3 leading-snug">
+                  {tw.payPartlyFromWalletButton(walletChoice.split.wallet.toLocaleString('ru-KZ'), walletChoice.split.kaspi.toLocaleString('ru-KZ'))}
+                </button>
+              )}
+              <button type="button" onClick={() => {
+                  const c = walletChoice
+                  setWalletChoice(null)
+                  openModal(c.name, c.amount, c.plan, c.period)
+                }}
+                className="w-full min-h-[48px] rounded-xl border-2 border-[#1C2056] text-[#1C2056] text-sm font-medium px-4 py-3">
+                {tw.payOnlyKaspiButton}
+              </button>
+            </div>
           </div>
         </div>
       )}

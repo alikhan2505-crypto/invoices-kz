@@ -11,6 +11,9 @@ import { profileCoreDict } from '@/lib/i18n/profileCore'
 import { useAppDialog } from '@/components/AppDialog'
 import { useBinLookup } from '@/components/useBinLookup'
 import { returnPathFromSearch, type ReturnPath } from '@/lib/returnPath'
+import { validateBinIin, digitsOnly } from '@/lib/kzIdentifiers'
+import { profileBonusDict } from '@/lib/i18n/profileBonus'
+import { claimAndAnnounceBonus } from '@/lib/profileBonusClient'
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
 // kept identical rather than inventing a second "house" ease.
@@ -59,6 +62,7 @@ export default function Requisites() {
   const router = useRouter()
   const { lang } = useLanguage()
   const t = profileCoreDict[lang]
+  const tb = profileBonusDict[lang]
   // Same shadowing as /create: see src/components/AppDialog.tsx.
   const { alert, dialogElement } = useAppDialog()
   const { binLookup, lookupBin, resetBinLookup } = useBinLookup()
@@ -116,6 +120,9 @@ export default function Requisites() {
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw
   const [saving, setSaving] = useState(false)
+  // Ошибку БИН показываем, когда набрано 12 цифр или после попытки сохранить —
+  // не на каждой первой цифре.
+  const [binTouched, setBinTouched] = useState(false)
   const [profile, setProfile] = useState({
     company_name: '', bin_iin: '', address: '', email: '', phone: '',
     director_name: '', accountant_name: ''
@@ -183,6 +190,15 @@ export default function Requisites() {
       alert(t.requisitesMissingAlert(missing.map(m => m.replace(' *', '')).join(', ')))
       return
     }
+    // Контрольная цифра БИН/ИИН (15.10.2026): опечатка в своём БИН уходит в
+    // каждый счёт. Старые сохранённые значения не трогаются — проверка только
+    // при следующем сохранении.
+    const binError = validateBinIin(profile.bin_iin)
+    if (binError) {
+      setBinTouched(true)
+      alert(tb.binErrors[binError])
+      return
+    }
 
     setSaving(true)
     try {
@@ -194,7 +210,7 @@ export default function Requisites() {
         .from('profiles')
         .update({
           company_name: profile.company_name,
-          bin_iin: profile.bin_iin,
+          bin_iin: digitsOnly(profile.bin_iin),
           address: profile.address,
           email: profile.email,
           phone: profile.phone,
@@ -209,6 +225,15 @@ export default function Requisites() {
         await alert(t.errorPrefix(error?.message || t.profileNotSavedMessage))
         return
       }
+      // Бонус за реквизиты — сервер сам перепроверит БИН по реестру (бывает
+      // небыстро), поэтому не ждём: всплывашка живёт в document.body и
+      // покажется и после перехода обратно в /create.
+      // Банковский счёт мог быть сохранён раньше реквизитов (путь из /create:
+      // сначала банк не засчитался — БИН был пустой). Реквизиты теперь
+      // в порядке — пробуем и банк; повторный запрос безопасен.
+      void claimAndAnnounceBonus('requisites', lang).then(r => {
+        if (r?.credited || r?.alreadyClaimed) return claimAndAnnounceBonus('bank', lang)
+      })
       await alert(t.savedAlert)
       router.push(returnTo || '/profile')
     } catch (e: any) {
@@ -278,6 +303,13 @@ export default function Requisites() {
                   {binLookup.status === 'loading' ? '…' : t.binLookupCheckButton}
                 </button>
               </div>
+              {(() => {
+                const err = validateBinIin(profile.bin_iin)
+                const show = err && err !== 'empty' && (binTouched || digitsOnly(profile.bin_iin).length >= 12)
+                return show ? (
+                  <div role="alert" className="text-xs mt-1" style={{ color: 'var(--nav-critical)' }}>{tb.binErrors[err]}</div>
+                ) : null
+              })()}
               {binLookup.status === 'notfound' && (
                 <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>{t.binLookupNotFound}</div>
               )}

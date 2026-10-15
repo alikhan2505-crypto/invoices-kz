@@ -11,6 +11,7 @@ import { getActivePlan } from '@/lib/plan'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import { useAppDialog } from '@/components/AppDialog'
+import { claimAndAnnounceBonus } from '@/lib/profileBonusClient'
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
 // kept identical rather than inventing a second "house" ease.
@@ -193,6 +194,8 @@ export default function Signature() {
       setSignatureUrl(url)
       setShowCanvas(false)
       setSaving(false)
+      // Бонус за подпись — сервер сам скачает картинку и проверит, что она не пустая.
+      void claimAndAnnounceBonus('signature', lang)
     }, 'image/png')
   }
 
@@ -449,6 +452,7 @@ export default function Signature() {
       setStampUrl(url)
       setShowCropModal(false)
       setSaving(false)
+      void claimAndAnnounceBonus('signature', lang)
     }, 'image/png')
   }
 

@@ -24,12 +24,17 @@ import {
 // anything shorter would just spend requests.
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000
 
+// 'error' — реестр не ответил (сеть, таймаут, не 2xx), в отличие от null —
+// «ответил, такого нет». Различие нужно бонусу за реквизиты: недоступный
+// реестр — это «попробуйте позже», а не «компания не найдена».
+type SourceAnswer = BinLookupResult | null | 'error'
+
 /** The legal-entity register. Rich, but holds no sole proprietors. */
-async function lookUpInEgov(bin: string): Promise<BinLookupResult | null> {
+async function lookUpInEgov(bin: string): Promise<SourceAnswer> {
   const key = process.env.EGOV_API_KEY
   if (!key) {
     console.error('bin-lookup: EGOV_API_KEY is not set')
-    return null
+    return 'error'
   }
   try {
     const url = `https://data.egov.kz/api/v4/gbd_ul/v1?source=${encodeURIComponent(egovQuery(bin))}&apiKey=${key}`
@@ -39,14 +44,19 @@ async function lookUpInEgov(bin: string): Promise<BinLookupResult | null> {
     return toLookupResult(bin, Array.isArray(records) ? records : [])
   } catch (e) {
     console.error('bin-lookup: egov request failed:', e instanceof Error ? e.message : e)
-    return null
+    return 'error'
   }
 }
 
 /** КГД. The only official source that covers ИП, at the cost of detail. */
-async function lookUpInKgd(bin: string): Promise<BinLookupResult | null> {
+async function lookUpInKgd(bin: string): Promise<SourceAnswer> {
   const token = process.env.KGD_PORTAL_TOKEN
-  if (!token) return null
+  if (!token) {
+    // Без токена ИП проверить нечем — это «реестр недоступен», а не «нет такого».
+    console.error('bin-lookup: KGD_PORTAL_TOKEN is not set')
+    return 'error'
+  }
+  let failed = false
   for (const taxpayerType of KGD_TAXPAYER_TYPES) {
     try {
       const url = `${KGD_TAXPAYER_URL}?taxpayerCode=${encodeURIComponent(bin)}&taxpayerType=${taxpayerType}`
@@ -54,14 +64,25 @@ async function lookUpInKgd(bin: string): Promise<BinLookupResult | null> {
         headers: { 'X-Portal-Token': token },
         signal: AbortSignal.timeout(12_000),
       })
-      if (!res.ok) continue
+      if (!res.ok) {
+        // Только 404 — уверенное «не нашли» для этого типа плательщика. Всё
+        // остальное (401/403 — протух или сменился токен, 400, 429, 5xx) —
+        // КГД не ответил по существу: «попробуйте позже», а не «не найден».
+        if (res.status !== 404) {
+          failed = true
+          console.error('bin-lookup: КГД responded', res.status, 'for taxpayerType', taxpayerType)
+        }
+        continue
+      }
+      if (res.status === 204) continue
       const taxpayer = parseTaxpayer(await res.json())
       if (taxpayer) return fromKgdTaxpayer(bin, taxpayer)
     } catch (e) {
+      failed = true
       console.error('bin-lookup: КГД request failed:', e instanceof Error ? e.message : e)
     }
   }
-  return null
+  return failed ? 'error' : null
 }
 
 /**
@@ -139,7 +160,12 @@ async function checkRisk(bin: string): Promise<{
   }
 }
 
-export type BinLookupOutcome = { found: false } | { found: true; company: BinLookupResult }
+/**
+ * unavailable: true — ни один реестр не смог ответить «нет» уверенно (сеть,
+ * таймаут). Старые потребители смотрят только на found и ведут себя как
+ * раньше.
+ */
+export type BinLookupOutcome = { found: false; unavailable?: boolean } | { found: true; company: BinLookupResult }
 
 /**
  * Полный цикл проверки по БИН: кэш → (при промахе) egov → КГД → НДС и риски
@@ -219,9 +245,11 @@ export async function performBinLookup(supabase: SupabaseClient, bin: string): P
   // a director and an activity, none of which КГД publishes. КГД is the
   // fallback that covers everyone the register cannot -- sole proprietors,
   // who are simply absent from it.
-  const company = (await lookUpInEgov(bin)) ?? (await lookUpInKgd(bin))
+  const egov = await lookUpInEgov(bin)
+  const kgd = egov && egov !== 'error' ? null : await lookUpInKgd(bin)
+  const company = egov && egov !== 'error' ? egov : (kgd && kgd !== 'error' ? kgd : null)
   if (!company) {
-    return { found: false }
+    return egov === 'error' || kgd === 'error' ? { found: false, unavailable: true } : { found: false }
   }
 
   // Run together: three independent КГД calls, and the user is waiting.

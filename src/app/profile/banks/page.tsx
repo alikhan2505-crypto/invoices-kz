@@ -12,6 +12,9 @@ import Skeleton from '@/components/Skeleton'
 import { KAZAKHSTAN_BANKS, OTHER_BANK, findBankByBik, findBankByName } from '@/lib/kazakhstanBanks'
 import { useAppDialog } from '@/components/AppDialog'
 import { returnPathFromSearch, type ReturnPath } from '@/lib/returnPath'
+import { validateIik, normalizeIik } from '@/lib/kzIdentifiers'
+import { profileBonusDict } from '@/lib/i18n/profileBonus'
+import { claimAndAnnounceBonus } from '@/lib/profileBonusClient'
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
 // kept identical rather than inventing a second "house" ease.
@@ -71,6 +74,7 @@ export default function Banks() {
   const router = useRouter()
   const { lang } = useLanguage()
   const t = profileAccountsDict[lang]
+  const tb = profileBonusDict[lang]
   // Shadows window.alert / window.confirm for this component -- see
   // src/components/AppDialog.tsx. Every confirm below is awaited: a Promise
   // is truthy, so `if (confirm(...))` would silently pass.
@@ -87,6 +91,8 @@ export default function Banks() {
   // outside the registry needs this, so it stays off unless the user asks for
   // it or an existing account turns out not to match any known bank.
   const [manualBank, setManualBank] = useState(false)
+  // Ошибку ИИК показываем после попытки сохранить или когда набрано 20 знаков.
+  const [iikTouched, setIikTouched] = useState(false)
 
   // The picker's value is derived from the form rather than stored alongside
   // it: two sources for one fact drift, and the drifted one is what would be
@@ -142,23 +148,33 @@ export default function Banks() {
     setEditingId(null)
     setForm({ bank_name: '', iik: '', bik: '', kbe: '19', currency: 'KZT' })
     setManualBank(false)
+    setIikTouched(false)
     setShowForm(false)
   }
 
   async function saveAccount() {
     if (!form.bank_name || !form.iik) { alert(t.fillBankNameAndIikAlert); return }
     if (!form.bik) { alert(t.fillBankBikAlert); return }
+    // ИИК — это IBAN: KZ + 18 знаков и контроль mod-97 (15.10.2026). Банк по
+    // ИИК не угадываем — публичные таблицы кодов противоречат друг другу.
+    // Уже сохранённые счета не трогаются — проверка при следующем сохранении.
+    const iikError = validateIik(form.iik)
+    if (iikError) { setIikTouched(true); alert(tb.iikErrors[iikError]); return }
+    const payload = { ...form, iik: normalizeIik(form.iik) }
     setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setSaving(false); router.push('/login'); return }
     if (editingId) {
-      const { error } = await supabase.from('bank_accounts').update({ ...form }).eq('id', editingId)
+      const { error } = await supabase.from('bank_accounts').update(payload).eq('id', editingId)
       if (error) { alert(t.errorPrefix(error.message)); setSaving(false); return }
     } else {
       const is_main = accounts.length === 0
-      const { error } = await supabase.from('bank_accounts').insert({ ...form, user_id: user.id, is_main })
+      const { error } = await supabase.from('bank_accounts').insert({ ...payload, user_id: user.id, is_main })
       if (error) { alert(t.errorPrefix(error.message)); setSaving(false); return }
     }
+    // Бонус за банковский счёт — сервер перепроверит ИИК и БИН профиля сам;
+    // не ждём (реестр бывает небыстрым), всплывашка переживёт переход.
+    void claimAndAnnounceBonus('bank', lang)
     setSaving(false)
     // Пришли из /create за банковским счётом — счёт есть, ведём обратно к
     // черновику, а не оставляем в списке счетов гадать, что дальше.
@@ -346,7 +362,15 @@ export default function Banks() {
                     placeholder={f.placeholder}
                     value={(form as any)[f.key]}
                     onChange={e => setForm({ ...form, [f.key]: e.target.value })}
+                    {...(f.key === 'iik' ? { autoCapitalize: 'characters', spellCheck: false, onBlur: () => { if (form.iik.trim()) setIikTouched(true) } } : {})}
                   />
+                  {f.key === 'iik' && (() => {
+                    const err = validateIik(form.iik)
+                    const show = err && err !== 'empty' && (iikTouched || normalizeIik(form.iik).length >= 20)
+                    return show ? (
+                      <div role="alert" className="text-xs mt-1" style={{ color: 'var(--nav-critical)' }}>{tb.iikErrors[err]}</div>
+                    ) : null
+                  })()}
                 </div>
               ))}
               <div>

@@ -15,6 +15,9 @@ const TYPE_LABELS: Record<string, string> = {
   commission: 'Комиссия за оплату счёта',
   kaspi_shop_check: 'Kaspi Bot: проверка цены',
   ai_agent_reply: 'ИИ-агент: ответ',
+  profile_bonus: 'Бонус за профиль',
+  plan_payment: 'Оплата тарифа',
+  plan_payment_refund: 'Возврат за тариф',
 }
 
 export async function GET(req: NextRequest) {

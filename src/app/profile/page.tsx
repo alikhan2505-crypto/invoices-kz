@@ -18,6 +18,7 @@ import { localMonthQueryFloor, sumPaidInMonth } from '@/lib/invoiceStats'
 import { profileCoreDict } from '@/lib/i18n/profileCore'
 import { useMediaQuery } from '@/lib/useMediaQuery'
 import Skeleton from '@/components/Skeleton'
+import ProfileBonusCard from '@/components/ProfileBonusCard'
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
 // kept identical rather than inventing a second "house" ease.
@@ -674,6 +675,7 @@ export default function Profile() {
           <div className="flex gap-6 items-start">
             <div className="flex flex-col gap-4 w-[360px] flex-shrink-0">
               {profileCardEl}
+              <ProfileBonusCard />
               {subscriptionEl}
               {themeEl}
               {signOutEl}
@@ -691,6 +693,8 @@ export default function Profile() {
           // На телефоне тариф — сразу под карточкой компании, а не в самом низу.
           <div className="space-y-4">
             {profileCardEl}
+            {/* «Готовность к счёту» — сразу под карточкой компании. */}
+            <ProfileBonusCard />
             {subscriptionEl}
             {companyEl}
             {documentsEl}

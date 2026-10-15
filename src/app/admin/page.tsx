@@ -370,6 +370,16 @@ export default function Admin() {
                         <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-700 text-gray-300">
                           {payment.billing_period === 'annual' ? 'Год' : 'Месяц'}
                         </span>
+                        {/* Оплата с кошелька (15.10.2026): целиком или частью. */}
+                        {Number(payment.wallet_amount) > 0 && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300"
+                            title={payment.wallet_status === 'refunded' ? 'Удержание вернули на кошелёк — Kaspi-часть не оплачена' : undefined}>
+                            {Number(payment.wallet_amount) >= Number(payment.amount)
+                              ? 'кошелёк'
+                              : `кошелёк ${Number(payment.wallet_amount).toLocaleString('ru-KZ')} ₸`}
+                            {payment.wallet_status === 'refunded' ? ' · возвращено' : ''}
+                          </span>
+                        )}
                       </div>
                       <div className="text-xs text-gray-500 mt-0.5">
                         {t.submittedLabel(formatDateTime(payment.created_at))}

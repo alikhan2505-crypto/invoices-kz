@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { KaspiConnectionSecretsError } from '@/lib/kaspiPay/connection'
 import { KaspiAuthError } from '@/lib/kaspiPay/client'
 import { checkAndSettleKaspiPayment } from '@/lib/kaspiPay/settlePayment'
-import { checkAndSettlePlanPayment } from '@/lib/kaspiPay/settlePlanPayment'
+import { checkAndSettlePlanPayment, refundOrphanPlanWalletHolds } from '@/lib/kaspiPay/settlePlanPayment'
 import { checkAndSettleWalletTopup } from '@/lib/kaspiPay/wallet'
 import { syncKaspiHistory } from '@/lib/kaspiPay/historySync'
 
@@ -133,6 +133,10 @@ export async function GET(request: Request) {
     }
   }
 
+  // Удержания с кошелька у несостоявшихся оплат тарифа (вызов возврата не
+  // дошёл или админ отклонил платёж) — вернуть. До миграции — тихий ноль.
+  const walletHoldsRefunded = await refundOrphanPlanWalletHolds()
+
   const { data: pendingTopups } = await supabase
     .from('kaspi_wallet_topups')
     .select('id, user_id, amount, kaspi_operation_id, status, expires_at')
@@ -165,5 +169,5 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.json({ ok: true, paid, expired, plansPaid, plansExpired, topupsPaid, topupsExpired, historySynced, historyAutoConfirmed })
+  return NextResponse.json({ ok: true, paid, expired, plansPaid, plansExpired, walletHoldsRefunded, topupsPaid, topupsExpired, historySynced, historyAutoConfirmed })
 }

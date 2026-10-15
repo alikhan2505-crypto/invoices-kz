@@ -3,7 +3,8 @@ import { createClient } from '@supabase/supabase-js'
 import { loadPlatformConnection } from '@/lib/kaspiPay/connection'
 import { createPayment } from '@/lib/kaspiPay/client'
 import { getPlanAmount, type BillingPeriod } from '@/lib/plans/pricing'
-import { checkAndSettlePlanPayment, type PlanPaymentRow } from '@/lib/kaspiPay/settlePlanPayment'
+import { checkAndSettlePlanPayment, refundDeadPlanWalletHolds, type PlanPaymentRow } from '@/lib/kaspiPay/settlePlanPayment'
+import { quoteWalletPlanPayment, startPlanPaymentWithWalletHold } from '@/lib/plans/walletPlanPayment'
 
 const supabaseAuth = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -21,8 +22,26 @@ const PLAN_PAYMENT_RATE_LIMIT = 5
 const PLAN_PAYMENT_RATE_WINDOW_MS = 60_000
 
 export async function POST(req: NextRequest) {
+  // Удержания с кошелька у старых строк, закрытых ниже, при useWallet не
+  // возвращаются сразу: start_plan_payment_with_wallet забирает их себе той
+  // же транзакцией. Если новый платёж с кошельком так и не создан (любая
+  // ошибка, кошелёк покрывает всё, кошелёк не понадобился), возвращаем их
+  // здесь — деньги не зависают до ночного крона.
+  const deferred: { userId: string | null; moved: boolean } = { userId: null, moved: false }
   try {
-    const { userId, plan, period } = await req.json()
+    return await createPlanPayment(req, deferred)
+  } finally {
+    if (deferred.userId && !deferred.moved) {
+      try { await refundDeadPlanWalletHolds(deferred.userId) } catch (e: any) {
+        console.error('Payment create: deferred wallet hold refund failed — the daily sweep will retry:', e?.message)
+      }
+    }
+  }
+}
+
+async function createPlanPayment(req: NextRequest, deferred: { userId: string | null; moved: boolean }) {
+  try {
+    const { userId, plan, period, useWallet } = await req.json()
     if (!userId || !plan || (plan !== 'pro' && plan !== 'basic')) {
       return NextResponse.json({ error: 'Missing params' }, { status: 400 })
     }
@@ -68,6 +87,8 @@ export async function POST(req: NextRequest) {
       .select('id, user_id, plan, amount, qr_operation_id, created_at, billing_period')
       .eq('user_id', userId)
       .eq('status', 'pending')
+    const deferWalletRefund = useWallet === true
+    if (deferWalletRefund) deferred.userId = userId
     if (pendingError) console.error('Payment create: pending-check failed, allowing request:', pendingError.message)
     else if ((pendingRows?.length ?? 0) > 0) {
       for (const row of pendingRows as PlanPaymentRow[]) {
@@ -77,7 +98,7 @@ export async function POST(req: NextRequest) {
           // (the previous behaviour) left customers staring at "у вас уже
           // есть неподтверждённый платёж" with no way forward until the
           // nightly cron cleared it. /kaspi-api has always worked this way.
-          const result = await checkAndSettlePlanPayment(row, { force: true })
+          const result = await checkAndSettlePlanPayment(row, { force: true, deferWalletRefund })
           if (result === 'paid') {
             // Settling just activated the plan from a QR the customer had
             // already paid. Same as create-phone: report it as a successful
@@ -98,7 +119,42 @@ export async function POST(req: NextRequest) {
     if (!connection) return NextResponse.json({ error: 'Platform Kaspi connection not set up' }, { status: 500 })
 
     const amount = getPlanAmount(plan, billingPeriod)
-    const payment = await createPayment(connection, { amount, orderId: `${userId}__${plan}__${Date.now()}` })
+
+    // «Списать часть с кошелька, остальное через Kaspi». Считается ПОСЛЕ
+    // закрытия старых pending-строк выше; их удержания входят в баланс
+    // расчёта (quoteWalletPlanPayment) и переезжают на новую строку внутри
+    // start_plan_payment_with_wallet. Целиком с кошелька — не здесь, а в
+    // /api/payment/wallet (там нет Kaspi-операции вовсе).
+    let walletPart = 0
+    if (useWallet === true) {
+      const quote = await quoteWalletPlanPayment(userId, plan, billingPeriod)
+      if (!quote.available) return NextResponse.json({ error: 'wallet_unavailable' }, { status: 503 })
+      if (quote.split.mode === 'wallet_full') return NextResponse.json({ error: 'wallet_covers_full' }, { status: 409 })
+      walletPart = quote.split.mode === 'partial' ? quote.split.wallet : 0
+    }
+    const kaspiAmount = amount - walletPart
+
+    const payment = await createPayment(connection, { amount: kaspiAmount, orderId: `${userId}__${plan}__${Date.now()}` })
+
+    if (walletPart > 0) {
+      // Строка платежа и удержание с кошелька — одной транзакцией в базе.
+      // Не вышло (баланс успел уменьшиться) — строки нет, QR никому не
+      // показан, выпущенная операция просто истечёт у Kaspi.
+      const hold = await startPlanPaymentWithWalletHold({ user, plan, period: billingPeriod, walletPart, operationId: payment.operationId })
+      if (!hold.ok) {
+        const status = hold.error === 'unavailable' ? 503 : hold.error === 'server_error' ? 502 : 409
+        return NextResponse.json({ error: hold.error === 'insufficient_funds' ? 'wallet_changed' : `wallet_${hold.error}` }, { status })
+      }
+      deferred.moved = true
+      return NextResponse.json({
+        qr_token: payment.paymentLink,
+        ext_tran_id: payment.operationId,
+        expire_date: payment.expiresAt,
+        kaspi_amount: kaspiAmount,
+        wallet_amount: walletPart,
+        wallet_balance: hold.balance,
+      })
+    }
 
     const { error: insertError } = await supabase.from('payment_requests').insert({
       user_id: userId,
@@ -119,6 +175,8 @@ export async function POST(req: NextRequest) {
       qr_token: payment.paymentLink,
       ext_tran_id: payment.operationId,
       expire_date: payment.expiresAt,
+      kaspi_amount: amount,
+      wallet_amount: 0,
     })
   } catch (e: any) {
     console.error('Payment create error:', e)
