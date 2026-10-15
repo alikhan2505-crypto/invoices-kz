@@ -207,6 +207,7 @@ export default function Support() {
           {[
             { label: t.privacyPolicyLabel, href: '/privacy' },
             { label: t.termsOfUseLabel, href: '/terms' },
+            { label: t.dataDeletionLabel, href: '/data-deletion' },
           ].map((item, i, arr) => (
             <Link key={item.href} href={item.href}
               className="flex items-center justify-between mx-2 px-3 py-3 rounded-xl transition-colors hover:bg-[var(--nav-surface-glass)]"

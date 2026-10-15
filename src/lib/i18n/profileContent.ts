@@ -90,6 +90,7 @@ export interface ProfileMiscContent {
   websiteLabel: string
   privacyPolicyLabel: string
   termsOfUseLabel: string
+  dataDeletionLabel: string
   madeInKazakhstanLabel: string
   copyrightLabel: string
 
@@ -203,6 +204,7 @@ export const profileContentDict: Record<'ru' | 'kk' | 'en', ProfileMiscContent> 
     websiteLabel: 'Сайт',
     privacyPolicyLabel: 'Политика конфиденциальности',
     termsOfUseLabel: 'Условия использования',
+    dataDeletionLabel: 'Удаление аккаунта и данных',
     madeInKazakhstanLabel: 'Сделано в Казахстане с ❤️',
     copyrightLabel: '© 2026 INVOICES.KZ. Все права защищены.',
 
@@ -308,6 +310,7 @@ export const profileContentDict: Record<'ru' | 'kk' | 'en', ProfileMiscContent> 
     websiteLabel: 'Сайт',
     privacyPolicyLabel: 'Құпиялылық саясаты',
     termsOfUseLabel: 'Пайдалану шарттары',
+    dataDeletionLabel: 'Аккаунт пен деректерді жою',
     madeInKazakhstanLabel: 'Қазақстанда ❤️-пен жасалған',
     copyrightLabel: '© 2026 INVOICES.KZ. Барлық құқықтар қорғалған.',
 
@@ -413,6 +416,7 @@ export const profileContentDict: Record<'ru' | 'kk' | 'en', ProfileMiscContent> 
     websiteLabel: 'Website',
     privacyPolicyLabel: 'Privacy Policy',
     termsOfUseLabel: 'Terms of Use',
+    dataDeletionLabel: 'Account and data deletion',
     madeInKazakhstanLabel: 'Made in Kazakhstan with ❤️',
     copyrightLabel: '© 2026 INVOICES.KZ. All rights reserved.',
 
