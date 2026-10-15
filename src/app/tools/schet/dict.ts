@@ -169,7 +169,7 @@ export const schetDict: Record<ToolLang, SchetDict> = {
     limitTitle: n => `Все ${n} бесплатных счёта в этом квартале уже созданы`,
     limitReset: iso => `Новые бесплатные счета откроются ${quarterStartLabel('ru', iso)}.`,
     limitBody:
-      'В кабинете invoices.kz счета без лимита и без водяного знака: реквизиты сохраняются один раз, номера считаются сами, видно, когда клиент открыл счёт, а оплату можно принять через Kaspi. Регистрация бесплатная, по ссылке на почту.',
+      'В кабинете invoices.kz реквизиты сохраняются один раз, номера считаются сами, видно, когда клиент открыл счёт, а оплату можно принять через Kaspi. Регистрация бесплатная, по ссылке на почту.',
     limitButton: 'Зарегистрироваться бесплатно',
     generate: 'Создать счёт — откроется для печати и скачивания',
     remaining: (left, n) => `Осталось ${left} из ${n} бесплатных счетов в этом квартале · в счёте будет строка «Создано на invoices.kz»`,
@@ -272,7 +272,7 @@ export const schetDict: Record<ToolLang, SchetDict> = {
     limitTitle: n => `Осы тоқсандағы ${n} тегін шоттың бәрі жасалып қойды`,
     limitReset: iso => `Жаңа тегін шоттар ${quarterStartLabel('kk', iso)} ашылады.`,
     limitBody:
-      'invoices.kz кабинетінде шоттар шектеусіз және су белгісіз: деректемелер бір рет сақталады, нөмірлер өздігінен қойылады, клиенттің шотты қашан ашқаны көрінеді, ал төлемді Kaspi арқылы қабылдауға болады. Тіркелу тегін, поштаға келген сілтеме арқылы.',
+      'invoices.kz кабинетінде деректемелер бір рет сақталады, нөмірлер өздігінен қойылады, клиенттің шотты қашан ашқаны көрінеді, ал төлемді Kaspi арқылы қабылдауға болады. Тіркелу тегін, поштаға келген сілтеме арқылы.',
     limitButton: 'Тегін тіркелу',
     generate: 'Шот жасау — басып шығаруға және жүктеуге ашылады',
     remaining: (left, n) => `Осы тоқсанда қалған тегін шот: ${left} / ${n} · шоттың төменгі жағында invoices.kz белгісі бар жол болады`,
@@ -375,7 +375,7 @@ export const schetDict: Record<ToolLang, SchetDict> = {
     limitTitle: n => `You've used all ${n} free invoices for this quarter`,
     limitReset: iso => `New free invoices unlock on ${quarterStartLabel('en', iso)}.`,
     limitBody:
-      'In an invoices.kz account invoices are unlimited and watermark-free: your details are saved once, numbering is automatic, you can see when the client opened the invoice, and you can accept payment via Kaspi. Sign-up is free, with an email link.',
+      'In an invoices.kz account your details are saved once, numbering is automatic, you can see when the client opened the invoice, and you can accept payment via Kaspi. Sign-up is free, with an email link.',
     limitButton: 'Sign up for free',
     generate: 'Create the invoice — opens for printing and download',
     remaining: (left, n) => `${left} of ${n} free invoices left this quarter · the invoice carries a small invoices.kz footer line`,

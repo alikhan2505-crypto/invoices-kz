@@ -145,7 +145,7 @@ export const avrDict: Record<ToolLang, AvrDict> = {
     limitTitle: n => `Все ${n} бесплатных акта в этом квартале уже созданы`,
     limitReset: iso => `Новые бесплатные акты откроются ${quarterStartLabel('ru', iso)}.`,
     limitBody:
-      'В кабинете invoices.kz АВР создаётся из счёта в один клик: реквизиты и работы уже заполнены, номера считаются сами, подпись и печать — внутри PDF, подписание ЭЦП. Регистрация бесплатная.',
+      'В кабинете invoices.kz на тарифе Про АВР создаётся из счёта в один клик: реквизиты и работы уже заполнены, номера считаются сами, подпись и печать — внутри PDF, подписание ЭЦП. Регистрация бесплатная.',
     limitButton: 'Зарегистрироваться бесплатно',
     generate: 'Создать АВР — откроется для печати и скачивания',
     remaining: (left, n) => `Осталось ${left} из ${n} бесплатных актов в этом квартале`,
@@ -240,7 +240,7 @@ export const avrDict: Record<ToolLang, AvrDict> = {
     limitTitle: n => `Осы тоқсандағы ${n} тегін актінің бәрі жасалып қойды`,
     limitReset: iso => `Жаңа тегін актілер ${quarterStartLabel('kk', iso)} ашылады.`,
     limitBody:
-      'invoices.kz кабинетінде акт шоттан бір басумен жасалады: деректемелер мен жұмыстар толтырылып тұрады, нөмірлер өздігінен қойылады, қолтаңба мен мөр PDF ішінде, ЭЦҚ-мен қол қоюға болады. Тіркелу тегін.',
+      'invoices.kz кабинетінде Про тарифінде акт шоттан бір басумен жасалады: деректемелер мен жұмыстар толтырылып тұрады, нөмірлер өздігінен қойылады, қолтаңба мен мөр PDF ішінде, ЭЦҚ-мен қол қоюға болады. Тіркелу тегін.',
     limitButton: 'Тегін тіркелу',
     generate: 'Акт жасау — басып шығаруға және жүктеуге ашылады',
     remaining: (left, n) => `Осы тоқсанда қалған тегін акт: ${left} / ${n}`,
@@ -335,7 +335,7 @@ export const avrDict: Record<ToolLang, AvrDict> = {
     limitTitle: n => `You've used all ${n} free certificates for this quarter`,
     limitReset: iso => `New free certificates unlock on ${quarterStartLabel('en', iso)}.`,
     limitBody:
-      'In an invoices.kz account an AVR is created from an invoice in one click: your details and services are already filled in, numbering is automatic, the signature and stamp are inside the PDF, and it can be signed with a digital signature (EDS). Sign-up is free.',
+      'On the Pro plan in an invoices.kz account an AVR is created from an invoice in one click: your details and services are already filled in, numbering is automatic, the signature and stamp are inside the PDF, and it can be signed with a digital signature (EDS). Sign-up is free.',
     limitButton: 'Sign up for free',
     generate: 'Create the AVR — opens for printing and download',
     remaining: (left, n) => `${left} of ${n} free certificates left this quarter`,

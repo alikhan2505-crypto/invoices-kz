@@ -136,7 +136,7 @@ export const nakladnayaDict: Record<ToolLang, NakladnayaDict> = {
     limitTitle: n => `Все ${n} бесплатные накладные в этом квартале уже созданы`,
     limitReset: iso => `Новые бесплатные накладные откроются ${quarterStartLabel('ru', iso)}.`,
     limitBody:
-      'В кабинете invoices.kz накладная создаётся из счёта в один клик: реквизиты и товары уже заполнены, номера считаются сами, подпись и печать — внутри PDF. Регистрация бесплатная.',
+      'В кабинете invoices.kz на тарифе Про накладная создаётся из счёта в один клик: реквизиты и товары уже заполнены, номера считаются сами, подпись и печать — внутри PDF. Регистрация бесплатная.',
     limitButton: 'Зарегистрироваться бесплатно',
     generate: 'Создать накладную — откроется для печати и скачивания',
     remaining: (left, n) => `Осталось ${left} из ${n} бесплатных накладных в этом квартале`,
@@ -223,7 +223,7 @@ export const nakladnayaDict: Record<ToolLang, NakladnayaDict> = {
     limitTitle: n => `Осы тоқсандағы ${n} тегін жүкқұжаттың бәрі жасалып қойды`,
     limitReset: iso => `Жаңа тегін жүкқұжаттар ${quarterStartLabel('kk', iso)} ашылады.`,
     limitBody:
-      'invoices.kz кабинетінде жүкқұжат шоттан бір басумен жасалады: деректемелер мен тауарлар толтырылып тұрады, нөмірлер өздігінен қойылады, қолтаңба мен мөр PDF ішінде. Тіркелу тегін.',
+      'invoices.kz кабинетінде Про тарифінде жүкқұжат шоттан бір басумен жасалады: деректемелер мен тауарлар толтырылып тұрады, нөмірлер өздігінен қойылады, қолтаңба мен мөр PDF ішінде. Тіркелу тегін.',
     limitButton: 'Тегін тіркелу',
     generate: 'Жүкқұжат жасау — басып шығаруға және жүктеуге ашылады',
     remaining: (left, n) => `Осы тоқсанда қалған тегін жүкқұжат: ${left} / ${n}`,
@@ -310,7 +310,7 @@ export const nakladnayaDict: Record<ToolLang, NakladnayaDict> = {
     limitTitle: n => `You've used all ${n} free notes for this quarter`,
     limitReset: iso => `New free notes unlock on ${quarterStartLabel('en', iso)}.`,
     limitBody:
-      'In an invoices.kz account a delivery note is created from an invoice in one click: requisites and goods are already filled in, numbering is automatic, and the signature and stamp are inside the PDF. Sign-up is free.',
+      'On the Pro plan in an invoices.kz account a delivery note is created from an invoice in one click: requisites and goods are already filled in, numbering is automatic, and the signature and stamp are inside the PDF. Sign-up is free.',
     limitButton: 'Sign up for free',
     generate: 'Create the delivery note — opens for printing and download',
     remaining: (left, n) => `${left} of ${n} free notes left this quarter`,
