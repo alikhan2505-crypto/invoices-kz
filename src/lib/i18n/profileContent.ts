@@ -168,7 +168,7 @@ export const profileContentDict: Record<'ru' | 'kk' | 'en', ProfileMiscContent> 
     itemsEmptyStateLabel: (hasSearch: boolean) => hasSearch ? 'Не найдено' : 'Нет позиций',
     servicesSectionLabel: (count: number) => `📋 Услуги (${count})`,
     productsSectionLabel: (count: number) => `📦 Товары (${count})`,
-    addItemButton: '+ Добавить позицию',
+    addItemButton: '+ Добавить товар / услугу',
     fillNameAndPriceAlert: 'Заполните название и цену',
     deleteItemConfirm: 'Удалить позицию?',
 
@@ -279,7 +279,7 @@ export const profileContentDict: Record<'ru' | 'kk' | 'en', ProfileMiscContent> 
     itemsEmptyStateLabel: (hasSearch: boolean) => hasSearch ? 'Табылмады' : 'Позициялар жоқ',
     servicesSectionLabel: (count: number) => `📋 Қызметтер (${count})`,
     productsSectionLabel: (count: number) => `📦 Тауарлар (${count})`,
-    addItemButton: '+ Позиция қосу',
+    addItemButton: '+ Тауар / қызмет қосу',
     fillNameAndPriceAlert: 'Атауы мен бағасын толтырыңыз',
     deleteItemConfirm: 'Позицияны жоясыз ба?',
 
@@ -390,7 +390,7 @@ export const profileContentDict: Record<'ru' | 'kk' | 'en', ProfileMiscContent> 
     itemsEmptyStateLabel: (hasSearch: boolean) => hasSearch ? 'Not found' : 'No items',
     servicesSectionLabel: (count: number) => `📋 Services (${count})`,
     productsSectionLabel: (count: number) => `📦 Products (${count})`,
-    addItemButton: '+ Add item',
+    addItemButton: '+ Add product / service',
     fillNameAndPriceAlert: 'Fill in the name and price',
     deleteItemConfirm: 'Delete this item?',
 

@@ -111,7 +111,7 @@ export const nakladnayaDict: Record<ToolLang, NakladnayaDict> = {
     qtyAria: n => `Количество, строка ${n}`,
     priceAria: n => `Цена, строка ${n}`,
     removeRow: n => `Удалить строку ${n}`,
-    addRow: '+ Добавить товар',
+    addRow: '+ Добавить товар / услугу',
     total: s => `Итого: ${s}`,
     vatIncluded: s => `в т. ч. НДС 16%: ${s}`,
     errors: {
@@ -195,7 +195,7 @@ export const nakladnayaDict: Record<ToolLang, NakladnayaDict> = {
     qtyAria: n => `${n}-жолдағы саны`,
     priceAria: n => `${n}-жолдағы бағасы`,
     removeRow: n => `${n}-жолды өшіру`,
-    addRow: '+ Тауар қосу',
+    addRow: '+ Тауар / қызмет қосу',
     total: s => `Барлығы: ${s}`,
     vatIncluded: s => `оның ішінде ҚҚС 16%: ${s}`,
     errors: {
@@ -279,7 +279,7 @@ export const nakladnayaDict: Record<ToolLang, NakladnayaDict> = {
     qtyAria: n => `Quantity, row ${n}`,
     priceAria: n => `Price, row ${n}`,
     removeRow: n => `Remove row ${n}`,
-    addRow: '+ Add item',
+    addRow: '+ Add product / service',
     total: s => `Total: ${s}`,
     vatIncluded: s => `incl. VAT 16%: ${s}`,
     errors: {
