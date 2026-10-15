@@ -1109,16 +1109,18 @@ export default function CreateInvoicePage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.15 }}
           >
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-medium" style={{ color: 'var(--nav-text-primary)' }}>{t.servicesHeader}</h3>
-              <div className="flex gap-2">
+            {/* На узком телефоне кнопки целиком уходят под заголовок, а не ломаются
+                по словам («+ Добавить товар / услугу» длиннее прежнего «+ Добавить»). */}
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+              <h3 className="font-medium whitespace-nowrap" style={{ color: 'var(--nav-text-primary)' }}>{t.servicesHeader}</h3>
+              <div className="flex flex-wrap gap-2">
                 {savedServices.length > 0 && (
                   <button onClick={() => setShowServicePicker(true)}
-                    className="text-xs font-semibold rounded-lg px-3 py-1 border border-[color:var(--nav-accent)]" style={{ color: 'var(--nav-accent)' }}>
+                    className="text-xs font-semibold rounded-lg px-3 py-1 whitespace-nowrap border border-[color:var(--nav-accent)]" style={{ color: 'var(--nav-accent)' }}>
                     {t.fromDirectoryButton}
                   </button>
                 )}
-                <button onClick={addService} className="text-xs font-semibold rounded-lg px-3 py-1" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                <button onClick={addService} className="text-xs font-semibold rounded-lg px-3 py-1 whitespace-nowrap" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                   {t.addButton}
                 </button>
               </div>
