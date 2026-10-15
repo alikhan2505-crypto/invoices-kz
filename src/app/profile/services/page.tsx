@@ -261,15 +261,6 @@ export default function Services() {
 
               <div className="flex gap-2">
                 <button type="button"
-                  onClick={() => setForm({ ...form, type: 'service' })}
-                  className="flex-1 px-3 py-2 text-xs rounded-lg font-semibold transition-colors"
-                  style={{
-                    background: form.type === 'service' ? 'var(--nav-accent)' : 'var(--nav-surface-glass)',
-                    color: form.type === 'service' ? 'var(--nav-accent-ink)' : 'var(--nav-text-muted)',
-                  }}>
-                  {t.serviceTypeToggleLabel}
-                </button>
-                <button type="button"
                   onClick={() => setForm({ ...form, type: 'product' })}
                   className="flex-1 px-3 py-2 text-xs rounded-lg font-semibold transition-colors"
                   style={{
@@ -277,6 +268,15 @@ export default function Services() {
                     color: form.type === 'product' ? 'white' : 'var(--nav-text-muted)',
                   }}>
                   {t.productTypeToggleLabel}
+                </button>
+                <button type="button"
+                  onClick={() => setForm({ ...form, type: 'service' })}
+                  className="flex-1 px-3 py-2 text-xs rounded-lg font-semibold transition-colors"
+                  style={{
+                    background: form.type === 'service' ? 'var(--nav-accent)' : 'var(--nav-surface-glass)',
+                    color: form.type === 'service' ? 'var(--nav-accent-ink)' : 'var(--nav-text-muted)',
+                  }}>
+                  {t.serviceTypeToggleLabel}
                 </button>
               </div>
 
@@ -355,6 +355,14 @@ export default function Services() {
             </div>
           ) : (
             <>
+              {productsList.length > 0 && (
+                <div className="mb-4">
+                  <div className="text-[11px] font-extrabold uppercase px-1 mb-2" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.09em' }}>
+                    {t.productsSectionLabel(productsList.length)}
+                  </div>
+                  <div className="nav-glass rounded-2xl overflow-hidden">
+                    {productsList.map((svc, i) => <ItemRow key={svc.id} svc={svc} i={i} total={productsList.length} />)}
+
               {servicesList.length > 0 && (
                 <div className="mb-4">
                   <div className="text-[11px] font-extrabold uppercase px-1 mb-2" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.09em' }}>
@@ -365,14 +373,6 @@ export default function Services() {
                   </div>
                 </div>
               )}
-
-              {productsList.length > 0 && (
-                <div className="mb-4">
-                  <div className="text-[11px] font-extrabold uppercase px-1 mb-2" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.09em' }}>
-                    {t.productsSectionLabel(productsList.length)}
-                  </div>
-                  <div className="nav-glass rounded-2xl overflow-hidden">
-                    {productsList.map((svc, i) => <ItemRow key={svc.id} svc={svc} i={i} total={productsList.length} />)}
                   </div>
                 </div>
               )}

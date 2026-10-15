@@ -280,15 +280,15 @@ export default function EditInvoice() {
               <div key={idx} className="rounded-xl p-3 space-y-2 border border-[color:var(--nav-border-soft)]">
                 {/* Переключатель */}
                 <div className="flex gap-2">
-                  <button type="button" onClick={() => updateService(idx, 'type', 'service')}
-                    className="flex-1 px-3 py-1.5 text-xs rounded-lg font-medium transition"
-                    style={(svc.type || 'service') === 'service' ? { background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' } : { background: 'var(--nav-surface-glass)', color: 'var(--nav-text-secondary)' }}>
-                    {t.serviceToggleLabel}
-                  </button>
                   <button type="button" onClick={() => updateService(idx, 'type', 'product')}
                     className="flex-1 px-3 py-1.5 text-xs rounded-lg font-medium transition"
                     style={svc.type === 'product' ? { background: 'var(--nav-success)', color: '#fff' } : { background: 'var(--nav-surface-glass)', color: 'var(--nav-text-secondary)' }}>
                     {t.productToggleLabel}
+                  </button>
+                  <button type="button" onClick={() => updateService(idx, 'type', 'service')}
+                    className="flex-1 px-3 py-1.5 text-xs rounded-lg font-medium transition"
+                    style={(svc.type || 'service') === 'service' ? { background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' } : { background: 'var(--nav-surface-glass)', color: 'var(--nav-text-secondary)' }}>
+                    {t.serviceToggleLabel}
                   </button>
                 </div>
                 <div className="flex gap-2 items-start">
