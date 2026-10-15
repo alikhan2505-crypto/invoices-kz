@@ -143,7 +143,7 @@ export const profileContentDict: Record<'ru' | 'kk' | 'en', ProfileMiscContent> 
     referralStep4: 'Вы оба получаете +7 дней Базового тарифа',
 
     servicesHeaderLabel: 'Товары и услуги',
-    openAddFormButton: '+ Добавить',
+    openAddFormButton: 'Добавить',
     searchServicesPlaceholder: 'Поиск по названию или коду...',
     editItemHeading: 'Редактировать позицию',
     newItemHeading: 'Новая позиция',
@@ -163,7 +163,7 @@ export const profileContentDict: Record<'ru' | 'kk' | 'en', ProfileMiscContent> 
     itemsEmptyStateLabel: (hasSearch: boolean) => hasSearch ? 'Не найдено' : 'Нет позиций',
     servicesSectionLabel: (count: number) => `📋 Услуги (${count})`,
     productsSectionLabel: (count: number) => `📦 Товары (${count})`,
-    addItemButton: '+ Добавить товар / услугу',
+    addItemButton: 'Добавить товар / услугу',
     fillNameAndPriceAlert: 'Заполните название и цену',
     deleteItemConfirm: 'Удалить позицию?',
 
@@ -248,7 +248,7 @@ export const profileContentDict: Record<'ru' | 'kk' | 'en', ProfileMiscContent> 
     referralStep4: 'Екеуіңіз де +7 күн Негізгі тарифін аласыздар',
 
     servicesHeaderLabel: 'Тауарлар мен қызметтер',
-    openAddFormButton: '+ Қосу',
+    openAddFormButton: 'Қосу',
     searchServicesPlaceholder: 'Атауы немесе коды бойынша іздеу...',
     editItemHeading: 'Позицияны өзгерту',
     newItemHeading: 'Жаңа позиция',
@@ -268,7 +268,7 @@ export const profileContentDict: Record<'ru' | 'kk' | 'en', ProfileMiscContent> 
     itemsEmptyStateLabel: (hasSearch: boolean) => hasSearch ? 'Табылмады' : 'Позициялар жоқ',
     servicesSectionLabel: (count: number) => `📋 Қызметтер (${count})`,
     productsSectionLabel: (count: number) => `📦 Тауарлар (${count})`,
-    addItemButton: '+ Тауар / қызмет қосу',
+    addItemButton: 'Тауар / қызмет қосу',
     fillNameAndPriceAlert: 'Атауы мен бағасын толтырыңыз',
     deleteItemConfirm: 'Позицияны жоясыз ба?',
 
@@ -353,7 +353,7 @@ export const profileContentDict: Record<'ru' | 'kk' | 'en', ProfileMiscContent> 
     referralStep4: 'You both get +7 days of the Basic plan',
 
     servicesHeaderLabel: 'Products and services',
-    openAddFormButton: '+ Add',
+    openAddFormButton: 'Add',
     searchServicesPlaceholder: 'Search by name or code...',
     editItemHeading: 'Edit item',
     newItemHeading: 'New item',
@@ -373,7 +373,7 @@ export const profileContentDict: Record<'ru' | 'kk' | 'en', ProfileMiscContent> 
     itemsEmptyStateLabel: (hasSearch: boolean) => hasSearch ? 'Not found' : 'No items',
     servicesSectionLabel: (count: number) => `📋 Services (${count})`,
     productsSectionLabel: (count: number) => `📦 Products (${count})`,
-    addItemButton: '+ Add product / service',
+    addItemButton: 'Add product / service',
     fillNameAndPriceAlert: 'Fill in the name and price',
     deleteItemConfirm: 'Delete this item?',
 

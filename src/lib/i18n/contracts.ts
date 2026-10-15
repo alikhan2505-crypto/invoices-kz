@@ -44,7 +44,7 @@ export interface ContractsContent {
 export const contractsDict: Record<'ru' | 'kk' | 'en', ContractsContent> = {
   ru: {
     headerLabel: 'Договоры',
-    uploadButton: '+ Загрузить',
+    uploadButton: 'Загрузить',
     newContractTitle: 'Новый договор',
     titleFieldLabel: 'Название договора *',
     titleFieldPlaceholder: 'Договор оказания услуг №1',
@@ -86,7 +86,7 @@ export const contractsDict: Record<'ru' | 'kk' | 'en', ContractsContent> = {
   },
   kk: {
     headerLabel: 'Шарттар',
-    uploadButton: '+ Жүктеу',
+    uploadButton: 'Жүктеу',
     newContractTitle: 'Жаңа шарт',
     titleFieldLabel: 'Шарттың атауы *',
     titleFieldPlaceholder: 'Қызмет көрсету шарты №1',
@@ -128,7 +128,7 @@ export const contractsDict: Record<'ru' | 'kk' | 'en', ContractsContent> = {
   },
   en: {
     headerLabel: 'Contracts',
-    uploadButton: '+ Upload',
+    uploadButton: 'Upload',
     newContractTitle: 'New contract',
     titleFieldLabel: 'Contract title *',
     titleFieldPlaceholder: 'Service agreement #1',
