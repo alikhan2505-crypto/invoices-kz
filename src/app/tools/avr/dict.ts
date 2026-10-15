@@ -125,7 +125,7 @@ export const avrDict: Record<ToolLang, AvrDict> = {
     qtyAria: n => `Количество, строка ${n}`,
     priceAria: n => `Цена, строка ${n}`,
     removeRow: n => `Удалить строку ${n}`,
-    addRow: '+ Добавить товар / услугу',
+    addRow: '+ Добавить работу / услугу',
     total: s => `Итого: ${s}`,
     vatIncluded: (s, rate) => `в т.ч. НДС ${rate}%: ${s}`,
     errors: {
@@ -220,7 +220,7 @@ export const avrDict: Record<ToolLang, AvrDict> = {
     qtyAria: n => `${n}-жолдағы саны`,
     priceAria: n => `${n}-жолдағы бағасы`,
     removeRow: n => `${n}-жолды өшіру`,
-    addRow: '+ Тауар / қызмет қосу',
+    addRow: '+ Жұмыс / қызмет қосу',
     total: s => `Барлығы: ${s}`,
     vatIncluded: (s, rate) => `оның ішінде ҚҚС ${rate}%: ${s}`,
     errors: {
@@ -315,7 +315,7 @@ export const avrDict: Record<ToolLang, AvrDict> = {
     qtyAria: n => `Quantity, row ${n}`,
     priceAria: n => `Price, row ${n}`,
     removeRow: n => `Remove row ${n}`,
-    addRow: '+ Add product / service',
+    addRow: '+ Add work / service',
     total: s => `Total: ${s}`,
     vatIncluded: (s, rate) => `incl. VAT ${rate}%: ${s}`,
     errors: {
