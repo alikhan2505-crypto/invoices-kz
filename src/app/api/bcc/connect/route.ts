@@ -25,9 +25,16 @@ export async function POST(req: NextRequest) {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('bin_iin, plan, plan_expires_at, bonus_expires_at, trial_expires_at')
+    .select('bin_iin, plan, plan_expires_at, bonus_expires_at, trial_expires_at, is_admin')
     .eq('id', user.id)
     .single()
+  // Только админы (15.10.2026): приложение BCC не одобрено банком для
+  // продакшена (Development → Production), подключение у клиента всё равно
+  // не завершилось бы. Кнопка в /profile/acquiring видна тоже только
+  // админам; это — настоящая граница. Снимать вместе с гейтом в интерфейсе.
+  if (profile?.is_admin !== true) {
+    return NextResponse.json({ error: 'admin_only' }, { status: 403 })
+  }
   // Acquiring (bank statement import) is a Pro-only feature — checked
   // server-side since it's the actual authority (the client-side UI already
   // hides the "Connect BCC" button for non-Pro accounts, but that's just UX,

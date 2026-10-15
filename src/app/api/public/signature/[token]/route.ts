@@ -11,9 +11,11 @@ const DOCUMENT_TABLES: Record<string, string> = {
   contract: 'contracts',
 }
 
-// Only what SignatureSection renders in client mode, plus snapshot_pdf_url
-// (the bytes the client signs). The CMS blobs and document hash stay server-side.
-const SIGNATURE_FIELDS = 'id, status, owner_signed_at, client_signed_at, owner_signer_name, owner_signer_iin, client_signer_name, client_signer_iin, ddc_pdf_url, snapshot_pdf_url, display_pdf_url'
+// Only what SignatureSection renders in client mode. The CMS blobs, document
+// hash and storage paths stay server-side: the client gets the bytes it signs
+// from ./snapshot and opens files via /api/documents/[id]/*, so of ddc_pdf_url
+// only the fact that a card exists (has_card) leaves the server.
+const SIGNATURE_FIELDS = 'id, status, owner_signed_at, client_signed_at, owner_signer_name, owner_signer_iin, client_signer_name, client_signer_iin, ddc_pdf_url'
 
 // The signature row for a public document page (/view/[token], /contract-view/[token]).
 // The 2026-09-04 audit dropped the anonymous read policy on document_signatures
@@ -45,5 +47,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
     .eq('document_id', doc.id)
     .maybeSingle()
 
-  return NextResponse.json({ signature: signature || null })
+  if (!signature) return NextResponse.json({ signature: null })
+  const { ddc_pdf_url, ...publicSignature } = signature
+  return NextResponse.json({ signature: { ...publicSignature, has_card: !!ddc_pdf_url } })
 }

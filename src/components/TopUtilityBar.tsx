@@ -9,6 +9,7 @@ import { supabase } from '@/lib/supabase'
 import { signOutForLogin } from '@/lib/signOut'
 import { getActivePlan } from '@/lib/plan'
 import { invoiceLimitWindow } from '@/lib/invoiceLimit'
+import { companyInitials } from '@/lib/companyIdentity'
 import { useLanguage, type Lang } from '@/components/LanguageProvider'
 
 type WalletKey = 'unified'
@@ -352,7 +353,7 @@ export default function TopUtilityBar() {
   // The shell sidebar shows the unread badge and the initials; it asks for them on mount.
   useEffect(() => {
     const emit = () => window.dispatchEvent(new CustomEvent('utility-bar-state', {
-      detail: { unread: unreadCount, initials: companyName ? companyName.slice(0, 2).toUpperCase() : '··' },
+      detail: { unread: unreadCount, initials: companyInitials(companyName) || '··' },
     }))
     emit()
     window.addEventListener('utility-bar-request', emit)
@@ -624,7 +625,8 @@ export default function TopUtilityBar() {
 
   const visibleWallets = WALLETS.filter(w => !w.adminOnly || isAdmin)
   const wallet = visibleWallets.find(w => w.key === activeWallet) ?? visibleWallets[0]
-  const initials = companyName ? companyName.slice(0, 2).toUpperCase() : '··'
+  // Те же инициалы, что на карточке компании в /profile («ТОО «Альфа Строй»» → «АС»).
+  const initials = companyInitials(companyName) || '··'
 
   const activePlan = getActivePlan(profile)
   const totalSpend30d = breakdown ? breakdown.commission + breakdown.kaspi_shop_check + breakdown.ai_agent_reply : 0
@@ -1066,7 +1068,7 @@ export default function TopUtilityBar() {
                   </svg>
                   Поддержка
                 </Link>
-                <Link href="/profile/about" onClick={() => setPanel(null)}
+                <Link href="/profile/support#about" onClick={() => setPanel(null)}
                   className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-gray-50 text-sm text-gray-700 transition-colors">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="flex-shrink-0">
                     <circle cx="12" cy="12" r="9" stroke="var(--nav-accent)" strokeWidth="1.6" />
@@ -1123,11 +1125,13 @@ export default function TopUtilityBar() {
 function LangCycleButton() {
   const { lang, setLang } = useLanguage()
   const next: Record<Lang, Lang> = { ru: 'kk', kk: 'en', en: 'ru' }
-  const label: Record<Lang, string> = { ru: 'РУ', kk: 'ҚЗ', en: 'EN' }
+  // Подписи как в остальном продукте: RU / ҚЗ / EN (раньше «РУ» кириллицей).
+  const label: Record<Lang, string> = { ru: 'RU', kk: 'ҚЗ', en: 'EN' }
   return (
     <button
       onClick={() => setLang(next[lang])}
       title="Язык · Тіл · Language"
+      aria-label="Язык · Тіл · Language"
       className="w-11 h-11 flex items-center justify-center rounded-full hover:bg-gray-50 transition-colors text-[11px] font-bold"
       style={{ color: 'var(--nav-accent)' }}
     >

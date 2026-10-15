@@ -84,21 +84,16 @@ export interface ProfileMiscContent {
   deleteDocumentConfirm: string
   totalDocumentsLabel: (count: number) => string
 
-  // about page (about/page.tsx)
-  aboutHeaderLabel: string
+  // «О сервисе» — блок на support/page.tsx (бывшая about/page.tsx)
   appTaglineLabel: string
   versionLabel: string
-  updatedLabel: (date: string) => string
   websiteLabel: string
-  supportLabel: string
-  emailLabel: string
-  documentsSectionLabel: string
   privacyPolicyLabel: string
   termsOfUseLabel: string
   madeInKazakhstanLabel: string
   copyrightLabel: string
 
-  // support page (support/page.tsx)
+  // help page (support/page.tsx)
   supportHeaderLabel: string
   supportHoursText: string
   telegramContactLabel: string
@@ -147,7 +142,7 @@ export const profileContentDict: Record<'ru' | 'kk' | 'en', ProfileMiscContent> 
     referralStep3: 'Друг создаёт первый счёт',
     referralStep4: 'Вы оба получаете +7 дней Базового тарифа',
 
-    servicesHeaderLabel: 'Услуги и товары',
+    servicesHeaderLabel: 'Товары и услуги',
     openAddFormButton: '+ Добавить',
     searchServicesPlaceholder: 'Поиск по названию или коду...',
     editItemHeading: 'Редактировать позицию',
@@ -183,7 +178,7 @@ export const profileContentDict: Record<'ru' | 'kk' | 'en', ProfileMiscContent> 
     useTemplateButton: 'Использовать',
     deleteTemplateConfirm: 'Удалить шаблон?',
 
-    documentsHeaderLabel: 'Документы для налоговой',
+    documentsHeaderLabel: 'КП, АВР и накладные',
     documentsLockedTitle: 'Доступно на тарифе Про',
     documentsLockedDesc: 'КП, АВР и Накладные для налоговой отчётности доступны только на тарифе Про',
     goToPlansButton: '🚀 Перейти к тарифам',
@@ -203,21 +198,15 @@ export const profileContentDict: Record<'ru' | 'kk' | 'en', ProfileMiscContent> 
     deleteTitleLabel: 'Удалить',
     deleteDocumentConfirm: 'Удалить документ?',
     totalDocumentsLabel: (count: number) => `Итого: ${count} документов`,
-
-    aboutHeaderLabel: 'О приложении',
     appTaglineLabel: 'Счета на оплату за 1 минуту',
     versionLabel: 'Версия 1.0.0',
-    updatedLabel: (date: string) => `Обновлено ${date}`,
     websiteLabel: 'Сайт',
-    supportLabel: 'Поддержка',
-    emailLabel: 'Email',
-    documentsSectionLabel: 'Документы',
     privacyPolicyLabel: 'Политика конфиденциальности',
     termsOfUseLabel: 'Условия использования',
     madeInKazakhstanLabel: 'Сделано в Казахстане с ❤️',
     copyrightLabel: '© 2026 INVOICES.KZ. Все права защищены.',
 
-    supportHeaderLabel: 'Поддержка',
+    supportHeaderLabel: 'Помощь и о сервисе',
     supportHoursText: 'Служба поддержки работает ежедневно с 09:00 до 20:00 (Астанинское время).',
     telegramContactLabel: 'Написать в Telegram',
     telegramResponseTimeLabel: 'Отвечаем в течение 24 часов',
@@ -230,7 +219,7 @@ export const profileContentDict: Record<'ru' | 'kk' | 'en', ProfileMiscContent> 
       { q: 'Как скачать PDF?', a: 'На странице счёта нажмите кнопку «PDF» и выберите вариант с подписью или без.' },
       { q: 'Как изменить реквизиты?', a: 'Профиль → Реквизиты → заполните данные компании и нажмите «Сохранить».' },
       { q: 'Что входит в пробный период?', a: '7 дней бесплатного доступа с возможностями тарифа Базовый (до 10 счетов).' },
-      { q: 'Как продлить подписку?', a: 'Профиль → Подписка → выберите тариф и следуйте инструкциям оплаты.' },
+      { q: 'Как продлить подписку?', a: 'Профиль → карточка тарифа → выберите тариф и следуйте инструкциям оплаты.' },
       { q: 'Принимают ли банки такие счета?', a: 'Да. PDF документ соответствует стандартам РК — содержит БИН, ИИК, БИК, КБе и все необходимые реквизиты.' },
     ],
   },
@@ -258,7 +247,7 @@ export const profileContentDict: Record<'ru' | 'kk' | 'en', ProfileMiscContent> 
     referralStep3: 'Досыңыз алғашқы шотын жасайды',
     referralStep4: 'Екеуіңіз де +7 күн Негізгі тарифін аласыздар',
 
-    servicesHeaderLabel: 'Қызметтер мен тауарлар',
+    servicesHeaderLabel: 'Тауарлар мен қызметтер',
     openAddFormButton: '+ Қосу',
     searchServicesPlaceholder: 'Атауы немесе коды бойынша іздеу...',
     editItemHeading: 'Позицияны өзгерту',
@@ -294,7 +283,7 @@ export const profileContentDict: Record<'ru' | 'kk' | 'en', ProfileMiscContent> 
     useTemplateButton: 'Пайдалану',
     deleteTemplateConfirm: 'Үлгіні жоясыз ба?',
 
-    documentsHeaderLabel: 'Салық құжаттары',
+    documentsHeaderLabel: 'Ұсыныстар, актілер және жүкқұжаттар',
     documentsLockedTitle: 'Про тарифінде қолжетімді',
     documentsLockedDesc: 'Салық есептілігі үшін КҰ, ОЖА және Жүкқұжаттар тек Про тарифінде қолжетімді',
     goToPlansButton: '🚀 Тарифтерге өту',
@@ -314,21 +303,15 @@ export const profileContentDict: Record<'ru' | 'kk' | 'en', ProfileMiscContent> 
     deleteTitleLabel: 'Жою',
     deleteDocumentConfirm: 'Құжатты жоясыз ба?',
     totalDocumentsLabel: (count: number) => `Барлығы: ${count} құжат`,
-
-    aboutHeaderLabel: 'Қосымша туралы',
     appTaglineLabel: 'Төлемге арналған шоттар 1 минутта',
     versionLabel: 'Нұсқа 1.0.0',
-    updatedLabel: (date: string) => `Жаңартылды ${date}`,
     websiteLabel: 'Сайт',
-    supportLabel: 'Қолдау қызметі',
-    emailLabel: 'Email',
-    documentsSectionLabel: 'Құжаттар',
     privacyPolicyLabel: 'Құпиялылық саясаты',
     termsOfUseLabel: 'Пайдалану шарттары',
     madeInKazakhstanLabel: 'Қазақстанда ❤️-пен жасалған',
     copyrightLabel: '© 2026 INVOICES.KZ. Барлық құқықтар қорғалған.',
 
-    supportHeaderLabel: 'Қолдау қызметі',
+    supportHeaderLabel: 'Көмек және сервис туралы',
     supportHoursText: 'Қолдау қызметі күн сайын 09:00-ден 20:00-ге дейін жұмыс істейді (Астана уақыты бойынша).',
     telegramContactLabel: 'Telegram-ға жазу',
     telegramResponseTimeLabel: '24 сағат ішінде жауап береміз',
@@ -341,7 +324,7 @@ export const profileContentDict: Record<'ru' | 'kk' | 'en', ProfileMiscContent> 
       { q: 'PDF-ті қалай жүктеп алуға болады?', a: 'Шот бетінде «PDF» батырмасын басып, қолтаңбамен немесе қолтаңбасыз нұсқасын таңдаңыз.' },
       { q: 'Деректемелерді қалай өзгертуге болады?', a: 'Профиль → Деректемелер → компания деректерін толтырып, «Сақтау» батырмасын басыңыз.' },
       { q: 'Сынақ мерзіміне не кіреді?', a: 'Негізгі тариф мүмкіндіктерімен 7 күн тегін қолжетімділік (10 шотқа дейін).' },
-      { q: 'Жазылымды қалай ұзартуға болады?', a: 'Профиль → Жазылым → тарифті таңдап, төлем нұсқауларын орындаңыз.' },
+      { q: 'Жазылымды қалай ұзартуға болады?', a: 'Профиль → тариф картасы → тарифті таңдап, төлем нұсқауларын орындаңыз.' },
       { q: 'Банктер мұндай шоттарды қабылдай ма?', a: 'Иә. PDF құжаты ҚР стандарттарына сәйкес келеді — БСН, ЖСК, БСК, КБЕ және барлық қажетті деректемелерден тұрады.' },
     ],
   },
@@ -369,7 +352,7 @@ export const profileContentDict: Record<'ru' | 'kk' | 'en', ProfileMiscContent> 
     referralStep3: 'Your friend creates their first invoice',
     referralStep4: 'You both get +7 days of the Basic plan',
 
-    servicesHeaderLabel: 'Services and products',
+    servicesHeaderLabel: 'Products and services',
     openAddFormButton: '+ Add',
     searchServicesPlaceholder: 'Search by name or code...',
     editItemHeading: 'Edit item',
@@ -405,7 +388,7 @@ export const profileContentDict: Record<'ru' | 'kk' | 'en', ProfileMiscContent> 
     useTemplateButton: 'Use',
     deleteTemplateConfirm: 'Delete this template?',
 
-    documentsHeaderLabel: 'Tax documents',
+    documentsHeaderLabel: 'Quotes, acts and waybills',
     documentsLockedTitle: 'Available on the Pro plan',
     documentsLockedDesc: 'Quotes, acts, and delivery notes for tax reporting are only available on the Pro plan',
     goToPlansButton: '🚀 View plans',
@@ -425,21 +408,15 @@ export const profileContentDict: Record<'ru' | 'kk' | 'en', ProfileMiscContent> 
     deleteTitleLabel: 'Delete',
     deleteDocumentConfirm: 'Delete this document?',
     totalDocumentsLabel: (count: number) => `Total: ${count} documents`,
-
-    aboutHeaderLabel: 'About the app',
     appTaglineLabel: 'Invoices for payment in 1 minute',
     versionLabel: 'Version 1.0.0',
-    updatedLabel: (date: string) => `Updated ${date}`,
     websiteLabel: 'Website',
-    supportLabel: 'Support',
-    emailLabel: 'Email',
-    documentsSectionLabel: 'Documents',
     privacyPolicyLabel: 'Privacy Policy',
     termsOfUseLabel: 'Terms of Use',
     madeInKazakhstanLabel: 'Made in Kazakhstan with ❤️',
     copyrightLabel: '© 2026 INVOICES.KZ. All rights reserved.',
 
-    supportHeaderLabel: 'Support',
+    supportHeaderLabel: 'Help and about',
     supportHoursText: 'Support is available daily from 9:00 AM to 8:00 PM (Astana time).',
     telegramContactLabel: 'Message us on Telegram',
     telegramResponseTimeLabel: 'We reply within 24 hours',
@@ -452,7 +429,7 @@ export const profileContentDict: Record<'ru' | 'kk' | 'en', ProfileMiscContent> 
       { q: 'How do I download the PDF?', a: 'On the invoice page, tap the "PDF" button and choose the signed or unsigned version.' },
       { q: 'How do I change my company details?', a: 'Profile → Company details → fill in your company information and tap "Save".' },
       { q: 'What does the trial period include?', a: '7 days of free access with Basic plan features (up to 10 invoices).' },
-      { q: 'How do I renew my subscription?', a: 'Profile → Subscription → choose a plan and follow the payment instructions.' },
+      { q: 'How do I renew my subscription?', a: 'Profile → plan card → choose a plan and follow the payment instructions.' },
       { q: 'Do banks accept these invoices?', a: 'Yes. The PDF document meets KZ standards — it includes BIN, IIK, BIK, KBe and all required details.' },
     ],
   },

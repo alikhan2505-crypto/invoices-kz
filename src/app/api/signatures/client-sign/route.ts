@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
 import { sigexAddSignature, sigexBuildDDC, sigexGetDocument, parseSignerName } from '@/lib/sigex'
+import { SIGNED_DOCUMENTS_BUCKET } from '@/lib/signedDocuments'
+import { downloadSignedDocument } from '@/lib/signedDocumentsServer'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -56,9 +58,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
 
-  const pdfRes = await fetch(row.snapshot_pdf_url)
-  if (!pdfRes.ok) return NextResponse.json({ error: 'Could not fetch snapshot PDF' }, { status: 400 })
-  const pdfBytes = new Uint8Array(await pdfRes.arrayBuffer())
+  // Служебной ролью из бакета: snapshot_pdf_url — путь (или старая публичная
+  // ссылка, из которой путь достаётся), а бакет закрыт для браузера.
+  const pdfBytes = await downloadSignedDocument(supabase, row.snapshot_pdf_url)
+  if (!pdfBytes) return NextResponse.json({ error: 'Could not fetch snapshot PDF' }, { status: 400 })
 
   let clientSignerName: string | null = null
   let clientSignerIin: string | null = null
@@ -77,11 +80,10 @@ export async function POST(req: NextRequest) {
     const ddcBytes = await sigexBuildDDC(row.sigex_document_id, pdfBytes, `${doc.title.replace(/[^a-zA-Z0-9-]/g, '_')}.pdf`)
     const path = `${row.document_id}/${Date.now()}.pdf`
     const { error: uploadError } = await supabase.storage
-      .from('signed-documents')
+      .from(SIGNED_DOCUMENTS_BUCKET)
       .upload(path, ddcBytes, { contentType: 'application/pdf', upsert: false })
-    if (!uploadError) {
-      ddcPdfUrl = supabase.storage.from('signed-documents').getPublicUrl(path).data.publicUrl
-    }
+    // Путь, не публичная ссылка — см. src/lib/signedDocuments.ts.
+    if (!uploadError) ddcPdfUrl = path
   } catch (e) {
     // Best-effort — the actual signatures are already safely recorded above.
     // The verification "card" PDF can be regenerated/fixed later without

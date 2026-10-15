@@ -34,11 +34,17 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ tok
   // Signatures already on this contract -- the page shows who has signed.
   // Scoped to this contract only, so the old blanket "any signature whose
   // document has a token" policy is no longer needed.
+  // Без CMS-подписей и путей к файлам: странице они не нужны.
   const { data: signatures } = await supabase
     .from('document_signatures')
-    .select('*')
+    .select('id, status, owner_signed_at, client_signed_at, owner_signer_name, client_signer_name')
     .eq('document_type', 'contract')
     .eq('document_id', contract.id)
 
-  return NextResponse.json({ contract, profile: profile || null, signatures: signatures || [] })
+  // file_url не отдаётся: это путь в закрытом бакете (или старая вечная
+  // публичная ссылка). Файл страница открывает через
+  // /api/public/contract/[token]/file — короткая подписанная ссылка.
+  const publicContract = { ...contract }
+  delete publicContract.file_url
+  return NextResponse.json({ contract: publicContract, profile: profile || null, signatures: signatures || [] })
 }

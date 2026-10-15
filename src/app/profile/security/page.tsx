@@ -16,20 +16,10 @@ import { useAppDialog } from '@/components/AppDialog'
 // kept identical rather than inventing a second "house" ease.
 const EASE = [0.16, 1, 0.3, 1] as const
 
-const CARD_HOVER = 'transition-all duration-200 ease-out hover:-translate-y-1 hover:shadow-[var(--nav-card-glow)]'
-
 function ChevronLeftIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="m15 6-6 6 6 6" />
-    </svg>
-  )
-}
-function SignatureIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 17s2.5-8 5-8 2 6 4.5 6S16 7 18 7s3 6 3 6" />
-      <path d="M3 21h18" />
     </svg>
   )
 }
@@ -153,34 +143,11 @@ export default function Security() {
           </motion.div>
 
           <div className="space-y-4">
-            {/* ECP explanation */}
-            <motion.div
-              initial={reduceMotion ? false : { opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.06 }}
-            >
-              <div className="text-[11px] font-extrabold uppercase px-1 mb-2" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.09em' }}>
-                {t.electronicSignatureSectionLabel}
-              </div>
-              <div className={`nav-glass rounded-2xl p-4 ${CARD_HOVER}`}>
-                <div className="flex items-center gap-3 mb-2">
-                  <span
-                    className="w-9 h-9 rounded-[10px] flex items-center justify-center flex-shrink-0"
-                    style={{ background: 'linear-gradient(135deg, var(--nav-accent-soft), transparent)', color: 'var(--nav-accent)' }}
-                  >
-                    <SignatureIcon />
-                  </span>
-                  <div className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{t.ecpHowItWorksTitle}</div>
-                </div>
-                <div className="text-xs leading-relaxed" style={{ color: 'var(--nav-text-muted)' }}>{t.ecpHowItWorksBody}</div>
-              </div>
-            </motion.div>
-
             {/* Passkeys */}
             <motion.div
               initial={reduceMotion ? false : { opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.12 }}
+              transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.06 }}
             >
               <div className="text-[11px] font-extrabold uppercase px-1 mb-2" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.09em' }}>
                 {t.loginSecuritySectionLabel}
@@ -227,22 +194,17 @@ export default function Security() {
               </div>
             </motion.div>
 
-            {/* Info */}
-            <motion.div
+            {/* ЭЦП здесь не настраивается — только напоминание, где её искать. */}
+            <motion.p
               initial={reduceMotion ? false : { opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.18 }}
-              className="rounded-2xl p-4 flex gap-3"
-              style={{ background: 'var(--nav-accent-soft)' }}
+              transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.12 }}
+              className="flex items-start gap-2 text-xs px-1 leading-relaxed"
+              style={{ color: 'var(--nav-text-muted)' }}
             >
-              <span className="flex-shrink-0 mt-0.5" style={{ color: 'var(--nav-accent)' }}><InfoIcon /></span>
-              <div>
-                <div className="text-xs font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>{t.whatIsEcpTitle}</div>
-                <div className="text-xs leading-relaxed" style={{ color: 'var(--nav-text-muted)' }}>
-                  {t.whatIsEcpBody}
-                </div>
-              </div>
-            </motion.div>
+              <span className="flex-shrink-0" style={{ color: 'var(--nav-text-muted)' }}><InfoIcon /></span>
+              <span>{t.ecpWhereNote}</span>
+            </motion.p>
           </div>
         </div>
       {dialogElement}

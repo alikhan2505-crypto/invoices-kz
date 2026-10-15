@@ -39,6 +39,23 @@ function SendIcon() {
     </svg>
   )
 }
+function GlobeIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18M12 3c2.5 2.6 4 6 4 9s-1.5 6.4-4 9c-2.5-2.6-4-6-4-9s1.5-6.4 4-9Z" />
+    </svg>
+  )
+}
+function DocumentIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M7 3h7l4 4v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" />
+      <path d="M14 3v4h4" />
+      <path d="M9 12h6M9 16h6" />
+    </svg>
+  )
+}
 function MailIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -48,6 +65,8 @@ function MailIcon() {
   )
 }
 
+// «Помощь и о сервисе» (15.10.2026): бывшие «Поддержка» и «О приложении»
+// слиты в одну страницу. /profile/about теперь перенаправляет сюда, к якорю #about.
 export default function Support() {
   const router = useRouter()
   const { lang } = useLanguage()
@@ -65,11 +84,12 @@ export default function Support() {
       if (!user) return
       const { data: profile } = await supabase
         .from('profiles')
-        .select('plan, plan_expires_at, bonus_expires_at, trial_expires_at')
+        .select('plan, plan_expires_at, bonus_expires_at, trial_expires_at, is_admin')
         .eq('id', user.id)
         .single()
       const { plan, isActive } = getActivePlan(profile)
-      setCanTelegramSupport(isActive && plan !== 'free')
+      // Как на дашборде: админу Telegram-поддержка открыта всегда.
+      setCanTelegramSupport(!!profile?.is_admin || (isActive && plan !== 'free'))
     })()
   }, [])
 
@@ -99,7 +119,7 @@ export default function Support() {
         <motion.div {...fadeIn(2)} className={`nav-glass rounded-2xl overflow-hidden ${CARD_HOVER}`}>
           {canTelegramSupport ? (
             <a href="https://t.me/invoiceskz_support"
-              target="_blank"
+              target="_blank" rel="noopener noreferrer"
               className="flex items-center justify-between px-4 py-4 transition-colors hover:bg-[var(--nav-surface-glass)]"
               style={{ borderBottom: '1px solid var(--nav-border-soft)' }}>
               <div className="flex items-center gap-3">
@@ -160,6 +180,49 @@ export default function Support() {
               <p className="text-sm pb-3.5" style={{ color: 'var(--nav-text-secondary)' }}>{item.a}</p>
             </details>
           ))}
+        </motion.div>
+
+        {/* О сервисе — бывшая страница /profile/about */}
+        <motion.div {...fadeIn(4)} id="about" className="nav-glass nav-card-accent rounded-2xl p-6 text-center scroll-mt-24">
+          <div className="text-2xl font-bold mb-1" style={{ color: 'var(--nav-text-primary)' }}>INVOICES.KZ</div>
+          <div className="text-sm mb-3" style={{ color: 'var(--nav-text-muted)' }}>{t.appTaglineLabel}</div>
+          <span className="inline-block text-xs px-3 py-1.5 rounded-full font-medium" style={{ background: 'var(--nav-border-soft)', color: 'var(--nav-text-secondary)' }}>
+            {t.versionLabel}
+          </span>
+        </motion.div>
+
+        <motion.div {...fadeIn(5)} className="nav-glass rounded-2xl overflow-hidden py-1">
+          <a href="https://invoices.kz" target="_blank" rel="noopener noreferrer"
+            className="flex items-center justify-between mx-2 px-3 py-3 rounded-xl transition-colors hover:bg-[var(--nav-surface-glass)]"
+            style={{ borderBottom: '1px solid var(--nav-border-soft)' }}>
+            <span className="flex items-center gap-3 min-w-0">
+              <span className="w-8 h-8 rounded-[9px] flex items-center justify-center flex-shrink-0"
+                style={{ background: 'linear-gradient(135deg, var(--nav-accent-soft), transparent)', color: 'var(--nav-accent)' }}>
+                <GlobeIcon />
+              </span>
+              <span className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>{t.websiteLabel}</span>
+            </span>
+            <span className="text-sm font-medium" style={{ color: 'var(--nav-text-primary)' }}>invoices.kz</span>
+          </a>
+          {[
+            { label: t.privacyPolicyLabel, href: '/privacy' },
+            { label: t.termsOfUseLabel, href: '/terms' },
+          ].map((item, i, arr) => (
+            <Link key={item.href} href={item.href}
+              className="flex items-center justify-between mx-2 px-3 py-3 rounded-xl transition-colors hover:bg-[var(--nav-surface-glass)]"
+              style={{ borderBottom: i < arr.length - 1 ? '1px solid var(--nav-border-soft)' : 'none' }}>
+              <span className="text-sm flex items-center gap-3" style={{ color: 'var(--nav-text-primary)' }}>
+                <span className="w-8 flex justify-center" style={{ color: 'var(--nav-text-muted)' }}><DocumentIcon /></span>
+                {item.label}
+              </span>
+              <span style={{ color: 'var(--nav-text-muted)' }}><ChevronRightIcon /></span>
+            </Link>
+          ))}
+        </motion.div>
+
+        <motion.div {...fadeIn(6)} className="text-center py-4">
+          <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>{t.madeInKazakhstanLabel}</div>
+          <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>{t.copyrightLabel}</div>
         </motion.div>
 
       </div>

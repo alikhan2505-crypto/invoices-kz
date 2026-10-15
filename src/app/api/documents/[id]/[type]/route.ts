@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { downloadSignedDocument } from '@/lib/signedDocumentsServer'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -12,20 +13,14 @@ const supabase = createClient(
 // reads as untrustworthy/unbranded for a document meant to carry legal
 // weight. No auth: same public trust model as the invoice itself (this
 // route is only ever linked from the public-token-gated invoice pages).
-// Only our own Supabase Storage may be fetched here. Parsed with the URL
-// API rather than a string prefix check, so "https://evil.example/?x=<our
-// host>" and similar can't slip past, and non-http schemes are rejected.
-function isAllowedDocumentSource(raw: string): boolean {
-  try {
-    const url = new URL(raw)
-    if (url.protocol !== 'https:') return false
-    const storageHost = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL!).host
-    return url.host === storageHost
-  } catch {
-    return false
-  }
-}
-
+// Файл берётся только из нашего бакета signed-documents и скачивается
+// служебной ролью (бакет закрыт для браузера с 15.10.2026, см.
+// src/lib/signedDocuments.ts) — никаких fetch() по ссылке из колонки.
+// Без входа и без токена намеренно: id строки подписи публикует и страница
+// проверки /api/documents/verify/[sigexId], так что подписанный договор
+// читается любым, у кого есть номер SIGEX с бумаги. Закрыть его (сессия
+// владельца или public_token для document_type='contract') — решение
+// основателя; см. supabase/migrations/signed_documents_private.sql.
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string; type: string }> }
@@ -58,24 +53,15 @@ export async function GET(
   const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
   const safeFilename = escapeHtml(filename)
 
-  // sourceUrl comes from a column a user can set on their own row
-  // (signatures/set-display-pdf, owner-sign's snapshotPdfUrl), and this
-  // route is unauthenticated and returns the fetched bytes base64-encoded
-  // in the response -- i.e. a full-read SSRF, not a blind one. Restricted
-  // to our own Storage host so it can only ever serve documents we stored
-  // (security audit 2026-09-04, CWE-918).
-  if (!isAllowedDocumentSource(sourceUrl)) {
-    console.error('documents route: blocked non-Storage source url')
-    return NextResponse.json({ error: 'Source not allowed' }, { status: 400 })
+  // sourceUrl — значение колонки: путь объекта или старая публичная ссылка.
+  // Раньше здесь был fetch() этой ссылки с проверкой хоста (SSRF, аудит
+  // 2026-09-04); теперь downloadSignedDocument принимает только объект
+  // нашего бакета, и сетевого запроса по присланному адресу нет вовсе.
+  const bytes = await downloadSignedDocument(supabase, sourceUrl)
+  if (!bytes) {
+    console.error('documents route: source not available')
+    return NextResponse.json({ error: 'Source fetch failed' }, { status: 502 })
   }
-
-  // redirect: 'manual' matters as much as the allowlist above -- fetch
-  // follows redirects by default, so an allowed host answering 302 to an
-  // internal address would walk straight past the host check. A 3xx now
-  // surfaces as a non-ok response and is refused like any other failure.
-  const fileRes = await fetch(sourceUrl, { redirect: 'manual' })
-  if (!fileRes.ok) return NextResponse.json({ error: 'Source fetch failed' }, { status: 502 })
-  const bytes = await fileRes.arrayBuffer()
 
   // A raw application/pdf response opens straight in the browser's native
   // PDF viewer, which always shows its own generic file icon in the tab --

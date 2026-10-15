@@ -8,60 +8,75 @@ export interface ProfileCoreContent {
   // profile hub page (profile/page.tsx)
   fillProfileLabel: string
   noDataLabel: string
-  binIinPrefixLabel: (bin: string) => string
-  incomeThisMonthLabel: string
-  totalInvoicesLabel: (count: number) => string
-  chartIncomeLabel: string
+  // БИН — у юрлица (ТОО, АО…), ИИН — у ИП; если по названию не понять — «БИН/ИИН».
+  binPrefixLabel: (bin: string) => string
+  iinPrefixLabel: (iin: string) => string
+  binOrIinPrefixLabel: (value: string) => string
+  companyCardOpenLabel: string
+  paidThisMonthLabel: string
+  issuedInvoicesLabel: (count: number) => string
+  statsDashboardLink: string
   noInvoicesYetHint: string
   createFirstInvoiceButton: string
   companySectionLabel: string
   requisitesMenuLabel: string
-  signatureMenuLabel: string
   banksMenuLabel: string
-  securityMenuLabel: string
-  acquiringMenuLabel: string
-  kaspiPayMenuLabel: string
+  signatureMenuLabel: string
   connectorsMenuLabel: string
-  directoriesSectionLabel: string
+  documentsSectionLabel: string
   clientsMenuLabel: string
   servicesMenuLabel: string
   templatesMenuLabel: string
   documentsMenuLabel: string
   contractsMenuLabel: string
-  settingsSectionLabel: string
   invoiceSettingsLabel: string
+  acquiringMenuLabel: string
+  accountSectionLabel: string
+  securityMenuLabel: string
   notificationsMenuLabel: string
+  helpSectionLabel: string
   supportMenuLabel: string
-  aboutMenuLabel: string
   referralMenuLabel: string
+  adminSectionLabel: string
   adminPanelMenuLabel: string
-  subscriptionSectionLabel: string
+  proTagLabel: string
   proFeaturesLabel: string
   basicFeaturesLabel: string
-  freeFeaturesLabel: string
+  freePlanTitle: string
+  trialPlanTitle: (days: number) => string
+  bonusPlanTitle: (days: number) => string
+  freeUsageLabel: (used: number, limit: number) => string
+  freeUsageLoadingLabel: (limit: number) => string
   trialFeaturesLabel: string
+  adminAccessLabel: string
+  adminPlanTitle: string
   proTariffLabel: string
   basicTariffLabel: string
   planActiveUntilLabel: (tariffName: string) => string
-  referralBonusLabel: (days: number) => string
+  bonusBasicLabel: string
   untilDateLabel: (date: string) => string
   trialUntilLabel: string
-  darkThemeLabel: string
-  lightThemeLabel: string
-  languageSectionLabel: string
+  themeSectionLabel: string
+  themeSystemLabel: string
+  themeLightLabel: string
+  themeDarkLabel: string
   signOutButton: string
   deleteAccountButton: string
   deleteAccountModalTitle: string
   deleteAccountModalBody: string
+  deleteAccountModalLossWarning: string
   deleteAccountModalConfirmLabel: (phrase: string) => string
   deleteAccountModalCancelButton: string
   deleteAccountModalConfirmButton: string
   deleteAccountModalDeletingLabel: string
+  deleteAccountAdminRefusal: string
 
   // requisites page (requisites/page.tsx)
   requisitesHeaderLabel: string
   companyNameFieldLabel: string
   requisitesMissingAlert: (missing: string) => string
+  profileNotSavedMessage: string
+  returnToInvoiceHint: string
   binLookupCheckButton: string
   binLookupSearching: string
   binLookupNotFound: string
@@ -114,12 +129,13 @@ export interface ProfileCoreContent {
   cropSizeLabel: string
   saveStampButton: string
   fileReadErrorAlert: string
+  signatureFreePlanNote: string
+  signatureFreePlanUpgradeLink: string
 
   // settings page (settings/page.tsx)
   invoiceNumberingSectionLabel: string
   prefixFieldLabel: string
   nextNumberFieldLabel: string
-  defaultCurrencyFieldLabel: string
   defaultDueDaysFieldLabel: string
   defaultNoteFieldLabel: string
   defaultNotePlaceholder: string
@@ -137,6 +153,9 @@ export interface ProfileCoreContent {
   vat0InfoText: string
   noVatInfoText: string
   saveSettingsButton: string
+  nextNumberInvalidAlert: (section: string) => string
+  nextNumberTooLowAlert: (section: string, minimum: number) => string
+  issuedNumbersCheckFailedAlert: string
 }
 
 export const profileCoreDict: Record<'ru' | 'kk' | 'en', ProfileCoreContent> = {
@@ -145,6 +164,8 @@ export const profileCoreDict: Record<'ru' | 'kk' | 'en', ProfileCoreContent> = {
     errorPrefix: (message: string) => `Ошибка: ${message}`,
     savedAlert: 'Сохранено!',
     requisitesMissingAlert: (missing: string) => `Без этого счёт выставить не получится — заполните: ${missing}`,
+    profileNotSavedMessage: 'изменения не сохранились. Обновите страницу и попробуйте ещё раз',
+    returnToInvoiceHint: 'Черновик счёта сохранён. После сохранения вернём вас к нему.',
     binLookupCheckButton: 'Проверить',
     binLookupSearching: 'Ищем в реестре…',
     binLookupNotFound: 'В реестре не нашли — заполните поля вручную.',
@@ -158,55 +179,67 @@ export const profileCoreDict: Record<'ru' | 'kk' | 'en', ProfileCoreContent> = {
 
     fillProfileLabel: 'Заполните профиль',
     noDataLabel: 'Нет данных',
-    binIinPrefixLabel: (bin: string) => `ИИН: ${bin}`,
-    incomeThisMonthLabel: 'Доход за месяц',
-    totalInvoicesLabel: (count: number) => `Всего счетов: ${count}`,
-    chartIncomeLabel: 'Доход',
-    noInvoicesYetHint: 'Здесь появится доход, когда вы создадите первый счёт',
+    binPrefixLabel: (bin: string) => `БИН: ${bin}`,
+    iinPrefixLabel: (iin: string) => `ИИН: ${iin}`,
+    binOrIinPrefixLabel: (value: string) => `БИН/ИИН: ${value}`,
+    companyCardOpenLabel: 'Открыть реквизиты',
+    paidThisMonthLabel: 'Оплачено в этом месяце',
+    issuedInvoicesLabel: (count: number) => `Счетов: ${count}`,
+    statsDashboardLink: 'Вся статистика',
+    noInvoicesYetHint: 'Здесь появятся оплаты, когда вы выставите первый счёт',
     createFirstInvoiceButton: 'Создать первый счёт',
     companySectionLabel: 'Компания',
     requisitesMenuLabel: 'Реквизиты',
-    signatureMenuLabel: 'Брендинг',
     banksMenuLabel: 'Банковские счета',
-    securityMenuLabel: 'ЭЦП и безопасность',
-    acquiringMenuLabel: 'Эквайринг',
-    kaspiPayMenuLabel: 'Приём Kaspi',
-    connectorsMenuLabel: 'Коннекторы',
-    directoriesSectionLabel: 'Справочники',
-    clientsMenuLabel: 'Мои клиенты',
-    servicesMenuLabel: 'Услуги и товары',
+    signatureMenuLabel: 'Подпись, печать и логотип',
+    connectorsMenuLabel: 'Кнопки оплаты и контакты',
+    documentsSectionLabel: 'Документы',
+    clientsMenuLabel: 'Клиенты',
+    servicesMenuLabel: 'Товары и услуги',
     templatesMenuLabel: 'Шаблоны счетов',
-    documentsMenuLabel: 'Документы для налоговой',
-    contractsMenuLabel: 'Договора',
-    settingsSectionLabel: 'Настройки',
-    invoiceSettingsLabel: 'Настройки счетов',
+    documentsMenuLabel: 'КП, АВР и накладные',
+    contractsMenuLabel: 'Договоры',
+    invoiceSettingsLabel: 'Нумерация и НДС',
+    acquiringMenuLabel: 'Сверка оплат',
+    accountSectionLabel: 'Аккаунт',
+    securityMenuLabel: 'Вход и Face ID',
     notificationsMenuLabel: 'Уведомления',
-    supportMenuLabel: 'Поддержка',
-    aboutMenuLabel: 'О приложении',
+    helpSectionLabel: 'Помощь',
+    supportMenuLabel: 'Помощь и о сервисе',
     referralMenuLabel: 'Пригласить друзей',
+    adminSectionLabel: 'Админ',
     adminPanelMenuLabel: 'Админ панель',
-    subscriptionSectionLabel: 'Подписка',
+    proTagLabel: 'Про',
     proFeaturesLabel: 'Безлимит · ЭЦП · Шаблоны',
     basicFeaturesLabel: '30 счетов в месяц',
-    freeFeaturesLabel: 'Перейдите на платный тариф',
+    freePlanTitle: 'Бесплатный',
+    trialPlanTitle: (days: number) => `Пробный (${days} дн.)`,
+    bonusPlanTitle: (days: number) => `Бонус Базового (${days} дн.)`,
+    freeUsageLabel: (used: number, limit: number) => `Использовано ${used} из ${limit} счетов в этом месяце`,
+    freeUsageLoadingLabel: (limit: number) => `${limit} счёта в месяц`,
     trialFeaturesLabel: 'Уровень Базового: 10 счетов · без Kaspi Bot и AI-агента',
+    adminAccessLabel: 'Доступ администратора — все функции открыты',
+    adminPlanTitle: 'Администратор',
     proTariffLabel: 'Про тариф',
     basicTariffLabel: 'Базовый тариф',
     planActiveUntilLabel: (tariffName: string) => `${tariffName} действует до`,
-    referralBonusLabel: (days: number) => `Реферальный бонус Basic (+${days} дн.)`,
+    bonusBasicLabel: 'Бонус Базового',
     untilDateLabel: (date: string) => `до ${date}`,
     trialUntilLabel: 'Пробный период до',
-    darkThemeLabel: 'Тёмная тема',
-    lightThemeLabel: 'Светлая тема',
-    languageSectionLabel: 'Язык / Тіл',
+    themeSectionLabel: 'Тема',
+    themeSystemLabel: 'Как в системе',
+    themeLightLabel: 'Светлая',
+    themeDarkLabel: 'Тёмная',
     signOutButton: 'Выйти из аккаунта',
     deleteAccountButton: 'Удалить аккаунт',
     deleteAccountModalTitle: 'Удалить аккаунт?',
     deleteAccountModalBody: 'Вы больше не сможете войти в этот аккаунт. Счета, клиенты и вся история сохранятся у нас на случай, если вы вернётесь, но доступ к ним будет закрыт.',
+    deleteAccountModalLossWarning: 'Оплаченные дни тарифа и остаток на балансе кошелька пропадут вместе с аккаунтом — деньги за них не возвращаются.',
     deleteAccountModalConfirmLabel: (phrase: string) => `Введите ${phrase}, чтобы подтвердить`,
     deleteAccountModalCancelButton: 'Отмена',
     deleteAccountModalConfirmButton: 'Удалить аккаунт',
     deleteAccountModalDeletingLabel: 'Удаляем...',
+    deleteAccountAdminRefusal: 'Аккаунт администратора удалить нельзя.',
 
     requisitesHeaderLabel: 'Реквизиты компании',
     companyNameFieldLabel: 'Название компании / ИП *',
@@ -224,7 +257,7 @@ export const profileCoreDict: Record<'ru' | 'kk' | 'en', ProfileCoreContent> = {
     personNamePlaceholder: 'Смагулов А.К.',
     saveChangesButton: 'Сохранить изменения',
 
-    signatureHeaderLabel: 'Подпись и печать',
+    signatureHeaderLabel: 'Подпись, печать и логотип',
     signatureSectionLabel: 'Подпись руководителя',
     signatureAltText: 'Подпись',
     redrawButton: 'Перерисовать',
@@ -252,11 +285,12 @@ export const profileCoreDict: Record<'ru' | 'kk' | 'en', ProfileCoreContent> = {
     cropSizeLabel: 'Размер рамки',
     saveStampButton: '✅ Сохранить печать',
     fileReadErrorAlert: 'Ошибка чтения файла',
+    signatureFreePlanNote: 'Подпись и печать появятся в счёте с тарифа Базовый.',
+    signatureFreePlanUpgradeLink: 'Перейти к тарифам',
 
     invoiceNumberingSectionLabel: 'Нумерация счетов',
     prefixFieldLabel: 'Префикс',
     nextNumberFieldLabel: 'След. номер',
-    defaultCurrencyFieldLabel: 'Валюта по умолчанию',
     defaultDueDaysFieldLabel: 'Срок оплаты по умолчанию (дней)',
     defaultNoteFieldLabel: 'Стандартное примечание',
     defaultNotePlaceholder: 'Оплата в течение 3 рабочих дней...',
@@ -274,12 +308,17 @@ export const profileCoreDict: Record<'ru' | 'kk' | 'en', ProfileCoreContent> = {
     vat0InfoText: '💡 В счетах будет показываться НДС 0% — для экспортных операций',
     noVatInfoText: '💡 В счетах будет написано "Без НДС"',
     saveSettingsButton: 'Сохранить настройки',
+    nextNumberInvalidAlert: (section: string) => `${section}: в «След. номер» — только цифры, от 1 до 999999999.`,
+    nextNumberTooLowAlert: (section: string, minimum: number) => `${section}: номер ${minimum - 1} с этим префиксом уже выдан. Следующий номер — не меньше ${minimum}, иначе у двух документов будет один номер.`,
+    issuedNumbersCheckFailedAlert: 'Не удалось проверить уже выданные номера — настройки не сохранены. Попробуйте ещё раз.',
   },
   kk: {
     loadingLabel: 'Жүктелуде...',
     errorPrefix: (message: string) => `Қате: ${message}`,
     savedAlert: 'Сақталды!',
     requisitesMissingAlert: (missing: string) => `Онсыз шот шығару мүмкін емес — толтырыңыз: ${missing}`,
+    profileNotSavedMessage: 'өзгерістер сақталмады. Бетті жаңартып, қайталап көріңіз',
+    returnToInvoiceHint: 'Шот жобасы сақталды. Сақтағаннан кейін сізді оған қайтарамыз.',
     binLookupCheckButton: 'Тексеру',
     binLookupSearching: 'Тізілімнен іздеудеміз…',
     binLookupNotFound: 'Тізілімнен табылмады — өрістерді қолмен толтырыңыз.',
@@ -293,55 +332,67 @@ export const profileCoreDict: Record<'ru' | 'kk' | 'en', ProfileCoreContent> = {
 
     fillProfileLabel: 'Профильді толтырыңыз',
     noDataLabel: 'Деректер жоқ',
-    binIinPrefixLabel: (bin: string) => `ЖСН: ${bin}`,
-    incomeThisMonthLabel: 'Айлық табыс',
-    totalInvoicesLabel: (count: number) => `Барлық шоттар: ${count}`,
-    chartIncomeLabel: 'Табыс',
-    noInvoicesYetHint: 'Алғашқы шотты жасағанда мұнда табыс көрсетіледі',
+    binPrefixLabel: (bin: string) => `БСН: ${bin}`,
+    iinPrefixLabel: (iin: string) => `ЖСН: ${iin}`,
+    binOrIinPrefixLabel: (value: string) => `БСН/ЖСН: ${value}`,
+    companyCardOpenLabel: 'Деректемелерді ашу',
+    paidThisMonthLabel: 'Осы айда төленді',
+    issuedInvoicesLabel: (count: number) => `Шоттар: ${count}`,
+    statsDashboardLink: 'Барлық статистика',
+    noInvoicesYetHint: 'Алғашқы шотты шығарғанда мұнда төлемдер көрсетіледі',
     createFirstInvoiceButton: 'Алғашқы шотты жасау',
     companySectionLabel: 'Компания',
     requisitesMenuLabel: 'Деректемелер',
-    signatureMenuLabel: 'Брендинг',
     banksMenuLabel: 'Банк шоттары',
-    securityMenuLabel: 'ЭЦҚ және қауіпсіздік',
-    acquiringMenuLabel: 'Эквайринг',
-    kaspiPayMenuLabel: 'Kaspi қабылдау',
-    connectorsMenuLabel: 'Коннекторлар',
-    directoriesSectionLabel: 'Анықтамалар',
-    clientsMenuLabel: 'Менің клиенттерім',
-    servicesMenuLabel: 'Қызметтер мен тауарлар',
+    signatureMenuLabel: 'Қолтаңба, мөр және логотип',
+    connectorsMenuLabel: 'Төлем батырмалары мен байланыстар',
+    documentsSectionLabel: 'Құжаттар',
+    clientsMenuLabel: 'Клиенттер',
+    servicesMenuLabel: 'Тауарлар мен қызметтер',
     templatesMenuLabel: 'Шот үлгілері',
-    documentsMenuLabel: 'Салық құжаттары',
+    documentsMenuLabel: 'Ұсыныстар, актілер және жүкқұжаттар',
     contractsMenuLabel: 'Шарттар',
-    settingsSectionLabel: 'Баптаулар',
-    invoiceSettingsLabel: 'Шот баптаулары',
+    invoiceSettingsLabel: 'Нөмірлеу және ҚҚС',
+    acquiringMenuLabel: 'Төлемдерді салыстыру',
+    accountSectionLabel: 'Аккаунт',
+    securityMenuLabel: 'Кіру және Face ID',
     notificationsMenuLabel: 'Хабарландырулар',
-    supportMenuLabel: 'Қолдау қызметі',
-    aboutMenuLabel: 'Қосымша туралы',
+    helpSectionLabel: 'Көмек',
+    supportMenuLabel: 'Көмек және сервис туралы',
     referralMenuLabel: 'Достарды шақыру',
+    adminSectionLabel: 'Әкімші',
     adminPanelMenuLabel: 'Әкімші панелі',
-    subscriptionSectionLabel: 'Жазылым',
+    proTagLabel: 'Про',
     proFeaturesLabel: 'Шексіз · ЭЦҚ · Үлгілер',
     basicFeaturesLabel: 'Айына 30 шот',
-    freeFeaturesLabel: 'Ақылы тарифке өтіңіз',
+    freePlanTitle: 'Тегін',
+    trialPlanTitle: (days: number) => `Сынақ (${days} күн)`,
+    bonusPlanTitle: (days: number) => `Негізгі тариф бонусы (${days} күн)`,
+    freeUsageLabel: (used: number, limit: number) => `Осы айда ${limit} шоттан ${used} пайдаланылды`,
+    freeUsageLoadingLabel: (limit: number) => `Айына ${limit} шот`,
     trialFeaturesLabel: 'Негізгі деңгей: 10 шот · Kaspi Bot пен AI-агентсіз',
+    adminAccessLabel: 'Әкімші қолжетімділігі — барлық мүмкіндіктер ашық',
+    adminPlanTitle: 'Әкімші',
     proTariffLabel: 'Про тарифі',
     basicTariffLabel: 'Негізгі тариф',
     planActiveUntilLabel: (tariffName: string) => `${tariffName} қолданылу мерзімі`,
-    referralBonusLabel: (days: number) => `Basic реферал бонусы (+${days} күн)`,
+    bonusBasicLabel: 'Негізгі тариф бонусы',
     untilDateLabel: (date: string) => `${date} дейін`,
     trialUntilLabel: 'Сынақ мерзімі',
-    darkThemeLabel: 'Қараңғы тақырып',
-    lightThemeLabel: 'Ашық тақырып',
-    languageSectionLabel: 'Тіл',
+    themeSectionLabel: 'Тақырып',
+    themeSystemLabel: 'Жүйедегідей',
+    themeLightLabel: 'Ашық',
+    themeDarkLabel: 'Қараңғы',
     signOutButton: 'Аккаунттан шығу',
     deleteAccountButton: 'Аккаунтты жою',
     deleteAccountModalTitle: 'Аккаунтты жоясыз ба?',
     deleteAccountModalBody: 'Бұл аккаунтқа енді кіре алмайсыз. Шоттар, клиенттер және барлық тарих сақталады — қайта оралсаңыз пайдалы болады, бірақ қазір оларға қол жеткізу жабылады.',
+    deleteAccountModalLossWarning: 'Тарифтің төленген күндері мен әмияндағы қалдық аккаунтпен бірге жойылады — олар үшін ақша қайтарылмайды.',
     deleteAccountModalConfirmLabel: (phrase: string) => `Растау үшін ${phrase} деп жазыңыз`,
     deleteAccountModalCancelButton: 'Бас тарту',
     deleteAccountModalConfirmButton: 'Аккаунтты жою',
     deleteAccountModalDeletingLabel: 'Жойылуда...',
+    deleteAccountAdminRefusal: 'Әкімші аккаунтын жоюға болмайды.',
 
     requisitesHeaderLabel: 'Компания деректемелері',
     companyNameFieldLabel: 'Компания / ЖК атауы *',
@@ -359,7 +410,7 @@ export const profileCoreDict: Record<'ru' | 'kk' | 'en', ProfileCoreContent> = {
     personNamePlaceholder: 'Смағұлов А.Қ.',
     saveChangesButton: 'Өзгерістерді сақтау',
 
-    signatureHeaderLabel: 'Қолтаңба мен мөр',
+    signatureHeaderLabel: 'Қолтаңба, мөр және логотип',
     signatureSectionLabel: 'Басшының қолтаңбасы',
     signatureAltText: 'Қолтаңба',
     redrawButton: 'Қайта салу',
@@ -387,11 +438,12 @@ export const profileCoreDict: Record<'ru' | 'kk' | 'en', ProfileCoreContent> = {
     cropSizeLabel: 'Рамка өлшемі',
     saveStampButton: '✅ Мөрді сақтау',
     fileReadErrorAlert: 'Файлды оқу қатесі',
+    signatureFreePlanNote: 'Қолтаңба мен мөр шотта Негізгі тарифтен бастап шығады.',
+    signatureFreePlanUpgradeLink: 'Тарифтерге өту',
 
     invoiceNumberingSectionLabel: 'Шоттарды нөмірлеу',
     prefixFieldLabel: 'Префикс',
     nextNumberFieldLabel: 'Келесі нөмір',
-    defaultCurrencyFieldLabel: 'Әдепкі валюта',
     defaultDueDaysFieldLabel: 'Әдепкі төлем мерзімі (күн)',
     defaultNoteFieldLabel: 'Стандартты ескертпе',
     defaultNotePlaceholder: 'Төлем 3 жұмыс күні ішінде...',
@@ -409,12 +461,17 @@ export const profileCoreDict: Record<'ru' | 'kk' | 'en', ProfileCoreContent> = {
     vat0InfoText: '💡 Шоттарда ҚҚС 0% көрсетіледі — экспорттық операциялар үшін',
     noVatInfoText: '💡 Шоттарда «ҚҚС-сыз» деп жазылады',
     saveSettingsButton: 'Баптауларды сақтау',
+    nextNumberInvalidAlert: (section: string) => `${section}: «Келесі нөмір» өрісінде тек сандар, 1-ден 999999999-ға дейін.`,
+    nextNumberTooLowAlert: (section: string, minimum: number) => `${section}: осы префикспен ${minimum - 1} нөмірі берілген. Келесі нөмір ${minimum}-ден кем болмауы керек, әйтпесе екі құжаттың нөмірі бірдей болады.`,
+    issuedNumbersCheckFailedAlert: 'Берілген нөмірлерді тексеру мүмкін болмады — баптаулар сақталмады. Қайталап көріңіз.',
   },
   en: {
     loadingLabel: 'Loading...',
     errorPrefix: (message: string) => `Error: ${message}`,
     savedAlert: 'Saved!',
     requisitesMissingAlert: (missing: string) => `An invoice cannot be issued without this — please fill in: ${missing}`,
+    profileNotSavedMessage: 'your changes were not saved. Refresh the page and try again',
+    returnToInvoiceHint: 'Your invoice draft is kept. Once you save, we will take you back to it.',
     binLookupCheckButton: 'Check',
     binLookupSearching: 'Searching the register…',
     binLookupNotFound: 'Not found in the register — please fill the fields in by hand.',
@@ -428,55 +485,67 @@ export const profileCoreDict: Record<'ru' | 'kk' | 'en', ProfileCoreContent> = {
 
     fillProfileLabel: 'Fill out your profile',
     noDataLabel: 'No data',
-    binIinPrefixLabel: (bin: string) => `IIN: ${bin}`,
-    incomeThisMonthLabel: 'Income this month',
-    totalInvoicesLabel: (count: number) => `Total invoices: ${count}`,
-    chartIncomeLabel: 'Income',
-    noInvoicesYetHint: "You'll see income here once you create your first invoice",
+    binPrefixLabel: (bin: string) => `BIN: ${bin}`,
+    iinPrefixLabel: (iin: string) => `IIN: ${iin}`,
+    binOrIinPrefixLabel: (value: string) => `BIN/IIN: ${value}`,
+    companyCardOpenLabel: 'Open company details',
+    paidThisMonthLabel: 'Paid this month',
+    issuedInvoicesLabel: (count: number) => `Invoices: ${count}`,
+    statsDashboardLink: 'All statistics',
+    noInvoicesYetHint: "Payments will show up here once you issue your first invoice",
     createFirstInvoiceButton: 'Create your first invoice',
     companySectionLabel: 'Company',
     requisitesMenuLabel: 'Company details',
-    signatureMenuLabel: 'Branding',
     banksMenuLabel: 'Bank accounts',
-    securityMenuLabel: 'Digital signature and security',
-    acquiringMenuLabel: 'Acquiring',
-    kaspiPayMenuLabel: 'Kaspi payments',
-    connectorsMenuLabel: 'Connectors',
-    directoriesSectionLabel: 'Directories',
-    clientsMenuLabel: 'My clients',
-    servicesMenuLabel: 'Services and products',
+    signatureMenuLabel: 'Signature, stamp and logo',
+    connectorsMenuLabel: 'Payment buttons and contacts',
+    documentsSectionLabel: 'Documents',
+    clientsMenuLabel: 'Clients',
+    servicesMenuLabel: 'Products and services',
     templatesMenuLabel: 'Invoice templates',
-    documentsMenuLabel: 'Tax documents',
+    documentsMenuLabel: 'Quotes, acts and waybills',
     contractsMenuLabel: 'Contracts',
-    settingsSectionLabel: 'Settings',
-    invoiceSettingsLabel: 'Invoice settings',
+    invoiceSettingsLabel: 'Numbering and VAT',
+    acquiringMenuLabel: 'Payment matching',
+    accountSectionLabel: 'Account',
+    securityMenuLabel: 'Sign-in and Face ID',
     notificationsMenuLabel: 'Notifications',
-    supportMenuLabel: 'Support',
-    aboutMenuLabel: 'About the app',
+    helpSectionLabel: 'Help',
+    supportMenuLabel: 'Help and about',
     referralMenuLabel: 'Invite friends',
+    adminSectionLabel: 'Admin',
     adminPanelMenuLabel: 'Admin panel',
-    subscriptionSectionLabel: 'Subscription',
+    proTagLabel: 'Pro',
     proFeaturesLabel: 'Unlimited · e-signature · Templates',
     basicFeaturesLabel: '30 invoices per month',
-    freeFeaturesLabel: 'Upgrade to a paid plan',
+    freePlanTitle: 'Free',
+    trialPlanTitle: (days: number) => `Trial (${days} days)`,
+    bonusPlanTitle: (days: number) => `Basic bonus (${days} days)`,
+    freeUsageLabel: (used: number, limit: number) => `${used} of ${limit} invoices used this month`,
+    freeUsageLoadingLabel: (limit: number) => `${limit} invoices per month`,
     trialFeaturesLabel: 'Basic level: 10 invoices · no Kaspi Bot or AI agent',
+    adminAccessLabel: 'Administrator access — all features unlocked',
+    adminPlanTitle: 'Administrator',
     proTariffLabel: 'Pro plan',
     basicTariffLabel: 'Basic plan',
     planActiveUntilLabel: (tariffName: string) => `${tariffName} valid until`,
-    referralBonusLabel: (days: number) => `Basic referral bonus (+${days} days)`,
+    bonusBasicLabel: 'Basic bonus',
     untilDateLabel: (date: string) => `until ${date}`,
     trialUntilLabel: 'Trial period until',
-    darkThemeLabel: 'Dark theme',
-    lightThemeLabel: 'Light theme',
-    languageSectionLabel: 'Language',
+    themeSectionLabel: 'Theme',
+    themeSystemLabel: 'System',
+    themeLightLabel: 'Light',
+    themeDarkLabel: 'Dark',
     signOutButton: 'Sign out',
     deleteAccountButton: 'Delete account',
     deleteAccountModalTitle: 'Delete your account?',
     deleteAccountModalBody: "You won't be able to log into this account anymore. Invoices, clients and history stay on our side in case you come back, but access to them is closed.",
+    deleteAccountModalLossWarning: 'Paid plan days and your wallet balance are lost together with the account — they are not refunded.',
     deleteAccountModalConfirmLabel: (phrase: string) => `Type ${phrase} to confirm`,
     deleteAccountModalCancelButton: 'Cancel',
     deleteAccountModalConfirmButton: 'Delete account',
     deleteAccountModalDeletingLabel: 'Deleting...',
+    deleteAccountAdminRefusal: 'An administrator account cannot be deleted.',
 
     requisitesHeaderLabel: 'Company details',
     companyNameFieldLabel: 'Company / sole proprietor name *',
@@ -494,7 +563,7 @@ export const profileCoreDict: Record<'ru' | 'kk' | 'en', ProfileCoreContent> = {
     personNamePlaceholder: 'Smagulov A.K.',
     saveChangesButton: 'Save changes',
 
-    signatureHeaderLabel: 'Signature and stamp',
+    signatureHeaderLabel: 'Signature, stamp and logo',
     signatureSectionLabel: "Director's signature",
     signatureAltText: 'Signature',
     redrawButton: 'Redraw',
@@ -522,11 +591,12 @@ export const profileCoreDict: Record<'ru' | 'kk' | 'en', ProfileCoreContent> = {
     cropSizeLabel: 'Frame size',
     saveStampButton: '✅ Save stamp',
     fileReadErrorAlert: 'Error reading file',
+    signatureFreePlanNote: 'The signature and stamp appear on invoices from the Basic plan.',
+    signatureFreePlanUpgradeLink: 'View plans',
 
     invoiceNumberingSectionLabel: 'Invoice numbering',
     prefixFieldLabel: 'Prefix',
     nextNumberFieldLabel: 'Next number',
-    defaultCurrencyFieldLabel: 'Default currency',
     defaultDueDaysFieldLabel: 'Default payment due (days)',
     defaultNoteFieldLabel: 'Default note',
     defaultNotePlaceholder: 'Payment due within 3 business days...',
@@ -544,5 +614,8 @@ export const profileCoreDict: Record<'ru' | 'kk' | 'en', ProfileCoreContent> = {
     vat0InfoText: '💡 Invoices will show 0% VAT — for export operations',
     noVatInfoText: '💡 Invoices will say "No VAT"',
     saveSettingsButton: 'Save settings',
+    nextNumberInvalidAlert: (section: string) => `${section}: “Next number” takes digits only, from 1 to 999999999.`,
+    nextNumberTooLowAlert: (section: string, minimum: number) => `${section}: number ${minimum - 1} with this prefix has already been issued. The next number must be at least ${minimum}, otherwise two documents would share a number.`,
+    issuedNumbersCheckFailedAlert: 'Could not check the numbers already issued — settings were not saved. Please try again.',
   },
 }

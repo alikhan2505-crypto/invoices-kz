@@ -3,7 +3,7 @@
 // concurrently) so this feature doesn't collide with unrelated landing work.
 //
 // Used by: src/app/dashboard/page.tsx (footer contacts), src/app/profile/support/page.tsx,
-// src/app/profile/about/page.tsx, src/app/upgrade/page.tsx (free-plan footer variant).
+// src/app/upgrade/page.tsx (free-plan footer variant).
 
 export interface SupportGatingContent {
   // Shown in place of the Telegram support link for free-plan users.

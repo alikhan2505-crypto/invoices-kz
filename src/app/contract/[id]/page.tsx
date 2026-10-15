@@ -21,6 +21,32 @@ export default function ContractPage() {
 
   useEffect(() => { load() }, [])
 
+  // Бакет с договорами закрыт для браузера (src/lib/signedDocuments.ts):
+  // короткую подписанную ссылку на файл выдаёт сервер, проверив владельца.
+  async function getFileUrl(): Promise<string> {
+    const { data: { session } } = await supabase.auth.getSession()
+    const res = await fetch(`/api/contracts/${encodeURIComponent(String(id))}/file`, {
+      headers: { Authorization: `Bearer ${session?.access_token}` },
+    })
+    const json = await res.json().catch(() => null)
+    if (!res.ok || !json?.url) throw new Error(t.fileUnavailableError)
+    return json.url as string
+  }
+
+  async function openFile() {
+    // Окно открывается синхронно, прямо в клике — иначе после await
+    // браузер посчитает его всплывающим и заблокирует.
+    const win = window.open('', '_blank')
+    try {
+      const url = await getFileUrl()
+      if (win) win.location.href = url
+      else window.location.href = url
+    } catch (e: any) {
+      win?.close()
+      alert(e?.message || t.fileUnavailableError)
+    }
+  }
+
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
@@ -65,10 +91,10 @@ export default function ContractPage() {
           </div>
         </div>
 
-        <a href={contract.file_url} target="_blank" rel="noreferrer"
-          className="block text-center bg-white shadow-sm rounded-xl py-3.5 text-sm font-medium text-[#1C2056]">
+        <button type="button" onClick={openFile}
+          className="block w-full text-center bg-white shadow-sm rounded-xl py-3.5 text-sm font-medium text-[#1C2056]">
           {t.viewFileButton}
-        </a>
+        </button>
 
         {profile?.is_admin || getActivePlan(profile).canEcp ? (
         <SignatureSection
@@ -77,7 +103,7 @@ export default function ContractPage() {
           documentId={contract.id}
           documentTitle={contract.title}
           ownerCompanyName={profile?.company_name}
-          getPdfUrl={async () => contract.file_url}
+          getPdfUrl={getFileUrl}
         />
         ) : (
         <div className="bg-white rounded-2xl shadow-sm p-4">

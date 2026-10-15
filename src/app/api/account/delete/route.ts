@@ -45,16 +45,26 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json().catch(() => null)
-  if (body?.confirmText !== CONFIRM_PHRASE) {
+  // Регистр и пробелы по краям не важны: «invoices.kz» — тоже подтверждение
+  // (ревизия /profile 15.10.2026). Сравнение то же, что в модалке.
+  const confirmText = typeof body?.confirmText === 'string' ? body.confirmText.trim().toUpperCase() : ''
+  if (confirmText !== CONFIRM_PHRASE) {
     return NextResponse.json({ error: `Введите "${CONFIRM_PHRASE}" для подтверждения` }, { status: 400 })
   }
 
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('company_name, email, bin_iin, created_at, deleted_at')
+    .select('company_name, email, bin_iin, created_at, deleted_at, is_admin')
     .eq('id', user.id)
     .single()
   if (profileError || !profile) return NextResponse.json({ error: 'Профиль не найден' }, { status: 404 })
+
+  // Аккаунт администратора удалить отсюда нельзя: одно неловкое нажатие —
+  // и платформа теряет админа (его тестовые данные, доступ к /admin).
+  // Модалка отказывает так же; это — граница на сервере.
+  if (profile.is_admin) {
+    return NextResponse.json({ error: 'Аккаунт администратора удалить нельзя', code: 'admin_account' }, { status: 403 })
+  }
 
   if (profile.deleted_at) {
     // Already flagged deleted in a previous attempt -- most likely the auth

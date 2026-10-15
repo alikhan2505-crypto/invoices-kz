@@ -7,6 +7,9 @@ import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import Skeleton from '@/components/Skeleton'
 import { useAppDialog } from '@/components/AppDialog'
+import { useLanguage } from '@/components/LanguageProvider'
+import { backLabel, editLabel, deleteLabel, clearSearchLabel } from '@/lib/a11yLabels'
+import { profileClientsDict } from '@/lib/i18n/profileClients'
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
 // kept identical rather than inventing a second "house" ease.
@@ -67,6 +70,8 @@ function PeopleIcon() {
 
 export default function Clients() {
   const router = useRouter()
+  const { lang } = useLanguage()
+  const t = profileClientsDict[lang]
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw
   const [clients, setClients] = useState<any[]>([])
@@ -120,17 +125,17 @@ export default function Clients() {
   }
 
   async function saveClient() {
-    if (!form.name) { alert('Введите название'); return }
+    if (!form.name) { alert(t.nameRequiredAlert); return }
     setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+    if (!user) { setSaving(false); router.push('/login'); return }
 
     if (editingId) {
       const { error } = await supabase.from('clients').update({ ...form }).eq('id', editingId)
-      if (error) { alert('Ошибка: ' + error.message); setSaving(false); return }
+      if (error) { alert(t.errorPrefix(error.message)); setSaving(false); return }
     } else {
       const { error } = await supabase.from('clients').insert({ ...form, user_id: user.id })
-      if (error) { alert('Ошибка: ' + error.message); setSaving(false); return }
+      if (error) { alert(t.errorPrefix(error.message)); setSaving(false); return }
     }
 
     resetForm()
@@ -139,7 +144,7 @@ export default function Clients() {
   }
 
   async function deleteClient(id: string) {
-    if (!(await confirm('Удалить клиента?'))) return
+    if (!(await confirm(t.deleteConfirm))) return
     await supabase.from('clients').delete().eq('id', id)
     setClients(prev => prev.filter(c => c.id !== id))
   }
@@ -166,20 +171,20 @@ export default function Clients() {
             <div className="flex items-center gap-3 min-w-0">
               <button
                 onClick={() => router.push('/profile')}
-                aria-label="Назад"
+                aria-label={backLabel(lang)}
                 className="w-11 h-11 flex items-center justify-center rounded-xl flex-shrink-0 transition-colors hover:bg-[var(--nav-surface-glass)]"
                 style={{ color: 'var(--nav-text-muted)' }}
               >
                 <ChevronLeftIcon />
               </button>
-              <h2 className="text-xl font-bold truncate" style={{ color: 'var(--nav-text-primary)' }}>Мои клиенты</h2>
+              <h2 className="text-xl font-bold truncate" style={{ color: 'var(--nav-text-primary)' }}>{t.headerLabel}</h2>
             </div>
             {!showForm && (
               <button onClick={() => setShowForm(true)}
                 className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg flex-shrink-0 transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0"
                 style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                 <PlusIcon />
-                Добавить
+                {t.addButton}
               </button>
             )}
           </motion.div>
@@ -193,13 +198,13 @@ export default function Clients() {
             <span className="flex-shrink-0" style={{ color: 'var(--nav-text-muted)' }}><SearchIcon /></span>
             <input
               className="flex-1 text-sm outline-none bg-transparent"
-              placeholder="Поиск по названию, БИН, email..."
+              placeholder={t.searchPlaceholder}
               value={search}
               onChange={e => setSearch(e.target.value)}
               style={{ color: 'var(--nav-text-primary)' }}
             />
             {search && (
-              <button onClick={() => setSearch('')} aria-label="Очистить поиск"
+              <button onClick={() => setSearch('')} aria-label={clearSearchLabel(lang)}
                 className="flex-shrink-0 text-[color:var(--nav-text-muted)] hover:text-[color:var(--nav-text-secondary)] transition-colors">
                 <XIcon />
               </button>
@@ -208,12 +213,12 @@ export default function Clients() {
 
           {!search && clients.length > 0 && (
             <div className="text-xs px-1 mb-3" style={{ color: 'var(--nav-text-muted)' }}>
-              Всего клиентов: <span className="font-medium" style={{ color: 'var(--nav-text-primary)' }}>{clients.length}</span>
+              {t.totalLabel} <span className="font-medium" style={{ color: 'var(--nav-text-primary)' }}>{clients.length}</span>
             </div>
           )}
           {search && (
             <div className="text-xs px-1 mb-3" style={{ color: 'var(--nav-text-muted)' }}>
-              Найдено: <span className="font-medium" style={{ color: 'var(--nav-text-primary)' }}>{filtered.length}</span> из {clients.length}
+              {t.foundLabel} <span className="font-medium" style={{ color: 'var(--nav-text-primary)' }}>{filtered.length}</span> {t.ofLabel(clients.length)}
             </div>
           )}
 
@@ -225,21 +230,21 @@ export default function Clients() {
               className="nav-glass nav-card-accent rounded-2xl p-5 mb-4 space-y-3"
             >
               <div className="font-semibold text-sm mb-1" style={{ color: 'var(--nav-text-primary)' }}>
-                {editingId ? 'Редактировать клиента' : 'Новый клиент'}
+                {editingId ? t.editClientTitle : t.newClientTitle}
               </div>
 
               <div>
-                <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>Название компании / ИП *</label>
+                <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.nameFieldLabel}</label>
                 <input
                   className={inputClass}
-                  placeholder="ТОО «Пример»"
+                  placeholder={t.namePlaceholder}
                   value={form.name}
                   onChange={e => setForm({ ...form, name: e.target.value })}
                 />
               </div>
 
               <div>
-                <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>БИН / ИИН</label>
+                <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.binIinFieldLabel}</label>
                 <input
                   className={inputClass}
                   placeholder="123456789012"
@@ -249,7 +254,7 @@ export default function Clients() {
               </div>
 
               <div>
-                <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>Email</label>
+                <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.emailFieldLabel}</label>
                 <input
                   className={inputClass}
                   placeholder="client@mail.kz"
@@ -259,17 +264,17 @@ export default function Clients() {
               </div>
 
               <div>
-                <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>Адрес</label>
+                <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.addressFieldLabel}</label>
                 <input
                   className={inputClass}
-                  placeholder="г. Алматы, ул. Абая 1"
+                  placeholder={t.addressPlaceholder}
                   value={form.address}
                   onChange={e => setForm({ ...form, address: e.target.value })}
                 />
               </div>
 
               <div>
-                <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>Телефон</label>
+                <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.phoneFieldLabel}</label>
                 <input
                   className={inputClass}
                   placeholder="+7 776 355 5177"
@@ -284,12 +289,12 @@ export default function Clients() {
                 <button onClick={resetForm}
                   className="flex-1 nav-glass rounded-xl py-3 text-sm font-medium transition-colors hover:bg-[var(--nav-surface-glass)]"
                   style={{ color: 'var(--nav-text-secondary)' }}>
-                  Отмена
+                  {t.cancelButton}
                 </button>
                 <button onClick={saveClient} disabled={saving}
                   className="flex-1 rounded-xl py-3 text-sm font-semibold transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60"
                   style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-                  {saving ? 'Сохраняем...' : editingId ? 'Сохранить' : 'Добавить'}
+                  {saving ? t.savingLabel : editingId ? t.saveButton : t.addButton}
                 </button>
               </div>
             </motion.div>
@@ -310,12 +315,12 @@ export default function Clients() {
             <div className="flex flex-col items-center text-center py-12">
               <PeopleIcon />
               <p className="text-sm mt-3" style={{ color: 'var(--nav-text-secondary)' }}>
-                {search ? 'Клиент не найден' : 'Нет клиентов'}
+                {search ? t.notFoundLabel : t.emptyLabel}
               </p>
               {search && (
                 <button onClick={() => setSearch('')}
                   className="mt-3 text-xs font-medium" style={{ color: 'var(--nav-accent)' }}>
-                  Очистить поиск
+                  {t.clearSearchButton}
                 </button>
               )}
             </div>
@@ -331,18 +336,18 @@ export default function Clients() {
                 >
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-sm truncate" style={{ color: 'var(--nav-text-primary)' }}>{client.name}</div>
-                    {client.bin_iin && <div className="text-xs mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>БИН: {client.bin_iin}</div>}
+                    {client.bin_iin && <div className="text-xs mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{t.binPrefix(client.bin_iin)}</div>}
                     {client.email && <div className="text-xs truncate" style={{ color: 'var(--nav-text-muted)' }}>{client.email}</div>}
                     {client.phone && <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>{client.phone}</div>}
                     {client.address && <div className="text-xs truncate" style={{ color: 'var(--nav-text-muted)' }}>{client.address}</div>}
                   </div>
                   <div className="flex items-center gap-1 ml-3 flex-shrink-0">
-                    <button onClick={() => startEdit(client)} aria-label="Изменить"
+                    <button onClick={() => startEdit(client)} aria-label={editLabel(lang)}
                       className="w-11 h-11 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--nav-surface-glass)]"
                       style={{ color: 'var(--nav-text-muted)' }}>
                       <PencilIcon />
                     </button>
-                    <button onClick={() => deleteClient(client.id)} aria-label="Удалить"
+                    <button onClick={() => deleteClient(client.id)} aria-label={deleteLabel(lang)}
                       className="w-11 h-11 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--nav-surface-glass)] hover:text-[color:var(--nav-critical)]"
                       style={{ color: 'var(--nav-text-muted)' }}>
                       <XIcon />
@@ -363,7 +368,7 @@ export default function Clients() {
               style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)', boxShadow: '0 10px 24px -10px var(--nav-accent)' }}
             >
               <PlusIcon />
-              Новый клиент
+              {t.newClientButton}
             </motion.button>
           )}
         </div>

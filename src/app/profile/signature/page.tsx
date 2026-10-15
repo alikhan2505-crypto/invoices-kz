@@ -7,6 +7,7 @@ import { resizeToFit } from '@/lib/imageResize'
 import { useLanguage } from '@/components/LanguageProvider'
 import { backLabel, closeLabel } from '@/lib/a11yLabels'
 import { profileCoreDict } from '@/lib/i18n/profileCore'
+import { getActivePlan } from '@/lib/plan'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import { useAppDialog } from '@/components/AppDialog'
@@ -81,6 +82,8 @@ export default function Signature() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const cropCanvasRef = useRef<HTMLCanvasElement>(null)
   const [userId, setUserId] = useState<string>('')
+  // null — тариф ещё не загружен: подсказку про Бесплатный не показываем заранее.
+  const [canSign, setCanSign] = useState<boolean | null>(null)
 
   // Кроп состояние
   const [cropX, setCropX] = useState(0)
@@ -101,11 +104,18 @@ export default function Signature() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
     setUserId(user.id)
-    const { data } = await supabase.from('profiles').select('signature_url, stamp_url, logo_url').eq('id', user.id).single()
+    const { data } = await supabase
+      .from('profiles')
+      .select('signature_url, stamp_url, logo_url, plan, plan_expires_at, bonus_expires_at, trial_expires_at, is_admin')
+      .eq('id', user.id)
+      .single()
     if (data) {
       setSignatureUrl(data.signature_url)
       setStampUrl(data.stamp_url)
       setLogoUrl(data.logo_url)
+      // Подпись и печать попадают в PDF счёта только с Базового (canSign);
+      // на Бесплатном их можно загрузить заранее, но в счёте их не будет.
+      setCanSign(getActivePlan(data).canSign)
     }
   }
 
@@ -501,6 +511,15 @@ export default function Signature() {
           </button>
           <span className="font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{t.signatureHeaderLabel}</span>
         </motion.div>
+
+        {canSign === false && (
+          <motion.div {...fadeIn(0)} className="rounded-xl px-4 py-3 text-xs leading-relaxed" style={{ background: 'var(--nav-accent-soft)', color: 'var(--nav-text-secondary)' }}>
+            {t.signatureFreePlanNote}{' '}
+            <button type="button" onClick={() => router.push('/upgrade')} className="underline font-medium" style={{ color: 'var(--nav-accent)' }}>
+              {t.signatureFreePlanUpgradeLink}
+            </button>
+          </motion.div>
+        )}
 
         {/* Подпись */}
         <motion.div {...fadeIn(1)}>

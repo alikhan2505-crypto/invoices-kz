@@ -11,6 +11,8 @@ import { backLabel, deleteLabel } from '@/lib/a11yLabels'
 import { contractsDict } from '@/lib/i18n/contracts'
 import Skeleton from '@/components/Skeleton'
 import { useAppDialog } from '@/components/AppDialog'
+import { SIGNED_DOCUMENTS_BUCKET } from '@/lib/signedDocuments'
+import { getActivePlan } from '@/lib/plan'
 
 type Contract = {
   id: string
@@ -93,6 +95,8 @@ export default function Contracts() {
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({ title: '', client_name: '', client_email: '' })
   const [file, setFile] = useState<File | null>(null)
+  // null — тариф ещё не загружен: подсказку «ЭЦП — на Про» не показываем заранее.
+  const [canEcp, setCanEcp] = useState<boolean | null>(null)
 
   useEffect(() => { load() }, [])
 
@@ -100,8 +104,13 @@ export default function Contracts() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
 
-    const { data: c } = await supabase.from('contracts').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
+    const [{ data: c }, { data: planProfile }] = await Promise.all([
+      supabase.from('contracts').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+      supabase.from('profiles').select('plan, plan_expires_at, bonus_expires_at, trial_expires_at, is_admin').eq('id', user.id).single(),
+    ])
     setContracts(c || [])
+    // Хранить договоры можно на любом тарифе, а подписывать ЭЦП — только на Про.
+    setCanEcp(getActivePlan(planProfile).canEcp)
 
     if (c && c.length > 0) {
       const { data: sigs } = await supabase
@@ -127,12 +136,14 @@ export default function Contracts() {
     if (!file) { alert(t.fileRequiredAlert); return }
     setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+    if (!user) { setSaving(false); return }
 
     const path = `contracts/${user.id}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
-    const { error: uploadError } = await supabase.storage.from('signed-documents').upload(path, file, { contentType: 'application/pdf' })
+    const { error: uploadError } = await supabase.storage.from(SIGNED_DOCUMENTS_BUCKET).upload(path, file, { contentType: 'application/pdf' })
     if (uploadError) { alert(t.errorPrefix(uploadError.message)); setSaving(false); return }
-    const fileUrl = supabase.storage.from('signed-documents').getPublicUrl(path).data.publicUrl
+    // В file_url — путь объекта, не публичная ссылка: бакет закрыт, файл
+    // отдаёт сервер по короткой подписанной ссылке (src/lib/signedDocuments.ts).
+    const fileUrl = path
 
     const { error } = await supabase.from('contracts').insert({
       user_id: user.id,
@@ -192,6 +203,15 @@ export default function Contracts() {
               </button>
             )}
           </motion.div>
+
+          {canEcp === false && (
+            <p className="text-xs px-1 -mt-2 mb-4" style={{ color: 'var(--nav-text-muted)' }}>
+              {t.ecpProOnlyNote}{' '}
+              <button type="button" onClick={() => router.push('/upgrade')} className="underline font-medium" style={{ color: 'var(--nav-accent)' }}>
+                {t.goToPlansButton}
+              </button>
+            </p>
+          )}
 
           {showForm && (
             <motion.div

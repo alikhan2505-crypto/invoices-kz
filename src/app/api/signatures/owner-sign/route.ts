@@ -4,6 +4,8 @@ import { Resend } from 'resend'
 import crypto from 'crypto'
 import { sigexRegisterDocument, sigexUploadDocumentData, sigexBuildDDC, sigexGetDocument, parseSignerName } from '@/lib/sigex'
 import { getActivePlan } from '@/lib/plan'
+import { SIGNED_DOCUMENTS_BUCKET } from '@/lib/signedDocuments'
+import { downloadSignedDocument, resolveContractFilePath, resolveSignedDocumentPath } from '@/lib/signedDocumentsServer'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -35,6 +37,9 @@ type DocumentRecord = {
   clientEmail: string | null
   userId: string
   publicUrl: string
+  // Для договора — путь его загруженного файла: подписывается ровно он.
+  // null, если файл не из папки владельца (тогда подпись отклоняется).
+  filePath: string | null
 }
 
 async function loadDocumentRecord(documentType: string, documentId: string): Promise<DocumentRecord | null> {
@@ -51,12 +56,13 @@ async function loadDocumentRecord(documentType: string, documentId: string): Pro
       clientEmail: data.client_email,
       userId: data.user_id,
       publicUrl: `https://invoices.kz/view/${data.public_token}`,
+      filePath: null,
     }
   }
   if (documentType === 'contract') {
     const { data } = await supabase
       .from('contracts')
-      .select('id, title, client_email, user_id, public_token')
+      .select('id, title, client_email, user_id, public_token, file_url')
       .eq('id', documentId)
       .single()
     if (!data) return null
@@ -66,6 +72,7 @@ async function loadDocumentRecord(documentType: string, documentId: string): Pro
       clientEmail: data.client_email,
       userId: data.user_id,
       publicUrl: `https://invoices.kz/contract-view/${data.public_token}`,
+      filePath: resolveContractFilePath(data.file_url, data.user_id),
     }
   }
   return null
@@ -103,9 +110,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'ЭЦП доступна только на тарифе Про' }, { status: 403 })
   }
 
-  const pdfRes = await fetch(snapshotPdfUrl)
-  if (!pdfRes.ok) return NextResponse.json({ error: 'Could not fetch snapshot PDF' }, { status: 400 })
-  const pdfBytes = new Uint8Array(await pdfRes.arrayBuffer())
+  // snapshotPdfUrl — путь в бакете signed-documents (uploadSnapshot) или,
+  // для договора, подписанная ссылка на его файл. Раньше сервер делал
+  // fetch() любой присланной ссылки и сохранял её как есть; теперь берётся
+  // только объект нашего бакета, и только тот, что относится к этому
+  // документу: снимок счёта лежит под `${documentId}/`, у договора
+  // подписывается ровно его загруженный файл.
+  const snapshotPath = resolveSignedDocumentPath(snapshotPdfUrl)
+  const pathBelongsToDocument = !!snapshotPath && (
+    documentType === 'contract'
+      ? !!doc.filePath && snapshotPath === doc.filePath
+      : snapshotPath.startsWith(`${documentId}/`)
+  )
+  if (!snapshotPath || !pathBelongsToDocument) {
+    return NextResponse.json({ error: 'Invalid snapshot' }, { status: 400 })
+  }
+  const pdfBytes = await downloadSignedDocument(supabase, snapshotPath)
+  if (!pdfBytes) return NextResponse.json({ error: 'Could not fetch snapshot PDF' }, { status: 400 })
   const documentHash = crypto.createHash('sha256').update(pdfBytes).digest('hex')
 
   let sigexDocumentId: string
@@ -131,11 +152,10 @@ export async function POST(req: NextRequest) {
       const ddcBytes = await sigexBuildDDC(sigexDocumentId, pdfBytes, `${doc.title.replace(/[^a-zA-Z0-9-]/g, '_')}.pdf`)
       const path = `${documentId}/${Date.now()}.pdf`
       const { error: uploadError } = await supabase.storage
-        .from('signed-documents')
+        .from(SIGNED_DOCUMENTS_BUCKET)
         .upload(path, ddcBytes, { contentType: 'application/pdf', upsert: false })
-      if (!uploadError) {
-        ddcPdfUrl = supabase.storage.from('signed-documents').getPublicUrl(path).data.publicUrl
-      }
+      // Путь, не публичная ссылка — см. src/lib/signedDocuments.ts.
+      if (!uploadError) ddcPdfUrl = path
     } catch (e) {
       // Best-effort — the owner's CMS signature is already safely
       // registered with SIGEX at this point; the verification card can be
@@ -151,7 +171,7 @@ export async function POST(req: NextRequest) {
       document_id: documentId,
       owner_user_id: user.id,
       status: requiresClient ? 'awaiting_client' : 'signed',
-      snapshot_pdf_url: snapshotPdfUrl,
+      snapshot_pdf_url: snapshotPath,
       document_hash: documentHash,
       owner_signed_at: new Date().toISOString(),
       owner_signature_cms: signatureCms,

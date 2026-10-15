@@ -11,6 +11,7 @@ import Skeleton from '@/components/Skeleton'
 import Link from 'next/link'
 import { useLanguage } from '@/components/LanguageProvider'
 import { getActivePlan, parseDbTimestamp } from '@/lib/plan'
+import { isInLocalMonth } from '@/lib/invoiceStats'
 import { invoiceLimitWindow, countInvoicesInWindow, invoicesLeft, type InvoiceLimitWindow } from '@/lib/invoiceLimit'
 import { useMyProducts } from '@/lib/useMyProducts'
 import { supportDict } from '@/lib/i18n/support'
@@ -622,11 +623,8 @@ export default function DashboardPage() {
 
   const now = new Date()
   const monthInvoices = useMemo(
-    () => invoices.filter(inv => {
-      const d = parseDbTimestamp(inv.created_at)
-      if (!d) return false
-      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
-    }),
+    // Та же граница месяца, что у «Оплачено в этом месяце» в /profile.
+    () => invoices.filter(inv => isInLocalMonth(inv.created_at, now)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [invoices]
   )

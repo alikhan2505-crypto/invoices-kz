@@ -10,6 +10,7 @@ import { backLabel } from '@/lib/a11yLabels'
 import { profileCoreDict } from '@/lib/i18n/profileCore'
 import { useAppDialog } from '@/components/AppDialog'
 import { useBinLookup } from '@/components/useBinLookup'
+import { returnPathFromSearch, type ReturnPath } from '@/lib/returnPath'
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
 // kept identical rather than inventing a second "house" ease.
@@ -119,13 +120,38 @@ export default function Requisites() {
     company_name: '', bin_iin: '', address: '', email: '', phone: '',
     director_name: '', accountant_name: ''
   })
+  // ?next=/create — сюда прислал /create, где ждёт черновик счёта; после
+  // сохранения возвращаем туда же, а не в /profile. См. src/lib/returnPath.ts.
+  const [returnTo, setReturnTo] = useState<ReturnPath | null>(null)
 
   useEffect(() => {
+    // Адрес есть только в браузере; прочитать его при рендере — расхождение гидратации.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setReturnTo(returnPathFromSearch(window.location.search))
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
-      const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
-      if (data) setProfile({ ...profile, ...data })
+      // Только поля этой формы. Раньше грузилась вся строка profiles, а
+      // сохранялась она же целиком через upsert — и откатывала всё, что
+      // успело измениться, пока страница была открыта: номер следующего
+      // счёта, telegram_chat_id, настройки уведомлений (а у админов, кого
+      // триггер пропускает, — и тариф с балансом).
+      const { data } = await supabase
+        .from('profiles')
+        .select('company_name, bin_iin, address, email, phone, director_name, accountant_name')
+        .eq('id', user.id)
+        .single()
+      if (data) {
+        setProfile({
+          company_name: data.company_name || '',
+          bin_iin: data.bin_iin || '',
+          address: data.address || '',
+          email: data.email || '',
+          phone: data.phone || '',
+          director_name: data.director_name || '',
+          accountant_name: data.accountant_name || '',
+        })
+      }
     }
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -159,12 +185,37 @@ export default function Requisites() {
     }
 
     setSaving(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    const { error } = await supabase.from('profiles').upsert({ id: user.id, ...profile })
-    if (error) alert(t.errorPrefix(error.message))
-    else { alert(t.savedAlert); router.push('/profile') }
-    setSaving(false)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { router.push('/login'); return }
+      // update, не upsert: строка profiles всегда есть (её создаёт триггер
+      // при регистрации), а меняются ровно поля этой формы.
+      const { data: updated, error } = await supabase
+        .from('profiles')
+        .update({
+          company_name: profile.company_name,
+          bin_iin: profile.bin_iin,
+          address: profile.address,
+          email: profile.email,
+          phone: profile.phone,
+          director_name: profile.director_name,
+          accountant_name: profile.accountant_name,
+        })
+        .eq('id', user.id)
+        .select('id')
+      // PostgREST отвечает «успехом» и на update без единой строки — без
+      // этой проверки человек увидел бы «Сохранено!», а сохранено ничего.
+      if (error || !updated || updated.length === 0) {
+        await alert(t.errorPrefix(error?.message || t.profileNotSavedMessage))
+        return
+      }
+      await alert(t.savedAlert)
+      router.push(returnTo || '/profile')
+    } catch (e: any) {
+      await alert(t.errorPrefix(e?.message || String(e)))
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -179,7 +230,7 @@ export default function Requisites() {
             transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE }}
           >
             <button
-              onClick={() => router.push('/profile')}
+              onClick={() => router.push(returnTo || '/profile')}
               aria-label={backLabel(lang)}
               className="w-11 h-11 flex items-center justify-center rounded-xl flex-shrink-0 transition-colors hover:bg-[var(--nav-surface-glass)]"
               style={{ color: 'var(--nav-text-muted)' }}
@@ -188,6 +239,12 @@ export default function Requisites() {
             </button>
             <h2 className="text-xl font-bold" style={{ color: 'var(--nav-text-primary)' }}>{t.requisitesHeaderLabel}</h2>
           </motion.div>
+
+          {returnTo && (
+            <div className="mb-4 rounded-xl p-3 text-xs" style={{ background: 'var(--nav-accent-soft)', color: 'var(--nav-text-primary)' }}>
+              {t.returnToInvoiceHint}
+            </div>
+          )}
 
           <motion.div
             className={`nav-glass nav-card-accent rounded-2xl p-5 space-y-4 ${CARD_HOVER}`}

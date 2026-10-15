@@ -198,7 +198,7 @@ export async function GET(request: Request) {
             from: 'invoices.kz <mail@invoices.kz>',
             to: ownerProfile.email,
             subject: `Найдено ${newMatches} возможных оплат`,
-            html: `<p>По вашему подключённому счёту BCC найдено ${newMatches} операций, совпадающих по БИН и сумме с вашими открытыми счетами. Проверьте и подтвердите их в разделе <a href="https://www.invoices.kz/profile/acquiring">Эквайринг</a>.</p>`,
+            html: `<p>По вашему подключённому счёту BCC найдено ${newMatches} операций, совпадающих по БИН и сумме с вашими открытыми счетами. Проверьте и подтвердите их в разделе <a href="https://www.invoices.kz/profile/acquiring">Сверка оплат</a>.</p>`,
           })
           notified++
         }

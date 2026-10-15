@@ -16,6 +16,7 @@ import { useLanguage } from '@/components/LanguageProvider'
 import { closeLabel, deleteLabel } from '@/lib/a11yLabels'
 import { invoiceFlowDict } from '@/lib/i18n/invoiceFlow'
 import { saveInvoiceDraft, takeInvoiceDraft, clearInvoiceDraft, type InvoiceDraft } from '@/lib/invoiceDraft'
+import { withReturnPath } from '@/lib/returnPath'
 import { useAppDialog } from '@/components/AppDialog'
 import { useBinLookup } from '@/components/useBinLookup'
 
@@ -181,12 +182,13 @@ export default function CreateInvoicePage() {
   // has to be restored exactly once -- otherwise switching to another tab and
   // back would re-apply it over whatever the user has since typed.
   const draftRestored = useRef(false)
-  // A restore must be visible. Nothing sends the user back here after they fill
-  // in their requisites (/profile/requisites saves to /profile), so the return
-  // trip is an ordinary menu click -- days later it could just as easily be
-  // someone starting a different invoice, and a form that silently fills itself
-  // with a previous client's name, BIN and prices is how the wrong line items
-  // reach a real customer.
+  // A restore must be visible. Since 15.10.2026 the gates below send the user
+  // to /profile/requisites and /profile/banks with ?next=/create, and those
+  // pages bring them straight back here after saving -- but the return trip
+  // can still be an ordinary menu click days later (the draft lives 24h), by
+  // someone starting a different invoice, and a form that silently fills
+  // itself with a previous client's name, BIN and prices is how the wrong
+  // line items reach a real customer.
   const [draftRestoredNotice, setDraftRestoredNotice] = useState(false)
 
   // Snapshot of everything a person can type into this form, for the two gates
@@ -521,6 +523,14 @@ export default function CreateInvoicePage() {
     setShowSaveClient(false)
   }
 
+  // Onboarding checklist steps 1-2: same trip as the gates in createInvoice()
+  // -- park whatever is already typed and come back here after saving.
+  async function goFillPrerequisite(href: '/profile/requisites' | '/profile/banks') {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) saveInvoiceDraft(user.id, currentDraft())
+    router.push(withReturnPath(href, '/create'))
+  }
+
   async function createInvoice() {
     // Both gates below stand exactly as they were -- requisites and a bank
     // account stay hard requirements (founder, 2026-09-05). What changed is
@@ -537,8 +547,12 @@ export default function CreateInvoicePage() {
 
     if (!profile?.company_name || !profile?.bin_iin) {
       const kept = saveInvoiceDraft(user.id, currentDraft())
-      alert(t.fillCompanyDetailsFirstAlert + (kept ? '\n\n' + t.draftKeptNote : ''))
-      router.push('/profile/requisites')
+      // await: AppDialog -- an in-page portal; navigating without waiting
+      // would tear the message down before anyone could read it.
+      await alert(t.fillCompanyDetailsFirstAlert + (kept ? '\n\n' + t.draftKeptNote : ''))
+      // ?next=/create: after saving, requisites brings the user back here,
+      // where the parked draft is restored (src/lib/returnPath.ts).
+      router.push(withReturnPath('/profile/requisites', '/create'))
       return
     }
 
@@ -551,7 +565,7 @@ export default function CreateInvoicePage() {
       // them, and a copy in storage would then ambush a later, unrelated visit.
       if (await confirm(t.bankDetailsNeededConfirm)) {
         saveInvoiceDraft(user.id, currentDraft())
-        router.push('/profile/banks')
+        router.push(withReturnPath('/profile/banks', '/create'))
       }
       return
     }
@@ -826,8 +840,8 @@ export default function CreateInvoicePage() {
             </div>
             <div className="space-y-3">
               {[
-                { step: 1, title: t.onboardingStep1Title, desc: t.onboardingStep1Desc, done: !!(profile?.company_name && profile?.bin_iin), action: () => router.push('/profile/requisites'), btn: t.onboardingStep1Btn },
-                { step: 2, title: t.onboardingStep2Title, desc: t.onboardingStep2Desc, done: bankAccounts.length > 0, action: () => router.push('/profile/banks'), btn: t.onboardingStep2Btn },
+                { step: 1, title: t.onboardingStep1Title, desc: t.onboardingStep1Desc, done: !!(profile?.company_name && profile?.bin_iin), action: () => goFillPrerequisite('/profile/requisites'), btn: t.onboardingStep1Btn },
+                { step: 2, title: t.onboardingStep2Title, desc: t.onboardingStep2Desc, done: bankAccounts.length > 0, action: () => goFillPrerequisite('/profile/banks'), btn: t.onboardingStep2Btn },
                 { step: 3, title: t.onboardingStep3Title, desc: t.onboardingStep3Desc, done: !!(profile?.signature_url), action: () => router.push('/profile/signature'), btn: t.onboardingStep3Btn },
                 { step: 4, title: t.onboardingStep4Title, desc: t.onboardingStep4Desc, done: monthStats.total > 0, action: () => {}, btn: '' },
               ].map((item, i) => (

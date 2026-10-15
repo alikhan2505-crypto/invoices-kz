@@ -163,7 +163,7 @@ export interface AcquiringContent {
 
 export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
   ru: {
-    headerLabel: 'Эквайринг',
+    headerLabel: 'Сверка оплат',
     introText: 'Загрузите выписку по счёту (Excel-экспорт из приложения Kaspi Pay) — мы сопоставим операции с вашими открытыми счетами по БИН плательщика и сумме. Файл обрабатывается только в браузере и никуда не отправляется.',
     proBadge: 'Про',
     proLockedHint: 'Доступно на тарифе Про',
@@ -329,7 +329,7 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     esfErrorGeneric: 'Не удалось подключить ЭСФ. Попробуйте ещё раз.',
   },
   kk: {
-    headerLabel: 'Эквайринг',
+    headerLabel: 'Төлемдерді салыстыру',
     introText: 'Шот бойынша үзінді көшірмені (Kaspi Pay қосымшасынан Excel-экспорт) жүктеңіз — біз операцияларды сіздің ашық шоттарыңызбен төлеуші БИН-і мен сомасы бойынша салыстырамыз. Файл тек браузерде өңделеді және ешқайда жіберілмейді.',
     proBadge: 'Про',
     proLockedHint: 'Про тарифінде қолжетімді',
@@ -495,7 +495,7 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     esfErrorGeneric: 'ЭСФ қосу мүмкін болмады. Қайталап көріңіз.',
   },
   en: {
-    headerLabel: 'Acquiring',
+    headerLabel: 'Payment matching',
     introText: 'Upload your account statement (Excel export from the Kaspi Pay app) — we\'ll match transactions to your open invoices by payer BIN and amount. The file is processed only in your browser and never sent anywhere.',
     proBadge: 'Pro',
     proLockedHint: 'Available on the Pro plan',

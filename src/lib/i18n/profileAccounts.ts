@@ -38,9 +38,6 @@ export interface ProfileAccountsContent {
 
   // security page (security/page.tsx)
   securityHeaderLabel: string
-  electronicSignatureSectionLabel: string
-  ecpHowItWorksTitle: string
-  ecpHowItWorksBody: string
   loginSecuritySectionLabel: string
   passkeyDefaultLabel: string
   passkeyAddedPrefix: (date: string) => string
@@ -49,8 +46,7 @@ export interface ProfileAccountsContent {
   passkeyNoneHint: string
   passkeyNotSupportedHint: string
   passkeyRemoveConfirm: string
-  whatIsEcpTitle: string
-  whatIsEcpBody: string
+  ecpWhereNote: string
 
   // connectors page (connectors/page.tsx)
   connectorsHeaderLabel: string
@@ -77,6 +73,10 @@ export interface ProfileAccountsContent {
   // notifications page (notifications/page.tsx)
   notificationsHeaderLabel: string
   savingLabel: string
+  notificationsSaveError: string
+  // banks page (banks/page.tsx), when opened with ?next=/create
+  returnToInvoiceHint: string
+  returnToInvoiceButton: string
   notificationsInfoTitle: string
   notificationsInfoBody: string
   channelsGroupTitle: string
@@ -101,6 +101,8 @@ export interface ProfileAccountsContent {
   telegramConnectedHint: string
   disconnectTelegramButton: string
   disconnectingLabel: string
+  connectingLabel: string
+  telegramDisconnectError: string
   telegramConnectErrorGeneric: string
 }
 
@@ -141,10 +143,7 @@ export const profileAccountsDict: Record<'ru' | 'kk' | 'en', ProfileAccountsCont
     fillBankBikAlert: 'Заполните БИК банка',
     deleteAccountConfirm: 'Удалить этот счёт?',
 
-    securityHeaderLabel: 'ЭЦП и безопасность',
-    electronicSignatureSectionLabel: 'Электронная подпись',
-    ecpHowItWorksTitle: 'Как это работает',
-    ecpHowItWorksBody: 'Подпись оформляется отдельно на каждом документе — кнопка «Подписать ЭЦП» есть на странице счёта. Подключать заранее ничего не нужно: достаточно приложения eGov mobile с действующей ЭЦП НУЦ РК на телефоне.',
+    securityHeaderLabel: 'Вход и Face ID',
     loginSecuritySectionLabel: 'Вход по Face ID / Touch ID',
     passkeyDefaultLabel: 'Устройство',
     passkeyAddedPrefix: (date: string) => `Добавлено: ${date}`,
@@ -153,10 +152,9 @@ export const profileAccountsDict: Record<'ru' | 'kk' | 'en', ProfileAccountsCont
     passkeyNoneHint: 'Пока нет ни одного устройства — вход только по email',
     passkeyNotSupportedHint: 'Этот браузер не поддерживает вход по Face ID / Touch ID',
     passkeyRemoveConfirm: 'Убрать это устройство?',
-    whatIsEcpTitle: 'Что такое ЭЦП?',
-    whatIsEcpBody: 'Электронная цифровая подпись (ЭЦП) — это аналог рукописной подписи. Счета подписанные ЭЦП имеют юридическую силу в Казахстане. Получить ЭЦП можно бесплатно в НУЦ РК (pki.gov.kz).',
+    ecpWhereNote: 'ЭЦП-подпись ставится на странице счёта, на тарифе Про.',
 
-    connectorsHeaderLabel: 'Коннекторы',
+    connectorsHeaderLabel: 'Кнопки оплаты и контакты',
     emptyLinkLabel: 'Ссылка',
     genericLinkLabel: 'Сайт',
     paymentButtonsSectionLabel: 'Кнопки оплаты',
@@ -179,6 +177,9 @@ export const profileAccountsDict: Record<'ru' | 'kk' | 'en', ProfileAccountsCont
 
     notificationsHeaderLabel: 'Уведомления',
     savingLabel: 'Сохранение...',
+    notificationsSaveError: 'Не удалось сохранить — переключатель вернули как было. Попробуйте ещё раз.',
+    returnToInvoiceHint: 'Черновик счёта сохранён. Добавьте банковский счёт — и вернём вас к нему.',
+    returnToInvoiceButton: 'Вернуться к счёту',
     notificationsInfoTitle: 'ℹ️ Как работают уведомления',
     notificationsInfoBody: 'Уведомления отправляются на email указанный при регистрации. Изменения сохраняются автоматически.',
     channelsGroupTitle: 'Каналы уведомлений',
@@ -203,6 +204,8 @@ export const profileAccountsDict: Record<'ru' | 'kk' | 'en', ProfileAccountsCont
     telegramConnectedHint: 'Вы будете получать уведомления в этот чат, пока включён тумблер выше.',
     disconnectTelegramButton: 'Отключить Telegram',
     disconnectingLabel: 'Отключаем...',
+    connectingLabel: 'Открываем Telegram...',
+    telegramDisconnectError: 'Не удалось отключить Telegram. Попробуйте ещё раз.',
     telegramConnectErrorGeneric: 'Не удалось подключить Telegram. Попробуйте ещё раз.',
   },
   kk: {
@@ -241,10 +244,7 @@ export const profileAccountsDict: Record<'ru' | 'kk' | 'en', ProfileAccountsCont
     fillBankBikAlert: 'Банктің БСК-сын толтырыңыз',
     deleteAccountConfirm: 'Бұл шотты жоясыз ба?',
 
-    securityHeaderLabel: 'ЭЦҚ және қауіпсіздік',
-    electronicSignatureSectionLabel: 'Электрондық қолтаңба',
-    ecpHowItWorksTitle: 'Бұл қалай жұмыс істейді',
-    ecpHowItWorksBody: 'Қолтаңба әр құжатта жеке қойылады — шот бетінде «ЭЦҚ қою» батырмасы бар. Алдын ала ештеңе қосудың қажеті жоқ: телефоныңызда әрекеттегі ҚР ҰКО ЭЦҚ-сы бар eGov mobile қолданбасы жеткілікті.',
+    securityHeaderLabel: 'Кіру және Face ID',
     loginSecuritySectionLabel: 'Face ID / Touch ID арқылы кіру',
     passkeyDefaultLabel: 'Құрылғы',
     passkeyAddedPrefix: (date: string) => `Қосылды: ${date}`,
@@ -253,10 +253,9 @@ export const profileAccountsDict: Record<'ru' | 'kk' | 'en', ProfileAccountsCont
     passkeyNoneHint: 'Әзірге бірде-бір құрылғы жоқ — тек email арқылы кіру',
     passkeyNotSupportedHint: 'Бұл браузер Face ID / Touch ID арқылы кіруді қолдамайды',
     passkeyRemoveConfirm: 'Бұл құрылғыны алып тастау керек пе?',
-    whatIsEcpTitle: 'ЭЦҚ дегеніміз не?',
-    whatIsEcpBody: 'Электрондық цифрлық қолтаңба (ЭЦҚ) — қолжазба қолтаңбаның аналогы. ЭЦҚ қойылған шоттар Қазақстанда заңды күшке ие болады. ЭЦҚ-ны ҚР ҰКО-дан (pki.gov.kz) тегін алуға болады.',
+    ecpWhereNote: 'ЭЦҚ-мен қол шот бетінде қойылады, Про тарифінде.',
 
-    connectorsHeaderLabel: 'Коннекторлар',
+    connectorsHeaderLabel: 'Төлем батырмалары мен байланыстар',
     emptyLinkLabel: 'Сілтеме',
     genericLinkLabel: 'Сайт',
     paymentButtonsSectionLabel: 'Төлем түймелері',
@@ -279,6 +278,9 @@ export const profileAccountsDict: Record<'ru' | 'kk' | 'en', ProfileAccountsCont
 
     notificationsHeaderLabel: 'Хабарландырулар',
     savingLabel: 'Сақталуда...',
+    notificationsSaveError: 'Сақтау мүмкін болмады — ауыстырғыш бұрынғы күйіне қайтарылды. Қайталап көріңіз.',
+    returnToInvoiceHint: 'Шот жобасы сақталды. Банк шотын қосыңыз — сізді оған қайтарамыз.',
+    returnToInvoiceButton: 'Шотқа оралу',
     notificationsInfoTitle: 'ℹ️ Хабарландырулар қалай жұмыс істейді',
     notificationsInfoBody: 'Хабарландырулар тіркелу кезінде көрсетілген email-ге жіберіледі. Өзгерістер автоматты түрде сақталады.',
     channelsGroupTitle: 'Хабарландыру арналары',
@@ -303,6 +305,8 @@ export const profileAccountsDict: Record<'ru' | 'kk' | 'en', ProfileAccountsCont
     telegramConnectedHint: 'Жоғарыдағы қосқыш қосулы тұрғанда осы чатқа хабарландырулар келеді.',
     disconnectTelegramButton: 'Telegram-ды ажырату',
     disconnectingLabel: 'Ажыратылуда...',
+    connectingLabel: 'Telegram ашылуда...',
+    telegramDisconnectError: 'Telegram-ды ажырату мүмкін болмады. Қайталап көріңіз.',
     telegramConnectErrorGeneric: 'Telegram қосу мүмкін болмады. Қайталап көріңіз.',
   },
   en: {
@@ -341,10 +345,7 @@ export const profileAccountsDict: Record<'ru' | 'kk' | 'en', ProfileAccountsCont
     fillBankBikAlert: "Fill in the bank's BIK",
     deleteAccountConfirm: 'Delete this account?',
 
-    securityHeaderLabel: 'Digital signature and security',
-    electronicSignatureSectionLabel: 'Electronic signature',
-    ecpHowItWorksTitle: 'How this works',
-    ecpHowItWorksBody: 'Each document is signed individually — a "Sign with ЭЦП" button is on the invoice page. Nothing to connect in advance: just the eGov mobile app with a valid NCA RK digital signature on your phone.',
+    securityHeaderLabel: 'Sign-in and Face ID',
     loginSecuritySectionLabel: 'Sign in with Face ID / Touch ID',
     passkeyDefaultLabel: 'Device',
     passkeyAddedPrefix: (date: string) => `Added: ${date}`,
@@ -353,10 +354,9 @@ export const profileAccountsDict: Record<'ru' | 'kk' | 'en', ProfileAccountsCont
     passkeyNoneHint: 'No devices added yet — signing in still requires email',
     passkeyNotSupportedHint: 'This browser doesn’t support Face ID / Touch ID sign-in',
     passkeyRemoveConfirm: 'Remove this device?',
-    whatIsEcpTitle: 'What is a digital signature?',
-    whatIsEcpBody: 'A digital signature is the electronic equivalent of a handwritten signature. Invoices signed with a digital signature have legal force in Kazakhstan. You can get a digital signature for free from NCA RK (pki.gov.kz).',
+    ecpWhereNote: 'A digital signature is added on the invoice page, on the Pro plan.',
 
-    connectorsHeaderLabel: 'Connectors',
+    connectorsHeaderLabel: 'Payment buttons and contacts',
     emptyLinkLabel: 'Link',
     genericLinkLabel: 'Website',
     paymentButtonsSectionLabel: 'Payment buttons',
@@ -379,6 +379,9 @@ export const profileAccountsDict: Record<'ru' | 'kk' | 'en', ProfileAccountsCont
 
     notificationsHeaderLabel: 'Notifications',
     savingLabel: 'Saving...',
+    notificationsSaveError: 'Could not save — the switch was put back. Please try again.',
+    returnToInvoiceHint: 'Your invoice draft is kept. Add a bank account and we will take you back to it.',
+    returnToInvoiceButton: 'Back to the invoice',
     notificationsInfoTitle: 'ℹ️ How notifications work',
     notificationsInfoBody: 'Notifications are sent to the email you registered with. Changes are saved automatically.',
     channelsGroupTitle: 'Notification channels',
@@ -403,6 +406,8 @@ export const profileAccountsDict: Record<'ru' | 'kk' | 'en', ProfileAccountsCont
     telegramConnectedHint: "You'll get notifications in this chat while the toggle above is on.",
     disconnectTelegramButton: 'Disconnect Telegram',
     disconnectingLabel: 'Disconnecting...',
+    connectingLabel: 'Opening Telegram...',
+    telegramDisconnectError: 'Could not disconnect Telegram. Please try again.',
     telegramConnectErrorGeneric: 'Could not connect Telegram. Please try again.',
   },
 }

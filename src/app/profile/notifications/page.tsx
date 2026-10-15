@@ -45,6 +45,7 @@ export default function Notifications() {
   const reduceMotion = !!reduceMotionRaw
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
   const [telegramChatId, setTelegramChatId] = useState<string | null>(null)
   const [telegramConnecting, setTelegramConnecting] = useState(false)
   const [telegramDisconnecting, setTelegramDisconnecting] = useState(false)
@@ -62,7 +63,12 @@ export default function Notifications() {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
-      const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+      // Только поля этой страницы — раньше select('*').
+      const { data } = await supabase
+        .from('profiles')
+        .select('notify_email, notify_telegram, notify_client_viewed, notify_payment_reminder, notify_overdue, notify_weekly_report, telegram_chat_id')
+        .eq('id', user.id)
+        .single()
       if (data) {
         setSettings({
           notify_email: data.notify_email ?? true,
@@ -79,14 +85,29 @@ export default function Notifications() {
     load()
   }, [])
 
-  async function toggle(key: string, value: boolean) {
-    const newSettings = { ...settings, [key]: value }
-    setSettings(newSettings)
+  async function toggle(key: keyof typeof settings, value: boolean) {
+    // Переключатель меняется сразу, а пишется в базу ровно одно поле —
+    // update, не upsert всего набора: два быстрых переключения больше не
+    // перезаписывают друг друга устаревшим снимком, а ошибка возвращает
+    // переключатель как был, а не делает вид, что всё сохранилось.
+    setSettings(prev => ({ ...prev, [key]: value }))
+    setSaveError('')
     setSaving(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    await supabase.from('profiles').upsert({ id: user.id, ...newSettings })
-    setSaving(false)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { router.push('/login'); return }
+      const { data: updated, error } = await supabase
+        .from('profiles')
+        .update({ [key]: value })
+        .eq('id', user.id)
+        .select('id')
+      if (error || !updated || updated.length === 0) throw new Error(error?.message || 'not saved')
+    } catch {
+      setSettings(prev => ({ ...prev, [key]: !value }))
+      setSaveError(t.notificationsSaveError)
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function connectTelegram() {
@@ -98,34 +119,42 @@ export default function Notifications() {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${session?.access_token}` },
       })
-      const data = await res.json()
+      const data = await res.json().catch(() => ({}))
       if (!res.ok || !data.token) {
         setTelegramError(t.telegramConnectErrorGeneric)
         return
       }
       window.location.href = `https://t.me/${data.botUsername}?start=${data.token}`
+    } catch {
+      setTelegramError(t.telegramConnectErrorGeneric)
     } finally {
       setTelegramConnecting(false)
     }
   }
 
   async function disconnectTelegram() {
+    setTelegramError('')
     setTelegramDisconnecting(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      await fetch('/api/telegram-connect/disconnect', {
+      const res = await fetch('/api/telegram-connect/disconnect', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${session?.access_token}` },
       })
+      // Раньше ответ не проверялся: при ошибке страница показывала «не
+      // подключён», а бот продолжал слать уведомления.
+      if (!res.ok) throw new Error('disconnect failed')
       setTelegramChatId(null)
+    } catch {
+      setTelegramError(t.telegramDisconnectError)
     } finally {
       setTelegramDisconnecting(false)
     }
   }
 
-  function Toggle({ value, onChange }: { value: boolean, onChange: (v: boolean) => void }) {
+  function Toggle({ value, onChange, label }: { value: boolean, onChange: (v: boolean) => void, label: string }) {
     return (
-      <button onClick={() => onChange(!value)}
+      <button type="button" role="switch" aria-checked={value} aria-label={label} onClick={() => onChange(!value)}
         className="w-12 h-6 rounded-full transition-colors relative flex-shrink-0"
         style={{ background: value ? 'var(--nav-accent)' : 'var(--nav-border)' }}>
         <span className="absolute top-1 w-4 h-4 rounded-full shadow transition-all"
@@ -186,6 +215,12 @@ export default function Notifications() {
           {saving && <span className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>{t.savingLabel}</span>}
         </motion.div>
 
+        {saveError && (
+          <div role="alert" className="rounded-xl p-3 text-xs" style={{ background: 'var(--nav-critical-soft, var(--nav-border-soft))', color: 'var(--nav-critical)' }}>
+            {saveError}
+          </div>
+        )}
+
         {/* Инфо баннер */}
         <motion.div {...fadeIn(1)} className="nav-glass rounded-2xl p-4 flex items-start gap-2" style={{ background: 'var(--nav-accent-soft)' }}>
           <span className="mt-0.5" style={{ color: 'var(--nav-accent)' }}><InfoIcon /></span>
@@ -211,7 +246,8 @@ export default function Notifications() {
                   </div>
                   <Toggle
                     value={(settings as any)[item.key]}
-                    onChange={v => toggle(item.key, v)}
+                    label={item.label}
+                    onChange={v => toggle(item.key as keyof typeof settings, v)}
                   />
                 </div>
               ))}
@@ -229,6 +265,7 @@ export default function Notifications() {
                   <div className="text-sm font-medium" style={{ color: 'var(--nav-text-primary)' }}>{t.telegramConnectedLabel}</div>
                 </div>
                 <div className="text-xs mb-3" style={{ color: 'var(--nav-text-muted)' }}>{t.telegramConnectedHint}</div>
+                {telegramError && <p role="alert" className="text-xs mb-2" style={{ color: 'var(--nav-critical)' }}>{telegramError}</p>}
                 <button onClick={disconnectTelegram} disabled={telegramDisconnecting}
                   className="w-full rounded-xl py-3 text-sm font-medium border transition-colors disabled:opacity-60"
                   style={{ borderColor: 'var(--nav-critical)', color: 'var(--nav-critical)' }}>
@@ -246,7 +283,7 @@ export default function Notifications() {
                   className="flex items-center justify-center gap-2 w-full rounded-xl py-3 text-sm font-medium transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60"
                   style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                   <SendIcon />
-                  {telegramConnecting ? t.disconnectingLabel : t.connectTelegramBotButton}
+                  {telegramConnecting ? t.connectingLabel : t.connectTelegramBotButton}
                 </button>
               </>
             )}

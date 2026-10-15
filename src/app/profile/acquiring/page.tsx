@@ -400,6 +400,13 @@ export default function AcquiringPage() {
   )
 
   const ap = getActivePlan(profile)
+  // ЭСФ и BCC — только для админов (15.10.2026). ЭСФ клиентам везде «Скоро»
+  // (КГД ещё не выдал боевой доступ), а приложение BCC не одобрено банком
+  // для продакшена — форма с логином/паролем ИС ЭСФ и кнопка «Подключить
+  // BCC» у обычного клиента вели в тупик. Сервер отказывает так же:
+  // /api/esf/connect и /api/bcc/connect проверяют profiles.is_admin.
+  // Сверка выписки (импорт Excel) для Про остаётся как была.
+  const isAdmin = profile?.is_admin === true
 
   // Rendered in BOTH the Pro and the non-Pro branch below. A user whose Pro
   // plan lapsed while a BCC connection is live still has a real OAuth token
@@ -494,6 +501,7 @@ export default function AcquiringPage() {
                 submit route reads this connection directly via
                 loadEsfConnectionByUserId -- this card has no later consumer
                 on this page itself. */}
+            {isAdmin && (
             <motion.div
               initial={reduceMotion ? false : { opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
@@ -572,6 +580,7 @@ export default function AcquiringPage() {
                 </>
               )}
             </motion.div>
+            )}
 
             {!ap.canAcquiring ? (
               bccConnection && (
@@ -582,9 +591,13 @@ export default function AcquiringPage() {
               )
             ) : (
               <>
-                {bccMessage && <p className="text-xs px-1" style={{ color: 'var(--nav-accent)' }}>{bccMessage}</p>}
+                {(isAdmin || bccConnection) && bccMessage && <p className="text-xs px-1" style={{ color: 'var(--nav-accent)' }}>{bccMessage}</p>}
 
-                {bccConnection ? bccConnectedCard : (
+                {/* Клиент без подключения не видит BCC вовсе. Карточка уже
+                    живого подключения (с «Отключить») остаётся видна всем:
+                    за ней настоящий OAuth-токен к счёту в банке, и отозвать
+                    его человек должен мочь всегда. */}
+                {bccConnection ? bccConnectedCard : isAdmin && (
                   <motion.div
                     initial={reduceMotion ? false : { opacity: 0, y: 16 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -606,7 +619,7 @@ export default function AcquiringPage() {
                   </motion.div>
                 )}
 
-                {bccPending.length > 0 && (
+                {(isAdmin || bccConnection) && bccPending.length > 0 && (
                   <>
                     <div className="text-[11px] font-extrabold uppercase px-1" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.09em' }}>
                       {t.bccPendingMatchesLabel(bccPending.length)}

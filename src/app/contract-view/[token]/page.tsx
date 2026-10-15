@@ -70,7 +70,9 @@ export default function PublicContract() {
           <p className="text-xs text-gray-600 leading-relaxed">{t.publicIntro}</p>
         </div>
 
-        <a href={contract.file_url} target="_blank" rel="noreferrer"
+        {/* Через сервер по токену, а не прямой ссылкой на хранилище: бакет
+            с договорами закрыт, см. src/lib/signedDocuments.ts. */}
+        <a href={`/api/public/contract/${encodeURIComponent(token)}/file`} target="_blank" rel="noreferrer"
           className="block text-center bg-[#1C2056] text-white rounded-xl py-4 font-medium text-sm">
           {t.publicViewFileButton}
         </a>

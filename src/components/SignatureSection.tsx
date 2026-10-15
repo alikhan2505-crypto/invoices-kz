@@ -32,9 +32,12 @@ type Row = {
   owner_signer_iin: string | null
   client_signer_name: string | null
   client_signer_iin: string | null
-  ddc_pdf_url: string | null
-  snapshot_pdf_url: string
-  display_pdf_url: string | null
+  // Пути в бакете есть только у владельца (читает свою строку через RLS);
+  // публичный маршрут отдаёт вместо них лишь has_card.
+  ddc_pdf_url?: string | null
+  snapshot_pdf_url?: string
+  display_pdf_url?: string | null
+  has_card?: boolean
 }
 
 type Props = {
@@ -139,8 +142,12 @@ export default function SignatureSection(props: Props) {
         snapshotPdfUrl = await uploadSnapshot(documentId, pdfBlob)
       } else {
         // Contract-style: the file was already uploaded — sign it as-is.
+        // getPdfUrl отдаёт короткую подписанную ссылку на файл договора;
+        // owner-sign сам достаёт из неё путь и сверяет с файлом договора.
         snapshotPdfUrl = await props.getPdfUrl!()
-        pdfBlob = await (await fetch(snapshotPdfUrl)).blob()
+        const fileRes = await fetch(snapshotPdfUrl)
+        if (!fileRes.ok) throw new Error(t.snapshotUnavailableError)
+        pdfBlob = await fileRes.blob()
       }
 
       const signatureCms = await signWithEscape(pdfBlob)
@@ -213,7 +220,12 @@ export default function SignatureSection(props: Props) {
     setError('')
     setQr(null)
     try {
-      const pdfRes = await fetch(row.snapshot_pdf_url)
+      // Не напрямую из хранилища: бакет закрыт (src/lib/signedDocuments.ts).
+      // Сервер проверяет public_token и переадресует на короткую подписанную
+      // ссылку на те самые байты, что подписал владелец.
+      const publicToken = (props as { publicToken?: string }).publicToken || ''
+      const pdfRes = await fetch(`/api/public/signature/${encodeURIComponent(publicToken)}/snapshot?type=${documentType}`)
+      if (!pdfRes.ok) throw new Error(t.snapshotUnavailableError)
       const pdfBlob = await pdfRes.blob()
 
       const signatureCms = await signWithEscape(pdfBlob)
@@ -309,7 +321,7 @@ export default function SignatureSection(props: Props) {
                 {t.downloadDocumentButton}
               </a>
             </div>
-            {row.ddc_pdf_url && (
+            {(row.has_card ?? !!row.ddc_pdf_url) && (
               <a href={`/api/documents/${row.id}/card`} target="_blank" rel="noreferrer"
                 className="block text-center text-xs underline mt-2" style={{ color: 'var(--nav-text-muted)' }}>
                 {t.downloadVerificationCardButton}

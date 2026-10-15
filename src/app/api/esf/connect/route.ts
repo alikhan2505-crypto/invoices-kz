@@ -19,7 +19,12 @@ export async function POST(req: NextRequest) {
     : { data: { user: null } }
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data: profile } = await supabase.from('profiles').select('plan, plan_expires_at, bonus_expires_at, trial_expires_at').eq('id', user.id).maybeSingle()
+  const { data: profile } = await supabase.from('profiles').select('plan, plan_expires_at, bonus_expires_at, trial_expires_at, is_admin').eq('id', user.id).maybeSingle()
+  // Только админы (15.10.2026): ЭСФ клиентам пока «Скоро» — КГД не выдал
+  // боевой доступ, и логин/пароль ИС ЭСФ от клиента принимать незачем.
+  // Форма в /profile/acquiring видна тоже только админам; это — настоящая
+  // граница, не UX. Снимать вместе с гейтом в интерфейсе.
+  if (profile?.is_admin !== true) return NextResponse.json({ error: 'admin_only' }, { status: 403 })
   if (!getActivePlan(profile).canEsf) return NextResponse.json({ error: 'Требуется тариф Про' }, { status: 403 })
 
   const body = await req.json().catch(() => null)

@@ -8,7 +8,31 @@ import { useEffectivePath } from '@/lib/useEffectivePath'
 // users who toggle it. (A brief dark-default experiment on 2026-08-19 was
 // reverted the same day once the founder confirmed the approved reference
 // is the light one.)
-const ThemeContext = createContext({ theme: 'light', toggle: () => {} })
+export type ThemeMode = 'system' | 'light' | 'dark'
+
+// theme — то, что реально на экране ('light' | 'dark'); mode — выбор
+// человека. 'system' = в localStorage ничего нет, и тему ведёт
+// `@media (prefers-color-scheme: dark)` в globals.css (ревизия /profile
+// 15.10.2026: вместо двухпозиционного «Светлая тема» — три варианта).
+const ThemeContext = createContext<{
+  theme: 'light' | 'dark'
+  mode: ThemeMode
+  setMode: (mode: ThemeMode) => void
+  toggle: () => void
+}>({ theme: 'light', mode: 'system', setMode: () => {}, toggle: () => {} })
+
+function readStoredMode(): ThemeMode {
+  try {
+    const saved = localStorage.getItem('theme')
+    return saved === 'light' || saved === 'dark' ? saved : 'system'
+  } catch {
+    return 'system'
+  }
+}
+
+function systemPrefersDark(): boolean {
+  return typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-color-scheme: dark)').matches
+}
 
 // The dark-designed marketing pages have no theme toggle and are styled
 // assuming light-mode colors. globals.css has ~40 `[data-theme="dark"] ... !important`
@@ -21,40 +45,61 @@ const ThemeContext = createContext({ theme: 'light', toggle: () => {} })
 const FORCE_LIGHT_ROUTES = new Set(['/', '/cashier-api'])
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState('light')
+  const [mode, setModeState] = useState<ThemeMode>('system')
+  const [systemDark, setSystemDark] = useState(false)
   const pathname = useEffectivePath()
 
+  // A visitor who has never touched the switch has no stored value -- that's
+  // the "system" state, not an implicit choice of light. The old code
+  // defaulted to 'light' and stamped data-theme="light" unconditionally,
+  // which permanently beat globals.css's `@media (prefers-color-scheme: dark)`
+  // block for every --nav-* token (same specificity, later source order).
+  // Leaving the attribute UNSET for that case lets the media query govern.
   useEffect(() => {
-    const saved = localStorage.getItem('theme')
-    // A visitor who has never touched the toggle has no `saved` value --
-    // that's the "system" state, not an implicit choice of light. The old
-    // code defaulted `saved` to 'light' and stamped data-theme="light"
-    // unconditionally, which permanently beat globals.css's
-    // `@media (prefers-color-scheme: dark)` block for every --nav-* token
-    // (same specificity, later source order) -- the whole dashboard stayed
-    // light for every OS-dark visitor who'd never manually toggled, which
-    // is most of them. Leaving the attribute UNSET for that case lets the
-    // media query govern, as its own comment in globals.css already assumed.
-    const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-    setTheme(saved ?? (systemDark ? 'dark' : 'light'))
+    // localStorage и matchMedia есть только в браузере — читаем после монтирования.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setModeState(readStoredMode())
+    setSystemDark(systemPrefersDark())
+    const mq = window.matchMedia?.('(prefers-color-scheme: dark)')
+    if (!mq) return
+    const onChange = (e: MediaQueryListEvent) => setSystemDark(e.matches)
+    mq.addEventListener?.('change', onChange)
+    return () => mq.removeEventListener?.('change', onChange)
+  }, [])
+
+  useEffect(() => {
+    const stored = readStoredMode()
     if (FORCE_LIGHT_ROUTES.has(pathname)) {
       document.documentElement.setAttribute('data-theme', 'light')
-    } else if (saved) {
-      document.documentElement.setAttribute('data-theme', saved)
+    } else if (stored !== 'system') {
+      document.documentElement.setAttribute('data-theme', stored)
     } else {
       document.documentElement.removeAttribute('data-theme')
     }
   }, [pathname])
 
+  function setMode(next: ThemeMode) {
+    setModeState(next)
+    try {
+      // «Как в системе» — это отсутствие сохранённого выбора, а не третье значение.
+      if (next === 'system') localStorage.removeItem('theme')
+      else localStorage.setItem('theme', next)
+    } catch {
+      // Хранилище недоступно (приватный режим) — тема всё равно сменится до перезагрузки.
+    }
+    if (FORCE_LIGHT_ROUTES.has(pathname)) return
+    if (next === 'system') document.documentElement.removeAttribute('data-theme')
+    else document.documentElement.setAttribute('data-theme', next)
+  }
+
+  const theme: 'light' | 'dark' = mode === 'system' ? (systemDark ? 'dark' : 'light') : mode
+
   function toggle() {
-    const next = theme === 'light' ? 'dark' : 'light'
-    setTheme(next)
-    localStorage.setItem('theme', next)
-    document.documentElement.setAttribute('data-theme', next)
+    setMode(theme === 'light' ? 'dark' : 'light')
   }
 
   return (
-    <ThemeContext.Provider value={{ theme, toggle }}>
+    <ThemeContext.Provider value={{ theme, mode, setMode, toggle }}>
       {children}
     </ThemeContext.Provider>
   )

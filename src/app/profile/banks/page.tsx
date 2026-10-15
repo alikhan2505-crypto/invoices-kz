@@ -11,6 +11,7 @@ import { profileAccountsDict } from '@/lib/i18n/profileAccounts'
 import Skeleton from '@/components/Skeleton'
 import { KAZAKHSTAN_BANKS, OTHER_BANK, findBankByBik, findBankByName } from '@/lib/kazakhstanBanks'
 import { useAppDialog } from '@/components/AppDialog'
+import { returnPathFromSearch, type ReturnPath } from '@/lib/returnPath'
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
 // kept identical rather than inventing a second "house" ease.
@@ -106,7 +107,17 @@ export default function Banks() {
     setForm({ ...form, bank_name: bank.name, bik: bank.bik })
   }
 
-  useEffect(() => { loadAccounts() }, [])
+  // ?next=/create — сюда прислал /create, где ждёт черновик счёта; после
+  // сохранения счёта возвращаем туда же. См. src/lib/returnPath.ts.
+  const [returnTo, setReturnTo] = useState<ReturnPath | null>(null)
+
+  useEffect(() => {
+    // Адрес есть только в браузере; прочитать его при рендере — расхождение гидратации.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setReturnTo(returnPathFromSearch(window.location.search))
+    loadAccounts()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   async function loadAccounts() {
     const { data: { user } } = await supabase.auth.getUser()
@@ -139,7 +150,7 @@ export default function Banks() {
     if (!form.bik) { alert(t.fillBankBikAlert); return }
     setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+    if (!user) { setSaving(false); router.push('/login'); return }
     if (editingId) {
       const { error } = await supabase.from('bank_accounts').update({ ...form }).eq('id', editingId)
       if (error) { alert(t.errorPrefix(error.message)); setSaving(false); return }
@@ -148,9 +159,12 @@ export default function Banks() {
       const { error } = await supabase.from('bank_accounts').insert({ ...form, user_id: user.id, is_main })
       if (error) { alert(t.errorPrefix(error.message)); setSaving(false); return }
     }
+    setSaving(false)
+    // Пришли из /create за банковским счётом — счёт есть, ведём обратно к
+    // черновику, а не оставляем в списке счетов гадать, что дальше.
+    if (returnTo) { router.push(returnTo); return }
     resetForm()
     loadAccounts()
-    setSaving(false)
   }
 
   async function setMain(id: string) {
@@ -179,7 +193,7 @@ export default function Banks() {
             transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE }}
           >
             <button
-              onClick={() => router.push('/profile')}
+              onClick={() => router.push(returnTo || '/profile')}
               aria-label={backLabel(lang)}
               className="w-11 h-11 flex items-center justify-center rounded-xl flex-shrink-0 transition-colors hover:bg-[var(--nav-surface-glass)]"
               style={{ color: 'var(--nav-text-muted)' }}
@@ -188,6 +202,19 @@ export default function Banks() {
             </button>
             <h2 className="text-xl font-bold" style={{ color: 'var(--nav-text-primary)' }}>{t.banksHeaderLabel}</h2>
           </motion.div>
+
+          {returnTo && (
+            <div className="mb-4 rounded-xl p-3 flex items-center gap-3" style={{ background: 'var(--nav-accent-soft)' }}>
+              <div className="flex-1 text-xs" style={{ color: 'var(--nav-text-primary)' }}>{t.returnToInvoiceHint}</div>
+              {accounts.length > 0 && (
+                <button onClick={() => router.push(returnTo)}
+                  className="text-xs font-semibold px-3 min-h-[44px] rounded-lg flex-shrink-0"
+                  style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                  {t.returnToInvoiceButton}
+                </button>
+              )}
+            </div>
+          )}
 
           {loading ? (
             <div className="space-y-3 mb-4">

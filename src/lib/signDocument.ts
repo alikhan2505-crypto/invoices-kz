@@ -3,6 +3,7 @@ import QRCode from 'qrcode'
 import { QRSigningClientCMS } from 'sigex-qr-signing-client'
 import { supabase } from './supabase'
 import { escapeHtml } from './htmlEscape'
+import { SIGNED_DOCUMENTS_BUCKET } from './signedDocuments'
 
 // Renders the same HTML `generateInvoicePDF()` produces into a real PDF Blob
 // (client-side, via html2canvas+jsPDF under the hood) instead of opening the
@@ -43,13 +44,17 @@ export async function renderPdfBlob(html: string): Promise<Blob> {
   return result as Blob
 }
 
+// Возвращает ПУТЬ объекта в бакете, а не публичную ссылку (15.10.2026):
+// бакет закрывается, а файлы отдаёт только сервер после проверки прав —
+// см. src/lib/signedDocuments.ts. owner-sign и set-display-pdf принимают
+// этот путь и сверяют, что он лежит под `${documentId}/`.
 export async function uploadSnapshot(documentId: string, blob: Blob, suffix = 'snapshot'): Promise<string> {
   const path = `${documentId}/${Date.now()}-${suffix}.pdf`
   const { error } = await supabase.storage
-    .from('signed-documents')
+    .from(SIGNED_DOCUMENTS_BUCKET)
     .upload(path, blob, { contentType: 'application/pdf' })
   if (error) throw error
-  return supabase.storage.from('signed-documents').getPublicUrl(path).data.publicUrl
+  return path
 }
 
 // The originally-signed PDF (`snapshot_pdf_url`) can never be touched again

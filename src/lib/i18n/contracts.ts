@@ -30,6 +30,7 @@ export interface ContractsContent {
   noClientLabel: string
   createdLabel: (date: string) => string
   viewFileButton: string
+  fileUnavailableError: string
   deleteButton: string
   publicIntro: string
   publicViewFileButton: string
@@ -37,11 +38,12 @@ export interface ContractsContent {
   proBadge: string
   proLockedHint: string
   goToPlansButton: string
+  ecpProOnlyNote: string
 }
 
 export const contractsDict: Record<'ru' | 'kk' | 'en', ContractsContent> = {
   ru: {
-    headerLabel: 'Договора',
+    headerLabel: 'Договоры',
     uploadButton: '+ Загрузить',
     newContractTitle: 'Новый договор',
     titleFieldLabel: 'Название договора *',
@@ -72,6 +74,7 @@ export const contractsDict: Record<'ru' | 'kk' | 'en', ContractsContent> = {
     noClientLabel: 'Клиент не указан',
     createdLabel: (date: string) => `Загружен: ${date}`,
     viewFileButton: 'Открыть файл',
+    fileUnavailableError: 'Не удалось открыть файл договора. Обновите страницу и попробуйте ещё раз.',
     deleteButton: 'Удалить договор',
     publicIntro: 'Вам направлен договор на подписание электронной цифровой подписью (ЭЦП). Ознакомьтесь с документом и подпишите его через приложение eGov mobile.',
     publicViewFileButton: 'Открыть договор',
@@ -79,6 +82,7 @@ export const contractsDict: Record<'ru' | 'kk' | 'en', ContractsContent> = {
     proBadge: 'Про',
     proLockedHint: 'Доступно на тарифе Про',
     goToPlansButton: 'Перейти к тарифам',
+    ecpProOnlyNote: 'Подписание ЭЦП — на тарифе Про.',
   },
   kk: {
     headerLabel: 'Шарттар',
@@ -112,6 +116,7 @@ export const contractsDict: Record<'ru' | 'kk' | 'en', ContractsContent> = {
     noClientLabel: 'Клиент көрсетілмеген',
     createdLabel: (date: string) => `Жүктелді: ${date}`,
     viewFileButton: 'Файлды ашу',
+    fileUnavailableError: 'Шарт файлын ашу мүмкін болмады. Бетті жаңартып, қайталап көріңіз.',
     deleteButton: 'Шартты жою',
     publicIntro: 'Сізге электрондық цифрлық қолтаңбамен (ЭЦҚ) қол қою үшін шарт жіберілді. Құжатпен танысып, eGov mobile қосымшасы арқылы қол қойыңыз.',
     publicViewFileButton: 'Шартты ашу',
@@ -119,6 +124,7 @@ export const contractsDict: Record<'ru' | 'kk' | 'en', ContractsContent> = {
     proBadge: 'Про',
     proLockedHint: 'Про тарифінде қолжетімді',
     goToPlansButton: 'Тарифтерге өту',
+    ecpProOnlyNote: 'ЭЦҚ-мен қол қою — Про тарифінде.',
   },
   en: {
     headerLabel: 'Contracts',
@@ -152,6 +158,7 @@ export const contractsDict: Record<'ru' | 'kk' | 'en', ContractsContent> = {
     noClientLabel: 'No client specified',
     createdLabel: (date: string) => `Uploaded: ${date}`,
     viewFileButton: 'Open file',
+    fileUnavailableError: 'Could not open the contract file. Refresh the page and try again.',
     deleteButton: 'Delete contract',
     publicIntro: 'You have been sent a contract for electronic digital signature (ЭЦП). Review the document and sign it via the eGov mobile app.',
     publicViewFileButton: 'Open contract',
@@ -159,5 +166,6 @@ export const contractsDict: Record<'ru' | 'kk' | 'en', ContractsContent> = {
     proBadge: 'Pro',
     proLockedHint: 'Available on the Pro plan',
     goToPlansButton: 'View plans',
+    ecpProOnlyNote: 'Signing with a digital signature (ЭЦП) is on the Pro plan.',
   },
 }

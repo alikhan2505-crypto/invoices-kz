@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { resolveSignedDocumentPath } from '@/lib/signedDocumentsServer'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -30,7 +31,7 @@ export async function POST(req: NextRequest) {
 
   const { data: row } = await supabase
     .from('document_signatures')
-    .select('owner_user_id')
+    .select('owner_user_id, document_id')
     .eq('id', signatureId)
     .single()
 
@@ -38,9 +39,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
 
+  // displayPdfUrl — путь, который вернул uploadSnapshot. Принимается только
+  // объект нашего бакета под папкой этого документа: /api/documents/[id]
+  // отдаёт его кому угодно со ссылкой, так что чужой файл сюда не подложить.
+  const displayPath = resolveSignedDocumentPath(displayPdfUrl)
+  if (!displayPath || !displayPath.startsWith(`${row.document_id}/`)) {
+    return NextResponse.json({ error: 'Invalid file' }, { status: 400 })
+  }
+
   const { error } = await supabase
     .from('document_signatures')
-    .update({ display_pdf_url: displayPdfUrl, updated_at: new Date().toISOString() })
+    .update({ display_pdf_url: displayPath, updated_at: new Date().toISOString() })
     .eq('id', signatureId)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
