@@ -8,6 +8,8 @@ import DesktopShell from '@/components/DesktopShell'
 import { formatDate } from '@/lib/date'
 import { getActivePlan } from '@/lib/plan'
 import { generateNakladnaya } from '@/lib/generateNakladnaya'
+import { generateKP } from '@/lib/generateKP'
+import { generateAVR } from '@/lib/generateAVR'
 import { useLanguage } from '@/components/LanguageProvider'
 import { backLabel, deleteLabel } from '@/lib/a11yLabels'
 import { profileContentDict } from '@/lib/i18n/profileContent'
@@ -117,6 +119,50 @@ export default function Documents() {
     setBusyDocId(id)
     await supabase.from(table).delete().eq('id', id)
     await load()
+    setBusyDocId(null)
+  }
+
+  // КП и АВР раньше можно было только удалить (правка основателя 15.10.2026):
+  // открываем их заново из сохранённой строки, как накладную. В КП печатаются
+  // банковские реквизиты — берём основной счёт пользователя.
+  async function openKp(doc: any) {
+    const win = window.open('', '_blank')
+    setBusyDocId(doc.id)
+    const { data: banks } = await supabase.from('bank_accounts').select('bank_name, iik, bik, kbe, is_main')
+      .eq('user_id', profile?.id).order('is_main', { ascending: false }).limit(1)
+    const bank = banks?.[0]
+    await generateKP({
+      number: doc.number,
+      date: doc.date,
+      validUntil: doc.valid_until || undefined,
+      clientName: doc.client_name || '',
+      clientBin: doc.client_bin || '',
+      services: doc.services || [],
+      total: Number(doc.total),
+      note: doc.note || '',
+      vatType: doc.vat_type || 'no_vat',
+      profile: profile,
+      bank: bank ? { bank_name: bank.bank_name, iik: bank.iik, bik: bank.bik, kbe: bank.kbe } : undefined,
+    }, win)
+    setBusyDocId(null)
+  }
+
+  async function openAvr(doc: any) {
+    const win = window.open('', '_blank')
+    setBusyDocId(doc.id)
+    await generateAVR({
+      number: doc.number,
+      date: doc.date,
+      contractNumber: doc.contract_number || undefined,
+      contractDate: doc.contract_date || undefined,
+      clientName: doc.client_name || '',
+      clientBin: doc.client_bin || '',
+      clientAddress: doc.client_address || '',
+      services: doc.services || [],
+      total: Number(doc.total),
+      vatType: doc.vat_type || 'no_vat',
+      profile: profile,
+    }, win)
     setBusyDocId(null)
   }
 
@@ -298,11 +344,11 @@ export default function Documents() {
                       <span className="text-sm font-bold mr-1 tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>
                         {Number(doc.total).toLocaleString('ru-KZ')} ₸
                       </span>
-                      {tab === 'nakladnaya' && (
+                      {(
                         <button
-                          onClick={() => openNakl(doc)}
+                          onClick={() => (tab === 'kp' ? openKp(doc) : tab === 'avr' ? openAvr(doc) : openNakl(doc))}
                           disabled={busyDocId === doc.id}
-                          aria-label={t.openNakladnayaAriaLabel}
+                          aria-label={tab === 'nakladnaya' ? t.openNakladnayaAriaLabel : t.openTitleLabel}
                           title={t.openTitleLabel}
                           className="w-11 h-11 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--nav-surface-glass)] disabled:opacity-40"
                           style={{ color: 'var(--nav-accent)' }}>
