@@ -144,3 +144,24 @@ describe('buildKPHtml — футер', () => {
     expect(html).not.toContain('Профессиональные счета')
   })
 })
+
+describe('buildKPHtml — колонка «Код»', () => {
+  it('без кодов у позиций колонки нет (раньше там дублировался номер строки)', () => {
+    const html = buildKPHtml(baseData({ services: [{ name: 'Кирпич', qty: 1, price: 100, unit: 'шт' }], total: 100 }))
+    expect(html).not.toContain('>Код</th>')
+    expect(html).toContain('<th class="name" style="width:48%">Наименование</th>')
+  })
+
+  it('с кодом из справочника — колонка есть, у позиции без кода ячейка пустая', () => {
+    const html = buildKPHtml(baseData({
+      services: [
+        { name: 'Дизайн', qty: 1, price: 100, unit: 'усл', code: 'A-1' },
+        { name: 'Печать', qty: 1, price: 50, unit: 'шт' },
+      ],
+      total: 150,
+    }))
+    expect(html).toContain('<th style="width:8%">Код</th>')
+    expect(html).toContain('<td>A-1</td>')
+    expect(html).toMatch(/<td>2<\/td>\s*<td><\/td>\s*<td class="name">Печать<\/td>/)
+  })
+})

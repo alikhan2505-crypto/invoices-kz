@@ -127,6 +127,8 @@ export function buildKPHtml(data: KPData, images: KPImages = {}): string {
   const totalWithoutVat = vatType === 'vat_16' ? Math.round(data.total / 1.16) : data.total
   const vatAmount = vatType === 'vat_16' ? Math.round(data.total - data.total / 1.16) : 0
 
+  const hasCodes = data.services.some(s => String(s.code ?? '').trim() !== '')
+
   let totalsHTML = ''
   if (vatType === 'vat_16') {
     totalsHTML = `
@@ -238,7 +240,7 @@ export function buildKPHtml(data: KPData, images: KPImages = {}): string {
         .services-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 10px; }
         .services-table thead tr { background: #1C2056; color: white; }
         .services-table thead th { padding: 8px 10px; text-align: center; font-weight: bold; font-size: 10px; }
-        .services-table thead th:nth-child(3) { text-align: left; }
+        .services-table thead th.name { text-align: left; }
         .services-table tbody tr:nth-child(even) { background: #f8f9fa; }
         .services-table tbody tr:nth-child(odd) { background: white; }
         .services-table tbody td {
@@ -400,14 +402,16 @@ export function buildKPHtml(data: KPData, images: KPImages = {}): string {
           </div>
         </div>
 
-        <!-- Services -->
+        <!-- Services. Колонка «Код» — только если у позиций есть настоящие коды
+             (из справочника услуг в кабинете). Раньше без кода в ней печатался
+             номер строки ещё раз — дубль «№» (правка основателя 15.10.2026). -->
         <div class="section-title">Перечень товаров / услуг</div>
         <table class="services-table">
           <thead>
             <tr>
               <th style="width:5%">№</th>
-              <th style="width:8%">Код</th>
-              <th style="width:40%">Наименование</th>
+              ${hasCodes ? '<th style="width:8%">Код</th>' : ''}
+              <th class="name" style="width:${hasCodes ? 40 : 48}%">Наименование</th>
               <th style="width:10%">Кол-во</th>
               <th style="width:8%">Ед.</th>
               <th style="width:14%">Цена</th>
@@ -418,7 +422,7 @@ export function buildKPHtml(data: KPData, images: KPImages = {}): string {
             ${data.services.map((s, i) => `
               <tr>
                 <td>${i + 1}</td>
-                <td>${escapeHtml(s.code || (i + 1))}</td>
+                ${hasCodes ? `<td>${escapeHtml(s.code || '')}</td>` : ''}
                 <td class="name">${escapeHtml(s.name)}</td>
                 <td>${escapeHtml(s.qty)}</td>
                 <td>${escapeHtml(s.unit || 'шт')}</td>
