@@ -158,7 +158,7 @@ export const aiAgentDict: Record<Lang, AiAgentDict> = {
     tabTemplates: 'Шаблоны',
     tabFlows: 'Сценарии',
     tabChannels: 'Каналы',
-    reviewQueueLink: 'Диалоги на проверке',
+    reviewQueueLink: 'На проверку',
 
     channelInstagramDesc: 'Агент отвечает на сообщения в Директ вашего бизнес-аккаунта Instagram',
     channelTelegramDesc: 'Агент отвечает на сообщения в вашем Telegram-боте, созданном через @BotFather',
@@ -178,7 +178,7 @@ export const aiAgentDict: Record<Lang, AiAgentDict> = {
     openingInstagram: 'Открываем Instagram…',
     instagramExpiredHint: 'Instagram отключился — переподключите аккаунт, чтобы агент снова отвечал',
 
-    reviewTitle: 'Диалоги на проверке',
+    reviewTitle: 'На проверку',
     reviewSubtitle: 'Черновики ответов ждут вашего одобрения',
     reviewEmpty: 'Пока нечего проверять',
     reviewInReview: (c) => `На проверке: ${c}`,
@@ -240,7 +240,7 @@ export const aiAgentDict: Record<Lang, AiAgentDict> = {
     tabTemplates: 'Үлгілер',
     tabFlows: 'Сценарийлер',
     tabChannels: 'Арналар',
-    reviewQueueLink: 'Тексерудегі диалогтар',
+    reviewQueueLink: 'Тексеруге',
 
     channelInstagramDesc: 'Агент Instagram бизнес-аккаунтыңыздың Директіндегі хабарламаларға жауап береді',
     channelTelegramDesc: '@BotFather арқылы құрылған Telegram-ботыңыздағы хабарламаларға агент жауап береді',
@@ -260,7 +260,7 @@ export const aiAgentDict: Record<Lang, AiAgentDict> = {
     openingInstagram: 'Instagram ашылуда…',
     instagramExpiredHint: 'Instagram ажырады — агент қайта жауап беруі үшін аккаунтты қайта қосыңыз',
 
-    reviewTitle: 'Тексерудегі диалогтар',
+    reviewTitle: 'Тексеруге',
     reviewSubtitle: 'Жауап жобалары сіздің мақұлдауыңызды күтуде',
     reviewEmpty: 'Әзірге тексеретін ештеңе жоқ',
     reviewInReview: (c) => `Тексеруде: ${c}`,
@@ -322,7 +322,7 @@ export const aiAgentDict: Record<Lang, AiAgentDict> = {
     tabTemplates: 'Templates',
     tabFlows: 'Flows',
     tabChannels: 'Channels',
-    reviewQueueLink: 'Replies awaiting review',
+    reviewQueueLink: 'To review',
 
     channelInstagramDesc: 'The assistant replies to direct messages on your Instagram business account',
     channelTelegramDesc: 'The assistant replies to messages in your Telegram bot created via @BotFather',
@@ -342,7 +342,7 @@ export const aiAgentDict: Record<Lang, AiAgentDict> = {
     openingInstagram: 'Opening Instagram…',
     instagramExpiredHint: 'Instagram disconnected — reconnect the account so the assistant can reply again',
 
-    reviewTitle: 'Replies awaiting review',
+    reviewTitle: 'To review',
     reviewSubtitle: 'Draft replies are waiting for your approval',
     reviewEmpty: 'Nothing to review yet',
     reviewInReview: (c) => `In review: ${c}`,

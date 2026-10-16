@@ -129,6 +129,17 @@ export interface AiAgentFormsDict {
   savingAgentButton: string
   testChatTitle: string
   testChatDisabledHint: string
+  // TestChatPanel (B12, 16.10.2026): поле ввода, ошибка, рестарт, пустое состояние
+  testChatTyping: string
+  testChatSendError: string
+  testChatPlaceholder: string
+  testChatInputAria: string
+  testChatSendAria: string
+  testChatRestart: string
+  testChatRestartText: string
+  testChatRestartConfirm: string
+  testChatEmptyTitle: string
+  testChatEmptyText: string
   closeAria: string
   tabsAria: string
   defaultAgentName: string
@@ -216,7 +227,7 @@ export const aiAgentFormsDict: Record<Lang, AiAgentFormsDict> = {
     customInstructionsPlaceholder: 'Например: не обещай скидки; доставка только по Алматы; рабочие часы 9:00–18:00',
     customInstructionsHint: 'Агент будет следовать этим правилам в каждом ответе.',
     stopPhrasesLabel: 'Стоп-фразы (передают диалог вам)',
-    stopPhrasesHint: 'Если клиент напишет одну из этих фраз, агент замолчит в этом диалоге и пришлёт вам уведомление (и в Telegram, если он подключён в Профиле → Уведомления) — отвечайте в «Переписке».',
+    stopPhrasesHint: 'Если клиент напишет одну из этих фраз, агент замолчит в этом диалоге и пришлёт вам уведомление (и в Telegram, если он подключён в Профиле → Уведомления) — отвечайте в «Диалогах».',
     triggerPlaceholder: 'Триггер — запятая или Enter (например: цена, стоимость)',
 
     connectShopTitle: 'Подключите Kaspi Shop — агент будет знать реальные цены',
@@ -226,11 +237,11 @@ export const aiAgentFormsDict: Record<Lang, AiAgentFormsDict> = {
     promptPreviewHint: 'Примерный вид инструкций агента — собирается из полей выше; в реальном ответе к этой строке добавляется системный текст.',
 
     trainingTitle: 'Агент на обучении — клиенты пока не видят его ответов',
-    trainingBody: 'Каждый ответ ждёт вашего одобрения в «Диалогах» и не уходит клиенту, пока вы его не отправите. Это защита: агент учится на ваших правках. Но если не заглядывать в очередь, клиент не получит ничего.',
+    trainingBody: 'Каждый ответ ждёт вашего одобрения в разделе «На проверку» и не уходит клиенту, пока вы его не отправите. Это защита: агент учится на ваших правках. Но если не заглядывать в очередь, клиент не получит ничего.',
     trainingLeft: (a, d) => `До самостоятельной работы: ${a} одобрений или ${d} дней.`,
     trainingLeftNoDraft: (a, d) => `До самостоятельной работы: ${a} одобрений или ${d} дней с первого черновика — черновиков пока не было, отсчёт дней не начался.`,
     trainingExitPending: 'Срок обучения прошёл: со следующего сообщения клиента агент начнёт отвечать сам, а вы получите уведомление.',
-    trainingLink: 'Открыть Диалоги →',
+    trainingLink: 'Открыть «На проверку» →',
     botStatusLabel: 'Статус бота',
     botStatusHint: 'Выключенный агент не отвечает клиентам.',
     botStatusSaved: 'Сохранено',
@@ -256,7 +267,7 @@ export const aiAgentFormsDict: Record<Lang, AiAgentFormsDict> = {
     walletSharedHint: 'Кошелёк общий для Счетов, Kaspi Bot и AI-агента — пополнить можно значком кошелька в правом верхнем углу.',
 
     templatesHint: 'Шаблоны отвечают мгновенно и бесплатно — если сообщение клиента содержит триггер, ИИ не вызывается.',
-    templatesEmpty: 'Шаблонов пока нет. Они создаются автоматически, когда вы одобряете ответы в «Диалогах на проверке», — и их можно добавить вручную.',
+    templatesEmpty: 'Шаблонов пока нет. Они создаются автоматически, когда вы одобряете ответы в разделе «На проверку», — и их можно добавить вручную.',
     triggerWordsLabel: 'Триггерные слова',
     templateChannelLabel: 'Где отвечать',
     templateChannelAll: 'Везде',
@@ -302,6 +313,16 @@ export const aiAgentFormsDict: Record<Lang, AiAgentFormsDict> = {
     savingAgentButton: 'Сохраняем…',
     testChatTitle: 'Тестовый чат',
     testChatDisabledHint: 'Сохраните агента, чтобы протестировать',
+    testChatTyping: 'Агент печатает',
+    testChatSendError: 'Не удалось получить ответ — попробуйте ещё раз',
+    testChatPlaceholder: 'Напишите сообщение…',
+    testChatInputAria: 'Сообщение агенту',
+    testChatSendAria: 'Отправить',
+    testChatRestart: 'Рестарт чата',
+    testChatRestartText: 'После перезапуска сбросится контекст диалога.',
+    testChatRestartConfirm: 'Перезапустить',
+    testChatEmptyTitle: 'Начните диалог',
+    testChatEmptyText: 'Напишите сообщение — агент ответит так же, как ответил бы реальному клиенту.',
     closeAria: 'Закрыть',
     tabsAria: 'Разделы настроек агента',
     defaultAgentName: 'Ассистент',
@@ -381,7 +402,7 @@ export const aiAgentFormsDict: Record<Lang, AiAgentFormsDict> = {
     customInstructionsPlaceholder: 'Мысалы: жеңілдік уәде етпе; жеткізу тек Алматы бойынша; жұмыс уақыты 9:00–18:00',
     customInstructionsHint: 'Агент әр жауабында осы ережелерді ұстанады.',
     stopPhrasesLabel: 'Тоқтату тіркестері (диалогты сізге береді)',
-    stopPhrasesHint: 'Клиент осы тіркестердің бірін жазса, агент бұл диалогта үндемей қалады және сізге хабарлама жібереді (Telegram Профиль → Хабарламалар бөлімінде қосылған болса, онда да) — «Хат алмасу» бөлімінде жауап беріңіз.',
+    stopPhrasesHint: 'Клиент осы тіркестердің бірін жазса, агент бұл диалогта үндемей қалады және сізге хабарлама жібереді (Telegram Профиль → Хабарламалар бөлімінде қосылған болса, онда да) — «Диалогтар» бөлімінде жауап беріңіз.',
     triggerPlaceholder: 'Триггер — үтір немесе Enter (мысалы: баға, құны)',
 
     connectShopTitle: 'Kaspi Shop-ты қосыңыз — агент нақты бағаларды біледі',
@@ -391,11 +412,11 @@ export const aiAgentFormsDict: Record<Lang, AiAgentFormsDict> = {
     promptPreviewHint: 'Агент нұсқауларының шамамен көрінісі — жоғарыдағы өрістерден жиналады; нақты жауапта бұл жолға жүйелік мәтін қосылады.',
 
     trainingTitle: 'Агент оқуда — клиенттер оның жауаптарын әзірге көрмейді',
-    trainingBody: 'Әр жауап «Диалогтарда» сіздің мақұлдауыңызды күтеді және сіз жібермейінше клиентке бармайды. Бұл қорғаныс: агент сіздің түзетулеріңізден үйренеді. Бірақ кезекке қарамасаңыз, клиент ештеңе алмайды.',
+    trainingBody: 'Әр жауап «Тексеруге» бөлімінде сіздің мақұлдауыңызды күтеді және сіз жібермейінше клиентке бармайды. Бұл қорғаныс: агент сіздің түзетулеріңізден үйренеді. Бірақ кезекке қарамасаңыз, клиент ештеңе алмайды.',
     trainingLeft: (a, d) => `Дербес жұмысқа дейін: ${a} мақұлдау немесе ${d} күн.`,
     trainingLeftNoDraft: (a, d) => `Дербес жұмысқа дейін: ${a} мақұлдау немесе алғашқы жауап жобасынан бастап ${d} күн — әзірге жоба болған жоқ, күн санау басталмады.`,
     trainingExitPending: 'Оқу мерзімі өтті: клиенттің келесі хабарламасынан бастап агент өзі жауап береді, ал сізге хабарлама келеді.',
-    trainingLink: 'Диалогтарды ашу →',
+    trainingLink: '«Тексеруге» бөлімін ашу →',
     botStatusLabel: 'Бот күйі',
     botStatusHint: 'Өшірілген агент клиенттерге жауап бермейді.',
     botStatusSaved: 'Сақталды',
@@ -421,7 +442,7 @@ export const aiAgentFormsDict: Record<Lang, AiAgentFormsDict> = {
     walletSharedHint: 'Әмиян Шоттар, Kaspi Bot және AI-агент үшін ортақ — оң жақ жоғарғы бұрыштағы әмиян белгішесі арқылы толтыруға болады.',
 
     templatesHint: 'Үлгілер бірден әрі тегін жауап береді — клиенттің хабарламасында триггер болса, ИИ шақырылмайды.',
-    templatesEmpty: 'Әзірге үлгілер жоқ. Олар «Тексерудегі диалогтарда» жауаптарды мақұлдағанда автоматты түрде жасалады, оларды қолмен де қосуға болады.',
+    templatesEmpty: 'Әзірге үлгілер жоқ. Олар «Тексеруге» бөлімінде жауаптарды мақұлдағанда автоматты түрде жасалады, оларды қолмен де қосуға болады.',
     triggerWordsLabel: 'Триггер сөздер',
     templateChannelLabel: 'Қайда жауап беру',
     templateChannelAll: 'Барлық жерде',
@@ -467,6 +488,16 @@ export const aiAgentFormsDict: Record<Lang, AiAgentFormsDict> = {
     savingAgentButton: 'Сақталуда…',
     testChatTitle: 'Сынақ чаты',
     testChatDisabledHint: 'Сынау үшін агентті сақтаңыз',
+    testChatTyping: 'Агент жазып жатыр',
+    testChatSendError: 'Жауап алу мүмкін болмады — қайталап көріңіз',
+    testChatPlaceholder: 'Хабарлама жазыңыз…',
+    testChatInputAria: 'Агентке хабарлама',
+    testChatSendAria: 'Жіберу',
+    testChatRestart: 'Чатты қайта бастау',
+    testChatRestartText: 'Қайта бастағаннан кейін диалог мәтінмәні тазаланады.',
+    testChatRestartConfirm: 'Қайта бастау',
+    testChatEmptyTitle: 'Диалогты бастаңыз',
+    testChatEmptyText: 'Хабарлама жазыңыз — агент нақты клиентке қалай жауап берсе, дәл солай жауап береді.',
     closeAria: 'Жабу',
     tabsAria: 'Агент параметрлерінің бөлімдері',
     defaultAgentName: 'Ассистент',
@@ -556,11 +587,11 @@ export const aiAgentFormsDict: Record<Lang, AiAgentFormsDict> = {
     promptPreviewHint: 'An approximation of the assistant’s instructions, assembled from the fields above; a system prompt is added to this in a real reply.',
 
     trainingTitle: 'The agent is in training — customers do not see its replies yet',
-    trainingBody: 'Every reply waits for your approval under Conversations and does not reach the customer until you send it. That is the safeguard: the agent learns from your edits. But if nobody opens the queue, the customer gets nothing.',
+    trainingBody: 'Every reply waits for your approval under To review and does not reach the customer until you send it. That is the safeguard: the agent learns from your edits. But if nobody opens the queue, the customer gets nothing.',
     trainingLeft: (a, d) => `Until it works on its own: ${a} approvals or ${d} days.`,
     trainingLeftNoDraft: (a, d) => `Until it works on its own: ${a} approvals or ${d} days from the first draft — there have been no drafts yet, so the day count has not started.`,
     trainingExitPending: 'The training period is over: from the next customer message the agent will reply on its own, and you will get a notification.',
-    trainingLink: 'Open Conversations →',
+    trainingLink: 'Open To review →',
     botStatusLabel: 'Bot status',
     botStatusHint: 'A disabled assistant does not reply to customers.',
     botStatusSaved: 'Saved',
@@ -586,7 +617,7 @@ export const aiAgentFormsDict: Record<Lang, AiAgentFormsDict> = {
     walletSharedHint: 'The wallet is shared between Invoices, Kaspi Bot and the AI agent — top it up from the wallet icon in the top right.',
 
     templatesHint: 'Templates reply instantly and for free — if the customer’s message contains a trigger, the AI is not called.',
-    templatesEmpty: 'No templates yet. They are created automatically when you approve replies under Conversations to review, and can also be added by hand.',
+    templatesEmpty: 'No templates yet. They are created automatically when you approve replies under To review, and can also be added by hand.',
     triggerWordsLabel: 'Trigger words',
     templateChannelLabel: 'Where it replies',
     templateChannelAll: 'Everywhere',
@@ -632,6 +663,16 @@ export const aiAgentFormsDict: Record<Lang, AiAgentFormsDict> = {
     savingAgentButton: 'Saving…',
     testChatTitle: 'Test chat',
     testChatDisabledHint: 'Save the agent to test it',
+    testChatTyping: 'The agent is typing',
+    testChatSendError: 'Could not get a reply — please try again',
+    testChatPlaceholder: 'Write a message…',
+    testChatInputAria: 'Message to the agent',
+    testChatSendAria: 'Send',
+    testChatRestart: 'Restart chat',
+    testChatRestartText: 'Restarting clears the conversation context.',
+    testChatRestartConfirm: 'Restart',
+    testChatEmptyTitle: 'Start a conversation',
+    testChatEmptyText: 'Write a message — the agent replies exactly as it would to a real customer.',
     closeAria: 'Close',
     tabsAria: 'Agent settings sections',
     defaultAgentName: 'Assistant',

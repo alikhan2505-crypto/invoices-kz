@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getActivePlan } from '@/lib/plan'
+import { isDraftAgent, isMissingColumnError } from '@/lib/aiAgent/setupWizard'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -37,14 +38,22 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!(await hasAiAgentAccess(user.id))) return NextResponse.json({ error: 'admin_only' }, { status: 403 })
 
-  const { data: agents, error } = await supabase
+  // launched_at -- признак черновика мастера (16.10.2026). До миграции
+  // ai_agent_launch.sql колонки нет: тогда тот же список без неё, и черновиков
+  // просто не бывает (как раньше).
+  const listAgents = (columns: string) => supabase
     .from('ai_agents')
-    .select('id, name, tone, goal, status, created_at')
+    .select(columns)
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
+  let listed: { data: any[] | null; error: any } = await listAgents('id, name, tone, goal, status, created_at, is_enabled, launched_at')
+  if (listed.error && isMissingColumnError(listed.error, 'launched_at')) {
+    listed = await listAgents('id, name, tone, goal, status, created_at, is_enabled')
+  }
+  const { data: agents, error } = listed
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  const agentIds = (agents || []).map(a => a.id)
+  const agentIds = (agents || []).map((a: any) => a.id)
   const { data: connections } = agentIds.length > 0
     ? await supabase
         .from('ai_agent_channel_connections')
@@ -59,13 +68,15 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json({
-    agents: (agents || []).map(a => ({
+    agents: (agents || []).map((a: any) => ({
       id: a.id,
       name: a.name,
       tone: a.tone,
       goal: a.goal,
       status: a.status,
       createdAt: a.created_at,
+      isEnabled: a.is_enabled !== false,
+      isDraft: isDraftAgent(a, connectionsByAgent[a.id] || []),
       connections: connectionsByAgent[a.id] || [],
     })),
   })

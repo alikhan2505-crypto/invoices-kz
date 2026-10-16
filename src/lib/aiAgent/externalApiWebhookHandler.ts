@@ -20,6 +20,8 @@ import { findFlowTriggerMatch, type FlowStep } from './flow'
 import { startFlow, handleFlowButtonClick, FLOW_STALE_TEXT, type FlowStepSender } from './flowEngine'
 import { sendIntoConversation } from './channelSend'
 import { hashApiKey } from './externalApi'
+import { agentReplyState, storesInboundOnly } from './planGate'
+import { handleInboundWithoutReply } from './lapsedInbound'
 
 // The fifth tenant pipeline, a twin of websiteWebhookHandler.ts (which it
 // mirrors almost exactly -- same "no external send API, the outbound row
@@ -85,7 +87,20 @@ interface ExternalApiIncomingParams {
 export async function handleExternalApiIncoming(conn: ExternalApiConnection, params: ExternalApiIncomingParams): Promise<void> {
   const { data: agent } = await supabase.from('ai_agents').select('*').eq('id', conn.agentId).single()
   if (!agent) return
-  if (agent.is_enabled === false) return
+  // Решение 3 (16.10.2026): и тариф владельца -- кончился Про, бот молчит и
+  // не списывает, ничего не меняя в базе (см. planGate.ts). Но входящее
+  // сохраняется, чтобы после продления владелец увидел этих клиентов (A2).
+  const replyState = await agentReplyState(supabase, agent)
+  if (replyState === 'paused') return
+  if (storesInboundOnly(replyState)) {
+    await handleInboundWithoutReply(supabase, replyState, agent, {
+      agentId: conn.agentId, channel: 'api', externalThreadId: params.externalUserId,
+      customerHandle: params.customerName?.trim() || params.externalUserId,
+      text: params.isButtonClick ? `[кнопка] ${params.text}` : params.text,
+      externalId: crypto.randomUUID(),
+    })
+    return
+  }
 
   // Срок обучения проверяется здесь, на входящем сообщении (см. trainingExit.ts):
   // вышедший по сроку агент отвечает клиенту сам уже на этом сообщении.

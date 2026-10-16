@@ -9,6 +9,9 @@ import DesktopShell from '@/components/DesktopShell'
 import LoadingSpinner from '@/components/LoadingSpinner'
 import { getActivePlan } from '@/lib/plan'
 import BrandLoader from '@/components/BrandLoader'
+import Link from 'next/link'
+import { useLanguage } from '@/components/LanguageProvider'
+import { aiAgentSetupDict } from '@/lib/i18n/aiAgentSetup'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -76,10 +79,16 @@ function formatRelative(iso: string): string {
 function AiAgentDialogsInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { lang } = useLanguage()
+  const sd = aiAgentSetupDict[lang]
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw
   const [loading, setLoading] = useState(true)
   const [forbidden, setForbidden] = useState(false)
+  // Про кончился, агенты есть (решение основателя 3, 16.10.2026): переписка
+  // открыта на чтение -- без поля ответа и «Вернуть боту», с плашкой
+  // «Продлите Про». Агент в это время клиентам не отвечает.
+  const [readOnly, setReadOnly] = useState(false)
   const [items, setItems] = useState<DialogItem[]>([])
   const [agents, setAgents] = useState<{ id: string; name: string }[]>([])
   const [agentFilter, setAgentFilter] = useState<string>('all')
@@ -104,7 +113,8 @@ function AiAgentDialogsInner() {
     return { 'Authorization': `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' }
   }
 
-  const loadItems = useCallback(async (agent: string = agentFilter): Promise<DialogItem[]> => {
+  // null -- сервер не пустил (403: ни тарифа, ни агентов).
+  const loadItems = useCallback(async (agent: string = agentFilter): Promise<DialogItem[] | null> => {
     setFetching(true)
     const headers = await authHeader()
     const params = new URLSearchParams()
@@ -112,10 +122,12 @@ function AiAgentDialogsInner() {
     const qs = params.toString()
     const res = await fetch(`/api/ai-agent/dialogs${qs ? `?${qs}` : ''}`, { headers })
     let fetched: DialogItem[] = []
+    if (res.status === 403) { setFetching(false); return null }
     if (res.ok) {
       const data = await res.json()
       fetched = Array.isArray(data.items) ? data.items : []
       setItems(fetched)
+      setReadOnly(!!data.readOnly)
     }
     setFetching(false)
     return fetched
@@ -126,16 +138,29 @@ function AiAgentDialogsInner() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
       const { data: profile } = await supabase.from('profiles').select('is_admin, plan, plan_expires_at, bonus_expires_at, trial_expires_at').eq('id', user.id).single()
-      if (!profile?.is_admin && !getActivePlan(profile).canAiAgent) { setForbidden(true); setLoading(false); return }
+      const hasPlan = !!profile?.is_admin || getActivePlan(profile).canAiAgent
       const headers = await authHeader()
+      if (!hasPlan) {
+        // Без Про -- только чтение, и только если агенты есть: решает сервер
+        // (403 -- обычная Про-стена). Список агентов для фильтра -- из самих
+        // диалогов: /api/ai-agent/agents без Про закрыт.
+        const fetched = await loadItems('all')
+        if (fetched === null) { setForbidden(true); setLoading(false); return }
+        const byId = new Map<string, string>()
+        for (const i of fetched) byId.set(i.agentId, i.agentName)
+        setAgents(Array.from(byId, ([id, name]) => ({ id, name })))
+        setLoading(false)
+        return
+      }
       // agents fetch + loadItems folded into one Promise.all (final-review
       // finding) -- loadItems doesn't need to wait for the agents response
       // to be handled first, so serializing it after was a needless extra
       // round-trip on first paint.
-      const [agentsRes, fetched] = await Promise.all([
+      const [agentsRes, fetchedOrNull] = await Promise.all([
         fetch('/api/ai-agent/agents', { headers }),
         loadItems('all'),
       ])
+      const fetched = fetchedOrNull || []
       if (agentsRes.ok) {
         const data = await agentsRes.json()
         setAgents(Array.isArray(data.agents) ? data.agents.map((a: any) => ({ id: a.id, name: a.name })) : [])
@@ -255,8 +280,8 @@ function AiAgentDialogsInner() {
           transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE }}
         >
           <div>
-            <h1 className="text-xl font-bold" style={{ color: 'var(--nav-text-primary)' }}>Переписка</h1>
-            <p className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>Живая переписка с клиентами по всем каналам — перехватите диалог, просто ответив</p>
+            <h1 className="text-xl font-bold" style={{ color: 'var(--nav-text-primary)' }}>{sd.dialogsTitle}</h1>
+            <p className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>{readOnly ? sd.dialogsSubtitleReadOnly : sd.dialogsSubtitle}</p>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
             {agents.length > 0 && (
@@ -276,6 +301,20 @@ function AiAgentDialogsInner() {
             </button>
           </div>
         </motion.div>
+
+        {readOnly && (
+          <div role="status" className="nav-glass rounded-2xl p-4 mb-4 flex items-center justify-between gap-3 flex-wrap flex-shrink-0">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{sd.lapsedTitle}</div>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--nav-text-secondary)' }}>{sd.lapsedText}</p>
+            </div>
+            <Link href="/upgrade"
+              className="inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold flex-shrink-0 transition-transform hover:-translate-y-0.5"
+              style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+              {sd.lapsedCta}
+            </Link>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-4 flex-1 min-h-0">
           <div className="space-y-2 overflow-y-auto" style={{ opacity: fetching ? 0.6 : 1 }}>
@@ -339,7 +378,7 @@ function AiAgentDialogsInner() {
                       <div className="text-[11px]" style={{ color: 'var(--nav-text-muted)' }}>{selected.agentName}</div>
                     )}
                   </div>
-                  {selected.pausedForHuman && (
+                  {selected.pausedForHuman && !readOnly && (
                     <button onClick={releaseConversation} disabled={sending}
                       className="text-xs font-semibold nav-glass rounded-lg px-3 py-1.5 disabled:opacity-50" style={{ color: 'var(--nav-text-secondary)' }}>
                       Вернуть боту
@@ -369,7 +408,7 @@ function AiAgentDialogsInner() {
 
                 {error && <div className="text-xs mb-2 flex-shrink-0" style={{ color: 'var(--nav-critical)' }}>{error}</div>}
 
-                <div className="flex gap-2 flex-shrink-0">
+                {!readOnly && <div className="flex gap-2 flex-shrink-0">
                   <input value={replyText} onChange={e => setReplyText(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter' && !sending) sendReply() }}
                     placeholder="Ваш ответ клиенту…"
@@ -379,7 +418,7 @@ function AiAgentDialogsInner() {
                     className="rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                     Отправить
                   </button>
-                </div>
+                </div>}
               </>
             )}
           </div>

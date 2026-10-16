@@ -17,14 +17,21 @@ const STATE_TTL_MS = 10 * 60 * 1000 // 10 minutes -- generous for a user to comp
 // the signature covers it, so a caller can't rewrite the state to target a
 // different agent. Ownership (agent belongs to userId) is still verified
 // server-side in the callback; the signature only proves WE issued the pair.
-export function createOAuthState(userId: string, agentId?: string): string {
-  const payload = JSON.stringify({ userId, ...(agentId ? { agentId } : {}), nonce: crypto.randomBytes(8).toString('hex'), exp: Date.now() + STATE_TTL_MS })
+//
+// returnTo (16.10.2026): 'setup' -- подключение начато из мастера
+// /ai-agent/setup, и callback возвращает туда, а не на вкладку «Каналы».
+// Тоже под подписью: подменить, куда вернуть, нельзя (а значения, кроме
+// 'setup', и не принимаются).
+export type OAuthReturnTo = 'setup'
+
+export function createOAuthState(userId: string, agentId?: string, returnTo?: OAuthReturnTo): string {
+  const payload = JSON.stringify({ userId, ...(agentId ? { agentId } : {}), ...(returnTo === 'setup' ? { returnTo } : {}), nonce: crypto.randomBytes(8).toString('hex'), exp: Date.now() + STATE_TTL_MS })
   const payloadB64 = Buffer.from(payload).toString('base64url')
   const sig = crypto.createHmac('sha256', getKey()).update(payloadB64).digest('base64url')
   return `${payloadB64}.${sig}`
 }
 
-export function verifyOAuthState(state: string): { userId: string; agentId?: string } | null {
+export function verifyOAuthState(state: string): { userId: string; agentId?: string; returnTo?: OAuthReturnTo } | null {
   const parts = state.split('.')
   if (parts.length !== 2) return null
   const [payloadB64, sig] = parts
@@ -32,12 +39,16 @@ export function verifyOAuthState(state: string): { userId: string; agentId?: str
   const sigBuf = Buffer.from(sig)
   const expectedBuf = Buffer.from(expectedSig)
   if (sigBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(sigBuf, expectedBuf)) return null
-  let payload: { userId: string; agentId?: string; exp: number }
+  let payload: { userId: string; agentId?: string; returnTo?: string; exp: number }
   try {
     payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString('utf8'))
   } catch {
     return null
   }
   if (Date.now() > payload.exp) return null
-  return { userId: payload.userId, ...(payload.agentId ? { agentId: payload.agentId } : {}) }
+  return {
+    userId: payload.userId,
+    ...(payload.agentId ? { agentId: payload.agentId } : {}),
+    ...(payload.returnTo === 'setup' ? { returnTo: 'setup' as const } : {}),
+  }
 }

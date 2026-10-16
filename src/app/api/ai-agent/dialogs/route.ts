@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { getActivePlan } from '@/lib/plan'
+import { hasAiAgentPlan, aiAgentAccessLevel, AI_AGENT_PROFILE_COLUMNS, type AiAgentAccess } from '@/lib/aiAgent/planGate'
 import { VISIBLE_IN_DIALOG_FILTER } from '@/lib/aiAgent/dialogVisibility'
 
 const supabase = createClient(
@@ -20,9 +20,15 @@ async function requireUser(req: NextRequest) {
   return user
 }
 
-async function hasAiAgentAccess(userId: string): Promise<boolean> {
-  const { data: profile } = await supabase.from('profiles').select('is_admin, plan, plan_expires_at, bonus_expires_at, trial_expires_at').eq('id', userId).single()
-  return !!profile?.is_admin || getActivePlan(profile).canAiAgent
+// Решение основателя 3 (16.10.2026): когда Про кончился, агент молчит, но
+// переписка остаётся открытой НА ЧТЕНИЕ -- если агенты у владельца есть.
+// Ответить (dialogs/reply) и вернуть боту (dialogs/release) по-прежнему
+// можно только на Про.
+async function dialogsAccess(userId: string): Promise<AiAgentAccess> {
+  const { data: profile } = await supabase.from('profiles').select(AI_AGENT_PROFILE_COLUMNS).eq('id', userId).single()
+  if (hasAiAgentPlan(profile)) return 'full'
+  const { count } = await supabase.from('ai_agents').select('id', { count: 'exact', head: true }).eq('user_id', userId)
+  return aiAgentAccessLevel(profile, (count ?? 0) > 0)
 }
 
 // «Переписка» -- every conversation across the caller's agents, newest
@@ -33,7 +39,9 @@ async function hasAiAgentAccess(userId: string): Promise<boolean> {
 export async function GET(req: NextRequest) {
   const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!(await hasAiAgentAccess(user.id))) return NextResponse.json({ error: 'admin_only' }, { status: 403 })
+  const access = await dialogsAccess(user.id)
+  if (access === 'none') return NextResponse.json({ error: 'admin_only' }, { status: 403 })
+  const readOnly = access === 'read_only'
 
   // ?agentId= (2026-09-02) narrows to one owned agent, same
   // 404-if-not-owned shape as leads/route.ts and review/route.ts; omitted,
@@ -48,7 +56,7 @@ export async function GET(req: NextRequest) {
     const { data } = await supabase.from('ai_agents').select('id, name').eq('user_id', user.id)
     agents = data || []
   }
-  if (agents.length === 0) return NextResponse.json({ items: [] })
+  if (agents.length === 0) return NextResponse.json({ items: [], readOnly })
   const agentNameById: Record<string, string> = {}
   for (const a of agents) agentNameById[a.id] = a.name
 
@@ -69,7 +77,7 @@ export async function GET(req: NextRequest) {
     .order('created_at', { referencedTable: 'ai_agent_messages', ascending: false })
     .limit(1, { referencedTable: 'ai_agent_messages' })
   if (convError) return NextResponse.json({ error: convError.message }, { status: 500 })
-  if (!conversations || conversations.length === 0) return NextResponse.json({ items: [] })
+  if (!conversations || conversations.length === 0) return NextResponse.json({ items: [], readOnly })
 
   const previewByConversation: Record<string, { text: string; createdAt: string }> = {}
   for (const c of conversations) {
@@ -93,5 +101,7 @@ export async function GET(req: NextRequest) {
     }))
     .sort((a, b) => (a.lastActivityAt < b.lastActivityAt ? 1 : -1))
 
-  return NextResponse.json({ items })
+  // readOnly -- Про кончился: страница «Диалоги» прячет поле ответа и
+  // показывает плашку «Продлите Про».
+  return NextResponse.json({ items, readOnly })
 }

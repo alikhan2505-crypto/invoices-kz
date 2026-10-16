@@ -13,6 +13,8 @@ import { aiAgentDict, type AiAgentDict } from '@/lib/i18n/aiAgent'
 import BrandLoader from '@/components/BrandLoader'
 import AiAgentTour from './AiAgentTour'
 import { summarizeConnections, type AgentChannel } from '@/lib/aiAgent/connectedChannels'
+import { canUseSetupWizard } from '@/lib/aiAgent/setupWizard'
+import { aiAgentSetupDict } from '@/lib/i18n/aiAgentSetup'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -46,6 +48,9 @@ type AgentListItem = {
   goal: string
   status: string
   createdAt: string
+  // Черновик мастера /ai-agent/setup (16.10.2026): создан, но не запущен.
+  // До миграции launched_at всегда false.
+  isDraft?: boolean
   connections: AgentConnection[]
 }
 
@@ -99,10 +104,15 @@ export default function AiAgentsList() {
   const router = useRouter()
   const { lang } = useLanguage()
   const t = aiAgentDict[lang]
+  const s = aiAgentSetupDict[lang]
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw
   const [loading, setLoading] = useState(true)
   const [forbidden, setForbidden] = useState(false)
+  // Мастер «сначала канал» пока только для админов (решение 4): у них
+  // «Создать агента» и «Черновик · Продолжить настройку» ведут в
+  // /ai-agent/setup, у остальных -- прежний путь через настройки.
+  const [wizard, setWizard] = useState(false)
   const [agents, setAgents] = useState<AgentListItem[]>([])
   const [deleteTarget, setDeleteTarget] = useState<AgentListItem | null>(null)
   const [confirmText, setConfirmText] = useState('')
@@ -125,6 +135,7 @@ export default function AiAgentsList() {
       // an inline message.
       const { data: profile } = await supabase.from('profiles').select('is_admin, plan, plan_expires_at, bonus_expires_at, trial_expires_at').eq('id', user.id).single()
       if (!profile?.is_admin && !getActivePlan(profile).canAiAgent) { setForbidden(true); setLoading(false); return }
+      setWizard(canUseSetupWizard(!!profile?.is_admin))
       const headers = await authHeader()
       const res = await fetch('/api/ai-agent/agents', { headers })
       if (res.ok) {
@@ -180,6 +191,8 @@ export default function AiAgentsList() {
     </DesktopShell>
   )
 
+  const createHref = wizard ? '/ai-agent/setup' : '/ai-agent/settings?new=1'
+
   return (
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
@@ -199,7 +212,7 @@ export default function AiAgentsList() {
             <p className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>{t.agentsSubtitle}</p>
           </div>
           {agents.length > 0 && (
-            <Link href="/ai-agent/settings?new=1"
+            <Link href={createHref}
               className="flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-semibold flex-shrink-0 transition-transform hover:-translate-y-0.5"
               style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)', boxShadow: '0 10px 24px -10px var(--nav-accent)' }}>
               <PlusIcon /> {t.createAgentButton.replace(/^\+\s*/, '')}{/* иконка уже «+» — без второго плюса из текста */}
@@ -221,7 +234,7 @@ export default function AiAgentsList() {
             <p className="text-sm mb-5 max-w-sm mx-auto" style={{ color: 'var(--nav-text-secondary)' }}>
               {t.emptyText}
             </p>
-            <Link href="/ai-agent/settings?new=1"
+            <Link href={createHref}
               className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-semibold transition-transform hover:-translate-y-0.5"
               style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)', boxShadow: '0 10px 24px -10px var(--nav-accent)' }}>
               <PlusIcon /> {t.emptyCta}
@@ -233,8 +246,9 @@ export default function AiAgentsList() {
               // Every connected channel, not just Instagram (15.10.2026): a
               // WhatsApp-only agent used to read «Канал не подключён».
               const channels = summarizeConnections(agent.connections)
-              const agentStatusLabel = statusLabel(t, agent.status)
-              const statusColor = agent.status === 'active' ? 'var(--nav-success)' : 'var(--nav-accent)'
+              const draft = wizard && !!agent.isDraft
+              const agentStatusLabel = draft ? s.draftBadge : statusLabel(t, agent.status)
+              const statusColor = draft ? 'var(--nav-text-muted)' : agent.status === 'active' ? 'var(--nav-success)' : 'var(--nav-accent)'
               return (
                 <motion.div
                   key={agent.id}
@@ -246,7 +260,7 @@ export default function AiAgentsList() {
                   {/* The card body is one big link; the delete button below is
                       a SIBLING (not nested inside the link) absolutely
                       positioned in the top-right corner, clear of the title. */}
-                  <Link href={`/ai-agent/settings?agent=${agent.id}`} className="block p-5">
+                  <Link href={draft ? `/ai-agent/setup?agent=${agent.id}` : `/ai-agent/settings?agent=${agent.id}`} className="block p-5">
                     <div className="flex items-center gap-2 mb-2 pr-10">
                       <span className="text-sm font-semibold truncate" style={{ color: 'var(--nav-text-primary)' }}>{agent.name}</span>
                       <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium flex-shrink-0" style={{ background: 'var(--nav-bg)', color: statusColor }}>
@@ -276,6 +290,9 @@ export default function AiAgentsList() {
                       </ul>
                     ) : (
                       <div className="text-xs mb-1" style={{ color: 'var(--nav-text-muted)' }}>{t.channelNotConnected}</div>
+                    )}
+                    {draft && (
+                      <div className="text-xs font-semibold mt-2 mb-1" style={{ color: 'var(--nav-accent)' }}>{s.continueSetup} →</div>
                     )}
                     <div className="text-[11px]" style={{ color: 'var(--nav-text-muted)' }}>
                       {t.createdOn(new Date(agent.createdAt).toLocaleDateString(lang === 'en' ? 'en-GB' : lang === 'kk' ? 'kk-KZ' : 'ru-RU', { day: 'numeric', month: 'long', year: 'numeric' }))}

@@ -18,6 +18,9 @@ import { pairConversationHistory } from './telegram'
 import { findFlowTriggerMatch, type FlowStep } from './flow'
 import { startFlow, handleFlowButtonClick, FLOW_STALE_TEXT, type FlowStepSender } from './flowEngine'
 import { sendIntoConversation } from './channelSend'
+import { agentReplyState, storesInboundOnly } from './planGate'
+import { handleInboundWithoutReply } from './lapsedInbound'
+import { shouldQueueForReview } from './setupWizard'
 
 // The website tenant pipeline -- a fourth twin of telegramWebhookHandler.ts/
 // whatsappWebhookHandler.ts/webhookHandler.ts, driven by direct POSTs from
@@ -91,7 +94,20 @@ export async function handleWebsiteIncoming(conn: WebsiteTenantConnection, param
 
   const { data: agent } = await supabase.from('ai_agents').select('*').eq('id', conn.agentId).single()
   if (!agent) return
-  if (agent.is_enabled === false) return
+  // Решение 3 (16.10.2026): и тариф владельца -- кончился Про, бот молчит и
+  // не списывает, ничего не меняя в базе (см. planGate.ts). Но входящее
+  // сохраняется, чтобы после продления владелец увидел этих посетителей (A2).
+  const replyState = await agentReplyState(supabase, agent)
+  if (replyState === 'paused') return
+  if (storesInboundOnly(replyState)) {
+    await handleInboundWithoutReply(supabase, replyState, agent, {
+      agentId: conn.agentId, channel: 'website', externalThreadId: params.visitorId,
+      customerHandle: 'посетитель сайта',
+      text: params.isButtonClick ? `[кнопка] ${params.text}` : params.text,
+      externalId: params.externalId,
+    })
+    return
+  }
 
   // Срок обучения проверяется здесь, на входящем сообщении (см. trainingExit.ts):
   // вышедший по сроку агент отвечает клиенту сам уже на этом сообщении.
@@ -282,7 +298,11 @@ export async function handleWebsiteIncoming(conn: WebsiteTenantConnection, param
     await mergeCollectedData(conversation.id, extractedFields)
   }
 
-  if (agent.status === 'training') {
+  // Чат для сайта отвечает сразу и в режиме «Сначала показывать ответы мне»
+  // (решение основателя 1, 16.10.2026): посетитель ждёт ответа прямо сейчас,
+  // черновик, одобренный через час, уже никто не прочтёт. Ветка с очередью
+  // остаётся на случай, если правило в shouldQueueForReview поменяют.
+  if (shouldQueueForReview('website', agent.status)) {
     const { data: inserted } = await supabase.from('ai_agent_messages').insert({
       conversation_id: conversation.id,
       direction: 'outbound',

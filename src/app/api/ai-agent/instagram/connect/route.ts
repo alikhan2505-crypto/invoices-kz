@@ -46,7 +46,10 @@ export async function GET(req: NextRequest) {
   // attaches to the right agent. Ownership (agent belongs to this user) is
   // verified in the callback, which queries ai_agents by id AND user_id.
   const agentId = req.nextUrl.searchParams.get('agentId') || undefined
-  const state = createOAuthState(user.id, agentId)
+  // ?returnTo=setup -- подключение из мастера /ai-agent/setup: callback
+  // вернёт туда же (16.10.2026).
+  const returnTo = req.nextUrl.searchParams.get('returnTo') === 'setup' ? 'setup' as const : undefined
+  const state = createOAuthState(user.id, agentId, returnTo)
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.invoices.kz'
   const redirectUri = `${appUrl}/api/ai-agent/instagram/callback`
   // App Review decided this app's request on 2026-09-07: instagram_business_basic

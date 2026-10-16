@@ -73,8 +73,11 @@ const kaspiShopLinks: { href: string; label: LocalizedLabel; soon?: boolean }[] 
 const aiAgentLinks: { href: string; label: LocalizedLabel }[] = [
   { href: '/ai-agent/overview', label: { ru: 'Обзор', kk: 'Шолу', en: 'Overview' } },
   { href: '/ai-agent', label: { ru: 'Агенты', kk: 'Агенттер', en: 'Agents' } },
-  { href: '/ai-agent/review', label: { ru: 'Диалоги', kk: 'Диалогтар', en: 'Conversations' } },
-  { href: '/ai-agent/dialogs', label: { ru: 'Переписка', kk: 'Хат алмасу', en: 'Correspondence' } },
+  // 16.10.2026 (решение основателя 5): очередь проверки -- «На проверку»,
+  // вся переписка -- «Диалоги» (раньше «Диалоги» вели на очередь, а вся
+  // переписка называлась «Переписка»).
+  { href: '/ai-agent/review', label: { ru: 'На проверку', kk: 'Тексеруге', en: 'To review' } },
+  { href: '/ai-agent/dialogs', label: { ru: 'Диалоги', kk: 'Диалогтар', en: 'Conversations' } },
   { href: '/ai-agent/test-chat', label: { ru: 'Тестовый чат', kk: 'Сынақ чаты', en: 'Test chat' } },
   { href: '/ai-agent/broadcasts', label: { ru: 'Рассылки', kk: 'Таратылымдар', en: 'Broadcasts' } },
   { href: '/ai-agent/leads', label: { ru: 'Заявки', kk: 'Өтінімдер', en: 'Leads' } },

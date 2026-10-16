@@ -5,6 +5,7 @@ import { encryptAtRest, decryptAtRest } from '@/lib/kaspiPay/crypto'
 import { getKey } from '@/lib/aiAgent/connection'
 import { getTelegramMe, setTelegramWebhook, deleteTelegramWebhook, telegramWebhookBase } from '@/lib/aiAgent/telegram'
 import { getActivePlan } from '@/lib/plan'
+import { markLaunchedIfLive } from '@/lib/aiAgent/launchMark'
 
 // Connect (POST) / disconnect (DELETE) a customer's Telegram bot to an
 // agent -- the BotFather-token flow: the user pastes a bot token, getMe
@@ -109,6 +110,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'webhook_setup_failed' }, { status: 502 })
   }
 
+  await markLaunchedIfLive(supabase, agentId)
   return NextResponse.json({ connected: true, botUsername: me.username })
 }
 

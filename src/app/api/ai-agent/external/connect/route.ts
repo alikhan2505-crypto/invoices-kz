@@ -5,6 +5,7 @@ import { encryptAtRest } from '@/lib/kaspiPay/crypto'
 import { getKey } from '@/lib/aiAgent/connection'
 import { generateApiKey, hashApiKey } from '@/lib/aiAgent/externalApi'
 import { getActivePlan } from '@/lib/plan'
+import { markLaunchedIfLive } from '@/lib/aiAgent/launchMark'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -79,6 +80,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'connect_failed' }, { status: 500 })
   }
 
+  await markLaunchedIfLive(supabase, agentId)
   return NextResponse.json({ connected: true, apiKey })
 }
 

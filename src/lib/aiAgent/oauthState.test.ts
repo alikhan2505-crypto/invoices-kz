@@ -20,6 +20,11 @@ describe('createOAuthState / verifyOAuthState', () => {
     expect(verifyOAuthState(state)).toEqual({ userId: 'user-123', agentId: 'agent-456' })
   })
 
+  it('carries returnTo=setup for a connect started from the setup wizard', () => {
+    const state = createOAuthState('user-123', 'agent-456', 'setup')
+    expect(verifyOAuthState(state)).toEqual({ userId: 'user-123', agentId: 'agent-456', returnTo: 'setup' })
+  })
+
   it('rejects a tampered state', () => {
     const state = createOAuthState('user-123')
     const tampered = state.slice(0, -1) + (state.endsWith('a') ? 'b' : 'a')

@@ -67,9 +67,9 @@ function WarnIcon() {
 
 // Three pulsing dots while the agent reply is in flight. Under
 // prefers-reduced-motion the dots render static (no infinite loop).
-function TypingIndicator({ reduceMotion }: { reduceMotion: boolean }) {
+function TypingIndicator({ reduceMotion, label }: { reduceMotion: boolean; label: string }) {
   return (
-    <span className="inline-flex items-center gap-1 px-1" aria-label="Агент печатает">
+    <span className="inline-flex items-center gap-1 px-1" role="img" aria-label={label}>
       {[0, 1, 2].map(i => (
         <motion.span
           key={i}
@@ -94,7 +94,10 @@ function TypingIndicator({ reduceMotion }: { reduceMotion: boolean }) {
 // capped viewport-relative height; the settings slide-over hosts it inside
 // a flex column that already owns the available height, so the transcript
 // should grow to fill that instead of re-capping itself.
-export default function TestChatPanel({ agentId, fill = false }: { agentId: string; fill?: boolean }) {
+//
+// `suggestions` (мастер /ai-agent/setup, 16.10.2026): готовые вопросы-кнопки
+// над полем ввода -- нажатие сразу отправляет вопрос, как будто его набрали.
+export default function TestChatPanel({ agentId, fill = false, suggestions }: { agentId: string; fill?: boolean; suggestions?: string[] }) {
   const { lang } = useLanguage()
   const tf = aiAgentFormsDict[lang]
   const reduceMotionRaw = useReducedMotion()
@@ -129,12 +132,12 @@ export default function TestChatPanel({ agentId, fill = false }: { agentId: stri
     if (el) el.scrollTop = el.scrollHeight
   }, [messages, sending])
 
-  async function send() {
-    const text = input.trim()
+  async function send(preset?: string) {
+    const text = (preset ?? input).trim()
     if (!text || !agentId || sending) return
     const historyBefore = messages
     setMessages(prev => [...prev, { role: 'user', text }])
-    setInput('')
+    if (preset === undefined) setInput('')
     setSending(true)
     setSendError(false)
     try {
@@ -173,7 +176,7 @@ export default function TestChatPanel({ agentId, fill = false }: { agentId: stri
             className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium disabled:opacity-50 transition-colors hover:bg-[color:var(--nav-bg)]"
             style={{ color: 'var(--nav-text-secondary)' }}
           >
-            <RestartIcon /> Рестарт чата
+            <RestartIcon /> {tf.testChatRestart}
           </button>
         </div>
 
@@ -188,9 +191,9 @@ export default function TestChatPanel({ agentId, fill = false }: { agentId: stri
               <div className="mb-3 flex items-center justify-center w-11 h-11 rounded-2xl" style={{ background: 'var(--nav-bg)', color: 'var(--nav-accent)' }}>
                 <BotIcon size={22} />
               </div>
-              <div className="text-sm font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>Начните диалог</div>
+              <div className="text-sm font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>{tf.testChatEmptyTitle}</div>
               <p className="text-xs max-w-xs" style={{ color: 'var(--nav-text-muted)' }}>
-                Напишите сообщение — агент ответит так же, как ответил бы реальному клиенту в Instagram.
+                {tf.testChatEmptyText}
               </p>
             </div>
           )}
@@ -245,7 +248,7 @@ export default function TestChatPanel({ agentId, fill = false }: { agentId: stri
                 <BotIcon size={15} />
               </span>
               <span className="rounded-2xl px-3.5 py-3" style={{ background: 'var(--nav-bg)', borderBottomLeftRadius: '6px' }}>
-                <TypingIndicator reduceMotion={reduceMotion} />
+                <TypingIndicator reduceMotion={reduceMotion} label={tf.testChatTyping} />
               </span>
             </motion.div>
           )}
@@ -254,27 +257,39 @@ export default function TestChatPanel({ agentId, fill = false }: { agentId: stri
         {sendError && (
           <div className="mx-4 lg:mx-5 mb-2 rounded-lg px-3 py-2.5 text-xs flex items-start gap-2" style={{ background: 'var(--nav-bg)', color: 'var(--nav-critical)' }}>
             <span className="mt-0.5"><WarnIcon /></span>
-            <span>Не удалось получить ответ — попробуйте ещё раз</span>
+            <span>{tf.testChatSendError}</span>
+          </div>
+        )}
+
+        {suggestions && suggestions.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 px-3 lg:px-4 pt-3 border-t border-[color:var(--nav-border)]">
+            {suggestions.map(q => (
+              <button key={q} type="button" onClick={() => send(q)} disabled={sending}
+                className="text-xs font-medium rounded-full px-3 py-1.5 transition-colors disabled:opacity-50 hover:bg-[color:var(--nav-accent-soft)]"
+                style={{ background: 'var(--nav-bg)', color: 'var(--nav-accent)' }}>
+                {q}
+              </button>
+            ))}
           </div>
         )}
 
         <form
-          className="flex items-center gap-2 p-3 lg:p-4 border-t border-[color:var(--nav-border)]"
+          className={`flex items-center gap-2 p-3 lg:p-4 ${suggestions && suggestions.length > 0 ? '' : 'border-t border-[color:var(--nav-border)]'}`}
           onSubmit={e => { e.preventDefault(); send() }}
         >
           <input
             value={input}
             onChange={e => setInput(e.target.value)}
-            placeholder="Напишите сообщение…"
+            placeholder={tf.testChatPlaceholder}
             maxLength={2000}
-            aria-label="Сообщение агенту"
+            aria-label={tf.testChatInputAria}
             className="flex-1 rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
             style={{ color: 'var(--nav-text-primary)', background: 'transparent' }}
           />
           <button
             type="submit"
             disabled={sending || input.trim().length === 0}
-            aria-label="Отправить"
+            aria-label={tf.testChatSendAria}
             className="flex items-center justify-center w-11 h-11 rounded-lg flex-shrink-0 disabled:opacity-40 transition-transform hover:-translate-y-0.5"
             style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)', boxShadow: '0 10px 24px -10px var(--nav-accent)' }}
           >
@@ -305,22 +320,22 @@ export default function TestChatPanel({ agentId, fill = false }: { agentId: stri
               onClick={e => e.stopPropagation()}
               role="dialog"
               aria-modal="true"
-              aria-label="Рестарт чата"
+              aria-label={tf.testChatRestart}
             >
-              <div className="text-base font-bold mb-2" style={{ color: 'var(--nav-text-primary)' }}>Рестарт чата</div>
+              <div className="text-base font-bold mb-2" style={{ color: 'var(--nav-text-primary)' }}>{tf.testChatRestart}</div>
               <p className="text-sm mb-5" style={{ color: 'var(--nav-text-secondary)' }}>
-                После перезапуска сбросится контекст диалога.
+                {tf.testChatRestartText}
               </p>
               <div className="flex gap-2">
                 <button onClick={() => setShowRestartConfirm(false)}
                   className="flex-1 nav-glass rounded-lg px-4 py-2.5 text-sm font-medium"
                   style={{ color: 'var(--nav-text-primary)' }}>
-                  Отмена
+                  {tf.cancelButton}
                 </button>
                 <button onClick={restartChat}
                   className="flex-1 rounded-lg px-4 py-2.5 text-sm font-semibold"
                   style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-                  Перезапустить
+                  {tf.testChatRestartConfirm}
                 </button>
               </div>
             </motion.div>

@@ -22,6 +22,8 @@ import { sendWhatsAppImage, sendWhatsAppMessage, sendWhatsAppFlowStep, WhatsAppA
 import { UNSUPPORTED_MEDIA_REPLY_TEXT } from '@/lib/aiAgent/mediaLimits'
 import { findFlowTriggerMatch, type FlowStep } from './flow'
 import { startFlow, handleFlowButtonClick, FLOW_STALE_TEXT, type FlowStepSender } from './flowEngine'
+import { agentCanReply, agentReplyState, storesInboundOnly } from './planGate'
+import { handleInboundWithoutReply } from './lapsedInbound'
 
 // The WhatsApp twin of telegramWebhookHandler.ts's Telegram tenant pipeline
 // (itself the twin of webhookHandler.ts's Instagram pipeline) -- same
@@ -190,7 +192,19 @@ export async function handleWhatsAppIncoming(conn: WhatsAppTenantConnection, par
 
   // Owner paused this agent (is_enabled toggle) -- drop the message
   // entirely: no conversation row, no logged message, no reply, no debit.
-  if (agent.is_enabled === false) return
+  // Решение 3 (16.10.2026): и тариф владельца -- кончился Про, бот молчит и
+  // не списывает, ничего не меняя в базе (см. planGate.ts). Но входящее
+  // сохраняется, чтобы после продления владелец увидел этих клиентов (A2):
+  // без ответа, сценариев, CAPI и списаний (lapsedInbound.ts).
+  const replyState = await agentReplyState(supabase, agent)
+  if (replyState === 'paused') return
+  if (storesInboundOnly(replyState)) {
+    await handleInboundWithoutReply(supabase, replyState, agent, {
+      agentId: conn.agentId, channel: 'whatsapp', externalThreadId: params.from,
+      customerHandle: params.customerHandle, text: params.incomingText, externalId: params.externalId,
+    })
+    return
+  }
 
   // Срок обучения проверяется здесь, на входящем сообщении (см. trainingExit.ts):
   // вышедший по сроку агент отвечает клиенту сам уже на этом сообщении.
@@ -572,8 +586,8 @@ export async function handleWhatsAppFlowButtonClick(conn: WhatsAppTenantConnecti
     .maybeSingle()
   if (existingMsg) return
 
-  const { data: agent } = await supabase.from('ai_agents').select('is_enabled').eq('id', conn.agentId).single()
-  if (!agent || agent.is_enabled === false) return
+  const { data: agent } = await supabase.from('ai_agents').select('is_enabled, user_id').eq('id', conn.agentId).single()
+  if (!(await agentCanReply(supabase, agent))) return
 
   const { data: conversation } = await supabase
     .from('ai_agent_conversations')

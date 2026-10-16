@@ -4,6 +4,8 @@ import { loadWhatsAppConnection, handleWhatsAppEcho, handleWhatsAppIncoming, han
 import { downloadWhatsAppMedia, sendWhatsAppMessage } from '@/lib/whatsapp'
 import { transcribeAudio } from '@/lib/openaiWhisper'
 import { isImageWithinLimits, isAudioWithinLimits, UNSUPPORTED_MEDIA_REPLY_TEXT } from '@/lib/aiAgent/mediaLimits'
+import { createReplyStateLoader } from '@/lib/aiAgent/replyStateLoader'
+import { lapsedPlaceholder } from '@/lib/aiAgent/lapsedInbound'
 
 // Inbound WhatsApp Cloud API webhook for every connected customer number --
 // mirrors src/app/api/instagram/webhook/route.ts's exact shape (GET verify
@@ -96,6 +98,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true })
   }
 
+  // Состояние агента читается до скачивания медиа и до заготовки «не понимаю
+  // такой формат» (A1): черновик/выключенный агент молчит совсем, агент с
+  // кончившимся Про молчит, но входящее сохраняется (без скачивания и Whisper).
+  const replyStateOf = createReplyStateLoader()
+
   for (const entry of payload.entry || []) {
     for (const change of entry.changes || []) {
       // Coexistence: the owner answered a customer from their own WhatsApp
@@ -141,6 +148,12 @@ export async function POST(req: NextRequest) {
         const contact = value.contacts?.find(c => c.wa_id === msg.from)
         const customerHandle = contact?.profile?.name || msg.from
 
+        const replyState = await replyStateOf(conn.agentId)
+        if (replyState === 'paused') continue
+        // Агент живой, но отвечать нельзя (Про кончился / профиль не прочитан):
+        // обработчик только сохранит входящее. Медиа не скачиваем.
+        const silent = replyState !== 'reply'
+
         try {
           if (msg.type === 'interactive') {
             const clickedPayload = msg.interactive?.button_reply?.id || msg.interactive?.list_reply?.id
@@ -158,6 +171,21 @@ export async function POST(req: NextRequest) {
               incomingText: msg.text.body,
               ctwaClid: msg.referral?.ctwa_clid,
             })
+            continue
+          }
+
+          // Текст и кнопки идут обычным путём ниже: обработчик сам сохранит
+          // их без ответа. Медиа и прочие форматы -- подписью, без скачивания.
+          if (silent && msg.type && msg.type !== 'interactive' && msg.type !== 'text') {
+            const isContent = msg.type === 'image' || msg.type === 'audio' || WHATSAPP_CONTENT_TYPES.includes(msg.type)
+            if (isContent) {
+              await handleWhatsAppIncoming(conn, {
+                externalId: msg.id,
+                from: msg.from,
+                customerHandle,
+                incomingText: (msg.type === 'image' && msg.image?.caption?.trim()) || lapsedPlaceholder(msg.type),
+              })
+            }
             continue
           }
 
@@ -211,6 +239,7 @@ export async function POST(req: NextRequest) {
           // silence. The fallback send itself is best-effort: if it also
           // fails (e.g. a dead token), swallow it rather than throw.
           console.error('whatsapp webhook: processing failed for', msg.id, ':', err.message)
+          if (silent) continue
           await sendWhatsAppMessage(conn.phoneNumberId, msg.from, UNSUPPORTED_MEDIA_REPLY_TEXT, { accessToken: conn.accessToken }).catch(() => {})
         }
       }

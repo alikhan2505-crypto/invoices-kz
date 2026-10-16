@@ -8,6 +8,10 @@ import DesktopShell from '@/components/DesktopShell'
 import { getActivePlan } from '@/lib/plan'
 import { useCrossHref } from '@/lib/useCrossHref'
 import { kzWindowStart, countNewLeadsSince, countWaitingForHuman, formatDialogWhen } from '@/lib/aiAgent/overviewStats'
+import AiAgentProUpsell from '@/components/aiAgent/AiAgentProUpsell'
+import { fetchWaUsage, waLevelColor, type WaUsageResponse } from '@/components/aiAgent/WhatsAppUsage'
+import { useLanguage } from '@/components/LanguageProvider'
+import { aiAgentSetupDict } from '@/lib/i18n/aiAgentSetup'
 
 // "Обзор" of the AI agent (founder's mock, 21.09.2026): three numbers, the
 // freshest conversations, and the hand-offs to the neighbouring products.
@@ -49,6 +53,15 @@ export default function AiAgentOverview() {
   const [newLeads, setNewLeads] = useState<number | null>(null)
   const [dialogs, setDialogs] = useState<DialogRow[] | null>(null)
   const [hasAgents, setHasAgents] = useState<boolean | null>(null)
+  // Без Про -- та же Про-стена, что на остальных страницах раздела (у кого Про
+  // кончился, она сама предложит «Диалоги» на чтение), а не молчаливый
+  // переход на /upgrade.
+  const [forbidden, setForbidden] = useState(false)
+  // Счётчик бесплатных ответов WhatsApp (16.10.2026) -- 4-й показатель,
+  // только если WhatsApp подключён хотя бы у одного агента.
+  const [waUsage, setWaUsage] = useState<WaUsageResponse | null>(null)
+  const { lang } = useLanguage()
+  const sd = aiAgentSetupDict[lang]
 
   useEffect(() => {
     let alive = true
@@ -60,7 +73,7 @@ export default function AiAgentOverview() {
       // explanation. /upgrade is where every other Pro paywall in the app
       // already sends a blocked user (SiteNav's proOnly sections,
       // /profile/acquiring's cards).
-      if (!profile?.is_admin && !getActivePlan(profile).canAiAgent) { router.push('/upgrade'); return }
+      if (!profile?.is_admin && !getActivePlan(profile).canAiAgent) { if (alive) { setForbidden(true); setReady(true) } return }
       if (!alive) return
       setReady(true)
 
@@ -83,6 +96,8 @@ export default function AiAgentOverview() {
         .then((d) => { if (alive) setDialogs((d?.items ?? []) as DialogRow[]) })
         .catch(() => { if (alive) setDialogs([]) })
 
+      fetchWaUsage().then((d) => { if (alive) setWaUsage(d) })
+
       fetch('/api/ai-agent/agents', { headers })
         .then((r) => (r.ok ? r.json() : null))
         .then((d) => { if (alive) setHasAgents(Array.isArray(d?.agents) ? d.agents.length > 0 : null) })
@@ -94,12 +109,26 @@ export default function AiAgentOverview() {
 
   if (!ready) return <LoadingSpinner />
 
+  if (forbidden) return (
+    <DesktopShell>
+      <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
+        <SiteNav />
+        <AiAgentProUpsell />
+      </main>
+    </DesktopShell>
+  )
+
   // The table only ever holds the 5 freshest -- the KPI needs the real count
   // across everything, so it's derived from the full list and the rows are
   // trimmed separately (it used to count the trimmed rows).
   const pausedCount = dialogs === null ? null : countWaitingForHuman(dialogs)
   const freshDialogs = dialogs === null ? null : dialogs.slice(0, 5)
   const nowMs = Date.now()
+  // Несколько номеров -- показываем самый загруженный: лимит считается на
+  // номер, и предупреждать надо о том, что ближе к краю.
+  const waTop = waUsage && waUsage.numbers.length > 0
+    ? waUsage.numbers.reduce((a, b) => (b.used > a.used ? b : a))
+    : null
   const back = '/ai-agent/overview'
   const links = [
     { title: 'Выставить счёт клиенту из диалога', where: 'Счета · invoices.kz', href: crossHref('invoices', '/create', 'aiAgent', back) },
@@ -137,12 +166,27 @@ export default function AiAgentOverview() {
             {kpi('Диалогов за неделю', totals === undefined ? null : totals === null ? '—' : String(totals.conversations), totals ? `ответов отправлено: ${totals.replies}` : '')}
             {kpi('Новых заявок за неделю', newLeads === null ? null : String(newLeads), 'из всех каналов')}
             {kpi('Ждут человека', pausedCount === null ? null : String(pausedCount), 'агент передал диалог')}
+            {waTop && (
+              <div className="flex-1 min-w-[200px] p-5" style={{ borderRight: '1px solid var(--nav-border)' }}>
+                <div className="text-[11px] font-semibold uppercase" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.08em' }}>{sd.waKpiLabel}</div>
+                <div className="mt-1 text-3xl font-black tabular-nums" style={{ color: waTop.level === 'normal' ? 'var(--nav-text-primary)' : waLevelColor(waTop.level) }}>
+                  {waTop.used.toLocaleString('ru-RU')}
+                </div>
+                <div className="mt-1 text-xs" style={{ color: 'var(--nav-text-secondary)' }} title={sd.waApproxHint}>
+                  {sd.waKpiSub(waUsage!.limit)}
+                  {waUsage!.numbers.length > 1 && waTop.phone ? ` · ${waTop.phone}` : ''}
+                </div>
+                {waTop.level === 'over' && (
+                  <div className="mt-1.5 text-[11px]" style={{ color: 'var(--nav-critical)' }}>{sd.waOver}</div>
+                )}
+              </div>
+            )}
           </div>
 
           <section>
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-[15px] font-semibold" style={{ color: 'var(--nav-text-primary)' }}>Свежие диалоги</h2>
-              <a href="/ai-agent/dialogs" className="text-xs font-semibold" style={{ color: 'var(--nav-accent)' }}>Вся переписка →</a>
+              <a href="/ai-agent/dialogs" className="text-xs font-semibold" style={{ color: 'var(--nav-accent)' }}>Все диалоги →</a>
             </div>
             <div className="nav-glass rounded-2xl overflow-x-auto">
               <table className="w-full text-sm">

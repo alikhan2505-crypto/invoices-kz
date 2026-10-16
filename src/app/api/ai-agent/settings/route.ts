@@ -4,6 +4,7 @@ import { getActivePlan } from '@/lib/plan'
 import { firstReviewDraftAt } from '@/lib/aiAgent/trainingExit'
 import { agentRowShouldExitTraining } from '@/lib/aiAgent/trainingStatus'
 import { backfillWhatsAppDisplayName } from '@/lib/aiAgent/whatsappDisplayName'
+import { canUseSetupWizard, isDraftAgent, isMissingColumnError } from '@/lib/aiAgent/setupWizard'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -116,8 +117,12 @@ export async function GET(req: NextRequest) {
     : null
   const trainingExitPending = !!agent && agentRowShouldExitTraining(agent, new Date(), trainingFirstDraftAt)
 
+  // external_account_id нужен чату для сайта: это ключ виджета в коде
+  // вставки (без него после перезагрузки страницы код показывал
+  // data-key="undefined"). Секретов в нём нет ни у одного канала -- токены
+  // лежат в access_token_enc / api_token_hash и сюда не попадают.
   const { data: connectionRows } = agent
-    ? await supabase.from('ai_agent_channel_connections').select('channel, external_account_name, status').eq('agent_id', agent.id)
+    ? await supabase.from('ai_agent_channel_connections').select('channel, external_account_id, external_account_name, status').eq('agent_id', agent.id)
     : { data: [] }
   let connections = connectionRows || []
   // Номер WhatsApp для чипа у подключений, сделанных до того, как callback
@@ -164,6 +169,10 @@ export async function GET(req: NextRequest) {
         ? agent.kaspi_shop_connection_id
         : null,
       metaPixelId: agent.meta_pixel_id || null,
+      // Мастер /ai-agent/setup (16.10.2026): черновик -- launched_at есть и
+      // пуст. До миграции колонки нет: isDraft всегда false, как раньше.
+      isDraft: isDraftAgent(agent, connections),
+      launchedAt: agent.launched_at ?? null,
     } : null,
     suggestedName: profile?.company_name || '',
     connections,
@@ -186,6 +195,25 @@ export async function POST(req: NextRequest) {
   if (!(await hasAiAgentAccess(user.id))) return NextResponse.json({ error: 'admin_only' }, { status: 403 })
 
   const body = await req.json()
+
+  // Шаг 0 мастера «Создать» (16.10.2026): мгновенный агент-черновик.
+  // Название = company_name или «Ассистент», всё остальное -- значения
+  // колонок по умолчанию; is_enabled = false и launched_at = null, поэтому
+  // он НЕ отвечает клиентам, пока владелец не нажмёт «Запустить»
+  // (agents/[id]/launch). Мастер пока только для админов (решение 4).
+  if (body?.draft === true && !body?.agentId) {
+    const { data: owner } = await supabase.from('profiles').select('is_admin, company_name').eq('id', user.id).maybeSingle()
+    if (!canUseSetupWizard(!!owner?.is_admin)) return NextResponse.json({ error: 'admin_only' }, { status: 403 })
+    const draftName = (typeof owner?.company_name === 'string' && owner.company_name.trim()) || 'Ассистент'
+    const { data, error } = await supabase
+      .from('ai_agents')
+      .insert({ user_id: user.id, name: draftName.slice(0, 120), is_enabled: false })
+      .select('id, name, status, is_enabled')
+      .single()
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ agent: data })
+  }
+
   const { agentId, name, tone, businessDescription, goal, collectFields, timezone, currency, customInstructions, historyPairs, isEnabled, stopPhrases, kaspiShopConnectionId } = body
 
   if (agentId !== undefined && typeof agentId !== 'string') return NextResponse.json({ error: 'invalid agentId' }, { status: 400 })
@@ -283,13 +311,24 @@ export async function POST(req: NextRequest) {
     if (!data) return NextResponse.json({ error: 'not_found' }, { status: 404 })
     agent = data
   } else {
-    const { data, error } = await supabase
+    // Прежний путь создания (форма настроек): агент отвечает, как только
+    // подключён канал, -- значит, он сразу «запущен». launched_at ставится,
+    // чтобы такой агент никогда не выглядел черновиком мастера. До миграции
+    // колонки нет -- вставка без неё, как раньше.
+    let inserted = await supabase
       .from('ai_agents')
-      .insert({ user_id: user.id, ...payload })
+      .insert({ user_id: user.id, ...payload, launched_at: new Date().toISOString() })
       .select()
       .single()
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    agent = data
+    if (inserted.error && isMissingColumnError(inserted.error, 'launched_at')) {
+      inserted = await supabase
+        .from('ai_agents')
+        .insert({ user_id: user.id, ...payload })
+        .select()
+        .single()
+    }
+    if (inserted.error) return NextResponse.json({ error: inserted.error.message }, { status: 500 })
+    agent = inserted.data
   }
 
   // No wallet row to seed since the 2026-08-18 unified-wallet merge: spend

@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { verifyOAuthState } from '@/lib/aiAgent/oauthState'
 import { getKey } from '@/lib/aiAgent/connection'
 import { encryptAtRest } from '@/lib/kaspiPay/crypto'
+import { markLaunchedIfLive } from '@/lib/aiAgent/launchMark'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -30,20 +31,32 @@ export async function GET(req: NextRequest) {
   const state = req.nextUrl.searchParams.get('state')
   const oauthError = req.nextUrl.searchParams.get('error')
 
-  if (oauthError || !code || !state) {
-    return NextResponse.redirect(`${appUrl}/ai-agent/settings?instagram_error=1`)
+  // Куда вернуть при ошибке: в мастер, если подключение начато оттуда
+  // (returnTo в подписанном state), иначе на настройки, как раньше. state
+  // проверяется ПЕРВЫМ, ещё до error/code: отмена на экране согласия
+  // Instagram приходит с error и тем же state, и раньше такой владелец
+  // выпадал из мастера на «Каналы» (B2). returnTo -- только из закрытого
+  // списка под HMAC-подписью (oauthState.ts); неподписанный или
+  // просроченный state -- на настройки.
+  let verified: ReturnType<typeof verifyOAuthState> = null
+  try {
+    verified = state ? verifyOAuthState(state) : null
+  } catch (e: any) {
+    console.error('ai-agent Instagram OAuth callback: state check failed:', e.message)
+  }
+  const errorUrl = verified?.returnTo === 'setup' && verified.agentId
+    ? `${appUrl}/ai-agent/setup?agent=${encodeURIComponent(verified.agentId)}&step=1&instagram_error=1`
+    : `${appUrl}/ai-agent/settings?instagram_error=1`
+  if (oauthError || !code || !verified) {
+    return NextResponse.redirect(errorUrl)
   }
   try {
-    const verified = verifyOAuthState(state)
-    if (!verified) {
-      return NextResponse.redirect(`${appUrl}/ai-agent/settings?instagram_error=1`)
-    }
 
     const appId = process.env.NEXT_PUBLIC_INSTAGRAM_APP_ID
     const appSecret = process.env.INSTAGRAM_APP_SECRET
     const redirectUri = `${appUrl}/api/ai-agent/instagram/callback`
     if (!appId || !appSecret) {
-      return NextResponse.redirect(`${appUrl}/ai-agent/settings?instagram_error=1`)
+      return NextResponse.redirect(errorUrl)
     }
 
     const tokenRes = await fetch('https://api.instagram.com/oauth/access_token', {
@@ -132,11 +145,18 @@ export async function GET(req: NextRequest) {
     }, { onConflict: 'channel,external_account_id' })
     if (upsertError) throw new Error(upsertError.message)
 
+    // Уже включённый агент без launched_at получил канал -- он запущен (A4).
+    await markLaunchedIfLive(supabase, agent.id)
+
     // Carry the agent id back so the settings page reopens the agent that
-    // was just connected (not the default most-recent one).
+    // was just connected (not the default most-recent one). Из мастера --
+    // обратно в мастер, сразу на следующий шаг «О бизнесе» (16.10.2026).
+    if (verified.returnTo === 'setup') {
+      return NextResponse.redirect(`${appUrl}/ai-agent/setup?agent=${agent.id}&step=2&instagram_connected=1`)
+    }
     return NextResponse.redirect(`${appUrl}/ai-agent/settings?agent=${agent.id}&instagram_connected=1`)
   } catch (e: any) {
     console.error('ai-agent Instagram OAuth callback failed:', e.message)
-    return NextResponse.redirect(`${appUrl}/ai-agent/settings?instagram_error=1`)
+    return NextResponse.redirect(errorUrl)
   }
 }

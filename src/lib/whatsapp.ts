@@ -9,6 +9,16 @@ import type { FlowStep } from './aiAgent/flow'
 // graph.instagram.com) with its own endpoints and v25.0 pin.
 const GRAPH_API = 'https://graph.facebook.com/v25.0'
 
+// Бесплатные служебные сообщения (ответы в окне 24 часа) в календарный месяц
+// на ОДИН номер -- с 01.10.2026 по всем найденным источникам 1000 (не 3000),
+// остаток не переносится, сообщения через других провайдеров на этом же
+// номере тоже входят в лимит. Официальная страница Meta цифру не
+// подтвердила, поэтому она держится одной константой: нашли текст Meta с
+// другой цифрой -- поменять здесь. Счётчик: src/lib/aiAgent/waUsage.ts и
+// GET /api/ai-agent/whatsapp/usage. Сверх лимита платит продавец Meta
+// напрямую (≈ $0.018 за сообщение); наши ответы при этом НЕ блокируются.
+export const WA_FREE_SERVICE_PER_MONTH = 1000
+
 // Mirrors InstagramApiError / TelegramApiError -- a 401 on a send or API
 // call means the stored access token is dead (revoked from the customer's
 // Meta Business Manager), which callers translate into the connection's

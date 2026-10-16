@@ -20,6 +20,8 @@ import { findTemplateMatch, mergeCollectedData, findStopPhraseMatch, STOP_PHRASE
 import { sendTelegramBotMessage, sendTelegramBotPhoto, TELEGRAM_CAPTION_MAX, sendTelegramFlowStep, answerTelegramCallbackQuery, pairConversationHistory, TelegramApiError } from './telegram'
 import { UNSUPPORTED_MEDIA_REPLY_TEXT } from '@/lib/aiAgent/mediaLimits'
 import { parseFlowDefinition, isTerminalStep, firstStep, findFlowTriggerMatch, resolveFlowButtonClick, type FlowStep } from './flow'
+import { agentCanReply, agentReplyState, storesInboundOnly } from './planGate'
+import { handleInboundWithoutReply } from './lapsedInbound'
 
 // The Telegram twin of webhookHandler.ts's Instagram tenant pipeline.
 // Deliberately a PARALLEL handler rather than a channel parameter threaded
@@ -107,7 +109,19 @@ export async function handleTelegramIncoming(conn: TelegramTenantConnection, par
 
   // Owner paused this agent (is_enabled toggle) -- drop the update
   // entirely: no conversation row, no logged message, no reply, no debit.
-  if (agent.is_enabled === false) return
+  // Решение 3 (16.10.2026): и тариф владельца -- кончился Про, бот молчит и
+  // не списывает, ничего не меняя в базе (см. planGate.ts). Но входящее
+  // сохраняется, чтобы после продления владелец увидел этих клиентов (A2):
+  // без ответа, сценариев и списаний (lapsedInbound.ts).
+  const replyState = await agentReplyState(supabase, agent)
+  if (replyState === 'paused') return
+  if (storesInboundOnly(replyState)) {
+    await handleInboundWithoutReply(supabase, replyState, agent, {
+      agentId: conn.agentId, channel: 'telegram', externalThreadId: params.chatId,
+      customerHandle: params.fromHandle, text: params.incomingText, externalId: params.externalId,
+    })
+    return
+  }
 
   // Срок обучения проверяется здесь, на входящем сообщении (см. trainingExit.ts):
   // вышедший по сроку агент отвечает клиенту сам уже на этом сообщении.
@@ -517,8 +531,8 @@ async function startTelegramFlow(
 // turn. If the agent has a flow marked is_start, that flow's first step
 // replaces the old static greeting; otherwise the greeting is unchanged.
 export async function handleTelegramStart(conn: TelegramTenantConnection, params: { chatId: string; fromHandle: string }): Promise<void> {
-  const { data: agent } = await supabase.from('ai_agents').select('is_enabled').eq('id', conn.agentId).single()
-  if (!agent || agent.is_enabled === false) return // owner paused the agent -- stay silent, matching handleTelegramIncoming's own pause behavior
+  const { data: agent } = await supabase.from('ai_agents').select('is_enabled, user_id').eq('id', conn.agentId).single()
+  if (!(await agentCanReply(supabase, agent))) return // owner paused the agent -- stay silent, matching handleTelegramIncoming's own pause behavior
 
   const { data: startFlow } = await supabase
     .from('ai_agent_flows')
@@ -582,8 +596,8 @@ export async function handleTelegramFlowCallback(
   conn: TelegramTenantConnection,
   params: { chatId: string; data: string; callbackQueryId: string }
 ): Promise<void> {
-  const { data: agent } = await supabase.from('ai_agents').select('is_enabled').eq('id', conn.agentId).single()
-  if (!agent || agent.is_enabled === false) {
+  const { data: agent } = await supabase.from('ai_agents').select('is_enabled, user_id').eq('id', conn.agentId).single()
+  if (!(await agentCanReply(supabase, agent))) {
     // Owner paused the agent -- still clear the customer's spinner, but
     // otherwise stay silent, matching handleTelegramIncoming's own pause behavior.
     await answerTelegramCallbackQuery(conn.botToken, params.callbackQueryId).catch((err: any) => {

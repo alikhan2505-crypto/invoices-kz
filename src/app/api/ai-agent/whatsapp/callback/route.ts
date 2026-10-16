@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { encryptAtRest } from '@/lib/kaspiPay/crypto'
 import { getKey } from '@/lib/aiAgent/connection'
 import { getActivePlan } from '@/lib/plan'
+import { markLaunchedIfLive } from '@/lib/aiAgent/launchMark'
 import {
   exchangeWhatsAppCode,
   registerWhatsAppPhoneNumber,
@@ -133,6 +134,7 @@ export async function POST(req: NextRequest) {
     }, { onConflict: 'channel,external_account_id' })
     if (upsertError) throw new Error(upsertError.message)
 
+    await markLaunchedIfLive(supabase, agentId)
     return NextResponse.json({ ok: true, phoneNumberId, displayPhoneNumber })
   } catch (e: any) {
     const detail = e instanceof WhatsAppApiError ? `[${e.status}] ${e.message}` : e?.message

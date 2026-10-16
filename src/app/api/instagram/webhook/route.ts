@@ -7,6 +7,8 @@ import { generateAiReply } from '@/lib/instagramAiReply'
 import { loadTenantConnection, handleTenantIncoming, handleInstagramFlowButtonClick } from '@/lib/aiAgent/webhookHandler'
 import { transcribeAudio } from '@/lib/openaiWhisper'
 import { isImageWithinLimits, isAudioWithinLimits, sniffImageMimeType, UNSUPPORTED_MEDIA_REPLY_TEXT } from '@/lib/aiAgent/mediaLimits'
+import { createReplyStateLoader } from '@/lib/aiAgent/replyStateLoader'
+import { lapsedPlaceholder } from '@/lib/aiAgent/lapsedInbound'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -242,6 +244,7 @@ export async function POST(req: NextRequest) {
   }
 
   const payload = JSON.parse(rawBody)
+  const replyStateOf = createReplyStateLoader()
 
   for (const entry of payload.entry || []) {
     // entry.id is the Instagram-scoped account id the event occurred on --
@@ -336,6 +339,23 @@ export async function POST(req: NextRequest) {
       // a sender id or a fetchable attachment url -- defensive skip.
       const attachment = Array.isArray(msg.attachments) ? msg.attachments[0] : undefined
       if (!replyTarget || !attachment?.payload?.url) continue
+
+      // Состояние агента -- до скачивания вложения, расшифровки голосового
+      // (Whisper платный) и заготовки «не понимаю такой формат» (A1).
+      // Черновик/выключенный агент молчит совсем; агент с кончившимся Про
+      // молчит, но входящее сохраняется подписью.
+      const replyState = await replyStateOf(tenantConnection!.agentId)
+      if (replyState === 'paused') continue
+      if (replyState !== 'reply') {
+        await handleTenantIncoming(tenantConnection!, {
+          source: 'dm',
+          externalId: msg.mid,
+          fromUsername,
+          incomingText: lapsedPlaceholder(attachment.type),
+          replyTarget,
+        })
+        continue
+      }
 
       try {
         if (attachment.type === 'image') {

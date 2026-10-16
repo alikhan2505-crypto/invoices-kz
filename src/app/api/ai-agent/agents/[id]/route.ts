@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getActivePlan } from '@/lib/plan'
+import { isMissingColumnError } from '@/lib/aiAgent/setupWizard'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -192,6 +193,22 @@ export async function PATCH(
     .maybeSingle()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   if (!data) return NextResponse.json({ error: 'not_found' }, { status: 404 })
+
+  // Включили агента-черновик мастера тумблером в настройках, мимо
+  // «Запустить»: он уже отвечает клиентам, значит, запущен -- иначе в списке
+  // висел бы «Черновик» у работающего агента. Только пустой launched_at,
+  // best-effort: до миграции колонки нет, и ошибка здесь тумблер не ломает.
+  if (body.isEnabled) {
+    const { error: launchError } = await supabase
+      .from('ai_agents')
+      .update({ launched_at: new Date().toISOString() })
+      .eq('id', data.id)
+      .eq('user_id', user.id)
+      .is('launched_at', null)
+    if (launchError && !isMissingColumnError(launchError, 'launched_at')) {
+      console.error('ai-agent PATCH: launched_at update failed for', data.id, ':', launchError.message)
+    }
+  }
 
   return NextResponse.json({ agent: { id: data.id, isEnabled: !!data.is_enabled } })
 }

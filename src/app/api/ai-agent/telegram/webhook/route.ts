@@ -4,6 +4,8 @@ import { parseTelegramUpdate, telegramDedupKey, sendTelegramBotMessage, download
 import { loadTelegramConnectionBySecret, handleTelegramIncoming, handleTelegramStart, handleTelegramFlowCallback } from '@/lib/aiAgent/telegramWebhookHandler'
 import { transcribeAudio } from '@/lib/openaiWhisper'
 import { isImageWithinLimits, isAudioWithinLimits, UNSUPPORTED_MEDIA_REPLY_TEXT } from '@/lib/aiAgent/mediaLimits'
+import { createReplyStateLoader } from '@/lib/aiAgent/replyStateLoader'
+import { lapsedPlaceholder } from '@/lib/aiAgent/lapsedInbound'
 
 // Inbound Telegram updates for every connected customer bot. Authenticity
 // is verified TWO ways, both against the per-connection webhook_secret
@@ -48,6 +50,17 @@ export async function POST(req: NextRequest) {
   // loop, and dedup would drop the retries anyway once the inbound row is
   // claimed.
   const parsed = parseTelegramUpdate(update)
+
+  // Состояние агента -- до скачивания фото, расшифровки голосового (Whisper
+  // платный) и заготовки «не понимаю такой формат» (A1). Черновик или
+  // выключенный агент молчит совсем; агент с кончившимся Про молчит, но
+  // входящее сохраняется подписью ([Фото], [Голосовое сообщение]). /start и
+  // нажатия кнопок обработчики проверяют сами (там надо снять «часики»).
+  const needsGate = parsed.kind === 'photo' || parsed.kind === 'voice' || parsed.kind === 'unsupported'
+  const replyState = needsGate ? await createReplyStateLoader()(conn.agentId) : 'reply'
+  if (replyState === 'paused') return NextResponse.json({ ok: true })
+  const silent = replyState !== 'reply'
+
   try {
     if (parsed.kind === 'start') {
       // /start is a chat-opening handshake -- if the agent has a flow
@@ -64,6 +77,15 @@ export async function POST(req: NextRequest) {
         fromHandle: parsed.fromHandle,
         incomingText: parsed.text,
       })
+    } else if (silent && (parsed.kind === 'photo' || parsed.kind === 'voice')) {
+      await handleTelegramIncoming(conn, {
+        externalId: telegramDedupKey(conn.botId, parsed.updateId),
+        chatId: parsed.chatId,
+        fromHandle: parsed.fromHandle,
+        incomingText: (parsed.kind === 'photo' && parsed.caption) || lapsedPlaceholder(parsed.kind === 'photo' ? 'image' : 'voice'),
+      })
+    } else if (silent && parsed.kind === 'unsupported') {
+      // Без update_id сохранить нечего (нет ключа дедупа) -- просто молчим.
     } else if (parsed.kind === 'photo') {
       try {
         const buffer = await downloadTelegramMedia(parsed.fileId, conn.botToken)
