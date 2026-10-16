@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import InvoicesLandingPage from '@/components/marketing/InvoicesLandingPage'
+import VisitBeacon from '@/components/VisitBeacon'
 
 // The Счета marketing page's real address once the apex root becomes the
 // Products Hub (see src/lib/rootHub.ts). Reached publicly through
@@ -41,5 +42,5 @@ export const metadata: Metadata = {
 }
 
 export default function InvoicesLandingRoute() {
-  return <InvoicesLandingPage />
+  return <><VisitBeacon /><InvoicesLandingPage /></>
 }

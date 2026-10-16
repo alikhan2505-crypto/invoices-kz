@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { Unbounded, Onest } from 'next/font/google'
 import { LANDINGS, isLandingKey } from '@/lib/landings'
 import ProductLanding from '@/components/products/ProductLanding'
+import VisitBeacon from '@/components/VisitBeacon'
 
 // Marketing-surface fonts (DESIGN.md §7), loaded only on these landings.
 const unbounded = Unbounded({ subsets: ['cyrillic', 'latin'], weight: ['700'], variable: '--font-unbounded', display: 'swap' })
@@ -37,5 +38,5 @@ export async function generateMetadata({ params }: { params: Promise<{ key: stri
 export default async function LandingPage({ params }: { params: Promise<{ key: string }> }) {
   const { key } = await params
   if (!isLandingKey(key)) notFound()
-  return <ProductLanding landing={key} fontClass={`${unbounded.variable} ${onest.variable}`} />
+  return <><VisitBeacon /><ProductLanding landing={key} fontClass={`${unbounded.variable} ${onest.variable}`} /></>
 }

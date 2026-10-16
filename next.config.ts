@@ -36,6 +36,8 @@ const nextConfig: NextConfig = {
   redirects() {
     return [
       { source: '/car', destination: '/?utm_source=car&utm_medium=decal&utm_campaign=jetour', permanent: false },
+      // /qr — запасной короткий адрес на случай перепечатки QR; utm_source=car → в отчёте «точно по QR».
+      { source: '/qr', destination: '/?utm_source=car&utm_medium=qr&utm_campaign=jetour', permanent: false },
     ]
   },
 };

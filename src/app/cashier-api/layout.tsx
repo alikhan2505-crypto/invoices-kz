@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { API_HOST_BASE } from '@/lib/hostRouting'
+import VisitBeacon from '@/components/VisitBeacon'
 
 // Canonical follows the redirect switch: apex path until API_HOST_REDIRECT=1,
 // then the api subdomain root.
@@ -38,5 +39,5 @@ export const metadata: Metadata = {
 }
 
 export default function CashierApiLayout({ children }: { children: React.ReactNode }) {
-  return children
+  return <><VisitBeacon />{children}</>
 }

@@ -3,6 +3,7 @@ import { Unbounded, Onest, Caveat } from 'next/font/google'
 import InvoicesLandingPage from '@/components/marketing/InvoicesLandingPage'
 import ProductsHub from './products/ProductsHub'
 import { ROOT_HUB_LIVE } from '@/lib/rootHub'
+import VisitBeacon from '@/components/VisitBeacon'
 
 // Marketing-surface fonts (DESIGN.md §7), only actually used once the Hub is
 // live here -- module-scope is the only place next/font/google can be
@@ -46,6 +47,7 @@ export function generateMetadata(): Metadata {
 }
 
 export default function Home() {
-  if (!ROOT_HUB_LIVE) return <InvoicesLandingPage />
-  return <ProductsHub fontClass={`${unbounded.variable} ${onest.variable} ${caveat.variable}`} />
+  // VisitBeacon — счётчик заходов для отчёта «Машина/QR» (src/lib/visits).
+  if (!ROOT_HUB_LIVE) return <><VisitBeacon /><InvoicesLandingPage /></>
+  return <><VisitBeacon /><ProductsHub fontClass={`${unbounded.variable} ${onest.variable} ${caveat.variable}`} /></>
 }

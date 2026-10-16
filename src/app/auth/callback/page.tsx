@@ -7,6 +7,7 @@ import { authDict } from '@/lib/i18n/auth'
 import { choosePostLoginDestination, readPostLoginIntents } from '@/lib/postLoginDestination'
 import { selectablePersonaProducts, parsePersonaKeys, PENDING_PERSONA_KEY } from '@/lib/products'
 import { logToolEvent, readFirstTouch } from '@/lib/tools-i18n/toolEvents'
+import { readSignupSource } from '@/lib/visits/client'
 
 export default function AuthCallback() {
   const router = useRouter()
@@ -249,6 +250,20 @@ export default function AuthCallback() {
             accessToken: session.access_token,
             utm: { source: firstTouch?.utm_source, medium: firstTouch?.utm_medium, campaign: firstTouch?.utm_campaign },
           })
+
+          // Источник первого захода для отчёта «Машина/QR» (только метка из
+          // белого списка; без неё — 'unknown'). Выстрелил и забыл, как выше.
+          try {
+            fetch('/api/track/signup-source', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'text/plain;charset=UTF-8',
+                'Authorization': `Bearer ${session.access_token}`,
+              },
+              body: JSON.stringify({ source: readSignupSource(session.user.user_metadata?.first_source) }),
+              keepalive: true,
+            }).catch(() => {})
+          } catch {}
 
           goToDestination()
         } else {

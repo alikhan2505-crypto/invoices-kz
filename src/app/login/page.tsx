@@ -10,6 +10,7 @@ import { postLoginRedirectFromSearch, setPostLoginRedirect } from '@/lib/postLog
 import { resolvePostLoginDestination } from '@/lib/postLoginDestination'
 import { SIGNED_OUT_PARAM } from '@/lib/signOut'
 import { useAppDialog } from '@/components/AppDialog'
+import { rawFreshFirstSource } from '@/lib/visits/client'
 
 // The signed-in user's enabled_products (for homeFor) and tour state (a
 // newcomer goes to the dashboard tour first) -- see postLoginDestination.ts.
@@ -169,11 +170,17 @@ export default function Login() {
     // localStorage пуст, и бонус молча терялся. /auth/callback читает оттуда.
     let refCode = ''
     try { refCode = localStorage.getItem('referral_code') || '' } catch {}
+    // Так же едет и источник первого захода (отчёт «Машина/QR»): иначе
+    // регистрация из другого браузера всегда оказывалась бы 'unknown'.
+    const firstSource = rawFreshFirstSource()
+    const otpData: Record<string, string> = {}
+    if (refCode) otpData.referral_code = refCode
+    if (firstSource) otpData.first_source = firstSource
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
         emailRedirectTo: 'https://invoices.kz/auth/callback',
-        ...(refCode ? { data: { referral_code: refCode } } : {}),
+        ...(Object.keys(otpData).length ? { data: otpData } : {}),
       }
     })
     if (error) {
