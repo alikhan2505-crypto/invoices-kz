@@ -7,10 +7,17 @@ import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import { getActivePlan } from '@/lib/plan'
 import { useCrossHref } from '@/lib/useCrossHref'
+import { kzWindowStart, countNewLeadsSince, countWaitingForHuman, formatDialogWhen } from '@/lib/aiAgent/overviewStats'
 
 // "Обзор" of the AI agent (founder's mock, 21.09.2026): three numbers, the
 // freshest conversations, and the hand-offs to the neighbouring products.
 // Everything here reads endpoints the other AI-agent pages already use.
+// 15.10.2026: all three KPIs count the same seven KZ calendar days (the
+// analytics route's window) and the full dialog list, not the 5 table rows --
+// see src/lib/aiAgent/overviewStats.ts.
+
+// Same window as /api/ai-agent/analytics?days=7 below.
+const WEEK_DAYS = 7
 
 const CHANNEL_LABEL: Record<string, string> = {
   instagram: 'Instagram',
@@ -59,19 +66,21 @@ export default function AiAgentOverview() {
 
       const headers = await authHeader()
 
-      fetch('/api/ai-agent/analytics?days=7', { headers })
+      fetch(`/api/ai-agent/analytics?days=${WEEK_DAYS}`, { headers })
         .then((r) => (r.ok ? r.json() : null))
         .then((d) => { if (alive) setTotals(d ? { conversations: d.totals.conversations, replies: d.totals.replies } : null) })
         .catch(() => { if (alive) setTotals(null) })
 
       fetch('/api/ai-agent/leads', { headers })
         .then((r) => (r.ok ? r.json() : null))
-        .then((d) => { if (alive) setNewLeads((d?.items ?? []).filter((i: { leadStatus: string }) => i.leadStatus === 'new').length) })
+        // Новые заявки ЗА НЕДЕЛЮ (по дате создания диалога), а не за всё время.
+        .then((d) => { if (alive) setNewLeads(countNewLeadsSince(d?.items ?? [], kzWindowStart(WEEK_DAYS, Date.now()).sinceIso)) })
         .catch(() => { if (alive) setNewLeads(null) })
 
       fetch('/api/ai-agent/dialogs', { headers })
         .then((r) => (r.ok ? r.json() : null))
-        .then((d) => { if (alive) setDialogs(((d?.items ?? []) as DialogRow[]).slice(0, 5)) })
+        // Весь список: «Ждут человека» считается по нему, таблица берёт 5 свежих.
+        .then((d) => { if (alive) setDialogs((d?.items ?? []) as DialogRow[]) })
         .catch(() => { if (alive) setDialogs([]) })
 
       fetch('/api/ai-agent/agents', { headers })
@@ -85,10 +94,12 @@ export default function AiAgentOverview() {
 
   if (!ready) return <LoadingSpinner />
 
-  const pausedCount = dialogs === null ? null : dialogs.filter((d) => d.pausedForHuman).length
   // The table only ever holds the 5 freshest -- the KPI needs the real count
-  // across everything, so it's derived from the same fetch's full list, kept
-  // separately from the trimmed table rows.
+  // across everything, so it's derived from the full list and the rows are
+  // trimmed separately (it used to count the trimmed rows).
+  const pausedCount = dialogs === null ? null : countWaitingForHuman(dialogs)
+  const freshDialogs = dialogs === null ? null : dialogs.slice(0, 5)
+  const nowMs = Date.now()
   const back = '/ai-agent/overview'
   const links = [
     { title: 'Выставить счёт клиенту из диалога', where: 'Счета · invoices.kz', href: crossHref('invoices', '/create', 'aiAgent', back) },
@@ -121,8 +132,10 @@ export default function AiAgentOverview() {
           )}
 
           <div className="nav-glass rounded-2xl flex flex-wrap overflow-hidden">
-            {kpi('Диалогов за неделю', totals === undefined ? null : totals === null ? '—' : String(totals.conversations), totals ? `${totals.replies} ответил агент сам` : '')}
-            {kpi('Новых заявок', newLeads === null ? null : String(newLeads), 'из всех каналов')}
+            {/* replies -- все отправленные ответы (и агента, и ваши вручную), поэтому
+                не «ответил агент сам». */}
+            {kpi('Диалогов за неделю', totals === undefined ? null : totals === null ? '—' : String(totals.conversations), totals ? `ответов отправлено: ${totals.replies}` : '')}
+            {kpi('Новых заявок за неделю', newLeads === null ? null : String(newLeads), 'из всех каналов')}
             {kpi('Ждут человека', pausedCount === null ? null : String(pausedCount), 'агент передал диалог')}
           </div>
 
@@ -135,23 +148,26 @@ export default function AiAgentOverview() {
               <table className="w-full text-sm">
                 <thead>
                   <tr style={{ color: 'var(--nav-text-muted)' }}>
-                    {['Клиент', 'Канал', 'Последнее сообщение', 'Статус'].map((h) => (
+                    {['Клиент', 'Канал', 'Последнее сообщение', 'Когда', 'Статус'].map((h) => (
                       <th key={h} className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase" style={{ letterSpacing: '0.08em' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {dialogs === null && (
-                    <tr><td colSpan={4} className="px-4 py-6 text-center" style={{ color: 'var(--nav-text-muted)' }}>Загружаем диалоги…</td></tr>
+                  {freshDialogs === null && (
+                    <tr><td colSpan={5} className="px-4 py-6 text-center" style={{ color: 'var(--nav-text-muted)' }}>Загружаем диалоги…</td></tr>
                   )}
-                  {dialogs !== null && dialogs.length === 0 && (
-                    <tr><td colSpan={4} className="px-4 py-6 text-center" style={{ color: 'var(--nav-text-muted)' }}>Пока нет ни одного диалога</td></tr>
+                  {freshDialogs !== null && freshDialogs.length === 0 && (
+                    <tr><td colSpan={5} className="px-4 py-6 text-center" style={{ color: 'var(--nav-text-muted)' }}>Пока нет ни одного диалога</td></tr>
                   )}
-                  {dialogs?.map((d) => (
+                  {freshDialogs?.map((d) => (
                     <tr key={d.id} style={{ borderTop: '1px solid var(--nav-border)' }}>
                       <td className="px-4 py-3" style={{ color: 'var(--nav-text-primary)' }}>{d.customerHandle}</td>
                       <td className="px-4 py-3" style={{ color: 'var(--nav-text-secondary)' }}>{CHANNEL_LABEL[d.channel] ?? d.channel}</td>
                       <td className="px-4 py-3 max-w-[360px] truncate" style={{ color: 'var(--nav-text-secondary)' }}>{d.lastMessagePreview || '—'}</td>
+                      <td className="px-4 py-3 whitespace-nowrap tabular-nums" style={{ color: 'var(--nav-text-muted)' }}>
+                        <time dateTime={d.lastActivityAt}>{formatDialogWhen(d.lastActivityAt, nowMs)}</time>
+                      </td>
                       <td className="px-4 py-3" style={{ color: d.pausedForHuman ? 'var(--nav-critical)' : 'var(--nav-text-muted)' }}>
                         {d.pausedForHuman ? 'Передан человеку' : 'Отвечает агент'}
                       </td>

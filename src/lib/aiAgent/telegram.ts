@@ -178,6 +178,17 @@ export async function getTelegramMe(botToken: string): Promise<{ id: string; use
   return { id: String(me.id), username: me.username || String(me.id) }
 }
 
+// База адреса вебхука: всегда apex. www.invoices.kz отвечает 308, а Telegram
+// редирект не проходит и молча теряет обновления -- поэтому и пустой env
+// (запасной адрес), и env, выставленный на www, дают https://invoices.kz.
+// Любой другой хост (локальный туннель, превью) остаётся как есть.
+export function telegramWebhookBase(appUrl: string | undefined): string {
+  // Trim BEFORE the fallback: a blank env value (' ') must fall back to the
+  // apex too, not produce an empty base and a relative webhook URL.
+  const base = (appUrl?.trim() || 'https://invoices.kz').replace(/\/+$/, '')
+  return base.replace(/^https?:\/\/www\.invoices\.kz$/i, 'https://invoices.kz')
+}
+
 // secret_token comes back on every delivery as the
 // X-Telegram-Bot-Api-Secret-Token header; the same value also rides in the
 // URL's ?secret= for the connection lookup. allowed_updates keeps Telegram

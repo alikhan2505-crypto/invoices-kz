@@ -8,7 +8,13 @@
     return;
   }
 
-  var API_BASE = 'https://www.invoices.kz/api/ai-agent/widget';
+  // Always the APEX host, never www: www.invoices.kz answers every request
+  // (CORS preflight included) with a 308 to the apex, and browsers refuse to
+  // follow a redirect on a preflight -- so a www API_BASE meant no visitor
+  // message ever left a seller's site (found 15.10.2026). Snippets already
+  // pasted on sellers' sites still load www/widget.js; that load follows the
+  // redirect to this file, so they pick up this fix without re-pasting.
+  var API_BASE = 'https://invoices.kz/api/ai-agent/widget';
   var STORAGE_KEY = 'invoiceskz_widget_visitor_id';
   var POLL_INTERVAL_MS = 5000;
 

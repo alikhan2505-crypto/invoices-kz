@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getActivePlan } from '@/lib/plan'
+import { VISIBLE_IN_DIALOG_FILTER } from '@/lib/aiAgent/dialogVisibility'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -24,6 +25,8 @@ async function hasAiAgentAccess(userId: string): Promise<boolean> {
   return !!profile?.is_admin || getActivePlan(profile).canAiAgent
 }
 
+const MESSAGES_LIMIT = 200
+
 export async function GET(req: NextRequest) {
   const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -44,16 +47,23 @@ export async function GET(req: NextRequest) {
     .maybeSingle()
   if (!conversation) return NextResponse.json({ error: 'Диалог не найден' }, { status: 404 })
 
-  const { data: messages, error } = await supabase
+  // Only what the customer actually saw: every inbound row plus outbound rows
+  // that were really sent. A skipped (rejected) or still-pending draft used to
+  // render as an «ИИ» bubble, as if the customer had received it.
+  // The NEWEST N, shown oldest-first: ordering ascending with a limit
+  // returned the first 200 messages forever and hid everything after them.
+  const { data: newestFirst, error } = await supabase
     .from('ai_agent_messages')
     .select('id, direction, text, is_ai_generated, created_at')
     .eq('conversation_id', conversationId)
-    .order('created_at', { ascending: true })
-    .limit(200)
+    .or(VISIBLE_IN_DIALOG_FILTER)
+    .order('created_at', { ascending: false })
+    .limit(MESSAGES_LIMIT)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  const messages = (newestFirst || []).slice().reverse()
 
   return NextResponse.json({
-    messages: (messages || []).map(m => ({
+    messages: messages.map(m => ({
       id: m.id, direction: m.direction, text: m.text, isAiGenerated: m.is_ai_generated, createdAt: m.created_at,
     })),
   })

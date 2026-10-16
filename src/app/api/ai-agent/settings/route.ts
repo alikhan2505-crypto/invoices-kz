@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getActivePlan } from '@/lib/plan'
+import { firstReviewDraftAt } from '@/lib/aiAgent/trainingExit'
+import { agentRowShouldExitTraining } from '@/lib/aiAgent/trainingStatus'
+import { backfillWhatsAppDisplayName } from '@/lib/aiAgent/whatsappDisplayName'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -103,9 +106,28 @@ export async function GET(req: NextRequest) {
   if (isNew) {
     return NextResponse.json({ agent: null, suggestedName: profile?.company_name || '', connections: [], kaspiShops })
   }
-  const { data: connections } = agent
+  // Прогресс обучения -- только для показа. Статус здесь НЕ меняется (до
+  // 16.10.2026 открытие настроек само выпускало агента из обучения, молча):
+  // выход случается на входящем сообщении или в очереди проверки, и владелец
+  // получает об этом уведомление (trainingExit.ts). Срок в днях идёт от
+  // первого черновика; нет черновиков -- отсчёт не начался (null).
+  const trainingFirstDraftAt = agent && agent.status === 'training'
+    ? await firstReviewDraftAt(supabase, agent.id)
+    : null
+  const trainingExitPending = !!agent && agentRowShouldExitTraining(agent, new Date(), trainingFirstDraftAt)
+
+  const { data: connectionRows } = agent
     ? await supabase.from('ai_agent_channel_connections').select('channel, external_account_name, status').eq('agent_id', agent.id)
     : { data: [] }
+  let connections = connectionRows || []
+  // Номер WhatsApp для чипа у подключений, сделанных до того, как callback
+  // начал его сохранять -- лениво, один раз (см. whatsappDisplayName.ts).
+  if (agent && connections.some(c => c.channel === 'whatsapp' && c.status === 'active' && !c.external_account_name)) {
+    const display = await backfillWhatsAppDisplayName(supabase, agent.id)
+    if (display) {
+      connections = connections.map(c => (c.channel === 'whatsapp' && c.status === 'active' && !c.external_account_name ? { ...c, external_account_name: display } : c))
+    }
+  }
 
   return NextResponse.json({
     agent: agent ? {
@@ -128,13 +150,23 @@ export async function GET(req: NextRequest) {
       // before the agent answers customers on its own instead of queueing.
       trainingMessageCount: agent.training_message_count ?? 0,
       trainingStartedAt: agent.training_started_at || null,
+      // Начало отсчёта дней обучения (первый черновик на проверке) и флаг
+      // «срок вышел -- агент начнёт отвечать сам со следующего сообщения».
+      trainingFirstDraftAt,
+      trainingExitPending,
       // null = follow the account's active store (the behaviour every agent
       // had before stores became selectable).
-      kaspiShopConnectionId: agent.kaspi_shop_connection_id || null,
+      // A pin to a store that is not on this account any more reads as null
+      // (the FK is ON DELETE SET NULL, so this is only a belt-and-braces
+      // guard) -- otherwise the page would keep re-sending a dead id and
+      // every save would fail with «магазин не найден».
+      kaspiShopConnectionId: agent.kaspi_shop_connection_id && kaspiShops.some(s => s.id === agent.kaspi_shop_connection_id)
+        ? agent.kaspi_shop_connection_id
+        : null,
       metaPixelId: agent.meta_pixel_id || null,
     } : null,
     suggestedName: profile?.company_name || '',
-    connections: connections || [],
+    connections,
     kaspiShops,
   })
 }

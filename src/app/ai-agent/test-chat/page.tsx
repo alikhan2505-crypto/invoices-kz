@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { motion, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import SiteNav from '@/components/SiteNav'
+import AiAgentProUpsell from '@/components/aiAgent/AiAgentProUpsell'
 import DesktopShell from '@/components/DesktopShell'
 import TestChatPanel from '@/components/aiAgent/TestChatPanel'
 import { getActivePlan } from '@/lib/plan'
@@ -88,7 +89,7 @@ export default function AiAgentTestChat() {
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
-      <div className="p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Эта функция пока доступна только администраторам.</div>
+      <AiAgentProUpsell />
     </main>
     </DesktopShell>
   )

@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { generateAiReply } from '@/lib/instagramAiReply'
-import { buildBusinessContextLine, AgentTone, AgentGoal } from '@/lib/aiAgent/promptContext'
-import { debitAiAgentWallet, AI_AGENT_CREDITS_PER_AI_REPLY } from '@/lib/aiAgent/wallet'
-import { findStopPhraseMatch, STOP_PHRASE_ACK_TEXT } from '@/lib/aiAgent/webhookHandler'
+import { debitAiAgentWallet, AI_AGENT_CREDITS_PER_AI_REPLY, hasAiAgentBudget, AI_AGENT_BUDGET_DEPLETED_REPLY } from '@/lib/aiAgent/wallet'
+import { findStopPhraseMatch, findTemplateMatch, STOP_PHRASE_ACK_TEXT } from '@/lib/aiAgent/webhookHandler'
+import { buildAgentReplyContext, pickPreviewChannel } from '@/lib/aiAgent/replyContext'
+import { findFlowTriggerMatch, parseFlowDefinition, firstStep, flowStepPreviewText } from '@/lib/aiAgent/flow'
 import { getActivePlan } from '@/lib/plan'
 
 const supabase = createClient(
@@ -45,7 +46,19 @@ const MAX_RAW_HISTORY_ENTRIES = 60
 // The owner chatting with their own agent to try it out before (or without)
 // connecting a real channel. Same generation + billing path as a real DM
 // reply -- generateAiReply on the paid Anthropic API, then a wallet debit --
-// just without any Instagram send or DB persistence.
+// just without any channel send or DB persistence.
+//
+// Since 15.10.2026 it walks the SAME tiers, in the same order, as a live
+// channel (see whatsappWebhookHandler.ts): start flow on the first message ->
+// stop phrase -> template -> flow trigger -> wallet check -> AI reply built
+// with the shared replyContext.ts builder (catalog, delivery, shop links,
+// salon). Before, it skipped templates/flows, ignored the wallet (live
+// channels answered with the canned text while the test chat showed a real
+// AI answer) and prompted without the catalog or delivery. Still not
+// mirrored: the invoice/booking tools -- they create real drafts in the
+// database, which a browser-only preview must not do.
+//
+// `source` tells the panel what produced the reply (and whether it was paid).
 export async function POST(req: NextRequest) {
   const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -96,6 +109,20 @@ export async function POST(req: NextRequest) {
     : DEFAULT_HISTORY_PAIRS
   const conversationHistory = pairs.slice(-pairsCap)
 
+  // Live channels fire the agent's start flow on a customer's very first
+  // message; an empty transcript is that moment here.
+  if (rawHistory.length === 0) {
+    const { data: startFlowRow } = await supabase
+      .from('ai_agent_flows')
+      .select('definition')
+      .eq('agent_id', agent.id)
+      .eq('is_start', true)
+      .maybeSingle()
+    const startDefinition = startFlowRow ? parseFlowDefinition(startFlowRow.definition) : null
+    const entry = startDefinition ? firstStep(startDefinition) : undefined
+    if (entry) return NextResponse.json({ replyText: flowStepPreviewText(entry), source: 'flow' })
+  }
+
   // Stop-phrase preview: test-chat has no ai_agent_conversations row (the
   // transcript is browser-only), so there's nothing to persist paused
   // state onto -- but the CUSTOMER-facing effect of a stop-phrase match
@@ -106,28 +133,56 @@ export async function POST(req: NextRequest) {
   // is no owner-side inbox conversation here to hand off to. Free, like
   // the real ack (no Anthropic call, no wallet debit).
   if (findStopPhraseMatch(message, Array.isArray(agent.stop_phrases) ? agent.stop_phrases : [])) {
-    return NextResponse.json({ replyText: STOP_PHRASE_ACK_TEXT })
+    return NextResponse.json({ replyText: STOP_PHRASE_ACK_TEXT, source: 'stop_phrase' })
   }
 
-  const businessContextLine = buildBusinessContextLine({
-    name: agent.name,
-    tone: agent.tone as AgentTone,
-    description: agent.business_description,
-    goal: agent.goal as AgentGoal,
-    collectFields: Array.isArray(agent.collect_fields) ? agent.collect_fields : undefined,
-    timezone: agent.timezone || undefined,
-    currency: agent.currency || undefined,
-    customInstructions: typeof agent.custom_instructions === 'string' ? agent.custom_instructions : undefined,
-  })
+  // Templates, then flow triggers -- free tiers, same scope as a DM on a
+  // live channel (dm-scoped and unscoped templates).
+  const { data: templates } = await supabase
+    .from('ai_agent_reply_templates')
+    .select('id, trigger_words, reply_text')
+    .eq('agent_id', agent.id)
+    .or('channel.is.null,channel.eq.dm')
+    .order('created_at', { ascending: true })
+  const templateMatch = findTemplateMatch(message, templates || [])
+  if (templateMatch) return NextResponse.json({ replyText: templateMatch.reply_text, source: 'template' })
+
+  const { data: flows } = await supabase
+    .from('ai_agent_flows')
+    .select('id, trigger_words, definition')
+    .eq('agent_id', agent.id)
+    .order('created_at', { ascending: true })
+  const matchedFlowId = findFlowTriggerMatch(message, flows || [])
+  const matchedFlow = matchedFlowId ? (flows || []).find(f => f.id === matchedFlowId) : undefined
+  const matchedDefinition = matchedFlow ? parseFlowDefinition(matchedFlow.definition) : null
+  const flowEntry = matchedDefinition ? firstStep(matchedDefinition) : undefined
+  if (flowEntry) return NextResponse.json({ replyText: flowStepPreviewText(flowEntry), source: 'flow' })
+
+  // Same wallet gate as every live channel: below the price of one reply the
+  // customer gets the canned text, so the preview shows exactly that (free,
+  // no model call) instead of an AI answer nobody would actually receive.
+  if (!(await hasAiAgentBudget(user.id))) {
+    return NextResponse.json({ replyText: AI_AGENT_BUDGET_DEPLETED_REPLY, source: 'budget_depleted', budgetDepleted: true })
+  }
+
+  // Prompt as on the agent's connected channel (WhatsApp first), with the
+  // same catalog/delivery/shop-links/salon context the live reply gets.
+  const { data: activeConnections } = await supabase
+    .from('ai_agent_channel_connections')
+    .select('channel')
+    .eq('agent_id', agent.id)
+    .eq('status', 'active')
+  const channel = pickPreviewChannel((activeConnections || []).map(c => c.channel))
 
   let replyText: string
   try {
+    const replyContext = await buildAgentReplyContext(supabase, agent, { channel, withSalon: true })
     const result = await generateAiReply({
       incomingText: message,
       fromUsername: 'Клиент',
       source: 'dm',
       conversationHistory: conversationHistory.length > 0 ? conversationHistory : undefined,
-      businessContextLine,
+      businessContextLine: replyContext.businessContextLine,
     })
     replyText = result.replyText
   } catch (err: any) {
@@ -145,5 +200,5 @@ export async function POST(req: NextRequest) {
     console.error('ai-agent test-chat: wallet debit failed for user', user.id, ':', walletErr.message)
   }
 
-  return NextResponse.json({ replyText })
+  return NextResponse.json({ replyText, source: 'ai' })
 }

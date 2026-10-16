@@ -110,7 +110,14 @@ export async function POST(req: NextRequest) {
     // 2026-08-16).
     await subscribeWhatsAppWebhooks(wabaId, accessToken)
 
-    // 4. Persist. Same unique key as Instagram/Telegram --
+    // 4. Best-effort display number for the settings-page chip -- fetched
+    // BEFORE the upsert now so it is stored in external_account_name (it used
+    // to be only returned to the browser, so after a reload the chip fell
+    // back to plain «WhatsApp»). null (Meta hiccup) leaves the column out of
+    // the upsert, so a reconnect never wipes a number already stored.
+    const displayPhoneNumber = await getWhatsAppDisplayPhoneNumber(phoneNumberId, accessToken)
+
+    // 5. Persist. Same unique key as Instagram/Telegram --
     // (channel, external_account_id) -- reconnecting the same number
     // overwrites the existing row and restores status 'active'.
     const encryptedToken = encryptAtRest(accessToken, getKey())
@@ -122,11 +129,9 @@ export async function POST(req: NextRequest) {
       is_coexistence: isCoexistence,
       access_token_enc: encryptedToken,
       status: 'active',
+      ...(displayPhoneNumber ? { external_account_name: displayPhoneNumber } : {}),
     }, { onConflict: 'channel,external_account_id' })
     if (upsertError) throw new Error(upsertError.message)
-
-    // 5. Best-effort display number for the settings-page chip.
-    const displayPhoneNumber = await getWhatsAppDisplayPhoneNumber(phoneNumberId, accessToken)
 
     return NextResponse.json({ ok: true, phoneNumberId, displayPhoneNumber })
   } catch (e: any) {

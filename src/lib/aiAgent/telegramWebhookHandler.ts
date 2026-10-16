@@ -2,17 +2,20 @@ import { createClient } from '@supabase/supabase-js'
 import { decryptAtRest } from '@/lib/kaspiPay/crypto'
 import { getKey } from './connection'
 import { generateAiReply } from '@/lib/instagramAiReply'
-import { buildBusinessContextLine, buildCollectFieldsToExtract, buildCatalogBlock, buildDeliveryBlock, buildShopLinksBlock, AgentTone, AgentGoal } from './promptContext'
-import { loadAgentCatalog, loadAgentDeliveryInfo, loadAgentShopLinks } from './catalogContext'
+import { buildCollectFieldsToExtract } from './promptContext'
+import { buildAgentReplyContext } from './replyContext'
+import { loadAgentCatalog } from './catalogContext'
 import { pickProductPhoto } from './productPhoto'
 import { buildInvoiceToolExecutor, createDraft } from './invoiceSend'
 import { validateDraftInput, canAutoSend } from './invoiceDrafts'
-import { loadAgentSalonInfo, buildSalonBlock } from './salonContext'
 import { buildBookingToolExecutor } from './bookingSend'
 import { debitAiAgentWallet, AI_AGENT_CREDITS_PER_AI_REPLY, hasAiAgentBudget, AI_AGENT_BUDGET_DEPLETED_REPLY } from './wallet'
 import { isConversationRateLimited } from './rateLimit'
 import { sendTelegramNotification } from '@/lib/telegramNotify'
 import { createNotification } from '@/lib/notifications'
+import { AI_AGENT_DIALOGS_URL, AI_AGENT_REVIEW_URL } from './links'
+import { exitTrainingIfDue } from './trainingExit'
+import { scheduleBudgetDepletedAlert } from './budgetAlert'
 import { findTemplateMatch, mergeCollectedData, findStopPhraseMatch, STOP_PHRASE_ACK_TEXT } from './webhookHandler'
 import { sendTelegramBotMessage, sendTelegramBotPhoto, TELEGRAM_CAPTION_MAX, sendTelegramFlowStep, answerTelegramCallbackQuery, pairConversationHistory, TelegramApiError } from './telegram'
 import { UNSUPPORTED_MEDIA_REPLY_TEXT } from '@/lib/aiAgent/mediaLimits'
@@ -106,6 +109,10 @@ export async function handleTelegramIncoming(conn: TelegramTenantConnection, par
   // entirely: no conversation row, no logged message, no reply, no debit.
   if (agent.is_enabled === false) return
 
+  // Срок обучения проверяется здесь, на входящем сообщении (см. trainingExit.ts):
+  // вышедший по сроку агент отвечает клиенту сам уже на этом сообщении.
+  if (await exitTrainingIfDue(supabase, agent)) agent.status = 'active'
+
   // Find or create the conversation thread for this chat. One Telegram
   // private chat == one thread, keyed by chat.id.
   const { data: conversation } = await supabase
@@ -187,7 +194,7 @@ export async function handleTelegramIncoming(conn: TelegramTenantConnection, par
     const { data: ownerProfile } = await supabase.from('profiles').select('telegram_chat_id, notify_telegram').eq('id', agent.user_id).single()
     if (ownerProfile?.notify_telegram && ownerProfile.telegram_chat_id) {
       try {
-        await sendTelegramNotification(ownerProfile.telegram_chat_id, `Клиент попросил оператора: «${params.incomingText.slice(0, 120)}» — https://www.invoices.kz/ai-agent/dialogs`)
+        await sendTelegramNotification(ownerProfile.telegram_chat_id, `Клиент попросил оператора: «${params.incomingText.slice(0, 120)}» — ${AI_AGENT_DIALOGS_URL}`)
       } catch (telegramErr: any) {
         console.error('ai-agent telegram webhook: stop-phrase Telegram nudge failed for user', agent.user_id, ':', telegramErr.message)
       }
@@ -291,23 +298,18 @@ export async function handleTelegramIncoming(conn: TelegramTenantConnection, par
   if (budgetDepleted) {
     draftReply = AI_AGENT_BUDGET_DEPLETED_REPLY
     urgent = false
+    // Подмена ответа ИИ заготовкой больше не молчаливая: владелец получает
+    // колокольчик и Telegram, не чаще раза в сутки на агента (budgetAlert.ts).
+    scheduleBudgetDepletedAlert(supabase, agent)
   } else try {
     // Phase 3: real catalog prices in context + the invoice tool.
-    catalog = await loadAgentCatalog(supabase, agent.user_id, agent.kaspi_shop_connection_id)
-    const catalogBlock = buildCatalogBlock(catalog)
-    const deliveryInfo = await loadAgentDeliveryInfo(supabase, agent.user_id, agent.kaspi_shop_connection_id)
-    const deliveryBlock = buildDeliveryBlock(deliveryInfo)
-    const shopLinks = await loadAgentShopLinks(supabase, agent.user_id, agent.kaspi_shop_connection_id)
-    const shopLinksBlock = buildShopLinksBlock(shopLinks)
-
-    // Salon booking planner: only an agent pinned to a salon
-    // (ai_agents.salon_site_id) gets the salon context block and the
-    // booking tool -- every other agent's prompt/tools stay exactly as
-    // before this feature. A salon agent gets bookingTool INSTEAD OF
-    // invoiceTool, never both -- same rule already applied to WhatsApp
-    // (see whatsappWebhookHandler.ts's identical comment).
-    const salonInfo = agent.salon_site_id ? await loadAgentSalonInfo(supabase, agent.salon_site_id) : null
-    const salonBlock = salonInfo ? buildSalonBlock(salonInfo) : ''
+    // Каталог, доставка, ссылки на магазин и блок салона -- общим сборщиком
+    // (replyContext.ts), тем же, что у тестового чата. Агент салона получает
+    // bookingTool ВМЕСТО invoiceTool, никогда оба (generateAiReply принимает
+    // только один инструмент за вызов).
+    const replyContext = await buildAgentReplyContext(supabase, agent, { channel: 'telegram', withSalon: true })
+    catalog = replyContext.catalog
+    const salonInfo = replyContext.salonInfo
 
     const result = await generateAiReply({
       incomingText: params.incomingText,
@@ -316,17 +318,7 @@ export async function handleTelegramIncoming(conn: TelegramTenantConnection, par
       conversationHistory,
       historyGapHours,
       image: params.media?.kind === 'image' ? { base64: params.media.base64, mediaType: params.media.mediaType } : undefined,
-      businessContextLine: buildBusinessContextLine({
-        name: agent.name,
-        tone: agent.tone as AgentTone,
-        description: agent.business_description,
-        goal: agent.goal as AgentGoal,
-        collectFields: Array.isArray(agent.collect_fields) ? agent.collect_fields : undefined,
-        timezone: agent.timezone || undefined,
-        currency: agent.currency || undefined,
-        customInstructions: typeof agent.custom_instructions === 'string' ? agent.custom_instructions : undefined,
-        channel: 'telegram',
-      }) + catalogBlock + deliveryBlock + shopLinksBlock + salonBlock,
+      businessContextLine: replyContext.businessContextLine,
       collectFieldsToExtract: buildCollectFieldsToExtract(Array.isArray(agent.collect_fields) ? agent.collect_fields : undefined),
       ...(salonInfo
         ? { bookingTool: buildBookingToolExecutor(supabase, { id: agent.id }, conversation.id, salonInfo) }
@@ -380,7 +372,7 @@ export async function handleTelegramIncoming(conn: TelegramTenantConnection, par
     const { data: profile } = await supabase.from('profiles').select('telegram_chat_id, notify_telegram').eq('id', agent.user_id).single()
     if (profile?.notify_telegram && profile.telegram_chat_id && inserted) {
       try {
-        await sendTelegramNotification(profile.telegram_chat_id, 'У вас новый черновик ответа на проверке в AI-агенте: https://www.invoices.kz/ai-agent/review')
+        await sendTelegramNotification(profile.telegram_chat_id, `У вас новый черновик ответа на проверке в AI-агенте: ${AI_AGENT_REVIEW_URL}`)
       } catch (telegramErr: any) {
         console.error('ai-agent telegram webhook: training-mode nudge failed for user', agent.user_id, ':', telegramErr.message)
       }

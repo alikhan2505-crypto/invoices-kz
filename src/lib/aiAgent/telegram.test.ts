@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseTelegramUpdate, telegramDedupKey, pairConversationHistory } from './telegram'
+import { parseTelegramUpdate, telegramDedupKey, pairConversationHistory, telegramWebhookBase } from './telegram'
 
 describe('telegramDedupKey', () => {
   it('scopes the update_id by bot id so two bots seeing the same update_id never collide', () => {
@@ -231,5 +231,25 @@ describe('pairConversationHistory', () => {
       { direction: 'outbound', text: 'Здравствуйте!', status: 'sent' },
     ]
     expect(pairConversationHistory(rows, 5)).toEqual([])
+  })
+})
+
+describe('telegramWebhookBase', () => {
+  it('falls back to the apex, never www', () => {
+    expect(telegramWebhookBase(undefined)).toBe('https://invoices.kz')
+    expect(telegramWebhookBase('')).toBe('https://invoices.kz')
+    expect(telegramWebhookBase(' ')).toBe('https://invoices.kz')
+    expect(telegramWebhookBase(' \n')).toBe('https://invoices.kz')
+    expect(telegramWebhookBase(' https://www.invoices.kz ')).toBe('https://invoices.kz')
+  })
+
+  it('rewrites a www env value to the apex (Telegram drops redirected deliveries)', () => {
+    expect(telegramWebhookBase('https://www.invoices.kz')).toBe('https://invoices.kz')
+    expect(telegramWebhookBase('https://www.invoices.kz/')).toBe('https://invoices.kz')
+  })
+
+  it('leaves any other host alone', () => {
+    expect(telegramWebhookBase('https://invoices.kz')).toBe('https://invoices.kz')
+    expect(telegramWebhookBase('https://abc.ngrok.app')).toBe('https://abc.ngrok.app')
   })
 })

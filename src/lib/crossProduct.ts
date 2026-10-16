@@ -37,6 +37,14 @@ function isSafeBack(back: string | null): back is string {
   return BACK_PREFIXES.some((p) => back === p || back.startsWith(`${p}/`) || back.startsWith(`${p}?`))
 }
 
+// Absolute production link into a product cabinet, for places that have no
+// current host to stay on: Telegram nudges, e-mails, server-built texts.
+// A link to https://www.invoices.kz/ai-agent/... used to land on the apex
+// (one extra redirect hop) instead of the product's own host.
+export function productAbsoluteUrl(key: ProductKey, path: string): string {
+  return `${ORIGINS[key] ?? ORIGINS.invoices}${path}`
+}
+
 // Address of a product's cabinet: its own host in production, the current host elsewhere.
 export function productCabinetHref(key: ProductKey, hostname: string): string {
   const p = PRODUCTS.find((x) => x.key === key)

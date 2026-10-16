@@ -5,7 +5,9 @@ import Link from 'next/link'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { buildAgentSettingsHref } from '@/lib/aiAgent/settingsLink'
+import { findBroadcastAfterDrop } from '@/lib/aiAgent/broadcasts'
 import SiteNav from '@/components/SiteNav'
+import AiAgentProUpsell from '@/components/aiAgent/AiAgentProUpsell'
 import DesktopShell from '@/components/DesktopShell'
 import { getActivePlan } from '@/lib/plan'
 import { useAppDialog } from '@/components/AppDialog'
@@ -13,6 +15,8 @@ import BrandLoader from '@/components/BrandLoader'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 const MAX_MESSAGE_LEN = 2000
+// Pause before re-reading the history after a dropped connection.
+const DROP_RECHECK_DELAY_MS = 2000
 
 type ConnectionInfo = { channel: string; external_account_name: string | null; status: string }
 type Agent = { id: string; name: string; connections: ConnectionInfo[] }
@@ -28,7 +32,10 @@ type Broadcast = {
   status: string
   createdAt: string
 }
-type SendResult = { recipientsTotal: number; sentCount: number; failedCount: number }
+// title/note: set when the outcome is not a plain «отправлено» -- a retry the
+// server recognised as already sent, or a connection drop mid-send. Counts are
+// null when they are unknown (connection dropped before the answer arrived).
+type SendResult = { recipientsTotal: number | null; sentCount: number | null; failedCount: number; title?: string; note?: string }
 // compose -> confirm (inline swap, not a browser confirm) -> sending -> done
 type ModalStage = 'compose' | 'confirm' | 'sending' | 'done'
 type BroadcastChannel = 'telegram' | 'whatsapp'
@@ -118,13 +125,16 @@ export default function AiAgentBroadcasts() {
     return { 'Authorization': `Bearer ${session?.access_token}` }
   }, [])
 
-  const loadBroadcasts = useCallback(async () => {
+  // Returns the fresh list (null when it could not be loaded) so the
+  // dropped-connection path can check what actually reached the server.
+  const loadBroadcasts = useCallback(async (): Promise<Broadcast[] | null> => {
     const headers = await authHeaders()
-    const res = await fetch('/api/ai-agent/broadcasts', { headers })
-    if (res.ok) {
-      const payload = await res.json()
-      setBroadcasts(Array.isArray(payload.broadcasts) ? payload.broadcasts : [])
-    }
+    const res = await fetch('/api/ai-agent/broadcasts', { headers }).catch(() => null)
+    if (!res || !res.ok) return null
+    const payload = await res.json().catch(() => null)
+    const list: Broadcast[] = Array.isArray(payload?.broadcasts) ? payload.broadcasts : []
+    setBroadcasts(list)
+    return list
   }, [authHeaders])
 
   useEffect(() => {
@@ -223,6 +233,20 @@ export default function AiAgentBroadcasts() {
         body: JSON.stringify({ agentId: selectedAgentId, message: message.trim(), channel }),
       })
       const payload = await res.json().catch(() => null)
+      if (res.status === 409 && payload?.error === 'duplicate_recent') {
+        // The server refused to send the same text twice (retry after a
+        // dropped connection, or a second press). Show what already went out.
+        setSendResult({
+          recipientsTotal: payload.recipientsTotal ?? null,
+          sentCount: payload.sentCount ?? null,
+          failedCount: payload.failedCount ?? 0,
+          title: payload.status === 'sending' ? 'Эта рассылка уже отправляется' : 'Эта рассылка уже отправлена',
+          note: 'Тот же текст этому агенту ушёл в последние 15 минут — второй раз не отправляем, чтобы клиенты не получили его дважды.',
+        })
+        setStage('done')
+        loadBroadcasts()
+        return
+      }
       if (!res.ok) {
         // no_recipients' server-side `detail` is already channel-aware
         // (explains the WhatsApp 24h window honestly rather than implying
@@ -237,8 +261,32 @@ export default function AiAgentBroadcasts() {
       setSendResult({ recipientsTotal: payload.recipientsTotal, sentCount: payload.sentCount, failedCount: payload.failedCount })
       setStage('done')
     } catch {
-      setSendError('Не удалось отправить рассылку. Попробуйте ещё раз.')
-      setStage('compose')
+      // A network error here does NOT by itself mean nothing was sent: the
+      // server keeps sending after the connection drops. Reload the history
+      // (after a short pause, so a request that did reach the server has
+      // inserted its row) and only say «уже уходит» when this broadcast is
+      // really there; otherwise the request never arrived and a retry is
+      // safe (an identical retry is refused server-side anyway, see
+      // src/lib/aiAgent/broadcasts.ts).
+      const candidate = { agentId: selectedAgentId, channel, message: message.trim() }
+      await new Promise(resolve => setTimeout(resolve, DROP_RECHECK_DELAY_MS))
+      const list = await loadBroadcasts().catch(() => null)
+      const found = list ? findBroadcastAfterDrop(candidate, list, new Date()) : null
+      if (found) {
+        setSendResult({
+          recipientsTotal: found.recipientsTotal ?? null,
+          sentCount: found.status === 'done' ? found.sentCount : null,
+          failedCount: found.status === 'done' ? found.failedCount : 0,
+          title: 'Связь прервалась',
+          note: found.status === 'done'
+            ? 'Рассылка уже отправлена — итог в истории ниже. Повторно тот же текст не отправится.'
+            : 'Рассылка уже уходит клиентам. Проверьте историю ниже через пару минут — повторно тот же текст не отправится.',
+        })
+        setStage('done')
+      } else {
+        setSendError('Связь прервалась, и рассылка не отправилась — попробуйте ещё раз.')
+        setStage('compose')
+      }
     }
   }
 
@@ -257,7 +305,7 @@ export default function AiAgentBroadcasts() {
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
-      <div className="p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Эта функция пока доступна только администраторам.</div>
+      <AiAgentProUpsell />
     </main>
     </DesktopShell>
   )
@@ -322,7 +370,7 @@ export default function AiAgentBroadcasts() {
               >
                 <div className="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
                   <div className="flex items-center gap-2 text-[11.5px] font-bold" style={{ color: 'var(--nav-text-secondary)' }}>
-                    <StatusDot ok={b.failedCount === 0} />
+                    <StatusDot ok={b.failedCount === 0 && b.status !== 'failed'} />
                     {b.agentName}
                     <span className="inline-flex items-center gap-1 font-medium" style={{ color: 'var(--nav-text-muted)' }}>
                       · <ChannelBadge channel={b.channel} /> {b.channel === 'whatsapp' ? 'WhatsApp' : 'Telegram'}
@@ -335,7 +383,11 @@ export default function AiAgentBroadcasts() {
                 </p>
                 <div className="flex items-center gap-3 text-[11.5px] font-semibold flex-wrap">
                   <span style={{ color: 'var(--nav-teal)' }}>
-                    {b.status === 'sending' ? 'Отправляется…' : `Отправлено ${b.sentCount} из ${b.recipientsTotal}`}
+                    {b.status === 'sending'
+                      ? 'Отправляется…'
+                      : b.status === 'failed'
+                        ? `Прервана: отправлено ${b.sentCount} из ${b.recipientsTotal}`
+                        : `Отправлено ${b.sentCount} из ${b.recipientsTotal}`}
                   </span>
                   {b.failedCount > 0 && (
                     <span style={{ color: 'var(--nav-critical)' }}>Не доставлено: {b.failedCount}</span>
@@ -370,10 +422,15 @@ export default function AiAgentBroadcasts() {
             >
               {stage === 'done' && sendResult ? (
                 <>
-                  <div className="text-base font-bold mb-2" style={{ color: 'var(--nav-text-primary)' }}>Рассылка отправлена</div>
-                  <p className="text-sm mb-1.5" style={{ color: 'var(--nav-text-secondary)' }}>
-                    Отправлено {sendResult.sentCount} из {sendResult.recipientsTotal} получателей.
-                  </p>
+                  <div className="text-base font-bold mb-2" style={{ color: 'var(--nav-text-primary)' }}>{sendResult.title || 'Рассылка отправлена'}</div>
+                  {sendResult.note && (
+                    <p className="text-sm mb-1.5" style={{ color: 'var(--nav-text-secondary)' }}>{sendResult.note}</p>
+                  )}
+                  {sendResult.sentCount !== null && sendResult.recipientsTotal !== null && (
+                    <p className="text-sm mb-1.5" style={{ color: 'var(--nav-text-secondary)' }}>
+                      Отправлено {sendResult.sentCount} из {sendResult.recipientsTotal} получателей.
+                    </p>
+                  )}
                   {sendResult.failedCount > 0 && (
                     <p className="text-xs mb-3" style={{ color: 'var(--nav-critical)' }}>
                       Не доставлено: {sendResult.failedCount} — обычно это клиенты, которые заблокировали бота.

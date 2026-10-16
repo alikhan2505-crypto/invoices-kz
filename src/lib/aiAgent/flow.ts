@@ -150,3 +150,10 @@ export function findFlowTriggerMatch(text: string, flows: { id: string; trigger_
   }
   return null
 }
+
+// Тестовый чат: как клиент увидит первый шаг сценария -- текст шага и под ним
+// кнопки (в чате превью кнопки не нажимаются, поэтому показываются строками).
+export function flowStepPreviewText(step: FlowStep): string {
+  if (step.buttons.length === 0) return step.text
+  return `${step.text}\n\n${step.buttons.map(b => `▸ ${b.label}`).join('\n')}`
+}

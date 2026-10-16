@@ -9,7 +9,8 @@ import { loadAgentCatalog } from '@/lib/aiAgent/catalogContext'
 import { sendTelegramBotMessage, sendTelegramBotPhoto, TELEGRAM_CAPTION_MAX, TelegramApiError } from '@/lib/aiAgent/telegram'
 import { sendWhatsAppImage, sendWhatsAppMessage, WhatsAppApiError } from '@/lib/whatsapp'
 import { extractTriggerWords } from '@/lib/instagramAiReply'
-import { shouldExitTraining } from '@/lib/aiAgent/trainingStatus'
+import { trainingCountAfterReview } from '@/lib/aiAgent/trainingStatus'
+import { exitTrainingIfDue } from '@/lib/aiAgent/trainingExit'
 import { debitAiAgentWallet, AI_AGENT_CREDITS_PER_AI_REPLY } from '@/lib/aiAgent/wallet'
 
 const supabase = createClient(
@@ -324,15 +325,17 @@ export async function POST(req: NextRequest) {
     await supabase.from('ai_agent_messages').update({ status: 'skipped' }).eq('id', messageId)
   }
 
-  const nextCount = agent.training_message_count + 1
-  const exit = shouldExitTraining(
-    { status: agent.status, trainingStartedAt: agent.training_started_at, trainingMessageCount: nextCount },
-    new Date()
-  )
-  await supabase.from('ai_agents').update({
-    training_message_count: nextCount,
-    ...(exit ? { status: 'active' } : {}),
-  }).eq('id', agent.id)
+  // Only an approved (sent) draft counts toward leaving training -- a skip
+  // means the agent's answer was not good enough, so 20 skips must not set it
+  // loose on customers. The day threshold (counted from the agent's first
+  // draft, see trainingExit.ts) is still checked on skip. The exit itself
+  // goes through exitTrainingIfDue so the owner gets the same one-time
+  // «вышел из обучения» notification as on the incoming-message path.
+  const nextCount = trainingCountAfterReview(action, agent.training_message_count)
+  if (nextCount !== agent.training_message_count) {
+    await supabase.from('ai_agents').update({ training_message_count: nextCount }).eq('id', agent.id)
+  }
+  const exit = await exitTrainingIfDue(supabase, { ...agent, training_message_count: nextCount })
 
   return NextResponse.json({ ok: true, exitedTraining: exit, triggerWords })
 }

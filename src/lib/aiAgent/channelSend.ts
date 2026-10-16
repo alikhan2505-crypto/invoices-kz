@@ -3,7 +3,7 @@ import { decryptAtRest } from '@/lib/kaspiPay/crypto'
 import { getKey } from './connection'
 import { sendTelegramBotMessage } from './telegram'
 import { sendWhatsAppMessage, sendWhatsAppCtaUrlButton } from '@/lib/whatsapp'
-import { sendDirectMessage } from '@/lib/instagram'
+import { sendDirectMessage, replyToComment } from '@/lib/instagram'
 
 // Sends one plain-text message into a conversation via its channel's
 // active connection, and records it as an outbound ai_agent_messages row
@@ -13,7 +13,11 @@ import { sendDirectMessage } from '@/lib/instagram'
 // success, an error string on failure (caller decides how to surface it).
 export async function sendIntoConversation(
   supabase: SupabaseClient,
-  conversation: { id: string; channel: string; external_thread_id: string; agent_id: string },
+  // source: 'comment' for an Instagram thread that started under a post --
+  // there external_thread_id is the COMMENT id, not a user id, so the reply
+  // must go through replyToComment (same rule as review/route.ts). Optional:
+  // callers that never select it keep the DM path they always had.
+  conversation: { id: string; channel: string; external_thread_id: string; agent_id: string; source?: string | null },
   text: string,
   // Optional tappable button instead of (WhatsApp only, for now) a bare
   // pasted link in the body -- e.g. the invoice link invoiceSend.ts sends.
@@ -48,10 +52,16 @@ export async function sendIntoConversation(
         await sendWhatsAppMessage(connection.external_account_id, conversation.external_thread_id, text, { accessToken })
       }
     } else if (conversation.channel === 'instagram') {
-      await sendDirectMessage(conversation.external_thread_id, text, {
-        igUserId: connection.external_account_id,
-        accessToken,
-      })
+      if (conversation.source === 'comment') {
+        // Ответ в «Переписке» на комментарий раньше всегда падал: в DM-отправку
+        // уходил id комментария вместо id пользователя.
+        await replyToComment(conversation.external_thread_id, text, { accessToken })
+      } else {
+        await sendDirectMessage(conversation.external_thread_id, text, {
+          igUserId: connection.external_account_id,
+          accessToken,
+        })
+      }
     } else if (conversation.channel === 'website' || conversation.channel === 'api') {
       // No external send API for either channel -- the outbound row inserted
       // below IS the delivery mechanism (the widget's poll / the caller's

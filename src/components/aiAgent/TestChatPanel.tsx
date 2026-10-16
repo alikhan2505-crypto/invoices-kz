@@ -2,6 +2,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
+import { useLanguage } from '@/components/LanguageProvider'
+import { aiAgentFormsDict, type AiAgentFormsDict } from '@/lib/i18n/aiAgentForms'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -11,7 +13,19 @@ const EASE = [0.16, 1, 0.3, 1] as const
 // scope, which must never end up in a client bundle. Keep in sync manually.
 const REPLY_PRICE_TENGE = 5
 
-type ChatMessage = { role: 'user' | 'agent'; text: string }
+// source: what produced an agent reply (test-chat route). Only 'ai' is paid;
+// the rest are the free tiers a live channel answers with first, plus the
+// canned text a live channel sends while the wallet is empty.
+type ReplySource = 'ai' | 'template' | 'flow' | 'stop_phrase' | 'budget_depleted'
+type ChatMessage = { role: 'user' | 'agent'; text: string; source?: ReplySource }
+
+function replyNote(source: ReplySource | undefined, tf: AiAgentFormsDict): string {
+  if (source === 'template') return tf.testChatNoteTemplate
+  if (source === 'flow') return tf.testChatNoteFlow
+  if (source === 'stop_phrase') return tf.testChatNoteStopPhrase
+  if (source === 'budget_depleted') return tf.testChatNoteBudgetDepleted
+  return `≈ ${REPLY_PRICE_TENGE} ₸`
+}
 
 function BotIcon({ size = 26 }: { size?: number }) {
   return (
@@ -81,6 +95,8 @@ function TypingIndicator({ reduceMotion }: { reduceMotion: boolean }) {
 // a flex column that already owns the available height, so the transcript
 // should grow to fill that instead of re-capping itself.
 export default function TestChatPanel({ agentId, fill = false }: { agentId: string; fill?: boolean }) {
+  const { lang } = useLanguage()
+  const tf = aiAgentFormsDict[lang]
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -130,7 +146,8 @@ export default function TestChatPanel({ agentId, fill = false }: { agentId: stri
       })
       if (!res.ok) throw new Error('request failed')
       const data = await res.json()
-      setMessages(prev => [...prev, { role: 'agent', text: String(data.replyText || '') }])
+      const source: ReplySource | undefined = ['ai', 'template', 'flow', 'stop_phrase', 'budget_depleted'].includes(data.source) ? data.source : undefined
+      setMessages(prev => [...prev, { role: 'agent', text: String(data.replyText || ''), source }])
     } catch {
       setSendError(true)
     }
@@ -205,8 +222,8 @@ export default function TestChatPanel({ agentId, fill = false }: { agentId: stri
                   {m.text}
                 </div>
                 {m.role === 'agent' && (
-                  <div className="text-[10.5px] mt-1 px-1" style={{ color: 'var(--nav-text-muted)' }}>
-                    ≈ {REPLY_PRICE_TENGE} ₸
+                  <div className="text-[10.5px] mt-1 px-1" style={{ color: m.source === 'budget_depleted' ? 'var(--nav-critical)' : 'var(--nav-text-muted)' }}>
+                    {replyNote(m.source, tf)}
                   </div>
                 )}
               </div>

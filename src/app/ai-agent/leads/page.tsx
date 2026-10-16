@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { motion, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import SiteNav from '@/components/SiteNav'
+import AiAgentProUpsell from '@/components/aiAgent/AiAgentProUpsell'
 import DesktopShell from '@/components/DesktopShell'
 import { COLLECT_FIELD_LABELS } from '@/lib/aiAgent/promptContext'
 import { getActivePlan } from '@/lib/plan'
@@ -63,11 +64,23 @@ function WebsiteIcon() {
   )
 }
 
+function ApiIcon() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+      <path d="m16 18 6-6-6-6M8 6l-6 6 6 6" />
+    </svg>
+  )
+}
+
+// Every channel a conversation can arrive on -- same set as dialogs/page.tsx
+// and review/page.tsx. An unlisted one falls back to Instagram below, so a
+// lead from the HTTP API used to wear an Instagram label (15.10.2026 fix).
 const CHANNEL_META: Record<string, { label: string; icon: () => React.ReactElement }> = {
   instagram: { label: 'Instagram', icon: InstagramIcon },
   telegram: { label: 'Telegram', icon: TelegramIcon },
   whatsapp: { label: 'WhatsApp', icon: WhatsAppIcon },
   website: { label: 'Сайт', icon: WebsiteIcon },
+  api: { label: 'API', icon: ApiIcon },
 }
 
 // One entry per Kanban column, in left-to-right order. `next` is the
@@ -182,7 +195,7 @@ export default function AiAgentLeads() {
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
-      <div className="p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Эта функция пока доступна только администраторам.</div>
+      <AiAgentProUpsell />
     </main>
     </DesktopShell>
   )

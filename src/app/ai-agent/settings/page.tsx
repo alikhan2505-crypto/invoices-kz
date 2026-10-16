@@ -1,10 +1,11 @@
 'use client'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import SiteNav from '@/components/SiteNav'
+import AiAgentProUpsell from '@/components/aiAgent/AiAgentProUpsell'
 import DesktopShell from '@/components/DesktopShell'
 import TestChatPanel from '@/components/aiAgent/TestChatPanel'
 import TriggerChipsEditor from '@/components/aiAgent/TriggerChipsEditor'
@@ -13,7 +14,9 @@ import { getActivePlan } from '@/lib/plan'
 import { useLanguage } from '@/components/LanguageProvider'
 import { aiAgentDict, type AiAgentDict } from '@/lib/i18n/aiAgent'
 import { aiAgentFormsDict } from '@/lib/i18n/aiAgentForms'
-import { TRAINING_MESSAGE_THRESHOLD, TRAINING_DAYS_THRESHOLD } from '@/lib/aiAgent/trainingStatus'
+import { TRAINING_MESSAGE_THRESHOLD, TRAINING_DAYS_THRESHOLD, trainingDaysLeft } from '@/lib/aiAgent/trainingStatus'
+import { buildWidgetSnippet } from '@/lib/aiAgent/widgetSnippet'
+import { settingsSaveErrorKind, isBlankAgentName, type SettingsSaveErrorKind } from '@/lib/aiAgent/settingsSaveError'
 // promptContext is a pure, dependency-free module (no server-only imports,
 // no env access) -- safe to bundle client-side, so the Промптинг preview
 // shows the REAL assembled context line, not a hand-maintained copy.
@@ -77,11 +80,13 @@ const TIMEZONE_VALUES = ['Asia/Almaty', 'Asia/Aqtobe', 'Asia/Atyrau', 'Asia/Oral
 
 const CURRENCY_VALUES = ['KZT', 'USD', 'EUR', 'RUB']
 
-// How long the "Создаём AI-агента" overlay stays up on FIRST creation.
-// The upsert itself is near-instant; the countdown exists to give the
-// moment weight (founder: "создает эффект волшебства") and matches the
-// reference product's real ~настройка pacing without overstaying.
-const CREATE_ANIMATION_MS = 7000
+// Создание агента мгновенное (15.10.2026): 7-секундный оверлей с обратным
+// отсчётом (CREATE_ANIMATION_MS) убран -- запись в базу занимает доли
+// секунды, а ожидание только задерживало переход к каналу, без которого
+// агент не отвечает. После создания страница сама открывает «Каналы».
+
+// Сколько держится строка «Сохранено» под кнопкой и у тумблера.
+const SAVED_FLASH_MS = 2500
 
 const INPUT_CLS = 'w-full rounded-lg px-3 py-2 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]'
 
@@ -278,10 +283,35 @@ export default function AiAgentSettings() {
   // always returned this status and the page has always ignored it.
   const [agentStatus, setAgentStatus] = useState('')
   const [trainingCount, setTrainingCount] = useState(0)
-  const [trainingStartedAt, setTrainingStartedAt] = useState('')
-  const [creating, setCreating] = useState(false)
-  const [createCountdown, setCreateCountdown] = useState(0)
-  const createTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  // Первый черновик на проверке (null -- ещё не было, отсчёт дней не начался)
+  // и «срок вышел, агент начнёт отвечать сам со следующего сообщения».
+  const [trainingFirstDraftAt, setTrainingFirstDraftAt] = useState<string | null>(null)
+  const [trainingExitPending, setTrainingExitPending] = useState(false)
+  // Итог последнего «Сохранить»: ошибка сервера показывается словами
+  // (раньше !res.ok молча проглатывался), успех -- короткое «Сохранено».
+  const [saveError, setSaveError] = useState<SettingsSaveErrorKind | null>(null)
+  const [savedFlash, setSavedFlash] = useState(false)
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Тумблер «Статус бота» сохраняется сразу (PATCH /api/ai-agent/agents/[id]),
+  // при ошибке откатывается назад.
+  const [statusBusy, setStatusBusy] = useState(false)
+  const [statusError, setStatusError] = useState(false)
+  const [statusSaved, setStatusSaved] = useState(false)
+  const statusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Только что созданный агент: один раз докрутить к подсказке на «Каналах».
+  // Флаг в ref, а прокрутка -- в callback ref самой подсказки: вкладки
+  // меняются через AnimatePresence mode="wait", и «Каналы» монтируются только
+  // после анимации ухода старой вкладки, так что эффект на [tab] срабатывал,
+  // когда подсказки в DOM ещё не было.
+  const scrollToChannelHintRef = useRef(false)
+  // Защита от гонки тумблера «Статус бота» (PATCH) и «Сохранить» (POST):
+  // пока идёт одно, второе не запускается. Ref, а не только state, чтобы
+  // проверка не зависела от того, успел ли React перерисовать кнопку.
+  const savingRef = useRef(false)
+  const statusBusyRef = useRef(false)
+  // Номер попытки сохранения: ключ текста ошибки, чтобы скринридер заново
+  // озвучил ту же ошибку при повторном нажатии.
+  const [saveAttempt, setSaveAttempt] = useState(0)
   const [agentId, setAgentId] = useState<string | null>(null)
   const [connections, setConnections] = useState<{ channel: string; external_account_id: string; external_account_name: string | null; status: string }[]>([])
   const [connecting, setConnecting] = useState(false)
@@ -616,7 +646,8 @@ export default function AiAgentSettings() {
           if (typeof data.agent.isEnabled === 'boolean') setIsEnabled(data.agent.isEnabled)
           setAgentStatus(data.agent.status || '')
           setTrainingCount(data.agent.trainingMessageCount || 0)
-          setTrainingStartedAt(data.agent.trainingStartedAt || '')
+          setTrainingFirstDraftAt(data.agent.trainingFirstDraftAt || null)
+          setTrainingExitPending(!!data.agent.trainingExitPending)
           setConnections(data.connections || [])
           setKaspiShopConnectionId(data.agent.kaspiShopConnectionId || '')
           setMetaPixelId(data.agent.metaPixelId || null)
@@ -651,47 +682,141 @@ export default function AiAgentSettings() {
   // One save() shared by every tab's Сохранить button -- the whole form is
   // a single agent row, whichever tab the visible field lives on.
   async function save() {
+    // Тумблер статуса ещё сохраняется -- ждём его, иначе POST и PATCH
+    // гоняются за is_enabled.
+    if (savingRef.current || statusBusyRef.current) return
     const isFirstCreation = !agentId
+    setSaveAttempt(n => n + 1)
+    setSaveError(null)
+    setSavedFlash(false)
+    if (savedTimerRef.current) { clearTimeout(savedTimerRef.current); savedTimerRef.current = null }
+
+    // Сервер проверяет только пустую строку; название из пробелов ловим тут,
+    // чтобы не ждать ответа ради очевидной ошибки.
+    if (isBlankAgentName(name)) {
+      setSaveError('name_required')
+      return
+    }
+
     setSaving(true)
+    savingRef.current = true
+    let res: Response | null = null
+    let data: any = null
+    try {
+      const headers = await authHeader()
+      res = await fetch('/api/ai-agent/settings', {
+        method: 'POST',
+        headers,
+        // agentId present -> UPDATE that agent; absent -> CREATE a new one.
+        // is_enabled существующего агента принадлежит тумблеру (PATCH сразу
+        // при переключении) -- POST его не трогает, иначе медленный POST со
+        // старым значением перетирал только что сохранённый тумблер. Новый
+        // агент создаётся с тем значением, что выставлено в форме.
+        body: JSON.stringify({ ...(agentId ? { agentId } : { isEnabled }), name, tone, businessDescription, goal, collectFields, timezone, currency, customInstructions, historyPairs, stopPhrases, kaspiShopConnectionId: kaspiShopConnectionId || null }),
+      })
+      data = await res.json().catch(() => null)
+    } catch {
+      res = null
+    }
 
-    // First creation gets the full-screen "Создаём AI-сотрудника" moment --
-    // the upsert itself is instant, the countdown gives the step weight.
-    // Plain re-saves skip it.
+    if (!res || !res.ok || !data?.agent?.id) {
+      const kind = settingsSaveErrorKind(res?.status ?? 0, data?.error)
+      // Закреплённого магазина больше нет: убираем его из списка, чтобы
+      // выбор магазина показался (см. pinnedShopMissing) и сохранение можно
+      // было исправить без перезагрузки страницы.
+      if (kind === 'kaspi_shop' && kaspiShopConnectionId) {
+        const missing = kaspiShopConnectionId
+        setKaspiShops(prev => prev.filter(s => s.id !== missing))
+      }
+      setSaveError(kind)
+      setSaving(false)
+      savingRef.current = false
+      return
+    }
+
+    setAgentId(data.agent.id)
     if (isFirstCreation) {
-      setCreating(true)
-      setCreateCountdown(Math.round(CREATE_ANIMATION_MS / 1000))
-      createTimerRef.current = setInterval(() => {
-        setCreateCountdown(prev => (prev > 1 ? prev - 1 : 0))
-      }, 1000)
+      // Новый агент стартует в режиме обучения (default колонки status) --
+      // берём его из ответа, чтобы баннер обучения появился сразу.
+      setAgentStatus(data.agent.status || '')
+      setTrainingCount(data.agent.training_message_count || 0)
+      // Только что созданный агент: черновиков ещё нет, отсчёт дней не начался.
+      setTrainingFirstDraftAt(null)
+      setTrainingExitPending(false)
+      // Pin the URL to the created agent so a refresh EDITS it instead of
+      // re-creating (drops any ?new=1 too) and lands on «Каналы» -- the step
+      // without which the agent answers nobody. history.replaceState, not
+      // router.replace -- router.replace is known-broken for query-only
+      // changes in this app (see src/app/create/page.tsx).
+      window.history.replaceState({}, '', `/ai-agent/settings?agent=${data.agent.id}&tab=channels`)
+      scrollToChannelHintRef.current = true
+      setTab('channels')
+    } else {
+      setSavedFlash(true)
+      savedTimerRef.current = setTimeout(() => setSavedFlash(false), SAVED_FLASH_MS)
     }
-    const startedAt = Date.now()
-
-    const headers = await authHeader()
-    const res = await fetch('/api/ai-agent/settings', {
-      method: 'POST',
-      headers,
-      // agentId present -> UPDATE that agent; absent -> CREATE a new one.
-      body: JSON.stringify({ ...(agentId ? { agentId } : {}), name, tone, businessDescription, goal, collectFields, timezone, currency, customInstructions, historyPairs, isEnabled, stopPhrases, kaspiShopConnectionId: kaspiShopConnectionId || null }),
-    })
-    if (res.ok) {
-      const data = await res.json()
-      if (isFirstCreation) {
-        const remaining = Math.max(0, CREATE_ANIMATION_MS - (Date.now() - startedAt))
-        await new Promise(resolve => setTimeout(resolve, remaining))
-      }
-      setAgentId(data.agent.id)
-      if (isFirstCreation) {
-        // Pin the URL to the created agent so a refresh EDITS it instead of
-        // re-creating (drops any ?new=1 too). history.replaceState, not
-        // router.replace -- router.replace is known-broken for query-only
-        // changes in this app (see src/app/create/page.tsx).
-        window.history.replaceState({}, '', `/ai-agent/settings?agent=${data.agent.id}`)
-      }
-    }
-    if (createTimerRef.current) { clearInterval(createTimerRef.current); createTimerRef.current = null }
-    setCreating(false)
     setSaving(false)
+    savingRef.current = false
   }
+
+  // «Статус бота»: у существующего агента -- сохранение сразу, без общей
+  // кнопки (раньше выключение терялось, если не нажать «Сохранить»). До
+  // создания агента сохранять некуда: значение уйдёт вместе с созданием.
+  async function toggleEnabled() {
+    // aria-disabled, а не disabled (фокус клавиатуры не теряется) -- поэтому
+    // нажатие во время сохранения игнорируется здесь.
+    if (statusBusyRef.current || savingRef.current) return
+    const next = !isEnabled
+    setIsEnabled(next)
+    setStatusError(false)
+    setStatusSaved(false)
+    if (statusTimerRef.current) { clearTimeout(statusTimerRef.current); statusTimerRef.current = null }
+    if (!agentId) return
+
+    setStatusBusy(true)
+    statusBusyRef.current = true
+    let ok = false
+    try {
+      const headers = await authHeader()
+      const res = await fetch(`/api/ai-agent/agents/${encodeURIComponent(agentId)}`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ isEnabled: next }),
+      })
+      const data = await res.json().catch(() => null)
+      ok = res.ok && data?.agent?.isEnabled === next
+    } catch {
+      ok = false
+    }
+    if (ok) {
+      setStatusSaved(true)
+      statusTimerRef.current = setTimeout(() => setStatusSaved(false), SAVED_FLASH_MS)
+    } else {
+      setIsEnabled(!next)
+      setStatusError(true)
+    }
+    setStatusBusy(false)
+    statusBusyRef.current = false
+  }
+
+  // Кнопка «Создать агента» стоит внизу длинной формы: после переключения на
+  // «Каналы» подсказка оказалась бы выше экрана (особенно на телефоне) --
+  // докручиваем к ней один раз, в момент, когда она реально появилась в DOM.
+  const channelHintRef = useCallback((el: HTMLDivElement | null) => {
+    if (!el || !scrollToChannelHintRef.current) return
+    scrollToChannelHintRef.current = false
+    requestAnimationFrame(() => el.scrollIntoView({ block: 'center', behavior: reduceMotion ? 'auto' : 'smooth' }))
+  }, [reduceMotion])
+
+  // Любая правка формы снимает устаревшую ошибку сохранения.
+  useEffect(() => {
+    setSaveError(null)
+  }, [name, tone, businessDescription, goal, collectFields, timezone, currency, customInstructions, historyPairs, stopPhrases, kaspiShopConnectionId])
+
+  useEffect(() => () => {
+    if (savedTimerRef.current) clearTimeout(savedTimerRef.current)
+    if (statusTimerRef.current) clearTimeout(statusTimerRef.current)
+  }, [])
 
   async function connectInstagram() {
     setConnecting(true)
@@ -889,7 +1014,7 @@ export default function AiAgentSettings() {
 
   function copyWidgetSnippet() {
     if (!websiteConnection) return
-    const snippet = `<script src="https://www.invoices.kz/widget.js" data-key="${websiteConnection.external_account_id}" async></script>`
+    const snippet = buildWidgetSnippet(websiteConnection.external_account_id)
     navigator.clipboard.writeText(snippet)
     setWebsiteCopied(true)
     setTimeout(() => setWebsiteCopied(false), 2000)
@@ -1164,7 +1289,7 @@ export default function AiAgentSettings() {
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
-      <div className="p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>{tf.adminOnlyLabel}</div>
+      <AiAgentProUpsell />
     </main>
     </DesktopShell>
   )
@@ -1215,12 +1340,36 @@ export default function AiAgentSettings() {
     customInstructions,
   })
 
+  // Агент закреплён за магазином, которого нет в списке (удалён после
+  // загрузки страницы) -- выбор магазина показывается даже при одном
+  // оставшемся, иначе каждое сохранение падало бы без способа это исправить.
+  const pinnedShopMissing = !!kaspiShopConnectionId && !kaspiShops.some(s => s.id === kaspiShopConnectionId)
+
+  const saveErrorText = saveError === 'name_required' ? tf.errSaveNameRequired
+    : saveError === 'kaspi_shop' ? tf.errSaveKaspiShop
+    : saveError === 'forbidden' ? tf.errSaveForbidden
+    : saveError === 'not_found' ? tf.errSaveNotFound
+    : saveError ? tf.errSaveChanges
+    : null
+
   const saveButton = (
-    <button onClick={save} disabled={saving}
-      className="w-full rounded-lg px-4 py-3 text-sm font-semibold transition-transform hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0"
-      style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)', boxShadow: '0 10px 24px -10px var(--nav-accent)' }}>
-      {saving ? tf.savingAgentButton : agentId ? tf.saveAgentButton : tf.createAgentButton}
-    </button>
+    <div>
+      <button onClick={save} disabled={saving || statusBusy}
+        className="w-full rounded-lg px-4 py-3 text-sm font-semibold transition-transform hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0"
+        style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)', boxShadow: '0 10px 24px -10px var(--nav-accent)' }}>
+        {saving ? tf.savingAgentButton : agentId ? tf.saveAgentButton : tf.createAgentButton}
+      </button>
+      {/* Итог сохранения -- aria-live, чтобы скринридер тоже его услышал. */}
+      <div role="status" aria-live="polite" className="min-h-[1.25rem] mt-2 text-xs text-center">
+        {saveErrorText ? (
+          <span key={saveAttempt} style={{ color: 'var(--nav-critical)' }}>{saveErrorText}</span>
+        ) : savedFlash ? (
+          <span className="inline-flex items-center gap-1.5" style={{ color: 'var(--nav-success)' }}>
+            <CheckCircleIcon /> {tf.saveSuccess}
+          </span>
+        ) : null}
+      </div>
+    </div>
   )
 
   const needsAgentHint = (text: string) => (
@@ -1317,12 +1466,16 @@ export default function AiAgentSettings() {
             <div className="text-sm font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>{tf.trainingTitle}</div>
             <p className="text-[13px] mb-2" style={{ color: 'var(--nav-text-secondary)' }}>{tf.trainingBody}</p>
             <div className="text-[13px] mb-2" style={{ color: 'var(--nav-text-muted)' }}>
-              {tf.trainingLeft(
-                Math.max(0, TRAINING_MESSAGE_THRESHOLD - trainingCount),
-                trainingStartedAt
-                  ? Math.max(0, Math.ceil(TRAINING_DAYS_THRESHOLD - (Date.now() - new Date(trainingStartedAt).getTime()) / 86400000))
-                  : TRAINING_DAYS_THRESHOLD
-              )}
+              {(() => {
+                // Срок в днях идёт от первого черновика на проверке (не от
+                // создания агента); статус здесь только показывается.
+                if (trainingExitPending) return tf.trainingExitPending
+                const approvalsLeft = Math.max(0, TRAINING_MESSAGE_THRESHOLD - trainingCount)
+                const daysLeft = trainingDaysLeft(trainingFirstDraftAt, new Date())
+                return daysLeft === null
+                  ? tf.trainingLeftNoDraft(approvalsLeft, TRAINING_DAYS_THRESHOLD)
+                  : tf.trainingLeft(approvalsLeft, daysLeft)
+              })()}
             </div>
             <Link href="/ai-agent/review" className="text-[13px] font-semibold" style={{ color: 'var(--nav-accent)' }}>{tf.trainingLink}</Link>
           </div>
@@ -1516,11 +1669,24 @@ export default function AiAgentSettings() {
                     </span>
                   </div>
                   <button role="switch" aria-checked={isEnabled} aria-label={tf.botStatusLabel}
-                    onClick={() => setIsEnabled(v => !v)}
+                    onClick={toggleEnabled}
+                    aria-disabled={statusBusy || saving}
+                    aria-busy={statusBusy}
                     className="relative w-10 h-6 rounded-full transition-colors flex-shrink-0 mt-0.5"
-                    style={{ background: isEnabled ? 'var(--nav-accent)' : 'var(--nav-border)' }}>
+                    style={{ background: isEnabled ? 'var(--nav-accent)' : 'var(--nav-border)', opacity: statusBusy || saving ? 0.6 : 1, cursor: statusBusy || saving ? 'default' : undefined }}>
                     <span className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all" style={{ left: isEnabled ? '18px' : '2px' }} />
                   </button>
+                </div>
+                {/* Тумблер сохраняется сам -- общая кнопка «Сохранить» ниже
+                    для остальных полей вкладки. */}
+                <div role="status" aria-live="polite" className="text-[11px] min-h-[1rem] mt-1">
+                  {statusError ? (
+                    <span style={{ color: 'var(--nav-critical)' }}>{tf.errBotStatus}</span>
+                  ) : statusSaved ? (
+                    <span className="inline-flex items-center gap-1" style={{ color: 'var(--nav-success)' }}><CheckCircleIcon /> {tf.botStatusSaved}</span>
+                  ) : !agentId ? (
+                    <span style={{ color: 'var(--nav-text-muted)' }}>{tf.botStatusOnCreateHint}</span>
+                  ) : null}
                 </div>
 
                 <div className="my-5" style={{ borderTop: '1px solid var(--nav-border-soft)' }} />
@@ -1540,13 +1706,16 @@ export default function AiAgentSettings() {
                 {/* Only worth showing when there is a choice to make: with one
                     store the default already points at it, and with none the
                     agent has no catalog to quote from at all. */}
-                {kaspiShops.length > 1 && (
+                {(kaspiShops.length > 1 || pinnedShopMissing) && (
                   <label className="block mb-6">
                     <span className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{tf.kaspiShopLabel}</span>
                     <select value={kaspiShopConnectionId} onChange={e => setKaspiShopConnectionId(e.target.value)}
                       className={INPUT_CLS}
                       style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-surface-chrome)' }}>
                       <option value="">{tf.kaspiShopDefaultOption}</option>
+                      {pinnedShopMissing && (
+                        <option value={kaspiShopConnectionId} disabled>{tf.kaspiShopMissingOption}</option>
+                      )}
                       {kaspiShops.map(s => (
                         <option key={s.id} value={s.id}>{s.name}{s.isActive ? tf.kaspiShopActiveSuffix : ''}</option>
                       ))}
@@ -1729,6 +1898,14 @@ export default function AiAgentSettings() {
             {tab === 'channels' && (
               !agentId ? needsAgentHint(tf.needsAgentChannels) : (
                 <>
+                {/* Видна сразу после создания (save() открывает эту вкладку)
+                    и вообще пока ни один канал не работает: без канала агент
+                    никому не отвечает. */}
+                {!connections.some(c => c.status === 'active') && (
+                  <div ref={channelHintRef} className="rounded-xl px-3.5 py-2.5 mb-3 text-sm scroll-mt-24" style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-primary)', borderLeft: '3px solid var(--nav-accent)' }}>
+                    {tf.connectChannelHint}
+                  </div>
+                )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <ChannelCard
                     icon={<InstagramIcon />}
@@ -1898,7 +2075,7 @@ export default function AiAgentSettings() {
                           {tf.websiteEmbedHint}
                         </p>
                         <code className="block text-[10px] mb-2 p-2 rounded-lg break-all" style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-secondary)' }}>
-                          {`<script src="https://www.invoices.kz/widget.js" data-key="${websiteConnection.external_account_id}" async></script>`}
+                          {buildWidgetSnippet(websiteConnection.external_account_id)}
                         </code>
                         <div className="flex gap-2">
                           <button onClick={copyWidgetSnippet}
@@ -2099,57 +2276,6 @@ export default function AiAgentSettings() {
         )}
       </AnimatePresence>
 
-      {/* First-creation overlay: the "magic" moment. A rotating gradient
-          ring (SVG dashoffset spinner, same hand-rolled style as the app's
-          charts) + countdown, full-screen over everything. Skipped entirely
-          on re-saves and under prefers-reduced-motion the ring is static. */}
-      <AnimatePresence>
-        {creating && (
-          <motion.div
-            className="fixed inset-0 z-[60] flex items-center justify-center"
-            style={{ background: 'var(--nav-surface-chrome)' }}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0, transition: { duration: 0.4, ease: EASE } }}
-          >
-            <div className="text-center px-6">
-              <motion.svg
-                width="72" height="72" viewBox="0 0 72 72" fill="none" className="mx-auto mb-6"
-                animate={reduceMotion ? undefined : { rotate: 360 }}
-                transition={reduceMotion ? undefined : { duration: 1.1, repeat: Infinity, ease: 'linear' }}
-              >
-                <defs>
-                  <linearGradient id="aiAgentSpinnerGradient" x1="0" y1="0" x2="1" y2="1">
-                    <stop offset="0%" stopColor="var(--nav-accent)" />
-                    <stop offset="100%" stopColor="var(--nav-teal)" />
-                  </linearGradient>
-                </defs>
-                <circle cx="36" cy="36" r="30" stroke="var(--nav-border-soft)" strokeWidth="5" />
-                <circle cx="36" cy="36" r="30" stroke="url(#aiAgentSpinnerGradient)" strokeWidth="5"
-                  strokeLinecap="round" strokeDasharray="188.5" strokeDashoffset="132" />
-              </motion.svg>
-              <motion.div
-                className="text-lg font-semibold mb-2"
-                style={{ color: 'var(--nav-text-primary)' }}
-                initial={reduceMotion ? false : { opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE, delay: reduceMotion ? 0 : 0.1 }}
-              >
-                {tf.creatingAgentTitle}
-              </motion.div>
-              <motion.div
-                className="text-sm tabular-nums"
-                style={{ color: 'var(--nav-text-muted)' }}
-                initial={reduceMotion ? false : { opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE, delay: reduceMotion ? 0 : 0.2 }}
-              >
-                {tf.creatingAgentCountdown(String(createCountdown).padStart(2, '0'))}
-              </motion.div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
       {dialogElement}
     </main>
     </DesktopShell>

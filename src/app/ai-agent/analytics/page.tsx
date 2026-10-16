@@ -6,6 +6,7 @@ import { motion, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { buildAgentSettingsHref } from '@/lib/aiAgent/settingsLink'
 import SiteNav from '@/components/SiteNav'
+import AiAgentProUpsell from '@/components/aiAgent/AiAgentProUpsell'
 import DesktopShell from '@/components/DesktopShell'
 import { getActivePlan } from '@/lib/plan'
 import BrandLoader from '@/components/BrandLoader'
@@ -430,7 +431,7 @@ export default function AiAgentAnalytics() {
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
-      <div className="p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Эта функция пока доступна только администраторам.</div>
+      <AiAgentProUpsell />
     </main>
     </DesktopShell>
   )
@@ -527,7 +528,8 @@ export default function AiAgentAnalytics() {
                 Пока нет диалогов — подключите канал или попробуйте Тестовый чат
               </div>
               <div className="flex items-center gap-2 flex-wrap justify-center">
-                <Link href={buildAgentSettingsHref(agentFilter, agents)}
+                {/* «Подключить канал» -- сразу на вкладку «Каналы», а не «Настройки». */}
+                <Link href={buildAgentSettingsHref(agentFilter, agents, 'channels')}
                   className="inline-flex items-center rounded-lg px-3.5 py-2 text-xs font-semibold transition-transform hover:-translate-y-0.5"
                   style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)', boxShadow: '0 10px 24px -10px var(--nav-accent)' }}>
                   Подключить канал

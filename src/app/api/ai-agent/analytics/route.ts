@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getActivePlan } from '@/lib/plan'
+import { kzWindowStart } from '@/lib/aiAgent/overviewStats'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -75,9 +76,9 @@ export async function GET(req: NextRequest) {
 
   // Window: the last `days` KZ calendar days including today. sinceIso is
   // the UTC instant of KZ midnight on the earliest day.
-  const shiftedNow = new Date(Date.now() + KZ_OFFSET_MS)
-  const startShiftedMs = Date.UTC(shiftedNow.getUTCFullYear(), shiftedNow.getUTCMonth(), shiftedNow.getUTCDate() - (days - 1))
-  const sinceIso = new Date(startShiftedMs - KZ_OFFSET_MS).toISOString()
+  // Same helper the «Обзор» page uses for «Новых заявок», so both KPIs on
+  // that page count the same seven days.
+  const { startShiftedMs, sinceIso } = kzWindowStart(days, Date.now())
 
   const dayKeys: string[] = []
   for (let i = 0; i < days; i++) {

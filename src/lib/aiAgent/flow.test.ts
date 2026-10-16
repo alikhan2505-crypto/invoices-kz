@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isTerminalStep, findStepById, firstStep, parseFlowDefinition, findFlowTriggerMatch, resolveFlowButtonClick, type FlowDefinition } from './flow'
+import { isTerminalStep, findStepById, firstStep, parseFlowDefinition, findFlowTriggerMatch, resolveFlowButtonClick, flowStepPreviewText, type FlowDefinition } from './flow'
 
 const sample: FlowDefinition = {
   steps: [
@@ -136,5 +136,19 @@ describe('resolveFlowButtonClick', () => {
   it('is stale when nextStepId points at a step that no longer exists (defensive, save-time validation should prevent this)', () => {
     const corrupted: FlowDefinition = { steps: [{ id: 's1', text: 'x', buttons: [{ label: 'A', nextStepId: 'ghost' }] }] }
     expect(resolveFlowButtonClick(corrupted, 's1', 0)).toEqual({ outcome: 'stale' })
+  })
+})
+
+describe('flowStepPreviewText', () => {
+  it('shows a terminal step as its plain text', () => {
+    expect(flowStepPreviewText({ id: 's1', text: 'Спасибо!', buttons: [] })).toBe('Спасибо!')
+  })
+
+  it('lists the buttons under the text, one per line', () => {
+    expect(flowStepPreviewText({
+      id: 's1',
+      text: 'Что вас интересует?',
+      buttons: [{ label: 'Цены', nextStepId: 's2' }, { label: 'Доставка', nextStepId: null }],
+    })).toBe('Что вас интересует?\n\n▸ Цены\n▸ Доставка')
   })
 })

@@ -5,12 +5,14 @@ import Link from 'next/link'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import SiteNav from '@/components/SiteNav'
+import AiAgentProUpsell from '@/components/aiAgent/AiAgentProUpsell'
 import DesktopShell from '@/components/DesktopShell'
 import { getActivePlan } from '@/lib/plan'
 import { useLanguage } from '@/components/LanguageProvider'
 import { aiAgentDict, type AiAgentDict } from '@/lib/i18n/aiAgent'
 import BrandLoader from '@/components/BrandLoader'
 import AiAgentTour from './AiAgentTour'
+import { summarizeConnections, type AgentChannel } from '@/lib/aiAgent/connectedChannels'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -26,6 +28,15 @@ const goalLabel = (t: AiAgentDict, goal: string): string =>
 // insert) and 'active' (set by the review route once training exits).
 const statusLabel = (t: AiAgentDict, status: string): string =>
   status === 'active' ? t.statusActive : t.statusTraining
+
+// Brand names stay as-is in every language; only the two generic channels
+// are translated.
+const channelName = (t: AiAgentDict, channel: AgentChannel): string =>
+  channel === 'whatsapp' ? 'WhatsApp'
+  : channel === 'instagram' ? 'Instagram'
+  : channel === 'telegram' ? 'Telegram'
+  : channel === 'website' ? t.channelWebsite
+  : t.channelApi
 
 type AgentConnection = { channel: string; external_account_name: string | null; status: string }
 type AgentListItem = {
@@ -96,7 +107,9 @@ export default function AiAgentsList() {
   const [deleteTarget, setDeleteTarget] = useState<AgentListItem | null>(null)
   const [confirmText, setConfirmText] = useState('')
   const [deleting, setDeleting] = useState(false)
-  const [deleteError, setDeleteError] = useState(false)
+  // false -- ошибки нет; true -- общая ошибка; число -- сколько неразобранных
+  // заявок на запись салона не дают удалить агента (409 pending_booking_drafts).
+  const [deleteError, setDeleteError] = useState<boolean | number>(false)
 
   async function authHeader() {
     const { data: { session } } = await supabase.auth.getSession()
@@ -134,7 +147,10 @@ export default function AiAgentsList() {
       setDeleteTarget(null)
       setConfirmText('')
     } else {
-      setDeleteError(true)
+      const data = await res.json().catch(() => null)
+      setDeleteError(res.status === 409 && data?.error === 'pending_booking_drafts' && typeof data.count === 'number'
+        ? data.count
+        : true)
     }
     setDeleting(false)
   }
@@ -159,7 +175,7 @@ export default function AiAgentsList() {
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
-      <div className="p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>{t.adminOnly}</div>
+      <AiAgentProUpsell />
     </main>
     </DesktopShell>
   )
@@ -214,7 +230,9 @@ export default function AiAgentsList() {
         ) : (
           <div data-tour="ai-agents-list" className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {agents.map((agent, i) => {
-              const instagram = agent.connections.find(c => c.channel === 'instagram')
+              // Every connected channel, not just Instagram (15.10.2026): a
+              // WhatsApp-only agent used to read «Канал не подключён».
+              const channels = summarizeConnections(agent.connections)
               const agentStatusLabel = statusLabel(t, agent.status)
               const statusColor = agent.status === 'active' ? 'var(--nav-success)' : 'var(--nav-accent)'
               return (
@@ -237,14 +255,25 @@ export default function AiAgentsList() {
                       </span>
                     </div>
                     <div className="text-xs mb-3" style={{ color: 'var(--nav-text-secondary)' }}>{goalLabel(t, agent.goal)}</div>
-                    {instagram?.status === 'active' ? (
-                      <div className="text-xs flex items-center gap-1.5 mb-1" style={{ color: 'var(--nav-success)' }}>
-                        <CheckCircleIcon /> {t.connectedTo(instagram.external_account_name ? `@${instagram.external_account_name}` : 'Instagram')}
-                      </div>
-                    ) : instagram?.status === 'token_expired' ? (
-                      <div className="text-xs flex items-center gap-1.5 mb-1" style={{ color: 'var(--nav-critical)' }}>
-                        <WarnIcon /> {t.instagramDisconnected}
-                      </div>
+                    {channels.length > 0 ? (
+                      <ul className="space-y-1 mb-1.5">
+                        {channels.map(ch => (
+                          ch.state === 'ok' ? (
+                            <li key={ch.channel} className="text-xs flex items-center gap-1.5 min-w-0" style={{ color: 'var(--nav-success)' }}>
+                              <CheckCircleIcon />
+                              <span className="truncate">
+                                {channelName(t, ch.channel)}
+                                {ch.account && <span style={{ color: 'var(--nav-text-secondary)' }}>{' · '}{ch.account}</span>}
+                              </span>
+                            </li>
+                          ) : (
+                            <li key={ch.channel} className="text-xs flex items-center gap-1.5 min-w-0" style={{ color: 'var(--nav-critical)' }}>
+                              <WarnIcon />
+                              <span className="truncate">{t.channelReconnect(channelName(t, ch.channel))}</span>
+                            </li>
+                          )
+                        ))}
+                      </ul>
                     ) : (
                       <div className="text-xs mb-1" style={{ color: 'var(--nav-text-muted)' }}>{t.channelNotConnected}</div>
                     )}
@@ -309,9 +338,9 @@ export default function AiAgentsList() {
                   className="w-full rounded-lg px-3 py-2 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-critical)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
                   style={{ color: 'var(--nav-text-primary)', background: 'transparent' }} />
               </label>
-              {deleteError && (
-                <div className="text-xs mb-3" style={{ color: 'var(--nav-critical)' }}>
-                  {t.deleteAgentError}
+              {deleteError !== false && (
+                <div className="text-xs mb-3" role="alert" style={{ color: 'var(--nav-critical)' }}>
+                  {typeof deleteError === 'number' ? t.deleteAgentPendingBookings(deleteError) : t.deleteAgentError}
                 </div>
               )}
               <div className="flex gap-2">

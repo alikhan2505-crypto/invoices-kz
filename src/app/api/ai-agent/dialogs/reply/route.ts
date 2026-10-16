@@ -26,7 +26,10 @@ async function hasAiAgentAccess(userId: string): Promise<boolean> {
 }
 
 // Sending a manual reply IS the takeover -- no separate "Взять диалог"
-// action. Idempotent on an already-paused conversation.
+// action. Idempotent on an already-paused conversation. The pause is set only
+// AFTER a successful send: before 15.10.2026 it was set first, so a failed
+// send (e.g. every reply to an Instagram comment thread) still switched the
+// bot off for that customer while nobody had actually answered them.
 export async function POST(req: NextRequest) {
   const user = await requireUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -41,18 +44,18 @@ export async function POST(req: NextRequest) {
   const agentIds = (agents || []).map(a => a.id)
   const { data: conversation } = await supabase
     .from('ai_agent_conversations')
-    .select('id, agent_id, channel, external_thread_id, paused_for_human')
+    .select('id, agent_id, channel, source, external_thread_id, paused_for_human')
     .eq('id', conversationId)
     .in('agent_id', agentIds)
     .maybeSingle()
   if (!conversation) return NextResponse.json({ error: 'Диалог не найден' }, { status: 404 })
 
+  const sendError = await sendIntoConversation(supabase, conversation, text)
+  if (sendError) return NextResponse.json({ error: sendError }, { status: 502 })
+
   if (!conversation.paused_for_human) {
     await supabase.from('ai_agent_conversations').update({ paused_for_human: true }).eq('id', conversationId)
   }
-
-  const sendError = await sendIntoConversation(supabase, conversation, text)
-  if (sendError) return NextResponse.json({ error: sendError }, { status: 502 })
 
   return NextResponse.json({ ok: true })
 }

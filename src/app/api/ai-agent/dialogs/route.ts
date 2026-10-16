@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getActivePlan } from '@/lib/plan'
+import { VISIBLE_IN_DIALOG_FILTER } from '@/lib/aiAgent/dialogVisibility'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -51,22 +52,29 @@ export async function GET(req: NextRequest) {
   const agentNameById: Record<string, string> = {}
   for (const a of agents) agentNameById[a.id] = a.name
 
+  // Each conversation's latest visible message comes embedded, limited to
+  // ONE row per conversation (PostgREST applies .limit/.order with
+  // referencedTable per parent row). The old flat query over all messages
+  // of all conversations hit PostgREST's 1000-row cap: a single broadcast
+  // writes up to 500 history rows, so recent broadcast rows crowded out
+  // every other conversation's latest message and their previews/sort
+  // order silently broke.
   const { data: conversations, error: convError } = await supabase
     .from('ai_agent_conversations')
-    .select('id, agent_id, channel, source, customer_handle, collected_name, created_at, paused_for_human')
+    .select('id, agent_id, channel, source, customer_handle, collected_name, created_at, paused_for_human, ai_agent_messages(text, created_at)')
     .in('agent_id', agents.map(a => a.id))
+    // Same visibility rule as the thread itself (dialogs/messages): a
+    // rejected or pending draft is not the last thing the customer saw.
+    .or(VISIBLE_IN_DIALOG_FILTER, { referencedTable: 'ai_agent_messages' })
+    .order('created_at', { referencedTable: 'ai_agent_messages', ascending: false })
+    .limit(1, { referencedTable: 'ai_agent_messages' })
   if (convError) return NextResponse.json({ error: convError.message }, { status: 500 })
   if (!conversations || conversations.length === 0) return NextResponse.json({ items: [] })
 
-  const conversationIds = conversations.map(c => c.id)
-  const { data: messageRows } = await supabase
-    .from('ai_agent_messages')
-    .select('conversation_id, text, created_at')
-    .in('conversation_id', conversationIds)
-    .order('created_at', { ascending: false })
   const previewByConversation: Record<string, { text: string; createdAt: string }> = {}
-  for (const row of messageRows || []) {
-    if (!previewByConversation[row.conversation_id]) previewByConversation[row.conversation_id] = { text: row.text, createdAt: row.created_at }
+  for (const c of conversations) {
+    const latest = Array.isArray(c.ai_agent_messages) ? c.ai_agent_messages[0] : null
+    if (latest) previewByConversation[c.id] = { text: latest.text || '', createdAt: latest.created_at }
   }
 
   const items = conversations

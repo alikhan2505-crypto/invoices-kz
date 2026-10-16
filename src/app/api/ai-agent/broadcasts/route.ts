@@ -5,6 +5,7 @@ import { getKey } from '@/lib/aiAgent/connection'
 import { sendTelegramBotMessage } from '@/lib/aiAgent/telegram'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
 import { getActivePlan } from '@/lib/plan'
+import { isStaleSendingBroadcast, findRecentDuplicateBroadcast, findOlderDuplicateBroadcast, BROADCAST_DUPLICATE_WINDOW_MS, BROADCAST_PROGRESS_EVERY } from '@/lib/aiAgent/broadcasts'
 
 type BroadcastChannel = 'telegram' | 'whatsapp'
 
@@ -66,7 +67,12 @@ const SEND_DELAY_MS = 50
 // created manually in Meta's WhatsApp Manager) -- so any WhatsApp
 // conversation whose last inbound message is stale (or has none) must be
 // excluded here, not just rejected at send time.
-async function collectRecipients(agentId: string, channel: BroadcastChannel): Promise<string[]> {
+// Each recipient carries its conversation id so a sent broadcast message can
+// be written into that conversation's history (Переписка) -- before
+// 15.10.2026 only the counters on ai_agent_broadcasts recorded it.
+type Recipient = { threadId: string; conversationId: string }
+
+async function collectRecipients(agentId: string, channel: BroadcastChannel): Promise<Recipient[]> {
   const { data } = await supabase
     .from('ai_agent_conversations')
     .select('id, external_thread_id')
@@ -105,12 +111,15 @@ async function collectRecipients(agentId: string, channel: BroadcastChannel): Pr
   }
 
   const seen = new Set<string>()
+  const recipients: Recipient[] = []
   for (const row of conversations) {
     if (!row.external_thread_id) continue
     if (withinWindow && !withinWindow.has(row.id)) continue
+    if (seen.has(row.external_thread_id)) continue
     seen.add(row.external_thread_id)
+    recipients.push({ threadId: row.external_thread_id, conversationId: row.id })
   }
-  return Array.from(seen).slice(0, MAX_RECIPIENTS)
+  return recipients.slice(0, MAX_RECIPIENTS)
 }
 
 export async function GET(req: NextRequest) {
@@ -138,6 +147,22 @@ export async function GET(req: NextRequest) {
     .order('created_at', { ascending: false })
     .limit(100)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // A send that crashed mid-way (timeout, deploy) never reached its final
+  // update and used to show «Отправляется…» forever. Anything still
+  // 'sending' after the function could possibly have lived is marked failed
+  // here; sent_count keeps whatever progress was saved along the way.
+  const now = new Date()
+  const staleIds = (broadcasts || []).filter(b => isStaleSendingBroadcast(b, now)).map(b => b.id)
+  if (staleIds.length > 0) {
+    const { error: staleError } = await supabase
+      .from('ai_agent_broadcasts')
+      .update({ status: 'failed' })
+      .in('id', staleIds)
+      .eq('status', 'sending')
+    if (staleError) console.error('ai-agent broadcasts: failed to close stale sends:', staleError.message)
+    else for (const b of broadcasts || []) if (staleIds.includes(b.id)) b.status = 'failed'
+  }
 
   // Agent names joined in JS via one .in() query -- same two-query shape as
   // src/app/api/ai-agent/agents/route.ts, no N+1.
@@ -198,6 +223,41 @@ export async function POST(req: NextRequest) {
   }
   const accessToken = decryptAtRest(connection.access_token_enc, getKey()).toString('utf8')
 
+  // Retry safety: the send loop runs inside this request, so a dropped
+  // connection on the owner's side leaves the server sending while the page
+  // shows an error -- and a second press used to send everything twice. The
+  // same text by the same agent to the same channel within the last few
+  // minutes (already sent or still sending) is answered with that broadcast
+  // instead of a new one. See src/lib/aiAgent/broadcasts.ts.
+  //
+  // This first check is only the cheap early answer (no recipient scan for an
+  // obvious retry). It cannot be race-safe on its own -- two presses can both
+  // pass it before either inserts -- so the binding check runs again AFTER
+  // our own row is inserted, below.
+  async function loadRecentBroadcasts() {
+    const { data } = await supabase
+      .from('ai_agent_broadcasts')
+      .select('id, agent_id, channel, message, recipients_total, sent_count, failed_count, status, created_at')
+      .eq('user_id', user!.id)
+      .eq('agent_id', agentId)
+      .eq('channel', channel)
+      .gte('created_at', new Date(Date.now() - BROADCAST_DUPLICATE_WINDOW_MS).toISOString())
+      .order('created_at', { ascending: false })
+    return data || []
+  }
+  function duplicateResponse(duplicate: { id: string; status: string; recipients_total: number; sent_count: number; failed_count: number }) {
+    return NextResponse.json({
+      error: 'duplicate_recent',
+      id: duplicate.id,
+      status: duplicate.status,
+      recipientsTotal: duplicate.recipients_total,
+      sentCount: duplicate.sent_count,
+      failedCount: duplicate.failed_count,
+    }, { status: 409 })
+  }
+  const duplicate = findRecentDuplicateBroadcast({ agentId, channel, message }, await loadRecentBroadcasts(), new Date())
+  if (duplicate) return duplicateResponse(duplicate)
+
   const recipients = await collectRecipients(agentId, channel)
   if (recipients.length === 0) {
     return NextResponse.json({
@@ -220,32 +280,69 @@ export async function POST(req: NextRequest) {
       message,
       recipients_total: recipients.length,
     })
-    .select('id')
+    .select('id, created_at')
     .single()
   if (insertError || !broadcast) {
     return NextResponse.json({ error: insertError?.message || 'insert_failed' }, { status: 500 })
   }
 
+  // Race-safe re-check: our 'sending' row now exists, so a concurrent
+  // identical request either already sees it or is seen by us here. Of two
+  // identical broadcasts only the older one proceeds; the newer one is
+  // removed before a single message goes out (findOlderDuplicateBroadcast).
+  const olderDuplicate = findOlderDuplicateBroadcast(broadcast, await loadRecentBroadcasts(), new Date())
+  if (olderDuplicate) {
+    const { error: cancelError } = await supabase.from('ai_agent_broadcasts').delete().eq('id', broadcast.id)
+    if (cancelError) {
+      // Could not remove our row -- mark it failed so it never shows as a
+      // live «Отправляется…»; nothing was sent from it either way.
+      console.error('ai-agent broadcasts: failed to cancel duplicate broadcast', broadcast.id, ':', cancelError.message)
+      await supabase.from('ai_agent_broadcasts').update({ status: 'failed', sent_count: 0, failed_count: 0 }).eq('id', broadcast.id)
+    }
+    return duplicateResponse(olderDuplicate)
+  }
+
   const phoneNumberId = connection.external_account_id || ''
   let sent = 0
   let failed = 0
+  // Sent messages go into each conversation's history, flushed in batches
+  // together with the progress counters -- so a crash mid-way still leaves
+  // an honest «отправлено N» and the messages that did go out visible in
+  // Переписка.
+  let historyBuffer: { conversation_id: string; direction: 'outbound'; text: string; is_ai_generated: boolean; status: 'sent' }[] = []
+  async function flushProgress() {
+    if (historyBuffer.length > 0) {
+      const rows = historyBuffer
+      historyBuffer = []
+      const { error: historyError } = await supabase.from('ai_agent_messages').insert(rows)
+      if (historyError) console.error('ai-agent broadcasts: history insert failed for broadcast', broadcast!.id, ':', historyError.message)
+    }
+    await supabase.from('ai_agent_broadcasts').update({ sent_count: sent, failed_count: failed }).eq('id', broadcast!.id)
+  }
   for (let i = 0; i < recipients.length; i++) {
     try {
       if (channel === 'whatsapp') {
-        await sendWhatsAppMessage(phoneNumberId, recipients[i], message, { accessToken })
+        await sendWhatsAppMessage(phoneNumberId, recipients[i].threadId, message, { accessToken })
       } else {
-        await sendTelegramBotMessage(accessToken, recipients[i], message)
+        await sendTelegramBotMessage(accessToken, recipients[i].threadId, message)
       }
       sent++
+      historyBuffer.push({ conversation_id: recipients[i].conversationId, direction: 'outbound', text: message, is_ai_generated: false, status: 'sent' })
     } catch {
       // Per-recipient failures (user blocked the bot, deleted the chat,
       // WhatsApp window closed between preview and send) are expected --
       // count and continue rather than aborting the whole batch.
       failed++
     }
+    if ((i + 1) % BROADCAST_PROGRESS_EVERY === 0 && i < recipients.length - 1) await flushProgress()
     if (i < recipients.length - 1) {
       await new Promise(resolve => setTimeout(resolve, SEND_DELAY_MS))
     }
+  }
+  if (historyBuffer.length > 0) {
+    const { error: historyError } = await supabase.from('ai_agent_messages').insert(historyBuffer)
+    if (historyError) console.error('ai-agent broadcasts: history insert failed for broadcast', broadcast.id, ':', historyError.message)
+    historyBuffer = []
   }
 
   await supabase

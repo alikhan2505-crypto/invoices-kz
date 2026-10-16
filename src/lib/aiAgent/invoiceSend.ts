@@ -195,7 +195,9 @@ export async function sendInvoiceForDraft(
       if (persistError) return fail(`сохранение ссылки на счёт: ${persistError.message}`)
     }
 
-    const link = `https://www.invoices.kz/view/${publicToken}`
+    // Apex, not www: www.invoices.kz only redirects here (one extra hop for
+    // the customer, and some in-app browsers drop the redirect).
+    const link = `https://invoices.kz/view/${publicToken}`
     // Line-by-line breakdown (founder request 2026-09-16: name/qty/price per
     // item, e.g. a "Доставка" line the model added as a plain item shows up
     // here the same as any product) instead of only the bare total.

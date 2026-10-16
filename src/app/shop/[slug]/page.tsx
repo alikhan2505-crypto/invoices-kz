@@ -6,6 +6,7 @@ import Script from 'next/script'
 import QRCode from 'qrcode'
 import { StorefrontLangSwitch, StorefrontStatus, useStorefrontT } from '@/components/shop/StorefrontChrome'
 import { formatStorefrontPrice as formatPrice, storefrontApiErrorKey, type StorefrontErrorKey } from '@/lib/i18n/storefront'
+import { WIDGET_SCRIPT_URL } from '@/lib/aiAgent/widgetSnippet'
 
 type Product = { id: string; name: string; brand: string; price: number; imageUrl: string | null; categoryId: string | null }
 type Category = { id: string; name: string; sortOrder: number }
@@ -259,7 +260,7 @@ export default function StorefrontPage() {
   return (
     <div className="min-h-screen" style={{ background: backgroundColor || 'var(--nav-bg)' }}>
       {widgetKey && (
-        <Script id="invoiceskz-storefront-widget" src="https://www.invoices.kz/widget.js" data-key={widgetKey} strategy="afterInteractive" />
+        <Script id="invoiceskz-storefront-widget" src={WIDGET_SCRIPT_URL} data-key={widgetKey} strategy="afterInteractive" />
       )}
       <div className="max-w-6xl mx-auto p-4 lg:p-6 pb-32 lg:pb-32">
         <div className="flex items-center gap-2.5 mb-6">

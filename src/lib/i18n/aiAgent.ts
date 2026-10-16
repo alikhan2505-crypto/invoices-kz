@@ -18,7 +18,11 @@ export type Lang = 'ru' | 'kk' | 'en'
 export interface AiAgentDict {
   // shared
   loading: string
-  adminOnly: string
+  // Пользователь без Про (или с истёкшим Про) -- раньше видел «Эта функция
+  // пока доступна только администраторам», что неправда: раздел открыт на Про.
+  proOnlyTitle: string
+  proOnlyText: string
+  proOnlyCta: string
   allAgents: string
   backToAgents: string
 
@@ -35,7 +39,9 @@ export interface AiAgentDict {
   statusTraining: string
   statusActive: string
   connectedTo: (account: string) => string
-  instagramDisconnected: string
+  channelReconnect: (channel: string) => string
+  channelWebsite: string
+  channelApi: string
   channelNotConnected: string
   createdOn: (date: string) => string
   deleteAgentAria: (name: string) => string
@@ -47,6 +53,7 @@ export interface AiAgentDict {
   deleteButton: string
   cancelButton: string
   deleteAgentError: string
+  deleteAgentPendingBookings: (count: number) => string
 
   // agent page header + tabs
   agentPageTitle: string
@@ -103,15 +110,17 @@ export interface AiAgentDict {
 export const aiAgentDict: Record<Lang, AiAgentDict> = {
   ru: {
     loading: 'Загрузка…',
-    adminOnly: 'Эта функция пока доступна только администраторам.',
+    proOnlyTitle: 'Доступно на тарифе Про',
+    proOnlyText: 'AI-агент отвечает вашим клиентам в WhatsApp, Instagram, Telegram и в чате на сайте. Перейдите на Про, чтобы создавать агентов и управлять ими.',
+    proOnlyCta: 'Перейти на Про',
     allAgents: 'Все агенты',
     backToAgents: 'Все агенты',
 
     agentsTitle: 'Агенты',
-    agentsSubtitle: 'Ваши AI-сотрудники, которые отвечают клиентам в Instagram',
+    agentsSubtitle: 'Ваши AI-сотрудники, которые отвечают клиентам в WhatsApp, Instagram, Telegram и на сайте',
     createAgentButton: '+ Создать агента',
     emptyTitle: 'Пока нет ни одного агента',
-    emptyText: 'Создайте AI-сотрудника, подключите Instagram — и он начнёт отвечать вашим клиентам на комментарии и сообщения.',
+    emptyText: 'Создайте AI-сотрудника, подключите канал — WhatsApp, Instagram, Telegram или чат на сайте, — и он начнёт отвечать вашим клиентам.',
     emptyCta: 'Создать первого агента',
     goalAnswerQuestions: 'Отвечать на вопросы',
     goalQualifyLead: 'Квалифицировать заявку',
@@ -119,7 +128,9 @@ export const aiAgentDict: Record<Lang, AiAgentDict> = {
     statusTraining: 'Обучается',
     statusActive: 'Активен',
     connectedTo: (a) => `Подключено: ${a}`,
-    instagramDisconnected: 'Instagram отключился — переподключите',
+    channelReconnect: (c) => `${c} отключился — переподключите`,
+    channelWebsite: 'Чат на сайте',
+    channelApi: 'API',
     channelNotConnected: 'Канал не подключён',
     createdOn: (d) => `Создан ${d}`,
     deleteAgentAria: (n) => `Удалить агента ${n}`,
@@ -131,10 +142,15 @@ export const aiAgentDict: Record<Lang, AiAgentDict> = {
     deleteButton: 'Удалить',
     cancelButton: 'Отмена',
     deleteAgentError: 'Не удалось удалить агента. Попробуйте ещё раз.',
+    deleteAgentPendingBookings: (n) => {
+      const m10 = n % 10, m100 = n % 100
+      const what = m10 === 1 && m100 !== 11 ? 'необработанная заявка' : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? 'необработанные заявки' : 'необработанных заявок'
+      return `Нельзя удалить агента: в планировщике салона ${n} ${what} на запись от этого агента. Подтвердите или отклоните их в планировщике, затем удалите агента.`
+    },
 
     agentPageTitle: 'AI-агент',
     agentLabel: (n) => `Агент: ${n}`,
-    agentPageSubtitle: 'Настройте ассистента, который отвечает вашим клиентам в Instagram и Telegram',
+    agentPageSubtitle: 'Настройте ассистента, который отвечает вашим клиентам в WhatsApp, Instagram, Telegram и на сайте',
     testChatButton: 'Тестовый чат',
     tabSettings: 'Настройки',
     tabPrompting: 'Промптинг',
@@ -180,15 +196,17 @@ export const aiAgentDict: Record<Lang, AiAgentDict> = {
 
   kk: {
     loading: 'Жүктелуде…',
-    adminOnly: 'Бұл мүмкіндік әзірге тек әкімшілерге қолжетімді.',
+    proOnlyTitle: 'Про тарифінде қолжетімді',
+    proOnlyText: 'AI-агент клиенттеріңізге WhatsApp, Instagram, Telegram және сайттағы чатта жауап береді. Агенттерді құру және басқару үшін Про тарифіне өтіңіз.',
+    proOnlyCta: 'Про тарифіне өту',
     allAgents: 'Барлық агенттер',
     backToAgents: 'Барлық агенттер',
 
     agentsTitle: 'Агенттер',
-    agentsSubtitle: 'Instagram-да клиенттерге жауап беретін AI-қызметкерлеріңіз',
+    agentsSubtitle: 'WhatsApp, Instagram, Telegram және сайтта клиенттерге жауап беретін AI-қызметкерлеріңіз',
     createAgentButton: '+ Агент құру',
     emptyTitle: 'Әзірге бірде-бір агент жоқ',
-    emptyText: 'AI-қызметкер құрыңыз, Instagram-ды қосыңыз — ол клиенттеріңіздің пікірлері мен хабарламаларына жауап бере бастайды.',
+    emptyText: 'AI-қызметкер құрыңыз, арнаны қосыңыз — WhatsApp, Instagram, Telegram немесе сайттағы чат, — сонда ол клиенттеріңізге жауап бере бастайды.',
     emptyCta: 'Бірінші агентті құру',
     goalAnswerQuestions: 'Сұрақтарға жауап беру',
     goalQualifyLead: 'Өтінімді сұрыптау',
@@ -196,7 +214,9 @@ export const aiAgentDict: Record<Lang, AiAgentDict> = {
     statusTraining: 'Оқып жатыр',
     statusActive: 'Белсенді',
     connectedTo: (a) => `Қосылған: ${a}`,
-    instagramDisconnected: 'Instagram ажырады — қайта қосыңыз',
+    channelReconnect: (c) => `${c} ажырады — қайта қосыңыз`,
+    channelWebsite: 'Сайттағы чат',
+    channelApi: 'API',
     channelNotConnected: 'Арна қосылмаған',
     createdOn: (d) => `Құрылған ${d}`,
     deleteAgentAria: (n) => `${n} агентін жою`,
@@ -208,10 +228,11 @@ export const aiAgentDict: Record<Lang, AiAgentDict> = {
     deleteButton: 'Жою',
     cancelButton: 'Болдырмау',
     deleteAgentError: 'Агентті жою мүмкін болмады. Қайталап көріңіз.',
+    deleteAgentPendingBookings: (n) => `Агентті жою мүмкін емес: салон жоспарлағышында осы агенттен жазылуға ${n} өңделмеген өтінім бар. Оларды жоспарлағышта растаңыз немесе қабылдамаңыз, содан кейін агентті жойыңыз.`,
 
     agentPageTitle: 'AI-агент',
     agentLabel: (n) => `Агент: ${n}`,
-    agentPageSubtitle: 'Instagram мен Telegram-да клиенттеріңізге жауап беретін ассистентті баптаңыз',
+    agentPageSubtitle: 'WhatsApp, Instagram, Telegram және сайтта клиенттеріңізге жауап беретін ассистентті баптаңыз',
     testChatButton: 'Сынақ чаты',
     tabSettings: 'Параметрлер',
     tabPrompting: 'Промптинг',
@@ -257,15 +278,17 @@ export const aiAgentDict: Record<Lang, AiAgentDict> = {
 
   en: {
     loading: 'Loading…',
-    adminOnly: 'This feature is currently available to administrators only.',
+    proOnlyTitle: 'Available on the Pro plan',
+    proOnlyText: 'The AI agent replies to your customers on WhatsApp, Instagram, Telegram and your website chat. Upgrade to Pro to create and manage agents.',
+    proOnlyCta: 'Upgrade to Pro',
     allAgents: 'All agents',
     backToAgents: 'All agents',
 
     agentsTitle: 'Agents',
-    agentsSubtitle: 'Your AI assistants that reply to customers on Instagram',
+    agentsSubtitle: 'Your AI assistants that reply to customers on WhatsApp, Instagram, Telegram and your website',
     createAgentButton: '+ Create agent',
     emptyTitle: 'No agents yet',
-    emptyText: 'Create an AI assistant, connect Instagram — and it will start replying to your customers’ comments and messages.',
+    emptyText: 'Create an AI assistant, connect a channel — WhatsApp, Instagram, Telegram or a website chat — and it will start replying to your customers.',
     emptyCta: 'Create your first agent',
     goalAnswerQuestions: 'Answer questions',
     goalQualifyLead: 'Qualify the lead',
@@ -273,7 +296,9 @@ export const aiAgentDict: Record<Lang, AiAgentDict> = {
     statusTraining: 'Training',
     statusActive: 'Active',
     connectedTo: (a) => `Connected: ${a}`,
-    instagramDisconnected: 'Instagram disconnected — reconnect it',
+    channelReconnect: (c) => `${c} disconnected — reconnect it`,
+    channelWebsite: 'Website chat',
+    channelApi: 'API',
     channelNotConnected: 'Channel not connected',
     createdOn: (d) => `Created ${d}`,
     deleteAgentAria: (n) => `Delete agent ${n}`,
@@ -285,10 +310,11 @@ export const aiAgentDict: Record<Lang, AiAgentDict> = {
     deleteButton: 'Delete',
     cancelButton: 'Cancel',
     deleteAgentError: 'Could not delete the agent. Please try again.',
+    deleteAgentPendingBookings: (n) => `This agent can’t be deleted yet: the salon planner has ${n} unprocessed booking ${n === 1 ? 'request' : 'requests'} from it. Confirm or reject ${n === 1 ? 'it' : 'them'} in the planner, then delete the agent.`,
 
     agentPageTitle: 'AI agent',
     agentLabel: (n) => `Agent: ${n}`,
-    agentPageSubtitle: 'Set up the assistant that replies to your customers on Instagram and Telegram',
+    agentPageSubtitle: 'Set up the assistant that replies to your customers on WhatsApp, Instagram, Telegram and your website',
     testChatButton: 'Test chat',
     tabSettings: 'Settings',
     tabPrompting: 'Prompting',

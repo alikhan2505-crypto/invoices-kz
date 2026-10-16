@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
 import { encryptAtRest, decryptAtRest } from '@/lib/kaspiPay/crypto'
 import { getKey } from '@/lib/aiAgent/connection'
-import { getTelegramMe, setTelegramWebhook, deleteTelegramWebhook } from '@/lib/aiAgent/telegram'
+import { getTelegramMe, setTelegramWebhook, deleteTelegramWebhook, telegramWebhookBase } from '@/lib/aiAgent/telegram'
 import { getActivePlan } from '@/lib/plan'
 
 // Connect (POST) / disconnect (DELETE) a customer's Telegram bot to an
@@ -93,7 +93,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'connect_failed' }, { status: 500 })
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.invoices.kz'
+  // Только apex: www отвечает 308, а Telegram считает редирект ошибкой
+  // доставки и молча теряет все обновления (та же ловушка www/apex, что уже
+  // трижды ломала вебхуки, см. telegram-notify-webhook/setup). Поэтому и
+  // запасной адрес apex, и www в NEXT_PUBLIC_APP_URL срезается до apex.
+  const appUrl = telegramWebhookBase(process.env.NEXT_PUBLIC_APP_URL)
   try {
     await setTelegramWebhook(botToken, `${appUrl}/api/ai-agent/telegram/webhook?secret=${webhookSecret}`, webhookSecret)
   } catch (e: any) {

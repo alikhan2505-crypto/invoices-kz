@@ -49,14 +49,25 @@ export interface AiAgentFormsDict {
   trainingTitle: string
   trainingBody: string
   trainingLeft: (approvals: number, days: number) => string
+  trainingLeftNoDraft: (approvals: number, days: number) => string
+  trainingExitPending: string
   trainingLink: string
   botStatusLabel: string
   botStatusHint: string
+  // Тумблер сохраняется сразу (15.10.2026); до создания агента -- вместе с ним.
+  botStatusSaved: string
+  botStatusOnCreateHint: string
+  errBotStatus: string
+  testChatNoteTemplate: string
+  testChatNoteFlow: string
+  testChatNoteStopPhrase: string
+  testChatNoteBudgetDepleted: string
   historyDepthLabel: string
   historyOption: (n: number) => string
   historyDepthHint: string
   kaspiShopLabel: string
   kaspiShopDefaultOption: string
+  kaspiShopMissingOption: string
   kaspiShopActiveSuffix: string
   kaspiShopHint: string
   replyCostTitle: string
@@ -122,8 +133,9 @@ export interface AiAgentFormsDict {
   tabsAria: string
   defaultAgentName: string
   defaultBusinessName: string
-  creatingAgentTitle: string
-  creatingAgentCountdown: (seconds: string) => string
+  // После создания агента страница сама открывает «Каналы» с этой строкой.
+  connectChannelHint: string
+  saveSuccess: string
 
   // errors
   errConnectInstagram: string
@@ -138,6 +150,10 @@ export interface AiAgentFormsDict {
   errDisconnectWhatsapp: string
   errSaveTemplate: string
   errSaveChanges: string
+  errSaveNameRequired: string
+  errSaveKaspiShop: string
+  errSaveForbidden: string
+  errSaveNotFound: string
   errDeleteTemplate: string
   // deployment and Meta-dialog diagnostics -- these say plainly which side
   // failed, because a silent Embedded Signup close is otherwise unreadable
@@ -155,7 +171,6 @@ export interface AiAgentFormsDict {
   errMetaRejected: (message: string, step: string) => string
   errMetaRejectedNoReason: string
   loadingLabel: string
-  adminOnlyLabel: string
   confirmDisconnectInstagram: string
   confirmDisconnectWhatsapp: string
   confirmDeleteTemplate: string
@@ -213,14 +228,24 @@ export const aiAgentFormsDict: Record<Lang, AiAgentFormsDict> = {
     trainingTitle: 'Агент на обучении — клиенты пока не видят его ответов',
     trainingBody: 'Каждый ответ ждёт вашего одобрения в «Диалогах» и не уходит клиенту, пока вы его не отправите. Это защита: агент учится на ваших правках. Но если не заглядывать в очередь, клиент не получит ничего.',
     trainingLeft: (a, d) => `До самостоятельной работы: ${a} одобрений или ${d} дней.`,
+    trainingLeftNoDraft: (a, d) => `До самостоятельной работы: ${a} одобрений или ${d} дней с первого черновика — черновиков пока не было, отсчёт дней не начался.`,
+    trainingExitPending: 'Срок обучения прошёл: со следующего сообщения клиента агент начнёт отвечать сам, а вы получите уведомление.',
     trainingLink: 'Открыть Диалоги →',
     botStatusLabel: 'Статус бота',
     botStatusHint: 'Выключенный агент не отвечает клиентам.',
+    botStatusSaved: 'Сохранено',
+    botStatusOnCreateHint: 'Применится, когда вы создадите агента.',
+    errBotStatus: 'Не удалось изменить статус бота. Попробуйте ещё раз.',
+    testChatNoteTemplate: 'Шаблон — бесплатно',
+    testChatNoteFlow: 'Сценарий — бесплатно',
+    testChatNoteStopPhrase: 'Стоп-фраза — в живом канале диалог перешёл бы к вам',
+    testChatNoteBudgetDepleted: 'Кошелёк пуст — так сейчас отвечает живой канал. Пополните баланс, чтобы ответил ИИ',
     historyDepthLabel: 'Глубина памяти диалога',
     historyOption: (n) => `Последние ${n} обменов`,
     historyDepthHint: 'Сколько прошлых сообщений агент помнит. Больше — точнее контекст, но дороже каждый ответ.',
     kaspiShopLabel: 'Магазин Kaspi для цен и товаров',
     kaspiShopDefaultOption: 'Активный магазин аккаунта',
+    kaspiShopMissingOption: 'Магазин удалён — выберите другой',
     kaspiShopActiveSuffix: ' — сейчас активный',
     kaspiShopHint: 'Откуда агент берёт названия товаров и цены. Если не выбирать, он следует за магазином, переключённым в разделе Kaspi Bot — и тогда все агенты аккаунта отвечают по одному и тому же.',
     replyCostTitle: 'Стоимость ИИ-ответов',
@@ -281,8 +306,8 @@ export const aiAgentFormsDict: Record<Lang, AiAgentFormsDict> = {
     tabsAria: 'Разделы настроек агента',
     defaultAgentName: 'Ассистент',
     defaultBusinessName: 'Ваш бизнес',
-    creatingAgentTitle: 'Создаём AI-агента…',
-    creatingAgentCountdown: (s) => `Агент создастся примерно через 0:${s}`,
+    connectChannelHint: 'Подключите канал, чтобы агент начал отвечать',
+    saveSuccess: 'Сохранено',
 
     errConnectInstagram: 'Не удалось подключить Instagram. Попробуйте ещё раз — если не получится снова, напишите в поддержку.',
     errDisconnectInstagram: 'Не удалось отключить Instagram. Попробуйте ещё раз.',
@@ -296,6 +321,10 @@ export const aiAgentFormsDict: Record<Lang, AiAgentFormsDict> = {
     errDisconnectWhatsapp: 'Не удалось отключить WhatsApp. Попробуйте ещё раз.',
     errSaveTemplate: 'Не удалось сохранить шаблон. Попробуйте ещё раз.',
     errSaveChanges: 'Не удалось сохранить изменения. Попробуйте ещё раз.',
+    errSaveNameRequired: 'Заполните поле «Название компании» на вкладке «Настройки».',
+    errSaveKaspiShop: 'Выбранный магазин Kaspi не найден. Выберите другой на вкладке «Контроль».',
+    errSaveForbidden: 'Не сохранено: AI-агент доступен на тарифе Про.',
+    errSaveNotFound: 'Агент не найден — возможно, его удалили в другой вкладке.',
     errDeleteTemplate: 'Не удалось удалить шаблон. Попробуйте ещё раз.',
     confirmDisconnectInstagram: 'Отключить Instagram? Агент перестанет отвечать клиентам в этом аккаунте.',
     confirmDisconnectWhatsapp: 'Отключить WhatsApp? Агент перестанет отвечать клиентам в этом номере.',
@@ -314,7 +343,6 @@ export const aiAgentFormsDict: Record<Lang, AiAgentFormsDict> = {
     errMetaRejected: (m, step) => `Meta отклонила подключение: ${m}${step ? ` (шаг: ${step})` : ''}`,
     errMetaRejectedNoReason: 'Meta отклонила подключение и не назвала причину. Попробуйте ещё раз, и если повторится — напишите в поддержку.',
     loadingLabel: 'Загрузка…',
-    adminOnlyLabel: 'Эта функция пока доступна только администраторам.',
   },
 
   kk: {
@@ -365,14 +393,24 @@ export const aiAgentFormsDict: Record<Lang, AiAgentFormsDict> = {
     trainingTitle: 'Агент оқуда — клиенттер оның жауаптарын әзірге көрмейді',
     trainingBody: 'Әр жауап «Диалогтарда» сіздің мақұлдауыңызды күтеді және сіз жібермейінше клиентке бармайды. Бұл қорғаныс: агент сіздің түзетулеріңізден үйренеді. Бірақ кезекке қарамасаңыз, клиент ештеңе алмайды.',
     trainingLeft: (a, d) => `Дербес жұмысқа дейін: ${a} мақұлдау немесе ${d} күн.`,
+    trainingLeftNoDraft: (a, d) => `Дербес жұмысқа дейін: ${a} мақұлдау немесе алғашқы жауап жобасынан бастап ${d} күн — әзірге жоба болған жоқ, күн санау басталмады.`,
+    trainingExitPending: 'Оқу мерзімі өтті: клиенттің келесі хабарламасынан бастап агент өзі жауап береді, ал сізге хабарлама келеді.',
     trainingLink: 'Диалогтарды ашу →',
     botStatusLabel: 'Бот күйі',
     botStatusHint: 'Өшірілген агент клиенттерге жауап бермейді.',
+    botStatusSaved: 'Сақталды',
+    botStatusOnCreateHint: 'Агентті құрған кезде қолданылады.',
+    errBotStatus: 'Бот күйін өзгерту мүмкін болмады. Қайталап көріңіз.',
+    testChatNoteTemplate: 'Үлгі — тегін',
+    testChatNoteFlow: 'Сценарий — тегін',
+    testChatNoteStopPhrase: 'Тоқтату тіркесі — нақты арнада диалог сізге өтер еді',
+    testChatNoteBudgetDepleted: 'Әмиян бос — нақты арна қазір осылай жауап береді. ЖИ жауап беруі үшін балансты толтырыңыз',
     historyDepthLabel: 'Диалог жадының тереңдігі',
     historyOption: (n) => `Соңғы ${n} алмасу`,
     historyDepthHint: 'Агент қанша өткен хабарламаны есте сақтайды. Көбірек — контекст дәлірек, бірақ әр жауап қымбатырақ.',
     kaspiShopLabel: 'Бағалар мен тауарларға арналған Kaspi дүкені',
     kaspiShopDefaultOption: 'Аккаунттың белсенді дүкені',
+    kaspiShopMissingOption: 'Дүкен жойылған — басқасын таңдаңыз',
     kaspiShopActiveSuffix: ' — қазір белсенді',
     kaspiShopHint: 'Агент тауар атаулары мен бағаларды қайдан алады. Таңдамасаңыз, ол Kaspi Bot бөлімінде ауыстырылған дүкенді ұстанады — сонда аккаунттың барлық агенттері бірдей жауап береді.',
     replyCostTitle: 'ИИ-жауаптардың құны',
@@ -433,8 +471,8 @@ export const aiAgentFormsDict: Record<Lang, AiAgentFormsDict> = {
     tabsAria: 'Агент параметрлерінің бөлімдері',
     defaultAgentName: 'Ассистент',
     defaultBusinessName: 'Сіздің бизнесіңіз',
-    creatingAgentTitle: 'AI-агент құрылуда…',
-    creatingAgentCountdown: (s) => `Агент шамамен 0:${s} ішінде құрылады`,
+    connectChannelHint: 'Агент жауап бере бастауы үшін арнаны қосыңыз',
+    saveSuccess: 'Сақталды',
 
     errConnectInstagram: 'Instagram-ды қосу мүмкін болмады. Қайталап көріңіз — қайта болмаса, қолдауға жазыңыз.',
     errDisconnectInstagram: 'Instagram-ды ажырату мүмкін болмады. Қайталап көріңіз.',
@@ -448,6 +486,10 @@ export const aiAgentFormsDict: Record<Lang, AiAgentFormsDict> = {
     errDisconnectWhatsapp: 'WhatsApp-ты ажырату мүмкін болмады. Қайталап көріңіз.',
     errSaveTemplate: 'Үлгіні сақтау мүмкін болмады. Қайталап көріңіз.',
     errSaveChanges: 'Өзгерістерді сақтау мүмкін болмады. Қайталап көріңіз.',
+    errSaveNameRequired: '«Параметрлер» қойындысындағы «Компания атауы» өрісін толтырыңыз.',
+    errSaveKaspiShop: 'Таңдалған Kaspi дүкені табылмады. «Бақылау» қойындысында басқасын таңдаңыз.',
+    errSaveForbidden: 'Сақталмады: AI-агент Про тарифінде қолжетімді.',
+    errSaveNotFound: 'Агент табылмады — мүмкін, оны басқа қойындыда жойған шығарсыз.',
     errDeleteTemplate: 'Үлгіні жою мүмкін болмады. Қайталап көріңіз.',
     confirmDisconnectInstagram: 'Instagram-ды ажыратасыз ба? Агент бұл аккаунтта клиенттерге жауап беруді тоқтатады.',
     confirmDisconnectWhatsapp: 'WhatsApp-ты ажыратасыз ба? Агент бұл нөмірде клиенттерге жауап беруді тоқтатады.',
@@ -466,7 +508,6 @@ export const aiAgentFormsDict: Record<Lang, AiAgentFormsDict> = {
     errMetaRejected: (m, step) => `Meta қосылымды қабылдамады: ${m}${step ? ` (қадам: ${step})` : ''}`,
     errMetaRejectedNoReason: 'Meta қосылымды қабылдамады және себебін айтпады. Қайталап көріңіз, қайталанса — қолдауға жазыңыз.',
     loadingLabel: 'Жүктелуде…',
-    adminOnlyLabel: 'Бұл мүмкіндік әзірге тек әкімшілерге қолжетімді.',
   },
 
   en: {
@@ -517,14 +558,24 @@ export const aiAgentFormsDict: Record<Lang, AiAgentFormsDict> = {
     trainingTitle: 'The agent is in training — customers do not see its replies yet',
     trainingBody: 'Every reply waits for your approval under Conversations and does not reach the customer until you send it. That is the safeguard: the agent learns from your edits. But if nobody opens the queue, the customer gets nothing.',
     trainingLeft: (a, d) => `Until it works on its own: ${a} approvals or ${d} days.`,
+    trainingLeftNoDraft: (a, d) => `Until it works on its own: ${a} approvals or ${d} days from the first draft — there have been no drafts yet, so the day count has not started.`,
+    trainingExitPending: 'The training period is over: from the next customer message the agent will reply on its own, and you will get a notification.',
     trainingLink: 'Open Conversations →',
     botStatusLabel: 'Bot status',
     botStatusHint: 'A disabled assistant does not reply to customers.',
+    botStatusSaved: 'Saved',
+    botStatusOnCreateHint: 'Applies when you create the agent.',
+    errBotStatus: 'Could not change the bot status. Please try again.',
+    testChatNoteTemplate: 'Template — free',
+    testChatNoteFlow: 'Scenario — free',
+    testChatNoteStopPhrase: 'Stop phrase — in a live channel the conversation would be handed to you',
+    testChatNoteBudgetDepleted: 'Wallet is empty — this is how a live channel replies right now. Top up so the AI can answer',
     historyDepthLabel: 'Conversation memory depth',
     historyOption: (n) => `Last ${n} exchanges`,
     historyDepthHint: 'How many past messages the assistant remembers. More means better context but a higher cost per reply.',
     kaspiShopLabel: 'Kaspi shop for prices and products',
     kaspiShopDefaultOption: "The account's active shop",
+    kaspiShopMissingOption: 'Shop was deleted — pick another one',
     kaspiShopActiveSuffix: ' — currently active',
     kaspiShopHint: 'Where the assistant takes product names and prices from. Left unset, it follows whichever shop is selected in the Kaspi Bot section — and then every agent on the account answers from the same one.',
     replyCostTitle: 'Cost of AI replies',
@@ -585,8 +636,8 @@ export const aiAgentFormsDict: Record<Lang, AiAgentFormsDict> = {
     tabsAria: 'Agent settings sections',
     defaultAgentName: 'Assistant',
     defaultBusinessName: 'Your business',
-    creatingAgentTitle: 'Creating the AI agent…',
-    creatingAgentCountdown: (s) => `The agent will be ready in about 0:${s}`,
+    connectChannelHint: 'Connect a channel so the agent can start replying',
+    saveSuccess: 'Saved',
 
     errConnectInstagram: 'Could not connect Instagram. Please try again — if it fails again, contact support.',
     errDisconnectInstagram: 'Could not disconnect Instagram. Please try again.',
@@ -600,6 +651,10 @@ export const aiAgentFormsDict: Record<Lang, AiAgentFormsDict> = {
     errDisconnectWhatsapp: 'Could not disconnect WhatsApp. Please try again.',
     errSaveTemplate: 'Could not save the template. Please try again.',
     errSaveChanges: 'Could not save the changes. Please try again.',
+    errSaveNameRequired: 'Fill in “Company name” on the “Settings” tab.',
+    errSaveKaspiShop: 'The selected Kaspi store was not found. Pick another one on the “Control” tab.',
+    errSaveForbidden: 'Not saved: the AI agent is available on the Pro plan.',
+    errSaveNotFound: 'Agent not found — it may have been deleted in another tab.',
     errDeleteTemplate: 'Could not delete the template. Please try again.',
     confirmDisconnectInstagram: 'Disconnect Instagram? The assistant will stop replying to customers on this account.',
     confirmDisconnectWhatsapp: 'Disconnect WhatsApp? The assistant will stop replying to customers on this number.',
@@ -618,6 +673,5 @@ export const aiAgentFormsDict: Record<Lang, AiAgentFormsDict> = {
     errMetaRejected: (m, step) => `Meta rejected the connection: ${m}${step ? ` (step: ${step})` : ''}`,
     errMetaRejectedNoReason: 'Meta rejected the connection without giving a reason. Please try again, and contact support if it happens again.',
     loadingLabel: 'Loading…',
-    adminOnlyLabel: 'This feature is currently available to administrators only.',
   },
 }

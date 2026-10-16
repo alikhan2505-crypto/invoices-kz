@@ -4,15 +4,19 @@ import { getKey } from './connection'
 import { replyToComment, sendDirectMessage, sendDirectImage, sendInstagramFlowStep, InstagramApiError } from '@/lib/instagram'
 import { pickProductPhoto } from './productPhoto'
 import { generateAiReply } from '@/lib/instagramAiReply'
-import { buildBusinessContextLine, buildCollectFieldsToExtract, buildCatalogBlock, buildDeliveryBlock, buildShopLinksBlock, AgentTone, AgentGoal } from './promptContext'
-import { loadAgentCatalog, loadAgentDeliveryInfo, loadAgentShopLinks } from './catalogContext'
+import { buildCollectFieldsToExtract } from './promptContext'
+import { buildAgentReplyContext } from './replyContext'
+import { loadAgentCatalog } from './catalogContext'
 import { buildInvoiceToolExecutor } from './invoiceSend'
-import { loadAgentSalonInfo, buildSalonBlock } from './salonContext'
 import { buildBookingToolExecutor } from './bookingSend'
 import { debitAiAgentWallet, AI_AGENT_CREDITS_PER_AI_REPLY, hasAiAgentBudget, AI_AGENT_BUDGET_DEPLETED_REPLY } from './wallet'
 import { isConversationRateLimited } from './rateLimit'
 import { sendTelegramNotification } from '@/lib/telegramNotify'
 import { createNotification } from '@/lib/notifications'
+import { AI_AGENT_DIALOGS_URL, AI_AGENT_REVIEW_URL } from './links'
+import { exitTrainingIfDue } from './trainingExit'
+import { scheduleBudgetDepletedAlert } from './budgetAlert'
+import { findStopPhraseMatch } from './stopPhrases'
 import { UNSUPPORTED_MEDIA_REPLY_TEXT } from '@/lib/aiAgent/mediaLimits'
 import { findFlowTriggerMatch, type FlowStep } from './flow'
 import { startFlow, handleFlowButtonClick, FLOW_STALE_TEXT, type FlowStepSender } from './flowEngine'
@@ -110,6 +114,10 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
   // debit. Same rule and placement as the Telegram tenant path
   // (telegramWebhookHandler.ts).
   if (agent.is_enabled === false) return
+
+  // Срок обучения проверяется здесь, на входящем сообщении (см. trainingExit.ts):
+  // вышедший по сроку агент отвечает клиенту сам уже на этом сообщении.
+  if (await exitTrainingIfDue(supabase, agent)) agent.status = 'active'
 
   // Find or create the conversation thread for this sender.
   const { data: conversation } = await supabase
@@ -218,7 +226,7 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
     const { data: ownerProfile } = await supabase.from('profiles').select('telegram_chat_id, notify_telegram').eq('id', agent.user_id).single()
     if (ownerProfile?.notify_telegram && ownerProfile.telegram_chat_id) {
       try {
-        await sendTelegramNotification(ownerProfile.telegram_chat_id, `Клиент попросил оператора: «${params.incomingText.slice(0, 120)}» — https://www.invoices.kz/ai-agent/dialogs`)
+        await sendTelegramNotification(ownerProfile.telegram_chat_id, `Клиент попросил оператора: «${params.incomingText.slice(0, 120)}» — ${AI_AGENT_DIALOGS_URL}`)
       } catch (telegramErr: any) {
         console.error('ai-agent webhook: stop-phrase Telegram nudge failed for user', agent.user_id, ':', telegramErr.message)
       }
@@ -355,25 +363,20 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
   if (budgetDepleted) {
     draftReply = AI_AGENT_BUDGET_DEPLETED_REPLY
     urgent = false
+    // Подмена ответа ИИ заготовкой больше не молчаливая: владелец получает
+    // колокольчик и Telegram, не чаще раза в сутки на агента (budgetAlert.ts).
+    scheduleBudgetDepletedAlert(supabase, agent)
   } else try {
     // Phase 3: real catalog prices in context + the invoice tool. The
     // tool is DM-only -- a public comment thread is no place to collect
     // a phone number or drop a personal invoice link.
-    catalog = await loadAgentCatalog(supabase, agent.user_id, agent.kaspi_shop_connection_id)
-    const catalogBlock = buildCatalogBlock(catalog)
-    const deliveryInfo = await loadAgentDeliveryInfo(supabase, agent.user_id, agent.kaspi_shop_connection_id)
-    const deliveryBlock = buildDeliveryBlock(deliveryInfo)
-    const shopLinks = await loadAgentShopLinks(supabase, agent.user_id, agent.kaspi_shop_connection_id)
-    const shopLinksBlock = buildShopLinksBlock(shopLinks)
-
-    // Salon booking planner: only an agent pinned to a salon
-    // (ai_agents.salon_site_id), and only in DM -- same "DM-only" rule the
-    // invoice tool already follows above, for the same reason (a public
-    // comment thread is no place to collect a phone number or start a
-    // booking). A salon agent gets bookingTool INSTEAD OF invoiceTool,
-    // never both (see whatsappWebhookHandler.ts's identical comment).
-    const salonInfo = (params.source === 'dm' && agent.salon_site_id) ? await loadAgentSalonInfo(supabase, agent.salon_site_id) : null
-    const salonBlock = salonInfo ? buildSalonBlock(salonInfo) : ''
+    // Каталог, доставка, ссылки на магазин и блок салона -- общим сборщиком
+    // (replyContext.ts), тем же, что у тестового чата. Агент салона получает
+    // bookingTool ВМЕСТО invoiceTool, никогда оба (generateAiReply принимает
+    // только один инструмент за вызов).
+    const replyContext = await buildAgentReplyContext(supabase, agent, { withSalon: params.source === 'dm' })
+    catalog = replyContext.catalog
+    const salonInfo = replyContext.salonInfo
 
     const result = await generateAiReply({
       incomingText: params.incomingText,
@@ -382,16 +385,7 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
       conversationHistory,
       historyGapHours,
       image: params.media?.kind === 'image' ? { base64: params.media.base64, mediaType: params.media.mediaType } : undefined,
-      businessContextLine: buildBusinessContextLine({
-        name: agent.name,
-        tone: agent.tone as AgentTone,
-        description: agent.business_description,
-        goal: agent.goal as AgentGoal,
-        collectFields: Array.isArray(agent.collect_fields) ? agent.collect_fields : undefined,
-        timezone: agent.timezone || undefined,
-        currency: agent.currency || undefined,
-        customInstructions: typeof agent.custom_instructions === 'string' ? agent.custom_instructions : undefined,
-      }) + catalogBlock + deliveryBlock + shopLinksBlock + salonBlock,
+      businessContextLine: replyContext.businessContextLine,
       collectFieldsToExtract: buildCollectFieldsToExtract(Array.isArray(agent.collect_fields) ? agent.collect_fields : undefined),
       ...(params.source === 'dm'
         ? (salonInfo
@@ -452,7 +446,7 @@ export async function handleTenantIncoming(conn: TenantConnection, params: Tenan
     const { data: profile } = await supabase.from('profiles').select('telegram_chat_id, notify_telegram').eq('id', agent.user_id).single()
     if (profile?.notify_telegram && profile.telegram_chat_id && inserted) {
       try {
-        await sendTelegramNotification(profile.telegram_chat_id, 'У вас новый черновик ответа на проверке в AI-агенте: https://www.invoices.kz/ai-agent/review')
+        await sendTelegramNotification(profile.telegram_chat_id, `У вас новый черновик ответа на проверке в AI-агенте: ${AI_AGENT_REVIEW_URL}`)
       } catch (telegramErr: any) {
         console.error('ai-agent webhook: training-mode Telegram nudge failed for user', agent.user_id, ':', telegramErr.message)
       }
@@ -565,16 +559,16 @@ export function findTemplateMatch(text: string, templates: { id: string; trigger
   return null
 }
 
-// Same case-insensitive substring rule as findTemplateMatch/
-// findFlowTriggerMatch, applied to the agent's configurable stop-phrase
-// list (ai_agents.stop_phrases) instead of templates/flows. Checked
-// BEFORE template/flow matching in every tenant handler -- a customer
-// asking for a human must never accidentally match a template or flow
-// trigger word first.
-export function findStopPhraseMatch(text: string, phrases: string[]): boolean {
-  const lower = text.toLowerCase()
-  return phrases.some(p => lower.includes(p.toLowerCase()))
-}
+// The agent's configurable stop-phrase list (ai_agents.stop_phrases).
+// Checked BEFORE template/flow matching in every tenant handler -- a
+// customer asking for a human must never accidentally match a template or
+// flow trigger word first. Unlike templates/flows this is a word-start match
+// with a short inflection ending (see stopPhrases.ts): «оператор» catches
+// «оператором»/«операторға», while counting people («4 человека»,
+// «количество человек») never fires «человек» -- a match pauses the bot for
+// that customer until the owner releases it. Re-exported here so every
+// existing import keeps working.
+export { findStopPhraseMatch }
 
 // Shared fixed acknowledgement sent (or, in test-chat's stateless preview,
 // shown) on a stop-phrase match -- one copy instead of four, now that all
