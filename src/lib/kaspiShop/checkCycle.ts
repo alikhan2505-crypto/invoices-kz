@@ -32,11 +32,68 @@ async function fetchOfferPointCodes(sessionCookies: string, merchantId: string, 
   return Array.from(codes)
 }
 import { sendTelegramNotification } from '@/lib/telegramNotify'
+import { FLOOR_ALERT_INTERVAL_MS, wantsNotification } from '@/lib/notificationPrefs'
+import { isMissingSchemaError, loadNotifyProfile } from '@/lib/notificationPrefsServer'
+import { escapeHtml } from '@/lib/htmlEscape'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
+
+// «Цена упёрлась в минимум» — не чаще раза в сутки на товар (раньше уходило
+// на каждом цикле проверки, пока товар стоял на минимуме). Атомарный захват
+// по floor_alert_sent_at: из параллельных циклов отправит только один.
+// До миграции (колонки нет) — только при переходе «не на минимуме → на
+// минимуме» (held_at_floor прошлой проверки), т.е. раз за эпизод.
+// Возвращает null — слот не наш (уже слали за сутки / ошибка); иначе — чем
+// слот освободить, если отправка не удалась (см. alertFloorPriceOnce).
+type FloorAlertClaim = { stampedAt: string | null }
+
+async function claimFloorAlert(trackedProductId: string, wasHeldAtFloor: boolean): Promise<FloorAlertClaim | null> {
+  const now = new Date()
+  const stampedAt = now.toISOString()
+  const since = new Date(now.getTime() - FLOOR_ALERT_INTERVAL_MS).toISOString()
+  const { data, error } = await supabase
+    .from('kaspi_shop_tracked_products')
+    .update({ floor_alert_sent_at: stampedAt })
+    .eq('id', trackedProductId)
+    .or(`floor_alert_sent_at.is.null,floor_alert_sent_at.lt."${since}"`)
+    .select('id')
+  if (!error) return (data?.length ?? 0) > 0 ? { stampedAt } : null
+  if (isMissingSchemaError(error, 'floor_alert_sent_at')) return wasHeldAtFloor ? null : { stampedAt: null }
+  // Не знаем, слали ли уже, — лучше промолчать, чем спамить каждый цикл.
+  console.error('kaspi-shop checkCycle: floor alert claim failed for product', trackedProductId, ':', error.message)
+  return null
+}
+
+// Отправка не удалась — возвращаем слот, чтобы следующий цикл попробовал
+// снова, а не молчал сутки. Только если в колонке всё ещё НАША отметка
+// (параллельный цикл мог успеть своё). NULL равнозначен «давно не слали»
+// для условия захвата выше.
+async function releaseFloorAlert(trackedProductId: string, claim: FloorAlertClaim): Promise<void> {
+  if (!claim.stampedAt) return // до миграции освобождать нечего
+  const { error } = await supabase
+    .from('kaspi_shop_tracked_products')
+    .update({ floor_alert_sent_at: null })
+    .eq('id', trackedProductId)
+    .eq('floor_alert_sent_at', claim.stampedAt)
+  if (error) console.error('kaspi-shop checkCycle: floor alert release failed for product', trackedProductId, ':', error.message)
+}
+
+// Best-effort: never throws.
+async function alertFloorPriceOnce(userId: string, trackedProductId: string, wasHeldAtFloor: boolean, text: string): Promise<void> {
+  try {
+    const profile = await loadNotifyProfile(supabase, userId)
+    if (!wantsNotification(profile, 'kaspi_floor_price', 'telegram')) return
+    const claim = await claimFloorAlert(trackedProductId, wasHeldAtFloor)
+    if (!claim) return
+    const sent = await sendTelegramNotification(profile!.telegram_chat_id as string, text)
+    if (!sent) await releaseFloorAlert(trackedProductId, claim)
+  } catch (err: any) {
+    console.error('kaspi-shop checkCycle: floor alert failed for product', trackedProductId, ':', err?.message || err)
+  }
+}
 
 export type DueTrackedProduct = { id: string; kaspiSku: string; kaspiMasterSku: string; targetCities: string[] }
 
@@ -429,15 +486,8 @@ export async function applyPriceCheckResult(
       }
 
       if (anyHeldAtFloor) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('telegram_chat_id, notify_telegram')
-          .eq('id', userId)
-          .single()
-        if (profile?.notify_telegram && profile.telegram_chat_id) {
-          await sendTelegramNotification(profile.telegram_chat_id,
-            `🔴 Kaspi Магазин: цена товара «${product.product_name}» упёрлась в ваш минимум (${product.floor_price} ₸) в одном или нескольких городах — конкурент дешевле, но снижать дальше нельзя. Проверьте вручную, если хотите скорректировать минимум.`)
-        }
+        await alertFloorPriceOnce(userId, trackedProductId, product.held_at_floor === true,
+          `🔴 Kaspi Магазин: цена товара «${escapeHtml(product.product_name)}» упёрлась в ваш минимум (${product.floor_price} ₸) в одном или нескольких городах — конкурент дешевле, но снижать дальше нельзя. Проверьте вручную, если хотите скорректировать минимум.`)
       }
     }
   } else if (!fetchError) {
@@ -535,15 +585,8 @@ export async function applyPriceCheckResult(
     }
 
     if (heldAtFloor) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('telegram_chat_id, notify_telegram')
-        .eq('id', userId)
-        .single()
-      if (profile?.notify_telegram && profile.telegram_chat_id) {
-        await sendTelegramNotification(profile.telegram_chat_id,
-          `🔴 Kaspi Магазин: цена товара «${product.product_name}» упёрлась в ваш минимум (${product.floor_price} ₸) — конкурент дешевле, но снижать дальше нельзя. Проверьте вручную, если хотите скорректировать минимум.`)
-      }
+      await alertFloorPriceOnce(userId, trackedProductId, product.held_at_floor === true,
+        `🔴 Kaspi Магазин: цена товара «${escapeHtml(product.product_name)}» упёрлась в ваш минимум (${product.floor_price} ₸) — конкурент дешевле, но снижать дальше нельзя. Проверьте вручную, если хотите скорректировать минимум.`)
     }
   } else {
     action = 'error'

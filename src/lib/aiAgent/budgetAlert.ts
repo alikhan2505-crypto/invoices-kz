@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { after } from 'next/server'
-import { sendTelegramNotification } from '@/lib/telegramNotify'
+import { notifyOwnerTelegram } from '@/lib/notificationPrefsServer'
 import { escapeHtml } from '@/lib/htmlEscape'
 import { aiAgentUrl } from './links'
 import { buildAgentSettingsHref } from './settingsLink'
@@ -99,10 +99,8 @@ export async function notifyOwnerBudgetDepleted(
     }
 
     // parse_mode HTML: имя агента и «&» в адресе экранированы в budgetAlertTexts.
-    const { data: profile } = await supabase.from('profiles').select('telegram_chat_id, notify_telegram').eq('id', agent.user_id).maybeSingle()
-    if (profile?.notify_telegram && profile.telegram_chat_id) {
-      await sendTelegramNotification(profile.telegram_chat_id, texts.telegram, { timeoutMs: BUDGET_ALERT_TELEGRAM_TIMEOUT_MS })
-    }
+    // Telegram — по настройке события «Кошелёк агента пуст» (notification_prefs).
+    await notifyOwnerTelegram(supabase, agent.user_id, 'ai_wallet_empty', texts.telegram, { timeoutMs: BUDGET_ALERT_TELEGRAM_TIMEOUT_MS })
   } catch (err: any) {
     console.error('ai-agent: budget-depleted owner alert failed for agent', agent.id, ':', err?.message || err)
   }

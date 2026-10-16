@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
 import { createClient } from '@supabase/supabase-js'
 import { sendTelegramNotification } from '@/lib/telegramNotify'
+import { loadNotifyProfile } from '@/lib/notificationPrefsServer'
+import { wantsNotification } from '@/lib/notificationPrefs'
+import { escapeHtml } from '@/lib/htmlEscape'
 
 const resend = new Resend(process.env.RESEND_API_KEY!)
 const supabase = createClient(
@@ -28,27 +31,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true, skipped: true })
     }
 
-    const { data: owner } = await supabase
-      .from('profiles')
-      .select('email, notify_email, notify_telegram, telegram_chat_id')
-      .eq('id', inv.user_id)
-      .single()
+    // Настройки события «Клиент нажал „Я оплатил“» (notification_prefs; до
+    // миграции — старые notify_email / notify_telegram).
+    const owner = await loadNotifyProfile(supabase, inv.user_id)
 
     if (!owner) {
       return NextResponse.json({ ok: true, skipped: true })
     }
 
     const amount = Number(inv.amount).toLocaleString('ru-KZ')
+    const clientName = escapeHtml(inv.client_name || '')
+    const number = escapeHtml(inv.number)
 
     // Own try/catch, not just the outer one — email and Telegram are meant
     // to be fully independent channels (see plan's Global Constraints), so
     // a Resend failure (bad key, rate limit, network blip) must not prevent
     // the Telegram branch below from still running.
-    if (owner.email && owner.notify_email !== false) {
+    if (wantsNotification(owner, 'invoice_marked_paid', 'email')) {
       try {
         await resend.emails.send({
           from: 'invoices.kz <mail@invoices.kz>',
-          to: owner.email,
+          to: owner.email as string,
           subject: `Счёт №${inv.number} отмечен как оплаченный`,
           html: `
 <!DOCTYPE html>
@@ -61,7 +64,7 @@ export async function POST(request: NextRequest) {
   </div>
   <div style="padding:28px 32px;">
     <p style="margin:0 0 12px; font-size:14px; color:#333;">
-      Клиент <strong>${inv.client_name || ''}</strong> отметил счёт №${inv.number} на сумму
+      Клиент <strong>${clientName}</strong> отметил счёт №${number} на сумму
       <strong>${amount} ₸</strong> как оплаченный.
     </p>
     <p style="margin:0; font-size:12px; color:#aaa;">
@@ -78,9 +81,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    if (owner.notify_telegram && owner.telegram_chat_id) {
-      await sendTelegramNotification(owner.telegram_chat_id,
-        `💰 Клиент <b>${inv.client_name || ''}</b> отметил счёт №${inv.number} на сумму <b>${amount} ₸</b> как оплаченный.`)
+    if (wantsNotification(owner, 'invoice_marked_paid', 'telegram')) {
+      await sendTelegramNotification(owner.telegram_chat_id as string,
+        `💰 Клиент <b>${clientName}</b> отметил счёт №${number} на сумму <b>${amount} ₸</b> как оплаченный.`)
     }
 
     return NextResponse.json({ ok: true })

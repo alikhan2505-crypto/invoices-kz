@@ -69,40 +69,9 @@ export interface ProfileAccountsContent {
   websiteBadgeLabel: string
   saveConnectorsButton: string
 
-  // notifications page (notifications/page.tsx)
-  notificationsHeaderLabel: string
-  savingLabel: string
-  notificationsSaveError: string
   // banks page (banks/page.tsx), when opened with ?next=/create
   returnToInvoiceHint: string
   returnToInvoiceButton: string
-  notificationsInfoTitle: string
-  notificationsInfoBody: string
-  channelsGroupTitle: string
-  emailNotifyLabel: string
-  emailNotifyDesc: string
-  telegramNotifyLabel: string
-  telegramNotifyDesc: string
-  eventsGroupTitle: string
-  clientViewedLabel: string
-  clientViewedDesc: string
-  paymentReminderLabel: string
-  paymentReminderDesc: string
-  overdueLabel: string
-  overdueDesc: string
-  weeklyReportLabel: string
-  weeklyReportDesc: string
-  connectTelegramTitle: string
-  connectTelegramBodyBefore: string
-  connectTelegramBodyAfter: string
-  connectTelegramBotButton: string
-  telegramConnectedLabel: string
-  telegramConnectedHint: string
-  disconnectTelegramButton: string
-  disconnectingLabel: string
-  connectingLabel: string
-  telegramDisconnectError: string
-  telegramConnectErrorGeneric: string
 }
 
 export const profileAccountsDict: Record<'ru' | 'kk' | 'en', ProfileAccountsContent> = {
@@ -173,38 +142,8 @@ export const profileAccountsDict: Record<'ru' | 'kk' | 'en', ProfileAccountsCont
     websiteBadgeLabel: '🌐 Сайт',
     saveConnectorsButton: '💾 Сохранить',
 
-    notificationsHeaderLabel: 'Уведомления',
-    savingLabel: 'Сохранение...',
-    notificationsSaveError: 'Не удалось сохранить — переключатель вернули как было. Попробуйте ещё раз.',
     returnToInvoiceHint: 'Черновик счёта сохранён. Добавьте банковский счёт — и вернём вас к нему.',
     returnToInvoiceButton: 'Вернуться к счёту',
-    notificationsInfoTitle: 'ℹ️ Как работают уведомления',
-    notificationsInfoBody: 'Уведомления отправляются на email указанный при регистрации. Изменения сохраняются автоматически.',
-    channelsGroupTitle: 'Каналы уведомлений',
-    emailNotifyLabel: 'Email уведомления',
-    emailNotifyDesc: 'Получать уведомления на почту',
-    telegramNotifyLabel: 'Telegram уведомления',
-    telegramNotifyDesc: 'Получать уведомления в Telegram бот',
-    eventsGroupTitle: 'События',
-    clientViewedLabel: 'Клиент просмотрел счёт',
-    clientViewedDesc: 'Когда клиент открыл вашу ссылку на счёт',
-    paymentReminderLabel: 'Напоминания об оплате',
-    paymentReminderDesc: 'Автоматические напоминания клиентам',
-    overdueLabel: 'Счёт просрочен',
-    overdueDesc: 'Если счёт не оплачен более 7 дней',
-    weeklyReportLabel: 'Еженедельный отчёт',
-    weeklyReportDesc: 'Сводка по счетам каждый понедельник',
-    connectTelegramTitle: 'Подключить Telegram',
-    connectTelegramBodyBefore: 'Напишите боту команду',
-    connectTelegramBodyAfter: 'чтобы получать уведомления',
-    connectTelegramBotButton: '✈️ Открыть Telegram бот',
-    telegramConnectedLabel: '✅ Telegram подключён',
-    telegramConnectedHint: 'Вы будете получать уведомления в этот чат, пока включён тумблер выше.',
-    disconnectTelegramButton: 'Отключить Telegram',
-    disconnectingLabel: 'Отключаем...',
-    connectingLabel: 'Открываем Telegram...',
-    telegramDisconnectError: 'Не удалось отключить Telegram. Попробуйте ещё раз.',
-    telegramConnectErrorGeneric: 'Не удалось подключить Telegram. Попробуйте ещё раз.',
   },
   kk: {
     loadingLabel: 'Жүктелуде...',
@@ -273,38 +212,8 @@ export const profileAccountsDict: Record<'ru' | 'kk' | 'en', ProfileAccountsCont
     websiteBadgeLabel: '🌐 Сайт',
     saveConnectorsButton: '💾 Сақтау',
 
-    notificationsHeaderLabel: 'Хабарландырулар',
-    savingLabel: 'Сақталуда...',
-    notificationsSaveError: 'Сақтау мүмкін болмады — ауыстырғыш бұрынғы күйіне қайтарылды. Қайталап көріңіз.',
     returnToInvoiceHint: 'Шот жобасы сақталды. Банк шотын қосыңыз — сізді оған қайтарамыз.',
     returnToInvoiceButton: 'Шотқа оралу',
-    notificationsInfoTitle: 'ℹ️ Хабарландырулар қалай жұмыс істейді',
-    notificationsInfoBody: 'Хабарландырулар тіркелу кезінде көрсетілген email-ге жіберіледі. Өзгерістер автоматты түрде сақталады.',
-    channelsGroupTitle: 'Хабарландыру арналары',
-    emailNotifyLabel: 'Email хабарландырулары',
-    emailNotifyDesc: 'Хабарландыруларды поштаға алу',
-    telegramNotifyLabel: 'Telegram хабарландырулары',
-    telegramNotifyDesc: 'Хабарландыруларды Telegram бот арқылы алу',
-    eventsGroupTitle: 'Оқиғалар',
-    clientViewedLabel: 'Клиент шотты қарады',
-    clientViewedDesc: 'Клиент сіздің шот сілтемеңізді ашқанда',
-    paymentReminderLabel: 'Төлем туралы еске салулар',
-    paymentReminderDesc: 'Клиенттерге автоматты еске салулар',
-    overdueLabel: 'Шот мерзімі өтті',
-    overdueDesc: 'Шот 7 күннен астам төленбесе',
-    weeklyReportLabel: 'Апталық есеп',
-    weeklyReportDesc: 'Дүйсенбі сайын шоттар бойынша қорытынды',
-    connectTelegramTitle: 'Telegram қосу',
-    connectTelegramBodyBefore: 'Хабарландыруларды алу үшін ботқа',
-    connectTelegramBodyAfter: 'командасын жазыңыз',
-    connectTelegramBotButton: '✈️ Telegram ботты ашу',
-    telegramConnectedLabel: '✅ Telegram қосылды',
-    telegramConnectedHint: 'Жоғарыдағы қосқыш қосулы тұрғанда осы чатқа хабарландырулар келеді.',
-    disconnectTelegramButton: 'Telegram-ды ажырату',
-    disconnectingLabel: 'Ажыратылуда...',
-    connectingLabel: 'Telegram ашылуда...',
-    telegramDisconnectError: 'Telegram-ды ажырату мүмкін болмады. Қайталап көріңіз.',
-    telegramConnectErrorGeneric: 'Telegram қосу мүмкін болмады. Қайталап көріңіз.',
   },
   en: {
     loadingLabel: 'Loading...',
@@ -373,37 +282,7 @@ export const profileAccountsDict: Record<'ru' | 'kk' | 'en', ProfileAccountsCont
     websiteBadgeLabel: '🌐 Website',
     saveConnectorsButton: '💾 Save',
 
-    notificationsHeaderLabel: 'Notifications',
-    savingLabel: 'Saving...',
-    notificationsSaveError: 'Could not save — the switch was put back. Please try again.',
     returnToInvoiceHint: 'Your invoice draft is kept. Add a bank account and we will take you back to it.',
     returnToInvoiceButton: 'Back to the invoice',
-    notificationsInfoTitle: 'ℹ️ How notifications work',
-    notificationsInfoBody: 'Notifications are sent to the email you registered with. Changes are saved automatically.',
-    channelsGroupTitle: 'Notification channels',
-    emailNotifyLabel: 'Email notifications',
-    emailNotifyDesc: 'Receive notifications by email',
-    telegramNotifyLabel: 'Telegram notifications',
-    telegramNotifyDesc: 'Receive notifications via the Telegram bot',
-    eventsGroupTitle: 'Events',
-    clientViewedLabel: 'Client viewed the invoice',
-    clientViewedDesc: 'When the client opens your invoice link',
-    paymentReminderLabel: 'Payment reminders',
-    paymentReminderDesc: 'Automatic reminders to clients',
-    overdueLabel: 'Invoice overdue',
-    overdueDesc: 'If the invoice remains unpaid for more than 7 days',
-    weeklyReportLabel: 'Weekly report',
-    weeklyReportDesc: 'Invoice summary every Monday',
-    connectTelegramTitle: 'Connect Telegram',
-    connectTelegramBodyBefore: 'Send the bot the command',
-    connectTelegramBodyAfter: 'to receive notifications',
-    connectTelegramBotButton: '✈️ Open Telegram bot',
-    telegramConnectedLabel: '✅ Telegram connected',
-    telegramConnectedHint: "You'll get notifications in this chat while the toggle above is on.",
-    disconnectTelegramButton: 'Disconnect Telegram',
-    disconnectingLabel: 'Disconnecting...',
-    connectingLabel: 'Opening Telegram...',
-    telegramDisconnectError: 'Could not disconnect Telegram. Please try again.',
-    telegramConnectErrorGeneric: 'Could not connect Telegram. Please try again.',
   },
 }

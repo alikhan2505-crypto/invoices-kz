@@ -4,6 +4,10 @@ import { Resend } from 'resend'
 import { sigexAddSignature, sigexBuildDDC, sigexGetDocument, parseSignerName } from '@/lib/sigex'
 import { SIGNED_DOCUMENTS_BUCKET } from '@/lib/signedDocuments'
 import { downloadSignedDocument } from '@/lib/signedDocumentsServer'
+import { loadNotifyProfile } from '@/lib/notificationPrefsServer'
+import { wantsNotification } from '@/lib/notificationPrefs'
+import { sendTelegramNotification } from '@/lib/telegramNotify'
+import { escapeHtml } from '@/lib/htmlEscape'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -106,16 +110,19 @@ export async function POST(req: NextRequest) {
 
   if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 })
 
-  const { data: owner } = await supabase
-    .from('profiles')
-    .select('email')
-    .eq('id', row.owner_user_id)
-    .single()
+  // Событие «Клиент подписал документ ЭЦП» (document_signed): письмо — как
+  // и раньше по умолчанию включено, Telegram — по выбору владельца.
+  const owner = await loadNotifyProfile(supabase, row.owner_user_id)
 
-  if (owner?.email) {
+  if (wantsNotification(owner, 'document_signed', 'telegram')) {
+    await sendTelegramNotification(owner!.telegram_chat_id as string,
+      `✍️ Клиент подписал «${escapeHtml(doc.title)}» своей ЭЦП — документ подписан обеими сторонами.`, { timeoutMs: 5000 })
+  }
+
+  if (wantsNotification(owner, 'document_signed', 'email')) {
     await resend.emails.send({
       from: 'invoices.kz <mail@invoices.kz>',
-      to: owner.email,
+      to: owner!.email as string,
       subject: `«${doc.title}» подписан обеими сторонами`,
       html: `
 <!DOCTYPE html>
@@ -128,7 +135,10 @@ export async function POST(req: NextRequest) {
   </div>
   <div style="padding:28px 32px;">
     <p style="margin:0; font-size:14px; color:#333;">
-      Клиент подписал «${doc.title}» своей ЭЦП. Документ подписан обеими сторонами.
+      Клиент подписал «${escapeHtml(doc.title)}» своей ЭЦП. Документ подписан обеими сторонами.
+    </p>
+    <p style="margin:16px 0 0; font-size:12px; color:#aaa;">
+      Отключить это письмо можно в Профиль → Уведомления.
     </p>
   </div>
 </div>

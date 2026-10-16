@@ -4,6 +4,8 @@ import { validateDraftInput, normalizeToolInput, canAutoSend, checkCatalogPricin
 import { loadAgentCatalog } from './catalogContext'
 import { pickProductPhoto } from './productPhoto'
 import { createNotification } from '@/lib/notifications'
+import { loadNotifyProfile } from '@/lib/notificationPrefsServer'
+import { preferenceFor } from '@/lib/notificationPrefs'
 
 // Phase 3 «счёт из чата» core: turns an approved (or auto-approved)
 // draft into a REAL invoices.kz счёт and sends the /view link into the
@@ -281,6 +283,15 @@ export async function notifyInvoicePaidInConversation(
     .eq('invoice_id', invoiceId)
     .maybeSingle()
   if (!draft) return
+
+  // Продавец может выключить этот ответ клиенту в «Уведомлениях»
+  // (событие client_payment_chat). Не смогли прочитать профиль — шлём, как
+  // и до настройки.
+  const { data: invoiceOwner } = await supabase.from('invoices').select('user_id').eq('id', invoiceId).maybeSingle()
+  if (invoiceOwner?.user_id) {
+    const ownerProfile = await loadNotifyProfile(supabase, invoiceOwner.user_id)
+    if (!preferenceFor(ownerProfile, 'client_payment_chat', 'chat')) return
+  }
 
   const { data: conversation } = await supabase.from('ai_agent_conversations')
     .select('id, channel, external_thread_id, agent_id')

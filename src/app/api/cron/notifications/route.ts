@@ -6,6 +6,9 @@ import { createNotification } from '@/lib/notifications'
 import { addDaysToDateString, todayDateString } from '@/lib/dueDate'
 import { loadDigestData, formatDigest } from '@/lib/kaspiShop/dailyDigest'
 import { hasKaspiShopAccess, KASPI_SHOP_PROFILE_COLUMNS } from '@/lib/kaspiShop/planGate'
+import { NOTIFY_PROFILE_COLUMNS, wantsNotification, type NotifyProfile } from '@/lib/notificationPrefs'
+import { selectWithNotificationPrefs } from '@/lib/notificationPrefsServer'
+import { escapeHtml } from '@/lib/htmlEscape'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -57,32 +60,36 @@ export async function GET(request: Request) {
   // a day). Invoices without one (every invoice created before this
   // feature existed, or wherever the date was cleared): keep the original
   // heuristic, 3 days after the invoice was sent, still unpaid.
+  // Владелец и его настройки едут вложенным select'ом; notification_prefs
+  // добавляется, только если колонка уже есть (selectWithNotificationPrefs).
   const reminderDueDateTarget = addDaysToDateString(todayDateString(), 1)
-  const { data: reminderByDueDate } = await supabase
+  const { data: reminderByDueDate } = await selectWithNotificationPrefs<any[]>(NOTIFY_PROFILE_COLUMNS, cols => supabase
     .from('invoices')
-    .select('id, number, amount, client_name, profiles(email, notify_payment_reminder, notify_telegram, telegram_chat_id)')
+    .select(`id, number, amount, client_name, profiles(${cols})`)
     .in('status', ['sent', 'viewed'])
-    .eq('due_date', reminderDueDateTarget)
+    .eq('due_date', reminderDueDateTarget))
 
-  const { data: reminderLegacy } = await supabase
+  const { data: reminderLegacy } = await selectWithNotificationPrefs<any[]>(NOTIFY_PROFILE_COLUMNS, cols => supabase
     .from('invoices')
-    .select('id, number, amount, client_name, profiles(email, notify_payment_reminder, notify_telegram, telegram_chat_id)')
+    .select(`id, number, amount, client_name, profiles(${cols})`)
     .in('status', ['sent', 'viewed'])
     .is('due_date', null)
     .gte('created_at', startOfDayAgo(3).toISOString())
-    .lt('created_at', startOfDayAgo(2).toISOString())
+    .lt('created_at', startOfDayAgo(2).toISOString()))
 
   for (const inv of [...(reminderByDueDate || []), ...(reminderLegacy || [])] as any[]) {
-    const owner = inv.profiles
-    if (owner?.email && owner.notify_payment_reminder !== false) {
+    const owner = inv.profiles as NotifyProfile | null
+    const clientName = escapeHtml(inv.client_name || '')
+    const number = escapeHtml(inv.number)
+    if (wantsNotification(owner, 'invoice_due_tomorrow', 'email')) {
       try {
         await resend.emails.send({
           from: 'invoices.kz <mail@invoices.kz>',
-          to: owner.email,
+          to: owner!.email as string,
           subject: `Напоминание: счёт №${inv.number} ещё не оплачен`,
           html: wrapEmail('#F5A623', 'Напоминание об оплате', `
             <p style="margin:0 0 12px; font-size:14px; color:#333;">
-              Счёт №${inv.number} для <strong>${inv.client_name || ''}</strong> на сумму
+              Счёт №${number} для <strong>${clientName}</strong> на сумму
               <strong>${Number(inv.amount).toLocaleString('ru-KZ')} ₸</strong> ещё не оплачен.
             </p>
           `),
@@ -92,9 +99,9 @@ export async function GET(request: Request) {
         console.error('cron/notifications: reminder email failed for invoice', inv.id, ':', e.message)
       }
     }
-    if (owner?.notify_telegram && owner.telegram_chat_id) {
-      await sendTelegramNotification(owner.telegram_chat_id,
-        `⏰ Счёт №${inv.number} для <b>${inv.client_name || ''}</b> на сумму <b>${Number(inv.amount).toLocaleString('ru-KZ')} ₸</b> ещё не оплачен.`)
+    if (wantsNotification(owner, 'invoice_due_tomorrow', 'telegram')) {
+      await sendTelegramNotification(owner!.telegram_chat_id as string,
+        `⏰ Счёт №${number} для <b>${clientName}</b> на сумму <b>${Number(inv.amount).toLocaleString('ru-KZ')} ₸</b> ещё не оплачен.`)
     }
   }
 
@@ -103,31 +110,33 @@ export async function GET(request: Request) {
   // 1 day in the past (a short grace period). Invoices without one: the
   // original heuristic, 7+ days since the invoice was sent.
   const overdueDueDateTarget = addDaysToDateString(todayDateString(), -1)
-  const { data: overdueByDueDate } = await supabase
+  const { data: overdueByDueDate } = await selectWithNotificationPrefs<any[]>(NOTIFY_PROFILE_COLUMNS, cols => supabase
     .from('invoices')
-    .select('id, number, amount, client_name, profiles(email, notify_overdue, notify_telegram, telegram_chat_id)')
+    .select(`id, number, amount, client_name, profiles(${cols})`)
     .in('status', ['sent', 'viewed'])
-    .lt('due_date', overdueDueDateTarget)
+    .lt('due_date', overdueDueDateTarget))
 
-  const { data: overdueLegacy } = await supabase
+  const { data: overdueLegacy } = await selectWithNotificationPrefs<any[]>(NOTIFY_PROFILE_COLUMNS, cols => supabase
     .from('invoices')
-    .select('id, number, amount, client_name, profiles(email, notify_overdue, notify_telegram, telegram_chat_id)')
+    .select(`id, number, amount, client_name, profiles(${cols})`)
     .in('status', ['sent', 'viewed'])
     .is('due_date', null)
-    .lt('created_at', startOfDayAgo(7).toISOString())
+    .lt('created_at', startOfDayAgo(7).toISOString()))
 
   for (const inv of [...(overdueByDueDate || []), ...(overdueLegacy || [])] as any[]) {
     await supabase.from('invoices').update({ status: 'overdue' }).eq('id', inv.id)
-    const owner = inv.profiles
-    if (owner?.email && owner.notify_overdue !== false) {
+    const owner = inv.profiles as NotifyProfile | null
+    const clientName = escapeHtml(inv.client_name || '')
+    const number = escapeHtml(inv.number)
+    if (wantsNotification(owner, 'invoice_overdue', 'email')) {
       try {
         await resend.emails.send({
           from: 'invoices.kz <mail@invoices.kz>',
-          to: owner.email,
+          to: owner!.email as string,
           subject: `Счёт №${inv.number} просрочен`,
           html: wrapEmail('#E05252', 'Счёт просрочен', `
             <p style="margin:0 0 12px; font-size:14px; color:#333;">
-              Счёт №${inv.number} для <strong>${inv.client_name || ''}</strong> на сумму
+              Счёт №${number} для <strong>${clientName}</strong> на сумму
               <strong>${Number(inv.amount).toLocaleString('ru-KZ')} ₸</strong> не оплачен и помечен как просроченный.
             </p>
           `),
@@ -137,9 +146,9 @@ export async function GET(request: Request) {
         console.error('cron/notifications: overdue email failed for invoice', inv.id, ':', e.message)
       }
     }
-    if (owner?.notify_telegram && owner.telegram_chat_id) {
-      await sendTelegramNotification(owner.telegram_chat_id,
-        `🔴 Счёт №${inv.number} для <b>${inv.client_name || ''}</b> на сумму <b>${Number(inv.amount).toLocaleString('ru-KZ')} ₸</b> не оплачен и помечен как просроченный.`)
+    if (wantsNotification(owner, 'invoice_overdue', 'telegram')) {
+      await sendTelegramNotification(owner!.telegram_chat_id as string,
+        `🔴 Счёт №${number} для <b>${clientName}</b> на сумму <b>${Number(inv.amount).toLocaleString('ru-KZ')} ₸</b> не оплачен и помечен как просроченный.`)
     }
   }
 
@@ -175,12 +184,26 @@ export async function GET(request: Request) {
 
   // --- Weekly report: Mondays only ---
   if (new Date().getUTCDay() === 1) {
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('id, email, notify_weekly_report, notify_telegram, telegram_chat_id')
-      .or('notify_weekly_report.eq.true,notify_telegram.eq.true')
+    // Кандидаты: включён старый флаг отчёта ИЛИ заполнены хоть какие-то
+    // notification_prefs (до миграции — только старый флаг).
+    // Раньше брались все с notify_telegram, и Telegram-отчёт уходил даже при
+    // выключенном отчёте — теперь решает wantsNotification по каналу.
+    const { data: profiles, error: weeklyError } = await selectWithNotificationPrefs<any[]>(
+      `id, ${NOTIFY_PROFILE_COLUMNS}`,
+      cols => {
+        const q = supabase.from('profiles').select(cols)
+        return cols.includes('notification_prefs')
+          ? q.or('notify_weekly_report.eq.true,notification_prefs.not.is.null')
+          : q.eq('notify_weekly_report', true)
+      },
+    )
+    if (weeklyError) console.error('cron/notifications: weekly report recipients lookup failed:', weeklyError.message)
 
-    for (const p of profiles || []) {
+    for (const p of (profiles || []) as (NotifyProfile & { id: string })[]) {
+      const wantsEmail = wantsNotification(p, 'weekly_report', 'email')
+      const wantsTelegram = wantsNotification(p, 'weekly_report', 'telegram')
+      if (!wantsEmail && !wantsTelegram) continue
+
       const { data: weekInvoices } = await supabase
         .from('invoices')
         .select('status, amount')
@@ -194,11 +217,11 @@ export async function GET(request: Request) {
       const paidSum = paid.reduce((s, i) => s + Number(i.amount), 0)
       const unpaidCount = list.filter(i => ['sent', 'viewed', 'overdue'].includes(i.status)).length
 
-      if (p.email && (p as any).notify_weekly_report) {
+      if (wantsEmail) {
         try {
           await resend.emails.send({
             from: 'invoices.kz <mail@invoices.kz>',
-            to: p.email,
+            to: p.email as string,
             subject: 'Ваш еженедельный отчёт invoices.kz',
             html: wrapEmail('#1C2056', 'Отчёт за неделю', `
               <p style="margin:0 0 12px; font-size:14px; color:#333;">За последние 7 дней:</p>
@@ -214,18 +237,17 @@ export async function GET(request: Request) {
           console.error('cron/notifications: weekly report email failed for profile', p.id, ':', e.message)
         }
       }
-      if ((p as any).notify_telegram && (p as any).telegram_chat_id) {
-        await sendTelegramNotification((p as any).telegram_chat_id,
+      if (wantsTelegram) {
+        await sendTelegramNotification(p.telegram_chat_id as string,
           `📊 <b>Отчёт за неделю</b>\nСоздано счетов: ${list.length}\nОплачено: ${paid.length} на сумму ${paidSum.toLocaleString('ru-KZ')} ₸\nОжидают оплаты: ${unpaidCount}`)
       }
     }
   }
 
   // --- Daily Kaspi shop digest (Telegram only) ---
-  // Rides the existing notify_telegram toggle rather than adding a column:
-  // a seller who asked for Telegram notifications at all is the same
-  // audience. Split into its own toggle only if that turns out to annoy
-  // someone. formatDigest returns null on a genuinely quiet day, so silence
+  // Its own event (kaspi_daily_digest) in notification_prefs; until the
+  // owner chooses, it follows the old notify_telegram toggle, as before.
+  // formatDigest returns null on a genuinely quiet day, so silence
   // is the default and nobody gets a daily "ничего не произошло".
   //
   // Kaspi Bot is a Pro feature (founder decision, 14.10.2026): once a
@@ -237,14 +259,17 @@ export async function GET(request: Request) {
   // Renewing Pro resumes the digest on the next run; nothing is changed.
   let digests = 0
   let digestsSkippedNoPlan = 0
-  const { data: shopOwners, error: shopOwnersError } = await supabase
-    .from('profiles')
-    .select(`id, telegram_chat_id, ${KASPI_SHOP_PROFILE_COLUMNS}`)
-    .eq('notify_telegram', true)
-    .not('telegram_chat_id', 'is', null)
+  const { data: shopOwners, error: shopOwnersError } = await selectWithNotificationPrefs<any[]>(
+    `id, ${NOTIFY_PROFILE_COLUMNS}, ${KASPI_SHOP_PROFILE_COLUMNS}`,
+    cols => supabase
+      .from('profiles')
+      .select(cols)
+      .not('telegram_chat_id', 'is', null),
+  )
   if (shopOwnersError) console.error('cron/notifications: kaspi digest recipients lookup failed:', shopOwnersError.message)
 
-  const digestRecipients = (shopOwners || []).filter(owner => {
+  const digestRecipients = (shopOwners || []).filter((owner: any) => {
+    if (!wantsNotification(owner, 'kaspi_daily_digest', 'telegram')) return false
     if (hasKaspiShopAccess(owner)) return true
     digestsSkippedNoPlan++
     return false

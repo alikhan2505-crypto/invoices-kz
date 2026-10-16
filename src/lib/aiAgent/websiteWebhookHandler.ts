@@ -8,7 +8,8 @@ import { buildInvoiceToolExecutor } from './invoiceSend'
 import { buildBookingToolExecutor } from './bookingSend'
 import { debitAiAgentWallet, AI_AGENT_CREDITS_PER_AI_REPLY, hasAiAgentBudget, AI_AGENT_BUDGET_DEPLETED_REPLY } from './wallet'
 import { isConversationRateLimited } from './rateLimit'
-import { sendTelegramNotification } from '@/lib/telegramNotify'
+import { notifyOwnerTelegram } from '@/lib/notificationPrefsServer'
+import { escapeHtml } from '@/lib/htmlEscape'
 import { createNotification } from '@/lib/notifications'
 import { AI_AGENT_DIALOGS_URL, AI_AGENT_REVIEW_URL } from './links'
 import { exitTrainingIfDue } from './trainingExit'
@@ -187,14 +188,9 @@ export async function handleWebsiteIncoming(conn: WebsiteTenantConnection, param
     // this codebase already uses for the training-mode draft nudge below) --
     // a stop-phrase is time-sensitive (a real customer waiting for a human),
     // so it shouldn't rely on the owner happening to check the in-app bell.
-    const { data: ownerProfile } = await supabase.from('profiles').select('telegram_chat_id, notify_telegram').eq('id', agent.user_id).single()
-    if (ownerProfile?.notify_telegram && ownerProfile.telegram_chat_id) {
-      try {
-        await sendTelegramNotification(ownerProfile.telegram_chat_id, `Клиент попросил оператора: «${params.text.slice(0, 120)}» — ${AI_AGENT_DIALOGS_URL}`)
-      } catch (telegramErr: any) {
-        console.error('ai-agent website webhook: stop-phrase Telegram nudge failed for user', agent.user_id, ':', telegramErr.message)
-      }
-    }
+    // По настройке события «Клиент попросил оператора» (notification_prefs);
+    // текст клиента экранируется — parse_mode HTML.
+    await notifyOwnerTelegram(supabase, agent.user_id, 'ai_operator_requested', `Клиент попросил оператора: «${escapeHtml(params.text.slice(0, 120))}» — ${escapeHtml(AI_AGENT_DIALOGS_URL)}`)
     return
   }
 
@@ -316,13 +312,8 @@ export async function handleWebsiteIncoming(conn: WebsiteTenantConnection, param
       await createNotification(agent.user_id, 'Новый черновик ответа на проверке', draftReply.slice(0, 120), '/ai-agent/review')
     }
 
-    const { data: profile } = await supabase.from('profiles').select('telegram_chat_id, notify_telegram').eq('id', agent.user_id).single()
-    if (profile?.notify_telegram && profile.telegram_chat_id && inserted) {
-      try {
-        await sendTelegramNotification(profile.telegram_chat_id, `У вас новый черновик ответа на проверке в AI-агенте: ${AI_AGENT_REVIEW_URL}`)
-      } catch (telegramErr: any) {
-        console.error('ai-agent website widget: training-mode nudge failed for user', agent.user_id, ':', telegramErr.message)
-      }
+    if (inserted) {
+      await notifyOwnerTelegram(supabase, agent.user_id, 'ai_review_draft', `У вас новый черновик ответа на проверке в AI-агенте: ${escapeHtml(AI_AGENT_REVIEW_URL)}`)
     }
     return
   }

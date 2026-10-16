@@ -2,7 +2,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { sendIntoConversation } from './channelSend'
 import { validateBookingInput, normalizeBookingToolInput, resolveAgainstList, type BookingToolInput } from './bookingDrafts'
 import { createNotification } from '@/lib/notifications'
-import { sendTelegramNotification } from '@/lib/telegramNotify'
+import { notifyOwnerTelegram } from '@/lib/notificationPrefsServer'
+import { escapeHtml } from '@/lib/htmlEscape'
 
 // The create_booking_draft executor a salon-linked agent passes to
 // generateAiReply's bookingTool param -- one shared implementation,
@@ -116,19 +117,16 @@ export async function createBookingDraft(supabase: SupabaseClient, args: {
       )
     }
 
-    if (site?.owner_profile_id) {
-      const { data: owner } = await supabase
-        .from('profiles')
-        .select('telegram_chat_id, notify_telegram')
-        .eq('id', site.owner_profile_id)
-        .maybeSingle()
-      if (owner?.notify_telegram && owner.telegram_chat_id && site.slug) {
-        const label = typeof salonName === 'string' && salonName ? ` — ${salonName}` : ''
-        await sendTelegramNotification(
-          owner.telegram_chat_id,
-          `Новая запись на подтверждении${label}: ${args.customerName || 'клиент'}, ${args.serviceName}. https://invoices.kz/planner/${site.slug}`,
-        )
-      }
+    if (site?.owner_profile_id && site.slug) {
+      // По настройке события «Новая запись ждёт подтверждения»; имя клиента и
+      // услуги экранируются — parse_mode HTML.
+      const label = typeof salonName === 'string' && salonName ? ` — ${escapeHtml(salonName)}` : ''
+      await notifyOwnerTelegram(
+        supabase,
+        site.owner_profile_id,
+        'salon_booking_pending',
+        `Новая запись на подтверждении${label}: ${escapeHtml(args.customerName || 'клиент')}, ${escapeHtml(args.serviceName)}. https://invoices.kz/planner/${escapeHtml(site.slug)}`,
+      )
     }
   } catch (err: any) {
     console.error('ai-agent booking draft: owner notification failed:', err?.message || err)

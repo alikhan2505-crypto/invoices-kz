@@ -3,6 +3,7 @@ import { loadConnectionByUserId } from './connection'
 import { getOperationsHistory, KaspiHistoryOperation } from './client'
 import { matchOperation, OpenInvoiceForMatch } from './historyMatch'
 import { debitWalletForCommission } from './wallet'
+import { notifyOwnerInvoicePaidViaKaspi } from './ownerPaidNotify'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -58,14 +59,31 @@ async function settleUnambiguous(userId: string, op: KaspiHistoryOperation, invo
   // retry -- mirrors the pending-match confirm route's identical check.
   const { data: invoice } = await supabase.from('invoices').select('status').eq('id', invoiceId).maybeSingle()
   if (!invoice || invoice.status === 'paid' || invoice.status === 'cancelled') return
-  await supabase.from('invoices').update({ status: 'paid' }).eq('id', invoiceId)
+  // Сам переход в «Оплачен» — атомарный захват: условие по статусу в UPDATE
+  // означает, что из двух параллельных проходов (два прогона синхронизации или
+  // синхронизация наперегонки с checkAndSettleKaspiPayment) строку переключит
+  // только один, и только он пишет лог и уведомляет владельца.
+  const { data: won, error: claimError } = await supabase
+    .from('invoices')
+    .update({ status: 'paid' })
+    .eq('id', invoiceId)
+    .not('status', 'in', '(paid,cancelled)')
+    .select('id')
+  if (claimError) throw new Error(`failed to mark invoice ${invoiceId} paid: ${claimError.message}`)
+  if (!won || won.length === 0) return
   await supabase.from('invoice_logs').insert({ invoice_id: invoiceId, status: 'paid' })
-  if (await alreadyCharged(userId, op.id)) return
-  try {
-    await debitWalletForCommission(userId, op.amount, null, `kaspi_operation:${op.id}`)
-  } catch (e: any) {
-    console.error('CRITICAL: Kaspi history sync commission debit failed for user', userId, 'operation', op.id, ':', e.message)
+  if (!(await alreadyCharged(userId, op.id))) {
+    try {
+      await debitWalletForCommission(userId, op.amount, null, `kaspi_operation:${op.id}`)
+    } catch (e: any) {
+      console.error('CRITICAL: Kaspi history sync commission debit failed for user', userId, 'operation', op.id, ':', e.message)
+    }
   }
+  // Владельцу: «Счёт оплачен через Kaspi Pay» (колокольчик + prefs). После
+  // комиссии — сетевые вызовы уведомления не должны стоять между оплатой и
+  // списанием. Ровно один раз: только проход, выигравший захват выше.
+  // Никогда не бросает.
+  await notifyOwnerInvoicePaidViaKaspi(supabase, invoiceId)
 }
 
 async function recordPendingMatches(userId: string, op: KaspiHistoryOperation, invoices: OpenInvoiceForMatch[]) {

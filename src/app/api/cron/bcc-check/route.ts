@@ -5,6 +5,9 @@ import { findMatches, OpenInvoice } from '@/lib/acquiringMatch'
 import { mapBccTransactions } from '@/lib/bccStatement'
 import { getBccAppToken, BCC_AUTH_CLIENT_BASE, BCC_BUSINESS_ACCOUNT_BASE } from '@/lib/bccAuth'
 import { getActivePlan } from '@/lib/plan'
+import { loadNotifyProfile } from '@/lib/notificationPrefsServer'
+import { wantsNotification } from '@/lib/notificationPrefs'
+import { sendTelegramNotification } from '@/lib/telegramNotify'
 import { encryptAtRest, decryptAtRest } from '@/lib/kaspiPay/crypto'
 
 function getBccKey(): string {
@@ -94,12 +97,10 @@ export async function GET(request: Request) {
       // "N payments found" emails) forever. Skipped silently — a lapsed plan
       // is not a broken connection, so the status stays 'active' and picks
       // back up by itself the day they resubscribe.
-      const { data: ownerProfile, error: profileError } = await supabase
-        .from('profiles')
-        .select('email, plan, plan_expires_at, bonus_expires_at, trial_expires_at')
-        .eq('id', conn.user_id)
-        .single()
-      if (profileError) console.error('BCC cron: profile fetch failed for connection', conn.id, profileError.message)
+      // Plan columns + notification settings in one read (loadNotifyProfile
+      // logs its own failure and returns null -> treated as no plan, as before).
+      const ownerProfile = await loadNotifyProfile<{ plan: string | null; plan_expires_at: string | null; bonus_expires_at: string | null; trial_expires_at: string | null }>(
+        supabase, conn.user_id, 'plan, plan_expires_at, bonus_expires_at, trial_expires_at')
       if (!getActivePlan(ownerProfile).canAcquiring) continue
 
       let clientToken = decryptAtRest(conn.access_token, getBccKey()).toString('utf8')
@@ -193,10 +194,15 @@ export async function GET(request: Request) {
       checked++
 
       if (newMatches > 0) {
-        if (ownerProfile?.email) {
+        // Событие «Найдены возможные оплаты (BCC)» (bcc_matches_found).
+        if (wantsNotification(ownerProfile, 'bcc_matches_found', 'telegram')) {
+          await sendTelegramNotification(ownerProfile!.telegram_chat_id as string,
+            `🏦 BCC: найдено ${newMatches} поступлений, похожих на оплату ваших счетов. Проверьте и подтвердите: https://invoices.kz/profile/acquiring`)
+        }
+        if (wantsNotification(ownerProfile, 'bcc_matches_found', 'email')) {
           await resend.emails.send({
             from: 'invoices.kz <mail@invoices.kz>',
-            to: ownerProfile.email,
+            to: ownerProfile!.email as string,
             subject: `Найдено ${newMatches} возможных оплат`,
             html: `<p>По вашему подключённому счёту BCC найдено ${newMatches} операций, совпадающих по БИН и сумме с вашими открытыми счетами. Проверьте и подтвердите их в разделе <a href="https://www.invoices.kz/profile/acquiring">Сверка оплат</a>.</p>`,
           })

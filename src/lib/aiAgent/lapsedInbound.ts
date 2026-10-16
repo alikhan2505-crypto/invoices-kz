@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { after } from 'next/server'
-import { sendTelegramNotification } from '@/lib/telegramNotify'
+import { notifyOwnerTelegram } from '@/lib/notificationPrefsServer'
 import { escapeHtml } from '@/lib/htmlEscape'
 import { productAbsoluteUrl } from '@/lib/crossProduct'
 import type { AgentReplyState } from './planGate'
@@ -98,10 +98,7 @@ export async function notifyOwnerProLapsed(
       return
     }
 
-    const { data: profile } = await supabase.from('profiles').select('telegram_chat_id, notify_telegram').eq('id', agent.user_id).maybeSingle()
-    if (profile?.notify_telegram && profile.telegram_chat_id) {
-      await sendTelegramNotification(profile.telegram_chat_id, texts.telegram, { timeoutMs: PRO_LAPSED_ALERT_TELEGRAM_TIMEOUT_MS })
-    }
+    await notifyOwnerTelegram(supabase, agent.user_id, 'ai_pro_lapsed', texts.telegram, { timeoutMs: PRO_LAPSED_ALERT_TELEGRAM_TIMEOUT_MS })
   } catch (err: any) {
     console.error('ai-agent: pro-lapsed owner alert failed for agent', agent.id, ':', err?.message || err)
   }

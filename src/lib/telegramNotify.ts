@@ -13,11 +13,13 @@ export function parseStartToken(text: string): string | null {
 // continuing to the next row), so this never throws.
 // opts.timeoutMs: abort a hanging Telegram call (used where the caller is on
 // a customer-facing path and must not wait on Telegram indefinitely).
-export async function sendTelegramNotification(chatId: string, text: string, opts?: { timeoutMs?: number }): Promise<void> {
+// Returns true only when Telegram accepted the message (the test-message
+// route reports that back to the owner); every other caller ignores it.
+export async function sendTelegramNotification(chatId: string, text: string, opts?: { timeoutMs?: number }): Promise<boolean> {
   const token = process.env.CUSTOMER_TELEGRAM_BOT_TOKEN
   if (!token) {
     console.error('sendTelegramNotification: CUSTOMER_TELEGRAM_BOT_TOKEN is not configured')
-    return
+    return false
   }
   try {
     const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
@@ -35,8 +37,11 @@ export async function sendTelegramNotification(chatId: string, text: string, opt
     if (!response.ok) {
       const body = await response.text().catch(() => '<unreadable body>')
       console.error('sendTelegramNotification rejected by Telegram for chat', chatId, '— status', response.status, ':', body.slice(0, 500))
+      return false
     }
+    return true
   } catch (e: any) {
     console.error('sendTelegramNotification delivery failed for chat', chatId, ':', e.message)
+    return false
   }
 }

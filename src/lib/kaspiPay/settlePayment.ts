@@ -5,6 +5,7 @@ import { checkStatus } from './client'
 import { isSafeWebhookUrl } from './webhookSafety'
 import { debitWalletForCommission } from './wallet'
 import { notifyInvoicePaidInConversation } from '@/lib/aiAgent/invoiceSend'
+import { notifyOwnerInvoicePaidViaKaspi } from './ownerPaidNotify'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -208,6 +209,15 @@ export async function checkAndSettleKaspiPayment(
         }
       }).catch((e) => console.error('Kaspi webhook delivery failed for', reqRow.id, e.message))
     }
+  }
+
+  // Владельцу: колокольчик + Telegram/письмо по настройкам (invoice_paid_kaspi).
+  // Намеренно ПОСЛЕ комиссии и callback-вебхука: уведомление делает несколько
+  // сетевых вызовов (Telegram, Resend), и если функцию убьют посреди них, деньги
+  // и вебхук клиенту уже не должны от этого зависеть. Никогда не бросает;
+  // ровно один раз — мы выиграли захват строки выше.
+  if (reqRow.invoice_id) {
+    await notifyOwnerInvoicePaidViaKaspi(supabase, reqRow.invoice_id)
   }
 
   return 'paid'

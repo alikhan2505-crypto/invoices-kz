@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { parseStartToken } from '@/lib/telegramNotify'
+import { isConnectTokenFresh } from '@/lib/telegramConnectToken'
 import { handleCfoMessage, handleCfoPhoto } from '@/lib/cfo/telegramHandle'
 
 const supabase = createClient(
@@ -126,13 +127,26 @@ export async function POST(req: NextRequest) {
   }
 
   if (!token) {
-    await reply(chatId, 'Этот бот используется только для уведомлений invoices.kz. Чтобы подключить его к своему аккаунту, перейдите в Профиль → Уведомления и нажмите «Подключить».')
+    await reply(chatId, 'Этот бот используется только для уведомлений invoices.kz. Чтобы подключить его к своему аккаунту, откройте Профиль → Уведомления и нажмите «Открыть бота».')
     return NextResponse.json({ ok: true })
   }
 
+  // Ссылка живёт TELEGRAM_CONNECT_TTL_MS с момента выдачи (время — внутри
+  // самого токена). Старый/просроченный токен не привязывает чат, даже если
+  // совпадает с сохранённым: QR со скриншота не должен подключать чужой чат.
+  if (!isConnectTokenFresh(token)) {
+    await reply(chatId, 'Ссылка устарела. Откройте Профиль → Уведомления на invoices.kz — там будет новая — и нажмите «Открыть бота» ещё раз.')
+    return NextResponse.json({ ok: true })
+  }
+
+  // Подключение бота = согласие на уведомления в Telegram: notify_telegram
+  // включается сам. Это значение по умолчанию для событий, по которым
+  // владелец ещё ничего не выбрал в notification_prefs (раньше блок
+  // подключения был спрятан за этим тумблером, так что подключившийся всегда
+  // его и имел; теперь блок показывается сразу).
   const { data: owner, error } = await supabase
     .from('profiles')
-    .update({ telegram_chat_id: String(chatId), telegram_connect_token: null })
+    .update({ telegram_chat_id: String(chatId), telegram_connect_token: null, notify_telegram: true })
     .eq('telegram_connect_token', token)
     .select('id')
     .maybeSingle()
@@ -144,7 +158,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (!owner) {
-    await reply(chatId, 'Ссылка недействительна, вернитесь в приложение и нажмите «Подключить» ещё раз.')
+    await reply(chatId, 'Ссылка недействительна. Откройте Профиль → Уведомления на invoices.kz и нажмите «Открыть бота» ещё раз.')
     return NextResponse.json({ ok: true })
   }
 

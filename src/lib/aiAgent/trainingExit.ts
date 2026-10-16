@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createNotification } from '@/lib/notifications'
-import { sendTelegramNotification } from '@/lib/telegramNotify'
+import { notifyOwnerTelegram } from '@/lib/notificationPrefsServer'
 import { escapeHtml } from '@/lib/htmlEscape'
 import {
   agentRowShouldExitTraining,
@@ -86,11 +86,8 @@ export async function notifyOwnerTrainingExit(supabase: SupabaseClient, agent: T
     const link = trainingExitSettingsUrl(agent.id)
     await createNotification(agent.user_id, title, body, link)
 
-    const { data: profile } = await supabase.from('profiles').select('telegram_chat_id, notify_telegram').eq('id', agent.user_id).maybeSingle()
-    if (profile?.notify_telegram && profile.telegram_chat_id) {
-      // parse_mode HTML: имя агента и «&» в адресе экранируются.
-      await sendTelegramNotification(profile.telegram_chat_id, `${escapeHtml(title)}. ${escapeHtml(reason)} Настройки агента: ${escapeHtml(link)}`, { timeoutMs: 5000 })
-    }
+    // parse_mode HTML: имя агента и «&» в адресе экранируются.
+    await notifyOwnerTelegram(supabase, agent.user_id, 'ai_training_exit', `${escapeHtml(title)}. ${escapeHtml(reason)} Настройки агента: ${escapeHtml(link)}`, { timeoutMs: 5000 })
   } catch (err: any) {
     console.error('ai-agent: training-exit owner notification failed for agent', agent.id, ':', err?.message || err)
   }
