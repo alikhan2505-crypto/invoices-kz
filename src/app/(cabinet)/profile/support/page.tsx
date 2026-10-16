@@ -4,11 +4,11 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { motion, useReducedMotion } from 'framer-motion'
 import { useLanguage } from '@/components/LanguageProvider'
-import { backLabel } from '@/lib/a11yLabels'
 import { profileContentDict } from '@/lib/i18n/profileContent'
 import { supportDict } from '@/lib/i18n/support'
 import { supabase } from '@/lib/supabase'
 import { getActivePlan } from '@/lib/plan'
+import PageHeader from '@/components/PageHeader'
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
 // kept identical rather than inventing a second "house" ease.
@@ -16,13 +16,6 @@ const EASE = [0.16, 1, 0.3, 1] as const
 
 const CARD_HOVER = 'transition-all duration-200 ease-out hover:-translate-y-1 hover:shadow-[var(--nav-card-glow)]'
 
-function ChevronLeftIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="m15 18-6-6 6-6" />
-    </svg>
-  )
-}
 function ChevronRightIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -101,12 +94,7 @@ export default function Support() {
     <>
       <div className="max-w-lg lg:max-w-2xl mx-auto p-4 space-y-4">
 
-        <motion.div {...fadeIn(0)} className="nav-glass rounded-2xl px-4 py-4 flex items-center gap-3">
-          <button onClick={() => router.push('/profile')} className="back-btn transition-colors flex-shrink-0" style={{ color: 'var(--nav-text-muted)' }} aria-label={backLabel(lang)}>
-            <ChevronLeftIcon />
-          </button>
-          <span className="font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{t.supportHeaderLabel}</span>
-        </motion.div>
+        <PageHeader title={t.supportHeaderLabel} backHref="/profile" />
 
         <motion.p {...fadeIn(1)} className="text-sm px-1" style={{ color: 'var(--nav-text-muted)' }}>
           {t.supportHoursText}

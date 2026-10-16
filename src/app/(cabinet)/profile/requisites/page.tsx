@@ -4,7 +4,6 @@ import { useRouter } from 'next/navigation'
 import { motion, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { useLanguage } from '@/components/LanguageProvider'
-import { backLabel } from '@/lib/a11yLabels'
 import { profileCoreDict } from '@/lib/i18n/profileCore'
 import { useAppDialog } from '@/components/AppDialog'
 import { useBinLookup } from '@/components/useBinLookup'
@@ -12,6 +11,7 @@ import { returnPathFromSearch, type ReturnPath } from '@/lib/returnPath'
 import { validateBinIin, digitsOnly } from '@/lib/kzIdentifiers'
 import { profileBonusDict } from '@/lib/i18n/profileBonus'
 import { claimAndAnnounceBonus } from '@/lib/profileBonusClient'
+import PageHeader from '@/components/PageHeader'
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
 // kept identical rather than inventing a second "house" ease.
@@ -22,14 +22,6 @@ const CARD_HOVER = 'transition-all duration-200 ease-out hover:-translate-y-1 ho
 // Same input treatment as src/app/create/page.tsx's form fields -- token
 // borders/focus ring, no remount-on-keystroke (plain controlled input).
 const inputClass = 'w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]'
-
-function ChevronLeftIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="m15 6-6 6 6 6" />
-    </svg>
-  )
-}
 
 function Field({
   label, value, onChange, placeholder, type = 'text', maxLength,
@@ -244,22 +236,10 @@ export default function Requisites() {
   return (
       <>
         <div className="max-w-lg lg:max-w-2xl mx-auto p-4">
-          <motion.div
-            className="flex items-center gap-3 mb-5"
-            initial={reduceMotion ? false : { opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE }}
-          >
-            <button
-              onClick={() => router.push(returnTo || '/profile')}
-              aria-label={backLabel(lang)}
-              className="w-11 h-11 flex items-center justify-center rounded-xl flex-shrink-0 transition-colors hover:bg-[var(--nav-surface-glass)]"
-              style={{ color: 'var(--nav-text-muted)' }}
-            >
-              <ChevronLeftIcon />
-            </button>
-            <h2 className="text-xl font-bold" style={{ color: 'var(--nav-text-primary)' }}>{t.requisitesHeaderLabel}</h2>
-          </motion.div>
+          <PageHeader
+            title={t.requisitesHeaderLabel}
+            backHref={returnTo || '/profile'}
+          />
 
           {returnTo && (
             <div className="mb-4 rounded-xl p-3 text-xs" style={{ background: 'var(--nav-accent-soft)', color: 'var(--nav-text-primary)' }}>

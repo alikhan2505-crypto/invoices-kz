@@ -14,6 +14,7 @@ import { invoiceLimitWindow, countInvoicesInWindow, invoicesLeft, type InvoiceLi
 import { useMyProducts } from '@/lib/useMyProducts'
 import { supportDict } from '@/lib/i18n/support'
 import { invoiceFlowDict } from '@/lib/i18n/invoiceFlow'
+import PageHeader from '@/components/PageHeader'
 
 // Same easing curve used on the landing page (src/app/page.tsx) -- kept
 // identical across the app rather than inventing a second "house" ease.
@@ -737,18 +738,7 @@ export default function DashboardPage() {
   return (
       <>
         <div className="max-w-lg lg:max-w-5xl mx-auto p-4">
-          {/* Header row */}
-          <motion.div
-            className="flex items-center justify-between mb-5"
-            initial={reduceMotion ? false : { opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE }}
-          >
-            {/* Header button removed 2026-08-19 (founder) -- the full-width
-                «Создать счёт» under the recent-invoices list is the single
-                create entry point on this page now. */}
-            <h2 className="text-xl font-bold" style={{ color: 'var(--nav-text-primary)' }}>Дашборд</h2>
-          </motion.div>
+          <PageHeader title="Дашборд" />
 
           {/* Пробный период и срок тарифа. Same wording as the banner on
               /create, from the same dictionary, so the two screens do not

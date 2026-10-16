@@ -11,13 +11,13 @@ import { generateNakladnaya } from '@/lib/generateNakladnaya'
 import { getActivePlan } from '@/lib/plan'
 import { isInvoiceLimitError, invoiceLimitFromError, invoiceLimitWindow, checkInvoiceLimit } from '@/lib/invoiceLimit'
 import { useLanguage } from '@/components/LanguageProvider'
-import { backLabel } from '@/lib/a11yLabels'
 import { invoiceFlowDict } from '@/lib/i18n/invoiceFlow'
 import InvoiceLivePreview from '@/components/InvoiceLivePreview'
 import Skeleton from '@/components/Skeleton'
 import SignatureSection from '@/components/SignatureSection'
 import { runSigexQrSigning, SigexQrState } from '@/lib/signDocument'
 import { useAppDialog } from '@/components/AppDialog'
+import PageHeader from '@/components/PageHeader'
 
 // Common ОКЕИ unit codes -- confirmed against the SDK's own "796" example
 // (штука) and standard, widely-documented ОКЕИ values. Expand from the full
@@ -683,10 +683,7 @@ export default function InvoicePage() {
   if (loading) return (
     <>
       <div className="max-w-lg lg:max-w-5xl mx-auto p-4">
-      <div className="flex items-center gap-3 mb-5">
-        <button onClick={() => router.push('/history')} className="text-xl transition-colors" style={{ color: 'var(--nav-text-muted)' }} aria-label={backLabel(lang)}>‹</button>
-        <Skeleton className="h-6 w-32" />
-      </div>
+      <PageHeader title={<Skeleton className="h-6 w-32" />} backHref="/history" animate={false} />
       <div className="lg:flex lg:gap-6 lg:items-start">
       <div className="lg:flex-1 lg:min-w-0 space-y-4">
         <Skeleton className="h-28 rounded-2xl" />
@@ -795,10 +792,7 @@ export default function InvoicePage() {
   return (
     <>
       <div className="max-w-lg lg:max-w-5xl mx-auto p-4">
-      <div className="flex items-center gap-3 mb-5">
-        <button onClick={() => router.push('/history')} className="text-xl transition-colors text-[color:var(--nav-text-muted)] hover:text-[color:var(--nav-text-secondary)]" aria-label={backLabel(lang)}>‹</button>
-        <h2 className="text-xl font-bold" style={{ color: 'var(--nav-text-primary)' }}>{t.invoiceHeaderTitle(invoice.number)}</h2>
-      </div>
+      <PageHeader title={t.invoiceHeaderTitle(invoice.number)} backHref="/history" animate={false} />
       <div className="lg:flex lg:gap-6 lg:items-start">
       <div className="lg:flex-1 lg:min-w-0 space-y-4">
 

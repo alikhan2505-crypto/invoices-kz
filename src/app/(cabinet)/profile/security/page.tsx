@@ -6,21 +6,14 @@ import { startRegistration } from '@simplewebauthn/browser'
 import { supabase } from '@/lib/supabase'
 import { formatDate } from '@/lib/date'
 import { useLanguage } from '@/components/LanguageProvider'
-import { backLabel } from '@/lib/a11yLabels'
 import { profileAccountsDict } from '@/lib/i18n/profileAccounts'
 import { useAppDialog } from '@/components/AppDialog'
+import PageHeader from '@/components/PageHeader'
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
 // kept identical rather than inventing a second "house" ease.
 const EASE = [0.16, 1, 0.3, 1] as const
 
-function ChevronLeftIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="m15 6-6 6 6 6" />
-    </svg>
-  )
-}
 function KeyIcon() {
   return (
     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -111,22 +104,10 @@ export default function Security() {
   return (
       <>
         <div className="max-w-lg lg:max-w-2xl mx-auto p-4">
-          <motion.div
-            className="flex items-center gap-3 mb-5"
-            initial={reduceMotion ? false : { opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE }}
-          >
-            <button
-              onClick={() => router.push('/profile')}
-              aria-label={backLabel(lang)}
-              className="w-11 h-11 flex items-center justify-center rounded-xl flex-shrink-0 transition-colors hover:bg-[var(--nav-surface-glass)]"
-              style={{ color: 'var(--nav-text-muted)' }}
-            >
-              <ChevronLeftIcon />
-            </button>
-            <h2 className="text-xl font-bold" style={{ color: 'var(--nav-text-primary)' }}>{t.securityHeaderLabel}</h2>
-          </motion.div>
+          <PageHeader
+            title={t.securityHeaderLabel}
+            backHref="/profile"
+          />
 
           <div className="space-y-4">
             {/* Passkeys */}

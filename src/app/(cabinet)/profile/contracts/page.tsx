@@ -5,7 +5,8 @@ import { motion, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { formatDate } from '@/lib/date'
 import { useLanguage } from '@/components/LanguageProvider'
-import { backLabel, deleteLabel } from '@/lib/a11yLabels'
+import { deleteLabel } from '@/lib/a11yLabels'
+import PageHeader, { PageHeaderButton } from '@/components/PageHeader'
 import { contractsDict } from '@/lib/i18n/contracts'
 import Skeleton from '@/components/Skeleton'
 import { useAppDialog } from '@/components/AppDialog'
@@ -35,13 +36,6 @@ const statusFill: Record<string, string> = {
   not_sent: 'var(--nav-text-muted)',
 }
 
-function ChevronLeftIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="m15 6-6 6 6 6" />
-    </svg>
-  )
-}
 function PlusIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
@@ -173,32 +167,16 @@ export default function Contracts() {
   return (
       <>
         <div className="max-w-lg lg:max-w-3xl mx-auto p-4">
-          <motion.div
-            className="flex items-center justify-between gap-3 mb-5"
-            initial={reduceMotion ? false : { opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE }}
-          >
-            <div className="flex items-center gap-3 min-w-0">
-              <button
-                onClick={() => router.push('/profile')}
-                aria-label={backLabel(lang)}
-                className="w-11 h-11 flex items-center justify-center rounded-xl flex-shrink-0 transition-colors hover:bg-[var(--nav-surface-glass)]"
-                style={{ color: 'var(--nav-text-muted)' }}
-              >
-                <ChevronLeftIcon />
-              </button>
-              <h2 className="text-xl font-bold truncate" style={{ color: 'var(--nav-text-primary)' }}>{t.headerLabel}</h2>
-            </div>
-            {!showForm && (
-              <button onClick={() => setShowForm(true)}
-                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg flex-shrink-0 transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0"
-                style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+          <PageHeader
+            title={t.headerLabel}
+            backHref="/profile"
+            right={!showForm && (
+              <PageHeaderButton onClick={() => setShowForm(true)}>
                 <PlusIcon />
                 {t.uploadButton}
-              </button>
+              </PageHeaderButton>
             )}
-          </motion.div>
+          />
 
           {canEcp === false && (
             <p className="text-xs px-1 -mt-2 mb-4" style={{ color: 'var(--nav-text-muted)' }}>

@@ -11,6 +11,7 @@ import { clearSearchLabel } from '@/lib/a11yLabels'
 import { historyDict } from '@/lib/i18n/history'
 import Skeleton from '@/components/Skeleton'
 import { useAppDialog } from '@/components/AppDialog'
+import PageHeader, { PageHeaderButton } from '@/components/PageHeader'
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
 // kept identical rather than inventing a second "house" ease.
@@ -250,31 +251,19 @@ export default function History() {
   return (
       <>
         <div className="max-w-lg lg:max-w-5xl mx-auto p-4">
-          {/* Header row */}
-          <motion.div
-            className="flex items-center justify-between flex-wrap gap-2 mb-5"
-            initial={reduceMotion ? false : { opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE }}
-          >
-            <h2 className="text-xl font-bold" style={{ color: 'var(--nav-text-primary)' }}>История счетов</h2>
-            <div className="flex gap-2 flex-shrink-0">
-              <button
-                onClick={markOverdue}
-                className="nav-glass text-xs font-semibold px-3 py-1.5 rounded-lg"
-                style={{ color: 'var(--nav-critical)' }}
-              >
-                {t.markOverdueButtonLabel}
-              </button>
-              <button
-                onClick={exportToExcel}
-                className="text-xs font-semibold px-3 py-1.5 rounded-lg"
-                style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}
-              >
-                {t.exportButtonLabel}
-              </button>
-            </div>
-          </motion.div>
+          <PageHeader
+            title="История счетов"
+            right={
+              <div className="flex flex-col items-stretch gap-1.5 sm:flex-row sm:items-center sm:gap-2">
+                <PageHeaderButton variant="danger-soft" onClick={markOverdue}>
+                  {t.markOverdueButtonLabel}
+                </PageHeaderButton>
+                <PageHeaderButton onClick={exportToExcel}>
+                  {t.exportButtonLabel}
+                </PageHeaderButton>
+              </div>
+            }
+          />
 
           {/* Search */}
           <motion.div

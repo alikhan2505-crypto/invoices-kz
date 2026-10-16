@@ -4,10 +4,10 @@ import { useRouter } from 'next/navigation'
 import { motion, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { useLanguage } from '@/components/LanguageProvider'
-import { backLabel } from '@/lib/a11yLabels'
 import { profileCoreDict } from '@/lib/i18n/profileCore'
 import { useAppDialog } from '@/components/AppDialog'
 import { checkNextNumber, digitsOnly, highestIssuedNumber } from '@/lib/docNumbering'
+import PageHeader from '@/components/PageHeader'
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
 // kept identical rather than inventing a second "house" ease.
@@ -86,14 +86,6 @@ async function fetchIssuedNumbers(table: NumberedDoc['table'], userId: string, p
     if (!data || data.length < PAGE) break
   }
   return numbers
-}
-
-function ChevronLeftIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="m15 18-6-6 6-6" />
-    </svg>
-  )
 }
 
 export default function InvoiceSettings() {
@@ -242,12 +234,7 @@ export default function InvoiceSettings() {
     <>
       <div className="max-w-lg lg:max-w-2xl mx-auto p-4 space-y-4">
 
-        <motion.div {...fadeIn(0)} className="nav-glass rounded-2xl px-4 py-4 flex items-center gap-3">
-          <button onClick={() => router.push('/profile')} className="back-btn transition-colors flex-shrink-0" style={{ color: 'var(--nav-text-muted)' }} aria-label={backLabel(lang)}>
-            <ChevronLeftIcon />
-          </button>
-          <span className="font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{t.invoiceSettingsLabel}</span>
-        </motion.div>
+        <PageHeader title={t.invoiceSettingsLabel} backHref="/profile" />
 
         {/* Нумерация счетов */}
         <motion.div {...fadeIn(1)} className="nav-glass rounded-2xl p-4 space-y-4">

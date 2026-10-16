@@ -5,11 +5,12 @@ import { motion, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { formatDate } from '@/lib/date'
 import { useLanguage } from '@/components/LanguageProvider'
-import { backLabel, deleteLabel } from '@/lib/a11yLabels'
+import { deleteLabel } from '@/lib/a11yLabels'
 import { invoiceFlowDict } from '@/lib/i18n/invoiceFlow'
 import InvoiceLivePreview from '@/components/InvoiceLivePreview'
 import Skeleton from '@/components/Skeleton'
 import { useAppDialog } from '@/components/AppDialog'
+import PageHeader from '@/components/PageHeader'
 
 const UNIT_OPTIONS = ['шт', 'кг', 'л', 'м', 'м²', 'м³', 'час', 'день', 'месяц', 'услуга', 'работа']
 
@@ -160,10 +161,7 @@ export default function EditInvoice() {
   if (loading) return (
     <>
       <div className="max-w-lg mx-auto p-4 space-y-4">
-      <div className="flex items-center gap-3 mb-1">
-        <button onClick={() => router.push('/invoice/' + id)} className="text-xl transition-colors" style={{ color: 'var(--nav-text-muted)' }} aria-label={backLabel(lang)}>‹</button>
-        <Skeleton className="h-6 w-32" />
-      </div>
+      <PageHeader title={<Skeleton className="h-6 w-32" />} backHref={'/invoice/' + id} animate={false} />
         <Skeleton className="h-48 rounded-2xl" />
         <Skeleton className="h-32 rounded-2xl" />
         <Skeleton className="h-24 rounded-2xl" />
@@ -174,10 +172,7 @@ export default function EditInvoice() {
   return (
     <>
       <div className="max-w-lg lg:max-w-5xl mx-auto p-4">
-      <div className="flex items-center gap-3 mb-5">
-        <button onClick={() => router.push('/invoice/' + id)} className="text-xl transition-colors text-[color:var(--nav-text-muted)] hover:text-[color:var(--nav-text-secondary)]" aria-label={backLabel(lang)}>‹</button>
-        <h2 className="text-xl font-bold" style={{ color: 'var(--nav-text-primary)' }}>{t.editInvoiceHeaderTitle}</h2>
-      </div>
+      <PageHeader title={t.editInvoiceHeaderTitle} backHref={'/invoice/' + id} animate={false} />
       <div className="lg:flex lg:gap-6 lg:items-start">
       <div className="lg:flex-1 lg:min-w-0 space-y-4">
 

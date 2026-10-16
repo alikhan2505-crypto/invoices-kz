@@ -4,9 +4,10 @@ import { useRouter } from 'next/navigation'
 import { motion, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { useLanguage } from '@/components/LanguageProvider'
-import { backLabel, deleteLabel } from '@/lib/a11yLabels'
+import { deleteLabel } from '@/lib/a11yLabels'
 import { profileAccountsDict, ProfileAccountsContent } from '@/lib/i18n/profileAccounts'
 import { useAppDialog } from '@/components/AppDialog'
+import PageHeader from '@/components/PageHeader'
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
 // kept identical rather than inventing a second "house" ease.
@@ -15,13 +16,6 @@ const EASE = [0.16, 1, 0.3, 1] as const
 // Same rounded-bordered field treatment used by src/app/create/page.tsx's form inputs.
 const INPUT_CLS = 'w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]'
 
-function ChevronLeftIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="m15 18-6-6 6-6" />
-    </svg>
-  )
-}
 function PlusIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -131,12 +125,7 @@ export default function ConnectorsPage() {
     <>
       <div className="max-w-lg lg:max-w-2xl mx-auto p-4 space-y-4">
 
-        <motion.div {...fadeIn(0)} className="nav-glass rounded-2xl px-4 py-4 flex items-center gap-3">
-          <button onClick={() => router.push('/profile')} className="back-btn transition-colors flex-shrink-0" style={{ color: 'var(--nav-text-muted)' }} aria-label={backLabel(lang)}>
-            <ChevronLeftIcon />
-          </button>
-          <span className="font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{t.connectorsHeaderLabel}</span>
-        </motion.div>
+        <PageHeader title={t.connectorsHeaderLabel} backHref="/profile" />
 
         {/* Оплата */}
         <motion.div {...fadeIn(1)}>

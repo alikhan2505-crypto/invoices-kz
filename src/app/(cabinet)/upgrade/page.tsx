@@ -6,7 +6,7 @@ import { motion, useReducedMotion } from 'framer-motion'
 import QRCode from 'qrcode'
 import { supabase } from '@/lib/supabase'
 import { useLanguage } from '@/components/LanguageProvider'
-import { backLabel, closeLabel } from '@/lib/a11yLabels'
+import { closeLabel } from '@/lib/a11yLabels'
 import { miscDict } from '@/lib/i18n/misc'
 import { supportDict } from '@/lib/i18n/support'
 import { getActivePlan } from '@/lib/plan'
@@ -17,6 +17,7 @@ import { homeFor } from '@/lib/products'
 import { formatDateNumeric } from '@/lib/date'
 import { profileBonusDict } from '@/lib/i18n/profileBonus'
 import type { PlanPaymentSplit } from '@/lib/plans/planActivation'
+import PageHeader from '@/components/PageHeader'
 
 // How long an untouched QR is shown before it is retired for a fresh one.
 // Kaspi's own window is ~5 minutes; /kaspi-api shortens the visible wait to a
@@ -53,13 +54,6 @@ const inputClass = 'w-full rounded-lg px-3 text-sm outline-none transition-color
 const INPUT_STYLE: CSSProperties = { background: 'var(--nav-surface-glass)', color: 'var(--nav-text-primary)', WebkitTextFillColor: 'var(--nav-text-primary)' }
 const ROW_STYLE: CSSProperties = { background: 'var(--nav-surface-glass)' }
 
-function ChevronLeftIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="m15 6-6 6 6 6" />
-    </svg>
-  )
-}
 function XIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -870,23 +864,7 @@ export default function Upgrade() {
   return (
       <>
         <div className="max-w-lg lg:max-w-5xl mx-auto p-4">
-          <motion.div
-            className="flex items-center gap-3 mb-5"
-            initial={{ opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE }}
-          >
-            <button
-              type="button"
-              onClick={goBack}
-              aria-label={backLabel(lang)}
-              className="w-11 h-11 flex items-center justify-center rounded-xl flex-shrink-0 transition-colors hover:bg-[var(--nav-surface-glass)]"
-              style={{ color: 'var(--nav-text-muted)' }}
-            >
-              <ChevronLeftIcon />
-            </button>
-            <h1 className="text-xl lg:text-2xl font-bold truncate" style={{ color: 'var(--nav-text-primary)' }}>{t.pageTitle}</h1>
-          </motion.div>
+          <PageHeader title={t.pageTitle} onBack={goBack} as="h1" />
 
           {/* Narrow column: owned card, hero, promo, wallet, period toggle. */}
           <div className="max-w-xl mx-auto">

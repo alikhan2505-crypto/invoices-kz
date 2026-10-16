@@ -20,6 +20,7 @@ import { saveInvoiceDraft, takeInvoiceDraft, clearInvoiceDraft, type InvoiceDraf
 import { withReturnPath } from '@/lib/returnPath'
 import { useAppDialog } from '@/components/AppDialog'
 import { useBinLookup } from '@/components/useBinLookup'
+import PageHeader from '@/components/PageHeader'
 
 const UNIT_OPTIONS = ['шт', 'кг', 'л', 'м', 'м²', 'м³', 'час', 'день', 'месяц', 'услуга', 'работа']
 
@@ -1142,14 +1143,7 @@ export default function CreateInvoicePage() {
   return (
     <div ref={pageRef}>
       <div className="max-w-lg lg:max-w-7xl mx-auto p-4">
-        <motion.div
-          initial={reduceMotion ? false : { opacity: 0, y: 14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE }}
-        >
-          <h2 id="create-page-top" className="text-xl font-bold mb-1 scroll-mt-32" style={{ color: 'var(--nav-text-primary)' }}>{t.newInvoiceTitle}</h2>
-          <p className="text-sm mb-4" style={{ color: 'var(--nav-text-secondary)' }}>{t.newInvoiceSubtitle}</p>
-        </motion.div>
+        <PageHeader title={t.newInvoiceTitle} subtitle={t.newInvoiceSubtitle} titleId="create-page-top" titleClassName="scroll-mt-32" />
 
         <div className="lg:flex lg:gap-6 lg:items-start">
         <div className="lg:flex-1 lg:min-w-0">

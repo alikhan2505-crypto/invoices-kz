@@ -6,8 +6,9 @@ import { supabase } from '@/lib/supabase'
 import Skeleton from '@/components/Skeleton'
 import { useAppDialog } from '@/components/AppDialog'
 import { useLanguage } from '@/components/LanguageProvider'
-import { backLabel, editLabel, deleteLabel, clearSearchLabel } from '@/lib/a11yLabels'
+import { editLabel, deleteLabel, clearSearchLabel } from '@/lib/a11yLabels'
 import { profileClientsDict } from '@/lib/i18n/profileClients'
+import PageHeader, { PageHeaderButton } from '@/components/PageHeader'
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
 // kept identical rather than inventing a second "house" ease.
@@ -18,13 +19,6 @@ const CARD_HOVER = 'transition-all duration-200 ease-out hover:-translate-y-1 ho
 // Same input treatment as src/app/create/page.tsx's form fields.
 const inputClass = 'w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]'
 
-function ChevronLeftIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="m15 6-6 6 6 6" />
-    </svg>
-  )
-}
 function PlusIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
@@ -158,32 +152,16 @@ export default function Clients() {
   return (
       <>
         <div className="max-w-lg lg:max-w-3xl mx-auto p-4">
-          <motion.div
-            className="flex items-center justify-between gap-3 mb-5"
-            initial={reduceMotion ? false : { opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE }}
-          >
-            <div className="flex items-center gap-3 min-w-0">
-              <button
-                onClick={() => router.push('/profile')}
-                aria-label={backLabel(lang)}
-                className="w-11 h-11 flex items-center justify-center rounded-xl flex-shrink-0 transition-colors hover:bg-[var(--nav-surface-glass)]"
-                style={{ color: 'var(--nav-text-muted)' }}
-              >
-                <ChevronLeftIcon />
-              </button>
-              <h2 className="text-xl font-bold truncate" style={{ color: 'var(--nav-text-primary)' }}>{t.headerLabel}</h2>
-            </div>
-            {!showForm && (
-              <button onClick={() => setShowForm(true)}
-                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg flex-shrink-0 transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0"
-                style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+          <PageHeader
+            title={t.headerLabel}
+            backHref="/profile"
+            right={!showForm && (
+              <PageHeaderButton onClick={() => setShowForm(true)}>
                 <PlusIcon />
                 {t.addButton}
-              </button>
+              </PageHeaderButton>
             )}
-          </motion.div>
+          />
 
           <motion.div
             className="nav-glass rounded-xl px-3 py-2.5 flex items-center gap-2 mb-3"

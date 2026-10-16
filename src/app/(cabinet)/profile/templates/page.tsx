@@ -4,11 +4,12 @@ import { useRouter } from 'next/navigation'
 import { motion, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { useLanguage } from '@/components/LanguageProvider'
-import { backLabel, deleteLabel } from '@/lib/a11yLabels'
+import { deleteLabel } from '@/lib/a11yLabels'
 import { profileContentDict } from '@/lib/i18n/profileContent'
 import { getActivePlan } from '@/lib/plan'
 import Skeleton from '@/components/Skeleton'
 import { useAppDialog } from '@/components/AppDialog'
+import PageHeader from '@/components/PageHeader'
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
 // kept identical rather than inventing a second "house" ease.
@@ -16,13 +17,6 @@ const EASE = [0.16, 1, 0.3, 1] as const
 
 const CARD_HOVER = 'transition-all duration-200 ease-out hover:-translate-y-1 hover:shadow-[var(--nav-card-glow)]'
 
-function ChevronLeftIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="m15 6-6 6 6 6" />
-    </svg>
-  )
-}
 function XIcon({ size = 15 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -90,22 +84,10 @@ export default function Templates() {
   const isPro = !!profile?.is_admin || getActivePlan(profile).canTemplates
 
   const header = (
-    <motion.div
-      className="flex items-center gap-3 mb-5"
-      initial={reduceMotion ? false : { opacity: 0, y: 14 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE }}
-    >
-      <button
-        onClick={() => router.push('/profile')}
-        aria-label={backLabel(lang)}
-        className="w-11 h-11 flex items-center justify-center rounded-xl flex-shrink-0 transition-colors hover:bg-[var(--nav-surface-glass)]"
-        style={{ color: 'var(--nav-text-muted)' }}
-      >
-        <ChevronLeftIcon />
-      </button>
-      <h2 className="text-xl font-bold" style={{ color: 'var(--nav-text-primary)' }}>{t.templatesHeaderLabel}</h2>
-    </motion.div>
+    <PageHeader
+      title={t.templatesHeaderLabel}
+      backHref="/profile"
+    />
   )
 
   return (

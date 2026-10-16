@@ -205,10 +205,14 @@ function CloseIcon({ size = 16 }: { size?: number }) {
 // Same mark the profile-section headers use (e.g. profile/banks/page.tsx) --
 // duplicated locally rather than shared, matching how LockIcon/CloseIcon
 // are already declared in this file.
-function ChevronLeftIcon({ size = 18 }: { size?: number }) {
+// Кнопка верхней панели на телефоне открывает МЕНЮ, а не возвращает назад, --
+// поэтому это «гамбургер», а не стрелка. Раньше здесь была шеврон-стрелка
+// влево, и на страницах с собственной стрелкой «назад» (шапка PageHeader)
+// на экране было две одинаковые стрелки с РАЗНЫМ смыслом (16.10.2026).
+function MenuIcon({ size = 20 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-      <path d="m15 6-6 6 6 6" />
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }} aria-hidden="true">
+      <path d="M4 7h16M4 12h16M4 17h16" />
     </svg>
   )
 }
@@ -348,7 +352,7 @@ function SiteNavBar({ desktopOnly = false }: { desktopOnly?: boolean }) {
             className="w-11 h-11 flex items-center justify-center rounded-xl transition-colors hover:bg-[var(--nav-surface-glass)]"
             style={{ color: 'var(--nav-text-primary)' }}
           >
-            <ChevronLeftIcon />
+            <MenuIcon />
           </button>
         </div>
       )}
