@@ -1,7 +1,7 @@
 'use client'
 import { useContext, useEffect, useState, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { useEffectivePath, useProductHost } from '@/lib/useEffectivePath'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
@@ -232,7 +232,6 @@ export default function SiteNav(props: { desktopOnly?: boolean }) {
 }
 
 function SiteNavBar({ desktopOnly = false }: { desktopOnly?: boolean }) {
-  const router = useRouter()
   const path = useEffectivePath()
   const { lang } = useLanguage()
   const [perms, setPerms] = useState<Perms | null>(null)
@@ -274,7 +273,11 @@ function SiteNavBar({ desktopOnly = false }: { desktopOnly?: boolean }) {
       }
     }
     loadPerms()
-  }, [])
+    // Re-read on every route change: the nav now outlives navigation, so a plan
+    // that just changed (payment, promo, bonus -> router.push) must show up in
+    // the lock icons without a hard reload. The cache above paints first, so
+    // there is no flicker; query-string changes don't re-run (path only).
+  }, [path])
 
   // Drawer follows navigation: any route change closes it.
   useEffect(() => { setDrawerOpen(false) }, [path])
@@ -406,9 +409,11 @@ function SiteNavBar({ desktopOnly = false }: { desktopOnly?: boolean }) {
                   ]).map(item => {
                     const active = path === item.href || path.startsWith(item.href + '/')
                     return (
-                      <button
+                      <Link
                         key={item.href}
-                        onClick={() => { setDrawerOpen(false); router.push(item.href) }}
+                        href={item.href}
+                        aria-current={active ? 'page' : undefined}
+                        onClick={() => setDrawerOpen(false)}
                         className="w-full min-h-[44px] flex items-center px-3 rounded-xl text-sm font-semibold text-left"
                         style={{
                           color: active ? 'var(--nav-text-primary)' : 'var(--nav-text-secondary)',
@@ -416,7 +421,7 @@ function SiteNavBar({ desktopOnly = false }: { desktopOnly?: boolean }) {
                         }}
                       >
                         {item.label}
-                      </button>
+                      </Link>
                     )
                   })}
 
@@ -438,20 +443,29 @@ function SiteNavBar({ desktopOnly = false }: { desktopOnly?: boolean }) {
                             that styling, so on a phone the drawer read as empty
                             (founder, 2026-09-05) -- a header that does something
                             has to look like the rows above it. */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (locked) { showLockedHint(`drawer-${s.key}`); return }
-                            setDrawerOpen(false)
-                            router.push(s.links[0].href)
-                          }}
-                          aria-disabled={locked}
-                          className="w-full min-h-[44px] flex items-center gap-1.5 px-3 rounded-xl text-sm font-semibold text-left"
-                          style={{ color: active ? 'var(--nav-text-primary)' : 'var(--nav-text-secondary)', cursor: locked ? 'not-allowed' : 'pointer' }}
-                        >
-                          <span className="flex-1 truncate">{labels[lang][s.key]}</span>
-                          {locked ? <LockIcon size={13} /> : <ChevronRightIcon />}
-                        </button>
+                        {locked ? (
+                          <button
+                            type="button"
+                            onClick={() => showLockedHint(`drawer-${s.key}`)}
+                            aria-disabled={true}
+                            className="w-full min-h-[44px] flex items-center gap-1.5 px-3 rounded-xl text-sm font-semibold text-left"
+                            style={{ color: 'var(--nav-text-secondary)', cursor: 'not-allowed' }}
+                          >
+                            <span className="flex-1 truncate">{labels[lang][s.key]}</span>
+                            <LockIcon size={13} />
+                          </button>
+                        ) : (
+                          <Link
+                            href={s.links[0].href}
+                            aria-current={active ? 'true' : undefined}
+                            onClick={() => setDrawerOpen(false)}
+                            className="w-full min-h-[44px] flex items-center gap-1.5 px-3 rounded-xl text-sm font-semibold text-left"
+                            style={{ color: active ? 'var(--nav-text-primary)' : 'var(--nav-text-secondary)', cursor: 'pointer' }}
+                          >
+                            <span className="flex-1 truncate">{labels[lang][s.key]}</span>
+                            <ChevronRightIcon />
+                          </Link>
+                        )}
                         {locked ? (
                           lockedHint === `drawer-${s.key}` && (
                             <div className="px-3 pb-1.5 text-xs font-medium" style={{ color: 'var(--nav-text-secondary)' }}>
@@ -465,9 +479,11 @@ function SiteNavBar({ desktopOnly = false }: { desktopOnly?: boolean }) {
                               .sort((a, b) => b.href.length - a.href.length)[0]?.href
                             const linkActive = l.href === bestMatch
                             return (
-                              <button
+                              <Link
                                 key={l.href}
-                                onClick={() => { setDrawerOpen(false); router.push(l.href) }}
+                                href={l.href}
+                                aria-current={linkActive ? 'page' : undefined}
+                                onClick={() => setDrawerOpen(false)}
                                 className="w-full min-h-[44px] flex items-center px-3 rounded-xl text-sm text-left"
                                 style={{
                                   color: linkActive ? 'var(--nav-accent-ink)' : 'var(--nav-text-secondary)',
@@ -476,7 +492,7 @@ function SiteNavBar({ desktopOnly = false }: { desktopOnly?: boolean }) {
                                 }}
                               >
                                 {l.label[lang]}
-                              </button>
+                              </Link>
                             )
                           })
                         )}
@@ -504,7 +520,7 @@ function SiteNavBar({ desktopOnly = false }: { desktopOnly?: boolean }) {
           {/* Always the invoices.kz brand mark here (2026-08-19, founder:
               "тут надо поставить лого invoices.kz") -- /icon.svg is the
               same IK mark used for the favicon/PWA icons. */}
-          <button onClick={() => router.push('/dashboard')} className="flex items-center gap-2 mr-5 flex-shrink-0">
+          <Link href="/dashboard" className="flex items-center gap-2 mr-5 flex-shrink-0">
             <img
               src="/icon.svg"
               alt=""
@@ -512,11 +528,12 @@ function SiteNavBar({ desktopOnly = false }: { desktopOnly?: boolean }) {
               style={{ boxShadow: '0 6px 14px -6px var(--nav-accent)' }}
             />
             <span className="font-semibold text-sm" style={{ color: 'var(--nav-text-primary)', letterSpacing: '-0.02em' }}>invoices.kz</span>
-          </button>
+          </Link>
 
           {!onProductHost && (
-            <button
-              onClick={() => router.push('/dashboard')}
+            <Link
+              href="/dashboard"
+              aria-current={path === '/dashboard' ? 'page' : undefined}
               className="px-3 py-2 rounded-lg text-sm font-semibold transition-colors"
               style={{
                 color: path === '/dashboard' ? 'var(--nav-text-primary)' : 'var(--nav-text-secondary)',
@@ -524,7 +541,7 @@ function SiteNavBar({ desktopOnly = false }: { desktopOnly?: boolean }) {
               }}
             >
               {labels[lang].home}
-            </button>
+            </Link>
           )}
 
           {visibleSections.map(s => {
@@ -532,24 +549,36 @@ function SiteNavBar({ desktopOnly = false }: { desktopOnly?: boolean }) {
             const active = !locked && activeSection?.key === s.key
             return (
               <div key={s.key} className="relative">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (locked) { showLockedHint(`desktop-${s.key}`); return }
-                    router.push(s.links[0].href)
-                  }}
-                  aria-disabled={locked}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-colors"
-                  style={{
-                    color: active ? 'var(--nav-text-primary)' : 'var(--nav-text-secondary)',
-                    boxShadow: active ? `inset 0 -2px 0 var(--nav-accent)` : 'none',
-                    opacity: locked ? 0.6 : 1,
-                    cursor: locked ? 'not-allowed' : 'pointer',
-                  }}
-                >
-                  {labels[lang][s.key]}
-                  {locked && <LockIcon />}
-                </button>
+                {locked ? (
+                  <button
+                    type="button"
+                    onClick={() => showLockedHint(`desktop-${s.key}`)}
+                    aria-disabled={true}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-colors"
+                    style={{
+                      color: 'var(--nav-text-secondary)',
+                      boxShadow: 'none',
+                      opacity: 0.6,
+                      cursor: 'not-allowed',
+                    }}
+                  >
+                    {labels[lang][s.key]}
+                    <LockIcon />
+                  </button>
+                ) : (
+                  <Link
+                    href={s.links[0].href}
+                    aria-current={active ? 'true' : undefined}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-colors"
+                    style={{
+                      color: active ? 'var(--nav-text-primary)' : 'var(--nav-text-secondary)',
+                      boxShadow: active ? `inset 0 -2px 0 var(--nav-accent)` : 'none',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {labels[lang][s.key]}
+                  </Link>
+                )}
                 {locked && lockedHint === `desktop-${s.key}` && (
                   <div
                     className="nav-glass absolute top-[calc(100%+10px)] left-0 whitespace-nowrap px-3 py-2 rounded-xl text-xs font-medium z-20"
@@ -562,9 +591,9 @@ function SiteNavBar({ desktopOnly = false }: { desktopOnly?: boolean }) {
             )
           })}
 
-          <button
-            type="button"
-            onClick={() => router.push('/products')}
+          <Link
+            href="/products"
+            aria-current={path === '/products' ? 'page' : undefined}
             className="px-3 py-2 rounded-lg text-sm font-semibold transition-colors"
             style={{
               color: path === '/products' ? 'var(--nav-text-primary)' : 'var(--nav-text-secondary)',
@@ -572,7 +601,7 @@ function SiteNavBar({ desktopOnly = false }: { desktopOnly?: boolean }) {
             }}
           >
             {labels[lang].products}
-          </button>
+          </Link>
 
           <div className="flex-1" />
           {/* TopUtilityBar renders its own wallet/notifications/account trigger
@@ -601,9 +630,10 @@ function SiteNavBar({ desktopOnly = false }: { desktopOnly?: boolean }) {
               return activeSection.links.filter(l => !l.soon).map(l => {
               const linkActive = l.href === bestMatch
               return (
-                <button
+                <Link
                   key={l.href}
-                  onClick={() => router.push(l.href)}
+                  href={l.href}
+                  aria-current={linkActive ? 'page' : undefined}
                   className="relative px-3 py-1.5 rounded-full text-[13px] font-medium whitespace-nowrap flex-shrink-0 transition-colors"
                   style={{
                     color: linkActive ? 'var(--nav-accent-ink)' : 'var(--nav-text-secondary)',
@@ -618,7 +648,7 @@ function SiteNavBar({ desktopOnly = false }: { desktopOnly?: boolean }) {
                     />
                   )}
                   <span className="relative">{l.label[lang]}</span>
-                </button>
+                </Link>
               )
             })
             })()}

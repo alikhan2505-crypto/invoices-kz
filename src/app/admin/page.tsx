@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { AreaChart, Area, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
 import { formatDateTime, formatDate } from '@/lib/date'
@@ -281,10 +282,12 @@ export default function Admin() {
           <div className="font-bold text-lg">{t.adminBrandLabel}</div>
           <div className="text-xs text-gray-400">{t.controlPanelLabel}</div>
         </div>
-        <button onClick={() => router.push('/dashboard')}
+        {/* Link (not router.push): prefetched, so leaving the standalone admin page
+            for the cabinet frame does not fall back to the root splash. */}
+        <Link href="/dashboard"
           className="text-xs bg-gray-700 text-gray-300 px-3 py-1.5 rounded-lg">
           {t.backToSiteButton}
-        </button>
+        </Link>
       </div>
 
       <div className="max-w-4xl mx-auto p-6">

@@ -1,10 +1,12 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useLanguage, type Lang } from '@/components/LanguageProvider'
 import { SECTIONS } from '@/components/SiteNav'
 import KaspiShopStoreSwitcher, { type StoreState } from '@/components/KaspiShopStoreSwitcher'
 import { ShellContext } from '@/components/shellContext'
+import DesktopShell from '@/components/DesktopShell'
+import ContentLoading from '@/components/ContentLoading'
 import { supabase } from '@/lib/supabase'
 import { PRODUCTS, SELECTABLE_KEYS, type ProductKey } from '@/lib/products'
 import { productCabinetHref } from '@/lib/crossProduct'
@@ -257,7 +259,15 @@ export default function ProductShell({ product, children }: { product: ProductKe
           </div>
         )}
 
-        <div className="product-shell-main">{children}</div>
+        {/* The floating card lives here, once, next to the sidebar -- pages that still
+            wrap themselves in <DesktopShell> get a pass-through (see DesktopShell), so
+            the card is not rebuilt on every navigation. The Suspense keeps a slow page
+            load inside the card instead of falling back to the root full-screen splash. */}
+        <div className="product-shell-main">
+          <DesktopShell>
+            <Suspense fallback={<ContentLoading />}>{children}</Suspense>
+          </DesktopShell>
+        </div>
       </div>
     </ShellContext.Provider>
   )
