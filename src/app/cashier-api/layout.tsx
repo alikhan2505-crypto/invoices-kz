@@ -14,7 +14,7 @@ const PAGE_URL = API_HOST_BASE === 'https://api.invoices.kz' ? 'https://api.invo
 export const metadata: Metadata = {
   title: 'Kaspi Cashier API — invoices.kz',
   // ru + kk в одной строке (как у хаба, src/app/page.tsx): api.invoices.kz
-  // выходит в поиске отдельным лендингом, а язык по умолчанию — казахский.
+  // выходит в поиске отдельным лендингом, а язык сайта у посетителя определяется отдельно (русский по умолчанию, 17.10.2026).
   description: 'Принимайте Kaspi Pay на своём сайте: создание платежа, QR-ссылка и вебхук об оплате. 2% с оплаченного — без абонплаты и минимального оборота. Сайтыңызда Kaspi Pay қабылдаңыз: төлем құру, QR-сілтеме және төлем туралы вебхук. Төленген сомадан 2% — абоненттік төлемсіз және ең аз айналым талабынсыз.',
   // Without its own canonical this page inherited the root's, which pointed
   // at the homepage and asked search engines not to index this page at all.

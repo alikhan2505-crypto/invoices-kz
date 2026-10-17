@@ -8,6 +8,7 @@ import HandoffBanner from '@/components/HandoffBanner'
 import NavAurora from '@/components/NavAurora'
 import { Analytics } from '@vercel/analytics/next'
 import StructuredData from '@/components/StructuredData'
+import { LANG_BOOT_SCRIPT, LANG_HOLD_CSS } from '@/lib/langResolve'
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -60,8 +61,15 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="kk">
+    // Серверный/статический HTML всегда русский (lang="ru"); язык посетителя
+    // определяет встроенный скрипт ниже ещё до первой отрисовки и меняет
+    // lang / data-lang-hold на <html> — отсюда suppressHydrationWarning.
+    // Корневой layout намеренно НЕ читает cookies()/headers(): иначе все
+    // публичные страницы стали бы динамическими. См. src/lib/langResolve.ts.
+    <html lang="ru" suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: LANG_BOOT_SCRIPT }} />
+        <style dangerouslySetInnerHTML={{ __html: LANG_HOLD_CSS }} />
         <link rel="apple-touch-icon" href="/icon-192.png" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />

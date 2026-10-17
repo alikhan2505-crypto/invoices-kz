@@ -5,7 +5,7 @@ import { useLanguage } from '@/components/LanguageProvider'
 import { TOOL_CHROME, TOOL_LANGS, TOOL_LANG_LABEL, TOOL_LANG_NAME, toolPath, type ToolLang } from './index'
 
 /**
- * <html lang> под язык страницы инструмента. Корневой layout отдаёт lang="kk",
+ * <html lang> под язык страницы инструмента. Корневой layout отдаёт lang="ru",
  * а LanguageProvider на монтировании ставит язык из куки посетителя — оба не
  * знают, что эта страница целиком на языке из адреса. Ставим после провайдера
  * (его эффект срабатывает позже дочерних, отсюда setTimeout) и при уходе со
