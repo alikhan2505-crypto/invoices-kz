@@ -505,7 +505,12 @@ export default function ChannelCards({
   // waba_id the user just created arrive separately via the message-event
   // listener above, usually slightly BEFORE the callback -- so a short poll
   // covers the rare race where the callback resolves first.
-  async function connectWhatsApp() {
+  // mode 'app' — номер уже зарегистрирован в приложении WhatsApp Business на
+  // телефоне (Coexistence, Meta: featureType whatsapp_business_app_onboarding):
+  // окно Meta показывает QR для привязки, номер остаётся и в приложении, и у
+  // агента. Обычный режим ('new') — новый номер с кодом из SMS: для номера из
+  // приложения Meta отвечает «номер зарегистрирован в существующем аккаунте».
+  async function connectWhatsApp(mode: 'new' | 'app' = 'new') {
     if (!agentId) return
     const FB = (window as any).FB
     if (!FB) {
@@ -595,7 +600,9 @@ export default function ChannelCards({
       config_id: process.env.NEXT_PUBLIC_WHATSAPP_CONFIG_ID || '',
       response_type: 'code',
       override_default_response_type: true,
-      extras: { setup: {} },
+      extras: mode === 'app'
+        ? { setup: {}, featureType: 'whatsapp_business_app_onboarding', sessionInfoVersion: '3' }
+        : { setup: {} },
     })
   }
 
@@ -768,7 +775,7 @@ export default function ChannelCards({
           <div className="text-xs mb-2 flex items-center gap-1.5" style={{ color: 'var(--nav-critical)' }}>
             <WarnIcon /> {tf.whatsappExpiredHint}
           </div>
-          <button onClick={connectWhatsApp} disabled={waConnecting}
+          <button onClick={() => connectWhatsApp()} disabled={waConnecting}
             className="w-full rounded-lg px-4 py-2.5 text-sm font-medium disabled:opacity-50"
             style={{ background: 'var(--nav-critical)', color: '#fff' }}>
             {waConnecting ? tf.openingWhatsapp : t.reconnectButton}
@@ -776,11 +783,21 @@ export default function ChannelCards({
         </>
       )}
       {!whatsappConnection && (
-        <button onClick={connectWhatsApp} disabled={waConnecting}
+        <button onClick={() => connectWhatsApp()} disabled={waConnecting}
           className={`w-full rounded-lg px-4 text-sm font-semibold disabled:opacity-50 ${featured ? 'py-3' : 'py-2.5'}`}
           style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)', ...(featured ? { boxShadow: '0 10px 24px -10px var(--nav-accent)' } : {}) }}>
           {waConnecting ? tf.connectingButton : t.connectButton}
         </button>
+      )}
+      {!whatsappConnection && (
+        <>
+          <button onClick={() => connectWhatsApp('app')} disabled={waConnecting}
+            className="w-full nav-glass rounded-lg px-4 py-2.5 text-sm font-medium disabled:opacity-50 mt-2"
+            style={{ color: 'var(--nav-text-primary)' }}>
+            {tf.connectExistingAppButton}
+          </button>
+          <div className="text-xs mt-1.5" style={{ color: 'var(--nav-text-secondary)' }}>{tf.connectExistingAppHint}</div>
+        </>
       )}
       {waError && (
         <div className="text-xs mt-2" style={{ color: 'var(--nav-critical)' }}>{waError}</div>
