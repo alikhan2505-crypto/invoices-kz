@@ -90,6 +90,8 @@ const CURRENCY_VALUES = ['KZT', 'USD', 'EUR', 'RUB']
 // Сколько держится строка «Сохранено» под кнопкой и у тумблера.
 const SAVED_FLASH_MS = 2500
 
+// Значение пункта «Не использовать магазин Kaspi» в выборе магазина (не id).
+const KASPI_OFF_VALUE = '__off__'
 const INPUT_CLS = 'w-full rounded-lg px-3 py-2 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]'
 
 interface ReplyTemplate {
@@ -186,6 +188,11 @@ export default function AiAgentSettings() {
   // one happened to be active in the Kaspi Bot section.
   const [kaspiShopConnectionId, setKaspiShopConnectionId] = useState('')
   const [kaspiShops, setKaspiShops] = useState<{ id: string; name: string; isActive: boolean }[]>([])
+  // «Не использовать магазин Kaspi»: агент не называет товары и цены вовсе
+  // (ai_agents.kaspi_catalog_off). kaspiCatalogSupported -- миграция с этой
+  // колонкой применена; без неё опцию не показываем и флаг не шлём.
+  const [kaspiCatalogOff, setKaspiCatalogOff] = useState(false)
+  const [kaspiCatalogSupported, setKaspiCatalogSupported] = useState(false)
   const [metaPixelId, setMetaPixelId] = useState<string | null>(null)
   const [metaPixelIdInput, setMetaPixelIdInput] = useState('')
   const [metaTokenInput, setMetaTokenInput] = useState('')
@@ -460,6 +467,7 @@ export default function AiAgentSettings() {
           setTrainingExitPending(!!data.agent.trainingExitPending)
           setConnections(data.connections || [])
           setKaspiShopConnectionId(data.agent.kaspiShopConnectionId || '')
+          setKaspiCatalogOff(data.agent.kaspiCatalogOff === true)
           setMetaPixelId(data.agent.metaPixelId || null)
           // Secondary data (badge count + saved templates) loads in the
           // background -- neither should hold up first paint of the form.
@@ -471,6 +479,7 @@ export default function AiAgentSettings() {
         // Returned for a new agent too, so the store can be chosen before the
         // first save rather than only on a second visit.
         setKaspiShops(data.kaspiShops || [])
+        setKaspiCatalogSupported(data.kaspiCatalogSupported === true)
       }
       setLoading(false)
     }
@@ -522,7 +531,7 @@ export default function AiAgentSettings() {
         // при переключении) -- POST его не трогает, иначе медленный POST со
         // старым значением перетирал только что сохранённый тумблер. Новый
         // агент создаётся с тем значением, что выставлено в форме.
-        body: JSON.stringify({ ...(agentId ? { agentId } : { isEnabled }), name, tone, businessDescription, goal, collectFields, timezone, currency, customInstructions, historyPairs, stopPhrases, kaspiShopConnectionId: kaspiShopConnectionId || null }),
+        body: JSON.stringify({ ...(agentId ? { agentId } : { isEnabled }), name, tone, businessDescription, goal, collectFields, timezone, currency, customInstructions, historyPairs, stopPhrases, kaspiShopConnectionId: kaspiCatalogOff ? null : (kaspiShopConnectionId || null), ...(kaspiCatalogSupported ? { kaspiCatalogOff } : {}) }),
       })
       data = await res.json().catch(() => null)
     } catch {
@@ -621,7 +630,7 @@ export default function AiAgentSettings() {
   // Любая правка формы снимает устаревшую ошибку сохранения.
   useEffect(() => {
     setSaveError(null)
-  }, [name, tone, businessDescription, goal, collectFields, timezone, currency, customInstructions, historyPairs, stopPhrases, kaspiShopConnectionId])
+  }, [name, tone, businessDescription, goal, collectFields, timezone, currency, customInstructions, historyPairs, stopPhrases, kaspiShopConnectionId, kaspiCatalogOff])
 
   useEffect(() => () => {
     if (savedTimerRef.current) clearTimeout(savedTimerRef.current)
@@ -816,6 +825,7 @@ export default function AiAgentSettings() {
 
   const saveErrorText = saveError === 'name_required' ? tf.errSaveNameRequired
     : saveError === 'kaspi_shop' ? tf.errSaveKaspiShop
+    : saveError === 'kaspi_migration' ? tf.errSaveKaspiMigration
     : saveError === 'forbidden' ? tf.errSaveForbidden
     : saveError === 'not_found' ? tf.errSaveNotFound
     : saveError ? tf.errSaveChanges
@@ -1106,7 +1116,7 @@ export default function AiAgentSettings() {
                   {saveButton}
                 </div>
 
-                {hasKaspiShop === false && (
+                {hasKaspiShop === false && !kaspiCatalogOff && (
                   <div className="nav-glass nav-card-accent rounded-2xl p-5 mt-4">
                     <div className="text-sm font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>{tf.connectShopTitle}</div>
                     <p className="text-[11px] mb-3" style={{ color: 'var(--nav-text-muted)' }}>
@@ -1175,12 +1185,20 @@ export default function AiAgentSettings() {
                 {/* Only worth showing when there is a choice to make: with one
                     store the default already points at it, and with none the
                     agent has no catalog to quote from at all. */}
-                {(kaspiShops.length > 1 || pinnedShopMissing) && (
+                {(kaspiShops.length > 1 || pinnedShopMissing || (kaspiShops.length >= 1 && kaspiCatalogSupported)) && (
                   <label className="block mb-6">
                     <span className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{tf.kaspiShopLabel}</span>
-                    <select value={kaspiShopConnectionId} onChange={e => setKaspiShopConnectionId(e.target.value)}
+                    <select value={kaspiCatalogOff ? KASPI_OFF_VALUE : kaspiShopConnectionId}
+                      onChange={e => {
+                        // Первый пункт -- полный отказ от магазина: флаг вверх,
+                        // закрепление снято. Любой другой пункт флаг снимает.
+                        const v = e.target.value
+                        setKaspiCatalogOff(v === KASPI_OFF_VALUE)
+                        setKaspiShopConnectionId(v === KASPI_OFF_VALUE ? '' : v)
+                      }}
                       className={INPUT_CLS}
                       style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-surface-chrome)' }}>
+                      {kaspiCatalogSupported && <option value={KASPI_OFF_VALUE}>{tf.kaspiShopOffOption}</option>}
                       <option value="">{tf.kaspiShopDefaultOption}</option>
                       {pinnedShopMissing && (
                         <option value={kaspiShopConnectionId} disabled>{tf.kaspiShopMissingOption}</option>
@@ -1190,8 +1208,13 @@ export default function AiAgentSettings() {
                       ))}
                     </select>
                     <span className="text-[11px] mt-1 block" style={{ color: 'var(--nav-text-muted)' }}>
-                      {tf.kaspiShopHint}
+                      {tf.kaspiShopHint}{kaspiCatalogSupported ? ` ${tf.kaspiShopHintOff}` : ''}
                     </span>
+                    {kaspiCatalogOff && (
+                      <span className="text-[11px] mt-1.5 block font-medium" style={{ color: 'var(--nav-text-secondary)' }}>
+                        {tf.kaspiShopOffNote}
+                      </span>
+                    )}
                   </label>
                 )}
 

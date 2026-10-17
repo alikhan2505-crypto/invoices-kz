@@ -7,6 +7,7 @@
 export type SettingsSaveErrorKind =
   | 'name_required'   // пустое название (сервер: 'name required')
   | 'kaspi_shop'      // выбранный магазин Kaspi не найден у этого аккаунта
+  | 'kaspi_migration' // «не использовать магазин» без применённой миграции колонки
   | 'forbidden'       // нет доступа к разделу (тариф закончился, 403 admin_only)
   | 'not_found'       // агент удалён в другой вкладке
   | 'generic'         // всё остальное, включая обрыв сети
@@ -16,6 +17,7 @@ export function settingsSaveErrorKind(status: number, error: unknown): SettingsS
   const code = typeof error === 'string' ? error : ''
   if (code === 'name required') return 'name_required'
   if (code === 'kaspi shop not found') return 'kaspi_shop'
+  if (code === 'kaspi_catalog_migration') return 'kaspi_migration'
   if (status === 403 || code === 'admin_only') return 'forbidden'
   if (status === 404 || code === 'not_found') return 'not_found'
   return 'generic'

@@ -510,7 +510,9 @@ export default function ChannelCards({
   // окно Meta показывает QR для привязки, номер остаётся и в приложении, и у
   // агента. Обычный режим ('new') — новый номер с кодом из SMS: для номера из
   // приложения Meta отвечает «номер зарегистрирован в существующем аккаунте».
-  async function connectWhatsApp(mode: 'new' | 'app' = 'new') {
+  // Основная кнопка и «Переподключить» -- 'app' (у подключений нет признака,
+  // каким путём они сделаны, а окно Meta само показывает нужный шаг).
+  async function connectWhatsApp(mode: 'new' | 'app' = 'app') {
     if (!agentId) return
     const FB = (window as any).FB
     if (!FB) {
@@ -775,7 +777,7 @@ export default function ChannelCards({
           <div className="text-xs mb-2 flex items-center gap-1.5" style={{ color: 'var(--nav-critical)' }}>
             <WarnIcon /> {tf.whatsappExpiredHint}
           </div>
-          <button onClick={() => connectWhatsApp()} disabled={waConnecting}
+          <button onClick={() => connectWhatsApp('app')} disabled={waConnecting}
             className="w-full rounded-lg px-4 py-2.5 text-sm font-medium disabled:opacity-50"
             style={{ background: 'var(--nav-critical)', color: '#fff' }}>
             {waConnecting ? tf.openingWhatsapp : t.reconnectButton}
@@ -783,20 +785,25 @@ export default function ChannelCards({
         </>
       )}
       {!whatsappConnection && (
-        <button onClick={() => connectWhatsApp()} disabled={waConnecting}
-          className={`w-full rounded-lg px-4 text-sm font-semibold disabled:opacity-50 ${featured ? 'py-3' : 'py-2.5'}`}
-          style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)', ...(featured ? { boxShadow: '0 10px 24px -10px var(--nav-accent)' } : {}) }}>
-          {waConnecting ? tf.connectingButton : t.connectButton}
-        </button>
-      )}
-      {!whatsappConnection && (
         <>
+          {/* Основной путь -- номер уже в приложении WhatsApp Business на
+              телефоне (у большинства продавцов так): QR, приложение
+              продолжает работать. Обычный режим для нового номера по SMS на
+              этом номере всегда упирался в «номер зарегистрирован в
+              существующем аккаунте» (проверено вживую 18.10.2026), поэтому он
+              вторичный. */}
           <button onClick={() => connectWhatsApp('app')} disabled={waConnecting}
-            className="w-full nav-glass rounded-lg px-4 py-2.5 text-sm font-medium disabled:opacity-50 mt-2"
-            style={{ color: 'var(--nav-text-primary)' }}>
-            {tf.connectExistingAppButton}
+            className={`w-full rounded-lg px-4 text-sm font-semibold disabled:opacity-50 ${featured ? 'py-3' : 'py-2.5'}`}
+            style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)', ...(featured ? { boxShadow: '0 10px 24px -10px var(--nav-accent)' } : {}) }}>
+            {waConnecting ? tf.connectingButton : tf.connectExistingAppButton}
           </button>
           <div className="text-xs mt-1.5" style={{ color: 'var(--nav-text-secondary)' }}>{tf.connectExistingAppHint}</div>
+          <button onClick={() => connectWhatsApp('new')} disabled={waConnecting}
+            className="self-start text-xs font-medium underline underline-offset-2 mt-2 py-1 text-left disabled:opacity-50"
+            style={{ color: 'var(--nav-text-primary)' }}>
+            {tf.connectNewNumberButton}
+          </button>
+          <div className="text-[11px] mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{tf.connectNewNumberHint}</div>
         </>
       )}
       {waError && (

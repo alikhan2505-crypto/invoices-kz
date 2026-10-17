@@ -70,6 +70,9 @@ export interface AiAgentFormsDict {
   kaspiShopMissingOption: string
   kaspiShopActiveSuffix: string
   kaspiShopHint: string
+  kaspiShopHintOff: string
+  kaspiShopOffOption: string
+  kaspiShopOffNote: string
   replyCostTitle: string
   replyCostText: (price: number) => string
   // Split rather than interpolated because the two numbers are bolded inline.
@@ -114,6 +117,8 @@ export interface AiAgentFormsDict {
   openingWhatsapp: string
   connectExistingAppButton: string
   connectExistingAppHint: string
+  connectNewNumberButton: string
+  connectNewNumberHint: string
   testChatAgentFallback: string
   regenerateKeyButton: string
   connectingButton: string
@@ -165,6 +170,7 @@ export interface AiAgentFormsDict {
   errSaveChanges: string
   errSaveNameRequired: string
   errSaveKaspiShop: string
+  errSaveKaspiMigration: string
   errSaveForbidden: string
   errSaveNotFound: string
   errDeleteTemplate: string
@@ -257,10 +263,13 @@ export const aiAgentFormsDict: Record<Lang, AiAgentFormsDict> = {
     historyOption: (n) => `Последние ${n} обменов`,
     historyDepthHint: 'Сколько прошлых сообщений агент помнит. Больше — точнее контекст, но дороже каждый ответ.',
     kaspiShopLabel: 'Магазин Kaspi для цен и товаров',
-    kaspiShopDefaultOption: 'Активный магазин аккаунта',
+    kaspiShopDefaultOption: 'Активный магазин аккаунта (по умолчанию)',
     kaspiShopMissingOption: 'Магазин удалён — выберите другой',
     kaspiShopActiveSuffix: ' — сейчас активный',
-    kaspiShopHint: 'Откуда агент берёт названия товаров и цены. Если не выбирать, он следует за магазином, переключённым в разделе Kaspi Bot — и тогда все агенты аккаунта отвечают по одному и тому же.',
+    kaspiShopHint: 'Откуда агент берёт названия товаров, цены, доставку и ссылки на магазин. По умолчанию он следует за магазином, переключённым в разделе Kaspi Bot — и тогда все агенты аккаунта отвечают по одному и тому же.',
+    kaspiShopHintOff: 'Если агент не про товары (например, про ваш сервис), выберите «Не использовать магазин Kaspi».',
+    kaspiShopOffOption: 'Не использовать магазин Kaspi (агент не называет товары и цены)',
+    kaspiShopOffNote: 'Магазин не используется: агент не называет товары, цены, доставку и не присылает ссылки на магазин.',
     replyCostTitle: 'Стоимость ИИ-ответов',
     replyCostText: (p) => `Ответ по совпадению с шаблоном — бесплатно. Ответ, который сгенерировал ИИ — ${p} ₸.`,
     walletBalanceLabel: 'Баланс кошелька:',
@@ -299,8 +308,10 @@ export const aiAgentFormsDict: Record<Lang, AiAgentFormsDict> = {
     channelTelegramName: 'Telegram-бот',
     channelWebsiteName: 'Чат для сайта',
     openingWhatsapp: 'Открываем WhatsApp…',
-    connectExistingAppButton: 'Номер уже в приложении WhatsApp Business',
-    connectExistingAppHint: 'Подключится по QR-коду, приложение на телефоне продолжит работать, а ваши ответы с телефона будут видны в «Диалогах». Для нового номера используйте кнопку выше.',
+    connectExistingAppButton: 'У меня уже есть WhatsApp Business на телефоне',
+    connectExistingAppHint: 'Подключится по QR-коду, приложение на телефоне продолжит работать, а ваши ответы с телефона будут видны в «Диалогах».',
+    connectNewNumberButton: 'Подключить новый номер (по SMS)',
+    connectNewNumberHint: 'Для номера, которого нет в приложении WhatsApp.',
     testChatAgentFallback: 'Ваш агент',
     regenerateKeyButton: 'Перегенерировать ключ',
     connectingButton: 'Подключаем…',
@@ -348,6 +359,7 @@ export const aiAgentFormsDict: Record<Lang, AiAgentFormsDict> = {
     errSaveChanges: 'Не удалось сохранить изменения. Попробуйте ещё раз.',
     errSaveNameRequired: 'Заполните поле «Название компании» на вкладке «Настройки».',
     errSaveKaspiShop: 'Выбранный магазин Kaspi не найден. Выберите другой на вкладке «Контроль».',
+    errSaveKaspiMigration: 'Чтобы отключить магазин Kaspi, нужно применить миграцию ai_agent_kaspi_catalog_off.sql в Supabase (SQL Editor). Остальные настройки не сохранены.',
     errSaveForbidden: 'Не сохранено: AI-агент доступен на тарифе Про.',
     errSaveNotFound: 'Агент не найден — возможно, его удалили в другой вкладке.',
     errDeleteTemplate: 'Не удалось удалить шаблон. Попробуйте ещё раз.',
@@ -434,10 +446,13 @@ export const aiAgentFormsDict: Record<Lang, AiAgentFormsDict> = {
     historyOption: (n) => `Соңғы ${n} алмасу`,
     historyDepthHint: 'Агент қанша өткен хабарламаны есте сақтайды. Көбірек — контекст дәлірек, бірақ әр жауап қымбатырақ.',
     kaspiShopLabel: 'Бағалар мен тауарларға арналған Kaspi дүкені',
-    kaspiShopDefaultOption: 'Аккаунттың белсенді дүкені',
+    kaspiShopDefaultOption: 'Аккаунттың белсенді дүкені (әдепкі)',
     kaspiShopMissingOption: 'Дүкен жойылған — басқасын таңдаңыз',
     kaspiShopActiveSuffix: ' — қазір белсенді',
-    kaspiShopHint: 'Агент тауар атаулары мен бағаларды қайдан алады. Таңдамасаңыз, ол Kaspi Bot бөлімінде ауыстырылған дүкенді ұстанады — сонда аккаунттың барлық агенттері бірдей жауап береді.',
+    kaspiShopHint: 'Агент тауар атаулары, бағалар, жеткізу және дүкен сілтемелерін қайдан алады. Әдепкіде ол Kaspi Bot бөлімінде ауыстырылған дүкенді ұстанады — сонда аккаунттың барлық агенттері бірдей жауап береді.',
+    kaspiShopHintOff: 'Агент тауарлар туралы емес болса (мысалы, сіздің сервисіңіз туралы), «Kaspi дүкенін пайдаланбау» таңдаңыз.',
+    kaspiShopOffOption: 'Kaspi дүкенін пайдаланбау (агент тауар мен бағаны атамайды)',
+    kaspiShopOffNote: 'Дүкен пайдаланылмайды: агент тауарларды, бағаларды, жеткізуді атамайды және дүкен сілтемелерін жібермейді.',
     replyCostTitle: 'ИИ-жауаптардың құны',
     replyCostText: (p) => `Үлгімен сәйкес келген жауап — тегін. ИИ жасаған жауап — ${p} ₸.`,
     walletBalanceLabel: 'Әмиян балансы:',
@@ -476,8 +491,10 @@ export const aiAgentFormsDict: Record<Lang, AiAgentFormsDict> = {
     channelTelegramName: 'Telegram-бот',
     channelWebsiteName: 'Сайтқа арналған чат',
     openingWhatsapp: 'WhatsApp ашылуда…',
-    connectExistingAppButton: 'Нөмір WhatsApp Business қосымшасында тұр',
-    connectExistingAppHint: 'QR-код арқылы қосылады, телефондағы қосымша жұмысын жалғастырады, ал телефоннан жауаптарыңыз «Диалогтарда» көрінеді. Жаңа нөмір үшін жоғарыдағы батырманы қолданыңыз.',
+    connectExistingAppButton: 'Телефонымда WhatsApp Business бұрыннан бар',
+    connectExistingAppHint: 'QR-код арқылы қосылады, телефондағы қосымша жұмысын жалғастырады, ал телефоннан жауаптарыңыз «Диалогтарда» көрінеді.',
+    connectNewNumberButton: 'Жаңа нөмірді қосу (SMS арқылы)',
+    connectNewNumberHint: 'WhatsApp қосымшасында жоқ нөмір үшін.',
     testChatAgentFallback: 'Сіздің агентіңіз',
     regenerateKeyButton: 'Кілтті қайта жасау',
     connectingButton: 'Қосылуда…',
@@ -525,6 +542,7 @@ export const aiAgentFormsDict: Record<Lang, AiAgentFormsDict> = {
     errSaveChanges: 'Өзгерістерді сақтау мүмкін болмады. Қайталап көріңіз.',
     errSaveNameRequired: '«Параметрлер» қойындысындағы «Компания атауы» өрісін толтырыңыз.',
     errSaveKaspiShop: 'Таңдалған Kaspi дүкені табылмады. «Бақылау» қойындысында басқасын таңдаңыз.',
+    errSaveKaspiMigration: 'Kaspi дүкенін өшіру үшін Supabase-те (SQL Editor) ai_agent_kaspi_catalog_off.sql миграциясын қолдану керек. Қалған баптаулар сақталмады.',
     errSaveForbidden: 'Сақталмады: AI-агент Про тарифінде қолжетімді.',
     errSaveNotFound: 'Агент табылмады — мүмкін, оны басқа қойындыда жойған шығарсыз.',
     errDeleteTemplate: 'Үлгіні жою мүмкін болмады. Қайталап көріңіз.',
@@ -611,10 +629,13 @@ export const aiAgentFormsDict: Record<Lang, AiAgentFormsDict> = {
     historyOption: (n) => `Last ${n} exchanges`,
     historyDepthHint: 'How many past messages the assistant remembers. More means better context but a higher cost per reply.',
     kaspiShopLabel: 'Kaspi shop for prices and products',
-    kaspiShopDefaultOption: "The account's active shop",
+    kaspiShopDefaultOption: "The account's active shop (default)",
     kaspiShopMissingOption: 'Shop was deleted — pick another one',
     kaspiShopActiveSuffix: ' — currently active',
-    kaspiShopHint: 'Where the assistant takes product names and prices from. Left unset, it follows whichever shop is selected in the Kaspi Bot section — and then every agent on the account answers from the same one.',
+    kaspiShopHint: 'Where the assistant takes product names, prices, delivery terms and shop links from. By default it follows whichever shop is selected in the Kaspi Bot section — and then every agent on the account answers from the same one.',
+    kaspiShopHintOff: 'If the assistant is not about products (say, it is about your service), pick “Do not use a Kaspi shop”.',
+    kaspiShopOffOption: 'Do not use a Kaspi shop (the assistant names no products or prices)',
+    kaspiShopOffNote: 'No shop in use: the assistant names no products, prices or delivery terms and sends no shop links.',
     replyCostTitle: 'Cost of AI replies',
     replyCostText: (p) => `A reply matched by a template is free. A reply generated by AI costs ${p} ₸.`,
     walletBalanceLabel: 'Wallet balance:',
@@ -653,8 +674,10 @@ export const aiAgentFormsDict: Record<Lang, AiAgentFormsDict> = {
     channelTelegramName: 'Telegram bot',
     channelWebsiteName: 'Website chat',
     openingWhatsapp: 'Opening WhatsApp…',
-    connectExistingAppButton: 'My number is already in the WhatsApp Business app',
-    connectExistingAppHint: 'Connects with a QR code; the phone app keeps working and your replies from the phone show up in Conversations. For a new number use the button above.',
+    connectExistingAppButton: 'I already have WhatsApp Business on my phone',
+    connectExistingAppHint: 'Connects with a QR code; the phone app keeps working and your replies from the phone show up in Conversations.',
+    connectNewNumberButton: 'Connect a new number (via SMS)',
+    connectNewNumberHint: 'For a number that is not in the WhatsApp app.',
     testChatAgentFallback: 'Your agent',
     regenerateKeyButton: 'Regenerate key',
     connectingButton: 'Connecting…',
@@ -702,6 +725,7 @@ export const aiAgentFormsDict: Record<Lang, AiAgentFormsDict> = {
     errSaveChanges: 'Could not save the changes. Please try again.',
     errSaveNameRequired: 'Fill in “Company name” on the “Settings” tab.',
     errSaveKaspiShop: 'The selected Kaspi store was not found. Pick another one on the “Control” tab.',
+    errSaveKaspiMigration: 'To turn the Kaspi shop off, apply the migration ai_agent_kaspi_catalog_off.sql in Supabase (SQL Editor). Nothing else was saved either.',
     errSaveForbidden: 'Not saved: the AI agent is available on the Pro plan.',
     errSaveNotFound: 'Agent not found — it may have been deleted in another tab.',
     errDeleteTemplate: 'Could not delete the template. Please try again.',

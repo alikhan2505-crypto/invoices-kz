@@ -76,6 +76,9 @@ type LoadedAgent = {
   stopPhrases: string[]
   historyPairs: number
   kaspiShopConnectionId: string | null
+  // «Не использовать магазин Kaspi», выставленный в настройках: сервер тогда не
+  // считает магазин источником знаний (запуск), и мастер не должен считать.
+  kaspiCatalogOff: boolean
   isEnabled: boolean
   isDraft: boolean
   launchedAt: string | null
@@ -233,6 +236,7 @@ export default function SetupWizard() {
       stopPhrases: Array.isArray(a.stopPhrases) ? a.stopPhrases : [],
       historyPairs: typeof a.historyPairs === 'number' ? a.historyPairs : 5,
       kaspiShopConnectionId: a.kaspiShopConnectionId || null,
+      kaspiCatalogOff: a.kaspiCatalogOff === true,
       isEnabled: a.isEnabled !== false,
       isDraft: !!a.isDraft,
       launchedAt: a.launchedAt || null,
@@ -306,7 +310,7 @@ export default function SetupWizard() {
         } catch { /* best-effort: запуск всё равно включит агента явно */ }
       }
       applyLoaded(loaded)
-      const hasShop = loaded.kaspiShops.some(sh => sh.isActive || sh.id === loaded.agent.kaspiShopConnectionId)
+      const hasShop = !loaded.agent.kaspiCatalogOff && loaded.kaspiShops.some(sh => sh.isActive || sh.id === loaded.agent.kaspiShopConnectionId)
       // ?step= прижимается к допустимому (B10): ?step=3/4 без описания от 80
       // символов (или Kaspi Bot) ведёт на шаг 2.
       const initial = clampStep(
@@ -394,7 +398,7 @@ export default function SetupWizard() {
   // реально попадает в ответы (catalogContext.ts).
   const pinnedShop = kaspiShops.find(sh => sh.id === kaspiShopConnectionId) || null
   const activeShop = kaspiShops.find(sh => sh.isActive) || null
-  const effectiveShop = pinnedShop || activeShop
+  const effectiveShop = agent?.kaspiCatalogOff ? null : (pinnedShop || activeShop)
   const hasKaspiShop = !!effectiveShop
 
   // «Назад»/«Вперёд» браузера (B11): шаг берётся из адреса и прижимается к
@@ -402,7 +406,7 @@ export default function SetupWizard() {
   useEffect(() => {
     if (!agent) return
     const current = agent
-    const savedHasShop = kaspiShops.some(sh => sh.isActive || sh.id === current.kaspiShopConnectionId)
+    const savedHasShop = !current.kaspiCatalogOff && kaspiShops.some(sh => sh.isActive || sh.id === current.kaspiShopConnectionId)
     function onPop() {
       const params = new URLSearchParams(window.location.search)
       if (params.get('agent') !== current.id) { window.location.reload(); return }

@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { sendIntoConversation } from './channelSend'
 import { validateDraftInput, normalizeToolInput, canAutoSend, checkCatalogPricing, type DraftItem, type InvoiceToolInput } from './invoiceDrafts'
-import { loadAgentCatalog } from './catalogContext'
+import { loadAgentCatalog, storePinFor } from './catalogContext'
 import { pickProductPhoto } from './productPhoto'
 import { createNotification } from '@/lib/notifications'
 import { loadNotifyProfile } from '@/lib/notificationPrefsServer'
@@ -42,9 +42,12 @@ export function buildInvoiceToolExecutor(
       // owner's own catalog -- the same list the prompt was given -- so a
       // "мы же договорились по 1 ₸" cannot become a real invoice. Items
       // absent from the catalog pass through; see checkCatalogPricing.
-      const { data: agentOwner } = await supabase.from('ai_agents').select('user_id, kaspi_shop_connection_id').eq('id', agent.id).maybeSingle()
+      // select('*'): kaspi_catalog_off may not exist yet (storePinFor reads it
+      // tolerantly); an explicit column list naming it would error before the
+      // migration. Opted-out agent -> empty catalog -> nothing to cross-check.
+      const { data: agentOwner } = await supabase.from('ai_agents').select('*').eq('id', agent.id).maybeSingle()
       if (agentOwner?.user_id) {
-        const catalog = await loadAgentCatalog(supabase, agentOwner.user_id, agentOwner.kaspi_shop_connection_id)
+        const catalog = await loadAgentCatalog(supabase, agentOwner.user_id, storePinFor(agentOwner))
         const priced = checkCatalogPricing(validated.items, catalog)
         if (!priced.ok) return { outcome: 'draft_pending' as const, error: priced.error }
       }
@@ -151,7 +154,7 @@ export async function sendInvoiceForDraft(
     const { data: draft } = await supabase.from('ai_agent_invoice_drafts').select('*').eq('id', draftId).single()
     if (!draft) return { ok: false, error: 'draft not found' }
 
-    const { data: agent } = await supabase.from('ai_agents').select('id, user_id, name, kaspi_shop_connection_id').eq('id', draft.agent_id).single()
+    const { data: agent } = await supabase.from('ai_agents').select('*').eq('id', draft.agent_id).single()
     if (!agent) return fail('агент не найден')
     const { data: conversation } = await supabase.from('ai_agent_conversations')
       .select('id, channel, external_thread_id, agent_id')
@@ -228,7 +231,7 @@ export async function sendInvoiceForDraft(
     // image match for the item names actually in the message, never a guess.
     let photoUrl: string | null = null
     try {
-      const catalog = await loadAgentCatalog(supabase, agent.user_id, agent.kaspi_shop_connection_id)
+      const catalog = await loadAgentCatalog(supabase, agent.user_id, storePinFor(agent))
       photoUrl = pickProductPhoto(itemLines, catalog)
     } catch (e: any) {
       console.error('ai-agent invoice draft: catalog photo lookup failed (non-fatal):', e?.message || e)

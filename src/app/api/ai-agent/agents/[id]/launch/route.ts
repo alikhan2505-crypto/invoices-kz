@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { hasAiAgentPlan, AI_AGENT_PROFILE_COLUMNS } from '@/lib/aiAgent/planGate'
+import { NO_STORE, storePinFor } from '@/lib/aiAgent/catalogContext'
 import { canLaunch, canUseSetupWizard, parseLaunchMode, isMissingColumnError, launchKnowledgeOk } from '@/lib/aiAgent/setupWizard'
 
 // «Запустить» -- последний шаг мастера /ai-agent/setup (16.10.2026).
@@ -51,7 +52,7 @@ export async function POST(
   // Владелец: service-role клиент обходит RLS, поэтому user_id в фильтре.
   const { data: agent } = await supabase
     .from('ai_agents')
-    .select('id, business_description, kaspi_shop_connection_id')
+    .select('*')
     .eq('id', id)
     .eq('user_id', user.id)
     .maybeSingle()
@@ -61,7 +62,10 @@ export async function POST(
   // аккаунта или активный магазин аккаунта (тогда каталог реально попадает
   // в ответы, catalogContext.ts).
   const { data: shops } = await supabase.from('kaspi_shop_connections').select('id, is_active').eq('user_id', user.id)
-  const hasKaspiShop = (shops || []).some(s => s.is_active || s.id === agent.kaspi_shop_connection_id)
+  // Агент с отключённым магазином (kaspi_catalog_off) магазином не пользуется --
+  // он не считается знанием о бизнесе. select('*'): колонки до миграции нет.
+  const hasKaspiShop = storePinFor(agent) !== NO_STORE
+    && (shops || []).some(s => s.is_active || s.id === agent.kaspi_shop_connection_id)
   if (!launchKnowledgeOk(agent.business_description, hasKaspiShop)) {
     return NextResponse.json({ error: 'needs_business' }, { status: 400 })
   }

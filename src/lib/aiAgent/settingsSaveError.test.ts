@@ -10,6 +10,10 @@ describe('settingsSaveErrorKind', () => {
     expect(settingsSaveErrorKind(400, 'kaspi shop not found')).toBe('kaspi_shop')
   })
 
+  it('maps the missing-migration 409 for the Kaspi opt-out to its own message', () => {
+    expect(settingsSaveErrorKind(409, 'kaspi_catalog_migration')).toBe('kaspi_migration')
+  })
+
   it('treats 403 / admin_only as lost access', () => {
     expect(settingsSaveErrorKind(403, 'admin_only')).toBe('forbidden')
     expect(settingsSaveErrorKind(403, undefined)).toBe('forbidden')

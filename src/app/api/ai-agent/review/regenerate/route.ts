@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { generateAiReply } from '@/lib/instagramAiReply'
 import { buildBusinessContextLine, buildCatalogBlock, AgentTone, AgentGoal } from '@/lib/aiAgent/promptContext'
-import { loadAgentCatalog } from '@/lib/aiAgent/catalogContext'
+import { loadAgentCatalog, storePinFor } from '@/lib/aiAgent/catalogContext'
 import { pairConversationHistory } from '@/lib/aiAgent/telegram'
 import { debitAiAgentWallet, hasAiAgentBudget } from '@/lib/aiAgent/wallet'
 import { getActivePlan } from '@/lib/plan'
@@ -146,7 +146,7 @@ export async function POST(req: NextRequest) {
     // regenerated variant of a price question loses the real prices the
     // original draft had (final-review finding M2). No invoiceTool here:
     // «Другой вариант» regenerates TEXT, it must not create drafts.
-    const catalogBlock = buildCatalogBlock(await loadAgentCatalog(supabase, agent.user_id, agent.kaspi_shop_connection_id))
+    const catalogBlock = buildCatalogBlock(await loadAgentCatalog(supabase, agent.user_id, storePinFor(agent)))
     const result = await generateAiReply({
       incomingText: questionRow.text,
       fromUsername: conversation.customer_handle || 'клиент',

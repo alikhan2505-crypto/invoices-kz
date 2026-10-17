@@ -5,7 +5,7 @@ import { decryptAtRest } from '@/lib/kaspiPay/crypto'
 import { getKey } from '@/lib/aiAgent/connection'
 import { replyToComment, sendDirectMessage, sendDirectImage, InstagramApiError } from '@/lib/instagram'
 import { pickProductPhoto } from '@/lib/aiAgent/productPhoto'
-import { loadAgentCatalog } from '@/lib/aiAgent/catalogContext'
+import { loadAgentCatalog, storePinFor } from '@/lib/aiAgent/catalogContext'
 import { sendTelegramBotMessage, sendTelegramBotPhoto, TELEGRAM_CAPTION_MAX, TelegramApiError } from '@/lib/aiAgent/telegram'
 import { sendWhatsAppImage, sendWhatsAppMessage, WhatsAppApiError } from '@/lib/whatsapp'
 import { extractTriggerWords } from '@/lib/instagramAiReply'
@@ -219,7 +219,7 @@ export async function POST(req: NextRequest) {
     // edited, so re-deciding is right rather than reusing what was drafted.
     const photo = deliversByRow
       ? null
-      : pickProductPhoto(finalText, await loadAgentCatalog(supabase, agent.user_id, agent.kaspi_shop_connection_id))
+      : pickProductPhoto(finalText, await loadAgentCatalog(supabase, agent.user_id, storePinFor(agent)))
 
     try {
       // ai_agent_conversations.external_thread_id doubles as the reply

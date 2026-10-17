@@ -1,6 +1,29 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { CATALOG_MAX_PRODUCTS } from './promptContext'
 
+// The one place that decides "which store does this agent quote from".
+// ai_agents.kaspi_catalog_off (18.10.2026) is a true opt-out: «не использовать
+// магазин Kaspi» -- the agent names no products, prices, delivery terms or
+// shop links at all, instead of falling back to the account's ACTIVE store
+// (the fallback below is only a default for agents without a pin).
+//
+// storePinFor(agent) is the value every call site passes as the loaders'
+// third argument: NO_STORE (opted out) | a connection id (pinned) | null
+// (follow the active store). The flag is read tolerantly -- the column may
+// not exist yet (migration not applied), then it is undefined and means
+// «not opted out», so the code works before and after the migration. Call
+// sites must hand over a row loaded with select('*'), never an explicit
+// column list that names kaspi_catalog_off (it would error before the
+// migration).
+export const NO_STORE = '__no_store__'
+
+export function storePinFor(
+  agent: { kaspi_shop_connection_id?: string | null; kaspi_catalog_off?: boolean | null } | null | undefined,
+): string | null {
+  if (agent?.kaspi_catalog_off === true) return NO_STORE
+  return agent?.kaspi_shop_connection_id || null
+}
+
 // Loads the Kaspi Shop catalog sample for the prompt's «Каталог и цены»
 // block (see buildCatalogBlock in promptContext.ts).
 //
@@ -32,6 +55,7 @@ async function resolveAgentConnectionId(
   ownerUserId: string,
   pinnedConnectionId?: string | null,
 ): Promise<string | null> {
+  if (pinnedConnectionId === NO_STORE) return null
   if (pinnedConnectionId) {
     const { data } = await supabase
       .from('kaspi_shop_connections')

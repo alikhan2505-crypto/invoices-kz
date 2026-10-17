@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { buildBusinessContextLine, buildCatalogBlock, buildDeliveryBlock, buildShopLinksBlock, type AgentTone, type AgentGoal, type BusinessContext } from './promptContext'
-import { loadAgentCatalog, loadAgentDeliveryInfo, loadAgentShopLinks } from './catalogContext'
+import { loadAgentCatalog, loadAgentDeliveryInfo, loadAgentShopLinks, storePinFor, NO_STORE } from './catalogContext'
 import { loadAgentSalonInfo, buildSalonBlock, type SalonInfo } from './salonContext'
 
 // Единый сборщик контекста промпта для ИИ-ответа агента: строка о бизнесе +
@@ -24,6 +24,9 @@ export interface ReplyContextAgent {
   currency?: string | null
   custom_instructions?: unknown
   kaspi_shop_connection_id?: string | null
+  // Опция «не использовать магазин Kaspi». Колонки может ещё не быть (миграция
+  // не применена) -- тогда undefined, то есть «не отключено».
+  kaspi_catalog_off?: boolean | null
   salon_site_id?: string | null
 }
 
@@ -37,6 +40,10 @@ export interface ReplyContextData {
 // Чистая часть: из уже загруженных данных -- строка businessContextLine.
 // channel не передан = Instagram (как всегда было у Instagram-канала).
 export function composeReplyContextLine(agent: ReplyContextAgent, channel: PromptChannel | undefined, data: ReplyContextData): string {
+  // Агент с отключённым магазином Kaspi не называет ни товары, ни цены, ни
+  // условия доставки -- в том числе общий ориентир по курьерам (иначе он
+  // всё равно озвучил бы «1000-15000 ₸»).
+  const deliveryBlock = storePinFor(agent) === NO_STORE ? '' : buildDeliveryBlock(data.deliveryInfo)
   return buildBusinessContextLine({
     name: agent.name,
     tone: agent.tone as AgentTone,
@@ -47,7 +54,7 @@ export function composeReplyContextLine(agent: ReplyContextAgent, channel: Promp
     currency: agent.currency || undefined,
     customInstructions: typeof agent.custom_instructions === 'string' ? agent.custom_instructions : undefined,
     ...(channel ? { channel } : {}),
-  }) + buildCatalogBlock(data.catalog) + buildDeliveryBlock(data.deliveryInfo) + buildShopLinksBlock(data.shopLinks) + (data.salonInfo ? buildSalonBlock(data.salonInfo) : '')
+  }) + buildCatalogBlock(data.catalog) + deliveryBlock + buildShopLinksBlock(data.shopLinks) + (data.salonInfo ? buildSalonBlock(data.salonInfo) : '')
 }
 
 // withSalon: блок салона и инструмент записи -- только в личной переписке
@@ -58,10 +65,11 @@ export async function buildAgentReplyContext(
   agent: ReplyContextAgent,
   opts: { channel?: PromptChannel; withSalon: boolean },
 ): Promise<ReplyContextData & { businessContextLine: string }> {
+  const pin = storePinFor(agent)
   const [catalog, deliveryInfo, shopLinks] = await Promise.all([
-    loadAgentCatalog(supabase, agent.user_id, agent.kaspi_shop_connection_id),
-    loadAgentDeliveryInfo(supabase, agent.user_id, agent.kaspi_shop_connection_id),
-    loadAgentShopLinks(supabase, agent.user_id, agent.kaspi_shop_connection_id),
+    loadAgentCatalog(supabase, agent.user_id, pin),
+    loadAgentDeliveryInfo(supabase, agent.user_id, pin),
+    loadAgentShopLinks(supabase, agent.user_id, pin),
   ])
   const salonInfo = opts.withSalon && agent.salon_site_id ? await loadAgentSalonInfo(supabase, agent.salon_site_id) : null
   const data: ReplyContextData = { catalog, deliveryInfo, shopLinks, salonInfo }

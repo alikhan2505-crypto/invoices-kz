@@ -105,7 +105,10 @@ export async function GET(req: NextRequest) {
   }))
 
   if (isNew) {
-    return NextResponse.json({ agent: null, suggestedName: profile?.company_name || '', connections: [], kaspiShops })
+    // Колонка kaspi_catalog_off уже есть? Видно по ключу в любой строке
+    // select('*') -- явный список колонок до миграции падал бы.
+    const { data: anyAgent } = await supabase.from('ai_agents').select('*').limit(1).maybeSingle()
+    return NextResponse.json({ agent: null, suggestedName: profile?.company_name || '', connections: [], kaspiShops, kaspiCatalogSupported: !!anyAgent && 'kaspi_catalog_off' in anyAgent })
   }
   // Прогресс обучения -- только для показа. Статус здесь НЕ меняется (до
   // 16.10.2026 открытие настроек само выпускало агента из обучения, молча):
@@ -168,6 +171,10 @@ export async function GET(req: NextRequest) {
       kaspiShopConnectionId: agent.kaspi_shop_connection_id && kaspiShops.some(s => s.id === agent.kaspi_shop_connection_id)
         ? agent.kaspi_shop_connection_id
         : null,
+      // «Не использовать магазин Kaspi» (kaspi_catalog_off): агент не называет
+      // товары, цены, доставку и ссылки на магазин. До миграции колонки нет --
+      // читается как false (agent загружен через select('*')).
+      kaspiCatalogOff: agent.kaspi_catalog_off === true,
       metaPixelId: agent.meta_pixel_id || null,
       // Мастер /ai-agent/setup (16.10.2026): черновик -- launched_at есть и
       // пуст. До миграции колонки нет: isDraft всегда false, как раньше.
@@ -177,6 +184,9 @@ export async function GET(req: NextRequest) {
     suggestedName: profile?.company_name || '',
     connections,
     kaspiShops,
+    // true, когда миграция ai_agent_kaspi_catalog_off.sql применена (ключ
+    // есть в строке агента) -- без неё страница не показывает опцию.
+    kaspiCatalogSupported: !!agent && 'kaspi_catalog_off' in agent,
   })
 }
 
@@ -214,7 +224,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ agent: data })
   }
 
-  const { agentId, name, tone, businessDescription, goal, collectFields, timezone, currency, customInstructions, historyPairs, isEnabled, stopPhrases, kaspiShopConnectionId } = body
+  const { agentId, name, tone, businessDescription, goal, collectFields, timezone, currency, customInstructions, historyPairs, isEnabled, stopPhrases, kaspiShopConnectionId, kaspiCatalogOff } = body
 
   if (agentId !== undefined && typeof agentId !== 'string') return NextResponse.json({ error: 'invalid agentId' }, { status: 400 })
   if (historyPairs !== undefined && (typeof historyPairs !== 'number' || historyPairs < 1 || historyPairs > 20)) {
@@ -222,6 +232,9 @@ export async function POST(req: NextRequest) {
   }
   if (isEnabled !== undefined && typeof isEnabled !== 'boolean') {
     return NextResponse.json({ error: 'invalid isEnabled' }, { status: 400 })
+  }
+  if (kaspiCatalogOff !== undefined && typeof kaspiCatalogOff !== 'boolean') {
+    return NextResponse.json({ error: 'invalid kaspiCatalogOff' }, { status: 400 })
   }
   if (kaspiShopConnectionId !== undefined && kaspiShopConnectionId !== null && typeof kaspiShopConnectionId !== 'string') {
     return NextResponse.json({ error: 'invalid kaspiShopConnectionId' }, { status: 400 })
@@ -295,41 +308,55 @@ export async function POST(req: NextRequest) {
     // client sent the field, same rule as isEnabled above -- an older client
     // omitting it must not silently unpin an agent back to the active store.
     // An explicit null IS a choice ("follow the active store") and is stored.
-    ...(kaspiShopConnectionId !== undefined ? { kaspi_shop_connection_id: kaspiShopConnectionId || null } : {}),
+    // Отказ от магазина снимает и закрепление: «не использовать» и «закреплён
+    // за магазином X» не должны жить в строке одновременно.
+    ...(kaspiShopConnectionId !== undefined || kaspiCatalogOff === true
+      ? { kaspi_shop_connection_id: kaspiCatalogOff === true ? null : (kaspiShopConnectionId || null) }
+      : {}),
+    // «Не использовать магазин Kaspi». Пишется только если клиент прислал
+    // флаг (страница шлёт его лишь когда колонка есть); без миграции запись
+    // откатывается ниже, а не ломает сохранение всей формы.
+    ...(typeof kaspiCatalogOff === 'boolean' ? { kaspi_catalog_off: kaspiCatalogOff } : {}),
   }
 
-  let agent: any = null
-  if (agentId) {
-    const { data, error } = await supabase
-      .from('ai_agents')
-      .update(payload)
-      .eq('id', agentId)
-      .eq('user_id', user.id)
-      .select()
-      .maybeSingle()
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    if (!data) return NextResponse.json({ error: 'not_found' }, { status: 404 })
-    agent = data
-  } else {
+  // Одна попытка записи: обновление или вставка (с прежним откатом launched_at).
+  async function writeAgent(p: Record<string, unknown>) {
+    if (agentId) {
+      return supabase.from('ai_agents').update(p).eq('id', agentId).eq('user_id', user!.id).select().maybeSingle()
+    }
     // Прежний путь создания (форма настроек): агент отвечает, как только
     // подключён канал, -- значит, он сразу «запущен». launched_at ставится,
     // чтобы такой агент никогда не выглядел черновиком мастера. До миграции
     // колонки нет -- вставка без неё, как раньше.
     let inserted = await supabase
       .from('ai_agents')
-      .insert({ user_id: user.id, ...payload, launched_at: new Date().toISOString() })
+      .insert({ user_id: user!.id, ...p, launched_at: new Date().toISOString() })
       .select()
       .single()
     if (inserted.error && isMissingColumnError(inserted.error, 'launched_at')) {
       inserted = await supabase
         .from('ai_agents')
-        .insert({ user_id: user.id, ...payload })
+        .insert({ user_id: user!.id, ...p })
         .select()
         .single()
     }
-    if (inserted.error) return NextResponse.json({ error: inserted.error.message }, { status: 500 })
-    agent = inserted.data
+    return inserted
   }
+
+  let result: { data: any; error: { code?: string | null; message?: string | null } | null } = await writeAgent(payload)
+  if (result.error && 'kaspi_catalog_off' in payload && isMissingColumnError(result.error, 'kaspi_catalog_off')) {
+    // Миграция ai_agent_kaspi_catalog_off.sql ещё не применена. «Не использовать
+    // магазин» без колонки сохранить нечем -- честная ошибка, ничего не
+    // записано. Значение false ничего не меняет: сохраняем остальное без колонки.
+    if (kaspiCatalogOff === true) {
+      return NextResponse.json({ error: 'kaspi_catalog_migration' }, { status: 409 })
+    }
+    const { kaspi_catalog_off: _omit, ...withoutColumn } = payload
+    result = await writeAgent(withoutColumn)
+  }
+  if (result.error) return NextResponse.json({ error: result.error.message }, { status: 500 })
+  if (!result.data) return NextResponse.json({ error: 'not_found' }, { status: 404 })
+  const agent = result.data
 
   // No wallet row to seed since the 2026-08-18 unified-wallet merge: spend
   // now debits the shared profiles.kaspi_wallet_balance, which always exists
