@@ -6,5 +6,10 @@ Disallow: /profile
 Disallow: /invoice
 Disallow: /admin
 Disallow: /onboarding
+Disallow: /create
+Disallow: /upgrade
+Disallow: /kaspi-shop
+Disallow: /ai-agent
+Disallow: /cfo
 
 Sitemap: https://invoices.kz/sitemap.xml

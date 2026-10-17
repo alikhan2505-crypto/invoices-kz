@@ -28,6 +28,7 @@ export default function PublicContract() {
       const { contract: c, profile: p } = await res.json()
       if (!c) { setLoading(false); return }
       setContract(c)
+      if (c.title) document.title = `${c.title} — INVOICES.KZ`
       setCompanyName(p?.company_name)
 
       setLoading(false)
@@ -72,7 +73,7 @@ export default function PublicContract() {
 
         {/* Через сервер по токену, а не прямой ссылкой на хранилище: бакет
             с договорами закрыт, см. src/lib/signedDocuments.ts. */}
-        <a href={`/api/public/contract/${encodeURIComponent(token)}/file`} target="_blank" rel="noreferrer"
+        <a href={`/api/public/contract/${encodeURIComponent(token)}/file?lang=${lang}`} target="_blank" rel="noreferrer"
           className="block text-center bg-[#1C2056] text-white rounded-xl py-4 font-medium text-sm">
           {t.publicViewFileButton}
         </a>

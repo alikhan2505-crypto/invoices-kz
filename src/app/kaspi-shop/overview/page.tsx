@@ -112,8 +112,8 @@ export default function KaspiShopOverview() {
   const atFloor = products ? products.filter((p) => p.own_current_price <= p.floor_price + 0.01).length : null
 
   const back = '/kaspi-shop/overview'
+  // Карточки про витрину сняты, пока витрина закрыта («скоро», 15.10.2026).
   const links = [
-    { title: 'Принимать оплату на витрине через Kaspi Pay', where: 'Kaspi Cashier API · api.invoices.kz', href: crossHref('kaspiApi', '/kaspi-api', 'kaspiShop', back) },
     { title: 'Выставить счёт по заказу', where: 'Счета · invoices.kz', href: crossHref('invoices', '/create', 'kaspiShop', back) },
     { title: 'Подключить AI-агента для ответов покупателям', where: 'AI-агент · agent.invoices.kz', href: crossHref('aiAgent', '/ai-agent', 'kaspiShop', back) },
   ]
@@ -189,7 +189,7 @@ export default function KaspiShopOverview() {
 
           <section>
             <h2 className="text-[15px] font-semibold mb-2" style={{ color: 'var(--nav-text-primary)' }}>Связано с другими продуктами</h2>
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2">
               {links.map((l) => (
                 <a key={l.title} href={l.href} className="nav-glass rounded-2xl p-4 flex flex-col gap-1.5 transition-transform hover:-translate-y-0.5">
                   <span className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{l.title}</span>

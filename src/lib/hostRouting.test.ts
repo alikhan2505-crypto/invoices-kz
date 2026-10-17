@@ -95,3 +95,21 @@ describe('apexToCfoRedirect', () => {
     expect(apexToCfoRedirect('localhost', '/cfo/overview', '', 'invoices.kz')).toBeNull()
   })
 })
+
+describe('redirectsCrossHost / linkPrefetch', () => {
+  it('отключает префетч у адресов, уходящих редиректом на другой хост', async () => {
+    const { redirectsCrossHost, linkPrefetch } = await import('./hostRouting')
+    expect(redirectsCrossHost('/kaspi-api/docs')).toBe(true)
+    expect(redirectsCrossHost('/cashier-api/')).toBe(true)
+    expect(linkPrefetch('/kaspi-api/docs')).toBe(false)
+    expect(linkPrefetch('/kaspi-api')).toBeUndefined()
+    expect(linkPrefetch('/kaspi-shop/orders')).toBeUndefined()
+  })
+  it('/cfo редиректит только с apex', async () => {
+    const { redirectsCrossHost } = await import('./hostRouting')
+    expect(redirectsCrossHost('/cfo/overview', 'invoices.kz')).toBe(true)
+    expect(redirectsCrossHost('/cfo/overview', 'www.invoices.kz')).toBe(true)
+    expect(redirectsCrossHost('/cfo/overview', 'cfo.invoices.kz')).toBe(false)
+    expect(redirectsCrossHost('/cfo/overview', 'localhost')).toBe(false)
+  })
+})

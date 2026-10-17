@@ -4,6 +4,8 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
+import { withTimeout, fetchWithTimeout } from '@/lib/loadGuard'
+import LoadErrorCard from '@/components/LoadErrorCard'
 import { buildAgentSettingsHref } from '@/lib/aiAgent/settingsLink'
 import { findBroadcastAfterDrop } from '@/lib/aiAgent/broadcasts'
 import SiteNav from '@/components/SiteNav'
@@ -105,6 +107,9 @@ export default function AiAgentBroadcasts() {
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw
   const [loading, setLoading] = useState(true)
+  // Загрузка не удалась или зависла (>20 с): показываем «Повторить» вместо вечной заставки.
+  const [loadError, setLoadError] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
   // Shadows window.alert for this component -- see src/components/AppDialog.tsx.
   const { alert, dialogElement } = useAppDialog()
   const [forbidden, setForbidden] = useState(false)
@@ -121,7 +126,7 @@ export default function AiAgentBroadcasts() {
   const [sendError, setSendError] = useState<string | null>(null)
 
   const authHeaders = useCallback(async () => {
-    const { data: { session } } = await supabase.auth.getSession()
+    const { data: { session } } = await withTimeout(supabase.auth.getSession())
     return { 'Authorization': `Bearer ${session?.access_token}` }
   }, [])
 
@@ -129,7 +134,7 @@ export default function AiAgentBroadcasts() {
   // dropped-connection path can check what actually reached the server.
   const loadBroadcasts = useCallback(async (): Promise<Broadcast[] | null> => {
     const headers = await authHeaders()
-    const res = await fetch('/api/ai-agent/broadcasts', { headers }).catch(() => null)
+    const res = await fetchWithTimeout('/api/ai-agent/broadcasts', { headers }).catch(() => null)
     if (!res || !res.ok) return null
     const payload = await res.json().catch(() => null)
     const list: Broadcast[] = Array.isArray(payload?.broadcasts) ? payload.broadcasts : []
@@ -138,16 +143,17 @@ export default function AiAgentBroadcasts() {
   }, [authHeaders])
 
   useEffect(() => {
-    async function load() {
+    let redirected = false
+    async function loadInner() {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/login'); return }
+      if (!user) { redirected = true; router.push('/login'); return }
       // Same admin-only client-side check as ../analytics/page.tsx -- the
       // real enforcement is the API's 403 admin_only; this swaps a redirect
       // for an inline message.
       const { data: profile } = await supabase.from('profiles').select('is_admin, plan, plan_expires_at, bonus_expires_at, trial_expires_at').eq('id', user.id).single()
       if (!profile?.is_admin && !getActivePlan(profile).canAiAgent) { setForbidden(true); setLoading(false); return }
       const headers = await authHeaders()
-      const res = await fetch('/api/ai-agent/agents', { headers })
+      const res = await fetchWithTimeout('/api/ai-agent/agents', { headers })
       if (res.ok) {
         const payload = await res.json()
         setAgents(Array.isArray(payload.agents)
@@ -157,8 +163,14 @@ export default function AiAgentBroadcasts() {
       await loadBroadcasts()
       setLoading(false)
     }
-    load()
-  }, [router, authHeaders, loadBroadcasts])
+    let alive = true
+    async function load() {
+      setLoadError(false)
+      try { await withTimeout(loadInner()) } catch { if (alive) setLoadError(true) } finally { if (alive && !redirected) setLoading(false) }
+    }
+    void load()
+    return () => { alive = false }
+  }, [router, authHeaders, loadBroadcasts, reloadKey])
 
   // An agent is selectable for broadcasts once it has AT LEAST ONE
   // broadcastable channel connected (Telegram, WhatsApp, or both) -- which
@@ -297,6 +309,17 @@ export default function AiAgentBroadcasts() {
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
       <BrandLoader />
+    </main>
+    </DesktopShell>
+  )
+
+  const retryLoad = () => { setLoading(true); setReloadKey(k => k + 1) }
+
+  if (loadError) return (
+    <DesktopShell>
+    <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
+      <SiteNav />
+      <LoadErrorCard onRetry={retryLoad} />
     </main>
     </DesktopShell>
   )

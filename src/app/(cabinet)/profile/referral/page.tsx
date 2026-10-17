@@ -152,7 +152,8 @@ export default function Referral() {
           </div>
           <button onClick={shareWhatsApp}
             className="w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-medium text-white transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0"
-            style={{ background: '#25D366' }}>
+            // Фирменный #25D366 с белым текстом давал контраст 1.98; этот зелёный даёт ~5:1.
+            style={{ background: '#0E8043' }}>
             <WhatsAppIcon />
             {t.shareWhatsAppButton}
           </button>

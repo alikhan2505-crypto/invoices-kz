@@ -9,6 +9,8 @@ import DesktopShell from '@/components/DesktopShell'
 import { KASPI_SHOP_CONNECTIONS_CHANGED_EVENT } from '@/components/KaspiShopStoreSwitcher'
 import KaspiTour from './KaspiTour'
 import { getActivePlan } from '@/lib/plan'
+import { useLanguage, type Lang } from '@/components/LanguageProvider'
+import { useCrossHref } from '@/lib/useCrossHref'
 import { useAppDialog } from '@/components/AppDialog'
 
 type Product = {
@@ -223,8 +225,15 @@ async function postConnectStep(url: string, headers: HeadersInit, body: unknown)
   }
 }
 
+// Кнопка «Позже» в окне подключения (17.10.2026). Окно закрывает всю страницу,
+// а на телефоне ещё и перекрывало верхнюю панель с меню -- человек без магазина
+// не мог ни открыть меню, ни уйти. Остальной текст этой страницы пока русский.
+const LATER_TEXT: Record<Lang, string> = { ru: 'Позже', kk: 'Кейінірек', en: 'Later' }
+
 export default function KaspiShop() {
   const router = useRouter()
+  const { lang } = useLanguage()
+  const crossHref = useCrossHref()
   const searchParams = useSearchParams()
   const [loading, setLoading] = useState(true)
   // Shadows window.alert / window.confirm for this component -- see
@@ -733,7 +742,7 @@ export default function KaspiShop() {
              dialogs (bank picker, wallet). Dismissible only when reached via
              "+ Добавить магазин" while already connected -- the mandatory
              first-connect case has nothing else on the page to interact with. */
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/30">
+          <div className="fixed inset-x-0 bottom-0 top-14 lg:top-0 z-50 flex items-center justify-center p-3 bg-black/30">
             <motion.div initial={{ opacity: 0, scale: 0.97, y: 6 }} animate={{ opacity: 1, scale: 1, y: 0 }} transition={{ duration: 0.25, ease: EASE }}
               className="relative nav-glass rounded-[24px] w-full max-w-md p-6 lg:p-8 max-h-[84vh] overflow-y-auto"
               style={{ boxShadow: '0 34px 80px -20px rgba(10,10,15,0.4), var(--nav-card-glow)' }}>
@@ -784,6 +793,16 @@ export default function KaspiShop() {
                     {connecting ? 'Проверяем...' : 'Подтвердить'}
                   </button>
                 </div>
+              )}
+              {/* Выход из обязательного окна: пока магазин не подключён (или
+                  сессия истекла), закрыть его нечем, кроме этой кнопки.
+                  Возвращаемся в кабинет счетов с плашкой «вернуться в Kaspi Bot». */}
+              {(!connected || needsReconnect) && (
+                <a href={crossHref('invoices', '/dashboard', 'kaspiShop', '/kaspi-shop')}
+                  className="mt-3 flex items-center justify-center min-h-[44px] rounded-xl text-sm font-medium transition-colors hover:bg-[var(--nav-surface-glass)]"
+                  style={{ color: 'var(--nav-text-secondary)' }}>
+                  {LATER_TEXT[lang]}
+                </a>
               )}
             </motion.div>
           </div>

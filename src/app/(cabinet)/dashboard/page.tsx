@@ -15,6 +15,9 @@ import { useMyProducts } from '@/lib/useMyProducts'
 import { supportDict } from '@/lib/i18n/support'
 import { invoiceFlowDict } from '@/lib/i18n/invoiceFlow'
 import PageHeader from '@/components/PageHeader'
+import LapsedPlanNotice from '@/components/LapsedPlanNotice'
+import { dashboardDict } from '@/lib/i18n/dashboard'
+import { historyDict } from '@/lib/i18n/history'
 
 // Same easing curve used on the landing page (src/app/page.tsx) -- kept
 // identical across the app rather than inventing a second "house" ease.
@@ -31,16 +34,6 @@ const statusFill: Record<string, string> = {
   draft: 'var(--nav-text-muted)',
   cancelled: 'var(--nav-text-muted)',
 }
-const statusText: Record<string, string> = {
-  paid: 'Оплачен',
-  sent: 'Отправлен',
-  overdue: 'Просрочен',
-  draft: 'Черновик',
-  viewed: 'Просмотрен',
-  cancelled: 'Аннулирован',
-}
-
-const MONTH_ABBR_RU = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек']
 
 // Kaspi Bot and AI-агент are live, Pro-only features (not "coming soon" --
 // SiteNav.tsx marks both sections proOnly: true and shows proLockedMessages
@@ -50,8 +43,8 @@ const MONTH_ABBR_RU = ['янв', 'фев', 'мар', 'апр', 'май', 'июн
 // isAdmin alone -- which told a real paying Pro customer without the admin
 // flag "coming soon" for a feature they already use, and told a trial user
 // nothing about how to actually unlock it. Copy now matches SiteNav's
-// proLockedMessages.ru exactly.
-const LOCKED_TEXT = 'Доступно на тарифе Про'
+// proLockedMessages.ru exactly. Сам текст теперь в dashboardDict.lockedText
+// (ru/kk/en).
 
 function PlusIcon() {
   return (
@@ -218,6 +211,7 @@ function ProductCard({
   // onClick. Falls back to the card's onClick when omitted.
   onCtaClick?: () => void
 }) {
+  const d = dashboardDict[useLanguage().lang]
   return (
     <motion.div
       initial={reduceMotion ? false : { opacity: 0, y: 16 }}
@@ -260,7 +254,7 @@ function ProductCard({
       )}
 
       {state === 'locked' && (
-        <div className="text-[11.5px] mt-2" style={{ color: 'var(--nav-text-muted)' }}>{LOCKED_TEXT}</div>
+        <div className="text-[11.5px] mt-2" style={{ color: 'var(--nav-text-muted)' }}>{d.lockedText}</div>
       )}
       {state === 'neutral' && (
         <>
@@ -296,6 +290,7 @@ function MiniCard({
   neutralText?: string
   onClick?: () => void
 }) {
+  const d = dashboardDict[useLanguage().lang]
   return (
     <motion.div
       initial={reduceMotion ? false : { opacity: 0, y: 16 }}
@@ -322,7 +317,7 @@ function MiniCard({
           </div>
         ) : (
           <div className="text-[11.5px] mt-2" style={{ color: 'var(--nav-text-muted)' }}>
-            {state === 'locked' ? LOCKED_TEXT : neutralText}
+            {state === 'locked' ? d.lockedText : neutralText}
           </div>
         )}
       </div>
@@ -343,6 +338,7 @@ function MiniCard({
 // pathLength), and a floating label at the last non-zero day. Keyed by
 // `period` at the call site so switching 7д/14д/30д replays the draw-in.
 function RevenueAreaChart({ days, reduceMotion, period }: { days: { date: Date; total: number }[]; reduceMotion: boolean; period: number }) {
+  const d = dashboardDict[useLanguage().lang]
   const VIEW_W = 720
   const VIEW_H = 220
   const PAD_LEFT = 8
@@ -364,7 +360,7 @@ function RevenueAreaChart({ days, reduceMotion, period }: { days: { date: Date; 
   if (maxValue === 0) {
     return (
       <div className="h-48 flex items-center justify-center text-center px-6 text-sm" style={{ color: 'var(--nav-text-muted)' }}>
-        Пока нет оплаченных счетов за этот период
+        {d.noPaidInPeriod}
       </div>
     )
   }
@@ -482,7 +478,7 @@ function RevenueAreaChart({ days, reduceMotion, period }: { days: { date: Date; 
 
           {tickIdx.map(i => (
             <text key={i} x={x(i)} y={VIEW_H - 6} textAnchor="middle" fontSize="9" fill="var(--nav-text-muted)">
-              {`${days[i].date.getDate()} ${MONTH_ABBR_RU[days[i].date.getMonth()]}`}
+              {`${days[i].date.getDate()} ${d.monthsShort[days[i].date.getMonth()]}`}
             </text>
           ))}
 
@@ -529,7 +525,7 @@ function RevenueAreaChart({ days, reduceMotion, period }: { days: { date: Date; 
             }}
           >
             <div style={{ fontSize: '9.5px', fontWeight: 500, color: 'var(--nav-text-muted)' }}>
-              {`${days[hover.i].date.getDate()} ${MONTH_ABBR_RU[days[hover.i].date.getMonth()]}`}
+              {`${days[hover.i].date.getDate()} ${d.monthsShort[days[hover.i].date.getMonth()]}`}
             </div>
             {Math.round(days[hover.i].total).toLocaleString('ru-KZ')} ₸
           </div>
@@ -569,6 +565,8 @@ export default function DashboardPage() {
   const { lang } = useLanguage()
   const s = supportDict[lang]
   const tf = invoiceFlowDict[lang]
+  const d = dashboardDict[lang]
+  const h = historyDict[lang]
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw
   const [invoices, setInvoices] = useState<any[]>([])
@@ -583,6 +581,7 @@ export default function DashboardPage() {
   // shown on /create, but the reason to act today belongs on the first
   // screen, not one click in.
   const [plan, setPlan] = useState<ReturnType<typeof getActivePlan> | null>(null)
+  const [planProfile, setPlanProfile] = useState<any>(null)
   // Окно лимита счетов (invoiceLimitWindow — то же, что на /create и в триггере
   // базы): пробный считает 10 счетов с начала пробного периода.
   const [quotaWindow, setQuotaWindow] = useState<InvoiceLimitWindow | null>(null)
@@ -601,6 +600,7 @@ export default function DashboardPage() {
     setIsAdmin(!!profile?.is_admin)
     const activePlan = getActivePlan(profile)
     setPlan(activePlan)
+    setPlanProfile(profile)
     setQuotaWindow(invoiceLimitWindow(profile))
     setCanTelegramSupport(!!profile?.is_admin || (activePlan.isActive && activePlan.plan !== 'free'))
     setLoading(false)
@@ -697,14 +697,14 @@ export default function DashboardPage() {
     const totals = new Map<string, number>()
     invoices.forEach(inv => {
       if (inv.status !== 'paid') return
-      const name = inv.client_name || inv.clients?.name || 'Без клиента'
+      const name = inv.client_name || inv.clients?.name || h.noClientLabel
       totals.set(name, (totals.get(name) || 0) + Number(inv.amount))
     })
     return Array.from(totals.entries())
       .map(([name, total]) => ({ name, total }))
       .sort((a, b) => b.total - a.total)
       .slice(0, 5)
-  }, [invoices])
+  }, [invoices, h.noClientLabel])
 
   // Top 5 items/services by number of occurrences across all of the user's
   // invoices (any status) -- a count of appearances, not a sum of quantities.
@@ -738,7 +738,7 @@ export default function DashboardPage() {
   return (
       <>
         <div className="max-w-lg lg:max-w-5xl mx-auto p-4">
-          <PageHeader title="Дашборд" />
+          <PageHeader title={d.pageTitle} />
 
           {/* Пробный период и срок тарифа. Same wording as the banner on
               /create, from the same dictionary, so the two screens do not
@@ -752,6 +752,7 @@ export default function DashboardPage() {
               <button onClick={() => router.push('/upgrade')} className="text-xs font-semibold px-3 py-1.5 rounded-lg flex-shrink-0" style={{ background: 'var(--nav-success)', color: '#fff' }}>{tf.buyButton}</button>
             </div>
           )}
+          <LapsedPlanNotice profile={planProfile} className="mb-5" />
           {!plan?.isTrial && plan?.daysLeft !== null && plan?.daysLeft !== undefined && plan.daysLeft <= 3 && (
             <div className="nav-glass flex items-center justify-between rounded-xl px-4 py-3 mb-5">
               <div>
@@ -765,7 +766,7 @@ export default function DashboardPage() {
           {/* Продукты платформы */}
           <div className="mb-6">
             <div className="text-[11px] font-extrabold uppercase mb-3" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.09em' }}>
-              Продукты платформы
+              {d.productsHeading}
             </div>
             <div data-tour="products" className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               {loading ? (
@@ -779,11 +780,11 @@ export default function DashboardPage() {
                     icon={<InvoiceIcon />}
                     colorVar="--nav-accent"
                     softVar="--nav-accent-soft"
-                    title="Счета"
+                    title={d.productInvoices}
                     state="data"
-                    subtitle={`${monthInvoices.length} за этот месяц`}
+                    subtitle={d.perMonthCount(monthInvoices.length)}
                     deltaPct={invoiceCountDelta}
-                    deltaLabel="к прошлому месяцу"
+                    deltaLabel={d.vsPrevMonth}
                     sparkValues={last14CreatedCounts}
                     onClick={() => router.push('/create')}
                   />
@@ -795,10 +796,10 @@ export default function DashboardPage() {
                     icon={<ApiIcon />}
                     colorVar="--nav-accent"
                     softVar="--nav-accent-soft"
-                    title="Kaspi Cashier API"
+                    title={d.productKaspiApi}
                     state={kaspiApiStats ? 'data' : 'neutral'}
-                    subtitle={kaspiApiStats ? `${kaspiApiStats.count.toLocaleString('ru-KZ')} платежей · ${kaspiApiStats.amount.toLocaleString('ru-KZ')} ₸ за 30д` : undefined}
-                    neutralText="Приём оплат Kaspi на вашем сайте"
+                    subtitle={kaspiApiStats ? d.paymentsLine(kaspiApiStats.count.toLocaleString('ru-KZ'), kaspiApiStats.amount.toLocaleString('ru-KZ')) : undefined}
+                    neutralText={d.kaspiApiNeutral}
                     onClick={() => router.push('/kaspi-api')}
                   />
 )}
@@ -809,9 +810,9 @@ export default function DashboardPage() {
                     icon={<AgentIcon />}
                     colorVar="--nav-magenta"
                     softVar="--nav-magenta-soft"
-                    title="AI-агент"
+                    title={d.productAiAgent}
                     state={agentState}
-                    neutralText="Диалоги появятся здесь"
+                    neutralText={d.aiAgentNeutral}
                     onClick={() => router.push(canOpenAiAgent ? '/ai-agent' : '/upgrade')}
                   />
 )}
@@ -822,9 +823,9 @@ export default function DashboardPage() {
                     icon={<ShopIcon />}
                     colorVar="--nav-teal"
                     softVar="--nav-teal-soft"
-                    title="Kaspi Bot"
+                    title={d.productKaspiBot}
                     state={kaspiState}
-                    neutralText="Показатели появятся здесь"
+                    neutralText={d.kaspiBotNeutral}
                     onClick={() => router.push(canOpenKaspiShop ? '/kaspi-shop' : '/upgrade')}
                   />
 )}
@@ -836,7 +837,7 @@ export default function DashboardPage() {
           {/* Аналитика */}
           <div className="mb-6">
             <div className="text-[11px] font-extrabold uppercase mb-3" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.09em' }}>
-              Аналитика
+              {d.analyticsHeading}
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-4 items-start">
               {/* Main revenue chart card */}
@@ -856,7 +857,7 @@ export default function DashboardPage() {
                 >
                   <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
                     <div className="text-[14.5px] font-semibold" style={{ color: 'var(--nav-text-primary)', letterSpacing: '-0.02em' }}>
-                      Выручка по счетам
+                      {d.revenueByInvoices}
                     </div>
                     <div className="relative flex items-center gap-0.5 rounded-full p-[3px]" style={{ background: 'var(--nav-bg)' }}>
                       {PERIODS.map(p => (
@@ -875,7 +876,7 @@ export default function DashboardPage() {
                               transition={reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 380, damping: 32 }}
                             />
                           )}
-                          <span className="relative" style={{ zIndex: 1 }}>{p}д</span>
+                          <span className="relative" style={{ zIndex: 1 }}>{d.periodDays(p)}</span>
                         </button>
                       ))}
                     </div>
@@ -883,20 +884,20 @@ export default function DashboardPage() {
 
                   <div className="flex gap-7 flex-wrap mb-[18px]">
                     <div>
-                      <div className="text-[11px] font-semibold" style={{ color: 'var(--nav-text-muted)' }}>Итого за период</div>
+                      <div className="text-[11px] font-semibold" style={{ color: 'var(--nav-text-muted)' }}>{d.periodTotal}</div>
                       <div className="text-[21px] font-bold mt-[3px]" style={{ color: 'var(--nav-text-primary)', letterSpacing: '-0.03em' }}>
                         <CountUp key={`total-${period}`} value={totalPeriod} reduceMotion={reduceMotion} format={n => `${n.toLocaleString('ru-KZ')} ₸`} />
                       </div>
                     </div>
                     <div>
-                      <div className="text-[11px] font-semibold" style={{ color: 'var(--nav-text-muted)' }}>Средний счёт</div>
+                      <div className="text-[11px] font-semibold" style={{ color: 'var(--nav-text-muted)' }}>{d.averageInvoice}</div>
                       <div className="text-[21px] font-bold mt-[3px]" style={{ color: 'var(--nav-text-primary)', letterSpacing: '-0.03em' }}>
                         <CountUp key={`avg-${period}`} value={avgInvoice} reduceMotion={reduceMotion} format={n => `${n.toLocaleString('ru-KZ')} ₸`} />
                       </div>
                     </div>
                     {trend !== null && (
                       <div>
-                        <div className="text-[11px] font-semibold" style={{ color: 'var(--nav-text-muted)' }}>Динамика</div>
+                        <div className="text-[11px] font-semibold" style={{ color: 'var(--nav-text-muted)' }}>{d.trend}</div>
                         <div className="text-[21px] font-bold mt-[3px]" style={{ color: 'var(--nav-success)', letterSpacing: '-0.03em' }}>
                           <CountUp key={`trend-${period}`} value={trend} reduceMotion={reduceMotion} format={n => `${n >= 0 ? '+' : ''}${n}%`} />
                         </div>
@@ -921,7 +922,7 @@ export default function DashboardPage() {
                       index={0}
                       reduceMotion={reduceMotion}
                       dotVar="--nav-accent"
-                      label="Счета"
+                      label={d.productInvoices}
                       state="data"
                       value={monthInvoices.length.toLocaleString('ru-KZ')}
                       deltaPct={invoiceCountDelta}
@@ -933,9 +934,9 @@ export default function DashboardPage() {
                       index={1}
                       reduceMotion={reduceMotion}
                       dotVar="--nav-teal"
-                      label="Kaspi Bot"
+                      label={d.productKaspiBot}
                       state={kaspiState}
-                      neutralText="Показатели появятся здесь"
+                      neutralText={d.kaspiBotNeutral}
                       onClick={() => router.push(canOpenKaspiShop ? '/kaspi-shop' : '/upgrade')}
                     />
                   </>
@@ -962,9 +963,9 @@ export default function DashboardPage() {
                 transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.25 }}
               >
                 <div className="flex items-center justify-between px-4 pt-4 pb-1">
-                  <h3 className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>Последние счета</h3>
+                  <h3 className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{d.recentInvoices}</h3>
                   <button onClick={() => router.push('/history')} className="text-xs font-medium" style={{ color: 'var(--nav-accent)' }}>
-                    Вся история →
+                    {d.allHistory}
                   </button>
                 </div>
 
@@ -984,14 +985,14 @@ export default function DashboardPage() {
                   <div className="flex flex-col items-center text-center px-4 py-10">
                     <DocumentIcon />
                     <p className="text-sm mt-3 mb-4" style={{ color: 'var(--nav-text-secondary)' }}>
-                      У вас пока нет счетов. Создайте первый, чтобы начать.
+                      {d.noInvoicesYet}
                     </p>
                     <button
                       onClick={() => router.push('/create')}
                       className="px-5 py-2.5 rounded-xl text-sm font-semibold"
                       style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}
                     >
-                      Создать первый счёт
+                      {d.createFirstInvoice}
                     </button>
                   </div>
                 ) : (
@@ -1008,7 +1009,7 @@ export default function DashboardPage() {
                         <div className="min-w-0">
                           <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>{inv.number}</div>
                           <div className="text-sm font-medium truncate" style={{ color: 'var(--nav-text-primary)' }}>
-                            {inv.client_name || inv.clients?.name || 'Без клиента'}
+                            {inv.client_name || inv.clients?.name || h.noClientLabel}
                           </div>
                           <div className="text-xs mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{formatDateTime(inv.created_at)}</div>
                         </div>
@@ -1020,7 +1021,7 @@ export default function DashboardPage() {
                             className="text-xs px-2 py-1 rounded-full font-semibold text-white"
                             style={{ background: statusFill[inv.status] || statusFill.draft }}
                           >
-                            {statusText[inv.status] || statusText.draft}
+                            {h.statusLabels[inv.status] || h.statusLabels.draft}
                           </span>
                         </div>
                       </div>
@@ -1039,7 +1040,7 @@ export default function DashboardPage() {
                 style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)', boxShadow: '0 10px 24px -10px var(--nav-accent)' }}
               >
                 <PlusIcon />
-                Создать счёт
+                {d.createInvoice}
               </motion.button>
             </div>
 
@@ -1054,11 +1055,11 @@ export default function DashboardPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.3 }}
             >
-              <h3 className="text-sm font-semibold mb-4" style={{ color: 'var(--nav-text-primary)' }}>Аналитика по счетам</h3>
+              <h3 className="text-sm font-semibold mb-4" style={{ color: 'var(--nav-text-primary)' }}>{d.invoiceAnalytics}</h3>
 
               <div className="mb-5">
                 <div className="text-[11px] font-extrabold uppercase mb-2.5" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.07em' }}>
-                  Топ покупателей
+                  {d.topBuyers}
                 </div>
                 {loading ? (
                   <>
@@ -1067,7 +1068,7 @@ export default function DashboardPage() {
                     <Skeleton className="h-3 w-full" />
                   </>
                 ) : topClients.length === 0 ? (
-                  <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>Пока нет оплаченных счетов</div>
+                  <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>{d.noPaidInvoicesYet}</div>
                 ) : (
                   topClients.map(c => (
                     <AnalyticsRow
@@ -1083,7 +1084,7 @@ export default function DashboardPage() {
 
               <div>
                 <div className="text-[11px] font-extrabold uppercase mb-2.5" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.07em' }}>
-                  Топ товаров и услуг
+                  {d.topItems}
                 </div>
                 {loading ? (
                   <>
@@ -1092,7 +1093,7 @@ export default function DashboardPage() {
                     <Skeleton className="h-3 w-full" />
                   </>
                 ) : topItems.length === 0 ? (
-                  <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>Появятся после первых счетов</div>
+                  <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>{d.appearAfterFirst}</div>
                 ) : (
                   topItems.map(it => (
                     <AnalyticsRow
@@ -1117,9 +1118,9 @@ export default function DashboardPage() {
                 ИП First Project · БИН 890525350143 · г. Астана
               </span>
               <nav className="flex flex-wrap gap-4" aria-label="legal">
-                <Link href="/privacy" className="text-xs hover:underline" style={{ color: 'var(--nav-text-secondary)' }}>Политика</Link>
-                <Link href="/terms" className="text-xs hover:underline" style={{ color: 'var(--nav-text-secondary)' }}>Условия</Link>
-                <Link href="/data-deletion" className="text-xs hover:underline" style={{ color: 'var(--nav-text-secondary)' }}>Удаление данных</Link>
+                <Link href="/privacy" className="text-xs hover:underline" style={{ color: 'var(--nav-text-secondary)' }}>{d.footerPolicy}</Link>
+                <Link href="/terms" className="text-xs hover:underline" style={{ color: 'var(--nav-text-secondary)' }}>{d.footerTerms}</Link>
+                <Link href="/data-deletion" className="text-xs hover:underline" style={{ color: 'var(--nav-text-secondary)' }}>{d.footerDataDeletion}</Link>
               </nav>
               <div className="flex flex-wrap items-center gap-4">
                 <a href="https://wa.me/77763555177" target="_blank" rel="noopener noreferrer" className="text-xs hover:underline" style={{ color: 'var(--nav-text-secondary)' }}>WhatsApp</a>

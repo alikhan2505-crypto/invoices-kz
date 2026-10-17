@@ -169,14 +169,14 @@ type Tok = { text: string; tone?: 'accent' | 'muted' }
 type CodeLine = Tok[]
 
 const CURL_LINES: CodeLine[] = [
-  [{ text: 'curl -X ', tone: 'muted' }, { text: 'POST', tone: 'accent' }, { text: ' https://www.invoices.kz/api/kaspi/pay \\' }],
+  [{ text: 'curl -X ', tone: 'muted' }, { text: 'POST', tone: 'accent' }, { text: ' https://api.invoices.kz/api/kaspi/pay \\' }],
   [{ text: '  -H "Authorization: Bearer YOUR_API_TOKEN" \\', tone: 'muted' }],
   [{ text: '  -H "Content-Type: application/json" \\', tone: 'muted' }],
   [{ text: "  -d '{" }, { text: '"amount"', tone: 'accent' }, { text: ': 10000, ' }, { text: '"order_id"', tone: 'accent' }, { text: `: "order_12345"}'` }],
 ]
 
 const JAVASCRIPT_LINES: CodeLine[] = [
-  [{ text: 'const', tone: 'accent' }, { text: ' res = ' }, { text: 'await', tone: 'accent' }, { text: " fetch('https://www.invoices.kz/api/kaspi/pay', {" }],
+  [{ text: 'const', tone: 'accent' }, { text: ' res = ' }, { text: 'await', tone: 'accent' }, { text: " fetch('https://api.invoices.kz/api/kaspi/pay', {" }],
   [{ text: "  method: 'POST'," }],
   [{ text: '  headers: {' }],
   [{ text: "    Authorization: 'Bearer YOUR_API_TOKEN'," }],
@@ -191,7 +191,7 @@ const PYTHON_LINES: CodeLine[] = [
   [{ text: 'import', tone: 'accent' }, { text: ' requests' }],
   [{ text: '' }],
   [{ text: 'response = requests.' }, { text: 'post', tone: 'accent' }, { text: '(' }],
-  [{ text: '    "https://www.invoices.kz/api/kaspi/pay",' }],
+  [{ text: '    "https://api.invoices.kz/api/kaspi/pay",' }],
   [{ text: '    headers={"Authorization": "Bearer YOUR_API_TOKEN"},' }],
   [{ text: '    json={"amount": 10000, "order_id": "order_12345"},' }],
   [{ text: ')' }],

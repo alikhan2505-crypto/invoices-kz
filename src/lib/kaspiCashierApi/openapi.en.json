@@ -11,7 +11,7 @@
     }
   },
   "servers": [
-    { "url": "https://www.invoices.kz", "description": "Production — the only environment; there is no test/sandbox mode" }
+    { "url": "https://api.invoices.kz", "description": "Production — the only environment; there is no test/sandbox mode" }
   ],
   "tags": [
     { "name": "Kaspi Cashier API", "description": "Accepting and tracking Kaspi Pay payments" }

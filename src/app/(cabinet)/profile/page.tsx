@@ -9,6 +9,7 @@ import { useTheme, type ThemeMode } from '@/components/ThemeProvider'
 import { useLanguage } from '@/components/LanguageProvider'
 import { cacheGet, cacheSet, cacheClear } from '@/lib/cache'
 import { getActivePlan, parseDbTimestamp } from '@/lib/plan'
+import LapsedPlanNotice from '@/components/LapsedPlanNotice'
 import { invoiceLimitWindow } from '@/lib/invoiceLimit'
 import { formatDateNumeric } from '@/lib/date'
 import { companyIdKind, companyInitials } from '@/lib/companyIdentity'
@@ -568,6 +569,7 @@ export default function Profile() {
 
   const subscriptionEl = (
     <motion.div {...fadeIn(1)} className={`nav-glass nav-card-accent rounded-2xl overflow-hidden ${CARD_HOVER}`}>
+          <LapsedPlanNotice profile={profile} className="!rounded-none !border-0" />
           <Link href="/upgrade" className="px-4 py-4 flex items-center justify-between gap-3">
               <span className="flex items-center gap-3 min-w-0">
                 <span

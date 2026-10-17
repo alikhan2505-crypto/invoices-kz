@@ -2,6 +2,8 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { withTimeout } from '@/lib/loadGuard'
+import LoadErrorCard from '@/components/LoadErrorCard'
 import LoadingSpinner from '@/components/LoadingSpinner'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
@@ -41,7 +43,7 @@ type DialogRow = {
 }
 
 async function authHeader() {
-  const { data: { session } } = await supabase.auth.getSession()
+  const { data: { session } } = await withTimeout(supabase.auth.getSession())
   return { Authorization: `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' }
 }
 
@@ -49,6 +51,9 @@ export default function AiAgentOverview() {
   const router = useRouter()
   const crossHref = useCrossHref()
   const [ready, setReady] = useState(false)
+  // Загрузка не удалась или зависла (>20 с): «Повторить» вместо вечной заставки.
+  const [loadError, setLoadError] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
   const [totals, setTotals] = useState<{ conversations: number; replies: number } | null | undefined>(undefined)
   const [newLeads, setNewLeads] = useState<number | null>(null)
   const [dialogs, setDialogs] = useState<DialogRow[] | null>(null)
@@ -65,7 +70,7 @@ export default function AiAgentOverview() {
 
   useEffect(() => {
     let alive = true
-    async function load() {
+    async function loadInner() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
       const { data: profile } = await supabase.from('profiles').select('is_admin, plan, plan_expires_at, bonus_expires_at, trial_expires_at').eq('id', user.id).single()
@@ -103,11 +108,26 @@ export default function AiAgentOverview() {
         .then((d) => { if (alive) setHasAgents(Array.isArray(d?.agents) ? d.agents.length > 0 : null) })
         .catch(() => { if (alive) setHasAgents(null) })
     }
+    async function load() {
+      setLoadError(false)
+      try { await withTimeout(loadInner()) } catch { if (alive) { setLoadError(true); setReady(true) } }
+    }
     void load()
     return () => { alive = false }
-  }, [router])
+  }, [router, reloadKey])
+
+  const retryLoad = () => { setReady(false); setReloadKey(k => k + 1) }
 
   if (!ready) return <LoadingSpinner />
+
+  if (loadError) return (
+    <DesktopShell>
+      <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
+        <SiteNav />
+        <LoadErrorCard onRetry={retryLoad} />
+      </main>
+    </DesktopShell>
+  )
 
   if (forbidden) return (
     <DesktopShell>

@@ -30,6 +30,19 @@ export default function AuthCallback() {
           return
         }
 
+        // Пришли без кода, токена и ошибки (адрес открыт вручную, закладка,
+        // обрезанная ссылка): ждать нечего. Раньше страница висела ~7 секунд
+        // (1 с пауза + 5 попыток по 0,5 с) и только потом уходила на /login.
+        // Если сессия уже есть, идём дальше обычным путём.
+        const hasAuthParams = !!(code || accessToken || hashParams.get('refresh_token') || params.get('token_hash') || params.get('access_token'))
+        if (!hasAuthParams) {
+          const { data: existing } = await supabase.auth.getSession()
+          if (!existing.session) {
+            router.replace('/login')
+            return
+          }
+        }
+
         if (code) {
           const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
           if (exchangeError) {

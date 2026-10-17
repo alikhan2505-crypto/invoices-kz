@@ -3,6 +3,8 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
+import { withTimeout, fetchWithTimeout } from '@/lib/loadGuard'
+import LoadErrorCard from '@/components/LoadErrorCard'
 import SiteNav from '@/components/SiteNav'
 import AiAgentProUpsell from '@/components/aiAgent/AiAgentProUpsell'
 import DesktopShell from '@/components/DesktopShell'
@@ -130,6 +132,9 @@ export default function AiAgentReview() {
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw
   const [loading, setLoading] = useState(true)
+  // Загрузка не удалась или зависла (>20 с): показываем «Повторить» вместо вечной заставки.
+  const [loadError, setLoadError] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
   const [agents, setAgents] = useState<{ id: string; name: string }[]>([])
   const [agentFilter, setAgentFilter] = useState<string>('all')
   const [items, setItems] = useState<ReviewItem[]>([])
@@ -151,27 +156,31 @@ export default function AiAgentReview() {
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   async function authHeader() {
-    const { data: { session } } = await supabase.auth.getSession()
+    const { data: { session } } = await withTimeout(supabase.auth.getSession())
     return { 'Authorization': `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' }
   }
 
   async function loadItems(agent: string) {
     setFetching(true)
-    const headers = await authHeader()
-    const params = new URLSearchParams()
-    if (agent !== 'all') params.set('agentId', agent)
-    const qs = params.toString()
-    const res = await fetch(`/api/ai-agent/review${qs ? `?${qs}` : ''}`, { headers })
-    if (res.ok) {
-      const data = await res.json()
-      setItems(data.items || [])
+    try {
+      const headers = await authHeader()
+      const params = new URLSearchParams()
+      if (agent !== 'all') params.set('agentId', agent)
+      const qs = params.toString()
+      const res = await fetchWithTimeout(`/api/ai-agent/review${qs ? `?${qs}` : ''}`, { headers })
+      if (res.ok) {
+        const data = await res.json()
+        setItems(data.items || [])
+      }
+    } finally {
+      setFetching(false)
     }
-    setFetching(false)
   }
 
-  async function load() {
+  let redirected = false
+    async function loadInner() {
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { router.push('/login'); return }
+    if (!user) { redirected = true; router.push('/login'); return }
     // AI-агент is open to admins (testing) and active Pro-plan users
     // (2026-09-02, opened up now that Telegram/WhatsApp/website/API are
     // proven live -- Instagram stays disabled below pending Meta review).
@@ -187,8 +196,8 @@ export default function AiAgentReview() {
     // agents/drafts responses to be handled first, so serializing it after
     // them was a needless extra round-trip on first paint.
     const [agentsRes, draftsRes] = await Promise.all([
-      fetch('/api/ai-agent/agents', { headers }),
-      fetch('/api/ai-agent/invoice-drafts', { headers }),
+      fetchWithTimeout('/api/ai-agent/agents', { headers }),
+      fetchWithTimeout('/api/ai-agent/invoice-drafts', { headers }),
       loadItems('all'),
     ])
     if (agentsRes.ok) {
@@ -202,9 +211,15 @@ export default function AiAgentReview() {
     setLoading(false)
   }
 
+  // Любой сбой или зависание (>20 с) -> «Повторить», а не вечная заставка.
+  async function load() {
+    setLoadError(false)
+    try { await withTimeout(loadInner()) } catch { setLoadError(true) } finally { if (!redirected) setLoading(false) }
+  }
+
   function changeAgent(id: string) {
     setAgentFilter(id)
-    loadItems(id)
+    loadItems(id).catch(() => setLoadError(true))
   }
 
   async function draftAct(id: string, action: 'approve' | 'reject') {
@@ -231,7 +246,8 @@ export default function AiAgentReview() {
     }
   }
 
-  useEffect(() => { load() }, [])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load() }, [reloadKey])
 
   useEffect(() => {
     if (!hintFor) return
@@ -332,6 +348,17 @@ export default function AiAgentReview() {
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
       <BrandLoader />
+    </main>
+    </DesktopShell>
+  )
+
+  const retryLoad = () => { setLoading(true); setReloadKey(k => k + 1) }
+
+  if (loadError) return (
+    <DesktopShell>
+    <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
+      <SiteNav />
+      <LoadErrorCard onRetry={retryLoad} />
     </main>
     </DesktopShell>
   )

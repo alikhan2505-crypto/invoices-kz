@@ -12,6 +12,7 @@ import { invoiceLimitWindow } from '@/lib/invoiceLimit'
 import { companyInitials } from '@/lib/companyIdentity'
 import { useLanguage, type Lang } from '@/components/LanguageProvider'
 import { notifyWalletChanged, useWalletRefresh } from '@/lib/walletSignal'
+import { utilityBarDict, localizePlanLabel, type UtilityBarContent } from '@/lib/i18n/utilityBar'
 
 type WalletKey = 'unified'
 type Panel = 'wallet' | 'notifications' | 'help' | 'account' | null
@@ -73,29 +74,20 @@ const WALLETS: WalletConfig[] = [
   },
 ]
 
-const BREAKDOWN_SEGMENTS: { key: keyof Omit<WalletBreakdown, 'topup'>; label: string; color: string }[] = [
-  { key: 'commission', label: 'Счета', color: 'var(--nav-accent)' },
-  { key: 'kaspi_shop_check', label: 'Kaspi Bot', color: 'var(--nav-teal)' },
-  { key: 'ai_agent_reply', label: 'ИИ-агент', color: 'var(--nav-magenta)' },
+const BREAKDOWN_SEGMENTS: { key: keyof Omit<WalletBreakdown, 'topup'>; label: keyof Pick<UtilityBarContent, 'segmentInvoices' | 'segmentKaspiBot' | 'segmentAiAgent'>; color: string }[] = [
+  { key: 'commission', label: 'segmentInvoices', color: 'var(--nav-accent)' },
+  { key: 'kaspi_shop_check', label: 'segmentKaspiBot', color: 'var(--nav-teal)' },
+  { key: 'ai_agent_reply', label: 'segmentAiAgent', color: 'var(--nav-magenta)' },
 ]
 
-function timeAgo(iso: string): string {
+function timeAgo(iso: string, u: UtilityBarContent): string {
   const diffMs = Date.now() - new Date(iso).getTime()
   const min = Math.floor(diffMs / 60000)
-  if (min < 1) return 'только что'
-  if (min < 60) return `${min} мин назад`
+  if (min < 1) return u.timeJustNow
+  if (min < 60) return u.timeMinutesAgo(min)
   const hr = Math.floor(min / 60)
-  if (hr < 24) return `${hr} ч назад`
-  return `${Math.floor(hr / 24)} дн назад`
-}
-
-// Russian plural agreement for "день" (1 день / 2 дня / 5 дней).
-function pluralDays(n: number): string {
-  const mod10 = n % 10
-  const mod100 = n % 100
-  if (mod10 === 1 && mod100 !== 11) return 'день'
-  if ([2, 3, 4].includes(mod10) && ![12, 13, 14].includes(mod100)) return 'дня'
-  return 'дней'
+  if (hr < 24) return u.timeHoursAgo(hr)
+  return u.timeDaysAgo(Math.floor(hr / 24))
 }
 
 // The ledger API (src/app/api/kaspi/wallet/history/route.ts) only returns
@@ -113,6 +105,8 @@ function walletDotColor(entry: HistoryEntry): string {
 
 export default function TopUtilityBar() {
   const router = useRouter()
+  const { lang } = useLanguage()
+  const u = utilityBarDict[lang]
   const pathname = useEffectivePath()
   const reduceMotion = !!useReducedMotion()
   const [loggedIn, setLoggedIn] = useState(false)
@@ -254,10 +248,10 @@ export default function TopUtilityBar() {
           const res = await fetch('/api/wallet/claim-welcome-bonus', { method: 'POST', headers })
           const data = await res.json().catch(() => null)
           if (res.ok && data?.claimed) {
-            setBonusClaimMessage(`Начислено ${data.amount} ₸ — добро пожаловать!`)
+            setBonusClaimMessage(u.bonusCredited(String(data.amount)))
             refreshBalances(visible, headers)
           } else if (res.ok && data?.reason === 'already_claimed') {
-            setBonusClaimMessage('Бонус уже был получен ранее.')
+            setBonusClaimMessage(u.bonusAlready)
           }
           if (res.ok && data && (data.claimed || data.reason === 'already_claimed')) {
             // Not openPanel('wallet') -- its closure over `userId` state
@@ -415,7 +409,7 @@ export default function TopUtilityBar() {
 
   async function sendTopupToPhone(wallet: WalletConfig, amount: number) {
     if (amount < wallet.minAmount) {
-      setTopupError(`Минимум ${wallet.minAmount.toLocaleString('ru-KZ')} ₸`)
+      setTopupError(u.minAmount(wallet.minAmount.toLocaleString('ru-KZ')))
       return
     }
     setTopupPhoneSending(true)
@@ -435,13 +429,13 @@ export default function TopUtilityBar() {
         setTopupPhoneOpen(false)
       } else {
         setTopupError(data.error === 'invalid_phone'
-          ? 'Проверьте номер телефона'
+          ? u.invalidPhone
           : data.error === 'invalid_amount'
-            ? `Минимум ${(data.min ?? wallet.minAmount).toLocaleString('ru-KZ')} ₸`
-            : 'Не удалось отправить запрос, попробуйте ещё раз')
+            ? u.minAmount((data.min ?? wallet.minAmount).toLocaleString('ru-KZ'))
+            : u.sendFailed)
       }
     } catch {
-      setTopupError('Не удалось отправить запрос, попробуйте ещё раз')
+      setTopupError(u.sendFailed)
     }
     setTopupPhoneSending(false)
   }
@@ -471,7 +465,7 @@ export default function TopUtilityBar() {
 
   async function startTopup(wallet: WalletConfig, amount: number) {
     if (amount < wallet.minAmount) {
-      setTopupError(`Минимум ${wallet.minAmount.toLocaleString('ru-KZ')} ₸`)
+      setTopupError(u.minAmount(wallet.minAmount.toLocaleString('ru-KZ')))
       return
     }
     setToppingUp(true)
@@ -491,7 +485,7 @@ export default function TopUtilityBar() {
       topupCreatedAtRef.current = Date.now()
       setTopupPhoneDeclined(false)
     } else {
-      setTopupError(data.error === 'invalid_amount' ? `Минимум ${(data.min ?? wallet.minAmount).toLocaleString('ru-KZ')} ₸` : 'Не удалось создать оплату, попробуйте ещё раз')
+      setTopupError(data.error === 'invalid_amount' ? u.minAmount((data.min ?? wallet.minAmount).toLocaleString('ru-KZ')) : u.createFailed)
     }
     setToppingUp(false)
   }
@@ -679,7 +673,7 @@ export default function TopUtilityBar() {
           jammed into the corner rather than sitting in the bar. right-6 clears it. */}
       <div data-tour="wallet" className={`fixed top-1.5 ${ownHeaderPage ? 'lg:top-[11px]' : 'lg:top-[21px]'} right-3 lg:right-6 z-50 flex items-center gap-1.5 nav-glass rounded-full px-1.5 py-0 lg:py-1.5`}
         style={{ boxShadow: `0 12px 30px -14px rgba(10,10,15,0.35), var(--nav-card-glow)` }}>
-        <button onClick={() => openPanel('wallet')} title="Кошелёк"
+        <button onClick={() => openPanel('wallet')} title={u.walletTitle}
           className="flex items-center gap-1.5 rounded-full pl-2 pr-2.5 py-1.5 hover:bg-gray-50 transition-colors">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
             <rect x="3" y="6" width="18" height="13" rx="2.5" stroke="var(--nav-accent)" strokeWidth="1.6" />
@@ -693,7 +687,7 @@ export default function TopUtilityBar() {
 
         <LangCycleButton />
 
-        <button data-tour="notifications" onClick={() => openPanel('notifications')} title="Уведомления"
+        <button data-tour="notifications" onClick={() => openPanel('notifications')} title={u.notificationsTitle}
           className="relative w-11 h-11 flex items-center justify-center rounded-full hover:bg-gray-50 transition-colors">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
             <path d="M6 10a6 6 0 1 1 12 0c0 4 1.5 5.5 1.5 5.5H4.5S6 14 6 10Z" stroke="var(--nav-accent)" strokeWidth="1.6" strokeLinejoin="round" />
@@ -706,7 +700,7 @@ export default function TopUtilityBar() {
           )}
         </button>
 
-        <button data-tour="help" onClick={() => openPanel('help')} title="Помощь"
+        <button data-tour="help" onClick={() => openPanel('help')} title={u.helpTitle}
           className="w-11 h-11 flex items-center justify-center rounded-full hover:bg-gray-50 transition-colors">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
             <circle cx="12" cy="12" r="9" stroke="var(--nav-accent)" strokeWidth="1.6" />
@@ -715,7 +709,7 @@ export default function TopUtilityBar() {
           </svg>
         </button>
 
-        <button onClick={() => openPanel('account')} title="Аккаунт"
+        <button onClick={() => openPanel('account')} title={u.accountTitle}
           className="w-11 h-11 rounded-full bg-[var(--nav-accent)] text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">
           {initials}
         </button>
@@ -747,7 +741,7 @@ export default function TopUtilityBar() {
 
               <div className="p-6">
                 <div className="flex items-center justify-between">
-                  <div className="text-[11px] font-extrabold uppercase" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.08em' }}>Баланс</div>
+                  <div className="text-[11px] font-extrabold uppercase" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.08em' }}>{u.balance}</div>
                   <button onClick={() => setPanel(null)} className="text-[var(--nav-text-secondary)] text-lg leading-none">✕</button>
                 </div>
 
@@ -755,7 +749,7 @@ export default function TopUtilityBar() {
                   {currentBalance !== undefined ? `${currentBalance.toLocaleString('ru-KZ')} ₸` : '···'}
                 </div>
                 <p className="text-xs mt-2 leading-relaxed" style={{ color: 'var(--nav-text-secondary)' }}>
-                  Один баланс на все сервисы — пополняете один раз, тратится там, где используете.
+                  {u.oneBalance}
                 </p>
 
                 {bonusClaimMessage && (
@@ -766,7 +760,7 @@ export default function TopUtilityBar() {
 
                 {breakdown && totalSpend30d > 0 && (
                   <div className="mt-5">
-                    <div className="text-xs mb-2" style={{ color: 'var(--nav-text-muted)' }}>Расходы за 30 дней</div>
+                    <div className="text-xs mb-2" style={{ color: 'var(--nav-text-muted)' }}>{u.spend30}</div>
                     <div className="flex h-2 rounded-full overflow-hidden w-full" style={{ background: 'var(--nav-bg)' }}>
                       {BREAKDOWN_SEGMENTS.filter(s => breakdown[s.key] > 0).map(s => (
                         <div key={s.key} style={{ flexGrow: breakdown[s.key], background: s.color }} />
@@ -776,14 +770,14 @@ export default function TopUtilityBar() {
                       {BREAKDOWN_SEGMENTS.filter(s => breakdown[s.key] > 0).map(s => (
                         <div key={s.key} className="flex items-center gap-1.5 text-xs">
                           <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: s.color }} />
-                          <span style={{ color: 'var(--nav-text-secondary)' }}>{s.label}</span>
+                          <span style={{ color: 'var(--nav-text-secondary)' }}>{u[s.label]}</span>
                           <span className="font-semibold tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{breakdown[s.key].toLocaleString('ru-KZ')} ₸</span>
                         </div>
                       ))}
                     </div>
                     {breakdown.topup > 0 && (
                       <div className="text-[11px] mt-2" style={{ color: 'var(--nav-text-muted)' }}>
-                        Пополнено за 30 дней: {breakdown.topup.toLocaleString('ru-KZ')} ₸
+                        {u.topped30(breakdown.topup.toLocaleString('ru-KZ'))}
                       </div>
                     )}
                   </div>
@@ -792,7 +786,7 @@ export default function TopUtilityBar() {
                 <div className="flex items-center justify-between gap-3 mt-5">
                   <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>
                     {daysLeft !== null ? (
-                      <>Хватит на <b style={{ color: 'var(--nav-text-primary)' }}>{daysLeft} {pluralDays(daysLeft)}</b> при текущем темпе</>
+                      <>{u.enoughFor} <b style={{ color: 'var(--nav-text-primary)' }}>{daysLeft} {u.pluralDays(daysLeft)}</b> {u.atCurrentPace}</>
                     ) : <>&nbsp;</>}
                   </div>
                   <button
@@ -800,7 +794,7 @@ export default function TopUtilityBar() {
                     className="px-4 py-2 rounded-lg text-xs font-semibold flex-shrink-0 transition-colors"
                     style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}
                   >
-                    Пополнить
+                    {u.topUp}
                   </button>
                 </div>
 
@@ -810,32 +804,32 @@ export default function TopUtilityBar() {
                       <div className="text-center py-3">
                         <div className="text-2xl mb-2">🚫</div>
                         <p className="text-xs mb-3" style={{ color: 'var(--nav-text-primary)' }}>
-                          Запрос отклонён в приложении Kaspi
+                          {u.requestDeclined}
                         </p>
                         <button onClick={() => { setTopupPhoneDeclined(false); setTopupPhoneOpen(true) }}
                           className="w-full rounded-lg px-3 py-2 text-xs font-medium transition-colors"
                           style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-                          Повторить
+                          {u.retry}
                         </button>
                       </div>
                     ) : topupPending && topupPhoneSent ? (
                       <div className="text-center py-3">
                         <div className="text-2xl mb-2">📲</div>
                         <p className="text-xs mb-1" style={{ color: 'var(--nav-text-primary)' }}>
-                          Запрос отправлен на {formatKzPhone(topupPhone)}
+                          {u.requestSentTo(formatKzPhone(topupPhone))}
                         </p>
                         <p className="text-[11px] mb-3" style={{ color: 'var(--nav-text-secondary)' }}>
-                          Подтвердите оплату в приложении Kaspi — баланс пополнится автоматически.
+                          {u.confirmInKaspi}
                         </p>
                         <button onClick={() => cancelPhoneTopup(wallet)}
                           className="w-full text-center text-[11px] underline"
                           style={{ color: 'var(--nav-text-muted)' }}>
-                          Отменить запрос
+                          {u.cancelRequest}
                         </button>
                       </div>
                     ) : topupPending ? (
                       <div>
-                        <p className="text-xs mb-2" style={{ color: 'var(--nav-text-secondary)' }}>Отсканируйте QR-код Kaspi — баланс пополнится автоматически.</p>
+                        <p className="text-xs mb-2" style={{ color: 'var(--nav-text-secondary)' }}>{u.scanQr}</p>
                         {topupQrDataUrl && (
                           <div className="flex justify-center mb-2">
                             <img src={topupQrDataUrl} alt="Kaspi QR" className="w-40 h-40 rounded-lg" style={{ background: '#fff', padding: 8 }} />
@@ -843,19 +837,19 @@ export default function TopUtilityBar() {
                         )}
                         <div className="text-[11px] text-center mb-2 h-4" aria-live="polite">
                           {topupScanning ? (
-                            <span style={{ color: 'var(--nav-success)' }}>Подтвердите оплату в приложении Kaspi…</span>
+                            <span style={{ color: 'var(--nav-success)' }}>{u.confirmPaymentEllipsis}</span>
                           ) : topupRefreshing ? (
-                            <span style={{ color: 'var(--nav-text-muted)' }}>Обновляем код…</span>
+                            <span style={{ color: 'var(--nav-text-muted)' }}>{u.refreshingCode}</span>
                           ) : topupSecondsLeft > 0 ? (
                             <span style={{ color: 'var(--nav-text-muted)' }}>
-                              QR действителен ещё {Math.floor(topupSecondsLeft / 60)}:{String(topupSecondsLeft % 60).padStart(2, '0')}
+                              {u.qrValidFor} {Math.floor(topupSecondsLeft / 60)}:{String(topupSecondsLeft % 60).padStart(2, '0')}
                             </span>
                           ) : null}
                         </div>
                         <a href={topupPending.payment_link} target="_blank" rel="noopener noreferrer"
                           className="block text-center rounded-lg px-3 py-2 text-xs font-medium"
                           style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-                          Открыть оплату
+                          {u.openPayment}
                         </a>
 
                         {/* The phone alternative sits on the amount-picker
@@ -868,13 +862,13 @@ export default function TopUtilityBar() {
                             two different UI languages. */}
                         <div className="flex items-center gap-2 my-2">
                           <div className="flex-1 h-px" style={{ background: 'var(--nav-border-soft)' }} />
-                          <span className="text-[10px]" style={{ color: 'var(--nav-text-muted)' }}>или</span>
+                          <span className="text-[10px]" style={{ color: 'var(--nav-text-muted)' }}>{u.or}</span>
                           <div className="flex-1 h-px" style={{ background: 'var(--nav-border-soft)' }} />
                         </div>
                         <button onClick={() => { setTopupPending(null); setTopupPhoneOpen(true) }}
                           className="w-full rounded-lg px-3 py-2 text-xs font-medium border transition-colors"
                           style={{ borderColor: 'var(--nav-border-soft)', color: 'var(--nav-accent)', background: 'transparent' }}>
-                          Отправить запрос на телефон
+                          {u.sendToPhone}
                         </button>
                       </div>
                     ) : (
@@ -891,7 +885,7 @@ export default function TopUtilityBar() {
                           ))}
                         </div>
                         <input value={topupCustom} onChange={e => { setTopupCustom(e.target.value.replace(/\D/g, '')); setTopupAmount(null) }}
-                          placeholder="Своя сумма, ₸" type="text" inputMode="numeric" name="topupCustomAmount"
+                          placeholder={u.customAmount} type="text" inputMode="numeric" name="topupCustomAmount"
                           className="w-full border rounded-lg px-3 py-1.5 text-xs mb-2"
                           style={{ borderColor: 'var(--nav-border-soft)', background: 'var(--nav-bg)', color: 'var(--nav-text-primary)' }} />
                         {topupError && <div className="text-xs mb-2" style={{ color: 'var(--nav-critical)' }}>{topupError}</div>}
@@ -904,7 +898,7 @@ export default function TopUtilityBar() {
                               style={topupDisabled
                                 ? { background: 'var(--nav-bg)', color: 'var(--nav-text-secondary)', cursor: 'not-allowed' }
                                 : { background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-                              {toppingUp ? 'Создаём оплату…' : 'Пополнить'}
+                              {toppingUp ? u.creatingPayment : u.topUp}
                             </button>
                           )
                         })()}
@@ -915,7 +909,7 @@ export default function TopUtilityBar() {
                             the QR with. */}
                         <div className="flex items-center gap-2 my-2">
                           <div className="flex-1 h-px" style={{ background: 'var(--nav-border-soft)' }} />
-                          <span className="text-[10px]" style={{ color: 'var(--nav-text-muted)' }}>или</span>
+                          <span className="text-[10px]" style={{ color: 'var(--nav-text-muted)' }}>{u.or}</span>
                           <div className="flex-1 h-px" style={{ background: 'var(--nav-border-soft)' }} />
                         </div>
 
@@ -940,7 +934,7 @@ export default function TopUtilityBar() {
                                   style={disabled
                                     ? { background: 'var(--nav-bg)', color: 'var(--nav-text-secondary)', cursor: 'not-allowed' }
                                     : { background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-                                  {topupPhoneSending ? 'Отправляем…' : 'Отправить запрос'}
+                                  {topupPhoneSending ? u.sendingEllipsis : u.sendRequest}
                                 </button>
                               )
                             })()}
@@ -950,7 +944,7 @@ export default function TopUtilityBar() {
                             disabled={!((topupAmount ?? Number(topupCustom)) >= wallet.minAmount)}
                             className="w-full rounded-lg px-3 py-2 text-xs font-medium border transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             style={{ borderColor: 'var(--nav-border-soft)', color: 'var(--nav-accent)', background: 'transparent' }}>
-                            Отправить запрос на телефон
+                            {u.sendToPhone}
                           </button>
                         )}
                       </>
@@ -960,10 +954,10 @@ export default function TopUtilityBar() {
 
                 <div className="mt-5 pt-5" style={{ borderTop: '1px solid var(--nav-border-soft)' }}>
                   <div className="text-[11px] font-extrabold uppercase mb-2.5" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.07em' }}>
-                    Последние операции
+                    {u.recentOperations}
                   </div>
-                  {historyLoading && <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>Загрузка…</div>}
-                  {!historyLoading && history.length === 0 && <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>Пока нет операций</div>}
+                  {historyLoading && <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>{u.loading}</div>}
+                  {!historyLoading && history.length === 0 && <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>{u.noOperations}</div>}
                   {!historyLoading && history.length > 0 && (
                     <div className="space-y-0.5 max-h-40 overflow-y-auto pr-2 -mr-2">
                       {history.slice(0, 8).map((h, i) => (
@@ -977,7 +971,7 @@ export default function TopUtilityBar() {
                           <div className="flex items-center gap-2 min-w-0">
                             <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: walletDotColor(h) }} />
                             <span className="text-xs truncate" style={{ color: 'var(--nav-text-primary)' }}>{h.label}</span>
-                            <span className="text-[10px] flex-shrink-0" style={{ color: 'var(--nav-text-muted)' }}>{timeAgo(h.createdAt)}</span>
+                            <span className="text-[10px] flex-shrink-0" style={{ color: 'var(--nav-text-muted)' }}>{timeAgo(h.createdAt, u)}</span>
                           </div>
                           <span className="text-xs font-semibold tabular-nums flex-shrink-0" style={{ color: h.amount >= 0 ? 'var(--nav-success)' : 'var(--nav-text-primary)' }}>
                             {h.amount >= 0 ? '+' : ''}{h.amount.toLocaleString('ru-KZ')}
@@ -999,9 +993,9 @@ export default function TopUtilityBar() {
                       </svg>
                     </span>
                     <div className="min-w-0">
-                      <div className="text-xs font-semibold" style={{ color: 'var(--nav-text-primary)' }}>Заработано через Kaspi</div>
+                      <div className="text-xs font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{u.earnedViaKaspi}</div>
                       <div className="text-[11px] truncate" style={{ color: 'var(--nav-text-muted)' }}>
-                        Оплаты приходят напрямую на ваш Kaspi ·{' '}
+                        {u.paymentsDirect} ·{' '}
                         <Link href="/kaspi-api" onClick={() => setPanel(null)} className="font-medium" style={{ color: 'var(--nav-accent)' }}>Kaspi Pay →</Link>
                       </div>
                     </div>
@@ -1014,12 +1008,12 @@ export default function TopUtilityBar() {
                 <div className="mt-5 pt-5 flex items-center gap-3" style={{ borderTop: '1px solid var(--nav-border-soft)' }}>
                   {activePlan.invoiceLimit === null ? (
                     <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>
-                      Тариф <b style={{ color: 'var(--nav-text-primary)' }}>{activePlan.label}</b> · безлимит
+                      {u.tariff} <b style={{ color: 'var(--nav-text-primary)' }}>{localizePlanLabel(activePlan.label, lang)}</b> · {u.unlimited}
                     </div>
                   ) : (
                     <>
                       <div className="text-xs flex-shrink-0" style={{ color: 'var(--nav-text-secondary)' }}>
-                        Тариф <b style={{ color: 'var(--nav-text-primary)' }}>{activePlan.label}</b>
+                        {u.tariff} <b style={{ color: 'var(--nav-text-primary)' }}>{localizePlanLabel(activePlan.label, lang)}</b>
                       </div>
                       <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--nav-accent-track)' }}>
                         <div className="h-full rounded-full"
@@ -1029,7 +1023,7 @@ export default function TopUtilityBar() {
                           }} />
                       </div>
                       <div className="text-xs flex-shrink-0" style={{ color: 'var(--nav-text-secondary)' }}>
-                        <b style={{ color: 'var(--nav-text-primary)' }}>{monthInvoiceCount ?? '···'}/{activePlan.invoiceLimit}</b> счетов
+                        <b style={{ color: 'var(--nav-text-primary)' }}>{monthInvoiceCount ?? '···'}/{activePlan.invoiceLimit}</b> {u.invoicesWord}
                       </div>
                     </>
                   )}
@@ -1042,15 +1036,15 @@ export default function TopUtilityBar() {
             <div className="nav-glass rounded-2xl w-full max-w-sm mb-0 lg:mb-0 lg:mt-[76px] max-h-[80vh] overflow-y-auto" style={{ boxShadow: 'var(--nav-card-glow)' }} onClick={e => e.stopPropagation()}>
               <div className="p-4">
                 <div className="flex items-center justify-between mb-1">
-                  <h2 className="text-sm font-bold text-[var(--nav-accent)]">Уведомления</h2>
+                  <h2 className="text-sm font-bold text-[var(--nav-accent)]">{u.notificationsTitle}</h2>
                   <button onClick={() => setPanel(null)} className="text-[var(--nav-text-secondary)] text-lg leading-none">✕</button>
                 </div>
                 {unreadCount > 0 && (
-                  <button onClick={markAllRead} className="text-xs text-[var(--nav-text-secondary)] hover:text-[var(--nav-accent)] mb-3">Отметить всё прочитанным</button>
+                  <button onClick={markAllRead} className="text-xs text-[var(--nav-text-secondary)] hover:text-[var(--nav-accent)] mb-3">{u.markAllRead}</button>
                 )}
-                {notificationsLoading && <div className="text-xs text-[var(--nav-text-secondary)] py-4 text-center">Загрузка…</div>}
+                {notificationsLoading && <div className="text-xs text-[var(--nav-text-secondary)] py-4 text-center">{u.loading}</div>}
                 {!notificationsLoading && notifications.length === 0 && (
-                  <div className="text-xs text-[var(--nav-text-secondary)] py-8 text-center">Пока нет уведомлений</div>
+                  <div className="text-xs text-[var(--nav-text-secondary)] py-8 text-center">{u.noNotifications}</div>
                 )}
                 <div className="space-y-1 mt-2">
                   {notifications.map(n => {
@@ -1061,7 +1055,7 @@ export default function TopUtilityBar() {
                           {!n.read && <span className="w-1.5 h-1.5 rounded-full bg-[var(--nav-accent)] mt-1.5 flex-shrink-0" />}
                         </div>
                         {n.body && <div className="text-xs text-[var(--nav-text-secondary)] mt-0.5">{n.body}</div>}
-                        <div className="text-[10px] text-[var(--nav-text-muted)] mt-1">{timeAgo(n.createdAt)}</div>
+                        <div className="text-[10px] text-[var(--nav-text-muted)] mt-1">{timeAgo(n.createdAt, u)}</div>
                       </div>
                     )
                     return n.link ? (
@@ -1073,7 +1067,7 @@ export default function TopUtilityBar() {
                 </div>
                 <Link href="/profile/notifications" onClick={() => setPanel(null)}
                   className="block text-center text-xs text-[var(--nav-text-secondary)] hover:text-[var(--nav-accent)] mt-4 pt-3 border-t border-[var(--nav-border-soft)]">
-                  Настройки уведомлений
+                  {u.notificationSettings}
                 </Link>
               </div>
             </div>
@@ -1083,7 +1077,7 @@ export default function TopUtilityBar() {
             <div className="nav-glass rounded-2xl w-full max-w-xs mb-0 lg:mb-0 lg:mt-[76px]" style={{ boxShadow: 'var(--nav-card-glow)' }} onClick={e => e.stopPropagation()}>
               <div className="p-3">
                 <div className="flex items-center justify-between mb-1 px-1">
-                  <h2 className="text-sm font-bold text-[var(--nav-accent)]">Помощь</h2>
+                  <h2 className="text-sm font-bold text-[var(--nav-accent)]">{u.helpTitle}</h2>
                   <button onClick={() => setPanel(null)} className="text-[var(--nav-text-secondary)] text-lg leading-none">✕</button>
                 </div>
                 <Link href="/profile/support" onClick={() => setPanel(null)}
@@ -1091,7 +1085,7 @@ export default function TopUtilityBar() {
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="flex-shrink-0">
                     <path d="M4 11a8 8 0 1 1 3.5 6.6L4 19l1.3-3.3A7.96 7.96 0 0 1 4 11Z" stroke="var(--nav-accent)" strokeWidth="1.6" strokeLinejoin="round" />
                   </svg>
-                  Поддержка
+                  {u.support}
                 </Link>
                 <Link href="/profile/support#about" onClick={() => setPanel(null)}
                   className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-gray-50 text-sm text-gray-700 transition-colors">
@@ -1100,7 +1094,7 @@ export default function TopUtilityBar() {
                     <path d="M12 11v5.5" stroke="var(--nav-accent)" strokeWidth="1.6" strokeLinecap="round" />
                     <circle cx="12" cy="8" r="1" fill="var(--nav-accent)" />
                   </svg>
-                  О сервисе
+                  {u.about}
                 </Link>
               </div>
             </div>
@@ -1114,7 +1108,7 @@ export default function TopUtilityBar() {
                     {initials}
                   </div>
                   <div className="min-w-0">
-                    <div className="text-sm font-semibold text-[var(--nav-accent)] truncate">{companyName || 'Без названия'}</div>
+                    <div className="text-sm font-semibold text-[var(--nav-accent)] truncate">{companyName || u.noCompanyName}</div>
                     <div className="text-xs text-[var(--nav-text-secondary)] truncate">{email}</div>
                   </div>
                 </div>
@@ -1124,14 +1118,14 @@ export default function TopUtilityBar() {
                     <circle cx="12" cy="8" r="4" stroke="var(--nav-accent)" strokeWidth="1.6" />
                     <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="var(--nav-accent)" strokeWidth="1.6" strokeLinecap="round" />
                   </svg>
-                  Профиль и настройки
+                  {u.profileAndSettings}
                 </Link>
                 <button onClick={signOut}
                   className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-red-50 text-sm text-red-500 transition-colors text-left">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="flex-shrink-0">
                     <path d="M15 4h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-2M10 8l-4 4 4 4M6 12h11" stroke="#FF5A5F" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
-                  Выйти
+                  {u.signOut}
                 </button>
               </div>
             </div>

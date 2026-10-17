@@ -3,6 +3,8 @@ import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { motion, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
+import { withTimeout, fetchWithTimeout } from '@/lib/loadGuard'
+import LoadErrorCard from '@/components/LoadErrorCard'
 import SiteNav from '@/components/SiteNav'
 import AiAgentProUpsell from '@/components/aiAgent/AiAgentProUpsell'
 import DesktopShell from '@/components/DesktopShell'
@@ -84,6 +86,9 @@ function AiAgentDialogsInner() {
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw
   const [loading, setLoading] = useState(true)
+  // Загрузка не удалась или зависла (>20 с): показываем «Повторить» вместо вечной заставки.
+  const [loadError, setLoadError] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
   const [forbidden, setForbidden] = useState(false)
   // Про кончился, агенты есть (решение основателя 3, 16.10.2026): переписка
   // открыта на чтение -- без поля ответа и «Вернуть боту», с плашкой
@@ -109,34 +114,38 @@ function AiAgentDialogsInner() {
   }, [messages])
 
   async function authHeader() {
-    const { data: { session } } = await supabase.auth.getSession()
+    const { data: { session } } = await withTimeout(supabase.auth.getSession())
     return { 'Authorization': `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' }
   }
 
   // null -- сервер не пустил (403: ни тарифа, ни агентов).
   const loadItems = useCallback(async (agent: string = agentFilter): Promise<DialogItem[] | null> => {
     setFetching(true)
-    const headers = await authHeader()
-    const params = new URLSearchParams()
-    if (agent !== 'all') params.set('agentId', agent)
-    const qs = params.toString()
-    const res = await fetch(`/api/ai-agent/dialogs${qs ? `?${qs}` : ''}`, { headers })
-    let fetched: DialogItem[] = []
-    if (res.status === 403) { setFetching(false); return null }
-    if (res.ok) {
-      const data = await res.json()
-      fetched = Array.isArray(data.items) ? data.items : []
-      setItems(fetched)
-      setReadOnly(!!data.readOnly)
+    try {
+      const headers = await authHeader()
+      const params = new URLSearchParams()
+      if (agent !== 'all') params.set('agentId', agent)
+      const qs = params.toString()
+      const res = await fetchWithTimeout(`/api/ai-agent/dialogs${qs ? `?${qs}` : ''}`, { headers })
+      let fetched: DialogItem[] = []
+      if (res.status === 403) return null
+      if (res.ok) {
+        const data = await res.json()
+        fetched = Array.isArray(data.items) ? data.items : []
+        setItems(fetched)
+        setReadOnly(!!data.readOnly)
+      }
+      return fetched
+    } finally {
+      setFetching(false)
     }
-    setFetching(false)
-    return fetched
   }, [agentFilter])
 
   useEffect(() => {
-    async function load() {
+    let redirected = false
+    async function loadInner() {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/login'); return }
+      if (!user) { redirected = true; router.push('/login'); return }
       const { data: profile } = await supabase.from('profiles').select('is_admin, plan, plan_expires_at, bonus_expires_at, trial_expires_at').eq('id', user.id).single()
       const hasPlan = !!profile?.is_admin || getActivePlan(profile).canAiAgent
       const headers = await authHeader()
@@ -157,7 +166,7 @@ function AiAgentDialogsInner() {
       // to be handled first, so serializing it after was a needless extra
       // round-trip on first paint.
       const [agentsRes, fetchedOrNull] = await Promise.all([
-        fetch('/api/ai-agent/agents', { headers }),
+        fetchWithTimeout('/api/ai-agent/agents', { headers }),
         loadItems('all'),
       ])
       const fetched = fetchedOrNull || []
@@ -174,9 +183,15 @@ function AiAgentDialogsInner() {
       }
       setLoading(false)
     }
-    load()
+    let alive = true
+    async function load() {
+      setLoadError(false)
+      try { await withTimeout(loadInner()) } catch { if (alive) setLoadError(true) } finally { if (alive && !redirected) setLoading(false) }
+    }
+    void load()
+    return () => { alive = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router, searchParams])
+  }, [router, searchParams, reloadKey])
 
   async function openConversation(id: string) {
     setSelectedId(id)
@@ -255,6 +270,17 @@ function AiAgentDialogsInner() {
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
       <BrandLoader />
+    </main>
+    </DesktopShell>
+  )
+
+  const retryLoad = () => { setLoading(true); setReloadKey(k => k + 1) }
+
+  if (loadError) return (
+    <DesktopShell>
+    <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
+      <SiteNav />
+      <LoadErrorCard onRetry={retryLoad} />
     </main>
     </DesktopShell>
   )

@@ -10,10 +10,13 @@ import ContentLoading from '@/components/ContentLoading'
 import { supabase } from '@/lib/supabase'
 import { PRODUCTS, SELECTABLE_KEYS, type ProductKey } from '@/lib/products'
 import { productCabinetHref } from '@/lib/crossProduct'
+import { linkPrefetch } from '@/lib/hostRouting'
 import { useEffectivePath } from '@/lib/useEffectivePath'
 import { useMyProducts } from '@/lib/useMyProducts'
 import { useCfoMode } from '@/lib/cfo/modeStore'
 import { useWalletRefresh } from '@/lib/walletSignal'
+
+const BASE_DOMAIN = process.env.NEXT_PUBLIC_SITE_DOMAIN || 'invoices.kz'
 
 const TEXT: Record<Lang, { all: string; menu: string; close: string; balance: string; topup: string; connected: string; notConnected: string; notifications: string; help: string; account: string; soon: string }> = {
   ru: { all: 'Все продукты', menu: 'Меню', close: 'Закрыть', balance: 'Баланс', topup: 'Пополнить баланс', connected: 'Магазин подключён', notConnected: 'Магазин не подключён', notifications: 'Уведомления', help: 'Помощь', account: 'Аккаунт', soon: 'скоро' },
@@ -183,6 +186,7 @@ export default function ProductShell({ product, children }: { product: ProductKe
             <Link
               key={l.href}
               href={l.href}
+              prefetch={linkPrefetch(l.href, hostname, BASE_DOMAIN)}
               data-tour={l.href.slice(1).replace(/\//g, '-')}
               onClick={() => setOpen(false)}
               aria-current={active ? 'page' : undefined}
@@ -261,7 +265,8 @@ export default function ProductShell({ product, children }: { product: ProductKe
           <span className="text-sm font-bold" style={{ color: 'var(--nav-text-primary)' }}>{def.name}</span>
         </div>
         {open && (
-          <div className="lg:hidden fixed inset-0 z-50">
+          // z-[55]: выше окон страницы (z-50, например окна подключения магазина), иначе меню открывалось под ними.
+          <div className="lg:hidden fixed inset-0 z-[55]">
             <button type="button" aria-label={t.close} className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
             <div className="absolute top-0 left-0 bottom-0 w-[280px] max-w-[85vw] nav-glass shadow-2xl" style={{ background: 'var(--nav-bg)' }}>
               {panel}

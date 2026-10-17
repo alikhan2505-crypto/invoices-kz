@@ -2,6 +2,7 @@
 import { useContext, useEffect, useState, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
+import { linkPrefetch } from '@/lib/hostRouting'
 import { useEffectivePath, useProductHost } from '@/lib/useEffectivePath'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
@@ -416,6 +417,7 @@ function SiteNavBar({ desktopOnly = false }: { desktopOnly?: boolean }) {
                       <Link
                         key={item.href}
                         href={item.href}
+                        prefetch={linkPrefetch(item.href)}
                         aria-current={active ? 'page' : undefined}
                         onClick={() => setDrawerOpen(false)}
                         className="w-full min-h-[44px] flex items-center px-3 rounded-xl text-sm font-semibold text-left"
@@ -461,6 +463,7 @@ function SiteNavBar({ desktopOnly = false }: { desktopOnly?: boolean }) {
                         ) : (
                           <Link
                             href={s.links[0].href}
+                            prefetch={linkPrefetch(s.links[0].href)}
                             aria-current={active ? 'true' : undefined}
                             onClick={() => setDrawerOpen(false)}
                             className="w-full min-h-[44px] flex items-center gap-1.5 px-3 rounded-xl text-sm font-semibold text-left"
@@ -486,6 +489,7 @@ function SiteNavBar({ desktopOnly = false }: { desktopOnly?: boolean }) {
                               <Link
                                 key={l.href}
                                 href={l.href}
+                                prefetch={linkPrefetch(l.href)}
                                 aria-current={linkActive ? 'page' : undefined}
                                 onClick={() => setDrawerOpen(false)}
                                 className="w-full min-h-[44px] flex items-center px-3 rounded-xl text-sm text-left"
@@ -572,6 +576,7 @@ function SiteNavBar({ desktopOnly = false }: { desktopOnly?: boolean }) {
                 ) : (
                   <Link
                     href={s.links[0].href}
+                    prefetch={linkPrefetch(s.links[0].href)}
                     aria-current={active ? 'true' : undefined}
                     className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-colors"
                     style={{
@@ -637,6 +642,7 @@ function SiteNavBar({ desktopOnly = false }: { desktopOnly?: boolean }) {
                 <Link
                   key={l.href}
                   href={l.href}
+                  prefetch={linkPrefetch(l.href)}
                   aria-current={linkActive ? 'page' : undefined}
                   className="relative px-3 py-1.5 rounded-full text-[13px] font-medium whitespace-nowrap flex-shrink-0 transition-colors"
                   style={{

@@ -55,3 +55,22 @@ export function apexToCfoRedirect(hostname: string, pathname: string, search: st
 }
 
 export const API_HOST_BASE = process.env.API_HOST_REDIRECT === '1' ? 'https://api.invoices.kz' : 'https://invoices.kz'
+
+// Адреса, которые на apex отвечают редиректом на ДРУГОЙ хост (api., cfo.).
+// next/link префетчит ссылку в фоне, а редирект на чужой origin браузер для
+// такого запроса запрещает (CORS-ошибка в консоли на каждой загрузке
+// /kaspi-api, аудит 17.10.2026). У таких ссылок префетч выключаем: переход по
+// клику это не меняет.
+export function redirectsCrossHost(path: string, hostname?: string, baseDomain = 'invoices.kz'): boolean {
+  const clean = path.split(/[?#]/)[0].replace(/\/+$/, '') || '/'
+  if (Object.prototype.hasOwnProperty.call(APEX_TO_API, clean)) return true
+  if (clean !== '/cfo' && !clean.startsWith('/cfo/')) return false
+  // /cfo уходит на cfo. только с apex; на самом cfo. (и в локальной разработке) редиректа нет.
+  return hostname === undefined || hostname === baseDomain || hostname === `www.${baseDomain}`
+}
+
+// Значение для пропа prefetch у <Link>: false там, где префетч упрётся в редирект
+// на другой хост, иначе undefined (поведение по умолчанию).
+export function linkPrefetch(path: string, hostname?: string, baseDomain?: string): false | undefined {
+  return redirectsCrossHost(path, hostname, baseDomain) ? false : undefined
+}

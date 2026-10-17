@@ -163,6 +163,8 @@ export default function PublicInvoice() {
       const { invoice: inv, profile: loadedProfile, bank: loadedBank, showWatermark: loadedShowWatermark } = await res.json()
       if (!inv) { setLoading(false); return }
       setInvoice(inv)
+      // Номер счёта во вкладку: клиент с несколькими счетами различает их по названию.
+      if (inv.number) document.title = `Счёт №${inv.number} — INVOICES.KZ`
 
       // Fired immediately, in parallel with the profile/bank queries below
       // rather than after them — this hits Kaspi's own API to mint a live QR,

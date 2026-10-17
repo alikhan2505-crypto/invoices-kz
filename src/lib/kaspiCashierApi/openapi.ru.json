@@ -11,7 +11,7 @@
     }
   },
   "servers": [
-    { "url": "https://www.invoices.kz", "description": "Продакшн — единственная среда, тестового режима нет" }
+    { "url": "https://api.invoices.kz", "description": "Продакшн — единственная среда, тестового режима нет" }
   ],
   "tags": [
     { "name": "Kaspi Cashier API", "description": "Приём и отслеживание платежей Kaspi Pay" }

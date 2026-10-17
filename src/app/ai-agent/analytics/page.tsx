@@ -4,6 +4,8 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { motion, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
+import { withTimeout, fetchWithTimeout } from '@/lib/loadGuard'
+import LoadErrorCard from '@/components/LoadErrorCard'
 import { buildAgentSettingsHref } from '@/lib/aiAgent/settingsLink'
 import SiteNav from '@/components/SiteNav'
 import AiAgentProUpsell from '@/components/aiAgent/AiAgentProUpsell'
@@ -362,6 +364,9 @@ export default function AiAgentAnalytics() {
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw
   const [loading, setLoading] = useState(true)
+  // Загрузка не удалась или зависла (>20 с): показываем «Повторить» вместо вечной заставки.
+  const [loadError, setLoadError] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
   const [forbidden, setForbidden] = useState(false)
   const [agents, setAgents] = useState<AgentListItem[]>([])
   const [agentFilter, setAgentFilter] = useState<string>('all')
@@ -371,30 +376,34 @@ export default function AiAgentAnalytics() {
 
   const loadAnalytics = useCallback(async (agent: string, days: Period) => {
     setFetching(true)
-    const { data: { session } } = await supabase.auth.getSession()
-    const headers = { 'Authorization': `Bearer ${session?.access_token}` }
-    const params = new URLSearchParams({ days: String(days) })
-    if (agent !== 'all') params.set('agentId', agent)
-    const res = await fetch(`/api/ai-agent/analytics?${params}`, { headers })
-    if (res.ok) {
-      const payload = await res.json()
-      setData(payload)
+    try {
+      const { data: { session } } = await withTimeout(supabase.auth.getSession())
+      const headers = { 'Authorization': `Bearer ${session?.access_token}` }
+      const params = new URLSearchParams({ days: String(days) })
+      if (agent !== 'all') params.set('agentId', agent)
+      const res = await fetchWithTimeout(`/api/ai-agent/analytics?${params}`, { headers })
+      if (res.ok) {
+        const payload = await res.json()
+        setData(payload)
+      }
+    } finally {
+      setFetching(false)
     }
-    setFetching(false)
   }, [])
 
   useEffect(() => {
-    async function load() {
+    let redirected = false
+    async function loadInner() {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/login'); return }
+      if (!user) { redirected = true; router.push('/login'); return }
       // Same admin-only client-side check as ../page.tsx -- the real
       // enforcement is the API's 403 admin_only; this swaps a redirect for
       // an inline message.
       const { data: profile } = await supabase.from('profiles').select('is_admin, plan, plan_expires_at, bonus_expires_at, trial_expires_at').eq('id', user.id).single()
       if (!profile?.is_admin && !getActivePlan(profile).canAiAgent) { setForbidden(true); setLoading(false); return }
-      const { data: { session } } = await supabase.auth.getSession()
+      const { data: { session } } = await withTimeout(supabase.auth.getSession())
       const headers = { 'Authorization': `Bearer ${session?.access_token}` }
-      const res = await fetch('/api/ai-agent/agents', { headers })
+      const res = await fetchWithTimeout('/api/ai-agent/agents', { headers })
       if (res.ok) {
         const payload = await res.json()
         setAgents(Array.isArray(payload.agents) ? payload.agents.map((a: any) => ({ id: a.id, name: a.name })) : [])
@@ -402,17 +411,23 @@ export default function AiAgentAnalytics() {
       await loadAnalytics('all', 30)
       setLoading(false)
     }
-    load()
-  }, [router, loadAnalytics])
+    let alive = true
+    async function load() {
+      setLoadError(false)
+      try { await withTimeout(loadInner()) } catch { if (alive) setLoadError(true) } finally { if (alive && !redirected) setLoading(false) }
+    }
+    void load()
+    return () => { alive = false }
+  }, [router, loadAnalytics, reloadKey])
 
   function changeAgent(id: string) {
     setAgentFilter(id)
-    loadAnalytics(id, period)
+    loadAnalytics(id, period).catch(() => setLoadError(true))
   }
 
   function changePeriod(p: Period) {
     setPeriod(p)
-    loadAnalytics(agentFilter, p)
+    loadAnalytics(agentFilter, p).catch(() => setLoadError(true))
   }
 
   const scopeKey = `${agentFilter}-${period}`
@@ -423,6 +438,17 @@ export default function AiAgentAnalytics() {
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
       <BrandLoader />
+    </main>
+    </DesktopShell>
+  )
+
+  const retryLoad = () => { setLoading(true); setReloadKey(k => k + 1) }
+
+  if (loadError) return (
+    <DesktopShell>
+    <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
+      <SiteNav />
+      <LoadErrorCard onRetry={retryLoad} />
     </main>
     </DesktopShell>
   )

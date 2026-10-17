@@ -11,10 +11,17 @@ export default function PromoPage() {
   const t = miscDict[lang]
 
   useEffect(() => {
-    if (code) {
-      localStorage.setItem('promo_code', code as string)
+    // useParams может отдать массив; в адрес код идёт закодированным, иначе
+    // спецсимвол (&, #, пробел) ломает параметр promo.
+    const segment = Array.isArray(code) ? code[0] : code
+    // useParams отдаёт сегмент как есть (%26 остаётся %26) -- сначала
+    // раскодируем, потом кодируем один раз, иначе получится %2526.
+    let raw = segment
+    try { raw = segment ? decodeURIComponent(segment) : segment } catch { /* битая последовательность: берём как есть */ }
+    if (raw) {
+      try { localStorage.setItem('promo_code', raw) } catch { /* private mode */ }
     }
-    router.push('/login?promo=' + code)
+    router.push('/login?promo=' + encodeURIComponent(raw ?? ''))
   }, [])
 
   return (

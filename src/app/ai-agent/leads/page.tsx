@@ -3,6 +3,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
+import { withTimeout, fetchWithTimeout } from '@/lib/loadGuard'
+import LoadErrorCard from '@/components/LoadErrorCard'
 import SiteNav from '@/components/SiteNav'
 import AiAgentProUpsell from '@/components/aiAgent/AiAgentProUpsell'
 import DesktopShell from '@/components/DesktopShell'
@@ -103,6 +105,9 @@ export default function AiAgentLeads() {
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw
   const [loading, setLoading] = useState(true)
+  // Загрузка не удалась или зависла (>20 с): показываем «Повторить» вместо вечной заставки.
+  const [loadError, setLoadError] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
   const [forbidden, setForbidden] = useState(false)
   const [agents, setAgents] = useState<AgentListItem[]>([])
   const [agentFilter, setAgentFilter] = useState<string>('all')
@@ -111,36 +116,40 @@ export default function AiAgentLeads() {
   const [movingId, setMovingId] = useState<string | null>(null)
 
   async function authHeader() {
-    const { data: { session } } = await supabase.auth.getSession()
+    const { data: { session } } = await withTimeout(supabase.auth.getSession())
     return { 'Authorization': `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' }
   }
 
   const loadLeads = useCallback(async (agent: string) => {
     setFetching(true)
-    const headers = await authHeader()
-    const params = new URLSearchParams()
-    if (agent !== 'all') params.set('agentId', agent)
-    const qs = params.toString()
-    const res = await fetch(`/api/ai-agent/leads${qs ? `?${qs}` : ''}`, { headers })
-    if (res.ok) {
-      const payload = await res.json()
-      setItems(Array.isArray(payload.items) ? payload.items : [])
+    try {
+      const headers = await authHeader()
+      const params = new URLSearchParams()
+      if (agent !== 'all') params.set('agentId', agent)
+      const qs = params.toString()
+      const res = await fetchWithTimeout(`/api/ai-agent/leads${qs ? `?${qs}` : ''}`, { headers })
+      if (res.ok) {
+        const payload = await res.json()
+        setItems(Array.isArray(payload.items) ? payload.items : [])
+      }
+    } finally {
+      setFetching(false)
     }
-    setFetching(false)
   }, [])
 
   useEffect(() => {
-    async function load() {
+    let redirected = false
+    async function loadInner() {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/login'); return }
+      if (!user) { redirected = true; router.push('/login'); return }
       // Same admin-only client-side check as ../analytics/page.tsx -- the
       // real enforcement is the API's 403 admin_only; this swaps a redirect
       // for an inline message.
       const { data: profile } = await supabase.from('profiles').select('is_admin, plan, plan_expires_at, bonus_expires_at, trial_expires_at').eq('id', user.id).single()
       if (!profile?.is_admin && !getActivePlan(profile).canAiAgent) { setForbidden(true); setLoading(false); return }
-      const { data: { session } } = await supabase.auth.getSession()
+      const { data: { session } } = await withTimeout(supabase.auth.getSession())
       const headers = { 'Authorization': `Bearer ${session?.access_token}` }
-      const res = await fetch('/api/ai-agent/agents', { headers })
+      const res = await fetchWithTimeout('/api/ai-agent/agents', { headers })
       if (res.ok) {
         const payload = await res.json()
         setAgents(Array.isArray(payload.agents) ? payload.agents.map((a: any) => ({ id: a.id, name: a.name })) : [])
@@ -148,12 +157,18 @@ export default function AiAgentLeads() {
       await loadLeads('all')
       setLoading(false)
     }
-    load()
-  }, [router, loadLeads])
+    let alive = true
+    async function load() {
+      setLoadError(false)
+      try { await withTimeout(loadInner()) } catch { if (alive) setLoadError(true) } finally { if (alive && !redirected) setLoading(false) }
+    }
+    void load()
+    return () => { alive = false }
+  }, [router, loadLeads, reloadKey])
 
   function changeAgent(id: string) {
     setAgentFilter(id)
-    loadLeads(id)
+    loadLeads(id).catch(() => setLoadError(true))
   }
 
   async function moveStatus(id: string, status: LeadStatus) {
@@ -187,6 +202,17 @@ export default function AiAgentLeads() {
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
       <BrandLoader />
+    </main>
+    </DesktopShell>
+  )
+
+  const retryLoad = () => { setLoading(true); setReloadKey(k => k + 1) }
+
+  if (loadError) return (
+    <DesktopShell>
+    <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
+      <SiteNav />
+      <LoadErrorCard onRetry={retryLoad} />
     </main>
     </DesktopShell>
   )

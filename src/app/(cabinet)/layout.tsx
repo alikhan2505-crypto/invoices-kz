@@ -1,3 +1,5 @@
+import type { Metadata } from 'next'
+import { noindexMetadata } from '@/lib/noindex'
 import DesktopShell from '@/components/DesktopShell'
 import SiteNav from '@/components/SiteNav'
 
@@ -16,6 +18,10 @@ import SiteNav from '@/components/SiteNav'
 // /login, лендинги, /tools, /guides, /shop, /print, /planner), /admin (своя
 // шапка) и продуктовые кабинеты с боковым меню (/kaspi-shop, /kaspi-api, /cfo,
 // /ai-agent) -- у них свой ProductShell.
+// Личный кабинет не для поисковиков (17.10.2026): раньше все эти страницы
+// наследовали 'index, follow' от корневого layout.
+export const metadata: Metadata = noindexMetadata()
+
 export default function CabinetLayout({ children }: { children: React.ReactNode }) {
   return (
     <DesktopShell>
