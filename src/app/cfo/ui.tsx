@@ -2,11 +2,14 @@
 import DesktopShell from '@/components/DesktopShell'
 import SiteNav from '@/components/SiteNav'
 import { formatTenge } from '@/lib/cfo/money'
+import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 
 export const inputClass = 'w-full min-h-[44px] rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]'
 export const inputStyle: React.CSSProperties = { background: 'var(--nav-surface-chrome)', color: 'var(--nav-text-primary)', WebkitTextFillColor: 'var(--nav-text-primary)' }
 
+// Вкладка браузера: «Обзор · CFO — INVOICES.KZ», а не одна строка на весь кабинет.
 export function CfoPage({ title, actions, children }: { title: string; actions?: React.ReactNode; children: React.ReactNode }) {
+  usePageDocumentTitle(`${title} · CFO`)
   return (
     <DesktopShell>
       <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">

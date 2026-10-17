@@ -70,3 +70,38 @@ describe('almatyToday', () => {
     expect(almatyToday(new Date('2026-10-07T19:00:00Z'))).toBe('2026-10-08')
   })
 })
+
+
+describe('buildDigest in family mode (P2-2)', () => {
+  it('uses family words: no «кассовый разрыв», «клиенты», «платёжный календарь»; shows debts separately', () => {
+    const w: Workspace = { ...ws([
+      op({ amount: 150_000_00, paidOn: '2026-10-20' }),
+    ]), mode: 'family', companyName: 'Моя компания', accounts: [account, { id: 'm', name: 'Ипотека', kind: 'loan', openingBalance: -12_000_000_00, openingDate: '2026-10-01', archived: false, sort: 20 }] }
+    const text = buildDigest(w, '2026-10-08')
+    expect(text).toContain('<b>Семейный бюджет · Семейный бюджет</b>')
+    expect(text).toContain('💰 Денег: <b>100 000 ₸</b>') // ипотека не уменьшает деньги
+    expect(text).toContain('🏦 Долги: −12 000 000 ₸')
+    expect(text).toMatch(/🔴 Денег не хватит .* — через 12 дней: по запланированным платежам не достаёт 50 000 ₸/)
+    expect(text).toContain('Открыть платежи')
+    expect(text).not.toMatch(/Кассов|клиент|платёжный календарь|CFO ·/)
+  })
+  it('a planned mortgage payment (transfer to the loan account) is «к оплате» today and in the 7-day outlook', () => {
+    const mortgage: CfoAccount = { id: 'm', name: 'Ипотека', kind: 'loan', openingBalance: -12_000_000_00, openingDate: '2026-10-01', archived: false, sort: 20 }
+    const w: Workspace = { ...ws([
+      op({ direction: 'transfer', articleId: null, toAccountId: 'm', amount: 150_000_00, paidOn: '2026-10-08', counterparty: 'Отбасы банк' }),
+      op({ direction: 'transfer', articleId: null, toAccountId: 'm', amount: 20_000_00, paidOn: '2026-10-12' }),
+      op({ direction: 'transfer', articleId: null, accountId: 'm', toAccountId: 'acc', amount: 500_000_00, paidOn: '2026-10-13' }), // новый транш кредита
+      op({ direction: 'out', accountId: 'm', amount: 9_000_00, paidOn: '2026-10-08' }), // проценты списаны с кредитного счёта — не деньги
+    ]), mode: 'family', accounts: [account, mortgage] }
+    const text = buildDigest(w, '2026-10-08')
+    expect(text).toContain('📤 Сегодня к оплате: 1 платёж на <b>150 000 ₸</b>')
+    expect(text).toContain('• Отбасы банк — 150 000 ₸')
+    expect(text).toMatch(/🔴 Денег не хватит сегодня: по запланированным платежам не достаёт 50 000 ₸/)
+    expect(text).toContain('📆 Следующие 7 дней: платежи 20 000 ₸, поступления 500 000 ₸')
+  })
+  it('business wording is unchanged', () => {
+    const text = buildDigest(ws([]), '2026-10-08')
+    expect(text).toContain('<b>CFO · ТОО &lt;Ромашка&gt; &amp; Ко</b>')
+    expect(text).toContain('Открыть платёжный календарь')
+  })
+})

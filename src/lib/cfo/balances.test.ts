@@ -41,3 +41,34 @@ describe('balances', () => {
     expect(totalBalanceAt([kaspi, { ...cash, archived: true }], ops, '2026-01-31')).toBe(120_000_000)
   })
 })
+
+
+describe('loan accounts', () => {
+  const mortgage: CfoAccount = { id: 'mortgage', name: 'Ипотека', kind: 'loan', openingBalance: -12_000_000, openingDate: '2026-01-01', archived: false, sort: 4 }
+  const pay = op({ id: 'pay', direction: 'transfer', amount: 2_000_000, toAccountId: 'mortgage', articleId: null, paidOn: '2026-01-15' })
+
+  it('cash excludes the loan, debt is the loan balance, a payment moves money from one to the other', async () => {
+    const { cashBalanceAt, debtAt, cashDelta, loanIds } = await import('./balances')
+    const all = [kaspi, cash, mortgage]
+    expect(cashBalanceAt(all, [...ops, pay], '2026-01-31')).toBe(118_000_000)
+    expect(debtAt(all, [...ops, pay], '2026-01-31')).toBe(-10_000_000)
+    const loans = loanIds(all)
+    expect(cashDelta(pay, loans)).toBe(-2_000_000)
+    expect(cashDelta(op({ direction: 'transfer', amount: 1, accountId: 'mortgage', toAccountId: 'kaspi', articleId: null }), loans)).toBe(1)
+    expect(cashDelta(ops[2], loans)).toBe(0) // перевод между своими денежными счетами
+    expect(cashDelta(op({ direction: 'out', amount: 7, accountId: 'mortgage' }), loans)).toBe(0) // списание с кредитного счёта — не деньги
+    expect(cashDelta(ops[0], loans)).toBe(20_000_000)
+  })
+
+  it('isCashOut / isCashIn classify by the effect on money', async () => {
+    const { isCashIn, isCashOut, loanIds } = await import('./balances')
+    const loans = loanIds([kaspi, cash, mortgage])
+    const payout = op({ direction: 'transfer', amount: 1, accountId: 'mortgage', toAccountId: 'kaspi', articleId: null })
+    const onLoan = op({ direction: 'out', amount: 7, accountId: 'mortgage' })
+    expect([isCashOut(pay, loans), isCashIn(pay, loans)]).toEqual([true, false])
+    expect([isCashOut(payout, loans), isCashIn(payout, loans)]).toEqual([false, true])
+    expect([isCashOut(ops[1], loans), isCashIn(ops[0], loans)]).toEqual([true, true])
+    expect([isCashOut(ops[2], loans), isCashIn(ops[2], loans)]).toEqual([false, false]) // свой перевод
+    expect([isCashOut(onLoan, loans), isCashIn(onLoan, loans)]).toEqual([false, false]) // начисление на кредитном счёте
+  })
+})

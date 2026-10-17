@@ -26,7 +26,7 @@ export type ScenarioResult = { calendar: Calendar; minBalance: number; minDate: 
 export function runScenario(ws: Workspace, today: string, s: Scenario): ScenarioResult {
   const ops: CfoOperation[] = forecastOperations(ws, today).map((o) => (o.status === 'planned' ? scaled(o, s) : o))
   if (s.extra && s.extra.amount > 0) {
-    const accountId = ws.accounts.find((a) => !a.archived)?.id ?? ''
+    const accountId = ws.accounts.find((a) => !a.archived && a.kind !== 'loan')?.id ?? ''
     ops.push({
       id: 'scenario:extra', direction: s.extra.direction, amount: s.extra.amount, accountId, toAccountId: null, articleId: null,
       counterparty: null, comment: 'Сценарий', paidOn: s.extra.date, accruedOn: s.extra.date, status: 'planned', recurrenceId: null, recurrenceDate: null,

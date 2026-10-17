@@ -54,3 +54,45 @@ describe('buildCalendar', () => {
     expect(cal.days).toHaveLength(28)
   })
 })
+
+
+describe('buildCalendar with a loan account (P1-7)', () => {
+  const mortgage: CfoAccount = { id: 'mortgage', name: 'Ипотека', kind: 'loan', openingBalance: -12_000_000, openingDate: '2026-01-01', archived: false, sort: 2 }
+  const rich = { ...kaspi, openingBalance: 100_000_000 }
+
+  it('the debt itself never creates a gap', () => {
+    const c = buildCalendar({ accounts: [rich, mortgage], operations: [], recurrences: [], today: '2026-02-10', from: '2026-02-01', to: '2026-02-28' })
+    expect(c.firstGap).toBeNull()
+    expect(c.days[0].balance).toBe(100_000_000)
+  })
+
+  it('a planned mortgage payment (transfer to the loan account) reduces cash, a loan payout adds to it', () => {
+    const ops = [
+      op({ id: 'pay', direction: 'transfer', articleId: null, toAccountId: 'mortgage', amount: 30_000_000, paidOn: '2026-02-15', status: 'planned' }),
+      op({ id: 'get', direction: 'transfer', articleId: null, accountId: 'mortgage', toAccountId: 'kaspi', amount: 5_000_000, paidOn: '2026-02-20', status: 'planned' }),
+    ]
+    const c = buildCalendar({ accounts: [kaspi, mortgage], operations: ops, recurrences: [], today: '2026-02-10', from: '2026-02-01', to: '2026-02-28' })
+    const d = (x: string) => c.days.find((y) => y.date === x)!
+    expect(d('2026-02-14').balance).toBe(10_000_000)
+    expect(d('2026-02-15').balance).toBe(-20_000_000)
+    expect(d('2026-02-20').balance).toBe(-15_000_000)
+    expect(c.firstGap).toBe('2026-02-15')
+  })
+
+  it('day inflow/outflow follow the money like the balance does: loan payment is an outflow, loan payout an inflow, own transfer neither', () => {
+    const ops = [
+      op({ id: 'pay', direction: 'transfer', articleId: null, toAccountId: 'mortgage', amount: 30_000_000, paidOn: '2026-02-15', status: 'planned' }),
+      op({ id: 'own', direction: 'transfer', articleId: null, accountId: 'kaspi', toAccountId: 'cash', amount: 1_000_000, paidOn: '2026-02-15', status: 'planned' }),
+      op({ id: 'get', direction: 'transfer', articleId: null, accountId: 'mortgage', toAccountId: 'kaspi', amount: 5_000_000, paidOn: '2026-02-20', status: 'planned' }),
+      op({ id: 'fee', direction: 'out', accountId: 'mortgage', amount: 70_000, paidOn: '2026-02-20', status: 'planned' }),
+    ]
+    const cashAcc: CfoAccount = { id: 'cash', name: 'Касса', kind: 'cash', openingBalance: 0, openingDate: '2026-01-01', archived: false, sort: 3 }
+    const c = buildCalendar({ accounts: [rich, cashAcc, mortgage], operations: ops, recurrences: [], today: '2026-02-10', from: '2026-02-01', to: '2026-02-28' })
+    const d = (x: string) => c.days.find((y) => y.date === x)!
+    expect(d('2026-02-15').outflow).toBe(30_000_000)
+    expect(d('2026-02-15').inflow).toBe(0)
+    expect(d('2026-02-20').inflow).toBe(5_000_000)
+    expect(d('2026-02-20').outflow).toBe(0)
+    expect(d('2026-02-20').balance).toBe(100_000_000 - 30_000_000 + 5_000_000)
+  })
+})

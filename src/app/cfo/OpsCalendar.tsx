@@ -1,22 +1,14 @@
 'use client'
 import type { ReactNode } from 'react'
 import { daysInMonth } from '@/lib/cfo/dates'
-import { monthTitle, opTitle } from '@/lib/cfo/labels'
-import { formatTenge } from '@/lib/cfo/money'
+import { monthTitle, opTitle, opsCount } from '@/lib/cfo/labels'
+import { formatTenge, shortTenge } from '@/lib/cfo/money'
 import type { CfoAccount, CfoArticle, CfoOperation } from '@/lib/cfo/types'
 
 const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
 const ITEMS_IN_TILE = 3
 
 const net = (ops: CfoOperation[]) => ops.reduce((s, o) => s + (o.direction === 'in' ? o.amount : o.direction === 'out' ? -o.amount : 0), 0)
-// Компактная сумма для плитки: 1 250 000 → «1,25 млн», 45 000 → «45 тыс».
-function short(t: number): string {
-  const v = Math.abs(t) / 100
-  const sign = t < 0 ? '−' : '+'
-  if (v >= 1_000_000) return `${sign}${(v / 1_000_000).toFixed(v >= 10_000_000 ? 0 : 2).replace(/\.?0+$/, '').replace('.', ',')}м`
-  if (v >= 1_000) return `${sign}${Math.round(v / 1_000)}к`
-  return `${sign}${Math.round(v)}`
-}
 
 // Месяц плитками по 7 дней (с понедельника).
 export default function OpsCalendar({ months, byDate, today, selected, onSelect, accounts, articles, dayPanel }: {
@@ -43,7 +35,7 @@ export default function OpsCalendar({ months, byDate, today, selected, onSelect,
               <h2 className="text-lg font-bold" style={{ color: 'var(--nav-text-primary)' }}>{monthTitle(m)}</h2>
               {monthOps.length > 0 && (
                 <span className="text-sm tabular-nums" style={{ color: monthNet < 0 ? 'var(--nav-critical)' : 'var(--nav-text-secondary)' }}>
-                  {monthOps.length} опер. · итог {monthNet > 0 ? '+' : ''}{formatTenge(monthNet)}
+                  {opsCount(monthOps.length)} · итог {monthNet > 0 ? '+' : ''}{formatTenge(monthNet)}
                 </span>
               )}
             </div>
@@ -63,7 +55,7 @@ export default function OpsCalendar({ months, byDate, today, selected, onSelect,
                     type="button"
                     onClick={() => onSelect(d)}
                     aria-pressed={isSel}
-                    aria-label={`${Number(d.slice(8))} ${monthTitle(m)}: ${ops.length ? `${ops.length} операций, итог ${formatTenge(dayNet)}` : 'операций нет'}`}
+                    aria-label={`${Number(d.slice(8))} ${monthTitle(m)}: ${ops.length ? `${opsCount(ops.length)}, итог ${formatTenge(dayNet)}` : 'операций нет'}`}
                     className="min-h-[60px] sm:min-h-[104px] rounded-lg p-1 sm:p-1.5 text-left flex flex-col gap-0.5 overflow-hidden transition-colors"
                     style={{
                       background: isSel ? 'var(--nav-accent-soft)' : 'var(--nav-surface-chrome)',
@@ -74,7 +66,7 @@ export default function OpsCalendar({ months, byDate, today, selected, onSelect,
                     <span className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0 sm:gap-1 min-w-0">
                       <span className="text-xs font-semibold" style={{ color: isToday ? 'var(--nav-accent)' : 'var(--nav-text-primary)' }}>{Number(d.slice(8))}</span>
                       {ops.length > 0 && dayNet !== 0 && (
-                        <span className="text-[10px] sm:text-[11px] font-semibold tabular-nums leading-tight" style={{ color: dayNet < 0 ? 'var(--nav-critical)' : 'var(--nav-success)' }}>{short(dayNet)}</span>
+                        <span className="text-[10px] sm:text-[11px] font-semibold tabular-nums leading-tight whitespace-nowrap" style={{ color: dayNet < 0 ? 'var(--nav-critical)' : 'var(--nav-success)' }}>{shortTenge(dayNet)}</span>
                       )}
                     </span>
                     {/* На телефоне в плитке только сумма дня — детали по нажатию. */}

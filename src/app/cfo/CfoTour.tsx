@@ -1,4 +1,5 @@
 'use client'
+import { useState } from 'react'
 import { GuidedTour, type TourStep } from '@/components/DashboardTour'
 import { markTourDone } from '@/lib/cfo/data'
 import { useCfo } from './CfoWorkspace'
@@ -23,9 +24,28 @@ const STEPS: Record<'business' | 'family', TourStep[]> = {
   ],
 }
 
+// На телефоне пункты меню живут в выдвижной панели за кнопкой «☰» и в DOM не
+// отрисованы — тур их пропускал (2 шага из 7). Вместо этого один шаг указывает
+// на саму кнопку меню и перечисляет разделы.
+const MOBILE_STEPS: Record<'business' | 'family', TourStep[]> = {
+  business: [
+    STEPS.business[0],
+    { anchor: 'product-menu', title: 'Разделы — в меню ☰', body: 'Операции — каждый приход и расход календарём, импорт выписки. Платёжный календарь — будущие платежи и прогноз остатка, предупредим о кассовом разрыве. БДР и БДДС — отчёты с планом и выгрузкой в Excel. План — лимиты по статьям. Настройки — утренняя сводка в Telegram и ввод операций боту.' },
+    STEPS.business[5],
+  ],
+  family: [
+    STEPS.family[0],
+    { anchor: 'product-menu', title: 'Разделы — в меню ☰', body: 'Операции — каждая трата и поступление календарём, импорт выписки Kaspi. Платежи — что и когда платить, предупредим, если до зарплаты не хватит. Доходы и расходы, Движение денег — отчёты. Бюджет — сколько готовы тратить по статьям. Настройки — утренняя сводка в Telegram и ввод трат боту.' },
+    STEPS.family[4],
+  ],
+}
+
 // Тур с подсветкой при первом входе в кабинет; «пройден» запоминается у компании.
 export default function CfoTour() {
   const { ws } = useCfo()
+  // Решаем один раз при монтировании: до lg (1024px) меню — выдвижная панель.
+  const [mobile] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches)
   if (ws.tourDone || ws.hasDemo) return null
-  return <GuidedTour steps={STEPS[ws.mode ?? 'business']} shouldStart={async () => true} onFinish={() => markTourDone(ws)} />
+  const mode = ws.mode ?? 'business'
+  return <GuidedTour steps={mobile ? MOBILE_STEPS[mode] : STEPS[mode]} shouldStart={async () => true} onFinish={() => markTourDone(ws)} />
 }

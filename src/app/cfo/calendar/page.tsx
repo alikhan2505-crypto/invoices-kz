@@ -8,6 +8,7 @@ import { accountName, dayLabel, opTitle } from '@/lib/cfo/labels'
 import { formatTenge } from '@/lib/cfo/money'
 import { isVirtual } from '@/lib/cfo/recurrence'
 import type { CfoOperation } from '@/lib/cfo/types'
+import { vocab } from '@/lib/cfo/mode'
 import { useCfo } from '../CfoWorkspace'
 import TaxSetup from '../TaxSetup'
 import MoveButton from '../MoveButton'
@@ -19,6 +20,7 @@ import { Badge, Card, CfoPage, GhostButton, Money, SectionTitle } from '../ui'
 export default function CfoCalendar() {
   const { ws, reload } = useCfo()
   const { alert, dialogElement } = useAppDialog()
+  const v = vocab(ws.mode)
   const today = todayIso()
   const [showAll, setShowAll] = useState(false)
   const [taxes, setTaxes] = useState(false)
@@ -68,7 +70,7 @@ export default function CfoCalendar() {
 
   return (
     <CfoPage
-      title={ws.mode === 'family' ? 'Платежи' : 'Платёжный календарь'}
+      title={v.calendar}
       actions={
         <>
           {!whatIf && <GhostButton type="button" onClick={() => setWhatIf(true)}>Что если</GhostButton>}
@@ -86,7 +88,7 @@ export default function CfoCalendar() {
       {cal.firstGap && (
         <Card className="!py-3">
           <p className="text-sm font-medium" style={{ color: 'var(--nav-critical)' }}>
-            Кассовый разрыв {dayLabel(cal.firstGap)}: по плану денег на счетах не хватит. Перенесите платежи или ускорьте поступления.
+            {v.gap} {dayLabel(cal.firstGap)}: {v.gapHint}. {v.gapAdvice}
           </p>
         </Card>
       )}

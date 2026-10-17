@@ -148,3 +148,51 @@ describe('buildCashflow edge cases', () => {
     expect(activityRows.some((r) => r.key === 'act:financing')).toBe(false)
   })
 })
+
+
+describe('buildCashflow with a loan account (P1-7)', () => {
+  const mortgage: CfoAccount = { id: 'mortgage', name: 'Ипотека', kind: 'loan', openingBalance: t(-12_000_000), openingDate: '2025-12-01', archived: false, sort: 3 }
+  const ops = [
+    ...operations,
+    op({ direction: 'transfer', toAccountId: 'mortgage', amount: t(150_000), paidOn: '2026-01-15' }), // платёж по ипотеке
+    op({ direction: 'transfer', accountId: 'mortgage', toAccountId: 'kaspi', amount: t(2_000_000), paidOn: '2026-02-03' }), // взяли ещё кредит
+  ]
+  const r = buildCashflow({ accounts: [kaspi, cash, mortgage], articles, operations: ops, plan, months: ['2026-01', '2026-02'], mode: 'family' })
+  const row = (key: string) => r.find((x) => x.key === key)!
+
+  it('balances are cash only — the debt does not sink the opening balance', () => {
+    expect(row('b:opening').cells['2026-01'].fact).toBe(t(1_000_000))
+    expect(row('b:closing').cells['2026-01'].fact).toBe(t(700_000 - 150_000))
+  })
+
+  it('loan payments and new loans appear as financing flows so opening + flow = closing', () => {
+    expect(row('a:loan-payments').cells['2026-01'].fact).toBe(t(150_000))
+    expect(row('a:loan-received').cells['2026-02'].fact).toBe(t(2_000_000))
+    for (const m of ['2026-01', '2026-02']) {
+      expect(row('b:opening').cells[m].fact + row('t:netflow').cells[m].fact).toBe(row('b:closing').cells[m].fact)
+    }
+  })
+
+  it('income/expense booked directly on the loan account changes the debt, not cash: opening + flow = closing', () => {
+    const interest = art('interest', 'expense', 'financing', 6)
+    const withInterest = [
+      ...ops,
+      op({ articleId: 'interest', accountId: 'mortgage', amount: t(80_000), paidOn: '2026-01-20' }), // проценты списаны банком с ипотечного счёта
+      op({ direction: 'in', articleId: 'rev', accountId: 'mortgage', amount: t(5_000), paidOn: '2026-01-21' }), // кэшбэк зачислен на кредитный счёт
+    ]
+    for (const mode of ['business', 'family'] as const) {
+      const x = buildCashflow({ accounts: [kaspi, cash, mortgage], articles: [...articles, interest], operations: withInterest, plan, months: ['2026-01', '2026-02'], mode })
+      const get = (k: string, m: string) => x.find((r) => r.key === k)?.cells[m].fact
+      expect(get('a:interest', '2026-01') ?? 0).toBe(0)
+      expect(get('a:rev', '2026-01')).toBe(t(300_000))
+      for (const m of ['2026-01', '2026-02']) expect(get('b:opening', m)! + get('t:netflow', m)!).toBe(get('b:closing', m))
+      expect(get('b:closing', '2026-01')).toBe(t(550_000))
+    }
+  })
+
+  it('family mode renames the sections', () => {
+    expect(row('act:operating').label).toBe('Обычные доходы и траты')
+    expect(row('act:financing').label).toBe('Долги и кредиты')
+    expect(rows.find((x) => x.key === 'act:financing')!.label).toBe('Финансовая деятельность')
+  })
+})

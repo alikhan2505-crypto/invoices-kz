@@ -7,7 +7,8 @@ import type { AccountKind, Activity, ArticleKind, CfoAccount, CfoArticle, CfoOpe
 import type { OperationDraft, RecurrenceDraft } from './validate'
 import type { ImportDraft } from './statementImport'
 import { buildDemo } from './demo'
-import { BUSINESS_ARTICLE_NAMES, familyRegroup, planModeSwitch, type CfoMode } from './mode'
+import { BUSINESS_ARTICLE_NAMES, planModeSwitch, type CfoMode } from './mode'
+import { validateAccount, validateAmount, validateArticle } from './validate'
 
 export type Workspace = {
   userId: string
@@ -176,6 +177,8 @@ export async function clearDemo(ws: Workspace): Promise<void> {
 
 // Смена режима: добавить недостающие статьи, убрать в архив неиспользуемые статьи
 // прежнего режима (используемые остаются — иначе выпадут из отчётов), потом сам флаг.
+// Группы БДР (pnl_group) не трогаются: семейная группировка считается в отчёте,
+// поэтому круг «бизнес → семья → бизнес» ничего не ломает.
 export async function setMode(ws: Workspace, mode: CfoMode): Promise<void> {
   const used = new Set<string>([
     ...ws.operations.map((o) => o.articleId), ...ws.recurrences.map((r) => r.articleId), ...ws.plan.map((p) => p.articleId),
@@ -187,14 +190,10 @@ export async function setMode(ws: Workspace, mode: CfoMode): Promise<void> {
       ...owned(ws), name: a.name, kind: a.kind, activity: a.activity, pnl_group: a.pnlGroup, sort: base + (i + 1) * 10,
     })))).error)
   }
-  if (plan.archive.length > 0) check((await supabase.from('cfo_articles').update({ archived: true }).in('id', plan.archive)).error)
+  // Страховка поверх planModeSwitch: статья с операциями, повторами или планом в архив не уходит никогда.
+  const archive = plan.archive.filter((id) => !articleInUse(ws, id))
+  if (archive.length > 0) check((await supabase.from('cfo_articles').update({ archived: true }).in('id', archive)).error)
   if (plan.restore.length > 0) check((await supabase.from('cfo_articles').update({ archived: false }).in('id', plan.restore)).error)
-  if (mode === 'family') {
-    const archived = new Set(plan.archive)
-    for (const g of familyRegroup(ws.articles.filter((a) => !archived.has(a.id)))) {
-      check((await supabase.from('cfo_articles').update({ pnl_group: g.pnlGroup }).eq('id', g.id)).error)
-    }
-  }
   check((await supabase.from('cfo_companies').update({ mode }).eq('id', ws.companyId)).error)
 }
 
@@ -229,6 +228,8 @@ export async function saveCompanyName(ws: Workspace, name: string): Promise<void
 }
 
 export async function saveAccount(ws: Workspace, a: { id?: string; name: string; kind: AccountKind; openingBalance: number; openingDate: string }): Promise<void> {
+  const problem = validateAccount(a, ws.accounts)
+  if (problem) throw new Error(problem)
   const row = { name: a.name, kind: a.kind, opening_balance: toDbAmount(a.openingBalance), opening_date: a.openingDate }
   if (a.id) {
     const { error } = await supabase.from('cfo_accounts').update(row).eq('id', a.id)
@@ -242,6 +243,12 @@ export async function saveAccount(ws: Workspace, a: { id?: string; name: string;
 
 // Several accounts in one insert — all or nothing, so a failed first-run wizard never leaves half the accounts.
 export async function createAccounts(ws: Workspace, list: { name: string; kind: AccountKind; openingBalance: number; openingDate: string }[]): Promise<void> {
+  for (let i = 0; i < list.length; i++) {
+    // Дубли и среди уже существующих счетов, и внутри самого списка.
+    const others = [...ws.accounts, ...list.slice(0, i).map((x, j) => ({ id: `new-${j}`, name: x.name, archived: false }))]
+    const problem = validateAccount(list[i], others)
+    if (problem) throw new Error(problem)
+  }
   const base = Math.max(0, ...ws.accounts.map((x) => x.sort))
   const rows = list.map((a, i) => ({
     name: a.name, kind: a.kind, opening_balance: toDbAmount(a.openingBalance), opening_date: a.openingDate,
@@ -259,6 +266,8 @@ export function articleInUse(ws: Workspace, articleId: string): boolean {
 }
 
 export async function saveArticle(ws: Workspace, a: { id?: string; name: string; kind: ArticleKind; activity: Activity; pnlGroup: PnlGroup | null }): Promise<void> {
+  const problem = validateArticle(a, ws.articles)
+  if (problem) throw new Error(problem)
   const row = { name: a.name, kind: a.kind, activity: a.activity, pnl_group: a.pnlGroup }
   if (a.id) {
     const before = ws.articles.find((x) => x.id === a.id)
@@ -439,7 +448,13 @@ export async function deleteRecurrence(id: string): Promise<void> {
 }
 
 // Ячейка с нулём удаляется, остальные — upsert по (company_id, article_id, month).
+// Удаления собираются в один запрос на месяц («скопировать из прошлого месяца»
+// делало по запросу на каждую пустую статью — около 8 секунд).
 export async function setPlanCells(ws: Workspace, cells: { articleId: string; month: string; amount: number }[]): Promise<void> {
+  for (const c of cells) {
+    const problem = validateAmount(c.amount)
+    if (problem) throw new Error(problem)
+  }
   const upserts = cells
     .filter((c) => c.amount > 0)
     .map((c) => ({ ...owned(ws), article_id: c.articleId, month: `${c.month}-01`, amount: toDbAmount(c.amount) }))
@@ -447,13 +462,15 @@ export async function setPlanCells(ws: Workspace, cells: { articleId: string; mo
     const { error } = await supabase.from('cfo_plan_items').upsert(upserts, { onConflict: 'company_id,article_id,month' })
     check(error)
   }
-  for (const c of cells.filter((x) => x.amount <= 0)) {
+  const byMonth = new Map<string, string[]>()
+  for (const c of cells.filter((x) => x.amount <= 0)) byMonth.set(c.month, [...(byMonth.get(c.month) ?? []), c.articleId])
+  for (const [month, articleIds] of byMonth) {
     const { error } = await supabase
       .from('cfo_plan_items')
       .delete()
       .eq('company_id', ws.companyId)
-      .eq('article_id', c.articleId)
-      .eq('month', `${c.month}-01`)
+      .eq('month', `${month}-01`)
+      .in('article_id', articleIds)
     check(error)
   }
 }

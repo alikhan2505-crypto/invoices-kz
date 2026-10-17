@@ -78,3 +78,45 @@ describe('buildPnl', () => {
     expect(row('t:net').total.fact).toBe(t(330_000))
   })
 })
+
+
+describe('buildPnl in family mode (grouping at report level, stored groups untouched)', () => {
+  const loan: Set<string> = new Set(['mortgage'])
+  const famOps = [
+    ...operations,
+    // платёж по ипотеке: перевод с карты на кредитный счёт
+    op({ id: 'mort', direction: 'transfer', articleId: null, accountId: 'k', toAccountId: 'mortgage', amount: t(150_000) }),
+    // взяли кредит: перевод с кредитного счёта на карту — не доход
+    op({ id: 'loan', direction: 'transfer', articleId: null, accountId: 'mortgage', toAccountId: 'k', amount: t(5_000_000) }),
+  ]
+  const fam = buildPnl({ articles, operations: famOps, plan, months: ['2026-01', '2026-02'], mode: 'family', loanAccountIds: loan })
+  const frow = (key: string) => fam.find((r) => r.key === key)!
+
+  it('shows only Доходы, Расходы and Сбережено — no business subtotals or empty groups', () => {
+    expect(fam.filter((r) => r.type !== 'article').map((r) => [r.key, r.label])).toEqual([['g:revenue', 'Доходы'], ['g:opex', 'Расходы'], ['t:net', 'Сбережено']])
+  })
+
+  it('cogs, tax and finance expenses all land in Расходы; finance income lands in Доходы', () => {
+    expect(fam.filter((r) => r.type === 'article' && r.group === 'opex').map((r) => r.key)).toEqual(['a:cogs', 'a:rent', 'a:interest', 'a:tax', 'a:loan-payments'])
+    expect(fam.filter((r) => r.type === 'article' && r.group === 'revenue').map((r) => r.key)).toEqual(['a:rev', 'a:otherInc'])
+    expect(frow('a:interest').cells['2026-01'].fact).toBe(t(50_000)) // без бизнес-минуса группы «прочие»
+  })
+
+  it('a mortgage payment counts as an expense, a new loan is not income', () => {
+    expect(frow('a:loan-payments').cells['2026-01'].fact).toBe(t(150_000))
+    expect(frow('g:opex').cells['2026-01'].fact).toBe(t(400_000 + 200_000 + 50_000 + 30_000 + 150_000))
+    expect(frow('g:revenue').cells['2026-01'].fact).toBe(t(1_010_000))
+    expect(frow('t:net').cells['2026-01'].fact).toBe(t(1_010_000 - 830_000))
+  })
+
+  it('the business view of the same data is unchanged by the family view', () => {
+    const biz = buildPnl({ articles, operations: famOps, plan, months: ['2026-01', '2026-02'], mode: 'business', loanAccountIds: loan })
+    expect(biz.find((r) => r.key === 't:gross')!.cells['2026-01'].fact).toBe(t(600_000))
+    expect(biz.some((r) => r.key === 'a:loan-payments')).toBe(false)
+    expect(biz.find((r) => r.key === 't:net')!.cells['2026-01'].fact).toBe(t(330_000))
+  })
+
+  it('without loan accounts there is no loan row', () => {
+    expect(buildPnl({ articles, operations: famOps, plan, months: ['2026-01'], mode: 'family' }).some((r) => r.key === 'a:loan-payments')).toBe(false)
+  })
+})

@@ -32,6 +32,14 @@ describe('checkParsed', () => {
     expect(checkParsed({ direction: 'out', amount: -5, article_id: 'rent' }, ws, T, 'x').ok).toBe(false)
     expect(checkParsed({ direction: 'sideways', amount: 5, article_id: 'rent' }, ws, T, 'x').ok).toBe(false)
   })
+  it('never defaults to a loan account (money comes to a card, not to the mortgage)', () => {
+    const loanFirst: Workspace = { ...ws, accounts: [
+      { id: 'm', name: 'Ипотека', kind: 'loan', openingBalance: -1_000_000_00, openingDate: '2026-01-01', archived: false, sort: 0 },
+      { id: 'cash', name: 'Касса', kind: 'cash', openingBalance: 0, openingDate: '2026-01-01', archived: false, sort: 1 },
+    ] }
+    const r = checkParsed({ direction: 'in', amount: 10, article_id: 'rev', account_id: 'm' }, loanFirst, T, 'x')
+    expect(r.ok && r.draft.accountId).toBe('cash')
+  })
   it('ignores an unknown account id and an out-of-range date', () => {
     const r = checkParsed({ direction: 'in', amount: 10, article_id: 'rev', account_id: 'evil', date: '1999-01-01' }, ws, T, 'x')
     expect(r.ok && [r.draft.accountId, r.draft.paidOn]).toEqual(['bank', T])

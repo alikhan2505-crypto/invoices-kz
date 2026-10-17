@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { CfoAccount, CfoArticle, CfoOperation } from './types'
-import { NO_COLUMN, detectColumns, extractRows, markDuplicates, parseCellDate, parseCellMoney, rowProblem, suggestChoice, toDraft, type ParsedRow } from './statementImport'
+import { MAX_IMPORT_ROWS, NO_COLUMN, detectColumns, extractRows, extractRowsWithTotal, markDuplicates, parseCellDate, parseCellMoney, rowProblem, suggestChoice, toDraft, type ParsedRow } from './statementImport'
 
 const art = (id: string, name: string, kind: 'income' | 'expense', archived = false): CfoArticle =>
   ({ id, name, kind, activity: 'operating', pnlGroup: null, sort: 0, archived } as CfoArticle)
@@ -137,5 +137,65 @@ describe('rowProblem / toDraft', () => {
     expect(toDraft(row({ direction: 'in' }), 'acc', { kind: 'transfer', otherAccountId: 'cash' }))
       .toMatchObject({ direction: 'transfer', accountId: 'cash', toAccountId: 'acc' })
     expect(toDraft(row({}), 'acc', { kind: 'none' })).toBeNull()
+  })
+})
+
+
+describe('extractRowsWithTotal (P1-2: never drop rows silently)', () => {
+  it('reports the real row count when the file is longer than the cap', () => {
+    const grid: (string | number)[][] = [['Дата', 'Сумма', 'Детали'], ...Array.from({ length: 2100 }, (_, i) => ['03.10.2026', `-${i + 1}`, `строка ${i}`])]
+    const r = extractRowsWithTotal(grid, 0, { date: 0, amount: 1, debit: NO_COLUMN, credit: NO_COLUMN, counterparty: NO_COLUMN, purpose: 2 })
+    expect(r.rows).toHaveLength(MAX_IMPORT_ROWS)
+    expect(r.total).toBe(2100)
+    const small = extractRowsWithTotal(grid.slice(0, 11), 0, { date: 0, amount: 1, debit: NO_COLUMN, credit: NO_COLUMN, counterparty: NO_COLUMN, purpose: 2 })
+    expect(small).toMatchObject({ total: 10 })
+    expect(small.rows).toHaveLength(10)
+  })
+})
+
+describe('suggestChoice in family mode (P1-6: Kaspi statement lines)', () => {
+  const fam = [
+    art('sal', 'Зарплата', 'income'),
+    art('ben', 'Пособия и выплаты', 'income'),
+    art('oin', 'Прочие доходы', 'income'),
+    art('food', 'Продукты', 'expense'),
+    art('cafe', 'Кафе и доставка еды', 'expense'),
+    art('home', 'Жильё и коммунальные', 'expense'),
+    art('taxi', 'Транспорт и такси', 'expense'),
+    art('tel', 'Связь и подписки', 'expense'),
+    art('kids', 'Дети и образование', 'expense'),
+    art('med', 'Здоровье и аптека', 'expense'),
+    art('oout', 'Прочие расходы', 'expense'),
+  ]
+  const guess = (counterparty: string, purpose = '', direction: 'in' | 'out' = 'out') => suggestChoice(row({ counterparty, purpose, direction }), [], fam, 'family')
+  it('recognises the sample lines from the QA report', () => {
+    expect(guess('Magnum')).toEqual({ kind: 'article', articleId: 'food' })
+    expect(guess('Wolt', 'Оплата заказа')).toEqual({ kind: 'article', articleId: 'cafe' })
+    expect(guess('Yandex.Go')).toEqual({ kind: 'article', articleId: 'taxi' })
+    expect(guess('Алсеко', 'Коммунальные услуги')).toEqual({ kind: 'article', articleId: 'home' })
+    expect(guess('Beeline')).toEqual({ kind: 'article', articleId: 'tel' })
+    expect(guess('Аптека 36.6')).toEqual({ kind: 'article', articleId: 'med' })
+    expect(guess('Детский сад №12')).toEqual({ kind: 'article', articleId: 'kids' })
+    // «сад» как отдельное слово: \b после кириллицы в JS не срабатывает, нужен lookahead
+    expect(guess('Сад Балапан')).toEqual({ kind: 'article', articleId: 'kids' })
+    expect(guess('ИП Иванова', 'Оплата сад №5')).toEqual({ kind: 'article', articleId: 'kids' })
+    expect(guess('Садыхан')).toEqual({ kind: 'article', articleId: 'med' })
+    expect(guess('ТОО Работодатель', 'Зарплата за сентябрь', 'in')).toEqual({ kind: 'article', articleId: 'sal' })
+  })
+  it('salary is income in family and expense in business', () => {
+    expect(guess('ТОО Работодатель', 'Зарплата', 'out')).toEqual({ kind: 'article', articleId: 'oout' })
+    const biz = [art('salx', 'Зарплата', 'expense'), art('oin', 'Прочие доходы', 'income')]
+    expect(suggestChoice(row({ purpose: 'Зарплата за сентябрь', direction: 'in' }), [], biz, 'business')).toEqual({ kind: 'article', articleId: 'oin' })
+    expect(suggestChoice(row({ purpose: 'Зарплата за сентябрь', direction: 'out' }), [], biz, 'business')).toEqual({ kind: 'article', articleId: 'salx' })
+  })
+  it('falls back to the owner own similar article («Продукты питания») and then to «Прочие»', () => {
+    const own = [art('mine', 'Продукты питания', 'expense'), art('oout', 'Прочие расходы', 'expense')]
+    expect(suggestChoice(row({ counterparty: 'Small' }), [], own, 'family')).toEqual({ kind: 'article', articleId: 'mine' })
+    expect(suggestChoice(row({ counterparty: 'Что-то непонятное' }), [], own, 'family')).toEqual({ kind: 'article', articleId: 'oout' })
+  })
+  it('business keywords stay untouched', () => {
+    const biz = [art('fee', 'Банковские комиссии и эквайринг', 'expense'), art('oout', 'Прочие расходы', 'expense')]
+    expect(suggestChoice(row({ purpose: 'Комиссия за перевод' }), [], biz)).toEqual({ kind: 'article', articleId: 'fee' })
+    expect(suggestChoice(row({ counterparty: 'Magnum' }), [], biz)).toEqual({ kind: 'article', articleId: 'oout' })
   })
 })

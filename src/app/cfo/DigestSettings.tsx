@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { setTelegramDigest } from '@/lib/cfo/data'
+import { vocab } from '@/lib/cfo/mode'
 import { useCfo } from './CfoWorkspace'
 import { Card, ErrorText, GhostButton, SectionTitle } from './ui'
 
@@ -9,6 +10,7 @@ import { Card, ErrorText, GhostButton, SectionTitle } from './ui'
 // который человек подключает в Профиль → Уведомления.
 export default function DigestSettings() {
   const { ws, reload } = useCfo()
+  const v = vocab(ws.mode)
   const [telegram, setTelegram] = useState<'loading' | 'connected' | 'missing'>('loading')
   const [busy, setBusy] = useState(false)
   const [sending, setSending] = useState(false)
@@ -58,8 +60,8 @@ export default function DigestSettings() {
     <Card>
       <SectionTitle>Утренняя сводка в Telegram</SectionTitle>
       <p className="text-sm mb-3" style={{ color: 'var(--nav-text-secondary)' }}>
-        Каждый день в 8:00 — сколько денег на счетах, что сегодня к оплате и к поступлению, просрочка и ближайший кассовый разрыв. 1-го числа — ещё и итоги прошлого месяца.
-        А ещё боту можно писать операции: «аренда 300 000», «пришло 450к от ТОО Ромашка», «такси 3500 вчера» или прислать фото чека — операция сразу попадёт в журнал. Ошиблись — напишите «отмена».
+        Каждый день в 8:00 — {v.telegramDigestWhat}. 1-го числа — ещё и итоги прошлого месяца.
+        А ещё боту можно писать операции: {v.digestExamples} или прислать фото чека — операция сразу попадёт в журнал. Ошиблись — напишите «отмена».
       </p>
       {telegram === 'missing' ? (
         <p className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>

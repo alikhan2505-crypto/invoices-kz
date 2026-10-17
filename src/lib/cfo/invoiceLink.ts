@@ -16,8 +16,9 @@ export function expectedOn(inv: InvoiceLite): string {
   return inv.dueDate ?? addDays(inv.createdOn, DAYS_WITHOUT_DUE_DATE)
 }
 
+// Ожидаемые оплаты приходят на деньги, не на кредитный счёт.
 const defaultAccountId = (ws: Workspace) => {
-  const live = ws.accounts.filter((a) => !a.archived)
+  const live = ws.accounts.filter((a) => !a.archived && a.kind !== 'loan')
   return (live.find((a) => a.kind === 'bank') ?? live[0])?.id ?? ''
 }
 export const revenueArticleId = (ws: Workspace) =>

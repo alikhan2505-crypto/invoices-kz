@@ -2,7 +2,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAppDialog } from '@/components/AppDialog'
 import { articleInUse, reorder, saveAccount, saveArticle, saveCompanyName, setArchived } from '@/lib/cfo/data'
-import { ACCOUNT_KIND_LABEL, ACTIVITY_LABEL, ARTICLE_KIND_LABEL, PNL_GROUP_LABEL } from '@/lib/cfo/labels'
+import { ACCOUNT_KIND_LABEL, ARTICLE_KIND_LABEL } from '@/lib/cfo/labels'
+import { ACTIVITY_LABEL_BY_MODE, PNL_GROUP_LABEL_BY_MODE, familyPnlGroup, vocab, type CfoMode } from '@/lib/cfo/mode'
 import { formatTenge } from '@/lib/cfo/money'
 import { validateArticle } from '@/lib/cfo/validate'
 import type { Activity, ArticleKind, CfoAccount, CfoArticle, PnlGroup } from '@/lib/cfo/types'
@@ -14,12 +15,18 @@ import { Card, CfoPage, ErrorText, Field, GhostButton, PrimaryButton, SectionTit
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
-function ArticleForm({ initial, kindLocked = false, onSave, onCancel }: {
+// В семейном режиме строка отчёта — просто «Доход» или «Расход» (группировка
+// считается в отчёте, в базе остаётся бизнес-группа).
+function ArticleForm({ mode, existing, initial, kindLocked = false, onSave, onCancel }: {
+  mode: CfoMode
+  existing: CfoArticle[]
   initial?: CfoArticle
   kindLocked?: boolean
   onSave: (a: { name: string; kind: ArticleKind; activity: Activity; pnlGroup: PnlGroup | null }) => Promise<string | null>
   onCancel: () => void
 }) {
+  const v = vocab(mode)
+  const family = mode === 'family'
   const [name, setName] = useState(initial?.name ?? '')
   const [kind, setKind] = useState<ArticleKind>(initial?.kind ?? 'expense')
   const [activity, setActivity] = useState<Activity>(initial?.activity ?? 'operating')
@@ -27,11 +34,18 @@ function ArticleForm({ initial, kindLocked = false, onSave, onCancel }: {
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
+  const groups = (Object.keys(PNL_GROUP_LABEL_BY_MODE.business) as PnlGroup[])
+  // Семья: один пункт «Доход» для статьи дохода, один «Расход» для расхода.
+  const familyGroup: PnlGroup = kind === 'income' ? 'revenue' : 'opex'
+  const shownPnl = family ? (pnl === 'none' ? 'none' : familyPnlGroup({ kind, pnlGroup: pnl }) ?? 'none') : pnl
+
   async function submit(e: React.FormEvent) {
     e.preventDefault()
-    const draft = { name: name.trim(), kind, activity, pnlGroup: pnl === 'none' ? null : pnl }
-    const v = validateArticle(draft)
-    if (v) { setError(v); return }
+    // В семье хранимую группу не меняем, если она уже есть и в отчёте читается так же.
+    const group = pnl === 'none' ? null : family && initial?.pnlGroup && familyPnlGroup(initial) === familyGroup && initial.kind === kind ? initial.pnlGroup : family ? familyGroup : pnl
+    const draft = { id: initial?.id, name: name.trim(), kind, activity, pnlGroup: group }
+    const problem = validateArticle(draft, existing)
+    if (problem) { setError(problem); return }
     setSaving(true)
     setError(null)
     const err = await onSave(draft)
@@ -55,15 +69,17 @@ function ArticleForm({ initial, kindLocked = false, onSave, onCancel }: {
             <option value="expense">{ARTICLE_KIND_LABEL.expense}</option>
           </select>
         </Field>
-        <Field label="Вид деятельности (БДДС)">
+        <Field label={v.activityField}>
           <select className={inputClass} style={inputStyle} value={activity} onChange={(e) => setActivity(e.target.value as Activity)}>
-            {(Object.keys(ACTIVITY_LABEL) as Activity[]).map((a) => <option key={a} value={a}>{ACTIVITY_LABEL[a]}</option>)}
+            {(Object.keys(ACTIVITY_LABEL_BY_MODE[mode]) as Activity[]).map((a) => <option key={a} value={a}>{ACTIVITY_LABEL_BY_MODE[mode][a]}</option>)}
           </select>
         </Field>
-        <Field label="Строка БДР">
-          <select className={inputClass} style={inputStyle} value={pnl} onChange={(e) => setPnl(e.target.value as PnlGroup | 'none')}>
-            {(Object.keys(PNL_GROUP_LABEL) as PnlGroup[]).map((g) => <option key={g} value={g}>{PNL_GROUP_LABEL[g]}</option>)}
-            <option value="none">Не идёт в БДР</option>
+        <Field label={v.pnlField}>
+          <select className={inputClass} style={inputStyle} value={shownPnl} onChange={(e) => setPnl(e.target.value as PnlGroup | 'none')}>
+            {family
+              ? <option value={familyGroup}>{PNL_GROUP_LABEL_BY_MODE.family[familyGroup]}</option>
+              : groups.map((g) => <option key={g} value={g}>{PNL_GROUP_LABEL_BY_MODE.business[g]}</option>)}
+            <option value="none">{v.pnlNone}</option>
           </select>
         </Field>
       </div>
@@ -79,6 +95,8 @@ function ArticleForm({ initial, kindLocked = false, onSave, onCancel }: {
 export default function CfoSettings() {
   const { ws, reload } = useCfo()
   const { alert, dialogElement } = useAppDialog()
+  const mode: CfoMode = ws.mode ?? 'business'
+  const v = vocab(mode)
   const [companyName, setCompanyName] = useState(ws.companyName)
   const [editingAccount, setEditingAccount] = useState<string | 'new' | null>(null)
   const [editingArticle, setEditingArticle] = useState<string | 'new' | null>(null)
@@ -92,7 +110,7 @@ export default function CfoSettings() {
   async function submitCompanyName(e: React.FormEvent) {
     e.preventDefault()
     const name = companyName.trim()
-    if (!name) { setNameError('Введите название компании'); setNameSaved(false); return }
+    if (!name) { setNameError(v.nameEmpty); setNameSaved(false); return }
     setNameError(null)
     setNameSaving(true)
     try {
@@ -136,6 +154,10 @@ export default function CfoSettings() {
 
   const accounts = ws.accounts.filter((a) => showArchived || !a.archived)
   const articleList = (kind: ArticleKind) => ws.articles.filter((a) => a.kind === kind && (showArchived || !a.archived))
+  const groupLabel = (a: CfoArticle) => {
+    const g = mode === 'family' ? familyPnlGroup(a) : a.pnlGroup
+    return g ? PNL_GROUP_LABEL_BY_MODE[mode][g] : v.pnlNoneShort
+  }
 
   const accountRow = (a: CfoAccount) => (
     <div key={a.id} className="py-3 flex items-start gap-2 flex-wrap" style={{ borderBottom: '1px solid var(--nav-border-soft)' }}>
@@ -144,7 +166,7 @@ export default function CfoSettings() {
           {a.name}{a.archived && ' · в архиве'}
         </div>
         <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>
-          {ACCOUNT_KIND_LABEL[a.kind]} · остаток {formatTenge(a.openingBalance)} на {a.openingDate}
+          {ACCOUNT_KIND_LABEL[a.kind]} · {a.kind === 'loan' ? 'долг' : 'остаток'} {formatTenge(a.openingBalance)} на {a.openingDate}
         </div>
       </div>
       <div className="flex gap-1 flex-wrap">
@@ -159,6 +181,7 @@ export default function CfoSettings() {
         <div className="w-full pt-2">
           <AccountForm
             initial={a}
+            accounts={ws.accounts}
             operations={ws.operations}
             submitLabel="Сохранить"
             onCancel={() => setEditingAccount(null)}
@@ -178,7 +201,7 @@ export default function CfoSettings() {
           {a.name}{a.archived && ' · в архиве'}
         </div>
         <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>
-          {ACTIVITY_LABEL[a.activity]} · {a.pnlGroup ? PNL_GROUP_LABEL[a.pnlGroup] : 'не идёт в БДР'}
+          {ACTIVITY_LABEL_BY_MODE[mode][a.activity]} · {groupLabel(a)}
         </div>
       </div>
       <div className="flex gap-1 flex-wrap">
@@ -192,6 +215,8 @@ export default function CfoSettings() {
       {editingArticle === a.id && (
         <div className="w-full pt-2">
           <ArticleForm
+            mode={mode}
+            existing={ws.articles}
             initial={a}
             kindLocked={articleInUse(ws, a.id)}
             onCancel={() => setEditingArticle(null)}
@@ -215,7 +240,7 @@ export default function CfoSettings() {
       }
     >
       <Card>
-        <SectionTitle>{ws.mode === 'family' ? 'Семья' : 'Компания'}</SectionTitle>
+        <SectionTitle>{v.company}</SectionTitle>
         <ModeSwitch />
         <form className="flex gap-2 flex-wrap items-center" onSubmit={(e) => void submitCompanyName(e)}>
           <input
@@ -223,7 +248,8 @@ export default function CfoSettings() {
             style={inputStyle}
             value={companyName}
             onChange={(e) => { setCompanyName(e.target.value); setNameError(null) }}
-            aria-label={ws.mode === 'family' ? 'Название семейного бюджета' : 'Название компании'}
+            aria-label={mode === 'family' ? 'Название семейного бюджета' : 'Название компании'}
+            placeholder={v.companyField}
             aria-invalid={nameError ? true : undefined}
           />
           <PrimaryButton type="submit" disabled={nameSaving}>{nameSaving ? 'Сохраняю…' : 'Сохранить'}</PrimaryButton>
@@ -236,12 +262,13 @@ export default function CfoSettings() {
 
       <Card>
         <div className="flex items-center justify-between gap-2 mb-1">
-          <SectionTitle>Счета и кассы</SectionTitle>
+          <SectionTitle>{mode === 'family' ? 'Карты, наличные и накопления' : 'Счета и кассы'}</SectionTitle>
           {editingAccount !== 'new' && <PrimaryButton type="button" onClick={() => setEditingAccount('new')}>Добавить счёт</PrimaryButton>}
         </div>
         {editingAccount === 'new' && (
           <div className="mb-3">
             <AccountForm
+              accounts={ws.accounts}
               operations={ws.operations}
               submitLabel="Добавить"
               onCancel={() => setEditingAccount(null)}
@@ -267,6 +294,8 @@ export default function CfoSettings() {
         {editingArticle === 'new' && (
           <div className="mb-3">
             <ArticleForm
+              mode={mode}
+              existing={ws.articles}
               onCancel={() => setEditingArticle(null)}
               onSave={async (input) => {
                 try { await saveArticle(ws, input); setEditingArticle(null); await reload(); return null } catch (e) { return errText(e) }

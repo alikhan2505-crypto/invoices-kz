@@ -1,15 +1,17 @@
 // Утренняя сводка CFO для Telegram. Чистая функция над рабочим пространством:
 // те же расчёты, что календарь и обзор, поэтому цифры в сообщении и в кабинете
 // совпадают. Текст — Telegram HTML, всё пользовательское экранируется.
+// Слова — по режиму кабинета: в семейном бюджете нет «кассового разрыва» и «клиентов».
 import type { Workspace } from './data'
 import { CALENDAR_HORIZON_DAYS, buildCalendar } from './calendar'
-import { totalBalanceAt } from './balances'
+import { cashBalanceAt, debtAt, isCashIn, isCashOut, loanIds } from './balances'
 import { addDays, firstDay, monthKey } from './dates'
-import { dayLabel, opTitle } from './labels'
+import { dayLabel, opTitle, plural } from './labels'
 import { formatTenge } from './money'
 import type { CfoOperation } from './types'
 import { forecastOperations, overdueReceivables } from './invoiceLink'
 import { monthLimits } from './limits'
+import { displayName } from './mode'
 
 export const DIGEST_URL = 'https://cfo.invoices.kz/cfo/calendar'
 const LIST_LIMIT = 5
@@ -23,18 +25,12 @@ function daysBetween(from: string, to: string): number {
   return Math.round((Date.UTC(y2, m2 - 1, d2) - Date.UTC(y1, m1 - 1, d1)) / 86400000)
 }
 
-function plural(n: number, one: string, few: string, many: string): string {
-  const m10 = n % 10
-  const m100 = n % 100
-  if (m10 === 1 && m100 !== 11) return one
-  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few
-  return many
-}
 const payments = (n: number) => `${n} ${plural(n, 'платёж', 'платежа', 'платежей')}`
 
 export function buildDigest(ws: Workspace, today: string): string {
+  const family = ws.mode === 'family'
   const actual = ws.operations.filter((o) => o.status === 'actual')
-  const cash = totalBalanceAt(ws.accounts, actual, today)
+  const cash = cashBalanceAt(ws.accounts, actual, today)
   const cal = buildCalendar({
     accounts: ws.accounts,
     operations: forecastOperations(ws, today),
@@ -45,14 +41,19 @@ export function buildDigest(ws: Workspace, today: string): string {
   })
   const upcoming = (from: string, to: string) =>
     cal.days.filter((d) => d.date >= from && d.date <= to).flatMap((d) => d.items.filter((o) => o.status === 'planned'))
+  // Платёж/поступление — по деньгам, как остаток в календаре: плановый платёж по
+  // ипотеке (перевод на кредитный счёт) — тоже «к оплате», иначе сводка говорила бы
+  // «платежей нет» рядом с «денег не хватит».
+  const loans = loanIds(ws.accounts)
   const todayItems = upcoming(today, today)
-  const toPay = todayItems.filter((o) => o.direction === 'out')
-  const toReceive = todayItems.filter((o) => o.direction === 'in')
+  const toPay = todayItems.filter((o) => isCashOut(o, loans))
+  const toReceive = todayItems.filter((o) => isCashIn(o, loans))
   const week = upcoming(addDays(today, 1), addDays(today, 7))
   const title = (o: CfoOperation) => esc(o.counterparty?.trim() || opTitle(o, ws.accounts, ws.articles))
 
-  const lines: string[] = [`<b>CFO · ${esc(ws.companyName)}</b> — ${dayLabel(today)}`, '']
-  lines.push(`💰 На счетах: <b>${formatTenge(cash)}</b>`)
+  const lines: string[] = [`<b>${family ? 'Семейный бюджет' : 'CFO'} · ${esc(displayName(ws))}</b> — ${dayLabel(today)}`, '']
+  lines.push(`💰 ${family ? 'Денег' : 'На счетах'}: <b>${formatTenge(cash)}</b>`)
+  if (loans.size > 0) lines.push(`🏦 Долги: ${formatTenge(debtAt(ws.accounts, actual, today))}`)
 
   if (toPay.length > 0) {
     lines.push(`📤 Сегодня к оплате: ${payments(toPay.length)} на <b>${formatTenge(sum(toPay))}</b>`)
@@ -63,28 +64,32 @@ export function buildDigest(ws: Workspace, today: string): string {
   }
   if (toReceive.length > 0) lines.push(`📥 Сегодня ожидается: ${formatTenge(sum(toReceive))}`)
 
-  const overdueOut = cal.overdue.filter((o) => o.direction === 'out')
+  const overdueOut = cal.overdue.filter((o) => isCashOut(o, loans))
   if (overdueOut.length > 0) lines.push(`⚠️ Просрочено: ${payments(overdueOut.length)} на ${formatTenge(sum(overdueOut))}`)
   const unpaid = overdueReceivables(ws, today)
-  if (unpaid.length > 0) lines.push(`💸 Клиенты не оплатили в срок: ${unpaid.length} ${plural(unpaid.length, 'счёт', 'счёта', 'счетов')} на ${formatTenge(sum(unpaid))}`)
+  if (unpaid.length > 0) lines.push(`💸 ${family ? 'Не оплачены вовремя выставленные счета' : 'Клиенты не оплатили в срок'}: ${unpaid.length} ${plural(unpaid.length, 'счёт', 'счёта', 'счетов')} на ${formatTenge(sum(unpaid))}`)
 
   if (cal.firstGap) {
     const gapDay = cal.days.find((d) => d.date === cal.firstGap)!
     const inDays = daysBetween(today, cal.firstGap)
     const when = inDays === 0 ? 'сегодня' : `${dayLabel(cal.firstGap)} — через ${inDays} ${plural(inDays, 'день', 'дня', 'дней')}`
-    lines.push(`🔴 Кассовый разрыв ${when}: не хватит ${formatTenge(-gapDay.balance)}`)
+    lines.push(family
+      ? `🔴 Денег не хватит ${when}: по запланированным платежам не достаёт ${formatTenge(-gapDay.balance)}`
+      : `🔴 Кассовый разрыв ${when}: не хватит ${formatTenge(-gapDay.balance)}`)
   } else {
-    lines.push(`✅ Кассовых разрывов в ближайшие ${CALENDAR_HORIZON_DAYS} дней нет`)
+    lines.push(family
+      ? `✅ Денег на все платежи ближайших ${CALENDAR_HORIZON_DAYS} дней хватает`
+      : `✅ Кассовых разрывов в ближайшие ${CALENDAR_HORIZON_DAYS} дней нет`)
   }
 
   const tight = monthLimits(ws, monthKey(today)).filter((r) => r.level !== 'ok').slice(0, 3)
-  if (tight.length > 0) lines.push(`📊 Лимиты месяца: ${tight.map((r) => `${esc(r.name)} ${Math.round(r.share * 100)}%`).join(', ')}`)
+  if (tight.length > 0) lines.push(`📊 ${family ? 'Бюджет месяца' : 'Лимиты месяца'}: ${tight.map((r) => `${esc(r.name)} ${Math.round(r.share * 100)}%`).join(', ')}`)
 
-  const weekOut = sum(week.filter((o) => o.direction === 'out'))
-  const weekIn = sum(week.filter((o) => o.direction === 'in'))
-  if (weekOut > 0 || weekIn > 0) lines.push(`📆 Следующие 7 дней: выплаты ${formatTenge(weekOut)}, поступления ${formatTenge(weekIn)}`)
+  const weekOut = sum(week.filter((o) => isCashOut(o, loans)))
+  const weekIn = sum(week.filter((o) => isCashIn(o, loans)))
+  if (weekOut > 0 || weekIn > 0) lines.push(`📆 Следующие 7 дней: ${family ? 'платежи' : 'выплаты'} ${formatTenge(weekOut)}, поступления ${formatTenge(weekIn)}`)
 
-  lines.push('', `<a href="${DIGEST_URL}">Открыть платёжный календарь</a>`)
+  lines.push('', `<a href="${DIGEST_URL}">${family ? 'Открыть платежи' : 'Открыть платёжный календарь'}</a>`)
   return lines.join('\n')
 }
 

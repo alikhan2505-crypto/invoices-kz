@@ -5,6 +5,7 @@
 import type { CfoAccount, CfoArticle, CfoOperation, Direction } from './types'
 import { isIsoDate } from './dates'
 import { MAX_AMOUNT_TIYN } from './money'
+import { FAMILY_ARTICLES, type CfoMode } from './mode'
 
 export type Cell = string | number | boolean | null | undefined
 export type Grid = Cell[][]
@@ -113,10 +114,17 @@ export type ParsedRow = {
   purpose: string
 }
 
-export function extractRows(grid: Grid, headerRow: number, map: ColumnMap): ParsedRow[] {
+// Первые MAX_IMPORT_ROWS строк с датой и суммой; `total` — сколько их в файле
+// на самом деле, чтобы экран честно сказал «показаны первые N из M».
+export function extractRowsWithTotal(grid: Grid, headerRow: number, map: ColumnMap, limit = MAX_IMPORT_ROWS): { rows: ParsedRow[]; total: number } {
+  const rows = extractRows(grid, headerRow, map, Infinity)
+  return { rows: rows.slice(0, limit), total: rows.length }
+}
+
+export function extractRows(grid: Grid, headerRow: number, map: ColumnMap, limit = MAX_IMPORT_ROWS): ParsedRow[] {
   const out: ParsedRow[] = []
   const text = (row: Cell[], i: number) => (i === NO_COLUMN ? '' : String(row[i] ?? '').replace(/\s+/g, ' ').trim())
-  for (let r = headerRow + 1; r < grid.length && out.length < MAX_IMPORT_ROWS; r++) {
+  for (let r = headerRow + 1; r < grid.length && out.length < limit; r++) {
     const row = grid[r] ?? []
     const date = parseCellDate(row[map.date])
     if (!date) continue // итоги, подписи, пустые строки
@@ -152,7 +160,8 @@ const normParty = (s: string) => s.toLowerCase().replace(/["«»'`.,]/g, ' ').sp
 
 // Ключевые слова → начало названия стартовой статьи. Подсказка срабатывает,
 // только если у человека есть статья с таким названием и нужного вида.
-const KEYWORDS: { words: RegExp; article: string; kind: 'income' | 'expense' }[] = [
+type Keyword = { words: RegExp; article: string; kind: 'income' | 'expense' }
+const BUSINESS_KEYWORDS: Keyword[] = [
   { words: /комисси|эквайр|обслуживани[ея] сч/i, article: 'банковские комиссии', kind: 'expense' },
   { words: /аренд/i, article: 'аренда', kind: 'expense' },
   { words: /заработн|зарплат|з\/п/i, article: 'зарплата', kind: 'expense' },
@@ -166,8 +175,35 @@ const KEYWORDS: { words: RegExp; article: string; kind: 'income' | 'expense' }[]
   { words: /вознагражд|процент/i, article: 'проценты по кредитам', kind: 'expense' },
   { words: /оплат.*(за товар|по счет|по договор)|за услуг|kaspi pay|продаж/i, article: 'выручка от', kind: 'income' },
 ]
+// Семейный бюджет: магазины, доставка, такси, коммуналка, связь, аптека, дети —
+// по названиям из выписки Kaspi; зарплата здесь ДОХОД. Порядок важен: первое
+// совпадение побеждает («Yandex Eats» — доставка, а не такси).
+const FAMILY_KEYWORDS: Keyword[] = [
+  { words: /зарплат|заработн|оклад|аванс|з\/п|salary|выплата зар/i, article: 'зарплата', kind: 'income' },
+  { words: /пособи|пенси|стипенди|соцвыплат|выплат/i, article: 'пособия и выплаты', kind: 'income' },
+  { words: /фриланс|подработ|заказ|гонорар/i, article: 'подработка и фриланс', kind: 'income' },
+  { words: /wolt|glovo|yandex ?eats|яндекс ?еда|chocofood|кафе|ресторан|coffee|кофе|пицц|суши|бургер|доставк|столов/i, article: 'кафе и доставка еды', kind: 'expense' },
+  { words: /magnum|магнум|small|смолл|galmart|галмарт|арбуз|anvar|анвар|carrefour|metro|fix ?price|продукт|супермаркет|маркет|бакале|мясн|фрукт|овощ|minimarket|мини-?маркет/i, article: 'продукты', kind: 'expense' },
+  { words: /yandex\.? ?go|яндекс ?go|яндекс ?такси|indrive|такси|taxi|uber|bolt|бензин|азс|petrol|газпром|автобус|метро|парков|onay|onai|проезд|каршер/i, article: 'транспорт и такси', kind: 'expense' },
+  { words: /алсеко|alseco|кск|жкх|коммунал|электроэнерг|энергосбыт|водоканал|водоснаб|газ |газоснаб|отоплени|тепло|ипотек|аренда квартир|квартплат|домофон|мусор/i, article: 'жильё и коммунальные', kind: 'expense' },
+  { words: /beeline|билайн|tele2|теле2|kcell|кселл|activ|актив|altel|алтел|izi|связ|интернет|мобильн|подписк|netflix|spotify|yandex ?plus|яндекс ?плюс|ivi|okko|youtube|apple\.com|google|icloud|telegram premium/i, article: 'связь и подписки', kind: 'expense' },
+  { words: /аптек|europharma|biosfera|садыхан|клиник|медиц|стоматолог|врач|анализ|invivo|олимп|здоров|оптик|лекарств/i, article: 'здоровье и аптека', kind: 'expense' },
+  // «сад» — только как отдельное слово («Сад №5», «Оплата сад»): \b после кириллицы в JS не работает.
+  { words: /детск|школ|сад(?![а-яё])|садик|кружок|кружк|секци|репетитор|учеб|образован|университет|колледж|курс|обучени/i, article: 'дети и образование', kind: 'expense' },
+  { words: /одежд|обув|zara|h&m|lc ?waikiki|sport ?master|спортмастер|koton|defacto|bershka|pull ?& ?bear|adidas|nike|reserved|sinsay|cropp/i, article: 'одежда и обувь', kind: 'expense' },
+  { words: /кино|cinema|kinopark|chaplin|театр|концерт|развлеч|отдых|путешеств|отпуск|air ?astana|flyarystan|scat|booking|airbnb|отел|hotel|аквапарк|парк развлеч|билет/i, article: 'развлечения и отдых', kind: 'expense' },
+  { words: /налог|штраф|госпошлин|пошлин|сбор|егов|egov|казначейств|кгд/i, article: 'налоги и сборы', kind: 'expense' },
+  { words: /вознагражд|процент/i, article: 'проценты по кредитам', kind: 'expense' },
+  { words: /погашени|кредит|займ|ипотек|рассрочк/i, article: 'возврат долга', kind: 'expense' },
+  { words: /подар|цвет|flowers/i, article: 'подарки', kind: 'expense' },
+  { words: /leroy|леруа|мебел|ремонт|строй|хозтовар|ikea|jysk|быт|химия|texnomart|технодом|sulpak|сулпак|mechta|мечта/i, article: 'дом и быт', kind: 'expense' },
+]
 
-export function suggestChoice(row: ParsedRow, history: CfoOperation[], articles: CfoArticle[]): Choice {
+// Своя похожая статья («Продукты питания», «Оплата за школу») находится по тем же
+// словам, что и при смене режима (FAMILY_ARTICLES.alike).
+const FAMILY_ALIKE = new Map(FAMILY_ARTICLES.map((f) => [f.name.toLowerCase(), f.alike ?? []]))
+
+export function suggestChoice(row: ParsedRow, history: CfoOperation[], articles: CfoArticle[], mode: CfoMode = 'business'): Choice {
   const kind = row.direction === 'in' ? 'income' : 'expense'
   const live = articles.filter((a) => !a.archived && a.kind === kind)
   // 1. Тот же контрагент уже разносился — берём последнюю его статью.
@@ -179,12 +215,17 @@ export function suggestChoice(row: ParsedRow, history: CfoOperation[], articles:
       .find((o) => live.some((a) => a.id === o.articleId))
     if (prev?.articleId) return { kind: 'article', articleId: prev.articleId }
   }
-  // 2. Ключевые слова в назначении.
+  // 2. Ключевые слова в назначении и названии контрагента.
   const textToCheck = `${row.purpose} ${row.counterparty}`
-  for (const k of KEYWORDS) {
+  for (const k of mode === 'family' ? FAMILY_KEYWORDS : BUSINESS_KEYWORDS) {
     if (k.kind !== kind || !k.words.test(textToCheck)) continue
     const a = live.find((x) => x.name.toLowerCase().startsWith(k.article))
     if (a) return { kind: 'article', articleId: a.id }
+    if (mode === 'family') {
+      const alike = [...FAMILY_ALIKE.entries()].find(([name]) => name.startsWith(k.article))?.[1] ?? []
+      const own = live.find((x) => alike.some((w) => x.name.toLowerCase().includes(w)))
+      if (own) return { kind: 'article', articleId: own.id }
+    }
   }
   // 3. «Прочие …» нужного вида, иначе — человек выберет сам.
   const other = live.find((a) => a.name.toLowerCase().startsWith('прочие'))

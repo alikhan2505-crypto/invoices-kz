@@ -1,6 +1,6 @@
 import type { ArticleKind, CfoAccount, CfoArticle, CfoOperation, Direction, OpStatus, PnlGroup } from './types'
 import { isIsoDate } from './dates'
-import { MAX_AMOUNT_TIYN } from './money'
+import { MAX_AMOUNT_TIYN, TOO_LARGE_AMOUNT } from './money'
 
 export type OperationDraft = {
   direction: Direction
@@ -30,7 +30,7 @@ const beforeStart = (a: CfoAccount) => `Дата раньше начала уч�
 
 export function validateOperation(d: OperationDraft, ctx: ValidationContext): string | null {
   if (!Number.isInteger(d.amount) || d.amount <= 0) return 'Укажите сумму больше нуля'
-  if (d.amount > MAX_AMOUNT_TIYN) return 'Слишком большая сумма'
+  if (d.amount > MAX_AMOUNT_TIYN) return TOO_LARGE_AMOUNT
   if (!isIsoDate(d.paidOn)) return 'Укажите дату оплаты'
   if (!isIsoDate(d.accruedOn)) return 'Укажите дату начисления'
   if (d.status === 'actual' && d.paidOn > ctx.today) return 'Будущая дата — отметьте операцию как плановую'
@@ -63,12 +63,37 @@ export function validateRecurrence(r: RecurrenceDraft, ctx: ValidationContext): 
   return validateOperation({ ...r, paidOn: r.startsOn, accruedOn: r.startsOn, status: 'planned' }, ctx)
 }
 
-export function validateArticle(a: { name: string; kind: ArticleKind; pnlGroup: PnlGroup | null }): string | null {
+// Сумма в клетке плана и в формах — не больше того, что принимает numeric(14,2) в базе.
+export function validateAmount(tiyn: number): string | null {
+  if (!Number.isInteger(tiyn) || tiyn < 0) return 'Укажите сумму'
+  if (tiyn > MAX_AMOUNT_TIYN) return TOO_LARGE_AMOUNT
+  return null
+}
+
+const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
+
+// Дубли считаем только среди действующих: архивная «Зарплата» не мешает завести новую.
+export function validateArticle(
+  a: { id?: string; name: string; kind: ArticleKind; pnlGroup: PnlGroup | null },
+  existing: Pick<CfoArticle, 'id' | 'name' | 'archived'>[] = [],
+): string | null {
   if (!a.name.trim()) return 'Укажите название статьи'
   if (a.pnlGroup === 'revenue' && a.kind !== 'income') return 'Выручка бывает только у статьи дохода'
   if ((a.pnlGroup === 'cogs' || a.pnlGroup === 'opex' || a.pnlGroup === 'tax') && a.kind !== 'expense') {
     return 'Себестоимость, операционные расходы и налоги — только у статьи расхода'
   }
+  if (existing.some((x) => !x.archived && x.id !== a.id && sameName(x.name, a.name))) return 'Статья с таким названием уже есть'
+  return null
+}
+
+export function validateAccount(
+  a: { id?: string; name: string; openingBalance: number; openingDate: string },
+  existing: Pick<CfoAccount, 'id' | 'name' | 'archived'>[] = [],
+): string | null {
+  if (!a.name.trim()) return 'Укажите название'
+  if (!Number.isInteger(a.openingBalance) || Math.abs(a.openingBalance) > MAX_AMOUNT_TIYN) return TOO_LARGE_AMOUNT
+  if (!isIsoDate(a.openingDate)) return 'Укажите дату начала учёта'
+  if (existing.some((x) => !x.archived && x.id !== a.id && sameName(x.name, a.name))) return 'Счёт с таким названием уже есть'
   return null
 }
 

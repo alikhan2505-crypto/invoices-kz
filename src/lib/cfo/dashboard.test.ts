@@ -33,9 +33,21 @@ describe('buildDashboard', () => {
     expect(d.netProfit.fact).toBe(t(200_000))
   })
 
-  it('cash now and runway without new income', () => {
+  it('cash now and runway without new income, over the days the data actually covers (P1-4)', () => {
     expect(d.cashNow).toBe(t(800_000))
-    expect(d.runwayDays).toBe(60)
+    // Учёт ведётся с 2026-01-01, сегодня 2026-03-15 — 74 дня, не 90: 800 000 × 74 / 1 200 000 = 49
+    expect(d.runwayWindowDays).toBe(74)
+    expect(d.runwayDays).toBe(49)
+  })
+
+  it('runway on 17 days of data divides by 17, not 90 (QA: «388 дн.» instead of ~73)', () => {
+    const young: CfoAccount = { ...kaspi, openingBalance: t(1_000_000), openingDate: '2026-03-01' }
+    const ops = [at('2026-03-02', { amount: t(50_000) }), at('2026-03-10', { amount: t(70_000) }), at('2026-03-17', { amount: t(50_000) })]
+    const r = buildDashboard({ ...input, accounts: [young], operations: ops, today: '2026-03-17' })
+    expect(r.runwayWindowDays).toBe(17)
+    expect(r.cashNow).toBe(t(830_000))
+    expect(r.runwayDays).toBe(Math.floor((830_000 * 17) / 170_000)) // 83, а по 90-дневному окну было бы 439
+    expect(r.runwayDays).toBe(83)
   })
 
   it('break-even revenue', () => {
@@ -73,9 +85,11 @@ describe('buildDashboard', () => {
 
   it('runway window excludes outflows outside the 90-day window', () => {
     // With today='2026-03-15', the window is 2025-12-16..2026-03-15 (90 days back, inclusive)
-    // Outflow on 2025-12-15 (one day outside) should not affect runway
+    // Outflow on 2025-12-15 (one day outside) should not affect the sum, but it does
+    // widen the covered period to the full 90 days: 800 000 × 90 / 1 200 000 = 60
     const withOutsideOutflow = [...operations, at('2025-12-15', { articleId: 'rent', amount: t(5_000_000) })]
     const outsideResult = buildDashboard({ ...input, operations: withOutsideOutflow })
+    expect(outsideResult.runwayWindowDays).toBe(90)
     expect(outsideResult.runwayDays).toBe(60)
 
     // Move the same outflow to 2025-12-16 (inside window) should change runway
@@ -113,6 +127,22 @@ describe('buildDashboard', () => {
 
     // Expense structure should be unchanged
     expect(withTransferResult.expenseStructure).toEqual(baseline.expenseStructure)
+  })
+
+  it('a loan account is excluded from cash and runway, reported as debt, and its payments count as outflow (P1-7)', () => {
+    const mortgage: CfoAccount = { id: 'mortgage', name: 'Ипотека', kind: 'loan', openingBalance: t(-12_000_000), openingDate: '2026-01-01', archived: false, sort: 9 }
+    const pay = op({ direction: 'transfer', articleId: null, accountId: 'kaspi', toAccountId: 'mortgage', amount: t(100_000), paidOn: '2026-03-10', accruedOn: '2026-03-10' })
+    const r = buildDashboard({ ...input, accounts: [kaspi, mortgage], operations: [...operations, pay], mode: 'family' })
+    expect(r.cashNow).toBe(t(700_000))
+    expect(r.debt).toBe(t(-11_900_000))
+    expect(r.firstGap).toBeNull() // долг сам по себе — не кассовый разрыв
+    expect(r.runwayDays).toBe(Math.floor((700_000 * 74) / 1_300_000))
+    // Семья: платёж по ипотеке — трата месяца
+    expect(r.expenseStructure.find((x) => x.articleId === 'loan-payments')?.amount).toBe(t(100_000))
+    expect(r.monthly[11].expense).toBe(t(900_000))
+    const biz = buildDashboard({ ...input, accounts: [kaspi, mortgage], operations: [...operations, pay] })
+    expect(biz.expenseStructure.some((x) => x.articleId === 'loan-payments')).toBe(false)
+    expect(buildDashboard(input).debt).toBe(0)
   })
 
   it('upcoming includes recurrence occurrences', () => {

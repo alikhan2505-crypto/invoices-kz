@@ -87,3 +87,30 @@ describe('openingDateConflict', () => {
     expect(openingDateConflict('card', '2026-03-01', ops)).toBeNull()
   })
 })
+
+
+describe('validateArticle / validateAccount uniqueness (P2-9)', () => {
+  const existing = [
+    { id: 'a1', name: 'Продукты', archived: false },
+    { id: 'a2', name: 'Зарплата', archived: true },
+  ]
+  it('rejects a duplicate name among active articles, case-insensitively, but not against archived ones or itself', () => {
+    expect(validateArticle({ name: 'продукты ', kind: 'expense', pnlGroup: 'opex' }, existing)).toBe('Статья с таким названием уже есть')
+    expect(validateArticle({ id: 'a1', name: 'Продукты', kind: 'expense', pnlGroup: 'opex' }, existing)).toBeNull()
+    expect(validateArticle({ name: 'Зарплата', kind: 'income', pnlGroup: 'revenue' }, existing)).toBeNull()
+    expect(validateArticle({ name: 'Новая', kind: 'expense', pnlGroup: 'opex' }, existing)).toBeNull()
+  })
+  it('validateAccount: name, amount bound, date and duplicate among active accounts', async () => {
+    const { validateAccount, validateAmount } = await import('./validate')
+    const accs = [{ id: 'k', name: 'Касса', archived: false }, { id: 'old', name: 'Старая карта', archived: true }]
+    expect(validateAccount({ name: 'касса', openingBalance: 0, openingDate: '2026-10-01' }, accs)).toBe('Счёт с таким названием уже есть')
+    expect(validateAccount({ id: 'k', name: 'Касса', openingBalance: 0, openingDate: '2026-10-01' }, accs)).toBeNull()
+    expect(validateAccount({ name: 'Старая карта', openingBalance: 0, openingDate: '2026-10-01' }, accs)).toBeNull()
+    expect(validateAccount({ name: ' ', openingBalance: 0, openingDate: '2026-10-01' }, accs)).toBe('Укажите название')
+    expect(validateAccount({ name: 'X', openingBalance: 0, openingDate: '2026-13-01' }, accs)).toBe('Укажите дату начала учёта')
+    expect(validateAccount({ name: 'X', openingBalance: 1e18, openingDate: '2026-10-01' }, accs)).toBe('Слишком большая сумма')
+    expect(validateAmount(99_999_999_999_999)).toBeNull()
+    expect(validateAmount(100_000_000_000_000)).toBe('Слишком большая сумма') // P2-8: та же граница, что в форме операции
+    expect(validateAmount(-1)).toBe('Укажите сумму')
+  })
+})

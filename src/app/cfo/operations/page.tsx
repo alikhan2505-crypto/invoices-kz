@@ -5,6 +5,7 @@ import { deleteOperation, deleteRecurrence, markPaid, receiptUrl } from '@/lib/c
 import { addMonths, firstDay, lastDay, monthKey, todayIso } from '@/lib/cfo/dates'
 import { expandRecurrences, isVirtual } from '@/lib/cfo/recurrence'
 import { accountName, dayLabel, DIRECTION_LABEL, opTitle } from '@/lib/cfo/labels'
+import { displayName, vocab } from '@/lib/cfo/mode'
 import { formatTenge } from '@/lib/cfo/money'
 import type { CfoOperation, OpStatus } from '@/lib/cfo/types'
 import { useCfo } from '../CfoWorkspace'
@@ -22,6 +23,7 @@ const signedAmount = (op: CfoOperation) => (op.direction === 'in' ? op.amount : 
 export default function CfoOperations() {
   const { ws, reload } = useCfo()
   const { alert, confirm, dialogElement } = useAppDialog()
+  const v = vocab(ws.mode)
   const today = todayIso()
   const [month, setMonth] = useState(monthKey(today))
   const [accountId, setAccountId] = useState('')
@@ -65,6 +67,16 @@ export default function CfoOperations() {
     return map // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ws.operations, ws.recurrences, calMonth, today, accountId, articleId, status])
 
+  // Excel: тот месяц, который на экране — в календаре это месяц календаря, не месяц списка.
+  const exportMonth = view === 'calendar' ? calMonth : month
+  const exportList = useMemo(() => (view === 'calendar'
+    ? [...byDate.values()].flat().filter((o) => !isVirtual(o)).sort((a, b) => b.paidOn.localeCompare(a.paidOn))
+    : list), [view, byDate, list])
+
+  // Фильтры: архивные статьи и счета не показываем, если они сейчас не выбраны.
+  const filterAccounts = ws.accounts.filter((a) => !a.archived || a.id === accountId)
+  const filterArticles = (kind: 'income' | 'expense') => ws.articles.filter((a) => a.kind === kind && (!a.archived || a.id === articleId))
+
   const busy = useRef(false)
   async function run(action: () => Promise<void>) {
     if (busy.current) return // ignore double clicks on row actions while one is in flight
@@ -101,7 +113,7 @@ export default function CfoOperations() {
                 <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>
                   {op.direction !== 'transfer' && `${accountName(op.accountId, ws.accounts)} · `}
                   {[op.counterparty, op.comment].filter(Boolean).join(' · ') || DIRECTION_LABEL[op.direction]}
-                  {op.accruedOn !== op.paidOn && ` · начисление ${op.accruedOn}`}
+                  {op.accruedOn !== op.paidOn && ` · ${ws.mode === 'family' ? 'относится к' : 'начисление'} ${op.accruedOn}`}
                 </div>
               </div>
               <div className="order-2 ml-auto sm:ml-0 sm:order-3 text-right">
@@ -130,7 +142,7 @@ export default function CfoOperations() {
     <CfoPage title="Операции" actions={editing === null && (
       <>
         <a href="/cfo/import" className="inline-flex items-center min-h-[44px] rounded-xl px-4 text-sm font-medium transition-colors hover:bg-[var(--nav-surface-glass)]" style={{ border: '1px solid var(--nav-border)', color: 'var(--nav-text-secondary)' }}>Импорт выписки</a>
-        <ExportButton onExport={() => downloadWorkbook(`Операции ${month} — ${ws.companyName}.xlsx`, { Операции: operationsSheet(list, ws.accounts, ws.articles) })} />
+        <ExportButton onExport={() => downloadWorkbook(`Операции ${exportMonth} — ${displayName(ws)}.xlsx`, { Операции: operationsSheet(exportList, ws.accounts, ws.articles, ws.mode) })} />
         <PrimaryButton type="button" onClick={() => { setNewDate(undefined); setEditing('new') }}>Добавить операцию</PrimaryButton>
       </>
     )}>
@@ -155,11 +167,16 @@ export default function CfoOperations() {
           {view === 'list' && <input type="month" aria-label="Месяц" className={`${inputClass} ${CTL} max-w-[180px]`} style={inputStyle} value={month} onChange={(e) => setMonth(e.target.value)} />}
           <select aria-label="Счёт" className={`${inputClass} ${CTL} max-w-[200px]`} style={inputStyle} value={accountId} onChange={(e) => setAccountId(e.target.value)}>
             <option value="">Все счета</option>
-            {ws.accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+            {filterAccounts.map((a) => <option key={a.id} value={a.id}>{a.name}{a.archived ? ' · в архиве' : ''}</option>)}
           </select>
           <select aria-label="Статья" className={`${inputClass} ${CTL} max-w-[240px]`} style={inputStyle} value={articleId} onChange={(e) => setArticleId(e.target.value)}>
             <option value="">Все статьи</option>
-            {ws.articles.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+            <optgroup label="Доходы">
+              {filterArticles('income').map((a) => <option key={a.id} value={a.id}>{a.name}{a.archived ? ' · в архиве' : ''}</option>)}
+            </optgroup>
+            <optgroup label="Расходы">
+              {filterArticles('expense').map((a) => <option key={a.id} value={a.id}>{a.name}{a.archived ? ' · в архиве' : ''}</option>)}
+            </optgroup>
           </select>
           <Segmented label="Статус" value={status} onChange={setStatus} options={[{ value: 'all', label: 'Все' }, { value: 'actual', label: 'Факт' }, { value: 'planned', label: 'План' }]} />
         </div>
@@ -181,7 +198,7 @@ export default function CfoOperations() {
       )}
 
       {view === 'list' && (ws.operations.length === 0 && editing === null ? (
-        <EmptyState title="Добавьте первую операцию" hint="Приход, расход или перевод между своими счетами — из них сами строятся БДР, БДДС и календарь." />
+        <EmptyState title="Добавьте первую операцию" hint={v.opsEmptyHint} />
       ) : (
         <Card className="!p-0 overflow-hidden">
           {list.length === 0 && <p className="p-4 text-sm" style={{ color: 'var(--nav-text-muted)' }}>{accountId || articleId || status !== 'all' ? 'Нет операций по выбранным фильтрам' : 'За этот период операций нет.'}</p>}
@@ -195,14 +212,15 @@ export default function CfoOperations() {
           {ws.recurrences.map((r) => (
             <div key={r.id} className="py-3 flex items-center gap-3 flex-wrap" style={{ borderBottom: '1px solid var(--nav-border-soft)' }}>
               <div className="flex-1 min-w-[200px]">
-                <div className="text-sm font-medium" style={{ color: 'var(--nav-text-primary)' }}>{opTitle(r, ws.accounts, ws.articles)}</div>
+                <div className="text-sm font-medium" style={{ color: 'var(--nav-text-primary)' }}>{opTitle(r, ws.accounts, ws.articles)}{r.counterparty ? ` · ${r.counterparty}` : ''}</div>
                 <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>
-                  {DIRECTION_LABEL[r.direction]} · {formatTenge(r.amount)} · каждое {r.dayOfMonth}-е число с {r.startsOn}{r.endsOn ? ` по ${r.endsOn}` : ''}
+                  {DIRECTION_LABEL[r.direction]} · {formatTenge(r.amount)} · каждое {r.dayOfMonth}-е число с {dayLabel(r.startsOn)} {r.startsOn.slice(0, 4)}{r.endsOn ? ` по ${dayLabel(r.endsOn)} ${r.endsOn.slice(0, 4)}` : ''}
                 </div>
               </div>
               <GhostButton
                 type="button"
-                onClick={async () => { if (await confirm('Удалить правило? Уже оплаченные операции останутся.')) await run(() => deleteRecurrence(r.id)) }}
+                aria-label={`Удалить правило: ${opTitle(r, ws.accounts, ws.articles)}, ${formatTenge(r.amount)}`}
+                onClick={async () => { if (await confirm('Удалить правило? Уже оплаченные и перенесённые платежи останутся.')) await run(() => deleteRecurrence(r.id)) }}
               >
                 Удалить
               </GhostButton>

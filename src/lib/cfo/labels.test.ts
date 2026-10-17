@@ -59,3 +59,18 @@ describe('labels', () => {
     expect(opTitle(unknownOp, [kaspi, cash], [rent, rev])).toBe('Без статьи')
   })
 })
+
+
+describe('plural', () => {
+  it('declines Russian nouns by number', async () => {
+    const { plural, opsCount, daysCount } = await import('./labels')
+    expect(opsCount(1)).toBe('1 операция')
+    expect(opsCount(2)).toBe('2 операции')
+    expect(opsCount(5)).toBe('5 операций')
+    expect(opsCount(11)).toBe('11 операций')
+    expect(opsCount(21)).toBe('21 операция')
+    expect(opsCount(112)).toBe('112 операций')
+    expect(daysCount(3)).toBe('3 дня')
+    expect(plural(0, 'день', 'дня', 'дней')).toBe('дней')
+  })
+})

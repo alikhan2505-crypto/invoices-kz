@@ -1,13 +1,9 @@
 'use client'
 import { shortMonth } from '@/lib/cfo/labels'
 import { formatTenge } from '@/lib/cfo/money'
+import { MEASURE_OPTIONS, elapsedMonths, isFutureMonth, measureValue, totalCell, totalHeading, type Measure, type ReportCell } from '@/lib/cfo/reportView'
 
-export type Measure = 'fact' | 'plan' | 'diff'
-export const MEASURE_OPTIONS: { value: Measure; label: string }[] = [
-  { value: 'fact', label: 'Факт' },
-  { value: 'plan', label: 'План' },
-  { value: 'diff', label: 'Отклонение' },
-]
+export { MEASURE_OPTIONS, type Measure }
 
 export type ReportRow = {
   key: string
@@ -16,25 +12,25 @@ export type ReportRow = {
   strong: boolean
   toggleKey?: string
   parentKey?: string
-  cells: Record<string, { plan: number | null; fact: number }>
-  total: { plan: number | null; fact: number }
+  cells: Record<string, ReportCell>
+  total: ReportCell
   higherIsBetter: boolean
 }
 
-// Founder 07.10.2026: a month that hasn't happened yet has no fact — show «—»,
-// not «0 ₸». The plan of a future month is real and stays visible.
-function Value({ cell, measure, higherIsBetter, future }: { cell: { plan: number | null; fact: number }; measure: Measure; higherIsBetter: boolean; future: boolean }) {
-  if (future && measure !== 'plan') return <span style={{ color: 'var(--nav-text-muted)' }}>—</span>
-  if (measure === 'fact') return <span style={{ color: cell.fact < 0 ? 'var(--nav-critical)' : undefined }}>{formatTenge(cell.fact)}</span>
-  if (cell.plan === null) return <span style={{ color: 'var(--nav-text-muted)' }}>—</span>
-  if (measure === 'plan') return <span>{formatTenge(cell.plan)}</span>
-  const diff = cell.fact - cell.plan
-  if (diff === 0) return <span style={{ color: 'var(--nav-text-muted)' }}>0</span>
-  const good = higherIsBetter ? diff > 0 : diff < 0
-  const pct = cell.plan !== 0 ? Math.round((diff / Math.abs(cell.plan)) * 100) : null
+// Что показывать в клетке, решает reportView (те же правила, что в Excel):
+// будущий месяц без факта — «—», план будущего месяца виден.
+function Value({ cell, measure, higherIsBetter, future }: { cell: ReportCell | undefined; measure: Measure; higherIsBetter: boolean; future: boolean }) {
+  const v = measureValue(cell, measure, future)
+  if (v === null) return <span style={{ color: 'var(--nav-text-muted)' }}>—</span>
+  if (measure === 'fact') return <span style={{ color: v < 0 ? 'var(--nav-critical)' : undefined }}>{formatTenge(v)}</span>
+  if (measure === 'plan') return <span>{formatTenge(v)}</span>
+  if (v === 0) return <span style={{ color: 'var(--nav-text-muted)' }}>0</span>
+  const good = higherIsBetter ? v > 0 : v < 0
+  const plan = cell?.plan ?? 0
+  const pct = plan !== 0 ? Math.round((v / Math.abs(plan)) * 100) : null
   return (
     <span style={{ color: good ? 'var(--nav-success)' : 'var(--nav-critical)' }}>
-      {diff > 0 ? '+' : ''}{formatTenge(diff)}
+      {v > 0 ? '+' : ''}{formatTenge(v)}
       {pct !== null && <span className="block text-[11px] opacity-80">{pct > 0 ? '+' : ''}{pct}%</span>}
     </span>
   )
@@ -49,16 +45,7 @@ export default function ReportTable({ months, rows, measure, collapsed, onToggle
   currentMonth: string
 }) {
   const visible = rows.filter((r) => !r.parentKey || !collapsed.has(r.parentKey))
-  const elapsed = months.filter((m) => m <= currentMonth)
-  // Deviation in «Итого» compares like with like: only months that have already started,
-  // otherwise mid-year the year-to-date fact is set against the full-year plan.
-  const totalCell = (r: ReportRow): ReportRow['total'] => {
-    if (measure !== 'diff' || r.total.plan === null) return r.total
-    return elapsed.reduce(
-      (acc, m) => ({ plan: (acc.plan ?? 0) + (r.cells[m]?.plan ?? 0), fact: acc.fact + (r.cells[m]?.fact ?? 0) }),
-      { plan: 0 as number | null, fact: 0 },
-    )
-  }
+  const noneElapsed = elapsedMonths(months, currentMonth).length === 0
   return (
     <div className="nav-glass rounded-2xl overflow-x-auto">
       <table className="text-sm border-collapse min-w-full">
@@ -66,7 +53,7 @@ export default function ReportTable({ months, rows, measure, collapsed, onToggle
           <tr style={{ borderBottom: '1px solid var(--nav-border)' }}>
             <th scope="col" className="sticky left-0 z-10 text-left font-semibold px-3 py-2 min-w-[240px]" style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-secondary)' }}>Статья</th>
             {months.map((m) => <th scope="col" key={m} className="px-3 py-2 font-semibold text-right whitespace-nowrap" style={{ color: 'var(--nav-text-secondary)' }}>{shortMonth(m)}</th>)}
-            <th scope="col" className="px-3 py-2 font-semibold text-right whitespace-nowrap" style={{ color: 'var(--nav-text-secondary)' }}>{measure === 'diff' && elapsed.length > 0 && elapsed.length < months.length ? 'Итого с начала года' : 'Итого'}</th>
+            <th scope="col" className="px-3 py-2 font-semibold text-right whitespace-nowrap" style={{ color: 'var(--nav-text-secondary)' }}>{totalHeading(months, currentMonth, measure)}</th>
           </tr>
         </thead>
         <tbody>
@@ -83,11 +70,11 @@ export default function ReportTable({ months, rows, measure, collapsed, onToggle
               </td>
               {months.map((m) => (
                 <td key={m} className="px-3 py-2 text-right tabular-nums whitespace-nowrap" style={{ fontWeight: r.strong ? 600 : 400 }}>
-                  <Value cell={r.cells[m]} measure={measure} higherIsBetter={r.higherIsBetter} future={m > currentMonth} />
+                  <Value cell={r.cells[m]} measure={measure} higherIsBetter={r.higherIsBetter} future={isFutureMonth(m, currentMonth)} />
                 </td>
               ))}
               <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap font-semibold">
-                <Value cell={totalCell(r)} measure={measure} higherIsBetter={r.higherIsBetter} future={elapsed.length === 0} />
+                <Value cell={totalCell(r, months, currentMonth, measure)} measure={measure} higherIsBetter={r.higherIsBetter} future={noneElapsed} />
               </td>
             </tr>
           ))}

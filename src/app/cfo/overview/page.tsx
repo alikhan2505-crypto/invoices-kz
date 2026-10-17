@@ -1,11 +1,13 @@
 'use client'
 import { useMemo, useState } from 'react'
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
-import { accountBalanceAt } from '@/lib/cfo/balances'
+import { accountBalanceAt, cashAccounts, loanAccounts } from '@/lib/cfo/balances'
 import { buildDashboard } from '@/lib/cfo/dashboard'
 import { daysInMonth, monthKey, todayIso } from '@/lib/cfo/dates'
-import { dayLabel, monthTitle, opTitle, shortMonth } from '@/lib/cfo/labels'
-import { formatTenge } from '@/lib/cfo/money'
+import { forecastOperations } from '@/lib/cfo/invoiceLink'
+import { dayLabel, monthTitle, opTitle, plural, shortMonth } from '@/lib/cfo/labels'
+import { vocab } from '@/lib/cfo/mode'
+import { formatNumber, formatTenge } from '@/lib/cfo/money'
 import { useCfo } from '../CfoWorkspace'
 import AskCfo from '../AskCfo'
 import CfoTour from '../CfoTour'
@@ -25,14 +27,17 @@ function Kpi({ label, value, sub, tone }: { label: string; value: string; sub?: 
 export default function CfoOverview() {
   const { ws } = useCfo()
   const family = ws.mode === 'family'
+  const v = vocab(ws.mode)
   const today = todayIso()
   const [month, setMonth] = useState(monthKey(today))
-  const d = useMemo(() => buildDashboard({ accounts: ws.accounts, articles: ws.articles, operations: ws.operations, recurrences: ws.recurrences, plan: ws.plan, month, today }), [ws, month, today])
+  // Прогноз — с ожидаемыми оплатами по счетам invoices.kz, как в календаре и сводке
+  // (виртуальные плановые строки влияют только на разрыв и «Платежи на 7 дней»).
+  const d = useMemo(() => buildDashboard({ accounts: ws.accounts, articles: ws.articles, operations: forecastOperations(ws, today), recurrences: ws.recurrences, plan: ws.plan, month, today, mode: ws.mode }), [ws, month, today])
 
   if (ws.operations.length === 0 && ws.recurrences.length === 0) {
     return (
       <CfoPage title="Обзор">
-        <EmptyState title="Добавьте первую операцию" hint="Как только появятся приходы и расходы, здесь будут выручка, прибыль, запас денег и ближайшие платежи." href="/cfo/operations" cta="Перейти к операциям" />
+        <EmptyState title="Добавьте первую операцию" hint={v.overviewEmptyHint} href="/cfo/operations" cta="Перейти к операциям" />
         <CfoTour />
       </CfoPage>
     )
@@ -46,15 +51,19 @@ export default function CfoOverview() {
   }
   const actual = ws.operations.filter((o) => o.status === 'actual')
   // The headline counts archived accounts too, so name their total — otherwise the parts don't add up.
-  const archivedTotal = ws.accounts.filter((a) => a.archived).reduce((s, a) => s + accountBalanceAt(a, actual, today), 0)
+  const cash = cashAccounts(ws.accounts)
+  const archivedTotal = cash.filter((a) => a.archived).reduce((s, a) => s + accountBalanceAt(a, actual, today), 0)
   const byAccount = [
-    ...ws.accounts.filter((a) => !a.archived).map((a) => `${a.name} ${formatTenge(accountBalanceAt(a, actual, today))}`),
+    ...cash.filter((a) => !a.archived).map((a) => `${a.name} ${formatTenge(accountBalanceAt(a, actual, today))}`),
     ...(archivedTotal !== 0 ? [`в архиве ${formatTenge(archivedTotal)}`] : []),
   ].join(' · ')
+  const loans = loanAccounts(ws.accounts)
+  const byLoan = loans.map((a) => `${a.name} ${formatTenge(accountBalanceAt(a, actual, today))}`).join(' · ')
   // Break-even is an estimate — whole tenge, no kopecks.
   const breakeven = d.breakeven.kind === 'ok' ? formatTenge(Math.round(d.breakeven.value / 100) * 100) : d.breakeven.kind === 'unreachable' ? 'не достигается' : '—'
   const breakevenSub = d.breakeven.kind === 'ok' ? 'выручка в месяц, при которой прибыль = 0' : d.breakeven.kind === 'unreachable' ? 'при текущей марже' : 'нет выручки за месяц'
   const maxExpense = d.expenseStructure[0]?.amount ?? 0
+  const more = d.expenseStructure.length - 8
 
   return (
     <CfoPage
@@ -64,7 +73,7 @@ export default function CfoOverview() {
       {d.firstGap && (
         <Card className="!py-3">
           <p className="text-sm font-medium" style={{ color: 'var(--nav-critical)' }}>
-            Кассовый разрыв {dayLabel(d.firstGap)} — по плановым платежам денег не хватит. <a href="/cfo/calendar" className="underline inline-flex min-h-[44px] items-center">Открыть календарь</a>
+            {v.gap} {dayLabel(d.firstGap)} — {v.gapHint}. <a href="/cfo/calendar" className="underline inline-flex min-h-[44px] items-center">{family ? 'Открыть платежи' : 'Открыть календарь'}</a>
           </p>
         </Card>
       )}
@@ -83,8 +92,14 @@ export default function CfoOverview() {
             <Kpi label="Чистая прибыль" value={formatTenge(d.netProfit.fact)} sub={planNote(d.netProfit)} tone={d.netProfit.fact < 0 ? 'bad' : undefined} />
           </>
         )}
-        <Kpi label="Деньги сейчас" value={formatTenge(d.cashNow)} sub={byAccount || 'на всех счетах и в кассах'} tone={d.cashNow < 0 ? 'bad' : undefined} />
-        <Kpi label="Запас денег" value={d.runwayDays === null ? '—' : d.cashNow <= 0 ? 'нет денег' : `${d.runwayDays} дн.`} sub={d.runwayDays === null ? 'нет выплат за 90 дней' : 'без новых поступлений, по средним выплатам за 90 дней'} tone={d.runwayDays !== null && (d.cashNow <= 0 || d.runwayDays < 30) ? 'bad' : undefined} />
+        <Kpi label="Деньги сейчас" value={formatTenge(d.cashNow)} sub={byAccount || (family ? 'на всех картах и наличными' : 'на всех счетах и в кассах')} tone={d.cashNow < 0 ? 'bad' : undefined} />
+        <Kpi
+          label="Запас денег"
+          value={d.runwayDays === null ? '—' : d.cashNow <= 0 ? 'нет денег' : `${formatNumber(d.runwayDays)} дн.`}
+          sub={d.runwayDays === null ? `нет выплат за ${d.runwayWindowDays} дн.` : `без новых поступлений, по средним выплатам за ${d.runwayWindowDays} ${plural(d.runwayWindowDays, 'день', 'дня', 'дней')}`}
+          tone={d.runwayDays !== null && (d.cashNow <= 0 || d.runwayDays < 30) ? 'bad' : undefined}
+        />
+        {loans.length > 0 && <Kpi label="Долги" value={formatTenge(d.debt)} sub={byLoan || 'кредиты и ипотека'} tone={d.debt < 0 ? 'bad' : undefined} />}
         {family
           ? <Kpi label="Средние траты в день" value={formatTenge(Math.round((d.revenue.fact - d.netProfit.fact) / Math.max(1, month === monthKey(todayIso()) ? Number(todayIso().slice(8)) : daysInMonth(month)) / 100) * 100)} sub="расходы месяца ÷ дни" />
           : <Kpi label="Точка безубыточности" value={breakeven} sub={breakevenSub} />}
@@ -128,9 +143,9 @@ export default function CfoOverview() {
                 </div>
               </div>
             ))}
-            {d.expenseStructure.length > 8 && (
+            {more > 0 && (
               <p className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>
-                ещё {d.expenseStructure.length - 8} {d.expenseStructure.length - 8 === 1 ? 'статья' : d.expenseStructure.length - 8 < 5 ? 'статьи' : 'статей'} — {formatTenge(d.expenseStructure.slice(8).reduce((s, x) => s + x.amount, 0))}
+                ещё {more} {plural(more, 'статья', 'статьи', 'статей')} — {formatTenge(d.expenseStructure.slice(8).reduce((s, x) => s + x.amount, 0))}
               </p>
             )}
           </div>

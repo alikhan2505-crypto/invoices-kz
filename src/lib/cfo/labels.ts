@@ -1,6 +1,12 @@
 import type { AccountKind, Activity, ArticleKind, CfoAccount, CfoArticle, CfoOperation, Direction, PnlGroup } from './types'
 
-export const ACCOUNT_KIND_LABEL: Record<AccountKind, string> = { bank: 'Банковский счёт', card: 'Карта', cash: 'Наличные', deposit: 'Депозит' }
+export const ACCOUNT_KIND_LABEL: Record<AccountKind, string> = { bank: 'Банковский счёт', card: 'Карта', cash: 'Наличные', deposit: 'Депозит', loan: 'Кредит / ипотека' }
+// Вид «кредит» появляется в формах только после миграции cfo_account_loan.sql
+// (расширяет check-ограничение kind в базе). Пока она не применена, вставка
+// такого счёта упала бы на ограничении — поэтому пункт спрятан. После
+// применения миграции переключить на true.
+export const LOAN_KIND_ENABLED = false
+export const SELECTABLE_ACCOUNT_KINDS: AccountKind[] = (Object.keys(ACCOUNT_KIND_LABEL) as AccountKind[]).filter((k) => LOAN_KIND_ENABLED || k !== 'loan')
 export const ARTICLE_KIND_LABEL: Record<ArticleKind, string> = { income: 'Доход', expense: 'Расход' }
 export const ACTIVITY_LABEL: Record<Activity, string> = { operating: 'Операционная', investing: 'Инвестиционная', financing: 'Финансовая' }
 export const PNL_GROUP_LABEL: Record<PnlGroup, string> = {
@@ -36,3 +42,15 @@ export function opTitle(op: Pick<CfoOperation, 'direction' | 'accountId' | 'toAc
   if (op.direction === 'transfer') return `Перевод: ${accountName(op.accountId, accounts)} → ${accountName(op.toAccountId, accounts)}`
   return articles.find((a) => a.id === op.articleId)?.name ?? 'Без статьи'
 }
+
+// Склонение по числу: plural(1, 'операция', 'операции', 'операций') → «операция».
+export function plural(n: number, one: string, few: string, many: string): string {
+  const abs = Math.abs(n)
+  const m10 = abs % 10
+  const m100 = abs % 100
+  if (m10 === 1 && m100 !== 11) return one
+  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few
+  return many
+}
+export const opsCount = (n: number) => `${n} ${plural(n, 'операция', 'операции', 'операций')}`
+export const daysCount = (n: number) => `${n} ${plural(n, 'день', 'дня', 'дней')}`

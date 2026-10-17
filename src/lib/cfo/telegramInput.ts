@@ -38,7 +38,8 @@ export function checkParsed(p: Parsed, ws: Workspace, today: string, text: strin
   if (!Number.isFinite(amount) || amount <= 0 || amount > MAX_AMOUNT_TIYN) return { ok: false, error: 'Не понял сумму. Напишите её цифрами, например 300 000 или 300к.' }
   const article = ws.articles.find((a) => a.id === p.article_id && !a.archived && a.kind === (direction === 'in' ? 'income' : 'expense'))
   if (!article) return { ok: false, error: 'Не смог подобрать статью — уточните, на что деньги (например «аренда», «зарплата», «закупка»).' }
-  const live = ws.accounts.filter((a) => !a.archived)
+  // Счёт по умолчанию — денежный: приход «на ипотеку» был бы не деньгами (как в invoiceLink).
+  const live = ws.accounts.filter((a) => !a.archived && a.kind !== 'loan')
   const account = live.find((a) => a.id === p.account_id) ?? live.find((a) => a.kind === 'bank') ?? live[0]
   if (!account) return { ok: false, error: 'В кабинете нет ни одного счёта — добавьте его в настройках CFO.' }
   const date = typeof p.date === 'string' && isIsoDate(p.date) && p.date >= addDays(today, -366) && p.date <= addDays(today, 366) ? p.date : today

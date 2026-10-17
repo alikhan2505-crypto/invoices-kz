@@ -2,22 +2,24 @@
 import { monthLimits } from '@/lib/cfo/limits'
 import { monthTitle } from '@/lib/cfo/labels'
 import { formatTenge } from '@/lib/cfo/money'
+import { vocab } from '@/lib/cfo/mode'
 import { useCfo } from './CfoWorkspace'
 import { Card, SectionTitle } from './ui'
 
 const COLOR = { ok: 'var(--nav-accent)', warn: 'var(--nav-magenta)', over: 'var(--nav-critical)' } as const
 
-// Лимиты расходов месяца — это план по статьям из «Плана»: видно, где бюджет на исходе.
+// Лимиты расходов месяца — это план по статьям из «Плана» (в семье — «Бюджета»): видно, где бюджет на исходе.
 export default function LimitsCard({ month }: { month: string }) {
   const { ws } = useCfo()
+  const v = vocab(ws.mode)
   const rows = monthLimits(ws, month)
   return (
     <Card>
       <SectionTitle>Лимиты расходов · {monthTitle(month)}</SectionTitle>
       {rows.length === 0 ? (
         <p className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
-          Лимитов нет. Впишите план расходов по статьям в{' '}
-          <a href="/cfo/plan" className="inline-flex items-center min-h-[44px] underline font-semibold" style={{ color: 'var(--nav-accent)' }}>Плане</a>
+          {v.limitsEmpty}{' '}
+          <a href="/cfo/plan" className="inline-flex items-center min-h-[44px] underline font-semibold" style={{ color: 'var(--nav-accent)' }}>{v.limitsLink}</a>
           {' '}— здесь будет видно, где бюджет на исходе.
         </p>
       ) : (

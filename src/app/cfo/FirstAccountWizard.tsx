@@ -5,7 +5,8 @@ import { createAccounts, loadDemo, setMode } from '@/lib/cfo/data'
 import type { CfoMode } from '@/lib/cfo/mode'
 import { parseAmountInput } from '@/lib/cfo/money'
 import { isIsoDate, todayIso } from '@/lib/cfo/dates'
-import { ACCOUNT_KIND_LABEL } from '@/lib/cfo/labels'
+import { ACCOUNT_KIND_LABEL, SELECTABLE_ACCOUNT_KINDS } from '@/lib/cfo/labels'
+import { NEGATIVE_BALANCE_WARNING } from './AccountForm'
 import { useCfo } from './CfoWorkspace'
 import { Card, CfoPage, ErrorText, Field, GhostButton, PrimaryButton, inputClass, inputStyle } from './ui'
 
@@ -52,6 +53,8 @@ export default function FirstAccountWizard() {
   }
 
   const patch = (key: number, p: Partial<Row>) => setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...p } : r)))
+  // Та же подсказка, что в форме счёта: минус у обычного счёта — почти всегда долг не тем видом.
+  const negativeRow = rows.some((r) => r.kind !== 'loan' && (parseAmountInput(r.balance, { allowNegative: true }) ?? 0) < 0)
   const addRow = () => setRows((rs) => [...rs, { key: Math.max(...rs.map((r) => r.key)) + 1, kind: 'bank', name: '', balance: '' }])
   const removeRow = (key: number) => setRows((rs) => rs.filter((r) => r.key !== key))
 
@@ -119,7 +122,7 @@ export default function FirstAccountWizard() {
           {mode === 'family'
             ? 'Укажите, сколько денег сейчас на каждой карте, наличными и в накоплениях — от этого будет считаться, сколько у семьи денег и на сколько их хватит.'
             : 'Укажите, сколько денег сейчас на каждом счёте, карте, в кассе и на депозите — это стартовая точка для движения денег и платёжного календаря.'}
-          Чего нет — оставьте пустым. Остаток может быть отрицательным (овердрафт). Счета можно добавить и поправить потом в настройках.
+          Чего нет — оставьте пустым. Остаток может быть отрицательным (овердрафт){SELECTABLE_ACCOUNT_KINDS.includes('loan') ? '; кредит или ипотеку заведите видом «Кредит / ипотека» — это долг, а не деньги' : ''}. Счета можно добавить и поправить потом в настройках.
         </p>
         <form onSubmit={submit} className="space-y-3">
           <div className="space-y-3">
@@ -129,7 +132,7 @@ export default function FirstAccountWizard() {
                 <div className="order-3 sm:order-1">
                   <Field label="Тип">
                     <select className={inputClass} style={inputStyle} value={r.kind} onChange={(e) => patch(r.key, { kind: e.target.value as AccountKind })}>
-                      {(Object.keys(ACCOUNT_KIND_LABEL) as AccountKind[]).map((k) => <option key={k} value={k}>{ACCOUNT_KIND_LABEL[k]}</option>)}
+                      {SELECTABLE_ACCOUNT_KINDS.map((k) => <option key={k} value={k}>{ACCOUNT_KIND_LABEL[k]}</option>)}
                     </select>
                   </Field>
                 </div>
@@ -149,6 +152,11 @@ export default function FirstAccountWizard() {
               </div>
             ))}
           </div>
+          {negativeRow && (
+            <p role="status" className="text-xs rounded-lg px-3 py-2" style={{ background: 'var(--nav-magenta-soft)', color: 'var(--nav-critical)' }}>
+              {NEGATIVE_BALANCE_WARNING}
+            </p>
+          )}
           <GhostButton type="button" onClick={addRow}>+ Ещё счёт</GhostButton>
           <div className="max-w-xs">
             <Field label="Остатки на дату (начало учёта)">

@@ -4,11 +4,12 @@ import { useRouter } from 'next/navigation'
 import { useAppDialog } from '@/components/AppDialog'
 import { importOperations } from '@/lib/cfo/data'
 import { todayIso } from '@/lib/cfo/dates'
-import { dayLabel } from '@/lib/cfo/labels'
-import { formatTenge } from '@/lib/cfo/money'
+import { dayLabel, opsCount } from '@/lib/cfo/labels'
+import { vocab } from '@/lib/cfo/mode'
+import { formatNumber, formatTenge } from '@/lib/cfo/money'
 import { readStatementGrid } from '@/lib/cfo/readStatement'
 import {
-  NO_COLUMN, detectColumns, extractRows, markDuplicates, rowProblem, suggestChoice, toDraft,
+  MAX_IMPORT_ROWS, NO_COLUMN, detectColumns, extractRowsWithTotal, markDuplicates, rowProblem, suggestChoice, toDraft,
   type Choice, type ColumnMap, type Grid, type ImportDraft, type ParsedRow,
 } from '@/lib/cfo/statementImport'
 import { validateOperation } from '@/lib/cfo/validate'
@@ -16,14 +17,6 @@ import { useCfo } from '../CfoWorkspace'
 import { Badge, Card, CfoPage, ErrorText, Field, GhostButton, Money, PrimaryButton, SectionTitle, inputClass, inputStyle } from '../ui'
 
 const EMPTY_MAP: ColumnMap = { date: NO_COLUMN, amount: NO_COLUMN, debit: NO_COLUMN, credit: NO_COLUMN, counterparty: NO_COLUMN, purpose: NO_COLUMN }
-const MAP_FIELDS: { key: keyof ColumnMap; label: string }[] = [
-  { key: 'date', label: 'Дата' },
-  { key: 'amount', label: 'Сумма со знаком (минус — списание)' },
-  { key: 'debit', label: 'Списание (дебет)' },
-  { key: 'credit', label: 'Поступление (кредит)' },
-  { key: 'counterparty', label: 'Контрагент' },
-  { key: 'purpose', label: 'Назначение платежа' },
-]
 
 const encode = (c: Choice) => (c.kind === 'article' ? `a:${c.articleId}` : c.kind === 'transfer' ? `t:${c.otherAccountId}` : 'none')
 const decode = (v: string): Choice => (v.startsWith('a:') ? { kind: 'article', articleId: v.slice(2) } : v.startsWith('t:') ? { kind: 'transfer', otherAccountId: v.slice(2) } : { kind: 'none' })
@@ -34,8 +27,18 @@ export default function CfoImport() {
   const { ws, reload, pro } = useCfo()
   const router = useRouter()
   const { alert, confirm, dialogElement } = useAppDialog()
+  const v = vocab(ws.mode)
+  const family = ws.mode === 'family'
   const today = todayIso()
   const liveAccounts = ws.accounts.filter((a) => !a.archived)
+  const mapFields: { key: keyof ColumnMap; label: string }[] = [
+    { key: 'date', label: 'Дата' },
+    { key: 'amount', label: 'Сумма со знаком (минус — списание)' },
+    { key: 'debit', label: 'Списание (дебет)' },
+    { key: 'credit', label: 'Поступление (кредит)' },
+    { key: 'counterparty', label: v.counterparty },
+    { key: 'purpose', label: v.purpose },
+  ]
 
   const [accountId, setAccountId] = useState(liveAccounts[0]?.id ?? '')
   const [fileName, setFileName] = useState('')
@@ -70,9 +73,11 @@ export default function CfoImport() {
   }
 
   const mapOk = map.date !== NO_COLUMN && (map.amount !== NO_COLUMN || map.debit !== NO_COLUMN || map.credit !== NO_COLUMN)
-  const rows = useMemo(() => (grid && mapOk ? extractRows(grid, headerRow, map) : []), [grid, headerRow, map, mapOk])
+  const parsed = useMemo(() => (grid && mapOk ? extractRowsWithTotal(grid, headerRow, map) : { rows: [], total: 0 }), [grid, headerRow, map, mapOk])
+  const rows = parsed.rows
+  const truncated = parsed.total > rows.length
   const duplicates = useMemo(() => (account ? markDuplicates(rows, account.id, ws.operations) : new Set<number>()), [rows, account, ws.operations])
-  const suggested = useMemo(() => new Map(rows.map((r) => [r.line, suggestChoice(r, ws.operations, ws.articles)])), [rows, ws.operations, ws.articles])
+  const suggested = useMemo(() => new Map(rows.map((r) => [r.line, suggestChoice(r, ws.operations, ws.articles, ws.mode)])), [rows, ws.operations, ws.articles, ws.mode])
 
   const choiceOf = (r: ParsedRow) => overrides.get(r.line) ?? suggested.get(r.line) ?? { kind: 'none' as const }
   const problemOf = (r: ParsedRow) => (account ? rowProblem(r, account, today) : 'выберите счёт')
@@ -118,12 +123,12 @@ export default function CfoImport() {
       if (!d || problem) { setError(`Строка ${r.line}: ${problem ?? 'выберите статью'}`); return }
       drafts.push(d)
     }
-    if (!(await confirm(`Загрузить ${drafts.length} операций на счёт «${account.name}»?`))) return
+    if (!(await confirm(`Загрузить ${opsCount(drafts.length)} на счёт «${account.name}»?${truncated ? ` В файле ещё ${formatNumber(parsed.total - rows.length)} строк — их нужно загрузить отдельным файлом.` : ''}`))) return
     setSaving(true)
     try {
       const n = await importOperations(ws, drafts)
       await reload().catch(() => {})
-      await alert(`Загружено операций: ${n}`)
+      await alert(`Загружено: ${opsCount(n)}`)
       router.push('/cfo/operations')
     } catch (e) {
       await reload().catch(() => {})
@@ -138,7 +143,9 @@ export default function CfoImport() {
       <CfoPage title="Импорт выписки">
         <Card className="max-w-xl">
           <p className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
-            Загрузка банковской выписки из Excel доступна на тарифе Про: операции сами ложатся в журнал, статьи подставляются по контрагенту и назначению платежа.
+            {family
+              ? 'Загрузка выписки Kaspi или другого банка из Excel доступна на тарифе Про: траты сами ложатся в журнал, а категории подставляются по магазину и описанию.'
+              : 'Загрузка банковской выписки из Excel доступна на тарифе Про: операции сами ложатся в журнал, статьи подставляются по контрагенту и назначению платежа.'}
           </p>
           <a href="/upgrade" className="inline-flex items-center min-h-[44px] mt-4 rounded-xl px-4 text-sm font-semibold" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>Перейти на Про</a>
         </Card>
@@ -154,7 +161,7 @@ export default function CfoImport() {
     <CfoPage title="Импорт выписки" actions={<GhostButton type="button" onClick={() => router.push('/cfo/operations')}>К операциям</GhostButton>}>
       <Card>
         <p className="text-sm mb-4" style={{ color: 'var(--nav-text-secondary)' }}>
-          Выгрузите выписку из интернет-банка в Excel и загрузите сюда. Файл читается прямо в браузере и никуда не отправляется — в журнал попадут только строки, которые вы подтвердите.
+          Выгрузите выписку из {family ? 'приложения банка' : 'интернет-банка'} в Excel и загрузите сюда. Файл читается прямо в браузере и никуда не отправляется — в журнал попадут только строки, которые вы подтвердите.
           Повторная загрузка той же выписки не задвоит операции: совпадения по дате и сумме отмечаются как «уже есть».
         </p>
         <div className="grid sm:grid-cols-2 gap-3">
@@ -182,7 +189,7 @@ export default function CfoImport() {
             <Field label="Строка с заголовками">
               <input type="number" min={1} max={grid.length} className={inputClass} style={inputStyle} value={headerRow + 1} onChange={(e) => setHeaderRow(Math.max(0, Math.min(grid.length - 1, Number(e.target.value) - 1 || 0)))} />
             </Field>
-            {MAP_FIELDS.map((f) => (
+            {mapFields.map((f) => (
               <Field key={f.key} label={f.label}>
                 <select className={inputClass} style={inputStyle} value={map[f.key]} onChange={(e) => setMap((m) => ({ ...m, [f.key]: Number(e.target.value) }))}>
                   <option value={NO_COLUMN}>—</option>
@@ -201,11 +208,16 @@ export default function CfoImport() {
       {grid && mapOk && (
         <Card>
           <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
-            <SectionTitle>Строки выписки: {rows.length}</SectionTitle>
+            <SectionTitle>Строки выписки: {formatNumber(rows.length)}{truncated ? ` из ${formatNumber(parsed.total)}` : ''}</SectionTitle>
             <div className="text-sm tabular-nums" style={{ color: 'var(--nav-text-secondary)' }}>
               К загрузке {chosen.length}: приход {formatTenge(totals.in)} · расход {formatTenge(totals.out)}
             </div>
           </div>
+          {truncated && (
+            <p role="alert" className="text-sm mb-3 rounded-xl px-3 py-2" style={{ background: 'var(--nav-magenta-soft)', color: 'var(--nav-critical)' }}>
+              Показаны первые {formatNumber(MAX_IMPORT_ROWS)} из {formatNumber(parsed.total)} строк — разбейте файл на части (например, по месяцам) и загрузите остальные {formatNumber(parsed.total - rows.length)} строк отдельно. Ни одна строка не будет загружена молча.
+            </p>
+          )}
           {rows.length === 0 && <p className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>Не нашли ни одной строки с датой и суммой — проверьте колонки выше.</p>}
           <div>
             {rows.map((r) => {
@@ -249,7 +261,7 @@ export default function CfoImport() {
           <div className="mt-4 space-y-2">
             <ErrorText>{error}</ErrorText>
             <PrimaryButton type="button" disabled={saving || chosen.length === 0} onClick={() => void submit()}>
-              {saving ? 'Загружаю…' : `Загрузить ${chosen.length} операций`}
+              {saving ? 'Загружаю…' : `Загрузить ${opsCount(chosen.length)}`}
             </PrimaryButton>
           </div>
         </Card>

@@ -2,6 +2,7 @@
 import { useMemo, useState } from 'react'
 import { buildCashflow, type CashflowRow } from '@/lib/cfo/cashflow'
 import { monthKey, todayIso, yearMonths } from '@/lib/cfo/dates'
+import { displayName, vocab } from '@/lib/cfo/mode'
 import { useCfo } from '../CfoWorkspace'
 import ReportTable, { MEASURE_OPTIONS, type Measure, type ReportRow } from '../ReportTable'
 import { CfoPage, Segmented, YearPicker } from '../ui'
@@ -21,9 +22,11 @@ export default function CfoCashflow() {
   const [measure, setMeasure] = useState<Measure>('fact')
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const months = useMemo(() => yearMonths(year), [year])
+  const currentMonth = monthKey(todayIso())
+  const v = vocab(ws.mode)
 
   const rows: ReportRow[] = useMemo(() => {
-    const raw = buildCashflow({ accounts: ws.accounts, articles: ws.articles, operations: ws.operations, plan: ws.plan, months })
+    const raw = buildCashflow({ accounts: ws.accounts, articles: ws.articles, operations: ws.operations, plan: ws.plan, months, mode: ws.mode })
     const kindOf = new Map(ws.articles.map((a) => [a.id, a.kind]))
     return raw.map((r) => {
       const articleKind = r.type === 'article' ? kindOf.get(r.key.slice(2)) : undefined
@@ -36,7 +39,8 @@ export default function CfoCashflow() {
         parentKey: (r.type === 'section' || r.type === 'article') && r.activity ? `act:${r.activity}` : undefined,
         cells: r.cells,
         total: r.total,
-        higherIsBetter: r.type === 'article' ? articleKind === 'income' : higherIsBetter(r),
+        // Синтетические строки кредитов («Платежи по кредитам» / «Получено по кредиту») — по секции.
+        higherIsBetter: r.type === 'article' ? (articleKind ? articleKind === 'income' : r.key === 'a:loan-received') : higherIsBetter(r),
       }
     })
   }, [ws, months])
@@ -49,11 +53,11 @@ export default function CfoCashflow() {
   })
 
   return (
-    <CfoPage title={ws.mode === 'family' ? 'Движение денег' : 'БДДС'} actions={<><ExportButton onExport={() => downloadWorkbook(`${ws.mode === 'family' ? 'Движение денег' : 'БДДС'} ${year} — ${ws.companyName}.xlsx`, reportSheets(months, rows))} /><Segmented label="Показатель" value={measure} onChange={setMeasure} options={MEASURE_OPTIONS} /><YearPicker value={year} onChange={setYear} /></>}>
+    <CfoPage title={v.cashflow} actions={<><ExportButton onExport={() => downloadWorkbook(`${v.cashflow} ${year} — ${displayName(ws)}.xlsx`, reportSheets(months, rows, currentMonth))} /><Segmented label="Показатель" value={measure} onChange={setMeasure} options={MEASURE_OPTIONS} /><YearPicker value={year} onChange={setYear} /></>}>
       <p className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
-        Деньги по дате оплаты, по видам деятельности. Остатки — по всем счетам и кассам, переводы между ними не считаются ни поступлением, ни выплатой.
+        {v.cashflowHint}
       </p>
-      <ReportTable months={months} rows={rows} measure={measure} collapsed={collapsed} onToggle={toggle} currentMonth={monthKey(todayIso())} />
+      <ReportTable months={months} rows={rows} measure={measure} collapsed={collapsed} onToggle={toggle} currentMonth={currentMonth} />
     </CfoPage>
   )
 }

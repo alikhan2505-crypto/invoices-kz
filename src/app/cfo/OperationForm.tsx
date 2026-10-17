@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import type { CfoOperation, Direction, OpStatus } from '@/lib/cfo/types'
 import { removeReceipt, saveOperation, saveRecurrence, uploadReceipt } from '@/lib/cfo/data'
+import { vocab } from '@/lib/cfo/mode'
 import { parseAmountInput, tiynToNumber } from '@/lib/cfo/money'
 import { todayIso } from '@/lib/cfo/dates'
 import { validateOperation, validateRecurrence } from '@/lib/cfo/validate'
@@ -10,6 +11,7 @@ import { ErrorText, Field, GhostButton, PrimaryButton, Segmented, inputClass, in
 
 export default function OperationForm({ initial, defaultDate, onDone, onCancel }: { initial?: CfoOperation; defaultDate?: string; onDone: () => Promise<void>; onCancel: () => void }) {
   const { ws } = useCfo()
+  const v = vocab(ws.mode)
   const today = todayIso()
   const accounts = ws.accounts.filter((a) => !a.archived || a.id === initial?.accountId || a.id === initial?.toAccountId)
 
@@ -131,10 +133,10 @@ export default function OperationForm({ initial, defaultDate, onDone, onCancel }
         <div className="space-y-2">
           <label className="flex items-center gap-2 text-sm min-h-[44px]" style={{ color: 'var(--nav-text-secondary)' }}>
             <input type="checkbox" checked={separateAccrual} onChange={(e) => setSeparateAccrual(e.target.checked)} />
-            Другая дата начисления (для БДР)
+            {v.accrualToggle}
           </label>
           {separateAccrual && (
-            <Field label="Дата начисления" hint="Например, услуга за март, оплаченная в апреле: начисление — март">
+            <Field label={ws.mode === 'family' ? 'Дата, к которой относится' : 'Дата начисления'} hint={v.accrualHint}>
               <input type="date" className={inputClass} style={inputStyle} value={accruedOn} onChange={(e) => setAccruedOn(e.target.value)} />
             </Field>
           )}
@@ -142,11 +144,11 @@ export default function OperationForm({ initial, defaultDate, onDone, onCancel }
       )}
 
       <div className="grid sm:grid-cols-2 gap-3">
-        <Field label="Контрагент">
-          <input className={inputClass} style={inputStyle} value={counterparty} onChange={(e) => setCounterparty(e.target.value)} />
+        <Field label={v.counterparty}>
+          <input className={inputClass} style={inputStyle} maxLength={200} value={counterparty} onChange={(e) => setCounterparty(e.target.value)} />
         </Field>
         <Field label="Комментарий">
-          <input className={inputClass} style={inputStyle} value={comment} onChange={(e) => setComment(e.target.value)} />
+          <input className={inputClass} style={inputStyle} maxLength={500} value={comment} onChange={(e) => setComment(e.target.value)} />
         </Field>
       </div>
 

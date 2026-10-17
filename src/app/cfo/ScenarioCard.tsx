@@ -4,6 +4,7 @@ import { addDays } from '@/lib/cfo/dates'
 import { dayLabel } from '@/lib/cfo/labels'
 import { formatTenge, parseAmountInput } from '@/lib/cfo/money'
 import { NO_CHANGE, runScenario, type Scenario } from '@/lib/cfo/scenario'
+import { vocab } from '@/lib/cfo/mode'
 import { useCfo } from './CfoWorkspace'
 import { Card, Field, GhostButton, SectionTitle, inputClass, inputStyle } from './ui'
 
@@ -21,6 +22,7 @@ function Slider({ label, value, onChange }: { label: string; value: number; onCh
 // «Что если» поверх платёжного календаря: ничего не сохраняет, только пересчитывает прогноз.
 export default function ScenarioCard({ today, onClose }: { today: string; onClose: () => void }) {
   const { ws, pro } = useCfo()
+  const v = vocab(ws.mode)
   const [incomePct, setIncome] = useState(0)
   const [expensePct, setExpense] = useState(0)
   const [extraAmount, setExtraAmount] = useState('')
@@ -38,7 +40,7 @@ export default function ScenarioCard({ today, onClose }: { today: string; onClos
     return (
       <Card>
         <SectionTitle>Что если</SectionTitle>
-        <p className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>Сценарии «выручка упадёт на 20%», «наймём двоих», «купим оборудование» — и сразу видно, будет ли кассовый разрыв. Доступно на тарифе Про.</p>
+        <p className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>{v.scenarioGate}</p>
         <a href="/upgrade" className="inline-flex items-center min-h-[44px] mt-3 rounded-xl px-4 text-sm font-semibold" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>Перейти на Про</a>
       </Card>
     )
@@ -74,13 +76,13 @@ export default function ScenarioCard({ today, onClose }: { today: string; onClos
         </Field>
         <Field label="Это">
           <select className={inputClass} style={inputStyle} value={extraDir} onChange={(e) => setExtraDir(e.target.value as 'in' | 'out')}>
-            <option value="out">Выплата (покупка, найм…)</option>
-            <option value="in">Поступление (кредит, крупный заказ…)</option>
+            <option value="out">{ws.mode === 'family' ? 'Трата (покупка, отпуск…)' : 'Выплата (покупка, найм…)'}</option>
+            <option value="in">{ws.mode === 'family' ? 'Поступление (премия, подарок…)' : 'Поступление (кредит, крупный заказ…)'}</option>
           </select>
         </Field>
       </div>
       <div className="mt-4">
-        {row('Кассовый разрыв', gap(base.calendar.firstGap), gap(what.calendar.firstGap), !!what.calendar.firstGap && (!base.calendar.firstGap || what.calendar.firstGap < base.calendar.firstGap))}
+        {row(v.gap, gap(base.calendar.firstGap), gap(what.calendar.firstGap), !!what.calendar.firstGap && (!base.calendar.firstGap || what.calendar.firstGap < base.calendar.firstGap))}
         {row('Самый низкий остаток', `${formatTenge(base.minBalance)} (${dayLabel(base.minDate)})`, `${formatTenge(what.minBalance)} (${dayLabel(what.minDate)})`, what.minBalance < base.minBalance)}
         {row('Остаток через 90 дней', formatTenge(base.endBalance), formatTenge(what.endBalance), what.endBalance < base.endBalance)}
       </div>

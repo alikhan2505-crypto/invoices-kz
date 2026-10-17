@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { vocab } from '@/lib/cfo/mode'
 import { useCfo } from './CfoWorkspace'
 import { Card, ErrorText, GhostButton, PrimaryButton, SectionTitle, inputClass, inputStyle } from './ui'
 
@@ -17,9 +18,10 @@ const SUGGESTIONS = [
   'Почему прибыль меньше плана?',
 ]
 
-// «Спроси CFO»: вопрос обычным языком — ответ по цифрам кабинета.
+// «Спроси CFO» / «Спросите помощника»: вопрос обычным языком — ответ по цифрам кабинета.
 export default function AskCfo() {
   const { pro, ws } = useCfo()
+  const v = vocab(ws.mode)
   const suggestions = ws.mode === 'family' ? FAMILY_SUGGESTIONS : SUGGESTIONS
   const [question, setQuestion] = useState('')
   const [answer, setAnswer] = useState<string | null>(null)
@@ -55,10 +57,8 @@ export default function AskCfo() {
   if (!pro) {
     return (
       <Card>
-        <SectionTitle>Спросите CFO</SectionTitle>
-        <p className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
-          Задайте вопрос обычным языком — «почему упала прибыль?», «хватит ли денег до конца месяца?» — и ИИ ответит по цифрам вашего кабинета. Доступно на тарифе Про.
-        </p>
+        <SectionTitle>{v.ask}</SectionTitle>
+        <p className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>{v.askGate}</p>
         <a href="/upgrade" className="inline-flex items-center min-h-[44px] mt-3 rounded-xl px-4 text-sm font-semibold" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>Перейти на Про</a>
       </Card>
     )
@@ -66,7 +66,7 @@ export default function AskCfo() {
 
   return (
     <Card dataTour="cfo-ask">
-      <SectionTitle>Спросите CFO</SectionTitle>
+      <SectionTitle>{v.ask}</SectionTitle>
       <form className="flex gap-2 flex-wrap" onSubmit={(e) => { e.preventDefault(); void ask(question) }}>
         <input
           className={`${inputClass} flex-1 min-w-[220px]`}
@@ -74,8 +74,8 @@ export default function AskCfo() {
           value={question}
           maxLength={500}
           onChange={(e) => setQuestion(e.target.value)}
-          placeholder="Например: почему в сентябре прибыль упала?"
-          aria-label="Вопрос финансовому директору"
+          placeholder={v.askPlaceholder}
+          aria-label={ws.mode === 'family' ? 'Вопрос помощнику' : 'Вопрос финансовому директору'}
         />
         <PrimaryButton type="submit" disabled={busy || !question.trim()}>{busy ? 'Думаю…' : 'Спросить'}</PrimaryButton>
       </form>
@@ -92,7 +92,7 @@ export default function AskCfo() {
         <div className="mt-3 rounded-xl p-4 text-sm leading-relaxed whitespace-pre-wrap" style={{ background: 'var(--nav-surface-glass)', color: 'var(--nav-text-primary)' }} aria-live="polite">
           {answer.replace(/\*\*(.+?)\*\*/g, '$1').replace(/^#+\s*/gm, '')}
           <div className="text-xs mt-3" style={{ color: 'var(--nav-text-muted)' }}>
-            Ответ ИИ по данным кабинета — проверяйте важные решения.{left !== null && ` Осталось вопросов сегодня: ${left}.`}
+            Ответ ИИ по данным {ws.mode === 'family' ? 'бюджета' : 'кабинета'} — проверяйте важные решения.{left !== null && ` Осталось вопросов сегодня: ${left}.`}
           </div>
         </div>
       )}

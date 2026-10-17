@@ -6,7 +6,9 @@ export type OpStatus = 'actual' | 'planned'
 export type ArticleKind = 'income' | 'expense'
 export type Activity = 'operating' | 'investing' | 'financing'
 export type PnlGroup = 'revenue' | 'cogs' | 'opex' | 'finance' | 'tax'
-export type AccountKind = 'bank' | 'cash' | 'card' | 'deposit'
+// loan — кредит или ипотека: остаток отрицательный, это долг, а не деньги.
+// В «Деньги сейчас», запас денег и поиск кассового разрыва не входит.
+export type AccountKind = 'bank' | 'cash' | 'card' | 'deposit' | 'loan'
 
 export type CfoAccount = {
   id: string

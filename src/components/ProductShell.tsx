@@ -256,6 +256,7 @@ export default function ProductShell({ product, children }: { product: ProductKe
             type="button"
             onClick={() => setOpen(true)}
             aria-label={t.menu}
+            data-tour="product-menu"
             className="w-11 h-11 flex items-center justify-center rounded-xl text-xl"
             style={{ color: 'var(--nav-text-primary)' }}
           >
