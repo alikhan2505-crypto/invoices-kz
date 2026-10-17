@@ -275,7 +275,21 @@ export default function InvoicePage() {
   const pdfWinRef = useRef<Window | null>(null)
 
 
-  useEffect(() => { loadInvoice() }, [])
+  // Signed-out visitors go to /login, same as /invoice/[id]/edit does, instead
+  // of the shell with «Счёт не найден» and a 406 from rest/v1/invoices (RLS
+  // answers an anonymous read with that). getSession() is a local read; RLS
+  // remains the actual gate. The skeleton stays up while the redirect happens.
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (cancelled) return
+      if (!session) { router.replace('/login'); return }
+      loadInvoice()
+    })()
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   async function refreshKaspiLink() {
     if (!invoice?.public_token) return
@@ -714,7 +728,7 @@ export default function InvoicePage() {
   // PDFs), always show the due-date-derived sentence when a due date is on
   // record, same as the create-page's live note. Falls back to whatever's
   // actually stored only when there's no due date to derive from.
-  const displayNote = invoice.due_date ? t.paymentDueNote(formatDate(invoice.due_date)) : invoice.note
+  const displayNote = invoice.due_date ? t.paymentDueNote(formatDate(invoice.due_date, lang)) : invoice.note
   const displayContractDate = invoice.contract_date ? formatDateSafe(invoice.contract_date) : undefined
 
   const serviceTotal = calcServiceTotal(services)
@@ -811,7 +825,7 @@ export default function InvoicePage() {
             {status.text}
           </span>
           {invoice.due_date && (
-            <div className="text-xs mt-2" style={{ color: 'var(--nav-text-muted)' }}>{t.dueDateLabel}: {formatDate(invoice.due_date)}</div>
+            <div className="text-xs mt-2" style={{ color: 'var(--nav-text-muted)' }}>{t.dueDateLabel}: {formatDate(invoice.due_date, lang)}</div>
           )}
         </motion.div>
 
@@ -1095,7 +1109,7 @@ export default function InvoicePage() {
                         <span style={{ color: fill }}><LogIcon /></span>
                         {s.text}
                       </div>
-                      <div className="text-xs mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{formatDateTime(log.created_at)}</div>
+                      <div className="text-xs mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{formatDateTime(log.created_at, lang)}</div>
                     </div>
                   </div>
                 )
@@ -1349,8 +1363,8 @@ export default function InvoicePage() {
       >
         <InvoiceLivePreview
           invoiceNumber={invoice.number}
-          date={formatDate(invoice.created_at)}
-          dueDate={invoice.due_date ? formatDate(invoice.due_date) : undefined}
+          date={formatDate(invoice.created_at, lang)}
+          dueDate={invoice.due_date ? formatDate(invoice.due_date, lang) : undefined}
           companyName={profile?.company_name || ''}
           companyBin={profile?.bin_iin || ''}
           clientName={invoice.client_name || ''}

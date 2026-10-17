@@ -462,7 +462,7 @@ export default function AcquiringPage() {
                 </span>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>Kaspi Cashier API</div>
-                  <p className="text-xs mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>Подключение Kaspi Pay Cashier, API-токен, вебхуки и выписка теперь в своём разделе.</p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{t.cashierApiCardText}</p>
                 </div>
                 <span className="flex-shrink-0" style={{ color: 'var(--nav-text-muted)' }}><ChevronRightIcon /></span>
               </div>
@@ -608,7 +608,7 @@ export default function AcquiringPage() {
                         {pending.matched_description && <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>{t.descriptionLabel}: {pending.matched_description}</div>}
                         <button onClick={() => confirmBccMatch(pending)} disabled={confirmingId === pending.invoice_id}
                           className="w-full rounded-xl py-2.5 text-sm font-semibold mt-3 transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60"
-                          style={{ background: 'var(--nav-success)', color: 'white' }}>
+                          style={{ background: 'var(--nav-success-solid)', color: 'var(--nav-success-ink)' }}>
                           {confirmingId === pending.invoice_id ? t.confirmingLabel : t.confirmPaymentButton}
                         </button>
                       </div>
@@ -671,7 +671,7 @@ export default function AcquiringPage() {
                           )}
                           <button onClick={() => confirmPayment(match)} disabled={confirmingId === match.invoice.id}
                             className="w-full rounded-xl py-2.5 text-sm font-semibold mt-3 transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60"
-                            style={{ background: 'var(--nav-success)', color: 'white' }}>
+                            style={{ background: 'var(--nav-success-solid)', color: 'var(--nav-success-ink)' }}>
                             {confirmingId === match.invoice.id ? t.confirmingLabel : t.confirmPaymentButton}
                           </button>
                         </div>

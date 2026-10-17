@@ -9,6 +9,7 @@ export type UtilityBarContent = {
   notificationsTitle: string
   helpTitle: string
   accountTitle: string
+  closeLabel: string
   timeJustNow: string
   timeMinutesAgo: (n: number) => string
   timeHoursAgo: (n: number) => string
@@ -70,6 +71,7 @@ export const utilityBarDict: Record<Lang, UtilityBarContent> = {
     notificationsTitle: 'Уведомления',
     helpTitle: 'Помощь',
     accountTitle: 'Аккаунт',
+    closeLabel: 'Закрыть',
     timeJustNow: 'только что',
     timeMinutesAgo: (n) => `${n} мин назад`,
     timeHoursAgo: (n) => `${n} ч назад`,
@@ -135,6 +137,7 @@ export const utilityBarDict: Record<Lang, UtilityBarContent> = {
     notificationsTitle: 'Хабарландырулар',
     helpTitle: 'Көмек',
     accountTitle: 'Аккаунт',
+    closeLabel: 'Жабу',
     timeJustNow: 'жаңа ғана',
     timeMinutesAgo: (n) => `${n} мин бұрын`,
     timeHoursAgo: (n) => `${n} сағ бұрын`,
@@ -194,6 +197,7 @@ export const utilityBarDict: Record<Lang, UtilityBarContent> = {
     notificationsTitle: 'Notifications',
     helpTitle: 'Help',
     accountTitle: 'Account',
+    closeLabel: 'Close',
     timeJustNow: 'just now',
     timeMinutesAgo: (n) => `${n} min ago`,
     timeHoursAgo: (n) => `${n} h ago`,

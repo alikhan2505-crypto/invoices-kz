@@ -224,7 +224,7 @@ export default function KaspiShopQualityPage() {
                     {c.metric?.notEnoughData ? 'Недостаточно данных' : `${c.metric?.violatedCount ?? 0} из ${c.metric?.totalCount ?? 0}`}
                   </span>
                   {c.performanceStatus && (
-                    <span className="text-[10px] font-semibold rounded-full px-2 py-0.5" style={{ background: 'var(--nav-success)', color: '#fff' }}>
+                    <span className="text-[10px] font-semibold rounded-full px-2 py-0.5" style={{ background: 'var(--nav-success-solid)', color: 'var(--nav-success-ink)' }}>
                       {c.performanceStatus}
                     </span>
                   )}

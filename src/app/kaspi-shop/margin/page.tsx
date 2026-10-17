@@ -328,7 +328,7 @@ export default function KaspiShopMargin() {
               <div className="nav-glass rounded-2xl p-5 mb-3" style={{ borderColor: verdict === 'take' ? 'var(--nav-success)' : 'var(--nav-critical)' }}>
                 <div className="flex items-center justify-between mb-4">
                   <span className="text-2xl font-black tracking-tight px-4 py-1.5 rounded-full"
-                    style={{ background: verdict === 'take' ? 'var(--nav-success)' : 'var(--nav-critical)', color: '#fff' }}>
+                    style={{ background: verdict === 'take' ? 'var(--nav-success-solid)' : 'var(--nav-critical)', color: verdict === 'take' ? 'var(--nav-success-ink)' : '#fff' }}>
                     {verdict === 'take' ? 'Брать' : 'Не брать'}
                   </span>
                   <div className="text-right">
@@ -472,7 +472,7 @@ export default function KaspiShopMargin() {
                         {Number(ev.margin_percent).toFixed(1)}%
                       </div>
                       <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full inline-block"
-                        style={{ background: ev.verdict === 'take' ? 'var(--nav-success)' : 'var(--nav-critical)', color: '#fff' }}>
+                        style={{ background: ev.verdict === 'take' ? 'var(--nav-success-solid)' : 'var(--nav-critical)', color: ev.verdict === 'take' ? 'var(--nav-success-ink)' : '#fff' }}>
                         {ev.verdict === 'take' ? 'Брать' : 'Не брать'}
                       </span>
                     </div>

@@ -288,7 +288,7 @@ export default function Contracts() {
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium truncate" style={{ color: 'var(--nav-text-primary)' }}>{c.title}</div>
                       {c.client_name && <div className="text-xs mt-0.5" style={{ color: 'var(--nav-text-secondary)' }}>{c.client_name}</div>}
-                      <div className="text-xs mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{formatDate(c.created_at)}</div>
+                      <div className="text-xs mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{formatDate(c.created_at, lang)}</div>
                       <span
                         className="inline-block text-xs px-2 py-0.5 rounded-full font-semibold text-white mt-1.5"
                         style={{ background: badge.fill }}>

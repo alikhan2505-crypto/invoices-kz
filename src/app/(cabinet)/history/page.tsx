@@ -184,7 +184,7 @@ export default function History() {
       [t.excelColumnAmount]: Number(inv.amount),
       [t.excelColumnStatus]: t.statusLabels[inv.status] || t.statusLabels.draft,
       [t.excelColumnNote]: inv.note || '',
-      [t.excelColumnDate]: formatDate(inv.created_at),
+      [t.excelColumnDate]: formatDate(inv.created_at, lang),
     }))
     const ws = XLSX.utils.json_to_sheet(data)
     const wb = XLSX.utils.book_new()
@@ -252,7 +252,7 @@ export default function History() {
       <>
         <div className="max-w-lg lg:max-w-5xl mx-auto p-4">
           <PageHeader
-            title="История счетов"
+            title={t.pageTitle}
             right={
               <div className="flex flex-col items-stretch gap-1.5 sm:flex-row sm:items-center sm:gap-2">
                 <PageHeaderButton variant="danger-soft" onClick={markOverdue}>
@@ -448,7 +448,7 @@ export default function History() {
                         </div>
                       )}
                       <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>
-                        {formatDateTime(inv.created_at)}
+                        {formatDateTime(inv.created_at, lang)}
                       </div>
                     </div>
                     <div className="text-right ml-3 flex-shrink-0">

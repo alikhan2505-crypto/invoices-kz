@@ -38,6 +38,10 @@ const nextConfig: NextConfig = {
       { source: '/car', destination: '/?utm_source=car&utm_medium=decal&utm_campaign=jetour', permanent: false },
       // /qr — запасной короткий адрес на случай перепечатки QR; utm_source=car → в отчёте «точно по QR».
       { source: '/qr', destination: '/?utm_source=car&utm_medium=qr&utm_campaign=jetour', permanent: false },
+      // «О приложении» слито с поддержкой. Редирект здесь (до отрисовки), а не из page.tsx:
+      // там оболочка кабинета успевает отрисоваться, её запрос supabase.auth.getUser
+      // обрывается переходом и пишет в консоль «TypeError: Failed to fetch».
+      { source: '/profile/about', destination: '/profile/support#about', permanent: false },
     ]
   },
 };

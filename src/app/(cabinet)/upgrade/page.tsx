@@ -957,7 +957,7 @@ export default function Upgrade() {
                     {p === 'monthly' ? t.monthlyToggleLabel : t.annualToggleLabel}
                     {p === 'annual' && (
                       <span className="text-[10px] px-1.5 py-0.5 rounded-full whitespace-nowrap"
-                        style={{ fontWeight: 700, background: 'var(--nav-success)', color: 'var(--nav-bg)' }}>
+                        style={{ fontWeight: 700, background: 'var(--nav-success-solid)', color: 'var(--nav-success-ink)' }}>
                         {t.annualBadgeLabel}
                       </span>
                     )}

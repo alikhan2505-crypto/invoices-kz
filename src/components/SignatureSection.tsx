@@ -302,7 +302,7 @@ export default function SignatureSection(props: Props) {
               </div>
             )}
             {row.owner_signed_at && (
-              <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>{t.signedOwnerDatePrefix(formatDateTime(row.owner_signed_at))}</div>
+              <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>{t.signedOwnerDatePrefix(formatDateTime(row.owner_signed_at, lang))}</div>
             )}
             {row.client_signer_name && (
               <div className="text-xs mt-2 mb-1" style={{ color: 'var(--nav-text-secondary)' }}>
@@ -312,7 +312,7 @@ export default function SignatureSection(props: Props) {
               </div>
             )}
             {row.client_signed_at && (
-              <div className="text-xs mb-3" style={{ color: 'var(--nav-text-muted)' }}>{t.signedClientDatePrefix(formatDateTime(row.client_signed_at))}</div>
+              <div className="text-xs mb-3" style={{ color: 'var(--nav-text-muted)' }}>{t.signedClientDatePrefix(formatDateTime(row.client_signed_at, lang))}</div>
             )}
             <div className="flex gap-2 mt-1">
               <a href={`/api/documents/${row.id}/document`} target="_blank" rel="noreferrer"

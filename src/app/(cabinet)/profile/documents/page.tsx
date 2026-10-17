@@ -212,7 +212,7 @@ export default function Documents() {
             >
               <div className="flex justify-center mb-4"><LockIcon /></div>
               <div className="font-bold text-base mb-2" style={{ color: 'var(--nav-text-primary)' }}>{t.documentsLockedTitle}</div>
-              <div className="text-sm mb-6 max-w-xs mx-auto" style={{ color: 'var(--nav-text-muted)' }}>
+              <div className="text-sm mb-6 max-w-xs mx-auto" style={{ color: 'var(--nav-text-secondary)' }}>
                 {t.documentsLockedDesc}
               </div>
               <button onClick={() => router.push('/upgrade')}
@@ -249,7 +249,7 @@ export default function Documents() {
             <span className="flex-shrink-0 mt-0.5" style={{ color: 'var(--nav-accent)' }}><InfoIcon /></span>
             <div>
               <div className="text-sm font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>{t.documentsInfoBannerTitle}</div>
-              <div className="text-xs leading-relaxed" style={{ color: 'var(--nav-text-muted)' }}>
+              <div className="text-xs leading-relaxed" style={{ color: 'var(--nav-text-secondary)' }}>
                 {t.documentsInfoBannerBody}
               </div>
             </div>
@@ -266,7 +266,7 @@ export default function Documents() {
                 className="flex-1 py-2.5 rounded-xl text-xs font-semibold transition-colors"
                 style={{
                   background: tab === tabItem.key ? 'var(--nav-accent)' : 'var(--nav-surface-glass)',
-                  color: tab === tabItem.key ? 'var(--nav-accent-ink)' : 'var(--nav-text-muted)',
+                  color: tab === tabItem.key ? 'var(--nav-accent-ink)' : 'var(--nav-text-secondary)',
                 }}>
                 {tabItem.label}
                 {tabItem.count > 0 && (
@@ -282,7 +282,7 @@ export default function Documents() {
             <div className="flex flex-col items-center text-center py-12">
               <DocumentIcon />
               <p className="text-sm mt-3" style={{ color: 'var(--nav-text-secondary)' }}>{t.noDocumentsLabel}</p>
-              <p className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>
+              <p className="text-xs mt-1" style={{ color: 'var(--nav-text-secondary)' }}>
                 {t.createDocsHint(tab)}
               </p>
             </div>
@@ -300,16 +300,16 @@ export default function Documents() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm font-medium" style={{ color: 'var(--nav-text-primary)' }}>{t.docNumberLabel(doc.number)}</span>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: 'var(--nav-surface-glass)', color: 'var(--nav-text-muted)' }}>
-                          {formatDate(doc.created_at)}
+                        <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: 'var(--nav-surface-glass)', color: 'var(--nav-text-secondary)' }}>
+                          {formatDate(doc.created_at, lang)}
                         </span>
                       </div>
                       <div className="text-xs mt-0.5 truncate" style={{ color: 'var(--nav-text-secondary)' }}>{doc.client_name}</div>
                       {doc.contract_number && (
-                        <div className="text-xs mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{t.docContractNumberLabel(doc.contract_number)}</div>
+                        <div className="text-xs mt-0.5" style={{ color: 'var(--nav-text-secondary)' }}>{t.docContractNumberLabel(doc.contract_number)}</div>
                       )}
                       {doc.valid_until && (
-                        <div className="text-xs mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{t.docValidUntilLabel(doc.valid_until)}</div>
+                        <div className="text-xs mt-0.5" style={{ color: 'var(--nav-text-secondary)' }}>{t.docValidUntilLabel(doc.valid_until)}</div>
                       )}
                     </div>
                     <div className="flex items-center gap-1 flex-shrink-0">

@@ -8,6 +8,7 @@ export interface HistoryContent {
   statusLabels: Record<string, string>
 
   // history (list/archive) page
+  pageTitle: string
   markOverdueButtonLabel: string
   exportButtonLabel: string
   searchPlaceholder: string
@@ -87,6 +88,7 @@ export const historyDict: Record<'ru' | 'kk' | 'en', HistoryContent> = {
       cancelled: 'Аннулирован',
     },
 
+    pageTitle: 'История счетов',
     markOverdueButtonLabel: '⏰ Обновить просрочку',
     exportButtonLabel: '📊 Экспорт',
     searchPlaceholder: 'Поиск по клиенту, сумме, примечанию...',
@@ -176,8 +178,9 @@ export const historyDict: Record<'ru' | 'kk' | 'en', HistoryContent> = {
       cancelled: 'Жойылған',
     },
 
+    pageTitle: 'Шоттар тарихы',
     markOverdueButtonLabel: '⏰ Мерзімін жаңарту',
-    exportButtonLabel: '📊 Экспорт',
+    exportButtonLabel: '📊 Экспорттау',
     searchPlaceholder: 'Клиент, сома, ескертпе бойынша іздеу...',
     searchMinCharsHint: (min: number) => `Іздеу үшін кемінде ${min} таңба енгізіңіз`,
     repeatInvoiceLabel: 'Шотты қайталау',
@@ -265,6 +268,7 @@ export const historyDict: Record<'ru' | 'kk' | 'en', HistoryContent> = {
       cancelled: 'Cancelled',
     },
 
+    pageTitle: 'Invoice history',
     markOverdueButtonLabel: '⏰ Refresh overdue',
     exportButtonLabel: '📊 Export',
     searchPlaceholder: 'Search by client, amount, note...',

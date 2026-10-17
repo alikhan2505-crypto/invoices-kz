@@ -18,6 +18,7 @@ import { profileCoreDict } from '@/lib/i18n/profileCore'
 import { useMediaQuery } from '@/lib/useMediaQuery'
 import Skeleton from '@/components/Skeleton'
 import ProfileBonusCard from '@/components/ProfileBonusCard'
+import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
 // kept identical rather than inventing a second "house" ease.
@@ -257,6 +258,8 @@ export default function Profile() {
   const { mode: themeMode, setMode: setThemeMode } = useTheme()
   const { lang } = useLanguage()
   const t = profileCoreDict[lang]
+  const pageTitle = lang === 'en' ? 'Profile' : 'Профиль'
+  usePageDocumentTitle(pageTitle)
   const isDesktop = useMediaQuery('(min-width: 1024px)')
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw
@@ -664,7 +667,7 @@ export default function Profile() {
 
   return (
     <>
-
+      <h1 className="sr-only">{pageTitle}</h1>
       <div className="max-w-lg lg:max-w-5xl mx-auto p-4">
         {isDesktop ? (
           <div className="flex gap-6 items-start">

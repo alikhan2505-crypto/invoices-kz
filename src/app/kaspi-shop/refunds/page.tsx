@@ -70,7 +70,7 @@ type RefundDetail = {
 function statusColor(statusText: string): { bg: string; fg: string } {
   const s = statusText.toLowerCase()
   if (s.includes('отменён') || s.includes('отменен')) return { bg: 'var(--nav-surface-glass)', fg: 'var(--nav-text-secondary)' }
-  if (s.includes('оформлен') && !s.includes('оформляется')) return { bg: 'var(--nav-success)', fg: '#fff' }
+  if (s.includes('оформлен') && !s.includes('оформляется')) return { bg: 'var(--nav-success-solid)', fg: 'var(--nav-success-ink)' }
   return { bg: 'var(--nav-accent)', fg: 'var(--nav-accent-ink)' }
 }
 

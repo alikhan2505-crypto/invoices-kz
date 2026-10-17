@@ -1154,7 +1154,9 @@ html {
 .prd-tile[data-out="true"] { opacity: 0.55; filter: saturate(0.7); }
 .prd-tile[data-big="true"] { min-height: 340px; }
 .prd-cover { position: absolute; inset: 0; z-index: 1; border-radius: 28px; }
-.prd-tn { font: 700 clamp(22px, 2.6vw, 34px)/1.05 var(--font-unbounded), Arial, sans-serif; letter-spacing: -0.02em; max-width: 12ch; position: relative; z-index: 0; }
+.prd-tn { font: 700 clamp(20px, 2.3vw, 32px)/1.05 var(--font-unbounded), Arial, sans-serif; letter-spacing: -0.02em; max-width: 12ch; position: relative; z-index: 0; }
+/* The status pill sits absolutely top-right: keep the title out from under it, wrapping a long word rather than overlapping. */
+.prd-pill + .prd-tn { max-width: min(12ch, calc(100% - 128px)); overflow-wrap: anywhere; }
 .prd-tl { font-size: 15px; max-width: 24ch; position: relative; z-index: 0; }
 .prd-tl, .prd-th { opacity: 0.85; }
 .prd-th { font: 500 12px/1 var(--font-geist-mono), monospace; }
@@ -1164,11 +1166,13 @@ html {
 .prd-pill { position: absolute; top: 18px; right: 18px; z-index: 2; border-radius: 9999px; padding: 5px 11px; font: 600 12px/1 var(--font-onest), Arial, sans-serif; border: 2px solid var(--ink-t); }
 .prd-pill.prd-on { background: var(--ink-t); }
 .prd-pill.prd-on, .prd-pill.prd-on span { color: var(--bg-t) !important; }
-.prd-toggle { border: 2px solid var(--ink-t); background: transparent; border-radius: 9999px; padding: 6px 12px; font: 600 12px/1 var(--font-onest), Arial, sans-serif; }
+/* Solid tile-colour fill, not transparent: over the illustration (z-index 0, same ink colour) the label vanished (audit 17.10.2026, P2-3). */
+.prd-toggle { border: 2px solid var(--ink-t); background: var(--bg-t); border-radius: 9999px; padding: 6px 12px; font: 600 12px/1 var(--font-onest), Arial, sans-serif; }
 .prd-toggle:hover { background: var(--ink-t); }
 .prd-toggle:hover, .prd-toggle:hover span { color: var(--bg-t) !important; }
 .prd-art { position: absolute; right: -3%; bottom: -6%; width: min(60%, 310px); z-index: 0; pointer-events: none; }
 .prd-tile[data-big="true"] .prd-art { width: min(64%, 380px); }
+@media (min-width: 861px) { .prd-tile:not([data-big="true"]) .prd-art { width: min(46%, 260px); } }
 .prd-art svg { display: block; width: 100%; height: auto; animation: prd-bob 5s ease-in-out infinite; }
 @keyframes prd-bob { 0%, 100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-7px) rotate(1.2deg); } }
 .prd-note { padding-top: 26px; font-size: 14px; max-width: 70ch; color: var(--prd-ink2) !important; }

@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
+import { settleTourSteps, tourStepNumber } from '@/lib/tourSteps'
 
 export type TourStep = { anchor: string; title: string; body: string }
 type Step = TourStep
@@ -91,8 +92,12 @@ function findAnchor(name: string): Element | null {
 
 // Тур с подсветкой для любого экрана: шаги — data-tour якоря на уже отрисованных
 // элементах; показывать ли и как запомнить «пройден» — решает вызывающий.
-export function GuidedTour({ steps: STEPS, shouldStart, onFinish }: { steps: Step[]; shouldStart: () => Promise<boolean>; onFinish: () => Promise<void> }) {
+export function GuidedTour({ steps: ALL_STEPS, shouldStart, onFinish }: { steps: Step[]; shouldStart: () => Promise<boolean>; onFinish: () => Promise<void> }) {
   const [open, setOpen] = useState(false)
+  // The steps of THIS run, resolved once when the tour starts (after the page
+  // has settled) and never recomputed: anchors that mount later used to bump
+  // the total mid-tour ("1 из 7" -> "2 из 8").
+  const [STEPS, setSteps] = useState<Step[]>([])
   const [i, setI] = useState(0)
   const [rect, setRect] = useState<DOMRect | null>(null)
   const [vw, setVw] = useState(0)
@@ -137,20 +142,24 @@ export function GuidedTour({ steps: STEPS, shouldStart, onFinish }: { steps: Ste
     ;(async () => {
       const go = await shouldStart().catch(() => false)
       if (cancelled || !go) return
-      // Start at the first step whose anchor is actually rendered on this
-      // viewport (e.g. skip straight past "menu" on desktop, where that
-      // anchor sits in the DOM behind `lg:hidden`). If nothing on this
-      // viewport has a rendered anchor, don't open the tour at all rather
-      // than show an empty scrim.
-      const start = STEPS.findIndex((s) => findAnchor(s.anchor))
-      if (start === -1) return
+      // Keep only the steps whose anchor is actually rendered on this
+      // viewport (e.g. skip "menu" on desktop, where that anchor sits in the
+      // DOM behind `lg:hidden`), waiting until late-mounting anchors (header
+      // wallet, desktop nav row) have appeared so the total never changes
+      // mid-run. If nothing has a rendered anchor, don't open the tour at all
+      // rather than show an empty scrim.
+      const run = await settleTourSteps(ALL_STEPS, (a) => !!findAnchor(a), { cancelled: () => cancelled })
+      if (cancelled) return
+      if (run.length === 0) return
+      const start = 0
+      setSteps(run)
       // Measure now, in this same batched update, instead of leaving
       // vw/vh/rect at their zero/null initial state for one frame -- open
       // and i changing without them means the first paint computes box as
       // null (full-screen scrim, no highlight) and tipWidth as negative
       // (vw is still 0), corrected only after the post-paint effect below
       // runs measure().
-      const startEl = findAnchor(STEPS[start].anchor)
+      const startEl = findAnchor(run[start].anchor)
       setVw(window.innerWidth)
       setVh(window.innerHeight)
       setRect(startEl ? startEl.getBoundingClientRect() : null)
@@ -266,8 +275,8 @@ export function GuidedTour({ steps: STEPS, shouldStart, onFinish }: { steps: Ste
   // next() but still counted, so the visible counter jumps 1 -> 2 -> 4.
   // findAnchor stays the single source of truth for visibility, same as
   // everywhere else in this component.
-  const visibleSteps = STEPS.filter((s) => findAnchor(s.anchor))
-  const stepNumber = visibleSteps.indexOf(step) + 1
+  const visibleSteps = STEPS
+  const stepNumber = tourStepNumber(STEPS, step)
 
   const scrim = 'rgba(10,10,15,0.55)'
   // Four opaque rectangles around the target instead of a mask/clip-path:
@@ -419,9 +428,10 @@ export function GuidedTour({ steps: STEPS, shouldStart, onFinish }: { steps: Ste
               >
                 Пропустить
               </button>
+              {/* No hover translate on this button: lifting it 2px on :hover moved it out from under a pointer resting on its lower edge, which dropped :hover and put it back -- an endless 2px flicker. */}
               <button
                 onClick={next}
-                className="min-h-[44px] px-5 text-[13px] font-semibold rounded-xl transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0"
+                className="min-h-[44px] px-5 text-[13px] font-semibold rounded-xl transition-[filter] duration-150 hover:brightness-110"
                 style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}
               >
                 {stepNumber === visibleSteps.length ? 'Готово' : 'Далее'}

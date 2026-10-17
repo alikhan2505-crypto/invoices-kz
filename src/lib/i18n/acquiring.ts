@@ -68,6 +68,11 @@ export interface AcquiringContent {
   kaspiDocsLinkLabel: string
   kaspiDocsHint: string
   kaspiWalletBalanceLabel: string
+  cashierApiCardText: string
+  linkedHeading: string
+  linkedInvoicesTitle: string
+  linkedKaspiShopTitle: string
+  linkedOpen: string
   kaspiTopupPresetsLabel: string
   kaspiTopupNoFeeHint: string
   kaspiTopupCustomPlaceholder: string
@@ -238,6 +243,11 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiDocsLinkLabel: 'Документация по API',
     kaspiDocsHint: 'Есть вопросы по подключению или запросам? Ответы в документации.',
     kaspiWalletBalanceLabel: 'Баланс кошелька',
+    cashierApiCardText: 'Подключение Kaspi Pay Cashier, API-токен, вебхуки и выписка теперь в своём разделе.',
+    linkedHeading: 'Связано с другими продуктами',
+    linkedInvoicesTitle: 'Выставлять счета клиентам без кода',
+    linkedKaspiShopTitle: 'Заказы и демпинг цен на Kaspi Магазине',
+    linkedOpen: 'Открыть →',
     kaspiTopupPresetsLabel: 'Пополнить на сумму',
     kaspiTopupNoFeeHint: 'Зачисляется на баланс полностью, без комиссии. Комиссия 2% списывается отдельно, позже — только когда клиент оплачивает ваш счёт, заказ или API-платёж.',
     kaspiTopupCustomPlaceholder: 'Своя сумма, ₸',
@@ -404,6 +414,11 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiDocsLinkLabel: 'API құжаттамасы',
     kaspiDocsHint: 'Қосылу немесе сұраулар бойынша сұрақтарыңыз бар ма? Жауаптар құжаттамада.',
     kaspiWalletBalanceLabel: 'Әмиян балансы',
+    cashierApiCardText: 'Kaspi Pay Cashier қосу, API-токен, вебхуктер және көшірме енді жеке бөлімде.',
+    linkedHeading: 'Басқа өнімдермен байланысты',
+    linkedInvoicesTitle: 'Клиенттерге шотты кодсыз шығару',
+    linkedKaspiShopTitle: 'Kaspi Дүкенінде тапсырыстар және баға демпингі',
+    linkedOpen: 'Ашу →',
     kaspiTopupPresetsLabel: 'Мына сомаға толтыру',
     kaspiTopupNoFeeHint: 'Балансқа толығымен, комиссиясыз есептеледі. 2% комиссия бөлек, кейінірек — тек клиент шотыңызды, тапсырысыңызды немесе API-төлемді төлегенде ғана алынады.',
     kaspiTopupCustomPlaceholder: 'Өз сомаңыз, ₸',
@@ -570,6 +585,11 @@ export const acquiringDict: Record<'ru' | 'kk' | 'en', AcquiringContent> = {
     kaspiDocsLinkLabel: 'API documentation',
     kaspiDocsHint: 'Questions about connecting or making requests? The documentation has the answers.',
     kaspiWalletBalanceLabel: 'Wallet balance',
+    cashierApiCardText: 'Kaspi Pay Cashier connection, API token, webhooks and the statement now live in their own section.',
+    linkedHeading: 'Connected to other products',
+    linkedInvoicesTitle: 'Issue invoices to clients without code',
+    linkedKaspiShopTitle: 'Orders and price dumping on Kaspi Shop',
+    linkedOpen: 'Open →',
     kaspiTopupPresetsLabel: 'Top up by',
     kaspiTopupNoFeeHint: 'Credited to your balance in full, no fee. The 2% commission is charged separately, later — only when a customer pays your invoice, order, or an API payment.',
     kaspiTopupCustomPlaceholder: 'Custom amount, ₸',

@@ -145,7 +145,7 @@ export default function Referral() {
             </span>
             <button onClick={copyLink}
               className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg ml-2 flex-shrink-0 transition-colors"
-              style={{ background: copied ? 'var(--nav-success)' : 'var(--nav-accent)', color: copied ? '#fff' : 'var(--nav-accent-ink)' }}>
+              style={{ background: copied ? 'var(--nav-success-solid)' : 'var(--nav-accent)', color: copied ? 'var(--nav-success-ink)' : 'var(--nav-accent-ink)' }}>
               {copied ? <CheckIcon /> : <CopyIcon />}
               {copied ? t.copiedLabel : t.copyLinkButton}
             </button>

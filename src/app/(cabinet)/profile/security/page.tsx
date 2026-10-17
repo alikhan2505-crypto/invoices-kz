@@ -132,7 +132,7 @@ export default function Security() {
                       <div className="min-w-0">
                         <div className="text-sm truncate" style={{ color: 'var(--nav-text-primary)' }}>{p.device_label || t.passkeyDefaultLabel}</div>
                         <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>
-                          {p.last_used_at ? t.passkeyLastUsedPrefix(formatDate(p.last_used_at)) : t.passkeyAddedPrefix(formatDate(p.created_at))}
+                          {p.last_used_at ? t.passkeyLastUsedPrefix(formatDate(p.last_used_at, lang)) : t.passkeyAddedPrefix(formatDate(p.created_at, lang))}
                         </div>
                       </div>
                     </div>

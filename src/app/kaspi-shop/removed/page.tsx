@@ -764,7 +764,7 @@ export default function KaspiShopProductAvailability() {
                     </div>
                   </div>
                   {state === 'sent' ? (
-                    <span className="text-[11px] font-semibold rounded-full px-3 py-2 text-center" style={{ background: 'var(--nav-success)', color: '#fff' }}>
+                    <span className="text-[11px] font-semibold rounded-full px-3 py-2 text-center" style={{ background: 'var(--nav-success-solid)', color: 'var(--nav-success-ink)' }}>
                       Kaspi обрабатывает
                     </span>
                   ) : action === 'restore' ? (

@@ -77,7 +77,11 @@ export async function GET(req: NextRequest) {
     .eq('is_active', true)
     .maybeSingle()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  if (!connection) return NextResponse.json({ error: 'Kaspi Магазин не подключён' }, { status: 404 })
+  // «Not connected yet» is a normal state of the page that asks for this list
+  // on every load (the connect-first screen), not an error: 200 with an empty
+  // list keeps the browser console free of a 404 on each visit. PATCH below
+  // still answers 404 -- saving cities for a store that is not there is wrong.
+  if (!connection) return NextResponse.json({ cities: [], connected: false })
 
   let names: Record<string, string> = connection.city_lookup_cache || {}
 

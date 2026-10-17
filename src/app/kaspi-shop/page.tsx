@@ -826,8 +826,8 @@ export default function KaspiShop() {
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <button onClick={togglePause}
                     className="text-xs font-bold rounded-full px-3 py-2 flex items-center gap-1.5 transition-transform hover:-translate-y-0.5"
-                    style={{ background: paused ? 'var(--nav-critical)' : 'var(--nav-success)', color: '#fff' }}>
-                    {paused ? <PauseIcon /> : <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#fff' }} />}
+                    style={{ background: paused ? 'var(--nav-critical)' : 'var(--nav-success-solid)', color: paused ? '#fff' : 'var(--nav-success-ink)' }}>
+                    {paused ? <PauseIcon /> : <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'currentColor' }} />}
                     {paused ? 'На паузе' : 'Работает'}
                   </button>
                   <button onClick={disconnect} className="nav-glass text-xs font-medium rounded-full px-3 py-2 transition-colors" style={{ color: 'var(--nav-text-muted)' }}>
@@ -988,7 +988,7 @@ export default function KaspiShop() {
                           </div>
                           <span onClick={e => { e.stopPropagation(); toggleProduct(p.id, p.enabled) }}
                             className="text-[11px] px-2 py-1 rounded-full cursor-pointer font-semibold flex-shrink-0"
-                            style={{ background: p.enabled ? 'var(--nav-success)' : 'var(--nav-text-muted)', color: '#fff' }}>
+                            style={{ background: p.enabled ? 'var(--nav-success-solid)' : 'var(--nav-text-muted)', color: p.enabled ? 'var(--nav-success-ink)' : '#fff' }}>
                             {p.enabled ? 'Активно' : 'Пауза'}
                           </span>
                         </div>

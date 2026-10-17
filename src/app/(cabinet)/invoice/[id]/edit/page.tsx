@@ -4,6 +4,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { motion, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { formatDate } from '@/lib/date'
+import { UNIT_OPTIONS, unitLabel } from '@/lib/i18n/units'
 import { useLanguage } from '@/components/LanguageProvider'
 import { deleteLabel } from '@/lib/a11yLabels'
 import { invoiceFlowDict } from '@/lib/i18n/invoiceFlow'
@@ -12,7 +13,6 @@ import Skeleton from '@/components/Skeleton'
 import { useAppDialog } from '@/components/AppDialog'
 import PageHeader from '@/components/PageHeader'
 
-const UNIT_OPTIONS = ['шт', 'кг', 'л', 'м', 'м²', 'м³', 'час', 'день', 'месяц', 'услуга', 'работа']
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
 // kept identical rather than inventing a second "house" ease.
@@ -86,7 +86,7 @@ export default function EditInvoice() {
       setDueDate(inv.due_date || '')
       setNote(inv.note || '')
       setInvoiceNumber(inv.number || '')
-      setInvoiceDate(inv.created_at ? new Date(inv.created_at).toLocaleDateString('ru-KZ') : '')
+      setInvoiceDate(inv.created_at || '')
 
       if (inv.services && inv.services.length > 0) {
         setServices(inv.services.map((s: any) => ({ ...s, type: s.type || 'service' })))
@@ -270,7 +270,7 @@ export default function EditInvoice() {
                 <div className="flex gap-2">
                   <button type="button" onClick={() => updateService(idx, 'type', 'product')}
                     className="flex-1 px-3 py-1.5 text-xs rounded-lg font-medium transition"
-                    style={svc.type === 'product' ? { background: 'var(--nav-success)', color: '#fff' } : { background: 'var(--nav-surface-glass)', color: 'var(--nav-text-secondary)' }}>
+                    style={svc.type === 'product' ? { background: 'var(--nav-success-solid)', color: 'var(--nav-success-ink)' } : { background: 'var(--nav-surface-glass)', color: 'var(--nav-text-secondary)' }}>
                     {t.productToggleLabel}
                   </button>
                   <button type="button" onClick={() => updateService(idx, 'type', 'service')}
@@ -309,7 +309,7 @@ export default function EditInvoice() {
                     <select className={`${inputClass.replace('px-3', 'px-2')} bg-transparent`} style={{ color: 'var(--nav-text-primary)' }}
                       value={svc.unit || 'шт'}
                       onChange={e => updateService(idx, 'unit', e.target.value)}>
-                      {UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
+                      {UNIT_OPTIONS.map(u => <option key={u} value={u}>{unitLabel(u, lang)}</option>)}
                     </select>
                   </div>
                   <div>
@@ -377,8 +377,8 @@ export default function EditInvoice() {
           transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.25 }}
           className="w-full rounded-xl py-4 font-medium text-sm transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0 disabled:hover:translate-y-0"
           style={{
-            background: saving ? 'var(--nav-text-muted)' : 'var(--nav-success)',
-            color: '#fff',
+            background: saving ? 'var(--nav-text-muted)' : 'var(--nav-success-solid)',
+            color: saving ? '#fff' : 'var(--nav-success-ink)',
             boxShadow: saving ? 'none' : '0 10px 24px -10px var(--nav-success)',
           }}>
           {saving ? t.savingButtonLabel : t.saveChangesButton}
@@ -393,8 +393,8 @@ export default function EditInvoice() {
       >
         <InvoiceLivePreview
           invoiceNumber={invoiceNumber}
-          date={invoiceDate}
-          dueDate={dueDate ? formatDate(dueDate) : undefined}
+          date={invoiceDate ? formatDate(invoiceDate, lang) : ''}
+          dueDate={dueDate ? formatDate(dueDate, lang) : undefined}
           companyName={profile?.company_name || ''}
           companyBin={profile?.bin_iin || ''}
           clientName={clientName}

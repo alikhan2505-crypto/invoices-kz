@@ -86,7 +86,7 @@ export default function ContractPage() {
       <div className="space-y-4">
 
         <div className="nav-glass nav-card-accent rounded-2xl p-5">
-          <div className="text-xs mb-1" style={{ color: 'var(--nav-text-muted)' }}>{t.createdLabel(formatDate(contract.created_at))}</div>
+          <div className="text-xs mb-1" style={{ color: 'var(--nav-text-muted)' }}>{t.createdLabel(formatDate(contract.created_at, lang))}</div>
           <div className="text-lg font-bold" style={{ color: 'var(--nav-text-primary)' }}>{contract.title}</div>
           <div className="mt-3 pt-3" style={{ borderTop: '1px solid var(--nav-border-soft)' }}>
             <div className="text-xs mb-1" style={{ color: 'var(--nav-text-muted)' }}>{t.clientLabel}</div>

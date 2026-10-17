@@ -368,7 +368,29 @@ export default function TopUtilityBar() {
     return () => window.removeEventListener('utility-bar-request', emit)
   }, [unreadCount, companyName])
 
+  // Escape closes whichever panel is open; focus moves to its close button on
+  // open and returns to the opener on close (keyboard users do not get lost).
+  useEffect(() => {
+    if (!panel) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setPanel(null) }
+    document.addEventListener('keydown', onKey)
+    const raf = requestAnimationFrame(() => {
+      document.querySelector<HTMLElement>('[data-panel-close]')?.focus({ preventScroll: true })
+    })
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      cancelAnimationFrame(raf)
+      const opener = openerRef.current
+      openerRef.current = null
+      if (opener && opener.isConnected) opener.focus({ preventScroll: true })
+    }
+  }, [panel])
+
+  // Where focus goes back to when a panel closes (the button that opened it).
+  const openerRef = useRef<HTMLElement | null>(null)
   function openPanel(p: Exclude<Panel, null>) {
+    const active = typeof document !== 'undefined' ? document.activeElement : null
+    openerRef.current = active instanceof HTMLElement && active !== document.body ? active : null
     setPanel(p)
     if (p === 'wallet') {
       selectWallet(activeWallet)
@@ -673,7 +695,7 @@ export default function TopUtilityBar() {
           jammed into the corner rather than sitting in the bar. right-6 clears it. */}
       <div data-tour="wallet" className={`fixed top-1.5 ${ownHeaderPage ? 'lg:top-[11px]' : 'lg:top-[21px]'} right-3 lg:right-6 z-50 flex items-center gap-1.5 nav-glass rounded-full px-1.5 py-0 lg:py-1.5`}
         style={{ boxShadow: `0 12px 30px -14px rgba(10,10,15,0.35), var(--nav-card-glow)` }}>
-        <button onClick={() => openPanel('wallet')} title={u.walletTitle}
+        <button onClick={() => openPanel('wallet')} title={u.walletTitle} aria-label={balances.unified !== undefined ? `${u.walletTitle}: ${balances.unified.toLocaleString('ru-KZ')} ₸` : u.walletTitle} aria-haspopup="dialog"
           className="flex items-center gap-1.5 rounded-full pl-2 pr-2.5 py-1.5 hover:bg-gray-50 transition-colors">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
             <rect x="3" y="6" width="18" height="13" rx="2.5" stroke="var(--nav-accent)" strokeWidth="1.6" />
@@ -687,7 +709,7 @@ export default function TopUtilityBar() {
 
         <LangCycleButton />
 
-        <button data-tour="notifications" onClick={() => openPanel('notifications')} title={u.notificationsTitle}
+        <button data-tour="notifications" onClick={() => openPanel('notifications')} title={u.notificationsTitle} aria-label={u.notificationsTitle} aria-haspopup="dialog"
           className="relative w-11 h-11 flex items-center justify-center rounded-full hover:bg-gray-50 transition-colors">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
             <path d="M6 10a6 6 0 1 1 12 0c0 4 1.5 5.5 1.5 5.5H4.5S6 14 6 10Z" stroke="var(--nav-accent)" strokeWidth="1.6" strokeLinejoin="round" />
@@ -700,7 +722,7 @@ export default function TopUtilityBar() {
           )}
         </button>
 
-        <button data-tour="help" onClick={() => openPanel('help')} title={u.helpTitle}
+        <button data-tour="help" onClick={() => openPanel('help')} title={u.helpTitle} aria-label={u.helpTitle} aria-haspopup="dialog"
           className="w-11 h-11 flex items-center justify-center rounded-full hover:bg-gray-50 transition-colors">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
             <circle cx="12" cy="12" r="9" stroke="var(--nav-accent)" strokeWidth="1.6" />
@@ -709,7 +731,7 @@ export default function TopUtilityBar() {
           </svg>
         </button>
 
-        <button onClick={() => openPanel('account')} title={u.accountTitle}
+        <button onClick={() => openPanel('account')} title={u.accountTitle} aria-label={companyName ? `${u.accountTitle}: ${companyName}` : u.accountTitle} aria-haspopup="dialog"
           className="w-11 h-11 rounded-full bg-[var(--nav-accent)] text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">
           {initials}
         </button>
@@ -732,6 +754,7 @@ export default function TopUtilityBar() {
               initial={reduceMotion ? false : { opacity: 0, scale: 0.97, y: 6 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               transition={{ duration: reduceMotion ? 0 : 0.22, ease: [0.16, 1, 0.3, 1] }}
+              role="dialog" aria-label={u.walletTitle}
               className="relative nav-glass rounded-[24px] w-full max-w-lg mb-0 lg:mb-0 max-h-[84vh] overflow-y-auto overflow-x-hidden"
               style={{ boxShadow: '0 34px 80px -20px rgba(10,10,15,0.4), var(--nav-card-glow)' }}
               onClick={e => e.stopPropagation()}
@@ -742,7 +765,7 @@ export default function TopUtilityBar() {
               <div className="p-6">
                 <div className="flex items-center justify-between">
                   <div className="text-[11px] font-extrabold uppercase" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.08em' }}>{u.balance}</div>
-                  <button onClick={() => setPanel(null)} className="text-[var(--nav-text-secondary)] text-lg leading-none">✕</button>
+                  <button data-panel-close onClick={() => setPanel(null)} aria-label={u.closeLabel} className="flex items-center justify-center w-9 h-9 -mr-1.5 rounded-full text-[var(--nav-text-secondary)] text-lg leading-none hover:bg-gray-50">✕</button>
                 </div>
 
                 <div className="text-4xl font-bold tabular-nums mt-2" style={{ color: 'var(--nav-text-primary)', letterSpacing: '-0.03em' }}>
@@ -753,7 +776,7 @@ export default function TopUtilityBar() {
                 </p>
 
                 {bonusClaimMessage && (
-                  <div className="text-xs font-semibold mt-3 rounded-xl px-3 py-2" style={{ background: 'var(--nav-success)', color: '#fff' }}>
+                  <div className="text-xs font-semibold mt-3 rounded-xl px-3 py-2" style={{ background: 'var(--nav-success-solid)', color: 'var(--nav-success-ink)' }}>
                     {bonusClaimMessage}
                   </div>
                 )}
@@ -1033,11 +1056,11 @@ export default function TopUtilityBar() {
           )}
 
           {panel === 'notifications' && (
-            <div className="nav-glass rounded-2xl w-full max-w-sm mb-0 lg:mb-0 lg:mt-[76px] max-h-[80vh] overflow-y-auto" style={{ boxShadow: 'var(--nav-card-glow)' }} onClick={e => e.stopPropagation()}>
+            <div role="dialog" aria-label={u.notificationsTitle} className="nav-glass rounded-2xl w-full max-w-sm mb-0 lg:mb-0 lg:mt-[76px] max-h-[80vh] overflow-y-auto" style={{ boxShadow: 'var(--nav-card-glow)' }} onClick={e => e.stopPropagation()}>
               <div className="p-4">
                 <div className="flex items-center justify-between mb-1">
                   <h2 className="text-sm font-bold text-[var(--nav-accent)]">{u.notificationsTitle}</h2>
-                  <button onClick={() => setPanel(null)} className="text-[var(--nav-text-secondary)] text-lg leading-none">✕</button>
+                  <button data-panel-close onClick={() => setPanel(null)} aria-label={u.closeLabel} className="flex items-center justify-center w-9 h-9 -mr-1.5 rounded-full text-[var(--nav-text-secondary)] text-lg leading-none hover:bg-gray-50">✕</button>
                 </div>
                 {unreadCount > 0 && (
                   <button onClick={markAllRead} className="text-xs text-[var(--nav-text-secondary)] hover:text-[var(--nav-accent)] mb-3">{u.markAllRead}</button>
@@ -1074,11 +1097,11 @@ export default function TopUtilityBar() {
           )}
 
           {panel === 'help' && (
-            <div className="nav-glass rounded-2xl w-full max-w-xs mb-0 lg:mb-0 lg:mt-[76px]" style={{ boxShadow: 'var(--nav-card-glow)' }} onClick={e => e.stopPropagation()}>
+            <div role="dialog" aria-label={u.helpTitle} className="nav-glass rounded-2xl w-full max-w-xs mb-0 lg:mb-0 lg:mt-[76px]" style={{ boxShadow: 'var(--nav-card-glow)' }} onClick={e => e.stopPropagation()}>
               <div className="p-3">
                 <div className="flex items-center justify-between mb-1 px-1">
                   <h2 className="text-sm font-bold text-[var(--nav-accent)]">{u.helpTitle}</h2>
-                  <button onClick={() => setPanel(null)} className="text-[var(--nav-text-secondary)] text-lg leading-none">✕</button>
+                  <button data-panel-close onClick={() => setPanel(null)} aria-label={u.closeLabel} className="flex items-center justify-center w-9 h-9 -mr-1.5 rounded-full text-[var(--nav-text-secondary)] text-lg leading-none hover:bg-gray-50">✕</button>
                 </div>
                 <Link href="/profile/support" onClick={() => setPanel(null)}
                   className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-gray-50 text-sm text-gray-700 transition-colors">
@@ -1101,16 +1124,17 @@ export default function TopUtilityBar() {
           )}
 
           {panel === 'account' && (
-            <div className="nav-glass rounded-2xl w-full max-w-xs mb-0 lg:mb-0 lg:mt-[76px]" style={{ boxShadow: 'var(--nav-card-glow)' }} onClick={e => e.stopPropagation()}>
+            <div role="dialog" aria-label={u.accountTitle} className="nav-glass rounded-2xl w-full max-w-xs mb-0 lg:mb-0 lg:mt-[76px]" style={{ boxShadow: 'var(--nav-card-glow)' }} onClick={e => e.stopPropagation()}>
               <div className="p-3">
                 <div className="flex items-center gap-3 px-2 py-2 mb-1">
                   <div className="w-10 h-10 rounded-full bg-[var(--nav-accent)] text-white text-xs font-bold flex items-center justify-center flex-shrink-0">
                     {initials}
                   </div>
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <div className="text-sm font-semibold text-[var(--nav-accent)] truncate">{companyName || u.noCompanyName}</div>
                     <div className="text-xs text-[var(--nav-text-secondary)] truncate">{email}</div>
                   </div>
+                  <button data-panel-close onClick={() => setPanel(null)} aria-label={u.closeLabel} className="flex items-center justify-center w-9 h-9 -mr-1 rounded-full text-[var(--nav-text-secondary)] text-lg leading-none hover:bg-gray-50 flex-shrink-0 self-start">✕</button>
                 </div>
                 <Link href="/profile" onClick={() => setPanel(null)}
                   className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-gray-50 text-sm text-gray-700 transition-colors">

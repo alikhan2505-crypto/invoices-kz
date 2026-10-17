@@ -1163,17 +1163,17 @@ export default function KaspiApiPage() {
       )}
 
       <div className="max-w-3xl mx-auto px-6 pb-16">
-        <h2 className="text-[13px] font-semibold uppercase mb-3" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.08em' }}>Связано с другими продуктами</h2>
+        <h2 className="text-[13px] font-semibold uppercase mb-3" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.08em' }}>{t.linkedHeading}</h2>
         <div className="grid gap-3 sm:grid-cols-2">
           <a href={crossHref('invoices', '/create', 'kaspiApi', '/kaspi-api')} className="nav-glass rounded-2xl p-4 flex flex-col gap-1.5 transition-transform hover:-translate-y-0.5">
-            <span className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>Выставлять счета клиентам без кода</span>
+            <span className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{t.linkedInvoicesTitle}</span>
             <span className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>Счета · invoices.kz</span>
-            <span className="text-xs font-semibold mt-auto pt-2" style={{ color: 'var(--nav-accent)' }}>Открыть →</span>
+            <span className="text-xs font-semibold mt-auto pt-2" style={{ color: 'var(--nav-accent)' }}>{t.linkedOpen}</span>
           </a>
           <a href={crossHref('kaspiShop', '/kaspi-shop/overview', 'kaspiApi', '/kaspi-api')} className="nav-glass rounded-2xl p-4 flex flex-col gap-1.5 transition-transform hover:-translate-y-0.5">
-            <span className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>Заказы и демпинг цен на Kaspi Магазине</span>
+            <span className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{t.linkedKaspiShopTitle}</span>
             <span className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>Kaspi Bot · kaspi.invoices.kz</span>
-            <span className="text-xs font-semibold mt-auto pt-2" style={{ color: 'var(--nav-accent)' }}>Открыть →</span>
+            <span className="text-xs font-semibold mt-auto pt-2" style={{ color: 'var(--nav-accent)' }}>{t.linkedOpen}</span>
           </a>
         </div>
       </div>

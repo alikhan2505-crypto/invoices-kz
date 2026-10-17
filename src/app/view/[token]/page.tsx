@@ -753,8 +753,8 @@ export default function PublicInvoice() {
             )}
             {profile?.halyk_pay_link && (
               <a href={profile.halyk_pay_link} target="_blank" rel="noopener noreferrer"
-                className="w-full text-white rounded-xl py-3.5 font-medium text-sm flex items-center justify-center gap-2 block text-center transition-transform duration-150 hover:-translate-y-0.5"
-                style={{ background: 'var(--nav-success)' }}>
+                className="w-full rounded-xl py-3.5 font-medium text-sm flex items-center justify-center gap-2 block text-center transition-transform duration-150 hover:-translate-y-0.5"
+                style={{ background: 'var(--nav-success-solid)', color: 'var(--nav-success-ink)' }}>
                 {t.payViaHalykButton}
               </a>
             )}
@@ -806,7 +806,7 @@ export default function PublicInvoice() {
                   onClick={markAsPaid}
                   disabled={marking}
                   className="w-full rounded-xl py-4 font-medium text-sm transition-transform duration-150 hover:-translate-y-0.5 disabled:hover:translate-y-0"
-                  style={{ background: 'var(--nav-success)', color: '#fff' }}>
+                  style={{ background: 'var(--nav-success-solid)', color: 'var(--nav-success-ink)' }}>
                   {marking ? t.processingButtonLabel : t.alreadyPaidButton}
                 </button>
               </>

@@ -890,7 +890,7 @@ export default function AiAgentSettings() {
         </motion.div>
 
         {oauthNotice === 'connected' && (
-          <div className="rounded-lg px-3 py-2 text-sm mb-4 flex items-center gap-2" style={{ background: 'var(--nav-success)', color: '#fff' }}>
+          <div className="rounded-lg px-3 py-2 text-sm mb-4 flex items-center gap-2" style={{ background: 'var(--nav-success-solid)', color: 'var(--nav-success-ink)' }}>
             <CheckCircleIcon /> {t.chipConnected('Instagram')}
           </div>
         )}

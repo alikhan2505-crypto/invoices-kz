@@ -437,7 +437,7 @@ function KaspiShopOrdersInner() {
         )}
 
         {packingConfirmedMessage && (
-          <div className="rounded-2xl p-3 mb-4 text-sm" style={{ background: 'var(--nav-success)', color: '#fff' }}>{packingConfirmedMessage}</div>
+          <div className="rounded-2xl p-3 mb-4 text-sm" style={{ background: 'var(--nav-success-solid)', color: 'var(--nav-success-ink)' }}>{packingConfirmedMessage}</div>
         )}
 
         {WAYBILL_PRINTABLE_STATUSES.includes(status) && selected.size > 0 && (
@@ -606,7 +606,7 @@ function KaspiShopOrdersInner() {
                   aria-disabled={!normalized}
                   onClick={e => { if (!normalized) e.preventDefault(); else setReviewModal(null) }}
                   className="block text-center w-full rounded-xl py-2.5 text-sm font-semibold"
-                  style={{ background: normalized ? 'var(--nav-success)' : 'var(--nav-border-soft)', color: normalized ? '#fff' : 'var(--nav-text-muted)', cursor: normalized ? 'pointer' : 'not-allowed' }}>
+                  style={{ background: normalized ? 'var(--nav-success-solid)' : 'var(--nav-border-soft)', color: normalized ? 'var(--nav-success-ink)' : 'var(--nav-text-muted)', cursor: normalized ? 'pointer' : 'not-allowed' }}>
                   Открыть WhatsApp
                 </a>
               </div>

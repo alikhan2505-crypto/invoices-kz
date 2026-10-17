@@ -12,6 +12,7 @@ import { cacheGet, cacheSet } from '@/lib/cache'
 import { getActivePlan } from '@/lib/plan'
 import { almatyMonthStart, invoiceLimitWindow, checkInvoiceLimit, invoicesLeft, isInvoiceLimitError, invoiceLimitFromError } from '@/lib/invoiceLimit'
 import { formatDate, formatDateSafe } from '@/lib/date'
+import { UNIT_OPTIONS, unitLabel } from '@/lib/i18n/units'
 import { computeDefaultDueDate, todayDateString } from '@/lib/dueDate'
 import { useLanguage } from '@/components/LanguageProvider'
 import { closeLabel, deleteLabel } from '@/lib/a11yLabels'
@@ -22,7 +23,6 @@ import { useAppDialog } from '@/components/AppDialog'
 import { useBinLookup } from '@/components/useBinLookup'
 import PageHeader from '@/components/PageHeader'
 
-const UNIT_OPTIONS = ['шт', 'кг', 'л', 'м', 'м²', 'м³', 'час', 'день', 'месяц', 'услуга', 'работа']
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
 // kept identical rather than inventing a second "house" ease.
@@ -666,7 +666,7 @@ export default function CreateInvoicePage() {
   // Примечание всегда отражает выбранный срок оплаты -- вместо статичного
   // "оплата в течение N дней" показываем конкретную дату (2026-08-20, founder request).
   useEffect(() => {
-    if (dueDate) setNote(invoiceFlowDict[lang].paymentDueNote(formatDate(dueDate)))
+    if (dueDate) setNote(invoiceFlowDict[lang].paymentDueNote(formatDate(dueDate, lang)))
   }, [dueDate, lang])
 
   useEffect(() => {
@@ -1020,7 +1020,7 @@ export default function CreateInvoicePage() {
     // usually sets the same default date again -- so rebuild the note here,
     // as a fresh /create mount would, instead of carrying an edited one over.
     const dueDefault = computeDefaultDueDate(todayDateString(), profile?.default_due_days)
-    setNote(dueDefault ? t.paymentDueNote(formatDate(dueDefault)) : '')
+    setNote(dueDefault ? t.paymentDueNote(formatDate(dueDefault, lang)) : '')
     // An explicitly requested new invoice is not a double submit: a fresh
     // mount (the old way here) started with no lastCreated either.
     setLastCreated(null)
@@ -1190,7 +1190,7 @@ export default function CreateInvoicePage() {
                 <div className="text-sm font-medium" style={{ color: 'var(--nav-success)' }}>{t.trialPlanTitle}</div>
                 <div className="text-xs mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{t.trialDaysLeftLabel(activePlan.daysLeft!, invoicesLeft(activePlan, monthCount) ?? 0)}</div>
               </div>
-              <button onClick={() => router.push('/upgrade')} className="text-xs font-semibold px-3 py-1.5 rounded-lg flex-shrink-0" style={{ background: 'var(--nav-success)', color: '#fff' }}>{t.buyButton}</button>
+              <button onClick={() => router.push('/upgrade')} className="text-xs font-semibold px-3 py-1.5 rounded-lg flex-shrink-0" style={{ background: 'var(--nav-success-solid)', color: 'var(--nav-success-ink)' }}>{t.buyButton}</button>
             </div>
           )
           if (activePlan.daysLeft !== null && activePlan.daysLeft <= 3) return (
@@ -1219,7 +1219,7 @@ export default function CreateInvoicePage() {
                 { step: 4, title: t.onboardingStep4Title, desc: t.onboardingStep4Desc, done: monthStats.total > 0, action: () => {}, btn: '' },
               ].map((item, i) => (
                 <div key={i} className="flex items-center gap-3 p-3 rounded-xl" style={{ background: item.done ? 'var(--nav-success-soft)' : 'var(--nav-surface-glass)' }}>
-                  <div className="w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0" style={item.done ? { background: 'var(--nav-success)', color: '#fff' } : { background: 'var(--nav-border-soft)', color: 'var(--nav-text-muted)' }}>
+                  <div className="w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0" style={item.done ? { background: 'var(--nav-success-solid)', color: 'var(--nav-success-ink)' } : { background: 'var(--nav-border-soft)', color: 'var(--nav-text-muted)' }}>
                     {item.done ? '✓' : item.step}
                   </div>
                   <div className="flex-1">
@@ -1566,7 +1566,7 @@ export default function CreateInvoicePage() {
                   <div className="flex gap-2 mb-2">
                     <button type="button" onClick={() => updateService(idx, 'type', 'product')}
                       className="flex-1 px-3 py-1.5 text-xs rounded-lg font-medium transition"
-                      style={svc.type === 'product' ? { background: 'var(--nav-success)', color: '#fff' } : { background: 'var(--nav-surface-glass)', color: 'var(--nav-text-secondary)' }}>
+                      style={svc.type === 'product' ? { background: 'var(--nav-success-solid)', color: 'var(--nav-success-ink)' } : { background: 'var(--nav-surface-glass)', color: 'var(--nav-text-secondary)' }}>
                       {t.productToggleLabel}
                     </button>
                     <button type="button" onClick={() => updateService(idx, 'type', 'service')}
@@ -1600,7 +1600,7 @@ export default function CreateInvoicePage() {
                       <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-muted)' }}>{t.unitLabel}</label>
                       <select className="w-full rounded-lg px-2 py-2 text-sm outline-none transition-colors border border-[color:var(--nav-border)] focus:border-[color:var(--nav-accent)] focus:ring-2 focus:ring-[color:var(--nav-accent-track)]"
                         value={svc.unit || 'шт'} onChange={e => updateService(idx, 'unit', e.target.value)}>
-                        {UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
+                        {UNIT_OPTIONS.map(u => <option key={u} value={u}>{unitLabel(u, lang)}</option>)}
                       </select>
                     </div>
                     <div>
@@ -1706,8 +1706,8 @@ export default function CreateInvoicePage() {
               transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.25 }}
               className="w-full rounded-xl py-4 font-medium text-sm transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0 disabled:hover:translate-y-0"
               style={{
-                background: loading ? 'var(--nav-text-muted)' : 'var(--nav-success)',
-                color: '#fff',
+                background: loading ? 'var(--nav-text-muted)' : 'var(--nav-success-solid)',
+                color: loading ? '#fff' : 'var(--nav-success-ink)',
                 boxShadow: loading ? 'none' : '0 10px 24px -10px var(--nav-success)',
               }}
             >
@@ -1724,8 +1724,8 @@ export default function CreateInvoicePage() {
         >
           <InvoiceLivePreview
             invoiceNumber={!profileLoaded ? '' : (profile?.invoice_prefix || 'INV-') + (profile?.invoice_next_number || '0001')}
-            date={formatDate(new Date().toISOString())}
-            dueDate={dueDate ? formatDate(dueDate) : undefined}
+            date={formatDate(new Date().toISOString(), lang)}
+            dueDate={dueDate ? formatDate(dueDate, lang) : undefined}
             companyName={profile?.company_name || ''}
             companyBin={profile?.bin_iin || ''}
             clientName={clientName}
@@ -1775,7 +1775,7 @@ export default function CreateInvoicePage() {
                   className="flex items-center justify-between p-3 rounded-xl cursor-pointer transition-colors border border-[color:var(--nav-border-soft)] hover:border-[color:var(--nav-accent)]">
                   <div>
                     <div className="font-medium text-sm" style={{ color: 'var(--nav-text-primary)' }}>{s.name}</div>
-                    <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>{s.unit || 'шт'}</div>
+                    <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>{unitLabel(s.unit || 'шт', lang)}</div>
                   </div>
                   <div className="text-sm font-medium tabular-nums" style={{ color: 'var(--nav-text-primary)' }}>{Number(s.price).toLocaleString('ru-KZ')} ₸</div>
                 </div>

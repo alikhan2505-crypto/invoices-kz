@@ -749,7 +749,7 @@ export default function DashboardPage() {
                 <div className="text-sm font-medium" style={{ color: 'var(--nav-success)' }}>{tf.trialPlanTitle}</div>
                 <div className="text-xs mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{quotaLeft !== null ? tf.trialDaysLeftLabel(plan.daysLeft!, quotaLeft) : tf.daysLeftLabel(plan.daysLeft!)}</div>
               </div>
-              <button onClick={() => router.push('/upgrade')} className="text-xs font-semibold px-3 py-1.5 rounded-lg flex-shrink-0" style={{ background: 'var(--nav-success)', color: '#fff' }}>{tf.buyButton}</button>
+              <button onClick={() => router.push('/upgrade')} className="text-xs font-semibold px-3 py-1.5 rounded-lg flex-shrink-0" style={{ background: 'var(--nav-success-solid)', color: 'var(--nav-success-ink)' }}>{tf.buyButton}</button>
             </div>
           )}
           <LapsedPlanNotice profile={planProfile} className="mb-5" />
@@ -1011,7 +1011,7 @@ export default function DashboardPage() {
                           <div className="text-sm font-medium truncate" style={{ color: 'var(--nav-text-primary)' }}>
                             {inv.client_name || inv.clients?.name || h.noClientLabel}
                           </div>
-                          <div className="text-xs mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{formatDateTime(inv.created_at)}</div>
+                          <div className="text-xs mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{formatDateTime(inv.created_at, lang)}</div>
                         </div>
                         <div className="text-right ml-3 flex-shrink-0">
                           <div className="text-sm font-medium tabular-nums mb-1.5" style={{ color: 'var(--nav-text-primary)' }}>
@@ -1137,7 +1137,8 @@ export default function DashboardPage() {
             </div>
           </footer>
         </div>
-        <DashboardTour />
+        {/* Mounted only after the data has loaded: the tour freezes its step list when it starts, and the analytics anchor only exists once the skeletons are gone. */}
+        {!loading && <DashboardTour />}
       </>
   )
 }

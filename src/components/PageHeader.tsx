@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { motion, useReducedMotion } from 'framer-motion'
 import { useLanguage } from '@/components/LanguageProvider'
 import { backLabel } from '@/lib/a11yLabels'
+import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 
 // ЕДИНАЯ шапка страницы личного кабинета (решение основателя 15-16.10.2026:
 // «мы же должны соответствовать одному стилю!!»): стрелка «назад» (44x44) +
@@ -15,7 +16,7 @@ import { backLabel } from '@/lib/a11yLabels'
 //   без обоих -- стрелки нет (корневые разделы: дашборд, история, новый счёт);
 //   right     -- кнопки/статус справа (см. PageHeaderButton);
 //   subtitle  -- серая строка под заголовком;
-//   as        -- h1 или h2 (по умолчанию h2, как исторически на страницах);
+//   as        -- h1 или h2 (по умолчанию h1: на странице кабинета один заголовок, и это он);
 //   animate   -- мягкое появление (отключается само при prefers-reduced-motion).
 
 const EASE = [0.16, 1, 0.3, 1] as const
@@ -45,11 +46,15 @@ export type PageHeaderProps = {
 }
 
 export default function PageHeader({
-  title, subtitle, backHref, onBack, right, as = 'h2', titleId, titleClassName, className, animate = true,
+  title, subtitle, backHref, onBack, right, as = 'h1', titleId, titleClassName, className, animate = true,
 }: PageHeaderProps) {
   const { lang } = useLanguage()
   const reduceMotion = !!useReducedMotion()
   const Heading = as
+  // Вкладка и история браузера называют страницу её заголовком («История
+  // счетов — INVOICES.KZ»), а не одной общей строкой на все страницы кабинета.
+  // Заголовок-заглушка (Skeleton) строкой не является -- тогда остаётся прежний title.
+  usePageDocumentTitle(title)
   const hasBack = !!backHref || !!onBack
 
   const backControl = backHref ? (
