@@ -85,12 +85,48 @@ textarea::-moz-placeholder {
   opacity: 1;
 }
 
-/* Fix input text color on mobile PWA */
+/* Fix input text color on mobile PWA.
+   The ink is a token (--field-ink), not a literal, because this rule sets
+   -webkit-text-fill-color, which beats every `color` a page puts on an input
+   (inline or Tailwind): a literal near-black stayed near-black under the OS
+   dark scheme, where the theme is driven only by the prefers-color-scheme
+   block (data-theme is deliberately unset for visitors who never touched the
+   switch, see ThemeProvider) and the explicit-dark input overrides further
+   down only match [data-theme="dark"]. Typed text on /create, /profile/*
+   forms, search boxes etc. came out near-black on a dark card (contrast
+   1:1). Light theme keeps #111827 exactly as before; the scoped exceptions
+   (.cashier-dev-theme, .salon-admin-form, .planner-shell, inline fills) win
+   by specificity and are untouched. */
+:root {
+  --field-ink: #111827;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --field-ink: var(--nav-text-primary);
+  }
+}
+
+[data-theme="dark"] {
+  --field-ink: var(--text-primary);
+}
+
 input,
 textarea,
 select {
-  color: #111827;
-  -webkit-text-fill-color: #111827;
+  color: var(--field-ink);
+  -webkit-text-fill-color: var(--field-ink);
+}
+
+/* The native <select> popup is drawn by the browser on its own surface; with
+   a light ink inherited from the select (dark scheme) the options would be
+   light-on-light. Give them the theme's chrome surface, as the explicit dark
+   theme does below via [data-theme="dark"] select option. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) select option {
+    background-color: var(--nav-surface-chrome);
+    color: var(--field-ink);
+  }
 }
 
 /* Floors form-control font-size at 16px on mobile only -- iOS Safari

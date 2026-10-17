@@ -11,6 +11,7 @@ import { setPostLoginRedirect } from '@/lib/postLoginRedirect'
 import { useAppDialog } from '@/components/AppDialog'
 import BrandLoader from '@/components/BrandLoader'
 import { useCrossHref } from '@/lib/useCrossHref'
+import { notifyWalletChanged } from '@/lib/walletSignal'
 
 // Matches MIN_TOPUP in src/app/api/kaspi/wallet/topup/route.ts — kept here
 // too so the button can refuse an obviously-too-small amount before ever
@@ -153,6 +154,7 @@ export default function KaspiApiPage() {
         clearInterval(interval)
         setKaspiTopupPending(null)
         load()
+        notifyWalletChanged('kaspi-api')
       } else if (data.status === 'scanning') {
         // Kaspi's 'Wait' status -- the customer already opened the QR and is
         // looking at the confirmation screen. Never treat this as expired.
@@ -231,6 +233,7 @@ export default function KaspiApiPage() {
       if (data.status === 'paid') {
         setKaspiTopupPending(null)
         load()
+        notifyWalletChanged('kaspi-api')
         return
       }
       // 'scanning' can in principle land here too (the customer started
@@ -617,7 +620,7 @@ export default function KaspiApiPage() {
         headers: { 'Authorization': `Bearer ${session?.access_token}` },
       })
       const data = await res.json()
-      if (data.status === 'paid') load()
+      if (data.status === 'paid') { load(); notifyWalletChanged('kaspi-api') }
     } catch (e: any) {
       console.error('Cancel phone topup: force-settle failed:', e.message)
     }

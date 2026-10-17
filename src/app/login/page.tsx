@@ -275,6 +275,9 @@ export default function Login() {
             <label className="text-xs text-gray-500 mb-2 block">{t.emailLabel}</label>
             <input
               className="w-full border rounded-lg px-3 py-3 text-sm outline-none focus:border-[#1C2056] mb-3"
+              // The card is always white; the global field ink follows the OS
+              // dark scheme, which would paint light text on it.
+              style={{ backgroundColor: '#fff', color: '#111827', WebkitTextFillColor: '#111827' }}
               placeholder={t.emailPlaceholder}
               type="email"
               value={email}

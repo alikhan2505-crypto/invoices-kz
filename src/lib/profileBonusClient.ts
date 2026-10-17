@@ -9,6 +9,7 @@
 import { supabase } from '@/lib/supabase'
 import type { BonusClaimResponse, BonusStatusResponse, ProfileBonusBlock } from '@/lib/profileBonus'
 import { profileBonusDict } from '@/lib/i18n/profileBonus'
+import { notifyWalletChanged } from '@/lib/walletSignal'
 
 type Lang = 'ru' | 'kk' | 'en'
 
@@ -30,7 +31,10 @@ export async function claimProfileBonus(block: ProfileBonusBlock): Promise<Bonus
       headers: { ...headers, 'Content-Type': 'application/json' },
       body: JSON.stringify({ block }),
     })
-    return (await res.json().catch(() => null)) as BonusClaimResponse | null
+    const result = (await res.json().catch(() => null)) as BonusClaimResponse | null
+    // Бонус лёг на кошелёк — плашка с балансом должна обновиться сразу.
+    if (result?.credited) notifyWalletChanged('profile-bonus')
+    return result
   } catch {
     return null
   }

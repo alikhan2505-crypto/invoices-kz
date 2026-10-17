@@ -62,6 +62,9 @@ export interface MiscContent {
   qrCodeAltText: string
   otherMethodHint: string
   openLinkDirectlyLabel: string
+  qrConfirmInApp: string
+  qrRefreshing: string
+  qrValidFor: (time: string) => string
   toPayLabel: string
   checkingPaymentLabel: string
   awaitingConfirmationLabel: string
@@ -205,6 +208,9 @@ export const miscDict: Record<'ru' | 'kk' | 'en', MiscContent> = {
     qrCodeAltText: 'QR код',
     otherMethodHint: 'Или воспользуйтесь другим способом ниже',
     openLinkDirectlyLabel: 'Открыть ссылку напрямую',
+    qrConfirmInApp: 'Подтвердите оплату в приложении Kaspi…',
+    qrRefreshing: 'Обновляем код…',
+    qrValidFor: (time) => `QR действителен ещё ${time}`,
     toPayLabel: 'К оплате',
     checkingPaymentLabel: 'Проверяем оплату...',
     awaitingConfirmationLabel: 'Ожидаем подтверждение...',
@@ -345,6 +351,9 @@ export const miscDict: Record<'ru' | 'kk' | 'en', MiscContent> = {
     qrCodeAltText: 'QR код',
     otherMethodHint: 'Немесе төмендегі басқа әдісті пайдаланыңыз',
     openLinkDirectlyLabel: 'Сілтемені тікелей ашу',
+    qrConfirmInApp: 'Төлемді Kaspi қосымшасында растаңыз…',
+    qrRefreshing: 'Кодты жаңартудамыз…',
+    qrValidFor: (time) => `QR тағы ${time} жарамды`,
     toPayLabel: 'Төлеуге',
     checkingPaymentLabel: 'Төлем тексерілуде...',
     awaitingConfirmationLabel: 'Растауды күтудеміз...',
@@ -485,6 +494,9 @@ export const miscDict: Record<'ru' | 'kk' | 'en', MiscContent> = {
     qrCodeAltText: 'QR code',
     otherMethodHint: 'Or use another method below',
     openLinkDirectlyLabel: 'Open the link directly',
+    qrConfirmInApp: 'Confirm the payment in the Kaspi app…',
+    qrRefreshing: 'Refreshing the code…',
+    qrValidFor: (time) => `QR is valid for ${time} more`,
     toPayLabel: 'Amount due',
     checkingPaymentLabel: 'Checking payment...',
     awaitingConfirmationLabel: 'Awaiting confirmation...',

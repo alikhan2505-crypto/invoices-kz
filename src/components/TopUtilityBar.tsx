@@ -11,6 +11,7 @@ import { getActivePlan } from '@/lib/plan'
 import { invoiceLimitWindow } from '@/lib/invoiceLimit'
 import { companyInitials } from '@/lib/companyIdentity'
 import { useLanguage, type Lang } from '@/components/LanguageProvider'
+import { notifyWalletChanged, useWalletRefresh } from '@/lib/walletSignal'
 
 type WalletKey = 'unified'
 type Panel = 'wallet' | 'notifications' | 'help' | 'account' | null
@@ -334,6 +335,19 @@ export default function TopUtilityBar() {
     setHistoryLoading(false)
   }
 
+  // Баланс в плашке перечитывается по сигналу «кошелёк изменился» (оплата тарифа
+  // с кошелька, возврат удержания, бонус, пополнение), при смене маршрута и когда
+  // вкладка снова видима. Без сигналов плашка работает как раньше.
+  const refetchWalletBalance = async () => {
+    try {
+      const headers = await authHeader()
+      await refreshBalances(WALLETS.filter(w => !w.adminOnly || isAdmin), headers)
+    } catch {
+      // Сеть моргнула — следующий триггер перечитает.
+    }
+  }
+  useWalletRefresh(refetchWalletBalance, { enabled: loggedIn, routeKey: pathname, ownSource: 'topbar' })
+
   // The product shell shows the balance in its sidebar; its "top up" opens this panel.
   const openPanelRef = useRef<(p: Exclude<Panel, null>) => void>(() => {})
   useEffect(() => {
@@ -449,7 +463,7 @@ export default function TopUtilityBar() {
       const headers = await authHeader()
       const res = await fetch(`${wallet.topupStatusUrl}?topup_id=${topupId}&force=true`, { headers })
       const data = await res.json()
-      if (data.status === 'paid') { await refreshBalances([wallet], headers); selectWallet(activeWallet) }
+      if (data.status === 'paid') { await refreshBalances([wallet], headers); selectWallet(activeWallet); notifyWalletChanged('topbar') }
     } catch (e: any) {
       console.error('Cancel phone topup: force-settle failed:', e.message)
     }
@@ -515,6 +529,7 @@ export default function TopUtilityBar() {
         setTopupPending(null)
         await refreshBalances([wallet], headers)
         selectWallet(activeWallet)
+        notifyWalletChanged('topbar')
       } else if (data.status === 'expired' || data.status === 'failed') {
         // Both statuses leave a QR that Kaspi's scanner answers with a raw
         // "QR-код не распознан": 'expired' is the ~5-minute window closing or

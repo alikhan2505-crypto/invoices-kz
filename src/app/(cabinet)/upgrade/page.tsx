@@ -18,6 +18,7 @@ import { formatDateNumeric } from '@/lib/date'
 import { profileBonusDict } from '@/lib/i18n/profileBonus'
 import type { PlanPaymentSplit } from '@/lib/plans/planActivation'
 import PageHeader from '@/components/PageHeader'
+import { notifyWalletChanged } from '@/lib/walletSignal'
 
 // How long an untouched QR is shown before it is retired for a fresh one.
 // Kaspi's own window is ~5 minutes; /kaspi-api shortens the visible wait to a
@@ -355,6 +356,8 @@ export default function Upgrade() {
     }
     await reloadPlan()
     await refreshWalletInfo()
+    // Удержание вернулось (или оплата прошла) — баланс в плашке изменился.
+    notifyWalletChanged('upgrade')
   }
 
   async function reloadPlan() {
@@ -417,6 +420,8 @@ export default function Upgrade() {
     }
 
     setWalletPaid(Number(data.wallet_amount) || 0)
+    // Часть суммы удержана с кошелька — плашка должна показать остаток.
+    if (Number(data.wallet_amount) > 0) notifyWalletChanged('upgrade')
     setQrToken(data.qr_token)
     setExtTranId(data.ext_tran_id)
     setQrExpiresAt(data.expire_date ? new Date(data.expire_date).getTime() : 0)
@@ -722,6 +727,7 @@ export default function Upgrade() {
       if (!res.ok || !data.ok) {
         setShowModal(false)
         void refreshWalletInfo()
+        notifyWalletChanged('upgrade')
         alert(data.error === 'insufficient_funds' ? tw.walletErrors.insufficient
           : data.error === 'busy' ? tw.walletErrors.busy
           : data.error === 'unavailable' ? tw.walletErrors.unavailable
@@ -730,6 +736,7 @@ export default function Upgrade() {
       }
       await reloadPlan()
       await refreshWalletInfo()
+      notifyWalletChanged('upgrade')
       setStep('success')
     } catch {
       setShowModal(false)
@@ -1114,12 +1121,12 @@ export default function Upgrade() {
                     </div>
                     <div className="text-xs mb-4 h-4" aria-live="polite">
                       {qrScanning ? (
-                        <span style={{ color: 'var(--nav-success)' }}>Подтвердите оплату в приложении Kaspi…</span>
+                        <span style={{ color: 'var(--nav-success)' }}>{t.qrConfirmInApp}</span>
                       ) : refreshingQr ? (
-                        <span style={{ color: 'var(--nav-text-muted)' }}>Обновляем код…</span>
+                        <span style={{ color: 'var(--nav-text-muted)' }}>{t.qrRefreshing}</span>
                       ) : secondsLeft > 0 ? (
                         <span className="tabular-nums" style={{ color: 'var(--nav-text-muted)' }}>
-                          QR действителен ещё {Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, '0')}
+                          {t.qrValidFor(`${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, '0')}`)}
                         </span>
                       ) : null}
                     </div>

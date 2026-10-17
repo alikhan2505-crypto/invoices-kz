@@ -13,6 +13,7 @@ import { productCabinetHref } from '@/lib/crossProduct'
 import { useEffectivePath } from '@/lib/useEffectivePath'
 import { useMyProducts } from '@/lib/useMyProducts'
 import { useCfoMode } from '@/lib/cfo/modeStore'
+import { useWalletRefresh } from '@/lib/walletSignal'
 
 const TEXT: Record<Lang, { all: string; menu: string; close: string; balance: string; topup: string; connected: string; notConnected: string; notifications: string; help: string; account: string; soon: string }> = {
   ru: { all: 'Все продукты', menu: 'Меню', close: 'Закрыть', balance: 'Баланс', topup: 'Пополнить баланс', connected: 'Магазин подключён', notConnected: 'Магазин не подключён', notifications: 'Уведомления', help: 'Помощь', account: 'Аккаунт', soon: 'скоро' },
@@ -65,19 +66,28 @@ export default function ProductShell({ product, children }: { product: ProductKe
   }, [])
 
   // Wallet balance for the sidebar (same source as the top pill's wallet).
+  // Перечитывается по сигналу «кошелёк изменился», при смене маршрута и при
+  // возврате на вкладку (useWalletRefresh); без сигналов — как раньше, один раз.
+  const aliveRef = useRef(true)
   useEffect(() => {
-    let alive = true
-    async function load() {
+    aliveRef.current = true
+    return () => { aliveRef.current = false }
+  }, [])
+  const loadBalance = async () => {
+    try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) return
-      const res = await fetch('/api/kaspi/wallet', { headers: { Authorization: `Bearer ${session.access_token}` } })
+      const res = await fetch('/api/kaspi/wallet', { headers: { Authorization: `Bearer ${session.access_token}` }, cache: 'no-store' })
       if (!res.ok) return
       const data = await res.json()
-      if (alive && Number.isFinite(Number(data.balance))) setBalance(Number(data.balance))
+      if (aliveRef.current && Number.isFinite(Number(data.balance))) setBalance(Number(data.balance))
+    } catch {
+      // Баланс в меню — удобство; следующий триггер перечитает.
     }
-    void load()
-    return () => { alive = false }
+  }
+  useEffect(() => { void loadBalance() // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+  useWalletRefresh(loadBalance, { enabled: true, routeKey: path })
 
   // Bell badge and initials come from the top bar component (it owns the data).
   useEffect(() => {

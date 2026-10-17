@@ -77,11 +77,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if ('error' in resolved) return NextResponse.json({ error: resolved.error }, { status: resolved.status })
   const { conversation } = resolved
 
+  const sendError = await sendIntoConversation(supabase, conversation, text)
+  if (sendError) return NextResponse.json({ error: sendError }, { status: 502 })
+
+  // Пауза ИИ — только после успешной отправки: иначе неудачная отправка
+  // молча выключала бота, а владелец ничего не отправил (как в ai-agent/dialogs/reply).
   if (!conversation.paused_for_human) {
     await supabase.from('ai_agent_conversations').update({ paused_for_human: true }).eq('id', conversation.id)
   }
-
-  const sendError = await sendIntoConversation(supabase, conversation, text)
-  if (sendError) return NextResponse.json({ error: sendError }, { status: 502 })
   return NextResponse.json({ ok: true })
 }
