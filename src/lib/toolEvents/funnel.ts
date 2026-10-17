@@ -36,6 +36,11 @@ export interface ToolEventDbRow {
   user_id: string | null
   internal: boolean | null
   medium: string | null
+  // Метки захода (колонки есть с первой версии таблицы; необязательны ради
+  // старых тестов и строк без метки).
+  utm_source?: string | null
+  utm_medium?: string | null
+  utm_campaign?: string | null
 }
 
 export interface FunnelCounts {
@@ -58,6 +63,14 @@ export interface FunnelToolRow extends FunnelCounts {
   tool: ToolEventTool
 }
 
+// Строка разреза по меткам: источник / канал / кампания. Все три null — заходы
+// без метки (прямые, из поиска, из органики).
+export interface FunnelSourceRow extends FunnelCounts {
+  source: string | null
+  medium: string | null
+  campaign: string | null
+}
+
 export interface FunnelDay {
   day: string // YYYY-MM-DD по Алматы
   visitors: number
@@ -71,6 +84,8 @@ export interface ToolFunnel {
   since: string // ISO, начало первого дня периода по Алматы
   tools: FunnelToolRow[]
   totals: FunnelCounts
+  // Разрез по utm_source / utm_medium / utm_campaign (все инструменты вместе).
+  sources: FunnelSourceRow[]
   // Регистрации без недавнего касания инструмента (tool='none').
   unattributedSignups: number
   series: FunnelDay[]
@@ -124,6 +139,14 @@ function emptyMediums(): Record<ToolEventMedium | 'other', number> {
   return m
 }
 
+// Метки приводим к одному виду, иначе «TG_chat» и «tg_chat» — две строки.
+export function normUtm(v: string | null | undefined): string | null {
+  const s = (v ?? '').trim().toLowerCase()
+  return s || null
+}
+
+export const MAX_SOURCE_ROWS = 100
+
 function finish(b: Bucket): FunnelCounts {
   const visitors = b.visitors.size
   return {
@@ -143,6 +166,16 @@ function finish(b: Bucket): FunnelCounts {
   }
 }
 
+// Больше посетителей — выше; при равенстве — где больше регистраций и документов.
+// Строка «без метки» всегда последняя: разрез нужен ради размеченных ссылок, и
+// срез по MAX_SOURCE_ROWS не должен её потерять.
+function sortSources(rows: FunnelSourceRow[]): FunnelSourceRow[] {
+  const isBlank = (r: FunnelSourceRow) => !r.source && !r.medium && !r.campaign
+  const byWeight = (a: FunnelSourceRow, c: FunnelSourceRow) => c.visitors - a.visitors || c.signups - a.signups || c.docs - a.docs
+  const labelled = rows.filter(r => !isBlank(r)).sort(byWeight).slice(0, MAX_SOURCE_ROWS)
+  return [...labelled, ...rows.filter(isBlank)]
+}
+
 export function aggregateToolFunnel(
   rows: ToolEventDbRow[],
   opts: { days: number; includeInternal: boolean; now: number; selfVisitors?: string[] },
@@ -157,6 +190,7 @@ export function aggregateToolFunnel(
 
   const perTool = new Map<ToolEventTool, Bucket>(TOOL_EVENT_TOOLS.map(t => [t, new Bucket()]))
   const total = new Bucket()
+  const perSource = new Map<string, { source: string | null; medium: string | null; campaign: string | null; b: Bucket }>()
   const seriesMap = new Map<string, { visitors: Set<string>; docs: number; signups: Set<string> }>()
   for (let t = sinceMs; t <= opts.now; t += 24 * 60 * 60 * 1000) {
     seriesMap.set(almatyDay(t), { visitors: new Set(), docs: 0, signups: new Set() })
@@ -186,7 +220,11 @@ export function aggregateToolFunnel(
 
     const b = perTool.get(r.tool as ToolEventTool)
     if (!b) continue
-    const buckets = [b, total]
+    const source = normUtm(r.utm_source), medium = normUtm(r.utm_medium), campaign = normUtm(r.utm_campaign)
+    const sourceKey = JSON.stringify([source, medium, campaign])
+    let sb = perSource.get(sourceKey)
+    if (!sb) { sb = { source, medium, campaign, b: new Bucket() }; perSource.set(sourceKey, sb) }
+    const buckets = [b, total, sb.b]
 
     switch (r.event) {
       case 'view':
@@ -225,6 +263,7 @@ export function aggregateToolFunnel(
     since: new Date(sinceMs).toISOString(),
     tools: TOOL_EVENT_TOOLS.map(tool => ({ tool, ...finish(perTool.get(tool)!) })),
     totals: finish(total),
+    sources: sortSources([...perSource.values()].map(x => ({ source: x.source, medium: x.medium, campaign: x.campaign, ...finish(x.b) }))),
     unattributedSignups: unattributed.size,
     series: [...seriesMap.entries()].map(([day, d]) => ({ day, visitors: d.visitors.size, docs: d.docs, signups: d.signups.size })),
     rowsConsidered: considered,

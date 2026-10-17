@@ -18,7 +18,7 @@ import { createClient } from '@supabase/supabase-js'
 // the whitelist can be unit-tested; an unknown tool silently falls back to the
 // route's fallbackTool, so a new tool MUST be added here.
 export const TOOL_LABELS: Record<string, string> = {
-  waybills: 'Склейка накладных',
+  waybills: 'Печать накладных Kaspi одним PDF',
   margin: 'Калькулятор маржи',
   // КП: email поставщика — только с галочкой согласия на рассылку (14.10.2026).
   // Email покупателя сюда НЕ отправляется: это данные третьего лица без согласия.

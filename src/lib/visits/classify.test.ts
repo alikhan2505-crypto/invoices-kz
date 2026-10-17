@@ -81,6 +81,10 @@ describe('classifySource', () => {
     }
     expect(classifySource({ ...qrScan, utmSource: 'instagram' })).toBe('social')
     expect(classifySource({ ...qrScan, utmSource: 'tg' })).toBe('social')
+    // метки плана трафика: tg_<чат> — Telegram, а не «чужой сайт»
+    expect(classifySource({ ...qrScan, utmSource: 'tg_chat', utmMedium: 'chat_post', utmCampaign: 'waybills_oct' })).toBe('social')
+    expect(classifySource({ ...qrScan, utmSource: 'TG_kasi_seller' })).toBe('social')
+    expect(classifySource({ ...qrScan, utmSource: 'tgx' })).toBe('referral')
   })
 
   it('utm beats referrer', () => {

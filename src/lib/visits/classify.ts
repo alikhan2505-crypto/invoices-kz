@@ -58,6 +58,10 @@ const SOCIAL_UTM = new Set([
   'tiktok', 'vk', 'youtube', 'threads', 'twitter', 'x', 'linkedin',
 ])
 
+// Метки по плану трафика: tg_<чат>, ig_…, — это тоже соцсети, а не «чужой сайт».
+// Префикс с подчёркиванием, чтобы не зацепить чужое (например, «tgx»).
+const SOCIAL_UTM_PREFIXES = ['tg_', 'ig_', 'fb_', 'wa_', 'tiktok_', 'meta_']
+
 // Хосты; совпадение — точное или поддомен (l.instagram.com, m.facebook.com).
 // android-app://<пакет> из приложений Android парсится в хост = имя пакета.
 const SEARCH_HOSTS = [
@@ -137,7 +141,7 @@ export function classifySource(s: VisitSignals, baseDomain = BASE_DOMAIN): Sourc
   // Метка сильнее реферера: её ставим мы сами.
   if (utmSource) {
     if (SEARCH_UTM.has(utmSource)) return 'search'
-    if (SOCIAL_UTM.has(utmSource)) return 'social'
+    if (SOCIAL_UTM.has(utmSource) || SOCIAL_UTM_PREFIXES.some(p => utmSource.startsWith(p))) return 'social'
   }
 
   const ref = referrerKind(s.referrerHost, baseDomain)

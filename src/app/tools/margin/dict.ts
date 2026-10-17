@@ -139,7 +139,7 @@ export const marginDict: Record<ToolLang, MarginDict> = {
     categoryManual: 'Другое — укажу комиссию сам',
     categoryHint:
       'Ставки из официального тарифа Kaspi. Если вашей категории в списке нет, выберите «Другое» и впишите свой процент.',
-    otherToolLink: 'Ещё бесплатно: склейка накладных Kaspi →',
+    otherToolLink: 'Ещё бесплатно: печать накладных Kaspi одним PDF →',
     howTitle: 'Как считается',
     howItems: [
       'Комиссия Kaspi и налог с оборота берутся с цены продажи, а не с себестоимости — поэтому при повышении цены они тоже растут.',
@@ -222,7 +222,7 @@ export const marginDict: Record<ToolLang, MarginDict> = {
     categoryManual: 'Басқа — комиссияны өзім жазамын',
     categoryHint:
       'Мөлшерлемелер Kaspi-дің ресми тарифінен алынған. Санатыңыз тізімде болмаса, «Басқа» дегенді таңдап, өз пайызыңызды жазыңыз.',
-    otherToolLink: 'Тағы бір тегін құрал: Kaspi жүкқұжаттарын бір файлға біріктіру →',
+    otherToolLink: 'Тағы бір тегін құрал: Kaspi жүкқұжаттарын бір PDF-пен басып шығару →',
     howTitle: 'Қалай есептеледі',
     howItems: [
       'Kaspi комиссиясы мен айналым салығы өзіндік құннан емес, сату бағасынан алынады — сондықтан баға өскен сайын олар да өседі.',
@@ -329,7 +329,7 @@ export const marginDict: Record<ToolLang, MarginDict> = {
     categoryManual: 'Other — I will enter the rate myself',
     categoryHint:
       "Rates come from Kaspi's own published tariff. If your category is not listed, pick Other and type your rate.",
-    otherToolLink: 'Also free: Kaspi waybill merger →',
+    otherToolLink: 'Also free: print Kaspi waybills as one PDF →',
     howTitle: 'How it is calculated',
     howItems: [
       'Kaspi commission and turnover tax are charged on the selling price, not on the cost, so they grow as you raise the price.',

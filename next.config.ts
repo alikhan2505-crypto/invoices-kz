@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { goRedirects } from "./src/lib/goLinks";
 
 // Дата выкладки для «О сервисе» → «Обновлено ДД.ММ.ГГГГ» (по Алматы, UTC+5):
 // вычисляется один раз при сборке, поэтому всегда совпадает с последним деплоем.
@@ -42,6 +43,9 @@ const nextConfig: NextConfig = {
       // там оболочка кабинета успевает отрисоваться, её запрос supabase.auth.getUser
       // обрывается переходом и пишет в консоль «TypeError: Failed to fetch».
       { source: '/profile/about', destination: '/profile/support#about', permanent: false },
+      // /go/<код> — короткие ссылки для постов и рекламы: инструмент + готовая UTM-метка.
+      // Таблица кодов — src/lib/goLinks.ts; неизвестный код уходит на главную.
+      ...goRedirects(),
     ]
   },
 };

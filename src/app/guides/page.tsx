@@ -94,7 +94,7 @@ export default function GuidesIndex() {
               </div>
             </Link>
             <Link href="/tools/waybills" className="nav-glass rounded-xl p-4 block" style={{ color: 'var(--nav-text-primary)' }}>
-              <div className="text-sm font-semibold mb-1">Склейка накладных Kaspi</div>
+              <div className="text-sm font-semibold mb-1">Печать накладных Kaspi одним PDF (А4/А6)</div>
               <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>
                 Накладные одним PDF: 4 на лист А4 или А6 на термопринтер
               </div>

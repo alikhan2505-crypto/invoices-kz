@@ -94,7 +94,7 @@ export default function GuidesIndexKk() {
               </div>
             </Link>
             <Link href="/tools/kk/waybills" className="nav-glass rounded-xl p-4 block" style={{ color: 'var(--nav-text-primary)' }}>
-              <div className="text-sm font-semibold mb-1">Kaspi жүкқұжаттарын желімдеу</div>
+              <div className="text-sm font-semibold mb-1">Kaspi жүкқұжаттарын бір PDF-пен басып шығару (А4/А6)</div>
               <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>
                 Жүкқұжаттар бір PDF-те: А4 парағына 4-тен немесе термопринтерге А6
               </div>

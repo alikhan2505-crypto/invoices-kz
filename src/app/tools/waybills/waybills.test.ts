@@ -9,8 +9,8 @@ const pdf = (name: string, size = 10) => new File([new Uint8Array(size)], name, 
 describe('waybills metadata', () => {
   it('ru title and description name the monthly limit instead of an unqualified «без регистрации»', () => {
     const m = toolMetadata('waybills', 'ru', waybillsDict.ru.seo)
-    expect(m.title).toBe('Склейка накладных Kaspi — бесплатно онлайн | invoices.kz')
-    expect(m.description).toBe('Соберите накладные Kaspi Магазина в один PDF: по 4 на лист А4 или по одной в А6 для термопринтера. 5 склеек в месяц бесплатно, без ограничений — в Kaspi Bot (Про). Файлы нигде не сохраняются.')
+    expect(m.title).toBe('Печать накладных Kaspi одним PDF (А4/А6) | invoices.kz')
+    expect(m.description).toBe('Печать накладных Kaspi Магазина одним PDF: по 4 на лист А4 или по одной в А6 для термопринтера. 5 склеек в месяц бесплатно, без ограничений — в Kaspi Bot (Про). Файлы нигде не сохраняются.')
     expect(m.alternates?.canonical).toBe('https://invoices.kz/tools/waybills')
   })
 

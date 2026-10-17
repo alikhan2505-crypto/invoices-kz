@@ -77,13 +77,47 @@ function visitorId(): string | undefined {
   return storageSet(VISITOR_KEY, id) ? id : undefined
 }
 
+// utm сессии: метка из адреса читается один раз (первая страница с utm_*) и
+// кладётся в sessionStorage; дальше, пока человек ходит по инструментам без
+// метки в адресе (меню, «другие инструменты»), события несут ту же метку.
+// Новая метка в адресе перекрывает старую. Закрыл вкладку — сессия кончилась.
+export const UTM_SESSION_KEY = 'invoices.utm'
+
+function cleanUtmValue(x: unknown): string | undefined {
+  return typeof x === 'string' && x.trim() ? x.trim().slice(0, 100) : undefined
+}
+
+export function pickUtm(search: string, storedRaw: string | null): { utm: ToolEventUtm; persist: boolean } {
+  const p = new URLSearchParams(search)
+  const fromUrl: ToolEventUtm = {}
+  const s = cleanUtmValue(p.get('utm_source')); if (s) fromUrl.source = s
+  const m = cleanUtmValue(p.get('utm_medium')); if (m) fromUrl.medium = m
+  const c = cleanUtmValue(p.get('utm_campaign')); if (c) fromUrl.campaign = c
+  if (fromUrl.source || fromUrl.medium || fromUrl.campaign) return { utm: fromUrl, persist: true }
+  try {
+    const v = storedRaw ? JSON.parse(storedRaw) : null
+    if (v && typeof v === 'object' && !Array.isArray(v)) {
+      const utm: ToolEventUtm = {}
+      const ss = cleanUtmValue(v.source); if (ss) utm.source = ss
+      const sm = cleanUtmValue(v.medium); if (sm) utm.medium = sm
+      const sc = cleanUtmValue(v.campaign); if (sc) utm.campaign = sc
+      return { utm, persist: false }
+    }
+  } catch {}
+  return { utm: {}, persist: false }
+}
+
+function sessionGet(key: string): string | null {
+  try { return window.sessionStorage.getItem(key) } catch { return null }
+}
+function sessionSet(key: string, value: string): void {
+  try { window.sessionStorage.setItem(key, value) } catch {}
+}
+
 function currentUtm(): ToolEventUtm {
   try {
-    const p = new URLSearchParams(window.location.search)
-    const utm: ToolEventUtm = {}
-    const s = p.get('utm_source'); if (s) utm.source = s.slice(0, 100)
-    const m = p.get('utm_medium'); if (m) utm.medium = m.slice(0, 100)
-    const c = p.get('utm_campaign'); if (c) utm.campaign = c.slice(0, 100)
+    const { utm, persist } = pickUtm(window.location.search, sessionGet(UTM_SESSION_KEY))
+    if (persist) sessionSet(UTM_SESSION_KEY, JSON.stringify(utm))
     return utm
   } catch {
     return {}

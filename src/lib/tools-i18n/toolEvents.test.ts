@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { FIRST_TOUCH_TTL_MS } from '@/lib/toolEvents/schema'
-import { nextFirstTouch, parseFreshFirstTouch } from './toolEvents'
+import { nextFirstTouch, parseFreshFirstTouch, pickUtm } from './toolEvents'
 
 const NOW = Date.parse('2026-10-15T07:00:00Z')
 const DAY = 24 * 60 * 60 * 1000
@@ -34,5 +34,26 @@ describe('nextFirstTouch', () => {
   })
   it('replaces an expired first touch', () => {
     expect(nextFirstTouch(stored({ tool: 'kp', at: NOW - 40 * DAY }), 'schet', {}, NOW)).toEqual({ tool: 'schet', at: NOW })
+  })
+})
+
+describe('pickUtm', () => {
+  it('reads utm from the address and asks to persist it', () => {
+    expect(pickUtm('?utm_source=tg_chat&utm_medium=chat_post&utm_campaign=waybills_oct', null))
+      .toEqual({ utm: { source: 'tg_chat', medium: 'chat_post', campaign: 'waybills_oct' }, persist: true })
+  })
+  it('falls back to the session value when the address has no utm', () => {
+    const stored = JSON.stringify({ source: 'ig', campaign: 'margin_oct' })
+    expect(pickUtm('', stored)).toEqual({ utm: { source: 'ig', campaign: 'margin_oct' }, persist: false })
+    expect(pickUtm('?lang=kk', stored).utm.source).toBe('ig')
+  })
+  it('lets a new address utm override the stored one', () => {
+    const r = pickUtm('?utm_source=dm', JSON.stringify({ source: 'ig' }))
+    expect(r).toEqual({ utm: { source: 'dm' }, persist: true })
+  })
+  it('survives garbage and trims long values', () => {
+    expect(pickUtm('', '{oops')).toEqual({ utm: {}, persist: false })
+    expect(pickUtm('', '[1]')).toEqual({ utm: {}, persist: false })
+    expect(pickUtm(`?utm_source=${'a'.repeat(300)}`, null).utm.source).toHaveLength(100)
   })
 })

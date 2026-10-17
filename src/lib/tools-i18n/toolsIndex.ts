@@ -29,7 +29,7 @@ export const toolsIndexDict: Record<ToolLang, ToolsIndexDict> = {
     seo: {
       title: 'Бесплатные инструменты для бизнеса: счёт, АВР, накладная, налоги ИП',
       description:
-        'Счёт на оплату, АВР, накладная и коммерческое предложение онлайн, калькулятор налогов ИП 2026, проверка контрагента по БИН, калькулятор маржи и склейка накладных Kaspi. Бесплатно, без регистрации.',
+        'Счёт на оплату, АВР, накладная и коммерческое предложение онлайн, калькулятор налогов ИП 2026, проверка контрагента по БИН, калькулятор маржи и печать накладных Kaspi одним PDF. Бесплатно, без регистрации.',
       keywords:
         'бесплатные инструменты для ип, счёт на оплату онлайн, акт выполненных работ онлайн, накладная онлайн, калькулятор налогов ип 2026, проверка контрагента по бин, калькулятор маржи kaspi, склейка накладных kaspi',
       ogTitle: 'Бесплатные инструменты для бизнеса — invoices.kz',
@@ -59,7 +59,7 @@ export const toolsIndexDict: Record<ToolLang, ToolsIndexDict> = {
         title: 'Для продавцов Kaspi',
         tools: [
           { slug: 'margin', title: 'Калькулятор маржи Kaspi', text: 'Сколько остаётся с продажи после комиссии категории, доставки и налога — и сколько это в месяц.' },
-          { slug: 'waybills', title: 'Склейка накладных Kaspi', text: 'Накладные одним PDF: 4 на лист А4 или А6 на термопринтер — без ножниц и возни. 5 склеек в месяц бесплатно, без ограничений — в Kaspi Bot (Про).' },
+          { slug: 'waybills', title: 'Печать накладных Kaspi одним PDF (А4/А6)', text: 'Накладные одним PDF: 4 на лист А4 или А6 на термопринтер — без ножниц и возни. 5 склеек в месяц бесплатно, без ограничений — в Kaspi Bot (Про).' },
         ],
       },
     ],
@@ -70,7 +70,7 @@ export const toolsIndexDict: Record<ToolLang, ToolsIndexDict> = {
     seo: {
       title: 'Кәсіпкерге арналған тегін құралдар: шот, ОЖА, жүкқұжат, ЖК салықтары',
       description:
-        'Төлем шоты, орындалған жұмыстар актісі, жүкқұжат және коммерциялық ұсыныс онлайн, 2026 жылғы ЖК салығының калькуляторы, контрагентті БСН бойынша тексеру, Kaspi маржа калькуляторы және жүкқұжаттарды біріктіру. Тегін, тіркелусіз.',
+        'Төлем шоты, орындалған жұмыстар актісі, жүкқұжат және коммерциялық ұсыныс онлайн, 2026 жылғы ЖК салығының калькуляторы, контрагентті БСН бойынша тексеру, Kaspi маржа калькуляторы және Kaspi жүкқұжаттарын бір PDF-пен басып шығару. Тегін, тіркелусіз.',
       keywords:
         'жк үшін тегін құралдар, төлем шоты онлайн, орындалған жұмыстар актісі онлайн, жүкқұжат онлайн, жк салығы калькулятор 2026, контрагентті бсн бойынша тексеру, kaspi маржа калькуляторы, kaspi жүкқұжаттарын біріктіру, коммерциялық ұсыныс онлайн',
       ogTitle: 'Кәсіпкерге арналған тегін құралдар — invoices.kz',
@@ -100,7 +100,7 @@ export const toolsIndexDict: Record<ToolLang, ToolsIndexDict> = {
         title: 'Kaspi сатушыларына',
         tools: [
           { slug: 'margin', title: 'Kaspi маржа калькуляторы', text: 'Санат комиссиясы, жеткізу және салық шегерілгеннен кейін бір сатылымнан қанша қалады — және бұл айына қанша болады.' },
-          { slug: 'waybills', title: 'Kaspi жүкқұжаттарын біріктіру', text: 'Жүкқұжаттар бір PDF-те: А4 парағына 4-тен немесе термопринтерге А6 — қайшысыз, әурешіліксіз. Айына 5 рет тегін, шектеусіз — Kaspi Bot-та (Про).' },
+          { slug: 'waybills', title: 'Kaspi жүкқұжаттарын бір PDF-пен басып шығару (А4/А6)', text: 'Жүкқұжаттар бір PDF-те: А4 парағына 4-тен немесе термопринтерге А6 — қайшысыз, әурешіліксіз. Айына 5 рет тегін, шектеусіз — Kaspi Bot-та (Про).' },
         ],
       },
     ],
@@ -111,7 +111,7 @@ export const toolsIndexDict: Record<ToolLang, ToolsIndexDict> = {
     seo: {
       title: 'Free Business Tools for Kazakhstan — Invoices, Taxes, Company Check',
       description:
-        'Free online tools for small businesses in Kazakhstan: invoice for payment, certificate of completed work (AVR), delivery note and commercial proposal generators, sole proprietor tax calculator 2026, company check by BIN, Kaspi margin calculator and waybill merger. No sign-up.',
+        'Free online tools for small businesses in Kazakhstan: invoice for payment, certificate of completed work (AVR), delivery note and commercial proposal generators, sole proprietor tax calculator 2026, company check by BIN, Kaspi margin calculator and a tool to print Kaspi waybills as one PDF. No sign-up.',
       keywords:
         'kazakhstan business tools free, kazakhstan invoice generator, kazakhstan certificate of completed work avr, kazakhstan sole proprietor tax calculator 2026, check company by bin kazakhstan, kaspi margin calculator, kaspi waybill merge pdf, kazakhstan delivery note z-2',
       ogTitle: 'Free business tools for Kazakhstan — invoices.kz',
@@ -141,7 +141,7 @@ export const toolsIndexDict: Record<ToolLang, ToolsIndexDict> = {
         title: 'For Kaspi sellers',
         tools: [
           { slug: 'margin', title: 'Kaspi margin calculator', text: 'What you keep from a sale after the category commission, delivery and tax — and what that adds up to per month.' },
-          { slug: 'waybills', title: 'Kaspi waybill merger', text: 'Waybills in one PDF: 4 per A4 sheet, or A6 for a thermal printer — no scissors, no fuss. 5 free merges a month, unlimited in Kaspi Bot (Pro).' },
+          { slug: 'waybills', title: 'Print Kaspi Waybills as One PDF (A4/A6)', text: 'Waybills in one PDF: 4 per A4 sheet, or A6 for a thermal printer — no scissors, no fuss. 5 free merges a month, unlimited in Kaspi Bot (Pro).' },
         ],
       },
     ],

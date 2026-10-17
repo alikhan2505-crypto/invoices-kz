@@ -162,3 +162,51 @@ describe('aggregateToolFunnel', () => {
     expect(f.totals).toMatchObject({ visitors: 0, docs: 0, signups: 0, docsPct: null })
   })
 })
+
+describe('aggregateToolFunnel: разрез по меткам', () => {
+  const utm = (source: string | null, campaign: string | null, medium: string | null = null) => ({ utm_source: source, utm_medium: medium, utm_campaign: campaign })
+  const row = (f: ReturnType<typeof run>, source: string | null, campaign: string | null) =>
+    f.sources.find(r => r.source === source && r.campaign === campaign)!
+
+  it('groups visitors, docs, clicks, limits, leads and signups by source/medium/campaign', () => {
+    const tg = utm('tg_chat', 'waybills_oct', 'chat_post')
+    const f = run([
+      ev('view', 'waybills', 'a', tg), ev('view', 'waybills', 'b', tg), ev('view', 'margin', 'a', tg),
+      ev('doc', 'waybills', 'a', tg), ev('cta', 'waybills', 'a', { ...tg, medium: 'cta' }),
+      ev('limit', 'waybills', 'b', tg), ev('lead', 'waybills', 'b', tg),
+      ev('signup', 'waybills', 'a', { ...tg, user_id: 'u1' }),
+      ev('view', 'kp', 'c', utm('sellers_kz', 'waybills_oct', 'paid_post')),
+      ev('view', 'kp', 'd'),
+    ])
+    expect(f.sources).toHaveLength(3)
+    expect(row(f, 'tg_chat', 'waybills_oct')).toMatchObject({
+      medium: 'chat_post', visitors: 2, views: 3, docs: 1, cta: 1, limits: 1, leads: 1, signups: 1,
+    })
+    expect(row(f, 'sellers_kz', 'waybills_oct')).toMatchObject({ medium: 'paid_post', visitors: 1, docs: 0 })
+  })
+
+  it('merges case/space variants and puts the unlabelled row last', () => {
+    const f = run([
+      ev('view', 'kp', 'a'), ev('view', 'kp', 'b'), ev('view', 'kp', 'c'),
+      ev('view', 'kp', 'd', utm('TG_chat ', 'X')), ev('view', 'kp', 'e', utm('tg_chat', 'x')),
+    ])
+    expect(f.sources.map(r => [r.source, r.campaign, r.visitors])).toEqual([['tg_chat', 'x', 2], [null, null, 3]])
+  })
+
+  it('keeps source rows consistent with the totals and respects the internal filter', () => {
+    const rows = [
+      ev('view', 'kp', 'a', utm('ig', 'm')), ev('view', 'kp', 'b', utm('ig', 'm')),
+      ev('view', 'kp', 'me', { ...utm('ig', 'm'), internal: true }),
+    ]
+    const f = run(rows)
+    expect(row(f, 'ig', 'm').visitors).toBe(2)
+    expect(f.sources.reduce((n, r) => n + r.visitors, 0)).toBe(f.totals.visitors)
+    expect(row(run(rows, { includeInternal: true }), 'ig', 'm').visitors).toBe(3)
+  })
+
+  it('does not count unattributed (tool=none) signups in any source row', () => {
+    const f = run([ev('signup', 'none', 'v9', { user_id: 'u2' })])
+    expect(f.sources).toEqual([])
+    expect(f.unattributedSignups).toBe(1)
+  })
+})

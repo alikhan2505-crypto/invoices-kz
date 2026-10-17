@@ -44,7 +44,7 @@ export async function handleToolFunnel(req: NextRequest): Promise<Response> {
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await serviceSupabase
       .from('tool_events')
-      .select('created_at, event, tool, visitor, user_id, internal, medium')
+      .select('created_at, event, tool, visitor, user_id, internal, medium, utm_source, utm_medium, utm_campaign')
       .gte('created_at', since)
       .order('id', { ascending: false })
       .range(from, from + PAGE - 1)

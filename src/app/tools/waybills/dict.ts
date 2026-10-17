@@ -91,19 +91,19 @@ const pluralEn = (n: number, word: string) => (n === 1 ? word : `${word}s`)
 export const waybillsDict: Record<ToolLang, WaybillsDict> = {
   ru: {
     seo: {
-      title: 'Склейка накладных Kaspi — бесплатно онлайн',
+      title: 'Печать накладных Kaspi одним PDF (А4/А6)',
       description:
-        'Соберите накладные Kaspi Магазина в один PDF: по 4 на лист А4 или по одной в А6 для термопринтера. 5 склеек в месяц бесплатно, без ограничений — в Kaspi Bot (Про). Файлы нигде не сохраняются.',
+        'Печать накладных Kaspi Магазина одним PDF: по 4 на лист А4 или по одной в А6 для термопринтера. 5 склеек в месяц бесплатно, без ограничений — в Kaspi Bot (Про). Файлы нигде не сохраняются.',
       keywords:
-        'склейка накладных kaspi, печать накладных kaspi магазин, накладные 4 на лист а4, накладные а6 термопринтер, объединить pdf накладные, kaspi магазин накладные распечатать',
-      ogTitle: 'Склейка накладных Kaspi — бесплатно онлайн',
+        'печать накладных kaspi одним pdf, склейка накладных kaspi, печать накладных kaspi магазин, накладные 4 на лист а4, накладные а6 термопринтер, объединить pdf накладные, kaspi магазин накладные распечатать',
+      ogTitle: 'Печать накладных Kaspi одним PDF (А4/А6)',
       ogDescription:
-        'Накладные Kaspi одним файлом: по 4 на лист А4 или по одной в А6 на термопринтер. 5 склеек в месяц бесплатно, без ограничений — в Kaspi Bot (Про).',
-      ogImageAlt: 'Склейка накладных Kaspi — invoices.kz',
+        'Накладные Kaspi одним PDF: по 4 на лист А4 или по одной в А6 на термопринтер. 5 склеек в месяц бесплатно, без ограничений — в Kaspi Bot (Про).',
+      ogImageAlt: 'Печать накладных Kaspi одним PDF (А4/А6) — invoices.kz',
     },
-    h1: 'Склейка накладных Kaspi',
+    h1: 'Печать накладных Kaspi одним PDF (А4/А6)',
     intro:
-      'Соберите накладные из Kaspi Магазина в один PDF, чтобы не печатать каждую отдельно: по 4 на лист А4 для обычного принтера или по одной в А6, если у вас есть термопринтер. Бесплатно и без регистрации — 5 склеек в месяц, без ограничений — в Kaspi Bot на тарифе Про. Файлы нигде не сохраняются.',
+      'Соберите накладные из Kaspi Магазина в один PDF и распечатайте разом, не печатая каждую отдельно: по 4 на лист А4 для обычного принтера или по одной в А6, если у вас есть термопринтер. Бесплатно и без регистрации — 5 склеек в месяц, без ограничений — в Kaspi Bot на тарифе Про. Файлы нигде не сохраняются.',
     dropzoneTitle: 'Выберите PDF-накладные или ZIP-архив',
     dropzoneActive: 'Отпустите файлы здесь',
     dropzoneHint: max => `нажмите здесь или перетащите файлы · до ${max} файлов`,
@@ -183,17 +183,17 @@ export const waybillsDict: Record<ToolLang, WaybillsDict> = {
 
   kk: {
     seo: {
-      title: 'Kaspi жүкқұжаттарын бір PDF-ке біріктіру — тегін, онлайн',
+      title: 'Kaspi жүкқұжаттарын бір PDF-пен басып шығару (А4/А6)',
       description:
         'Kaspi Магазин жүкқұжаттарын бір PDF файлға біріктіріңіз: А4 парағына 4-тен немесе термопринтерге А6 форматында бір-бірден. Айына 5 рет тегін, шектеусіз — Про тарифіндегі Kaspi Bot-та. Файлдар ешқайда сақталмайды.',
       keywords:
-        'kaspi жүкқұжат басып шығару, kaspi жүкқұжаттарын біріктіру, kaspi магазин жүкқұжат, жүкқұжат а4 парағына 4, жүкқұжат а6 термопринтер, pdf файлдарды біріктіру тегін, kaspi накладная басып шығару',
-      ogTitle: 'Kaspi жүкқұжаттарын біріктіру — тегін, онлайн',
+        'kaspi жүкқұжаттарын бір pdf-пен басып шығару, kaspi жүкқұжат басып шығару, kaspi жүкқұжаттарын біріктіру, kaspi магазин жүкқұжат, жүкқұжат а4 парағына 4, жүкқұжат а6 термопринтер, pdf файлдарды біріктіру тегін, kaspi накладная басып шығару',
+      ogTitle: 'Kaspi жүкқұжаттарын бір PDF-пен басып шығару (А4/А6)',
       ogDescription:
         'Kaspi жүкқұжаттары бір файлда: А4 парағына 4-тен немесе термопринтерге А6. Айына 5 рет тегін, шектеусіз — Kaspi Bot-та (Про).',
-      ogImageAlt: 'Kaspi жүкқұжаттарын біріктіру — invoices.kz',
+      ogImageAlt: 'Kaspi жүкқұжаттарын бір PDF-пен басып шығару (А4/А6) — invoices.kz',
     },
-    h1: 'Kaspi жүкқұжаттарын біріктіру',
+    h1: 'Kaspi жүкқұжаттарын бір PDF-пен басып шығару (А4/А6)',
     intro:
       'Kaspi Магазин жүкқұжаттарын әрқайсысын бөлек басып шығармас үшін бір PDF файлға жинаңыз: кәдімгі принтерге А4 парағына 4-тен немесе термопринтеріңіз болса, А6 форматында бір-бірден. Тегін және тіркелусіз — айына 5 рет, шектеусіз — Про тарифіндегі Kaspi Bot-та. Файлдар ешқайда сақталмайды.',
     dropzoneTitle: 'PDF-жүкқұжаттарды немесе ZIP-архивті таңдаңыз',
@@ -273,17 +273,17 @@ export const waybillsDict: Record<ToolLang, WaybillsDict> = {
 
   en: {
     seo: {
-      title: 'Merge Kaspi Waybills into One PDF — Free Tool for Kazakhstan Sellers',
+      title: 'Print Kaspi Waybills as One PDF (A4/A6) — Free Tool for Kazakhstan Sellers',
       description:
         'Merge Kaspi Shop waybills (shipping labels from the Kaspi.kz marketplace, Kazakhstan) into one PDF: 4 per A4 sheet or one per A6 label for a thermal printer. 5 free merges a month, unlimited in Kaspi Bot on the Pro plan. Files are never stored.',
       keywords:
-        'kaspi waybill print, merge kaspi waybills, kaspi shop shipping labels, kaspi.kz seller tools, merge pdf shipping labels a4, a6 thermal printer shipping label, kazakhstan marketplace seller tools',
-      ogTitle: 'Merge Kaspi Waybills into One PDF — Free Online',
+        'print kaspi waybills one pdf, kaspi waybill print, merge kaspi waybills, kaspi shop shipping labels, kaspi.kz seller tools, merge pdf shipping labels a4, a6 thermal printer shipping label, kazakhstan marketplace seller tools',
+      ogTitle: 'Print Kaspi Waybills as One PDF (A4/A6) — Free Online',
       ogDescription:
         'Kaspi waybills in a single file: 4 per A4 sheet or one per A6 label for a thermal printer. 5 free merges a month, unlimited in Kaspi Bot (Pro).',
-      ogImageAlt: 'Kaspi Waybill Merger — invoices.kz',
+      ogImageAlt: 'Print Kaspi Waybills as One PDF (A4/A6) — invoices.kz',
     },
-    h1: 'Kaspi Waybill Merger',
+    h1: 'Print Kaspi Waybills as One PDF (A4/A6)',
     intro:
       "Combine your Kaspi Shop waybills (the shipping labels of Kazakhstan's Kaspi.kz marketplace) into one PDF so you don't print each one separately: 4 per A4 sheet for a regular printer, or one per A6 label if you have a thermal printer. Free with no signup — 5 merges a month; unlimited in Kaspi Bot on the Pro plan. Files are never stored.",
     dropzoneTitle: 'Choose PDF waybills or a ZIP archive',
