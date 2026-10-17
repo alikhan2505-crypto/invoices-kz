@@ -112,8 +112,6 @@ export interface AiAgentFormsDict {
   channelTelegramName: string
   channelWebsiteName: string
   openingWhatsapp: string
-  connectExistingAppButton: string
-  connectExistingAppHint: string
   testChatAgentFallback: string
   regenerateKeyButton: string
   connectingButton: string
@@ -299,8 +297,6 @@ export const aiAgentFormsDict: Record<Lang, AiAgentFormsDict> = {
     channelTelegramName: 'Telegram-бот',
     channelWebsiteName: 'Чат для сайта',
     openingWhatsapp: 'Открываем WhatsApp…',
-    connectExistingAppButton: 'Номер уже в приложении WhatsApp Business',
-    connectExistingAppHint: 'Подключится по QR-коду, приложение на телефоне продолжит работать, а ваши ответы с телефона будут видны в «Диалогах». Для нового номера используйте кнопку выше.',
     testChatAgentFallback: 'Ваш агент',
     regenerateKeyButton: 'Перегенерировать ключ',
     connectingButton: 'Подключаем…',
@@ -476,8 +472,6 @@ export const aiAgentFormsDict: Record<Lang, AiAgentFormsDict> = {
     channelTelegramName: 'Telegram-бот',
     channelWebsiteName: 'Сайтқа арналған чат',
     openingWhatsapp: 'WhatsApp ашылуда…',
-    connectExistingAppButton: 'Нөмір WhatsApp Business қосымшасында тұр',
-    connectExistingAppHint: 'QR-код арқылы қосылады, телефондағы қосымша жұмысын жалғастырады, ал телефоннан жауаптарыңыз «Диалогтарда» көрінеді. Жаңа нөмір үшін жоғарыдағы батырманы қолданыңыз.',
     testChatAgentFallback: 'Сіздің агентіңіз',
     regenerateKeyButton: 'Кілтті қайта жасау',
     connectingButton: 'Қосылуда…',
@@ -653,8 +647,6 @@ export const aiAgentFormsDict: Record<Lang, AiAgentFormsDict> = {
     channelTelegramName: 'Telegram bot',
     channelWebsiteName: 'Website chat',
     openingWhatsapp: 'Opening WhatsApp…',
-    connectExistingAppButton: 'My number is already in the WhatsApp Business app',
-    connectExistingAppHint: 'Connects with a QR code; the phone app keeps working and your replies from the phone show up in Conversations. For a new number use the button above.',
     testChatAgentFallback: 'Your agent',
     regenerateKeyButton: 'Regenerate key',
     connectingButton: 'Connecting…',
