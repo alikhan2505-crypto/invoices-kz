@@ -8,6 +8,7 @@ import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import SessionExpiredBanner from '@/components/kaspiShop/SessionExpiredBanner'
 import { getActivePlan } from '@/lib/plan'
+import { REFUND_ATTENTION_TABS } from '@/lib/kaspiShop/refunds'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -25,7 +26,7 @@ const TABS: { value: RefundTab; label: string }[] = [
 // used to pick a more useful default tab than always opening on Новые when
 // it happens to be empty (mirrors the Заказы page's "show me something
 // useful first" instinct).
-const ATTENTION_TABS: RefundTab[] = ['NEW', 'ON_DELIVERY', 'WAITING_DECISION', 'DISPUTE']
+const ATTENTION_TABS: RefundTab[] = REFUND_ATTENTION_TABS
 
 type RefundListItem = {
   refundId: string

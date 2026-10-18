@@ -7,13 +7,13 @@ import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import { getActivePlan } from '@/lib/plan'
 import { useCrossHref } from '@/lib/useCrossHref'
-import { ORDER_STATUS_TABS, PACKING_STATUS, TRANSFER_STATUS } from '@/lib/kaspiShop/orderStatuses'
+import { ORDER_STATUS_TABS, PACKING_STATUS, WORKING_ORDER_STATUSES } from '@/lib/kaspiShop/orderStatuses'
 
 // "Обзор" of Kaspi Bot (founder's mock, 21.09.2026): three numbers, the orders in
 // work, and the hand-offs to the neighbouring products. Everything here reads
 // endpoints the other Kaspi Bot pages already use; nothing new on the server.
 
-const WORKING_STATUSES = ['NEW', PACKING_STATUS, TRANSFER_STATUS]
+const WORKING_STATUSES = WORKING_ORDER_STATUSES
 
 type OrderRow = {
   code: string

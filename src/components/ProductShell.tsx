@@ -1,5 +1,5 @@
 'use client'
-import { Suspense, useEffect, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useLanguage, type Lang } from '@/components/LanguageProvider'
 import { SECTIONS } from '@/components/SiteNav'
@@ -15,6 +15,9 @@ import { useEffectivePath } from '@/lib/useEffectivePath'
 import { useMyProducts } from '@/lib/useMyProducts'
 import { useCfoMode } from '@/lib/cfo/modeStore'
 import { useWalletRefresh } from '@/lib/walletSignal'
+import { useKaspiMenuCounts } from '@/lib/kaspiShop/useMenuCounts'
+import { menuCountKeyForHref } from '@/lib/kaspiShop/menuCounts'
+import MenuCountBadge from '@/components/MenuCountBadge'
 
 const BASE_DOMAIN = process.env.NEXT_PUBLIC_SITE_DOMAIN || 'invoices.kz'
 
@@ -45,6 +48,16 @@ export default function ProductShell({ product, children }: { product: ProductKe
   const [open, setOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [storeState, setStoreState] = useState<StoreState>('loading')
+  // Для чисел у пунктов меню: «магазин подключён» не должно сбрасываться на каждое
+  // кратковременное 'loading' (мобильная шторка при открытии монтирует свой
+  // переключатель магазинов, и он начинает с 'loading') -- иначе числа мигали бы.
+  // Выключают его только настоящие 'expired' / 'none'.
+  const [storeLive, setStoreLive] = useState(false)
+  const onStoreState = useCallback((s: StoreState) => {
+    setStoreState(s)
+    if (s === 'connected') setStoreLive(true)
+    else if (s === 'expired' || s === 'none') setStoreLive(false)
+  }, [])
   const [balance, setBalance] = useState<number | null>(null)
   const [util, setUtil] = useState<{ unread: number; initials: string }>({ unread: 0, initials: '··' })
   const [mine] = useMyProducts()
@@ -59,6 +72,10 @@ export default function ProductShell({ product, children }: { product: ProductKe
   const bestMatch = links
     .filter((l) => path === l.href || path.startsWith(l.href + '/'))
     .sort((a, b) => b.href.length - a.href.length)[0]?.href
+
+  // Числа «в работе» у пунктов меню: только Kaspi Bot и только при живом подключении
+  // магазина (иначе ни одного запроса). Открытие шторки тоже проверяет свежесть.
+  const menuCounts = useKaspiMenuCounts(product === 'kaspiShop' && storeLive, path, open)
 
   const switchable = PRODUCTS.filter((p) => !p.locked && p.key !== 'salon' && (mine === null ? SELECTABLE_KEYS.includes(p.key) : mine.includes(p.key) || p.key === product))
 
@@ -161,7 +178,7 @@ export default function ProductShell({ product, children }: { product: ProductKe
             </ul>
           )}
         </div>
-        {product === 'kaspiShop' && <KaspiShopStoreSwitcher inSidebar onState={setStoreState} />}
+        {product === 'kaspiShop' && <KaspiShopStoreSwitcher inSidebar onState={onStoreState} />}
       </div>
 
       <nav aria-label={def.name} className="flex-1 min-h-0 overflow-y-auto hide-scrollbar px-2 pb-3">
@@ -182,6 +199,7 @@ export default function ProductShell({ product, children }: { product: ProductKe
           }
           // Link, а не <a>: переход между разделами без перезагрузки
           // страницы -- меню и шапка остаются, меняется только правая часть.
+          const countKey = product === 'kaspiShop' ? menuCountKeyForHref(l.href) : null
           return (
             <Link
               key={l.href}
@@ -190,13 +208,18 @@ export default function ProductShell({ product, children }: { product: ProductKe
               data-tour={l.href.slice(1).replace(/\//g, '-')}
               onClick={() => setOpen(false)}
               aria-current={active ? 'page' : undefined}
-              className="flex items-center min-h-[40px] px-3 rounded-xl text-[14px] font-medium mb-0.5 transition-colors"
+              className="flex items-center gap-2 min-h-[40px] px-3 rounded-xl text-[14px] font-medium mb-0.5 transition-colors"
               style={{
                 background: active ? 'var(--nav-accent-soft, var(--nav-surface-glass))' : 'transparent',
                 color: active ? 'var(--nav-accent)' : 'var(--nav-text-secondary)',
               }}
             >
-              {(product === 'cfo' && cfoMode === 'family' && l.family ? l.family : l.label)[lang]}
+              {countKey ? (
+                <>
+                  <span className="flex-1 min-w-0 truncate">{l.label[lang]}</span>
+                  <MenuCountBadge count={menuCounts[countKey]} active={active} />
+                </>
+              ) : (product === 'cfo' && cfoMode === 'family' && l.family ? l.family : l.label)[lang]}
             </Link>
           )
         })}

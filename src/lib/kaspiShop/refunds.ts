@@ -27,6 +27,11 @@ function stripHtml(text: string): string {
 export const REFUND_TABS = ['NEW', 'ON_DELIVERY', 'WAITING_DECISION', 'DISPUTE', 'CLOSED'] as const
 export type RefundTab = typeof REFUND_TABS[number]
 
+// Вкладки, где неразрешённый возврат требует внимания продавца (всё, кроме
+// «Закрытые заявки»). Одно определение для страницы Возвраты (какую вкладку
+// открыть первой) и для числа у пункта «Возвраты» в боковом меню (menuCounts.ts).
+export const REFUND_ATTENTION_TABS: RefundTab[] = ['NEW', 'ON_DELIVERY', 'WAITING_DECISION', 'DISPUTE']
+
 export type RefundCount = { tab: string; tabTitle: string; total: number }
 
 export async function getRefundCounts(

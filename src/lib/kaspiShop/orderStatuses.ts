@@ -20,6 +20,10 @@ export const ORDER_STATUS_TABS: { label: string; value: string }[] = [
 export const TRANSFER_STATUS = 'KASPI_DELIVERY_WAIT_FOR_COURIER'
 export const PACKING_STATUS = 'KASPI_DELIVERY_CARGO_ASSEMBLY'
 
+// «Заказы в работе» -- новые, на упаковке, на передаче курьеру. Одно определение
+// для страницы Обзор и для числа у пункта «Заказы» в боковом меню (menuCounts.ts).
+export const WORKING_ORDER_STATUSES: string[] = ['NEW', PACKING_STATUS, TRANSFER_STATUS]
+
 // CORRECTED 2026-08-26 (founder caught this live, confirmed against the
 // real cabinet + mobile app): an order sitting in Упаковка has NO накладная
 // yet -- Kaspi only generates one once the seller confirms packing via «Я

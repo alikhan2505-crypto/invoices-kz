@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { listPendingProducts, getPendingCount } from './pendingProducts'
+import { listPendingProducts, getPendingCount, getPendingCountOrNull } from './pendingProducts'
 
 function fakeFetch(status: number, body: any): typeof fetch {
   return (async () => ({
@@ -58,5 +58,25 @@ describe('getPendingCount', () => {
     const fetchFn = fakeFetch(401, {})
     const result = await getPendingCount('cookies', 'merchant1', fetchFn)
     expect(result).toEqual({ count: 0, sessionExpired: true })
+  })
+})
+
+describe('getPendingCountOrNull (sidebar badge variant)', () => {
+  it('returns the CHECK count, including a real 0', async () => {
+    expect(await getPendingCountOrNull('c', 'm', fakeFetch(200, { CHECK: 3 }))).toEqual({ count: 3, sessionExpired: false })
+    expect(await getPendingCountOrNull('c', 'm', fakeFetch(200, { CHECK: 0 }))).toEqual({ count: 0, sessionExpired: false })
+  })
+
+  it('is unknown (null), not 0, on a non-401 failure', async () => {
+    expect(await getPendingCountOrNull('c', 'm', fakeFetch(500, {}))).toEqual({ count: null, sessionExpired: false })
+  })
+
+  it('is unknown (null) when the response has no CHECK number', async () => {
+    expect(await getPendingCountOrNull('c', 'm', fakeFetch(200, {}))).toEqual({ count: null, sessionExpired: false })
+    expect(await getPendingCountOrNull('c', 'm', fakeFetch(200, { CHECK: 'x' }))).toEqual({ count: null, sessionExpired: false })
+  })
+
+  it('reports sessionExpired on a 401', async () => {
+    expect(await getPendingCountOrNull('c', 'm', fakeFetch(401, {}))).toEqual({ count: null, sessionExpired: true })
   })
 })

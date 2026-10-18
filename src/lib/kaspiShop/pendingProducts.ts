@@ -58,3 +58,21 @@ export async function getPendingCount(
   const json = await res.json().catch(() => null)
   return { count: Number(json?.CHECK) || 0, sessionExpired: false }
 }
+
+// Variant for the sidebar badge (menu-counts route): same endpoint, but a
+// failed call or a response without a CHECK number is "unknown" (count: null),
+// not a real 0 -- so a transient Kaspi failure never clears the badge.
+// getPendingCount above is left as is: the page keeps its old behaviour.
+export async function getPendingCountOrNull(
+  sessionCookies: string,
+  merchantId: string,
+  fetchFn: typeof fetch = fetch
+): Promise<{ count: number | null; sessionExpired: boolean }> {
+  const res = await fetchFn(`https://mc.shop.kaspi.kz/content/pending/mc/product/${merchantId}/count`, {
+    headers: authHeaders(sessionCookies),
+  })
+  if (!res.ok) return { count: null, sessionExpired: res.status === 401 }
+  const json = await res.json().catch(() => null)
+  const n = Number(json?.CHECK)
+  return { count: json?.CHECK != null && Number.isFinite(n) ? n : null, sessionExpired: false }
+}
