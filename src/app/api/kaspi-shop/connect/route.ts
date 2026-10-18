@@ -39,7 +39,13 @@ export async function POST(req: NextRequest) {
 
   const result = await startPhoneLogin(phone)
   if (result.status !== 'otp_required') {
-    return NextResponse.json({ error: result.status === 'error' ? result.message : 'Неожиданный ответ Kaspi' }, { status: 400 })
+    if (result.status === 'error') {
+      return NextResponse.json(
+        { error: result.message, code: result.code, detail: result.detail },
+        { status: result.code === 'kaspi_unreachable' ? 502 : 400 },
+      )
+    }
+    return NextResponse.json({ error: 'Неожиданный ответ Kaspi' }, { status: 400 })
   }
   return NextResponse.json({ status: 'otp_required', otpToken: result.otpToken })
 }

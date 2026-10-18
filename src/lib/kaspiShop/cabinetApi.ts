@@ -37,7 +37,7 @@ async function fetchWithRetryOn401(url: string, init: RequestInit, fetchFn: type
 // connect time so the seller picks from a real list instead of typing an
 // ID off their own cabinet header.
 export async function listMerchants(sessionCookies: string): Promise<{ uid: string }[]> {
-  const res = await fetch('https://mc.shop.kaspi.kz/s/m', { headers: authHeaders(sessionCookies) })
+  const res = await fetch('https://mc.shop.kaspi.kz/s/m', { headers: authHeaders(sessionCookies), signal: AbortSignal.timeout(15_000) })
   if (!res.ok) return []
   const json = await res.json().catch(() => null)
   const merchants = json?.merchants
@@ -54,6 +54,7 @@ export type MerchantInfo = {
 export async function getMerchantInfo(sessionCookies: string, merchantId: string): Promise<MerchantInfo | null> {
   const res = await fetch('https://mc.shop.kaspi.kz/mc/facade/graphql?opName=getMerchant', {
     method: 'POST',
+    signal: AbortSignal.timeout(15_000),
     headers: authHeaders(sessionCookies),
     body: JSON.stringify({
       operationName: 'getMerchant',

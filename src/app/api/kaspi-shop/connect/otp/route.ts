@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse, after } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { kaspiShopPlanGate } from '@/lib/kaspiShop/planGate'
-import { submitOtp } from '@/lib/kaspiShop/cabinetAuth'
+import {
+  submitOtp, isResumeToken, withConnectionRetry, resumeTokenFromSession,
+  KaspiNetworkError, logNetworkFailure, unreachableResult,
+} from '@/lib/kaspiShop/cabinetAuth'
 import { listMerchants, getMerchantInfo } from '@/lib/kaspiShop/cabinetApi'
 import { finalizeConnection } from '@/lib/kaspiShop/finalizeConnection'
 import { listConnections } from '@/lib/kaspiShop/connection'
@@ -42,23 +45,65 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Некорректный JSON' }, { status: 400 })
   }
   const { otpToken, code, isReconnect } = body
-  if (!otpToken || !code) {
+  // A normal otpToken needs the SMS code. A resume token (issued in a previous
+  // error response after Kaspi already ACCEPTED the code, see
+  // cabinetAuth.submitOtp) must be sent back WITHOUT a code: the spent code is
+  // not re-posted, only the redirect hops are re-walked.
+  if (typeof otpToken !== 'string' || !otpToken || (!isResumeToken(otpToken) && (typeof code !== 'string' || !code))) {
     return NextResponse.json({ error: 'otpToken и code обязательны' }, { status: 400 })
   }
 
-  const loginResult = await submitOtp(otpToken, code)
+  const loginResult = await submitOtp(otpToken, typeof code === 'string' ? code : undefined)
   if (loginResult.status !== 'success') {
-    return NextResponse.json({ error: loginResult.status === 'error' ? loginResult.message : 'Не удалось завершить вход' }, { status: 400 })
+    if (loginResult.status !== 'error') {
+      return NextResponse.json({ error: 'Не удалось завершить вход' }, { status: 400 })
+    }
+    // Error contract: { error (friendly ru text, never a URL), code?, detail?
+    // (underlying network cause such as ECONNRESET), resumable, resumeToken? }.
+    // Kaspi being unreachable is an upstream failure (502); everything else
+    // keeps the historical 400.
+    return NextResponse.json({
+      error: loginResult.message,
+      code: loginResult.code,
+      detail: loginResult.detail,
+      resumable: !!loginResult.resumeToken,
+      resumeToken: loginResult.resumeToken,
+    }, { status: loginResult.code === 'kaspi_unreachable' ? 502 : 400 })
   }
   const sessionCookies = loginResult.sessionCookies
 
-  const merchants = await listMerchants(sessionCookies)
+  // The SMS code is already spent and the session issued. A transient network
+  // failure in any Kaspi read below must not force a new SMS: reads are
+  // retried (bounded), and if they still fail the client gets the same
+  // resumable contract as a failed redirect walk (resumeToken made from the
+  // issued session, passed back WITHOUT a code).
+  try {
+    return await finishConnect(user.id, sessionCookies, !!isReconnect)
+  } catch (err) {
+    if (err instanceof KaspiNetworkError) {
+      logNetworkFailure('post_login', err)
+      const failed = unreachableResult('otp', err, resumeTokenFromSession(sessionCookies))
+      if (failed.status !== 'error') throw err
+      return NextResponse.json({
+        error: failed.message,
+        code: failed.code,
+        detail: failed.detail,
+        resumable: !!failed.resumeToken,
+        resumeToken: failed.resumeToken,
+      }, { status: 502 })
+    }
+    throw err
+  }
+}
+
+async function finishConnect(userId: string, sessionCookies: string, isReconnect: boolean) {
+  const merchants = await withConnectionRetry(() => listMerchants(sessionCookies))
   if (merchants.length === 0) {
     return NextResponse.json({ error: 'На этом номере не найдено ни одного магазина Kaspi' }, { status: 400 })
   }
 
   const named = await Promise.all(merchants.map(async m => {
-    const info = await getMerchantInfo(sessionCookies, m.uid)
+    const info = await withConnectionRetry(() => getMerchantInfo(sessionCookies, m.uid))
     return { id: m.uid, name: info?.name || m.uid }
   }))
 
@@ -78,11 +123,11 @@ export async function POST(req: NextRequest) {
     // (founder request 2026-09-14: one login shouldn't leave a second,
     // equally-reachable shop still stuck behind its own separate reconnect).
     if (isReconnect) {
-      const existing = await listConnections(user.id)
+      const existing = await listConnections(userId)
       const toRefresh = named.filter(m => existing.some(c => c.merchantId === m.id))
       if (toRefresh.length > 0) {
         const results = await Promise.all(
-          toRefresh.map(m => finalizeConnection(user.id, sessionCookies, m.id, m.name, { runInBackground: after }))
+          toRefresh.map(m => finalizeConnection(userId, sessionCookies, m.id, m.name, { runInBackground: after }))
         )
         return NextResponse.json({
           status: 'connected',
@@ -99,6 +144,6 @@ export async function POST(req: NextRequest) {
     })
   }
 
-  const { importedProducts } = await finalizeConnection(user.id, sessionCookies, named[0].id, named[0].name, { runInBackground: after })
+  const { importedProducts } = await finalizeConnection(userId, sessionCookies, named[0].id, named[0].name, { runInBackground: after })
   return NextResponse.json({ status: 'connected', companyName: named[0].name, importedProducts })
 }

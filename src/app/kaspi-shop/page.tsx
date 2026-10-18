@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
@@ -12,6 +12,7 @@ import { getActivePlan } from '@/lib/plan'
 import { useLanguage, type Lang } from '@/components/LanguageProvider'
 import { useCrossHref } from '@/lib/useCrossHref'
 import { useAppDialog } from '@/components/AppDialog'
+import { connectErrorMessage, connectUiText } from '@/lib/kaspiShop/connectMessages'
 
 type Product = {
   id: string
@@ -208,15 +209,16 @@ function StatCard({ label, value, accent }: { label: string; value: number; acce
 // Шаг подключения магазина: кнопка никогда не остаётся навсегда на
 // «Проверяем...». Сеть упала, сервер вернул не-JSON или ответ не пришёл за
 // 2 минуты -- показываем понятную ошибку вместо вечного ожидания.
-async function postConnectStep(url: string, headers: HeadersInit, body: unknown): Promise<{ ok: boolean; data: any; error?: string }> {
+async function postConnectStep(url: string, headers: HeadersInit, body: unknown): Promise<{ ok: boolean; status: number; data: any; error?: string }> {
   try {
     const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body), signal: AbortSignal.timeout(120_000) })
     const data = await res.json().catch(() => ({}))
-    return { ok: res.ok, data, error: res.ok ? undefined : data.error }
+    return { ok: res.ok, status: res.status, data, error: res.ok ? undefined : data.error }
   } catch (err: any) {
     const timedOut = err?.name === 'TimeoutError' || err?.name === 'AbortError'
     return {
       ok: false,
+      status: 0,
       data: {},
       error: timedOut
         ? 'Kaspi долго не отвечает. Обновите страницу -- если магазин уже подключился, он появится сам.'
@@ -259,6 +261,13 @@ export default function KaspiShop() {
   const [connectError, setConnectError] = useState('')
   const [otpToken, setOtpToken] = useState<string | null>(null)
   const [otpCode, setOtpCode] = useState('')
+  // Kaspi уже принял одноразовый код из SMS, но дальнейший шаг не удался
+  // (сеть). Сервер вернул resumeToken: «Повторить» шлёт его БЕЗ кода.
+  const [resumeToken, setResumeToken] = useState<string | null>(null)
+  // Короткая техническая причина (ECONNRESET, TIMEOUT...) мелким серым шрифтом.
+  const [connectErrorDetail, setConnectErrorDetail] = useState('')
+  // Защита от двойного нажатия: state обновляется асинхронно, ref -- сразу.
+  const connectInFlight = useRef(false)
   const [merchantChoices, setMerchantChoices] = useState<{ id: string; name: string }[] | null>(null)
   const [sessionToken, setSessionToken] = useState<string | null>(null)
 
@@ -411,30 +420,79 @@ export default function KaspiShop() {
 
   async function startConnect() {
     if (!phone) return
+    if (connectInFlight.current) return
+    connectInFlight.current = true
     setConnecting(true)
     setConnectError('')
-    const headers = await authHeader()
-    const res = await fetch('/api/kaspi-shop/connect', { method: 'POST', headers, body: JSON.stringify({ phone }) })
-    const data = await res.json()
-    setConnecting(false)
-    if (!res.ok) { setConnectError(data.error || 'Не удалось подключиться'); return }
-    setOtpToken(data.otpToken)
+    setConnectErrorDetail('')
+    try {
+      const headers = await authHeader()
+      const r = await postConnectStep('/api/kaspi-shop/connect', headers, { phone })
+      if (!r.ok) {
+        const localized = connectErrorMessage(lang, r.data?.code, { step: 'phone', resumable: false })
+        setConnectError(localized || r.error || 'Не удалось подключиться')
+        setConnectErrorDetail(typeof r.data?.detail === 'string' ? r.data.detail : '')
+        return
+      }
+      setOtpToken(r.data.otpToken)
+    } finally {
+      connectInFlight.current = false
+      setConnecting(false)
+    }
   }
 
+  // Обычный путь: otpToken + код из SMS. После сбоя сети УЖЕ ПОСЛЕ принятия
+  // кода (resumeToken) -- «Повторить»: тот же эндпоинт, но с resumeToken и без
+  // кода, одноразовый код повторно не отправляется.
   async function completeConnect() {
-    if (!otpToken || !otpCode) return
+    const resuming = !!resumeToken
+    if (connectInFlight.current) return
+    if (!resuming && (!otpToken || !otpCode)) return
+    connectInFlight.current = true
     setConnecting(true)
     setConnectError('')
-    const headers = await authHeader()
-    // Reconnecting an expired session already knows which store it's for --
-    // tells the API to auto-pick the already-connected merchant instead of
-    // showing the same picker used for genuinely adding a new store.
-    const isReconnect = connected && sessionStatus === 'session_expired'
-    const r = await postConnectStep('/api/kaspi-shop/connect/otp', headers, { otpToken, code: otpCode, isReconnect })
-    setConnecting(false)
-    if (!r.ok) { setConnectError(r.error || 'Не удалось подтвердить код'); return }
+    setConnectErrorDetail('')
+    let r: Awaited<ReturnType<typeof postConnectStep>>
+    try {
+      const headers = await authHeader()
+      // Reconnecting an expired session already knows which store it's for --
+      // tells the API to auto-pick the already-connected merchant instead of
+      // showing the same picker used for genuinely adding a new store.
+      const isReconnect = connected && sessionStatus === 'session_expired'
+      r = await postConnectStep(
+        '/api/kaspi-shop/connect/otp',
+        headers,
+        resuming ? { otpToken: resumeToken, isReconnect } : { otpToken, code: otpCode, isReconnect },
+      )
+    } finally {
+      connectInFlight.current = false
+      setConnecting(false)
+    }
+    if (!r.ok) {
+      // Код уже принят Kaspi, поэтому при повторе токен сохраняется при ЛЮБОМ
+      // сбое, кроме окончательного ответа (токен недействителен, переход
+      // на чужой адрес, на номере нет магазинов -- 400 без resumeToken).
+      // Сетевой сбой, 401/403, 5xx и не-JSON от Vercel -- не окончательные:
+      // иначе человек вернулся бы к форме с уже потраченным кодом.
+      const fresh = typeof r.data?.resumeToken === 'string' && r.data.resumeToken ? r.data.resumeToken : null
+      const terminal = r.data?.code === 'invalid_token' || r.data?.code === 'redirect_off_site' ||
+        (r.status === 400 && r.data?.resumable !== true)
+      const nextResume = fresh || (resuming && !terminal ? resumeToken : null)
+      setResumeToken(nextResume)
+      if (resuming && !nextResume) setOtpCode('') // потраченный код не подставляем
+      const localized = connectErrorMessage(lang, r.data?.code, { step: 'otp', resumable: !!nextResume })
+      // Сохранённый токен + ответ без нашего кода (401/403/5xx/не-JSON): сырой
+      // «Unauthorized» не показываем -- человеку нужно одно: нажать «Повторить».
+      const keptMsg = nextResume && !fresh && r.status > 0
+        ? connectErrorMessage(lang, 'kaspi_unreachable', { step: 'otp', resumable: true })
+        : null
+      setConnectError(localized || keptMsg || r.error || 'Не удалось подтвердить код')
+      setConnectErrorDetail(typeof r.data?.detail === 'string' ? r.data.detail : '')
+      return
+    }
     const data = r.data
     setOtpToken(null)
+    setResumeToken(null)
     setOtpCode('')
     if (data.status === 'merchant_required') {
       setSessionToken(data.sessionToken)
@@ -748,7 +806,7 @@ export default function KaspiShop() {
               style={{ boxShadow: '0 34px 80px -20px rgba(10,10,15,0.4), var(--nav-card-glow)' }}>
               <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[24px]" style={{ background: 'linear-gradient(90deg, var(--nav-accent), var(--nav-teal))' }} />
               {connected && !needsReconnect && (
-                <button onClick={() => { setAddingStore(false); setPhone(''); setOtpToken(null); setOtpCode(''); setMerchantChoices(null); setSessionToken(null); setConnectError('') }}
+                <button onClick={() => { setAddingStore(false); setPhone(''); setOtpToken(null); setResumeToken(null); setOtpCode(''); setMerchantChoices(null); setSessionToken(null); setConnectError(''); setConnectErrorDetail('') }}
                   className="absolute top-5 right-5 text-lg leading-none" style={{ color: 'var(--nav-text-secondary)' }}>✕</button>
               )}
               <div className="text-[11px] font-semibold tracking-wider uppercase mb-2" style={{ color: 'var(--nav-text-muted)' }}>Подключение</div>
@@ -760,7 +818,16 @@ export default function KaspiShop() {
                   Товары и настройки сохранены — просто войдите в тот же магазин ещё раз, чтобы обновить сессию.
                 </p>
               )}
-              {connectError && <div className="text-sm mb-3" style={{ color: 'var(--nav-critical)' }}>{connectError}</div>}
+              {connectError && (
+                <div className="mb-3" role="alert">
+                  <div className="text-sm" style={{ color: 'var(--nav-critical)' }}>{connectError}</div>
+                  {connectErrorDetail && (
+                    <div className="text-[11px] mt-1 font-mono break-all" style={{ color: 'var(--nav-text-muted)' }}>
+                      {connectUiText(lang).techReason}: {connectErrorDetail}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {merchantChoices ? (
                 <div className="flex flex-col gap-2">
@@ -787,11 +854,20 @@ export default function KaspiShop() {
                 <div className="flex flex-col gap-2">
                   <div className="text-xs mb-1" style={{ color: 'var(--nav-text-muted)' }}>Код из SMS отправлен на {phone}</div>
                   <input className={`${INPUT_CLS} font-mono tracking-widest`} style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }}
-                    placeholder="000000" value={otpCode} onChange={e => setOtpCode(e.target.value)} />
+                    placeholder="000000" value={otpCode} onChange={e => setOtpCode(e.target.value)}
+                    disabled={!!resumeToken || connecting} />
                   <button onClick={completeConnect} disabled={connecting}
                     className="mt-1 rounded-xl py-3 text-sm font-semibold disabled:opacity-50" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-                    {connecting ? 'Проверяем...' : 'Подтвердить'}
+                    {connecting ? 'Проверяем...' : resumeToken ? connectUiText(lang).retry : 'Подтвердить'}
                   </button>
+                  {connectError && (
+                    <button type="button" disabled={connecting}
+                      onClick={() => { setOtpToken(null); setResumeToken(null); setOtpCode(''); setConnectError(''); setConnectErrorDetail('') }}
+                      className="min-h-[44px] rounded-xl text-sm font-medium underline-offset-2 hover:underline disabled:opacity-50"
+                      style={{ color: 'var(--nav-text-secondary)' }}>
+                      {connectUiText(lang).newCode}
+                    </button>
+                  )}
                 </div>
               )}
               {/* Выход из обязательного окна: пока магазин не подключён (или
