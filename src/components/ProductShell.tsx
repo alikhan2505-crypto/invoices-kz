@@ -61,6 +61,26 @@ export default function ProductShell({ product, children }: { product: ProductKe
   const [balance, setBalance] = useState<number | null>(null)
   const [util, setUtil] = useState<{ unread: number; initials: string }>({ unread: 0, initials: '··' })
   const [mine] = useMyProducts()
+  // Админ-продукты (CFO) показываются в переключателе только админам и всегда --
+  // независимо от «моих продуктов» (enabled_products у админов их не содержит,
+  // и CFO в списке не было, 18.10.2026). Кэш прав кладёт SiteNav.
+  const [isAdmin, setIsAdmin] = useState(false)
+  useEffect(() => {
+    let alive = true
+    try {
+      const cached = JSON.parse(sessionStorage.getItem('sitenav_perms') || 'null')
+      if (cached && typeof cached.isAdmin === 'boolean') setIsAdmin(cached.isAdmin)
+    } catch {
+      // Кэш -- только ускорение первой отрисовки.
+    }
+    void (async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data } = await supabase.from('profiles').select('is_admin').eq('id', user.id).single()
+      if (alive) setIsAdmin(!!data?.is_admin)
+    })().catch(() => {})
+    return () => { alive = false }
+  }, [])
   const cfoMode = useCfoMode()
   const [hostname] = useState(() => (typeof window === 'undefined' ? '' : window.location.hostname))
   const switchRef = useRef<HTMLDivElement>(null)
@@ -77,7 +97,7 @@ export default function ProductShell({ product, children }: { product: ProductKe
   // магазина (иначе ни одного запроса). Открытие шторки тоже проверяет свежесть.
   const menuCounts = useKaspiMenuCounts(product === 'kaspiShop' && storeLive, path, open)
 
-  const switchable = PRODUCTS.filter((p) => !p.locked && p.key !== 'salon' && (mine === null ? SELECTABLE_KEYS.includes(p.key) : mine.includes(p.key) || p.key === product))
+  const switchable = PRODUCTS.filter((p) => !p.locked && p.key !== 'salon' && (p.adminOnly ? isAdmin : (mine === null ? SELECTABLE_KEYS.includes(p.key) : mine.includes(p.key) || p.key === product)))
 
   // The top pill drops its own balance button while a shell is on screen (CSS keys off this class).
   useEffect(() => {

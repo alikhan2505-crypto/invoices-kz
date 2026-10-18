@@ -318,7 +318,9 @@ function SiteNavBar({ desktopOnly = false }: { desktopOnly?: boolean }) {
   // in front of a non-admin; an admin sees it appear a moment later.
   const visibleSections = SECTIONS
     .filter(s => !s.adminOnly || perms?.isAdmin === true)
-    .filter(s => onProductHost ? s.key === activeSection?.key : isSectionVisible(mine, s.key, activeSection?.key ?? null))
+    // Админ-раздел (CFO) админу виден всегда, даже если его нет в «моих продуктах»
+    // (у админов enabled_products его не содержит) -- иначе добраться можно только по URL.
+    .filter(s => onProductHost ? s.key === activeSection?.key : (s.adminOnly && perms?.isAdmin === true) || isSectionVisible(mine, s.key, activeSection?.key ?? null))
 
   // Opening a product section connects it to the account. An admin-only section
   // (still under the founder's review) is never written into a non-admin's
