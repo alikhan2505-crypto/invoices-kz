@@ -1418,7 +1418,7 @@ export default function CreateInvoicePage() {
                                   как «чисто». */}
                               {typeof c.totalArrear === 'number' && (
                                 c.totalArrear > 0 ? (
-                                  <div className="font-medium" style={{ color: 'var(--nav-danger, #ef4444)' }}>
+                                  <div className="font-medium" style={{ color: 'var(--nav-critical, #ef4444)' }}>
                                     {t.binLookupTaxDebt(c.totalArrear.toLocaleString('ru-KZ', { maximumFractionDigits: 2 }))}
                                   </div>
                                 ) : (
@@ -1426,10 +1426,10 @@ export default function CreateInvoicePage() {
                                 )
                               )}
                               {c.isUnreliable === true && (
-                                <div className="font-medium" style={{ color: 'var(--nav-danger, #ef4444)' }}>{t.binLookupUnreliable}</div>
+                                <div className="font-medium" style={{ color: 'var(--nav-critical, #ef4444)' }}>{t.binLookupUnreliable}</div>
                               )}
                               {c.isLiquidating === true && (
-                                <div className="font-medium" style={{ color: 'var(--nav-danger, #ef4444)' }}>{t.binLookupLiquidating}</div>
+                                <div className="font-medium" style={{ color: 'var(--nav-critical, #ef4444)' }}>{t.binLookupLiquidating}</div>
                               )}
                               <div className="pt-1" style={{ color: 'var(--nav-text-muted)' }}>
                                 {c.source === 'kgd' ? t.binLookupSourceKgd : t.binLookupSource}

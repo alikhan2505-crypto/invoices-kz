@@ -58,7 +58,7 @@ export function useAppDialog() {
         >
           <div
             className="w-full max-w-sm rounded-2xl p-5 shadow-xl"
-            style={{ background: 'var(--nav-surface-card, #ffffff)', color: 'var(--nav-text-primary, #111827)' }}
+            style={{ background: 'var(--nav-surface-chrome, #ffffff)', color: 'var(--nav-text-primary, #111827)', border: '1px solid var(--nav-border, transparent)' }}
             onClick={e => e.stopPropagation()}
           >
             <div className="text-sm leading-relaxed whitespace-pre-line">{state.text}</div>
