@@ -42,13 +42,16 @@ const REPLY_PRICE_TENGE = 5
 // lands there.
 // Labels come from the dictionary at render time (src/lib/i18n/aiAgent.ts);
 // only the keys are structural.
+// «Каналы» первой в ряду (18.10.2026, просьба основателя: канал -- первое, что
+// нужно подключить, как и в мастере «сначала канал»); открывается по-прежнему
+// «Настройки» (порядок -- только вид панели, не ключи).
 const TABS = [
+  { key: 'channels' },
   { key: 'settings' },
   { key: 'prompting' },
   { key: 'control' },
   { key: 'templates' },
   { key: 'flows' },
-  { key: 'channels' },
 ] as const
 
 const tabLabel = (t: AiAgentDict, key: string): string =>
