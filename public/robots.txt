@@ -3,7 +3,7 @@ Allow: /
 Disallow: /dashboard
 Disallow: /history
 Disallow: /profile
-Disallow: /invoice
+Disallow: /invoice/
 Disallow: /admin
 Disallow: /onboarding
 Disallow: /create
@@ -11,5 +11,7 @@ Disallow: /upgrade
 Disallow: /kaspi-shop
 Disallow: /ai-agent
 Disallow: /cfo
+Allow: /api/shop/
+Disallow: /api/
 
 Sitemap: https://invoices.kz/sitemap.xml

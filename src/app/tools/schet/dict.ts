@@ -96,9 +96,9 @@ export interface SchetDict {
 export const schetDict: Record<ToolLang, SchetDict> = {
   ru: {
     seo: {
-      title: 'Счёт на оплату онлайн — создать бесплатно за минуту',
+      title: 'Счёт на оплату — образец, создать онлайн',
       description:
-        'Создайте счёт на оплату для ИП или ТОО Казахстана онлайн: реквизиты, БИН, банк и БИК из справочника, НДС 16% или без НДС, сумма прописью. Готовый PDF за минуту, без регистрации — 3 счёта в квартал бесплатно.',
+        'Образец счёта на оплату для ИП и ТОО: заполните реквизиты и скачайте PDF за минуту. НДС 16%, сумма прописью. 3 счёта в квартал бесплатно.',
       keywords:
         'счет на оплату образец казахстан, счет на оплату скачать, выставить счет онлайн бесплатно, счет на оплату ип образец, счет на оплату тоо, создать счет на оплату, счет с ндс 16 казахстан',
       ogTitle: 'Счёт на оплату онлайн — бесплатно за минуту',
@@ -201,9 +201,9 @@ export const schetDict: Record<ToolLang, SchetDict> = {
 
   kk: {
     seo: {
-      title: 'Төлем шоты онлайн — бір минутта тегін жасау',
+      title: 'Төлем шотының үлгісі — онлайн жасау, тегін',
       description:
-        'Қазақстандағы ЖК немесе ЖШС үшін төлем шотын онлайн жасаңыз: деректемелер, БСН, банк пен БСК анықтамалықтан, ҚҚС 16% немесе ҚҚС-сыз, сомасы жазбаша. Тіркелусіз бір минутта дайын PDF — тоқсанына 3 шот тегін.',
+        'ЖК және ЖШС үшін төлем шотының үлгісі: деректемелерді толтырып, бір минутта PDF жүктеңіз. ҚҚС 16%, сомасы жазбаша — тоқсанына 3 шот тегін.',
       keywords:
         'төлем шоты үлгісі, төлемге шот үлгісі, төлем шоты онлайн, шот жазу тегін, жк төлем шоты, жшс төлем шоты, төлем шотын жасау, төлем шоты pdf жүктеу, ққс 16 шот',
       ogTitle: 'Төлем шоты онлайн — бір минутта, тегін',
@@ -306,9 +306,9 @@ export const schetDict: Record<ToolLang, SchetDict> = {
 
   en: {
     seo: {
-      title: 'Kazakhstan Invoice Generator (Invoice for Payment) — Free PDF',
+      title: 'Kazakhstan Invoice Template — Free Online PDF',
       description:
-        'Create a Kazakhstan invoice for payment online for a sole proprietor (IE) or LLP: BIN, bank and BIC from the directory, 16% VAT or no VAT, amount in words. Ready PDF in a minute, no sign-up — 3 free invoices per quarter.',
+        'Kazakhstan invoice template for sole proprietors and LLPs: fill in your details, get a PDF in a minute. 16% VAT, total in words. 3 free per quarter.',
       keywords:
         'kazakhstan invoice template, invoice generator kazakhstan, kazakhstan invoice for payment, invoice for payment template kazakhstan, schet na oplatu, kazakhstan invoice pdf free, kazakhstan vat 16 invoice, llp invoice kazakhstan, sole proprietor invoice kazakhstan',
       ogTitle: 'Kazakhstan invoice for payment — free, in a minute',

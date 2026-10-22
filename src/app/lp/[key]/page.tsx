@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { Unbounded, Onest } from 'next/font/google'
-import { LANDINGS, isLandingKey } from '@/lib/landings'
+import { LANDINGS, isLandingKey, landingSeo } from '@/lib/landings'
 import ProductLanding from '@/components/products/ProductLanding'
 import VisitBeacon from '@/components/VisitBeacon'
 
@@ -22,10 +22,10 @@ export async function generateMetadata({ params }: { params: Promise<{ key: stri
   // CFO is in closed beta: keep it out of search until it opens. (Not keyed off access === 'invite' --
   // salon is also invite-only but its indexing must stay as is.) Remove this when cfo goes 'open'.
   const robots = key === 'cfo' ? { index: false } : undefined
-  // Поисковикам — русский + казахский сразу (язык страницы живёт в браузере,
-  // сервер его не знает); как на хабе /products. Бренд — один раз, в конце.
-  const title = `${l.metaTitle.replace(/\s*\|\s*invoices\.kz$/, '')} · ${l.metaTitleKk} | invoices.kz`
-  const description = `${l.metaDescription} ${l.metaDescriptionKk}`
+  // Поисковикам — только русский: язык страницы живёт в браузере, отдельного
+  // URL/hreflang для казахской версии нет, а смесь двух языков в одной строке
+  // выходила за лимиты сниппета (title <= 60, description <= 155).
+  const { title, description } = landingSeo(key)
   return {
     ...(robots && { robots }),
     title,

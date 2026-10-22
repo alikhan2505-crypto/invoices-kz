@@ -48,6 +48,8 @@ export interface KontragentDict {
   fullCardBodySignedIn: string
   fullCardLinkSignedIn: string
   sources: string
+  /** Ссылка на гайд proverka-kontragenta (en — русский гайд, подпись это говорит). */
+  guideLink: string
   /** Статус из реестра приходит по-русски (statusru) — переводим известные. */
   status: (raw: string) => string
   /** Пояснения под инструментом; те же вопросы уходят в FAQPage JSON-LD. */
@@ -73,9 +75,9 @@ const translateStatus = (lang: 'kk' | 'en') => (raw: string) =>
 export const kontragentDict: Record<ToolLang, KontragentDict> = {
   ru: {
     seo: {
-      title: 'Проверка контрагента по БИН — бесплатно, по данным КГД',
+      title: 'Проверка контрагента по БИН — бесплатно',
       description:
-        'Проверьте контрагента по БИН за секунды: неблагонадёжность, ликвидация, налоговая задолженность и статус плательщика НДС — по официальным реестрам ГБД ЮЛ и КГД РК. Бесплатно, без регистрации.',
+        'Проверьте контрагента по БИН за секунды: неблагонадёжность, ликвидация, налоговая задолженность, статус плательщика НДС. Данные КГД РК, бесплатно.',
       keywords:
         'проверка контрагента по бин, проверить бин казахстан, неблагонадёжный налогоплательщик кгд, проверить тоо по бин, налоговая задолженность по бин, плательщик ндс проверить бин, ликвидация тоо проверка',
       ogTitle: 'Проверка контрагента по БИН — бесплатно',
@@ -143,6 +145,7 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
     fullCardLinkSignedIn: 'Открыть в кабинете →',
     sources:
       'Источники: ГБД «Юридические лица» (data.egov.kz) и сервисы портала КГД РК. Данные обновляются реестрами с задержкой до суток; результат носит справочный характер.',
+    guideLink: 'Как проверить контрагента по БИН: пошагово →',
     status: raw => raw,
     faq: {
       title: 'Частые вопросы',
@@ -181,9 +184,9 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
 
   kk: {
     seo: {
-      title: 'Контрагентті БСН бойынша тексеру — тегін, МКК деректерімен',
+      title: 'Контрагентті БСН бойынша тексеру — тегін',
       description:
-        'Контрагентті БСН бойынша бірнеше секундта тексеріңіз: сенімсіз салық төлеушілер тізімі, тарату, салық берешегі және ҚҚС төлеуші мәртебесі — заңды тұлғалар тізілімі мен ҚР МКК ресми деректері бойынша. Тегін, тіркелусіз.',
+        'Контрагентті БСН бойынша секундтар ішінде тексеріңіз: сенімсіз салық төлеушілер, тарату, салық берешегі, ҚҚС төлеуші мәртебесі. ҚР МКК деректері, тегін.',
       keywords:
         'контрагентті тексеру, контрагентті бсн бойынша тексеру, бсн бойынша тексеру, компанияны бсн бойынша тексеру, сенімсіз салық төлеуші мкк, жшс тексеру бсн, салық берешегін тексеру, ққс төлеушіні тексеру, жк жсн бойынша тексеру, тарату жшс тексеру',
       ogTitle: 'Контрагентті БСН бойынша тегін тексеру',
@@ -251,6 +254,7 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
     fullCardLinkSignedIn: 'Кабинетте ашу →',
     sources:
       'Дереккөздер: «Заңды тұлғалар» мемлекеттік деректер базасы (data.egov.kz) және ҚР МКК порталының сервистері. Тізілімдер бір тәулікке дейін кешігіп жаңарады; нәтиже анықтамалық сипатта. Компания атауы мен мәртебесі тізілімде қалай жазылса, солай көрсетіледі — көбіне орыс тілінде.',
+    guideLink: 'Контрагентті БСН бойынша қалай тексеруге болады: қадам-қадаммен →',
     status: translateStatus('kk'),
     faq: {
       title: 'Жиі қойылатын сұрақтар',
@@ -289,9 +293,9 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
 
   en: {
     seo: {
-      title: 'Check a Kazakhstan Company by BIN — Free, Official KGD Data',
+      title: 'Check a Company by BIN in Kazakhstan — Free',
       description:
-        'Check any Kazakhstan company or sole proprietor by BIN/IIN in seconds: unreliable-taxpayer list, liquidation, tax debt and VAT registration — from the official State Revenue Committee (KGD) and legal entity registers. Free, no sign-up.',
+        'Check a Kazakhstan company or sole proprietor by BIN/IIN in seconds: unreliable-taxpayer list, liquidation, tax debt, VAT status. Official KGD data, free.',
       keywords:
         'kazakhstan company check by bin, kazakhstan bin lookup, verify kazakhstan company, counterparty check kazakhstan, kgd unreliable taxpayer, kazakhstan vat payer check, kazakhstan tax debt check, kazakhstan llp check',
       ogTitle: 'Free Kazakhstan company check by BIN',
@@ -359,6 +363,7 @@ export const kontragentDict: Record<ToolLang, KontragentDict> = {
     fullCardLinkSignedIn: 'Open in my account →',
     sources:
       'Sources: the “Legal Entities” state database (data.egov.kz) and KGD portal services. Registers update with up to a one-day delay; results are for reference only. Company names and statuses are shown as they appear in the register, usually in Russian.',
+    guideLink: 'How to check a counterparty by BIN, step by step (in Russian) →',
     status: translateStatus('en'),
     faq: {
       title: 'Frequently asked questions',

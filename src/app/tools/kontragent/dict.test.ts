@@ -18,10 +18,10 @@ const CYR = 'А-Яа-яЁёӘәҒғҚқҢңӨөҰұҮүҺһІі'
 const ruAbbr = (abbr: string, flags = '') => new RegExp(`(^|[^${CYR}])${abbr}($|[^${CYR}])`, flags)
 
 describe('kontragent dictionary — ru stays as it was', () => {
-  it('keeps the ru head copy word for word (search snippet already indexed)', () => {
+  it('keeps the ru ogTitle and h1 word for word (title and description shortened for the 60/155 limits on 22.10.2026)', () => {
     const { seo } = kontragentDict.ru
     expect(seo.description).toBe(
-      'Проверьте контрагента по БИН за секунды: неблагонадёжность, ликвидация, налоговая задолженность и статус плательщика НДС — по официальным реестрам ГБД ЮЛ и КГД РК. Бесплатно, без регистрации.',
+      'Проверьте контрагента по БИН за секунды: неблагонадёжность, ликвидация, налоговая задолженность, статус плательщика НДС. Данные КГД РК, бесплатно.',
     )
     expect(seo.ogTitle).toBe('Проверка контрагента по БИН — бесплатно')
     expect(kontragentDict.ru.h1).toBe('Проверка контрагента по БИН')

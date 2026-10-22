@@ -1,18 +1,18 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import GuideShell from '../../GuideShell'
-import { getGuide } from '@/lib/guides'
+import { getGuide, guideAlternates, guideMetaTitle } from '@/lib/guides'
 
 const guide = getGuide('penya-za-prosrochku')!
 
 export const metadata: Metadata = {
-  title: `${guide.kk.title} | invoices.kz`,
+  title: guideMetaTitle(guide.kk.title),
   description: guide.kk.description,
   keywords:
     'төлемді кешіктіргені үшін өсімпұл қазақстан, ақ 353 бап есептеу, шарт бойынша тұрақсыздық айыбы, клиент шотты төлемейді не істеу керек, ұлттық банк базалық мөлшерлеме',
   alternates: {
     canonical: `https://invoices.kz/guides/kk/${guide.slug}`,
-    languages: { ru: `https://invoices.kz/guides/${guide.slug}`, kk: `https://invoices.kz/guides/kk/${guide.slug}` },
+    languages: guideAlternates(guide.slug),
   },
   openGraph: {
     type: 'article',

@@ -1,17 +1,19 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import BrandWordmark from '@/components/BrandWordmark'
-import { GUIDES } from '@/lib/guides'
+import { GUIDES, guidesIndexAlternates } from '@/lib/guides'
+import { toolLinkPath } from '@/lib/tools-i18n'
+import { toolsIndexCards } from '@/lib/tools-i18n/toolsIndex'
 
 export const metadata: Metadata = {
   title: 'Қазақстан бизнесі үшін пайдалы — invoices.kz нұсқаулары',
   description:
-    'ЖК, ЖШС және Kaspi сатушылары үшін талдаулар: санаттар бойынша Kaspi Магазин комиссиясы, төлемге шотты қалай шығару керек, шот, ОЖА, жүкқұжат және КҰ айырмашылығы. Тегін, тіркелусіз.',
+    'ЖК, ЖШС және Kaspi сатушылары үшін талдаулар: Kaspi комиссиясы, төлемге шотты қалай шығару, ЖК салықтары, ЭШФ, шот, ОЖА, жүкқұжат және КҰ айырмашылығы.',
   keywords:
     'ип үшін төлемге шот қазақстан, kaspi магазин комиссиясы, ожа қазақстан, жүкқұжат, коммерциялық ұсыныс, ип құжаттары рк',
   alternates: {
     canonical: 'https://invoices.kz/guides/kk',
-    languages: { ru: 'https://invoices.kz/guides', kk: 'https://invoices.kz/guides/kk' },
+    languages: guidesIndexAlternates(),
   },
   openGraph: {
     type: 'website',
@@ -75,30 +77,19 @@ export default function GuidesIndexKk() {
             Тегін құралдар
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            <Link href="/tools/kk/schet" className="nav-glass rounded-xl p-4 block" style={{ color: 'var(--nav-text-primary)' }}>
-              <div className="text-sm font-semibold mb-1">Төлемге шот онлайн</div>
-              <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>
-                Бір минутта дайын шот: анықтамалықтан БСК, жазбаша сома, ҚҚС
-              </div>
-            </Link>
-            <Link href="/tools/kk/kontragent" className="nav-glass rounded-xl p-4 block" style={{ color: 'var(--nav-text-primary)' }}>
-              <div className="text-sm font-semibold mb-1">БСН бойынша контрагентті тексеру</div>
-              <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>
-                Сенімсіздік, тарату, салық қарызы және ҚҚС — МКК деректері бойынша
-              </div>
-            </Link>
-            <Link href="/tools/kk/margin" className="nav-glass rounded-xl p-4 block" style={{ color: 'var(--nav-text-primary)' }}>
-              <div className="text-sm font-semibold mb-1">Kaspi маржа калькуляторы</div>
-              <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>
-                Комиссия, жеткізу және салықтан кейін сатудан қанша қалады
-              </div>
-            </Link>
-            <Link href="/tools/kk/waybills" className="nav-glass rounded-xl p-4 block" style={{ color: 'var(--nav-text-primary)' }}>
-              <div className="text-sm font-semibold mb-1">Kaspi жүкқұжаттарын бір PDF-пен басып шығару (А4/А6)</div>
-              <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>
-                Жүкқұжаттар бір PDF-те: А4 парағына 4-тен немесе термопринтерге А6
-              </div>
-            </Link>
+            {toolsIndexCards('kk').map(c => (
+              <Link
+                key={c.slug}
+                href={toolLinkPath(c.slug, 'kk')}
+                className="nav-glass rounded-xl p-4 block"
+                style={{ color: 'var(--nav-text-primary)' }}
+              >
+                <div className="text-sm font-semibold mb-1">{c.title}</div>
+                <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>
+                  {c.text}
+                </div>
+              </Link>
+            ))}
           </div>
         </div>
       </div>

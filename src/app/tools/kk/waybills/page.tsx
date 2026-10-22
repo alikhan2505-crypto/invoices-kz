@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { toolMetadata } from '@/lib/tools-i18n'
 import ToolJsonLd from '@/lib/tools-i18n/ToolJsonLd'
+import ToolFaqJsonLd from '@/lib/tools-i18n/ToolFaqJsonLd'
 import WaybillsTool from '../../waybills/WaybillsTool'
 import { waybillsDict } from '../../waybills/dict'
 
@@ -16,6 +17,7 @@ export default function Page() {
   return (
     <>
       <ToolJsonLd slug="waybills" lang={LANG} name={t.h1} description={t.seo.description} />
+      <ToolFaqJsonLd slug="waybills" lang={LANG} items={t.faq} />
       <WaybillsTool lang={LANG} />
     </>
   )

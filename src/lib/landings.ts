@@ -39,13 +39,10 @@ export type LandingDef = {
   // Заголовок вкладки на языке страницы: язык живёт в браузере (cookie), сервер
   // его не знает, поэтому клиент подменяет серверный <title> (как на хабе).
   title: L10n
-  // Для поисковиков — русский + казахский (решение основателя, как на хабе):
-  // <title> = metaTitle (без «| invoices.kz») · metaTitleKk | invoices.kz,
-  // description = metaDescription + metaDescriptionKk.
+  // Для поисковиков — только русский, см. landingSeo() ниже: metaTitle без
+  // «| invoices.kz» (бренд добавляет landingSeo), metaDescription <= 155 символов.
   metaTitle: string
-  metaTitleKk: string
   metaDescription: string
-  metaDescriptionKk: string
 }
 
 export const LANDINGS: Record<LandingKey, LandingDef> = {
@@ -82,10 +79,8 @@ export const LANDINGS: Record<LandingKey, LandingDef> = {
       kk: 'Kaspi Bot — Kaspi-дегі баға демпингі мен тапсырыстар | invoices.kz',
       en: 'Kaspi Bot — Kaspi price undercutting and orders | invoices.kz',
     },
-    metaTitle: 'Kaspi Bot — демпинг цен и заказы Kaspi | invoices.kz',
-    metaTitleKk: 'Kaspi-дегі баға демпингі мен тапсырыстар',
+    metaTitle: 'Kaspi Bot — демпинг цен и заказы Kaspi',
     metaDescription: 'Цена на Kaspi сама следует за конкурентами, но не падает ниже вашей границы. Заказы, накладные, финансы и прибыль по товарам в одном кабинете.',
-    metaDescriptionKk: 'Kaspi-дегі баға бәсекелестерге ілесіп өзі өзгереді, бірақ сіз белгілеген шектен төмен түспейді. Тапсырыстар, жүкқұжаттар, қаржы және әр тауар бойынша пайда — бір кабинетте.',
   },
   agent: {
     key: 'agent',
@@ -123,10 +118,8 @@ export const LANDINGS: Record<LandingKey, LandingDef> = {
       kk: 'AI-агент — WhatsApp пен Instagram-да клиенттерге жауап береді | invoices.kz',
       en: 'AI Agent — replies to customers on WhatsApp and Instagram | invoices.kz',
     },
-    metaTitle: 'AI-агент — ответы клиентам в WhatsApp и Instagram | invoices.kz',
-    metaTitleKk: 'WhatsApp пен Instagram-да клиенттерге жауап береді',
+    metaTitle: 'AI-агент — ответы клиентам в WhatsApp и Instagram',
     metaDescription: 'AI-агент отвечает клиентам в WhatsApp, Instagram и на сайте, готовит счета и записи черновиком на подтверждение и передаёт диалог человеку.',
-    metaDescriptionKk: 'AI-агент WhatsApp, Instagram және сайттағы клиенттерге жауап береді, шот пен жазылуды растауға жоба ретінде дайындайды және қажет кезде диалогты адамға өткізеді.',
   },
   salon: {
     key: 'salon',
@@ -156,10 +149,8 @@ export const LANDINGS: Record<LandingKey, LandingDef> = {
       kk: 'Салон — клиенттердің жазылуы, шеберлер және салон сайты | invoices.kz',
       en: 'Salon — client bookings, staff and a salon website | invoices.kz',
     },
-    metaTitle: 'Салон — записи клиентов, мастера и сайт салона | invoices.kz',
-    metaTitleKk: 'жазылулар, шеберлер және салон сайты',
+    metaTitle: 'Салон — записи клиентов, мастера и сайт салона',
     metaDescription: 'Календарь по мастерам, записи из переписки на подтверждение владельцу, история клиентов и сайт салона. Подключаем салоны по заявке.',
-    metaDescriptionKk: 'Шеберлер бойынша күнтізбе, хат алмасудан келген жазылулар — салон иесінің растауына, клиенттер тарихы және салон сайты. Салондарды өтінім бойынша қосамыз.',
   },
   cfo: {
     key: 'cfo',
@@ -196,11 +187,27 @@ export const LANDINGS: Record<LandingKey, LandingDef> = {
       kk: 'CFO — кіріс-шығыс бюджеті, ақша ағыны және төлем күнтізбесі | invoices.kz',
       en: 'CFO — P&L, cash flow and a payment calendar | invoices.kz',
     },
-    metaTitle: 'CFO — БДР, БДДС и платёжный календарь | invoices.kz',
-    metaTitleKk: 'кіріс-шығыс бюджеті, ақша ағыны және төлем күнтізбесі',
-    metaDescription: 'Кабинет финансового директора: бюджет доходов и расходов, движение денежных средств, платёжный календарь с прогнозом кассовых разрывов и ключевые показатели. Есть режим для семейного бюджета.',
-    metaDescriptionKk: 'Қаржы директорының кабинеті: кірістер мен шығыстар бюджеті, ақша қаражатының қозғалысы, кассалық алшақтықты алдын ала көрсететін төлем күнтізбесі және негізгі көрсеткіштер. Отбасы бюджетіне арналған режимі де бар.',
+    metaTitle: 'CFO — БДР, БДДС и платёжный календарь',
+    metaDescription: 'Кабинет финдиректора: бюджет доходов и расходов, движение денег, платёжный календарь с прогнозом кассовых разрывов и ключевые показатели.',
   },
+}
+
+// Мета-теги лендинга для поисковиков: только русский (язык страницы живёт в
+// браузере, отдельного URL для казахской версии нет, поэтому казахская
+// половина в одной строке только раздувала title/description за лимиты
+// сниппета). Бренд «| invoices.kz» дописывается, только если title с ним
+// укладывается в 60 символов.
+export const META_TITLE_MAX = 60
+export const META_DESCRIPTION_MAX = 155
+const META_BRAND = ' | invoices.kz'
+
+export function landingSeo(key: LandingKey): { title: string; description: string } {
+  const l = LANDINGS[key]
+  const withBrand = `${l.metaTitle}${META_BRAND}`
+  return {
+    title: withBrand.length <= META_TITLE_MAX ? withBrand : l.metaTitle,
+    description: l.metaDescription,
+  }
 }
 
 export function isLandingKey(v: string): v is LandingKey {

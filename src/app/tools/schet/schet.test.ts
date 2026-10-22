@@ -23,9 +23,9 @@ const RU_ABBR_ON_KK = new RegExp(`(?<![${L}])(БИН|ИИН|НДС|ИП|ТОО|�
 describe('schet metadata', () => {
   it('keeps the ru head as it was before the split (limit wording: per quarter since 15.10.2026)', () => {
     const m = toolMetadata('schet', 'ru', schetDict.ru.seo)
-    expect(m.title).toBe('Счёт на оплату онлайн — создать бесплатно за минуту | invoices.kz')
+    expect(m.title).toBe('Счёт на оплату — образец, создать онлайн | invoices.kz')
     expect(m.description).toBe(
-      'Создайте счёт на оплату для ИП или ТОО Казахстана онлайн: реквизиты, БИН, банк и БИК из справочника, НДС 16% или без НДС, сумма прописью. Готовый PDF за минуту, без регистрации — 3 счёта в квартал бесплатно.',
+      'Образец счёта на оплату для ИП и ТОО: заполните реквизиты и скачайте PDF за минуту. НДС 16%, сумма прописью. 3 счёта в квартал бесплатно.',
     )
     expect(m.alternates?.canonical).toBe('https://invoices.kz/tools/schet')
   })

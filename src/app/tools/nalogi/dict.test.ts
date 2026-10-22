@@ -21,7 +21,7 @@ describe('nalogi dictionary', () => {
 
   it('keeps the ru title exactly as it was before the split', () => {
     const m = toolMetadata('nalogi', 'ru', nalogiDict.ru.seo)
-    expect(m.title).toBe('Калькулятор налогов ИП 2026 — упрощёнка 4% и взносы за себя | invoices.kz')
+    expect(m.title).toBe('Калькулятор налогов ИП 2026 — упрощёнка 4% | invoices.kz')
     expect(m.alternates?.canonical).toBe('https://invoices.kz/tools/nalogi')
   })
 

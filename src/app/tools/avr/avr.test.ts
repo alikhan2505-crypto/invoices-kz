@@ -23,9 +23,9 @@ const CYRILLIC = /[А-Яа-яЁёӘәҒғҚқҢңӨөҰұҮүҺһІі]/
 describe('avr metadata', () => {
   it('keeps the ru head as it was before the split (limit wording: per quarter since 15.10.2026)', () => {
     const m = toolMetadata('avr', 'ru', avrDict.ru.seo)
-    expect(m.title).toBe('АВР онлайн — акт выполненных работ бесплатно за минуту | invoices.kz')
+    expect(m.title).toBe('Акт выполненных работ — образец, АВР онлайн | invoices.kz')
     expect(m.description).toBe(
-      'Создайте акт выполненных работ (оказанных услуг) для ИП или ТОО Казахстана онлайн: реквизиты сторон, договор, НДС, сумма прописью. Готовый PDF за минуту, без регистрации — 3 акта в квартал бесплатно.',
+      'Образец акта выполненных работ (АВР) для ИП и ТОО: заполните стороны и договор, скачайте PDF за минуту. НДС, сумма прописью. 3 акта в квартал бесплатно.',
     )
     expect(m.openGraph?.title).toBe('АВР онлайн — акт выполненных работ за минуту')
   })

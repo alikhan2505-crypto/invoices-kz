@@ -1,18 +1,18 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import GuideShell from '../../GuideShell'
-import { getGuide } from '@/lib/guides'
+import { getGuide, guideAlternates, guideMetaTitle } from '@/lib/guides'
 
 const guide = getGuide('kak-otkryt-ip-2026')!
 
 export const metadata: Metadata = {
-  title: `${guide.kk.title} | invoices.kz`,
+  title: guideMetaTitle(guide.kk.title),
   description: guide.kk.description,
   keywords:
     'жк ашу қазақстан 2026, жк тіркеу egov, жк онлайн ашу тегін, жк қызметін бастау туралы хабарлама, жк үшін қэжж, жк салық режимі 2026',
   alternates: {
     canonical: `https://invoices.kz/guides/kk/${guide.slug}`,
-    languages: { ru: `https://invoices.kz/guides/${guide.slug}`, kk: `https://invoices.kz/guides/kk/${guide.slug}` },
+    languages: guideAlternates(guide.slug),
   },
   openGraph: {
     type: 'article',

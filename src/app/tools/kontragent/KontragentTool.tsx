@@ -6,7 +6,7 @@ import { motion } from 'framer-motion'
 import { track } from '@vercel/analytics'
 import { isValidBin, normalizeBin } from '@/lib/binLookup'
 import { useLanguage } from '@/components/LanguageProvider'
-import { formatIsoDate, formatTenge, guidesIndexPath, toolsIndexPath, TOOL_CHROME, type ToolLang } from '@/lib/tools-i18n'
+import { formatIsoDate, formatTenge, toolGuidePath, toolsIndexPath, TOOL_CHROME, type ToolLang } from '@/lib/tools-i18n'
 import ToolLangSwitch from '@/lib/tools-i18n/ToolLangSwitch'
 import ToolCta from '@/lib/tools-i18n/ToolCta'
 import { useToolSession } from '@/lib/tools-i18n/useToolSession'
@@ -21,6 +21,9 @@ import { kontragentDict } from './dict'
 // а не из куки посетителя — см. docs/tools-i18n-pattern.md.
 
 const EASE = [0.16, 1, 0.3, 1] as const
+
+// Гайд «Как проверить контрагента по БИН»: ru и kk есть, английского нет (en → русский).
+const GUIDE_SLUG = 'proverka-kontragenta'
 
 // Публичный срез ответа /api/tools/kontragent — без адреса, руководителя и
 // ОКЭД: они остаются за регистрацией, роут отдаёт только hasFullCard.
@@ -343,7 +346,7 @@ export default function KontragentTool({ lang }: { lang: ToolLang }) {
 
         <div className="mt-6 flex gap-4 flex-wrap">
           <Link href={toolsIndexPath(lang)} className="text-sm font-semibold" style={{ color: 'var(--nav-accent)' }}>{chrome.allTools}</Link>
-          <Link href={guidesIndexPath(lang)} className="text-sm font-semibold" style={{ color: 'var(--nav-accent)' }}>{chrome.guides}</Link>
+          <Link href={toolGuidePath(GUIDE_SLUG, lang)} hrefLang={lang === 'en' ? 'ru' : lang} className="text-sm font-semibold" style={{ color: 'var(--nav-accent)' }}>{t.guideLink}</Link>
         </div>
       </div>
     </div>

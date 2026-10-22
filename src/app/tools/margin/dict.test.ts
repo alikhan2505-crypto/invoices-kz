@@ -19,7 +19,7 @@ describe('margin dictionary', () => {
 
   it('keeps the ru head exactly as it was before the split', () => {
     const m = toolMetadata('margin', 'ru', marginDict.ru.seo)
-    expect(m.title).toBe('Калькулятор маржи Kaspi — расчёт прибыли с продажи | invoices.kz')
+    expect(m.title).toBe('Калькулятор маржи Kaspi — прибыль с продажи | invoices.kz')
     expect(m.alternates?.canonical).toBe('https://invoices.kz/tools/margin')
   })
 

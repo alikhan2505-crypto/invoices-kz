@@ -74,6 +74,8 @@ export interface KpDict {
   /** Тот же блок для вошедшего (с 15.10.2026): вместо фразы о регистрации — «продолжите в кабинете». */
   limitBodySignedIn: string
   nextStep: string
+  /** Ссылка на гайд dokumenty-ip-kazakhstan (en — русский гайд, подпись это говорит). */
+  guideLink: string
   faqTitle: string
   faq: Array<{ q: string; a: string }>
 }
@@ -81,9 +83,9 @@ export interface KpDict {
 export const kpDict: Record<ToolLang, KpDict> = {
   ru: {
     seo: {
-      title: 'Коммерческое предложение онлайн — КП бесплатно за минуту',
+      title: 'Коммерческое предложение — образец, КП онлайн',
       description:
-        'Создайте коммерческое предложение для клиента онлайн: позиции с ценами, срок действия, НДС, реквизиты. Готовый PDF за минуту, без регистрации — 3 КП в квартал бесплатно.',
+        'Образец коммерческого предложения (КП) для клиента: позиции с ценами, срок действия, НДС, реквизиты. Готовый PDF за минуту. 3 КП в квартал бесплатно.',
       keywords:
         'коммерческое предложение образец казахстан, кп скачать бесплатно, коммерческое предложение ип, как составить кп, коммерческое предложение на услуги образец',
       ogTitle: 'Коммерческое предложение онлайн — за минуту',
@@ -150,6 +152,7 @@ export const kpDict: Record<ToolLang, KpDict> = {
     limitBodySignedIn:
       'В кабинете invoices.kz на тарифе Про КП превращается в счёт одним кликом, когда клиент согласился: реквизиты сохранены, номера считаются сами, а оплату можно принять через Kaspi. Продолжите в кабинете invoices.kz.',
     nextStep: 'Клиент согласился? Выставить счёт →',
+    guideLink: 'Счёт, АВР, накладная и КП: когда что нужно →',
     faqTitle: 'Коротко о КП',
     faq: [
       {
@@ -177,9 +180,9 @@ export const kpDict: Record<ToolLang, KpDict> = {
 
   kk: {
     seo: {
-      title: 'Коммерциялық ұсыныс онлайн — бір минутта, тегін',
+      title: 'Коммерциялық ұсыныс үлгісі — онлайн, тегін',
       description:
-        'Клиентке коммерциялық ұсынысты онлайн жасаңыз: бағасы көрсетілген позициялар, қолданылу мерзімі, ҚҚС, деректемелер. Дайын PDF бір минутта, тіркелусіз — тоқсанына 3 ұсыныс тегін.',
+        'Коммерциялық ұсыныстың үлгісі: бағасы көрсетілген позициялар, қолданылу мерзімі, ҚҚС, деректемелер. Бір минутта дайын PDF — тоқсанына 3 ұсыныс тегін.',
       keywords:
         'коммерциялық ұсыныс үлгісі, коммерциялық ұсыныс жазу, коммерциялық ұсыныс қазақша, коммерциялық ұсыныс тегін, ЖК коммерциялық ұсыныс, қызмет көрсетуге коммерциялық ұсыныс үлгісі, КҰ жасау онлайн',
       ogTitle: 'Коммерциялық ұсыныс онлайн — бір минутта',
@@ -246,6 +249,7 @@ export const kpDict: Record<ToolLang, KpDict> = {
     limitBodySignedIn:
       'invoices.kz кабинетінде Про тарифінде клиент келіскен соң КҰ бір басумен шотқа айналады: деректемелер сақталады, нөмірлер өзі қойылады, ал төлемді Kaspi арқылы қабылдауға болады. Жұмысты invoices.kz кабинетінде жалғастырыңыз.',
     nextStep: 'Клиент келісті ме? Шот жазу →',
+    guideLink: 'Шот, ОЖА, жүкқұжат және КҰ: қашан қайсысы қажет →',
     faqTitle: 'КҰ туралы қысқаша',
     faq: [
       {
@@ -273,9 +277,9 @@ export const kpDict: Record<ToolLang, KpDict> = {
 
   en: {
     seo: {
-      title: 'Commercial Proposal Generator for Kazakhstan — Free PDF in a Minute',
+      title: 'Commercial Proposal Template for Kazakhstan — PDF',
       description:
-        'Create a commercial proposal (quote) for a client in Kazakhstan online: items with prices in tenge, validity date, VAT and your business details. Ready PDF in a minute, no sign-up — 3 free proposals per quarter.',
+        'Commercial proposal (quote) template for Kazakhstan: items with prices, validity date, VAT and your details. Ready PDF in a minute. 3 free per quarter.',
       keywords:
         'commercial proposal template kazakhstan, quotation template kazakhstan, free quote generator pdf, price quote kazakhstan tenge, business proposal kazakhstan, kommercheskoe predlozhenie template',
       ogTitle: 'Commercial proposal generator for Kazakhstan',
@@ -342,6 +346,7 @@ export const kpDict: Record<ToolLang, KpDict> = {
     limitBodySignedIn:
       'On the Pro plan in your invoices.kz account a proposal becomes an invoice in one click once the client agrees: your details are saved, numbering is automatic, and you can accept payment via Kaspi. Continue in your invoices.kz account.',
     nextStep: 'Client agreed? Issue an invoice →',
+    guideLink: 'Invoice, AVR, delivery note and proposal: which one when (in Russian) →',
     faqTitle: 'Commercial proposals in Kazakhstan: the basics',
     faq: [
       {

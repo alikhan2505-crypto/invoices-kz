@@ -1,4 +1,5 @@
 import { PLAN_PRICES } from '@/lib/plans/pricing'
+import { PRICING_URL } from '@/lib/landings'
 
 // Machine-readable description of the platform for Google and Yandex
 // (schema.org JSON-LD). The site had none at all before 2026-09-05, so
@@ -16,8 +17,28 @@ export default function StructuredData() {
         '@type': 'Organization',
         '@id': 'https://invoices.kz/#organization',
         name: 'INVOICES.KZ',
+        // Реквизиты оператора -- ровно те, что уже опубликованы в подвале хаба,
+        // на лендинге Счетов и в /privacy, /terms (ИП First Project, БИН, Астана,
+        // mail@ и WhatsApp из раздела «Контакты»). Ничего сверх опубликованного.
+        legalName: 'ИП First Project',
+        taxID: '890525350143',
         url: 'https://invoices.kz',
         logo: 'https://invoices.kz/icon-192.png',
+        address: {
+          '@type': 'PostalAddress',
+          addressLocality: 'Астана',
+          addressCountry: 'KZ',
+        },
+        contactPoint: [
+          {
+            '@type': 'ContactPoint',
+            contactType: 'customer support',
+            email: 'mail@invoices.kz',
+            telephone: '+7 776 355 51 77',
+            availableLanguage: ['Russian', 'Kazakh', 'English'],
+            areaServed: 'KZ',
+          },
+        ],
         areaServed: { '@type': 'Country', name: 'Kazakhstan' },
         sameAs: ['https://www.instagram.com/invoices.kz/'],
       },
@@ -56,7 +77,7 @@ export default function StructuredData() {
             price: String(PLAN_PRICES.basic.monthly),
             priceCurrency: 'KZT',
             category: 'monthly subscription',
-            url: 'https://invoices.kz/upgrade',
+            url: PRICING_URL,
           },
           {
             '@type': 'Offer',
@@ -64,7 +85,7 @@ export default function StructuredData() {
             price: String(PLAN_PRICES.pro.monthly),
             priceCurrency: 'KZT',
             category: 'monthly subscription',
-            url: 'https://invoices.kz/upgrade',
+            url: PRICING_URL,
           },
         ],
       },

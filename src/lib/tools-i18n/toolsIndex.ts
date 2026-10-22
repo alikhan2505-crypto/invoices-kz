@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import {
   SITE_ORIGIN, TOOL_CHROME, TOOL_LANGS, TOOL_LOCALE, TOOL_OG_LOCALE,
-  toolLinkPath, toolsIndexAlternates, toolsIndexUrl,
+  toolLinkPath, toolTitle, toolsIndexAlternates, toolsIndexUrl,
   type ToolLang, type ToolSeoCopy,
 } from './index'
 
@@ -27,9 +27,9 @@ export interface ToolsIndexDict {
 export const toolsIndexDict: Record<ToolLang, ToolsIndexDict> = {
   ru: {
     seo: {
-      title: 'Бесплатные инструменты для бизнеса: счёт, АВР, накладная, налоги ИП',
+      title: 'Бесплатные инструменты для бизнеса: счёт, АВР, налоги',
       description:
-        'Счёт на оплату, АВР, накладная и коммерческое предложение онлайн, калькулятор налогов ИП 2026, проверка контрагента по БИН, калькулятор маржи и печать накладных Kaspi одним PDF. Бесплатно, без регистрации.',
+        'Счёт на оплату, АВР, накладная, КП, налоги ИП 2026, проверка контрагента по БИН, маржа Kaspi и склейка накладных. Бесплатные инструменты для бизнеса.',
       keywords:
         'бесплатные инструменты для ип, счёт на оплату онлайн, акт выполненных работ онлайн, накладная онлайн, калькулятор налогов ип 2026, проверка контрагента по бин, калькулятор маржи kaspi, склейка накладных kaspi',
       ogTitle: 'Бесплатные инструменты для бизнеса — invoices.kz',
@@ -68,9 +68,9 @@ export const toolsIndexDict: Record<ToolLang, ToolsIndexDict> = {
   },
   kk: {
     seo: {
-      title: 'Кәсіпкерге арналған тегін құралдар: шот, ОЖА, жүкқұжат, ЖК салықтары',
+      title: 'Кәсіпкерге тегін құралдар: шот, ОЖА, жүкқұжат, салық',
       description:
-        'Төлем шоты, орындалған жұмыстар актісі, жүкқұжат және коммерциялық ұсыныс онлайн, 2026 жылғы ЖК салығының калькуляторы, контрагентті БСН бойынша тексеру, Kaspi маржа калькуляторы және Kaspi жүкқұжаттарын бір PDF-пен басып шығару. Тегін, тіркелусіз.',
+        'Төлем шоты, ОЖА, жүкқұжат, коммерциялық ұсыныс, ЖК салығы 2026, контрагентті БСН бойынша тексеру, Kaspi маржасы. Кәсіпкерге арналған тегін құралдар.',
       keywords:
         'жк үшін тегін құралдар, төлем шоты онлайн, орындалған жұмыстар актісі онлайн, жүкқұжат онлайн, жк салығы калькулятор 2026, контрагентті бсн бойынша тексеру, kaspi маржа калькуляторы, kaspi жүкқұжаттарын біріктіру, коммерциялық ұсыныс онлайн',
       ogTitle: 'Кәсіпкерге арналған тегін құралдар — invoices.kz',
@@ -109,9 +109,9 @@ export const toolsIndexDict: Record<ToolLang, ToolsIndexDict> = {
   },
   en: {
     seo: {
-      title: 'Free Business Tools for Kazakhstan — Invoices, Taxes, Company Check',
+      title: 'Free Business Tools for Kazakhstan — Invoices, Taxes',
       description:
-        'Free online tools for small businesses in Kazakhstan: invoice for payment, certificate of completed work (AVR), delivery note and commercial proposal generators, sole proprietor tax calculator 2026, company check by BIN, Kaspi margin calculator and a tool to print Kaspi waybills as one PDF. No sign-up.',
+        'Free Kazakhstan business tools: invoice, AVR, delivery note, commercial proposal, sole proprietor tax calculator 2026, company check by BIN, Kaspi tools.',
       keywords:
         'kazakhstan business tools free, kazakhstan invoice generator, kazakhstan certificate of completed work avr, kazakhstan sole proprietor tax calculator 2026, check company by bin kazakhstan, kaspi margin calculator, kaspi waybill merge pdf, kazakhstan delivery note z-2',
       ogTitle: 'Free business tools for Kazakhstan — invoices.kz',
@@ -160,7 +160,7 @@ export function toolsIndexMetadata(lang: ToolLang): Metadata {
   const url = toolsIndexUrl(lang)
   const image = `${SITE_ORIGIN}/og/tools-index.png`
   return {
-    title: `${t.title} | invoices.kz`,
+    title: toolTitle(t.title),
     description: t.description,
     keywords: t.keywords,
     alternates: { canonical: url, languages: toolsIndexAlternates() },

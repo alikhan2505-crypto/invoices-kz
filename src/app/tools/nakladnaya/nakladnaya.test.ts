@@ -14,7 +14,7 @@ const err = nakladnayaDict.ru.errors
 describe('nakladnaya metadata', () => {
   it('keeps the ru title exactly as it was before the split', () => {
     const m = toolMetadata('nakladnaya', 'ru', nakladnayaDict.ru.seo)
-    expect(m.title).toBe('Накладная онлайн — накладная на отпуск запасов бесплатно | invoices.kz')
+    expect(m.title).toBe('Накладная на отпуск запасов — образец, онлайн | invoices.kz')
   })
 
   it('canonicalises each language to itself with hreflang to all three', () => {

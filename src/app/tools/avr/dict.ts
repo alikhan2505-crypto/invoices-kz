@@ -84,9 +84,9 @@ export interface AvrDict {
 export const avrDict: Record<ToolLang, AvrDict> = {
   ru: {
     seo: {
-      title: 'АВР онлайн — акт выполненных работ бесплатно за минуту',
+      title: 'Акт выполненных работ — образец, АВР онлайн',
       description:
-        'Создайте акт выполненных работ (оказанных услуг) для ИП или ТОО Казахстана онлайн: реквизиты сторон, договор, НДС, сумма прописью. Готовый PDF за минуту, без регистрации — 3 акта в квартал бесплатно.',
+        'Образец акта выполненных работ (АВР) для ИП и ТОО: заполните стороны и договор, скачайте PDF за минуту. НДС, сумма прописью. 3 акта в квартал бесплатно.',
       keywords:
         'авр образец казахстан, акт выполненных работ скачать, акт оказанных услуг ип, авр онлайн бесплатно, акт выполненных работ тоо, р-1 акт казахстан',
       ogTitle: 'АВР онлайн — акт выполненных работ за минуту',
@@ -181,9 +181,9 @@ export const avrDict: Record<ToolLang, AvrDict> = {
 
   kk: {
     seo: {
-      title: 'Орындалған жұмыстар актісі (ОЖА) онлайн — тегін, бір минутта',
+      title: 'Орындалған жұмыстар актісінің үлгісі — онлайн',
       description:
-        'Қазақстандағы ЖК немесе ЖШС үшін Орындалған жұмыстар (көрсетілген қызметтер) актісін онлайн жасаңыз: тараптардың деректемелері, шарт, ҚҚС, сомасы жазбаша. Тіркелусіз бір минутта дайын PDF — тоқсанына 3 акт тегін.',
+        'ЖК және ЖШС үшін орындалған жұмыстар актісінің (ОЖА) үлгісі: тараптар мен шартты толтырып, бір минутта PDF жүктеңіз — тоқсанына 3 акт тегін.',
       keywords:
         'орындалған жұмыстар актісі, орындалған жұмыстар актісі үлгісі, көрсетілген қызметтер актісі, ожа онлайн, р-1 нысаны акт, жк орындалған жұмыстар актісі, жшс акт үлгісі, орындалған жұмыстар актісі pdf жүктеу',
       ogTitle: 'Орындалған жұмыстар актісі — бір минутта, тегін',
@@ -278,9 +278,9 @@ export const avrDict: Record<ToolLang, AvrDict> = {
 
   en: {
     seo: {
-      title: 'Kazakhstan Certificate of Completed Works (AVR) Generator — Free PDF',
+      title: 'Completed Works Certificate (AVR) Template — PDF',
       description:
-        'Create a Kazakhstan certificate of completed works or services rendered (AVR, form R-1) online for a sole proprietor (IE) or LLP: party details, contract, VAT, total in words. Ready PDF in a minute, no sign-up, 3 free certificates per quarter.',
+        'Completed works certificate (AVR, form R-1) template for Kazakhstan: fill in the parties and contract, get a PDF in a minute. 3 free per quarter.',
       keywords:
         'kazakhstan certificate of completed works, avr kazakhstan, act of completed works kazakhstan template, acceptance certificate kazakhstan, services rendered act kazakhstan, r-1 form kazakhstan, kazakhstan avr pdf free',
       ogTitle: 'Kazakhstan certificate of completed works (AVR) — free, in a minute',

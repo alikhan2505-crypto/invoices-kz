@@ -5,7 +5,7 @@ import BrandWordmark from '@/components/BrandWordmark'
 import { track } from '@vercel/analytics'
 import { generateKP } from '@/lib/generateKP'
 import { useLanguage } from '@/components/LanguageProvider'
-import { formatTenge, isToolLocalized, toolLinkPath, toolsIndexPath, TOOL_CHROME, type ToolLang } from '@/lib/tools-i18n'
+import { formatTenge, isToolLocalized, toolGuidePath, toolLinkPath, toolsIndexPath, TOOL_CHROME, type ToolLang } from '@/lib/tools-i18n'
 import ToolLangSwitch from '@/lib/tools-i18n/ToolLangSwitch'
 import ToolCta from '@/lib/tools-i18n/ToolCta'
 import { useToolSession } from '@/lib/tools-i18n/useToolSession'
@@ -31,6 +31,8 @@ import { kpLines, kpRowProblem, kpTotal, kpVatIncluded, localIsoDate, ruDate, KP
 // Один компонент на /tools/kp, /tools/kk/kp и /tools/en/kp: язык интерфейса
 // приходит пропсом из page.tsx (из адреса). Сам документ печатается по-русски
 // на любом языке страницы — см. docs/tools-i18n-pattern.md.
+// Гайд «Счёт, АВР, накладная и КП»: ru и kk есть, английского нет (en → русский).
+const GUIDE_SLUG = 'dokumenty-ip-kazakhstan'
 const DEFAULT_LIMIT = 3
 const DRAFT_KEY = 'tool-kp-draft'
 
@@ -432,6 +434,9 @@ export default function KpTool({ lang }: { lang: ToolLang }) {
           <Link href={toolsIndexPath(lang)} className="text-sm font-semibold" style={{ color: 'var(--nav-accent)' }}>{chrome.allTools}</Link>
           <Link href={toolLinkPath('schet', lang)} hrefLang={schetLang} className="text-sm font-semibold" style={{ color: 'var(--nav-accent)' }}>
             {t.nextStep}
+          </Link>
+          <Link href={toolGuidePath(GUIDE_SLUG, lang)} hrefLang={lang === 'en' ? 'ru' : lang} className="text-sm font-semibold" style={{ color: 'var(--nav-accent)' }}>
+            {t.guideLink}
           </Link>
         </div>
       </div>

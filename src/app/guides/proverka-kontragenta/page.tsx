@@ -1,18 +1,18 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import GuideShell from '../GuideShell'
-import { getGuide } from '@/lib/guides'
+import { getGuide, guideAlternates, guideMetaTitle } from '@/lib/guides'
 
 const guide = getGuide('proverka-kontragenta')!
 
 export const metadata: Metadata = {
-  title: `${guide.ru.title} | invoices.kz`,
+  title: guideMetaTitle(guide.ru.title),
   description: guide.ru.description,
   keywords:
     'проверка контрагента по бин, проверить бин казахстан, неблагонадёжный налогоплательщик кгд, проверить тоо перед сделкой, налоговая задолженность контрагента, проверить ип по иин, лжепредприятие казахстан',
   alternates: {
     canonical: `https://invoices.kz/guides/${guide.slug}`,
-    languages: { ru: `https://invoices.kz/guides/${guide.slug}`, kk: `https://invoices.kz/guides/kk/${guide.slug}` },
+    languages: guideAlternates(guide.slug),
   },
   openGraph: {
     type: 'article',

@@ -1,18 +1,18 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import GuideShell from '../../GuideShell'
-import { getGuide } from '@/lib/guides'
+import { getGuide, guideAlternates, guideMetaTitle } from '@/lib/guides'
 
 const guide = getGuide('esf-kazakhstan-2026')!
 
 export const metadata: Metadata = {
-  title: `${guide.kk.title} | invoices.kz`,
+  title: guideMetaTitle(guide.kk.title),
   description: guide.kk.description,
   keywords:
     'эшф кім жазуға міндетті 2026, электрондық шот фактура қазақстан, эшф мерзімдері, ққс төлемейтін жк эшф, бейрезидент үшін эшф, виртуалды қойма эшф',
   alternates: {
     canonical: `https://invoices.kz/guides/kk/${guide.slug}`,
-    languages: { ru: `https://invoices.kz/guides/${guide.slug}`, kk: `https://invoices.kz/guides/kk/${guide.slug}` },
+    languages: guideAlternates(guide.slug),
   },
   openGraph: {
     type: 'article',
@@ -40,7 +40,8 @@ export default function Page() {
         <Link href="/guides/kk/kak-vystavit-schet-ip">Төлемге арналған шот</Link> — жай ғана төлем сұрауы,
         нысаны еркін және мемлекетке жіберілмейді. ЭШФ — салықтық құжат: ол ҚҚС үшін айналымды тіркейді және
         МКК жүйесіне кетеді. Бірі екіншісін алмастырмайды: алдымен төлемге шот, тиеп жіберген соң — ЭШФ, егер
-        сіз жазуға міндеттілердің қатарында болсаңыз.
+        сіз жазуға міндеттілердің қатарында болсаңыз. Шотты{' '}
+        <Link href="/tools/kk/schet">тегін генераторда</Link> жинауға болады.
       </p>
 
       <h2>2026 жылы ЭШФ жазуға кім міндетті</h2>

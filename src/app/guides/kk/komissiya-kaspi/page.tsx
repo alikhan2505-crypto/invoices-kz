@@ -1,19 +1,19 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import GuideShell from '../../GuideShell'
-import { getGuide } from '@/lib/guides'
+import { getGuide, guideAlternates, guideMetaTitle } from '@/lib/guides'
 import { KASPI_CATEGORY_COMMISSIONS } from '@/lib/kaspiShop/margin'
 
 const guide = getGuide('komissiya-kaspi')!
 
 export const metadata: Metadata = {
-  title: `${guide.kk.title} | invoices.kz`,
+  title: guideMetaTitle(guide.kk.title),
   description: guide.kk.description,
   keywords:
     'kaspi магазин комиссиясы, санаттар бойынша kaspi комиссиясы, kaspi қанша ұстайды, kaspi магазин тарифтері 2026, ең төмен баға kaspi',
   alternates: {
     canonical: `https://invoices.kz/guides/kk/${guide.slug}`,
-    languages: { ru: `https://invoices.kz/guides/${guide.slug}`, kk: `https://invoices.kz/guides/kk/${guide.slug}` },
+    languages: guideAlternates(guide.slug),
   },
   openGraph: {
     type: 'article',
@@ -32,6 +32,10 @@ export default function Page() {
       <p className="lead">
         Қысқаша жауап: Kaspi Магазин сатылым бағасынан <strong>7,3%, 12,5% немесе 15,5%</strong> ұстап қалады —
         мөлшерлеме тауар санатына байланысты. Бұл ҚҚС-пен бірге, яғни бағаның есеп шотыңызға нақты жетпейтін бөлігі.
+      </p>
+      <p>
+        Комиссия, жеткізу және салықтан кейінгі пайданы тегін{' '}
+        <Link href="/tools/kk/margin">Kaspi маржа калькуляторында</Link> бірден есептеуге болады.
       </p>
 
       <h2>Тарифте неге екі түрлі сан бар</h2>
@@ -96,7 +100,9 @@ export default function Page() {
       <ul>
         <li>
           <strong>Жеткізу.</strong> Тапсырыс Kaspi жеткізуі арқылы жүрсе, оның құны комиссиядан бөлек ұсталады және
-          салмақ пен бағытқа байланысты.
+          салмақ пен бағытқа байланысты. Мұндай тапсырыстардың жүкқұжаттарын{' '}
+          <Link href="/tools/kk/waybills">бір PDF-пен басып шығару</Link> ыңғайлы: А4 парағына 4-тен немесе
+          термопринтерге А6.
         </li>
         <li>
           <strong>Айналымнан салық.</strong> Оңайлатылған режимдегі ЖК үшін 2026 жылдан бастап бұл түсімнен{' '}

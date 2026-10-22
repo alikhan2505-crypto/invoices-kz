@@ -57,7 +57,7 @@ describe('kp dictionary', () => {
 
   it('keeps the ru title exactly as it was before the split', () => {
     expect(toolMetadata('kp', 'ru', kpDict.ru.seo).title)
-      .toBe('Коммерческое предложение онлайн — КП бесплатно за минуту | invoices.kz')
+      .toBe('Коммерческое предложение — образец, КП онлайн | invoices.kz')
   })
 
   it('warns about the Russian document only on kk/en', () => {

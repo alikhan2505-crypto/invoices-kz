@@ -5,7 +5,7 @@ import BrandWordmark from '@/components/BrandWordmark'
 import { track } from '@vercel/analytics'
 import { generateAVR } from '@/lib/generateAVR'
 import { useLanguage } from '@/components/LanguageProvider'
-import { formatTenge, guidesIndexPath, toolsIndexPath, TOOL_CHROME, type ToolLang } from '@/lib/tools-i18n'
+import { formatTenge, toolsIndexPath, TOOL_CHROME, type ToolLang } from '@/lib/tools-i18n'
 import ToolLangSwitch from '@/lib/tools-i18n/ToolLangSwitch'
 import ToolCta from '@/lib/tools-i18n/ToolCta'
 import { useToolSession } from '@/lib/tools-i18n/useToolSession'
@@ -404,7 +404,6 @@ export default function AvrTool({ lang }: { lang: ToolLang }) {
           <Link href={guidePath} hrefLang={lang === 'en' ? 'ru' : lang} className="text-sm font-semibold" style={accentLink}>
             {t.guideLink}
           </Link>
-          <Link href={guidesIndexPath(lang)} className="text-sm font-semibold" style={accentLink}>{chrome.guides}</Link>
         </div>
       </div>
     </div>

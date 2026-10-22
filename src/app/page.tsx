@@ -21,8 +21,8 @@ const caveat = Caveat({ subsets: ['cyrillic', 'cyrillic-ext', 'latin'], weight: 
 export function generateMetadata(): Metadata {
   if (!ROOT_HUB_LIVE) return {}
   return {
-    title: 'invoices.kz — сервисы для бизнеса в Казахстане · бизнеске арналған сервистер',
-    description: 'Счета, Kaspi, Kaspi Cashier API, AI-агент и CFO-кабинет под одним аккаунтом. Шоттар, Kaspi, Kaspi Cashier API, AI-агент және CFO-кабинет — бір аккаунтта.',
+    title: 'invoices.kz — сервисы для бизнеса в Казахстане',
+    description: 'Счета, АВР и КП, Kaspi Bot, Kaspi Cashier API, AI-агент и CFO-кабинет под одним аккаунтом для ИП и ТОО Казахстана.',
     alternates: { canonical: 'https://invoices.kz' },
     // Своя карточка хаба (public/og-hub.png, собирается scripts/build-og-hub.mjs):
     // раньше '/' показывал в превью ссылки старую og-image.png про одни Счета.
@@ -33,14 +33,14 @@ export function generateMetadata(): Metadata {
       alternateLocale: ['kk_KZ'],
       url: 'https://invoices.kz',
       siteName: 'INVOICES.KZ',
-      title: 'invoices.kz — сервисы для бизнеса в Казахстане · бизнеске арналған сервистер',
-      description: 'Счета, Kaspi, Kaspi Cashier API, AI-агент и CFO-кабинет под одним аккаунтом. Шоттар, Kaspi, Kaspi Cashier API, AI-агент және CFO-кабинет — бір аккаунтта.',
-      images: [{ url: 'https://invoices.kz/og-hub.png', width: 1200, height: 630, alt: 'INVOICES.KZ — сервисы для бизнеса в Казахстане · бизнеске арналған сервистер' }],
+      title: 'invoices.kz — сервисы для бизнеса в Казахстане',
+      description: 'Счета, АВР и КП, Kaspi Bot, Kaspi Cashier API, AI-агент и CFO-кабинет под одним аккаунтом для ИП и ТОО Казахстана.',
+      images: [{ url: 'https://invoices.kz/og-hub.png', width: 1200, height: 630, alt: 'INVOICES.KZ — сервисы для бизнеса в Казахстане' }],
     },
     twitter: {
       card: 'summary_large_image',
-      title: 'invoices.kz — сервисы для бизнеса в Казахстане · бизнеске арналған сервистер',
-      description: 'Счета, Kaspi, Kaspi Cashier API, AI-агент и CFO-кабинет под одним аккаунтом. Шоттар, Kaspi, Kaspi Cashier API, AI-агент және CFO-кабинет — бір аккаунтта.',
+      title: 'invoices.kz — сервисы для бизнеса в Казахстане',
+      description: 'Счета, АВР и КП, Kaspi Bot, Kaspi Cashier API, AI-агент и CFO-кабинет под одним аккаунтом для ИП и ТОО Казахстана.',
       images: ['https://invoices.kz/og-hub.png'],
     },
   }

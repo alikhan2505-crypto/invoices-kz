@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { toolMetadata } from '@/lib/tools-i18n'
 import ToolJsonLd from '@/lib/tools-i18n/ToolJsonLd'
+import ToolFaqJsonLd from '@/lib/tools-i18n/ToolFaqJsonLd'
 import MarginTool from './MarginTool'
 import { marginDict } from './dict'
 
@@ -17,6 +18,7 @@ export default function Page() {
   return (
     <>
       <ToolJsonLd slug="margin" lang={LANG} name={t.h1} description={t.seo.description} />
+      <ToolFaqJsonLd slug="margin" lang={LANG} items={t.faq} />
       <MarginTool lang={LANG} />
     </>
   )

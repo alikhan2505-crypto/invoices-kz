@@ -1,18 +1,18 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import GuideShell from '../GuideShell'
-import { getGuide } from '@/lib/guides'
+import { getGuide, guideAlternates, guideMetaTitle } from '@/lib/guides'
 
 const guide = getGuide('esf-kazakhstan-2026')!
 
 export const metadata: Metadata = {
-  title: `${guide.ru.title} | invoices.kz`,
+  title: guideMetaTitle(guide.ru.title),
   description: guide.ru.description,
   keywords:
     'эсф кто обязан выписывать 2026, электронный счет фактура казахстан, ис эсф сроки выписки, эсф для ип без ндс, эсф за нерезидента, виртуальный склад эсф, эсф и счет на оплату разница',
   alternates: {
     canonical: `https://invoices.kz/guides/${guide.slug}`,
-    languages: { ru: `https://invoices.kz/guides/${guide.slug}`, kk: `https://invoices.kz/guides/kk/${guide.slug}` },
+    languages: guideAlternates(guide.slug),
   },
   openGraph: {
     type: 'article',
@@ -40,7 +40,8 @@ export default function Page() {
         <Link href="/guides/kak-vystavit-schet-ip">Счёт на оплату</Link> — просто просьба заплатить, его форма
         свободная и государству он не отправляется. ЭСФ — налоговый документ: он фиксирует оборот для НДС и
         уходит в систему КГД. Один не заменяет другой: сначала счёт на оплату, после отгрузки — ЭСФ, если вы
-        из тех, кто обязан его выписывать.
+        из тех, кто обязан его выписывать. Сам счёт на оплату собирается в бесплатном{' '}
+        <Link href="/tools/schet">генераторе счёта на оплату</Link>.
       </p>
 
       <h2>Кто обязан выписывать ЭСФ в 2026 году</h2>

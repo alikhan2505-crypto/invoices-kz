@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   toolPath, toolUrl, toolAlternates, toolMetadata, toolsIndexPath, guidesIndexPath,
   formatIsoDate, formatTenge, toolJsonLd, toolLinkPath, TOOL_LANGS,
+  toolTitle, toolFaqJsonLd, toolGuidePath, TOOL_TITLE_MAX,
 } from './index'
 import { kontragentDict } from '@/app/tools/kontragent/dict'
 
@@ -53,9 +54,46 @@ describe('toolMetadata', () => {
     }
   })
 
-  it('keeps the ru title exactly as it was before the split', () => {
+  it('puts the brand after the title when the whole thing fits in 60 characters', () => {
     const m = toolMetadata('kontragent', 'ru', kontragentDict.ru.seo)
-    expect(m.title).toBe('Проверка контрагента по БИН — бесплатно, по данным КГД | invoices.kz')
+    expect(m.title).toBe('Проверка контрагента по БИН — бесплатно | invoices.kz')
+  })
+})
+
+describe('toolTitle', () => {
+  it('appends the brand only when the whole title still fits in the limit', () => {
+    expect(toolTitle('Короткий заголовок')).toBe('Короткий заголовок | invoices.kz')
+    const fits = 'x'.repeat(TOOL_TITLE_MAX - ' | invoices.kz'.length)
+    expect(toolTitle(fits)).toBe(`${fits} | invoices.kz`)
+    expect(toolTitle(fits)).toHaveLength(TOOL_TITLE_MAX)
+    const tooLong = fits + 'y'
+    expect(toolTitle(tooLong)).toBe(tooLong)
+  })
+})
+
+describe('toolGuidePath', () => {
+  it('sends kk to the Kazakh guide and ru/en to the Russian one', () => {
+    expect(toolGuidePath('komissiya-kaspi', 'ru')).toBe('/guides/komissiya-kaspi')
+    expect(toolGuidePath('komissiya-kaspi', 'kk')).toBe('/guides/kk/komissiya-kaspi')
+    expect(toolGuidePath('komissiya-kaspi', 'en')).toBe('/guides/komissiya-kaspi')
+  })
+})
+
+describe('toolFaqJsonLd', () => {
+  const items = [{ q: 'Что такое <b>?', a: 'Ответ </script>' }, { q: 'Второй?', a: 'Да.' }]
+
+  it('builds an FAQPage that mirrors the items one to one on the language URL', () => {
+    const data = JSON.parse(toolFaqJsonLd('margin', 'kk', items))
+    expect(data['@type']).toBe('FAQPage')
+    expect(data['@id']).toBe('https://invoices.kz/tools/kk/margin#faq')
+    expect(data.inLanguage).toBe('kk-KZ')
+    expect(data.mainEntity).toHaveLength(2)
+    expect(data.mainEntity[0].name).toBe(items[0].q)
+    expect(data.mainEntity[0].acceptedAnswer.text).toBe(items[0].a)
+  })
+
+  it('is safe to inline in a script tag', () => {
+    expect(toolFaqJsonLd('margin', 'ru', items)).not.toContain('<')
   })
 })
 

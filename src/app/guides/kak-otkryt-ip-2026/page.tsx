@@ -1,18 +1,18 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import GuideShell from '../GuideShell'
-import { getGuide } from '@/lib/guides'
+import { getGuide, guideAlternates, guideMetaTitle } from '@/lib/guides'
 
 const guide = getGuide('kak-otkryt-ip-2026')!
 
 export const metadata: Metadata = {
-  title: `${guide.ru.title} | invoices.kz`,
+  title: guideMetaTitle(guide.ru.title),
   description: guide.ru.description,
   keywords:
     'как открыть ип в казахстане 2026, регистрация ип egov, открыть ип онлайн бесплатно, уведомление о начале деятельности ип, окэд для ип, налоговый режим ип 2026, что делать после регистрации ип',
   alternates: {
     canonical: `https://invoices.kz/guides/${guide.slug}`,
-    languages: { ru: `https://invoices.kz/guides/${guide.slug}`, kk: `https://invoices.kz/guides/kk/${guide.slug}` },
+    languages: guideAlternates(guide.slug),
   },
   openGraph: {
     type: 'article',

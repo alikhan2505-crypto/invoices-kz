@@ -1,4 +1,8 @@
 import Link from 'next/link'
+import { noindexMetadata } from '@/lib/noindex'
+
+// Раздел закрыт заглушкой, содержимого для поиска нет -- noindex на весь сегмент.
+export const metadata = noindexMetadata('Wildberries — скоро')
 
 // Wildberries isn't finished (founder, 21.09.2026), so every page under
 // /wildberries is held back for everyone, admin included -- the nav shows the

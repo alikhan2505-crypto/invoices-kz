@@ -66,9 +66,9 @@ export interface NalogiDict {
 export const nalogiDict: Record<ToolLang, NalogiDict> = {
   ru: {
     seo: {
-      title: 'Калькулятор налогов ИП 2026 — упрощёнка 4% и взносы за себя',
+      title: 'Калькулятор налогов ИП 2026 — упрощёнка 4%',
       description:
-        'Сколько платит ИП на упрощёнке в 2026 году по новому Налоговому кодексу: налог 4% с дохода, ОПВ, ОПВР, СО и ВОСМС за себя. Посчитайте свою сумму в месяц и за полугодие — бесплатно, без регистрации.',
+        'Налоги ИП на упрощёнке в 2026 году: налог 4% с дохода, ОПВ, ОПВР, СО и ВОСМС за себя. Посчитайте сумму в месяц и за полугодие — бесплатно.',
       keywords:
         'налоги ип калькулятор казахстан, упрощенка 4 процента 2026, сколько платит ип казахстан, взносы ип за себя 2026, опв со восмс ип, налоговый кодекс 2026 ип, форма 910 сколько платить',
       ogTitle: 'Калькулятор налогов ИП 2026 — упрощёнка 4% и взносы',
@@ -156,9 +156,9 @@ export const nalogiDict: Record<ToolLang, NalogiDict> = {
 
   kk: {
     seo: {
-      title: 'ЖК салығының калькуляторы 2026 — оңайлатылған 4% және өзі үшін жарналар',
+      title: 'ЖК салығының калькуляторы 2026 — оңайлатылған 4%',
       description:
-        'Жаңа Салық кодексі бойынша 2026 жылы оңайлатылған декларациядағы ЖК қанша төлейді: табыстан 4% салық, өзі үшін МЗЖ, ЖМЗЖ, ӘА және МӘМС. Айлық және жартыжылдық сомаңызды есептеңіз — тегін, тіркелусіз.',
+        '2026 жылы оңайлатылған декларациядағы ЖК салығы: табыстан 4%, өзі үшін МЗЖ, ЖМЗЖ, ӘА және МӘМС. Айлық және жартыжылдық сомаңызды есептеңіз — тегін.',
       keywords:
         'жк салығы калькулятор, жк салықтары 2026, оңайлатылған декларация 4 пайыз, жк қанша салық төлейді, жк өзі үшін жарналар 2026, мзж әа мәмс жк, 910 нысаны қанша төлеу, жаңа салық кодексі 2026 жк',
       ogTitle: 'ЖК салығының калькуляторы 2026 — 4% және жарналар',
@@ -246,9 +246,9 @@ export const nalogiDict: Record<ToolLang, NalogiDict> = {
 
   en: {
     seo: {
-      title: 'Kazakhstan Sole Proprietor Tax Calculator 2026 — 4% Simplified Regime',
+      title: 'Kazakhstan Sole Proprietor Tax Calculator 2026',
       description:
-        'How much an individual entrepreneur (IE) in Kazakhstan pays in 2026 under the new Tax Code: 4% simplified-regime tax on income plus pension, social and health insurance contributions for yourself. Get your monthly and half-year totals — free, no sign-up.',
+        'Kazakhstan sole proprietor (IE) tax in 2026, simplified regime: 4% of income plus pension, social and health contributions. Free monthly totals.',
       keywords:
         'kazakhstan tax calculator, kazakhstan individual entrepreneur tax, sole proprietor tax kazakhstan 2026, kazakhstan simplified tax regime 4%, ip tax kazakhstan, form 910 kazakhstan, kazakhstan self-employed pension contributions, kazakhstan new tax code 2026',
       ogTitle: 'Kazakhstan Sole Proprietor Tax Calculator 2026',

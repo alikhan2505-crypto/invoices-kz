@@ -1,4 +1,4 @@
-import type { ToolLang, ToolSeoCopy } from '@/lib/tools-i18n'
+import type { ToolFaqItem, ToolLang, ToolSeoCopy } from '@/lib/tools-i18n'
 import type { MarginInput } from '@/lib/marginCalc'
 
 // Все тексты /tools/margin на трёх языках: и <head> (seo), и интерфейс.
@@ -58,6 +58,13 @@ export interface MarginDict {
   /** «Как считается» — раскрывающийся блок с формулами под результатом. */
   howTitle: string
   howItems: string[]
+  /** Ссылка на гайд о комиссиях Kaspi внизу страницы (/guides/komissiya-kaspi). */
+  guideLink: string
+  /** Короткая ссылка на тот же гайд рядом с выбором категории. */
+  categoryGuideLink: string
+  faqTitle: string
+  /** Видимый блок вопросов; те же вопросы и ответы слово в слово уходят в FAQPage JSON-LD. */
+  faq: ToolFaqItem[]
   /**
    * Названия категорий Kaspi. В KASPI_CATEGORY_COMMISSIONS они русские (так
    * их видит продавец в русском кабинете) и русское название остаётся
@@ -70,9 +77,9 @@ export interface MarginDict {
 export const marginDict: Record<ToolLang, MarginDict> = {
   ru: {
     seo: {
-      title: 'Калькулятор маржи Kaspi — расчёт прибыли с продажи',
+      title: 'Калькулятор маржи Kaspi — прибыль с продажи',
       description:
-        'Посчитайте прибыль с одной продажи на Kaspi после комиссии, доставки и налога. Калькулятор покажет маржинальность, наценку и минимальную цену, ниже которой торговать в убыток. Бесплатно, без регистрации, с выгрузкой в Excel.',
+        'Калькулятор маржи Kaspi: прибыль с продажи после комиссии, доставки и налога, маржинальность, наценка и минимальная цена. Бесплатно, выгрузка в Excel.',
       keywords:
         'калькулятор маржи kaspi, комиссия kaspi магазина расчет, как посчитать прибыль на kaspi, маржинальность товара калькулятор, минимальная цена kaspi, наценка на товар расчет, unit экономика kaspi',
       ogTitle: 'Калькулятор маржи Kaspi — сколько остаётся с продажи',
@@ -148,14 +155,35 @@ export const marginDict: Record<ToolLang, MarginDict> = {
       'Минимальная цена = (себестоимость + доставка + прочие расходы) ÷ (1 − (комиссия % + налог %) ÷ 100). Это цена, при которой продажа выходит ровно в ноль.',
       'Дробные числа можно вводить и с запятой, и с точкой.',
     ],
+    guideLink: 'Комиссия Kaspi по категориям: полная таблица ставок →',
+    categoryGuideLink: 'Все ставки по категориям →',
+    faqTitle: 'Частые вопросы',
+    faq: [
+      {
+        q: 'Какая комиссия у Kaspi Магазина?',
+        a: 'От 7,3% до 15,5% от цены продажи, уже с НДС, — в зависимости от категории. 7,3% — лекарства, продукты питания, корма и лакомства для животных; 15,5% — аксессуары для телефонов и украшения; для большинства остальных категорий — 12,5%. Ставки взяты из официального тарифа Kaspi для партнёров (редакция от 28.01.2026): выберите категорию в калькуляторе, и ставка подставится сама. Если вашей категории нет в списке, введите свой процент вручную.',
+      },
+      {
+        q: 'Как посчитать минимальную цену на Kaspi?',
+        a: 'Минимальная цена = (себестоимость + доставка + прочие расходы) ÷ (1 − (комиссия % + налог %) ÷ 100). Комиссия и налог берутся с цены продажи, а не с себестоимости, поэтому минимальная цена всегда выше простой суммы расходов. Это цена, при которой продажа выходит ровно в ноль; ниже неё вы торгуете в убыток.',
+      },
+      {
+        q: 'Чем маржинальность отличается от наценки?',
+        a: 'Маржинальность — доля прибыли в цене продажи, наценка — прибыль, делённая на себестоимость. Прибыль = цена − себестоимость − доставка − прочие расходы − комиссия − налог.',
+      },
+      {
+        q: 'Какой налог учитывать в калькуляторе?',
+        a: 'По умолчанию подставлено 4% с оборота — ставка для ИП на упрощёнке в Казахстане с 2026 года. Если у вас другая ставка или другой режим, измените значение в поле «Налог с оборота». Налог, как и комиссия, считается от цены продажи.',
+      },
+    ],
     categoryNames: {},
   },
 
   kk: {
     seo: {
-      title: 'Kaspi маржа калькуляторы — бір сатылымнан түсетін пайданы есептеу',
+      title: 'Kaspi маржа калькуляторы — пайданы есептеу',
       description:
-        'Kaspi-дегі бір сатылымнан комиссия, жеткізу және салық шегерілгеннен кейін қанша пайда қалатынын есептеңіз. Калькулятор маржаны, үстемені және одан төмен сатсаңыз зиянға шығатын ең төменгі бағаны көрсетеді. Тегін, тіркелусіз, Excel-ге жүктеуге болады.',
+        'Kaspi-дегі сатылымнан комиссия, жеткізу және салықтан кейін қанша пайда қалатынын есептеңіз: маржа, үстеме, ең төменгі баға. Тегін, Excel-ге жүктеу.',
       keywords:
         'kaspi маржа калькуляторы, kaspi комиссиясын есептеу, kaspi дүкен комиссиясы, kaspi-де пайданы қалай есептеу, маржа калькуляторы қазақша, тауар үстемесін есептеу, kaspi ең төменгі баға, kaspi сатушыға арналған калькулятор',
       ogTitle: 'Kaspi маржа калькуляторы — сатылымнан қанша қалады',
@@ -231,6 +259,27 @@ export const marginDict: Record<ToolLang, MarginDict> = {
       'Ең төменгі баға = (өзіндік құны + жеткізу + басқа шығындар) ÷ (1 − (комиссия % + салық %) ÷ 100). Осы бағамен сатылым дәл нөлге шығады.',
       'Бөлшек сандарды үтірмен де, нүктемен де жазуға болады.',
     ],
+    guideLink: 'Kaspi комиссиясы санаттар бойынша: мөлшерлемелердің толық кестесі →',
+    categoryGuideLink: 'Санаттар бойынша барлық мөлшерлемелер →',
+    faqTitle: 'Жиі қойылатын сұрақтар',
+    faq: [
+      {
+        q: 'Kaspi Магазин комиссиясы қанша?',
+        a: 'Санатына байланысты сату бағасының 7,3%-ынан 15,5%-ына дейін, ҚҚС-пен қоса. 7,3% — дәрілер, азық-түлік, жануарларға арналған жем және тағам; 15,5% — телефон аксессуарлары мен әшекей бұйымдар; қалған санаттардың көбінде 12,5%. Мөлшерлемелер Kaspi-дің серіктестерге арналған ресми тарифінен алынған (28.01.2026 редакциясы): калькуляторда санатты таңдасаңыз, мөлшерлеме өзі қойылады. Санатыңыз тізімде болмаса, өз пайызыңызды қолмен жазыңыз.',
+      },
+      {
+        q: 'Kaspi-де ең төменгі бағаны қалай есептеуге болады?',
+        a: 'Ең төменгі баға = (өзіндік құны + жеткізу + басқа шығындар) ÷ (1 − (комиссия % + салық %) ÷ 100). Комиссия мен салық өзіндік құннан емес, сату бағасынан алынады, сондықтан ең төменгі баға шығындардың қарапайым жиынтығынан әрқашан жоғары болады. Осы бағамен сатылым дәл нөлге шығады, одан арзан сатсаңыз — залалға.',
+      },
+      {
+        q: 'Маржиналдылық пен үстеменің айырмашылығы неде?',
+        a: 'Маржиналдылық — пайданың сату бағасындағы үлесі, үстеме — пайданың өзіндік құнға қатынасы. Пайда = баға − өзіндік құны − жеткізу − басқа шығындар − комиссия − салық.',
+      },
+      {
+        q: 'Калькуляторда қандай салық ескеріледі?',
+        a: 'Әдепкі бойынша айналымның 4%-ы қойылған — бұл Қазақстандағы оңайлатылған декларация режиміндегі ЖК үшін 2026 жылдан бастап белгіленген мөлшерлеме. Сізде басқа мөлшерлеме немесе режим болса, «Айналымнан салық» өрісіндегі мәнді өзгертіңіз. Салық та комиссия сияқты сату бағасынан есептеледі.',
+      },
+    ],
     categoryNames: {
       'Автотовары': 'Автотауарлар',
       'Аптека — лекарства': 'Дәріхана — дәрілер',
@@ -260,9 +309,9 @@ export const marginDict: Record<ToolLang, MarginDict> = {
 
   en: {
     seo: {
-      title: 'Kaspi Margin Calculator — Profit per Sale for Sellers in Kazakhstan',
+      title: 'Kaspi Margin Calculator — Profit per Sale',
       description:
-        "Work out the profit on one Kaspi.kz sale after the marketplace commission, delivery and Kazakhstan's turnover tax. See your margin, markup and the floor price below which every order loses money. Free, no sign-up, Excel export.",
+        'Kaspi.kz margin calculator: profit on one sale after commission, delivery and tax, plus margin, markup and floor price. Free, with Excel export.',
       keywords:
         'kaspi margin calculator, kaspi.kz seller commission, kaspi commission rates by category, selling on kaspi kazakhstan, kazakhstan marketplace profit calculator, kaspi break-even price, kazakhstan sole trader turnover tax',
       ogTitle: 'Kaspi Margin Calculator — what one sale really leaves you',
@@ -337,6 +386,27 @@ export const marginDict: Record<ToolLang, MarginDict> = {
       'Margin is profit as a share of the selling price. Markup is profit divided by the cost price.',
       'Floor price = (cost + delivery + other costs) ÷ (1 − (commission % + tax %) ÷ 100). At this price a sale breaks exactly even.',
       'Amounts are in Kazakhstani tenge (₸). Decimals can be typed with a comma or a dot.',
+    ],
+    guideLink: 'Kaspi commission by category: full rate table (in Russian) →',
+    categoryGuideLink: 'All rates by category (in Russian) →',
+    faqTitle: 'Frequently asked questions',
+    faq: [
+      {
+        q: 'What commission does Kaspi charge sellers?',
+        a: "Between 7.3% and 15.5% of the selling price, VAT included, depending on the category. 7.3% applies to medicines, groceries, and pet food and treats; 15.5% to phone accessories and jewellery; most other categories are 12.5%. The rates come from Kaspi's official partner tariff (edition of 28 January 2026): pick a category in the calculator and the rate fills itself in. If your category is not listed, type your own rate.",
+      },
+      {
+        q: 'How do I work out the minimum price on Kaspi?',
+        a: 'Floor price = (cost + delivery + other costs) ÷ (1 − (commission % + tax %) ÷ 100). Commission and tax are charged on the selling price, not on the cost, so the floor is always above the plain sum of your costs. At this price a sale breaks exactly even; below it you lose money.',
+      },
+      {
+        q: 'What is the difference between margin and markup?',
+        a: 'Margin is profit as a share of the selling price; markup is profit divided by the cost price. Profit = price − cost − delivery − other costs − commission − tax.',
+      },
+      {
+        q: 'Which tax does the calculator use?',
+        a: "It is pre-filled with 4% of turnover, the rate for sole traders (IE) on Kazakhstan's simplified regime since 2026. If your rate or regime is different, change the “Turnover tax” field. Tax, like commission, is taken from the selling price.",
+      },
     ],
     categoryNames: {
       'Автотовары': 'Car parts & accessories',

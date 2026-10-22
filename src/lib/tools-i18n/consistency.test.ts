@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
 import sitemap from '@/app/sitemap'
+import { KASPI_CATEGORY_COMMISSIONS } from '@/lib/kaspiShop/margin'
 import { avrDict } from '@/app/tools/avr/dict'
 import { kontragentDict } from '@/app/tools/kontragent/dict'
 import { kpDict } from '@/app/tools/kp/dict'
@@ -12,7 +13,7 @@ import { schetDict } from '@/app/tools/schet/dict'
 import { waybillsDict } from '@/app/tools/waybills/dict'
 import {
   LOCALIZED_TOOL_SLUGS, TOOL_LANGS, isToolLocalized, toolAlternates, toolLinkPath,
-  toolMetadata, toolUrl, toolsIndexAlternates, toolsIndexUrl, type ToolLang, type ToolSeoCopy,
+  toolFaqJsonLd, toolMetadata, toolUrl, toolsIndexAlternates, toolsIndexUrl, TOOL_TITLE_MAX, type ToolLang, type ToolSeoCopy,
 } from './index'
 import { toolsIndexCards, toolsIndexDict, toolsIndexMetadata } from './toolsIndex'
 
@@ -175,5 +176,134 @@ describe('sitemap', () => {
 
   it('has no duplicate URLs', () => {
     expect(byUrl.size).toBe(entries.length)
+  })
+})
+
+describe('search snippet limits (22.10.2026)', () => {
+  const SLUGS = Object.keys(DICTS)
+
+  it('every title (with the brand when it fits) is at most 60 characters and every description at most 155', () => {
+    for (const slug of SLUGS) {
+      for (const lang of TOOL_LANGS) {
+        const m = toolMetadata(slug, lang, DICTS[slug][lang].seo)
+        expect(String(m.title).length, `${slug}.${lang} title: ${m.title}`).toBeLessThanOrEqual(TOOL_TITLE_MAX)
+        expect(String(m.description).length, `${slug}.${lang} description`).toBeLessThanOrEqual(155)
+      }
+    }
+  })
+
+  it('the tools index title and description obey the same limits on every language', () => {
+    for (const lang of TOOL_LANGS) {
+      const m = toolsIndexMetadata(lang)
+      expect(String(m.title).length, `index.${lang} title: ${m.title}`).toBeLessThanOrEqual(TOOL_TITLE_MAX)
+      expect(String(m.description).length, `index.${lang} description`).toBeLessThanOrEqual(155)
+    }
+  })
+
+  it('schet, avr, nakladnaya and kp name «образец» / «үлгісі» / «template» in the title on every language', () => {
+    const word = { ru: /образец/i, kk: /үлгіс/i, en: /template/i } as const
+    for (const slug of ['schet', 'avr', 'nakladnaya', 'kp']) {
+      for (const lang of TOOL_LANGS) {
+        expect(DICTS[slug][lang].seo.title, `${slug}.${lang}`).toMatch(word[lang])
+      }
+    }
+  })
+
+  it('waybills leads with «объединить накладные Kaspi в один PDF» in title and description (Yandex query)', () => {
+    const { title, description } = waybillsDict.ru.seo
+    expect(title.startsWith('Объединить накладные Kaspi в один PDF')).toBe(true)
+    expect(description.startsWith('Объединить накладные Kaspi в один PDF')).toBe(true)
+  })
+})
+
+describe('FAQ on margin and waybills', () => {
+  it('margin has 3-4 questions on every language and the page ships the matching FAQPage', () => {
+    for (const lang of TOOL_LANGS) {
+      const { faq } = marginDict[lang]
+      expect(faq.length, lang).toBeGreaterThanOrEqual(3)
+      expect(faq.length, lang).toBeLessThanOrEqual(4)
+      const ld = JSON.parse(toolFaqJsonLd('margin', lang, faq))
+      expect(ld.mainEntity.map((e: { name: string }) => e.name)).toEqual(faq.map(f => f.q))
+      expect(ld.mainEntity.map((e: { acceptedAnswer: { text: string } }) => e.acceptedAnswer.text)).toEqual(faq.map(f => f.a))
+    }
+    expect(marginDict.kk.faq).toHaveLength(marginDict.ru.faq.length)
+    expect(marginDict.en.faq).toHaveLength(marginDict.ru.faq.length)
+  })
+
+  it('margin FAQ commission answer quotes only rates that exist in KASPI_CATEGORY_COMMISSIONS', () => {
+    const rates = new Set(KASPI_CATEGORY_COMMISSIONS.map(c => c.ratePercent))
+    expect([...rates].sort((a, b) => a - b)).toEqual([7.3, 12.5, 15.5])
+    for (const lang of TOOL_LANGS) {
+      const a = marginDict[lang].faq[0].a
+      for (const r of rates) expect(a, `${lang}: ${r}`).toContain(String(r).replace('.', lang === 'en' ? '.' : ','))
+      // И наоборот: каждая дробная ставка в ответе есть в таблице.
+      for (const m of a.matchAll(/(\d+[.,]\d+)%/g)) {
+        expect(rates.has(Number(m[1].replace(',', '.'))), `${lang}: ${m[0]}`).toBe(true)
+      }
+    }
+  })
+
+  for (const slug of ['margin', 'waybills']) {
+    it(`${slug}: all three pages render ToolFaqJsonLd from the same dictionary list the tool draws`, () => {
+      for (const lang of TOOL_LANGS) {
+        const file = lang === 'ru' ? `src/app/tools/${slug}/page.tsx` : `src/app/tools/${lang}/${slug}/page.tsx`
+        expect(read(file), file).toContain(`<ToolFaqJsonLd slug="${slug}" lang={LANG} items={t.faq} />`)
+      }
+      const tool = slug === 'margin' ? 'MarginTool' : 'WaybillsTool'
+      expect(read(`src/app/tools/${slug}/${tool}.tsx`)).toContain('t.faq.map(')
+    })
+  }
+
+  it('waybills FAQ starts with the answer-first «how to merge» question and keeps the same length everywhere', () => {
+    expect(waybillsDict.ru.faq[0].q).toBe('Как объединить накладные Kaspi в один PDF?')
+    for (const lang of TOOL_LANGS) expect(waybillsDict[lang].faq).toHaveLength(waybillsDict.ru.faq.length)
+  })
+})
+
+describe('guide links under the tools', () => {
+  // Каждый инструмент ведёт на свой самый близкий гайд, а не на общий индекс /guides.
+  const GUIDE: Record<string, string> = {
+    schet: 'kak-vystavit-schet-ip',
+    avr: 'dokumenty-ip-kazakhstan',
+    nakladnaya: 'dokumenty-ip-kazakhstan',
+    kp: 'dokumenty-ip-kazakhstan',
+    kontragent: 'proverka-kontragenta',
+    nalogi: 'nalogi-ip-uproshchenka-2026',
+    margin: 'komissiya-kaspi',
+  }
+  const TOOL_FILE: Record<string, string> = {
+    schet: 'SchetTool', avr: 'AvrTool', nakladnaya: 'NakladnayaTool', kp: 'KpTool',
+    kontragent: 'KontragentTool', nalogi: 'NalogiTool', margin: 'MarginTool',
+  }
+
+  for (const [slug, guide] of Object.entries(GUIDE)) {
+    it(`${slug} links to /guides/${guide} and not to the guides index`, () => {
+      const src = read(`src/app/tools/${slug}/${TOOL_FILE[slug]}.tsx`)
+      const dict = read(`src/app/tools/${slug}/dict.ts`)
+      expect(src + dict).toContain(guide)
+      expect(src).not.toContain('guidesIndexPath(lang)')
+      expect(src).not.toContain('chrome.guides')
+    })
+  }
+
+  it('every guide a tool points to exists in the Russian and Kazakh guide folders', () => {
+    for (const guide of new Set(Object.values(GUIDE))) {
+      expect(fs.existsSync(path.join(ROOT, `src/app/guides/${guide}/page.tsx`)), guide).toBe(true)
+      expect(fs.existsSync(path.join(ROOT, `src/app/guides/kk/${guide}/page.tsx`)), `kk ${guide}`).toBe(true)
+    }
+  })
+
+  it('every dictionary that links a guide has a non-empty label on every language', () => {
+    const labels: Record<string, Record<ToolLang, string>> = {
+      avr: { ru: avrDict.ru.guideLink, kk: avrDict.kk.guideLink, en: avrDict.en.guideLink },
+      nakladnaya: { ru: nakladnayaDict.ru.guideLink, kk: nakladnayaDict.kk.guideLink, en: nakladnayaDict.en.guideLink },
+      kp: { ru: kpDict.ru.guideLink, kk: kpDict.kk.guideLink, en: kpDict.en.guideLink },
+      kontragent: { ru: kontragentDict.ru.guideLink, kk: kontragentDict.kk.guideLink, en: kontragentDict.en.guideLink },
+      margin: { ru: marginDict.ru.guideLink, kk: marginDict.kk.guideLink, en: marginDict.en.guideLink },
+    }
+    for (const [slug, byLang] of Object.entries(labels)) {
+      for (const lang of TOOL_LANGS) expect(byLang[lang].trim().length, `${slug}.${lang}`).toBeGreaterThan(5)
+      expect(byLang.en, slug).not.toMatch(CYRILLIC)
+    }
   })
 })

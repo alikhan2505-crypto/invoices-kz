@@ -1,7 +1,9 @@
 import Link from 'next/link'
 import BrandWordmark from '@/components/BrandWordmark'
 import { FEATURES_HREF } from '@/lib/rootHub'
-import { Guide, GuideLang, guidePath, guidesIndexPath, otherGuides } from '@/lib/guides'
+import { Guide, GuideLang, guideJsonLdData, guidePath, guidesIndexPath, relatedGuidesOf } from '@/lib/guides'
+import { toolLinkPath } from '@/lib/tools-i18n'
+import { toolsIndexCards } from '@/lib/tools-i18n/toolsIndex'
 
 // Shared chrome for every guide page in both languages: header, breadcrumb,
 // language switch, prose container, cross-links and the schema.org markup.
@@ -16,7 +18,11 @@ const CHROME: Record<GuideLang, {
   breadcrumbHome: string
   ctaTitle: string
   ctaBody: string
+  ctaButton: string
   ctaLink: string
+  relatedTools: string
+  summaryLabel: string
+  faqTitle: string
   alsoRead: string
   switchLabel: string
 }> = {
@@ -28,7 +34,11 @@ const CHROME: Record<GuideLang, {
     ctaTitle: 'Счета, АВР и накладные — за минуту',
     ctaBody:
       'Реквизиты подставляются по БИН, подпись и печать уже внутри PDF, отправка клиенту в WhatsApp одной кнопкой и оплата через Kaspi прямо со счёта. Для ИП и ТОО, первые 7 дней бесплатно.',
+    ctaButton: 'Создать счёт бесплатно',
     ctaLink: 'Посмотреть, как это работает →',
+    relatedTools: 'Связанные инструменты',
+    summaryLabel: 'Коротко',
+    faqTitle: 'Частые вопросы',
     alsoRead: 'Читайте также',
     switchLabel: 'Қазақша',
   },
@@ -40,46 +50,18 @@ const CHROME: Record<GuideLang, {
     ctaTitle: 'Шоттар, ОЖА және жүкқұжаттар — бір минутта',
     ctaBody:
       'Деректемелер БСН бойынша автоматты толтырылады, қолтаңба мен мөр PDF ішінде, клиентке WhatsApp арқылы бір түймемен жіберіледі, төлем Kaspi арқылы тікелей шоттан түседі. ЖК және ЖШС үшін, алғашқы 7 күн тегін.',
+    ctaButton: 'Шотты тегін жасау',
     ctaLink: 'Бұл қалай жұмыс істейтінін қараңыз →',
+    relatedTools: 'Байланысты құралдар',
+    summaryLabel: 'Қысқаша',
+    faqTitle: 'Жиі қойылатын сұрақтар',
     alsoRead: 'Тағы оқыңыз',
     switchLabel: 'Русский',
   },
 }
 
 function GuideJsonLd({ guide, lang }: { guide: Guide; lang: GuideLang }) {
-  const chrome = CHROME[lang]
-  const copy = guide[lang]
-  const url = `https://invoices.kz${guidePath(guide.slug, lang)}`
-  const data = {
-    '@context': 'https://schema.org',
-    '@graph': [
-      {
-        '@type': 'Article',
-        '@id': `${url}#article`,
-        headline: copy.title,
-        description: copy.description,
-        inLanguage: chrome.locale,
-        dateModified: guide.updated,
-        datePublished: guide.updated,
-        mainEntityOfPage: url,
-        author: { '@id': 'https://invoices.kz/#organization' },
-        publisher: { '@id': 'https://invoices.kz/#organization' },
-      },
-      {
-        '@type': 'BreadcrumbList',
-        itemListElement: [
-          { '@type': 'ListItem', position: 1, name: chrome.breadcrumbHome, item: 'https://invoices.kz' },
-          {
-            '@type': 'ListItem',
-            position: 2,
-            name: chrome.section,
-            item: `https://invoices.kz${guidesIndexPath(lang)}`,
-          },
-          { '@type': 'ListItem', position: 3, name: copy.title, item: url },
-        ],
-      },
-    ],
-  }
+  const data = guideJsonLdData(guide, lang)
   return (
     <script
       type="application/ld+json"
@@ -100,7 +82,9 @@ export default function GuideShell({
 }) {
   const chrome = CHROME[lang]
   const copy = guide[lang]
-  const others = otherGuides(guide.slug)
+  const others = relatedGuidesOf(guide)
+  const toolCards = toolsIndexCards(lang).filter(c => guide.relatedTools.includes(c.slug))
+  const faq = copy.faq ?? []
   const otherLang: GuideLang = lang === 'kk' ? 'ru' : 'kk'
 
   return (
@@ -147,7 +131,35 @@ export default function GuideShell({
           })}
         </p>
 
-        <article className="guide-prose nav-glass rounded-2xl p-5 lg:p-7">{children}</article>
+        <article className="guide-prose nav-glass rounded-2xl p-5 lg:p-7">
+          {copy.summary && (
+            <div
+              className="rounded-xl p-4"
+              style={{ background: 'var(--nav-surface-glass)', border: '1px solid var(--nav-border-soft)' }}
+            >
+              <div className="text-xs font-semibold mb-1.5 uppercase tracking-wide" style={{ color: 'var(--nav-text-muted)' }}>
+                {chrome.summaryLabel}
+              </div>
+              <p style={{ color: 'var(--nav-text-primary)' }}>{copy.summary}</p>
+            </div>
+          )}
+          {children}
+        </article>
+
+        {/* Visible Q&A: the FAQPage markup in GuideJsonLd is built from this very list. */}
+        {faq.length > 0 && (
+          <section className="guide-prose nav-glass rounded-2xl p-5 lg:p-7 mt-6">
+            <h2 style={{ marginTop: 0 }}>{chrome.faqTitle}</h2>
+            {faq.map(item => (
+              <div key={item.q}>
+                <h3 className="text-[15px] font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>
+                  {item.q}
+                </h3>
+                <p>{item.a}</p>
+              </div>
+            ))}
+          </section>
+        )}
 
         <div className="nav-glass nav-card-accent rounded-2xl p-5 mt-6">
           <div className="text-sm font-semibold mb-2" style={{ color: 'var(--nav-text-primary)' }}>
@@ -156,10 +168,42 @@ export default function GuideShell({
           <p className="text-sm mb-3" style={{ color: 'var(--nav-text-secondary)' }}>
             {chrome.ctaBody}
           </p>
-          <Link href={FEATURES_HREF} className="text-sm font-semibold" style={{ color: 'var(--nav-accent)' }}>
-            {chrome.ctaLink}
-          </Link>
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+            <Link
+              href={`/login?utm_source=guides&utm_medium=cta&utm_campaign=${guide.slug}`}
+              className="inline-block rounded-xl px-5 py-2.5 text-sm font-semibold transition-transform hover:-translate-y-0.5"
+              style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}
+            >
+              {chrome.ctaButton}
+            </Link>
+            <Link href={FEATURES_HREF} className="text-sm font-medium" style={{ color: 'var(--nav-text-secondary)' }}>
+              {chrome.ctaLink}
+            </Link>
+          </div>
         </div>
+
+        {toolCards.length > 0 && (
+          <div className="mt-8">
+            <div className="text-xs font-semibold mb-3 uppercase tracking-wide" style={{ color: 'var(--nav-text-muted)' }}>
+              {chrome.relatedTools}
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {toolCards.map(c => (
+                <Link
+                  key={c.slug}
+                  href={toolLinkPath(c.slug, lang)}
+                  className="nav-glass rounded-xl p-4 block"
+                  style={{ color: 'var(--nav-text-primary)' }}
+                >
+                  <div className="text-sm font-semibold mb-1">{c.title}</div>
+                  <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>
+                    {c.text}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
 
         {others.length > 0 && (
           <div className="mt-8">

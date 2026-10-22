@@ -1,19 +1,19 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import GuideShell from '../GuideShell'
-import { getGuide } from '@/lib/guides'
+import { getGuide, guideAlternates, guideMetaTitle } from '@/lib/guides'
 import { KASPI_CATEGORY_COMMISSIONS } from '@/lib/kaspiShop/margin'
 
 const guide = getGuide('komissiya-kaspi')!
 
 export const metadata: Metadata = {
-  title: `${guide.ru.title} | invoices.kz`,
+  title: guideMetaTitle(guide.ru.title),
   description: guide.ru.description,
   keywords:
     'комиссия kaspi магазина, комиссия каспи по категориям, сколько забирает kaspi, тарифы kaspi магазин 2026, комиссия каспи с ндс, минимальная цена на kaspi',
   alternates: {
     canonical: `https://invoices.kz/guides/${guide.slug}`,
-    languages: { ru: `https://invoices.kz/guides/${guide.slug}`, kk: `https://invoices.kz/guides/kk/${guide.slug}` },
+    languages: guideAlternates(guide.slug),
   },
   openGraph: {
     type: 'article',
@@ -32,6 +32,10 @@ export default function Page() {
       <p className="lead">
         Короткий ответ: Kaspi Магазин удерживает <strong>7,3%, 12,5% или 15,5%</strong> от цены продажи — ставка зависит
         от категории товара. Это уже с НДС, то есть та доля цены, которая реально не доходит до вашего счёта.
+      </p>
+      <p>
+        Свою прибыль после комиссии, доставки и налога можно сразу посчитать в бесплатном{' '}
+        <Link href="/tools/margin">калькуляторе маржи Kaspi</Link>.
       </p>
 
       <h2>Почему в тарифах две разные цифры</h2>
@@ -95,7 +99,8 @@ export default function Page() {
       <ul>
         <li>
           <strong>Доставка.</strong> Если заказ едет через доставку Kaspi, её стоимость удерживается отдельно от
-          комиссии и зависит от веса и направления.
+          комиссии и зависит от веса и направления. Накладные на такие заказы удобно{' '}
+          <Link href="/tools/waybills">напечатать одним PDF</Link>: 4 на лист А4 или А6 для термопринтера.
         </li>
         <li>
           <strong>Налог с оборота.</strong> У ИП на упрощёнке с 2026 года это <strong>4%</strong> от поступлений

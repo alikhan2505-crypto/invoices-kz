@@ -21,8 +21,8 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'INVOICES.KZ — Счета, оплата Kaspi, Kaspi Bot и AI-агент для бизнеса Казахстана',
-  description: 'Счета, АВР, накладные и КП с оплатой через Kaspi Pay — плюс демпинг-бот и публичная витрина для Kaspi Магазина и AI-агент для клиентов. Одна платформа, один кошелёк. Для ИП и ТОО Казахстана.',
+  title: 'INVOICES.KZ — сервисы для бизнеса в Казахстане',
+  description: 'Счета, АВР и КП, Kaspi Bot, Kaspi Cashier API, AI-агент и CFO-кабинет под одним аккаунтом для ИП и ТОО Казахстана.',
   keywords: 'счет на оплату казахстан, оплата Kaspi Pay для бизнеса, kaspi bot демпинг цен, витрина kaspi магазина, AI агент для бизнеса казахстан, АВР казахстан, акт выполненных работ онлайн, накладная на отпуск запасов, коммерческое предложение, счет фактура кз, документы для налоговой ИП, ТОО счет БИН ИИН, invoices kz, онлайн бухгалтерия казахстан',
   manifest: '/manifest.json',
   authors: [{ name: 'INVOICES.KZ' }],
@@ -42,13 +42,13 @@ export const metadata: Metadata = {
     url: 'https://invoices.kz',
     siteName: 'INVOICES.KZ',
     title: 'INVOICES.KZ — сервисы для бизнеса в Казахстане',
-    description: 'Счета, Kaspi Bot, Kaspi Cashier API, AI-агент и CFO-кабинет под одним аккаунтом. Қазақстандағы бизнеске арналған сервистер — бір аккаунтта.',
-    images: [{ url: 'https://invoices.kz/og-hub.png', width: 1200, height: 630, alt: 'INVOICES.KZ — сервисы для бизнеса в Казахстане · бизнеске арналған сервистер' }],
+    description: 'Счета, АВР и КП, Kaspi Bot, Kaspi Cashier API, AI-агент и CFO-кабинет под одним аккаунтом для ИП и ТОО Казахстана.',
+    images: [{ url: 'https://invoices.kz/og-hub.png', width: 1200, height: 630, alt: 'INVOICES.KZ — сервисы для бизнеса в Казахстане' }],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'INVOICES.KZ — сервисы для бизнеса в Казахстане',
-    description: 'Счета, Kaspi Bot, Kaspi Cashier API, AI-агент и CFO-кабинет под одним аккаунтом.',
+    description: 'Счета, АВР и КП, Kaspi Bot, Kaspi Cashier API, AI-агент и CFO-кабинет под одним аккаунтом для ИП и ТОО Казахстана.',
     images: ['https://invoices.kz/og-hub.png'],
   },
 }

@@ -72,6 +72,8 @@ export interface NakladnayaDict {
   generate: string
   remaining: (left: number, limit: number) => string
   waybillsLink: string
+  /** Ссылка на гайд dokumenty-ip-kazakhstan (en — русский гайд, подпись это говорит). */
+  guideLink: string
   faqTitle: string
   faq: NakladnayaFaqItem[]
 }
@@ -79,9 +81,9 @@ export interface NakladnayaDict {
 export const nakladnayaDict: Record<ToolLang, NakladnayaDict> = {
   ru: {
     seo: {
-      title: 'Накладная онлайн — накладная на отпуск запасов бесплатно',
+      title: 'Накладная на отпуск запасов — образец, онлайн',
       description:
-        'Создайте накладную на отпуск запасов на сторону (З-2) для ИП или ТОО Казахстана онлайн: стороны, товары, сумма прописью. Готовый PDF за минуту, без регистрации — 3 накладные в квартал бесплатно.',
+        'Образец накладной на отпуск запасов на сторону (З-2) для ИП и ТОО: заполните стороны и товары, скачайте PDF за минуту. 3 накладные в квартал бесплатно.',
       keywords:
         'накладная на отпуск запасов образец, накладная з-2 казахстан, накладная скачать бесплатно, расходная накладная ип, накладная на товар казахстан',
       ogTitle: 'Накладная онлайн — за минуту, бесплатно',
@@ -145,6 +147,7 @@ export const nakladnayaDict: Record<ToolLang, NakladnayaDict> = {
     generate: 'Создать накладную — откроется для печати и скачивания',
     remaining: (left, n) => `Осталось ${left} из ${n} бесплатных накладных в этом квартале`,
     waybillsLink: 'Накладные Kaspi одним PDF →',
+    guideLink: 'Чем накладная отличается от счёта и АВР →',
     faqTitle: 'Частые вопросы',
     faq: [
       {
@@ -168,9 +171,9 @@ export const nakladnayaDict: Record<ToolLang, NakladnayaDict> = {
 
   kk: {
     seo: {
-      title: 'Жүкқұжат онлайн — қорларды жағына босатуға арналған жүкқұжат тегін',
+      title: 'Жүкқұжат үлгісі (З-2 нысаны) — онлайн, тегін',
       description:
-        'Қазақстандағы ЖК немесе ЖШС үшін қорларды жағына босатуға арналған жүкқұжатты (З-2 нысаны) онлайн жасаңыз: тараптар, тауарлар, сомасы жазбаша. Тіркелусіз бір минутта дайын PDF — тоқсанына 3 жүкқұжат тегін.',
+        'Жүкқұжаттың (З-2 нысаны) үлгісі: тараптар мен тауарларды толтырып, бір минутта PDF жүктеңіз — тоқсанына 3 жүкқұжат тегін.',
       keywords:
         'жүкқұжат үлгісі, жүкқұжат з-2, қорларды жағына босатуға арналған жүкқұжат, жүкқұжат онлайн, жүкқұжат жасау тегін, жк жүкқұжат, тауарға жүкқұжат, жүкқұжат pdf жүктеу',
       ogTitle: 'Жүкқұжат онлайн — бір минутта, тегін',
@@ -234,6 +237,7 @@ export const nakladnayaDict: Record<ToolLang, NakladnayaDict> = {
     generate: 'Жүкқұжат жасау — басып шығаруға және жүктеуге ашылады',
     remaining: (left, n) => `Осы тоқсанда қалған тегін жүкқұжат: ${left} / ${n}`,
     waybillsLink: 'Kaspi жүкқұжаттары бір PDF-те →',
+    guideLink: 'Жүкқұжат төлем шотынан және ОЖА-дан немен ерекшеленеді →',
     faqTitle: 'Жиі қойылатын сұрақтар',
     faq: [
       {
@@ -257,9 +261,9 @@ export const nakladnayaDict: Record<ToolLang, NakladnayaDict> = {
 
   en: {
     seo: {
-      title: 'Kazakhstan Delivery Note (Form Z-2) Generator — Free PDF',
+      title: 'Delivery Note (Form Z-2) Template — Free PDF',
       description:
-        'Create a Kazakhstan goods delivery note — the standard form Z-2 for issuing inventory to third parties — online for a sole proprietor (IE) or LLP: parties, goods, total in words. Ready PDF in a minute, no sign-up, 3 free notes per quarter.',
+        'Delivery note template (form Z-2) for Kazakhstan: fill in the parties and goods, get a PDF in a minute. 3 free notes per quarter.',
       keywords:
         'kazakhstan delivery note template, delivery note generator kazakhstan, waybill kazakhstan, z-2 form kazakhstan, goods issue note kazakhstan, nakladnaya kazakhstan, kazakhstan delivery note pdf free',
       ogTitle: 'Kazakhstan delivery note (Z-2) — free, in a minute',
@@ -323,6 +327,7 @@ export const nakladnayaDict: Record<ToolLang, NakladnayaDict> = {
     generate: 'Create the delivery note — opens for printing and download',
     remaining: (left, n) => `${left} of ${n} free notes left this quarter`,
     waybillsLink: 'All Kaspi waybills in one PDF →',
+    guideLink: 'Delivery note vs invoice vs AVR (in Russian) →',
     faqTitle: 'FAQ',
     faq: [
       {

@@ -5,7 +5,7 @@ import BrandWordmark from '@/components/BrandWordmark'
 import { track } from '@vercel/analytics'
 import { generateNakladnaya } from '@/lib/generateNakladnaya'
 import { useLanguage } from '@/components/LanguageProvider'
-import { formatTenge, guidesIndexPath, toolPath, toolsIndexPath, TOOL_CHROME, type ToolLang } from '@/lib/tools-i18n'
+import { formatTenge, toolGuidePath, toolPath, toolsIndexPath, TOOL_CHROME, type ToolLang } from '@/lib/tools-i18n'
 import ToolLangSwitch from '@/lib/tools-i18n/ToolLangSwitch'
 import ToolCta from '@/lib/tools-i18n/ToolCta'
 import { useToolSession } from '@/lib/tools-i18n/useToolSession'
@@ -28,6 +28,8 @@ import { TOOL_UNITS, DEFAULT_UNIT, UNIT_LABELS, unitAria } from '@/lib/tools-i18
 // Один и тот же инструмент для /tools/nakladnaya, /tools/kk/nakladnaya и
 // /tools/en/nakladnaya: язык интерфейса приходит пропсом (из адреса), а сам
 // бланк всегда русский — см. docs/tools-i18n-pattern.md.
+// Гайд «Счёт, АВР, накладная и КП»: ru и kk есть, английского нет (en → русский).
+const GUIDE_SLUG = 'dokumenty-ip-kazakhstan'
 const DRAFT_KEY = 'tool-nakladnaya-draft'
 // Снятая галочка рассылки хранится отдельно от черновика: email из черновика
 // возвращается после перезагрузки, и без этого ключа галочка вставала бы
@@ -378,7 +380,9 @@ export default function NakladnayaTool({ lang }: { lang: ToolLang }) {
           <Link href={toolPath('waybills', lang)} className="text-sm font-semibold" style={accentLink}>
             {t.waybillsLink}
           </Link>
-          <Link href={guidesIndexPath(lang)} className="text-sm font-semibold" style={accentLink}>{chrome.guides}</Link>
+          <Link href={toolGuidePath(GUIDE_SLUG, lang)} hrefLang={lang === 'en' ? 'ru' : lang} className="text-sm font-semibold" style={accentLink}>
+            {t.guideLink}
+          </Link>
         </div>
       </div>
     </div>

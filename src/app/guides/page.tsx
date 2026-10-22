@@ -1,17 +1,19 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import BrandWordmark from '@/components/BrandWordmark'
-import { GUIDES } from '@/lib/guides'
+import { GUIDES, guidesIndexAlternates } from '@/lib/guides'
+import { toolLinkPath } from '@/lib/tools-i18n'
+import { toolsIndexCards } from '@/lib/tools-i18n/toolsIndex'
 
 export const metadata: Metadata = {
   title: 'Полезное для бизнеса Казахстана — гайды invoices.kz',
   description:
-    'Разборы для ИП, ТОО и продавцов Kaspi: комиссия Kaspi Магазина по категориям, как выставить счёт на оплату, чем отличаются счёт, АВР, накладная и КП. Бесплатно, без регистрации.',
+    'Разборы для ИП, ТОО и продавцов Kaspi: комиссия Kaspi, как выставить счёт на оплату, налоги ИП, ЭСФ, чем отличаются счёт, АВР, накладная и КП.',
   keywords:
     'счет на оплату ип казахстан, комиссия kaspi магазина, авр казахстан, накладная на отпуск запасов, коммерческое предложение кз, документы для ип рк',
   alternates: {
     canonical: 'https://invoices.kz/guides',
-    languages: { ru: 'https://invoices.kz/guides', kk: 'https://invoices.kz/guides/kk' },
+    languages: guidesIndexAlternates(),
   },
   openGraph: {
     type: 'website',
@@ -75,30 +77,19 @@ export default function GuidesIndex() {
             Бесплатные инструменты
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            <Link href="/tools/schet" className="nav-glass rounded-xl p-4 block" style={{ color: 'var(--nav-text-primary)' }}>
-              <div className="text-sm font-semibold mb-1">Счёт на оплату онлайн</div>
-              <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>
-                Готовый счёт за минуту: БИК из справочника, сумма прописью, НДС
-              </div>
-            </Link>
-            <Link href="/tools/kontragent" className="nav-glass rounded-xl p-4 block" style={{ color: 'var(--nav-text-primary)' }}>
-              <div className="text-sm font-semibold mb-1">Проверка контрагента по БИН</div>
-              <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>
-                Неблагонадёжность, ликвидация, долги по налогам и НДС — по данным КГД
-              </div>
-            </Link>
-            <Link href="/tools/margin" className="nav-glass rounded-xl p-4 block" style={{ color: 'var(--nav-text-primary)' }}>
-              <div className="text-sm font-semibold mb-1">Калькулятор маржи Kaspi</div>
-              <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>
-                Сколько остаётся с продажи после комиссии, доставки и налога
-              </div>
-            </Link>
-            <Link href="/tools/waybills" className="nav-glass rounded-xl p-4 block" style={{ color: 'var(--nav-text-primary)' }}>
-              <div className="text-sm font-semibold mb-1">Печать накладных Kaspi одним PDF (А4/А6)</div>
-              <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>
-                Накладные одним PDF: 4 на лист А4 или А6 на термопринтер
-              </div>
-            </Link>
+            {toolsIndexCards('ru').map(c => (
+              <Link
+                key={c.slug}
+                href={toolLinkPath(c.slug, 'ru')}
+                className="nav-glass rounded-xl p-4 block"
+                style={{ color: 'var(--nav-text-primary)' }}
+              >
+                <div className="text-sm font-semibold mb-1">{c.title}</div>
+                <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>
+                  {c.text}
+                </div>
+              </Link>
+            ))}
           </div>
         </div>
       </div>

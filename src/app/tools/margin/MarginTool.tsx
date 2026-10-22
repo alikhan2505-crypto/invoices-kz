@@ -9,7 +9,7 @@ import * as XLSX from 'xlsx'
 import { useLanguage } from '@/components/LanguageProvider'
 import { calculateMargin, MarginInput } from '@/lib/marginCalc'
 import { KASPI_CATEGORY_COMMISSIONS } from '@/lib/kaspiShop/margin'
-import { formatTenge, guidesIndexPath, toolPath, toolsIndexPath, TOOL_CHROME, type ToolLang } from '@/lib/tools-i18n'
+import { formatTenge, toolGuidePath, toolPath, toolsIndexPath, TOOL_CHROME, type ToolLang } from '@/lib/tools-i18n'
 import ToolLangSwitch from '@/lib/tools-i18n/ToolLangSwitch'
 import ToolCta from '@/lib/tools-i18n/ToolCta'
 import { logToolEvent } from '@/lib/tools-i18n/toolEvents'
@@ -27,6 +27,10 @@ const KASPI_BOT_LANDING =
 // из useLanguage(), и робот по одному адресу видел то русский, то казахский.
 
 const EASE = [0.16, 1, 0.3, 1] as const
+
+// Гайд о ставках комиссии: у него есть ru и kk, английского нет — en-страница
+// ведёт на русский и честно подписывает ссылку «(in Russian)».
+const GUIDE_SLUG = 'komissiya-kaspi'
 
 // 12.5% is the rate the large majority of Kaspi's top-level categories carry
 // (see KASPI_CATEGORY_COMMISSIONS, transcribed from Kaspi's own published
@@ -74,6 +78,7 @@ export default function MarginTool({ lang }: { lang: ToolLang }) {
   const { setLang } = useLanguage()
   const t = marginDict[lang]
   const chrome = TOOL_CHROME[lang]
+  const guideLang = lang === 'en' ? 'ru' : lang
 
   // Kept as strings so a cleared field stays cleared instead of snapping back
   // to 0 while someone is retyping it.
@@ -268,6 +273,10 @@ export default function MarginTool({ lang }: { lang: ToolLang }) {
               </select>
               <span className="text-[11px] mt-1 block" style={{ color: 'var(--nav-text-muted)' }}>{t.categoryHint}</span>
             </label>
+            {/* Гайд о ставках: вне <label>, чтобы клик по ссылке не трогал список. */}
+            <Link href={toolGuidePath(GUIDE_SLUG, lang)} hrefLang={guideLang} className="text-[13px] font-semibold block w-fit -mt-1 mb-3" style={{ color: 'var(--nav-accent)' }}>
+              {t.categoryGuideLink}
+            </Link>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {FIELDS.map(f => (
                 <label key={f.key} className="block">
@@ -439,6 +448,23 @@ export default function MarginTool({ lang }: { lang: ToolLang }) {
             </ul>
           </details>
 
+          {/* FAQ: обычные <details> — текст есть в серверном HTML; те же вопросы
+              слово в слово уходят в FAQPage JSON-LD (ToolFaqJsonLd в page.tsx). */}
+          <section aria-labelledby="margin-faq" className="mt-8">
+            <h2 id="margin-faq" className="text-base font-bold mb-3" style={{ color: 'var(--nav-text-primary)' }}>{t.faqTitle}</h2>
+            <div className="nav-glass rounded-2xl divide-y" style={{ borderColor: 'var(--nav-border)' }}>
+              {t.faq.map(item => (
+                <details key={item.q} className="group px-4 py-3" style={{ borderColor: 'var(--nav-border)' }}>
+                  <summary className="cursor-pointer text-sm font-semibold list-none flex items-center justify-between gap-3 [&::-webkit-details-marker]:hidden" style={{ color: 'var(--nav-text-primary)' }}>
+                    {item.q}
+                    <span className="text-xs transition-transform group-open:rotate-45 flex-shrink-0" style={{ color: 'var(--nav-text-muted)' }} aria-hidden="true">+</span>
+                  </summary>
+                  <p className="text-[13px] mt-2" style={{ color: 'var(--nav-text-secondary)' }}>{item.a}</p>
+                </details>
+              ))}
+            </div>
+          </section>
+
           {/* The floor price the calculator just produced is exactly what the
               repricing bot protects -- so the pitch is the visitor's own
               number, not a generic feature list. */}
@@ -468,7 +494,7 @@ export default function MarginTool({ lang }: { lang: ToolLang }) {
             </Link>
             <div className="flex gap-4 flex-wrap">
               <Link href={toolsIndexPath(lang)} className="text-sm font-semibold" style={{ color: 'var(--nav-accent)' }}>{chrome.allTools}</Link>
-              <Link href={guidesIndexPath(lang)} className="text-sm font-semibold" style={{ color: 'var(--nav-accent)' }}>{chrome.guides}</Link>
+              <Link href={toolGuidePath(GUIDE_SLUG, lang)} hrefLang={guideLang} className="text-sm font-semibold" style={{ color: 'var(--nav-accent)' }}>{t.guideLink}</Link>
             </div>
           </div>
         </motion.div>

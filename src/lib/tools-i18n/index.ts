@@ -118,9 +118,32 @@ export const TOOL_LOCALE: Record<ToolLang, string> = { ru: 'ru-KZ', kk: 'kk-KZ',
 /** og:locale (подчёркивание, как требует Open Graph). */
 export const TOOL_OG_LOCALE: Record<ToolLang, string> = { ru: 'ru_KZ', kk: 'kk_KZ', en: 'en_US' }
 
+/**
+ * Гайд-«ступенька» под инструментом: у гайдов есть ru и kk, английских нет —
+ * en-страницы ведут на русский гайд (ссылку помечают hrefLang="ru").
+ */
+export function toolGuidePath(guideSlug: string, lang: ToolLang): string {
+  return lang === 'kk' ? `/guides/kk/${guideSlug}` : `/guides/${guideSlug}`
+}
+
+/** Бренд в конце <title>. */
+export const TOOL_TITLE_BRAND = ' | invoices.kz'
+/** Длиннее заголовок в выдаче обрезается. */
+export const TOOL_TITLE_MAX = 60
+
+/**
+ * <title> страницы: «заголовок | invoices.kz», но бренд идёт только если вся
+ * строка укладывается в TOOL_TITLE_MAX — иначе он съел бы конец заголовка в
+ * выдаче, а ключевая фраза важнее бренда.
+ */
+export function toolTitle(title: string): string {
+  const withBrand = `${title}${TOOL_TITLE_BRAND}`
+  return withBrand.length <= TOOL_TITLE_MAX ? withBrand : title
+}
+
 /** Тексты для <head> одной языковой версии инструмента. */
 export interface ToolSeoCopy {
-  /** <title> без хвоста « | invoices.kz» — он добавляется здесь. */
+  /** <title> без хвоста « | invoices.kz» — он добавляется в toolTitle(), если помещается в 60 знаков. */
   title: string
   description: string
   keywords: string
@@ -141,7 +164,7 @@ export function toolMetadata(slug: string, lang: ToolLang, copy: ToolSeoCopy, og
   const url = toolUrl(slug, lang)
   const image = `${SITE_ORIGIN}${ogImage}`
   return {
-    title: `${copy.title} | invoices.kz`,
+    title: toolTitle(copy.title),
     description: copy.description,
     keywords: copy.keywords,
     alternates: { canonical: url, languages: toolAlternates(slug) },
@@ -287,6 +310,34 @@ export function toolJsonLd(slug: string, lang: ToolLang, name: string, descripti
         ],
       },
     ],
+  }
+  return JSON.stringify(data).replace(/</g, '\\u003c')
+}
+
+/** Один вопрос с ответом — то, что видно на странице и уходит в FAQPage. */
+export interface ToolFaqItem {
+  q: string
+  a: string
+}
+
+/**
+ * schema.org FAQPage языковой версии инструмента: те же вопросы и ответы
+ * слово в слово, что видны на странице (items берутся из того же словаря,
+ * что рисует блок FAQ). Строка уже экранирована от '</script>' — вставлять через
+ * dangerouslySetInnerHTML как есть (см. ToolFaqJsonLd). Форма та же, что у
+ * schetFaqJsonLd / nalogiFaqJsonLd / kontragentFaqJsonLd.
+ */
+export function toolFaqJsonLd(slug: string, lang: ToolLang, items: ReadonlyArray<ToolFaqItem>): string {
+  const data = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    '@id': `${toolUrl(slug, lang)}#faq`,
+    inLanguage: TOOL_LOCALE[lang],
+    mainEntity: items.map(item => ({
+      '@type': 'Question',
+      name: item.q,
+      acceptedAnswer: { '@type': 'Answer', text: item.a },
+    })),
   }
   return JSON.stringify(data).replace(/</g, '\\u003c')
 }

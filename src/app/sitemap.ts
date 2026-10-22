@@ -6,59 +6,51 @@ import { TOOL_LANGS, isToolLocalized, toolAlternates, toolUrl, toolsIndexAlterna
 // Все инструменты /tools, которые есть в sitemap (переведённые и нет).
 const TOOL_SLUGS_IN_SITEMAP = ['waybills', 'margin', 'kontragent', 'schet', 'avr', 'nalogi', 'nakladnaya', 'kp'] as const
 
+// Реальные даты правок, ISO (YYYY-MM-DD). Единственное место, где они живут:
+// при правке страницы обновите её дату здесь. Никогда не new Date() -- иначе
+// каждая выдача sitemap «меняет» все страницы, и Google/Яндекс перестают
+// доверять lastmod. Гайды берут дату из GUIDES[].updated, но не раньше
+// LASTMOD.guides (пакет SEO-правок 22.10.2026 затронул все гайды).
+// changefreq/priority убраны: Google их игнорирует.
+const LASTMOD = {
+  root: '2026-10-22', // лендинг Счетов + разметка (SEO-пакет 22.10.2026)
+  docsHub: '2026-10-22',
+  cashierApi: '2026-10-17',
+  productLandings: '2026-10-22', // kaspi./agent./salon. (lp/[key], landings.ts)
+  tools: '2026-10-22',
+  toolsIndex: '2026-10-22',
+  guidesIndex: '2026-10-22',
+  guides: '2026-10-22',
+  privacy: '2026-10-13',
+  terms: '2026-10-13',
+} as const
+
+function guideLastmod(updated: string): string {
+  return updated > LASTMOD.guides ? updated : LASTMOD.guides
+}
+
 export default function sitemap(): MetadataRoute.Sitemap {
+  const guidesAlt = { ru: 'https://invoices.kz/guides', kk: 'https://invoices.kz/guides/kk' }
   return [
-    {
-      url: 'https://invoices.kz',
-      lastModified: new Date(),
-      changeFrequency: 'weekly',
-      priority: 1,
-    },
+    { url: 'https://invoices.kz', lastModified: LASTMOD.root },
     // The Счета pitch's own address once it moves off apex '/' -- see
     // src/lib/rootHub.ts. Listed only once it's actually what's live there
     // (same gating the api. cutover below already uses), so the sitemap
     // never claims a page that isn't the one really serving yet.
-    ...(ROOT_HUB_LIVE ? [{
-      url: 'https://docs.invoices.kz/',
-      lastModified: new Date(),
-      changeFrequency: 'weekly' as const,
-      priority: 0.9,
-    }] : []),
-    {
-      url: 'https://invoices.kz/login',
-      lastModified: new Date(),
-      changeFrequency: 'monthly',
-      priority: 0.8,
-    },
+    ...(ROOT_HUB_LIVE ? [{ url: 'https://docs.invoices.kz/', lastModified: LASTMOD.docsHub }] : []),
+    // /login намеренно нет: это форма входа, она noindex (login/layout.tsx).
     {
       url: process.env.API_HOST_REDIRECT === '1' ? 'https://api.invoices.kz/' : 'https://invoices.kz/cashier-api',
-      lastModified: new Date(),
-      changeFrequency: 'monthly',
-      priority: 0.6,
+      lastModified: LASTMOD.cashierApi,
     },
     // Product subdomain landings (kaspi./agent./salon., stage 3 of the
     // product split, hostRouting.ts) -- these have always been missing
     // from the sitemap even though they're live, canonical-self URLs
     // (lp/[key]/page.tsx -> l.origin) with nothing gating them, unlike
     // docs./api. above. Added 05.10.2026.
-    {
-      url: 'https://kaspi.invoices.kz/',
-      lastModified: new Date(),
-      changeFrequency: 'monthly',
-      priority: 0.6,
-    },
-    {
-      url: 'https://agent.invoices.kz/',
-      lastModified: new Date(),
-      changeFrequency: 'monthly',
-      priority: 0.6,
-    },
-    {
-      url: 'https://salon.invoices.kz/',
-      lastModified: new Date(),
-      changeFrequency: 'monthly',
-      priority: 0.6,
-    },
+    { url: 'https://kaspi.invoices.kz/', lastModified: LASTMOD.productLandings },
+    { url: 'https://agent.invoices.kz/', lastModified: LASTMOD.productLandings },
+    { url: 'https://salon.invoices.kz/', lastModified: LASTMOD.productLandings },
     // Бесплатные инструменты /tools. Порядок — как в индексе. У переведённых
     // (LOCALIZED_TOOL_SLUGS в src/lib/tools-i18n) три адреса — ru /tools/<slug>,
     // kk /tools/kk/<slug>, en /tools/en/<slug> — и каждый перечисляет все три
@@ -74,25 +66,19 @@ export default function sitemap(): MetadataRoute.Sitemap {
       isToolLocalized(slug)
         ? TOOL_LANGS.map(lang => ({
             url: toolUrl(slug, lang),
-            lastModified: new Date(),
-            changeFrequency: 'monthly' as const,
-            priority: 0.7,
+            lastModified: LASTMOD.tools,
             alternates: { languages: toolAlternates(slug) },
           }))
         : [{
             url: toolUrl(slug, 'ru'),
-            lastModified: new Date(),
-            changeFrequency: 'monthly' as const,
-            priority: 0.7,
+            lastModified: LASTMOD.tools,
           }],
     ),
     // Индекс инструментов: страница-указатель для набравших /tools руками,
     // на трёх языках.
     ...TOOL_LANGS.map(lang => ({
       url: toolsIndexUrl(lang),
-      lastModified: new Date(),
-      changeFrequency: 'monthly' as const,
-      priority: 0.5,
+      lastModified: LASTMOD.toolsIndex,
       alternates: { languages: toolsIndexAlternates() },
     })),
     {
@@ -100,49 +86,31 @@ export default function sitemap(): MetadataRoute.Sitemap {
       // answers ("комиссия Kaspi", "как выставить счёт ИП") rather than for the
       // brand name.
       url: 'https://invoices.kz/guides',
-      lastModified: new Date(),
-      changeFrequency: 'weekly',
-      priority: 0.7,
-      alternates: { languages: { ru: 'https://invoices.kz/guides', kk: 'https://invoices.kz/guides/kk' } },
+      lastModified: LASTMOD.guidesIndex,
+      alternates: { languages: guidesAlt },
     },
     {
       url: 'https://invoices.kz/guides/kk',
-      lastModified: new Date(),
-      changeFrequency: 'weekly',
-      priority: 0.7,
-      alternates: { languages: { ru: 'https://invoices.kz/guides', kk: 'https://invoices.kz/guides/kk' } },
+      lastModified: LASTMOD.guidesIndex,
+      alternates: { languages: guidesAlt },
     },
-    // Each guide reports its own real edit date, so a crawler is never told a
-    // page changed when only its neighbours did. Both language routes list
+    // Each guide reports its real edit date (GUIDES[].updated, но не раньше
+    // LASTMOD.guides), никогда не «сейчас». Both language routes list
     // each other via alternates.languages (hreflang) so a crawler knows
     // they're the same article, not duplicate content.
     ...GUIDES.flatMap(g => [
       {
         url: `https://invoices.kz/guides/${g.slug}`,
-        lastModified: new Date(g.updated),
-        changeFrequency: 'monthly' as const,
-        priority: 0.7,
+        lastModified: guideLastmod(g.updated),
         alternates: { languages: guideAlternates(g.slug) },
       },
       {
         url: `https://invoices.kz/guides/kk/${g.slug}`,
-        lastModified: new Date(g.updated),
-        changeFrequency: 'monthly' as const,
-        priority: 0.7,
+        lastModified: guideLastmod(g.updated),
         alternates: { languages: guideAlternates(g.slug) },
       },
     ]),
-    {
-      url: 'https://invoices.kz/privacy',
-      lastModified: new Date(),
-      changeFrequency: 'monthly',
-      priority: 0.3,
-    },
-    {
-      url: 'https://invoices.kz/terms',
-      lastModified: new Date(),
-      changeFrequency: 'monthly',
-      priority: 0.3,
-    },
+    { url: 'https://invoices.kz/privacy', lastModified: LASTMOD.privacy },
+    { url: 'https://invoices.kz/terms', lastModified: LASTMOD.terms },
   ]
 }
