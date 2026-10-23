@@ -35,10 +35,10 @@ describe('toggleProduct', () => {
 })
 
 describe('locked products are never selectable by default', () => {
-  it('excludes wildberries (locked); salon is public by application since 21.09', () => {
+  it('excludes wildberries (locked), cfo and salon (closed teasers, salon closed 23.10.2026)', () => {
     expect(SELECTABLE_KEYS).not.toContain('wildberries')
     expect(SELECTABLE_KEYS).not.toContain('cfo')
-    expect(SELECTABLE_KEYS).toContain('salon')
+    expect(SELECTABLE_KEYS).not.toContain('salon')
   })
   it('isInMyProducts with no choice reflects the same set', () => {
     expect(isInMyProducts(null, 'invoices')).toBe(true)

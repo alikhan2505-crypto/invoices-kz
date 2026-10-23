@@ -19,9 +19,9 @@ export async function generateMetadata({ params }: { params: Promise<{ key: stri
   const { key } = await params
   if (!isLandingKey(key)) return {}
   const l = LANDINGS[key]
-  // CFO is in closed beta: keep it out of search until it opens. (Not keyed off access === 'invite' --
-  // salon is also invite-only but its indexing must stay as is.) Remove this when cfo goes 'open'.
-  const robots = key === 'cfo' ? { index: false } : undefined
+  // CFO и Салон закрыты (admin-only «скоро», решение основателя 23.10.2026 для салона):
+  // держим их вне поиска, пока не откроются. Убрать условие, когда продукт станет открытым.
+  const robots = key === 'cfo' || key === 'salon' ? { index: false } : undefined
   // Поисковикам — только русский: язык страницы живёт в браузере, отдельного
   // URL/hreflang для казахской версии нет, а смесь двух языков в одной строке
   // выходила за лимиты сниппета (title <= 60, description <= 155).

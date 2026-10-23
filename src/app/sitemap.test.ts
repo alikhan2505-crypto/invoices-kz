@@ -15,6 +15,10 @@ const ALLOWED_HOSTS = new Set([
 const entries = sitemap()
 
 describe('sitemap', () => {
+  it('закрытый салон (noindex, «скоро») в карте сайта не светится', () => {
+    expect(entries.some(e => new URL(e.url).hostname === 'salon.invoices.kz')).toBe(false)
+  })
+
   it('не содержит /login и других служебных адресов', () => {
     for (const e of entries) {
       const path = new URL(e.url).pathname

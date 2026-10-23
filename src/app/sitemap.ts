@@ -50,7 +50,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     // docs./api. above. Added 05.10.2026.
     { url: 'https://kaspi.invoices.kz/', lastModified: LASTMOD.productLandings },
     { url: 'https://agent.invoices.kz/', lastModified: LASTMOD.productLandings },
-    { url: 'https://salon.invoices.kz/', lastModified: LASTMOD.productLandings },
+    // salon.invoices.kz закрыт («скоро», noindex) с 23.10.2026 -- в карте сайта его нет.
     // Бесплатные инструменты /tools. Порядок — как в индексе. У переведённых
     // (LOCALIZED_TOOL_SLUGS в src/lib/tools-i18n) три адреса — ru /tools/<slug>,
     // kk /tools/kk/<slug>, en /tools/en/<slug> — и каждый перечисляет все три
