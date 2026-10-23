@@ -5,7 +5,7 @@ export const ACCOUNT_KIND_LABEL: Record<AccountKind, string> = { bank: 'Банк
 // (расширяет check-ограничение kind в базе). Пока она не применена, вставка
 // такого счёта упала бы на ограничении — поэтому пункт спрятан. После
 // применения миграции переключить на true.
-export const LOAN_KIND_ENABLED = false
+export const LOAN_KIND_ENABLED = true
 export const SELECTABLE_ACCOUNT_KINDS: AccountKind[] = (Object.keys(ACCOUNT_KIND_LABEL) as AccountKind[]).filter((k) => LOAN_KIND_ENABLED || k !== 'loan')
 export const ARTICLE_KIND_LABEL: Record<ArticleKind, string> = { income: 'Доход', expense: 'Расход' }
 export const ACTIVITY_LABEL: Record<Activity, string> = { operating: 'Операционная', investing: 'Инвестиционная', financing: 'Финансовая' }
