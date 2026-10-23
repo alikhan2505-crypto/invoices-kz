@@ -31,6 +31,20 @@ const nextConfig: NextConfig = {
     '/api/print/orders/**': ['public/fonts/print-shop/**/*.ttf'],
     '/api/cron/kaspi-poll': ['public/fonts/print-shop/**/*.ttf'],
   },
+  // Базовые заголовки безопасности (аудит 24.10.2026). Без X-Frame-Options и CSP:
+  // чат-виджет для сайтов клиентов встраивается во внешние страницы в iframe, а CSP
+  // для всего приложения нужен отдельным шагом с Report-Only. Салоны отдают свой CSP сами.
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+        ],
+      },
+    ]
+  },
   // Короткие адреса для печатных QR (наклейки на машине и т.п.). QR напечатан навсегда,
   // а куда он ведёт — меняется здесь; utm показывает в аналитике, сколько людей пришло с машины.
   // permanent: false — браузеры не кешируют, поэтому цель можно поменять в любой момент.
