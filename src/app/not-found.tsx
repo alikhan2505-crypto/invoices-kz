@@ -1,12 +1,12 @@
 'use client'
 import { useRouter } from 'next/navigation'
 import { useLanguage } from '@/components/LanguageProvider'
-import { miscDict } from '@/lib/i18n/misc'
+import { notFoundDict } from '@/lib/i18n/notFound'
 
 export default function NotFound() {
   const router = useRouter()
   const { lang } = useLanguage()
-  const t = miscDict[lang]
+  const t = notFoundDict[lang]
 
   return (
     <main className="min-h-screen bg-gray-50 flex items-center justify-center p-4">

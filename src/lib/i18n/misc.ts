@@ -1,3 +1,5 @@
+import { notFoundDict } from './notFound'
+
 export interface MiscContent {
   // shared
   errorPrefix: (message: string) => string
@@ -154,9 +156,7 @@ export const miscDict: Record<'ru' | 'kk' | 'en', MiscContent> = {
     tryAgainDefault: 'Попробуйте снова',
     loadingLabel: 'Загрузка...',
 
-    notFoundTitle: 'Страница не найдена',
-    notFoundBody: 'Возможно ссылка устарела или страница была удалена',
-    goHomeButton: 'На главную',
+    ...notFoundDict.ru,
 
     applyingPromoLabel: 'Применяем промокод...',
 
@@ -297,9 +297,7 @@ export const miscDict: Record<'ru' | 'kk' | 'en', MiscContent> = {
     tryAgainDefault: 'Қайталап көріңіз',
     loadingLabel: 'Жүктелуде...',
 
-    notFoundTitle: 'Бет табылмады',
-    notFoundBody: 'Сілтеме ескірген немесе бет жойылған болуы мүмкін',
-    goHomeButton: 'Басты бетке',
+    ...notFoundDict.kk,
 
     applyingPromoLabel: 'Промокод қолданылуда...',
 
@@ -440,9 +438,7 @@ export const miscDict: Record<'ru' | 'kk' | 'en', MiscContent> = {
     tryAgainDefault: 'Please try again',
     loadingLabel: 'Loading...',
 
-    notFoundTitle: 'Page not found',
-    notFoundBody: 'This link may be outdated or the page may have been removed',
-    goHomeButton: 'Go home',
+    ...notFoundDict.en,
 
     applyingPromoLabel: 'Applying promo code...',
 

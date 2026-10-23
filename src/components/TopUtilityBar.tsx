@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import { useEffectivePath } from '@/lib/useEffectivePath'
+import { isUtilityBarHiddenPath } from '@/lib/utilityBarPaths'
 import Link from 'next/link'
 import QRCode from 'qrcode'
 import { supabase } from '@/lib/supabase'
@@ -611,51 +612,10 @@ export default function TopUtilityBar() {
     router.push(await signOutForLogin())
   }
 
-  // App chrome has no business on public/marketing pages: the landing, auth,
-  // legal pages, and client-facing public document views (where the viewer
-  // may be a logged-in platform user who is NOT the document's owner).
-  const isPublicPage =
-    pathname === '/' ||
-    pathname === '/login' ||
-    pathname === '/privacy' ||
-    pathname === '/terms' ||
-    pathname === '/data-deletion' ||
-    pathname === '/cashier-api' ||
-    pathname === '/invoices-landing' ||
-    pathname.startsWith('/lp/') ||
-    pathname.startsWith('/view/') ||
-    pathname.startsWith('/contract-view/') ||
-    pathname.startsWith('/verify/') ||
-    pathname.startsWith('/promo/') ||
-    pathname.startsWith('/shop/') ||
-    pathname.startsWith('/tools/') ||
-    // Гайды — публичные статьи со своей шапкой: плашка закрывала там
-    // переключатель «Қазақша» у вошедших (15.10.2026).
-    pathname === '/tools' ||
-    pathname === '/guides' ||
-    pathname.startsWith('/guides/')
-  if (isPublicPage) return null
-
-  // Founder-requested 2026-09-17: not a public page (opposite reason from
-  // isPublicPage above) -- this is an internal admin tool with its own
-  // dedicated header, and the wallet balance is just noise there, not
-  // something the founder needs while generating salon landing pages.
-  if (pathname === '/admin/site-generator') return null
-
-  // Same reasoning, 2026-09-18: the salon booking planner is reached via its
-  // own Telegram-QR login (src/lib/plannerAuth.ts), not the platform's
-  // normal session -- this bar showing the FOUNDER's own wallet/profile here
-  // (visible whenever the same browser also happens to have a normal
-  // logged-in session, e.g. during testing) has nothing to do with whichever
-  // salon's planner is on screen. A reception tablet with no ordinary session
-  // at all would already get `!loggedIn` below regardless; this is the
-  // explicit, unconditional version of that for the case where one exists.
-  if (pathname?.startsWith('/planner/')) return null
-
-  // 21.09.2026: /products is the start page (DESIGN.md §7), with its own
-  // header and its own top-right button -- this fixed bar would sit on top of
-  // it. The wallet and profile stay one click away via its "Дашборд" link.
-  if (pathname === '/products') return null
+  // Pages with no bar (public/marketing, admin site-generator, salon planner,
+  // /products): one list in src/lib/utilityBarPaths.ts, shared with
+  // TopUtilityBarGate, which does not even load this component there.
+  if (isUtilityBarHiddenPath(pathname)) return null
 
   if (!loggedIn) return null
   // Страница без DesktopShell со своей шапкой высотой 80px на компьютере

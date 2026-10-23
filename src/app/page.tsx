@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
 import { Unbounded, Onest, Caveat } from 'next/font/google'
-import InvoicesLandingPage from '@/components/marketing/InvoicesLandingPage'
 import ProductsHub from './products/ProductsHub'
 import { ROOT_HUB_LIVE } from '@/lib/rootHub'
 import VisitBeacon from '@/components/VisitBeacon'
@@ -48,6 +47,15 @@ export function generateMetadata(): Metadata {
 
 export default function Home() {
   // VisitBeacon — счётчик заходов для отчёта «Машина/QR» (src/lib/visits).
-  if (!ROOT_HUB_LIVE) return <><VisitBeacon /><InvoicesLandingPage /></>
+  // The flag is compared inline (not via ROOT_HUB_LIVE) and the landing is
+  // require()d inside the branch so the bundler can drop it, and framer-motion
+  // with it, from the Hub build: a static import stayed in the client manifest
+  // (~130 KB of JS on '/') even though it never rendered. Same condition as
+  // ROOT_HUB_LIVE in src/lib/rootHub.ts.
+  if (process.env.NEXT_PUBLIC_ROOT_HUB_LIVE !== '1') {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const InvoicesLandingPage = require('@/components/marketing/InvoicesLandingPage').default
+    return <><VisitBeacon /><InvoicesLandingPage /></>
+  }
   return <><VisitBeacon /><ProductsHub fontClass={`${unbounded.variable} ${onest.variable} ${caveat.variable}`} /></>
 }

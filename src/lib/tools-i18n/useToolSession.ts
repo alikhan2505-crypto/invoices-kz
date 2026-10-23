@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { mightHaveStoredSession } from '@/lib/hasStoredSession'
 import { hasKaspiShopAccess, KASPI_SHOP_PROFILE_COLUMNS } from '@/lib/kaspiShop/access'
 
 // Is the visitor of a free tool signed in (and, for the margin tool, do they
@@ -8,7 +8,9 @@ import { hasKaspiShopAccess, KASPI_SHOP_PROFILE_COLUMNS } from '@/lib/kaspiShop/
 // client render -- the tools are statically rendered for search engines, so
 // anything else would be a hydration mismatch -- and switches after mount.
 // Reads only the locally stored session (supabase.auth.getSession(), no
-// network); a stale token just means the cabinet page's own guard sends the
+// network), and loads supabase-js at all only when this browser has a stored
+// session -- anonymous visitors (nearly all search traffic) never download it.
+// A stale token just means the cabinet page's own guard sends the
 // person to /login, which now handles that.
 export interface ToolSession {
   signedIn: boolean
@@ -20,8 +22,10 @@ export function useToolSession({ withKaspiAccess = false }: { withKaspiAccess?: 
 
   useEffect(() => {
     let cancelled = false
+    if (!mightHaveStoredSession()) return
     ;(async () => {
       try {
+        const { supabase } = await import('@/lib/supabase')
         const { data: { session } } = await supabase.auth.getSession()
         if (cancelled || !session) return
         if (!withKaspiAccess) { setState({ signedIn: true, kaspiShopAccess: false }); return }

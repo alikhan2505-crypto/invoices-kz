@@ -3,7 +3,6 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import BrandWordmark from '@/components/BrandWordmark'
 import { track } from '@vercel/analytics'
-import { generateInvoicePDF } from '@/lib/generatePDF'
 import { KAZAKHSTAN_BANKS, OTHER_BANK } from '@/lib/kazakhstanBanks'
 import { useLanguage } from '@/components/LanguageProvider'
 import { formatTenge, toolLinkPath, toolsIndexPath, TOOL_CHROME, type ToolLang } from '@/lib/tools-i18n'
@@ -177,6 +176,18 @@ export default function SchetTool({ lang, children }: { lang: ToolLang; children
       win.document.write('<!doctype html><meta charset="utf-8"><p style="font:14px system-ui,sans-serif;padding:24px;color:#555">…</p>')
       win.document.close()
     } catch {}
+    // PDF-модуль грузим ДО занятия слота: если чанк не загрузится (сеть, деплой
+    // во время открытой вкладки), слот не сгорит.
+    let pdfModule: typeof import('@/lib/generatePDF')
+    try {
+      pdfModule = await import('@/lib/generatePDF')
+    } catch {
+      try { win.close() } catch {}
+      busy.current = false
+      setGenerating(false)
+      setError(t.errors.failed)
+      return
+    }
     // Занимаем документ на сервере ДО генерации: лимит 3 в квартал на IP
     // держит только сервер. Квартал исчерпан — закрываем пустое окно и
     // показываем карточку лимита; сервер/сеть недоступны — документ не делаем.
@@ -197,6 +208,9 @@ export default function SchetTool({ lang, children }: { lang: ToolLang; children
     track('tool_schet_generate', { lang })
     try {
       const bank = resolveBank(f)
+      // Loaded on demand: pulls in qrcode and the whole PDF template (~95 KB)
+      // that a visitor only needs once they press the button.
+      const { generateInvoicePDF } = pdfModule
       const html = await generateInvoicePDF({
         // Страница с кнопками «Назад / Печать / Скачать PDF», как у КП, АВР и накладной.
         autoPrint: false,

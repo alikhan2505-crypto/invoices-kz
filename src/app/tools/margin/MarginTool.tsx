@@ -5,7 +5,6 @@ import BrandWordmark from '@/components/BrandWordmark'
 import { PRODUCTS } from '@/lib/products'
 import { motion, useReducedMotion } from 'framer-motion'
 import { track } from '@vercel/analytics'
-import * as XLSX from 'xlsx'
 import { useLanguage } from '@/components/LanguageProvider'
 import { calculateMargin, MarginInput } from '@/lib/marginCalc'
 import { KASPI_CATEGORY_COMMISSIONS } from '@/lib/kaspiShop/margin'
@@ -174,7 +173,9 @@ export default function MarginTool({ lang }: { lang: ToolLang }) {
     return () => { if (statTimer.current) clearTimeout(statTimer.current) }
   }, [sendStat, lang])
 
-  function exportExcel() {
+  async function exportExcel() {
+    // Loaded on click: xlsx is ~400 KB and only needed for this download.
+    const XLSX = await import('xlsx')
     const row = (param: string, value: string | number) => ({ [t.excelHeaderParam]: param, [t.excelHeaderValue]: value })
     const rows: Record<string, string | number>[] = [
       ...(category ? [row(t.categoryLabel, categoryName(category))] : []),

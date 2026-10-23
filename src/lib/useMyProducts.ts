@@ -1,6 +1,7 @@
 'use client'
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react'
-import { supabase } from './supabase'
+import { loadSupabase } from './lazySupabase'
+import { mightHaveStoredSession } from './hasStoredSession'
 import { parseMyProducts, serializeMyProducts, type ProductKey } from './products'
 
 // Which products are connected to this account (menu shows only these). The
@@ -50,6 +51,9 @@ let refreshed: Promise<void> | null = null
 function refreshFromProfile(): Promise<void> {
   if (!refreshed) {
     refreshed = (async () => {
+      // No stored login: nothing to fetch, so supabase-js is never downloaded.
+      if (!mightHaveStoredSession()) { writeCache(null); return }
+      const supabase = await loadSupabase()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { writeCache(null); return }
       const { data } = await supabase.from('profiles').select('enabled_products').eq('id', user.id).single()
@@ -65,6 +69,7 @@ function refreshFromProfile(): Promise<void> {
 // never overwrite it with an older one.
 export async function connectProduct(key: ProductKey): Promise<void> {
   await refreshFromProfile()
+  const supabase = await loadSupabase()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return
   const { data } = await supabase.from('profiles').select('enabled_products').eq('id', user.id).single()
@@ -82,9 +87,9 @@ export function useMyProducts(): [ProductKey[] | null, (next: ProductKey[]) => v
   useEffect(() => { void refreshFromProfile() }, [])
   const save = useCallback((next: ProductKey[]) => {
     writeCache(serializeMyProducts(next))
-    void supabase.auth.getUser().then(({ data: { user } }) => {
+    void loadSupabase().then((supabase) => supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) void supabase.from('profiles').update({ enabled_products: next }).eq('id', user.id)
-    })
+    }))
   }, [])
   return [mine, save]
 }

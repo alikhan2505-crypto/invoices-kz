@@ -1,7 +1,8 @@
 'use client'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { loadSupabase } from '@/lib/lazySupabase'
+import { mightHaveStoredSession } from '@/lib/hasStoredSession'
 import { getActivePlan } from '@/lib/plan'
 import { PRODUCTS, PERSONAS, PENDING_PERSONA_KEY, personasProducts, selectablePersonaProducts, isInMyProducts, toggleProduct, type ProductDef } from '@/lib/products'
 import { useMyProducts } from '@/lib/useMyProducts'
@@ -70,6 +71,10 @@ export default function ProductsHub({ fontClass }: { fontClass: string }) {
 
   useEffect(() => {
     async function load() {
+      // No stored login in this browser: a guest, decided without downloading
+      // supabase-js (most visitors of '/' are guests).
+      if (!mightHaveStoredSession()) { setWho({ state: 'guest' }); return }
+      const supabase = await loadSupabase()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { setWho({ state: 'guest' }); return }
       const { data } = await supabase.from('profiles').select('is_admin, plan, plan_expires_at, bonus_expires_at, trial_expires_at').eq('id', user.id).single()
