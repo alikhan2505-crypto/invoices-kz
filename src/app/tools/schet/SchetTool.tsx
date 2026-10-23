@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import BrandWordmark from '@/components/BrandWordmark'
 import { track } from '@vercel/analytics'
@@ -52,10 +52,13 @@ const EMPTY: Form = {
 }
 
 // Статья о реквизитах счёта есть на ru и kk; английской нет — en ведёт на русскую.
+// (Тот же путь использует блок «Образец» — schetGuidePath в sample.ts.)
 const guidePath = (lang: ToolLang) =>
   lang === 'kk' ? '/guides/kk/kak-vystavit-schet-ip' : '/guides/kak-vystavit-schet-ip'
 
-export default function SchetTool({ lang }: { lang: ToolLang }) {
+// children — серверный блок «Образец» (SchetSample): его рендерит page.tsx, а
+// здесь он просто встаёт под формой, перед вопросами.
+export default function SchetTool({ lang, children }: { lang: ToolLang; children?: ReactNode }) {
   const t = schetDict[lang]
   const chrome = TOOL_CHROME[lang]
   // Вошедшему блок лимита ведёт в кабинет, а не на /login (15.10.2026).
@@ -421,6 +424,8 @@ export default function SchetTool({ lang }: { lang: ToolLang }) {
             )}
           </div>
         )}
+
+        {children}
 
         <section className="nav-glass rounded-2xl p-5 mt-6" aria-labelledby="sc-faq">
           <h2 id="sc-faq" className="text-sm font-bold mb-2" style={{ color: 'var(--nav-text-primary)' }}>{t.faqTitle}</h2>

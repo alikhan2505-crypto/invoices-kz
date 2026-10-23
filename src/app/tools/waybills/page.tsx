@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import { toolMetadata } from '@/lib/tools-i18n'
 import ToolJsonLd from '@/lib/tools-i18n/ToolJsonLd'
 import ToolFaqJsonLd from '@/lib/tools-i18n/ToolFaqJsonLd'
@@ -19,6 +20,14 @@ export default function Page() {
       <ToolJsonLd slug="waybills" lang={LANG} name={t.h1} description={t.seo.description} />
       <ToolFaqJsonLd slug="waybills" lang={LANG} items={t.faq} />
       <WaybillsTool lang={LANG} />
+      {/* Ссылка на гайд под инструментом: серверная разметка, видна краулеру без JS. */}
+      <div style={{ background: 'var(--nav-bg)' }}>
+        <div className="max-w-2xl mx-auto px-4 lg:px-6 pb-10">
+          <Link href="/guides/nakladnye-kaspi-odnim-pdf" className="text-sm font-semibold" style={{ color: 'var(--nav-accent)' }}>
+            Пошаговый разбор: как распечатать накладные Kaspi одним PDF →
+          </Link>
+        </div>
+      </div>
     </>
   )
 }

@@ -4,6 +4,8 @@ import {
   guideMetaTitle, guidePublished, relatedGuidesOf, type GuideLang,
 } from './guides'
 import { LOCALIZED_TOOL_SLUGS } from './tools-i18n'
+import { WAYBILLS_MONTH_LIMIT } from './toolQuota'
+import { MAX_FILES, sheetCount } from '@/app/tools/waybills/uploads'
 
 const LANGS: GuideLang[] = ['ru', 'kk']
 const words = (s: string) => s.trim().split(/\s+/).length
@@ -66,6 +68,59 @@ describe('guides registry', () => {
     expect(getGuide('kak-vystavit-schet-ip')!.relatedTools).toEqual(expect.arrayContaining(['schet', 'kontragent']))
     expect(getGuide('esf-kazakhstan-2026')!.relatedTools).toContain('schet')
     expect(getGuide('komissiya-kaspi')!.relatedTools).toEqual(expect.arrayContaining(['margin', 'waybills']))
+  })
+})
+
+describe('guide nakladnye-kaspi-odnim-pdf', () => {
+  const guide = getGuide('nakladnye-kaspi-odnim-pdf')!
+
+  it('is registered with the agreed related tools and guides', () => {
+    expect(guide).toBeDefined()
+    expect(guide.relatedTools).toEqual(['waybills', 'margin'])
+    expect(guide.relatedGuides).toEqual(['komissiya-kaspi', 'kak-vystavit-schet-ip'])
+    expect(guide.updated).toBe('2026-10-23')
+  })
+
+  for (const lang of LANGS) {
+    it(`${lang}: 4-5 FAQ items, each with a question and a non-trivial answer`, () => {
+      const faq = guide[lang].faq ?? []
+      expect(faq.length).toBeGreaterThanOrEqual(4)
+      expect(faq.length).toBeLessThanOrEqual(5)
+      for (const f of faq) {
+        expect(f.q.trim().endsWith('?'), f.q).toBe(true)
+        expect(words(f.a), f.q).toBeGreaterThanOrEqual(10)
+      }
+      expect(new Set(faq.map(f => f.q)).size).toBe(faq.length)
+    })
+
+    it(`${lang}: facts match the tool (30 files per merge, 5 free merges, 8 A4 sheets for 30)`, () => {
+      const text = [guide[lang].summary ?? '', ...(guide[lang].faq ?? []).map(f => f.a)].join(' ')
+      expect(text).toContain(String(MAX_FILES))
+      expect(text).toContain(String(WAYBILLS_MONTH_LIMIT))
+      expect(text).toContain(String(sheetCount(MAX_FILES, 'a4')))
+    })
+  }
+
+  it('keeps the A4 / A6 split the tool actually has', () => {
+    expect(sheetCount(30, 'a4')).toBe(8)
+    expect(sheetCount(30, 'a6')).toBe(30)
+  })
+
+  it('the FAQ JSON-LD mirrors the visible Q&A exactly', () => {
+    for (const lang of LANGS) {
+      const graph = guideJsonLdData(guide, lang)['@graph'] as Record<string, unknown>[]
+      const faq = graph.find(n => n['@type'] === 'FAQPage') as {
+        mainEntity: { name: string; acceptedAnswer: { text: string } }[]
+      }
+      expect(faq.mainEntity.map(q => q.name)).toEqual(guide[lang].faq!.map(f => f.q))
+      expect(faq.mainEntity.map(q => q.acceptedAnswer.text)).toEqual(guide[lang].faq!.map(f => f.a))
+    }
+  })
+
+  it('has both language routes and hreflang alternates', () => {
+    const a = guideAlternates(guide.slug)
+    expect(a.ru).toBe('https://invoices.kz/guides/nakladnye-kaspi-odnim-pdf')
+    expect(a.kk).toBe('https://invoices.kz/guides/kk/nakladnye-kaspi-odnim-pdf')
   })
 })
 

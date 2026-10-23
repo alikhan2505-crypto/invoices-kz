@@ -64,6 +64,19 @@ describe('sitemap', () => {
     }
   })
 
+  it('гайд про накладные Kaspi: ru + kk, hreflang, lastmod 2026-10-23', () => {
+    const ru = entries.find(e => e.url === 'https://invoices.kz/guides/nakladnye-kaspi-odnim-pdf')
+    const kk = entries.find(e => e.url === 'https://invoices.kz/guides/kk/nakladnye-kaspi-odnim-pdf')
+    for (const e of [ru, kk]) {
+      expect(e).toBeDefined()
+      expect(e!.lastModified).toBe('2026-10-23')
+      expect(e!.alternates?.languages).toMatchObject({
+        ru: 'https://invoices.kz/guides/nakladnye-kaspi-odnim-pdf',
+        kk: 'https://invoices.kz/guides/kk/nakladnye-kaspi-odnim-pdf',
+      })
+    }
+  })
+
   it('сохраняет главные адреса: корень, гайды, инструменты', () => {
     const urls = new Set(entries.map(e => e.url))
     for (const u of [
