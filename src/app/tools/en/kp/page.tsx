@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { toolMetadata } from '@/lib/tools-i18n'
 import ToolJsonLd from '@/lib/tools-i18n/ToolJsonLd'
 import KpTool from '../../kp/KpTool'
+import KpSample, { KpSampleLink } from '../../kp/KpSample'
 import { kpDict } from '../../kp/dict'
 
 // Языковая версия /tools/kp (en). Серверная обёртка: metadata
@@ -16,7 +17,10 @@ export default function Page() {
   return (
     <>
       <ToolJsonLd slug="kp" lang={LANG} name={t.h1} description={t.seo.description} />
-      <KpTool lang={LANG} />
+      <KpSampleLink lang={LANG} />
+      <KpTool lang={LANG}>
+        <KpSample lang={LANG} />
+      </KpTool>
     </>
   )
 }

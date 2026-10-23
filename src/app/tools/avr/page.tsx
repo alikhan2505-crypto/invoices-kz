@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { toolMetadata } from '@/lib/tools-i18n'
 import ToolJsonLd from '@/lib/tools-i18n/ToolJsonLd'
 import AvrTool from './AvrTool'
+import AvrSample, { AvrSampleLink } from './AvrSample'
 import { avrDict } from './dict'
 
 // Языковая версия /tools/avr (ru). Серверная обёртка: metadata
@@ -17,7 +18,10 @@ export default function Page() {
   return (
     <>
       <ToolJsonLd slug="avr" lang={LANG} name={t.h1} description={t.seo.description} />
-      <AvrTool lang={LANG} />
+      <AvrSampleLink lang={LANG} />
+      <AvrTool lang={LANG}>
+        <AvrSample lang={LANG} />
+      </AvrTool>
     </>
   )
 }

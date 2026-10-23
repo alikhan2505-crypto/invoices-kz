@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { toolMetadata } from '@/lib/tools-i18n'
 import ToolJsonLd from '@/lib/tools-i18n/ToolJsonLd'
 import NakladnayaTool from './NakladnayaTool'
+import NakladnayaSample, { NakladnayaSampleLink } from './NakladnayaSample'
 import { nakladnayaDict } from './dict'
 
 // Языковая версия /tools/nakladnaya (ru). Серверная обёртка: metadata
@@ -16,7 +17,10 @@ export default function Page() {
   return (
     <>
       <ToolJsonLd slug="nakladnaya" lang={LANG} name={t.h1} description={t.seo.description} />
-      <NakladnayaTool lang={LANG} />
+      <NakladnayaSampleLink lang={LANG} />
+      <NakladnayaTool lang={LANG}>
+        <NakladnayaSample lang={LANG} />
+      </NakladnayaTool>
     </>
   )
 }

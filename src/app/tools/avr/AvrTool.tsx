@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import BrandWordmark from '@/components/BrandWordmark'
 import { track } from '@vercel/analytics'
@@ -49,7 +49,9 @@ const EMPTY: Form = {
   rows: [{ name: '', qty: '1', unit: DEFAULT_UNIT, price: '' }],
 }
 
-export default function AvrTool({ lang }: { lang: ToolLang }) {
+// children — серверный блок «Образец» (AvrSample): его рендерит page.tsx, а
+// здесь он просто встаёт под формой, перед вопросами.
+export default function AvrTool({ lang, children }: { lang: ToolLang; children?: ReactNode }) {
   const t = avrDict[lang]
   const chrome = TOOL_CHROME[lang]
   // Вошедшему блок лимита ведёт в кабинет, а не на /login (15.10.2026).
@@ -386,6 +388,8 @@ export default function AvrTool({ lang }: { lang: ToolLang }) {
             )}
           </div>
         )}
+
+        {children}
 
         <section className="nav-glass rounded-2xl p-5 mt-6" aria-labelledby="avr-faq">
           <h2 id="avr-faq" className="text-sm font-bold mb-2" style={{ color: 'var(--nav-text-primary)' }}>{t.faqTitle}</h2>

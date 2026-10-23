@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import BrandWordmark from '@/components/BrandWordmark'
 import { track } from '@vercel/analytics'
@@ -67,7 +67,9 @@ function parseQuota(data: unknown): Quota | null {
 
 const digits = (s: string) => s.replace(/\D/g, '')
 
-export default function KpTool({ lang }: { lang: ToolLang }) {
+// children — серверный блок «Образец» (KpSample): его рендерит page.tsx, а
+// здесь он просто встаёт под формой, перед вопросами.
+export default function KpTool({ lang, children }: { lang: ToolLang; children?: ReactNode }) {
   const t = kpDict[lang]
   const chrome = TOOL_CHROME[lang]
   // Вошедшему блок лимита ведёт в кабинет, а не на /login (15.10.2026).
@@ -415,6 +417,8 @@ export default function KpTool({ lang }: { lang: ToolLang }) {
             )}
           </div>
         )}
+
+        {children}
 
         <section className="nav-glass rounded-2xl p-5 mt-6">
           <h2 className="text-sm font-bold mb-3" style={{ color: 'var(--nav-text-primary)' }}>{t.faqTitle}</h2>
