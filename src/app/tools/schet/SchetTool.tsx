@@ -16,6 +16,7 @@ import { anonymousToolHref, signedInToolHref } from '@/lib/tools-i18n/signedInDe
 import BinNameField from '@/lib/tools-i18n/BinNameField'
 import { claimDocSlot, DOC_QUOTA_DEFAULT_LIMIT, useDocQuota } from '@/lib/tools-i18n/docQuota'
 import { schetDict } from './dict'
+import { autoKbe, isDraftKbeManual, needsManualKbe, suggestKbe } from '@/lib/kbe'
 import {
   digits, documentRows, documentTotal, localToday, resolveBank, ruDate, validateForm, vatIncluded,
   VAT_TYPES, type Form, type Row, type VatType,
@@ -38,6 +39,10 @@ const DRAFT_KEY = 'tool-schet-draft'
 // возвращается после перезагрузки, и без этого ключа галочка вставала бы
 // обратно — следующий документ отправил бы email вопреки отказу.
 const CONSENT_KEY = 'tool-schet-consent'
+// КБе подставляется по названию/ИИН, пока человек сам не тронул поле. Состояние
+// пишем отдельным ключом явно: '1' — правили руками, '0' — следует за подсказкой
+// (по самому черновику автоподставленное 17 не отличить от введённого вручную).
+const KBE_MANUAL_KEY = 'tool-schet-kbe-manual'
 
 // Дата заполняется на клиенте после монтирования: сервер и браузер живут в
 // разных часовых поясах, а модуль на сервере может жить сутками.
@@ -72,6 +77,9 @@ export default function SchetTool({ lang, children }: { lang: ToolLang; children
   // первый же эффект сохранения затёр бы его пустой формой (в dev React
   // запускает эффекты дважды, и черновик терялся бы).
   const [ready, setReady] = useState(false)
+  // true — КБе ввели руками (или он остался из старого черновика): подсказка
+  // его больше не перезаписывает.
+  const [kbeManual, setKbeManual] = useState(false)
 
   // Черновик переживает перезагрузку: заполнять реквизиты заново — главная
   // причина бросить такой инструмент на середине.
@@ -81,6 +89,14 @@ export default function SchetTool({ lang, children }: { lang: ToolLang; children
     try {
       const raw = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null')
       if (raw && typeof raw === 'object' && Array.isArray(raw.rows)) draft = raw
+    } catch {}
+    try {
+      const flag = localStorage.getItem(KBE_MANUAL_KEY)
+      const manual = isDraftKbeManual(flag, draft?.kbe)
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setKbeManual(manual)
+      // Черновик из версии без флага: фиксируем вывод, чтобы дальше он не плыл.
+      if (flag !== '0' && flag !== '1') localStorage.setItem(KBE_MANUAL_KEY, manual ? '1' : '0')
     } catch {}
     setF(prev => {
       const next: Form = { ...prev, ...(draft || {}) }
@@ -101,6 +117,20 @@ export default function SchetTool({ lang, children }: { lang: ToolLang; children
   }, [f, ready])
 
   const set = (patch: Partial<Form>) => setF(prev => ({ ...prev, ...patch }))
+  // КБе по продавцу: название (его же подставляет поиск по БИН) и ИИН. Пока
+  // человек не правил поле, оно следует за подсказкой; нечего подсказать — '19'.
+  const kbeSuggestion = useMemo(() => suggestKbe({ name: f.companyName, bin: f.binIin }), [f.companyName, f.binIin])
+  useEffect(() => {
+    if (!ready || kbeManual) return
+    const next = autoKbe({ name: f.companyName, bin: f.binIin })
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setF(prev => (prev.kbe === next ? prev : { ...prev, kbe: next }))
+  }, [ready, kbeManual, f.companyName, f.binIin])
+  const changeKbe = (value: string) => {
+    setKbeManual(true)
+    try { localStorage.setItem(KBE_MANUAL_KEY, '1') } catch {}
+    set({ kbe: digits(value).slice(0, 2) })
+  }
   // Согласие на рассылку для email продавца — галочка стоит по умолчанию
   // (решение основателя 14.10.2026, как в /tools/kp); снять можно здесь и по
   // ссылке «Отписаться» в любом письме (политика конфиденциальности).
@@ -294,7 +324,10 @@ export default function SchetTool({ lang, children }: { lang: ToolLang; children
             </div>
             <div>
               <label htmlFor="sc-kbe" className={label} style={labelStyle}>{t.kbeLabel}</label>
-              <input id="sc-kbe" className={input} style={inputStyle} inputMode="numeric" autoComplete="off" value={f.kbe} onChange={e => set({ kbe: digits(e.target.value).slice(0, 2) })} />
+              <input id="sc-kbe" className={input} style={inputStyle} inputMode="numeric" autoComplete="off" aria-describedby="sc-kbe-hint" value={f.kbe} onChange={e => changeKbe(e.target.value)} />
+              <div id="sc-kbe-hint" className="text-[11px] mt-1" style={{ color: 'var(--nav-text-muted)' }}>
+                {needsManualKbe({ name: f.companyName, bin: f.binIin }) ? t.kbeHintManual : t.kbeHint}{!kbeManual && kbeSuggestion !== null && ` ${t.kbeAuto}`}
+              </div>
             </div>
             <div>
               <label htmlFor="sc-director" className={label} style={labelStyle}>{t.directorLabel}</label>

@@ -31,6 +31,11 @@ export interface SchetDict {
   iikLabel: string
   iikPlaceholder: string
   kbeLabel: string
+  /** Подпись под полем КБе: что поставить и «проверьте по банку». */
+  kbeHint: string
+  kbeHintManual: string
+  /** Добавляется к подписи, когда КБе подставлен по названию, а не введён вручную. */
+  kbeAuto: string
   directorLabel: string
   directorPlaceholder: string
   addressLabel: string
@@ -123,6 +128,9 @@ export const schetDict: Record<ToolLang, SchetDict> = {
     iikLabel: 'ИИК (счёт KZ…) *',
     iikPlaceholder: 'KZ…',
     kbeLabel: 'КБе',
+    kbeHint: '19 — для ИП и физлиц, 17 — для ТОО. Проверьте по реквизитам вашего банка.',
+    kbeHintManual: 'Для АО и других форм КБе зависит от сектора экономики — укажите его по реквизитам вашего банка.',
+    kbeAuto: 'Подставлено автоматически.',
     directorLabel: 'Руководитель',
     directorPlaceholder: 'для строки подписи',
     addressLabel: 'Адрес',
@@ -228,6 +236,9 @@ export const schetDict: Record<ToolLang, SchetDict> = {
     iikLabel: 'ЖСК (KZ… банктік шот) *',
     iikPlaceholder: 'KZ…',
     kbeLabel: 'КБе',
+    kbeHint: '19 — ЖК мен жеке тұлғалар үшін, 17 — ЖШС үшін. Өз банкіңіздің деректемелері бойынша тексеріңіз.',
+    kbeHintManual: 'АҚ және өзге нысандар үшін КБе экономика секторына байланысты — оны банкіңіздің деректемелерінен көрсетіңіз.',
+    kbeAuto: 'Автоматты түрде қойылды.',
     directorLabel: 'Басшы',
     directorPlaceholder: 'қол қою жолы үшін',
     addressLabel: 'Мекенжай',
@@ -333,6 +344,9 @@ export const schetDict: Record<ToolLang, SchetDict> = {
     iikLabel: 'Account, IIK / IBAN (KZ…) *',
     iikPlaceholder: 'KZ…',
     kbeLabel: 'Kbe (beneficiary code)',
+    kbeHint: '19 is for sole proprietors (IP) and individuals, 17 is for LLPs (TOO). Check it against your bank’s details.',
+    kbeHintManual: 'For joint-stock companies and other forms the code depends on the economic sector — enter it from your bank’s details.',
+    kbeAuto: 'Filled in automatically.',
     directorLabel: 'Director',
     directorPlaceholder: 'for the signature line',
     addressLabel: 'Address',

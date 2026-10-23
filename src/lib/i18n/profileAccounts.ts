@@ -29,6 +29,11 @@ export interface ProfileAccountsContent {
   bikFromRegistryHint: string
   kbeFieldLabel: string
   kbePlaceholder: string
+  /** Подпись под полем КБе: что поставить и «проверьте по банку». */
+  kbeHint: string
+  kbeHintManual: string
+  /** Добавляется к подписи, когда КБе подставлен по названию компании профиля. */
+  kbeAutoNote: string
   currencyFieldLabel: string
   addLabel: string
   addAccountButton: string
@@ -104,6 +109,9 @@ export const profileAccountsDict: Record<'ru' | 'kk' | 'en', ProfileAccountsCont
     bikFromRegistryHint: 'БИК подставлен автоматически',
     kbeFieldLabel: 'КБе',
     kbePlaceholder: '19',
+    kbeHint: '19 — для ИП и физлиц, 17 — для ТОО. Проверьте по реквизитам вашего банка.',
+    kbeHintManual: 'Для АО и других форм КБе зависит от сектора экономики — укажите его по реквизитам вашего банка.',
+    kbeAutoNote: 'Подставлено автоматически.',
     currencyFieldLabel: 'Валюта',
     addLabel: 'Добавить',
     addAccountButton: 'Добавить счёт',
@@ -174,6 +182,9 @@ export const profileAccountsDict: Record<'ru' | 'kk' | 'en', ProfileAccountsCont
     bikFromRegistryHint: 'БСК автоматты түрде қойылды',
     kbeFieldLabel: 'КБЕ',
     kbePlaceholder: '19',
+    kbeHint: '19 — ЖК мен жеке тұлғалар үшін, 17 — ЖШС үшін. Өз банкіңіздің деректемелері бойынша тексеріңіз.',
+    kbeHintManual: 'АҚ және өзге нысандар үшін КБе экономика секторына байланысты — оны банкіңіздің деректемелерінен көрсетіңіз.',
+    kbeAutoNote: 'Автоматты түрде қойылды.',
     currencyFieldLabel: 'Валюта',
     addLabel: 'Қосу',
     addAccountButton: 'Шот қосу',
@@ -244,6 +255,9 @@ export const profileAccountsDict: Record<'ru' | 'kk' | 'en', ProfileAccountsCont
     bikFromRegistryHint: 'BIK filled in automatically',
     kbeFieldLabel: 'KBe',
     kbePlaceholder: '19',
+    kbeHint: '19 is for sole proprietors (IP) and individuals, 17 is for LLPs (TOO). Check it against your bank’s details.',
+    kbeHintManual: 'For joint-stock companies and other forms the code depends on the economic sector — enter it from your bank’s details.',
+    kbeAutoNote: 'Filled in automatically.',
     currencyFieldLabel: 'Currency',
     addLabel: 'Add',
     addAccountButton: 'Add account',

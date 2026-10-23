@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { toolMetadata } from '@/lib/tools-i18n'
 import ToolJsonLd from '@/lib/tools-i18n/ToolJsonLd'
 import SchetTool from '../../schet/SchetTool'
-import SchetSample from '../../schet/SchetSample'
+import SchetSample, { SchetSampleLink } from '../../schet/SchetSample'
 import { schetDict, schetFaqJsonLd } from '../../schet/dict'
 
 // Языковая версия /tools/schet (en). Серверная обёртка: metadata
@@ -19,6 +19,7 @@ export default function Page() {
       <ToolJsonLd slug="schet" lang={LANG} name={t.h1} description={t.seo.description} />
       {/* Строка из своего словаря, '<' уже экранирован в schetFaqJsonLd. */}
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: schetFaqJsonLd(LANG) }} />
+      <SchetSampleLink lang={LANG} />
       <SchetTool lang={LANG}>
         <SchetSample lang={LANG} />
       </SchetTool>

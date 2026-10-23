@@ -14,6 +14,7 @@ import { validateIik, normalizeIik } from '@/lib/kzIdentifiers'
 import { profileBonusDict } from '@/lib/i18n/profileBonus'
 import { claimAndAnnounceBonus } from '@/lib/profileBonusClient'
 import PageHeader from '@/components/PageHeader'
+import { autoKbe, needsManualKbe, suggestKbe } from '@/lib/kbe'
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
 // kept identical rather than inventing a second "house" ease.
@@ -85,6 +86,21 @@ export default function Banks() {
   const [manualBank, setManualBank] = useState(false)
   // Ошибку ИИК показываем после попытки сохранить или когда набрано 20 знаков.
   const [iikTouched, setIikTouched] = useState(false)
+  // Компания из профиля — по ней подставляем КБе нового счёта (ТОО -> 17, ИП -> 19).
+  const [kbeSource, setKbeSource] = useState<{ name: string; bin: string }>({ name: '', bin: '' })
+  // true — КБе правили руками или открыт сохранённый счёт: подсказка его не
+  // трогает. Сохранённый КБе автоматически не меняется никогда.
+  const [kbeManual, setKbeManual] = useState(false)
+  const kbeSuggestion = suggestKbe(kbeSource)
+
+  // Новый счёт: пока поле не тронуто, КБе следует за профилем (профиль может
+  // дозагрузиться уже после открытия формы).
+  useEffect(() => {
+    if (!showForm || editingId || kbeManual) return
+    const next = autoKbe(kbeSource)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setForm(prev => (prev.kbe === next ? prev : { ...prev, kbe: next }))
+  }, [showForm, editingId, kbeManual, kbeSource])
 
   // The picker's value is derived from the form rather than stored alongside
   // it: two sources for one fact drift, and the drifted one is what would be
@@ -120,13 +136,20 @@ export default function Banks() {
   async function loadAccounts() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
-    const { data } = await supabase.from('bank_accounts').select('*').eq('user_id', user.id).order('created_at')
+    const [{ data }, { data: prof }] = await Promise.all([
+      supabase.from('bank_accounts').select('*').eq('user_id', user.id).order('created_at'),
+      supabase.from('profiles').select('company_name, bin_iin').eq('id', user.id).maybeSingle(),
+    ])
     setAccounts(data || [])
+    const name = prof?.company_name || ''
+    const bin = prof?.bin_iin || ''
+    setKbeSource(prev => (prev.name === name && prev.bin === bin ? prev : { name, bin }))
     setLoading(false)
   }
 
   function startEdit(acc: any) {
     setEditingId(acc.id)
+    setKbeManual(true)
     setForm({ bank_name: acc.bank_name, iik: acc.iik, bik: acc.bik || '', kbe: acc.kbe || '19', currency: acc.currency || 'KZT' })
     // Accounts saved before the picker existed hold hand-typed names such as
     // 'AO kaspi bank'. Those that resolve to a known bank open with it
@@ -138,6 +161,7 @@ export default function Banks() {
 
   function resetForm() {
     setEditingId(null)
+    setKbeManual(false)
     setForm({ bank_name: '', iik: '', bik: '', kbe: '19', currency: 'KZT' })
     setManualBank(false)
     setIikTouched(false)
@@ -339,9 +363,17 @@ export default function Banks() {
                     className={inputClass}
                     placeholder={f.placeholder}
                     value={(form as any)[f.key]}
-                    onChange={e => setForm({ ...form, [f.key]: e.target.value })}
+                    onChange={e => {
+                      if (f.key === 'kbe') setKbeManual(true)
+                      setForm({ ...form, [f.key]: e.target.value })
+                    }}
                     {...(f.key === 'iik' ? { autoCapitalize: 'characters', spellCheck: false, onBlur: () => { if (form.iik.trim()) setIikTouched(true) } } : {})}
                   />
+                  {f.key === 'kbe' && (
+                    <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>
+                      {needsManualKbe(kbeSource) ? t.kbeHintManual : t.kbeHint}{!editingId && !kbeManual && kbeSuggestion !== null && ` ${t.kbeAutoNote}`}
+                    </div>
+                  )}
                   {f.key === 'iik' && (() => {
                     const err = validateIik(form.iik)
                     const show = err && err !== 'empty' && (iikTouched || normalizeIik(form.iik).length >= 20)

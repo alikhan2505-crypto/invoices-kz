@@ -19,6 +19,16 @@ export const SAMPLE_ROWS: Row[] = [
   { name: 'Бумага офисная А4, 500 листов', qty: '12', unit: 'упак.', price: '2450' },
 ]
 
+/** id секции образца: цель ссылки «Смотреть образец счёта» над формой. */
+export const SAMPLE_ANCHOR_ID = 'obrazec'
+
+/** Текст ссылки-якоря над формой (стрелка вниз: образец ниже формы). */
+export const schetSampleAnchorLabel: Record<ToolLang, string> = {
+  ru: 'Смотреть образец счёта ↓',
+  kk: 'Шот үлгісін көру ↓',
+  en: 'See the sample invoice ↓',
+}
+
 /** Статья о реквизитах счёта есть на ru и kk; английской нет — en ведёт на русскую. */
 export const schetGuidePath = (lang: ToolLang) =>
   lang === 'kk' ? '/guides/kk/kak-vystavit-schet-ip' : '/guides/kak-vystavit-schet-ip'

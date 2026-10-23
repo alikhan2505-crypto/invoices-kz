@@ -21,6 +21,8 @@ interface Props {
   docLang?: string
   /** Ссылка на гайд под списком пунктов. */
   guide?: { href: string; label: string }
+  /** id у секции — цель якорной ссылки «Смотреть образец» (#id); по умолчанию без id. */
+  id?: string
 }
 
 const cellBorder = '1px solid var(--nav-border)'
@@ -37,12 +39,12 @@ const SCROLL_SHADOW_BG = [
   'var(--nav-surface-chrome)',
 ].join(', ')
 
-export default function ToolSample({ idPrefix, copy, doc, docLang = 'ru', guide }: Props) {
+export default function ToolSample({ idPrefix, copy, doc, docLang = 'ru', guide, id }: Props) {
   const headingId = `${idPrefix}-heading`
   const right = new Set(doc.rightAlignedColumns)
 
   return (
-    <section className="nav-glass rounded-2xl p-5 mt-6" aria-labelledby={headingId}>
+    <section id={id} className="nav-glass rounded-2xl p-5 mt-6" aria-labelledby={headingId}>
       <h2 id={headingId} className="text-sm font-bold mb-2" style={{ color: 'var(--nav-text-primary)' }}>
         {copy.heading}
       </h2>

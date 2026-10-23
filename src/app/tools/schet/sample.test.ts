@@ -11,10 +11,11 @@ import { KAZAKHSTAN_BANKS } from '@/lib/kazakhstanBanks'
 import { TOOL_LANGS } from '@/lib/tools-i18n'
 import { formatSampleMoney } from '@/lib/tools-i18n/toolSample'
 import ToolSample from '@/components/tools/ToolSample'
+import SchetSample, { SchetSampleLink } from './SchetSample'
 import { documentRows } from './calc'
 import { schetDict } from './dict'
 import {
-  buildSchetSampleDoc, schetGuidePath, schetSampleCopy, SAMPLE_BUYER, SAMPLE_DATE, SAMPLE_NUMBER,
+  buildSchetSampleDoc, schetGuidePath, schetSampleAnchorLabel, schetSampleCopy, SAMPLE_ANCHOR_ID, SAMPLE_BUYER, SAMPLE_DATE, SAMPLE_NUMBER,
   SAMPLE_ROWS, SAMPLE_SUPPLIER, SAMPLE_TOTAL, SAMPLE_TOTAL_WORDS, SAMPLE_VAT, SAMPLE_VAT_RATE, SAMPLE_VAT_TYPE,
 } from './sample'
 
@@ -181,6 +182,35 @@ describe('ToolSample renders into server HTML', () => {
       // Цвета — только переменные темы.
       expect(html).not.toMatch(/#[0-9a-fA-F]{3,8}\b/)
       expect(html).not.toMatch(/rgba?\(/)
+    })
+  }
+})
+
+describe('sample anchor link above the form', () => {
+  it('defines the anchor text on every language', () => {
+    expect(schetSampleAnchorLabel.ru).toBe('Смотреть образец счёта ↓')
+    expect(schetSampleAnchorLabel.kk).toBe('Шот үлгісін көру ↓')
+    expect(schetSampleAnchorLabel.en).toBe('See the sample invoice ↓')
+    for (const lang of TOOL_LANGS) expect(schetSampleAnchorLabel[lang].trim()).not.toBe('')
+  })
+
+  it('ToolSample has no id by default and takes one through the prop', () => {
+    const base = { idPrefix: 'x', copy: schetSampleCopy.ru, doc: buildSchetSampleDoc() }
+    expect(renderToStaticMarkup(createElement(ToolSample, base))).not.toMatch(/<section[^>]*\sid=/)
+    expect(renderToStaticMarkup(createElement(ToolSample, { ...base, id: 'foo' }))).toMatch(/<section id="foo"/)
+  })
+
+  for (const lang of TOOL_LANGS) {
+    it(`${lang}: link href matches an existing id in the rendered sample, plain server <a>`, () => {
+      const link = renderToStaticMarkup(createElement(SchetSampleLink, { lang }))
+      const sample = renderToStaticMarkup(createElement(SchetSample, { lang }))
+      expect(SAMPLE_ANCHOR_ID).toBe('obrazec')
+      expect(link).toContain(`<a href="#${SAMPLE_ANCHOR_ID}"`)
+      expect(link).toContain(schetSampleAnchorLabel[lang])
+      expect(sample).toContain(`id="${SAMPLE_ANCHOR_ID}"`)
+      // Цвета только из переменных темы, без tabindex=-1 (ссылка фокусируется).
+      expect(link).not.toMatch(/#[0-9a-fA-F]{3,8}\b/)
+      expect(link).not.toContain('tabindex')
     })
   }
 })
