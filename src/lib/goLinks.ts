@@ -59,6 +59,14 @@ export const GO_LINKS: readonly GoLink[] = [
   link('reels-marzha', '/tools/margin', 'meta', 'paid_reels', 'margin_oct', 'платные Reels: маржа'),
   // Личные сообщения продавцам (Instagram, 2ГИС, WhatsApp).
   link('dm', '/tools/waybills', 'dm', 'outreach', 'waybills_oct', 'личные сообщения продавцам Kaspi'),
+  // Instagram (недели 3–4 плана 23.10.2026): шапка профиля и ссылка-стикер в Stories.
+  link('ig-schet', '/tools/schet', 'ig', 'organic_social', 'schet_oct', 'Instagram (органика): счёт на оплату'),
+  link('ig-nalogi', '/tools/nalogi', 'ig', 'organic_social', 'nalogi_oct', 'Instagram (органика): налоги ИП'),
+  // Личные сообщения: ответ на кодовое слово из ролика (БИН, НАЛОГИ, КОМИССИЯ, ПЕНЯ).
+  link('dm-kontragent', '/tools/kontragent', 'dm', 'outreach', 'kontragent_oct', 'личные сообщения: ответ на слово БИН'),
+  link('dm-nalogi', '/tools/nalogi', 'dm', 'outreach', 'nalogi_oct', 'личные сообщения: ответ на слово НАЛОГИ'),
+  link('dm-gid-komissiya', '/guides/komissiya-kaspi', 'dm', 'outreach', 'komissiya_oct', 'личные сообщения: ответ на слово КОМИССИЯ'),
+  link('dm-gid-penya', '/guides/penya-za-prosrochku', 'dm', 'outreach', 'penya_oct', 'личные сообщения: ответ на слово ПЕНЯ'),
 ]
 
 export const GO_PREFIX = '/go'
