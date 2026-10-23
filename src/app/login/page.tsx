@@ -11,6 +11,11 @@ import { resolvePostLoginDestination } from '@/lib/postLoginDestination'
 import { SIGNED_OUT_PARAM } from '@/lib/signOut'
 import { useAppDialog } from '@/components/AppDialog'
 import { rawFreshFirstSource } from '@/lib/visits/client'
+import { TurnstileWidget, type TurnstileHandle } from '@/components/TurnstileWidget'
+
+// Капча входа включается, когда задан публичный ключ Turnstile (и в Supabase
+// включена Captcha protection): без ключа поведение прежнее.
+const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || ''
 
 // The signed-in user's enabled_products (for homeFor) and tour state (a
 // newcomer goes to the dashboard tour first) -- see postLoginDestination.ts.
@@ -50,6 +55,8 @@ export default function Login() {
   // stored postLoginRedirect, so it must run once per mount, not be
   // cancelled-and-repeated (the second run would find the intent gone).
   const sessionCheckStarted = useRef(false)
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
+  const captchaRef = useRef<TurnstileHandle>(null)
   // Set as soon as the visitor touches the form (types an email, presses
   // the passkey button). A session check that finishes after the timeout
   // below must not yank them away mid-typing.
@@ -142,6 +149,7 @@ export default function Login() {
   async function sendLink({ again = false }: { again?: boolean } = {}) {
     if (!email) { alert(t.emailRequiredError); return }
     if (!email.includes('@')) { alert(t.invalidEmailError); return }
+    if (TURNSTILE_SITE_KEY && !captchaToken) { alert(t.captchaRequiredError); return }
     setLoading(true)
 
     // Asked before sending, because the send itself gives no sign of
@@ -181,8 +189,11 @@ export default function Login() {
       options: {
         emailRedirectTo: 'https://invoices.kz/auth/callback',
         ...(Object.keys(otpData).length ? { data: otpData } : {}),
+        ...(TURNSTILE_SITE_KEY && captchaToken ? { captchaToken } : {}),
       }
     })
+    // Токен капчи одноразовый: следующая отправка (в т.ч. «Отправить ещё раз») берёт новый.
+    if (TURNSTILE_SITE_KEY) captchaRef.current?.reset()
     if (error) {
       alert(t.errorPrefix(error.message === 'Invalid email' ? t.invalidEmailMessage : error.message))
     } else {
@@ -314,6 +325,7 @@ export default function Login() {
             </button>
           </div>
         )}
+        {TURNSTILE_SITE_KEY && <TurnstileWidget ref={captchaRef} siteKey={TURNSTILE_SITE_KEY} onToken={setCaptchaToken} />}
       </div>
       {dialogElement}
     </main>

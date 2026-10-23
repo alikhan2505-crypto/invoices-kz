@@ -13,6 +13,7 @@ export interface AuthContent {
   emailRequiredError: string
   invalidEmailError: string
   invalidEmailMessage: string
+  captchaRequiredError: string
   errorPrefix: (message: string) => string
   sendingButton: string
   sendLinkButton: string
@@ -86,6 +87,7 @@ export const authDict: Record<'ru' | 'kk' | 'en', AuthContent> = {
     emailRequiredError: 'Введите email адрес',
     invalidEmailError: 'Введите корректный email адрес',
     invalidEmailMessage: 'Некорректный email',
+    captchaRequiredError: 'Подождите секунду: идёт проверка, что вы не робот. Если не проходит, обновите страницу.',
     errorPrefix: (message: string) => `Ошибка: ${message}`,
     sendingButton: 'Отправка...',
     sendLinkButton: 'Получить ссылку для входа',
@@ -157,6 +159,7 @@ export const authDict: Record<'ru' | 'kk' | 'en', AuthContent> = {
     emailRequiredError: 'Email мекенжайын енгізіңіз',
     invalidEmailError: 'Дұрыс email мекенжайын енгізіңіз',
     invalidEmailMessage: 'Email мекенжайы дұрыс емес',
+    captchaRequiredError: 'Бір секунд күтіңіз: сіздің робот емес екеніңіз тексерілуде. Өтпесе, бетті жаңартыңыз.',
     errorPrefix: (message: string) => `Қате: ${message}`,
     sendingButton: 'Жіберілуде...',
     sendLinkButton: 'Кіру сілтемесін алу',
@@ -229,6 +232,7 @@ export const authDict: Record<'ru' | 'kk' | 'en', AuthContent> = {
     emailRequiredError: 'Enter your email address',
     invalidEmailError: 'Enter a valid email address',
     invalidEmailMessage: 'Invalid email',
+    captchaRequiredError: 'One second: checking that you are not a robot. If it does not pass, reload the page.',
     errorPrefix: (message: string) => `Error: ${message}`,
     sendingButton: 'Sending...',
     sendLinkButton: 'Get sign-in link',
