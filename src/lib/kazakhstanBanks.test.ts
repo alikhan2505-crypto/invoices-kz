@@ -40,6 +40,25 @@ describe('findBankByBik', () => {
   })
 })
 
+describe('registry corrections of 23.10.2026', () => {
+  it('Bereke Bank uses its own БИК, not the old Sberbank code', () => {
+    expect(findBankByBik('BRKEKZKA')?.name).toBe('АО «Bereke Bank»')
+    expect(findBankByBik('SABRKZKA')).toBeNull()
+  })
+
+  it('accounts saved under a renamed bank still find it', () => {
+    expect(findBankByName('АО "Jusan Bank"')?.bik).toBe('TSESKZKA')
+    expect(findBankByName('АО «Исламский Банк «Al Hilal»')?.bik).toBe('HLALKZKZ')
+    expect(findBankByName('АО «Freedom Bank Kazakhstan»')?.bik).toBe('KSNVKZKA')
+    expect(findBankByBik('TSESKZKA')?.name).toBe('АО «Alatau City Bank»')
+  })
+
+  it('has the two banks the National Bank registry added to our list', () => {
+    expect(findBankByBik('KMFBKZKK')?.name).toBe('АО «KMF Банк»')
+    expect(findBankByBik('HCSKKZKA')).not.toBeNull()
+  })
+})
+
 describe('findBankByName', () => {
   it('recognises the spellings already in the database', () => {
     // Every one of these is a real stored bank_name for Kaspi.

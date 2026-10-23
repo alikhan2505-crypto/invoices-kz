@@ -25,37 +25,46 @@ export interface KazakhstanBank {
   bik: string
   /** Official name, as it should appear on the document. */
   name: string
+  /** Former or brand spellings of the same bank: accounts saved under them still find their bank. */
+  aliases?: string[]
 }
 
 /**
  * Ordered by how likely a small Kazakhstan business is to bank there, not
  * alphabetically: the first three cover most of the accounts we have.
  *
- * Every БИК below is confirmed from two independent sources. HSBKKZKX and
- * CASPKZKA are additionally confirmed by our own production rows, where real
- * users typed them by hand.
+ * Every БИК below is in the National Bank's «Справочник БИК РК»
+ * (nationalbank.kz/ru/page/spravochnik-bik-rk-ps), names follow it; most are
+ * also confirmed on the bank's own requisites page. Re-checked 23.10.2026: that
+ * check found SABRKZKA («Bereke Bank») was the old Sberbank code, the real one
+ * is BRKEKZKA, and Jusan / Al Hilal had been renamed. HSBKKZKX and CASPKZKA
+ * are additionally confirmed by our own production rows, where real users typed
+ * them by hand. MOKFKZKA (БиЭнКей) is in the registry but not confirmed on the
+ * bank's own site, so it is left out.
  */
 export const KAZAKHSTAN_BANKS: KazakhstanBank[] = [
   { bik: 'CASPKZKA', name: 'АО «Kaspi Bank»' },
   { bik: 'HSBKKZKX', name: 'АО «Народный Банк Казахстана»' },
   { bik: 'KCJBKZKX', name: 'АО «Банк ЦентрКредит»' },
   { bik: 'IRTYKZKA', name: 'АО «ForteBank»' },
-  { bik: 'TSESKZKA', name: 'АО «Jusan Bank»' },
+  { bik: 'TSESKZKA', name: 'АО «Alatau City Bank»', aliases: ['АО «Jusan Bank»', 'АО «First Heartland Jusan Bank»'] },
   { bik: 'EURIKZKA', name: 'АО «Евразийский банк»' },
-  { bik: 'KSNVKZKA', name: 'АО «Freedom Bank Kazakhstan»' },
-  { bik: 'SABRKZKA', name: 'АО «Bereke Bank»' },
+  { bik: 'KSNVKZKA', name: 'АО «Фридом Банк Казахстан»', aliases: ['АО «Freedom Bank Kazakhstan»'] },
+  { bik: 'BRKEKZKA', name: 'АО «Bereke Bank»' },
   { bik: 'ATYNKZKA', name: 'АО «Altyn Bank»' },
-  { bik: 'KINCKZKA', name: 'АО «Банк RBK»' },
+  { bik: 'KINCKZKA', name: 'АО «Банк «Bank RBK»', aliases: ['АО «Банк RBK»'] },
   { bik: 'NURSKZKX', name: 'АО «Нурбанк»' },
   { bik: 'INLMKZKA', name: 'АО «Home Credit Bank»' },
   { bik: 'VTBAKZKZ', name: 'ДО АО Банк ВТБ (Казахстан)' },
   { bik: 'SHBKKZKA', name: 'АО «Шинхан Банк Казахстан»' },
   { bik: 'CITIKZKA', name: 'АО «Ситибанк Казахстан»' },
-  { bik: 'KZIBKZKA', name: 'АО «ДБ «КЗИ Банк»' },
-  { bik: 'BKCHKZKA', name: 'ДБ АО «Банк Китая в Казахстане»' },
-  { bik: 'ICBKKZKX', name: 'ДБ АО «Торгово-промышленный Банк Китая в г. Алматы»' },
-  { bik: 'HLALKZKZ', name: 'АО «Исламский Банк «Al Hilal»' },
+  { bik: 'KZIBKZKA', name: 'АО «ДБ «Казахстан-Зираат Интернешнл Банк»', aliases: ['АО «ДБ «КЗИ Банк»'] },
+  { bik: 'BKCHKZKA', name: 'АО ДБ «Банк Китая в Казахстане»', aliases: ['ДБ АО «Банк Китая в Казахстане»'] },
+  { bik: 'ICBKKZKX', name: 'АО «Торгово-промышленный Банк Китая в г. Алматы»', aliases: ['ДБ АО «Торгово-промышленный Банк Китая в г. Алматы»'] },
+  { bik: 'HLALKZKZ', name: 'АО «Исламский Банк «ADCB»', aliases: ['АО «Исламский Банк «Al Hilal»'] },
   { bik: 'ZAJSKZ22', name: 'АО «Исламский банк «Заман-Банк»' },
+  { bik: 'HCSKKZKA', name: 'АО «Жилищный строительный сберегательный банк «Отбасы банк»' },
+  { bik: 'KMFBKZKK', name: 'АО «KMF Банк»' },
 ]
 
 /** Sentinel for the "my bank is not listed" option, which reopens free text. */
@@ -89,5 +98,5 @@ export function findBankByName(name: string | null | undefined): KazakhstanBank 
     value.replace(/[«»"'`]/g, '').replace(/\s+/g, ' ').trim().toLowerCase()
   const needle = normalize(name || '')
   if (!needle) return null
-  return KAZAKHSTAN_BANKS.find(b => normalize(b.name) === needle) || null
+  return KAZAKHSTAN_BANKS.find(b => normalize(b.name) === needle || (b.aliases || []).some(a => normalize(a) === needle)) || null
 }
