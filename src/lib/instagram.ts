@@ -1,5 +1,6 @@
 import type { FlowStep } from './aiAgent/flow'
 import { loadPublishToken } from './instagramPublishToken'
+import { InstagramPublishError } from './instagramReel'
 
 // "Instagram API with Instagram Login" tokens (prefixed IGAA...) are only
 // valid against graph.instagram.com — the classic graph.facebook.com host
@@ -7,34 +8,157 @@ import { loadPublishToken } from './instagramPublishToken'
 // at all, which surfaces as an opaque "Cannot parse access token" error.
 const GRAPH_API = 'https://graph.instagram.com/v21.0'
 
-async function createContainer(igUserId: string, accessToken: string, params: Record<string, string>): Promise<string> {
+// Один запрос к Graph API не должен зависать дольше этого срока: общий срок
+// ожидания контейнера проверяется только МЕЖДУ опросами, и без таймаута один
+// повисший запрос съел бы весь maxDuration маршрута, оставив черновик в
+// промежуточном статусе. По таймауту fetch бросает исключение: опрос статуса
+// считает его временным сбоем, create/publish -- отказом.
+const GRAPH_REQUEST_TIMEOUT_MS = 20_000
+const graphSignal = () => AbortSignal.timeout(GRAPH_REQUEST_TIMEOUT_MS)
+
+async function createContainer(igUserId: string, accessToken: string, params: Record<string, string | boolean>): Promise<string> {
   const res = await fetch(`${GRAPH_API}/${igUserId}/media`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ...params, access_token: accessToken }),
+    signal: graphSignal(),
   })
   const data = await res.json()
   if (!res.ok || !data.id) {
-    throw new Error(data.error?.message || 'Failed to create media container')
+    throw new InstagramPublishError(data.error?.message || 'Failed to create media container', 'create')
   }
   return data.id as string
 }
 
+export interface WaitOptions {
+  // Общий срок ожидания готовности контейнера, мс.
+  timeoutMs: number
+  // Пауза перед следующим опросом (attempt считается с 0).
+  pollDelayMs: (attempt: number) => number
+  // Подмена для тестов: без реальных пауз и со своими часами.
+  sleep?: (ms: number) => Promise<void>
+  now?: () => number
+}
+
+// Картинки готовы за секунды: опрос раз в 1,5 с, до минуты.
+export const IMAGE_WAIT: WaitOptions = { timeoutMs: 60_000, pollDelayMs: () => 1500 }
+// Видео обрабатывается дольше (обычно секунды - минута, документации с цифрой
+// нет): 3 с, затем 4 с, 5 с ... до потолка 10 с. Срок 200 с оставляет запас
+// до maxDuration = 300 на webhook-маршруте (создание контейнера + publish + Telegram).
+export const VIDEO_WAIT: WaitOptions = {
+  timeoutMs: 200_000,
+  pollDelayMs: attempt => Math.min(3000 + attempt * 1000, 10_000),
+}
+
+// Подряд столько сбоев запроса статуса (HTTP-ошибка, не-JSON) считаем отказом
+// API, а не «пока не готово».
+const MAX_STATUS_FAILURES = 5
+
 // Instagram processes each container asynchronously — publishing (or adding
 // it as a carousel child) before it reports FINISHED fails with an opaque
 // "Media ID is not available".
-async function waitUntilFinished(containerId: string, accessToken: string) {
-  for (let attempt = 0; attempt < 10; attempt++) {
-    const statusRes = await fetch(
-      `${GRAPH_API}/${containerId}?fields=status_code&access_token=${accessToken}`
-    )
-    const statusData = await statusRes.json()
-    if (statusData.status_code === 'FINISHED') return
-    if (statusData.status_code === 'ERROR') {
-      throw new Error('Instagram failed to process the media container')
+//
+// Значения status_code (документация IG Container): IN_PROGRESS, FINISHED,
+// ERROR, EXPIRED, PUBLISHED. Всё, что не конечное, считаем «ещё идёт».
+//
+// Раньше эта функция по исчерпании попыток МОЛЧА возвращалась, будто
+// контейнер готов, и публикация падала с «Media ID is not available» уже
+// на следующем шаге, без указания причины. Теперь таймаут -- явная ошибка.
+export async function waitForContainer(
+  containerId: string,
+  accessToken: string,
+  opts: WaitOptions = IMAGE_WAIT,
+): Promise<void> {
+  const sleep = opts.sleep ?? ((ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms)))
+  const now = opts.now ?? (() => Date.now())
+  const startedAt = now()
+  let failures = 0
+  let lastApiError = ''
+
+  for (let attempt = 0; ; attempt++) {
+    let data: any = null
+    let httpOk = false
+    try {
+      const statusRes = await fetch(
+        `${GRAPH_API}/${containerId}?fields=status_code,status&access_token=${accessToken}`,
+        { signal: graphSignal() },
+      )
+      httpOk = statusRes.ok
+      data = await statusRes.json().catch(() => null)
+    } catch {
+      data = null
     }
-    await new Promise(resolve => setTimeout(resolve, 1500))
+
+    const code = data?.status_code
+    if (code === 'FINISHED' || code === 'PUBLISHED') return
+    if (code === 'ERROR') {
+      throw new InstagramPublishError(
+        'Instagram failed to process the media container',
+        'processing',
+        containerId,
+        typeof data.status === 'string' ? data.status : undefined,
+      )
+    }
+    if (code === 'EXPIRED') {
+      throw new InstagramPublishError('The media container expired before it was published', 'expired', containerId)
+    }
+
+    if (!httpOk || !code) {
+      failures++
+      lastApiError = data?.error?.message || lastApiError
+      if (failures >= MAX_STATUS_FAILURES) {
+        throw new InstagramPublishError(
+          lastApiError || 'Could not read the media container status',
+          'processing',
+          containerId,
+        )
+      }
+    } else {
+      failures = 0
+    }
+
+    const delay = opts.pollDelayMs(attempt)
+    if (now() - startedAt + delay > opts.timeoutMs) {
+      throw new InstagramPublishError(
+        `Instagram did not finish processing the media container within ${Math.round(opts.timeoutMs / 1000)}s`,
+        'timeout',
+        containerId,
+      )
+    }
+    await sleep(delay)
   }
+}
+
+// «Media ID is not available» -- контейнер уже FINISHED, но объект ещё не
+// виден публикации. Бывает у видео сразу после FINISHED; лечится повтором.
+function isNotYetAvailable(message: string | undefined, code: unknown, subcode: unknown): boolean {
+  return code === 9007 || subcode === 2207027 || /not available|not ready/i.test(message || '')
+}
+
+async function publishContainer(
+  igUserId: string,
+  accessToken: string,
+  creationId: string,
+  opts: { attempts?: number; retryDelayMs?: number; sleep?: (ms: number) => Promise<void> } = {},
+): Promise<string> {
+  const attempts = opts.attempts ?? 1
+  const sleep = opts.sleep ?? ((ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms)))
+  let lastMessage = 'Failed to publish media'
+  for (let i = 0; i < attempts; i++) {
+    const publishRes = await fetch(`${GRAPH_API}/${igUserId}/media_publish`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ creation_id: creationId, access_token: accessToken }),
+      signal: graphSignal(),
+    })
+    const publishData = await publishRes.json()
+    if (publishRes.ok && publishData.id) return publishData.id as string
+    lastMessage = publishData.error?.message || 'Failed to publish media'
+    const retriable = isNotYetAvailable(lastMessage, publishData.error?.code, publishData.error?.error_subcode)
+    if (!retriable || i === attempts - 1) break
+    await sleep(opts.retryDelayMs ?? 5000)
+  }
+  throw new InstagramPublishError(lastMessage, 'publish', creationId)
 }
 
 // The account we publish to, resolved from the token itself when
@@ -53,7 +177,7 @@ async function resolveIgUserId(accessToken: string): Promise<string> {
   const configured = process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID
   if (configured) return configured
   if (cachedIgUserId) return cachedIgUserId
-  const res = await fetch(`${GRAPH_API}/me?fields=user_id&access_token=${accessToken}`)
+  const res = await fetch(`${GRAPH_API}/me?fields=user_id&access_token=${accessToken}`, { signal: graphSignal() })
   const data = await res.json()
   const id = data?.user_id ? String(data.user_id) : ''
   if (!res.ok || !id) {
@@ -63,15 +187,10 @@ async function resolveIgUserId(accessToken: string): Promise<string> {
   return id
 }
 
-// A single image publishes directly; 2+ images publish as a swipeable
-// carousel (each image becomes a child container, then a parent CAROUSEL
-// container references all of them) — the format users can slide through
-// instead of a single photo + a caption they have to open and read.
-export async function publishToInstagram(
-  imageUrls: string[],
-  caption: string,
+// Token + account for posting to our OWN feed (shared by images and Reels).
+async function resolvePublishAuth(
   credentials?: { igUserId: string; accessToken: string },
-): Promise<string> {
+): Promise<{ igUserId: string; accessToken: string }> {
   // Our OWN marker wins — the one generated in the App Dashboard, which
   // carries every permission the app holds at Standard Access, including
   // instagram_business_content_publish. loadPublishToken returns the rotated
@@ -88,36 +207,109 @@ export async function publishToInstagram(
   const accessToken = ownToken || credentials?.accessToken
   if (!accessToken) throw new Error('Instagram not configured')
   const igUserId = ownToken ? await resolveIgUserId(ownToken) : credentials!.igUserId
+  return { igUserId, accessToken }
+}
+
+// A single image publishes directly; 2+ images publish as a swipeable
+// carousel (each image becomes a child container, then a parent CAROUSEL
+// container references all of them) — the format users can slide through
+// instead of a single photo + a caption they have to open and read.
+export async function publishToInstagram(
+  imageUrls: string[],
+  caption: string,
+  credentials?: { igUserId: string; accessToken: string },
+): Promise<string> {
+  const { igUserId, accessToken } = await resolvePublishAuth(credentials)
   if (imageUrls.length === 0) throw new Error('No images provided')
 
   let creationId: string
   if (imageUrls.length === 1) {
     creationId = await createContainer(igUserId, accessToken, { image_url: imageUrls[0], caption })
-    await waitUntilFinished(creationId, accessToken)
+    await waitForContainer(creationId, accessToken, IMAGE_WAIT)
   } else {
     const childIds = await Promise.all(
       imageUrls.map(url => createContainer(igUserId, accessToken, { image_url: url, is_carousel_item: 'true' }))
     )
-    await Promise.all(childIds.map(id => waitUntilFinished(id, accessToken)))
+    await Promise.all(childIds.map(id => waitForContainer(id, accessToken, IMAGE_WAIT)))
     creationId = await createContainer(igUserId, accessToken, {
       media_type: 'CAROUSEL',
       children: childIds.join(','),
       caption,
     })
-    await waitUntilFinished(creationId, accessToken)
+    await waitForContainer(creationId, accessToken, IMAGE_WAIT)
   }
 
-  const publishRes = await fetch(`${GRAPH_API}/${igUserId}/media_publish`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ creation_id: creationId, access_token: accessToken }),
+  return publishContainer(igUserId, accessToken, creationId)
+}
+
+// Параметры контейнера Reels (документация IG User Media): media_type=REELS,
+// video_url -- публичный адрес файла (Instagram сам скачивает его), share_to_feed
+// -- показывать и в ленте, cover_url -- обложка JPEG. Чистая функция ради теста.
+export function buildReelContainerParams(
+  videoUrl: string,
+  caption: string,
+  opts: { coverUrl?: string | null; shareToFeed?: boolean } = {},
+): Record<string, string | boolean> {
+  const params: Record<string, string | boolean> = {
+    media_type: 'REELS',
+    video_url: videoUrl,
+    caption,
+    share_to_feed: opts.shareToFeed ?? true,
+  }
+  if (opts.coverUrl) params.cover_url = opts.coverUrl
+  return params
+}
+
+export interface PublishReelOptions {
+  coverUrl?: string | null
+  shareToFeed?: boolean
+  credentials?: { igUserId: string; accessToken: string }
+  // Переопределения для тестов/настройки срока ожидания.
+  wait?: Partial<WaitOptions>
+  publishRetryDelayMs?: number
+}
+
+export interface PublishedReel {
+  mediaId: string
+  containerId: string
+  permalink: string | null
+}
+
+// Публикация Reels: контейнер -> ожидание обработки видео (минуты, не секунды)
+// -> media_publish. Бросает InstagramPublishError с этапом (create / processing
+// / expired / timeout / publish), по которому describeReelError объясняет причину.
+export async function publishReel(
+  videoUrl: string,
+  caption: string,
+  opts: PublishReelOptions = {},
+): Promise<PublishedReel> {
+  if (!videoUrl) throw new Error('No video provided')
+  const { igUserId, accessToken } = await resolvePublishAuth(opts.credentials)
+
+  const containerId = await createContainer(
+    igUserId,
+    accessToken,
+    buildReelContainerParams(videoUrl, caption, { coverUrl: opts.coverUrl, shareToFeed: opts.shareToFeed }),
+  )
+  await waitForContainer(containerId, accessToken, { ...VIDEO_WAIT, ...opts.wait })
+  // Объект после FINISHED иногда не сразу виден публикации: до 3 попыток.
+  const mediaId = await publishContainer(igUserId, accessToken, containerId, {
+    attempts: 3,
+    retryDelayMs: opts.publishRetryDelayMs ?? 5000,
+    sleep: opts.wait?.sleep,
   })
-  const publishData = await publishRes.json()
-  if (!publishRes.ok || !publishData.id) {
-    throw new Error(publishData.error?.message || 'Failed to publish media')
-  }
 
-  return publishData.id as string
+  // Лучшее усилие: ссылка на пост для сообщения в Telegram. Сбой не отменяет
+  // уже состоявшуюся публикацию.
+  let permalink: string | null = null
+  try {
+    const res = await fetch(`${GRAPH_API}/${mediaId}?fields=permalink&access_token=${accessToken}`, { signal: graphSignal() })
+    const data = await res.json()
+    if (res.ok && typeof data?.permalink === 'string') permalink = data.permalink
+  } catch {
+    permalink = null
+  }
+  return { mediaId, containerId, permalink }
 }
 
 export interface MediaInsights {

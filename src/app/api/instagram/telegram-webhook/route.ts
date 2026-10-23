@@ -1,6 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { publishToInstagram, replyToComment, sendDirectMessage } from '@/lib/instagram'
+import { publishToInstagram, publishReel, replyToComment, sendDirectMessage } from '@/lib/instagram'
+import { DRAFT_STATUS_IN_PROGRESS, describeReelError, sanitizeErrorText } from '@/lib/instagramReel'
+import { escapeHtml } from '@/lib/htmlEscape'
 import { extractTriggerWords } from '@/lib/instagramAiReply'
 import { decryptAtRest } from '@/lib/kaspiPay/crypto'
 import { getKey } from '@/lib/aiAgent/connection'
@@ -73,6 +75,83 @@ async function telegram(method: string, body: object) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
+  })
+}
+
+// Публикация Reel живёт в after() этого маршрута: создание контейнера,
+// ожидание обработки видео (до ~200 с, см. VIDEO_WAIT) и media_publish.
+// Должно укладываться в maxDuration.
+export const maxDuration = 300
+
+// Не бросает: любой исход фиксируется в строке черновика и в Telegram, чтобы
+// черновик не завис в статусе «в работе».
+async function runReelPublish(draft: any, cb: any): Promise<void> {
+  const chatId = cb.message.chat.id
+  const messageId = cb.message.message_id
+  const baseText = escapeHtml(cb.message.text)
+  const notify = async (method: string, body: object) => {
+    try {
+      await telegram(method, body)
+    } catch (err: any) {
+      console.error('instagram reel: telegram', method, 'failed:', sanitizeErrorText(err?.message || String(err)))
+    }
+  }
+
+  let published: Awaited<ReturnType<typeof publishReel>> | null = null
+  let failure: string | null = null
+  try {
+    if (!draft.video_url) throw new Error('В черновике нет video_url')
+    published = await publishReel(draft.video_url, draft.caption, {
+      coverUrl: draft.cover_url,
+      shareToFeed: draft.share_to_feed !== false,
+      credentials: await loadPublishCredentials(),
+    })
+  } catch (err) {
+    failure = describeReelError(err)
+    console.error('instagram reel: publish failed:', failure)
+  }
+
+  if (published) {
+    const { error } = await supabase
+      .from('instagram_drafts')
+      .update({ status: 'published', ig_media_id: published.mediaId, published_at: new Date().toISOString() })
+      .eq('id', draft.id)
+    if (error) console.error('instagram reel: could not mark draft published:', error.message)
+    const link = published.permalink ? `\n${escapeHtml(published.permalink)}` : ''
+    await notify('editMessageText', {
+      chat_id: chatId,
+      message_id: messageId,
+      text: `${baseText}\n\n✅ Reel опубликован в Instagram`,
+      parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: [] },
+    })
+    await notify('sendMessage', {
+      chat_id: chatId,
+      reply_to_message_id: messageId,
+      text: `✅ Reel опубликован в Instagram.${link}`,
+      parse_mode: 'HTML',
+    })
+    return
+  }
+
+  const reason = failure ?? 'неизвестная ошибка'
+  const { error } = await supabase
+    .from('instagram_drafts')
+    .update({ status: 'failed', error: reason })
+    .eq('id', draft.id)
+  if (error) console.error('instagram reel: could not mark draft failed:', error.message)
+  await notify('editMessageText', {
+    chat_id: chatId,
+    message_id: messageId,
+    text: `${baseText}\n\n⚠️ Не опубликовано`,
+    parse_mode: 'HTML',
+    reply_markup: { inline_keyboard: [] },
+  })
+  await notify('sendMessage', {
+    chat_id: chatId,
+    reply_to_message_id: messageId,
+    text: `⚠️ Reel не опубликован.\nПричина: ${escapeHtml(reason)}`,
+    parse_mode: 'HTML',
   })
 }
 
@@ -289,6 +368,59 @@ export async function POST(req: NextRequest) {
       parse_mode: 'HTML',
       reply_markup: { inline_keyboard: [] },
     })
+    return NextResponse.json({ ok: true })
+  }
+
+  // Reels (media_kind есть только после миграции instagram_drafts_video.sql;
+  // до неё поле undefined и черновик идёт обычным путём ниже).
+  if (draft.media_kind === 'reel') {
+    // Захват строки ДО публикации, условным UPDATE: проигравшие двойные
+    // нажатия (и запоздавшие, когда Reel уже опубликован) не находят строку
+    // в 'pending' и получают «Уже обработано». Статус 'approved' (а не
+    // 'publishing') -- потому что его допускает check-ограничение таблицы.
+    const { data: claimed } = await supabase
+      .from('instagram_drafts')
+      .update({ status: DRAFT_STATUS_IN_PROGRESS })
+      .eq('id', draftId)
+      .eq('status', 'pending')
+      .select('id')
+      .maybeSingle()
+    if (!claimed) {
+      await telegram('answerCallbackQuery', { callback_query_id: cb.id, text: 'Уже обработано' })
+      return NextResponse.json({ ok: true })
+    }
+
+    // Публикацию планируем СРАЗУ после захвата, до любых сетевых вызовов в
+    // Telegram: если ответ на кнопку или правка сообщения упадёт, строка уже
+    // не в 'pending' (повторное нажатие даст «Уже обработано»), и без
+    // запланированной публикации черновик завис бы в 'approved' навсегда.
+    // Долгая часть (контейнер, ожидание обработки видео, media_publish)
+    // доживает в after() -- до maxDuration. Вне запроса Next (тесты) after()
+    // бросает, тогда ждём в конце запроса.
+    const run = () => runReelPublish(draft, cb)
+    let runInline = false
+    try {
+      after(run)
+    } catch {
+      runInline = true
+    }
+
+    // Подтверждение для основателя -- лучшее усилие: сбой Telegram здесь не
+    // должен отменять публикацию (она уже запланирована).
+    try {
+      await telegram('answerCallbackQuery', { callback_query_id: cb.id, text: 'Публикую Reel, это до пары минут' })
+      await telegram('editMessageText', {
+        chat_id: cb.message.chat.id,
+        message_id: cb.message.message_id,
+        text: `${escapeHtml(cb.message.text)}\n\n⏳ Публикую Reel: Instagram обрабатывает видео, до пары минут. Напишу сюда, когда закончится.`,
+        parse_mode: 'HTML',
+        reply_markup: { inline_keyboard: [] },
+      })
+    } catch (err: any) {
+      console.error('instagram reel: telegram ack failed:', sanitizeErrorText(err?.message || String(err)))
+    }
+
+    if (runInline) await run()
     return NextResponse.json({ ok: true })
   }
 
