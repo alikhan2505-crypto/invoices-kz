@@ -60,15 +60,23 @@ export async function POST(req: NextRequest) {
     .update({ counter: verification.authenticationInfo.newCounter, last_used_at: new Date().toISOString() })
     .eq('id', cred.id)
 
-  const { data: profile } = await supabase.from('profiles').select('email').eq('id', cred.user_id).single()
-  if (!profile?.email) return NextResponse.json({ error: 'Account has no email' }, { status: 500 })
+  // Почту берём из auth.users, а НЕ из profiles: profiles.email пользователь
+  // пишет сам (страница реквизитов), и passkey-вход с чужой почтой в своём
+  // профиле выдал бы сессию жертвы (аудит 24.10.2026).
+  const { data: authUser, error: authUserError } = await supabase.auth.admin.getUserById(cred.user_id)
+  const authEmail = authUser?.user?.email
+  if (authUserError || !authEmail) return NextResponse.json({ error: 'Account has no email' }, { status: 500 })
 
   const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
     type: 'magiclink',
-    email: profile.email,
+    email: authEmail,
   })
 
-  if (linkError || !linkData) return NextResponse.json({ error: 'Failed to establish session' }, { status: 500 })
+  // Ссылка должна быть выдана именно владельцу ключа: если почта вдруг указывает
+  // на другого пользователя, сессию не даём.
+  if (linkError || !linkData || linkData.user?.id !== cred.user_id) {
+    return NextResponse.json({ error: 'Failed to establish session' }, { status: 500 })
+  }
 
   return NextResponse.json({ tokenHash: linkData.properties.hashed_token })
 }
