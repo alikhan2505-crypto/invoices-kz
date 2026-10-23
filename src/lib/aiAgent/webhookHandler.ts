@@ -18,6 +18,7 @@ import { AI_AGENT_DIALOGS_URL, AI_AGENT_REVIEW_URL } from './links'
 import { exitTrainingIfDue } from './trainingExit'
 import { scheduleBudgetDepletedAlert } from './budgetAlert'
 import { findStopPhraseMatch } from './stopPhrases'
+import { triggerMatches } from '@/lib/triggerMatch'
 import { UNSUPPORTED_MEDIA_REPLY_TEXT } from '@/lib/aiAgent/mediaLimits'
 import { findFlowTriggerMatch, type FlowStep } from './flow'
 import { startFlow, handleFlowButtonClick, FLOW_STALE_TEXT, type FlowStepSender } from './flowEngine'
@@ -547,18 +548,19 @@ export async function mergeCollectedData(conversationId: string, extractedFields
   }
 }
 
-// Same contiguous-substring matching as this codebase's existing
-// findMatchingTemplate (src/lib/instagramReplyMatch.ts) -- deliberately not
-// reused directly since that function is typed against
-// instagram_reply_templates's row shape; this is the same algorithm
-// against ai_agent_reply_templates's identical trigger_words/reply_text
-// shape. If instagramReplyMatch.ts's matching logic ever changes, mirror
-// the change here too. Exported (2026-08-20) so the Telegram tenant path
-// (telegramWebhookHandler.ts) matches templates with the exact same rule.
+// Same matching as this codebase's existing findMatchingTemplate
+// (src/lib/instagramReplyMatch.ts) -- deliberately not reused directly since
+// that function is typed against instagram_reply_templates's row shape; this
+// is the same algorithm against ai_agent_reply_templates's identical
+// trigger_words/reply_text shape. The per-trigger rule itself (substring;
+// short triggers up to 3 chars -- only at a word start) lives in ONE place,
+// src/lib/triggerMatch.ts, shared by both matchers and findFlowTriggerMatch,
+// so change it there, not here. Exported (2026-08-20) so the Telegram tenant
+// path (telegramWebhookHandler.ts) matches templates with the exact same rule.
 export function findTemplateMatch(text: string, templates: { id: string; trigger_words: string[]; reply_text: string }[]): { id: string; reply_text: string } | null {
   const lower = text.toLowerCase()
   for (const t of templates) {
-    if (t.trigger_words.some(w => lower.includes(w.toLowerCase()))) {
+    if (t.trigger_words.some(w => triggerMatches(lower, w))) {
       return { id: t.id, reply_text: t.reply_text }
     }
   }

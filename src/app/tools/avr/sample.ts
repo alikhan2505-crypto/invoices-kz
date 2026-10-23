@@ -1,5 +1,6 @@
 import { formatSampleMoney, type SampleCopy, type SampleDoc } from '@/lib/tools-i18n/toolSample'
 import type { ToolLang } from '@/lib/tools-i18n'
+import { amountInWordsKzt } from '@/lib/amountWords'
 import { documentRows, documentTotal, vatIncluded, type Row, type VatType } from './calc'
 
 // Образец для блока «Образец» под формой /tools/avr (ToolSample). Все данные
@@ -44,6 +45,8 @@ export const SAMPLE_CONTRACT_NUMBER = '12'
 export const SAMPLE_CONTRACT_DATE = '10.01.2026'
 
 export const SAMPLE_TOTAL = documentTotal(SAMPLE_ROWS)
+/** Итог прописью — строка «Всего оказано услуг на сумму: …» под таблицей, как её печатает buildAVRHtml. */
+export const SAMPLE_TOTAL_WORDS = amountInWordsKzt(SAMPLE_TOTAL)
 /** НДС, который появился бы под итогом при выбранном «С НДС 16%» (для пункта-пояснения и теста). */
 export const SAMPLE_VAT_IF_PAYER = vatIncluded(SAMPLE_TOTAL, 'vat_16')
 
@@ -105,7 +108,7 @@ export function buildAvrSampleDoc(): SampleDoc {
       cells: [String(i + 1), r.name, SAMPLE_DATE, '—', r.unit, String(r.qty), formatSampleMoney(r.price), formatSampleMoney(r.qty * r.price)],
     })),
     totals: [{ label: 'Итого', value: formatSampleMoney(SAMPLE_TOTAL) }],
-    summaryLines: [SAMPLE_STOCK_LINE, SAMPLE_APPENDIX_LINE, SAMPLE_ACCEPT_LINE],
+    summaryLines: [`Всего оказано услуг на сумму: ${SAMPLE_TOTAL_WORDS}`, SAMPLE_STOCK_LINE, SAMPLE_APPENDIX_LINE, SAMPLE_ACCEPT_LINE],
     signatureLabel: 'Сдал (Исполнитель)',
     signatureName: e.director,
   }
@@ -120,12 +123,12 @@ export const avrSampleCopy: Record<ToolLang, SampleCopy> = {
     heading: 'Образец акта выполненных работ',
     ribbon: 'Пример',
     intro:
-      'Так выглядит готовый АВР по форме Р-1: стороны, договор, перечень работ и итог. Все данные в примере вымышленные, а НДС по умолчанию не выделяется.',
+      'Так выглядит готовый АВР по форме Р-1: стороны, договор, перечень работ, итог и сумма прописью. Все данные в примере вымышленные, а НДС по умолчанию не выделяется.',
     pointsTitle: 'Что должно быть в акте выполненных работ',
     points: [
       'Стороны: название, БИН/ИИН и адрес исполнителя и заказчика.',
       'Договор (контракт), номер акта и дата составления.',
-      'Перечень работ или услуг: наименование, дата выполнения, количество, цена за единицу и стоимость, затем итог. Плательщик НДС выбирает «С НДС 16%»: налог выделяется из итога по формуле итог × 16 / 116.',
+      'Перечень работ или услуг: наименование, дата выполнения, количество, цена за единицу и стоимость, затем итог и сумма прописью. Плательщик НДС выбирает «С НДС 16%»: налог выделяется из итога по формуле итог × 16 / 116.',
       'Подписи: акт подписывают обе стороны, исполнитель сдаёт работы, заказчик принимает. Так заказчик подтверждает, что работа принята в полном объёме и претензий нет.',
     ],
     caption:
@@ -136,12 +139,12 @@ export const avrSampleCopy: Record<ToolLang, SampleCopy> = {
     heading: 'Орындалған жұмыстар актісінің үлгісі',
     ribbon: 'Мысал',
     intro:
-      'Дайын ОЖА-ны Р-1 нысаны бойынша осылай көрінеді: тараптар, шарт, жұмыстар тізбесі және жиынтық. Мысалдағы барлық деректер ойдан шығарылған, ал ҚҚС әдепкі бойынша бөлінбейді.',
+      'Дайын ОЖА-ны Р-1 нысаны бойынша осылай көрінеді: тараптар, шарт, жұмыстар тізбесі, жиынтық және сомасы жазбаша. Мысалдағы барлық деректер ойдан шығарылған, ал ҚҚС әдепкі бойынша бөлінбейді.',
     pointsTitle: 'Орындалған жұмыстар актісінде не болуы керек',
     points: [
       'Тараптар: орындаушы мен тапсырыс берушінің атауы, БСН/ЖСН және мекенжайы.',
       'Шарт (келісімшарт), актінің нөмірі және жасалған күні.',
-      'Жұмыстар немесе қызметтер тізбесі: атауы, орындалған күні, саны, бір бірліктің бағасы және құны, содан кейін жиынтық. ҚҚС төлеушісі «ҚҚС 16% қоса алғанда» таңдайды: салық жиынтықтан сома × 16 / 116 формуласымен бөлініп шығарылады.',
+      'Жұмыстар немесе қызметтер тізбесі: атауы, орындалған күні, саны, бір бірліктің бағасы және құны, содан кейін жиынтық және сомасы жазбаша. ҚҚС төлеушісі «ҚҚС 16% қоса алғанда» таңдайды: салық жиынтықтан сома × 16 / 116 формуласымен бөлініп шығарылады.',
       'Қолтаңбалар: актіге екі тарап қол қояды, орындаушы жұмысты тапсырады, тапсырыс беруші қабылдайды. Осылайша тапсырыс беруші жұмыстың толық көлемде қабылданғанын және наразылығы жоқ екенін растайды.',
     ],
     caption:
@@ -152,12 +155,12 @@ export const avrSampleCopy: Record<ToolLang, SampleCopy> = {
     heading: 'Certificate of completed works (AVR): sample',
     ribbon: 'Example',
     intro:
-      'This is what a finished AVR on form R-1 looks like: the parties, the contract, the list of works and the total. All data in the example is fictional, and VAT is not extracted by default.',
+      'This is what a finished AVR on form R-1 looks like: the parties, the contract, the list of works, the total and the amount in words. All data in the example is fictional, and VAT is not extracted by default.',
     pointsTitle: 'What a certificate of completed works must include',
     points: [
       'Parties: the name, BIN/IIN and address of the contractor and of the customer.',
       'The contract, the certificate number and the date it is drawn up.',
-      'The list of works or services: name, date of completion, quantity, price per unit and cost, then the total. A VAT payer picks “VAT 16% included”: VAT is extracted from the total as total × 16 / 116.',
+      'The list of works or services: name, date of completion, quantity, price per unit and cost, then the total and the amount in words. A VAT payer picks “VAT 16% included”: VAT is extracted from the total as total × 16 / 116.',
       'Signatures: both parties sign, the contractor hands over the work and the customer accepts it. This is how the customer confirms the work was accepted in full with no claims.',
     ],
     caption:

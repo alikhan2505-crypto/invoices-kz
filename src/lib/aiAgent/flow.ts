@@ -4,6 +4,8 @@
 // telegram.ts; this file is deliberately network- and DB-free so it can be
 // unit tested directly.
 
+import { triggerMatches } from '@/lib/triggerMatch'
+
 export interface FlowButton {
   label: string
   // null = "Конец сценария": clicking this button ends the flow
@@ -136,15 +138,16 @@ export function resolveFlowButtonClick(definition: FlowDefinition, activeStepId:
   return { outcome: 'advanced', nextStep }
 }
 
-// Same case-insensitive substring rule as findTemplateMatch
-// (webhookHandler.ts) applied to flows instead of templates -- kept as its
+// Same trigger rule as findTemplateMatch (webhookHandler.ts; shared helper
+// triggerMatches in src/lib/triggerMatch.ts: substring, short triggers --
+// word start only) applied to flows instead of templates -- kept as its
 // own small function rather than forcing templates and flows to share one
 // generic interface, since their result shapes differ (a matched template
 // returns reply text; a matched flow returns just its id).
 export function findFlowTriggerMatch(text: string, flows: { id: string; trigger_words: string[] }[]): string | null {
   const lower = text.toLowerCase()
   for (const flow of flows) {
-    if (flow.trigger_words.some(w => lower.includes(w.toLowerCase()))) {
+    if (flow.trigger_words.some(w => triggerMatches(lower, w))) {
       return flow.id
     }
   }

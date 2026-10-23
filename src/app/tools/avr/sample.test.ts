@@ -17,7 +17,7 @@ import { avrDict } from './dict'
 import {
   AVR_GUIDE_SLUG, avrGuidePath, avrSampleAnchorLabel, avrSampleCopy, buildAvrSampleDoc, SAMPLE_ANCHOR_ID, SAMPLE_CONTRACT_DATE,
   SAMPLE_CONTRACT_NUMBER, SAMPLE_CUSTOMER, SAMPLE_DATE, SAMPLE_EXECUTOR, SAMPLE_NUMBER, SAMPLE_ROWS, SAMPLE_TOTAL, SAMPLE_VAT_IF_PAYER,
-  SAMPLE_VAT_TYPE,
+  SAMPLE_TOTAL_WORDS, SAMPLE_VAT_TYPE,
 } from './sample'
 
 const L = 'A-Za-zА-Яа-яЁёӘәҒғҚқҢңӨөҰұҮүҺһІі'
@@ -121,17 +121,24 @@ describe('avr sample: matches what the real generator prints', () => {
     expect(html).toContain(SAMPLE_EXECUTOR.director)
   })
 
+  it('prints the total in words under the table, same string as the sample', () => {
+    const html = realHtml()
+    expect(SAMPLE_TOTAL_WORDS).toBe('сто шестьдесят тысяч тенге 00 тиын')
+    expect(html).toContain(`Всего оказано услуг на сумму: <u>${SAMPLE_TOTAL_WORDS}</u>`)
+    expect(buildAvrSampleDoc().summaryLines[0]).toBe(`Всего оказано услуг на сумму: ${SAMPLE_TOTAL_WORDS}`)
+  })
+
   it('prints the footer lines and both signature blocks that the sample shows', () => {
     const html = realHtml()
     const doc = buildAvrSampleDoc()
     // В генераторе в этой строке опечатка («заказчик___»), в образце слово дописано.
     expect(html).toContain('Сведения об использовании запасов, полученных от заказчик')
-    expect(doc.summaryLines[0]).toContain('Сведения об использовании запасов, полученных от заказчика')
+    expect(doc.summaryLines[1]).toContain('Сведения об использовании запасов, полученных от заказчика')
     expect(html).toContain('Приложение: Перечень документации, в том числе отчёт(ы) о маркетинговых, научных исследованиях, консультационных и прочих услугах (обязательны при их наличии) на _____ страниц')
-    expect(doc.summaryLines[1]).toContain('Приложение: Перечень документации, в том числе отчёт(ы) о маркетинговых, научных исследованиях, консультационных и прочих услугах (обязательны при их наличии) на _____ страниц')
+    expect(doc.summaryLines[2]).toContain('Приложение: Перечень документации, в том числе отчёт(ы) о маркетинговых, научных исследованиях, консультационных и прочих услугах (обязательны при их наличии) на _____ страниц')
     for (const part of ['Принял (Заказчик)', 'должность', 'подпись', 'расшифровка подписи', 'М.П.', 'Дата подписания (принятия) работ (услуг):']) {
       expect(html).toContain(part)
-      expect(doc.summaryLines[2]).toContain(part)
+      expect(doc.summaryLines[3]).toContain(part)
     }
     expect(html).toContain(doc.signatureLabel)
   })
@@ -210,8 +217,9 @@ describe('avr sample: copy on every language', () => {
     expect(avrSampleCopy.en.caption).toMatch(/in Russian/)
   })
 
-  it('does not promise anything the generator does not print (no amount in words)', () => {
-    for (const lang of TOOL_LANGS) expect(JSON.stringify(avrSampleCopy[lang])).not.toMatch(/прописью|жазбаша|in words/i)
+  it('no longer hides the amount in words: the generator prints it, so the copy may mention it', () => {
+    expect(avrSampleCopy.ru.intro).toMatch(/прописью/)
+    expect(avrSampleCopy.ru.points[2]).toMatch(/прописью/)
   })
 
   it('points to the documents guide (kk has its own, en falls back to ru)', () => {

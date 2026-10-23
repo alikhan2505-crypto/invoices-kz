@@ -38,6 +38,7 @@ import { resizeToFit } from './imageResize'
 import { docFitScript } from './docFit'
 import { watermarkCss, watermarkBodyClass } from './docWatermark'
 import { escapeHtml, escapeAttr } from './htmlEscape'
+import { amountInWordsKzt } from './amountWords'
 
 export interface AVRImages {
   signature?: string
@@ -96,6 +97,9 @@ export function buildAVRHtml(data: AVRData, images: AVRImages = {}): string | nu
   const vatType = data.vatType || 'no_vat'
   const totalWithoutVat = vatType === 'vat_16' ? Math.round(totalAmount / 1.16) : totalAmount
   const vatAmount = vatType === 'vat_16' ? Math.round(totalAmount - totalAmount / 1.16) : 0
+  // Прописью — ровно та сумма, что в строке «Итого» (с НДС, если он «в том числе»).
+  // Итог не число или за пределами таблицы разрядов — прописью не печатаем, чтобы строка не противоречила «Итого».
+  const totalWords = Number.isFinite(totalAmount) && totalAmount < 1e15 ? escapeHtml(amountInWordsKzt(totalAmount)) : ''
 
   const html = `
     <!DOCTYPE html>
@@ -274,6 +278,11 @@ export function buildAVRHtml(data: AVRData, images: AVRImages = {}): string | nu
         </tbody>
       </table>
 
+      <!-- Итого прописью (как «Всего к оплате» в счёте) -->
+      ${totalWords ? `<div class="total-words" style="margin-bottom:6px; font-size:9px; line-height:1.5; font-weight:bold; page-break-inside:avoid;">
+        Всего оказано услуг на сумму: <u>${totalWords}</u>
+      </div>` : ''}
+
       <!-- Сведения об использовании запасов -->
       <div style="margin-bottom:6px; font-size:9px;">
         Сведения об использовании запасов, полученных от заказчика_______________________
@@ -286,7 +295,7 @@ export function buildAVRHtml(data: AVRData, images: AVRImages = {}): string | nu
       </div>
 
       <!-- Подписи -->
-      <table style="width:100%; border:none; margin-top:10px;">
+      <table style="width:100%; border:none; margin-top:10px; page-break-inside:avoid;">
         <tr>
           <td style="border:none; width:48%; vertical-align:top;">
             <div style="font-size:9px; margin-bottom:4px; font-weight:bold;">Сдал (Исполнитель)</div>

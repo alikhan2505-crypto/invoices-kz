@@ -111,3 +111,55 @@ describe('buildAVRHtml — обычные данные не меняются', (
     expect(build({ services: [{ name: 'Товар', qty: 1, price: 1, type: 'product' }] })).toBeNull()
   })
 })
+
+describe('buildAVRHtml — сумма прописью', () => {
+  const words = (html: string) => html.match(/Всего оказано услуг на сумму: <u>([^<]*)<\/u>/)?.[1]
+
+  it('prints 21 000 with the feminine «одна тысяча»', () => {
+    const html = build({ services: [{ name: 'Работа', qty: 1, price: 21000 }] })
+    expect(words(html)).toBe('двадцать одна тысяча тенге 00 тиын')
+  })
+
+  it('prints 2 000 000 and a long sum with tiyn', () => {
+    expect(words(build({ services: [{ name: 'Работа', qty: 2, price: 1000000 }] }))).toBe('два миллиона тенге 00 тиын')
+    expect(words(build({ services: [{ name: 'Работа', qty: 1, price: 1234567.89 }] })))
+      .toBe('один миллион двести тридцать четыре тысячи пятьсот шестьдесят семь тенге 89 тиын')
+  })
+
+  it('sums only services and matches the «Итого» cell', () => {
+    const html = build({
+      services: [
+        { name: 'А', qty: 2, price: 5000 },
+        { name: 'Б', qty: 1, price: 84000 },
+        { name: 'Товар', qty: 1, price: 999999, type: 'product' },
+      ],
+    })
+    expect(words(html)).toBe('девяносто четыре тысячи тенге 00 тиын')
+    expect(html).toContain('94 000,00')
+  })
+
+  it('with 16% VAT the words are the gross total, same as «Итого»', () => {
+    const html = build({ vatType: 'vat_16', services: [{ name: 'Работа', qty: 1, price: 116000 }] })
+    expect(words(html)).toBe('сто шестнадцать тысяч тенге 00 тиын')
+  })
+
+  it('declines 11-14 thousand and takes tiyn from a float product', () => {
+    for (const [n, w] of [[11000, 'одиннадцать тысяч'], [12000, 'двенадцать тысяч'], [14000, 'четырнадцать тысяч']] as const) {
+      expect(words(build({ services: [{ name: 'Работа', qty: 1, price: n }] }))).toBe(w + ' тенге 00 тиын')
+    }
+    expect(words(build({ services: [{ name: 'Работа', qty: 3, price: 33.33 }] }))).toMatch(/девяносто девять тенге 99 тиын$/)
+  })
+
+  it('works without VAT and does not print the line for a non-numeric total', () => {
+    expect(words(build({ vatType: 'no_vat', services: [{ name: 'Работа', qty: 1, price: 5000 }] }))).toBe('пять тысяч тенге 00 тиын')
+    expect(build({ services: [{ name: 'Работа', qty: Number.NaN, price: 10 }] })).not.toContain('Всего оказано услуг на сумму')
+  })
+
+  it('sits right under the totals table, before the stock line and the signatures', () => {
+    const html = build()
+    const i = html.indexOf('Всего оказано услуг на сумму')
+    expect(i).toBeGreaterThan(html.indexOf('Итого'))
+    expect(i).toBeLessThan(html.indexOf('Сведения об использовании запасов'))
+    expect(i).toBeLessThan(html.indexOf('Сдал (Исполнитель)'))
+  })
+})

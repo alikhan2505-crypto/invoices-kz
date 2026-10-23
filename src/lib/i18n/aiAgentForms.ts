@@ -277,7 +277,7 @@ export const aiAgentFormsDict: Record<Lang, AiAgentFormsDict> = {
     walletRepliesSuffix: 'ИИ-ответов.',
     walletSharedHint: 'Кошелёк общий для Счетов, Kaspi Bot и AI-агента — пополнить можно значком кошелька в правом верхнем углу.',
 
-    templatesHint: 'Шаблоны отвечают мгновенно и бесплатно — если сообщение клиента содержит триггер, ИИ не вызывается.',
+    templatesHint: 'Шаблоны отвечают мгновенно и бесплатно — если сообщение клиента содержит триггер, ИИ не вызывается. Короткие слова (до 3 букв) срабатывают только в начале слова.',
     templatesEmpty: 'Шаблонов пока нет. Они создаются автоматически, когда вы одобряете ответы в разделе «На проверку», — и их можно добавить вручную.',
     triggerWordsLabel: 'Триггерные слова',
     templateChannelLabel: 'Где отвечать',
@@ -460,7 +460,7 @@ export const aiAgentFormsDict: Record<Lang, AiAgentFormsDict> = {
     walletRepliesSuffix: 'ИИ-жауапқа жетеді.',
     walletSharedHint: 'Әмиян Шоттар, Kaspi Bot және AI-агент үшін ортақ — оң жақ жоғарғы бұрыштағы әмиян белгішесі арқылы толтыруға болады.',
 
-    templatesHint: 'Үлгілер бірден әрі тегін жауап береді — клиенттің хабарламасында триггер болса, ИИ шақырылмайды.',
+    templatesHint: 'Үлгілер бірден әрі тегін жауап береді — клиенттің хабарламасында триггер болса, ИИ шақырылмайды. Қысқа сөздер (3 әріпке дейін) тек сөздің басында ғана іске қосылады.',
     templatesEmpty: 'Әзірге үлгілер жоқ. Олар «Тексеруге» бөлімінде жауаптарды мақұлдағанда автоматты түрде жасалады, оларды қолмен де қосуға болады.',
     triggerWordsLabel: 'Триггер сөздер',
     templateChannelLabel: 'Қайда жауап беру',
@@ -643,7 +643,7 @@ export const aiAgentFormsDict: Record<Lang, AiAgentFormsDict> = {
     walletRepliesSuffix: 'AI replies.',
     walletSharedHint: 'The wallet is shared between Invoices, Kaspi Bot and the AI agent — top it up from the wallet icon in the top right.',
 
-    templatesHint: 'Templates reply instantly and for free — if the customer’s message contains a trigger, the AI is not called.',
+    templatesHint: 'Templates reply instantly and for free — if the customer’s message contains a trigger, the AI is not called. Short words (up to 3 letters) match only at the beginning of a word.',
     templatesEmpty: 'No templates yet. They are created automatically when you approve replies under To review, and can also be added by hand.',
     triggerWordsLabel: 'Trigger words',
     templateChannelLabel: 'Where it replies',
