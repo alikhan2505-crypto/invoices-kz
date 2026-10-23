@@ -1,6 +1,7 @@
 import QRCode from 'qrcode'
 import { docFitScript } from './docFit'
 import { watermarkCss, watermarkBodyClass } from './docWatermark'
+import { amountInWordsKzt } from './amountWords'
 import { resizeToFit } from './imageResize'
 import { escapeHtml, escapeAttr } from './htmlEscape'
 
@@ -59,44 +60,6 @@ interface InvoiceData {
   viewUrl?: string
   dueDate?: string
   showWatermark?: boolean
-}
-
-function numberToWords(n: number): string {
-  const ones = ['','один','два','три','четыре','пять','шесть','семь','восемь','девять',
-    'десять','одиннадцать','двенадцать','тринадцать','четырнадцать','пятнадцать',
-    'шестнадцать','семнадцать','восемнадцать','девятнадцать']
-  const tens = ['','','двадцать','тридцать','сорок','пятьдесят','шестьдесят','семьдесят','восемьдесят','девяносто']
-  const hundreds = ['','сто','двести','триста','четыреста','пятьсот','шестьсот','семьсот','восемьсот','девятьсот']
-
-  if (n === 0) return 'ноль'
-  if (n < 0) return 'минус ' + numberToWords(-n)
-
-  let result = ''
-  const millions = Math.floor(n / 1000000)
-  const th = Math.floor((n % 1000000) / 1000)
-  const rest = n % 1000
-
-  if (millions > 0) result += numberToWords(millions) + ' миллионов '
-
-  if (th > 0 && th < 10) {
-    const tWords = ['','одна тысяча','две тысячи','три тысячи','четыре тысячи','пять тысяч','шесть тысяч','семь тысяч','восемь тысяч','девять тысяч']
-    result += tWords[th] + ' '
-  } else if (th >= 10) {
-    result += numberToWords(th) + ' тысяч '
-  }
-
-  const h = Math.floor(rest / 100)
-  const t = Math.floor((rest % 100) / 10)
-  const o = rest % 10
-
-  if (h > 0) result += hundreds[h] + ' '
-  if (t === 1) result += ones[10 + o] + ' '
-  else {
-    if (t > 1) result += tens[t] + ' '
-    if (o > 0) result += ones[o] + ' '
-  }
-
-  return result.trim()
 }
 
 // Картинка в src: только наши data:image/ (ресайз подписи/печати/логотипа,
@@ -175,7 +138,7 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<string> {
     ? await QRCode.toDataURL(qrTarget, { width: 200, margin: 1 }).catch(() => '')
     : '')
 
-  const totalWords = numberToWords(Math.floor(data.total)) + ' тенге 00 тиын'
+  const totalWords = amountInWordsKzt(data.total)
   const vatType = data.vatType || 'no_vat'
   const vatAmount = vatType === 'vat_16' ? Math.round(data.total - data.total / 1.16) : 0
 

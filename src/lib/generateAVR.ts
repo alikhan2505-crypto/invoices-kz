@@ -276,7 +276,7 @@ export function buildAVRHtml(data: AVRData, images: AVRImages = {}): string | nu
 
       <!-- Сведения об использовании запасов -->
       <div style="margin-bottom:6px; font-size:9px;">
-        Сведения об использовании запасов, полученных от заказчик_______________________
+        Сведения об использовании запасов, полученных от заказчика_______________________
         <span style="font-size:8px; color:#666;">наименование, количество, стоимость</span>
       </div>
 

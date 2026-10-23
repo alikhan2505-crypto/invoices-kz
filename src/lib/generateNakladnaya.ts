@@ -30,6 +30,7 @@ interface NakladnayaData {
   }
 }
 
+import { amountInWordsKzt } from './amountWords'
 import { resizeToFit } from './imageResize'
 import { docFitScript } from './docFit'
 import { watermarkCss, watermarkBodyClass } from './docWatermark'
@@ -49,33 +50,6 @@ function safeImageSrc(url: string): string {
 // чтобы «</script» из пользовательского текста не закрыл тег.
 function jsString(value: string): string {
   return JSON.stringify(value).replace(/</g, '\\u003c')
-}
-
-function numToWordsNakl(n: number): string {
-  const ones = ['','один','два','три','четыре','пять','шесть','семь','восемь','девять',
-    'десять','одиннадцать','двенадцать','тринадцать','четырнадцать','пятнадцать',
-    'шестнадцать','семнадцать','восемнадцать','девятнадцать']
-  const tens = ['','','двадцать','тридцать','сорок','пятьдесят','шестьдесят','семьдесят','восемьдесят','девяносто']
-  const hundreds = ['','сто','двести','триста','четыреста','пятьсот','шестьсот','семьсот','восемьсот','девятьсот']
-  if (n === 0) return 'ноль'
-  if (n < 0) return 'минус ' + numToWordsNakl(-n)
-  let result = ''
-  const millions = Math.floor(n / 1000000)
-  const thousands = Math.floor((n % 1000000) / 1000)
-  const rest = n % 1000
-  if (millions > 0) result += numToWordsNakl(millions) + ' миллионов '
-  if (thousands > 0) {
-    const tWords = ['','одна тысяча','две тысячи','три тысячи','четыре тысячи','пять тысяч','шесть тысяч','семь тысяч','восемь тысяч','девять тысяч']
-    if (thousands < 10) result += tWords[thousands] + ' '
-    else result += numToWordsNakl(thousands) + ' тысяч '
-  }
-  const h = Math.floor(rest / 100)
-  const t = Math.floor((rest % 100) / 10)
-  const o = rest % 10
-  if (h > 0) result += hundreds[h] + ' '
-  if (t === 1) result += ones[10 + o] + ' '
-  else { if (t > 1) result += tens[t] + ' '; if (o > 0) result += ones[o] + ' ' }
-  return result.trim()
 }
 
 function countToWords(n: number): string {
@@ -144,7 +118,7 @@ export function buildNakladnayaHtml(
   const vatType = data.vatType || 'no_vat'
   const vatAmount = vatType === 'vat_16' ? Math.round(totalAmount - totalAmount / 1.16) : 0
   const countStr = countToWords(productsOnly.length) + ' ' + (productsOnly.length === 1 ? 'позиция' : productsOnly.length < 5 ? 'позиции' : 'позиций')
-  const totalStr = numToWordsNakl(Math.floor(totalAmount)) + ' тенге 00 тиын'
+  const totalStr = amountInWordsKzt(totalAmount)
 
   const html = `<!DOCTYPE html>
 <html>

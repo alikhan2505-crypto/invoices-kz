@@ -86,16 +86,16 @@ export const avrDict: Record<ToolLang, AvrDict> = {
     seo: {
       title: 'Акт выполненных работ — образец, АВР онлайн',
       description:
-        'Образец акта выполненных работ (АВР) для ИП и ТОО: заполните стороны и договор, скачайте PDF за минуту. НДС, сумма прописью. 3 акта в квартал бесплатно.',
+        'Образец акта выполненных работ (АВР) для ИП и ТОО: заполните стороны и договор, скачайте PDF за минуту. НДС по желанию. 3 акта в квартал бесплатно.',
       keywords:
         'авр образец казахстан, акт выполненных работ скачать, акт оказанных услуг ип, авр онлайн бесплатно, акт выполненных работ тоо, р-1 акт казахстан',
       ogTitle: 'АВР онлайн — акт выполненных работ за минуту',
-      ogDescription: 'Реквизиты сторон, договор, НДС, сумма прописью. PDF без регистрации.',
+      ogDescription: 'Реквизиты сторон, договор, НДС по желанию. PDF без регистрации.',
       ogImageAlt: 'АВР онлайн — invoices.kz',
     },
     h1: 'Акт выполненных работ — онлайн, бесплатно',
     intro: n =>
-      `Заполните стороны и работы — получите готовый АВР по привычной казахстанской форме, с суммой прописью и НДС, если нужен. Без регистрации, ${n} акта в квартал.`,
+      `Заполните стороны и работы — получите готовый АВР по привычной казахстанской форме, с НДС, если нужен. Без регистрации, ${n} акта в квартал.`,
     docLangNote: '',
     executorTitle: 'Исполнитель — вы',
     companyLabel: 'Название ИП / ТОО *',
@@ -162,7 +162,7 @@ export const avrDict: Record<ToolLang, AvrDict> = {
       },
       {
         q: 'Что такое форма Р-1?',
-        a: 'Р-1 — форма акта выполненных работ (оказанных услуг), утверждённая Минфином РК. Генератор собирает акт именно по ней: стороны, договор, перечень работ, сумма прописью, подписи.',
+        a: 'Р-1 — форма акта выполненных работ (оказанных услуг), утверждённая Минфином РК. Генератор собирает акт именно по ней: стороны, договор, перечень работ, подписи.',
       },
       {
         q: 'Если я выписываю ЭСФ, АВР всё равно нужен?',
@@ -187,12 +187,12 @@ export const avrDict: Record<ToolLang, AvrDict> = {
       keywords:
         'орындалған жұмыстар актісі, орындалған жұмыстар актісі үлгісі, көрсетілген қызметтер актісі, ожа онлайн, р-1 нысаны акт, жк орындалған жұмыстар актісі, жшс акт үлгісі, орындалған жұмыстар актісі pdf жүктеу',
       ogTitle: 'Орындалған жұмыстар актісі — бір минутта, тегін',
-      ogDescription: 'Тараптар, шарт, ҚҚС, сомасы жазбаша. Тіркелусіз PDF.',
+      ogDescription: 'Тараптар, шарт, қалауыңызша ҚҚС. Тіркелусіз PDF.',
       ogImageAlt: 'Орындалған жұмыстар актісі онлайн — invoices.kz',
     },
     h1: 'Орындалған жұмыстар актісі — онлайн, тегін',
     intro: n =>
-      `Тараптар мен жұмыстарды толтырыңыз — таныс қазақстандық нысандағы дайын актіні аласыз: сомасы жазбаша, қажет болса ҚҚС-пен. Тіркелусіз, тоқсанына ${n} акт.`,
+      `Тараптар мен жұмыстарды толтырыңыз — таныс қазақстандық нысандағы дайын актіні аласыз: қажет болса ҚҚС-пен. Тіркелусіз, тоқсанына ${n} акт.`,
     docLangNote: 'Акт бланкісі (Р-1 нысаны) орыс тілінде шығады — бухгалтерия қабылдайтын үйреншікті нысан.',
     executorTitle: 'Орындаушы — сіз',
     companyLabel: 'ЖК / ЖШС атауы *',
@@ -259,7 +259,7 @@ export const avrDict: Record<ToolLang, AvrDict> = {
       },
       {
         q: 'Р-1 нысаны дегеніміз не?',
-        a: 'Р-1 — ҚР Қаржы министрлігі бекіткен Орындалған жұмыстар (көрсетілген қызметтер) актісінің нысаны. Генератор актіні дәл осы нысан бойынша жасайды: тараптар, шарт, жұмыстар тізбесі, сомасы жазбаша, қолтаңбалар.',
+        a: 'Р-1 — ҚР Қаржы министрлігі бекіткен Орындалған жұмыстар (көрсетілген қызметтер) актісінің нысаны. Генератор актіні дәл осы нысан бойынша жасайды: тараптар, шарт, жұмыстар тізбесі, қолтаңбалар.',
       },
       {
         q: 'ЭШФ жазсам да, акт керек пе?',
@@ -284,12 +284,12 @@ export const avrDict: Record<ToolLang, AvrDict> = {
       keywords:
         'kazakhstan certificate of completed works, avr kazakhstan, act of completed works kazakhstan template, acceptance certificate kazakhstan, services rendered act kazakhstan, r-1 form kazakhstan, kazakhstan avr pdf free',
       ogTitle: 'Kazakhstan certificate of completed works (AVR) — free, in a minute',
-      ogDescription: 'The standard Kazakhstan AVR (form R-1): parties, contract, VAT, total in words. PDF without sign-up.',
+      ogDescription: 'The standard Kazakhstan AVR (form R-1): parties, contract, optional VAT. PDF without sign-up.',
       ogImageAlt: 'Kazakhstan AVR generator — invoices.kz',
     },
     h1: 'Kazakhstan certificate of completed works (AVR) — online, free',
     intro: n =>
-      `Fill in the parties and the work done to get a ready AVR — the act of completed works (services rendered) on the familiar Kazakhstan form, with the total in words and VAT if needed. You will need your 12-digit BIN or IIN (business / individual identification number). No sign-up, ${n} certificates per quarter.`,
+      `Fill in the parties and the work done to get a ready AVR — the act of completed works (services rendered) on the familiar Kazakhstan form, with VAT if needed. You will need your 12-digit BIN or IIN (business / individual identification number). No sign-up, ${n} certificates per quarter.`,
     docLangNote: 'The certificate is generated in Russian (form R-1) — the standard form that accountants and counterparties in Kazakhstan accept.',
     executorTitle: 'Contractor — you',
     companyLabel: 'Sole proprietor (IE) / LLP name *',
@@ -356,7 +356,7 @@ export const avrDict: Record<ToolLang, AvrDict> = {
       },
       {
         q: 'What is form R-1?',
-        a: 'R-1 is the form of the certificate of completed works (services rendered) approved by the Ministry of Finance of Kazakhstan. The generator builds the certificate on exactly this form: parties, contract, list of works, total in words, signatures.',
+        a: 'R-1 is the form of the certificate of completed works (services rendered) approved by the Ministry of Finance of Kazakhstan. The generator builds the certificate on exactly this form: parties, contract, list of works, signatures.',
       },
       {
         q: 'I already issue an e-invoice (ESF). Do I still need an AVR?',
