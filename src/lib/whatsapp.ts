@@ -118,6 +118,31 @@ export async function getWhatsAppDisplayPhoneNumber(phoneNumberId: string, acces
   }
 }
 
+// Принадлежит ли номер этому WABA -- по токену, полученному обменом кода. И
+// phoneNumberId, и wabaId приходят из тела запроса (их пишет браузер из
+// postMessage Meta, то есть ПОДДЕЛЫВАЕМО), поэтому доверять им нельзя: только
+// список номеров WABA, который Graph отдаёт под этим токеном, доказывает связь.
+// Токен ES выдан на WABA'ы, которые пользователь сам отдал приложению, так что
+// чужой wabaId Graph отвечает 400/403 -- это «нет», а не сбой. Остальные ошибки
+// (401, 5xx, сеть) пробрасываются: молча сказать «нет» значило бы отказать
+// честному владельцу из-за временной проблемы Meta.
+export async function isPhoneNumberInWaba(wabaId: string, phoneNumberId: string, accessToken: string): Promise<boolean> {
+  let url: string | undefined = `${GRAPH_API}/${encodeURIComponent(wabaId)}/phone_numbers?fields=id&limit=100`
+  for (let page = 0; url && page < 10; page++) {
+    const res: Response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } })
+    const data = await res.json().catch(() => null)
+    if (!res.ok) {
+      if (res.status === 400 || res.status === 403 || res.status === 404) return false
+      throw new WhatsAppApiError(res.status, data?.error?.message || `phone_numbers lookup failed (HTTP ${res.status})`)
+    }
+    if (Array.isArray(data?.data) && data.data.some((n: { id?: unknown }) => String(n?.id) === phoneNumberId)) return true
+    // Страницы листаем только по ссылке на сам Graph: токен не должен уйти на чужой хост.
+    const next: unknown = data?.paging?.next
+    url = typeof next === 'string' && next.startsWith('https://graph.facebook.com/') ? next : undefined
+  }
+  return false
+}
+
 // Independent check used ONLY to decide whether a registerWhatsAppPhoneNumber
 // failure is safe to ignore (Embedded Signup v4 already registers the number
 // inside its own popup flow for most connect attempts, making our own

@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { buildWhatsAppFlowMessage } from './whatsapp'
+import { describe, it, expect, vi, afterEach } from 'vitest'
+import { buildWhatsAppFlowMessage, isPhoneNumberInWaba, WhatsAppApiError } from './whatsapp'
 import type { FlowStep } from './aiAgent/flow'
 
 describe('buildWhatsAppFlowMessage', () => {
@@ -50,5 +50,44 @@ describe('buildWhatsAppFlowMessage', () => {
     }
     const result: any = buildWhatsAppFlowMessage(step)
     expect(result.interactive.action.sections[0].rows).toHaveLength(10)
+  })
+})
+
+describe('isPhoneNumberInWaba', () => {
+  afterEach(() => { vi.unstubAllGlobals() })
+  const jsonRes = (status: number, body: unknown) => ({ ok: status >= 200 && status < 300, status, json: async () => body })
+
+  it('true when the number is in the WABA list (id compared as string)', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => jsonRes(200, { data: [{ id: '5' }, { id: 111 }] })))
+    expect(await isPhoneNumberInWaba('222', '111', 'tok')).toBe(true)
+  })
+
+  it('false when the number is absent', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => jsonRes(200, { data: [{ id: '5' }] })))
+    expect(await isPhoneNumberInWaba('222', '111', 'tok')).toBe(false)
+  })
+
+  it('false when Graph refuses the token access to that WABA (400/403)', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => jsonRes(400, { error: { message: 'Unsupported get request' } })))
+    expect(await isPhoneNumberInWaba('222', '111', 'tok')).toBe(false)
+  })
+
+  it('throws on 5xx instead of silently denying', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => jsonRes(500, { error: { message: 'boom' } })))
+    await expect(isPhoneNumberInWaba('222', '111', 'tok')).rejects.toBeInstanceOf(WhatsAppApiError)
+  })
+
+  it('follows graph.facebook.com paging but never a foreign host', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonRes(200, { data: [{ id: '1' }], paging: { next: 'https://graph.facebook.com/v25.0/222/phone_numbers?after=x' } }))
+      .mockResolvedValueOnce(jsonRes(200, { data: [{ id: '111' }] }))
+    vi.stubGlobal('fetch', fetchMock)
+    expect(await isPhoneNumberInWaba('222', '111', 'tok')).toBe(true)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+
+    const evil = vi.fn(async () => jsonRes(200, { data: [], paging: { next: 'https://evil.example/steal' } }))
+    vi.stubGlobal('fetch', evil)
+    expect(await isPhoneNumberInWaba('222', '111', 'tok')).toBe(false)
+    expect(evil).toHaveBeenCalledTimes(1)
   })
 })

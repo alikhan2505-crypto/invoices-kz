@@ -245,11 +245,47 @@ export function instantWindow(now = Date.now()): { newerThan: string; olderThan:
  * Ошибка проверки = «не подтверждён»: следующий прогон спросит снова.
  */
 export async function isEmailConfirmed(supabase: SupabaseClient, userId: string): Promise<boolean> {
+  return (await getAuthIdentity(supabase, userId)).confirmed
+}
+
+/**
+ * Адрес и подтверждённость из auth.users. profiles.email пользователь пишет
+ * сам (страница реквизитов, прямой REST), поэтому получателем системных писем
+ * он быть не должен: берём адрес, на который человек реально входит.
+ * Один вызов getUserById отвечает на оба вопроса. Ошибка = не подтверждён и
+ * адреса нет (email: null) — вызывающий решает, падать ли на profiles.email.
+ */
+export async function getAuthIdentity(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<{ confirmed: boolean; email: string | null }> {
   try {
     const { data, error } = await supabase.auth.admin.getUserById(userId)
-    return !error && !!data.user?.email_confirmed_at
+    if (error || !data?.user) return { confirmed: false, email: null }
+    return { confirmed: !!data.user.email_confirmed_at, email: data.user.email || null }
   } catch {
-    return false
+    return { confirmed: false, email: null }
+  }
+}
+
+/**
+ * Получатель системного письма: адрес из auth.users, а profiles.email — только
+ * если auth недоступен. Результат кешируется на время прогона крона (одно
+ * обращение к auth на пользователя, а не на каждое письмо), число обращений
+ * ограничено maxLookups: сверх лимита берём запасной адрес без запроса, чтобы
+ * прогон не превращался в тысячи вызовов auth.
+ */
+export function makeRecipientResolver(supabase: SupabaseClient, maxLookups = 300) {
+  const cache = new Map<string, string | null>()
+  let lookups = 0
+  return async function resolve(userId: string, fallback: string | null | undefined): Promise<string | null> {
+    const fb = fallback || null
+    if (cache.has(userId)) return cache.get(userId) ?? fb
+    if (lookups >= maxLookups) return fb
+    lookups++
+    const { email } = await getAuthIdentity(supabase, userId)
+    cache.set(userId, email)
+    return email ?? fb
   }
 }
 

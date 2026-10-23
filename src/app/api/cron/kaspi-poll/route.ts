@@ -6,6 +6,7 @@ import { checkAndSettleKaspiPayment } from '@/lib/kaspiPay/settlePayment'
 import { checkAndSettlePlanPayment, refundOrphanPlanWalletHolds } from '@/lib/kaspiPay/settlePlanPayment'
 import { checkAndSettleWalletTopup } from '@/lib/kaspiPay/wallet'
 import { syncKaspiHistory } from '@/lib/kaspiPay/historySync'
+import { isCronAuthorized } from '@/lib/cronAuth'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -29,9 +30,8 @@ const supabase = createClient(
 // reach connections late in the list).
 export const maxDuration = 60
 
-export async function GET(request: Request) {
-  const authHeader = request.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+export async function GET(request: Request) {
+  if (!isCronAuthorized(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

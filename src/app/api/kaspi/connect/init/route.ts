@@ -39,11 +39,11 @@ export async function POST(req: NextRequest) {
     setPendingAttempt(processId, { identity, userToken, userId: user.id, phoneNumber: normalizedPhone })
     return NextResponse.json({ processId })
   } catch (e: any) {
-    // Logs the exact wire-format number so a Kaspi-side rejection (e.g.
-    // UserPhoneNumberDoesNotBelongToAnyOperator) can be diagnosed from the
-    // logs alone next time, instead of re-deriving normalizeKzPhone's output
-    // by hand from a screenshot.
-    console.error('Kaspi connect init error for phone', normalizedPhone, ':', e.message)
+    // Logs the wire-format number with all but the last 4 digits masked: the
+    // operator prefix and length are still visible, which is enough to
+    // diagnose a Kaspi-side rejection (e.g. UserPhoneNumberDoesNotBelongToAnyOperator)
+    // without writing a customer's full phone into Vercel logs (audit 24.10).
+    console.error('Kaspi connect init error for phone', normalizedPhone.slice(0, -4).replace(/\d/g, '*') + normalizedPhone.slice(-4), ':', e.message)
     return NextResponse.json({ error: 'kaspi_unavailable' }, { status: 502 })
   }
 }

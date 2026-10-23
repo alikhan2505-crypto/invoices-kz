@@ -10,6 +10,7 @@ import {
   subscribeWhatsAppWebhooks,
   getWhatsAppDisplayPhoneNumber,
   isWhatsAppPhoneNumberVerified,
+  isPhoneNumberInWaba,
   WhatsAppApiError,
 } from '@/lib/whatsapp'
 
@@ -58,6 +59,9 @@ export async function POST(req: NextRequest) {
   // FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING against plain FINISH. That is
   // the only signal that the number is already live in the seller's phone
   // app, and it changes what this route must and must not do.
+  // ТОЛЬКО подсказка: поле приходит от клиента, поэтому на доступ оно не влияет
+  // (только пропускает register и пишется в is_coexistence) -- доступ решает
+  // проверка isPhoneNumberInWaba ниже.
   const isCoexistence = body?.esEvent === 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING'
   if (!agentId || typeof agentId !== 'string') return NextResponse.json({ error: 'agentId required' }, { status: 400 })
   if (!code || typeof code !== 'string') return NextResponse.json({ error: 'code required' }, { status: 400 })
@@ -72,9 +76,52 @@ export async function POST(req: NextRequest) {
   const appSecret = process.env.WHATSAPP_APP_SECRET
   if (!appId || !appSecret) return NextResponse.json({ error: 'whatsapp_not_configured' }, { status: 500 })
 
+  // phoneNumberId/wabaId попадают в URL-путь Graph API и приходят из браузера --
+  // только цифры (Meta-идентификаторы), чтобы не подсунуть путь вида «123/../».
+  if (!/^\d{1,40}$/.test(phoneNumberId) || !/^\d{1,40}$/.test(wabaId)) {
+    return NextResponse.json({ error: 'invalid_ids' }, { status: 400 })
+  }
+
   try {
     // 1. Exchange the ES code for a system-user access token.
     const { accessToken } = await exchangeWhatsAppCode(code, appId, appSecret)
+
+    // 1a. Доказать, что номер принадлежит WABA, а WABA -- доступен ЭТОМУ токену.
+    // Раньше единственной проверкой доступа к номеру был вызов register, а флаг
+    // coexistence (приходит из тела запроса, то есть от клиента) его отключал:
+    // Pro-аккаунт мог прислать свой валидный code, esEvent=FINISH_WHATSAPP_
+    // BUSINESS_APP_ONBOARDING и ЧУЖОЙ phoneNumberId -- и upsert ниже перезаписал
+    // бы чужую строку. Теперь проверка идёт всегда и по данным Meta, а не по
+    // словам клиента (аудит 24.10.2026, webhooks-cron-1).
+    if (!(await isPhoneNumberInWaba(wabaId, phoneNumberId, accessToken))) {
+      console.error('ai-agent WhatsApp connect refused: phone_number_id not in waba for user', user.id)
+      return NextResponse.json({
+        error: 'phone_not_in_waba',
+        detail: 'Этот номер не принадлежит выбранному WhatsApp Business аккаунту. Подключите номер заново через окно Meta.',
+      }, { status: 403 })
+    }
+
+    // 1b. Номер уже подключён к агенту ДРУГОГО пользователя -- не перезаписываем
+    // его строку (иначе сообщения клиентов прежнего владельца уйдут сюда).
+    // Тот же агент или другой агент того же пользователя -- обычное
+    // переподключение, оно проходит. Проверка идёт до register/subscribe:
+    // отказ не должен оставлять побочных эффектов в аккаунте Meta.
+    const { data: existing } = await supabase
+      .from('ai_agent_channel_connections')
+      .select('agent_id')
+      .eq('channel', 'whatsapp')
+      .eq('external_account_id', phoneNumberId)
+      .maybeSingle()
+    if (existing && existing.agent_id !== agentId) {
+      const { data: ownerAgent } = await supabase.from('ai_agents').select('user_id').eq('id', existing.agent_id).maybeSingle()
+      if (!ownerAgent || ownerAgent.user_id !== user.id) {
+        console.error('ai-agent WhatsApp connect refused: number already connected to another account, user', user.id)
+        return NextResponse.json({
+          error: 'number_already_connected',
+          detail: 'Этот номер WhatsApp уже подключён к другому аккаунту. Если это ваш номер, отключите его там или напишите в поддержку.',
+        }, { status: 409 })
+      }
+    }
 
     // 2. Register the number for Cloud API messaging -- without this the
     // number can't send/receive through the API at all. Embedded Signup v4

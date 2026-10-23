@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { sendTelegramNotification } from '@/lib/telegramNotify'
+import { escapeHtml } from '@/lib/htmlEscape'
+import { hookSecretOk } from '@/lib/hooksGuard'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -16,7 +18,10 @@ const supabase = createClient(
 //  2. профиль должен быть моложе часа — старыми id спамить нельзя;
 //  3. атомарный claim по signup_notified_at: один профиль = один пинг,
 //     сколько бы раз эндпоинт ни дёрнули.
+// Если в окружении задан HOOKS_PG_NET_SECRET, то дополнительно нужен заголовок
+// x-internal-secret (его должен слать SQL-триггер, см. hooksGuard).
 export async function POST(req: NextRequest) {
+  if (!hookSecretOk(req.headers)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const body = await req.json().catch(() => ({}))
   const userId = typeof body?.user_id === 'string' ? body.user_id : ''
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)) {
@@ -54,7 +59,7 @@ export async function POST(req: NextRequest) {
     try {
       await sendTelegramNotification(
         String(a.telegram_chat_id),
-        `🆕 Новая регистрация: ${profile.email || 'без email'}${count ? ` (№${count})` : ''}`,
+        `🆕 Новая регистрация: ${escapeHtml(profile.email) || 'без email'}${count ? ` (№${count})` : ''}`,
       )
     } catch (e) {
       console.error('hooks/new-signup: telegram failed:', e instanceof Error ? e.message : e)

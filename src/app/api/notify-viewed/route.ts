@@ -5,6 +5,8 @@ import { sendTelegramNotification } from '@/lib/telegramNotify'
 import { loadNotifyProfile } from '@/lib/notificationPrefsServer'
 import { wantsNotification } from '@/lib/notificationPrefs'
 import { escapeHtml } from '@/lib/htmlEscape'
+import { num, plainSubject } from '@/lib/invoiceEmail'
+import { claimOnce, notifyOnceKey } from '@/lib/oneShotLimits'
 
 const resend = new Resend(process.env.RESEND_API_KEY!)
 const supabase = createClient(
@@ -18,8 +20,11 @@ const supabase = createClient(
 // only for an invoice that's actually in `viewed` status.
 export async function POST(request: NextRequest) {
   try {
-    const { invoiceId } = await request.json()
-    if (!invoiceId) return NextResponse.json({ error: 'Missing invoiceId' }, { status: 400 })
+    const body = await request.json().catch(() => null)
+    const invoiceId = body?.invoiceId
+    if (typeof invoiceId !== 'string' || !invoiceId || invoiceId.length > 64) {
+      return NextResponse.json({ error: 'Missing invoiceId' }, { status: 400 })
+    }
 
     const { data: inv } = await supabase
       .from('invoices')
@@ -39,7 +44,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true, skipped: true })
     }
 
-    const amount = Number(inv.amount).toLocaleString('ru-KZ')
+    // Одно уведомление на счёт: страница звала этот роут при КАЖДОЙ загрузке,
+    // пока статус «просмотрен» (владельцу — письмо на каждую перезагрузку), а
+    // без авторизации его можно дёргать и вручную. Занимаем разовый слот
+    // атомарно (insert по первичному ключу) до отправки; не получили — уже
+    // слали (или счётчик недоступен — тогда лучше промолчать, чем спамить).
+    if (!(await claimOnce(supabase, notifyOnceKey('viewed', invoiceId)))) {
+      return NextResponse.json({ ok: true, skipped: true })
+    }
+
+    const amount = num(inv.amount).toLocaleString('ru-KZ')
     const clientName = escapeHtml(inv.client_name || '')
     const number = escapeHtml(inv.number)
 
@@ -55,7 +69,7 @@ export async function POST(request: NextRequest) {
         await resend.emails.send({
           from: 'invoices.kz <mail@invoices.kz>',
           to: owner.email as string,
-          subject: `Клиент открыл счёт №${inv.number}`,
+          subject: plainSubject(`Клиент открыл счёт №${inv.number}`),
           html: `
 <!DOCTYPE html>
 <html>

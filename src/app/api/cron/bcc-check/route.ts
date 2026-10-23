@@ -9,6 +9,7 @@ import { loadNotifyProfile } from '@/lib/notificationPrefsServer'
 import { wantsNotification } from '@/lib/notificationPrefs'
 import { sendTelegramNotification } from '@/lib/telegramNotify'
 import { encryptAtRest, decryptAtRest } from '@/lib/kaspiPay/crypto'
+import { isCronAuthorized } from '@/lib/cronAuth'
 
 function getBccKey(): string {
   const key = process.env.BCC_ENCRYPTION_KEY
@@ -63,8 +64,7 @@ function formatDate(d: Date) {
 }
 
 export async function GET(request: Request) {
-  const authHeader = request.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isCronAuthorized(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

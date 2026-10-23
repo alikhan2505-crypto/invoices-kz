@@ -4,6 +4,10 @@ import { createPayment } from '@/lib/kaspiPay/client'
 import { getWalletBalance, computeCommission } from '@/lib/kaspiPay/wallet'
 import type { SettleableRequest } from '@/lib/kaspiPay/settlePayment'
 import { getPrintShopOwnerUserId } from './ownerAccount'
+import {
+  claimPrintSlot, hourBucket, isOrderPayable, printLimitKey, releasePrintSlot,
+  PRINT_PAYMENT_GLOBAL_HOURLY_LIMIT, PRINT_PAYMENT_IP_HOURLY_LIMIT,
+} from './rateLimit'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -32,7 +36,8 @@ export async function getOrCreateKaspiPaymentForPrintOrder(order: {
   id: string
   price: number
   status: string
-}): Promise<KaspiPrintOrderPayment | null> {
+  created_at?: string | null
+}, opts: { ip: string }): Promise<KaspiPrintOrderPayment | null> {
   const ownerId = getPrintShopOwnerUserId()
 
   const { data: existing, error } = await supabase
@@ -50,6 +55,9 @@ export async function getOrCreateKaspiPaymentForPrintOrder(order: {
   }
 
   if (CLOSED_STATUSES.has(order.status)) return null
+  // Аудит 24.10.2026: новый платёж Kaspi — только живому pending-заказу и пока он
+  // «свежий». Уже выпущенный pending-платёж отдан выше и дальше опрашивается как раньше.
+  if (!isOrderPayable(order)) return null
 
   const balance = await getWalletBalance(ownerId)
   if (balance < computeCommission(order.price)) return null
@@ -64,7 +72,34 @@ export async function getOrCreateKaspiPaymentForPrintOrder(order: {
   const connection = await loadConnectionByUserId(ownerId)
   if (!connection) return null
 
-  const payment = await createPayment(connection, { amount: order.price, orderId: order.id })
+  // Лимиты на ВЫПУСК платежей (аудит 24.10.2026, abuse-cost-8): per-order лимит
+  // выше не мешал скрипту плодить заказы и по платежу на каждый — флаг Kaspi на
+  // единственном мерчанте. Слоты в БД: на IP и общий по витрине, оба в час.
+  // Счётчик не читается / лимит исчерпан — платёж не выпускаем (fail closed).
+  const bucket = hourBucket()
+  const ipKey = printLimitKey('pay-ip', opts.ip, bucket)
+  const globalKey = printLimitKey('pay-global', 'all', bucket)
+  const ipSlot = await claimPrintSlot(supabase, ipKey, PRINT_PAYMENT_IP_HOURLY_LIMIT)
+  if (ipSlot.status !== 'claimed') {
+    console.warn('Print shop: payment mint refused for the IP (', ipSlot.status, ') — order', order.id)
+    return null
+  }
+  const globalSlot = await claimPrintSlot(supabase, globalKey, PRINT_PAYMENT_GLOBAL_HOURLY_LIMIT)
+  if (globalSlot.status !== 'claimed') {
+    await releasePrintSlot(supabase, ipKey, ipSlot.used)
+    console.warn('Print shop: payment mint refused by the global hourly cap (', globalSlot.status, ') — order', order.id)
+    return null
+  }
+
+  let payment: Awaited<ReturnType<typeof createPayment>>
+  try {
+    payment = await createPayment(connection, { amount: order.price, orderId: order.id })
+  } catch (e) {
+    // Kaspi платёж не выпустил — слоты не тратим.
+    await releasePrintSlot(supabase, globalKey, globalSlot.used)
+    await releasePrintSlot(supabase, ipKey, ipSlot.used)
+    throw e
+  }
 
   const { data: inserted, error: insertError } = await supabase
     .from('kaspi_payment_requests')

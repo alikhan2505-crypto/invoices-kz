@@ -252,7 +252,7 @@ describe('telegram-webhook: image drafts unchanged', () => {
     image_urls: ['https://x/a.png', 'https://x/b.png'],
   }
 
-  it('publishes through publishToInstagram without claim/after, as before', async () => {
+  it('claims the row (pending -> approved) before publishing, without after()', async () => {
     setDraft(imageDraft)
     lib.publishToInstagram.mockResolvedValue('post-1')
     await POST(req(callback('ig_publish:i1')))
@@ -260,9 +260,27 @@ describe('telegram-webhook: image drafts unchanged', () => {
     expect(lib.publishToInstagram).toHaveBeenCalledWith(['https://x/a.png', 'https://x/b.png'], 'cap', undefined)
     expect(lib.publishReel).not.toHaveBeenCalled()
     expect(db.pendingAfter).toHaveLength(0)
-    expect(db.queries.some(q => q.mode === 'maybeSingle' && q.op === 'update')).toBe(false)
+    const claim = db.queries.find(q => q.mode === 'maybeSingle' && q.op === 'update')!
+    expect(claim.payload).toEqual({ status: 'approved' })
+    expect(claim.filters).toContainEqual(['status', 'pending'])
     expect(draftUpdates().at(-1)!.payload).toMatchObject({ status: 'published', ig_media_id: 'post-1' })
     expect(tg('editMessageText').at(-1)!.body.text).toContain('Опубликовано в Instagram')
+  })
+
+  it('ignores a double press that loses the claim: no second publish', async () => {
+    setDraft(imageDraft, null)
+    await POST(req(callback('ig_publish:i1')))
+    expect(tg('answerCallbackQuery')[0].body.text).toBe('Уже обработано')
+    expect(lib.publishToInstagram).not.toHaveBeenCalled()
+  })
+
+  it('escapes the original message text when editing it', async () => {
+    setDraft(imageDraft)
+    lib.publishToInstagram.mockResolvedValue('post-1')
+    await POST(req(callback('ig_publish:i1')))
+    const text = tg('editMessageText').at(-1)!.body.text as string
+    expect(text).toContain('Подпись &lt;b&gt;')
+    expect(text).not.toContain('<b>')
   })
 
   it('records a failure like before', async () => {

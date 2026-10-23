@@ -5,6 +5,7 @@ import { getActivePlan } from '@/lib/plan'
 import { loadWorkspace } from '@/lib/cfo/data'
 import { almatyToday } from '@/lib/cfo/digest'
 import { ASK_SYSTEM, ASK_SYSTEM_FAMILY, buildAskContext } from '@/lib/cfo/askContext'
+import { claimAskSlot, releaseAskSlot } from '@/lib/cfo/askClaim'
 
 export const maxDuration = 60
 
@@ -29,13 +30,23 @@ export async function POST(req: NextRequest) {
   const { data: profile } = await supabase.from('profiles').select('is_admin, plan, plan_expires_at, trial_expires_at, bonus_expires_at').eq('id', user.id).single()
   if (!getActivePlan(profile).canCfoPro) return NextResponse.json({ error: '«Спроси CFO» доступен на тарифе Про' }, { status: 403 })
 
-  const { data: company } = await supabase.from('cfo_companies').select('id, ask_day, ask_count').eq('user_id', user.id).maybeSingle()
+  const { data: company } = await supabase.from('cfo_companies').select('id').eq('user_id', user.id).maybeSingle()
   if (!company) return NextResponse.json({ error: 'Кабинет CFO ещё не создан' }, { status: 400 })
   const today = almatyToday()
-  const used = company.ask_day === today ? company.ask_count : 0
-  if (used >= DAILY_LIMIT) return NextResponse.json({ error: `На сегодня лимит ${DAILY_LIMIT} вопросов исчерпан — завтра снова можно` }, { status: 429 })
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) return NextResponse.json({ error: 'ИИ не настроен' }, { status: 500 })
+
+  // Слот занимаем атомарно ДО вызова модели (аудит 24.10, api-authz-8): раньше
+  // счётчик читался, потом шёл вызов, и только после ответа писалось used+1 --
+  // пачка параллельных запросов проходила мимо лимита. Не ответила модель --
+  // слот возвращаем ниже, считаются только состоявшиеся ответы.
+  const claim = await claimAskSlot(supabase, company.id, today, DAILY_LIMIT)
+  if (!claim.ok) {
+    if (claim.reason === 'limit') return NextResponse.json({ error: `На сегодня лимит ${DAILY_LIMIT} вопросов исчерпан — завтра снова можно` }, { status: 429 })
+    if (claim.reason === 'no_company') return NextResponse.json({ error: 'Кабинет CFO ещё не создан' }, { status: 400 })
+    return NextResponse.json({ error: 'Не удалось получить ответ — попробуйте ещё раз' }, { status: 502 })
+  }
+  const used = claim.used // вопросов сегодня до этого; с текущим — used + 1
   try {
     const ws = await loadWorkspace(company.id, user.id, supabase)
     const client = new Anthropic({ apiKey })
@@ -51,12 +62,13 @@ export async function POST(req: NextRequest) {
     const answer = message.content.filter((b) => b.type === 'text').map((b) => (b.type === 'text' ? b.text : '')).join('\n').trim()
     if (!answer) {
       console.error('api/cfo/ask: empty answer, stop_reason', message.stop_reason, 'blocks', message.content.map((b) => b.type).join(','))
+      await releaseAskSlot(supabase, company.id, today)
       return NextResponse.json({ error: 'Модель не дала ответа — попробуйте переформулировать вопрос' }, { status: 502 })
     }
-    // Считаем только состоявшиеся ответы.
-    await supabase.from('cfo_companies').update({ ask_day: today, ask_count: used + 1 }).eq('id', company.id)
+    // Считаются только состоявшиеся ответы: слот уже занят выше.
     return NextResponse.json({ answer, left: DAILY_LIMIT - used - 1 })
   } catch (e) {
+    await releaseAskSlot(supabase, company.id, today)
     console.error('api/cfo/ask failed for user', user.id, ':', e instanceof Error ? e.message : e)
     return NextResponse.json({ error: 'Не удалось получить ответ — попробуйте ещё раз' }, { status: 502 })
   }

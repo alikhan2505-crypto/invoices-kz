@@ -8,6 +8,11 @@ import { priceForSize, DEFAULT_RING_SIZE, type KeychainSize, type RingSize } fro
 import { findPrintShopFont } from '@/lib/printShop/fonts'
 import { buildKeychainGeometries } from '@/lib/printShop/keychainGeometry'
 import { normalizeKzPhone } from '@/lib/kaspiPay/phone'
+import { clientIp } from '@/lib/toolQuota'
+import {
+  claimPrintSlot, dayBucket, hourBucket, peekPrintLimit, printLimitKey, releasePrintSlot,
+  PRINT_ORDER_ATTEMPT_IP_HOURLY_LIMIT, PRINT_ORDER_IP_HOURLY_LIMIT, PRINT_ORDER_PHONE_DAILY_LIMIT,
+} from '@/lib/printShop/rateLimit'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -15,6 +20,10 @@ const supabase = createClient(
 )
 
 const MAX_TEXT_LENGTH = 20
+// Реальное тело заказа — меньше килобайта (note до 500 символов). Больше — мусор,
+// режем до разбора JSON и до всего остального.
+const MAX_BODY_CHARS = 8_000
+const MAX_NAME_LENGTH = 100
 const VALID_SIZES = new Set(['S', 'M', 'L'])
 const VALID_RING_SIZES = new Set(['S', 'M', 'L'])
 const VALID_COLORS = new Set(['белый', 'чёрный', 'серый', 'жёлтый', 'зелёный', 'красный', 'бордовый'])
@@ -42,8 +51,38 @@ function fontSupportsText(font: opentype.Font, text: string): boolean {
 // Public, unauthenticated -- the price is ALWAYS recomputed server-side from
 // `size` via priceForSize, never taken from the client body, so a tampered
 // request can't buy a keychain for less than its real price.
+//
+// Аудит 24.10.2026 (abuse-cost-8): без входа и раньше без лимитов, а каждый заказ —
+// CPU (шрифт + геометрия) и строка в БД. Порядок теперь такой: дешёвые проверки
+// (размер тела, длины, шрифт/размер/цвета из белых списков) → лимит попыток с IP →
+// чтение лимитов заказов (IP/час, телефон/сутки) → тяжёлая сборка геометрии →
+// занятие слотов (атомарно) → вставка. Лимиты — счётчики в tool_kontragent_checks
+// (src/lib/printShop/rateLimit.ts); счётчик не читается — отказ (fail closed).
+// Управляющие символы (перевод строки, NUL и т.п.) в тексте брелка бессмысленны.
+function hasControlChars(s: string): boolean {
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i)
+    if (c < 32 || c === 127) return true
+  }
+  return false
+}
+
+function limited(error: string, retryAfterSec: number) {
+  return NextResponse.json({ error }, { status: 429, headers: { 'Retry-After': String(retryAfterSec) } })
+}
+
+function unavailable() {
+  return NextResponse.json({ error: 'Сервис временно недоступен, попробуйте чуть позже' }, { status: 503 })
+}
+
+const IP_LIMIT_MESSAGE = 'Слишком много заказов с вашего адреса. Попробуйте через час'
+const PHONE_LIMIT_MESSAGE = 'С этого номера уже оформлено максимальное число заказов за сутки. Попробуйте завтра'
+
 export async function POST(req: NextRequest) {
-  const body = await req.json().catch(() => null)
+  const raw = await req.text().catch(() => '')
+  if (raw.length > MAX_BODY_CHARS) return NextResponse.json({ error: 'Слишком большой запрос' }, { status: 413 })
+  let body: any = null
+  try { body = JSON.parse(raw) } catch { body = null }
 
   const text = typeof body?.text === 'string' ? body.text.trim() : ''
   const fontId = typeof body?.font === 'string' ? body.font : ''
@@ -55,17 +94,34 @@ export async function POST(req: NextRequest) {
   const ringSize = typeof body?.ringSize === 'string' && body.ringSize ? body.ringSize : DEFAULT_RING_SIZE
   const baseColor = typeof body?.baseColor === 'string' ? body.baseColor : ''
   const textColor = typeof body?.textColor === 'string' ? body.textColor : ''
-  const customerName = typeof body?.customerName === 'string' ? body.customerName.trim() : ''
+  const customerName = typeof body?.customerName === 'string' ? body.customerName.trim().slice(0, MAX_NAME_LENGTH) : ''
   const customerPhone = normalizeKzPhone(typeof body?.customerPhone === 'string' ? body.customerPhone : '')
   const note = typeof body?.note === 'string' ? body.note.trim().slice(0, 500) : null
 
-  if (!text || text.length > MAX_TEXT_LENGTH) return NextResponse.json({ error: 'Укажите текст брелка (до 20 символов)' }, { status: 400 })
+  if (!text || text.length > MAX_TEXT_LENGTH || hasControlChars(text)) return NextResponse.json({ error: 'Укажите текст брелка (до 20 символов)' }, { status: 400 })
   if (!findPrintShopFont(fontId)) return NextResponse.json({ error: 'Неизвестный шрифт' }, { status: 400 })
   if (!VALID_SIZES.has(size)) return NextResponse.json({ error: 'Неизвестный размер' }, { status: 400 })
   if (!VALID_RING_SIZES.has(ringSize)) return NextResponse.json({ error: 'Неизвестный размер кольца' }, { status: 400 })
   if (!VALID_COLORS.has(baseColor) || !VALID_COLORS.has(textColor)) return NextResponse.json({ error: 'Неизвестный цвет' }, { status: 400 })
   if (!customerName) return NextResponse.json({ error: 'Укажите имя' }, { status: 400 })
   if (!customerPhone) return NextResponse.json({ error: 'Укажите телефон' }, { status: 400 })
+
+  // Все дешёвые проверки пройдены. Дальше — чтение шрифта с диска и сборка
+  // геометрии (CPU), поэтому сначала лимиты.
+  const ip = clientIp(req.headers)
+  const hour = hourBucket()
+  const attempt = await claimPrintSlot(supabase, printLimitKey('attempt-ip', ip, hour), PRINT_ORDER_ATTEMPT_IP_HOURLY_LIMIT)
+  if (attempt.status === 'unavailable') return unavailable()
+  if (attempt.status === 'limit') return limited(IP_LIMIT_MESSAGE, 3600)
+
+  const ipKey = printLimitKey('order-ip', ip, hour)
+  const phoneKey = printLimitKey('order-phone', customerPhone, dayBucket())
+  const ipPeek = await peekPrintLimit(supabase, ipKey, PRINT_ORDER_IP_HOURLY_LIMIT)
+  if (ipPeek === 'unavailable') return unavailable()
+  if (ipPeek === 'limit') return limited(IP_LIMIT_MESSAGE, 3600)
+  const phonePeek = await peekPrintLimit(supabase, phoneKey, PRINT_ORDER_PHONE_DAILY_LIMIT)
+  if (phonePeek === 'unavailable') return unavailable()
+  if (phonePeek === 'limit') return limited(PHONE_LIMIT_MESSAGE, 6 * 3600)
 
   // Defensive: fontId is already a known font at this point, so the file
   // read below should always succeed -- but if the static .ttf is ever
@@ -102,6 +158,18 @@ export async function POST(req: NextRequest) {
 
   const price = priceForSize(size as KeychainSize)
 
+  // Занимаем слоты заказа атомарно уже после сборки: пачка параллельных запросов,
+  // прошедшая чтение выше, здесь упрётся в лимит (лишнее — только CPU, ограниченный
+  // лимитом попыток). Порядок IP → телефон; не вышло с телефоном — IP возвращаем.
+  const ipSlot = await claimPrintSlot(supabase, ipKey, PRINT_ORDER_IP_HOURLY_LIMIT)
+  if (ipSlot.status === 'unavailable') return unavailable()
+  if (ipSlot.status === 'limit') return limited(IP_LIMIT_MESSAGE, 3600)
+  const phoneSlot = await claimPrintSlot(supabase, phoneKey, PRINT_ORDER_PHONE_DAILY_LIMIT)
+  if (phoneSlot.status !== 'claimed') {
+    await releasePrintSlot(supabase, ipKey, ipSlot.used)
+    return phoneSlot.status === 'limit' ? limited(PHONE_LIMIT_MESSAGE, 6 * 3600) : unavailable()
+  }
+
   const { data: inserted, error } = await supabase
     .from('print_orders')
     .insert({
@@ -121,6 +189,9 @@ export async function POST(req: NextRequest) {
     .single()
   if (error || !inserted) {
     console.error('print-shop order create failed:', error?.message)
+    // Заказ не создан — слоты лимита не тратим.
+    await releasePrintSlot(supabase, phoneKey, phoneSlot.used)
+    await releasePrintSlot(supabase, ipKey, ipSlot.used)
     return NextResponse.json({ error: 'Не удалось оформить заказ' }, { status: 500 })
   }
 

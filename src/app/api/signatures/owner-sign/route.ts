@@ -4,6 +4,7 @@ import { Resend } from 'resend'
 import crypto from 'crypto'
 import { sigexRegisterDocument, sigexUploadDocumentData, sigexBuildDDC, sigexGetDocument, parseSignerName } from '@/lib/sigex'
 import { getActivePlan } from '@/lib/plan'
+import { escapeHtml } from '@/lib/htmlEscape'
 import { SIGNED_DOCUMENTS_BUCKET } from '@/lib/signedDocuments'
 import { downloadSignedDocument, resolveContractFilePath, resolveSignedDocumentPath } from '@/lib/signedDocumentsServer'
 
@@ -189,9 +190,12 @@ export async function POST(req: NextRequest) {
     const subject = requiresClient
       ? `«${doc.title}» ожидает вашей подписи ЭЦП`
       : `«${doc.title}» подписан ЭЦП`
+    // Название документа вводит пользователь и уходит в HTML письма клиенту —
+    // экранируем (в subject, который не HTML, оно остаётся как есть).
+    const safeTitle = escapeHtml(doc.title)
     const body = requiresClient
-      ? `«${doc.title}» подписан отправителем и ожидает вашей подписи ЭЦП. Подписать можно через приложение eGov mobile — QR-код для сканирования на странице документа.`
-      : `«${doc.title}» подписан отправителем электронной цифровой подписью. Подписанную версию можно скачать на странице документа.`
+      ? `«${safeTitle}» подписан отправителем и ожидает вашей подписи ЭЦП. Подписать можно через приложение eGov mobile — QR-код для сканирования на странице документа.`
+      : `«${safeTitle}» подписан отправителем электронной цифровой подписью. Подписанную версию можно скачать на странице документа.`
     const buttonText = requiresClient ? 'Открыть и подписать' : 'Открыть документ'
 
     await resend.emails.send({
@@ -209,7 +213,7 @@ export async function POST(req: NextRequest) {
   </div>
   <div style="padding:28px 32px;">
     <p style="margin:0 0 16px; font-size:14px; color:#333;">${body}</p>
-    <a href="${doc.publicUrl}" style="display:block; background:#2DC48D; color:white; text-align:center; padding:14px; border-radius:10px; text-decoration:none; font-size:16px; font-weight:bold;">
+    <a href="${escapeHtml(doc.publicUrl)}" style="display:block; background:#2DC48D; color:white; text-align:center; padding:14px; border-radius:10px; text-decoration:none; font-size:16px; font-weight:bold;">
       ${buttonText}
     </a>
   </div>

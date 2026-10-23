@@ -4,6 +4,7 @@ import { loadPlatformConnection } from '@/lib/kaspiPay/connection'
 import { createInvoiceByPhone } from '@/lib/kaspiPay/client'
 import { getPlanAmount, type BillingPeriod } from '@/lib/plans/pricing'
 import { checkAndSettlePlanPayment, type PlanPaymentRow } from '@/lib/kaspiPay/settlePlanPayment'
+import { claimPhonePushSlots } from '@/lib/kaspiPay/phonePushLimits'
 
 const supabaseAuth = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -95,6 +96,13 @@ export async function POST(req: NextRequest) {
 
     const connection = await loadPlatformConnection()
     if (!connection) return NextResponse.json({ error: 'Platform Kaspi connection not set up' }, { status: 500 })
+
+    // Push с общего мерчанта уходит на ЛЮБОЙ номер, поэтому кроме лимита на
+    // пользователя -- лимиты на номер и на IP (аудит 24.10, billing-logic-6).
+    // Слот занят до обращения к Kaspi: неудачные попытки тоже считаются.
+    if (!(await claimPhonePushSlots(supabase, req.headers, phone))) {
+      return NextResponse.json({ error: 'rate_limited' }, { status: 429 })
+    }
 
     const amount = getPlanAmount(plan, billingPeriod)
     const comment = billingPeriod === 'annual'

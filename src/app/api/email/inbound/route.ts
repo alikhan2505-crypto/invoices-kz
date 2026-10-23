@@ -46,10 +46,13 @@ export async function POST(req: NextRequest) {
 
   const fields = extractInboundEmail(payload)
   if (!fields.resendId) {
-    // Still 200: a retry would deliver the same unusable payload. The raw body
-    // is logged so the shape can be read off the runtime logs and the
-    // extractor taught the missing key name.
-    console.error('email/inbound: no id in payload:', JSON.stringify(payload).slice(0, 2000))
+    // Still 200: a retry would deliver the same unusable payload. Only the key
+    // names are logged (never values: the body is a customer's email), which is
+    // enough to read the shape off the runtime logs and teach the extractor the
+    // missing key name.
+    const keys = (o: unknown) => (o && typeof o === 'object' ? Object.keys(o as object).join(',') : '')
+    const inner = (payload as { data?: unknown } | null)?.data
+    console.error('email/inbound: no id in payload; keys:', keys(payload), '; data keys:', keys(inner))
     return NextResponse.json({ ok: true, stored: false })
   }
 

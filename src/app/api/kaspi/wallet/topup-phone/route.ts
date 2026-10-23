@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { loadPlatformConnection } from '@/lib/kaspiPay/connection'
 import { createInvoiceByPhone } from '@/lib/kaspiPay/client'
+import { claimPhonePushSlots } from '@/lib/kaspiPay/phonePushLimits'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -59,6 +60,12 @@ export async function POST(req: NextRequest) {
 
   const connection = await loadPlatformConnection()
   if (!connection) return NextResponse.json({ error: 'Platform Kaspi connection not set up' }, { status: 500 })
+
+  // Лимиты на номер и на IP поверх лимита на пользователя: push уходит с общего
+  // мерчанта на любой номер (аудит 24.10, billing-logic-6).
+  if (!(await claimPhonePushSlots(supabase, req.headers, phoneNumber))) {
+    return NextResponse.json({ error: 'rate_limited' }, { status: 429 })
+  }
 
   try {
     const invoice = await createInvoiceByPhone(connection, {

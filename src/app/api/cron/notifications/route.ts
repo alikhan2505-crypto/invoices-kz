@@ -9,12 +9,18 @@ import { hasKaspiShopAccess, KASPI_SHOP_PROFILE_COLUMNS } from '@/lib/kaspiShop/
 import { NOTIFY_PROFILE_COLUMNS, wantsNotification, type NotifyProfile } from '@/lib/notificationPrefs'
 import { selectWithNotificationPrefs } from '@/lib/notificationPrefsServer'
 import { escapeHtml } from '@/lib/htmlEscape'
+import { makeRecipientResolver } from '@/lib/welcomeDrip'
+import { isCronAuthorized } from '@/lib/cronAuth'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 const resend = new Resend(process.env.RESEND_API_KEY!)
+
+// NOTIFY_PROFILE_COLUMNS + deleted_at: удалённый аккаунт (privacy-3) уведомлений не получает.
+const OWNER_COLUMNS = `${NOTIFY_PROFILE_COLUMNS}, deleted_at`
+type Owner = NotifyProfile & { deleted_at?: string | null }
 
 function startOfDayAgo(days: number) {
   const d = new Date()
@@ -44,11 +50,14 @@ function wrapEmail(accentColor: string, title: string, bodyHtml: string) {
 </html>`
 }
 
-export async function GET(request: Request) {
-  const authHeader = request.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+export async function GET(request: Request) {
+  if (!isCronAuthorized(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  // Получатель писем — адрес из auth.users, а не profiles.email (его пользователь
+  // пишет сам): один запрос к auth на владельца за прогон, с потолком.
+  const resolveEmail = makeRecipientResolver(supabase)
 
   let reminders = 0
   let overdue = 0
@@ -63,29 +72,30 @@ export async function GET(request: Request) {
   // Владелец и его настройки едут вложенным select'ом; notification_prefs
   // добавляется, только если колонка уже есть (selectWithNotificationPrefs).
   const reminderDueDateTarget = addDaysToDateString(todayDateString(), 1)
-  const { data: reminderByDueDate } = await selectWithNotificationPrefs<any[]>(NOTIFY_PROFILE_COLUMNS, cols => supabase
+  const { data: reminderByDueDate } = await selectWithNotificationPrefs<any[]>(OWNER_COLUMNS, cols => supabase
     .from('invoices')
-    .select(`id, number, amount, client_name, profiles(${cols})`)
+    .select(`id, user_id, number, amount, client_name, profiles(${cols})`)
     .in('status', ['sent', 'viewed'])
     .eq('due_date', reminderDueDateTarget))
 
-  const { data: reminderLegacy } = await selectWithNotificationPrefs<any[]>(NOTIFY_PROFILE_COLUMNS, cols => supabase
+  const { data: reminderLegacy } = await selectWithNotificationPrefs<any[]>(OWNER_COLUMNS, cols => supabase
     .from('invoices')
-    .select(`id, number, amount, client_name, profiles(${cols})`)
+    .select(`id, user_id, number, amount, client_name, profiles(${cols})`)
     .in('status', ['sent', 'viewed'])
     .is('due_date', null)
     .gte('created_at', startOfDayAgo(3).toISOString())
     .lt('created_at', startOfDayAgo(2).toISOString()))
 
   for (const inv of [...(reminderByDueDate || []), ...(reminderLegacy || [])] as any[]) {
-    const owner = inv.profiles as NotifyProfile | null
+    const owner = inv.profiles as Owner | null
+    if (owner?.deleted_at) continue
     const clientName = escapeHtml(inv.client_name || '')
     const number = escapeHtml(inv.number)
     if (wantsNotification(owner, 'invoice_due_tomorrow', 'email')) {
       try {
         await resend.emails.send({
           from: 'invoices.kz <mail@invoices.kz>',
-          to: owner!.email as string,
+          to: (await resolveEmail(inv.user_id, owner!.email)) as string,
           subject: `Напоминание: счёт №${inv.number} ещё не оплачен`,
           html: wrapEmail('#F5A623', 'Напоминание об оплате', `
             <p style="margin:0 0 12px; font-size:14px; color:#333;">
@@ -110,29 +120,30 @@ export async function GET(request: Request) {
   // 1 day in the past (a short grace period). Invoices without one: the
   // original heuristic, 7+ days since the invoice was sent.
   const overdueDueDateTarget = addDaysToDateString(todayDateString(), -1)
-  const { data: overdueByDueDate } = await selectWithNotificationPrefs<any[]>(NOTIFY_PROFILE_COLUMNS, cols => supabase
+  const { data: overdueByDueDate } = await selectWithNotificationPrefs<any[]>(OWNER_COLUMNS, cols => supabase
     .from('invoices')
-    .select(`id, number, amount, client_name, profiles(${cols})`)
+    .select(`id, user_id, number, amount, client_name, profiles(${cols})`)
     .in('status', ['sent', 'viewed'])
     .lt('due_date', overdueDueDateTarget))
 
-  const { data: overdueLegacy } = await selectWithNotificationPrefs<any[]>(NOTIFY_PROFILE_COLUMNS, cols => supabase
+  const { data: overdueLegacy } = await selectWithNotificationPrefs<any[]>(OWNER_COLUMNS, cols => supabase
     .from('invoices')
-    .select(`id, number, amount, client_name, profiles(${cols})`)
+    .select(`id, user_id, number, amount, client_name, profiles(${cols})`)
     .in('status', ['sent', 'viewed'])
     .is('due_date', null)
     .lt('created_at', startOfDayAgo(7).toISOString()))
 
   for (const inv of [...(overdueByDueDate || []), ...(overdueLegacy || [])] as any[]) {
+    const owner = inv.profiles as Owner | null
+    if (owner?.deleted_at) continue
     await supabase.from('invoices').update({ status: 'overdue' }).eq('id', inv.id)
-    const owner = inv.profiles as NotifyProfile | null
     const clientName = escapeHtml(inv.client_name || '')
     const number = escapeHtml(inv.number)
     if (wantsNotification(owner, 'invoice_overdue', 'email')) {
       try {
         await resend.emails.send({
           from: 'invoices.kz <mail@invoices.kz>',
-          to: owner!.email as string,
+          to: (await resolveEmail(inv.user_id, owner!.email)) as string,
           subject: `Счёт №${inv.number} просрочен`,
           html: wrapEmail('#E05252', 'Счёт просрочен', `
             <p style="margin:0 0 12px; font-size:14px; color:#333;">
@@ -189,7 +200,7 @@ export async function GET(request: Request) {
     // Раньше брались все с notify_telegram, и Telegram-отчёт уходил даже при
     // выключенном отчёте — теперь решает wantsNotification по каналу.
     const { data: profiles, error: weeklyError } = await selectWithNotificationPrefs<any[]>(
-      `id, ${NOTIFY_PROFILE_COLUMNS}`,
+      `id, ${OWNER_COLUMNS}`,
       cols => {
         const q = supabase.from('profiles').select(cols)
         return cols.includes('notification_prefs')
@@ -199,7 +210,8 @@ export async function GET(request: Request) {
     )
     if (weeklyError) console.error('cron/notifications: weekly report recipients lookup failed:', weeklyError.message)
 
-    for (const p of (profiles || []) as (NotifyProfile & { id: string })[]) {
+    for (const p of (profiles || []) as (Owner & { id: string })[]) {
+      if (p.deleted_at) continue
       const wantsEmail = wantsNotification(p, 'weekly_report', 'email')
       const wantsTelegram = wantsNotification(p, 'weekly_report', 'telegram')
       if (!wantsEmail && !wantsTelegram) continue
@@ -221,7 +233,7 @@ export async function GET(request: Request) {
         try {
           await resend.emails.send({
             from: 'invoices.kz <mail@invoices.kz>',
-            to: p.email as string,
+            to: (await resolveEmail(p.id, p.email)) as string,
             subject: 'Ваш еженедельный отчёт invoices.kz',
             html: wrapEmail('#1C2056', 'Отчёт за неделю', `
               <p style="margin:0 0 12px; font-size:14px; color:#333;">За последние 7 дней:</p>
@@ -260,7 +272,7 @@ export async function GET(request: Request) {
   let digests = 0
   let digestsSkippedNoPlan = 0
   const { data: shopOwners, error: shopOwnersError } = await selectWithNotificationPrefs<any[]>(
-    `id, ${NOTIFY_PROFILE_COLUMNS}, ${KASPI_SHOP_PROFILE_COLUMNS}`,
+    `id, ${OWNER_COLUMNS}, ${KASPI_SHOP_PROFILE_COLUMNS}`,
     cols => supabase
       .from('profiles')
       .select(cols)
@@ -269,6 +281,7 @@ export async function GET(request: Request) {
   if (shopOwnersError) console.error('cron/notifications: kaspi digest recipients lookup failed:', shopOwnersError.message)
 
   const digestRecipients = (shopOwners || []).filter((owner: any) => {
+    if (owner.deleted_at) return false
     if (!wantsNotification(owner, 'kaspi_daily_digest', 'telegram')) return false
     if (hasKaspiShopAccess(owner)) return true
     digestsSkippedNoPlan++

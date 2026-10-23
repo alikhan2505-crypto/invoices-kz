@@ -32,6 +32,26 @@ function escapeHtml(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
+// Гасим всё, что продолжает работать от имени аккаунта без владельца: паузу
+// Kaspi Shop, ИИ-агентов, повторяющиеся счета (cron/recurring слал бы письма
+// клиентам удалённого аккаунта) и публичную витрину (/shop/[slug]). Каждый шаг
+// независим и best-effort: сбой одного не должен блокировать удаление и
+// остальные шаги. Колонки только существующие (kaspi_shop_connections.paused /
+// storefront_published, ai_agents.is_enabled, invoices.recurring_active).
+async function stopBackgroundActivity(userId: string) {
+  const steps: [string, PromiseLike<{ error: { message: string } | null }>][] = [
+    ['kaspi_shop_connections.paused', supabase.from('kaspi_shop_connections').update({ paused: true }).eq('user_id', userId)],
+    ['kaspi_shop_connections.storefront_published', supabase.from('kaspi_shop_connections').update({ storefront_published: false }).eq('user_id', userId)],
+    ['ai_agents.is_enabled', supabase.from('ai_agents').update({ is_enabled: false }).eq('user_id', userId)],
+    ['invoices.recurring_active', supabase.from('invoices').update({ recurring_active: false }).eq('user_id', userId).eq('recurring_active', true)],
+  ]
+  const results = await Promise.allSettled(steps.map(([, q]) => q))
+  results.forEach((r, i) => {
+    const message = r.status === 'rejected' ? (r.reason?.message ?? String(r.reason)) : r.value.error?.message
+    if (message) console.error('account delete: failed to stop', steps[i][0], 'for', userId, ':', message)
+  })
+}
+
 // Soft delete (founder-approved, 2026-08-21): the profile row is kept with
 // deleted_at set -- it's how a later signup with the same email gets
 // recognised as a returning customer (see onboarding/page.tsx) and how
@@ -70,6 +90,7 @@ export async function POST(req: NextRequest) {
     // Already flagged deleted in a previous attempt -- most likely the auth
     // deletion below failed last time. Retry just that step, silently, no
     // duplicate stats/Telegram noise.
+    await stopBackgroundActivity(user.id)
     const { error: retryError } = await supabase.auth.admin.deleteUser(user.id)
     if (retryError) {
       console.error('CRITICAL: account delete retry failed for', user.id, ':', retryError.message)
@@ -91,14 +112,7 @@ export async function POST(req: NextRequest) {
   // Kaspi Shop repricer and AI-агент auto-replies otherwise keep acting
   // (and spending the account's wallet balance) with no owner left to see
   // it. Best-effort: a failure here must not block the deletion itself.
-  try {
-    await Promise.all([
-      supabase.from('kaspi_shop_connections').update({ paused: true }).eq('user_id', user.id),
-      supabase.from('ai_agents').update({ is_enabled: false }).eq('user_id', user.id),
-    ])
-  } catch (e: any) {
-    console.error('account delete: failed to pause background connections for', user.id, ':', e.message)
-  }
+  await stopBackgroundActivity(user.id)
 
   try {
     const statsLine = daysAsCustomer !== null

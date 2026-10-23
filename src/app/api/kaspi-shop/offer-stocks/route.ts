@@ -92,15 +92,11 @@ export async function GET(req: NextRequest) {
     console.error('offer-stocks: list stock merge failed (non-fatal)', err.message)
   }
 
-  // Self-diagnosis when the scan can't resolve cities: dump a truncated
-  // structural sample to the runtime logs so the parsing can be fixed from
-  // the server side without asking the founder for more DevTools captures.
+  // Self-diagnosis when the scan can't resolve cities: only the key names go
+  // to the runtime logs. The 12 KB dump of the seller's catalog entry that used
+  // to be here was a forgotten debug aid (audit 24.10, secrets-3).
   if (Array.from(entriesMap.values()).every(e => !e.cityId)) {
     console.log('offer-stocks debug keys:', Object.keys(details).join(','))
-    const json = JSON.stringify(details)
-    for (let i = 0; i < Math.min(json.length, 12000); i += 3000) {
-      console.log(`offer-stocks debug [${i}]:`, json.slice(i, i + 3000))
-    }
   }
 
   const { data: connRow } = await supabase

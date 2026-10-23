@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
 import { createClient } from '@supabase/supabase-js'
 import { getOrCreateKaspiPaymentForInvoice } from '@/lib/kaspiPay/invoicePayment'
+import { getActivePlan } from '@/lib/plan'
+import { buildInvoiceEmailHtml, invoiceEmailSubject, validateRecipientEmail } from '@/lib/invoiceEmail'
+import {
+  SEND_INVOICE_PER_INVOICE_DAILY, SEND_INVOICE_PER_USER_DAILY,
+  claimDailySlot, releaseDailySlot, sendInvoiceKey,
+} from '@/lib/oneShotLimits'
 
 const resend = new Resend(process.env.RESEND_API_KEY!)
 const supabase = createClient(
@@ -13,9 +19,20 @@ const supabaseAuth = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
+// Письмо уходит от mail@invoices.kz — того же отправителя, что и письма входа,
+// поэтому репутация домена общая. Отсюда жёсткие рамки (аудит 24.10.2026):
+// адрес — одна строка и один адрес, поля счёта экранируются, тариф проверяется
+// на сервере (в браузере это только подсказка), отправок на счёт и на
+// пользователя — не больше суточного лимита (окно — календарный день по Алматы).
+// Ответ фронтенду прежний: { success: true } или { error } — он показывает error.
 export async function POST(request: NextRequest) {
   try {
-    const { invoiceId, overrideEmail } = await request.json()
+    const body = await request.json().catch(() => null)
+    const invoiceId = body?.invoiceId
+    const overrideEmail = body?.overrideEmail
+    if (typeof invoiceId !== 'string' || !invoiceId || invoiceId.length > 64) {
+      return NextResponse.json({ error: 'Счёт не найден' }, { status: 400 })
+    }
 
     const accessToken = request.headers.get('authorization')?.replace('Bearer ', '')
     const { data: { user } } = accessToken
@@ -25,151 +42,117 @@ export async function POST(request: NextRequest) {
 
     const { data: inv } = await supabase
       .from('invoices')
-      .select('*')
+      .select('id, user_id, number, amount, status, client_name, client_email, services, note, created_at, public_token')
       .eq('id', invoiceId)
-      .single()
+      .maybeSingle()
 
     if (!inv) return NextResponse.json({ error: 'Счёт не найден' }, { status: 404 })
     if (inv.user_id !== user.id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-    // Where a reply goes. Without this the buyer answers mail@invoices.kz —
-    // a send-only address with no mailbox behind it, so "можно исправить
-    // сумму?" and "оплатил, вот квитанция" reached nobody and the seller
-    // never learned their customer had written. The seller's own address is
-    // who the buyer meant to write to anyway.
-    const { data: sellerProfile } = await supabase
+    // Тот же гейт, что в браузере (canEmail): платный тариф, бонус или пробный
+    // период; админ — всегда (getActivePlan учитывает is_admin сам).
+    const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('email')
-      .eq('id', inv.user_id)
+      .select('is_admin, plan, plan_expires_at, trial_expires_at, bonus_expires_at')
+      .eq('id', user.id)
       .maybeSingle()
-    const replyTo = (sellerProfile?.email || '').trim() || undefined
-
-    let kaspiPaymentLink: string | null = null
-    try {
-      // Shared with the payer-facing /api/kaspi/invoice-payment route, which
-      // regenerates this link on demand once it expires. Going through the
-      // same helper also means a resend reuses the invoice's still-valid
-      // payment instead of minting a second one for the same invoice.
-      const payment = await getOrCreateKaspiPaymentForInvoice(inv)
-      kaspiPaymentLink = payment?.payment_link ?? null
-    } catch (e: any) {
-      // A Kaspi failure must never block sending the invoice itself — the
-      // client can still pay by bank transfer, the owner just won't get an
-      // automated Kaspi link for this particular send.
-      console.error('Kaspi payment-link generation failed for invoice', inv.id, e.message)
+    if (profileError) {
+      console.error('send-invoice: profile read failed for user', user.id, ':', profileError.message)
+      return NextResponse.json({ error: 'Не удалось проверить тариф, попробуйте позже' }, { status: 503 })
+    }
+    if (!getActivePlan(profile).canEmail) {
+      return NextResponse.json({ error: 'Отправка счетов по email доступна на платных тарифах' }, { status: 403 })
     }
 
-    const recipientEmail = overrideEmail || inv.client_email
-    if (!recipientEmail) return NextResponse.json({ error: 'Нет email клиента' }, { status: 400 })
+    // Получатель — строка, один адрес. overrideEmail (если пришёл) важнее
+    // адреса клиента из счёта; пустой считаем «не передан», как раньше.
+    const hasOverride = overrideEmail !== undefined && overrideEmail !== null && overrideEmail !== ''
+    const rawRecipient = hasOverride ? overrideEmail : inv.client_email
+    if (!hasOverride && !inv.client_email) {
+      return NextResponse.json({ error: 'Нет email клиента' }, { status: 400 })
+    }
+    const recipient = validateRecipientEmail(rawRecipient)
+    if (!recipient.ok) {
+      return NextResponse.json({ error: 'Некорректный email получателя' }, { status: 400 })
+    }
 
-    const publicLink = `https://invoices.kz/view/${inv.public_token}`
-    const amount = Number(inv.amount).toLocaleString('ru-KZ')
-    const date = new Date(inv.created_at).toLocaleDateString('ru-KZ')
+    // Суточные лимиты: сначала на счёт, потом на пользователя. Слот занимается
+    // ДО отправки (иначе пачка параллельных запросов проскочит), а если письмо
+    // не ушло — возвращается. Счётчик недоступен — отказ, не пропуск.
+    const invoiceKey = sendInvoiceKey('invoice', inv.id)
+    const userKey = sendInvoiceKey('user', user.id)
+    const perInvoice = await claimDailySlot(supabase, invoiceKey, SEND_INVOICE_PER_INVOICE_DAILY)
+    if (!perInvoice.ok) {
+      return perInvoice.reason === 'limit'
+        ? NextResponse.json({ error: `Этот счёт уже отправлялся ${SEND_INVOICE_PER_INVOICE_DAILY} раз за сутки. Попробуйте завтра.` }, { status: 429 })
+        : NextResponse.json({ error: 'Сервис временно недоступен, попробуйте позже' }, { status: 503 })
+    }
+    const perUser = await claimDailySlot(supabase, userKey, SEND_INVOICE_PER_USER_DAILY)
+    if (!perUser.ok) {
+      await releaseDailySlot(supabase, invoiceKey)
+      return perUser.reason === 'limit'
+        ? NextResponse.json({ error: `Достигнут суточный лимит писем со счетами (${SEND_INVOICE_PER_USER_DAILY}). Попробуйте завтра.` }, { status: 429 })
+        : NextResponse.json({ error: 'Сервис временно недоступен, попробуйте позже' }, { status: 503 })
+    }
 
-    const servicesRows = (inv.services || []).map((s: any) => `
-        <tr style="border-bottom:1px solid #f0f0f0;">
-            <td style="padding:10px 12px; color:#333;">${s.name}</td>
-            <td style="padding:10px 12px; text-align:center; color:#555;">${s.qty} ${s.unit || 'шт'}</td>
-            <td style="padding:10px 12px; text-align:right; color:#555;">${Number(s.price).toLocaleString('ru-KZ')} ₸</td>
-            <td style="padding:10px 12px; text-align:right; color:#333; font-weight:bold;">${(s.qty * s.price).toLocaleString('ru-KZ')} ₸</td>
-        </tr>
-        `).join('')
+    try {
+      // Where a reply goes. Without this the buyer answers mail@invoices.kz —
+      // a send-only address with no mailbox behind it, so "можно исправить
+      // сумму?" and "оплатил, вот квитанция" reached nobody and the seller
+      // never learned their customer had written. The seller's own address is
+      // who the buyer meant to write to anyway. Берём адрес из auth.users, а
+      // не из profiles.email: тот пользователь пишет сам, и Reply-To можно
+      // было бы направить на любой чужой ящик.
+      const authEmail = validateRecipientEmail(user.email)
+      const replyTo = authEmail.ok ? authEmail.email : undefined
 
-    await resend.emails.send({
-      from: 'invoices.kz <mail@invoices.kz>',
-      // Omitted rather than defaulted when the seller has no email on file:
-      // pointing replies back at an unattended mailbox is the bug being
-      // fixed, not a safe fallback.
-      ...(replyTo ? { replyTo } : {}),
-      to: recipientEmail,
-      subject: `Счёт №${inv.number} на ${amount} ₸ — ${inv.client_name}`,
-      html: `
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="margin:0; padding:0; background:#f5f5f5; font-family: Arial, sans-serif;">
-<div style="max-width:560px; margin:30px auto; background:white; border:1px solid #e0e0e0;">
+      let kaspiPaymentLink: string | null = null
+      try {
+        // Shared with the payer-facing /api/kaspi/invoice-payment route, which
+        // regenerates this link on demand once it expires. Going through the
+        // same helper also means a resend reuses the invoice's still-valid
+        // payment instead of minting a second one for the same invoice.
+        const payment = await getOrCreateKaspiPaymentForInvoice(inv)
+        kaspiPaymentLink = payment?.payment_link ?? null
+      } catch (e: any) {
+        // A Kaspi failure must never block sending the invoice itself — the
+        // client can still pay by bank transfer, the owner just won't get an
+        // automated Kaspi link for this particular send.
+        console.error('Kaspi payment-link generation failed for invoice', inv.id, e.message)
+      }
 
-  <!-- Header -->
-  <div style="background:#1C2056; padding:24px 32px; display:flex; justify-content:space-between; align-items:center;">
-    <div style="color:white; font-size:18px; font-weight:bold; letter-spacing:1px;">INVOICES.KZ</div>
-    <div style="color:rgba(255,255,255,0.6); font-size:13px;">Сервис выставления счетов</div>
-  </div>
+      // Resend сообщает об отказе полем error, а не исключением.
+      const sent = await resend.emails.send({
+        from: 'invoices.kz <mail@invoices.kz>',
+        // Omitted rather than defaulted when the seller has no email on file:
+        // pointing replies back at an unattended mailbox is the bug being
+        // fixed, not a safe fallback.
+        ...(replyTo ? { replyTo } : {}),
+        to: recipient.email,
+        subject: invoiceEmailSubject({ number: inv.number, amount: inv.amount, clientName: inv.client_name }),
+        html: buildInvoiceEmailHtml({
+          number: inv.number,
+          amount: inv.amount,
+          clientName: inv.client_name,
+          createdAt: inv.created_at,
+          services: inv.services,
+          note: inv.note,
+          publicToken: inv.public_token,
+          kaspiPaymentLink,
+        }),
+      })
+      if (sent?.error) throw new Error(sent.error.message || 'Не удалось отправить письмо')
+    } catch (e: any) {
+      // Письмо не ушло — лимит не тратим.
+      await releaseDailySlot(supabase, userKey)
+      await releaseDailySlot(supabase, invoiceKey)
+      throw e
+    }
 
-  <!-- Title bar -->
-  <div style="background:#f9f9f9; border-bottom:1px solid #e0e0e0; padding:16px 32px; display:flex; justify-content:space-between; align-items:center;">
-    <div style="font-size:15px; font-weight:bold; color:#1C2056;">Счёт №${inv.number}</div>
-    <div style="font-size:13px; color:#888;">от ${date}</div>
-  </div>
-
-  <!-- Body -->
-  <div style="padding:28px 32px;">
-    <p style="margin:0 0 20px; font-size:14px; color:#333;">
-      Уважаемый(ая) <strong>${inv.client_name}</strong>,
-    </p>
-    <p style="margin:0 0 24px; font-size:14px; color:#555; line-height:1.6;">
-      Настоящим направляем Вам счёт на оплату. Просим произвести оплату в установленные сроки.
-    </p>
-
-    <!-- Services table -->
-    <table style="width:100%; border-collapse:collapse; font-size:13px; margin-bottom:20px;">
-      <thead>
-        <tr style="background:#f5f5f5; border-top:1px solid #e0e0e0; border-bottom:1px solid #e0e0e0;">
-          <th style="padding:10px 12px; text-align:left; color:#888; font-weight:600;">Наименование</th>
-          <th style="padding:10px 12px; text-align:center; color:#888; font-weight:600;">Кол-во</th>
-          <th style="padding:10px 12px; text-align:right; color:#888; font-weight:600;">Цена</th>
-          <th style="padding:10px 12px; text-align:right; color:#888; font-weight:600;">Сумма</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${servicesRows}
-      </tbody>
-      <tfoot>
-        <tr style="border-top:2px solid #1C2056;">
-          <td colspan="3" style="padding:12px; text-align:right; font-weight:bold; color:#1C2056; font-size:14px;">Итого к оплате:</td>
-          <td style="padding:12px; text-align:right; font-weight:bold; color:#1C2056; font-size:16px;">${amount} ₸</td>
-        </tr>
-      </tfoot>
-    </table>
-
-    ${inv.note ? `
-    <div style="border:1px solid #e0e0e0; border-left:3px solid #1C2056; padding:12px 16px; margin-bottom:24px; background:#fafafa;">
-      <div style="font-size:11px; color:#888; margin-bottom:4px; text-transform:uppercase; letter-spacing:0.5px;">Примечание</div>
-      <div style="font-size:13px; color:#333;">${inv.note}</div>
-    </div>
-    ` : ''}
-
-    <!-- Button -->
-    <a href="${publicLink}" style="display:block; background:#1C2056; color:white; text-align:center; padding:14px 20px; text-decoration:none; font-size:14px; font-weight:bold; letter-spacing:0.5px; margin-bottom:16px;">
-      ОТКРЫТЬ СЧЁТ ОНЛАЙН →
-    </a>
-
-    ${kaspiPaymentLink ? `
-    <a href="${kaspiPaymentLink}" style="display:block; background:#E4171F; color:white; text-align:center; padding:14px 20px; text-decoration:none; font-size:14px; font-weight:bold; letter-spacing:0.5px; margin-bottom:16px;">
-      ОПЛАТИТЬ ЧЕРЕЗ KASPI →
-    </a>
-    ` : ''}
-
-    <p style="font-size:12px; color:#aaa; text-align:center; margin:0;">
-      <a href="${publicLink}" style="color:#aaa;">${publicLink}</a>
-    </p>
-  </div>
-
-  <!-- Footer -->
-  <div style="background:#f5f5f5; border-top:1px solid #e0e0e0; padding:16px 32px; text-align:center;">
-    <p style="margin:0; font-size:12px; color:#aaa;">
-      Письмо сформировано автоматически через <strong style="color:#1C2056;">invoices.kz</strong>
-    </p>
-  </div>
-
-</div>
-</body>
-</html>
-      `
-    })
-
-    // Обновляем статус счёта на "отправлен"
-    await supabase.from('invoices').update({ status: 'sent' }).eq('id', invoiceId)
+    // Статус «отправлен» — только из черновика: повторная отправка не должна
+    // откатывать оплаченный / просмотренный / просроченный счёт.
+    await supabase.from('invoices').update({ status: 'sent' })
+      .eq('id', inv.id).eq('user_id', user.id).eq('status', 'draft')
 
     return NextResponse.json({ success: true })
   } catch (e: any) {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { claimWindowSlot, releaseWindowSlot, windowKey, hourBucket } from '@/lib/windowLimits'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -10,6 +11,10 @@ const supabaseAuth = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
+
+// Неудачных попыток ввести промокод в час на пользователя (аудит 24.10,
+// billing-logic-11). Без лимита код можно подбирать перебором.
+const PROMO_FAILED_ATTEMPTS_PER_HOUR = 5
 
 // Redeems a promo code for the caller's OWN profile -- from /upgrade, and from
 // /auth/callback for a code carried in through /promo/[code] at signup. Must
@@ -78,6 +83,20 @@ export async function POST(req: NextRequest) {
   // route, so a code grants the same plan for the same number of days no
   // matter where it is entered -- it used to silently mean "14 bonus days" at
   // signup and "the configured plan for the configured days" here.
+  //
+  // Попытка занимает слот ДО RPC (атомарно: пачка параллельных запросов не
+  // проскакивает), а удачный исход слот возвращает -- в лимит попадают только
+  // неудачи (неверный код, сбой). Сбой самого счётчика лимит не включает: код
+  // всё равно проверяет RPC, а блокировать честную активацию из-за инфраструктуры
+  // хуже. Фронт любой не-ok ответ, кроме 401/409, показывает как «код не найден».
+  const attemptKey = windowKey('promofail', user.id, hourBucket())
+  const attempt = await claimWindowSlot(supabase, attemptKey, PROMO_FAILED_ATTEMPTS_PER_HOUR)
+  if (!attempt.ok && attempt.reason === 'limit') {
+    console.error('promo: too many failed attempts for user', user.id)
+    return NextResponse.json({ error: 'rate_limited' }, { status: 429 })
+  }
+  const slotHeld = attempt.ok
+
   const { data: result, error } = await supabase.rpc('redeem_promo_code', {
     p_user: user.id,
     p_code: code.toUpperCase(),
@@ -89,6 +108,10 @@ export async function POST(req: NextRequest) {
   }
 
   const status = (result as any)?.status
+  // Код настоящий (успех, исчерпан, уже использован) -- это не подбор.
+  if (slotHeld && (status === 'ok' || status === 'exhausted' || status === 'already_redeemed')) {
+    await releaseWindowSlot(supabase, attemptKey)
+  }
   if (status === 'not_found') return NextResponse.json({ error: 'Not found' }, { status: 404 })
   // A code with no plan or no positive day count would mint a plan with no
   // expiry -- which getActivePlan reads as paid forever. The RPC refuses it;

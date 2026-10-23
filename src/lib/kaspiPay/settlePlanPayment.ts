@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { loadPlatformConnection } from './connection'
 import { checkStatus } from './client'
 import { computePlanActivation } from '@/lib/plans/planActivation'
+import { escapeHtml } from '@/lib/htmlEscape'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -134,7 +135,7 @@ export async function notifyPlanPaid(
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-internal-secret': process.env.INTERNAL_API_SECRET! },
       body: JSON.stringify({
-        message: `💳 <b>Оплата!</b>\n👤 ${prof?.company_name || row.user_id}\n📦 ${planLabel} ${row.amount.toLocaleString('ru-KZ')} ₸${periodLabel}${walletLabel}\n📅 до ${expiresAt.toLocaleDateString('ru-KZ')}`,
+        message: `💳 <b>Оплата!</b>\n👤 ${escapeHtml(prof?.company_name || row.user_id)}\n📦 ${planLabel} ${row.amount.toLocaleString('ru-KZ')} ₸${periodLabel}${walletLabel}\n📅 до ${expiresAt.toLocaleDateString('ru-KZ')}`,
       }),
     })
   } catch (e: any) {

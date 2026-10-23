@@ -6,6 +6,7 @@ import { transcribeAudio } from '@/lib/openaiWhisper'
 import { isImageWithinLimits, isAudioWithinLimits, UNSUPPORTED_MEDIA_REPLY_TEXT } from '@/lib/aiAgent/mediaLimits'
 import { createReplyStateLoader } from '@/lib/aiAgent/replyStateLoader'
 import { lapsedPlaceholder } from '@/lib/aiAgent/lapsedInbound'
+import { entryMatchesWabaId } from '@/lib/aiAgent/whatsappWabaMatch'
 
 // Inbound WhatsApp Cloud API webhook for every connected customer number --
 // mirrors src/app/api/instagram/webhook/route.ts's exact shape (GET verify
@@ -115,6 +116,10 @@ export async function POST(req: NextRequest) {
         if (!phoneNumberId) continue
         const conn = await loadWhatsAppConnection(phoneNumberId)
         if (!conn) continue
+        if (!entryMatchesWabaId(entry.id, conn.wabaId)) {
+          console.error('whatsapp webhook: entry.id does not match stored waba_id for phone_number_id', phoneNumberId)
+          continue
+        }
         for (const msg of value?.message_echoes || []) {
           const text = msg?.text?.body
           // Text only for now. A photo the owner sent from the phone has no
@@ -138,6 +143,12 @@ export async function POST(req: NextRequest) {
       if (!conn) {
         console.error('whatsapp webhook: no tenant connection found for phone_number_id', phoneNumberId)
         continue // unknown number -- shouldn't happen, defensive skip
+      }
+      // entry.id -- WABA доставки; не сходится с сохранённым waba_id -- номер
+      // не из этого аккаунта, не отвечаем (см. whatsappWabaMatch.ts).
+      if (!entryMatchesWabaId(entry.id, conn.wabaId)) {
+        console.error('whatsapp webhook: entry.id does not match stored waba_id for phone_number_id', phoneNumberId)
+        continue
       }
 
       for (const msg of value.messages) {

@@ -4,6 +4,7 @@ import { sendFounderTelegram } from '@/lib/founderTelegram'
 import { loadCarReportData } from '@/lib/visits/reportData'
 import { buildCarReportText } from '@/lib/visits/report'
 import { isMissingTableError } from '@/lib/visits/server'
+import { isCronAuthorized } from '@/lib/cronAuth'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -22,7 +23,7 @@ const supabase = createClient(
 //
 // ?dry=1 (с тем же CRON_SECRET) — вернуть текст, ничего не отправляя.
 export async function GET(request: Request) {
-  if (request.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isCronAuthorized(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

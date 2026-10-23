@@ -4,7 +4,7 @@ import path from 'path'
 import {
   STEPS, DAILY_STEPS, INSTANT_STEP, LAUNCH, MIN_GAP_HOURS,
   pickDailyStep, dailyWindow, instantWindow, trialUntil, trackedUrl,
-  isEmailConfirmed, sendDrip, dripIdempotencyKey,
+  isEmailConfirmed, getAuthIdentity, makeRecipientResolver, sendDrip, dripIdempotencyKey,
   type DripProfile,
 } from './welcomeDrip'
 
@@ -219,6 +219,32 @@ describe('review fixes 15.10', () => {
     expect(await isEmailConfirmed(client(async () => ({ data: { user: { email_confirmed_at: null } }, error: null })), 'u')).toBe(false)
     expect(await isEmailConfirmed(client(async () => ({ data: { user: null }, error: { message: 'x' } })), 'u')).toBe(false)
     expect(await isEmailConfirmed(client(async () => { throw new Error('net') }), 'u')).toBe(false)
+  })
+
+  it('getAuthIdentity: адрес берётся из auth.users, ошибка = не подтверждён и без адреса', async () => {
+    const client = (impl: () => unknown) => ({ auth: { admin: { getUserById: vi.fn(impl) } } }) as never
+    expect(await getAuthIdentity(client(async () => ({ data: { user: { email: 'real@auth.kz', email_confirmed_at: '2026-10-15T10:00:00Z' } }, error: null })), 'u'))
+      .toEqual({ confirmed: true, email: 'real@auth.kz' })
+    expect(await getAuthIdentity(client(async () => ({ data: { user: { email: 'real@auth.kz', email_confirmed_at: null } }, error: null })), 'u'))
+      .toEqual({ confirmed: false, email: 'real@auth.kz' })
+    expect(await getAuthIdentity(client(async () => ({ data: { user: null }, error: { message: 'x' } })), 'u'))
+      .toEqual({ confirmed: false, email: null })
+    expect(await getAuthIdentity(client(async () => { throw new Error('net') }), 'u'))
+      .toEqual({ confirmed: false, email: null })
+  })
+
+  it('makeRecipientResolver: auth-адрес главнее profiles.email, кеш, запасной адрес и потолок обращений', async () => {
+    const getUserById = vi.fn(async (id: string) =>
+      id === 'broken' ? { data: { user: null }, error: { message: 'down' } } : { data: { user: { email: `${id}@auth.kz` } }, error: null })
+    const resolve = makeRecipientResolver({ auth: { admin: { getUserById } } } as never, 2)
+
+    expect(await resolve('a', 'attacker@evil.kz')).toBe('a@auth.kz')
+    expect(await resolve('a', 'attacker@evil.kz')).toBe('a@auth.kz')
+    expect(getUserById).toHaveBeenCalledTimes(1) // второй вызов — из кеша
+    expect(await resolve('broken', 'profile@x.kz')).toBe('profile@x.kz') // auth недоступен → запасной
+    expect(await resolve('c', 'profile-c@x.kz')).toBe('profile-c@x.kz') // потолок 2 обращений исчерпан
+    expect(getUserById).toHaveBeenCalledTimes(2)
+    expect(await resolve('d', null)).toBeNull()
   })
 
   it('sendDrip passes a stable idempotency key and one-click unsubscribe headers', async () => {

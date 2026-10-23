@@ -1,6 +1,7 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
+import { hookSecretOk, throttled } from '@/lib/hooksGuard'
 import { STEPS, INSTANT_STEP, instantWindow, isEmailConfirmed, sendDrip } from '@/lib/welcomeDrip'
 
 const supabase = createClient(
@@ -26,7 +27,13 @@ const resend = new Resend(process.env.RESEND_API_KEY!)
 //     не пошлют письмо дважды. Сбой отправки — строку откатываем, следующий тик
 //     попробует снова (пока аккаунт в окне); повтор письма, которое Resend
 //     на деле принял, гасит ключ идемпотентности в sendDrip.
-export async function POST() {
+//  5. не чаще раза в минуту на инстанс: крон зовёт раз в 5 минут, а циклический
+//     внешний вызов иначе гонял бы Auth Admin (isEmailConfirmed) на каждом
+//     запросе (аудит 24.10, db-rls-5). Если в окружении задан HOOKS_PG_NET_SECRET,
+//     нужен ещё и заголовок x-internal-secret (его должен слать pg_cron-вызов).
+export async function POST(req: NextRequest) {
+  if (!hookSecretOk(req.headers)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (throttled('welcome-instant', 60_000)) return NextResponse.json({ ok: true, throttled: true })
   const step = STEPS.find(s => s.n === INSTANT_STEP)!
   const { newerThan, olderThan } = instantWindow()
 

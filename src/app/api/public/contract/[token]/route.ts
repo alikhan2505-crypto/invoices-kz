@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { PUBLIC_CONTRACT_COLUMNS } from '@/lib/publicDocument'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -16,7 +17,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ tok
 
   const { data: contract, error } = await supabase
     .from('contracts')
-    .select('*')
+    .select(`${PUBLIC_CONTRACT_COLUMNS}, user_id`)
     .eq('public_token', token)
     .maybeSingle()
   if (error) {
@@ -41,10 +42,10 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ tok
     .eq('document_type', 'contract')
     .eq('document_id', contract.id)
 
-  // file_url не отдаётся: это путь в закрытом бакете (или старая вечная
-  // публичная ссылка). Файл страница открывает через
-  // /api/public/contract/[token]/file — короткая подписанная ссылка.
-  const publicContract = { ...contract }
-  delete publicContract.file_url
+  // Явный список колонок вместо select('*') (аудит 24.10, secrets-6): file_url
+  // не отдаётся -- это путь в закрытом бакете (или старая вечная публичная
+  // ссылка), файл страница открывает через /api/public/contract/[token]/file
+  // (короткая подписанная ссылка); user_id и email клиента наружу тоже не нужны.
+  const { user_id: _userId, ...publicContract } = contract
   return NextResponse.json({ contract: publicContract, profile: profile || null, signatures: signatures || [] })
 }

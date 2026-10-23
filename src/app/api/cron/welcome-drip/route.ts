@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
-import { LAUNCH, isEmailConfirmed, pickDailyStep, sendDrip, type SentDrip } from '@/lib/welcomeDrip'
+import { LAUNCH, getAuthIdentity, pickDailyStep, sendDrip, type SentDrip } from '@/lib/welcomeDrip'
+import { isCronAuthorized } from '@/lib/cronAuth'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -26,7 +27,7 @@ const resend = new Resend(process.env.RESEND_API_KEY!)
 //     (pickDailyStep), claim строки email_drips до отправки — повторный
 //     вызов крона не пошлёт письмо дважды.
 export async function GET(request: Request) {
-  if (request.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isCronAuthorized(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -56,7 +57,12 @@ export async function GET(request: Request) {
   for (const p of profiles ?? []) {
     const step = pickDailyStep(p.created_at, sentBy.get(p.id) ?? [])
     if (!step) continue
-    if (!(await isEmailConfirmed(supabase, p.id))) { skipped++; continue }
+    // Получатель — адрес из auth.users (profiles.email пользователь пишет сам),
+    // запасной profiles.email — только если у подтверждённого аккаунта auth
+    // не вернул адрес.
+    const identity = await getAuthIdentity(supabase, p.id)
+    if (!identity.confirmed) { skipped++; continue }
+    const recipient = { ...p, email: identity.email ?? p.email }
 
     const { error: claimError } = await supabase
       .from('email_drips')
@@ -64,7 +70,7 @@ export async function GET(request: Request) {
     if (claimError) continue // параллельный прогон успел раньше
 
     try {
-      if (await sendDrip(resend, p, step)) sent++
+      if (await sendDrip(resend, recipient, step)) sent++
       else {
         // Адрес подавлен или негодный: снимаем claim, завтра проверим снова.
         await supabase.from('email_drips').delete().eq('user_id', p.id).eq('step', step.n)

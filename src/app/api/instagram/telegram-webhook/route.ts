@@ -256,7 +256,7 @@ export async function POST(req: NextRequest) {
       await telegram('editMessageText', {
         chat_id: cb.message.chat.id,
         message_id: cb.message.message_id,
-        text: `${cb.message.text}\n\n⏭️ Пропущено`,
+        text: `${escapeHtml(cb.message.text)}\n\n⏭️ Пропущено`,
         parse_mode: 'HTML',
         // Terminal: 'skipped' is never re-queued. Without this the buttons
         // stayed live in Telegram's UI while every press behind them fell
@@ -321,7 +321,7 @@ export async function POST(req: NextRequest) {
       await telegram('editMessageText', {
         chat_id: cb.message.chat.id,
         message_id: cb.message.message_id,
-        text: `${cb.message.text}\n\n✅ Отправлено`,
+        text: `${escapeHtml(cb.message.text)}\n\n✅ Отправлено`,
         parse_mode: 'HTML',
         reply_markup: { inline_keyboard: [] },
       })
@@ -340,7 +340,7 @@ export async function POST(req: NextRequest) {
       await telegram('editMessageText', {
         chat_id: cb.message.chat.id,
         message_id: cb.message.message_id,
-        text: `${cb.message.text}\n\n⚠️ Ошибка: ${err.message}`,
+        text: `${escapeHtml(cb.message.text)}\n\n⚠️ Ошибка: ${escapeHtml(err.message)}`,
         parse_mode: 'HTML',
       })
     }
@@ -364,32 +364,35 @@ export async function POST(req: NextRequest) {
     await telegram('editMessageText', {
       chat_id: cb.message.chat.id,
       message_id: cb.message.message_id,
-      text: `${cb.message.text}\n\n❌ Отклонено`,
+      text: `${escapeHtml(cb.message.text)}\n\n❌ Отклонено`,
       parse_mode: 'HTML',
       reply_markup: { inline_keyboard: [] },
     })
     return NextResponse.json({ ok: true })
   }
 
+  // Захват строки ДО публикации, условным UPDATE: проигравшие двойные
+  // нажатия (и запоздавшие, когда пост уже опубликован) не находят строку
+  // в 'pending' и получают «Уже обработано». Статус 'approved' (а не
+  // 'publishing') -- потому что его допускает check-ограничение таблицы.
+  // Общий для Reel и картинок: проверка status выше -- read-then-act, и при
+  // повторной отправке Telegram-колбэка (ретрай, пачка нажатий) картинка
+  // публиковалась дважды (аудит 24.10, webhooks-cron-10).
+  const { data: claimed } = await supabase
+    .from('instagram_drafts')
+    .update({ status: DRAFT_STATUS_IN_PROGRESS })
+    .eq('id', draftId)
+    .eq('status', 'pending')
+    .select('id')
+    .maybeSingle()
+  if (!claimed) {
+    await telegram('answerCallbackQuery', { callback_query_id: cb.id, text: 'Уже обработано' })
+    return NextResponse.json({ ok: true })
+  }
+
   // Reels (media_kind есть только после миграции instagram_drafts_video.sql;
   // до неё поле undefined и черновик идёт обычным путём ниже).
   if (draft.media_kind === 'reel') {
-    // Захват строки ДО публикации, условным UPDATE: проигравшие двойные
-    // нажатия (и запоздавшие, когда Reel уже опубликован) не находят строку
-    // в 'pending' и получают «Уже обработано». Статус 'approved' (а не
-    // 'publishing') -- потому что его допускает check-ограничение таблицы.
-    const { data: claimed } = await supabase
-      .from('instagram_drafts')
-      .update({ status: DRAFT_STATUS_IN_PROGRESS })
-      .eq('id', draftId)
-      .eq('status', 'pending')
-      .select('id')
-      .maybeSingle()
-    if (!claimed) {
-      await telegram('answerCallbackQuery', { callback_query_id: cb.id, text: 'Уже обработано' })
-      return NextResponse.json({ ok: true })
-    }
-
     // Публикацию планируем СРАЗУ после захвата, до любых сетевых вызовов в
     // Telegram: если ответ на кнопку или правка сообщения упадёт, строка уже
     // не в 'pending' (повторное нажатие даст «Уже обработано»), и без
@@ -435,7 +438,7 @@ export async function POST(req: NextRequest) {
     await telegram('editMessageText', {
       chat_id: cb.message.chat.id,
       message_id: cb.message.message_id,
-      text: `${cb.message.text}\n\n✅ Опубликовано в Instagram`,
+      text: `${escapeHtml(cb.message.text)}\n\n✅ Опубликовано в Instagram`,
       parse_mode: 'HTML',
       reply_markup: { inline_keyboard: [] },
     })
@@ -449,7 +452,7 @@ export async function POST(req: NextRequest) {
     await telegram('editMessageText', {
       chat_id: cb.message.chat.id,
       message_id: cb.message.message_id,
-      text: `${cb.message.text}\n\n⚠️ Ошибка: ${err.message}`,
+      text: `${escapeHtml(cb.message.text)}\n\n⚠️ Ошибка: ${escapeHtml(err.message)}`,
       parse_mode: 'HTML',
       reply_markup: { inline_keyboard: [] },
     })

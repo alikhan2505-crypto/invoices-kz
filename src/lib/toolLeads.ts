@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { escapeHtml } from '@/lib/htmlEscape'
 
 // Shared handler behind every free tool's optional "leave a contact" box.
 //
@@ -43,6 +44,12 @@ function rateLimited(ip: string): boolean {
   return recent.length > RATE_LIMIT
 }
 
+// Текст пинга основателю. /api/telegram шлёт его с parse_mode HTML, а contact
+// пишет любой аноним, поэтому экранируем (регресс класса 13.09, аудит 24.10).
+export function leadTelegramMessage(tool: string, contact: string): string {
+  return `🆓 Лид с «${TOOL_LABELS[tool]}»: ${escapeHtml(contact)}`
+}
+
 export async function saveToolLead(req: NextRequest, fallbackTool: string) {
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -77,7 +84,7 @@ export async function saveToolLead(req: NextRequest, fallbackTool: string) {
   fetch('https://invoices.kz/api/telegram', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-internal-secret': process.env.INTERNAL_API_SECRET! },
-    body: JSON.stringify({ message: `🆓 Лид с «${TOOL_LABELS[tool]}»: ${trimmed}` }),
+    body: JSON.stringify({ message: leadTelegramMessage(tool, trimmed) }),
   }).catch((e: any) => console.error('tools/lead: telegram notice failed:', e.message))
 
   return NextResponse.json({ ok: true })

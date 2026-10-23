@@ -32,3 +32,28 @@ export const WIDGET_AGENT_MESSAGE_RATE_LIMIT = 60
 export function exceedsAgentRateLimit(recentMessageCount: number): boolean {
   return recentMessageCount >= WIDGET_AGENT_MESSAGE_RATE_LIMIT
 }
+
+// Аудит 24.10.2026 (webhooks-cron-2 / abuse-cost-9 / billing-logic-4): widgetKey
+// публичен, visitorId задаёт клиент, а каждый ответ стоит продавцу 5 ₸ и вызов
+// модели. Поверх лимитов выше добавлены лимит по IP и суточный потолок на агента
+// (счётчики -- widgetLimiter.ts), а вход ужат до разумных размеров.
+//
+// Посетителей за одним NAT (офис, мобильный оператор) может быть много, поэтому
+// лимит по IP вдвое выше лимита одного посетителя, но достаточен, чтобы один
+// адрес не заменял собой ротацию visitorId.
+export const WIDGET_IP_RATE_LIMIT = 20
+export const WIDGET_IP_DAILY_LIMIT = 500
+// Потолок убытка продавца за сутки от публичного ключа: 2000 * 5 ₸ = 10 000 ₸.
+export const WIDGET_AGENT_DAILY_LIMIT = 2000
+export const WIDGET_MAX_TEXT_LENGTH = 2000
+// Тело запроса: текст до 2000 символов + служебные поля; с запасом на \uXXXX-
+// экранирование кириллицы. Больше -- заведомо не живой посетитель.
+export const WIDGET_MAX_BODY_CHARS = 16_384
+
+// widget.js отдаёт crypto.randomUUID() либо запасной вариант "<ms><hex>"; на
+// размер и алфавит смотрим, а не на строгий uuid, чтобы не потерять второй.
+const VISITOR_ID_PATTERN = /^[A-Za-z0-9_-]{8,64}$/
+
+export function isValidVisitorId(id: string): boolean {
+  return VISITOR_ID_PATTERN.test(id)
+}

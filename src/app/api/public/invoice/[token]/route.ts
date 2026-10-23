@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { getActivePlan } from '@/lib/plan'
+import {
+  INVOICE_SERVER_COLUMNS, PUBLIC_PROFILE_COLUMNS, PLAN_PROFILE_COLUMNS, PUBLIC_BANK_COLUMNS,
+  toPublicInvoice, splitPublicProfile,
+} from '@/lib/publicDocument'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -22,10 +25,9 @@ const supabase = createClient(
 // the sole public read path.
 //
 // Only the fields the payer's page renders are returned. Anything else on
-// those rows (wallet balance, plan internals, other users' data) never
-// leaves the server.
-
-const PROFILE_FIELDS = 'company_name, bin_iin, address, phone, email, director_name, signature_url, stamp_url, kaspi_pay_link, halyk_pay_link, website, social_links, plan, plan_expires_at, bonus_expires_at, trial_expires_at'
+// those rows (wallet balance, plan internals, the seller's email and user_id,
+// other users' data) never leaves the server: explicit column lists live in
+// src/lib/publicDocument.ts (audit 24.10, secrets-6/privacy-12).
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
@@ -33,7 +35,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ tok
 
   const { data: invoice, error } = await supabase
     .from('invoices')
-    .select('*')
+    .select(INVOICE_SERVER_COLUMNS)
     .eq('public_token', token)
     .maybeSingle()
   if (error) {
@@ -45,26 +47,20 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ tok
   // are real.
   if (!invoice) return NextResponse.json({ error: 'not_found' }, { status: 404 })
 
-  // is_admin is fetched alongside the public fields (one query) purely to
-  // compute showWatermark server-side -- an admin's own watermark-free PDF
-  // generation already respects is_admin (src/lib/plan.ts), but this public,
-  // unauthenticated page had no way to know that without is_admin leaking
-  // into the JSON a random visitor with the link can read. Stripped out of
-  // `profile` below before it ever reaches the response.
+  // Plan columns and is_admin are fetched alongside the public fields (one
+  // query) purely to compute showWatermark server-side -- an admin's own
+  // watermark-free PDF generation already respects is_admin (src/lib/plan.ts),
+  // but this public, unauthenticated page had no way to know that without the
+  // plan dates / is_admin leaking into the JSON a random visitor with the link
+  // can read. splitPublicProfile keeps only the public fields and a boolean.
   const [{ data: profileRow }, bank] = await Promise.all([
-    supabase.from('profiles').select(`${PROFILE_FIELDS}, is_admin`).eq('id', invoice.user_id).maybeSingle(),
+    supabase.from('profiles').select(`${PUBLIC_PROFILE_COLUMNS}, ${PLAN_PROFILE_COLUMNS}`).eq('id', invoice.user_id).maybeSingle(),
     invoice.bank_id
-      ? supabase.from('bank_accounts').select('*').eq('id', invoice.bank_id).maybeSingle()
-      : supabase.from('bank_accounts').select('*').eq('user_id', invoice.user_id).eq('is_main', true).maybeSingle(),
+      ? supabase.from('bank_accounts').select(PUBLIC_BANK_COLUMNS).eq('id', invoice.bank_id).maybeSingle()
+      : supabase.from('bank_accounts').select(PUBLIC_BANK_COLUMNS).eq('user_id', invoice.user_id).eq('is_main', true).maybeSingle(),
   ])
 
-  let profile: Record<string, unknown> | null = null
-  let showWatermark = true
-  if (profileRow) {
-    const { is_admin, ...publicFields } = profileRow as Record<string, unknown> & { is_admin: boolean }
-    profile = publicFields
-    showWatermark = !getActivePlan(profileRow).isActive
-  }
+  const { profile, showWatermark } = splitPublicProfile(profileRow as Record<string, unknown> | null)
 
   // First open by the recipient flips sent -> viewed. This used to be
   // attempted from the browser, where RLS silently refused it (there is no
@@ -79,5 +75,5 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ tok
     invoice.status = 'viewed'
   }
 
-  return NextResponse.json({ invoice, profile, bank: bank?.data || null, showWatermark })
+  return NextResponse.json({ invoice: toPublicInvoice(invoice), profile, bank: bank?.data || null, showWatermark })
 }

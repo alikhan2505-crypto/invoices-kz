@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { sendCfoDigest } from '@/lib/cfo/digestSend'
+import { isCronAuthorized } from '@/lib/cronAuth'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -10,7 +11,7 @@ const supabase = createClient(
 // Утренняя сводка CFO: 03:00 UTC = 08:00 в Алматы. Только для компаний, где
 // владелец сам включил её в настройках кабинета.
 export async function GET(request: Request) {
-  if (request.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isCronAuthorized(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   const { data: companies, error } = await supabase.from('cfo_companies').select('user_id').eq('telegram_digest', true)

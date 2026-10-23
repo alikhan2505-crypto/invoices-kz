@@ -32,3 +32,12 @@ export const EXTERNAL_API_RATE_WINDOW_MS = 60_000
 export function exceedsExternalApiRateLimit(recentMessageCount: number): boolean {
   return recentMessageCount >= EXTERNAL_API_AGENT_RATE_LIMIT
 }
+
+// Аудит 24.10.2026: суточный потолок на агента поверх минутного -- ключ секретный,
+// но утёкший ключ или зациклившийся ретрай не должны сжигать кошелёк без предела.
+// Выше, чем у виджета: интеграция обслуживает много конечных пользователей.
+export const EXTERNAL_API_AGENT_DAILY_LIMIT = 5000
+export const EXTERNAL_API_MAX_TEXT_LENGTH = 2000
+export const EXTERNAL_API_MAX_BODY_CHARS = 16_384
+export const EXTERNAL_API_MAX_USER_ID_LENGTH = 128
+export const EXTERNAL_API_MAX_CUSTOMER_NAME_LENGTH = 100
