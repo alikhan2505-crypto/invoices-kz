@@ -8,6 +8,7 @@ import { editLabel, deleteLabel, clearSearchLabel } from '@/lib/a11yLabels'
 import { profileContentDict } from '@/lib/i18n/profileContent'
 import Skeleton from '@/components/Skeleton'
 import { useAppDialog } from '@/components/AppDialog'
+import PageContainer from '@/components/PageContainer'
 import PageHeader, { PageHeaderButton } from '@/components/PageHeader'
 
 const UNIT_OPTIONS = ['шт', 'кг', 'л', 'м', 'м²', 'м³', 'час', 'день', 'месяц', 'услуга', 'работа']
@@ -188,7 +189,7 @@ export default function Services() {
 
   return (
       <>
-        <div className="max-w-lg lg:max-w-3xl mx-auto p-4">
+        <PageContainer>
           <PageHeader
             title={t.servicesHeaderLabel}
             backHref="/profile"
@@ -366,7 +367,7 @@ export default function Services() {
               {t.addItemButton}
             </motion.button>
           )}
-        </div>
+        </PageContainer>
       {dialogElement}
       </>
   )

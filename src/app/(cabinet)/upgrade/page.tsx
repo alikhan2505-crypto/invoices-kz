@@ -17,6 +17,7 @@ import { homeFor } from '@/lib/products'
 import { formatDateNumeric } from '@/lib/date'
 import { profileBonusDict } from '@/lib/i18n/profileBonus'
 import type { PlanPaymentSplit } from '@/lib/plans/planActivation'
+import PageContainer from '@/components/PageContainer'
 import PageHeader from '@/components/PageHeader'
 import { notifyWalletChanged } from '@/lib/walletSignal'
 
@@ -870,34 +871,36 @@ export default function Upgrade() {
 
   return (
       <>
-        <div className="max-w-lg lg:max-w-5xl mx-auto p-4">
+        <PageContainer variant="wide">
+          {/* Шапка и баннер тарифа стоят в той же широкой колонке, что и сетка тарифов:
+              стрелка и заголовок на одной линии с краем карточек. */}
           <PageHeader title={t.pageTitle} onBack={goBack} as="h1" />
 
-          {/* Narrow column: owned card, hero, promo, wallet, period toggle. */}
-          <div className="max-w-xl mx-auto">
-            {ownedCard && (
-              <div className="nav-glass nav-card-accent rounded-2xl p-5 mb-6" role="status"
-                style={{ boxShadow: 'var(--nav-card-glow)' }}>
-                <div className="font-bold text-base mb-4" style={{ color: 'var(--nav-text-primary)' }}>
-                  {ownedCard.kind === 'admin' ? t.adminAccessTitle : t.proActiveTitle(ownedCard.until)}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {ownedCard.kind === 'pro' && (
-                    <button type="button" onClick={scrollToRenew}
-                      className={`flex-1 min-w-[140px] min-h-[44px] rounded-xl text-sm font-semibold ${PRESS}`}
-                      style={BTN_OUTLINE}>
-                      {t.renewShortButton}
-                    </button>
-                  )}
-                  <button type="button" onClick={() => router.push(homeFor(profile?.enabled_products))}
-                    className={`flex-1 min-w-[140px] min-h-[44px] rounded-xl text-sm font-semibold ${PRESS}`}
-                    style={BTN_PRIMARY}>
-                    {t.toCabinetButton}
-                  </button>
-                </div>
+          {ownedCard && (
+            <div className="nav-glass nav-card-accent rounded-2xl p-5 mb-6" role="status"
+              style={{ boxShadow: 'var(--nav-card-glow)' }}>
+              <div className="font-bold text-base mb-4" style={{ color: 'var(--nav-text-primary)' }}>
+                {ownedCard.kind === 'admin' ? t.adminAccessTitle : t.proActiveTitle(ownedCard.until)}
               </div>
-            )}
+              <div className="flex flex-wrap gap-2">
+                {ownedCard.kind === 'pro' && (
+                  <button type="button" onClick={scrollToRenew}
+                    className={`flex-1 min-w-[140px] min-h-[44px] rounded-xl text-sm font-semibold ${PRESS}`}
+                    style={BTN_OUTLINE}>
+                    {t.renewShortButton}
+                  </button>
+                )}
+                <button type="button" onClick={() => router.push(homeFor(profile?.enabled_products))}
+                  className={`flex-1 min-w-[140px] min-h-[44px] rounded-xl text-sm font-semibold ${PRESS}`}
+                  style={BTN_PRIMARY}>
+                  {t.toCabinetButton}
+                </button>
+              </div>
+            </div>
+          )}
 
+          {/* Узкая колонка: промо, кошелёк, переключатель периода. */}
+          <div className="max-w-xl mx-auto">
             <div className="text-center mb-6">
               <h2 className="text-lg lg:text-xl font-bold mb-1" style={{ color: 'var(--nav-text-primary)' }}>{t.heroTitle}</h2>
               <p className="text-sm" style={{ color: 'var(--nav-text-muted)' }}>{t.heroSubtitle}</p>
@@ -1044,7 +1047,7 @@ export default function Upgrade() {
               </>
             )}
           </p>
-        </div>
+        </PageContainer>
 
         {/* Modal QR */}
         {showModal && (

@@ -12,7 +12,8 @@ import DesktopShell from '@/components/DesktopShell'
 import TestChatPanel from '@/components/aiAgent/TestChatPanel'
 import { getActivePlan } from '@/lib/plan'
 import BrandLoader from '@/components/BrandLoader'
-import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
+import PageHeader from '@/components/PageHeader'
+import PageContainer from '@/components/PageContainer'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -30,7 +31,6 @@ function BotIcon({ size = 26 }: { size?: number }) {
 }
 
 export default function AiAgentTestChat() {
-  usePageDocumentTitle('Тестовый чат — AI-агент')
   const router = useRouter()
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw
@@ -114,7 +114,7 @@ export default function AiAgentTestChat() {
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
-      <AiAgentProUpsell />
+      <AiAgentProUpsell title="Тестовый чат" />
     </main>
     </DesktopShell>
   )
@@ -123,29 +123,22 @@ export default function AiAgentTestChat() {
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
-      <div className="max-w-3xl mx-auto p-4 lg:p-6 pb-6">
-        <motion.div
-          className="flex items-start justify-between gap-3 mb-6 flex-wrap"
-          initial={reduceMotion ? false : { opacity: 0, y: 14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE }}
-        >
-          <div>
-            <h1 className="text-xl font-bold mb-1" style={{ color: 'var(--nav-text-primary)' }}>Тестовый чат</h1>
-            <p className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>Пообщайтесь со своим агентом так, как это сделает клиент</p>
-          </div>
-          {agents.length > 0 && (
+      <PageContainer variant="wide" align="start" className="pb-6">
+        <PageHeader
+          title="Тестовый чат"
+          subtitle="Пообщайтесь со своим агентом так, как это сделает клиент"
+          right={agents.length > 0 ? (
             <select
               value={agentId || ''}
               onChange={e => switchAgent(e.target.value)}
               aria-label="Выбор агента"
-              className="nav-glass rounded-lg px-3 py-2 text-sm font-medium outline-none cursor-pointer flex-shrink-0"
+              className="nav-glass rounded-lg px-3 py-2 text-sm font-medium outline-none cursor-pointer flex-shrink-0 max-w-[45vw] truncate"
               style={{ color: 'var(--nav-text-primary)', background: 'var(--nav-bg)' }}
             >
               {agents.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
             </select>
-          )}
-        </motion.div>
+          ) : undefined}
+        />
 
         {agents.length === 0 ? (
           <motion.div
@@ -169,6 +162,7 @@ export default function AiAgentTestChat() {
           </motion.div>
         ) : agentId ? (
           <motion.div
+            className="max-w-3xl"
             initial={reduceMotion ? false : { opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.06 }}
@@ -176,7 +170,7 @@ export default function AiAgentTestChat() {
             <TestChatPanel agentId={agentId} />
           </motion.div>
         ) : null}
-      </div>
+      </PageContainer>
     </main>
     </DesktopShell>
   )

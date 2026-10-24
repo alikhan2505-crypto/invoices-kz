@@ -11,6 +11,7 @@ import { returnPathFromSearch, type ReturnPath } from '@/lib/returnPath'
 import { validateBinIin, digitsOnly } from '@/lib/kzIdentifiers'
 import { profileBonusDict } from '@/lib/i18n/profileBonus'
 import { claimAndAnnounceBonus } from '@/lib/profileBonusClient'
+import PageContainer from '@/components/PageContainer'
 import PageHeader from '@/components/PageHeader'
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
@@ -235,7 +236,7 @@ export default function Requisites() {
 
   return (
       <>
-        <div className="max-w-lg lg:max-w-2xl mx-auto p-4">
+        <PageContainer>
           <PageHeader
             title={t.requisitesHeaderLabel}
             backHref={returnTo || '/profile'}
@@ -350,7 +351,7 @@ export default function Requisites() {
           >
             {saving ? t.savingEllipsis : t.saveChangesButton}
           </motion.button>
-        </div>
+        </PageContainer>
         {dialogElement}
       </>
   )

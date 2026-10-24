@@ -24,7 +24,6 @@ export interface AiAgentDict {
   proOnlyText: string
   proOnlyCta: string
   allAgents: string
-  backToAgents: string
 
   // agents list
   agentsTitle: string
@@ -114,7 +113,6 @@ export const aiAgentDict: Record<Lang, AiAgentDict> = {
     proOnlyText: 'AI-агент отвечает вашим клиентам в WhatsApp, Instagram, Telegram и в чате на сайте. Перейдите на Про, чтобы создавать агентов и управлять ими.',
     proOnlyCta: 'Перейти на Про',
     allAgents: 'Все агенты',
-    backToAgents: 'Все агенты',
 
     agentsTitle: 'Агенты',
     agentsSubtitle: 'Ваши AI-сотрудники, которые отвечают клиентам в WhatsApp, Instagram, Telegram и на сайте',
@@ -148,9 +146,9 @@ export const aiAgentDict: Record<Lang, AiAgentDict> = {
       return `Нельзя удалить агента: в планировщике салона ${n} ${what} на запись от этого агента. Подтвердите или отклоните их в планировщике, затем удалите агента.`
     },
 
-    agentPageTitle: 'AI-агент',
+    agentPageTitle: 'Настройки агента',
     agentLabel: (n) => `Агент: ${n}`,
-    agentPageSubtitle: 'Настройте ассистента, который отвечает вашим клиентам в WhatsApp, Instagram, Telegram и на сайте',
+    agentPageSubtitle: 'Ассистент для WhatsApp, Instagram, Telegram и сайта',
     testChatButton: 'Тестовый чат',
     tabSettings: 'Настройки',
     tabPrompting: 'Промптинг',
@@ -200,7 +198,6 @@ export const aiAgentDict: Record<Lang, AiAgentDict> = {
     proOnlyText: 'AI-агент клиенттеріңізге WhatsApp, Instagram, Telegram және сайттағы чатта жауап береді. Агенттерді құру және басқару үшін Про тарифіне өтіңіз.',
     proOnlyCta: 'Про тарифіне өту',
     allAgents: 'Барлық агенттер',
-    backToAgents: 'Барлық агенттер',
 
     agentsTitle: 'Агенттер',
     agentsSubtitle: 'WhatsApp, Instagram, Telegram және сайтта клиенттерге жауап беретін AI-қызметкерлеріңіз',
@@ -230,9 +227,9 @@ export const aiAgentDict: Record<Lang, AiAgentDict> = {
     deleteAgentError: 'Агентті жою мүмкін болмады. Қайталап көріңіз.',
     deleteAgentPendingBookings: (n) => `Агентті жою мүмкін емес: салон жоспарлағышында осы агенттен жазылуға ${n} өңделмеген өтінім бар. Оларды жоспарлағышта растаңыз немесе қабылдамаңыз, содан кейін агентті жойыңыз.`,
 
-    agentPageTitle: 'AI-агент',
+    agentPageTitle: 'Агент баптаулары',
     agentLabel: (n) => `Агент: ${n}`,
-    agentPageSubtitle: 'WhatsApp, Instagram, Telegram және сайтта клиенттеріңізге жауап беретін ассистентті баптаңыз',
+    agentPageSubtitle: 'WhatsApp, Instagram, Telegram және сайт ассистенті',
     testChatButton: 'Сынақ чаты',
     tabSettings: 'Параметрлер',
     tabPrompting: 'Промптинг',
@@ -282,7 +279,6 @@ export const aiAgentDict: Record<Lang, AiAgentDict> = {
     proOnlyText: 'The AI agent replies to your customers on WhatsApp, Instagram, Telegram and your website chat. Upgrade to Pro to create and manage agents.',
     proOnlyCta: 'Upgrade to Pro',
     allAgents: 'All agents',
-    backToAgents: 'All agents',
 
     agentsTitle: 'Agents',
     agentsSubtitle: 'Your AI assistants that reply to customers on WhatsApp, Instagram, Telegram and your website',
@@ -312,9 +308,9 @@ export const aiAgentDict: Record<Lang, AiAgentDict> = {
     deleteAgentError: 'Could not delete the agent. Please try again.',
     deleteAgentPendingBookings: (n) => `This agent can’t be deleted yet: the salon planner has ${n} unprocessed booking ${n === 1 ? 'request' : 'requests'} from it. Confirm or reject ${n === 1 ? 'it' : 'them'} in the planner, then delete the agent.`,
 
-    agentPageTitle: 'AI agent',
+    agentPageTitle: 'Agent settings',
     agentLabel: (n) => `Agent: ${n}`,
-    agentPageSubtitle: 'Set up the assistant that replies to your customers on WhatsApp, Instagram, Telegram and your website',
+    agentPageSubtitle: 'Assistant for WhatsApp, Instagram, Telegram and your website',
     testChatButton: 'Test chat',
     tabSettings: 'Settings',
     tabPrompting: 'Prompting',

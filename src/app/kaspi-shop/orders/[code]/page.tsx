@@ -8,6 +8,8 @@ import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import { getActivePlan } from '@/lib/plan'
 import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
+import PageHeader from '@/components/PageHeader'
+import PageContainer from '@/components/PageContainer'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -47,7 +49,9 @@ export default function KaspiShopOrderDetail() {
   const router = useRouter()
   const { code } = useParams()
   // Номер заказа, а не имя покупателя: имя в заголовке вкладки/истории ни к чему.
-  usePageDocumentTitle(typeof code === 'string' ? `Заказ ${code} — Kaspi Bot` : 'Заказ — Kaspi Bot')
+  // Хук и на время загрузки (PageHeader ещё не отрисован); строка та же, что ставит PageHeader.
+  const pageTitle = typeof code === 'string' ? `Заказ № ${code}` : 'Заказ'
+  usePageDocumentTitle(pageTitle)
   const [loading, setLoading] = useState(true)
   const [order, setOrder] = useState<OrderDetail | null>(null)
   const [loadError, setLoadError] = useState('')
@@ -96,8 +100,13 @@ export default function KaspiShopOrderDetail() {
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
 
-      <div className="flex-1 min-w-0 p-4 lg:p-6 pb-6 max-w-2xl">
-        <button onClick={() => router.back()} className="text-sm mb-4 transition-colors" style={{ color: 'var(--nav-text-muted)' }}>‹ Назад к заказам</button>
+      <PageContainer variant="narrow" align="start" className="flex-1 min-w-0 pb-6">
+        {/* Назад -- по истории, чтобы вернуться на ту же вкладку статуса; если истории нет (открыли по ссылке), в список заказов. */}
+        <PageHeader
+          title={pageTitle}
+          subtitle={order ? `${order.customerFirstName} ${order.customerLastName}` : undefined}
+          onBack={() => { if (window.history.length > 1) router.back(); else router.push('/kaspi-shop/orders') }}
+        />
 
         {loadError && (
           <div className="nav-glass rounded-2xl p-4 text-sm mb-4" style={{ color: 'var(--nav-critical)' }}>{loadError}</div>
@@ -109,8 +118,6 @@ export default function KaspiShopOrderDetail() {
           <>
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}
               className="nav-glass nav-card-accent rounded-[28px] p-6 lg:p-8 mb-4">
-              <div className="text-[11px] font-semibold tracking-wider uppercase mb-1" style={{ color: 'var(--nav-text-muted)' }}>Заказ № {order.code}</div>
-              <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight mb-4" style={{ color: 'var(--nav-text-primary)' }}>{order.customerFirstName} {order.customerLastName}</h1>
               <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
                 {order.cityName && <div className="flex items-center gap-1.5"><PinIcon />{order.cityName}</div>}
                 {order.plannedDeliveryDate && <div className="flex items-center gap-1.5"><TruckIcon />до {new Date(order.plannedDeliveryDate).toLocaleDateString('ru-KZ')}</div>}
@@ -138,7 +145,7 @@ export default function KaspiShopOrderDetail() {
             </div>
           </>
         )}
-      </div>
+      </PageContainer>
     </main>
     </DesktopShell>
   )

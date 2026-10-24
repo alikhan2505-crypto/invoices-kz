@@ -25,7 +25,8 @@ import { settingsSaveErrorKind, isBlankAgentName, type SettingsSaveErrorKind } f
 import { buildBusinessContextLine, AgentTone, AgentGoal } from '@/lib/aiAgent/promptContext'
 import { useAppDialog } from '@/components/AppDialog'
 import { useCrossHref } from '@/lib/useCrossHref'
-import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
+import PageHeader from '@/components/PageHeader'
+import PageContainer from '@/components/PageContainer'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -163,8 +164,6 @@ export default function AiAgentSettings() {
   const crossHref = useCrossHref()
   const { lang } = useLanguage()
   const t = aiAgentDict[lang]
-  // Под-экран конкретного агента: в меню подсвечены «Агенты», так же называем вкладку.
-  usePageDocumentTitle(`${t.agentsTitle} — ${t.agentPageTitle}`)
   // Shadows window.alert / window.confirm for this component -- see
   // src/components/AppDialog.tsx. Every confirm below is awaited: a Promise
   // is truthy, so `if (confirm(...))` would silently pass.
@@ -780,7 +779,7 @@ export default function AiAgentSettings() {
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
-      <AiAgentProUpsell />
+      <AiAgentProUpsell title={t.agentPageTitle} />
     </main>
     </DesktopShell>
   )
@@ -789,7 +788,8 @@ export default function AiAgentSettings() {
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
-      <div className="max-w-2xl mx-auto p-4 lg:p-6">
+      <PageContainer variant="wide" align="start">
+        <PageHeader title={t.agentPageTitle} backHref="/ai-agent" />
         {oauthNotice === 'error' && (
           <div className="rounded-lg px-3 py-2 text-sm mb-4" style={{ background: 'var(--nav-critical)', color: '#fff' }}>
             {tf.errConnectInstagram}
@@ -805,7 +805,7 @@ export default function AiAgentSettings() {
             {tf.toAgentsList}
           </Link>
         </div>
-      </div>
+      </PageContainer>
     </main>
     </DesktopShell>
   )
@@ -870,40 +870,38 @@ export default function AiAgentSettings() {
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
-      <div className="max-w-2xl mx-auto p-4 lg:p-6 pb-6">
-        <motion.div
-          className="flex items-start justify-between gap-3 flex-wrap"
-          initial={reduceMotion ? false : { opacity: 0, y: 14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE }}
-        >
-          <div>
-            <Link href="/ai-agent" className="inline-flex items-center gap-1 text-xs mb-2 transition-colors hover:text-[color:var(--nav-text-secondary)]" style={{ color: 'var(--nav-text-muted)' }}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M11 18l-6-6 6-6" /></svg>
-              {t.backToAgents}
-            </Link>
-            <h1 className="text-xl font-bold mb-1" style={{ color: 'var(--nav-text-primary)' }}>{t.agentPageTitle}</h1>
-            {agentId && (
-              <div className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold mb-2" style={{ background: 'var(--nav-bg)', color: 'var(--nav-accent)' }}>
-                {t.agentLabel(name)}
-              </div>
-            )}
-            <p className="text-sm mb-5" style={{ color: 'var(--nav-text-secondary)' }}>{t.agentPageSubtitle}</p>
-          </div>
-          {/* Persistent across all five tabs (MoonAI-style shortcut) --
-              disabled with a tooltip until the agent has a real id: a
-              ?new=1 agent isn't in the DB yet, so there's nothing for the
-              test-chat API to look up. */}
-          <button
-            onClick={openTestChat}
-            disabled={!agentId}
-            title={agentId ? undefined : tf.testChatDisabledHint}
-            className="flex items-center gap-1.5 nav-glass rounded-lg px-3 py-2 text-sm font-medium flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed transition-colors hover:bg-[color:var(--nav-bg)]"
-            style={{ color: 'var(--nav-text-primary)' }}
-          >
-            <TestChatBubbleIcon /> {t.testChatButton}
-          </button>
-        </motion.div>
+      <PageContainer variant="wide" align="start" className="pb-6">
+        <PageHeader
+          title={t.agentPageTitle}
+          backHref="/ai-agent"
+          subtitle={
+            <>
+              {agentId && (
+                <span className="inline-flex items-center rounded-full px-2.5 py-1 mr-2 text-xs font-semibold align-middle" style={{ background: 'var(--nav-bg)', color: 'var(--nav-accent)' }}>
+                  {t.agentLabel(name)}
+                </span>
+              )}
+              {t.agentPageSubtitle}
+            </>
+          }
+          right={
+            /* Persistent across all five tabs (MoonAI-style shortcut) --
+               disabled with a tooltip until the agent has a real id: a
+               ?new=1 agent isn't in the DB yet, so there's nothing for the
+               test-chat API to look up. На телефоне только значок: подпись
+               отняла бы у заголовка и подзаголовка половину строки. */
+            <button
+              onClick={openTestChat}
+              disabled={!agentId}
+              title={agentId ? undefined : tf.testChatDisabledHint}
+              aria-label={t.testChatButton}
+              className="flex items-center justify-center gap-1.5 min-w-11 min-h-11 sm:min-h-0 nav-glass rounded-lg px-3 py-2 text-sm font-medium flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed transition-colors hover:bg-[color:var(--nav-bg)]"
+              style={{ color: 'var(--nav-text-primary)' }}
+            >
+              <TestChatBubbleIcon /> <span className="hidden sm:inline">{t.testChatButton}</span>
+            </button>
+          }
+        />
 
         {oauthNotice === 'connected' && (
           <div className="rounded-lg px-3 py-2 text-sm mb-4 flex items-center gap-2" style={{ background: 'var(--nav-success-solid)', color: 'var(--nav-success-ink)' }}>
@@ -949,7 +947,7 @@ export default function AiAgentSettings() {
         {agentStatus === 'training' && agentId && (
           <div className="nav-glass rounded-2xl p-4 lg:p-5 mb-4" style={{ borderLeft: '3px solid var(--nav-magenta)' }}>
             <div className="text-sm font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>{tf.trainingTitle}</div>
-            <p className="text-[13px] mb-2" style={{ color: 'var(--nav-text-secondary)' }}>{tf.trainingBody}</p>
+            <p className="text-[13px] mb-2 max-w-prose" style={{ color: 'var(--nav-text-secondary)' }}>{tf.trainingBody}</p>
             <div className="text-[13px] mb-2" style={{ color: 'var(--nav-text-muted)' }}>
               {(() => {
                 // Срок в днях идёт от первого черновика на проверке (не от
@@ -1504,7 +1502,7 @@ export default function AiAgentSettings() {
             </Link>
           </motion.div>
         )}
-      </div>
+      </PageContainer>
 
       {/* Slide-over test chat -- MoonAI-style persistent shortcut so the
           founder can try a reply without leaving settings. Backdrop click

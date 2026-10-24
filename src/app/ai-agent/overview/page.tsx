@@ -14,7 +14,8 @@ import AiAgentProUpsell from '@/components/aiAgent/AiAgentProUpsell'
 import { fetchWaUsage, waLevelColor, type WaUsageResponse } from '@/components/aiAgent/WhatsAppUsage'
 import { useLanguage } from '@/components/LanguageProvider'
 import { aiAgentSetupDict } from '@/lib/i18n/aiAgentSetup'
-import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
+import PageHeader from '@/components/PageHeader'
+import PageContainer from '@/components/PageContainer'
 
 // "Обзор" of the AI agent (founder's mock, 21.09.2026): three numbers, the
 // freshest conversations, and the hand-offs to the neighbouring products.
@@ -49,7 +50,6 @@ async function authHeader() {
 }
 
 export default function AiAgentOverview() {
-  usePageDocumentTitle('Обзор — AI-агент')
   const router = useRouter()
   const crossHref = useCrossHref()
   const [ready, setReady] = useState(false)
@@ -135,7 +135,7 @@ export default function AiAgentOverview() {
     <DesktopShell>
       <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
         <SiteNav />
-        <AiAgentProUpsell />
+        <AiAgentProUpsell title="Обзор" />
       </main>
     </DesktopShell>
   )
@@ -169,11 +169,8 @@ export default function AiAgentOverview() {
     <DesktopShell>
       <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
         <SiteNav />
-        <div className="flex-1 min-w-0 p-4 lg:p-6 pb-6 space-y-6">
-          <div className="flex items-baseline gap-3 flex-wrap">
-            <h1 className="text-2xl font-bold" style={{ color: 'var(--nav-text-primary)', letterSpacing: '-0.02em' }}>Обзор</h1>
-            <span className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>AI-агент</span>
-          </div>
+        <PageContainer variant="wide" align="start" className="pb-6 space-y-6">
+          <PageHeader title="Обзор" subtitle="AI-агент" />
 
           {hasAgents === false && (
             <div className="nav-glass rounded-2xl p-4 flex items-center gap-3 flex-wrap text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
@@ -256,7 +253,7 @@ export default function AiAgentOverview() {
               ))}
             </div>
           </section>
-        </div>
+        </PageContainer>
       </main>
     </DesktopShell>
   )

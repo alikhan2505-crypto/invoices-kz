@@ -8,6 +8,7 @@ import { formatDate } from '@/lib/date'
 import { useLanguage } from '@/components/LanguageProvider'
 import { profileAccountsDict } from '@/lib/i18n/profileAccounts'
 import { useAppDialog } from '@/components/AppDialog'
+import PageContainer from '@/components/PageContainer'
 import PageHeader from '@/components/PageHeader'
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
@@ -103,7 +104,7 @@ export default function Security() {
 
   return (
       <>
-        <div className="max-w-lg lg:max-w-2xl mx-auto p-4">
+        <PageContainer>
           <PageHeader
             title={t.securityHeaderLabel}
             backHref="/profile"
@@ -162,7 +163,7 @@ export default function Security() {
             </motion.div>
 
           </div>
-        </div>
+        </PageContainer>
       {dialogElement}
       </>
   )

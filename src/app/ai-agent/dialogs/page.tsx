@@ -14,8 +14,8 @@ import BrandLoader from '@/components/BrandLoader'
 import Link from 'next/link'
 import { useLanguage } from '@/components/LanguageProvider'
 import { aiAgentSetupDict } from '@/lib/i18n/aiAgentSetup'
-import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
-import { aiAgentDict } from '@/lib/i18n/aiAgent'
+import PageHeader from '@/components/PageHeader'
+import PageContainer from '@/components/PageContainer'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -85,7 +85,6 @@ function AiAgentDialogsInner() {
   const searchParams = useSearchParams()
   const { lang } = useLanguage()
   const sd = aiAgentSetupDict[lang]
-  usePageDocumentTitle(`${sd.dialogsTitle} — ${aiAgentDict[lang].agentPageTitle}`)
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw
   const [loading, setLoading] = useState(true)
@@ -292,7 +291,7 @@ function AiAgentDialogsInner() {
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
-      <AiAgentProUpsell />
+      <AiAgentProUpsell title={sd.dialogsTitle} />
     </main>
     </DesktopShell>
   )
@@ -301,18 +300,21 @@ function AiAgentDialogsInner() {
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
-      <div className="max-w-7xl mx-auto p-4 lg:p-6 pb-6 flex flex-col" style={{ height: 'calc(100vh - 200px)', minHeight: 560 }}>
+      <PageContainer variant="full" align="start" className="pb-6 flex flex-col" style={{ height: 'calc(100vh - 200px)', minHeight: 560 }}>
+        <PageHeader
+          className="flex-shrink-0"
+          title={sd.dialogsTitle}
+          subtitle={readOnly ? sd.dialogsSubtitleReadOnly : sd.dialogsSubtitle}
+        />
+
+        {/* Фильтры отдельной строкой под шапкой: в правый слот шапки они на 390 не помещаются. */}
         <motion.div
-          className="flex items-center justify-between gap-3 mb-4 flex-wrap flex-shrink-0"
+          className="mb-4 flex-shrink-0"
           initial={reduceMotion ? false : { opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE }}
         >
-          <div>
-            <h1 className="text-xl font-bold" style={{ color: 'var(--nav-text-primary)' }}>{sd.dialogsTitle}</h1>
-            <p className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>{readOnly ? sd.dialogsSubtitleReadOnly : sd.dialogsSubtitle}</p>
-          </div>
-          <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap">
             {agents.length > 0 && (
               <select
                 value={agentFilter}
@@ -395,7 +397,8 @@ function AiAgentDialogsInner() {
             })}
           </div>
 
-          <div className="nav-glass rounded-2xl p-4 flex flex-col min-h-0">
+          {/* На телефоне панель переписки без выбранного диалога скрыта: «слева» там нет, остаётся пустой зазор. */}
+          <div className={`nav-glass rounded-2xl p-4 flex-col min-h-0 ${selected ? 'flex' : 'hidden lg:flex'}`}>
             {!selected ? (
               <div className="flex-1 flex items-center justify-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Выберите диалог слева</div>
             ) : (
@@ -452,7 +455,7 @@ function AiAgentDialogsInner() {
             )}
           </div>
         </div>
-      </div>
+      </PageContainer>
     </main>
     </DesktopShell>
   )

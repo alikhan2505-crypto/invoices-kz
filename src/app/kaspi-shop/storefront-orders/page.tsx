@@ -8,6 +8,8 @@ import DesktopShell from '@/components/DesktopShell'
 import { getActivePlan } from '@/lib/plan'
 import BrandLoader from '@/components/BrandLoader'
 import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
+import PageHeader from '@/components/PageHeader'
+import PageContainer from '@/components/PageContainer'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -33,7 +35,8 @@ function formatPrice(price: number): string {
 }
 
 export default function KaspiShopStorefrontOrders() {
-  usePageDocumentTitle('Заказы витрины — Kaspi Bot')
+  // Заголовок вкладки и на время загрузки (PageHeader ещё не отрисован); строка та же, что ставит PageHeader.
+  usePageDocumentTitle('Заказы витрины')
   const router = useRouter()
   const reduceMotion = !!useReducedMotion()
   const [loading, setLoading] = useState(true)
@@ -81,16 +84,8 @@ export default function KaspiShopStorefrontOrders() {
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
-      <div className="max-w-4xl mx-auto p-4 lg:p-6 pb-6">
-        <motion.div
-          className="mb-6"
-          initial={reduceMotion ? false : { opacity: 0, y: 14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE }}
-        >
-          <h1 className="text-xl font-bold" style={{ color: 'var(--nav-text-primary)' }}>Заказы витрины</h1>
-          <p className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>Заказы, оформленные напрямую через вашу витрину</p>
-        </motion.div>
+      <PageContainer variant="wide" align="start" className="pb-6">
+        <PageHeader title="Заказы витрины" subtitle="Заказы, оформленные напрямую через вашу витрину" />
 
         {orders.length === 0 ? (
           <div className="text-sm text-center py-16" style={{ color: 'var(--nav-text-muted)' }}>Пока нет заказов с витрины</div>
@@ -131,7 +126,7 @@ export default function KaspiShopStorefrontOrders() {
             })}
           </div>
         )}
-      </div>
+      </PageContainer>
     </main>
     </DesktopShell>
   )

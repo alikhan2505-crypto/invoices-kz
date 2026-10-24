@@ -2,7 +2,8 @@
 import { useState, type ReactNode } from 'react'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
-import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
+import PageHeader from '@/components/PageHeader'
+import PageContainer from '@/components/PageContainer'
 
 // Text-first onboarding for the AI-агент section (2026-08-20, founder:
 // "сделать онбординг через видеокурсы (пока текстовый Документацию написать
@@ -136,19 +137,18 @@ function ChannelSwitcher() {
 }
 
 export default function AiAgentDocsPage() {
-  usePageDocumentTitle('Как настроить — AI-агент')
   return (
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
-      <div className="max-w-5xl mx-auto px-4 lg:px-6 py-8">
-        <h1 className="text-3xl font-bold mb-2" style={{ color: 'var(--nav-text-primary)', letterSpacing: '-0.02em' }}>
-          Как настроить AI-агента
-        </h1>
-        <p className="text-sm mb-8" style={{ color: 'var(--nav-text-secondary)' }}>
-          Пошаговый курс: от создания агента до первых автоматических ответов вашим клиентам в Instagram, Telegram, WhatsApp, на сайте и через API.
-        </p>
+      <PageContainer variant="wide" align="start" className="pb-6">
+        <PageHeader
+          title="Как настроить AI-агента"
+          subtitle="Пошаговый курс: от создания агента до первых автоматических ответов вашим клиентам в Instagram, Telegram, WhatsApp, на сайте и через API."
+        />
 
+        {/* Текст курса -- колонка около 720 px: на всю ширину wide строки были по ~145 знаков. */}
+        <div className="max-w-[45rem]">
         <Lesson n={1} title="Что умеет AI-агент">
           <P>
             AI-агент — это ваш виртуальный сотрудник, который отвечает клиентам в Instagram (Direct и комментарии),
@@ -248,7 +248,8 @@ export default function AiAgentDocsPage() {
             </a>
           </div>
         </section>
-      </div>
+        </div>
+      </PageContainer>
     </main>
     </DesktopShell>
   )

@@ -1,7 +1,8 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { motion, useReducedMotion } from 'framer-motion'
+import Link from 'next/link'
+import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
@@ -9,8 +10,9 @@ import { getActivePlan } from '@/lib/plan'
 import { useCrossHref } from '@/lib/useCrossHref'
 import BrandLoader from '@/components/BrandLoader'
 import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
+import PageHeader from '@/components/PageHeader'
+import PageContainer from '@/components/PageContainer'
 
-const EASE = [0.16, 1, 0.3, 1] as const
 
 type Settings = {
   connectionId: string; companyName: string; slug: string | null; published: boolean; cashierConnected: boolean; visibleProductCount: number
@@ -30,10 +32,10 @@ function formatPrice(price: number): string {
 }
 
 export default function KaspiShopStorefrontSettings() {
-  usePageDocumentTitle('Витрина — Kaspi Bot')
+  // Заголовок вкладки и на время загрузки (PageHeader ещё не отрисован); строка та же, что ставит PageHeader.
+  usePageDocumentTitle('Витрина')
   const crossHref = useCrossHref()
   const router = useRouter()
-  const reduceMotion = !!useReducedMotion()
   const [loading, setLoading] = useState(true)
   const [noConnection, setNoConnection] = useState(false)
   const [settings, setSettings] = useState<Settings | null>(null)
@@ -341,7 +343,17 @@ export default function KaspiShopStorefrontSettings() {
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
-      <div className="p-8 text-center text-sm" style={{ color: 'var(--nav-text-muted)' }}>Сначала подключите магазин Kaspi Shop</div>
+      <PageContainer variant="narrow" align="start" className="pb-6">
+        <PageHeader title="Витрина" />
+        <div className="nav-glass nav-card-accent rounded-2xl p-6 text-center max-w-md">
+          <h2 className="text-base font-semibold mb-1.5" style={{ color: 'var(--nav-text-primary)' }}>Магазин не подключён</h2>
+          <p className="text-sm mb-5" style={{ color: 'var(--nav-text-secondary)' }}>Сначала подключите магазин Kaspi Shop, после этого можно настроить публичную витрину.</p>
+          <Link href="/kaspi-shop" className="inline-flex items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold transition-transform hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+            style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)', boxShadow: '0 10px 24px -10px var(--nav-accent)' }}>
+            Подключить магазин
+          </Link>
+        </div>
+      </PageContainer>
     </main>
     </DesktopShell>
   )
@@ -350,16 +362,8 @@ export default function KaspiShopStorefrontSettings() {
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
-      <div className="max-w-3xl mx-auto p-4 lg:p-6 pb-6">
-        <motion.div
-          className="mb-6"
-          initial={reduceMotion ? false : { opacity: 0, y: 14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE }}
-        >
-          <h1 className="text-xl font-bold" style={{ color: 'var(--nav-text-primary)' }}>Витрина</h1>
-          <p className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>Публичная страница с вашими товарами — делитесь ссылкой в Instagram/WhatsApp</p>
-        </motion.div>
+      <PageContainer variant="narrow" align="start" className="pb-6">
+        <PageHeader title="Витрина" subtitle="Публичная страница с вашими товарами — делитесь ссылкой в Instagram/WhatsApp" />
 
         <div className="flex items-center gap-1 flex-wrap nav-glass rounded-full p-1 w-fit mb-4">
           {([['settings', 'Настройки'], ['catalog', 'Каталог']] as const).map(([value, label]) => {
@@ -652,7 +656,7 @@ export default function KaspiShopStorefrontSettings() {
             </div>
           </div>
         )}
-      </div>
+      </PageContainer>
     </main>
     </DesktopShell>
   )

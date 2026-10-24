@@ -6,6 +6,8 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
+import PageHeader from '@/components/PageHeader'
+import PageContainer from '@/components/PageContainer'
 import BrandLoader from '@/components/BrandLoader'
 import AiAgentProUpsell from '@/components/aiAgent/AiAgentProUpsell'
 import ChannelCards, { WarnIcon, ensureFacebookSdk, type AgentConnection } from '@/components/aiAgent/ChannelCards'
@@ -502,7 +504,7 @@ export default function SetupWizard() {
     <DesktopShell>
       <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
         <SiteNav />
-        <AiAgentProUpsell />
+        <AiAgentProUpsell title={s.pageTitle} />
       </main>
     </DesktopShell>
   )
@@ -545,11 +547,12 @@ export default function SetupWizard() {
     <DesktopShell>
       <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
         <SiteNav />
-        <div className="max-w-3xl mx-auto px-4 py-4 lg:p-6 pb-6">
-          <Link href="/ai-agent" className="inline-flex items-center gap-1 text-xs mb-3 transition-colors hover:text-[color:var(--nav-text-secondary)]" style={{ color: 'var(--nav-text-muted)' }}>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M19 12H5M11 18l-6-6 6-6" /></svg>
-            {t.backToAgents}
-          </Link>
+        <PageContainer variant="wide" align="start" className="pb-6">
+          {/* Название страницы -- h1 шапки (оно же название вкладки); заголовки шагов ниже -- h2 с фокусом при смене шага. */}
+          <PageHeader title={s.pageTitle} backHref="/ai-agent" />
+
+          {/* Мастер -- один узкий поток внутри общей рамки раздела (wide), как формы настроек. */}
+          <div className="max-w-2xl">
 
           {/* Полоса прогресса: шаги 1–4 (шаг 0 -- вход, до него агента нет). */}
           {step > 0 && (
@@ -596,7 +599,7 @@ export default function SetupWizard() {
                   <div className="mx-auto mb-3 flex items-center justify-center w-12 h-12 rounded-2xl" style={{ background: 'var(--nav-bg)', color: 'var(--nav-accent)' }} aria-hidden>
                     <BotIcon />
                   </div>
-                  <h1 ref={headingRef} tabIndex={-1} className="text-xl font-bold mb-2 outline-none" style={{ color: 'var(--nav-text-primary)' }}>{s.step0Title}</h1>
+                  <h2 ref={headingRef} tabIndex={-1} className="text-xl font-bold mb-2 outline-none" style={{ color: 'var(--nav-text-primary)' }}>{s.step0Title}</h2>
                   <p className="text-sm mb-6 max-w-md mx-auto" style={{ color: 'var(--nav-text-secondary)' }}>{s.step0Text}</p>
                   <button onClick={createDraft} disabled={creating} className={primaryBtn} style={primaryStyle}>
                     {creating ? s.creating : s.createButton}
@@ -609,7 +612,7 @@ export default function SetupWizard() {
 
               {step === 1 && agent && (
                 <div>
-                  <h1 ref={headingRef} tabIndex={-1} className="text-xl font-bold mb-1 outline-none" style={{ color: 'var(--nav-text-primary)' }}>{s.step1Title}</h1>
+                  <h2 ref={headingRef} tabIndex={-1} className="text-xl font-bold mb-1 outline-none" style={{ color: 'var(--nav-text-primary)' }}>{s.step1Title}</h2>
                   <p className="text-sm mb-4" style={{ color: 'var(--nav-text-secondary)' }}>{s.step1Text}</p>
                   {igNotice === 'error' && (
                     <div role="alert" className="rounded-xl px-3.5 py-2.5 mb-3 text-sm" style={{ background: 'var(--nav-bg)', color: 'var(--nav-critical)' }}>{tf.errConnectInstagram}</div>
@@ -647,7 +650,7 @@ export default function SetupWizard() {
                       <CheckIcon /> {s.instagramConnected}
                     </div>
                   )}
-                  <h1 ref={headingRef} tabIndex={-1} className="text-xl font-bold mb-1 outline-none" style={{ color: 'var(--nav-text-primary)' }}>{s.step2Title}</h1>
+                  <h2 ref={headingRef} tabIndex={-1} className="text-xl font-bold mb-1 outline-none" style={{ color: 'var(--nav-text-primary)' }}>{s.step2Title}</h2>
                   <p className="text-sm mb-4" style={{ color: 'var(--nav-text-secondary)' }}>{s.step2Text}</p>
                   <div className="nav-glass nav-card-accent rounded-2xl p-5">
                     <label className="block mb-4">
@@ -708,7 +711,7 @@ export default function SetupWizard() {
 
               {step === 3 && agent && (
                 <div>
-                  <h1 ref={headingRef} tabIndex={-1} className="text-xl font-bold mb-1 outline-none" style={{ color: 'var(--nav-text-primary)' }}>{s.step3Title}</h1>
+                  <h2 ref={headingRef} tabIndex={-1} className="text-xl font-bold mb-1 outline-none" style={{ color: 'var(--nav-text-primary)' }}>{s.step3Title}</h2>
                   <p className="text-sm mb-4" style={{ color: 'var(--nav-text-secondary)' }}>{s.step3Text}</p>
                   <TestChatPanel agentId={agent.id} suggestions={s.suggestions} />
                   <div className="flex items-center justify-between gap-3 mt-4">
@@ -721,7 +724,7 @@ export default function SetupWizard() {
 
               {step === 4 && agent && (
                 <div>
-                  <h1 ref={headingRef} tabIndex={-1} className="text-xl font-bold mb-4 outline-none" style={{ color: 'var(--nav-text-primary)' }}>{s.step4Title}</h1>
+                  <h2 ref={headingRef} tabIndex={-1} className="text-xl font-bold mb-4 outline-none" style={{ color: 'var(--nav-text-primary)' }}>{s.step4Title}</h2>
 
                   <div className="nav-glass nav-card-accent rounded-2xl p-5 space-y-4">
                     {/* Каналы */}
@@ -834,7 +837,8 @@ export default function SetupWizard() {
               )}
             </motion.section>
           </AnimatePresence>
-        </div>
+          </div>
+        </PageContainer>
       </main>
     </DesktopShell>
   )

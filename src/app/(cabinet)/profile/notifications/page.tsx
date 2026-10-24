@@ -26,6 +26,7 @@ import {
   type ToggleableChannel,
 } from '@/lib/notificationPrefs'
 import { notificationEventTexts, notificationsDict, type NotificationsPageContent } from '@/lib/i18n/notifications'
+import PageContainer from '@/components/PageContainer'
 import PageHeader from '@/components/PageHeader'
 import Skeleton from '@/components/Skeleton'
 
@@ -634,7 +635,7 @@ export default function Notifications() {
   // Пока грузится: шапка уже на месте (и название вкладки), вместо «…» --
   // заглушки того же размера, чтобы макет не прыгал.
   if (loading) return (
-    <div className="max-w-lg lg:max-w-3xl mx-auto p-4" aria-busy="true">
+    <PageContainer aria-busy="true">
       <PageHeader title={t.headerLabel} backHref="/profile" as="h1" animate={false} />
       <div className="space-y-6">
         <Skeleton className="h-44 w-full rounded-2xl" />
@@ -644,7 +645,7 @@ export default function Notifications() {
           <Skeleton className="h-28 w-full rounded-2xl" />
         </div>
       </div>
-    </div>
+    </PageContainer>
   )
 
   const ownerGroups = OWNER_GROUP_ORDER
@@ -680,7 +681,7 @@ export default function Notifications() {
 
   return (
     <>
-        <div className="max-w-lg lg:max-w-3xl mx-auto p-4">
+        <PageContainer>
 
           {/* Шапка как на /profile/contracts: стрелка + крупный заголовок, без карточки. */}
           <PageHeader
@@ -911,7 +912,7 @@ export default function Notifications() {
 
           </div>
           )}
-        </div>
+        </PageContainer>
       {dialogElement}
     </>
   )

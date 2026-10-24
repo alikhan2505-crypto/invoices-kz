@@ -9,6 +9,8 @@ import DesktopShell from '@/components/DesktopShell'
 import SessionExpiredBanner from '@/components/kaspiShop/SessionExpiredBanner'
 import { getActivePlan } from '@/lib/plan'
 import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
+import PageHeader from '@/components/PageHeader'
+import PageContainer from '@/components/PageContainer'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -203,7 +205,8 @@ function FinanceChart({ byDay }: { byDay: FinanceSummary['byDay'] }) {
 }
 
 export default function KaspiShopFinance() {
-  usePageDocumentTitle('Выручка — Kaspi Bot')
+  // Заголовок вкладки и на время загрузки (PageHeader ещё не отрисован); строка та же, что ставит PageHeader.
+  usePageDocumentTitle('Финансы')
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [days, setDays] = useState(30)
@@ -261,7 +264,8 @@ export default function KaspiShopFinance() {
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
 
-      <div className="flex-1 min-w-0 p-4 lg:p-6 pb-6">
+      <PageContainer variant="full" align="start" className="flex-1 min-w-0 pb-6">
+        <PageHeader title="Финансы" subtitle="Выручка" />
         {summary?.sessionExpired && <SessionExpiredBanner />}
 
         {loadError && (
@@ -273,11 +277,7 @@ export default function KaspiShopFinance() {
 
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}
           className="nav-glass nav-card-accent rounded-[28px] p-6 lg:p-8 mb-4">
-          <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
-            <div>
-              <div className="text-[11px] font-semibold tracking-wider uppercase mb-1" style={{ color: 'var(--nav-text-muted)' }}>Финансы</div>
-              <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight" style={{ color: 'var(--nav-text-primary)' }}>Выручка</h1>
-            </div>
+          <div className="flex items-start justify-end gap-4 mb-6 flex-wrap">
             <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
               <div className="flex items-center gap-1 nav-glass rounded-full p-1">
                 {PERIODS.map(p => {
@@ -518,7 +518,7 @@ export default function KaspiShopFinance() {
             )}
           </>
         )}
-      </div>
+      </PageContainer>
     </main>
     </DesktopShell>
   )

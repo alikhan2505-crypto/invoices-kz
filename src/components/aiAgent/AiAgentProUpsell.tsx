@@ -6,6 +6,8 @@ import { useLanguage } from '@/components/LanguageProvider'
 import { aiAgentDict } from '@/lib/i18n/aiAgent'
 import { aiAgentSetupDict } from '@/lib/i18n/aiAgentSetup'
 import ProGateCard from '@/components/ProGateCard'
+import PageHeader from '@/components/PageHeader'
+import PageContainer from '@/components/PageContainer'
 
 // Что видит пользователь без активного Про на страницах AI-агента
 // (15.10.2026). Раньше там было «Эта функция пока доступна только
@@ -18,7 +20,11 @@ import ProGateCard from '@/components/ProGateCard'
 // -- «Продлите Про, чтобы агент снова отвечал» и ссылка на «Диалоги» только
 // для чтения. Узнаём это у самого сервера: /api/ai-agent/dialogs отвечает
 // readOnly: true ровно таким владельцам (и 403 всем остальным без Про).
-export default function AiAgentProUpsell() {
+//
+// 24.10.2026: `title` -- название раздела (то же, что у шапки самой страницы).
+// С ним замок стоит под PageHeader в PageContainer: заголовок страницы не
+// пропадает, а вкладка браузера называется разделом, а не общей строкой.
+export default function AiAgentProUpsell({ title }: { title?: string }) {
   const { lang } = useLanguage()
   const t = aiAgentDict[lang]
   const s = aiAgentSetupDict[lang]
@@ -39,12 +45,13 @@ export default function AiAgentProUpsell() {
     return () => { alive = false }
   }, [])
 
-  return (
+  const card = (
     <ProGateCard
       title={lapsedOwner ? s.lapsedTitle : t.proOnlyTitle}
       text={lapsedOwner ? s.lapsedText : t.proOnlyText}
       cta={lapsedOwner ? s.lapsedCta : t.proOnlyCta}
       href="/upgrade"
+      align={title ? 'start' : 'center'}
       extra={lapsedOwner ? (
         <div className="mt-3">
           <Link href="/ai-agent/dialogs" className="text-sm font-medium underline-offset-2 hover:underline" style={{ color: 'var(--nav-accent)' }}>
@@ -53,5 +60,13 @@ export default function AiAgentProUpsell() {
         </div>
       ) : undefined}
     />
+  )
+
+  if (!title) return card
+  return (
+    <PageContainer variant="wide" align="start" className="pb-6">
+      <PageHeader title={title} subtitle="AI-агент" />
+      {card}
+    </PageContainer>
   )
 }

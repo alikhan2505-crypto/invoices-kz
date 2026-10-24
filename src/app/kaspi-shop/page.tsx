@@ -14,6 +14,8 @@ import { useCrossHref } from '@/lib/useCrossHref'
 import { useAppDialog } from '@/components/AppDialog'
 import { connectErrorMessage, connectUiText } from '@/lib/kaspiShop/connectMessages'
 import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
+import PageHeader from '@/components/PageHeader'
+import PageContainer from '@/components/PageContainer'
 
 type Product = {
   id: string
@@ -234,7 +236,8 @@ async function postConnectStep(url: string, headers: HeadersInit, body: unknown)
 const LATER_TEXT: Record<Lang, string> = { ru: 'Позже', kk: 'Кейінірек', en: 'Later' }
 
 export default function KaspiShop() {
-  usePageDocumentTitle('Демпинг — Kaspi Bot')
+  // Окно подключения закрывает страницу без PageHeader, поэтому заголовок вкладки ставим и здесь (строка та же, что у PageHeader).
+  usePageDocumentTitle('Демпинг')
   const router = useRouter()
   const { lang } = useLanguage()
   const crossHref = useCrossHref()
@@ -776,7 +779,7 @@ export default function KaspiShop() {
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
 
-      <div className="flex-1 min-w-0 p-4 lg:p-6 pb-6">
+      <PageContainer variant="full" align="start" className="flex-1 min-w-0 pb-6">
         {loadError && (
           <div className="nav-glass rounded-2xl p-4 flex items-center justify-between gap-3 mb-4">
             <span className="text-sm" style={{ color: 'var(--nav-critical)' }}>{loadError}</span>
@@ -888,20 +891,11 @@ export default function KaspiShop() {
           <>
             {/* Тур первого входа — только когда магазин подключён. */}
             <KaspiTour />
-            {/* Top row (2026-08-21 founder layout request: "скомпанованнее"):
-                hero on the left (2/3), city picker beside it on the right --
-                the stats row below stays full-width as the second line. */}
-            <div className="grid lg:grid-cols-3 gap-4 mb-4 items-stretch">
-            {/* Hero: the one question this page answers, stated as three
-                numbers, not buried in per-product rows. */}
-            <motion.div data-tour="kaspi-hero" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}
-              className="nav-glass nav-card-accent rounded-[28px] p-6 lg:p-8 lg:col-span-2">
-              <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
-                <div>
-                  <div className="text-[11px] font-semibold tracking-wider uppercase mb-1" style={{ color: 'var(--nav-text-muted)' }}>{companyName || 'Магазин подключён'}</div>
-                  <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight" style={{ color: 'var(--nav-text-primary)' }}>Гонка цен сейчас</h1>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
+            <PageHeader
+              title="Демпинг"
+              subtitle={companyName || 'Магазин подключён'}
+              right={(
+                <>
                   <button onClick={togglePause}
                     className="text-xs font-bold rounded-full px-3 py-2 flex items-center gap-1.5 transition-transform hover:-translate-y-0.5"
                     style={{ background: paused ? 'var(--nav-critical)' : 'var(--nav-success-solid)', color: paused ? '#fff' : 'var(--nav-success-ink)' }}>
@@ -911,9 +905,17 @@ export default function KaspiShop() {
                   <button onClick={disconnect} className="nav-glass text-xs font-medium rounded-full px-3 py-2 transition-colors" style={{ color: 'var(--nav-text-muted)' }}>
                     Отключить
                   </button>
-                </div>
-              </div>
-
+                </>
+              )}
+            />
+            {/* Top row (2026-08-21 founder layout request: "скомпанованнее"):
+                hero on the left (2/3), city picker beside it on the right --
+                the stats row below stays full-width as the second line. */}
+            <div className="grid lg:grid-cols-3 gap-4 mb-4 items-stretch">
+            {/* Hero: the one question this page answers, stated as three
+                numbers, not buried in per-product rows. */}
+            <motion.div data-tour="kaspi-hero" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}
+              className="nav-glass nav-card-accent rounded-[28px] p-6 lg:p-8 lg:col-span-2">
         {untouchedFloorCount > 0 && (
           <div className="nav-glass rounded-2xl p-4 lg:p-5 mb-4" style={{ borderLeft: '3px solid var(--nav-critical)' }}>
             <div className="text-sm font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>
@@ -1250,7 +1252,7 @@ export default function KaspiShop() {
           </>
         )
         })()}
-      </div>
+      </PageContainer>
 
       <AnimatePresence>
         {walletOpen && (

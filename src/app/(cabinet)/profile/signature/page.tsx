@@ -10,7 +10,13 @@ import { profileCoreDict } from '@/lib/i18n/profileCore'
 import { getActivePlan } from '@/lib/plan'
 import { useAppDialog } from '@/components/AppDialog'
 import { claimAndAnnounceBonus } from '@/lib/profileBonusClient'
+import PageContainer from '@/components/PageContainer'
+import { ProGateBanner } from '@/components/ProGate'
 import PageHeader from '@/components/PageHeader'
+
+// Превью подписи, печати и логотипа лежат на «бумаге»: PNG с тёмными чернилами уходит в белый PDF,
+// поэтому плитка всегда белая, в тёмной теме тоже (#fff здесь осознанно: это цвет листа, не поверхность UI).
+const PAPER_TILE_STYLE = { border: '1px solid var(--nav-border-soft)', background: '#fff' } as const
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
 // kept identical rather than inventing a second "house" ease.
@@ -497,17 +503,12 @@ export default function Signature() {
 
   return (
     <div className="flex flex-col">
-      <div className="max-w-lg lg:max-w-2xl mx-auto p-4 space-y-4 w-full">
+      <PageContainer className="space-y-4 w-full">
 
         <PageHeader title={t.signatureHeaderLabel} backHref="/profile" />
 
         {canSign === false && (
-          <motion.div {...fadeIn(0)} className="rounded-xl px-4 py-3 text-xs leading-relaxed" style={{ background: 'var(--nav-accent-soft)', color: 'var(--nav-text-secondary)' }}>
-            {t.signatureFreePlanNote}{' '}
-            <button type="button" onClick={() => router.push('/upgrade')} className="underline font-medium" style={{ color: 'var(--nav-accent)' }}>
-              {t.signatureFreePlanUpgradeLink}
-            </button>
-          </motion.div>
+          <ProGateBanner variant="note" description={t.signatureFreePlanNote} />
         )}
 
         {/* Подпись */}
@@ -516,7 +517,7 @@ export default function Signature() {
           <div className="nav-glass rounded-2xl p-4">
             {signatureUrl && !showCanvas ? (
               <div>
-                <div className="rounded-xl p-3 mb-3" style={{ border: '1px solid var(--nav-border-soft)', background: 'var(--nav-bg)' }}>
+                <div className="rounded-xl p-3 mb-3 flex items-center justify-center" style={PAPER_TILE_STYLE}>
                   <img src={signatureUrl} alt={t.signatureAltText} className="h-20 object-contain" />
                 </div>
                 <div className="flex gap-2">
@@ -586,7 +587,7 @@ export default function Signature() {
           <div className="nav-glass rounded-2xl p-4">
             {stampUrl ? (
               <div>
-                <div className="rounded-xl p-3 mb-3 flex items-center justify-center" style={{ border: '1px solid var(--nav-border-soft)', background: 'var(--nav-bg)' }}>
+                <div className="rounded-xl p-3 mb-3 flex items-center justify-center" style={PAPER_TILE_STYLE}>
                   <img src={stampUrl} alt={t.stampAltText} className="h-24 w-24 object-contain" />
                 </div>
                 <div className="flex gap-2">
@@ -607,7 +608,7 @@ export default function Signature() {
                   <StampIcon />
                 </div>
                 <p className="text-sm mb-4" style={{ color: 'var(--nav-text-muted)' }}>{t.noStampHint}</p>
-                <label className="px-6 py-2.5 rounded-xl text-sm font-medium cursor-pointer" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                <label className="inline-block px-6 py-2.5 rounded-xl text-sm font-medium cursor-pointer" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                   {saving ? t.uploadingLabel : t.uploadPhotoButton}
                   <input type="file" accept="image/*" className="hidden" onChange={openCropModal} />
                 </label>
@@ -622,7 +623,7 @@ export default function Signature() {
           <div className="nav-glass rounded-2xl p-4">
             {logoUrl ? (
               <div>
-                <div className="rounded-xl p-3 mb-3 flex items-center justify-center" style={{ border: '1px solid var(--nav-border-soft)', background: 'var(--nav-bg)' }}>
+                <div className="rounded-xl p-3 mb-3 flex items-center justify-center" style={PAPER_TILE_STYLE}>
                   <img src={logoUrl} alt={t.logoAltText} className="h-16 object-contain" />
                 </div>
                 <div className="flex gap-2">
@@ -643,7 +644,7 @@ export default function Signature() {
                   <BuildingIcon />
                 </div>
                 <p className="text-sm mb-4" style={{ color: 'var(--nav-text-muted)' }}>{t.noLogoHint}</p>
-                <label className="px-6 py-2.5 rounded-xl text-sm font-medium cursor-pointer" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                <label className="inline-block px-6 py-2.5 rounded-xl text-sm font-medium cursor-pointer" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                   {savingLogo ? t.uploadingLabel : t.uploadLogoButton}
                   <input type="file" accept="image/*" className="hidden" onChange={uploadLogo} />
                 </label>
@@ -658,7 +659,7 @@ export default function Signature() {
             {t.tipBodyText}
           </div>
         </motion.div>
-      </div>
+      </PageContainer>
 
       {/* Кроп модал */}
       {showCropModal && (

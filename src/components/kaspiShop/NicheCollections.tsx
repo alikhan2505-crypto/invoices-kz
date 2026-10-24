@@ -119,15 +119,11 @@ export default function NicheCollections() {
 
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }} className="mb-8">
-      <div className="flex items-end justify-between gap-3 mb-4 flex-wrap">
-        <div>
-          <div className="text-[11px] font-semibold tracking-wider uppercase mb-1" style={{ color: 'var(--nav-text-muted)' }}>Ниши</div>
-          <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight" style={{ color: 'var(--nav-text-primary)' }}>Витрина ниш</h1>
+      {data?.computedAt && (
+        <div className="text-[11px] mb-3" style={{ color: 'var(--nav-text-muted)' }}>
+          Данные за {new Date(`${data.computedAt}T00:00:00`).toLocaleDateString('ru-KZ', { day: '2-digit', month: '2-digit' })}
         </div>
-        <div className="text-[11px]" style={{ color: 'var(--nav-text-muted)' }}>
-          Готовые подборки по реальным метрикам Kaspi · обновляются каждые 24 часа{data?.computedAt ? ` · данные за ${new Date(`${data.computedAt}T00:00:00`).toLocaleDateString('ru-KZ', { day: '2-digit', month: '2-digit' })}` : ''}
-        </div>
-      </div>
+      )}
 
       {error && (
         <div className="nav-glass rounded-2xl p-4 flex items-center justify-between gap-3 mb-4">

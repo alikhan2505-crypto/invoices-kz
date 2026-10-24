@@ -9,6 +9,8 @@ import DesktopShell from '@/components/DesktopShell'
 import { extractAttributes } from '@/lib/kaspiShop/salesAnalytics'
 import { getActivePlan } from '@/lib/plan'
 import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
+import PageHeader from '@/components/PageHeader'
+import PageContainer from '@/components/PageContainer'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -144,7 +146,8 @@ type AddModalState = {
 }
 
 export default function KaspiShopProductAvailability() {
-  usePageDocumentTitle('Управление товарами — Kaspi Bot')
+  // Заголовок вкладки и на время загрузки (PageHeader ещё не отрисован); строка та же, что ставит PageHeader.
+  usePageDocumentTitle('Управление товарами')
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
@@ -619,12 +622,11 @@ export default function KaspiShopProductAvailability() {
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
 
-      <div className="flex-1 min-w-0 p-4 lg:p-6 pb-6">
+      <PageContainer variant="full" align="start" className="flex-1 min-w-0 pb-6">
+        <PageHeader title="Управление товарами" />
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}
           className="nav-glass nav-card-accent rounded-[28px] p-6 lg:p-8 mb-4">
-          <div className="text-[11px] font-semibold tracking-wider uppercase mb-1" style={{ color: 'var(--nav-text-muted)' }}>Kaspi Bot</div>
-          <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight" style={{ color: 'var(--nav-text-primary)' }}>Управление товарами</h1>
-          <p className="text-sm mt-2" style={{ color: 'var(--nav-text-secondary)' }}>
+          <p className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
             Снимайте товары с продажи и возвращайте обратно — как в кабинете Kaspi, но прямо отсюда. Обе операции Kaspi
             обрабатывает сам, обычно в течение часа. При снятии с продажи правило демпинга для товара автоматически
             выключается, чтобы репрайсер случайно не вернул его в продажу.
@@ -795,7 +797,7 @@ export default function KaspiShopProductAvailability() {
             )
           })}
         </div>
-      </div>
+      </PageContainer>
 
       {/* «Цена и остатки» -- per-point (склад/город) price+stock editor,
           mirroring the cabinet's own modal; saves go through the captured

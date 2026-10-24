@@ -13,6 +13,8 @@ import BrandLoader from '@/components/BrandLoader'
 import { useCrossHref } from '@/lib/useCrossHref'
 import { notifyWalletChanged } from '@/lib/walletSignal'
 import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
+import PageHeader from '@/components/PageHeader'
+import PageContainer from '@/components/PageContainer'
 
 // Matches MIN_TOPUP in src/app/api/kaspi/wallet/topup/route.ts — kept here
 // too so the button can refuse an obviously-too-small amount before ever
@@ -39,7 +41,8 @@ export default function KaspiApiPage() {
   const router = useRouter()
   const { lang } = useLanguage()
   const t = acquiringDict[lang]
-  usePageDocumentTitle('Kaspi Cashier API')
+  // Заголовок вкладки и на время загрузки (PageHeader ещё не отрисован); строка та же, что ставит PageHeader.
+  usePageDocumentTitle('Подключение')
   const crossHref = useCrossHref()
   // Shadows window.alert / window.confirm for this component -- see
   // src/components/AppDialog.tsx. Every confirm below is awaited: a Promise
@@ -834,17 +837,16 @@ export default function KaspiApiPage() {
           strip above (rendered by SiteNav, outside this dark wrapper --
           the menu itself deliberately keeps its normal light app chrome). */}
       <div className="min-h-screen lg:min-h-full">
-      <div className="max-w-3xl mx-auto p-6 pb-12">
-        <h1 className="text-xl font-bold mb-1" style={{ color: 'var(--nav-text-primary)', letterSpacing: '-0.02em' }}>Kaspi Cashier API</h1>
-        <p className="text-sm mb-6" style={{ color: 'var(--nav-text-muted)' }}>Приём оплат Kaspi Pay на вашем сайте — токен, вебхуки, документация</p>
+      <PageContainer variant="wide" align="start" className="pb-16 space-y-6">
+        <PageHeader title="Подключение" subtitle="Приём оплат Kaspi Pay на вашем сайте: токен, вебхуки, документация" />
 
         {/* Kaspi Pay Cashier — deliberately NOT plan-gated: connecting a
             Cashier is free on every plan, only usage is monetized via the
             wallet balance (see /api/kaspi/pay, invoicePayment.ts). */}
         <div className="nav-glass nav-card-accent rounded-2xl p-5">
           <div className="text-sm font-semibold mb-2" style={{ color: 'var(--nav-text-primary)' }}>{t.kaspiSectionTitle}</div>
-          {!kaspiConnected && <p className="text-xs mb-2" style={{ color: 'var(--nav-text-muted)' }}>{t.kaspiIntroText}</p>}
-          <p className="text-xs mb-2" style={{ color: 'var(--nav-text-muted)' }}>{t.kaspiCommissionHint}</p>
+          {!kaspiConnected && <p className="text-xs mb-2 max-w-prose" style={{ color: 'var(--nav-text-muted)' }}>{t.kaspiIntroText}</p>}
+          <p className="text-xs mb-2 max-w-prose" style={{ color: 'var(--nav-text-muted)' }}>{t.kaspiCommissionHint}</p>
           {/* Founder feedback (2026-09-01): after connecting, kaspiIntroText's
               own "автоматически получать ссылки на оплату для своих счетов"
               disappears (it's gated on !kaspiConnected above), leaving no
@@ -854,7 +856,7 @@ export default function KaspiApiPage() {
               connection existing, no per-invoice toggle. Shown unconditionally
               (not gated on kaspiConnected) so it answers the question before
               connecting too. */}
-          <p className="text-xs mb-3" style={{ color: 'var(--nav-text-muted)' }}>{t.kaspiInvoiceAutoNote}</p>
+          <p className="text-xs mb-3 max-w-prose" style={{ color: 'var(--nav-text-muted)' }}>{t.kaspiInvoiceAutoNote}</p>
           {profile?.is_admin && (
             <p className="text-xs rounded-lg px-3 py-2 mb-3" style={{ background: 'var(--nav-accent-soft)', color: 'var(--nav-accent)' }}>{t.kaspiPlatformConnectionNote}</p>
           )}
@@ -883,7 +885,7 @@ export default function KaspiApiPage() {
                     style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                     {t.kaspiCopyTokenButton}
                   </button>
-                  <p className="text-xs mb-3" style={{ color: 'var(--nav-text-muted)' }}>{t.kaspiWebhookSecretHint}</p>
+                  <p className="text-xs mb-3 max-w-prose" style={{ color: 'var(--nav-text-muted)' }}>{t.kaspiWebhookSecretHint}</p>
                 </>
               )}
 
@@ -908,7 +910,7 @@ export default function KaspiApiPage() {
                       /api/kaspi/dashboard's rollup()) -- the founder's 2
                       recent "payments" were both wallet top-ups, so 0 here is
                       correct, just unexplained without this line. */}
-                  <p className="text-[11px] mb-2" style={{ color: 'var(--nav-text-muted)' }}>{t.kaspiConversionStatsHint}</p>
+                  <p className="text-[11px] mb-2 max-w-prose" style={{ color: 'var(--nav-text-muted)' }}>{t.kaspiConversionStatsHint}</p>
                   <div className="grid grid-cols-3 gap-2">
                     {([
                       [t.kaspiStatsTodayLabel, kaspiStats.last24h],
@@ -939,7 +941,7 @@ export default function KaspiApiPage() {
                       via checkAndSettleKaspiPayment debits the 2%. Spelled
                       out explicitly right where the amount is chosen, not
                       just implied by kaspiCommissionHint above. */}
-                  <p className="text-[11px] mb-2" style={{ color: 'var(--nav-text-muted)' }}>{t.kaspiTopupNoFeeHint}</p>
+                  <p className="text-[11px] mb-2 max-w-prose" style={{ color: 'var(--nav-text-muted)' }}>{t.kaspiTopupNoFeeHint}</p>
                   <div className="text-xs mb-1 mt-2" style={{ color: 'var(--nav-text-muted)' }}>{t.kaspiTopupPresetsLabel}</div>
                   <div className="flex gap-2 flex-wrap mb-2">
                     {[1000, 5000, 10000, 50000].map(amount => (
@@ -1156,29 +1158,29 @@ export default function KaspiApiPage() {
             {t.kaspiDocsLinkLabel}
           </button>
         </div>
-      </div>
 
-      {kaspiStatementSection && (
-        <div className="max-w-3xl mx-auto px-6 pb-16 space-y-3">
-          {kaspiStatementSection}
-        </div>
-      )}
+        {kaspiStatementSection && (
+          <div className="space-y-3">
+            {kaspiStatementSection}
+          </div>
+        )}
 
-      <div className="max-w-3xl mx-auto px-6 pb-16">
-        <h2 className="text-[13px] font-semibold uppercase mb-3" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.08em' }}>{t.linkedHeading}</h2>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <a href={crossHref('invoices', '/create', 'kaspiApi', '/kaspi-api')} className="nav-glass rounded-2xl p-4 flex flex-col gap-1.5 transition-transform hover:-translate-y-0.5">
-            <span className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{t.linkedInvoicesTitle}</span>
-            <span className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>Счета · invoices.kz</span>
-            <span className="text-xs font-semibold mt-auto pt-2" style={{ color: 'var(--nav-accent)' }}>{t.linkedOpen}</span>
-          </a>
-          <a href={crossHref('kaspiShop', '/kaspi-shop/overview', 'kaspiApi', '/kaspi-api')} className="nav-glass rounded-2xl p-4 flex flex-col gap-1.5 transition-transform hover:-translate-y-0.5">
-            <span className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{t.linkedKaspiShopTitle}</span>
-            <span className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>Kaspi Bot · kaspi.invoices.kz</span>
-            <span className="text-xs font-semibold mt-auto pt-2" style={{ color: 'var(--nav-accent)' }}>{t.linkedOpen}</span>
-          </a>
+        <div>
+          <h2 className="text-[13px] font-semibold uppercase mb-3" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.08em' }}>{t.linkedHeading}</h2>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <a href={crossHref('invoices', '/create', 'kaspiApi', '/kaspi-api')} className="nav-glass rounded-2xl p-4 flex flex-col gap-1.5 transition-transform hover:-translate-y-0.5">
+              <span className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{t.linkedInvoicesTitle}</span>
+              <span className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>Счета · invoices.kz</span>
+              <span className="text-xs font-semibold mt-auto pt-2" style={{ color: 'var(--nav-accent)' }}>{t.linkedOpen}</span>
+            </a>
+            <a href={crossHref('kaspiShop', '/kaspi-shop/overview', 'kaspiApi', '/kaspi-api')} className="nav-glass rounded-2xl p-4 flex flex-col gap-1.5 transition-transform hover:-translate-y-0.5">
+              <span className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{t.linkedKaspiShopTitle}</span>
+              <span className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>Kaspi Bot · kaspi.invoices.kz</span>
+              <span className="text-xs font-semibold mt-auto pt-2" style={{ color: 'var(--nav-accent)' }}>{t.linkedOpen}</span>
+            </a>
+          </div>
         </div>
-      </div>
+      </PageContainer>
       </div>
       {dialogElement}
     </main>

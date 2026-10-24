@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { useLanguage } from '@/components/LanguageProvider'
 import { profileContentDict } from '@/lib/i18n/profileContent'
 import { parseDbTimestamp } from '@/lib/plan'
+import PageContainer from '@/components/PageContainer'
 import PageHeader from '@/components/PageHeader'
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
@@ -97,7 +98,7 @@ export default function Referral() {
 
   return (
     <>
-      <div className="max-w-lg lg:max-w-2xl mx-auto p-4 space-y-4">
+      <PageContainer className="space-y-4">
 
         <PageHeader
           title={t.referralHeaderLabel}
@@ -174,7 +175,7 @@ export default function Referral() {
           </div>
         </motion.div>
 
-      </div>
+      </PageContainer>
     </>
   )
 }

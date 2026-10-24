@@ -5,6 +5,8 @@ import { useLanguage } from '@/components/LanguageProvider'
 import ContentLoading from '@/components/ContentLoading'
 import DesktopShell from '@/components/DesktopShell'
 import ProGateCard from '@/components/ProGateCard'
+import PageHeader from '@/components/PageHeader'
+import PageContainer from '@/components/PageContainer'
 import { kaspiProGateDict } from '@/lib/i18n/proGate'
 import { kaspiShopGateState, type ProGateState } from '@/lib/proGate'
 import { useCrossHref } from '@/lib/useCrossHref'
@@ -55,12 +57,16 @@ export default function KaspiShopGate({ children }: { children: React.ReactNode 
   return (
     <DesktopShell>
       <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
-        <ProGateCard
-          title={lapsed ? t.lapsedTitle : t.title}
-          text={lapsed ? t.lapsedText : t.text}
-          cta={lapsed ? t.lapsedCta : t.cta}
-          href={crossHref('invoices', '/upgrade', 'kaspiShop', back)}
-        />
+        <PageContainer variant="narrow" align="start">
+          <PageHeader title="Kaspi Bot" />
+          <ProGateCard
+            align="start"
+            title={lapsed ? t.lapsedTitle : t.title}
+            text={lapsed ? t.lapsedText : t.text}
+            cta={lapsed ? t.lapsedCta : t.cta}
+            href={crossHref('invoices', '/upgrade', 'kaspiShop', back)}
+          />
+        </PageContainer>
       </main>
     </DesktopShell>
   )

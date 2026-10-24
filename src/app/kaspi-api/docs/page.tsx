@@ -11,10 +11,11 @@ import ApiDocsViewer from '@/components/ApiDocsViewer'
 import { CASHIER_API_THEMED as C, CASHIER_API_FONT_SANS as FONT_SANS, CASHIER_API_FONT_MONO as FONT_MONO } from '@/lib/kaspiCashierApi/theme'
 import BrandLoader from '@/components/BrandLoader'
 import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
+import PageHeader from '@/components/PageHeader'
+import PageContainer from '@/components/PageContainer'
 
 interface DocsCopy {
   loading: string
-  title: string
   liveWarning: string
   i18nNote: string
   webhookTitle: string
@@ -34,7 +35,6 @@ interface DocsCopy {
 const DOCS_COPY: Record<Lang, DocsCopy> = {
   ru: {
     loading: 'Загрузка…',
-    title: 'Kaspi Cashier API — документация',
     liveWarning: 'Все запросы «Try it» ниже выполняются к реальному продакшн-API — у Kaspi Pay нет тестового режима. Успешный вызов создания платежа спишет комиссию 2% с вашего баланса при оплате.',
     i18nNote: 'Часть элементов интерфейса самого проводника (например, кнопки Authorize и Send Request) отображается на английском независимо от выбранного языка — это ограничение библиотеки Scalar, не наших переводов.',
     webhookTitle: 'Вебхуки (webhook)',
@@ -66,7 +66,6 @@ const isValid = signature === req.headers['x-kaspi-pay-signature'];`,
   },
   kk: {
     loading: 'Жүктелуде…',
-    title: 'Kaspi Cashier API — құжаттама',
     liveWarning: 'Төмендегі «Try it» сұраныстарының бәрі нақты продакшн-API-ға жіберіледі — Kaspi Pay-де тест режимі жоқ. Төлем құру сұранысы сәтті орындалса, клиент төлеген кезде балансыңыздан 2% комиссия алынады.',
     i18nNote: 'Анықтамалықтың өзі (эндпоинттер сипаттамасы) әзірге орыс тілінде, ал оның кейбір интерфейс элементтері (мысалы, Authorize және Send Request түймелері) таңдалған тілге қарамастан ағылшынша көрсетіледі — бұл аударманың олқылығы емес, Scalar кітапханасының шектеуі.',
     webhookTitle: 'Вебхуктер (webhook)',
@@ -98,7 +97,6 @@ const isValid = signature === req.headers['x-kaspi-pay-signature'];`,
   },
   en: {
     loading: 'Loading…',
-    title: 'Kaspi Cashier API — documentation',
     liveWarning: 'Every "Try it" request below hits the real production API — Kaspi Pay has no test/sandbox mode. A successful payment-creation call will debit a 2% commission from your balance once the customer pays.',
     i18nNote: "Some of the reference tool's own interface labels (e.g. the Authorize and Send Request buttons) stay in English regardless of the selected language — that's a limitation of the Scalar library itself, not of our translations.",
     webhookTitle: 'Webhooks',
@@ -163,6 +161,9 @@ function Pre({ children }: { children: string }) {
   )
 }
 
+// Заголовок страницы = подпись в меню SiteNav («Документация API»).
+const DOCS_HEADING = { ru: 'Документация API', kk: 'API құжаттамасы', en: 'API docs' } as const
+
 export default function KaspiApiDocsPage() {
   const router = useRouter()
   const { lang } = useLanguage()
@@ -171,13 +172,11 @@ export default function KaspiApiDocsPage() {
   // OpenAPI-справочник в ApiDocsViewer — только ru/en, поэтому для него
   // kk откатывается на ru (об этом честно говорит kk-версия i18nNote).
   const d = DOCS_COPY[lang]
-  usePageDocumentTitle(d.title)
+  // Заголовок вкладки и на время загрузки (PageHeader ещё не отрисован); строка та же, что ставит PageHeader.
+  usePageDocumentTitle(DOCS_HEADING[lang])
   const viewerLang: 'ru' | 'en' = lang === 'en' ? 'en' : 'ru'
 
   const [loading, setLoading] = useState(true)
-
-  // Серверный <title> из layout.tsx один (ru); на клиенте — по выбранному языку.
-  useEffect(() => { document.title = d.title }, [d.title])
 
   useEffect(() => {
     load()
@@ -246,16 +245,10 @@ export default function KaspiApiDocsPage() {
             standalone header's sticky bar. The page's own language follows
             the site-wide switcher (DOCS_COPY[lang] above) -- no independent toggle
             here anymore. */}
-        <div className="mx-auto max-w-6xl px-5 pt-6 sm:px-8">
-          <span className="text-[12px]" style={{ color: C.muted, fontFamily: FONT_MONO }}>
-            {d.title}
-          </span>
-          <p className="mt-2 text-[11px]" style={{ color: C.muted }}>
-            {d.i18nNote}
-          </p>
-        </div>
+        <PageContainer variant="wide" align="start">
+          <PageHeader title={DOCS_HEADING[lang]} subtitle={d.i18nNote} />
 
-        <div className="mx-auto max-w-6xl px-5 py-6 sm:px-8">
+        <div className="pb-6">
           <Panel>
             <p className="text-[13px] leading-relaxed" style={{ color: C.accent }}>{d.liveWarning}</p>
           </Panel>
@@ -272,7 +265,7 @@ export default function KaspiApiDocsPage() {
             actually matter. This callout sits immediately above the widget
             instead, naming the exact fields to fill (Bearer Token, Request
             Body) and explicitly telling the reader to ignore the rest. */}
-        <div className="mx-auto max-w-6xl px-5 pb-6 sm:px-8">
+        <div className="pb-6">
           <div className="rounded-xl p-4" style={{ background: C.bg1, border: `1px solid ${C.borderStrong}` }}>
             <h3 className="text-[13px] font-semibold" style={{ color: C.accent }}>{d.quickStartTitle}</h3>
             <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-[13px] leading-relaxed" style={{ color: C.text }}>
@@ -283,14 +276,14 @@ export default function KaspiApiDocsPage() {
           </div>
         </div>
 
-        <div className="mx-auto max-w-6xl sm:px-8">
+        <div>
           <ApiDocsViewer lang={viewerLang} />
         </div>
 
-        <div className="mx-auto max-w-6xl space-y-8 px-5 py-10 sm:px-8">
+        <div className="space-y-8 pt-10">
           <section>
             <h2 className="text-[20px] font-semibold">{d.webhookTitle}</h2>
-            <p className="mt-2 text-[13.5px] leading-relaxed" style={{ color: C.muted }}>{d.webhookIntro}</p>
+            <p className="mt-2 max-w-prose text-[13.5px] leading-relaxed" style={{ color: C.muted }}>{d.webhookIntro}</p>
 
             <p className="mb-2 mt-4 text-[13px] font-semibold">{d.webhookPayloadLabel}</p>
             <Pre>{WEBHOOK_BODY_EXAMPLE}</Pre>
@@ -299,13 +292,13 @@ export default function KaspiApiDocsPage() {
             <Pre>{'X-Kaspi-Pay-Signature: <hex-encoded HMAC-SHA256>'}</Pre>
 
             <h3 className="mt-6 text-[15px] font-semibold">{d.webhookVerifyTitle}</h3>
-            <p className="mb-2 mt-2 text-[13.5px] leading-relaxed" style={{ color: C.muted }}>{d.webhookVerifyIntro}</p>
+            <p className="mb-2 mt-2 max-w-prose text-[13.5px] leading-relaxed" style={{ color: C.muted }}>{d.webhookVerifyIntro}</p>
             <Pre>{d.webhookVerifyCode}</Pre>
           </section>
 
           <section className="rounded-xl p-5" style={{ background: C.bg1, border: `1px solid ${C.border}` }}>
             <h2 className="text-[15px] font-semibold" style={{ color: C.accent }}>{d.disclosureTitle}</h2>
-            <p className="mt-2 text-[13.5px] leading-relaxed" style={{ color: C.muted }}>{d.disclosureBody}</p>
+            <p className="mt-2 max-w-prose text-[13.5px] leading-relaxed" style={{ color: C.muted }}>{d.disclosureBody}</p>
           </section>
 
           <section>
@@ -330,6 +323,7 @@ export default function KaspiApiDocsPage() {
             </div>
           </section>
         </div>
+        </PageContainer>
       </div>
     </main>
     </DesktopShell>

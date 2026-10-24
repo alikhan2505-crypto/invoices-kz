@@ -10,6 +10,8 @@ import SessionExpiredBanner from '@/components/kaspiShop/SessionExpiredBanner'
 import { getActivePlan } from '@/lib/plan'
 import { REFUND_ATTENTION_TABS } from '@/lib/kaspiShop/refunds'
 import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
+import PageHeader from '@/components/PageHeader'
+import PageContainer from '@/components/PageContainer'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -83,7 +85,8 @@ function stepDotColor(stepStatus: string | null): string {
 }
 
 export default function KaspiShopRefundsPage() {
-  usePageDocumentTitle('Возвраты — Kaspi Bot')
+  // Заголовок вкладки и на время загрузки (PageHeader ещё не отрисован); строка та же, что ставит PageHeader.
+  usePageDocumentTitle('Возвраты')
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [sessionExpired, setSessionExpired] = useState(false)
@@ -188,10 +191,9 @@ export default function KaspiShopRefundsPage() {
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
 
-      <div className="flex-1 min-w-0 p-4 lg:p-6 pb-6">
+      <PageContainer variant="full" align="start" className="flex-1 min-w-0 pb-6">
+        <PageHeader title="Возвраты" />
         {sessionExpired && <SessionExpiredBanner />}
-
-        <h1 className="text-2xl font-extrabold mb-4" style={{ color: 'var(--nav-text-primary)' }}>Возвраты</h1>
 
         <div className="flex gap-2 overflow-x-auto pb-2 mb-4">
           {TABS.map(t => {
@@ -250,7 +252,7 @@ export default function KaspiShopRefundsPage() {
             })}
           </div>
         )}
-      </div>
+      </PageContainer>
 
       {(detailLoading || detail || detailError) && (
         <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center p-3 bg-black/30" onClick={() => { setDetail(null); setDetailError('') }}>

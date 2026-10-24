@@ -12,6 +12,8 @@ import {
   KASPI_CATEGORY_COMMISSIONS, DEFAULT_CARGO_RATE_PER_KG, DEFAULT_TARGET_MARGIN_PERCENT,
 } from '@/lib/kaspiShop/margin'
 import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
+import PageHeader from '@/components/PageHeader'
+import PageContainer from '@/components/PageContainer'
 
 // Same house conventions as the rest of Kaspi Shop (page.tsx, niches/page.tsx) --
 // kept byte-identical rather than inventing new ones for this page.
@@ -52,7 +54,8 @@ function fmt(n: number): string {
 }
 
 export default function KaspiShopMargin() {
-  usePageDocumentTitle('Калькулятор маржи — Kaspi Bot')
+  // Заголовок вкладки и на время загрузки (PageHeader ещё не отрисован); строка та же, что ставит PageHeader.
+  usePageDocumentTitle('Калькулятор маржи')
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
@@ -231,7 +234,8 @@ export default function KaspiShopMargin() {
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
 
-      <div className="flex-1 min-w-0 p-4 lg:p-6 pb-6">
+      <PageContainer variant="wide" align="start" className="flex-1 min-w-0 pb-6">
+        <PageHeader title="Калькулятор маржи" subtitle="Брать или не брать? Посчитайте реальную маржу товара до того, как выставите его на Kaspi." />
         {loadError && (
           <div className="nav-glass rounded-2xl p-4 flex items-center justify-between gap-3 mb-4">
             <span className="text-sm" style={{ color: 'var(--nav-critical)' }}>{loadError}</span>
@@ -241,10 +245,6 @@ export default function KaspiShopMargin() {
 
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}
           className="nav-glass nav-card-accent rounded-[28px] p-6 lg:p-8 mb-4">
-          <div className="text-[11px] font-semibold tracking-wider uppercase mb-1" style={{ color: 'var(--nav-text-muted)' }}>Калькулятор маржи</div>
-          <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight mb-1" style={{ color: 'var(--nav-text-primary)' }}>Брать или не брать?</h1>
-          <p className="text-xs mb-6" style={{ color: 'var(--nav-text-muted)' }}>Посчитайте реальную маржу товара до того, как выставите его на Kaspi.</p>
-
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Input form */}
             <div className="flex flex-col gap-3">
@@ -490,7 +490,7 @@ export default function KaspiShopMargin() {
             </AnimatePresence>
           )}
         </div>
-      </div>
+      </PageContainer>
     </main>
     </DesktopShell>
   )

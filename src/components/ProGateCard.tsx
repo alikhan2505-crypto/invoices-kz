@@ -6,19 +6,22 @@ import Link from 'next/link'
 // Ссылка с другого хоста (kaspi./agent. -> apex) -- обычный <a>, внутренняя --
 // Link; префетч отключён, чтобы не получить CORS-шум на редиректах между хостами.
 export default function ProGateCard({
-  title, text, cta, href, extra,
+  title, text, cta, href, extra, align = 'center',
 }: {
   title: string
   text: string
   cta: string
   href: string
   extra?: React.ReactNode
+  // 'start': карточка внутри PageContainer под PageHeader, прижата влево и без
+  // собственных отступов (их даёт контейнер). По умолчанию -- по центру экрана.
+  align?: 'center' | 'start'
 }) {
   const btnClass = 'inline-flex items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold transition-transform hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:translate-y-0'
   const btnStyle = { background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)', boxShadow: '0 10px 24px -10px var(--nav-accent)' }
   const external = /^https?:\/\//.test(href)
   return (
-    <div className="max-w-md mx-auto px-4 py-10">
+    <div className={align === 'start' ? 'max-w-md' : 'max-w-md mx-auto px-4 py-10'}>
       <div className="nav-glass nav-card-accent rounded-2xl p-6 text-center">
         <div className="mx-auto mb-3 flex items-center justify-center w-11 h-11 rounded-2xl" style={{ background: 'var(--nav-bg)', color: 'var(--nav-accent)' }} aria-hidden>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">

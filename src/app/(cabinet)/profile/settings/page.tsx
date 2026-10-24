@@ -7,6 +7,7 @@ import { useLanguage } from '@/components/LanguageProvider'
 import { profileCoreDict } from '@/lib/i18n/profileCore'
 import { useAppDialog } from '@/components/AppDialog'
 import { checkNextNumber, digitsOnly, highestIssuedNumber } from '@/lib/docNumbering'
+import PageContainer from '@/components/PageContainer'
 import PageHeader from '@/components/PageHeader'
 import Skeleton from '@/components/Skeleton'
 
@@ -225,17 +226,17 @@ export default function InvoiceSettings() {
 
   // Пока грузится: шапка и название вкладки уже на месте, поля -- заглушками.
   if (!loaded) return (
-    <div className="max-w-lg lg:max-w-2xl mx-auto p-4 space-y-4" aria-busy="true">
+    <PageContainer className="space-y-4" aria-busy="true">
       <PageHeader title={t.invoiceSettingsLabel} backHref="/profile" animate={false} />
       <Skeleton className="h-64 w-full rounded-2xl" />
       <Skeleton className="h-32 w-full rounded-2xl" />
       <Skeleton className="h-32 w-full rounded-2xl" />
-    </div>
+    </PageContainer>
   )
 
   return (
     <>
-      <div className="max-w-lg lg:max-w-2xl mx-auto p-4 space-y-4">
+      <PageContainer className="space-y-4">
 
         <PageHeader title={t.invoiceSettingsLabel} backHref="/profile" animate={false} />
 
@@ -380,7 +381,7 @@ export default function InvoiceSettings() {
           {saving ? t.savingEllipsis : t.saveSettingsButton}
         </motion.button>
 
-      </div>
+      </PageContainer>
       {dialogElement}
     </>
   )

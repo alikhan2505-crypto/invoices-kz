@@ -8,6 +8,7 @@ import { useAppDialog } from '@/components/AppDialog'
 import { useLanguage } from '@/components/LanguageProvider'
 import { editLabel, deleteLabel, clearSearchLabel } from '@/lib/a11yLabels'
 import { profileClientsDict } from '@/lib/i18n/profileClients'
+import PageContainer from '@/components/PageContainer'
 import PageHeader, { PageHeaderButton } from '@/components/PageHeader'
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
@@ -151,7 +152,7 @@ export default function Clients() {
 
   return (
       <>
-        <div className="max-w-lg lg:max-w-3xl mx-auto p-4">
+        <PageContainer>
           <PageHeader
             title={t.headerLabel}
             backHref="/profile"
@@ -345,7 +346,7 @@ export default function Clients() {
               {t.newClientButton}
             </motion.button>
           )}
-        </div>
+        </PageContainer>
       {dialogElement}
       </>
   )

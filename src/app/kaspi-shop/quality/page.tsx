@@ -9,6 +9,8 @@ import DesktopShell from '@/components/DesktopShell'
 import SessionExpiredBanner from '@/components/kaspiShop/SessionExpiredBanner'
 import { getActivePlan } from '@/lib/plan'
 import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
+import PageHeader from '@/components/PageHeader'
+import PageContainer from '@/components/PageContainer'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -63,7 +65,8 @@ function formatDateRu(iso: string): string {
 }
 
 export default function KaspiShopQualityPage() {
-  usePageDocumentTitle('Показатели качества — Kaspi Bot')
+  // Заголовок вкладки и на время загрузки (PageHeader ещё не отрисован); строка та же, что ставит PageHeader.
+  usePageDocumentTitle('Качество')
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [sessionExpired, setSessionExpired] = useState(false)
@@ -136,10 +139,9 @@ export default function KaspiShopQualityPage() {
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
 
-      <div className="flex-1 min-w-0 p-4 lg:p-6 pb-6">
+      <PageContainer variant="full" align="start" className="flex-1 min-w-0 pb-6">
+        <PageHeader title="Качество" subtitle="Показатели качества" />
         {sessionExpired && <SessionExpiredBanner />}
-
-        <h1 className="text-2xl font-extrabold mb-4" style={{ color: 'var(--nav-text-primary)' }}>Показатели качества</h1>
 
         {loadError && (
           <div className="nav-glass rounded-2xl p-4 flex items-center justify-between gap-3 mb-4">
@@ -235,7 +237,7 @@ export default function KaspiShopQualityPage() {
             ))
           )}
         </div>
-      </div>
+      </PageContainer>
     </main>
     </DesktopShell>
   )

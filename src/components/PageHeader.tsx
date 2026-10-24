@@ -18,6 +18,13 @@ import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 //   subtitle  -- серая строка под заголовком;
 //   as        -- h1 или h2 (по умолчанию h1: на странице кабинета один заголовок, и это он);
 //   animate   -- мягкое появление (отключается само при prefers-reduced-motion).
+//
+// Вертикаль: всё прижато к верху строки, а не по центру. Строка заголовка --
+// блок 44px (py-2 + leading-7), в одной строке со стрелкой 44x44 и кнопками
+// справа; подзаголовок идёт под этим блоком. Поэтому линия заголовка стоит на
+// одном y и с подзаголовком, и без него (раньше центровка в min-h-11 сдвигала
+// её на 8px). Отступ под шапкой mb-5 помечен data-page-header: PageContainer
+// по этой метке обнуляет верхний отступ первого соседа, и зазор везде ровно 20px.
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -69,27 +76,28 @@ export default function PageHeader({
 
   return (
     <motion.div
-      className={`flex items-center gap-3 mb-5 min-h-11 ${className ?? ''}`}
+      data-page-header=""
+      className={`flex items-start gap-3 mb-5 min-h-11 ${className ?? ''}`}
       initial={animate && !reduceMotion ? { opacity: 0, y: 14 } : false}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: animate && !reduceMotion ? 0.35 : 0, ease: EASE }}
     >
-      <div className="flex items-center gap-3 flex-1 min-w-0 min-h-11">
+      <div className="flex items-start gap-3 flex-1 min-w-0">
         {hasBack && backControl}
         <div className="min-w-0">
           <Heading
             id={titleId}
-            className={`text-xl font-bold break-words ${titleClassName ?? ''}`}
+            className={`text-xl leading-7 py-2 min-h-11 font-bold break-words ${titleClassName ?? ''}`}
             style={{ color: 'var(--nav-text-primary)' }}
           >
             {title}
           </Heading>
           {subtitle && (
-            <p className="text-sm mt-0.5" style={{ color: 'var(--nav-text-secondary)' }}>{subtitle}</p>
+            <p className="text-sm -mt-1.5 pb-1" style={{ color: 'var(--nav-text-secondary)' }}>{subtitle}</p>
           )}
         </div>
       </div>
-      {right && <div className="ml-auto flex items-center gap-2 flex-shrink-0">{right}</div>}
+      {right && <div className="ml-auto flex items-center gap-2 flex-shrink-0 min-h-11">{right}</div>}
     </motion.div>
   )
 }

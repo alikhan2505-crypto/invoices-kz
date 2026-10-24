@@ -7,6 +7,8 @@ import DesktopShell from '@/components/DesktopShell'
 import { getActivePlan } from '@/lib/plan'
 import BrandLoader from '@/components/BrandLoader'
 import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
+import PageHeader from '@/components/PageHeader'
+import PageContainer from '@/components/PageContainer'
 
 type Variant = { id: string; size: string; color: string; stockCount: number | null }
 type Model = { id: string; name: string; price: number; imageUrl: string | null; categoryId: string | null; variants: Variant[] }
@@ -16,8 +18,15 @@ function formatPrice(price: number): string {
   return new Intl.NumberFormat('ru-KZ').format(price) + ' ₸'
 }
 
+// Коды ошибок API -> человеческий текст (как на странице витрины).
+function humanError(code: unknown, fallback: string): string {
+  if (code === 'no_connection') return 'Сначала подключите магазин Kaspi Shop'
+  return typeof code === 'string' && code ? code : fallback
+}
+
 export default function WholesaleModelsPage() {
-  usePageDocumentTitle('Модели (оптовый каталог) — Kaspi Bot')
+  // Заголовок вкладки и на время загрузки (PageHeader ещё не отрисован); строка та же, что ставит PageHeader.
+  usePageDocumentTitle('Модели (оптовый каталог)')
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [models, setModels] = useState<Model[]>([])
@@ -50,7 +59,7 @@ export default function WholesaleModelsPage() {
         fetch('/api/kaspi-shop/storefront/categories', { headers }),
       ])
       const modelsData = await modelsRes.json().catch(() => null)
-      if (!modelsRes.ok) { setError(modelsData?.error || 'Не удалось загрузить модели'); return }
+      if (!modelsRes.ok) { setError(humanError(modelsData?.error, 'Не удалось загрузить модели')); return }
       setModels(modelsData.models || [])
       const categoriesData = await categoriesRes.json().catch(() => null)
       if (categoriesRes.ok) setCategories(categoriesData.categories || [])
@@ -88,7 +97,7 @@ export default function WholesaleModelsPage() {
         body: JSON.stringify({ name: newName.trim(), price, imageUrl: newImageUrl.trim() || null, categoryId: newCategoryId || null }),
       })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) { setError(data.error || 'Не удалось создать модель'); return }
+      if (!res.ok) { setError(humanError(data.error, 'Не удалось создать модель')); return }
       setNewName(''); setNewPrice(''); setNewImageUrl(''); setNewCategoryId('')
       await load()
     } catch {
@@ -120,7 +129,7 @@ export default function WholesaleModelsPage() {
         body: JSON.stringify({ size: variantSize.trim(), color: variantColor.trim(), stockCount: variantStock === '' ? null : Number(variantStock) }),
       })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) { setError(data.error || 'Не удалось добавить вариант'); return }
+      if (!res.ok) { setError(humanError(data.error, 'Не удалось добавить вариант')); return }
       setVariantSize(''); setVariantColor(''); setVariantStock('')
       await load()
     } catch {
@@ -158,11 +167,16 @@ export default function WholesaleModelsPage() {
     <DesktopShell>
       <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
         <SiteNav />
-        <div className="flex-1 min-w-0 p-4 lg:p-6 pb-6 max-w-4xl mx-auto w-full">
-          <h1 className="text-2xl font-extrabold mb-4" style={{ color: 'var(--nav-text-primary)' }}>Модели (оптовый каталог)</h1>
-          <p className="text-sm mb-6" style={{ color: 'var(--nav-text-muted)' }}>
-            Отдельный каталог для публичной витрины сестры — не связан с товарами Kaspi. У каждой модели своя цена и сетка размер×цвет с остатком; остаток 0 или пустой показывает покупателю «Оформить пошив на заказ».
-          </p>
+        <PageContainer variant="wide" align="start" className="flex-1 min-w-0 pb-6">
+          <PageHeader
+            title="Модели (оптовый каталог)"
+            subtitle="Отдельный каталог для публичной витрины, не связан с товарами Kaspi"
+            backHref="/kaspi-shop/storefront"
+          />
+
+          <div className="nav-glass rounded-2xl p-4 mb-4 text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
+            У каждой модели своя цена и сетка размер × цвет с остатком. Если остаток 0 или не указан, покупатель видит кнопку «Оформить пошив на заказ».
+          </div>
 
           {error && <div className="nav-glass rounded-2xl p-3 mb-4 text-sm" style={{ color: 'var(--nav-critical)' }}>{error}</div>}
 
@@ -261,7 +275,7 @@ export default function WholesaleModelsPage() {
               <div className="text-sm text-center py-8" style={{ color: 'var(--nav-text-muted)' }}>Пока нет ни одной модели</div>
             )}
           </div>
-        </div>
+        </PageContainer>
       </main>
     </DesktopShell>
   )

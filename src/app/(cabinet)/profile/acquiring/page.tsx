@@ -9,7 +9,9 @@ import { findMatches, AcquiringMatch, OpenInvoice } from '@/lib/acquiringMatch'
 import { useLanguage } from '@/components/LanguageProvider'
 import { acquiringDict } from '@/lib/i18n/acquiring'
 import Skeleton from '@/components/Skeleton'
+import PageContainer from '@/components/PageContainer'
 import PageHeader from '@/components/PageHeader'
+import { ProGateBanner, useProGateText } from '@/components/ProGate'
 
 interface BccConnection {
   iban: string
@@ -93,6 +95,7 @@ export default function AcquiringPage() {
   const router = useRouter()
   const { lang } = useLanguage()
   const t = acquiringDict[lang]
+  const proGateText = useProGateText()
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw
 
@@ -365,13 +368,13 @@ export default function AcquiringPage() {
 
   if (loading) return (
       <>
-        <div className="max-w-lg lg:max-w-3xl mx-auto p-4">
+        <PageContainer>
           {header}
           <div className="space-y-3">
             <div className="nav-glass rounded-2xl p-4"><Skeleton className="h-4 w-40 mb-2" /><Skeleton className="h-3 w-56" /></div>
             <div className="nav-glass rounded-2xl p-4"><Skeleton className="h-4 w-40 mb-2" /><Skeleton className="h-3 w-56" /></div>
           </div>
-        </div>
+        </PageContainer>
       </>
   )
 
@@ -394,7 +397,7 @@ export default function AcquiringPage() {
       <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>{t.bccConnectedIbanLabel}: {bccConnection.iban}</div>
       <div className="text-xs mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{t.bccLastCheckedLabel}: {new Date(bccConnection.last_checked_at).toLocaleString('ru-KZ')}</div>
       {bccConnection.status === 'error' && (
-        <div className="flex items-center gap-1.5 text-xs mt-2" style={{ color: '#D97706' }}>
+        <div className="flex items-center gap-1.5 text-xs mt-2" style={{ color: 'var(--nav-warning)' }}>
           <AlertIcon />
           {t.bccConnectionErrorHint}
         </div>
@@ -409,37 +412,18 @@ export default function AcquiringPage() {
 
   return (
       <>
-        <div className="max-w-lg lg:max-w-3xl mx-auto p-4">
+        <PageContainer>
           {header}
 
           <div className="space-y-4">
             {!ap.canAcquiring && (
-              <motion.div
-                initial={reduceMotion ? false : { opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.05 }}
-                className={`nav-glass nav-card-accent rounded-2xl p-4 ${CARD_HOVER}`}
-              >
-                <div className="flex items-center gap-3 mb-2">
-                  <span
-                    className="w-9 h-9 rounded-[10px] flex items-center justify-center flex-shrink-0"
-                    style={{ background: 'linear-gradient(135deg, var(--nav-accent-soft), transparent)', color: 'var(--nav-accent)' }}
-                  >
-                    <BankIcon />
-                  </span>
-                  <div className="text-sm font-semibold flex-1" style={{ color: 'var(--nav-text-primary)' }}>{t.headerLabel}</div>
-                  <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0" style={{ background: 'var(--nav-accent-soft)', color: 'var(--nav-accent)' }}>
-                    <LockIcon size={10} />
-                    {t.proBadge}
-                  </span>
-                </div>
-                <div className="text-xs mb-3" style={{ color: 'var(--nav-text-muted)' }}>{t.proLockedHint}</div>
-                <button onClick={() => router.push('/upgrade')}
-                  className="w-full rounded-xl py-2.5 text-sm font-semibold transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0"
-                  style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-                  {t.goToPlansButton}
-                </button>
-              </motion.div>
+              <ProGateBanner
+                className={CARD_HOVER}
+                icon={<BankIcon />}
+                title={proGateText.title}
+                description={t.proLockedHint}
+                badge={t.proBadge}
+              />
             )}
 
             {/* Kaspi Pay Cashier connection/wallet/statement moved out to its own
@@ -664,7 +648,7 @@ export default function AcquiringPage() {
                           {match.row.date && <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>{t.statementDateLabel}: {match.row.date}</div>}
                           {match.row.description && <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>{t.descriptionLabel}: {match.row.description}</div>}
                           {rowMatchCount > 1 && (
-                            <div className="flex items-center gap-1.5 text-xs mt-1" style={{ color: '#D97706' }}>
+                            <div className="flex items-center gap-1.5 text-xs mt-1" style={{ color: 'var(--nav-warning)' }}>
                               <AlertIcon />
                               {t.multipleMatchesHint}
                             </div>
@@ -682,7 +666,7 @@ export default function AcquiringPage() {
               </>
             )}
           </div>
-        </div>
+        </PageContainer>
       </>
   )
 }

@@ -12,6 +12,8 @@ import { filterByDeliveryCutoff, type DeliveryDateMode } from '@/lib/kaspiShop/o
 import { normalizeKzPhone } from '@/lib/kaspiPay/phone'
 import { getActivePlan } from '@/lib/plan'
 import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
+import PageHeader from '@/components/PageHeader'
+import PageContainer from '@/components/PageContainer'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 const CARD_HOVER = 'transition-all duration-200 ease-out hover:-translate-y-1 hover:shadow-[var(--nav-card-glow)]'
@@ -53,7 +55,8 @@ type Order = {
 }
 
 function KaspiShopOrdersInner() {
-  usePageDocumentTitle('Заказы — Kaspi Bot')
+  // Заголовок вкладки и на время загрузки (PageHeader ещё не отрисован); строка та же, что ставит PageHeader.
+  usePageDocumentTitle('Заказы')
   const router = useRouter()
   const searchParams = useSearchParams()
   const status = searchParams.get('status') || ORDER_STATUS_TABS[0].value
@@ -325,11 +328,11 @@ function KaspiShopOrdersInner() {
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
 
-      <div className="flex-1 min-w-0 p-4 lg:p-6 pb-6">
+      <PageContainer variant="full" align="start" className="flex-1 min-w-0 pb-6">
+        <PageHeader title="Заказы" />
         {sessionExpired && <SessionExpiredBanner />}
 
         <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
-          <h1 className="text-2xl font-extrabold" style={{ color: 'var(--nav-text-primary)' }}>Заказы</h1>
           <div className="flex items-center gap-2 flex-wrap">
             <input type="text" value={orderCodeInput} onChange={e => setOrderCodeInput(e.target.value)}
               placeholder="Поиск по номеру заказа"
@@ -558,7 +561,7 @@ function KaspiShopOrdersInner() {
         {orders.length < total && (
           <div className="mt-4 text-xs" style={{ color: 'var(--nav-text-muted)' }}>Показаны первые {orders.length} из {total}</div>
         )}
-      </div>
+      </PageContainer>
 
       {/* «Запросить отзыв» -- pure client-side wa.me deep link, no send on
           our side (see the design doc's header comment above the state

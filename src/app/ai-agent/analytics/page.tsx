@@ -12,7 +12,8 @@ import AiAgentProUpsell from '@/components/aiAgent/AiAgentProUpsell'
 import DesktopShell from '@/components/DesktopShell'
 import { getActivePlan } from '@/lib/plan'
 import BrandLoader from '@/components/BrandLoader'
-import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
+import PageHeader from '@/components/PageHeader'
+import PageContainer from '@/components/PageContainer'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 const MONTH_ABBR_RU = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек']
@@ -361,7 +362,6 @@ function StatCard({
 }
 
 export default function AiAgentAnalytics() {
-  usePageDocumentTitle('Аналитика — AI-агент')
   const router = useRouter()
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw
@@ -459,7 +459,7 @@ export default function AiAgentAnalytics() {
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
-      <AiAgentProUpsell />
+      <AiAgentProUpsell title="Аналитика" />
     </main>
     </DesktopShell>
   )
@@ -468,18 +468,20 @@ export default function AiAgentAnalytics() {
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
-      <div className="max-w-3xl mx-auto p-4 lg:p-6 pb-6">
+      <PageContainer variant="wide" align="start" className="pb-6">
+        <PageHeader
+          title="Аналитика"
+          subtitle="Диалоги, ответы и расходы ваших AI-агентов"
+        />
+
+        {/* Фильтры отдельной строкой под шапкой: в правый слот шапки они на 390 не помещаются. */}
         <motion.div
-          className="flex items-start justify-between gap-3 mb-6 flex-wrap"
+          className="mb-5"
           initial={reduceMotion ? false : { opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE }}
         >
-          <div>
-            <h1 className="text-xl font-bold mb-1" style={{ color: 'var(--nav-text-primary)' }}>Аналитика</h1>
-            <p className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>Диалоги, ответы и расходы ваших AI-агентов</p>
-          </div>
-          <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap">
             {agents.length > 0 && (
               <select
                 value={agentFilter}
@@ -505,7 +507,7 @@ export default function AiAgentAnalytics() {
                     <motion.span
                       layoutId="aiAnalyticsPeriodPill"
                       className="absolute inset-0 rounded-full"
-                      style={{ background: 'linear-gradient(120deg, var(--nav-accent), var(--nav-teal))', zIndex: 0 }}
+                      style={{ background: 'var(--nav-accent)', zIndex: 0 }}
                       transition={reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 380, damping: 32 }}
                     />
                   )}
@@ -571,7 +573,7 @@ export default function AiAgentAnalytics() {
             </div>
           )}
         </motion.div>
-      </div>
+      </PageContainer>
     </main>
     </DesktopShell>
   )

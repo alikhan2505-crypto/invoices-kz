@@ -9,6 +9,8 @@ import DesktopShell from '@/components/DesktopShell'
 import { getActivePlan } from '@/lib/plan'
 import { baseProductName } from '@/lib/kaspiShop/salesAnalytics'
 import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
+import PageHeader, { PageHeaderButton } from '@/components/PageHeader'
+import PageContainer from '@/components/PageContainer'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -89,7 +91,8 @@ function formatDateTime(iso: string | null): string {
 }
 
 export default function KaspiShopReviews() {
-  usePageDocumentTitle('Отзывы покупателей — Kaspi Bot')
+  // Заголовок вкладки и на время загрузки (PageHeader ещё не отрисован); строка та же, что ставит PageHeader.
+  usePageDocumentTitle('Отзывы')
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<ReviewsResponse | null>(null)
@@ -199,7 +202,21 @@ function sleep(ms: number) {
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
 
-      <div className="flex-1 min-w-0 p-4 lg:p-6 pb-6">
+      <PageContainer variant="full" align="start" className="flex-1 min-w-0 pb-6">
+        <PageHeader
+          title="Отзывы"
+          subtitle="Отзывы покупателей"
+          right={(
+            <div className="flex flex-col items-end gap-1.5">
+              <PageHeaderButton onClick={doRefresh} disabled={refreshing} className="disabled:opacity-50">
+                {refreshing ? 'Обновляем...' : 'Обновить'}
+              </PageHeaderButton>
+              {data?.lastFetchedAt && (
+                <div className="text-[11px]" style={{ color: 'var(--nav-text-muted)' }}>Обновлено: {formatDateTime(data.lastFetchedAt)}</div>
+              )}
+            </div>
+          )}
+        />
         {loadError && (
           <div className="nav-glass rounded-2xl p-4 flex items-center justify-between gap-3 mb-4">
             <span className="text-sm" style={{ color: 'var(--nav-critical)' }}>{loadError}</span>
@@ -209,23 +226,6 @@ function sleep(ms: number) {
 
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}
           className="nav-glass nav-card-accent rounded-[28px] p-6 lg:p-8 mb-4">
-          <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
-            <div>
-              <div className="text-[11px] font-semibold tracking-wider uppercase mb-1" style={{ color: 'var(--nav-text-muted)' }}>Отзывы</div>
-              <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight" style={{ color: 'var(--nav-text-primary)' }}>Отзывы покупателей</h1>
-            </div>
-            <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-              <button onClick={doRefresh} disabled={refreshing}
-                className="text-sm font-semibold rounded-xl px-4 py-2.5 disabled:opacity-50 transition-opacity"
-                style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-                {refreshing ? 'Обновляем...' : 'Обновить'}
-              </button>
-              {data?.lastFetchedAt && (
-                <div className="text-[11px]" style={{ color: 'var(--nav-text-muted)' }}>Обновлено: {formatDateTime(data.lastFetchedAt)}</div>
-              )}
-            </div>
-          </div>
-
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <div>
               <div className="text-lg font-bold font-mono tabular-nums flex items-center gap-1" style={{ color: 'var(--nav-text-primary)' }}>
@@ -376,7 +376,7 @@ function sleep(ms: number) {
             </div>
           )
         })()}
-      </div>
+      </PageContainer>
     </main>
     </DesktopShell>
   )

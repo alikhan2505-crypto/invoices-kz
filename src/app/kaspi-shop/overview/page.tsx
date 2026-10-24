@@ -9,6 +9,8 @@ import { getActivePlan } from '@/lib/plan'
 import { useCrossHref } from '@/lib/useCrossHref'
 import { ORDER_STATUS_TABS, PACKING_STATUS, WORKING_ORDER_STATUSES } from '@/lib/kaspiShop/orderStatuses'
 import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
+import PageHeader from '@/components/PageHeader'
+import PageContainer from '@/components/PageContainer'
 
 // "Обзор" of Kaspi Bot (founder's mock, 21.09.2026): three numbers, the orders in
 // work, and the hand-offs to the neighbouring products. Everything here reads
@@ -36,7 +38,8 @@ async function authHeader() {
 }
 
 export default function KaspiShopOverview() {
-  usePageDocumentTitle('Обзор — Kaspi Bot')
+  // Заголовок вкладки и на время загрузки (PageHeader ещё не отрисован); строка та же, что ставит PageHeader.
+  usePageDocumentTitle('Обзор')
   const router = useRouter()
   const crossHref = useCrossHref()
   const [ready, setReady] = useState(false)
@@ -132,11 +135,8 @@ export default function KaspiShopOverview() {
     <DesktopShell>
       <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
         <SiteNav />
-        <div className="flex-1 min-w-0 p-4 lg:p-6 pb-6 space-y-6">
-          <div className="flex items-baseline gap-3 flex-wrap">
-            <h1 className="text-2xl font-bold" style={{ color: 'var(--nav-text-primary)', letterSpacing: '-0.02em' }}>Обзор</h1>
-            <span className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>Kaspi Bot</span>
-          </div>
+        <PageContainer variant="full" align="start" className="flex-1 min-w-0 pb-6 space-y-6">
+          <PageHeader title="Обзор" subtitle="Kaspi Bot" />
 
           {sessionExpired && (
             <div role="alert" className="rounded-2xl p-4 flex items-center gap-3 flex-wrap text-sm font-medium"
@@ -201,7 +201,7 @@ export default function KaspiShopOverview() {
               ))}
             </div>
           </section>
-        </div>
+        </PageContainer>
       </main>
     </DesktopShell>
   )

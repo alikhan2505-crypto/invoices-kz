@@ -9,7 +9,9 @@ import { profileContentDict } from '@/lib/i18n/profileContent'
 import { getActivePlan } from '@/lib/plan'
 import Skeleton from '@/components/Skeleton'
 import { useAppDialog } from '@/components/AppDialog'
+import PageContainer from '@/components/PageContainer'
 import PageHeader from '@/components/PageHeader'
+import ProGate from '@/components/ProGate'
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
 // kept identical rather than inventing a second "house" ease.
@@ -21,13 +23,6 @@ function XIcon({ size = 15 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M18 6 6 18M6 6l12 12" />
-    </svg>
-  )
-}
-function StarIcon({ size = 42 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--nav-accent-ink)' }}>
-      <path d="m12 2 2.9 6.3 6.9.7-5.2 4.7 1.5 6.8L12 17l-6.1 3.5 1.5-6.8-5.2-4.7 6.9-.7Z" />
     </svg>
   )
 }
@@ -92,7 +87,7 @@ export default function Templates() {
 
   return (
       <>
-        <div className="max-w-lg lg:max-w-3xl mx-auto p-4">
+        <PageContainer>
           {header}
 
           {loading ? (
@@ -106,25 +101,7 @@ export default function Templates() {
               ))}
             </div>
           ) : !isPro ? (
-            <motion.div
-              initial={reduceMotion ? false : { opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.06 }}
-              className="nav-glass nav-card-accent rounded-2xl p-8 text-center"
-            >
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: 'var(--nav-accent)' }}>
-                <StarIcon size={26} />
-              </div>
-              <div className="font-bold text-base mb-2" style={{ color: 'var(--nav-text-primary)' }}>{t.proOnlyTitle}</div>
-              <div className="text-sm mb-5 max-w-xs mx-auto" style={{ color: 'var(--nav-text-muted)' }}>
-                {t.proOnlyDesc}
-              </div>
-              <button onClick={() => router.push('/upgrade')}
-                className="px-6 py-3 rounded-xl text-sm font-semibold transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0"
-                style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-                {t.upgradeToProButton}
-              </button>
-            </motion.div>
+            <ProGate description={t.proOnlyDesc} showPrice />
           ) : templates.length === 0 ? (
             <div className="flex flex-col items-center text-center py-12">
               <DocumentIcon />
@@ -176,7 +153,7 @@ export default function Templates() {
               ))}
             </div>
           )}
-        </div>
+        </PageContainer>
       {dialogElement}
       </>
   )

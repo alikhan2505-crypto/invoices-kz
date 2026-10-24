@@ -8,7 +8,8 @@ import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import NicheCollections from '@/components/kaspiShop/NicheCollections'
 import { getActivePlan } from '@/lib/plan'
-import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
+import PageHeader from '@/components/PageHeader'
+import PageContainer from '@/components/PageContainer'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 const CARD_HOVER = 'transition-all duration-200 ease-out hover:-translate-y-1 hover:shadow-[var(--nav-card-glow)]'
@@ -166,7 +167,6 @@ function TrendingProductsTable({ products, showCategory, emptyLabel }: { product
 }
 
 export default function KaspiShopNiches() {
-  usePageDocumentTitle('Ниши — Kaspi Bot')
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
@@ -335,17 +335,18 @@ export default function KaspiShopNiches() {
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
 
-      <div className="flex-1 min-w-0 p-4 lg:p-6 pb-6">
+      <PageContainer variant="full" align="start" className="flex-1 min-w-0 pb-6">
         {/* Витрина подборок -- the page's face (2026-08-23 founder
             decision); the keyword search below stays as the secondary
             "проверить свою идею" tool. */}
+        <PageHeader title="Витрина ниш" subtitle="Готовые подборки по реальным метрикам Kaspi, обновляются каждые 24 часа" />
         <NicheCollections />
 
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}
           className="nav-glass nav-card-accent rounded-[28px] p-6 lg:p-8 mb-4">
           <div className="text-[11px] font-semibold tracking-wider uppercase mb-1" style={{ color: 'var(--nav-text-muted)' }}>Проверка идеи</div>
           <div className="flex items-baseline gap-2 mb-6 flex-wrap">
-            <h2 className="text-2xl lg:text-3xl font-extrabold tracking-tight" style={{ color: 'var(--nav-text-primary)' }}>Проверить идею товара</h2>
+            <h2 className="text-base lg:text-lg font-bold" style={{ color: 'var(--nav-text-primary)' }}>Проверить идею товара</h2>
             <span className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>
               5 ₸ за проверку{walletBalance !== null && ` · на балансе ${walletBalance.toLocaleString('ru-KZ')} ₸`}
             </span>
@@ -496,7 +497,7 @@ export default function KaspiShopNiches() {
           <div className="flex items-end justify-between gap-3 mb-4 flex-wrap">
             <div>
               <div className="text-[11px] font-semibold tracking-wider uppercase mb-1" style={{ color: 'var(--nav-text-muted)' }}>Тренды Kaspi</div>
-              <h2 className="text-xl lg:text-2xl font-extrabold tracking-tight" style={{ color: 'var(--nav-text-primary)' }}>Что в тренде на Kaspi прямо сейчас</h2>
+              <h2 className="text-base lg:text-lg font-bold" style={{ color: 'var(--nav-text-primary)' }}>Что в тренде на Kaspi прямо сейчас</h2>
             </div>
             <div className="text-[11px]" style={{ color: 'var(--nav-text-muted)' }}>
               Обновляется каждые 24 часа{trends?.computedAt ? ` · обновлено ${new Date(trends.computedAt).toLocaleString('ru-KZ', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}` : ''}
@@ -568,7 +569,7 @@ export default function KaspiShopNiches() {
             </>
           ) : null}
         </motion.div>
-      </div>
+      </PageContainer>
 
       {openProduct && (
         <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4" onClick={() => setOpenProduct(null)}>

@@ -9,6 +9,8 @@ import DesktopShell from '@/components/DesktopShell'
 import SessionExpiredBanner from '@/components/kaspiShop/SessionExpiredBanner'
 import { getActivePlan } from '@/lib/plan'
 import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
+import PageHeader from '@/components/PageHeader'
+import PageContainer from '@/components/PageContainer'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -28,7 +30,8 @@ const TABS = [
 ]
 
 export default function KaspiShopPendingProducts() {
-  usePageDocumentTitle('Нераспознанные товары — Kaspi Bot')
+  // Заголовок вкладки и на время загрузки (PageHeader ещё не отрисован); строка та же, что ставит PageHeader.
+  usePageDocumentTitle('Нераспознанные товары')
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
@@ -91,7 +94,8 @@ export default function KaspiShopPendingProducts() {
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">
       <SiteNav />
 
-      <div className="flex-1 min-w-0 p-4 lg:p-6 pb-6">
+      <PageContainer variant="full" align="start" className="flex-1 min-w-0 pb-6">
+        <PageHeader title="Нераспознанные товары" subtitle={count > 0 ? `Всего: ${count}` : undefined} />
         {sessionExpired && <SessionExpiredBanner />}
 
         {loadError && (
@@ -103,10 +107,6 @@ export default function KaspiShopPendingProducts() {
 
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}
           className="nav-glass nav-card-accent rounded-[28px] p-6 lg:p-8 mb-4">
-          <div className="text-[11px] font-semibold tracking-wider uppercase mb-1" style={{ color: 'var(--nav-text-muted)' }}>Товары</div>
-          <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight mb-6" style={{ color: 'var(--nav-text-primary)' }}>
-            Нераспознанные товары {count > 0 && <span style={{ color: 'var(--nav-text-muted)' }}>· {count}</span>}
-          </h1>
           <div className="flex items-center gap-1 flex-wrap nav-glass rounded-full p-1 w-fit">
             {TABS.map(tab => (
               <button key={tab.key} disabled={!tab.enabled}
@@ -157,7 +157,7 @@ export default function KaspiShopPendingProducts() {
             </div>
           </div>
         )}
-      </div>
+      </PageContainer>
     </main>
     </DesktopShell>
   )

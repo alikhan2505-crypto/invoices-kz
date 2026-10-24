@@ -38,6 +38,18 @@ export const kaspiProGateDict: Record<Lang, ProGateDict> = {
   },
 }
 
+// Общие слова Про-замков кабинета (<ProGate>, <ProGateBanner>): ОДИН заголовок
+// и ОДНА подпись кнопки вместо пяти разных у documents/templates/acquiring/
+// contracts/signature. Пояснение страницы передаёт сама. Цена идёт отдельной
+// приглушённой строкой и берётся из PLAN_PRICES (price подставляет вызывающий).
+export type ProGateCtaDict = { title: string; cta: string; priceLine: (price: string) => string }
+
+export const proGateCtaDict: Record<Lang, ProGateCtaDict> = {
+  ru: { title: 'Доступно на тарифе Про', cta: 'Перейти к тарифам', priceLine: (p) => `Про: ${p} в месяц` },
+  kk: { title: 'Про тарифінде қолжетімді', cta: 'Тарифтерге өту', priceLine: (p) => `Про: айына ${p}` },
+  en: { title: 'Available on the Pro plan', cta: 'View plans', priceLine: (p) => `Pro: ${p} per month` },
+}
+
 // Одна строка «тариф закончился» на дашборде и в профиле (P2-16, 17.10.2026):
 // у кого Про только что истёк, там раньше стояло просто «Бесплатный».
 export type LapsedNoticeDict = {

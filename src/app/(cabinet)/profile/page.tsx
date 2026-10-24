@@ -18,6 +18,7 @@ import { profileCoreDict } from '@/lib/i18n/profileCore'
 import { useMediaQuery } from '@/lib/useMediaQuery'
 import Skeleton from '@/components/Skeleton'
 import ProfileBonusCard from '@/components/ProfileBonusCard'
+import PageContainer from '@/components/PageContainer'
 import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
@@ -376,7 +377,7 @@ export default function Profile() {
 
   if (loading && !profile) return (
     <>
-      <div className="max-w-lg lg:max-w-5xl mx-auto p-4 space-y-4">
+      <PageContainer variant="wide" className="space-y-4">
         <div className="nav-glass nav-card-accent rounded-2xl p-5">
           <div className="flex items-center gap-3 mb-4">
             <Skeleton className="w-12 h-12 rounded-full flex-shrink-0" />
@@ -396,7 +397,7 @@ export default function Profile() {
           <Skeleton className="h-4 w-full" />
           <Skeleton className="h-4 w-full" />
         </div>
-      </div>
+      </PageContainer>
     </>
   )
 
@@ -667,8 +668,9 @@ export default function Profile() {
 
   return (
     <>
+      {/* Сознательно скрытый заголовок: на хабе нет шапки со стрелкой, а название вкладки ставит usePageDocumentTitle выше. */}
       <h1 className="sr-only">{pageTitle}</h1>
-      <div className="max-w-lg lg:max-w-5xl mx-auto p-4">
+      <PageContainer variant="wide">
         {isDesktop ? (
           <div className="flex gap-6 items-start">
             <div className="flex flex-col gap-4 w-[360px] flex-shrink-0">
@@ -704,7 +706,7 @@ export default function Profile() {
             {deleteAccountEl}
           </div>
         )}
-      </div>
+      </PageContainer>
 
       <AnimatePresence>
         {deleteModalOpen && (

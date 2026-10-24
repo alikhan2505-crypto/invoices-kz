@@ -8,6 +8,7 @@ import { profileContentDict } from '@/lib/i18n/profileContent'
 import { supportDict } from '@/lib/i18n/support'
 import { supabase } from '@/lib/supabase'
 import { getActivePlan } from '@/lib/plan'
+import PageContainer from '@/components/PageContainer'
 import PageHeader from '@/components/PageHeader'
 import Skeleton from '@/components/Skeleton'
 
@@ -95,7 +96,7 @@ export default function Support() {
 
   return (
     <>
-      <div className="max-w-lg lg:max-w-2xl mx-auto p-4 space-y-4">
+      <PageContainer className="space-y-4">
 
         <PageHeader title={t.supportHeaderLabel} backHref="/profile" />
 
@@ -226,7 +227,7 @@ export default function Support() {
           <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>{t.copyrightLabel}</div>
         </motion.div>
 
-      </div>
+      </PageContainer>
     </>
   )
 }

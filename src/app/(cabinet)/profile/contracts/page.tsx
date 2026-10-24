@@ -6,6 +6,8 @@ import { supabase } from '@/lib/supabase'
 import { formatDate } from '@/lib/date'
 import { useLanguage } from '@/components/LanguageProvider'
 import { deleteLabel } from '@/lib/a11yLabels'
+import PageContainer from '@/components/PageContainer'
+import { ProGateBanner } from '@/components/ProGate'
 import PageHeader, { PageHeaderButton } from '@/components/PageHeader'
 import { contractsDict } from '@/lib/i18n/contracts'
 import Skeleton from '@/components/Skeleton'
@@ -166,7 +168,7 @@ export default function Contracts() {
 
   return (
       <>
-        <div className="max-w-lg lg:max-w-3xl mx-auto p-4">
+        <PageContainer>
           <PageHeader
             title={t.headerLabel}
             backHref="/profile"
@@ -179,12 +181,7 @@ export default function Contracts() {
           />
 
           {canEcp === false && (
-            <p className="text-xs px-1 -mt-2 mb-4" style={{ color: 'var(--nav-text-muted)' }}>
-              {t.ecpProOnlyNote}{' '}
-              <button type="button" onClick={() => router.push('/upgrade')} className="underline font-medium" style={{ color: 'var(--nav-accent)' }}>
-                {t.goToPlansButton}
-              </button>
-            </p>
+            <ProGateBanner variant="note" className="mb-4" description={t.ecpProOnlyNote} />
           )}
 
           {showForm && (
@@ -308,7 +305,7 @@ export default function Contracts() {
               })}
             </div>
           )}
-        </div>
+        </PageContainer>
       {dialogElement}
       </>
   )
