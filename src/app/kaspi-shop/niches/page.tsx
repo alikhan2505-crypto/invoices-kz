@@ -8,6 +8,7 @@ import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import NicheCollections from '@/components/kaspiShop/NicheCollections'
 import { getActivePlan } from '@/lib/plan'
+import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 const CARD_HOVER = 'transition-all duration-200 ease-out hover:-translate-y-1 hover:shadow-[var(--nav-card-glow)]'
@@ -165,6 +166,7 @@ function TrendingProductsTable({ products, showCategory, emptyLabel }: { product
 }
 
 export default function KaspiShopNiches() {
+  usePageDocumentTitle('Ниши — Kaspi Bot')
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')

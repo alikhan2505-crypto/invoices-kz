@@ -38,12 +38,15 @@ export type ProductDef = {
   proOnly?: boolean
   // Has a section in SiteNav's tab row (salon lives under /admin, not in it).
   inNav: boolean
+  // Short name for tight spots (the mobile top bar shares its row with the
+  // fixed utility pill and has ~90px left for the title).
+  shortName?: string
 }
 
 export const PRODUCTS: ProductDef[] = [
   { key: 'invoices', name: 'Счета', blurb: 'Счёт, КП и АВР за 30 секунд', audience: 'ИП и ТОО Казахстана', href: '/create', landing: 'https://docs.invoices.kz', bg: '#1C2056', ink: '#F4F6FF', inNav: true },
   { key: 'kaspiShop', name: 'Kaspi Bot', blurb: 'Демпинг цен и заказы Kaspi', audience: 'Продавцы Kaspi Магазина', href: '/kaspi-shop/overview', landing: 'https://kaspi.invoices.kz', bg: '#FF6B57', ink: '#2A0B07', proOnly: true, inNav: true },
-  { key: 'kaspiApi', name: 'Kaspi Cashier API', blurb: 'Приём Kaspi Pay в ваш код', audience: 'Разработчики и интеграторы', href: '/kaspi-api', landing: 'https://api.invoices.kz', bg: '#F5E663', ink: '#14130A', inNav: true },
+  { key: 'kaspiApi', name: 'Kaspi Cashier API', shortName: 'Kaspi API', blurb: 'Приём Kaspi Pay в ваш код', audience: 'Разработчики и интеграторы', href: '/kaspi-api', landing: 'https://api.invoices.kz', bg: '#F5E663', ink: '#14130A', inNav: true },
   { key: 'aiAgent', name: 'AI-агент', blurb: 'Отвечает клиентам в мессенджерах', audience: 'Бизнес, который живёт в переписке', href: '/ai-agent/overview', landing: 'https://agent.invoices.kz', bg: '#B7A6FF', ink: '#1D1140', proOnly: true, inNav: true },
   { key: 'salon', name: 'Салон', blurb: 'Записи, мастера, сайт салона', audience: 'Салоны красоты и барбершопы', href: '/admin/site-generator', landing: 'https://salon.invoices.kz', bg: '#F7C6D4', ink: '#3B1030', adminOnly: true, teaser: true, inNav: false },
   { key: 'cfo', name: 'CFO', blurb: 'БДР, БДДС и платёжный календарь', audience: 'Финдиректора и собственники бизнеса', href: '/cfo/overview', landing: 'https://cfo.invoices.kz', bg: '#0E4D45', ink: '#DFFAF1', adminOnly: true, teaser: true, inNav: true },
@@ -104,8 +107,12 @@ export function isInMyProducts(mine: ProductKey[] | null, key: ProductKey): bool
 // Should this menu section be drawn? Always when nothing was chosen, and
 // always for the section the person is standing in (hiding the tab you're on
 // would leave a page with no visible parent).
-export function isSectionVisible(mine: ProductKey[] | null, key: ProductKey, activeKey: ProductKey | null): boolean {
-  if (mine === null) return true
+// ready=false: the list hasn't been fetched yet and there's no cache, so null
+// means "don't know", not "never chose". Showing every section then makes the
+// menu collapse to the real few the moment the list arrives (7 -> 3 jump);
+// show only the base product and the active section instead.
+export function isSectionVisible(mine: ProductKey[] | null, key: ProductKey, activeKey: ProductKey | null, ready = true): boolean {
+  if (mine === null) return ready || key === 'invoices' || activeKey === key
   return mine.includes(key) || activeKey === key
 }
 

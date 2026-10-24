@@ -15,6 +15,7 @@ import AiAgentTour from './AiAgentTour'
 import { summarizeConnections, type AgentChannel } from '@/lib/aiAgent/connectedChannels'
 import { canUseSetupWizard } from '@/lib/aiAgent/setupWizard'
 import { aiAgentSetupDict } from '@/lib/i18n/aiAgentSetup'
+import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -105,6 +106,7 @@ export default function AiAgentsList() {
   const { lang } = useLanguage()
   const t = aiAgentDict[lang]
   const s = aiAgentSetupDict[lang]
+  usePageDocumentTitle(`${t.agentsTitle} — ${t.agentPageTitle}`)
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw
   const [loading, setLoading] = useState(true)

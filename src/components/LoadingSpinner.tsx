@@ -17,5 +17,5 @@ export default function LoadingSpinner() {
     )
   }
 
-  return <main className="min-h-screen bg-gray-50 flex items-center justify-center"><BrandLoader /></main>
+  return <main className="min-h-screen flex items-center justify-center" style={{ background: 'var(--nav-bg)' }}><BrandLoader /></main>
 }

@@ -12,6 +12,7 @@ import AiAgentProUpsell from '@/components/aiAgent/AiAgentProUpsell'
 import DesktopShell from '@/components/DesktopShell'
 import { getActivePlan } from '@/lib/plan'
 import BrandLoader from '@/components/BrandLoader'
+import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 const MONTH_ABBR_RU = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек']
@@ -360,6 +361,7 @@ function StatCard({
 }
 
 export default function AiAgentAnalytics() {
+  usePageDocumentTitle('Аналитика — AI-агент')
   const router = useRouter()
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw

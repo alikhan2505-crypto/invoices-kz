@@ -8,6 +8,7 @@ import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import { extractAttributes } from '@/lib/kaspiShop/salesAnalytics'
 import { getActivePlan } from '@/lib/plan'
+import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -143,6 +144,7 @@ type AddModalState = {
 }
 
 export default function KaspiShopProductAvailability() {
+  usePageDocumentTitle('Управление товарами — Kaspi Bot')
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')

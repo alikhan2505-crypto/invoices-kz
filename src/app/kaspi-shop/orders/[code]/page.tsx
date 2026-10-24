@@ -7,6 +7,7 @@ import LoadingSpinner from '@/components/LoadingSpinner'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import { getActivePlan } from '@/lib/plan'
+import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -45,6 +46,8 @@ type OrderDetail = {
 export default function KaspiShopOrderDetail() {
   const router = useRouter()
   const { code } = useParams()
+  // Номер заказа, а не имя покупателя: имя в заголовке вкладки/истории ни к чему.
+  usePageDocumentTitle(typeof code === 'string' ? `Заказ ${code} — Kaspi Bot` : 'Заказ — Kaspi Bot')
   const [loading, setLoading] = useState(true)
   const [order, setOrder] = useState<OrderDetail | null>(null)
   const [loadError, setLoadError] = useState('')

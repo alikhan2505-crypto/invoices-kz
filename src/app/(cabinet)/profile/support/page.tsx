@@ -9,6 +9,7 @@ import { supportDict } from '@/lib/i18n/support'
 import { supabase } from '@/lib/supabase'
 import { getActivePlan } from '@/lib/plan'
 import PageHeader from '@/components/PageHeader'
+import Skeleton from '@/components/Skeleton'
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
 // kept identical rather than inventing a second "house" ease.
@@ -66,13 +67,15 @@ export default function Support() {
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw
   // Telegram support is included from the Basic plan up (see src/lib/plan.ts);
-  // free users (incl. before the profile loads) see an /upgrade notice instead.
-  const [canTelegramSupport, setCanTelegramSupport] = useState(false)
+  // free users see an /upgrade notice instead. null = the plan is not known
+  // yet: the row shows a placeholder, not the notice, so a paying user never
+  // sees "available on Basic and Pro" flash by.
+  const [canTelegramSupport, setCanTelegramSupport] = useState<boolean | null>(null)
 
   useEffect(() => {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      if (!user) { setCanTelegramSupport(false); return }
       const { data: profile } = await supabase
         .from('profiles')
         .select('plan, plan_expires_at, bonus_expires_at, trial_expires_at, is_admin')
@@ -101,7 +104,20 @@ export default function Support() {
         </motion.p>
 
         <motion.div {...fadeIn(2)} className={`nav-glass rounded-2xl overflow-hidden ${CARD_HOVER}`}>
-          {canTelegramSupport ? (
+          {canTelegramSupport === null ? (
+            <div className="flex items-center px-4 py-4" style={{ borderBottom: '1px solid var(--nav-border-soft)' }} aria-busy="true">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+                  style={{ background: 'var(--nav-border-soft)', color: 'var(--nav-text-muted)' }}>
+                  <SendIcon />
+                </div>
+                <div>
+                  <div className="text-sm font-medium" style={{ color: 'var(--nav-text-primary)' }}>{t.telegramContactLabel}</div>
+                  <Skeleton className="h-3 w-40 mt-1.5" />
+                </div>
+              </div>
+            </div>
+          ) : canTelegramSupport ? (
             <a href="https://t.me/invoiceskz_support"
               target="_blank" rel="noopener noreferrer"
               className="flex items-center justify-between px-4 py-4 transition-colors hover:bg-[var(--nav-surface-glass)]"

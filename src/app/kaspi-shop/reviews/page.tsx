@@ -8,6 +8,7 @@ import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import { getActivePlan } from '@/lib/plan'
 import { baseProductName } from '@/lib/kaspiShop/salesAnalytics'
+import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -88,6 +89,7 @@ function formatDateTime(iso: string | null): string {
 }
 
 export default function KaspiShopReviews() {
+  usePageDocumentTitle('Отзывы покупателей — Kaspi Bot')
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<ReviewsResponse | null>(null)

@@ -12,6 +12,7 @@ import { getActivePlan } from '@/lib/plan'
 import { useLanguage } from '@/components/LanguageProvider'
 import { aiAgentDict } from '@/lib/i18n/aiAgent'
 import BrandLoader from '@/components/BrandLoader'
+import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 const FREE_REGENS = 3
@@ -129,6 +130,7 @@ export default function AiAgentReview() {
   const router = useRouter()
   const { lang } = useLanguage()
   const t = aiAgentDict[lang]
+  usePageDocumentTitle(`${t.reviewTitle} — ${t.agentPageTitle}`)
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw
   const [loading, setLoading] = useState(true)

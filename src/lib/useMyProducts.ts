@@ -35,6 +35,22 @@ function getServerSnapshot(): string | null {
   return null
 }
 
+// «Список аккаунта уже получен» -- отдельный от самого списка сигнал: null в
+// кэше значит и «ещё не загрузили», и «человек ничего не выбирал», а меню в
+// этих двух случаях должно вести себя по-разному (см. isSectionVisible).
+let profileLoaded = false
+function markLoaded() {
+  if (profileLoaded) return
+  profileLoaded = true
+  window.dispatchEvent(new Event(EVENT))
+}
+function getLoadedSnapshot(): boolean {
+  return profileLoaded
+}
+function getServerLoadedSnapshot(): boolean {
+  return false
+}
+
 function writeCache(raw: string | null) {
   try {
     if (raw === null) localStorage.removeItem(KEY)
@@ -52,14 +68,19 @@ function refreshFromProfile(): Promise<void> {
   if (!refreshed) {
     refreshed = (async () => {
       // No stored login: nothing to fetch, so supabase-js is never downloaded.
-      if (!mightHaveStoredSession()) { writeCache(null); return }
+      if (!mightHaveStoredSession()) { writeCache(null); markLoaded(); return }
       const supabase = await loadSupabase()
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { writeCache(null); return }
+      if (!user) { writeCache(null); markLoaded(); return }
       const { data } = await supabase.from('profiles').select('enabled_products').eq('id', user.id).single()
       const list = Array.isArray(data?.enabled_products) ? (data.enabled_products as string[]) : null
       writeCache(list ? serializeMyProducts(list as ProductKey[]) : null)
-    })().catch(() => { refreshed = null })
+      markLoaded()
+    })().catch(() => {
+      refreshed = null
+      // Сеть не ответила: дальше ждать нечего, меню показывает то, что есть в кэше.
+      markLoaded()
+    })
   }
   return refreshed
 }
@@ -81,8 +102,12 @@ export async function connectProduct(key: ProductKey): Promise<void> {
   writeCache(serializeMyProducts(next))
 }
 
-export function useMyProducts(): [ProductKey[] | null, (next: ProductKey[]) => void] {
+// Третий элемент -- ready: список известен (есть кэш с прошлого визита или
+// ответ профиля уже пришёл). Пока false, mine === null значит «не знаем», а не
+// «ничего не выбирал».
+export function useMyProducts(): [ProductKey[] | null, (next: ProductKey[]) => void, boolean] {
   const raw = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
+  const loaded = useSyncExternalStore(subscribe, getLoadedSnapshot, getServerLoadedSnapshot)
   const mine = useMemo(() => parseMyProducts(raw), [raw])
   useEffect(() => { void refreshFromProfile() }, [])
   const save = useCallback((next: ProductKey[]) => {
@@ -91,5 +116,5 @@ export function useMyProducts(): [ProductKey[] | null, (next: ProductKey[]) => v
       if (user) void supabase.from('profiles').update({ enabled_products: next }).eq('id', user.id)
     }))
   }, [])
-  return [mine, save]
+  return [mine, save, mine !== null || loaded]
 }

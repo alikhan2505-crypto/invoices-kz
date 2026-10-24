@@ -12,6 +12,7 @@ import { useAppDialog } from '@/components/AppDialog'
 import BrandLoader from '@/components/BrandLoader'
 import { useCrossHref } from '@/lib/useCrossHref'
 import { notifyWalletChanged } from '@/lib/walletSignal'
+import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 
 // Matches MIN_TOPUP in src/app/api/kaspi/wallet/topup/route.ts — kept here
 // too so the button can refuse an obviously-too-small amount before ever
@@ -38,6 +39,7 @@ export default function KaspiApiPage() {
   const router = useRouter()
   const { lang } = useLanguage()
   const t = acquiringDict[lang]
+  usePageDocumentTitle('Kaspi Cashier API')
   const crossHref = useCrossHref()
   // Shadows window.alert / window.confirm for this component -- see
   // src/components/AppDialog.tsx. Every confirm below is awaited: a Promise

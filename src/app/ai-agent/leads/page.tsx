@@ -11,6 +11,7 @@ import DesktopShell from '@/components/DesktopShell'
 import { COLLECT_FIELD_LABELS } from '@/lib/aiAgent/promptContext'
 import { getActivePlan } from '@/lib/plan'
 import BrandLoader from '@/components/BrandLoader'
+import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -101,6 +102,7 @@ function formatDate(iso: string): string {
 }
 
 export default function AiAgentLeads() {
+  usePageDocumentTitle('Заявки — AI-агент')
   const router = useRouter()
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw

@@ -11,6 +11,7 @@ import {
   computeMargin, computeVerdict, computeBreakEvenPrice, estimateKaspiDeliveryFee,
   KASPI_CATEGORY_COMMISSIONS, DEFAULT_CARGO_RATE_PER_KG, DEFAULT_TARGET_MARGIN_PERCENT,
 } from '@/lib/kaspiShop/margin'
+import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 
 // Same house conventions as the rest of Kaspi Shop (page.tsx, niches/page.tsx) --
 // kept byte-identical rather than inventing new ones for this page.
@@ -51,6 +52,7 @@ function fmt(n: number): string {
 }
 
 export default function KaspiShopMargin() {
+  usePageDocumentTitle('Калькулятор маржи — Kaspi Bot')
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')

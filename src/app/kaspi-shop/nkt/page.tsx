@@ -7,6 +7,7 @@ import LoadingSpinner from '@/components/LoadingSpinner'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import { getActivePlan } from '@/lib/plan'
+import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -58,6 +59,7 @@ function CopyField({ label, value }: { label: string; value: string }) {
 }
 
 export default function KaspiShopNkt() {
+  usePageDocumentTitle('Каталог НКТ — Kaspi Bot')
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [products, setProducts] = useState<NktProduct[]>([])

@@ -13,6 +13,7 @@ import { useLanguage, type Lang } from '@/components/LanguageProvider'
 import { useCrossHref } from '@/lib/useCrossHref'
 import { useAppDialog } from '@/components/AppDialog'
 import { connectErrorMessage, connectUiText } from '@/lib/kaspiShop/connectMessages'
+import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 
 type Product = {
   id: string
@@ -233,6 +234,7 @@ async function postConnectStep(url: string, headers: HeadersInit, body: unknown)
 const LATER_TEXT: Record<Lang, string> = { ru: 'Позже', kk: 'Кейінірек', en: 'Later' }
 
 export default function KaspiShop() {
+  usePageDocumentTitle('Демпинг — Kaspi Bot')
   const router = useRouter()
   const { lang } = useLanguage()
   const crossHref = useCrossHref()

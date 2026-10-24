@@ -174,7 +174,7 @@ export default function ProductShell({ product, children }: { product: ProductKe
           >
             {dot}
             <span className="flex-1 min-w-0 truncate text-[15px] font-bold" style={{ color: 'var(--nav-text-primary)', letterSpacing: '-0.02em' }}>{def.name}</span>
-            <span style={{ color: 'var(--nav-text-muted)' }}><Chevron /></span>
+            <span style={{ color: 'var(--nav-text-secondary)' }}><Chevron /></span>
           </button>
           {menuOpen && (
             <ul role="listbox" className="absolute left-0 right-0 top-[calc(100%+6px)] z-40 nav-glass rounded-2xl py-1.5 shadow-2xl" style={{ background: 'var(--nav-bg)' }}>
@@ -210,7 +210,7 @@ export default function ProductShell({ product, children }: { product: ProductKe
                 key={l.href}
                 aria-disabled="true"
                 className="flex items-center justify-between gap-2 min-h-[40px] px-3 rounded-xl text-[14px] font-medium mb-0.5 cursor-not-allowed select-none"
-                style={{ color: 'var(--nav-text-muted)', opacity: 0.55 }}
+                style={{ color: 'var(--nav-text-secondary)', opacity: 0.55 }}
               >
                 {l.label[lang]}
                 <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: 'var(--nav-surface-glass)', border: '1px solid var(--nav-border)' }}>{t.soon}</span>
@@ -253,7 +253,7 @@ export default function ProductShell({ product, children }: { product: ProductKe
             title={t.topup}
             className="flex-1 min-w-0 text-left"
           >
-            <div className="text-[11px] font-semibold uppercase" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.08em' }}>{t.balance}</div>
+            <div className="text-[11px] font-semibold uppercase" style={{ color: 'var(--nav-text-secondary)', letterSpacing: '0.08em' }}>{t.balance}</div>
             <div className="text-[15px] font-bold tabular-nums truncate" style={{ color: 'var(--nav-text-primary)' }}>
               {balance === null ? '···' : `${balance.toLocaleString('ru-KZ')} ₸`}
             </div>
@@ -294,7 +294,10 @@ export default function ProductShell({ product, children }: { product: ProductKe
         </aside>
 
         {/* Mobile: sticky top bar + drawer. */}
-        <div className="lg:hidden sticky top-0 z-40 h-14 flex items-center gap-2 px-2 nav-glass" style={{ borderLeft: 'none', borderRight: 'none', borderTop: 'none' }}>
+        {/* pr-[228px]: the fixed utility pill (TopUtilityBar, ~206px + right-3, the
+            shell drops its balance button) sits over the right of this bar; without the
+            reserve a long title ran under it and was cut («Kaspi Cashier API»). */}
+        <div className="lg:hidden sticky top-0 z-40 h-14 flex items-center gap-1.5 pl-1 pr-[226px] nav-glass" style={{ borderLeft: 'none', borderRight: 'none', borderTop: 'none' }}>
           <button
             type="button"
             onClick={() => setOpen(true)}
@@ -305,8 +308,8 @@ export default function ProductShell({ product, children }: { product: ProductKe
           >
             ☰
           </button>
-          {dot}
-          <span className="text-sm font-bold" style={{ color: 'var(--nav-text-primary)' }}>{def.name}</span>
+          <span className="max-[380px]:hidden flex">{dot}</span>
+          <span className="min-w-0 truncate text-sm font-bold" style={{ color: 'var(--nav-text-primary)' }}>{def.shortName ?? def.name}</span>
         </div>
         {open && (
           // z-[55]: выше окон страницы (z-50, например окна подключения магазина), иначе меню открывалось под ними.

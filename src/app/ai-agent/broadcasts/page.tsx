@@ -14,6 +14,7 @@ import DesktopShell from '@/components/DesktopShell'
 import { getActivePlan } from '@/lib/plan'
 import { useAppDialog } from '@/components/AppDialog'
 import BrandLoader from '@/components/BrandLoader'
+import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 const MAX_MESSAGE_LEN = 2000
@@ -103,6 +104,7 @@ function ChannelBadge({ channel }: { channel: string }) {
 }
 
 export default function AiAgentBroadcasts() {
+  usePageDocumentTitle('Рассылки — AI-агент')
   const router = useRouter()
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw

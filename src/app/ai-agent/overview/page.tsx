@@ -14,6 +14,7 @@ import AiAgentProUpsell from '@/components/aiAgent/AiAgentProUpsell'
 import { fetchWaUsage, waLevelColor, type WaUsageResponse } from '@/components/aiAgent/WhatsAppUsage'
 import { useLanguage } from '@/components/LanguageProvider'
 import { aiAgentSetupDict } from '@/lib/i18n/aiAgentSetup'
+import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 
 // "Обзор" of the AI agent (founder's mock, 21.09.2026): three numbers, the
 // freshest conversations, and the hand-offs to the neighbouring products.
@@ -48,6 +49,7 @@ async function authHeader() {
 }
 
 export default function AiAgentOverview() {
+  usePageDocumentTitle('Обзор — AI-агент')
   const router = useRouter()
   const crossHref = useCrossHref()
   const [ready, setReady] = useState(false)

@@ -27,6 +27,7 @@ import {
 } from '@/lib/notificationPrefs'
 import { notificationEventTexts, notificationsDict, type NotificationsPageContent } from '@/lib/i18n/notifications'
 import PageHeader from '@/components/PageHeader'
+import Skeleton from '@/components/Skeleton'
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx).
 const EASE = [0.16, 1, 0.3, 1] as const
@@ -630,12 +631,20 @@ export default function Notifications() {
     )
   }
 
+  // Пока грузится: шапка уже на месте (и название вкладки), вместо «…» --
+  // заглушки того же размера, чтобы макет не прыгал.
   if (loading) return (
-      <>
-        <div className="max-w-lg lg:max-w-3xl mx-auto p-4 flex items-center justify-center" style={{ minHeight: '50vh' }}>
-          <p style={{ color: 'var(--nav-text-muted)' }}>…</p>
+    <div className="max-w-lg lg:max-w-3xl mx-auto p-4" aria-busy="true">
+      <PageHeader title={t.headerLabel} backHref="/profile" as="h1" animate={false} />
+      <div className="space-y-6">
+        <Skeleton className="h-44 w-full rounded-2xl" />
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-40" />
+          <Skeleton className="h-28 w-full rounded-2xl" />
+          <Skeleton className="h-28 w-full rounded-2xl" />
         </div>
-      </>
+      </div>
+    </div>
   )
 
   const ownerGroups = OWNER_GROUP_ORDER
@@ -678,6 +687,7 @@ export default function Notifications() {
             title={t.headerLabel}
             backHref="/profile"
             as="h1"
+            animate={false}
             right={
               <span className="text-xs" aria-live="polite" style={{ color: savedFlash ? 'var(--nav-success)' : 'var(--nav-text-muted)' }}>
                 {anyPending ? t.savingLabel : savedFlash ? t.savedLabel : ''}

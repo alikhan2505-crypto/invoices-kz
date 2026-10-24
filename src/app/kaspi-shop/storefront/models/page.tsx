@@ -6,6 +6,7 @@ import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import { getActivePlan } from '@/lib/plan'
 import BrandLoader from '@/components/BrandLoader'
+import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 
 type Variant = { id: string; size: string; color: string; stockCount: number | null }
 type Model = { id: string; name: string; price: number; imageUrl: string | null; categoryId: string | null; variants: Variant[] }
@@ -16,6 +17,7 @@ function formatPrice(price: number): string {
 }
 
 export default function WholesaleModelsPage() {
+  usePageDocumentTitle('Модели (оптовый каталог) — Kaspi Bot')
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [models, setModels] = useState<Model[]>([])

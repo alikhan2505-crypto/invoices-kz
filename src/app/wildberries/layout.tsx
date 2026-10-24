@@ -12,13 +12,14 @@ export const metadata = noindexMetadata('Wildberries — скоро')
 // not affected, they only run for a connection someone already made.
 export default function WildberriesLayout() {
   return (
-    <main className="min-h-screen flex items-center justify-center p-6 bg-gray-50">
+    <main className="min-h-screen flex items-center justify-center p-6" style={{ background: 'var(--nav-bg)' }}>
       <div className="max-w-sm text-center space-y-3">
-        <h1 className="text-lg font-semibold text-[#1C2056]">Wildberries — скоро</h1>
-        <p className="text-sm text-gray-500">
+        <h1 className="text-lg font-semibold" style={{ color: 'var(--nav-text-primary)' }}>Wildberries — скоро</h1>
+        <p className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
           Раздел ещё дорабатывается. Откроем его для всех, когда он будет готов.
         </p>
-        <Link href="/dashboard" className="inline-block text-sm text-[#1C2056] font-medium underline">
+        <Link href="/dashboard" className="inline-block text-sm font-medium underline"
+          style={{ color: 'var(--nav-accent)' }}>
           Вернуться на дашборд
         </Link>
       </div>

@@ -7,6 +7,7 @@ import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import { getActivePlan } from '@/lib/plan'
 import BrandLoader from '@/components/BrandLoader'
+import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -32,6 +33,7 @@ function formatPrice(price: number): string {
 }
 
 export default function KaspiShopStorefrontOrders() {
+  usePageDocumentTitle('Заказы витрины — Kaspi Bot')
   const router = useRouter()
   const reduceMotion = !!useReducedMotion()
   const [loading, setLoading] = useState(true)

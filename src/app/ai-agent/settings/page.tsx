@@ -25,6 +25,7 @@ import { settingsSaveErrorKind, isBlankAgentName, type SettingsSaveErrorKind } f
 import { buildBusinessContextLine, AgentTone, AgentGoal } from '@/lib/aiAgent/promptContext'
 import { useAppDialog } from '@/components/AppDialog'
 import { useCrossHref } from '@/lib/useCrossHref'
+import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -162,6 +163,8 @@ export default function AiAgentSettings() {
   const crossHref = useCrossHref()
   const { lang } = useLanguage()
   const t = aiAgentDict[lang]
+  // Под-экран конкретного агента: в меню подсвечены «Агенты», так же называем вкладку.
+  usePageDocumentTitle(`${t.agentsTitle} — ${t.agentPageTitle}`)
   // Shadows window.alert / window.confirm for this component -- see
   // src/components/AppDialog.tsx. Every confirm below is awaited: a Promise
   // is truthy, so `if (confirm(...))` would silently pass.

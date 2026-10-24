@@ -50,6 +50,16 @@ describe('isSectionVisible', () => {
   it('shows every section when nothing was chosen', () => {
     expect(isSectionVisible(null, 'wildberries', null)).toBe(true)
   })
+  it('while the list is still loading shows only the base product and the active section', () => {
+    expect(isSectionVisible(null, 'invoices', null, false)).toBe(true)
+    expect(isSectionVisible(null, 'kaspiShop', null, false)).toBe(false)
+    expect(isSectionVisible(null, 'wildberries', null, false)).toBe(false)
+    expect(isSectionVisible(null, 'kaspiShop', 'kaspiShop', false)).toBe(true)
+  })
+  it('a known list ignores the ready flag', () => {
+    expect(isSectionVisible(['invoices', 'kaspiShop'], 'kaspiShop', null, false)).toBe(true)
+    expect(isSectionVisible(['invoices'], 'kaspiShop', null, false)).toBe(false)
+  })
   it('hides an unchosen section', () => {
     expect(isSectionVisible(['invoices'], 'kaspiShop', null)).toBe(false)
   })

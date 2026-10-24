@@ -14,6 +14,8 @@ import BrandLoader from '@/components/BrandLoader'
 import Link from 'next/link'
 import { useLanguage } from '@/components/LanguageProvider'
 import { aiAgentSetupDict } from '@/lib/i18n/aiAgentSetup'
+import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
+import { aiAgentDict } from '@/lib/i18n/aiAgent'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -83,6 +85,7 @@ function AiAgentDialogsInner() {
   const searchParams = useSearchParams()
   const { lang } = useLanguage()
   const sd = aiAgentSetupDict[lang]
+  usePageDocumentTitle(`${sd.dialogsTitle} — ${aiAgentDict[lang].agentPageTitle}`)
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw
   const [loading, setLoading] = useState(true)

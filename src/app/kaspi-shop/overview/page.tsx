@@ -8,6 +8,7 @@ import DesktopShell from '@/components/DesktopShell'
 import { getActivePlan } from '@/lib/plan'
 import { useCrossHref } from '@/lib/useCrossHref'
 import { ORDER_STATUS_TABS, PACKING_STATUS, WORKING_ORDER_STATUSES } from '@/lib/kaspiShop/orderStatuses'
+import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 
 // "Обзор" of Kaspi Bot (founder's mock, 21.09.2026): three numbers, the orders in
 // work, and the hand-offs to the neighbouring products. Everything here reads
@@ -35,6 +36,7 @@ async function authHeader() {
 }
 
 export default function KaspiShopOverview() {
+  usePageDocumentTitle('Обзор — Kaspi Bot')
   const router = useRouter()
   const crossHref = useCrossHref()
   const [ready, setReady] = useState(false)

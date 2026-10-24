@@ -8,6 +8,7 @@ import { profileCoreDict } from '@/lib/i18n/profileCore'
 import { useAppDialog } from '@/components/AppDialog'
 import { checkNextNumber, digitsOnly, highestIssuedNumber } from '@/lib/docNumbering'
 import PageHeader from '@/components/PageHeader'
+import Skeleton from '@/components/Skeleton'
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
 // kept identical rather than inventing a second "house" ease.
@@ -222,19 +223,21 @@ export default function InvoiceSettings() {
     transition: { delay: reduceMotion ? 0 : i * 0.05, duration: reduceMotion ? 0 : 0.4, ease: EASE },
   })
 
+  // Пока грузится: шапка и название вкладки уже на месте, поля -- заглушками.
   if (!loaded) return (
-    <>
-      <div className="max-w-lg lg:max-w-2xl mx-auto p-4 flex items-center justify-center" style={{ minHeight: '50vh' }}>
-        <p style={{ color: 'var(--nav-text-muted)' }}>{t.loadingLabel}</p>
-      </div>
-    </>
+    <div className="max-w-lg lg:max-w-2xl mx-auto p-4 space-y-4" aria-busy="true">
+      <PageHeader title={t.invoiceSettingsLabel} backHref="/profile" animate={false} />
+      <Skeleton className="h-64 w-full rounded-2xl" />
+      <Skeleton className="h-32 w-full rounded-2xl" />
+      <Skeleton className="h-32 w-full rounded-2xl" />
+    </div>
   )
 
   return (
     <>
       <div className="max-w-lg lg:max-w-2xl mx-auto p-4 space-y-4">
 
-        <PageHeader title={t.invoiceSettingsLabel} backHref="/profile" />
+        <PageHeader title={t.invoiceSettingsLabel} backHref="/profile" animate={false} />
 
         {/* Нумерация счетов */}
         <motion.div {...fadeIn(1)} className="nav-glass rounded-2xl p-4 space-y-4">

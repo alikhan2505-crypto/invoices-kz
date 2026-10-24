@@ -2,6 +2,7 @@
 import { useState, type ReactNode } from 'react'
 import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
+import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 
 // Text-first onboarding for the AI-агент section (2026-08-20, founder:
 // "сделать онбординг через видеокурсы (пока текстовый Документацию написать
@@ -135,6 +136,7 @@ function ChannelSwitcher() {
 }
 
 export default function AiAgentDocsPage() {
+  usePageDocumentTitle('Как настроить — AI-агент')
   return (
     <DesktopShell>
     <main className="page-surface-in-shell min-h-screen pb-6 lg:min-h-full">

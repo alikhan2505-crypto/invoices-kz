@@ -309,7 +309,10 @@ function SiteNavBar({ desktopOnly = false }: { desktopOnly?: boolean }) {
   // /products only sees those tabs (plus the one they're standing in). Nothing
   // chosen = every tab, exactly as before. Display only -- access is still
   // decided by isSectionLocked and each page's own guard.
-  const [mine] = useMyProducts()
+  // ready=false (no cache, list not fetched yet): null means "don't know", so
+  // the row shows only Счета and the active section instead of every tab that
+  // would then collapse to the real few (the 7 -> 3 jump, 23.10.2026).
+  const [mine, , mineReady] = useMyProducts()
   // On a product subdomain the menu is that product only ("you went where you
   // clicked, nothing else is offered"); the way to other products is «Все продукты».
   const onProductHost = useProductHost()
@@ -320,7 +323,7 @@ function SiteNavBar({ desktopOnly = false }: { desktopOnly?: boolean }) {
     .filter(s => !s.adminOnly || perms?.isAdmin === true)
     // Админ-раздел (CFO) админу виден всегда, даже если его нет в «моих продуктах»
     // (у админов enabled_products его не содержит) -- иначе добраться можно только по URL.
-    .filter(s => onProductHost ? s.key === activeSection?.key : (s.adminOnly && perms?.isAdmin === true) || isSectionVisible(mine, s.key, activeSection?.key ?? null))
+    .filter(s => onProductHost ? s.key === activeSection?.key : (s.adminOnly && perms?.isAdmin === true) || isSectionVisible(mine, s.key, activeSection?.key ?? null, mineReady))
 
   // Opening a product section connects it to the account. An admin-only section
   // (still under the founder's review) is never written into a non-admin's

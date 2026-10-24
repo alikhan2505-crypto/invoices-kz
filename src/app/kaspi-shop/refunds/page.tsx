@@ -9,6 +9,7 @@ import DesktopShell from '@/components/DesktopShell'
 import SessionExpiredBanner from '@/components/kaspiShop/SessionExpiredBanner'
 import { getActivePlan } from '@/lib/plan'
 import { REFUND_ATTENTION_TABS } from '@/lib/kaspiShop/refunds'
+import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -82,6 +83,7 @@ function stepDotColor(stepStatus: string | null): string {
 }
 
 export default function KaspiShopRefundsPage() {
+  usePageDocumentTitle('Возвраты — Kaspi Bot')
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [sessionExpired, setSessionExpired] = useState(false)

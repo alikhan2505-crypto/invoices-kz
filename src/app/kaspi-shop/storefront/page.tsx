@@ -8,6 +8,7 @@ import DesktopShell from '@/components/DesktopShell'
 import { getActivePlan } from '@/lib/plan'
 import { useCrossHref } from '@/lib/useCrossHref'
 import BrandLoader from '@/components/BrandLoader'
+import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -29,6 +30,7 @@ function formatPrice(price: number): string {
 }
 
 export default function KaspiShopStorefrontSettings() {
+  usePageDocumentTitle('Витрина — Kaspi Bot')
   const crossHref = useCrossHref()
   const router = useRouter()
   const reduceMotion = !!useReducedMotion()

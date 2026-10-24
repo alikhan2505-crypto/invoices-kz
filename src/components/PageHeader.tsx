@@ -58,11 +58,11 @@ export default function PageHeader({
   const hasBack = !!backHref || !!onBack
 
   const backControl = backHref ? (
-    <Link href={backHref} aria-label={backLabel(lang)} className={BACK_CLS} style={{ color: 'var(--nav-text-muted)' }}>
+    <Link href={backHref} aria-label={backLabel(lang)} className={BACK_CLS} style={{ color: 'var(--nav-text-secondary)' }}>
       <ChevronLeftIcon />
     </Link>
   ) : onBack ? (
-    <button type="button" onClick={onBack} aria-label={backLabel(lang)} className={BACK_CLS} style={{ color: 'var(--nav-text-muted)' }}>
+    <button type="button" onClick={onBack} aria-label={backLabel(lang)} className={BACK_CLS} style={{ color: 'var(--nav-text-secondary)' }}>
       <ChevronLeftIcon />
     </button>
   ) : null

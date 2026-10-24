@@ -8,6 +8,7 @@ import SiteNav from '@/components/SiteNav'
 import DesktopShell from '@/components/DesktopShell'
 import SessionExpiredBanner from '@/components/kaspiShop/SessionExpiredBanner'
 import { getActivePlan } from '@/lib/plan'
+import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
@@ -62,6 +63,7 @@ function formatDateRu(iso: string): string {
 }
 
 export default function KaspiShopQualityPage() {
+  usePageDocumentTitle('Показатели качества — Kaspi Bot')
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [sessionExpired, setSessionExpired] = useState(false)

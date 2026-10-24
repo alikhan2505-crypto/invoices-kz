@@ -10,6 +10,7 @@ import { setPostLoginRedirect } from '@/lib/postLoginRedirect'
 import ApiDocsViewer from '@/components/ApiDocsViewer'
 import { CASHIER_API_THEMED as C, CASHIER_API_FONT_SANS as FONT_SANS, CASHIER_API_FONT_MONO as FONT_MONO } from '@/lib/kaspiCashierApi/theme'
 import BrandLoader from '@/components/BrandLoader'
+import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 
 interface DocsCopy {
   loading: string
@@ -170,6 +171,7 @@ export default function KaspiApiDocsPage() {
   // OpenAPI-справочник в ApiDocsViewer — только ru/en, поэтому для него
   // kk откатывается на ru (об этом честно говорит kk-версия i18nNote).
   const d = DOCS_COPY[lang]
+  usePageDocumentTitle(d.title)
   const viewerLang: 'ru' | 'en' = lang === 'en' ? 'en' : 'ru'
 
   const [loading, setLoading] = useState(true)

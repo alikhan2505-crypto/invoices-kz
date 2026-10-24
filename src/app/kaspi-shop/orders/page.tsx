@@ -11,6 +11,7 @@ import { ORDER_STATUS_TABS, BULK_SELECTABLE_STATUSES, WAYBILL_PRINTABLE_STATUSES
 import { filterByDeliveryCutoff, type DeliveryDateMode } from '@/lib/kaspiShop/ordersFilters'
 import { normalizeKzPhone } from '@/lib/kaspiPay/phone'
 import { getActivePlan } from '@/lib/plan'
+import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 const CARD_HOVER = 'transition-all duration-200 ease-out hover:-translate-y-1 hover:shadow-[var(--nav-card-glow)]'
@@ -52,6 +53,7 @@ type Order = {
 }
 
 function KaspiShopOrdersInner() {
+  usePageDocumentTitle('Заказы — Kaspi Bot')
   const router = useRouter()
   const searchParams = useSearchParams()
   const status = searchParams.get('status') || ORDER_STATUS_TABS[0].value
