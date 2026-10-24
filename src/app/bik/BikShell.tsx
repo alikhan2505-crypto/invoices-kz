@@ -102,7 +102,7 @@ export default function BikShell({
             month: 'long',
             year: 'numeric',
           })}
-          {'. '}
+          {' · '}
           {chrome.checked}: {longDate(lang)}
         </p>
 

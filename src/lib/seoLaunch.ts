@@ -2,7 +2,7 @@
 // While SEO_TARIFF_BIK_LIVE is false the new pages are noindex, and are not in the
 // sitemap, the guides index/hub links or llms.txt. The founder reviews the pages
 // first and flips the flag.
-export const SEO_TARIFF_BIK_LIVE = false
+export const SEO_TARIFF_BIK_LIVE = true
 
 // ISO dates (YYYY-MM-DD): when the data was verified and when the tariff took effect.
 export const KASPI_TARIFF_CHECKED = '2026-10-23'

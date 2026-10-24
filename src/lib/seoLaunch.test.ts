@@ -9,8 +9,8 @@ import {
 } from './seoLaunch'
 
 describe('seoLaunch', () => {
-  it('stays off until the founder flips it', () => {
-    expect(SEO_TARIFF_BIK_LIVE).toBe(false)
+  it('is on: the founder approved publishing the pages', () => {
+    expect(SEO_TARIFF_BIK_LIVE).toBe(true)
   })
 
   it('formats Russian dates', () => {

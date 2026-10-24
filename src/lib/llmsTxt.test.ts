@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { buildLlmsTxt } from './llmsTxt'
 import { BIK_BANK_PAGES } from './bikRegistry'
 import { KASPI_GUIDES } from './kaspiGuides'
+import { SEO_TARIFF_BIK_LIVE } from './seoLaunch'
 
 describe('buildLlmsTxt', () => {
   it('флаг выключен: прежнее содержимое без новых разделов', () => {
@@ -15,8 +16,10 @@ describe('buildLlmsTxt', () => {
     expect(t).toContain('- [Как открыть ИП в 2026 году](https://invoices.kz/guides/kak-otkryt-ip-2026)\n\n## Optional\n')
   })
 
-  it('по умолчанию совпадает с выключенным флагом (флаг в репозитории false)', () => {
-    expect(buildLlmsTxt()).toBe(buildLlmsTxt(false))
+  it('по умолчанию совпадает с включённым флагом (флаг в репозитории true)', () => {
+    expect(SEO_TARIFF_BIK_LIVE).toBe(true)
+    expect(buildLlmsTxt()).toBe(buildLlmsTxt(true))
+    expect(buildLlmsTxt()).not.toBe(buildLlmsTxt(false))
   })
 
   it('флаг включён: 8 страниц K, хаб и 11 банков, Optional остаётся последним', () => {

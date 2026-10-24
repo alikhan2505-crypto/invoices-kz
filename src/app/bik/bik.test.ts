@@ -231,8 +231,8 @@ describe('launch flag', () => {
     for (const lang of LANGS) expect(hubMetadata(lang).robots).toEqual(expected)
   })
 
-  it('is off until the founder reviews the pages', () => {
-    expect(SEO_TARIFF_BIK_LIVE).toBe(false)
+  it('is on: the founder approved publishing the pages', () => {
+    expect(SEO_TARIFF_BIK_LIVE).toBe(true)
   })
 })
 

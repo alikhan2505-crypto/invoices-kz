@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { bikGuidesIndexCard, bikHubLink } from './bikLinks'
 import { bikHubPath } from './bikRegistry'
+import { SEO_TARIFF_BIK_LIVE } from './seoLaunch'
 
 describe('bikLinks', () => {
   it('флаг выключен: ссылок нет', () => {
@@ -9,9 +10,12 @@ describe('bikLinks', () => {
     expect(bikGuidesIndexCard('kk', false)).toBeNull()
   })
 
-  it('по умолчанию (флаг в репозитории выключен) тоже null', () => {
-    expect(bikHubLink('ru')).toBeNull()
-    expect(bikGuidesIndexCard('ru')).toBeNull()
+  it('по умолчанию (флаг в репозитории включён) ссылки есть', () => {
+    expect(SEO_TARIFF_BIK_LIVE).toBe(true)
+    expect(bikHubLink('ru')?.href).toBe(bikHubPath('ru'))
+    expect(bikHubLink('kk')?.href).toBe(bikHubPath('kk'))
+    expect(bikGuidesIndexCard('ru')?.href).toBe('/bik')
+    expect(bikGuidesIndexCard('kk')?.href).toBe('/bik/kk')
   })
 
   it('флаг включён: ссылки ведут на хаб нужного языка, en на русский', () => {
