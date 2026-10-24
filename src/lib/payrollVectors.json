@@ -1,0 +1,1117 @@
+{
+ "meta": {
+  "generatedBy": "scratchpad/payroll/gen_ts_vectors.py (final_ref.py integer reference + vectors.json; every row cross-checked against SPEC.md sections 6.1-6.4)",
+  "generated": "2026-10-24",
+  "soRounding": "ceil"
+ },
+ "main": [
+  {
+   "id": "V01",
+   "input": {
+    "gross": 60000
+   },
+   "expected": {
+    "opv": 6000,
+    "vosms": 1200,
+    "ipn": 0,
+    "net": 52800,
+    "opvr": 2975,
+    "so": 4250,
+    "sn": 3633,
+    "oosms": 1800,
+    "employerCost": 72658,
+    "totalToState": 19858
+   }
+  },
+  {
+   "id": "V02",
+   "input": {
+    "gross": 85000
+   },
+   "expected": {
+    "opv": 8500,
+    "vosms": 1700,
+    "ipn": 0,
+    "net": 74800,
+    "opvr": 2975,
+    "so": 4250,
+    "sn": 4488,
+    "oosms": 2550,
+    "employerCost": 99263,
+    "totalToState": 24463
+   }
+  },
+  {
+   "id": "V03",
+   "input": {
+    "gross": 94445
+   },
+   "expected": {
+    "opv": 9445,
+    "vosms": 1889,
+    "ipn": 0,
+    "net": 83111,
+    "opvr": 3306,
+    "so": 4250,
+    "sn": 4987,
+    "oosms": 2833,
+    "employerCost": 109821,
+    "totalToState": 26710
+   }
+  },
+  {
+   "id": "V04",
+   "input": {
+    "gross": 147443
+   },
+   "expected": {
+    "opv": 14744,
+    "vosms": 2949,
+    "ipn": 0,
+    "net": 129750,
+    "opvr": 5161,
+    "so": 6635,
+    "sn": 7785,
+    "oosms": 4423,
+    "employerCost": 171447,
+    "totalToState": 41697
+   }
+  },
+  {
+   "id": "V05",
+   "input": {
+    "gross": 150000
+   },
+   "expected": {
+    "opv": 15000,
+    "vosms": 3000,
+    "ipn": 225,
+    "net": 131775,
+    "opvr": 5250,
+    "so": 6750,
+    "sn": 7920,
+    "oosms": 4500,
+    "employerCost": 174420,
+    "totalToState": 42645
+   }
+  },
+  {
+   "id": "V06",
+   "input": {
+    "gross": 300000
+   },
+   "expected": {
+    "opv": 30000,
+    "vosms": 6000,
+    "ipn": 13425,
+    "net": 250575,
+    "opvr": 10500,
+    "so": 13500,
+    "sn": 15840,
+    "oosms": 9000,
+    "employerCost": 348840,
+    "totalToState": 98265
+   }
+  },
+  {
+   "id": "V07",
+   "input": {
+    "gross": 661111
+   },
+   "expected": {
+    "opv": 66111,
+    "vosms": 13222,
+    "ipn": 45203,
+    "net": 536575,
+    "opvr": 23139,
+    "so": 29750,
+    "sn": 34907,
+    "oosms": 19833,
+    "employerCost": 768740,
+    "totalToState": 232165
+   }
+  },
+  {
+   "id": "V08",
+   "input": {
+    "gross": 1700000
+   },
+   "expected": {
+    "opv": 170000,
+    "vosms": 34000,
+    "ipn": 136625,
+    "net": 1359375,
+    "opvr": 59500,
+    "so": 29750,
+    "sn": 89760,
+    "oosms": 51000,
+    "employerCost": 1930010,
+    "totalToState": 570635
+   }
+  },
+  {
+   "id": "V09",
+   "input": {
+    "gross": 3400000
+   },
+   "expected": {
+    "opv": 340000,
+    "vosms": 34000,
+    "ipn": 289625,
+    "net": 2736375,
+    "opvr": 119000,
+    "so": 29750,
+    "sn": 181560,
+    "oosms": 102000,
+    "employerCost": 3832310,
+    "totalToState": 1095935
+   }
+  },
+  {
+   "id": "V10",
+   "input": {
+    "gross": 4250000
+   },
+   "expected": {
+    "opv": 425000,
+    "vosms": 34000,
+    "ipn": 366125,
+    "net": 3424875,
+    "opvr": 148750,
+    "so": 29750,
+    "sn": 227460,
+    "oosms": 102000,
+    "employerCost": 4757960,
+    "totalToState": 1333085
+   }
+  },
+  {
+   "id": "V11",
+   "input": {
+    "gross": 10000000
+   },
+   "expected": {
+    "opv": 425000,
+    "vosms": 34000,
+    "ipn": 941125,
+    "net": 8599875,
+    "opvr": 148750,
+    "so": 29750,
+    "sn": 572460,
+    "oosms": 102000,
+    "employerCost": 10852960,
+    "totalToState": 2253085
+   }
+  },
+  {
+   "id": "V12",
+   "input": {
+    "gross": 10000000,
+    "monthIndex": 4
+   },
+   "expected": {
+    "opv": 425000,
+    "vosms": 34000,
+    "ipn": 985250,
+    "net": 8555750,
+    "opvr": 148750,
+    "so": 29750,
+    "sn": 572460,
+    "oosms": 102000,
+    "employerCost": 10852960,
+    "totalToState": 2297210
+   },
+   "altInput": {
+    "gross": 10000000,
+    "priorTaxableCum": 28233750
+   }
+  },
+  {
+   "id": "S01",
+   "input": {
+    "gross": 300000,
+    "category": "pensioner"
+   },
+   "expected": {
+    "opv": 0,
+    "vosms": 0,
+    "ipn": 17025,
+    "net": 282975,
+    "opvr": 0,
+    "so": 0,
+    "sn": 18000,
+    "oosms": 0,
+    "employerCost": 318000,
+    "totalToState": 35025
+   }
+  },
+  {
+   "id": "S02",
+   "input": {
+    "gross": 30000,
+    "hireOrFireMonth": true
+   },
+   "expected": {
+    "opv": 3000,
+    "vosms": 600,
+    "ipn": 0,
+    "net": 26400,
+    "opvr": 2975,
+    "so": 4250,
+    "sn": 1584,
+    "oosms": 900,
+    "employerCost": 39709,
+    "totalToState": 13309
+   }
+  }
+ ],
+ "extra": [
+  {
+   "id": "S02b",
+   "input": {
+    "gross": 60000,
+    "hireOrFireMonth": true
+   },
+   "expected": {
+    "opv": 6000,
+    "vosms": 1200,
+    "ipn": 0,
+    "net": 52800,
+    "opvr": 2975,
+    "so": 4250,
+    "sn": 3168,
+    "oosms": 1800,
+    "employerCost": 72193,
+    "totalToState": 19393
+   },
+   "base": 0
+  },
+  {
+   "id": "S03",
+   "input": {
+    "gross": 300000,
+    "employerRegime": "simplified"
+   },
+   "expected": {
+    "opv": 30000,
+    "vosms": 6000,
+    "ipn": 13425,
+    "net": 250575,
+    "opvr": 10500,
+    "so": 13500,
+    "sn": 0,
+    "oosms": 9000,
+    "employerCost": 333000,
+    "totalToState": 82425
+   },
+   "base": 134250
+  },
+  {
+   "id": "D01",
+   "input": {
+    "gross": 300000,
+    "baseDeduction": false
+   },
+   "expected": {
+    "opv": 30000,
+    "vosms": 6000,
+    "ipn": 26400,
+    "net": 237600,
+    "opvr": 10500,
+    "so": 13500,
+    "sn": 15840,
+    "oosms": 9000,
+    "employerCost": 348840,
+    "totalToState": 111240
+   },
+   "base": 264000
+  },
+  {
+   "id": "C1",
+   "input": {
+    "gross": 200001
+   },
+   "expected": {
+    "opv": 20000,
+    "vosms": 4000,
+    "ipn": 4625,
+    "net": 171376,
+    "opvr": 7000,
+    "so": 9001,
+    "sn": 10560,
+    "oosms": 6000,
+    "employerCost": 232562,
+    "totalToState": 61186
+   },
+   "base": 46251,
+   "flag": "ASSUMPTION_SO_ROUNDING",
+   "expectedIfHalfUp": {
+    "opv": 20000,
+    "vosms": 4000,
+    "ipn": 4625,
+    "net": 171376,
+    "opvr": 7000,
+    "so": 9000,
+    "sn": 10560,
+    "oosms": 6000,
+    "employerCost": 232561,
+    "totalToState": 61185
+   }
+  },
+  {
+   "id": "C2",
+   "input": {
+    "gross": 160001
+   },
+   "expected": {
+    "opv": 16000,
+    "vosms": 3200,
+    "ipn": 1105,
+    "net": 139696,
+    "opvr": 5600,
+    "so": 7201,
+    "sn": 8448,
+    "oosms": 4800,
+    "employerCost": 186050,
+    "totalToState": 46354
+   },
+   "base": 11051,
+   "flag": "ASSUMPTION_SO_ROUNDING",
+   "expectedIfHalfUp": {
+    "opv": 16000,
+    "vosms": 3200,
+    "ipn": 1105,
+    "net": 139696,
+    "opvr": 5600,
+    "so": 7200,
+    "sn": 8448,
+    "oosms": 4800,
+    "employerCost": 186049,
+    "totalToState": 46353
+   }
+  },
+  {
+   "id": "T1",
+   "input": {
+    "gross": 60550
+   },
+   "expected": {
+    "opv": 6055,
+    "vosms": 1211,
+    "ipn": 0,
+    "net": 53284,
+    "opvr": 2975,
+    "so": 4250,
+    "sn": 3633,
+    "oosms": 1817,
+    "employerCost": 73225,
+    "totalToState": 19941
+   },
+   "base": 0
+  },
+  {
+   "id": "T2",
+   "input": {
+    "gross": 60551
+   },
+   "expected": {
+    "opv": 6055,
+    "vosms": 1211,
+    "ipn": 0,
+    "net": 53285,
+    "opvr": 2975,
+    "so": 4250,
+    "sn": 3197,
+    "oosms": 1817,
+    "employerCost": 72790,
+    "totalToState": 19505
+   },
+   "base": 0
+  },
+  {
+   "id": "DI1",
+   "input": {
+    "gross": 300000,
+    "category": "disabled12Indefinite"
+   },
+   "expected": {
+    "opv": 0,
+    "vosms": 0,
+    "ipn": 0,
+    "net": 300000,
+    "opvr": 0,
+    "so": 15000,
+    "sn": 18000,
+    "oosms": 0,
+    "employerCost": 333000,
+    "totalToState": 33000
+   },
+   "base": 0
+  },
+  {
+   "id": "DT1",
+   "input": {
+    "gross": 300000,
+    "category": "disabled12Term"
+   },
+   "expected": {
+    "opv": 30000,
+    "vosms": 0,
+    "ipn": 0,
+    "net": 270000,
+    "opvr": 10500,
+    "so": 13500,
+    "sn": 16200,
+    "oosms": 0,
+    "employerCost": 340200,
+    "totalToState": 70200
+   },
+   "base": 0
+  },
+  {
+   "id": "DS1",
+   "input": {
+    "gross": 300000,
+    "category": "disabled3"
+   },
+   "expected": {
+    "opv": 30000,
+    "vosms": 0,
+    "ipn": 0,
+    "net": 270000,
+    "opvr": 10500,
+    "so": 13500,
+    "sn": 16200,
+    "oosms": 0,
+    "employerCost": 340200,
+    "totalToState": 70200
+   },
+   "base": 0
+  },
+  {
+   "id": "DS2",
+   "input": {
+    "gross": 600000,
+    "category": "disabled3",
+    "monthIndex": 9
+   },
+   "expected": {
+    "opv": 60000,
+    "vosms": 0,
+    "ipn": 0,
+    "net": 540000,
+    "opvr": 21000,
+    "so": 27000,
+    "sn": 32400,
+    "oosms": 0,
+    "employerCost": 680400,
+    "totalToState": 140400
+   },
+   "base": 0
+  },
+  {
+   "id": "DS3",
+   "input": {
+    "gross": 600000,
+    "category": "disabled3",
+    "monthIndex": 10
+   },
+   "expected": {
+    "opv": 60000,
+    "vosms": 0,
+    "ipn": 28785,
+    "net": 511215,
+    "opvr": 21000,
+    "so": 27000,
+    "sn": 32400,
+    "oosms": 0,
+    "employerCost": 680400,
+    "totalToState": 169185
+   },
+   "base": 287850
+  },
+  {
+   "id": "DS4",
+   "input": {
+    "gross": 600000,
+    "category": "disabled3",
+    "monthIndex": 12
+   },
+   "expected": {
+    "opv": 60000,
+    "vosms": 0,
+    "ipn": 41025,
+    "net": 498975,
+    "opvr": 21000,
+    "so": 27000,
+    "sn": 32400,
+    "oosms": 0,
+    "employerCost": 680400,
+    "totalToState": 181425
+   },
+   "base": 410250
+  },
+  {
+   "id": "DI2",
+   "input": {
+    "gross": 2200000,
+    "category": "disabled12Indefinite",
+    "monthIndex": 11
+   },
+   "expected": {
+    "opv": 0,
+    "vosms": 0,
+    "ipn": 114775,
+    "net": 2085225,
+    "opvr": 0,
+    "so": 29750,
+    "sn": 132000,
+    "oosms": 0,
+    "employerCost": 2361750,
+    "totalToState": 276525
+   },
+   "base": 1147750
+  },
+  {
+   "id": "DI3",
+   "input": {
+    "gross": 2200000,
+    "category": "disabled12Indefinite",
+    "monthIndex": 12
+   },
+   "expected": {
+    "opv": 0,
+    "vosms": 0,
+    "ipn": 207025,
+    "net": 1992975,
+    "opvr": 0,
+    "so": 29750,
+    "sn": 132000,
+    "oosms": 0,
+    "employerCost": 2361750,
+    "totalToState": 368775
+   },
+   "base": 2070250
+  },
+  {
+   "id": "M1",
+   "input": {
+    "gross": 1000000,
+    "priorTaxableCum": 36500000
+   },
+   "expected": {
+    "opv": 100000,
+    "vosms": 20000,
+    "ipn": 99413,
+    "net": 780587,
+    "opvr": 35000,
+    "so": 29750,
+    "sn": 52800,
+    "oosms": 30000,
+    "employerCost": 1147550,
+    "totalToState": 366963
+   },
+   "base": 750250
+  },
+  {
+   "id": "MAX",
+   "input": {
+    "gross": 999999999
+   },
+   "expected": {
+    "opv": 425000,
+    "vosms": 34000,
+    "ipn": 148073562,
+    "net": 851467437,
+    "opvr": 148750,
+    "so": 29750,
+    "sn": 59972460,
+    "oosms": 102000,
+    "employerCost": 1060252959,
+    "totalToState": 208785522
+   },
+   "base": 999411249
+  }
+ ],
+ "boundary": [
+  {
+   "id": "B1",
+   "input": {
+    "gross": 1
+   },
+   "expected": {
+    "opv": 0,
+    "vosms": 0,
+    "ipn": 0,
+    "net": 1,
+    "opvr": 2975,
+    "so": 4250,
+    "sn": 3633,
+    "oosms": 0,
+    "employerCost": 10859,
+    "totalToState": 10858
+   }
+  },
+  {
+   "id": "B60549",
+   "input": {
+    "gross": 60549
+   },
+   "expected": {
+    "opv": 6055,
+    "vosms": 1211,
+    "ipn": 0,
+    "net": 53283,
+    "opvr": 2975,
+    "so": 4250,
+    "sn": 3633,
+    "oosms": 1816,
+    "employerCost": 73223,
+    "totalToState": 19940
+   }
+  },
+  {
+   "id": "B60550",
+   "input": {
+    "gross": 60550
+   },
+   "expected": {
+    "opv": 6055,
+    "vosms": 1211,
+    "ipn": 0,
+    "net": 53284,
+    "opvr": 2975,
+    "so": 4250,
+    "sn": 3633,
+    "oosms": 1817,
+    "employerCost": 73225,
+    "totalToState": 19941
+   }
+  },
+  {
+   "id": "B60551",
+   "input": {
+    "gross": 60551
+   },
+   "expected": {
+    "opv": 6055,
+    "vosms": 1211,
+    "ipn": 0,
+    "net": 53285,
+    "opvr": 2975,
+    "so": 4250,
+    "sn": 3197,
+    "oosms": 1817,
+    "employerCost": 72790,
+    "totalToState": 19505
+   }
+  },
+  {
+   "id": "B84999",
+   "input": {
+    "gross": 84999
+   },
+   "expected": {
+    "opv": 8500,
+    "vosms": 1700,
+    "ipn": 0,
+    "net": 74799,
+    "opvr": 2975,
+    "so": 4250,
+    "sn": 4488,
+    "oosms": 2550,
+    "employerCost": 99262,
+    "totalToState": 24463
+   }
+  },
+  {
+   "id": "B85000",
+   "input": {
+    "gross": 85000
+   },
+   "expected": {
+    "opv": 8500,
+    "vosms": 1700,
+    "ipn": 0,
+    "net": 74800,
+    "opvr": 2975,
+    "so": 4250,
+    "sn": 4488,
+    "oosms": 2550,
+    "employerCost": 99263,
+    "totalToState": 24463
+   }
+  },
+  {
+   "id": "B147443",
+   "input": {
+    "gross": 147443
+   },
+   "expected": {
+    "opv": 14744,
+    "vosms": 2949,
+    "ipn": 0,
+    "net": 129750,
+    "opvr": 5161,
+    "so": 6635,
+    "sn": 7785,
+    "oosms": 4423,
+    "employerCost": 171447,
+    "totalToState": 41697
+   }
+  },
+  {
+   "id": "B147444",
+   "input": {
+    "gross": 147444
+   },
+   "expected": {
+    "opv": 14744,
+    "vosms": 2949,
+    "ipn": 0,
+    "net": 129751,
+    "opvr": 5161,
+    "so": 6635,
+    "sn": 7785,
+    "oosms": 4423,
+    "employerCost": 171448,
+    "totalToState": 41697
+   }
+  },
+  {
+   "id": "B147448",
+   "input": {
+    "gross": 147448
+   },
+   "expected": {
+    "opv": 14745,
+    "vosms": 2949,
+    "ipn": 0,
+    "net": 129754,
+    "opvr": 5161,
+    "so": 6636,
+    "sn": 7785,
+    "oosms": 4423,
+    "employerCost": 171453,
+    "totalToState": 41699
+   }
+  },
+  {
+   "id": "B147449",
+   "input": {
+    "gross": 147449
+   },
+   "expected": {
+    "opv": 14745,
+    "vosms": 2949,
+    "ipn": 1,
+    "net": 129754,
+    "opvr": 5161,
+    "so": 6636,
+    "sn": 7785,
+    "oosms": 4423,
+    "employerCost": 171454,
+    "totalToState": 41700
+   }
+  },
+  {
+   "id": "B661111",
+   "input": {
+    "gross": 661111
+   },
+   "expected": {
+    "opv": 66111,
+    "vosms": 13222,
+    "ipn": 45203,
+    "net": 536575,
+    "opvr": 23139,
+    "so": 29750,
+    "sn": 34907,
+    "oosms": 19833,
+    "employerCost": 768740,
+    "totalToState": 232165
+   }
+  },
+  {
+   "id": "B661112",
+   "input": {
+    "gross": 661112
+   },
+   "expected": {
+    "opv": 66111,
+    "vosms": 13222,
+    "ipn": 45203,
+    "net": 536576,
+    "opvr": 23139,
+    "so": 29750,
+    "sn": 34907,
+    "oosms": 19833,
+    "employerCost": 768741,
+    "totalToState": 232165
+   }
+  },
+  {
+   "id": "B1699999",
+   "input": {
+    "gross": 1699999
+   },
+   "expected": {
+    "opv": 170000,
+    "vosms": 34000,
+    "ipn": 136625,
+    "net": 1359374,
+    "opvr": 59500,
+    "so": 29750,
+    "sn": 89760,
+    "oosms": 51000,
+    "employerCost": 1930009,
+    "totalToState": 570635
+   }
+  },
+  {
+   "id": "B1700000",
+   "input": {
+    "gross": 1700000
+   },
+   "expected": {
+    "opv": 170000,
+    "vosms": 34000,
+    "ipn": 136625,
+    "net": 1359375,
+    "opvr": 59500,
+    "so": 29750,
+    "sn": 89760,
+    "oosms": 51000,
+    "employerCost": 1930010,
+    "totalToState": 570635
+   }
+  },
+  {
+   "id": "B1700001",
+   "input": {
+    "gross": 1700001
+   },
+   "expected": {
+    "opv": 170000,
+    "vosms": 34000,
+    "ipn": 136625,
+    "net": 1359376,
+    "opvr": 59500,
+    "so": 29750,
+    "sn": 89760,
+    "oosms": 51000,
+    "employerCost": 1930011,
+    "totalToState": 570635
+   }
+  },
+  {
+   "id": "B3399999",
+   "input": {
+    "gross": 3399999
+   },
+   "expected": {
+    "opv": 340000,
+    "vosms": 34000,
+    "ipn": 289625,
+    "net": 2736374,
+    "opvr": 119000,
+    "so": 29750,
+    "sn": 181560,
+    "oosms": 102000,
+    "employerCost": 3832309,
+    "totalToState": 1095935
+   }
+  },
+  {
+   "id": "B3400000",
+   "input": {
+    "gross": 3400000
+   },
+   "expected": {
+    "opv": 340000,
+    "vosms": 34000,
+    "ipn": 289625,
+    "net": 2736375,
+    "opvr": 119000,
+    "so": 29750,
+    "sn": 181560,
+    "oosms": 102000,
+    "employerCost": 3832310,
+    "totalToState": 1095935
+   }
+  },
+  {
+   "id": "B4249999",
+   "input": {
+    "gross": 4249999
+   },
+   "expected": {
+    "opv": 425000,
+    "vosms": 34000,
+    "ipn": 366125,
+    "net": 3424874,
+    "opvr": 148750,
+    "so": 29750,
+    "sn": 227460,
+    "oosms": 102000,
+    "employerCost": 4757959,
+    "totalToState": 1333085
+   }
+  },
+  {
+   "id": "B4250000",
+   "input": {
+    "gross": 4250000
+   },
+   "expected": {
+    "opv": 425000,
+    "vosms": 34000,
+    "ipn": 366125,
+    "net": 3424875,
+    "opvr": 148750,
+    "so": 29750,
+    "sn": 227460,
+    "oosms": 102000,
+    "employerCost": 4757960,
+    "totalToState": 1333085
+   }
+  },
+  {
+   "id": "B4250001",
+   "input": {
+    "gross": 4250001
+   },
+   "expected": {
+    "opv": 425000,
+    "vosms": 34000,
+    "ipn": 366125,
+    "net": 3424876,
+    "opvr": 148750,
+    "so": 29750,
+    "sn": 227460,
+    "oosms": 102000,
+    "employerCost": 4757961,
+    "totalToState": 1333085
+   }
+  }
+ ],
+ "reverse": [
+  {
+   "id": "R1",
+   "net": 74800,
+   "params": {},
+   "gross": 85000,
+   "alternatives": []
+  },
+  {
+   "id": "R2",
+   "net": 129750,
+   "params": {},
+   "gross": 147443,
+   "alternatives": []
+  },
+  {
+   "id": "R3",
+   "net": 250575,
+   "params": {},
+   "gross": 300000,
+   "alternatives": []
+  },
+  {
+   "id": "R4",
+   "net": 300000,
+   "params": {},
+   "gross": 362406,
+   "alternatives": []
+  },
+  {
+   "id": "R5",
+   "net": 1000000,
+   "params": {},
+   "gross": 1246243,
+   "alternatives": [
+    1246244,
+    1246245
+   ]
+  },
+  {
+   "id": "R6",
+   "net": 3424875,
+   "params": {},
+   "gross": 4250000,
+   "alternatives": []
+  },
+  {
+   "id": "R7",
+   "net": 8599875,
+   "params": {},
+   "gross": 10000000,
+   "alternatives": []
+  },
+  {
+   "id": "R8",
+   "net": 8555750,
+   "params": {
+    "monthIndex": 4
+   },
+   "gross": 10000000,
+   "alternatives": []
+  },
+  {
+   "id": "R9",
+   "net": 1,
+   "params": {},
+   "gross": 1,
+   "alternatives": []
+  },
+  {
+   "id": "R10",
+   "net": 100,
+   "params": {},
+   "gross": 113,
+   "alternatives": []
+  },
+  {
+   "id": "R11",
+   "net": 300000,
+   "params": {
+    "category": "pensioner"
+   },
+   "gross": 318917,
+   "alternatives": []
+  },
+  {
+   "id": "R12",
+   "net": 300000,
+   "params": {
+    "category": "disabled12Indefinite"
+   },
+   "gross": 300000,
+   "alternatives": []
+  },
+  {
+   "id": "R13",
+   "net": 300000,
+   "params": {
+    "category": "disabled3"
+   },
+   "gross": 333333,
+   "alternatives": []
+  },
+  {
+   "id": "R14",
+   "net": 300000,
+   "params": {
+    "baseDeduction": false
+   },
+   "gross": 378788,
+   "alternatives": []
+  }
+ ],
+ "thresholds": {
+  "minGrossReachingThresholdStandardDeduction": 3585880,
+  "minGrossReachingThresholdStandardNoDeduction": 3441713,
+  "ipnBaseZeroUpToStandardDeduction": 147443,
+  "firstGrossWithIpn1StandardDeduction": 147449
+ }
+}

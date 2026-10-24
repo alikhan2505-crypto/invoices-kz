@@ -206,7 +206,7 @@ export const PRODUCT_I18N: Record<ProductKey, { name: Record<Lang, string>; blur
 // Полоса «Бесплатно, без регистрации» под плитками хаба (решение основателя
 // 14.10.2026, вариант А): ссылки на бесплатные /tools и гайды. Порядок —
 // по частоте спроса: документы, потом налоги и проверки, потом Kaspi.
-export const FREE_TOOLS: readonly string[] = ['schet', 'avr', 'nakladnaya', 'kp', 'nalogi', 'kontragent', 'margin', 'waybills']
+export const FREE_TOOLS: readonly string[] = ['schet', 'avr', 'nakladnaya', 'kp', 'nalogi', 'zarplata', 'kontragent', 'margin', 'waybills']
 
 export const FREE_TOOLS_COPY: Record<Lang, { title: string; sub: string; all: string; guides: string; tools: Record<string, string> }> = {
   ru: {
@@ -214,20 +214,20 @@ export const FREE_TOOLS_COPY: Record<Lang, { title: string; sub: string; all: st
     sub: 'Документы и расчёты прямо в браузере',
     all: 'Все инструменты',
     guides: 'Гайды',
-    tools: { schet: 'Счёт на оплату', avr: 'АВР', nakladnaya: 'Накладная', kp: 'КП', nalogi: 'Налоги ИП 2026', kontragent: 'Проверка контрагента', margin: 'Маржа Kaspi', waybills: 'Печать накладных Kaspi' },
+    tools: { schet: 'Счёт на оплату', avr: 'АВР', nakladnaya: 'Накладная', kp: 'КП', nalogi: 'Налоги ИП 2026', zarplata: 'Зарплата 2026', kontragent: 'Проверка контрагента', margin: 'Маржа Kaspi', waybills: 'Печать накладных Kaspi' },
   },
   kk: {
     title: 'Тегін, тіркелусіз',
     sub: 'Құжаттар мен есептеулер тікелей браузерде',
     all: 'Барлық құралдар',
     guides: 'Нұсқаулықтар',
-    tools: { schet: 'Төлем шоты', avr: 'ОЖА', nakladnaya: 'Жүкқұжат', kp: 'КҰ', nalogi: 'ЖК салықтары 2026', kontragent: 'Контрагентті тексеру', margin: 'Kaspi маржасы', waybills: 'Kaspi жүкқұжаттарын басып шығару' },
+    tools: { schet: 'Төлем шоты', avr: 'ОЖА', nakladnaya: 'Жүкқұжат', kp: 'КҰ', nalogi: 'ЖК салықтары 2026', zarplata: 'Жалақы 2026', kontragent: 'Контрагентті тексеру', margin: 'Kaspi маржасы', waybills: 'Kaspi жүкқұжаттарын басып шығару' },
   },
   en: {
     title: 'Free, no sign-up',
     sub: 'Documents and calculators right in your browser',
     all: 'All tools',
     guides: 'Guides',
-    tools: { schet: 'Invoice', avr: 'Act of work (AVR)', nakladnaya: 'Delivery note', kp: 'Quote', nalogi: 'Sole-trader taxes 2026', kontragent: 'Counterparty check', margin: 'Kaspi margin', waybills: 'Print Kaspi waybills' },
+    tools: { schet: 'Invoice', avr: 'Act of work (AVR)', nakladnaya: 'Delivery note', kp: 'Quote', nalogi: 'Sole-trader taxes 2026', zarplata: 'Salary 2026', kontragent: 'Counterparty check', margin: 'Kaspi margin', waybills: 'Print Kaspi waybills' },
   },
 }

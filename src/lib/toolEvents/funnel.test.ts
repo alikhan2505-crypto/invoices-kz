@@ -158,7 +158,7 @@ describe('aggregateToolFunnel', () => {
 
   it('returns every tool row even with no data', () => {
     const f = run([])
-    expect(f.tools.map(t => t.tool)).toEqual(['kp', 'schet', 'avr', 'nakladnaya', 'kontragent', 'nalogi', 'margin', 'waybills'])
+    expect(f.tools.map(t => t.tool)).toEqual(['kp', 'schet', 'avr', 'nakladnaya', 'kontragent', 'nalogi', 'margin', 'waybills', 'zarplata'])
     expect(f.totals).toMatchObject({ visitors: 0, docs: 0, signups: 0, docsPct: null })
   })
 })

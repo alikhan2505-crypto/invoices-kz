@@ -66,7 +66,7 @@ export default function NalogiTool({ lang }: { lang: ToolLang }) {
   const baseNum = Number(base) || 0
   const baseNotes: string[] = []
   if (baseNum > 0 && baseNum < MZP_2026) baseNotes.push(t.baseRaisedToMin(formatTenge(MZP_2026)))
-  if (baseNum > 7 * MZP_2026) baseNotes.push(t.baseSoCapped(formatTenge(7 * MZP_2026)))
+  if (baseNum - r.opv > 7 * MZP_2026) baseNotes.push(t.baseSoCapped(formatTenge(7 * MZP_2026)))
   if (baseNum > 50 * MZP_2026) baseNotes.push(t.basePensionCapped(formatTenge(50 * MZP_2026)))
 
   const annual = (Number(income) || 0) * 12
@@ -96,6 +96,8 @@ export default function NalogiTool({ lang }: { lang: ToolLang }) {
   const incomeNum = Number(income) || 0
   const corridorNote = (used: number, corridor: string) =>
     baseNum > 0 && used !== baseNum ? ` (${f.entered(formatTenge(baseNum))}; ${corridor})` : ''
+  // База основного СО до коридора МЗП: заявленный доход минус ОПВ (разъяснения ГФСС).
+  const soAfterOpv = baseNum - r.opv
   const rows: Array<{ key: string; label: string; value: number; strong?: boolean; formula: string }> = [
     { key: 'tax', label: t.taxRow(rate), value: r.taxMonthly, strong: true,
       formula: `${formatTenge(incomeNum)} × ${pct(Number(rate) || 4)} = ${formatTenge(r.taxMonthly)}` },
@@ -108,7 +110,9 @@ export default function NalogiTool({ lang }: { lang: ToolLang }) {
         : `${formatTenge(r.pensionBase)} × ${pct(3.5)} = ${formatTenge(r.opvr)}${corridorNote(r.pensionBase, f.pensionCorridor)}` },
     { key: 'so', label: t.soRow, value: r.so,
       formula: r.soBase === 0 ? `0 — ${f.noIncome}`
-        : `${formatTenge(r.soBase)} × ${pct(5)} = ${formatTenge(r.so)}${corridorNote(r.soBase, f.soCorridor)}` },
+        : soAfterOpv === r.soBase
+          ? `(${f.soAfterOpv(formatTenge(baseNum), formatTenge(r.opv))}) × ${pct(5)} = ${formatTenge(r.so)}`
+          : `${formatTenge(r.soBase)} × ${pct(5)} = ${formatTenge(r.so)} (${f.soAfterOpv(formatTenge(baseNum), formatTenge(r.opv))} = ${formatTenge(soAfterOpv)}; ${f.soCorridor})` },
     { key: 'vosms', label: t.vosmsRow, value: r.vosms,
       formula: `${String(1.4).replace('.', sep)} × ${formatTenge(MZP_2026)} × ${pct(5)} = ${formatTenge(r.vosms)} — ${f.fixed}` },
   ]
@@ -220,6 +224,30 @@ export default function NalogiTool({ lang }: { lang: ToolLang }) {
               <Formula id="contrib" text={contribFormula} />
             </div>
           </div>
+
+          {/* База СО юридически не урегулирована: основная цифра выше идёт по разъяснению
+              ГФСС (СО за вычетом ОПВ), здесь второе толкование по буквальному тексту закона.
+              Числа второго толкования берутся только из его собственных полей (soLaw,
+              contributionsLaw, difference), не из r.so. Нулевая база: заметки нет. */}
+          {r.soBase > 0 && (
+            <div className="rounded-xl p-3.5 mt-3 text-[13px]" role="note" aria-labelledby="nalogi-so-note-title"
+              style={{ background: 'var(--nav-surface-glass)', border: '1px solid var(--nav-border)', color: 'var(--nav-text-secondary)' }}>
+              <div id="nalogi-so-note-title" className="font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>{t.soNote.title}</div>
+              <p className="mb-2">{t.soNote.reason}</p>
+              {r.difference > 0 ? (
+                <>
+                  <p className="font-semibold mb-2" style={{ color: 'var(--nav-text-primary)' }}>
+                    {t.soNote.other(formatTenge(r.soLaw), formatTenge(r.contributionsLaw), formatTenge(r.difference), formatTenge(r.differenceHalfYear))}
+                  </p>
+                  <p className="mb-2">{t.soNote.advice}</p>
+                </>
+              ) : (
+                <p className="mb-2">{t.soNote.same}</p>
+              )}
+              {baseNum > 7 * MZP_2026 && <p className="mb-2">{t.soNote.corridor}</p>}
+              <Link href={`${t.guideHref}#so-dva-sposoba`} hrefLang={lang === 'kk' ? 'kk' : 'ru'} style={{ color: 'var(--nav-accent)' }}>{t.soNote.more}</Link>
+            </div>
+          )}
 
           <div className="rounded-xl p-3.5 mt-3 text-[13px]" style={{ background: 'var(--nav-surface-glass)', color: 'var(--nav-text-secondary)' }}>
             <Rich line={t.halfYear(formatTenge(r.taxHalfYear))} />

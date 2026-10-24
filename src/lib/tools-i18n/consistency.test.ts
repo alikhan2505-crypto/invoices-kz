@@ -11,6 +11,7 @@ import { nakladnayaDict } from '@/app/tools/nakladnaya/dict'
 import { nalogiDict } from '@/app/tools/nalogi/dict'
 import { schetDict } from '@/app/tools/schet/dict'
 import { waybillsDict } from '@/app/tools/waybills/dict'
+import { zarplataDict } from '@/app/tools/zarplata/dict'
 import {
   LOCALIZED_TOOL_SLUGS, TOOL_LANGS, isToolLocalized, toolAlternates, toolLinkPath,
   toolFaqJsonLd, toolMetadata, toolUrl, toolsIndexAlternates, toolsIndexUrl, TOOL_TITLE_MAX, type ToolLang, type ToolSeoCopy,
@@ -32,6 +33,7 @@ const DICTS: Record<string, SeoDict> = {
   nalogi: nalogiDict,
   schet: schetDict,
   waybills: waybillsDict,
+  zarplata: zarplataDict,
 }
 
 const ROOT = path.resolve(__dirname, '../../..')
@@ -270,10 +272,11 @@ describe('guide links under the tools', () => {
     kontragent: 'proverka-kontragenta',
     nalogi: 'nalogi-ip-uproshchenka-2026',
     margin: 'komissiya-kaspi',
+    zarplata: 'mrp-2026',
   }
   const TOOL_FILE: Record<string, string> = {
     schet: 'SchetTool', avr: 'AvrTool', nakladnaya: 'NakladnayaTool', kp: 'KpTool',
-    kontragent: 'KontragentTool', nalogi: 'NalogiTool', margin: 'MarginTool',
+    kontragent: 'KontragentTool', nalogi: 'NalogiTool', margin: 'MarginTool', zarplata: 'ZarplataTool',
   }
 
   for (const [slug, guide] of Object.entries(GUIDE)) {
@@ -300,6 +303,7 @@ describe('guide links under the tools', () => {
       kp: { ru: kpDict.ru.guideLink, kk: kpDict.kk.guideLink, en: kpDict.en.guideLink },
       kontragent: { ru: kontragentDict.ru.guideLink, kk: kontragentDict.kk.guideLink, en: kontragentDict.en.guideLink },
       margin: { ru: marginDict.ru.guideLink, kk: marginDict.kk.guideLink, en: marginDict.en.guideLink },
+      zarplata: { ru: zarplataDict.ru.guideLink, kk: zarplataDict.kk.guideLink, en: zarplataDict.en.guideLink },
     }
     for (const [slug, byLang] of Object.entries(labels)) {
       for (const lang of TOOL_LANGS) expect(byLang[lang].trim().length, `${slug}.${lang}`).toBeGreaterThan(5)

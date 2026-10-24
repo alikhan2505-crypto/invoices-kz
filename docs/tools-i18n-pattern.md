@@ -96,7 +96,7 @@ export default function Page() {
 
 ## Состояние на 14.10.2026
 
-- Переведены все восемь инструментов (ru/kk/en, в `LOCALIZED_TOOL_SLUGS`): avr, kontragent, kp, margin, nakladnaya, nalogi, schet, waybills. Индекс `/tools` — на трёх языках, все карточки ведут на версию своего языка (пометка «орысша» / «in Russian» в индексе осталась только как механизм для будущих инструментов). Sitemap отдаёт все 24 адреса инструментов с взаимным hreflang.
+- Переведены все девять инструментов (ru/kk/en, в `LOCALIZED_TOOL_SLUGS`): avr, kontragent, kp, margin, nakladnaya, nalogi, schet, waybills, zarplata (24.10.2026). Индекс `/tools` — на трёх языках, все карточки ведут на версию своего языка (пометка «орысша» / «in Russian» в индексе осталась только как механизм для будущих инструментов). Sitemap отдаёт все 27 адресов инструментов с взаимным hreflang.
 - schet и avr переведены последними: сами документы (счёт `generateInvoicePDF`, АВР `generateAVR` по форме Р-1) по-прежнему печатаются на русском, на kk/en-страницах это сказано одной строкой. Ссылки «Выставить счёт» в nalogi/kp идут через `toolLinkPath` и теперь ведут на `/tools/kk|en/schet`.
 - Вне `/tools`: казахские гайды (`src/app/guides/kk/**`) ещё ссылаются на русские адреса инструментов — заменить на `/tools/kk/<slug>`. Корневой layout отдаёт серверный `<html lang="ru">` на всех страницах (с 17.10.2026; раньше `kk`); на `/tools/kk`, `/tools/en` его до первой отрисовки ставит встроенный скрипт `LANG_BOOT_SCRIPT` по адресу, а затем `useToolDocumentLang`.
 

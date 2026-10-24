@@ -43,6 +43,44 @@ describe('nalogi dictionary', () => {
     expect(flatten(nalogiDict.en)).not.toMatch(/[А-яЁёӘәҒғҚқҢңӨөҰұҮүҺһІі]/)
   })
 
+  it('explains the two SO readings in every language: GFSS is the main one, the law text is the second', () => {
+    for (const lang of TOOL_LANGS) {
+      const n = nalogiDict[lang].soNote
+      expect(n.title.length).toBeGreaterThan(10)
+      const other = n.other('15 000', '61 450', '1 500', '9 000')
+      for (const v of ['15 000', '61 450', '1 500', '9 000']) expect(other).toContain(v)
+      expect(n.reason).toContain('245')
+      expect(n.reason).toMatch(lang === 'en' ? /17 March 2026 and 4 May 2026/ : /17\.03\.2026.*04\.05\.2026/)
+      expect(n.corridor).toContain('595 000')
+      expect(nalogiDict[lang].formula.soAfterOpv('300 000', '30 000')).toContain('30 000')
+    }
+  })
+
+  it('names the fund in full the first time: ru and kk long names, en long name', () => {
+    expect(nalogiDict.ru.soNote.reason).toContain('Государственного фонда социального страхования (ГФСС)')
+    expect(nalogiDict.kk.soNote.reason).toContain('Мемлекеттік әлеуметтік сақтандыру қоры (ГФСС)')
+    expect(nalogiDict.en.soNote.reason).toContain('State Social Insurance Fund (GFSS)')
+  })
+
+  it('the refund advice is soft: no "safe" claim, points to the fund or an accountant', () => {
+    expect(nalogiDict.ru.soNote.advice).toContain('подлежит возврату по заявлению')
+    expect(nalogiDict.ru.soNote.advice).toContain('ГФСС')
+    for (const lang of TOOL_LANGS) {
+      expect(nalogiDict[lang].soNote.advice).not.toMatch(/безопасно|қауіпсіз|safe/i)
+    }
+    expect(nalogiDict.ru.soNote.other('A', 'B', 'C', 'D')).toContain('по буквальному тексту закона')
+  })
+
+  it('new SO prose has no em or en dashes and the English one has no hyphen-as-dash', () => {
+    for (const lang of TOOL_LANGS) {
+      const n = nalogiDict[lang].soNote
+      const text = JSON.stringify(Object.values(n).map(v => (typeof v === 'function' ? v('X', 'Y', 'Z', 'W') : v)))
+      expect(text).not.toMatch(/[‒-―−]/)
+    }
+    const en = JSON.stringify(Object.values(nalogiDict.en.soNote).map(v => (typeof v === 'function' ? v('X', 'Y', 'Z', 'W') : v)))
+    expect(en).not.toMatch(/ - /)
+  })
+
   it('formats the effective rate with the language decimal separator', () => {
     expect(nalogiDict.ru.decimalSeparator).toBe(',')
     expect(nalogiDict.kk.decimalSeparator).toBe(',')

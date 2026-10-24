@@ -19,7 +19,7 @@ describe('signedInToolHref (free tools -> cabinet for a signed-in visitor)', () 
   })
   it('unknown tool -> dashboard, and never /login', () => {
     expect(signedInToolHref('whatever', 'cta')).toBe('/dashboard?utm_source=tools&utm_medium=cta&utm_campaign=whatever')
-    for (const tool of ['kp', 'schet', 'avr', 'nakladnaya', 'kontragent', 'nalogi', 'margin', 'x']) {
+    for (const tool of ['kp', 'schet', 'avr', 'nakladnaya', 'kontragent', 'nalogi', 'zarplata', 'margin', 'x']) {
       expect(signedInToolHref(tool, 'cta')).not.toMatch(/^\/login/)
     }
   })

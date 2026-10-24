@@ -52,6 +52,7 @@ export const toolsIndexDict: Record<ToolLang, ToolsIndexDict> = {
         title: 'Налоги и проверка контрагента',
         tools: [
           { slug: 'nalogi', title: 'Налоги ИП — 2026', text: 'Сколько платит ИП на упрощёнке по новому кодексу: налог 4% и взносы за себя — помесячно и за полугодие.' },
+          { slug: 'zarplata', title: 'Расчёт зарплаты 2026', text: 'Сколько получит работник на руки и сколько он стоит работодателю: ИПН, взносы и налоги с зарплаты, расчёт и из суммы на руки.' },
           { slug: 'kontragent', title: 'Проверка контрагента по БИН', text: 'Неблагонадёжность, ликвидация, налоговая задолженность и НДС — по официальным данным КГД. 3 проверки в квартал бесплатно.' },
         ],
       },
@@ -93,6 +94,7 @@ export const toolsIndexDict: Record<ToolLang, ToolsIndexDict> = {
         title: 'Салықтар және контрагентті тексеру',
         tools: [
           { slug: 'nalogi', title: 'ЖК салықтары — 2026', text: 'Оңайлатылған декларациядағы ЖК жаңа кодекс бойынша қанша төлейді: 4% салық және өзі үшін жарналар — ай сайын және жарты жылға.' },
+          { slug: 'zarplata', title: 'Жалақыны есептеу 2026', text: 'Қызметкер қолға қанша алады және жұмыс берушіге қанша тұрады: ЖТС, жарналар мен жалақыдан салықтар, қолға алатын сомадан кері есеп.' },
           { slug: 'kontragent', title: 'Контрагентті БСН бойынша тексеру', text: 'Сенімсіз салық төлеуші, тарату, салық берешегі және ҚҚС — МКК ресми деректері бойынша. Тоқсанына 3 тексеру тегін.' },
         ],
       },
@@ -134,6 +136,7 @@ export const toolsIndexDict: Record<ToolLang, ToolsIndexDict> = {
         title: 'Taxes and company checks',
         tools: [
           { slug: 'nalogi', title: 'Sole proprietor taxes — 2026', text: 'What a sole proprietor on the simplified regime pays under the new Tax Code: 4% tax and own social contributions — per month and per half-year.' },
+          { slug: 'zarplata', title: 'Salary calculator 2026', text: 'What an employee takes home and what the employer pays in total: income tax, contributions and payroll taxes, also from a take-home amount.' },
           { slug: 'kontragent', title: 'Company check by BIN', text: 'Unreliable-taxpayer status, liquidation, tax debt and VAT registration — from official State Revenue Committee data. 3 free checks a quarter.' },
         ],
       },

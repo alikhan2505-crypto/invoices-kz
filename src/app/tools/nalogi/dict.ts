@@ -48,8 +48,28 @@ export interface NalogiDict {
     pensionCorridor: string
     soCorridor: string
     entered: (amount: string) => string
+    /** Как получена база основного СО: заявленный доход минус ОПВ. */
+    soAfterOpv: (declared: string, opv: string) => string
   }
   halfYear: (amount: string) => RichLine
+  /**
+   * Заметка под блоком взносов (24.10.2026): основной расчёт идёт по разъяснению
+   * ГФСС (СО за вычетом ОПВ), здесь второе толкование, по буквальному тексту
+   * ст. 245 п. 2 Соцкодекса. Все числа второго варианта приходят отдельными
+   * полями расчёта (soLaw, contributionsLaw, difference), не из основных.
+   */
+  soNote: {
+    title: string
+    /** Второе толкование: СО и взносы всего по тексту закона, разница в месяц и за полугодие. */
+    other: (so: string, total: string, month: string, half: string) => string
+    reason: string
+    advice: string
+    /** Когда оба толкования дают одну сумму (минимальная база). */
+    same: string
+    /** Допущение про границы 1-7 МЗП; показывается при доходе выше ~595 000. */
+    corridor: string
+    more: string
+  }
   /** Годовая выручка при таком темпе выше порога ҚҚС / НДС (10 000 МРП).
    *  В числах порогов ниже — неразрывный пробел (U+00A0), чтобы «10 000» не рвалось. */
   vatWarning: (annual: string, threshold: string) => string
@@ -93,7 +113,7 @@ export const nalogiDict: Record<ToolLang, NalogiDict> = {
     baseLabel: 'Доход для взносов «за себя», ₸ в месяц',
     baseHint: mzp => `Вы заявляете его сами, минимум для расчёта — 1 МЗП (${mzp}). 0 — дохода не было.`,
     baseRaisedToMin: a => `Это меньше 1 МЗП — взносы считаем от минимальной базы ${a}.`,
-    baseSoCapped: a => `СО считаем не больше чем с 7 МЗП (${a}).`,
+    baseSoCapped: a => `СО считаем от дохода за вычетом ОПВ и не больше чем с 7 МЗП (${a}).`,
     basePensionCapped: a => `ОПВ и ОПВР считаем не больше чем с 50 МЗП (${a}).`,
     before1975: 'Родился(ась) до 1975 года — без ОПВР',
     totalTitle: 'Итого в месяц',
@@ -114,12 +134,26 @@ export const nalogiDict: Record<ToolLang, NalogiDict> = {
       pensionCorridor: 'база в коридоре 1–50 МЗП',
       soCorridor: 'база в коридоре 1–7 МЗП',
       entered: a => `введено ${a}`,
+      soAfterOpv: (d, o) => `${d} минус ОПВ ${o}`,
     },
     halfYear: a => ({
       pre: 'Налог платится раз в полугодие с формой 910: за 6 месяцев при таком доходе — ',
       b: a,
       post: ' (до 25 августа и до 25 февраля). Взносы — ежемесячно до 25 числа.',
     }),
+    soNote: {
+      title: 'База СО: есть два толкования',
+      other: (so, total, m, h) =>
+        `Есть и другое толкование: по буквальному тексту закона СО считают от всего дохода: СО ${so}, итого взносов ${total}, разница ${m} в месяц, ${h} за полугодие.`,
+      reason:
+        'Расчёт выше идёт по разъяснению Государственного фонда социального страхования (ГФСС) от 17.03.2026 и 04.05.2026: СО считается от дохода за вычетом ОПВ. По буквальному тексту статьи 245 пункта 2 Социального кодекса порядок для ИП не урегулирован.',
+      advice:
+        'Излишне уплаченное СО подлежит возврату по заявлению: уточните порядок у ГФСС или у бухгалтера.',
+      same: 'При такой базе оба толкования дают одну и ту же сумму СО.',
+      corridor:
+        'Границы 1 и 7 МЗП мы применяем к базе после вычета ОПВ: так читаем границы. При доходе выше примерно 595 000 ₸ уточните порядок у ГФСС.',
+      more: 'Подробнее и ссылки на источники в гайде',
+    },
     vatWarning: (annual, thr) =>
       `При таком темпе выручка за год — ${annual}. Это выше порога постановки на учёт по НДС — 10 000 МРП (${thr}) в год. Уточните у бухгалтера, касается ли он вас.`,
     limitWarning: (annual, lim) =>
@@ -141,7 +175,7 @@ export const nalogiDict: Record<ToolLang, NalogiDict> = {
       },
       {
         q: 'Какие взносы ИП платит за себя?',
-        a: 'ОПВ 10% и ОПВР 3,5% (для родившихся в 1975 году и позже) от заявленного дохода, но с базы не выше 50 МЗП; СО 5% с базы от 1 до 7 МЗП; ВОСМС — фиксированно 5 950 ₸ в месяц.',
+        a: 'ОПВ 10% и ОПВР 3,5% (для родившихся в 1975 году и позже) от заявленного дохода, но с базы не выше 50 МЗП; СО 5% с базы от 1 до 7 МЗП (мы считаем СО от заявленного дохода за вычетом ОПВ, как в разъяснениях Государственного фонда социального страхования (ГФСС); по буквальному тексту закона вычета нет, второе толкование показано под расчётом); ВОСМС — фиксированно 5 950 ₸ в месяц.',
       },
       {
         q: 'Что платить, если дохода в месяце не было?',
@@ -183,7 +217,7 @@ export const nalogiDict: Record<ToolLang, NalogiDict> = {
     baseLabel: '«Өзі үшін» жарналарға арналған табыс, айына ₸',
     baseHint: mzp => `Оны өзіңіз мәлімдейсіз, есептеу үшін ең азы — 1 ЕТЖ (${mzp}). 0 — табыс болмаған.`,
     baseRaisedToMin: a => `Бұл 1 ЕТЖ-ден аз — жарналарды ең төменгі базадан есептейміз: ${a}.`,
-    baseSoCapped: a => `ӘА 7 ЕТЖ-ден (${a}) аспайтын базадан есептеледі.`,
+    baseSoCapped: a => `ӘА МЗЖ шегерілген табыстан және 7 ЕТЖ-ден (${a}) аспайтын базадан есептеледі.`,
     basePensionCapped: a => `МЗЖ мен ЖМЗЖ 50 ЕТЖ-ден (${a}) аспайтын базадан есептеледі.`,
     before1975: '1975 жылға дейін туғанмын — ЖМЗЖ төлемеймін',
     totalTitle: 'Айына барлығы',
@@ -204,12 +238,26 @@ export const nalogiDict: Record<ToolLang, NalogiDict> = {
       pensionCorridor: 'база 1–50 ЕТЖ аралығында',
       soCorridor: 'база 1–7 ЕТЖ аралығында',
       entered: a => `енгізілгені ${a}`,
+      soAfterOpv: (d, o) => `${d} минус МЗЖ ${o}`,
     },
     halfYear: a => ({
       pre: 'Салық 910 нысанымен жарты жылда бір рет төленеді: осындай табыспен 6 айға — ',
       b: a,
       post: ' (25 тамызға және 25 ақпанға дейін). Жарналар — ай сайын, 25-іне дейін.',
     }),
+    soNote: {
+      title: 'ӘА базасы: екі түсіндіру бар',
+      other: (so, total, m, h) =>
+        `Басқа түсіндіру де бар: заңның тікелей мәтіні бойынша ӘА-ны бүкіл табыстан есептейді: ӘА ${so}, жарналар барлығы ${total}, айырмашылық айына ${m}, жарты жылға ${h}.`,
+      reason:
+        'Жоғарыдағы есеп Мемлекеттік әлеуметтік сақтандыру қоры (ГФСС) 17.03.2026 және 04.05.2026 жылғы түсіндірмелері бойынша жасалған: ӘА МЗЖ шегерілген табыстан есептеледі. Әлеуметтік кодекстің 245-бабы 2-тармағының тікелей мәтіні бойынша ЖК үшін тәртіп реттелмеген.',
+      advice:
+        'Артық төленген ӘА өтініш бойынша қайтарылуға жатады: тәртібін ГФСС-тен немесе бухгалтерден нақтылаңыз.',
+      same: 'Мұндай базада екі түсіндіру де ӘА-ның бірдей сомасын береді.',
+      corridor:
+        '1 және 7 ЕТЖ шектерін МЗЖ шегерілген базаға қолданамыз: шектерді осылай оқимыз. Табыс шамамен 595 000 ₸-ден жоғары болса, тәртібін ГФСС-тен нақтылаңыз.',
+      more: 'Толығырақ және дереккөздер нұсқаулықта',
+    },
     vatWarning: (annual, thr) =>
       `Осы қарқынмен жылдық түсім — ${annual}. Бұл ҚҚС бойынша есепке тұру шегінен жоғары — жылына 10 000 АЕК (${thr}). Сізге қатысы бар-жоғын бухгалтерден нақтылаңыз.`,
     limitWarning: (annual, lim) =>
@@ -231,7 +279,7 @@ export const nalogiDict: Record<ToolLang, NalogiDict> = {
       },
       {
         q: 'ЖК өзі үшін қандай жарналар төлейді?',
-        a: 'Мәлімделген табыстан МЗЖ 10% және ЖМЗЖ 3,5% (1975 жылы және одан кейін туғандар үшін), база 50 ЕТЖ-ден аспайды; ӘА 5% — 1-ден 7 ЕТЖ-ге дейінгі базадан; МӘМС — айына тіркелген 5 950 ₸.',
+        a: 'Мәлімделген табыстан МЗЖ 10% және ЖМЗЖ 3,5% (1975 жылы және одан кейін туғандар үшін), база 50 ЕТЖ-ден аспайды; ӘА 5% — 1-ден 7 ЕТЖ-ге дейінгі базадан (ӘА-ны мәлімделген табыстан МЗЖ шегеріп есептейміз, Мемлекеттік әлеуметтік сақтандыру қорының (ГФСС) түсіндірмелеріндегідей; заңның тікелей мәтінінде шегеру жоқ, екінші түсіндіру есептің астында көрсетілген); МӘМС — айына тіркелген 5 950 ₸.',
       },
       {
         q: 'Айда табыс болмаса, не төлеу керек?',
@@ -273,7 +321,7 @@ export const nalogiDict: Record<ToolLang, NalogiDict> = {
     baseLabel: 'Declared income for your contributions, ₸ per month',
     baseHint: mzp => `You choose this amount yourself; the minimum is 1 minimum wage (${mzp}). Enter 0 if you had no income.`,
     baseRaisedToMin: a => `That is below 1 minimum wage, so contributions are calculated from the minimum base of ${a}.`,
-    baseSoCapped: a => `SO is capped at a base of 7 minimum wages (${a}).`,
+    baseSoCapped: a => `SO is calculated on income minus OPV, capped at a base of 7 minimum wages (${a}).`,
     basePensionCapped: a => `OPV and OPVR are capped at a base of 50 minimum wages (${a}).`,
     before1975: 'Born before 1975 — no OPVR',
     totalTitle: 'Total per month',
@@ -294,12 +342,26 @@ export const nalogiDict: Record<ToolLang, NalogiDict> = {
       pensionCorridor: 'base kept within 1 to 50 minimum wages',
       soCorridor: 'base kept within 1 to 7 minimum wages',
       entered: a => `you entered ${a}`,
+      soAfterOpv: (d, o) => `${d} minus OPV ${o}`,
     },
     halfYear: a => ({
       pre: 'The tax is paid every six months with form 910: for 6 months at this income it comes to ',
       b: a,
       post: ' (due by 25 August and 25 February). Contributions are paid monthly by the 25th.',
     }),
+    soNote: {
+      title: 'SO base: there are two readings',
+      other: (so, total, m, h) =>
+        `There is another reading: by the literal text of the law, SO is calculated on the whole income: SO ${so}, contributions in total ${total}, a difference of ${m} a month, ${h} per half-year.`,
+      reason:
+        'The calculation above follows the clarifications of the State Social Insurance Fund (GFSS) of 17 March 2026 and 4 May 2026: SO is calculated on income minus OPV. By the literal text of article 245, paragraph 2 of the Social Code, the procedure for an IE is not settled.',
+      advice:
+        'Overpaid SO is subject to refund on application: check the procedure with the GFSS or your accountant.',
+      same: 'At this base both readings give the same SO amount.',
+      corridor:
+        'We apply the limits of 1 and 7 minimum wages to the base after the OPV deduction: that is how we read the limits. If your income is above about 595 000 ₸, check the procedure with the GFSS.',
+      more: 'Details and sources in our guide (in Russian)',
+    },
     vatWarning: (annual, thr) =>
       `At this pace your annual revenue is ${annual}. That is above the VAT registration threshold of 10 000 MCI (${thr}) a year. Check with an accountant whether it applies to you.`,
     limitWarning: (annual, lim) =>
@@ -321,7 +383,7 @@ export const nalogiDict: Record<ToolLang, NalogiDict> = {
       },
       {
         q: 'Which contributions does an IE pay for themselves?',
-        a: 'OPV (mandatory pension) 10% and OPVR (additional pension) 3.5% for those born in 1975 or later, on declared income with a base of at most 50 minimum wages; SO (social contributions) 5% on a base between 1 and 7 minimum wages; VOSMS (compulsory social health insurance) is a fixed 5 950 ₸ a month.',
+        a: 'OPV (mandatory pension) 10% and OPVR (additional pension) 3.5% for those born in 1975 or later, on declared income with a base of at most 50 minimum wages; SO (social contributions) 5% on a base between 1 and 7 minimum wages (we calculate SO on declared income minus OPV, as in the clarifications of the State Social Insurance Fund (GFSS); the literal text of the law has no deduction, and that second reading is shown under the result); VOSMS (compulsory social health insurance) is a fixed 5 950 ₸ a month.',
       },
       {
         q: 'What do I pay in a month with no income?',

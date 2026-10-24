@@ -11,7 +11,7 @@
 export const TOOL_EVENT_NAMES = ['view', 'doc', 'cta', 'limit', 'lead', 'signup'] as const
 export type ToolEventName = (typeof TOOL_EVENT_NAMES)[number]
 
-export const TOOL_EVENT_TOOLS = ['kp', 'schet', 'avr', 'nakladnaya', 'kontragent', 'nalogi', 'margin', 'waybills'] as const
+export const TOOL_EVENT_TOOLS = ['kp', 'schet', 'avr', 'nakladnaya', 'kontragent', 'nalogi', 'margin', 'waybills', 'zarplata'] as const
 export type ToolEventTool = (typeof TOOL_EVENT_TOOLS)[number]
 // 'none' — только у регистрации без недавнего касания инструмента.
 export type ToolEventToolOrNone = ToolEventTool | 'none'

@@ -5,7 +5,7 @@ import { ROOT_HUB_LIVE } from '@/lib/rootHub'
 import { TOOL_LANGS, isToolLocalized, toolAlternates, toolUrl, toolsIndexAlternates, toolsIndexUrl } from '@/lib/tools-i18n'
 
 // Все инструменты /tools, которые есть в sitemap (переведённые и нет).
-const TOOL_SLUGS_IN_SITEMAP = ['waybills', 'margin', 'kontragent', 'schet', 'avr', 'nalogi', 'nakladnaya', 'kp'] as const
+const TOOL_SLUGS_IN_SITEMAP = ['waybills', 'margin', 'kontragent', 'schet', 'avr', 'nalogi', 'nakladnaya', 'kp', 'zarplata'] as const
 
 // Реальные даты правок, ISO (YYYY-MM-DD). Единственное место, где они живут:
 // при правке страницы обновите её дату здесь. Никогда не new Date() -- иначе
@@ -18,9 +18,9 @@ const LASTMOD = {
   docsHub: '2026-10-22',
   cashierApi: '2026-10-17',
   productLandings: '2026-10-22', // kaspi./agent./salon. (lp/[key], landings.ts)
-  tools: '2026-10-22',
-  toolsIndex: '2026-10-22',
-  guidesIndex: '2026-10-24', // на странице появилась карточка гайда про накладные Kaspi
+  tools: '2026-10-24', // + /tools/zarplata (ru, kk, en)
+  toolsIndex: '2026-10-24', // карточка zarplata
+  guidesIndex: '2026-10-24', // на странице появились карточки гайдов про накладные Kaspi и форму 910.00
   guides: '2026-10-22',
   privacy: '2026-10-13',
   terms: '2026-10-13',
@@ -57,7 +57,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     // kk /tools/kk/<slug>, en /tools/en/<slug> — и каждый перечисляет все три
     // через alternates.languages (hreflang), как у /guides ниже. Непереведённый
     // инструмент шёл бы только русским адресом, без hreflang (с 14.10.2026
-    // переведены все восемь).
+    // переведены все девять).
     //   waybills, margin — органический вход для продавцов Kaspi;
     //   kontragent — самый частотный запрос, лимит 3/день, дальше регистрация;
     //   schet — «счёт на оплату», лид-магнит; avr — второй документ после счёта;

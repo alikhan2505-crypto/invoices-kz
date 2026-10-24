@@ -30,6 +30,7 @@ const TOOL_LABELS: Record<string, string> = {
   nalogi: 'Налоги ИП',
   margin: 'Маржа Kaspi',
   waybills: 'Печать накладных (склейка)',
+  zarplata: 'Расчёт зарплаты',
 }
 
 const MEDIUM_LABELS: Record<string, string> = {

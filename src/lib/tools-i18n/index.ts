@@ -52,10 +52,11 @@ export function toolAlternates(slug: string): Record<ToolLang | 'x-default', str
  * (/tools/<slug>, /tools/kk/<slug>, /tools/en/<slug>). Единый источник для
  * sitemap.ts и индекса /tools: инструмент без перевода живёт только на
  * русском адресе и в sitemap идёт без hreflang (с 14.10.2026 переведены все
- * восемь). Перевели новый инструмент — добавить slug сюда, больше ничего не надо.
+ * восемь, 24.10.2026 добавлен девятый, zarplata). Перевели новый инструмент:
+ * добавить slug сюда, а ещё в TOOL_SLUGS_IN_SITEMAP в src/app/sitemap.ts.
  */
 export const LOCALIZED_TOOL_SLUGS: readonly string[] = [
-  'avr', 'kontragent', 'kp', 'margin', 'nakladnaya', 'nalogi', 'schet', 'waybills',
+  'avr', 'kontragent', 'kp', 'margin', 'nakladnaya', 'nalogi', 'schet', 'waybills', 'zarplata',
 ] as const
 
 export function isToolLocalized(slug: string): boolean {

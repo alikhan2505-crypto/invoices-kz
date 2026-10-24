@@ -18,6 +18,7 @@
 // `updated` (we never invent an earlier date).
 
 import { kaspiGuidesForRegistry } from './kaspiGuides'
+import { FORMA910_GUIDE } from './forma910'
 import { MRP_GUIDE } from './mrp'
 
 export type GuideLang = 'ru' | 'kk'
@@ -245,7 +246,7 @@ export const GUIDES: Guide[] = [
   },
   {
     slug: 'nalogi-ip-uproshchenka-2026',
-    updated: '2026-10-22',
+    updated: '2026-10-24',
     relatedTools: ['nalogi', 'margin'],
     relatedGuides: ['kak-otkryt-ip-2026', 'esf-kazakhstan-2026', 'komissiya-kaspi'],
     ru: {
@@ -267,6 +268,8 @@ export const GUIDES: Guide[] = [
   },
   // МРП 2026: данные и тексты в mrp.ts (одна константа размера), страница не за флагом.
   MRP_GUIDE,
+  // Форма 910.00: данные, даты и тексты в forma910.ts, страница не за флагом.
+  FORMA910_GUIDE,
   {
     slug: 'esf-kazakhstan-2026',
     updated: '2026-10-22',

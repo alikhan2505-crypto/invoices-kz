@@ -33,6 +33,7 @@ const HEAD = `# invoices.kz
 - [Накладная онлайн](https://invoices.kz/tools/nakladnaya)
 - [Коммерческое предложение](https://invoices.kz/tools/kp)
 - [Калькулятор налогов ИП 2026](https://invoices.kz/tools/nalogi): упрощёнка 4% и взносы за себя
+- [Расчёт зарплаты 2026](https://invoices.kz/tools/zarplata): зарплата на руки и обратно, налоги и взносы работника и работодателя
 - [Проверка контрагента по БИН](https://invoices.kz/tools/kontragent): реестры КГД и ГБД ЮЛ
 - [Калькулятор маржи Kaspi](https://invoices.kz/tools/margin): комиссия Kaspi Магазина по категориям
 - [Печать накладных Kaspi одним PDF](https://invoices.kz/tools/waybills)
@@ -42,6 +43,7 @@ const HEAD = `# invoices.kz
 - [Накладные Kaspi одним PDF: печать 4 на А4 или А6](https://invoices.kz/guides/nakladnye-kaspi-odnim-pdf)
 - [Налоги ИП на упрощёнке в 2026 году](https://invoices.kz/guides/nalogi-ip-uproshchenka-2026)
 - [МРП 2026 в тенге: размер, таблица, лимиты ИП](https://invoices.kz/guides/mrp-2026)
+- [Форма 910.00 в 2026: как заполнить и когда сдавать](https://invoices.kz/guides/forma-910-uproshchenka-2026)
 - [ЭСФ в 2026 году: кто обязан выписывать](https://invoices.kz/guides/esf-kazakhstan-2026)
 - [Как выставить счёт на оплату для ИП и ТОО](https://invoices.kz/guides/kak-vystavit-schet-ip)
 - [Счёт, АВР, накладная и КП: чем отличаются](https://invoices.kz/guides/dokumenty-ip-kazakhstan)
