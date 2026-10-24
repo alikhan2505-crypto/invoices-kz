@@ -213,7 +213,59 @@ describe('bik bank pages', () => {
     expect(ru).toMatch(/по сообщениям прессы/)
     expect(ru).toContain('16 июня 2025')
     const title = bankText(BIK_BANK_PAGES.find(r => r.slug === 'alatau-city-bank')!, 'ru').title
-    expect(title).toBe('БИК Alatau City Bank (бывш. Jusan Bank): TSESKZKA')
+    expect(title).toBe('БИК Алатау Сити Банка (бывший Jusan Bank): TSESKZKA')
+  })
+
+  it('ru titles and H1 carry the Cyrillic names people type, with the BIK, and the legal name stays in the page', () => {
+    const expected: Record<string, string> = {
+      'halyk-bank': 'БИК Халык Банка (Народного банка Казахстана): HSBKKZKX',
+      'kaspi-bank': 'БИК Каспи Банка: CASPKZKA',
+      'freedom-bank': 'БИК Фридом Банка: KSNVKZKA',
+      'forte-bank': 'БИК Форте Банка: IRTYKZKA',
+      'bereke-bank': 'БИК Береке Банка: BRKEKZKA',
+      tsentrkredit: 'БИК Банка ЦентрКредит: KCJBKZKX',
+      'evraziyskiy-bank': 'БИК Евразийского Банка: EURIKZKA',
+      'alatau-city-bank': 'БИК Алатау Сити Банка (бывший Jusan Bank): TSESKZKA',
+      'kmf-bank': 'БИК КМФ Банка: KMFBKZKK',
+      'vtb-kazakhstan': 'БИК ВТБ Казахстан: VTBAKZKZ',
+      'shinhan-bank-kazakhstan': 'БИК Шинхан Банка Казахстан: SHBKKZKA',
+    }
+    for (const row of BIK_BANK_PAGES) {
+      const t = bankText(row, 'ru')
+      expect(t.title, row.slug).toBe(expected[row.slug!])
+      expect(t.description.startsWith(`БИК ${row.ruName!.gen}`), row.slug).toBe(true)
+      expect(t.faq[0].q, row.slug).toContain(row.ruName!.gen)
+      // The legal name from the NBK table is still shown.
+      expect(t.rows.some(r => r.value === row.displayName), row.slug).toBe(true)
+      // The page-level facts come from the registry, not from the names.
+      expect(t.description, row.slug).toContain(row.bik)
+      expect(t.description, row.slug).toContain(row.code)
+    }
+    const halyk = allBankStrings('halyk-bank', 'ru').join('\n')
+    expect(halyk).toContain('Halyk Bank')
+    expect(halyk).toContain('Народный Банк Казахстана')
+    expect(halyk).toMatch(/бик халык банка/)
+    expect(halyk).toMatch(/бик народного банка казахстана/)
+    expect(allBankStrings('kaspi-bank', 'ru').join('\n')).toMatch(/бик каспи банка/)
+  })
+
+  it('kk pages use the standard Cyrillic names only where they exist', () => {
+    const titles = Object.fromEntries(BIK_BANK_PAGES.map(r => [r.slug, bankText(r, 'kk').title]))
+    expect(titles['halyk-bank']).toBe('Халық Банк БСК: HSBKKZKX')
+    expect(titles['kaspi-bank']).toBe('Каспи Банк БСК: CASPKZKA')
+    expect(titles['freedom-bank']).toBe('Фридом Банк БСК: KSNVKZKA')
+    // Banks without a settled Kazakh form keep the registry label.
+    expect(titles['kmf-bank']).toBe('KMF Банк БСК: KMFBKZKK')
+    expect(titles['evraziyskiy-bank']).toBe('Евразийский Банк БСК: EURIKZKA')
+  })
+
+  it('hub lead names Халык, Каспи, Фридом, Форте (ru) and Халық, Каспи (kk)', () => {
+    const ru = hubText('ru')
+    for (const w of ['Халык', 'Каспи', 'Фридом', 'Форте']) expect(ru.summary, w).toContain(w)
+    expect(ru.description).toMatch(/Халык, Каспи/)
+    const kk = hubText('kk')
+    expect(kk.summary).toContain('Халық Банк')
+    expect(kk.summary).toContain('Каспи Банк')
   })
 
   it('Freedom page gives both facts as written and does not explain why', () => {

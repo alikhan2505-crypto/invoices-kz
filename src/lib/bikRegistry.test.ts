@@ -77,6 +77,22 @@ describe('bikRegistry', () => {
     expect(new Set(BIK_BANK_PAGES.map(r => r.slug)).size).toBe(11)
   })
 
+  it('every page bank has Cyrillic colloquial names that never replace the NBK legal name', () => {
+    for (const r of BIK_BANK_PAGES) {
+      expect(r.ruName?.nom, r.bik).toMatch(/^[А-ЯЁ]/)
+      expect(r.ruName?.gen, r.bik).toMatch(/[А-Яа-яЁё]/)
+      expect(r.displayName, r.bik).toBe(r.nameNbk.replace(/^A(?=[а-яё])/, 'А'))
+    }
+    const halyk = getBikBySlug('halyk-bank')!
+    expect(halyk.ruName!.gen).toBe('Халык Банка')
+    expect(halyk.ruName!.aliasGen).toBe('Народного банка Казахстана')
+    expect(halyk.kkName!.nom).toBe('Халық Банк')
+    expect(getBikBySlug('kaspi-bank')!.ruName!.gen).toBe('Каспи Банка')
+    expect(getBikBySlug('freedom-bank')!.ruName!.gen).toBe('Фридом Банка')
+    // Unconfirmed rows carry no colloquial names.
+    for (const r of BIK_ROWS.filter(x => !x.confirmedOnBankSite)) expect(r.ruName, r.bik).toBeUndefined()
+  })
+
   it('does not print a БИН for Halyk and Евразийский (not confirmed in the verification)', () => {
     expect(getBikBySlug('halyk-bank')!.bankSite!.bin).toBeUndefined()
     expect(getBikBySlug('evraziyskiy-bank')!.bankSite!.bin).toBeUndefined()

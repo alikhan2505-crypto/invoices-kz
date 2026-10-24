@@ -41,6 +41,7 @@ const HEAD = `# invoices.kz
 - [Комиссия Kaspi Магазина по категориям](https://invoices.kz/guides/komissiya-kaspi)
 - [Накладные Kaspi одним PDF: печать 4 на А4 или А6](https://invoices.kz/guides/nakladnye-kaspi-odnim-pdf)
 - [Налоги ИП на упрощёнке в 2026 году](https://invoices.kz/guides/nalogi-ip-uproshchenka-2026)
+- [МРП 2026 в тенге: размер, таблица, лимиты ИП](https://invoices.kz/guides/mrp-2026)
 - [ЭСФ в 2026 году: кто обязан выписывать](https://invoices.kz/guides/esf-kazakhstan-2026)
 - [Как выставить счёт на оплату для ИП и ТОО](https://invoices.kz/guides/kak-vystavit-schet-ip)
 - [Счёт, АВР, накладная и КП: чем отличаются](https://invoices.kz/guides/dokumenty-ip-kazakhstan)

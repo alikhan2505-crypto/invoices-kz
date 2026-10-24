@@ -7,7 +7,7 @@ import {
   type BikLang,
 } from '@/lib/bikRegistry'
 import BikShell, { Paragraph } from './BikShell'
-import { hubText } from './bikContent'
+import { bankLinkName, hubText } from './bikContent'
 import { hubJsonLd } from './bikJsonLd'
 
 const MONO = { fontFamily: 'var(--font-geist-mono), monospace' } as const
@@ -54,7 +54,7 @@ export default function BikHubPage({ lang }: { lang: BikLang }) {
                 <td>{r.confirmedOnBankSite ? t.banks.confirmBoth : t.banks.confirmNbk}</td>
                 <td>
                   {r.confirmedOnBankSite && r.slug ? (
-                    <Link href={bikBankPath(r.slug, lang)}>{t.banks.pageLink(r.label!)}</Link>
+                    <Link href={bikBankPath(r.slug, lang)}>{t.banks.pageLink(bankLinkName(r, lang))}</Link>
                   ) : null}
                 </td>
               </tr>

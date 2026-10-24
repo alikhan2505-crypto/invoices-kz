@@ -6,7 +6,7 @@ import {
   type BikLang,
   type BikRow,
 } from '@/lib/bikRegistry'
-import { CHROME, bankText, hubText } from './bikContent'
+import { CHROME, bankLinkName, bankText, hubText } from './bikContent'
 
 // schema.org graphs for /bik. Rule from the plan: markup only for what is
 // visible on the page. No swiftCode property (its presence in schema.org was not
@@ -61,7 +61,7 @@ export function hubJsonLd(lang: BikLang) {
         itemListElement: BIK_BANK_PAGES.map((r, i) => ({
           '@type': 'ListItem',
           position: i + 1,
-          name: t.banks.pageLink(r.label!),
+          name: t.banks.pageLink(bankLinkName(r, lang)),
           url: `https://invoices.kz${bikBankPath(r.slug!, lang)}`,
         })),
       },

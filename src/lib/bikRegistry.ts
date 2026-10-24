@@ -17,6 +17,9 @@
 //     Казпочта, Правительство для граждан, Евразийский банк развития,
 //     московский Межгосударственный Банк).
 //   * Страницы банков получают только строки с confirmedOnBankSite === true.
+//   * ruName/kkName: разговорные названия (Халык, Каспи, Фридом, Народный банк Казахстана)
+//     только для текстов страниц и ссылок. Это не факты о банке: юридическое имя всегда
+//     берётся из nameNbk/displayName.
 //
 // Реестр намеренно отдельный от kazakhstanBanks.ts (там порядок и aliases под форму
 // счёта); сводить оба к одному источнику стоит позже.
@@ -47,6 +50,30 @@ export interface BikBankSite {
   bin?: string
 }
 
+/**
+ * Как банк называют в разговоре и в поисковых запросах (проверено по Вордстату КЗ
+ * за 08.09-07.10.2026, docs/seo/keywords/2026-10-24). Это НЕ юридическое имя:
+ * юридическое наименование остаётся в nameNbk/displayName из таблицы НБК.
+ */
+export interface BikRuName {
+  /** «Халык Банк»: именительный, для заголовков и ссылок. */
+  nom: string
+  /** «Халык Банка»: родительный, для «БИК Халык Банка». */
+  gen: string
+  /** Второе разговорное название того же банка, если есть: «Народный банк Казахстана». */
+  alias?: string
+  aliasGen?: string
+  /** Латинское написание, которым банк подписан в справочнике или на своём сайте. */
+  latin?: string
+}
+
+export interface BikKkName {
+  /** Казахская страница: кириллическое название; только там, где оно устоявшееся. */
+  nom: string
+  /** Латинское написание в скобках, если оно отличается. */
+  latin?: string
+}
+
 interface BikRaw {
   n: number
   bik: string
@@ -64,6 +91,9 @@ export interface BikRow extends BikRaw {
   slug?: string
   /** Короткое название для заголовков и ссылок. */
   label?: string
+  /** Разговорные названия для текстов страниц (см. BikRuName). Только у банков со страницей. */
+  ruName?: BikRuName
+  kkName?: BikKkName
 }
 
 // Таблица НБК, дословно. Порядок как в справочнике (по БИК).
@@ -106,6 +136,8 @@ const NBK_ROWS: BikRaw[] = [
 interface Confirmation {
   slug: string
   label: string
+  ruName: BikRuName
+  kkName?: BikKkName
   site: BikBankSite
 }
 
@@ -114,6 +146,8 @@ const CONFIRMED_ON_BANK_SITE: Record<string, Confirmation> = {
   CASPKZKA: {
     slug: 'kaspi-bank',
     label: 'Kaspi Bank',
+    ruName: { nom: 'Каспи Банк', gen: 'Каспи Банка', latin: 'Kaspi Bank' },
+    kkName: { nom: 'Каспи Банк', latin: 'Kaspi Bank' },
     site: {
       url: 'https://guide.kaspi.kz/cdn/content/pay/product/documents/Valyutniye-operatsii/Rekvizity-AO-Kaspi-Bank.pdf',
       host: 'guide.kaspi.kz',
@@ -125,6 +159,8 @@ const CONFIRMED_ON_BANK_SITE: Record<string, Confirmation> = {
   HSBKKZKX: {
     slug: 'halyk-bank',
     label: 'Halyk Bank',
+    ruName: { nom: 'Халык Банк', gen: 'Халык Банка', alias: 'Народный банк Казахстана', aliasGen: 'Народного банка Казахстана', latin: 'Halyk Bank' },
+    kkName: { nom: 'Халық Банк', latin: 'Halyk Bank' },
     site: {
       url: 'https://halykbank.kz/en/about/contacts/kontakty-i-rekvizity',
       host: 'halykbank.kz',
@@ -137,6 +173,8 @@ const CONFIRMED_ON_BANK_SITE: Record<string, Confirmation> = {
   IRTYKZKA: {
     slug: 'forte-bank',
     label: 'ForteBank',
+    ruName: { nom: 'Форте Банк', gen: 'Форте Банка', latin: 'ForteBank' },
+    kkName: { nom: 'Форте Банк', latin: 'ForteBank' },
     site: {
       url: 'https://support.forte.kz/bank_details',
       host: 'support.forte.kz',
@@ -150,6 +188,8 @@ const CONFIRMED_ON_BANK_SITE: Record<string, Confirmation> = {
   KSNVKZKA: {
     slug: 'freedom-bank',
     label: 'Freedom Bank',
+    ruName: { nom: 'Фридом Банк', gen: 'Фридом Банка', latin: 'Freedom Bank' },
+    kkName: { nom: 'Фридом Банк', latin: 'Freedom Bank' },
     site: {
       url: 'https://bankffin.kz/ru/requisites',
       host: 'bankffin.kz',
@@ -163,6 +203,7 @@ const CONFIRMED_ON_BANK_SITE: Record<string, Confirmation> = {
   KCJBKZKX: {
     slug: 'tsentrkredit',
     label: 'Банк ЦентрКредит',
+    ruName: { nom: 'Банк ЦентрКредит', gen: 'Банка ЦентрКредит' },
     site: {
       url: 'https://www.bcc.kz/about/press-center/news/smena-rekvizitov-eco-center-bank/',
       host: 'bcc.kz',
@@ -176,6 +217,8 @@ const CONFIRMED_ON_BANK_SITE: Record<string, Confirmation> = {
   BRKEKZKA: {
     slug: 'bereke-bank',
     label: 'Bereke Bank',
+    ruName: { nom: 'Береке Банк', gen: 'Береке Банка', latin: 'Bereke Bank' },
+    kkName: { nom: 'Береке Банк', latin: 'Bereke Bank' },
     site: {
       url: 'https://berekebank.kz/ru/about/requisites',
       host: 'berekebank.kz',
@@ -189,6 +232,7 @@ const CONFIRMED_ON_BANK_SITE: Record<string, Confirmation> = {
   EURIKZKA: {
     slug: 'evraziyskiy-bank',
     label: 'Евразийский Банк',
+    ruName: { nom: 'Евразийский Банк', gen: 'Евразийского Банка' },
     site: {
       url: 'https://eubank.kz/ru/requisites',
       host: 'eubank.kz',
@@ -201,6 +245,8 @@ const CONFIRMED_ON_BANK_SITE: Record<string, Confirmation> = {
   TSESKZKA: {
     slug: 'alatau-city-bank',
     label: 'Alatau City Bank',
+    ruName: { nom: 'Алатау Сити Банк', gen: 'Алатау Сити Банка', latin: 'Alatau City Bank' },
+    kkName: { nom: 'Алатау Сити Банк', latin: 'Alatau City Bank' },
     site: {
       url: 'https://alataucitybank.kz/business/salary-project',
       host: 'alataucitybank.kz',
@@ -214,6 +260,7 @@ const CONFIRMED_ON_BANK_SITE: Record<string, Confirmation> = {
   KMFBKZKK: {
     slug: 'kmf-bank',
     label: 'KMF Банк',
+    ruName: { nom: 'КМФ Банк', gen: 'КМФ Банка', latin: 'KMF Банк' },
     site: {
       url: 'https://kmf.kz/about/rekvizity/',
       host: 'kmf.kz',
@@ -227,6 +274,7 @@ const CONFIRMED_ON_BANK_SITE: Record<string, Confirmation> = {
   VTBAKZKZ: {
     slug: 'vtb-kazakhstan',
     label: 'ВТБ Казахстан',
+    ruName: { nom: 'ВТБ Казахстан', gen: 'ВТБ Казахстан' },
     site: {
       url: 'https://www.vtb-bank.kz/about/offices/',
       host: 'vtb-bank.kz',
@@ -240,6 +288,7 @@ const CONFIRMED_ON_BANK_SITE: Record<string, Confirmation> = {
   SHBKKZKA: {
     slug: 'shinhan-bank-kazakhstan',
     label: 'Шинхан Банк Казахстан',
+    ruName: { nom: 'Шинхан Банк Казахстан', gen: 'Шинхан Банка Казахстан' },
     site: {
       url: 'https://www.shinhan.kz/en/about-bank/requisites/',
       host: 'shinhan.kz',
@@ -263,7 +312,9 @@ export const BIK_ROWS: BikRow[] = NBK_ROWS.map(raw => {
     ...raw,
     displayName: toDisplayName(raw.nameNbk),
     confirmedOnBankSite: conf !== undefined,
-    ...(conf ? { bankSite: conf.site, slug: conf.slug, label: conf.label } : {}),
+    ...(conf
+      ? { bankSite: conf.site, slug: conf.slug, label: conf.label, ruName: conf.ruName, ...(conf.kkName ? { kkName: conf.kkName } : {}) }
+      : {}),
   }
 })
 
