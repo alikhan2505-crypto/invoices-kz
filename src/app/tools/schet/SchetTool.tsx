@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
+import { bikHubLink } from '@/lib/bikLinks'
 import BrandWordmark from '@/components/BrandWordmark'
 import { track } from '@vercel/analytics'
 import { KAZAKHSTAN_BANKS, OTHER_BANK } from '@/lib/kazakhstanBanks'
@@ -64,6 +65,7 @@ const guidePath = (lang: ToolLang) =>
 // здесь он просто встаёт под формой, перед вопросами.
 export default function SchetTool({ lang, children }: { lang: ToolLang; children?: ReactNode }) {
   const t = schetDict[lang]
+  const bikLink = bikHubLink(lang)
   const chrome = TOOL_CHROME[lang]
   // Вошедшему блок лимита ведёт в кабинет, а не на /login (15.10.2026).
   const { signedIn } = useToolSession()
@@ -319,6 +321,11 @@ export default function SchetTool({ lang, children }: { lang: ToolLang; children
                 {KAZAKHSTAN_BANKS.map(b => <option key={b.bik} value={b.bik}>{b.name}</option>)}
                 <option value={OTHER_BANK}>{t.otherBank}</option>
               </select>
+              {bikLink && (
+                <div className="text-xs mt-1">
+                  <Link href={bikLink.href} className="underline" style={{ color: 'var(--nav-text-secondary)' }}>{bikLink.label}</Link>
+                </div>
+              )}
             </div>
             {f.bankBik === OTHER_BANK && (
               <>

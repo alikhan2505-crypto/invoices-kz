@@ -102,34 +102,44 @@ export function estimateKaspiDeliveryFee(weightGrams: number): number {
 
 export type CategoryCommission = { label: string; ratePercent: number }
 
-// Real per-category commission rates, transcribed verbatim from Kaspi's own
-// published partner tariff PDF: https://guide.kaspi.kz/cdn/content/pay/product/documents/Magazin/Tarify_Magazina_na_Kaspi_kz_2026.pdf
-// (linked from https://guide.kaspi.kz/partner/ru/shop/conditions/commissions,
-// page states "Обновлено 28.01.2026"). The source document has thousands of
-// rows down to a 5th-level subcategory (e.g. "Автотовары > Автозапчасти >
-// Двигатель > Картер двигателя"), each with two published percentages --
-// "Комиссия без НДС" (Kaspi's base fee) and "Комиссия с НДС" (базовая ставка
-// + Kaspi's 16% VAT on that fee, charged separately per the guide page).
-// We use "с НДС" here because that is the real total percentage of the sale
-// price Kaspi actually withholds -- the number that matters for a seller's
-// cash unit economics, not the pre-VAT accounting figure.
+// Real per-category commission rates, transcribed from Kaspi's own published
+// partner tariff: "Тарифы Магазина на Kaspi.kz с 5 января 2026 года" (PDF),
+// https://guide.kaspi.kz/cdn/content/pay/product/documents/Magazin/Tarify_Magazina_na_Kaspi_kz_2026.pdf
+// -- linked from https://guide.kaspi.kz/partner/ru/shop/conditions/q1344
+// (page "Комиссии за продажи по всем категориям товаров в Магазине на Kaspi.kz",
+// "Обновлен 06.01.2026"). The tariff has been in force since 05.01.2026; the
+// table was re-checked against the PDF on 23.10.2026. The source document has
+// thousands of rows down to a 5th-level subcategory (e.g. "Автотовары >
+// Автозапчасти > Двигатель > Картер двигателя"), each with two published
+// percentages -- "Комиссия без НДС" (Kaspi's base fee) and "Комиссия с НДС"
+// (the same fee with VAT, shown by Kaspi as a separate published figure; the
+// pairs are NOT an exact x1.16, so never recompute one from the other).
+// We use "с НДС" here because that is the percentage of the sale price a
+// seller should plan their cash unit economics around.
 //
 // This table collapses that down to ONE rate per TOP-LEVEL category
 // ("Категория 1-го уровня"), which is enough for every category we verified
 // is uniform across all its subcategories (the overwhelming majority --
 // e.g. every single row under Автотовары, Одежда, Строительство и ремонт,
 // etc. carries the same rate). A handful of top-level categories are
-// genuinely split between two rates depending on subcategory (medicine vs.
+// genuinely split between rates depending on subcategory (medicine vs.
 // other pharmacy goods, phone accessories vs. phones themselves, pet food
-// vs. other pet goods) -- those are listed as two separate entries below.
+// and litter vs. other pet goods) -- those are listed as separate entries
+// below. The labels are also stored identifiers (commission_category_label in
+// kaspi_shop_product_costs, the stats key of the public calculator), so an
+// existing label is never reworded: a split is added as a NEW entry instead.
 //
-// "Аксессуары" (bags/belts/jewelry-adjacent accessories) is deliberately
-// OMITTED: unlike the above, it has no clean majority split -- roughly half
-// its subcategories are 12.5% and half are 15.5% with no simple rule to
-// collapse it to one number without guessing. Per this feature's own
-// design brief: an honestly incomplete list with a manual-entry fallback is
-// correct; a plausible-looking wrong number is not. Sellers in that
-// category should type their own rate.
+// A verified exception that is NOT split out (a single subcategory; the seller
+// can type the rate by hand): ТВ, Аудио, Видео > Аудиотехника > Чехлы для
+// наушников is 15,5% while the rest of that category is 12,5%.
+//
+// The top-level category "Аксессуары" is deliberately OMITTED: unlike the
+// above, it has no clean majority split -- 17 of its 29
+// subcategories are 15.5% and 12 are 12.5% with no simple rule to collapse it
+// to one number without guessing. Per this feature's own design brief: an
+// honestly incomplete list with a manual-entry fallback is correct; a
+// plausible-looking wrong number is not. Sellers in that category should type
+// their own rate.
 export const KASPI_CATEGORY_COMMISSIONS: CategoryCommission[] = [
   { label: 'Автотовары', ratePercent: 12.5 },
   { label: 'Аптека — лекарства', ratePercent: 7.3 },
@@ -150,8 +160,10 @@ export const KASPI_CATEGORY_COMMISSIONS: CategoryCommission[] = [
   { label: 'ТВ, Аудио, Видео', ratePercent: 12.5 },
   { label: 'Телефоны и гаджеты — смартфоны и гаджеты', ratePercent: 12.5 },
   { label: 'Телефоны и гаджеты — аксессуары (чехлы, кабели, стёкла)', ratePercent: 15.5 },
+  { label: 'Телефоны и гаджеты — зарядные устройства и внешние аккумуляторы', ratePercent: 12.5 },
   { label: 'Товары для дома и дачи', ratePercent: 12.5 },
   { label: 'Товары для животных — корма и лакомства', ratePercent: 7.3 },
+  { label: 'Товары для животных — наполнители туалета и комбикорма', ratePercent: 7.3 },
   { label: 'Товары для животных — прочее (ветаптека, груминг, аксессуары)', ratePercent: 12.5 },
   { label: 'Украшения', ratePercent: 15.5 },
 ]

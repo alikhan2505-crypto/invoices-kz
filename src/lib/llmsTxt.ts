@@ -1,4 +1,16 @@
-# invoices.kz
+// Содержимое /llms.txt (отдаётся маршрутом src/app/llms.txt/route.ts).
+// Раньше это был статический public/llms.txt. Файл стал кодом, чтобы разделы про
+// страницы комиссий Kaspi и БИК появлялись только при SEO_TARIFF_BIK_LIVE = true
+// (src/lib/seoLaunch.ts). При выключенном флаге вывод совпадает с прежним файлом
+// посимвольно (это проверяет llmsTxt.test.ts).
+
+import { BIK_BANK_PAGES, NBK_BIK_RETRIEVED, bikBankPath, bikHubPath } from './bikRegistry'
+import { KASPI_GUIDES } from './kaspiGuides'
+import { guidePath } from './guides'
+import { SEO_TARIFF_BIK_LIVE, formatRuDate } from './seoLaunch'
+
+// Всё до раздела "Optional", без завершающего перевода строки.
+const HEAD = `# invoices.kz
 
 > invoices.kz — казахстанская онлайн-платформа для ИП и ТОО: счета на оплату, АВР, накладные и коммерческие предложения в PDF с подписью и печатью, оплата через Kaspi Pay прямо в счёте, подписание ЭЦП. Кроме того: Kaspi Bot для продавцов Kaspi Магазина (демпинг цен и заказы) и AI-агент для ответов клиентам в WhatsApp, Instagram и на сайте. Оператор: ИП «First Project», БИН 890525350143, г. Астана, Казахстан. Контакт: mail@invoices.kz. Языки: русский, казахский, английский. Валюта: тенге (₸).
 
@@ -34,11 +46,35 @@
 - [Счёт, АВР, накладная и КП: чем отличаются](https://invoices.kz/guides/dokumenty-ip-kazakhstan)
 - [Как проверить контрагента по БИН](https://invoices.kz/guides/proverka-kontragenta)
 - [Пеня за просрочку оплаты](https://invoices.kz/guides/penya-za-prosrochku)
-- [Как открыть ИП в 2026 году](https://invoices.kz/guides/kak-otkryt-ip-2026)
+- [Как открыть ИП в 2026 году](https://invoices.kz/guides/kak-otkryt-ip-2026)`
 
-## Optional
+// Раздел "Optional" до конца файла.
+const OPTIONAL = `## Optional
 - [Тарифы в Markdown](https://invoices.kz/pricing.md)
 - [Политика конфиденциальности](https://invoices.kz/privacy)
 - [Условия сервиса](https://invoices.kz/terms)
 - [Удаление аккаунта и данных](https://invoices.kz/data-deletion)
 - [Карта сайта](https://invoices.kz/sitemap.xml)
+`
+
+function kaspiLines(): string[] {
+  return KASPI_GUIDES.map(g => `- [${g.ru.title}](https://invoices.kz${guidePath(g.slug, 'ru')})`)
+}
+
+function bikSection(): string {
+  const bankLines = BIK_BANK_PAGES.map(
+    r =>
+      `- [БИК ${r.label}: ${r.bik}](https://invoices.kz${bikBankPath(r.slug!, 'ru')}); казахская версия: https://invoices.kz${bikBankPath(r.slug!, 'kk')}`,
+  )
+  return [
+    '## БИК банков РК',
+    `- [Справочник БИК банков Казахстана](https://invoices.kz${bikHubPath('ru')}): 33 строки справочника Национального Банка, получено ${formatRuDate(NBK_BIK_RETRIEVED)}; казахская версия: https://invoices.kz${bikHubPath('kk')}`,
+    ...bankLines,
+  ].join('\n')
+}
+
+/** Текст /llms.txt. `live` по умолчанию берётся из флага запуска; параметр нужен тестам. */
+export function buildLlmsTxt(live: boolean = SEO_TARIFF_BIK_LIVE): string {
+  if (!live) return `${HEAD}\n\n${OPTIONAL}`
+  return [`${HEAD}\n${kaspiLines().join('\n')}`, bikSection(), OPTIONAL].join('\n\n')
+}

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import GuideShell from '../../GuideShell'
+import { bikHubLink } from '@/lib/bikLinks'
 import { getGuide, guideAlternates, guideMetaTitle } from '@/lib/guides'
 
 const guide = getGuide('kak-vystavit-schet-ip')!
@@ -26,6 +27,7 @@ export const metadata: Metadata = {
 }
 
 export default function Page() {
+  const bik = bikHubLink('kk')
   return (
     <GuideShell guide={guide} lang="kk">
       <p className="lead">
@@ -67,6 +69,12 @@ export default function Page() {
       <p>
         Осындай нысандағы дайын шотты <Link href="/tools/kk/schet">төлемге шоттың тегін генераторында</Link> жинауға
         болады: БСК банктер анықтамалығынан алынады, жазбаша сома мен ҚҚС өзі қойылады.
+        {bik && (
+          <>
+            {' '}
+            Банктің БСК-ын тексеру: <Link href={bik.href}>{bik.label}</Link>.
+          </>
+        )}
       </p>
 
       <h2>Шот неге төленбей қалады: төрт қате</h2>

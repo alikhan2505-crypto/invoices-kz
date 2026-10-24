@@ -1,5 +1,6 @@
 import { MetadataRoute } from 'next'
 import { GUIDES, guideAlternates } from '@/lib/guides'
+import { bikSitemapEntries } from '@/lib/bikRegistry'
 import { ROOT_HUB_LIVE } from '@/lib/rootHub'
 import { TOOL_LANGS, isToolLocalized, toolAlternates, toolUrl, toolsIndexAlternates, toolsIndexUrl } from '@/lib/tools-i18n'
 
@@ -110,6 +111,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
         alternates: { languages: guideAlternates(g.slug) },
       },
     ]),
+    // K1-K8 (комиссии и доставка Kaspi) приходят в GUIDES выше, а /bik и страницы банков
+    // добавляются здесь. Оба источника отдают пустой список, пока SEO_TARIFF_BIK_LIVE = false
+    // (src/lib/seoLaunch.ts): основатель сначала читает страницы, потом включает флаг.
+    ...bikSitemapEntries(),
     { url: 'https://invoices.kz/privacy', lastModified: LASTMOD.privacy },
     { url: 'https://invoices.kz/terms', lastModified: LASTMOD.terms },
   ]

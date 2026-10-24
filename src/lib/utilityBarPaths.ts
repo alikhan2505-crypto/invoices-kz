@@ -26,7 +26,10 @@ function isPublicPage(pathname: string): boolean {
     // переключатель «Қазақша» у вошедших (15.10.2026).
     pathname === '/tools' ||
     pathname === '/guides' ||
-    pathname.startsWith('/guides/')
+    pathname.startsWith('/guides/') ||
+    // Справочник БИК (/bik, /bik/kk, страницы банков): публичные статьи со своей шапкой.
+    pathname === '/bik' ||
+    pathname.startsWith('/bik/')
   )
 }
 

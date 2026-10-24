@@ -1,5 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
+import { bikHubLink } from '@/lib/bikLinks'
 import { useRouter } from 'next/navigation'
 import { motion, useReducedMotion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
@@ -13,6 +15,7 @@ import { returnPathFromSearch, type ReturnPath } from '@/lib/returnPath'
 import { validateIik, normalizeIik } from '@/lib/kzIdentifiers'
 import { profileBonusDict } from '@/lib/i18n/profileBonus'
 import { claimAndAnnounceBonus } from '@/lib/profileBonusClient'
+import PageContainer from '@/components/PageContainer'
 import PageHeader from '@/components/PageHeader'
 import { autoKbe, needsManualKbe, suggestKbe } from '@/lib/kbe'
 
@@ -67,6 +70,7 @@ export default function Banks() {
   const router = useRouter()
   const { lang } = useLanguage()
   const t = profileAccountsDict[lang]
+  const bikLink = bikHubLink(lang)
   const tb = profileBonusDict[lang]
   // Shadows window.alert / window.confirm for this component -- see
   // src/components/AppDialog.tsx. Every confirm below is awaited: a Promise
@@ -215,7 +219,7 @@ export default function Banks() {
 
   return (
       <>
-        <div className="max-w-lg lg:max-w-2xl mx-auto p-4">
+        <PageContainer>
           <PageHeader
             title={t.banksHeaderLabel}
             backHref={returnTo || '/profile'}
@@ -328,6 +332,11 @@ export default function Banks() {
                   ))}
                   <option value={OTHER_BANK}>{t.otherBankOption}</option>
                 </select>
+                {bikLink && (
+                  <div className="text-xs mt-1">
+                    <Link href={bikLink.href} className="underline" style={{ color: 'var(--nav-text-muted)' }}>{bikLink.label}</Link>
+                  </div>
+                )}
               </div>
               {manualBank && (
                 <div>
@@ -423,7 +432,7 @@ export default function Banks() {
               {t.addAccountButton}
             </motion.button>
           )}
-        </div>
+        </PageContainer>
       {dialogElement}
       </>
   )

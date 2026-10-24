@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import GuideShell from '../GuideShell'
+import { bikHubLink } from '@/lib/bikLinks'
 import { getGuide, guideAlternates, guideMetaTitle } from '@/lib/guides'
 
 const guide = getGuide('kak-vystavit-schet-ip')!
@@ -26,6 +27,7 @@ export const metadata: Metadata = {
 }
 
 export default function Page() {
+  const bik = bikHubLink('ru')
   return (
     <GuideShell guide={guide} lang="ru">
       <p className="lead">
@@ -67,6 +69,12 @@ export default function Page() {
       <p>
         Готовый счёт по такой форме собирается в бесплатном <Link href="/tools/schet">генераторе счёта на оплату</Link>:
         БИК берётся из справочника банков, сумма прописью и НДС подставляются сами.
+        {bik && (
+          <>
+            {' '}
+            Проверить БИК своего банка: <Link href={bik.href}>{bik.label}</Link>.
+          </>
+        )}
       </p>
 
       <h2>Почему счёт на оплату не оплачивают: четыре ошибки</h2>

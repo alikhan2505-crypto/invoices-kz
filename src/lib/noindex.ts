@@ -31,5 +31,5 @@ export const ROBOTS_DISALLOW_PREFIXES = [
 export const ROBOTS_MUST_STAY_ALLOWED = [
   '/view/some-token', '/contract-view/some-token',
   '/', '/tools', '/tools/waybills', '/guides', '/guides/x', '/lp/kaspi', '/lp/agent',
-  '/cashier-api', '/kaspi-api', '/s/salon', '/shop/x', '/login', '/products', '/privacy', '/terms',
+  '/bik', '/bik/kaspi-bank', '/cashier-api', '/kaspi-api', '/s/salon', '/shop/x', '/login', '/products', '/privacy', '/terms',
 ] as const

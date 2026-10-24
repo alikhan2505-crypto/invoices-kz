@@ -17,6 +17,8 @@
 // to be earlier than its last edit; without it datePublished falls back to
 // `updated` (we never invent an earlier date).
 
+import { kaspiGuidesForRegistry } from './kaspiGuides'
+
 export type GuideLang = 'ru' | 'kk'
 
 export type GuideFaqItem = { q: string; a: string }
@@ -328,6 +330,9 @@ export const GUIDES: Guide[] = [
         'Қазақстанда ЖК тегін, онлайн және хабарлама тәртібімен тіркеледі: egov.kz сайтында ЭЦҚ-мен қол қойылатын «Жеке кәсіпкер ретінде қызметті бастағаны туралы хабарлама» қызметі керек. Нәтиже — талон, жұмысты бірден бастауға болады. Алдын ала ҚЭЖЖ мен салық режимін таңдаңыз, тіркелгеннен кейін есеп шотын ашыңыз және 910 нысанының мерзімдерін есте сақтаңыз.',
     },
   },
+  // K1-K8 (комиссии и доставка Kaspi): пока SEO_TARIFF_BIK_LIVE = false функция
+  // возвращает [], и эти страницы не попадают в индекс гайдов, sitemap и «Читайте также».
+  ...kaspiGuidesForRegistry(),
 ]
 
 export function getGuide(slug: string): Guide | undefined {

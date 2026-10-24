@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, it, expect } from 'vitest'
 import {
   computeMargin,
@@ -158,6 +160,25 @@ describe('KASPI_CATEGORY_COMMISSIONS', () => {
     const food = KASPI_CATEGORY_COMMISSIONS.find(c => c.label === 'Продукты питания')
     expect(food?.ratePercent).toBe(7.3)
   })
+
+  // Verified against Kaspi's tariff "с 5 января 2026 года" on 23.10.2026.
+  it('keeps the stored labels of the split categories unchanged and adds the verified exceptions as new rows', () => {
+    const rate = (label: string) => KASPI_CATEGORY_COMMISSIONS.find(c => c.label === label)?.ratePercent
+    // Existing labels are persisted identifiers (kaspi_shop_product_costs), never reworded.
+    expect(rate('Телефоны и гаджеты — аксессуары (чехлы, кабели, стёкла)')).toBe(15.5)
+    expect(rate('Товары для животных — корма и лакомства')).toBe(7.3)
+    // Chargers and power banks sit in the phone-accessories branch of the tariff but at 12,5%.
+    expect(rate('Телефоны и гаджеты — зарядные устройства и внешние аккумуляторы')).toBe(12.5)
+    // Litter and compound feed for farm animals are in the 7,3% tier too.
+    expect(rate('Товары для животных — наполнители туалета и комбикорма')).toBe(7.3)
+  })
+
+  it('does not carry the unconfirmed 28.01.2026 date or the dead /conditions/commissions link in its source comment', () => {
+    const src = readFileSync(join(process.cwd(), 'src/lib/kaspiShop/margin.ts'), 'utf8')
+    expect(src).not.toContain('28.01.2026')
+    expect(src).not.toContain('conditions/commissions')
+    expect(src).toContain('conditions/q1344')
+  })
 })
 
 describe('defaults', () => {
@@ -216,5 +237,37 @@ describe('computeBreakEvenPrice', () => {
   it('treats negative inputs as zero instead of producing a negative floor', () => {
     const r = computeBreakEvenPrice({ ...costs, sourcingPrice: -5000, packagingCost: -1 })
     expect(r.breakEven).toBeGreaterThan(0)
+  })
+})
+
+describe('komissiya-kaspi source notes (ru, kk) and the margin FAQ', () => {
+  const read = (p: string) => readFileSync(join(process.cwd(), p), 'utf8')
+  const pages = ['src/app/guides/komissiya-kaspi/page.tsx', 'src/app/guides/kk/komissiya-kaspi/page.tsx']
+
+  it.each(pages)('%s cites the 05.01.2026 tariff checked 23.10.2026, not the unconfirmed 28.01.2026 edition', file => {
+    const src = read(file)
+    expect(src).not.toContain('28.01.2026')
+    expect(src).toContain('05.01.2026')
+    expect(src).toContain('23.10.2026')
+    expect(src).toContain('conditions/q1344')
+    expect(src).toContain('Tarify_Magazina_na_Kaspi_kz_2026.pdf')
+  })
+
+  it.each(pages)('%s states the delivery split (under 10 000 by order amount 49 to 799, weight from 10 000) and drops the unconfirmed "not withheld" claim', file => {
+    const src = read(file)
+    expect(src).toContain('49')
+    expect(src).toContain('799')
+    expect(src).toContain('10 000')
+    expect(src).not.toContain('Не удерживаются маркетплейсом')
+    expect(src).not.toContain('Маркетплейс ұстамайды')
+  })
+
+  it('the kk guide carries the native-speaker review marker', () => {
+    expect(read(pages[1]).startsWith('// kk: вычитка носителем ждёт основателя')).toBe(true)
+  })
+
+  it('the margin FAQ no longer cites the 28.01.2026 edition in any language', () => {
+    expect(read('src/app/tools/margin/dict.ts')).not.toContain('28.01.2026')
+    expect(read('src/app/tools/margin/dict.ts')).not.toContain('28 January 2026')
   })
 })

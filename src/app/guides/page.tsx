@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import BrandWordmark from '@/components/BrandWordmark'
 import { GUIDES, guidesIndexAlternates } from '@/lib/guides'
+import { bikGuidesIndexCard } from '@/lib/bikLinks'
 import { toolLinkPath } from '@/lib/tools-i18n'
 import { toolsIndexCards } from '@/lib/tools-i18n/toolsIndex'
 
@@ -28,6 +29,7 @@ export const metadata: Metadata = {
 }
 
 export default function GuidesIndex() {
+  const bikCard = bikGuidesIndexCard('ru')
   return (
     <div className="min-h-screen" style={{ background: 'var(--nav-bg)' }}>
       <div className="max-w-3xl mx-auto p-4 lg:p-6">
@@ -70,6 +72,18 @@ export default function GuidesIndex() {
               </div>
             </Link>
           ))}
+          {bikCard && (
+            <Link
+              href={bikCard.href}
+              className="nav-glass rounded-2xl p-5 block"
+              style={{ color: 'var(--nav-text-primary)' }}
+            >
+              <div className="text-base font-semibold mb-1.5">{bikCard.title}</div>
+              <div className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>
+                {bikCard.text}
+              </div>
+            </Link>
+          )}
         </div>
 
         <div className="mt-8">
