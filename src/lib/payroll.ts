@@ -24,7 +24,8 @@
 //       начисленной суммы СН не начисляется (п. 4, нет объекта обложения).
 //   Социальный кодекс РК: ст. 207, 243 (пенсионер освобождён от СО), ст. 244 п. 1
 //     (ставка СО 5%), ст. 245 п. 1 (база СО: доход минус ОПВ, от 1 МЗП до 7 МЗП),
-//     ст. 248 п. 3 и п. 6 (кому ОПВ и ОПВР не платятся), ст. 249 п. 1 пп. 1
+//     ст. 248 п. 3 и п. 6 (кому ОПВ и ОПВР не платятся; п. 6 пп. 6: ОПВР не платится
+//     за работников, родившихся до 01.01.1975, флаг bornBefore1975), ст. 249 п. 1 пп. 1
 //     (ОПВ 10%, потолок 50 МЗП), ст. 251 п. 1-2 (ОПВР 3,5% в 2026 году, от 1 МЗП
 //     до 50 МЗП).
 //   Закон РК «Об обязательном социальном медицинском страховании»: ст. 26 п. 1
@@ -148,6 +149,12 @@ export interface PayrollInput {
   employerRegime?: EmployerRegime
   /** Месяц найма или увольнения: пол СН не применяется. По умолчанию false. */
   hireOrFireMonth?: boolean
+  /**
+   * Работник родился до 01.01.1975: работодатель не платит за него ОПВР
+   * (Соц.К. ст. 248 п. 6 пп. 6). Меняет только ОПВР, стоимость работника и
+   * итого в бюджет; на руки и ИПН не затрагивает. По умолчанию false.
+   */
+  bornBefore1975?: boolean
   /** Номер месяца 1..12, зарплата одинакова с января. По умолчанию 1. */
   monthIndex?: number
   /**
@@ -163,6 +170,7 @@ export interface NormalizedPayrollInput {
   baseDeduction: boolean
   employerRegime: EmployerRegime
   hireOrFireMonth: boolean
+  bornBefore1975: boolean
   monthIndex: number
   /** undefined, если ручной ввод не задан или не применим к категории. */
   priorTaxableCum: number | undefined
@@ -199,8 +207,12 @@ export interface PayrollResult {
     /** База СН: gross - opv - vosms либо пол SN_FLOOR_OBJECT; 0 на упрощённой декларации и у ИП (фиксированная сумма). */
     sn: number
   }
-  /** Платёж обнулён категорией работника (причина для пояснения). */
-  exempt: { opv: boolean; vosms: boolean; oosms: boolean; opvr: boolean; so: boolean }
+  /**
+   * Платёж обнулён категорией работника или годом рождения (причина для пояснения).
+   * opvr: true и по категории, и по флагу «родился до 1975». opvrBorn1975: true,
+   * только когда единственная причина флаг (категория сама ОПВР не отменяет).
+   */
+  exempt: { opv: boolean; vosms: boolean; oosms: boolean; opvr: boolean; so: boolean; opvrBorn1975: boolean }
   /** Платёж упёрся в потолок. */
   capped: { opv: boolean; opvr: boolean; vosms: boolean; oosms: boolean }
   /** Применён пол СН 14 МРП (3 633 ₸). */
@@ -238,6 +250,8 @@ export interface ReverseOptions {
   baseDeduction?: boolean
   employerRegime?: EmployerRegime
   hireOrFireMonth?: boolean
+  /** Родился до 01.01.1975: ОПВР не платится. На сумму на руки не влияет, обратный расчёт его только пробрасывает. */
+  bornBefore1975?: boolean
   monthIndex?: number
   priorTaxableCum?: number
 }
@@ -330,6 +344,7 @@ function normalize(i: PayrollInput | (ReverseOptions & { gross: number })): Norm
     baseDeduction: i.baseDeduction ?? true,
     employerRegime: regime,
     hireOrFireMonth: i.hireOrFireMonth ?? false,
+    bornBefore1975: i.bornBefore1975 === true,
     monthIndex,
     priorTaxableCum: prior,
   }
@@ -369,7 +384,11 @@ function core(n: NormalizedPayrollInput): PayrollResult {
   const { opv, vosms } = employeeContributions(g, cat)
   const oosms = ex.osms ? 0 : rate(Math.min(g, CAP_40_MZP), RATE_OOSMS)
   const opvrBase = Math.min(Math.max(g, FLOOR_1_MZP), CAP_50_MZP)
-  const opvr = idle || ex.opvr ? 0 : rate(opvrBase, RATE_OPVR)
+  // Соц.К. ст. 248 п. 6 пп. 6: ОПВР не платится за работников, родившихся до 01.01.1975
+  // (платится за 1975 г. р. и моложе). Складывается с категорией по «или»: у пенсионера и
+  // у инвалида I-II группы бессрочно ОПВР и так ноль. На ОПВ, ВОСМС, ИПН, СО, СН, ООСМС не влияет.
+  const opvrExempt = ex.opvr || n.bornBefore1975
+  const opvr = idle || opvrExempt ? 0 : rate(opvrBase, RATE_OPVR)
   // Соц.К. ст. 245 п. 1: доход минус ОПВ (ВОСМС не вычитается), от 1 МЗП до 7 МЗП.
   const soBase = Math.min(Math.max(g - opv, FLOOR_1_MZP), CAP_7_MZP)
   const soRaw = soBase * RATE_SO[0]
@@ -438,7 +457,7 @@ function core(n: NormalizedPayrollInput): PayrollResult {
 
   const capped = {
     opv: !ex.opv && g >= CAP_50_MZP,
-    opvr: !ex.opvr && g >= CAP_50_MZP,
+    opvr: !opvrExempt && g >= CAP_50_MZP,
     vosms: !ex.osms && g >= CAP_20_MZP,
     oosms: !ex.osms && g >= CAP_40_MZP,
   }
@@ -448,7 +467,7 @@ function core(n: NormalizedPayrollInput): PayrollResult {
   if (!idle) {
     // Ниже МЗП: ОПВР и СО считаются от МЗП. От МЗП до МЗП + ОПВ: начислено выше МЗП,
     // но доход минус ОПВ ниже МЗП, и база СО тоже поднимается до МЗП (Соц.К. ст. 245 п. 1).
-    if ((g < MZP_2026 && (!ex.opvr || !ex.so)) || (!ex.so && g >= MZP_2026 && g - opv < FLOOR_1_MZP)) w.push('w1')
+    if ((g < MZP_2026 && (!opvrExempt || !ex.so)) || (!ex.so && g >= MZP_2026 && g - opv < FLOOR_1_MZP)) w.push('w1')
     if (n.baseDeduction && ipn === 0 && g > 0 && !disabled) w.push('w2')
     if (!n.baseDeduction) w.push('w3')
     if (capped.opv || capped.opvr || capped.vosms || capped.oosms) w.push('w4')
@@ -481,7 +500,7 @@ function core(n: NormalizedPayrollInput): PayrollResult {
       so: idle ? 0 : soBase,
       sn: snBase,
     },
-    exempt: { opv: ex.opv, vosms: ex.osms, oosms: ex.osms, opvr: ex.opvr, so: ex.so },
+    exempt: { opv: ex.opv, vosms: ex.osms, oosms: ex.osms, opvr: opvrExempt, so: ex.so, opvrBorn1975: n.bornBefore1975 && !ex.opvr },
     capped,
     snFloorApplied,
     snFixed,

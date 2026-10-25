@@ -55,6 +55,9 @@ export interface ZarplataDict {
   /** {amount} */
   deduction: string
   deductionHint: string
+  /** Флажок «родился до 1975 года»: ОПВР не платится (Соц.К. ст. 248 п. 6 пп. 6). */
+  born1975: string
+  born1975Hint: string
   advanced: string
   month: string
   /** 12 названий месяцев. */
@@ -122,6 +125,8 @@ export interface ZarplataDict {
   tooLarge: string
   exemptOpv: string
   exemptOpvr: string
+  /** Пояснение строки ОПВР, когда её отменил только флажок «родился до 1975 года». */
+  exemptOpvr1975: string
   exemptSo: string
   exemptOsms: string
   /** {base} {value} {cap} */
@@ -155,6 +160,10 @@ export interface ZarplataDict {
   warnings: Record<PayrollWarningCode, string>
   /** Вариант w1, когда начислено не меньше МЗП, а доход минус ОПВ меньше: {mzp} */
   w1Base: string
+  /** Вариант w1, когда ОПВР не платится (категория или год рождения): {mzp} */
+  w1NoOpvr: string
+  /** Вариант w4, когда ОПВР не платится: {cap50} {cap20} {cap40} */
+  w4NoOpvr: string
   /** Вариант w7 при ручном вводе: {threshold} */
   w7Manual: string
   noteRounding: string
@@ -224,7 +233,7 @@ function buildFaq(lang: ToolLang): ToolFaqItem[] {
       },
       {
         q: 'Бухгалтерия есебі калькулятордан неге өзгеше болуы мүмкін?',
-        a: 'Дөңгелектеуге байланысты 1-2 ₸ айырмашылық болуы мүмкін: салықтарды дөңгелектеудің бірыңғай нормасы Кодексте жоқ. Калькулятор резидент еместерді және тұруға ықтиярхаты бар шетелдіктерді, азаматтық-құқықтық шарттарды, көпбалалы аналарға, студенттерге және әскери қызметшілерге арналған МӘМС жеңілдіктерін, ауыл шаруашылығы өндірушілеріне арналған 1,8% әлеуметтік салық мөлшерлемесін, салық салынбайтын төлемдерді және жыл ішінде жалақының өзгеруін ескермейді. 01.01.1975 дейін туған қызметкерлер үшін жұмыс беруші ЖМЗЖ төлемейді, ал калькулятор оны есептейді, сондықтан қызметкердің құны ЖМЗЖ сомасына артық көрсетіледі. 2026 жылғы Салық кодексінде көпбалалы отбасыларға шегерім жоқ.',
+        a: 'Дөңгелектеуге байланысты 1-2 ₸ айырмашылық болуы мүмкін: салықтарды дөңгелектеудің бірыңғай нормасы Кодексте жоқ. Калькулятор резидент еместерді және тұруға ықтиярхаты бар шетелдіктерді, азаматтық-құқықтық шарттарды, көпбалалы аналарға, студенттерге және әскери қызметшілерге арналған МӘМС жеңілдіктерін, ауыл шаруашылығы өндірушілеріне арналған 1,8% әлеуметтік салық мөлшерлемесін, салық салынбайтын төлемдерді және жыл ішінде жалақының өзгеруін ескермейді. 2026 жылғы Салық кодексінде көпбалалы отбасыларға шегерім жоқ.',
       },
     ]
   }
@@ -248,7 +257,7 @@ function buildFaq(lang: ToolLang): ToolFaqItem[] {
       },
       {
         q: 'Why can payroll software give a different result?',
-        a: 'A difference of 1-2 ₸ is possible because of rounding: the Tax Code has no single rounding rule for taxes. The calculator does not cover non-residents and foreigners with a residence permit, civil-law contracts, health insurance benefits for mothers of large families, students and military personnel, the 1.8% social tax rate for agricultural producers, tax-exempt payments or a salary that changes during the year. For employees born before 01.01.1975 the employer pays no employer pension contributions (OPVR), but the calculator charges them, so the employee cost is overstated by that amount. The 2026 Tax Code has no deduction for large families.',
+        a: 'A difference of 1-2 ₸ is possible because of rounding: the Tax Code has no single rounding rule for taxes. The calculator does not cover non-residents and foreigners with a residence permit, civil-law contracts, health insurance benefits for mothers of large families, students and military personnel, the 1.8% social tax rate for agricultural producers, tax-exempt payments or a salary that changes during the year. The 2026 Tax Code has no deduction for large families.',
       },
     ]
   }
@@ -271,7 +280,7 @@ function buildFaq(lang: ToolLang): ToolFaqItem[] {
     },
     {
       q: 'Почему расчёт бухгалтерии может отличаться от калькулятора?',
-      a: 'Разница возможна на 1-2 ₸ из-за округления: единой нормы об округлении налогов в Кодексе нет. Калькулятор не учитывает нерезидентов и иностранцев с видом на жительство, договоры ГПХ, льготы по ОСМС для матерей многодетных семей, студентов и военнослужащих, ставку СН 1,8% для сельхозпроизводителей, необлагаемые выплаты и изменение зарплаты в течение года. За работников, родившихся до 01.01.1975, работодатель не платит ОПВР, а калькулятор её начисляет, поэтому стоимость работника завышена на сумму ОПВР. Вычета для многодетных семей в Налоговом кодексе 2026 года нет.',
+      a: 'Разница возможна на 1-2 ₸ из-за округления: единой нормы об округлении налогов в Кодексе нет. Калькулятор не учитывает нерезидентов и иностранцев с видом на жительство, договоры ГПХ, льготы по ОСМС для матерей многодетных семей, студентов и военнослужащих, ставку СН 1,8% для сельхозпроизводителей, необлагаемые выплаты и изменение зарплаты в течение года. Вычета для многодетных семей в Налоговом кодексе 2026 года нет.',
     },
   ]
 }
@@ -336,6 +345,9 @@ export const zarplataDict: Record<ToolLang, ZarplataDict> = {
     },
     deduction: 'Базовый вычет 30 МРП ({amount} в месяц)',
     deductionHint: 'Применяется по вашему заявлению и только у одного работодателя.',
+    born1975: 'Родился до 1975 года',
+    born1975Hint:
+      'ОПВР работодателем не платится (Соц.К. ст. 248 п. 6 пп. 6). В 2026 году ОПВР 3,5% платит работодатель за работников 1975 г. р. и моложе.',
     advanced: 'Расширенно',
     month: 'Месяц года',
     months: ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'],
@@ -403,6 +415,8 @@ export const zarplataDict: Record<ToolLang, ZarplataDict> = {
     exemptOpv:
       'По умолчанию не удерживается: пенсионный возраст или бессрочная инвалидность I и II группы; возможна уплата по заявлению работника (пп. 2). Соц.К. ст. 248 п. 3.',
     exemptOpvr: 'Не платится: пенсионный возраст или бессрочная инвалидность I и II группы. Соц.К. ст. 248 п. 6.',
+    exemptOpvr1975:
+      'Не платится: работник родился до 01.01.1975. В 2026 году ОПВР платит работодатель за работников 1975 г. р. и моложе. Соц.К. ст. 248 п. 6 пп. 6.',
     exemptSo: 'Не платится: достигшие пенсионного возраста не подлежат социальному страхованию. Соц.К. ст. 243.',
     exemptOsms:
       'Не удерживается и не платится: получатели пенсионных выплат и лица с инвалидностью. Закон об ОСМС ст. 26 п. 1, ст. 27 п. 3, ст. 28 п. 7.',
@@ -443,6 +457,9 @@ export const zarplataDict: Record<ToolLang, ZarplataDict> = {
     w1Base:
       'Начислено немного выше МЗП, но после вычета ОПВ остаётся меньше МЗП: СО считается с минимальной базы {mzp}. Соц.К. ст. 245 п. 1.',
     w7Manual: 'Облагаемый доход с начала года превышает {threshold}: с суммы превышения ИПН считается по ставке 15%.',
+    w1NoOpvr: 'Начислено меньше МЗП: СО считается от {mzp}. Соц.К. ст. 245 п. 1.',
+    w4NoOpvr:
+      'Взнос достиг предела: ОПВ считается не более чем с {cap50}, ВОСМС не более чем с {cap20}, ООСМС не более чем с {cap40}.',
     noteRounding:
       'Суммы округляются до целого тенге: ОПВ, ОПВР, ВОСМС, ООСМС, ИПН и СН по правилам арифметики. СО округляется до целого тенге независимо от тиын (п. 14 Правил исчисления социальных отчислений); мы читаем это как округление вверх, направление в Правилах не названо. Нормы об округлении налогов в Кодексе нет, расхождение с бухгалтерией может быть 1-2 ₸.',
     noteScope:
@@ -452,7 +469,6 @@ export const zarplataDict: Record<ToolLang, ZarplataDict> = {
       'договоры ГПХ и выплаты, которые не облагаются налогами;',
       'льготы по ОСМС для матерей многодетных семей, студентов и военнослужащих;',
       'ставка СН 1,8% для сельхозпроизводителей (НК ст. 557 п. 2);',
-      'работники, родившиеся до 01.01.1975: за них работодатель не платит ОПВР (Соц.К. ст. 248 п. 6 пп. 6), а калькулятор её начисляет, поэтому стоимость работника у них завышена на сумму ОПВР.',
     ],
     disclaimer: 'Предварительный расчёт, он не заменяет бухгалтера. Итоговые суммы подтверждает ваша бухгалтерия.',
     sourcesTitle: 'Источники, проверено {date}',
@@ -512,6 +528,9 @@ export const zarplataDict: Record<ToolLang, ZarplataDict> = {
     },
     deduction: '30 АЕК базалық шегерім (айына {amount})',
     deductionHint: 'Сіздің өтінішіңіз бойынша және тек бір жұмыс беруші бойынша қолданылады.',
+    born1975: '1975 жылға дейін туған',
+    born1975Hint:
+      'Жұмыс беруші ЖМЗЖ төлемейді (Әлеуметтік кодекс 248-б. 6-т. 6) тармақшасы). 2026 жылы 3,5% ЖМЗЖ-ны жұмыс беруші 1975 жылы және одан кейін туған қызметкерлер үшін төлейді.',
     advanced: 'Кеңейтілген',
     month: 'Жыл айы',
     months: ['Қаңтар', 'Ақпан', 'Наурыз', 'Сәуір', 'Мамыр', 'Маусым', 'Шілде', 'Тамыз', 'Қыркүйек', 'Қазан', 'Қараша', 'Желтоқсан'],
@@ -580,6 +599,8 @@ export const zarplataDict: Record<ToolLang, ZarplataDict> = {
     exemptOpv:
       'Әдепкі бойынша ұсталмайды: зейнеткерлік жас немесе I және II топ мүгедектігі мерзімсіз; қызметкердің өтініші бойынша төлеуге болады (2) тармақша). Әлеуметтік кодекс 248-б. 3-т.',
     exemptOpvr: 'Төленбейді: зейнеткерлік жас немесе I және II топ мүгедектігі мерзімсіз. Әлеуметтік кодекс 248-б. 6-т.',
+    exemptOpvr1975:
+      'Төленбейді: қызметкер 01.01.1975 дейін туған. 2026 жылы ЖМЗЖ-ны жұмыс беруші 1975 жылы және одан кейін туған қызметкерлер үшін төлейді. Әлеуметтік кодекс 248-б. 6-т. 6) тармақшасы.',
     exemptSo: 'Төленбейді: зейнеткерлік жасқа жеткендер әлеуметтік сақтандыруға жатпайды. Әлеуметтік кодекс 243-б.',
     exemptOsms:
       'Ұсталмайды және төленбейді: зейнетақы төлемдерін алушылар және мүгедектігі бар адамдар. МӘМС туралы Заң 26-б. 1-т., 27-б. 3-т., 28-б. 7-т.',
@@ -621,6 +642,9 @@ export const zarplataDict: Record<ToolLang, ZarplataDict> = {
     w1Base:
       'Есептелген сома ЕТЖ-ден сәл жоғары, бірақ МЗЖ шегерілгеннен кейін ЕТЖ-ден аз қалады: ӘА ең төменгі базадан, яғни {mzp} сомасынан есептеледі. Әлеуметтік кодекс 245-б. 1-т.',
     w7Manual: 'Жыл басынан салық салынатын табыс {threshold} мөлшерінен асады: асқан соманың ЖТС-ы 15% мөлшерлемесімен есептеледі.',
+    w1NoOpvr: 'Есептелген сома ЕТЖ-ден аз: ӘА {mzp} сомасынан есептеледі. Әлеуметтік кодекс 245-б. 1-т.',
+    w4NoOpvr:
+      'Жарна шегіне жетті: МЗЖ {cap50} сомасынан, МӘМС жарналары {cap20} сомасынан, МӘМС аударымдары {cap40} сомасынан артық есептелмейді.',
     noteRounding:
       'Сомалар бүтін теңгеге дейін дөңгелектенеді: МЗЖ, ЖМЗЖ, МӘМС жарналары мен аударымдары, ЖТС және әлеуметтік салық арифметика ережесімен. ӘА тиынға қарамастан бүтін теңгеге дейін дөңгелектенеді (Әлеуметтік аударымдарды есептеу ережелерінің 14-т.); біз мұны жоғары қарай дөңгелектеу деп оқимыз, ережелерде бағыты аталмаған. Салықтарды дөңгелектеу нормасы Кодексте жоқ, бухгалтериямен айырмашылық 1-2 ₸ болуы мүмкін.',
     noteScope:
@@ -630,7 +654,6 @@ export const zarplataDict: Record<ToolLang, ZarplataDict> = {
       'азаматтық-құқықтық шарттар және салық салынбайтын төлемдер;',
       'көпбалалы аналарға, студенттерге және әскери қызметшілерге арналған МӘМС жеңілдіктері;',
       'ауыл шаруашылығы өндірушілеріне арналған 1,8% әлеуметтік салық мөлшерлемесі (Салық кодексі 557-б. 2-т.);',
-      '01.01.1975 дейін туған қызметкерлер: олар үшін жұмыс беруші ЖМЗЖ төлемейді (Әлеуметтік кодекс 248-б. 6-т. 6) тармақшасы), ал калькулятор оны есептейді, сондықтан қызметкердің құны ЖМЗЖ сомасына артық көрсетіледі.',
     ],
     disclaimer: 'Алдын ала есеп, бухгалтерді алмастырмайды. Түпкілікті сомаларды сіздің бухгалтерияңыз растайды.',
     sourcesTitle: 'Дереккөздер, тексерілген күн: {date}',
@@ -690,6 +713,9 @@ export const zarplataDict: Record<ToolLang, ZarplataDict> = {
     },
     deduction: 'Basic deduction of 30 MRP ({amount} a month)',
     deductionHint: 'Applied on your written request and at one employer only.',
+    born1975: 'Born before 1975',
+    born1975Hint:
+      'The employer pays no OPVR for such an employee (Social Code art. 248 para. 6 sub-para. 6). In 2026 the employer pays OPVR of 3.5% for employees born in 1975 or later.',
     advanced: 'Advanced',
     month: 'Month of the year',
     months: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
@@ -759,6 +785,8 @@ export const zarplataDict: Record<ToolLang, ZarplataDict> = {
     exemptOpv:
       'Not withheld by default: retirement age or permanent disability of group I or II; it may be paid at the employee\'s request (sub-para. 2). Social Code art. 248 para. 3.',
     exemptOpvr: 'Not paid: retirement age or permanent disability of group I or II. Social Code art. 248 para. 6.',
+    exemptOpvr1975:
+      'Not paid: the employee was born before 01.01.1975. In 2026 the employer pays OPVR for employees born in 1975 or later. Social Code art. 248 para. 6 sub-para. 6.',
     exemptSo: 'Not paid: people of retirement age are not subject to social insurance. Social Code art. 243.',
     exemptOsms:
       'Not withheld and not paid: recipients of pension payments and persons with disabilities. Health Insurance Law art. 26 para. 1, art. 27 para. 3, art. 28 para. 7.',
@@ -800,6 +828,9 @@ export const zarplataDict: Record<ToolLang, ZarplataDict> = {
     w1Base:
       'Gross is slightly above the minimum wage, but after OPV it is below it: SO is calculated from the minimum base of {mzp}. Social Code art. 245 para. 1.',
     w7Manual: 'Taxable income since the start of the year exceeds {threshold}: income tax on the amount above it is charged at 15%.',
+    w1NoOpvr: 'Gross is below the minimum wage: SO is calculated from {mzp}. Social Code art. 245 para. 1.',
+    w4NoOpvr:
+      'A contribution has reached its cap: OPV is calculated on at most {cap50}, VOSMS on at most {cap20}, OOSMS on at most {cap40}.',
     noteRounding:
       'Amounts are rounded to whole tenge: OPV, OPVR, VOSMS, OOSMS, income tax and social tax by normal arithmetic rounding. SO is rounded to a whole tenge regardless of tiyn (para. 14 of the Rules for calculating social contributions); we read this as rounding up, since the Rules do not name the direction. The Tax Code has no rounding rule for taxes, so a difference of 1-2 ₸ from payroll software is possible.',
     noteScope:
@@ -809,7 +840,6 @@ export const zarplataDict: Record<ToolLang, ZarplataDict> = {
       'civil-law contracts and tax-exempt payments;',
       'health insurance benefits for mothers of large families, students and military personnel;',
       'the 1.8% social tax rate for agricultural producers (Tax Code art. 557 para. 2);',
-      'employees born before 01.01.1975: the employer pays no OPVR for them (Social Code art. 248 para. 6 sub-para. 6), but the calculator charges it, so their employee cost is overstated by the OPVR amount.',
     ],
     disclaimer: 'A preliminary estimate, not a substitute for an accountant. Final amounts are confirmed by your payroll.',
     sourcesTitle: 'Sources, checked on {date}',

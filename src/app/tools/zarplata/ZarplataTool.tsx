@@ -69,6 +69,7 @@ export default function ZarplataTool({ lang }: { lang: ToolLang }) {
   const [month, setMonth] = useState('1')
   const [prior, setPrior] = useState('')
   const [hire, setHire] = useState(false)
+  const [born1975, setBorn1975] = useState(false)
   const [touched, setTouched] = useState(false)
   const [pinned, setPinned] = useState<string | null>(null)
   const [hover, setHover] = useState<string | null>(null)
@@ -84,6 +85,7 @@ export default function ZarplataTool({ lang }: { lang: ToolLang }) {
       baseDeduction,
       employerRegime: regime,
       hireOrFireMonth: hire,
+      bornBefore1975: born1975,
       monthIndex: Number(month) || 1,
       priorTaxableCum: manual ? Number(prior) || 0 : undefined,
     }
@@ -94,7 +96,7 @@ export default function ZarplataTool({ lang }: { lang: ToolLang }) {
     const rev = grossFromNet(n, o)
     if (rev.tooLarge || !rev.result || (rev.gross ?? 0) > MAX_GROSS) return { kind: 'tooLarge' }
     return { kind: 'ok', r: rev.result, warnings: rev.warnings, alternatives: rev.alternatives }
-  }, [amount, mode, category, baseDeduction, regime, hire, month, manual, prior])
+  }, [amount, mode, category, baseDeduction, regime, hire, born1975, month, manual, prior])
 
   // Подсказка у выбора месяца: с какой начисленной месяц вообще влияет на результат.
   const monthFrom = useMemo(() => minGrossReachingThreshold({ category, baseDeduction }) ?? MAX_GROSS, [category, baseDeduction])
@@ -116,7 +118,7 @@ export default function ZarplataTool({ lang }: { lang: ToolLang }) {
       logToolEvent('doc', 'zarplata', { lang })
     }, 1500)
     return () => clearTimeout(timer)
-  }, [touched, amount, mode, category, baseDeduction, regime, hire, month, prior, priorMode, lang])
+  }, [touched, amount, mode, category, baseDeduction, regime, hire, born1975, month, prior, priorMode, lang])
 
   // Пояснение, закреплённое касанием, закрывается касанием в другом месте и Esc;
   // Esc закрывает и пояснение, открытое наведением мыши.
@@ -215,7 +217,7 @@ export default function ZarplataTool({ lang }: { lang: ToolLang }) {
       vosms: r.exempt.vosms ? t.exemptOsms : fill(t.exVosms, { base: m(r.bases.vosms), value: m(r.vosms), cap: m(CAP_20_MZP) }),
       ipn: fill(t.exIpn, { calc: ipnCalc, value: m(r.ipn), threshold: m(IPN_THRESHOLD_YEAR) }),
       base: baseText,
-      opvr: r.exempt.opvr ? t.exemptOpvr : fill(t.exOpvr, { base: m(r.bases.opvr), value: m(r.opvr), mzp: m(MZP_2026) }),
+      opvr: r.exempt.opvrBorn1975 ? t.exemptOpvr1975 : r.exempt.opvr ? t.exemptOpvr : fill(t.exOpvr, { base: m(r.bases.opvr), value: m(r.opvr), mzp: m(MZP_2026) }),
       so: r.exempt.so ? t.exemptSo : fill(t.exSo, { base: m(r.bases.so), value: m(r.so), mzp: m(MZP_2026), cap: m(CAP_7_MZP) }),
       sn:
         r.input.employerRegime === 'simplified'
@@ -294,8 +296,8 @@ export default function ZarplataTool({ lang }: { lang: ToolLang }) {
     // Тексты предупреждений собираются из кодов, числа берутся из констант и результата.
     const warningText = (code: PayrollWarningCode): string => {
       switch (code) {
-        case 'w1': return fill(r.gross < MZP_2026 ? t.warnings.w1 : t.w1Base, { mzp: m(MZP_2026) })
-        case 'w4': return fill(t.warnings.w4, { cap50: m(CAP_50_MZP), cap20: m(CAP_20_MZP), cap40: m(CAP_40_MZP) })
+        case 'w1': return fill(r.gross < MZP_2026 ? (r.exempt.opvr ? t.w1NoOpvr : t.warnings.w1) : t.w1Base, { mzp: m(MZP_2026) })
+        case 'w4': return fill(r.exempt.opvr ? t.w4NoOpvr : t.warnings.w4, { cap50: m(CAP_50_MZP), cap20: m(CAP_20_MZP), cap40: m(CAP_40_MZP) })
         case 'w5': return fill(t.warnings.w5, { cap7: m(CAP_7_MZP) })
         case 'w6': return fill(t.warnings.w6, { floor: m(SN_FLOOR_OBJECT), value: m(r.sn) })
         case 'w7':
@@ -500,6 +502,21 @@ export default function ZarplataTool({ lang }: { lang: ToolLang }) {
                 {PAYROLL_CATEGORIES.map(c => <option key={c} value={c}>{t.categories[c]}</option>)}
               </select>
               {catHint && <div id="zp-category-hint" className={hintCls} style={hintStyle}>{catHint}</div>}
+            </div>
+
+            <div>
+              <label className={checkCls} style={{ color: 'var(--nav-text-primary)' }}>
+                <input
+                  type="checkbox"
+                  checked={born1975}
+                  aria-describedby="zp-born-hint"
+                  onChange={e => onChange(() => setBorn1975(e.target.checked))}
+                  className="zp-native h-5 w-5 flex-none"
+                  style={{ accentColor: 'var(--nav-accent)' }}
+                />
+                <span>{t.born1975}</span>
+              </label>
+              <div id="zp-born-hint" className={hintCls} style={hintStyle}>{t.born1975Hint}</div>
             </div>
 
             <div>

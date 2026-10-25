@@ -58,6 +58,19 @@ describe('ZarplataTool server render', () => {
       expect(t.snSole).not.toBe(t.sn)
     })
 
+    it(`${lang}: the "born before 1975" checkbox is rendered unchecked with its hint and a described-by link`, () => {
+      const markup = html(lang)
+      const t = zarplataDict[lang]
+      const tag = markup.match(/<input[^>]*aria-describedby="zp-born-hint"[^>]*>/)?.[0] ?? ''
+      expect(tag, lang).toContain('type="checkbox"')
+      expect(tag, lang).not.toContain('checked')
+      expect(markup).toContain(t.born1975)
+      expect(markup).toContain('id="zp-born-hint"')
+      expect(text(markup)).toContain(t.born1975Hint)
+      // стартовое состояние флажка не меняет цифры: ОПВР 10 500 на месте
+      expect(text(markup).replace(/[  ]/g, ' ')).toContain(formatTenge(10_500).replace(/[  ]/g, ' '))
+    })
+
     it(`${lang}: styles use design tokens only (no hex, rgb or gray utilities)`, () => {
       // Логотип (BrandWordmark) рисуется SVG со своими цветами: в проверку не входит.
       const markup = html(lang).replace(/<svg[\s\S]*?<\/svg>/g, '')

@@ -191,11 +191,36 @@ describe('zarplata dictionary', () => {
   it('lists what the calculator does not cover, in every language', () => {
     for (const lang of TOOL_LANGS) {
       const t = zarplataDict[lang]
-      expect(t.noteScopeList.length, lang).toBeGreaterThanOrEqual(5)
+      expect(t.noteScopeList.length, lang).toBeGreaterThanOrEqual(4)
       const all = t.noteScopeList.join(' ')
-      expect(all, lang).toContain('1975')
+      // «до 1975 года» калькулятор теперь считает (флажок), в ограничениях его нет
+      expect(all, lang).not.toContain('1975')
       expect(all, lang).toContain('1,8%'.replace(',', lang === 'en' ? '.' : ','))
+      expect(t.faq[4].a, lang).not.toContain('1975')
     }
+  })
+
+  it('has the "born before 1975" option in every language, with the article reference and a distinct exemption text', () => {
+    expect(zarplataDict.ru.born1975).toBe('Родился до 1975 года')
+    expect(zarplataDict.kk.born1975).toBe('1975 жылға дейін туған')
+    expect(zarplataDict.en.born1975).toBe('Born before 1975')
+    for (const lang of TOOL_LANGS) {
+      const t = zarplataDict[lang]
+      expect(t.born1975Hint, lang).toContain('248')
+      expect(t.born1975Hint, lang).toContain('1975')
+      expect(t.exemptOpvr1975, lang).toContain('248')
+      expect(t.exemptOpvr1975, lang).toContain('01.01.1975')
+      expect(t.exemptOpvr1975, lang).not.toBe(t.exemptOpvr)
+      // варианты предупреждений для случая, когда ОПВР не платится, не называют ОПВР
+      expect(t.w1NoOpvr, lang).toContain('{mzp}')
+      expect(t.w4NoOpvr, lang).toContain('{cap50}')
+    }
+    expect(zarplataDict.ru.w1NoOpvr).not.toContain('ОПВР')
+    expect(zarplataDict.ru.w4NoOpvr).not.toContain('ОПВР')
+    expect(zarplataDict.en.w1NoOpvr).not.toContain('OPVR')
+    expect(zarplataDict.en.w4NoOpvr).not.toContain('OPVR')
+    expect(zarplataDict.kk.w1NoOpvr).not.toContain('ЖМЗЖ')
+    expect(zarplataDict.kk.w4NoOpvr).not.toContain('ЖМЗЖ')
   })
 
   it('splits the sources into the SO Rules and the OSMS Rules with their own links', () => {

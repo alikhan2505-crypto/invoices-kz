@@ -189,9 +189,9 @@ describe('payroll: input handling', () => {
 
   it('exposes which payments are exempt by category and which hit a cap', () => {
     const p = calculatePayroll({ gross: 300_000, category: 'pensioner' })
-    expect(p.exempt).toEqual({ opv: true, vosms: true, oosms: true, opvr: true, so: true })
+    expect(p.exempt).toEqual({ opv: true, vosms: true, oosms: true, opvr: true, so: true, opvrBorn1975: false })
     const d = calculatePayroll({ gross: 300_000, category: 'disabled12Term' })
-    expect(d.exempt).toEqual({ opv: false, vosms: true, oosms: true, opvr: false, so: false })
+    expect(d.exempt).toEqual({ opv: false, vosms: true, oosms: true, opvr: false, so: false, opvrBorn1975: false })
     const hi = calculatePayroll({ gross: 10_000_000 })
     expect(hi.capped).toEqual({ opv: true, opvr: true, vosms: true, oosms: true })
     expect(hi.bases.opv).toBe(CAP_50_MZP)
@@ -283,8 +283,176 @@ describe('payroll: sole proprietor on the general regime (NK art. 556 p. 1 and 4
   })
 })
 
+describe('payroll: employee born before 01.01.1975 (Social Code art. 248 p. 6 sub-p. 6: no OPVR)', () => {
+  const born = (i: PayrollInput) => calculatePayroll({ ...i, bornBefore1975: true })
+  const SAME = ['opv', 'vosms', 'ipn', 'net', 'so', 'sn', 'oosms'] as const
+
+  it('gross 300 000, legal-entity regime: OPVR 10 500 is removed, employer cost 338 340 (was 348 840)', () => {
+    const off = calculatePayroll({ gross: 300_000 })
+    const on = born({ gross: 300_000 })
+    expect(off.opvr).toBe(10_500)
+    expect(off.employerCost).toBe(348_840)
+    expect(on.opvr).toBe(0)
+    // 300 000 + СО 13 500 + СН 15 840 + ООСМС 9 000
+    expect(on.employerCost).toBe(300_000 + 13_500 + 15_840 + 9_000)
+    expect(on.employerCost).toBe(338_340)
+    // ОПВ 30 000 + ВОСМС 6 000 + ИПН 13 425 + СО 13 500 + СН 15 840 + ООСМС 9 000
+    expect(on.totalToState).toBe(87_765)
+    expect(on.net + on.totalToState).toBe(on.employerCost)
+    expect(on.net).toBe(250_575)
+    expect(on.input.bornBefore1975).toBe(true)
+    expect(off.input.bornBefore1975).toBe(false)
+    expect(on.exempt.opvr).toBe(true)
+    expect(on.exempt.opvrBorn1975).toBe(true)
+    expect(off.exempt.opvrBorn1975).toBe(false)
+  })
+
+  it('the flag is off by default and false/undefined behave the same', () => {
+    const a = calculatePayroll({ gross: 300_000 })
+    const b = calculatePayroll({ gross: 300_000, bornBefore1975: false })
+    expect(b).toEqual(a)
+  })
+
+  it('other regimes: only the OPVR amount leaves the employer cost', () => {
+    const sole = born({ gross: 300_000, employerRegime: 'soleGeneral' })
+    expect(sole.employerCost).toBe(300_000 + 13_500 + 4_325 + 9_000) // 326 825
+    expect(sole.totalToState).toBe(30_000 + 6_000 + 13_425 + 13_500 + 4_325 + 9_000)
+    const simp = born({ gross: 300_000, employerRegime: 'simplified' })
+    expect(simp.employerCost).toBe(300_000 + 13_500 + 9_000) // 322 500
+    expect(simp.employerCost).toBe(322_500)
+  })
+
+  it('the OPVR base follows the MZP floor and the 50 MZP cap, the flag zeroes both', () => {
+    // 60 000 < МЗП: ОПВР без флага считается от 85 000 = 2 975
+    expect(calculatePayroll({ gross: 60_000 }).opvr).toBe(2_975)
+    expect(born({ gross: 60_000 }).opvr).toBe(0)
+    // 1 000 000 x 3,5% = 35 000; 10 000 000 упирается в 50 МЗП: 4 250 000 x 3,5% = 148 750
+    expect(calculatePayroll({ gross: 1_000_000 }).opvr).toBe(35_000)
+    expect(calculatePayroll({ gross: 10_000_000 }).opvr).toBe(148_750)
+    expect(born({ gross: 1_000_000 }).opvr).toBe(0)
+    expect(born({ gross: 10_000_000 }).opvr).toBe(0)
+    expect(born({ gross: 10_000_000 }).capped.opvr).toBe(false)
+    expect(born({ gross: 10_000_000 }).capped.opv).toBe(true)
+  })
+
+  it('changes nothing but OPVR, employer cost and total to the state (every category, regime and gross)', () => {
+    for (const category of PAYROLL_CATEGORIES) {
+      for (const employerRegime of EMPLOYER_REGIMES) {
+        for (const g of [1, 60_000, 85_000, 147_444, 300_000, 1_000_000, 4_250_000, 12_000_000]) {
+          const off = calculatePayroll({ gross: g, category, employerRegime })
+          const on = born({ gross: g, category, employerRegime })
+          const tag = `${category} ${employerRegime} ${g}`
+          for (const k of SAME) expect(on[k], tag).toBe(off[k])
+          expect(on.opvr, tag).toBe(0)
+          expect(on.employerCost, tag).toBe(off.employerCost - off.opvr)
+          expect(on.totalToState, tag).toBe(off.totalToState - off.opvr)
+          expect(on.net + on.totalToState, tag).toBe(on.employerCost)
+          expect(on.ipnDetail, tag).toEqual(off.ipnDetail)
+        }
+      }
+    }
+  })
+
+  it('pensioner and permanent disability I-II already pay no OPVR: the flag changes nothing at all there', () => {
+    for (const category of ['pensioner', 'disabled12Indefinite'] as const) {
+      for (const g of [60_000, 300_000, 2_000_000]) {
+        const off = calculatePayroll({ gross: g, category })
+        const on = born({ gross: g, category })
+        expect(off.opvr).toBe(0)
+        expect(on.opvr).toBe(0)
+        expect(pick(on)).toEqual(pick(off))
+        expect(on.warnings).toEqual(off.warnings)
+        expect(on.exempt.opvr).toBe(true)
+        // причина «категория», а не флаг: пояснение остаётся про категорию
+        expect(on.exempt.opvrBorn1975).toBe(false)
+      }
+    }
+  })
+
+  it('fixed-term disability I-II and group III (OPVR paid by category): the flag removes it, the social deduction is untouched', () => {
+    for (const category of ['disabled12Term', 'disabled3'] as const) {
+      const off = calculatePayroll({ gross: 300_000, category })
+      const on = born({ gross: 300_000, category })
+      expect(off.opvr).toBe(10_500)
+      expect(on.opvr).toBe(0)
+      expect(on.exempt.opvrBorn1975).toBe(true)
+      expect(on.ipnDetail.socialApplied).toBe(off.ipnDetail.socialApplied)
+      expect(on.ipn).toBe(off.ipn)
+      expect(on.employerCost).toBe(off.employerCost - 10_500)
+    }
+    // группа III платит ОПВ, СО и СН (ВОСМС и ООСМС нет): СН от 300 000 - 30 000 = 270 000 x 6% = 16 200
+    const g3 = born({ gross: 300_000, category: 'disabled3' })
+    expect(g3.opv).toBe(30_000)
+    expect(g3.so).toBe(13_500)
+    expect(g3.sn).toBe(16_200)
+    expect(g3.employerCost).toBe(300_000 + 13_500 + 16_200)
+  })
+
+  it('warnings: OPVR cap and the below-MZP warning follow the effective OPVR exemption', () => {
+    // ниже МЗП: СО всё ещё считается от МЗП, w1 остаётся
+    expect(calculatePayroll({ gross: 60_000, bornBefore1975: true }).warnings).toContain('w1')
+    // у инвалида III группы с флагом ОПВР не платится, СО платится: w1 остаётся (причина СО)
+    expect(calculatePayroll({ gross: 60_000, bornBefore1975: true, category: 'disabled3' }).warnings).toContain('w1')
+    // пенсионер не платит ни СО, ни ОПВР: w1 нет ни с флагом, ни без
+    expect(calculatePayroll({ gross: 60_000, bornBefore1975: true, category: 'pensioner' }).warnings).not.toContain('w1')
+    // потолок 50 МЗП: ОПВ упирается в него, ОПВР не начисляется
+    const hi = calculatePayroll({ gross: 4_250_000, bornBefore1975: true })
+    expect(hi.warnings).toContain('w4')
+    expect(hi.capped).toEqual({ opv: true, opvr: false, vosms: true, oosms: true })
+  })
+
+  it('gross 0 stays all zero with the flag', () => {
+    const r = born({ gross: 0 })
+    expect(pick(r)).toEqual({ opv: 0, vosms: 0, ipn: 0, net: 0, opvr: 0, so: 0, sn: 0, oosms: 0, employerCost: 0, totalToState: 0 })
+    expect(r.warnings).toEqual([])
+  })
+
+  it('random inputs: the flag zeroes OPVR and shifts cost and state total by exactly that amount (3000 cases)', () => {
+    const rand = rng(1975)
+    for (let k = 0; k < 3000; k++) {
+      const i = randomInput(rand)
+      const off = calculatePayroll({ ...i, bornBefore1975: false })
+      const on = calculatePayroll({ ...i, bornBefore1975: true })
+      for (const key of SAME) expect(on[key]).toBe(off[key])
+      expect(on.opvr).toBe(0)
+      expect(on.employerCost).toBe(off.employerCost - off.opvr)
+      expect(on.totalToState).toBe(off.totalToState - off.opvr)
+      expect(on.net + on.totalToState).toBe(on.employerCost)
+      expect(on.ipnDetail).toEqual(off.ipnDetail)
+    }
+  })
+
+  it('reverse mode: the flag is passed through and does not change the gross, the alternatives or the net', () => {
+    const a = grossFromNet(300_000)
+    const b = grossFromNet(300_000, { bornBefore1975: true })
+    expect(b.gross).toBe(a.gross)
+    expect(b.alternatives).toEqual(a.alternatives)
+    expect(b.exact).toBe(a.exact)
+    expect(b.result?.net).toBe(300_000)
+    expect(b.result?.opvr).toBe(0)
+    expect(b.result?.input.bornBefore1975).toBe(true)
+    expect(a.result?.input.bornBefore1975).toBe(false)
+    expect(b.result!.employerCost).toBe(a.result!.employerCost - a.result!.opvr)
+    // R5: три начисленные с одной суммой на руки
+    const r5 = grossFromNet(1_000_000, { bornBefore1975: true })
+    expect([r5.gross, ...r5.alternatives]).toEqual([1_246_243, 1_246_244, 1_246_245])
+    for (const category of PAYROLL_CATEGORIES) {
+      for (const monthIndex of [1, 11]) {
+        for (const target of [50_000, 740_000, 5_000_000]) {
+          const x = grossFromNet(target, { category, monthIndex })
+          const y = grossFromNet(target, { category, monthIndex, bornBefore1975: true })
+          expect(y.gross, `${category} ${monthIndex} ${target}`).toBe(x.gross)
+          expect(y.alternatives).toEqual(x.alternatives)
+          expect(y.exact).toBe(x.exact)
+          expect(y.result?.net).toBe(x.result?.net)
+        }
+      }
+    }
+  })
+})
+
 describe('payroll: warnings', () => {
-  const w = (i: PayrollInput): PayrollWarningCode[] => calculatePayroll(i).warnings
+  const w =(i: PayrollInput): PayrollWarningCode[] => calculatePayroll(i).warnings
 
   it('w1: below MZP and the category pays OPVR or SO', () => {
     expect(w({ gross: 60_000 })).toContain('w1')
@@ -488,6 +656,7 @@ function randomInput(rand: () => number): PayrollInput {
     employerRegime: EMPLOYER_REGIMES[Math.floor(rand() * EMPLOYER_REGIMES.length)],
     hireOrFireMonth: rand() < 0.2,
     monthIndex: 1 + Math.floor(rand() * 12),
+    bornBefore1975: rand() < 0.3,
   }
   if (!category.startsWith('disabled') && rand() < 0.15) {
     input.priorTaxableCum = Math.floor(rand() * 40_000_000)
@@ -559,6 +728,8 @@ describe('payroll: properties', () => {
     { opts: { category: 'disabled12Term', monthIndex: 12 } },
     { opts: { category: 'disabled3', monthIndex: 10 } },
     { opts: { priorTaxableCum: 36_500_000 } },
+    { opts: { bornBefore1975: true } },
+    { opts: { bornBefore1975: true, category: 'disabled3', monthIndex: 12 } },
   ]
 
   it('reverse(forward(g)) finds g or an equal-net alternative, for 2000 values including all thresholds', () => {
@@ -607,6 +778,7 @@ describe('payroll: properties', () => {
         category,
         baseDeduction: rand() < 0.5,
         monthIndex: monthPool[Math.floor(rand() * 3)],
+        bornBefore1975: rand() < 0.3,
       }
       const bucket = rand()
       const target = bucket < 0.3 ? 1 + Math.floor(rand() * 3000) : bucket < 0.8 ? 1 + Math.floor(rand() * 800_000) : 1 + Math.floor(rand() * 12_000_000)
