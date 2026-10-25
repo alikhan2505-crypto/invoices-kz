@@ -88,8 +88,8 @@ export default function WholesaleModelPage() {
         </div>
 
         {/* С lg: фото слева (квадрат, 520 px), покупка справа на всю остальную
-            ширину; карточка покупки растягивается до высоты ряда, кнопка прижата вниз. */}
-        <div className="lg:grid lg:grid-cols-2 xl:grid-cols-[520px_minmax(0,1fr)] lg:gap-6 lg:items-stretch">
+            ширину; карточка покупки по высоте содержимого (без пустой полосы над кнопкой). */}
+        <div className="lg:grid lg:grid-cols-2 xl:grid-cols-[520px_minmax(0,1fr)] lg:gap-6 lg:items-start">
           <div className="rounded-2xl overflow-hidden mb-4 lg:mb-0 lg:self-start lg:sticky lg:top-6">
             <ProductPhoto src={model.imageUrl} name={model.name} />
           </div>
@@ -162,7 +162,7 @@ export default function WholesaleModelPage() {
             </div>
 
             <button onClick={addToCart} disabled={!selectedVariant}
-              className="w-full rounded-xl py-3.5 font-medium text-sm disabled:opacity-50 lg:mt-auto lg:shrink-0"
+              className="w-full rounded-xl py-3.5 font-medium text-sm disabled:opacity-50 lg:shrink-0"
               style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
               {added ? t.added : isCustomOrder ? t.orderCustom : t.addToCart}
             </button>
