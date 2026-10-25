@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import type { BillingPeriod, PlanKey } from '@/lib/plans/pricing'
+import { getPlanAmount, type BillingPeriod, type PlanKey } from '@/lib/plans/pricing'
 import { quoteWalletPlanPayment, payPlanFullyFromWallet } from '@/lib/plans/walletPlanPayment'
 
 const supabaseAuth = createClient(
@@ -21,8 +21,9 @@ function parsePlan(plan: unknown, period: unknown): { plan: PlanKey; period: Bil
   return { plan, period: period === 'annual' ? 'annual' : 'monthly' }
 }
 
-// Сколько из цены тарифа может покрыть кошелёк. Сумма считается только на
-// сервере по PLAN_PRICES и текущему балансу.
+// Сколько из цены тарифа может покрыть кошелёк. Сумма и границы выбора
+// (price, maxPartial, canPayFull) считаются только на сервере по PLAN_PRICES и
+// текущему балансу, теми же функциями, что проверяют выбранную сумму.
 export async function GET(req: NextRequest) {
   const user = await authUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -37,13 +38,25 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// Оплатить тариф целиком с кошелька.
+// Оплатить тариф целиком с кошелька. expectedAmount (необязательно) — цена,
+// которую человек видел на кнопке: если цена тарифа успела измениться, не
+// списываем, а просим открыть оплату заново. Сумму списания всё равно
+// определяет только сервер (PLAN_PRICES), expectedAmount её не задаёт.
 export async function POST(req: NextRequest) {
   const user = await authUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const body = await req.json().catch(() => null)
   const parsed = parsePlan(body?.plan, body?.period)
   if (!parsed) return NextResponse.json({ error: 'Invalid params' }, { status: 400 })
+  const expected = body?.expectedAmount
+  if (expected !== undefined && expected !== null) {
+    if (typeof expected !== 'number' || !Number.isSafeInteger(expected)) {
+      return NextResponse.json({ error: 'Invalid params' }, { status: 400 })
+    }
+    if (expected !== getPlanAmount(parsed.plan, parsed.period)) {
+      return NextResponse.json({ error: 'price_changed' }, { status: 409 })
+    }
+  }
   try {
     const result = await payPlanFullyFromWallet(user, parsed.plan, parsed.period)
     if (result.ok) return NextResponse.json(result)

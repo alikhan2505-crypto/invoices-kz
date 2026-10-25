@@ -36,6 +36,22 @@ export interface ProfileBonusContent {
   viaKaspiLabel: string
   /** Под суммами в окне частичной оплаты: удержание вернётся, если не оплатить. */
   walletHoldNote: (amount: string) => string
+  /** Выбор суммы списания с кошелька в окне «Как оплатить». */
+  walletAmountLabel: string
+  walletAmountInputAria: string
+  walletAmountSliderAria: string
+  /** Подпись неактивной главной кнопки, пока сумма в «щели» и не подтверждена. */
+  walletAmountInvalidButton: string
+  /** Быстрая кнопка «списать всё, что можно». */
+  walletAmountAll: string
+  walletRemainderLine: (kaspi: string) => string
+  walletRemainderNone: string
+  /** Введена сумма в «щели» у цены: на Kaspi осталось бы меньше минимума. */
+  walletGapHint: (max: string, full: string) => string
+  /** Кошелёк почти покрывает цену: больше max списать нельзя из-за минимума на Kaspi. */
+  walletMinRemainderCapHint: (max: string) => string
+  /** Введено больше, чем есть на кошельке. */
+  walletCappedHint: (balance: string) => string
   walletErrors: {
     insufficient: string
     changed: string
@@ -100,9 +116,19 @@ export const profileBonusDict: Record<'ru' | 'kk' | 'en', ProfileBonusContent> =
     fromWalletLabel: 'С кошелька',
     viaKaspiLabel: 'Через Kaspi',
     walletHoldNote: (amount) => `Если не оплатите, ${amount} ₸ вернутся в кошелёк`,
+    walletAmountLabel: 'Сколько списать с кошелька',
+    walletAmountInputAria: 'Сумма списания с кошелька, тенге',
+    walletAmountSliderAria: 'Сумма списания с кошелька',
+    walletAmountInvalidButton: 'Укажите другую сумму',
+    walletAmountAll: 'Всё',
+    walletRemainderLine: (kaspi) => `Остаток через Kaspi: ${kaspi} ₸`,
+    walletRemainderNone: 'Через Kaspi платить не нужно',
+    walletGapHint: (max, full) => `На Kaspi должно остаться не меньше 100 ₸. Введите до ${max} ₸ или всю сумму ${full} ₸.`,
+    walletMinRemainderCapHint: (max) => `Больше ${max} ₸ списать нельзя: на Kaspi должно остаться не меньше 100 ₸.`,
+    walletCappedHint: (balance) => `На кошельке ${balance} ₸, больше списать нельзя.`,
     walletErrors: {
       insufficient: 'В кошельке недостаточно денег. Обновите страницу — покажем, сколько можно списать.',
-      changed: 'Баланс кошелька только что изменился. Откройте оплату ещё раз.',
+      changed: 'Баланс кошелька только что изменился. Выберите сумму ещё раз.',
       busy: 'Тариф только что обновился. Попробуйте ещё раз через минуту.',
       unavailable: 'Оплата с кошелька пока недоступна. Оплатите через Kaspi.',
       generic: 'Не получилось оплатить с кошелька. Попробуйте ещё раз.',
@@ -162,9 +188,19 @@ export const profileBonusDict: Record<'ru' | 'kk' | 'en', ProfileBonusContent> =
     fromWalletLabel: 'Әмияннан',
     viaKaspiLabel: 'Kaspi арқылы',
     walletHoldNote: (amount) => `Төлемесеңіз, ${amount} ₸ әмиянға қайтады`,
+    walletAmountLabel: 'Әмияннан қанша алу керек',
+    walletAmountInputAria: 'Әмияннан алынатын сома, теңге',
+    walletAmountSliderAria: 'Әмияннан алынатын сома',
+    walletAmountInvalidButton: 'Басқа соманы көрсетіңіз',
+    walletAmountAll: 'Барлығы',
+    walletRemainderLine: (kaspi) => `Kaspi арқылы қалғаны: ${kaspi} ₸`,
+    walletRemainderNone: 'Kaspi арқылы төлеудің қажеті жоқ',
+    walletGapHint: (max, full) => `Kaspi-де кемінде 100 ₸ қалуы керек. ${max} ₸ дейін немесе бүкіл ${full} ₸ сомасын енгізіңіз.`,
+    walletMinRemainderCapHint: (max) => `${max} ₸ сомасынан артық алуға болмайды: Kaspi-де кемінде 100 ₸ қалуы керек.`,
+    walletCappedHint: (balance) => `Әмияндағы сома ${balance} ₸, одан артық алуға болмайды.`,
     walletErrors: {
       insufficient: 'Әмиянда ақша жеткіліксіз. Бетті жаңартыңыз — қанша алуға болатынын көрсетеміз.',
-      changed: 'Әмиян балансы жаңа ғана өзгерді. Төлемді қайта ашыңыз.',
+      changed: 'Әмиян балансы жаңа ғана өзгерді. Соманы қайта таңдаңыз.',
       busy: 'Тариф жаңа ғана жаңарды. Бір минуттан кейін қайталап көріңіз.',
       unavailable: 'Әмиянмен төлеу әзірге қолжетімсіз. Kaspi арқылы төлеңіз.',
       generic: 'Әмиянмен төлеу сәтсіз аяқталды. Қайталап көріңіз.',
@@ -224,9 +260,19 @@ export const profileBonusDict: Record<'ru' | 'kk' | 'en', ProfileBonusContent> =
     fromWalletLabel: 'From wallet',
     viaKaspiLabel: 'Via Kaspi',
     walletHoldNote: (amount) => `If you don’t pay, ${amount} ₸ goes back to your wallet`,
+    walletAmountLabel: 'How much to take from the wallet',
+    walletAmountInputAria: 'Amount to take from the wallet, tenge',
+    walletAmountSliderAria: 'Amount to take from the wallet',
+    walletAmountInvalidButton: 'Enter a different amount',
+    walletAmountAll: 'All',
+    walletRemainderLine: (kaspi) => `Remaining via Kaspi: ${kaspi} ₸`,
+    walletRemainderNone: 'Nothing to pay via Kaspi',
+    walletGapHint: (max, full) => `At least 100 ₸ must be left for Kaspi. Enter up to ${max} ₸ or the full ${full} ₸.`,
+    walletMinRemainderCapHint: (max) => `You can’t take more than ${max} ₸: at least 100 ₸ must be left for Kaspi.`,
+    walletCappedHint: (balance) => `Your wallet has ${balance} ₸, you can’t take more.`,
     walletErrors: {
       insufficient: 'Not enough money in the wallet. Refresh the page to see how much can be used.',
-      changed: 'Your wallet balance just changed. Please open the payment again.',
+      changed: 'Your wallet balance just changed. Please choose the amount again.',
       busy: 'Your plan was just updated. Please try again in a minute.',
       unavailable: 'Paying from the wallet isn’t available yet. Please pay via Kaspi.',
       generic: 'Couldn’t pay from the wallet. Please try again.',

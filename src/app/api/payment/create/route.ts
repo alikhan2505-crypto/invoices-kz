@@ -5,6 +5,7 @@ import { createPayment } from '@/lib/kaspiPay/client'
 import { getPlanAmount, type BillingPeriod } from '@/lib/plans/pricing'
 import { checkAndSettlePlanPayment, refundDeadPlanWalletHolds, type PlanPaymentRow } from '@/lib/kaspiPay/settlePlanPayment'
 import { quoteWalletPlanPayment, startPlanPaymentWithWalletHold } from '@/lib/plans/walletPlanPayment'
+import { resolveWalletPart } from '@/lib/plans/planActivation'
 
 const supabaseAuth = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -41,7 +42,7 @@ export async function POST(req: NextRequest) {
 
 async function createPlanPayment(req: NextRequest, deferred: { userId: string | null; moved: boolean }) {
   try {
-    const { userId, plan, period, useWallet } = await req.json()
+    const { userId, plan, period, useWallet, walletAmount } = await req.json()
     if (!userId || !plan || (plan !== 'pro' && plan !== 'basic')) {
       return NextResponse.json({ error: 'Missing params' }, { status: 400 })
     }
@@ -49,6 +50,16 @@ async function createPlanPayment(req: NextRequest, deferred: { userId: string | 
       return NextResponse.json({ error: 'Invalid period' }, { status: 400 })
     }
     const billingPeriod: BillingPeriod = period === 'annual' ? 'annual' : 'monthly'
+
+    // Сколько списать с кошелька (целые тенге). Формат проверяется до того, как
+    // что-либо тронуто: ни Kaspi-операции, ни закрытия старых платежей, ни
+    // удержания. Допустимые границы (баланс, цена, минимум на Kaspi) сервер
+    // проверяет ниже по свежему балансу, сумме из браузера верить нельзя.
+    // Без walletAmount работает прежний useWallet:true (= максимум).
+    const hasWalletAmount = walletAmount !== undefined && walletAmount !== null
+    if (hasWalletAmount && (typeof walletAmount !== 'number' || !Number.isSafeInteger(walletAmount) || walletAmount < 0)) {
+      return NextResponse.json({ error: 'invalid_wallet_amount' }, { status: 400 })
+    }
 
     const accessToken = req.headers.get('authorization')?.replace('Bearer ', '')
     const { data: { user } } = accessToken
@@ -87,7 +98,7 @@ async function createPlanPayment(req: NextRequest, deferred: { userId: string | 
       .select('id, user_id, plan, amount, qr_operation_id, created_at, billing_period')
       .eq('user_id', userId)
       .eq('status', 'pending')
-    const deferWalletRefund = useWallet === true
+    const deferWalletRefund = hasWalletAmount ? walletAmount > 0 : useWallet === true
     if (deferWalletRefund) deferred.userId = userId
     if (pendingError) console.error('Payment create: pending-check failed, allowing request:', pendingError.message)
     else if ((pendingRows?.length ?? 0) > 0) {
@@ -126,11 +137,26 @@ async function createPlanPayment(req: NextRequest, deferred: { userId: string | 
     // start_plan_payment_with_wallet. Целиком с кошелька — не здесь, а в
     // /api/payment/wallet (там нет Kaspi-операции вовсе).
     let walletPart = 0
-    if (useWallet === true) {
+    if (deferWalletRefund) {
       const quote = await quoteWalletPlanPayment(userId, plan, billingPeriod)
       if (!quote.available) return NextResponse.json({ error: 'wallet_unavailable' }, { status: 503 })
-      if (quote.split.mode === 'wallet_full') return NextResponse.json({ error: 'wallet_covers_full' }, { status: 409 })
-      walletPart = quote.split.mode === 'partial' ? quote.split.wallet : 0
+      if (hasWalletAmount) {
+        // Явная сумма: принимаем ровно её или отказываем. Не уменьшаем и не
+        // увеличиваем молча, иначе QR на Kaspi запросил бы не ту сумму, на
+        // которую человек согласился.
+        const picked = resolveWalletPart(amount, quote.balance, walletAmount)
+        if (!picked.ok) {
+          return NextResponse.json({ error: 'wallet_changed', reason: picked.reason, max: picked.max, can_pay_full: picked.canPayFull }, { status: 409 })
+        }
+        // Целиком с кошелька Kaspi-операции нет вовсе: это /api/payment/wallet.
+        if (picked.mode === 'wallet_full') {
+          return NextResponse.json({ error: 'wallet_use_full_endpoint' }, { status: 409 })
+        }
+        walletPart = picked.wallet
+      } else {
+        if (quote.split.mode === 'wallet_full') return NextResponse.json({ error: 'wallet_covers_full' }, { status: 409 })
+        walletPart = quote.split.mode === 'partial' ? quote.split.wallet : 0
+      }
     }
     const kaspiAmount = amount - walletPart
 

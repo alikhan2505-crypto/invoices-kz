@@ -16,7 +16,7 @@ import { useAppDialog } from '@/components/AppDialog'
 import { homeFor } from '@/lib/products'
 import { formatDateNumeric } from '@/lib/date'
 import { profileBonusDict } from '@/lib/i18n/profileBonus'
-import type { PlanPaymentSplit } from '@/lib/plans/planActivation'
+import WalletAmountChooser from '@/components/WalletAmountChooser'
 import PageContainer from '@/components/PageContainer'
 import PageHeader from '@/components/PageHeader'
 import { notifyWalletChanged } from '@/lib/walletSignal'
@@ -93,16 +93,47 @@ function CheckIcon() {
 // in-tree overlay would be pinned to the (tall) page, not the viewport.
 // Module-level so it is never re-created (and its content remounted) on a
 // re-render of the page.
-function Sheet({ children, zClass, labelledBy, onBackdrop }: {
+function Sheet({ children, zClass, labelledBy, onBackdrop, onEscape }: {
   children: ReactNode; zClass: string; labelledBy?: string; onBackdrop?: () => void
+  /** Если задан: Esc закрывает окно, а Tab не уходит из него на страницу под ним. */
+  onEscape?: () => void
 }) {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const escapeRef = useRef(onEscape)
+  escapeRef.current = onEscape
+  const trap = onEscape !== undefined
+  useEffect(() => {
+    if (!trap) return
+    const dialog = dialogRef.current
+    if (!dialog) return
+    const opener = document.activeElement as HTMLElement | null
+    if (!dialog.contains(document.activeElement)) dialog.focus()
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.preventDefault(); escapeRef.current?.(); return }
+      if (e.key !== 'Tab') return
+      const items = Array.from(dialog.querySelectorAll<HTMLElement>(
+        'button:not([disabled]):not([tabindex="-1"]), input:not([disabled]), [href], select, textarea, [tabindex]:not([tabindex="-1"])',
+      ))
+      if (items.length === 0) { e.preventDefault(); return }
+      const first = items[0]
+      const last = items[items.length - 1]
+      const active = document.activeElement
+      if (e.shiftKey && (active === first || active === dialog || !dialog.contains(active))) { e.preventDefault(); last.focus() }
+      else if (!e.shiftKey && (active === last || !dialog.contains(active))) { e.preventDefault(); first.focus() }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      if (opener && document.contains(opener)) opener.focus()
+    }
+  }, [trap])
   if (typeof document === 'undefined') return null
   return createPortal(
     <div className={`fixed inset-0 ${zClass} flex items-end lg:items-center justify-center lg:p-6`}
       style={{ background: 'rgba(15, 17, 23, 0.55)' }}
       onClick={onBackdrop}>
-      <div role="dialog" aria-modal="true" aria-labelledby={labelledBy}
-        className="w-full max-w-lg lg:max-w-md max-h-[92dvh] overflow-y-auto overscroll-contain rounded-t-3xl lg:rounded-3xl px-6 pt-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-2xl"
+      <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby={labelledBy}
+        className="outline-none w-full max-w-lg lg:max-w-md max-h-[92dvh] overflow-y-auto overscroll-contain rounded-t-3xl lg:rounded-3xl px-6 pt-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-2xl"
         style={{ background: 'var(--nav-surface-chrome)', color: 'var(--nav-text-primary)', border: '1px solid var(--nav-border-soft)' }}
         onClick={e => e.stopPropagation()}>
         {children}
@@ -222,12 +253,14 @@ export default function Upgrade() {
   const [userId, setUserId] = useState('')
   const [period, setPeriod] = useState<BillingPeriod>('monthly')
   const [showModal, setShowModal] = useState(false)
-  const [selectedPlan, setSelectedPlan] = useState<{ name: string; amount: number; plan: string; period: BillingPeriod; useWallet?: boolean } | null>(null)
+  const [selectedPlan, setSelectedPlan] = useState<{ name: string; amount: number; plan: string; period: BillingPeriod; useWallet?: boolean; walletAmount?: number } | null>(null)
   // Оплата с кошелька (15.10.2026). walletChoice — выбор «целиком / частью /
   // только Kaspi» перед оплатой; walletPaid — сколько реально удержано с
   // кошелька под текущий Kaspi-платёж (сервер мог списать меньше, чем
   // показывали, если баланс успел измениться).
-  const [walletChoice, setWalletChoice] = useState<{ name: string; amount: number; plan: string; period: BillingPeriod; split: PlanPaymentSplit } | null>(null)
+  // balance — кошелёк вместе со своими удержаниями (ответ сервера), amount — цена
+  // тарифа с сервера: от них считаются границы выбора суммы.
+  const [walletChoice, setWalletChoice] = useState<{ name: string; amount: number; plan: string; period: BillingPeriod; balance: number } | null>(null)
   const [walletPaid, setWalletPaid] = useState(0)
   const [walletQuoteLoading, setWalletQuoteLoading] = useState(false)
   const [walletInfo, setWalletInfo] = useState<{ available: boolean; balance: number } | null>(null)
@@ -407,8 +440,8 @@ export default function Upgrade() {
   const requestPayment = useCallback(async (
     planKey: string,
     billingPeriod: BillingPeriod,
-    useWallet = false,
-  ): Promise<{ link: string; settled: boolean }> => {
+    walletAmount = 0,
+  ): Promise<{ link: string; settled: boolean; error?: string }> => {
     const { data: { session } } = await supabase.auth.getSession()
     const res = await fetch('/api/payment/create', {
       method: 'POST',
@@ -416,7 +449,9 @@ export default function Upgrade() {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${session?.access_token}`,
       },
-      body: JSON.stringify({ userId, plan: planKey, period: billingPeriod, ...(useWallet ? { useWallet: true } : {}) })
+      // Сколько списать с кошелька, решает человек; сервер всё равно проверит сумму по
+      // свежему балансу и вернёт wallet_changed, если она уже недопустима.
+      body: JSON.stringify({ userId, plan: planKey, period: billingPeriod, ...(walletAmount > 0 ? { walletAmount } : {}) })
     })
     const data = await res.json()
 
@@ -428,12 +463,12 @@ export default function Upgrade() {
         setStep('success')
         return { link: '', settled: true }
       }
-      const walletError = data.error === 'wallet_changed' || data.error === 'wallet_covers_full' ? tw.walletErrors.changed
+      const walletError = data.error === 'wallet_changed' || data.error === 'wallet_covers_full' || data.error === 'wallet_use_full_endpoint' ? tw.walletErrors.changed
         : data.error === 'wallet_unavailable' ? tw.walletErrors.unavailable
         : typeof data.error === 'string' && data.error.startsWith('wallet_') ? tw.walletErrors.generic
         : null
       alert(walletError ?? (data.error === 'already_pending' ? t.alreadyPendingAlert : t.errorPrefix(data.error || t.tryAgainDefault)))
-      return { link: '', settled: false }
+      return { link: '', settled: false, error: typeof data.error === 'string' ? data.error : 'error' }
     }
 
     setWalletPaid(Number(data.wallet_amount) || 0)
@@ -532,7 +567,17 @@ export default function Upgrade() {
           }
           setRefreshingQr(true)
           try {
-            if (selectedPlan) await requestPayment(selectedPlan.plan, selectedPlan.period, !!selectedPlan.useWallet)
+            if (selectedPlan) {
+              const next = await requestPayment(selectedPlan.plan, selectedPlan.period, selectedPlan.walletAmount ?? 0)
+              if (!next.link && !next.settled && selectedPlan.useWallet) {
+                // Баланс успел измениться, и новый QR на выбранную сумму не
+                // выпущен: старый уже мёртв, оставлять его в окне нельзя.
+                // Закрываем окно (удержание вернулось на сервере) и обновляем баланс.
+                setShowModal(false)
+                void refreshWalletInfo()
+                notifyWalletChanged('upgrade')
+              }
+            }
           } finally {
             setRefreshingQr(false)
           }
@@ -566,8 +611,8 @@ export default function Upgrade() {
     return () => clearInterval(timer)
   }, [qrExpiresAt, showModal, step, phoneRequested])
 
-  async function openModal(planName: string, amount: number, planKey: string, billingPeriod: BillingPeriod, useWallet = false) {
-    setSelectedPlan({ name: planName, amount, plan: planKey, period: billingPeriod, useWallet })
+  async function openModal(planName: string, amount: number, planKey: string, billingPeriod: BillingPeriod, walletAmount = 0) {
+    setSelectedPlan({ name: planName, amount, plan: planKey, period: billingPeriod, useWallet: walletAmount > 0, walletAmount })
     setWalletPaid(0)
     setQrToken('')
     setExtTranId('')
@@ -586,12 +631,15 @@ export default function Upgrade() {
         : { data: null }
       baselineExpiresRef.current = p?.plan === planKey && p?.plan_expires_at ? new Date(p.plan_expires_at).getTime() : 0
 
-      const { link, settled } = await requestPayment(planKey, billingPeriod, useWallet)
+      const { link, settled, error } = await requestPayment(planKey, billingPeriod, walletAmount)
       if (!link) {
         // settled === true keeps the modal up on its success screen; only a
         // real failure closes it.
         if (!settled) setShowModal(false)
         setSubmitting(false)
+        // Баланс изменился, пока человек выбирал сумму: показать выбор заново со
+        // свежим балансом (запрос только читает, цикла нет).
+        if (!settled && walletAmount > 0 && error === 'wallet_changed') void startPurchase(planName, amount, planKey, billingPeriod, true)
         return
       }
 
@@ -693,9 +741,11 @@ export default function Upgrade() {
 
   // Кнопка тарифа: есть деньги в кошельке — сначала спрашиваем, как платить
   // (сумму делит сервер, по PLAN_PRICES и текущему балансу); нет — сразу Kaspi.
-  async function startPurchase(planName: string, amount: number, planKey: string, billingPeriod: BillingPeriod) {
+  // reopened: выбор открывается заново после wallet_changed. Тогда без кошелька
+  // сразу на Kaspi не уходим: человек не просил платить всю сумму картой.
+  async function startPurchase(planName: string, amount: number, planKey: string, billingPeriod: BillingPeriod, reopened = false) {
     // Кошелёк недоступен (миграция не применена) или пуст — сразу Kaspi.
-    if (!userId || !walletInfo?.available || walletInfo.balance < 1) { openModal(planName, amount, planKey, billingPeriod); return }
+    if (!userId || !walletInfo?.available || walletInfo.balance < 1) { if (!reopened) openModal(planName, amount, planKey, billingPeriod); return }
     setWalletQuoteLoading(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
@@ -703,8 +753,11 @@ export default function Upgrade() {
         headers: { 'Authorization': `Bearer ${session?.access_token}` },
       })
       const quote = res.ok ? await res.json() : null
-      if (quote?.available && quote.split && quote.split.mode !== 'kaspi_only') {
-        setWalletChoice({ name: planName, amount, plan: planKey, period: billingPeriod, split: quote.split })
+      // Баланс и цену отдаёт сервер: границы выбора считаются от них, а не от
+      // того, что страница помнит. Меньше 1 ₸ на кошельке выбирать не из чего.
+      const quoteBalance = Math.floor(Number(quote?.balance) || 0)
+      if (quote?.available && quoteBalance >= 1) {
+        setWalletChoice({ name: planName, amount: Number(quote.price) || amount, plan: planKey, period: billingPeriod, balance: quoteBalance })
         return
       }
     } catch {
@@ -712,6 +765,7 @@ export default function Upgrade() {
     } finally {
       setWalletQuoteLoading(false)
     }
+    if (reopened) { void refreshWalletInfo(); return }
     openModal(planName, amount, planKey, billingPeriod)
   }
 
@@ -729,7 +783,8 @@ export default function Upgrade() {
       const res = await fetch('/api/payment/wallet', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ plan: choice.plan, period: choice.period }),
+        // expectedAmount: цена, которую человек видел; изменилась — сервер не спишет.
+        body: JSON.stringify({ plan: choice.plan, period: choice.period, expectedAmount: choice.amount }),
       })
       const data = await res.json().catch(() => ({}))
       if (data.error === 'already_paid') {
@@ -746,6 +801,7 @@ export default function Upgrade() {
         void refreshWalletInfo()
         notifyWalletChanged('upgrade')
         alert(data.error === 'insufficient_funds' ? tw.walletErrors.insufficient
+          : data.error === 'price_changed' ? tw.walletErrors.changed
           : data.error === 'busy' ? tw.walletErrors.busy
           : data.error === 'unavailable' ? tw.walletErrors.unavailable
           : tw.walletErrors.generic)
@@ -1221,43 +1277,27 @@ export default function Upgrade() {
 
         {/* Выбор: целиком с кошелька / частью / только Kaspi */}
         {walletChoice && (
-          <Sheet zClass="z-[70]" labelledBy="wallet-choice-title" onBackdrop={() => setWalletChoice(null)}>
+          <Sheet zClass="z-[70]" labelledBy="wallet-choice-title" onBackdrop={() => setWalletChoice(null)} onEscape={() => setWalletChoice(null)}>
             <div className="flex items-center justify-between gap-3 mb-1 -mt-2">
               <div id="wallet-choice-title" className="font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{tw.walletChoiceTitle}</div>
               <SheetCloseButton onClick={() => setWalletChoice(null)} label={closeLabel(lang)} />
             </div>
             <div className="text-sm mb-5" style={{ color: 'var(--nav-text-secondary)' }}>
               {t.paymentForLabel(walletChoice.name)} · <span className="tabular-nums">{walletChoice.amount.toLocaleString('ru-KZ')} ₸{suffixFor(walletChoice.period)}</span>
-              <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>{tw.walletBalanceLine(walletBalance.toLocaleString('ru-KZ'))}</div>
+              <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>{tw.walletBalanceLine(Math.floor(walletChoice.balance).toLocaleString('ru-KZ'))}</div>
             </div>
-            <div className="flex flex-col gap-2">
-              {walletChoice.split.mode === 'wallet_full' ? (
-                <button type="button" onClick={() => payFullyFromWallet(walletChoice)}
-                  className={`w-full min-h-[48px] rounded-xl text-sm font-semibold px-4 py-3 ${PRESS}`}
-                  style={BTN_PRIMARY}>
-                  {tw.payFullyFromWalletButton(walletChoice.split.wallet.toLocaleString('ru-KZ'))}
-                </button>
-              ) : (
-                <button type="button" onClick={() => {
-                    const c = walletChoice
-                    setWalletChoice(null)
-                    openModal(c.name, c.amount, c.plan, c.period, true)
-                  }}
-                  className={`w-full min-h-[48px] rounded-xl text-sm font-semibold px-4 py-3 leading-snug ${PRESS}`}
-                  style={BTN_PRIMARY}>
-                  {tw.payPartlyFromWalletButton(walletChoice.split.wallet.toLocaleString('ru-KZ'), walletChoice.split.kaspi.toLocaleString('ru-KZ'))}
-                </button>
-              )}
-              <button type="button" onClick={() => {
-                  const c = walletChoice
-                  setWalletChoice(null)
-                  openModal(c.name, c.amount, c.plan, c.period)
-                }}
-                className="w-full min-h-[48px] rounded-xl text-sm font-semibold px-4 py-3"
-                style={BTN_OUTLINE}>
-                {tw.payOnlyKaspiButton}
-              </button>
-            </div>
+            <WalletAmountChooser price={walletChoice.amount} balance={walletChoice.balance} tw={tw}
+              onConfirm={walletAmount => {
+                const c = walletChoice
+                if (walletAmount >= c.amount) { void payFullyFromWallet(c); return }
+                setWalletChoice(null)
+                openModal(c.name, c.amount, c.plan, c.period, walletAmount)
+              }}
+              onKaspiOnly={() => {
+                const c = walletChoice
+                setWalletChoice(null)
+                openModal(c.name, c.amount, c.plan, c.period)
+              }} />
           </Sheet>
         )}
 

@@ -20,7 +20,7 @@
 
 import { createClient } from '@supabase/supabase-js'
 import { getPlanAmount, type BillingPeriod, type PlanKey } from './pricing'
-import { computePlanActivation, splitPlanPayment, planPaymentNote, type PlanPaymentSplit } from './planActivation'
+import { computePlanActivation, splitPlanPayment, walletChoiceBounds, planPaymentNote, type PlanPaymentSplit } from './planActivation'
 import { notifyPlanPaid, releaseUserPlanWalletHolds } from '@/lib/kaspiPay/settlePlanPayment'
 
 const supabase = createClient(
@@ -56,6 +56,12 @@ export interface WalletQuote {
   /** Баланс вместе с собственными удержаниями под ещё не оплаченный тариф. */
   balance: number
   split: PlanPaymentSplit
+  /** Цена тарифа из PLAN_PRICES: границы ниже посчитаны именно для неё. */
+  price: number
+  /** Наибольшая сумма частичной оплаты с кошелька (на Kaspi остаётся не меньше минимума). */
+  maxPartial: number
+  /** Кошелёк покрывает цену целиком. */
+  canPayFull: boolean
 }
 
 /**
@@ -80,9 +86,12 @@ export async function quoteWalletPlanPayment(userId: string, plan: PlanKey, peri
   const price = getPlanAmount(plan, period)
   const kaspiOnly: PlanPaymentSplit = { mode: 'kaspi_only', wallet: 0, kaspi: price }
   const [available, profile] = await Promise.all([isWalletPlanPaymentAvailable(), loadWalletProfile(userId)])
-  if (!available || !profile || profile.deleted_at) return { available: false, balance: 0, split: kaspiOnly }
+  if (!available || !profile || profile.deleted_at) {
+    return { available: false, balance: 0, split: kaspiOnly, price, maxPartial: 0, canPayFull: false }
+  }
   const balance = (Number(profile.kaspi_wallet_balance) || 0) + (await ownHeldForPlan(userId))
-  return { available: true, balance, split: splitPlanPayment(price, balance) }
+  const bounds = walletChoiceBounds(price, balance)
+  return { available: true, balance, split: splitPlanPayment(price, balance), price, maxPartial: bounds.maxPartial, canPayFull: bounds.canPayFull }
 }
 
 export type WalletPayResult =
