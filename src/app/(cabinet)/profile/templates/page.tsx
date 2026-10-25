@@ -91,7 +91,7 @@ export default function Templates() {
           {header}
 
           {loading ? (
-            <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-3 lg:gap-4 items-stretch">
               {[0, 1].map(i => (
                 <div key={i} className="nav-glass rounded-2xl p-4">
                   <Skeleton className="h-4 w-32 mb-2" />
@@ -111,16 +111,16 @@ export default function Templates() {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-3 lg:gap-4 items-stretch">
               {templates.map((tpl, i) => (
                 <motion.div
                   key={tpl.id}
                   initial={reduceMotion ? false : { opacity: 0, y: 14 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE, delay: reduceMotion ? 0 : Math.min(i * 0.05, 0.3) }}
-                  className={`nav-glass rounded-2xl p-4 ${CARD_HOVER}`}
+                  className={`nav-glass rounded-2xl p-4 h-full flex flex-col ${CARD_HOVER}`}
                 >
-                  <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start justify-between gap-3 flex-1">
                     <div className="min-w-0 cursor-pointer flex-1" onClick={() => router.push('/create?template=' + tpl.id)}>
                       <div className="font-semibold text-sm mb-1 truncate" style={{ color: 'var(--nav-text-primary)' }}>{tpl.name}</div>
                       {tpl.client_name && (

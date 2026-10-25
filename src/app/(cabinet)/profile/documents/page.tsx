@@ -13,7 +13,7 @@ import { deleteLabel } from '@/lib/a11yLabels'
 import { profileContentDict } from '@/lib/i18n/profileContent'
 import Skeleton from '@/components/Skeleton'
 import { useAppDialog } from '@/components/AppDialog'
-import PageContainer from '@/components/PageContainer'
+import PageContainer, { TILE_LIST_CLS, TILE_GRID_CLS, TILE_ITEM_CLS } from '@/components/PageContainer'
 import PageHeader from '@/components/PageHeader'
 import ProGate from '@/components/ProGate'
 
@@ -179,13 +179,15 @@ export default function Documents() {
       <>
         <PageContainer>
           {header}
-          <div className="nav-glass rounded-2xl overflow-hidden">
-            {[0, 1, 2].map(i => (
-              <div key={i} className="px-4 py-3.5" style={{ borderBottom: i < 2 ? '1px solid var(--nav-border-soft)' : 'none' }}>
-                <Skeleton className="h-4 w-40 mb-2" />
-                <Skeleton className="h-3 w-24" />
-              </div>
-            ))}
+          <div className={TILE_LIST_CLS}>
+            <div className={TILE_GRID_CLS}>
+              {[0, 1, 2].map(i => (
+                <div key={i} className={`px-4 py-3.5 ${TILE_ITEM_CLS}`}>
+                  <Skeleton className="h-4 w-40 mb-2" />
+                  <Skeleton className="h-3 w-24" />
+                </div>
+              ))}
+            </div>
           </div>
         </PageContainer>
       </>
@@ -265,13 +267,14 @@ export default function Documents() {
               </p>
             </div>
           ) : (
-            <div className="nav-glass rounded-2xl overflow-hidden lg:grid lg:grid-cols-2 2xl:grid-cols-3">
+            <div className={TILE_LIST_CLS}>
+             <div className={TILE_GRID_CLS}>
               {currentList.map((doc, i) => (
                 <motion.div key={doc.id}
                   initial={reduceMotion ? false : { opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: reduceMotion ? 0 : Math.min(i * 0.035, 0.3), duration: reduceMotion ? 0 : 0.35, ease: EASE }}
-                  className="px-4 py-3.5 border-b border-b-[color:var(--nav-border-soft)] last:border-b-0 lg:last:border-b"
+                  className={`px-4 py-3.5 ${TILE_ITEM_CLS}`}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
@@ -317,6 +320,7 @@ export default function Documents() {
                   </div>
                 </motion.div>
               ))}
+             </div>
             </div>
           )}
 

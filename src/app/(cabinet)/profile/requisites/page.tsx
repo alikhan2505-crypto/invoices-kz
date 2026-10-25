@@ -250,7 +250,7 @@ export default function Requisites() {
           )}
 
           <motion.div
-            className={`nav-glass nav-card-accent rounded-2xl p-5 space-y-4 md:space-y-0 md:grid md:grid-cols-2 md:gap-x-4 md:gap-y-4 md:items-start ${CARD_HOVER}`}
+            className={`nav-glass nav-card-accent rounded-2xl p-5 space-y-4 md:space-y-0 md:grid md:grid-cols-2 md:gap-x-4 md:gap-y-4 md:items-start xl:grid-cols-3 ${CARD_HOVER}`}
             initial={reduceMotion ? false : { opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.06 }}
@@ -325,7 +325,7 @@ export default function Requisites() {
             <Field label={t.companyNameFieldLabel} placeholder={t.companyNamePlaceholder}
               value={profile.company_name} onChange={v => setProfile({ ...profile, company_name: v })} />
 
-            <Field className="md:col-span-2" label={t.legalAddressFieldLabel} placeholder={t.legalAddressPlaceholder}
+            <Field className="md:col-span-2 xl:col-span-1" label={t.legalAddressFieldLabel} placeholder={t.legalAddressPlaceholder}
               value={profile.address} onChange={v => setProfile({ ...profile, address: v })} />
 
             <Field label={t.emailFieldLabel} placeholder={t.emailPlaceholder}

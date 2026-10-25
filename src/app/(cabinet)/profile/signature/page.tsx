@@ -511,14 +511,16 @@ export default function Signature() {
           <ProGateBanner variant="note" description={t.signatureFreePlanNote} />
         )}
 
-        <div className="space-y-4 xl:space-y-0 xl:grid xl:grid-cols-3 xl:gap-4 xl:items-start">
+        {/* Три плитки одной высоты: самая короткая тянется, кнопки прижаты к низу
+            каждой плитки (mt-auto). Ниже xl одна колонка, как раньше. */}
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-3 items-stretch">
         {/* Подпись */}
-        <motion.div {...fadeIn(1)}>
+        <motion.div {...fadeIn(1)} className="flex flex-col">
           <div className="text-[11px] font-extrabold uppercase px-1 mb-2" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.09em' }}>{t.signatureSectionLabel}</div>
-          <div className="nav-glass rounded-2xl p-4">
+          <div className="nav-glass rounded-2xl p-4 flex flex-col flex-1">
             {signatureUrl && !showCanvas ? (
-              <div>
-                <div className="rounded-xl p-3 mb-3 flex items-center justify-center" style={PAPER_TILE_STYLE}>
+              <div className="flex flex-col flex-1">
+                <div className="rounded-xl p-3 mb-3 flex flex-1 items-center justify-center" style={PAPER_TILE_STYLE}>
                   <img src={signatureUrl} alt={t.signatureAltText} className="h-20 object-contain" />
                 </div>
                 <div className="flex gap-2">
@@ -533,7 +535,7 @@ export default function Signature() {
                 </div>
               </div>
             ) : showCanvas ? (
-              <div>
+              <div className="flex flex-col flex-1">
                 <p className="text-xs mb-2" style={{ color: 'var(--nav-text-muted)' }}>{t.drawSignatureHint}</p>
                 <canvas
                   ref={canvasRef}
@@ -549,7 +551,7 @@ export default function Signature() {
                   onTouchMove={draw}
                   onTouchEnd={stopDraw}
                 />
-                <div className="flex gap-2 mt-3">
+                <div className="flex gap-2 mt-auto pt-3">
                   <button onClick={clearCanvas}
                     className={OUTLINE_BTN_CLS} style={{ borderColor: 'var(--nav-border)', color: 'var(--nav-text-secondary)' }}>
                     {t.clearButton}
@@ -566,14 +568,14 @@ export default function Signature() {
                 </div>
               </div>
             ) : (
-              <div className="text-center py-4">
+              <div className="text-center py-4 flex flex-col items-center flex-1">
                 <div className="w-14 h-14 mx-auto rounded-2xl flex items-center justify-center mb-3"
                   style={{ background: 'linear-gradient(135deg, var(--nav-accent-soft), transparent)', color: 'var(--nav-accent)' }}>
                   <PenIcon />
                 </div>
                 <p className="text-sm mb-4" style={{ color: 'var(--nav-text-muted)' }}>{t.noSignatureHint}</p>
                 <button onClick={() => setShowCanvas(true)}
-                  className="px-6 py-2.5 rounded-xl text-sm font-medium"
+                  className="px-6 py-2.5 rounded-xl text-sm font-medium mt-auto"
                   style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                   {t.drawSignatureButton}
                 </button>
@@ -583,12 +585,12 @@ export default function Signature() {
         </motion.div>
 
         {/* Печать */}
-        <motion.div {...fadeIn(2)}>
+        <motion.div {...fadeIn(2)} className="flex flex-col">
           <div className="text-[11px] font-extrabold uppercase px-1 mb-2" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.09em' }}>{t.stampSectionLabel}</div>
-          <div className="nav-glass rounded-2xl p-4">
+          <div className="nav-glass rounded-2xl p-4 flex flex-col flex-1">
             {stampUrl ? (
-              <div>
-                <div className="rounded-xl p-3 mb-3 flex items-center justify-center" style={PAPER_TILE_STYLE}>
+              <div className="flex flex-col flex-1">
+                <div className="rounded-xl p-3 mb-3 flex flex-1 items-center justify-center" style={PAPER_TILE_STYLE}>
                   <img src={stampUrl} alt={t.stampAltText} className="h-24 w-24 object-contain" />
                 </div>
                 <div className="flex gap-2">
@@ -603,13 +605,13 @@ export default function Signature() {
                 </div>
               </div>
             ) : (
-              <div className="text-center py-4">
+              <div className="text-center py-4 flex flex-col items-center flex-1">
                 <div className="w-14 h-14 mx-auto rounded-2xl flex items-center justify-center mb-3"
                   style={{ background: 'linear-gradient(135deg, var(--nav-teal-soft), transparent)', color: 'var(--nav-teal)' }}>
                   <StampIcon />
                 </div>
                 <p className="text-sm mb-4" style={{ color: 'var(--nav-text-muted)' }}>{t.noStampHint}</p>
-                <label className="inline-block px-6 py-2.5 rounded-xl text-sm font-medium cursor-pointer" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                <label className="inline-block px-6 py-2.5 rounded-xl text-sm font-medium cursor-pointer mt-auto" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                   {saving ? t.uploadingLabel : t.uploadPhotoButton}
                   <input type="file" accept="image/*" className="hidden" onChange={openCropModal} />
                 </label>
@@ -619,12 +621,12 @@ export default function Signature() {
         </motion.div>
 
         {/* Логотип */}
-        <motion.div {...fadeIn(3)}>
+        <motion.div {...fadeIn(3)} className="flex flex-col">
           <div className="text-[11px] font-extrabold uppercase px-1 mb-2" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.09em' }}>{t.logoSectionLabel}</div>
-          <div className="nav-glass rounded-2xl p-4">
+          <div className="nav-glass rounded-2xl p-4 flex flex-col flex-1">
             {logoUrl ? (
-              <div>
-                <div className="rounded-xl p-3 mb-3 flex items-center justify-center" style={PAPER_TILE_STYLE}>
+              <div className="flex flex-col flex-1">
+                <div className="rounded-xl p-3 mb-3 flex flex-1 items-center justify-center" style={PAPER_TILE_STYLE}>
                   <img src={logoUrl} alt={t.logoAltText} className="h-16 object-contain" />
                 </div>
                 <div className="flex gap-2">
@@ -639,13 +641,13 @@ export default function Signature() {
                 </div>
               </div>
             ) : (
-              <div className="text-center py-4">
+              <div className="text-center py-4 flex flex-col items-center flex-1">
                 <div className="w-14 h-14 mx-auto rounded-2xl flex items-center justify-center mb-3"
                   style={{ background: 'linear-gradient(135deg, var(--nav-magenta-soft), transparent)', color: 'var(--nav-magenta)' }}>
                   <BuildingIcon />
                 </div>
                 <p className="text-sm mb-4" style={{ color: 'var(--nav-text-muted)' }}>{t.noLogoHint}</p>
-                <label className="inline-block px-6 py-2.5 rounded-xl text-sm font-medium cursor-pointer" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+                <label className="inline-block px-6 py-2.5 rounded-xl text-sm font-medium cursor-pointer mt-auto" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                   {savingLogo ? t.uploadingLabel : t.uploadLogoButton}
                   <input type="file" accept="image/*" className="hidden" onChange={uploadLogo} />
                 </label>

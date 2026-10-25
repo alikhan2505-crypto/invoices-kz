@@ -8,7 +8,7 @@ import { formatDate } from '@/lib/date'
 import { useLanguage } from '@/components/LanguageProvider'
 import { profileAccountsDict } from '@/lib/i18n/profileAccounts'
 import { useAppDialog } from '@/components/AppDialog'
-import PageContainer from '@/components/PageContainer'
+import PageContainer, { TILE_LIST_CLS, TILE_GRID_CLS, TILE_ITEM_CLS } from '@/components/PageContainer'
 import PageHeader from '@/components/PageHeader'
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
@@ -110,8 +110,8 @@ export default function Security() {
             backHref="/profile"
           />
 
-          <div className="space-y-4 max-w-3xl">
-            {/* Passkeys */}
+          <div className="space-y-4">
+            {/* Passkeys: до lg одна стеклянная карточка со строками, с lg каждый ключ своей плиткой одной высоты. */}
             <motion.div
               initial={reduceMotion ? false : { opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
@@ -120,9 +120,10 @@ export default function Security() {
               <div className="text-[11px] font-extrabold uppercase px-1 mb-2" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.09em' }}>
                 {t.loginSecuritySectionLabel}
               </div>
-              <div className="nav-glass rounded-2xl overflow-hidden">
-                {passkeys.map((p, i) => (
-                  <div key={p.id} className="flex items-center justify-between px-4 py-3.5" style={{ borderBottom: i < passkeys.length - 1 ? '1px solid var(--nav-border-soft)' : 'none' }}>
+              <div className={TILE_LIST_CLS}>
+               <div className={TILE_GRID_CLS}>
+                {passkeys.map(p => (
+                  <div key={p.id} className={`flex items-center justify-between gap-3 px-4 py-3.5 ${TILE_ITEM_CLS}`}>
                     <div className="flex items-center gap-3 min-w-0">
                       <span
                         className="w-8 h-8 rounded-[9px] flex items-center justify-center flex-shrink-0"
@@ -145,20 +146,22 @@ export default function Security() {
                   </div>
                 ))}
 
+                {/* Плитка «добавить»: без ключей занимает всю строку, с ключами встаёт последней в сетку. */}
                 {!passkeySupported ? (
-                  <div className="px-4 py-3.5 text-xs" style={{ color: 'var(--nav-text-muted)' }}>{t.passkeyNotSupportedHint}</div>
+                  <div className={`px-4 py-3.5 text-xs flex items-center ${TILE_ITEM_CLS} ${passkeys.length === 0 ? 'lg:col-span-full' : ''}`} style={{ color: 'var(--nav-text-muted)' }}>{t.passkeyNotSupportedHint}</div>
                 ) : (
-                  <div className="px-4 py-3.5" style={{ borderTop: passkeys.length > 0 ? '1px solid var(--nav-border-soft)' : 'none' }}>
+                  <div className={`px-4 py-3.5 flex flex-col justify-center ${TILE_ITEM_CLS} ${passkeys.length === 0 ? 'lg:col-span-full' : ''}`}>
                     {passkeys.length === 0 && (
-                      <div className="text-xs mb-3" style={{ color: 'var(--nav-text-muted)' }}>{t.passkeyNoneHint}</div>
+                      <div className="text-xs mb-3 max-w-prose" style={{ color: 'var(--nav-text-muted)' }}>{t.passkeyNoneHint}</div>
                     )}
                     <button onClick={addPasskey} disabled={addingPasskey}
-                      className="w-full lg:w-fit lg:px-10 rounded-xl py-2.5 text-sm font-semibold transition-colors disabled:opacity-60"
+                      className={`${passkeys.length === 0 ? 'w-full lg:w-fit lg:px-10' : 'w-full'} rounded-xl py-2.5 text-sm font-semibold transition-colors disabled:opacity-60`}
                       style={{ border: '1px solid var(--nav-accent)', color: 'var(--nav-accent)' }}>
                       {addingPasskey ? t.savingEllipsis : t.passkeyAddButton}
                     </button>
                   </div>
                 )}
+               </div>
               </div>
             </motion.div>
 

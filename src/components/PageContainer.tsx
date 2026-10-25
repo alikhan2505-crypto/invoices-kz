@@ -8,9 +8,12 @@
 // ПОЛИТИКА ШИРИНЫ (всё, что шире телефона, стоит за lg:, поэтому до 1024px и на
 // телефоне ничего не меняется: база max-w-lg остаётся):
 //
-//   narrow  -- формы и настройки (/profile/*):  max-w-lg  lg:max-w-5xl xl:max-w-6xl
-//              (1024px, с 1280px экрана 1152px), по центру. Поля внутри раскладывайте
-//              в сетку (FORM_GRID_CLS), а не в одну колонку на 1000px.
+//   narrow  -- формы и настройки (/profile/*): ТА ЖЕ ширина, что у wide (решение
+//              основателя 25.10: «растянуто по размеру страницы, везде узко» -- узкие
+//              колонки 960-1152px оставляли пустую правую половину на 1920px).
+//              Вариант оставлен ради смысла в разметке (форма/настройки), ширина общая.
+//              Поля внутри раскладывайте в сетку (FORM_GRID_CLS), плитки одной
+//              высоты -- в сетку с items-stretch (см. ниже), а не в узкую колонку.
 //   wide    -- дашборд, история, тарифы, карточные разделы:
 //              max-w-lg  lg:max-w-none  min-[2000px]:max-w-[1800px]
 //              (без потолка до экранов ~1920px; на 2560px и шире -- 1800px по центру).
@@ -32,6 +35,11 @@
 //
 // ОТСТУПЫ: p-4, на десктопе p-6, на 2xl боковые px-8, чтобы содержимое не липло к
 // краю окна-карточки на больших экранах.
+//
+// РАВНАЯ ВЫСОТА. Плитки в ряду растягиваем, а не прижимаем к верху: сетка с
+// items-stretch, карточка `h-full flex flex-col`, кнопки `mt-auto`. Две колонки
+// РАЗНОЙ длины делайте двумя независимыми flex-колонками (`flex flex-col gap-4`),
+// у последней карточки `flex-1`: нижняя граница общая, пустоты под короткой нет.
 //
 // ЧИТАЕМЫЙ ТЕКСТ. В широком контейнере абзац длиной в 1500px читать нельзя. Абзацы и
 // подсказки оборачивайте в <Prose> или добавляйте PROSE_CLS (max-w-prose, около 65
@@ -62,7 +70,7 @@ export type PageContainerAlign = 'center' | 'start' | 'left'
 const HEADER_GAP_CLS = '[&>[data-page-header]]:mb-5 [&>[data-page-header]+*]:mt-0'
 
 export const WIDTH_CLS: Record<PageContainerVariant, string> = {
-  narrow: 'max-w-lg lg:max-w-5xl xl:max-w-6xl',
+  narrow: 'max-w-lg lg:max-w-none min-[2000px]:max-w-[1800px]',
   wide: 'max-w-lg lg:max-w-none min-[2000px]:max-w-[1800px]',
   full: 'max-w-lg lg:max-w-none min-[2240px]:max-w-[2100px]',
 }
@@ -76,6 +84,16 @@ export const FORM_GRID_CLS = 'grid grid-cols-1 gap-x-4 gap-y-3 md:grid-cols-2 xl
 export const FORM_FULL_CLS = 'col-span-full'
 export const SPLIT_GRID_CLS = 'grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_380px] xl:items-start'
 export const TWO_COL_CLS = 'grid grid-cols-1 gap-4 xl:grid-cols-2'
+// Список записей (клиенты, услуги, документы, договоры): на телефоне и планшете (до lg)
+// одна стеклянная карточка со строками, как было; с lg КАЖДАЯ запись -- своя плитка
+// (рамка, скругление, зазор), плитки одной высоты в ряду. Внешний div (TILE_LIST_CLS)
+// на lg исчезает (contents), сетку держит внутренний (TILE_GRID_CLS). Фон и рамку
+// nav-glass на lg выключить нельзя (CSS вне слоя бьёт утилиты), поэтому обёртка
+// «растворяется», а плитка красится сама (TILE_ITEM_CLS: на lg фон и рамка, до lg
+// разделитель строк; наведение раздельно, чтобы утилиты не спорили).
+export const TILE_LIST_CLS = 'nav-glass rounded-2xl overflow-hidden lg:contents'
+export const TILE_GRID_CLS = 'lg:grid lg:grid-cols-2 lg:gap-4 lg:items-stretch 2xl:grid-cols-3'
+export const TILE_ITEM_CLS = 'max-lg:border-b max-lg:border-b-[color:var(--nav-border-soft)] max-lg:last:border-b-0 max-lg:hover:bg-[var(--nav-surface-glass)] lg:rounded-2xl lg:border lg:border-[color:var(--nav-border-soft)] lg:bg-[var(--nav-surface-chrome)] lg:shadow-[var(--nav-card-glow)] lg:hover:border-[color:var(--nav-border)]'
 
 export type PageContainerProps = Omit<React.HTMLAttributes<HTMLDivElement>, 'children'> & {
   variant?: PageContainerVariant

@@ -86,10 +86,13 @@ export default function ContractPage() {
     <PageContainer>
       <PageHeader title={contract.title} backHref="/profile/contracts" />
 
-      <div className="space-y-4 max-w-3xl">
+      {/* Две колонки одной высоты с xl: слева карточка договора и кнопка файла
+          (карточка тянется), справа подпись ЭЦП или замок Про (тоже тянутся).
+          Ниже xl одна колонка в прежнем порядке. */}
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 items-stretch">
 
-        <div className="space-y-4">
-        <div className="nav-glass nav-card-accent rounded-2xl p-5">
+        <div className="flex flex-col gap-4">
+        <div className="nav-glass nav-card-accent rounded-2xl p-5 flex-1">
           <div className="text-xs mb-1" style={{ color: 'var(--nav-text-muted)' }}>{t.createdLabel(formatDate(contract.created_at, lang))}</div>
           <div className="mt-3 pt-3" style={{ borderTop: '1px solid var(--nav-border-soft)' }}>
             <div className="text-xs mb-1" style={{ color: 'var(--nav-text-muted)' }}>{t.clientLabel}</div>
@@ -107,6 +110,9 @@ export default function ContractPage() {
         </div>
 
         {profile?.is_admin || getActivePlan(profile).canEcp ? (
+        // SignatureSection общий (счета, договоры): корень и его карточку тянем
+        // снаружи, не меняя сам компонент.
+        <div className="flex flex-col [&>div]:flex-1 [&>div]:flex [&>div]:flex-col [&>div>div:last-child]:flex-1">
         <SignatureSection
           mode="owner"
           documentType="contract"
@@ -115,13 +121,17 @@ export default function ContractPage() {
           ownerCompanyName={profile?.company_name}
           getPdfUrl={getFileUrl}
         />
+        </div>
         ) : (
+        <div className="flex flex-col">
         <ProGateBanner
+          className="flex-1"
           icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>}
           title={proGateText.title}
           badge={t.proBadge}
           description={t.ecpProOnlyNote}
         />
+        </div>
         )}
       </div>
     </PageContainer>

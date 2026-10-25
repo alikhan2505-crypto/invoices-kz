@@ -100,7 +100,13 @@ export default function Support() {
 
         <PageHeader title={t.supportHeaderLabel} backHref="/profile" />
 
-        <div className="space-y-4 max-w-3xl">
+        {/* Две независимые колонки: слева часы, контакты, о сервисе и ссылки, справа
+            FAQ. Последняя карточка каждой колонки тянется (flex-1), поэтому, когда
+            раскрывается вопрос в FAQ, пустоты под левой колонкой не появляется.
+            Ниже xl колонки «contents», и порядок блоков как прежде (часы, контакты,
+            FAQ, о сервисе, ссылки): about и ссылки получают max-xl:order-1. */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-stretch">
+        <div className="contents xl:flex xl:flex-col xl:gap-4 xl:[&>:last-child]:flex-1">
         <motion.p {...fadeIn(1)} className="text-sm px-1" style={{ color: 'var(--nav-text-muted)' }}>
           {t.supportHoursText}
         </motion.p>
@@ -170,30 +176,15 @@ export default function Support() {
           </a>
         </motion.div>
 
-        {/* FAQ */}
-        <motion.div {...fadeIn(3)} className="nav-glass rounded-2xl overflow-hidden">
-          <div className="px-4 pt-4 pb-2 text-[11px] font-extrabold uppercase" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.09em' }}>{t.faqHeaderLabel}</div>
-          {t.faqItems.map((item, i, arr) => (
-            <details key={i} className="group px-4" style={{ borderBottom: i < arr.length - 1 ? '1px solid var(--nav-border-soft)' : 'none' }}>
-              <summary className="py-3.5 text-sm font-medium cursor-pointer list-none flex items-center justify-between" style={{ color: 'var(--nav-text-primary)' }}>
-                {item.q}
-                <span className="transition-transform group-open:rotate-90" style={{ color: 'var(--nav-text-muted)' }}><ChevronRightIcon /></span>
-              </summary>
-              <p className="text-sm pb-3.5" style={{ color: 'var(--nav-text-secondary)' }}>{item.a}</p>
-            </details>
-          ))}
-        </motion.div>
-
         {/* О сервисе — бывшая страница /profile/about */}
-        <motion.div {...fadeIn(4)} id="about" className="nav-glass nav-card-accent rounded-2xl p-6 text-center scroll-mt-24">
+        <motion.div {...fadeIn(4)} id="about" className="max-xl:order-1 nav-glass nav-card-accent rounded-2xl p-6 text-center scroll-mt-24">
           <div className="text-2xl font-bold mb-1" style={{ color: 'var(--nav-text-primary)' }}>INVOICES.KZ</div>
           <div className="text-sm mb-3" style={{ color: 'var(--nav-text-muted)' }}>{t.appTaglineLabel}</div>
           <span className="inline-block text-xs px-3 py-1.5 rounded-full font-medium" style={{ background: 'var(--nav-border-soft)', color: 'var(--nav-text-secondary)' }}>
             {t.versionLabel(process.env.NEXT_PUBLIC_BUILD_DATE || '')}
           </span>
         </motion.div>
-
-        <motion.div {...fadeIn(5)} className="nav-glass rounded-2xl overflow-hidden py-1">
+        <motion.div {...fadeIn(5)} className="max-xl:order-1 nav-glass rounded-2xl overflow-hidden py-1 xl:flex xl:flex-col xl:justify-start">
           <a href="https://invoices.kz" target="_blank" rel="noopener noreferrer"
             className="flex items-center justify-between mx-2 px-3 py-3 rounded-xl transition-colors hover:bg-[var(--nav-surface-glass)]"
             style={{ borderBottom: '1px solid var(--nav-border-soft)' }}>
@@ -224,7 +215,25 @@ export default function Support() {
         </motion.div>
         </div>
 
-        <motion.div {...fadeIn(6)} className="text-center py-4 max-w-3xl">
+        <div className="contents xl:flex xl:flex-col xl:gap-4 xl:[&>:last-child]:flex-1">
+        {/* FAQ */}
+        <motion.div {...fadeIn(3)} className="nav-glass rounded-2xl overflow-hidden">
+          <div className="px-4 pt-4 pb-2 text-[11px] font-extrabold uppercase" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.09em' }}>{t.faqHeaderLabel}</div>
+          {t.faqItems.map((item, i, arr) => (
+            <details key={i} className="group px-4" style={{ borderBottom: i < arr.length - 1 ? '1px solid var(--nav-border-soft)' : 'none' }}>
+              <summary className="py-3.5 text-sm font-medium cursor-pointer list-none flex items-center justify-between" style={{ color: 'var(--nav-text-primary)' }}>
+                {item.q}
+                <span className="transition-transform group-open:rotate-90" style={{ color: 'var(--nav-text-muted)' }}><ChevronRightIcon /></span>
+              </summary>
+              <p className="text-sm pb-3.5" style={{ color: 'var(--nav-text-secondary)' }}>{item.a}</p>
+            </details>
+          ))}
+        </motion.div>
+
+        </div>
+        </div>
+
+        <motion.div {...fadeIn(6)} className="text-center py-4">
           <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>{t.madeInKazakhstanLabel}</div>
           <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>{t.copyrightLabel}</div>
         </motion.div>

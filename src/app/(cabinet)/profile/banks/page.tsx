@@ -239,7 +239,7 @@ export default function Banks() {
           )}
 
           {loading ? (
-            <div className="space-y-3 mb-4 lg:space-y-0 lg:grid lg:grid-cols-2 2xl:grid-cols-3 lg:gap-3 lg:items-start">
+            <div className="space-y-3 mb-4 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-4 lg:items-stretch">
               {[0, 1].map(i => (
                 <div key={i} className="nav-glass rounded-2xl p-4">
                   <Skeleton className="h-4 w-40 mb-2" />
@@ -253,14 +253,14 @@ export default function Banks() {
               <p className="text-sm mt-3" style={{ color: 'var(--nav-text-secondary)' }}>{t.noAccountsLabel}</p>
             </div>
           ) : (
-            <div className="space-y-3 mb-4 lg:space-y-0 lg:grid lg:grid-cols-2 2xl:grid-cols-3 lg:gap-3 lg:items-start">
+            <div className={`space-y-3 mb-4 lg:space-y-0 lg:grid lg:gap-4 lg:items-stretch ${accounts.length > 2 ? 'lg:grid-cols-2 2xl:grid-cols-3' : 'lg:grid-cols-2'}`}>
               {accounts.map((acc, i) => (
                 <motion.div
                   key={acc.id}
                   initial={reduceMotion ? false : { opacity: 0, y: 14 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE, delay: reduceMotion ? 0 : 0.05 + i * 0.05 }}
-                  className={`rounded-2xl p-4 ${CARD_HOVER}`}
+                  className={`rounded-2xl p-4 h-full ${CARD_HOVER}`}
                   style={{
                     background: 'var(--nav-surface-chrome)',
                     border: acc.is_main ? '1.5px solid var(--nav-accent)' : '1px solid var(--nav-border-soft)',

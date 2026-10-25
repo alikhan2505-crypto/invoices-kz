@@ -541,10 +541,17 @@ export default function Profile() {
     </motion.div>
   )
 
-  const groupEl = (index: number, title: string, colorVar: string, items: (MenuItem & { allowed?: boolean })[]) => (
-    <motion.div {...fadeIn(index)}>
+  // Порядок групп ниже xl (стопки там «растворены» через contents) остаётся прежним:
+  // Компания, Документы, Аккаунт, Помощь, Админ. С xl порядок внутри стопки тот же.
+  const GROUP_ORDER_CLS: Record<number, string> = { 1: 'order-1', 2: 'order-2', 3: 'order-3', 4: 'order-4', 5: 'order-5' }
+  // grow: последняя карточка стопки на десктопе тянется до низа соседней стопки
+  // (колонки равной высоты, без пустоты между блоками): обёртка и список -- flex-колонки,
+  // строки делят лишнюю высоту поровну. Без лишней высоты (телефон, высокая стопка)
+  // всё выглядит как раньше.
+  const groupEl = (index: number, title: string, colorVar: string, items: (MenuItem & { allowed?: boolean })[], grow = false) => (
+    <motion.div {...fadeIn(index)} className={`${GROUP_ORDER_CLS[index] ?? ''} ${grow ? 'flex flex-col flex-1' : ''}`.trim() || undefined}>
           <div className="text-[11px] font-extrabold uppercase px-1 mb-2" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.09em' }}>{title}</div>
-          <nav aria-label={title} className="nav-glass rounded-2xl overflow-hidden py-1">
+          <nav aria-label={title} className={`nav-glass rounded-2xl overflow-hidden py-1 ${grow ? 'flex flex-col flex-1 [&>a]:flex-auto' : ''}`}>
             {items.map((item, i, arr) => (
               <ListRow
                 key={item.href}
@@ -562,12 +569,15 @@ export default function Profile() {
   )
 
   const companyEl = groupEl(1, t.companySectionLabel, '--nav-accent', companyItems)
-  const documentsEl = groupEl(2, t.documentsSectionLabel, '--nav-teal', documentItems)
-  const accountEl = groupEl(3, t.accountSectionLabel, '--nav-magenta', accountItems)
-  const helpEl = groupEl(4, t.helpSectionLabel, '--nav-magenta', helpItems)
+  // Стопка 1: Компания, Аккаунт, Помощь (8 строк); стопка 2: Документы (7 строк)
+  // + Админ. Строк почти поровну, поэтому добавка высоты у последней карточки стопки
+  // (grow) делится на много строк и растяжение не бросается в глаза.
+  const documentsEl = groupEl(2, t.documentsSectionLabel, '--nav-teal', documentItems, !isAdmin)
+  const accountEl = groupEl(3, t.accountSectionLabel, '--nav-magenta', accountItems, false)
+  const helpEl = groupEl(4, t.helpSectionLabel, '--nav-magenta', helpItems, true)
   // Отдельная группа «Админ» — из кэшированного профиля, сразу при первом
   // рендере: раньше пункт появлялся после загрузки и сдвигал список.
-  const adminEl = isAdmin ? groupEl(5, t.adminSectionLabel, '--nav-text-muted', adminItems) : null
+  const adminEl = isAdmin ? groupEl(5, t.adminSectionLabel, '--nav-text-muted', adminItems, true) : null
 
   const planDetailRows = showPlanEndRow || bonusIsPlan || trialIsPlan
 
@@ -672,7 +682,7 @@ export default function Profile() {
       <h1 className="sr-only">{pageTitle}</h1>
       <PageContainer variant="wide">
         {isDesktop ? (
-          <div className="flex gap-6 items-start">
+          <div className="flex gap-6 items-stretch">
             <div className="flex flex-col gap-4 w-[360px] flex-shrink-0">
               {profileCardEl}
               <ProfileBonusCard />
@@ -681,12 +691,21 @@ export default function Profile() {
               {signOutEl}
               {deleteAccountEl}
             </div>
-            <div className="flex flex-col gap-4 flex-1 min-w-0 2xl:grid 2xl:grid-cols-2 2xl:items-start">
-              {companyEl}
-              {documentsEl}
-              {accountEl}
-              {helpEl}
-              {adminEl}
+            {/* Две НЕЗАВИСИМЫЕ стопки рядом (с xl): иначе короткая «Компания»
+                встаёт рядом с высокими «Документами», а «Аккаунт» уезжает под них
+                с пустотой. Ниже xl стопки идут друг под другом (строки сетки не
+                растягиваем: content-start), а внешняя строка тянется до низа левой
+                колонки, и последняя карточка каждой стопки добирает высоту. */}
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-stretch content-start xl:content-normal flex-1 min-w-0">
+              <div className="contents xl:flex xl:flex-col xl:gap-4 xl:min-w-0">
+                {companyEl}
+                {accountEl}
+                {helpEl}
+              </div>
+              <div className="contents xl:flex xl:flex-col xl:gap-4 xl:min-w-0">
+                {documentsEl}
+                {adminEl}
+              </div>
             </div>
           </div>
         ) : (

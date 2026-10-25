@@ -127,14 +127,18 @@ export default function ConnectorsPage() {
     transition: { delay: reduceMotion ? 0 : i * 0.05, duration: reduceMotion ? 0 : 0.4, ease: EASE },
   })
 
+  const hasPreview = !!(kaspiLink || halykLink || website || socialLinks.some(l => l))
+
   return (
     <>
       <PageContainer className="space-y-4">
 
         <PageHeader title={t.connectorsHeaderLabel} backHref="/profile" />
 
-        <div className="space-y-4 max-w-3xl">
-        <div className="space-y-4">
+        {/* Две независимые колонки одинаковой высоты: последняя карточка каждой
+            колонки тянется (flex-1), поэтому нижние края совпадают и пустоты нет. */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-stretch">
+        <div className="flex flex-col gap-4">
         {/* Оплата */}
         <motion.div {...fadeIn(1)}>
           <div className="text-[11px] font-extrabold uppercase px-1 mb-2" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.09em' }}>{t.paymentButtonsSectionLabel}</div>
@@ -166,9 +170,9 @@ export default function ConnectorsPage() {
         </motion.div>
 
         {/* Сайт */}
-        <motion.div {...fadeIn(2)}>
+        <motion.div {...fadeIn(2)} className="flex flex-col flex-1">
           <div className="text-[11px] font-extrabold uppercase px-1 mb-2" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.09em' }}>{t.websiteSectionLabel}</div>
-          <div className="nav-glass rounded-2xl p-4">
+          <div className="nav-glass rounded-2xl p-4 flex-1">
             <input className={INPUT_CLS}
               placeholder={t.websitePlaceholder}
               value={website} onChange={e => setWebsite(e.target.value)} />
@@ -176,11 +180,11 @@ export default function ConnectorsPage() {
         </motion.div>
 
         </div>
-        <div className="space-y-4">
+        <div className="flex flex-col gap-4">
         {/* Соцсети */}
-        <motion.div {...fadeIn(3)}>
+        <motion.div {...fadeIn(3)} className={`flex flex-col ${hasPreview ? '' : 'flex-1'}`}>
           <div className="text-[11px] font-extrabold uppercase px-1 mb-2" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.09em' }}>{t.socialMediaSectionLabel}</div>
-          <div className="nav-glass rounded-2xl p-4 space-y-3">
+          <div className="nav-glass rounded-2xl p-4 space-y-3 flex-1">
             {socialLinks.map((link, i) => (
               <div key={i} className="flex items-center gap-2">
                 <span className="w-8 h-8 rounded-[9px] flex items-center justify-center flex-shrink-0"
@@ -216,10 +220,10 @@ export default function ConnectorsPage() {
         </motion.div>
 
         {/* Preview */}
-        {(kaspiLink || halykLink || website || socialLinks.some(l => l)) && (
-          <motion.div {...fadeIn(4)}>
+        {hasPreview && (
+          <motion.div {...fadeIn(4)} className="flex flex-col flex-1">
             <div className="text-[11px] font-extrabold uppercase px-1 mb-2" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.09em' }}>{t.previewSectionLabel}</div>
-            <div className="nav-glass rounded-2xl p-4 space-y-2">
+            <div className="nav-glass rounded-2xl p-4 space-y-2 flex-1">
               {kaspiLink && (
                 <div className="w-full rounded-xl py-3 text-sm font-medium text-center text-white" style={{ background: '#F14635' }}>
                   {t.payViaKaspiLabel}

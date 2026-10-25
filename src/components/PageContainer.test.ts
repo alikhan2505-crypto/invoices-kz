@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import PageContainer, { Prose, WIDTH_CLS } from './PageContainer'
+import PageContainer, { Prose, WIDTH_CLS, TILE_LIST_CLS, TILE_GRID_CLS, TILE_ITEM_CLS } from './PageContainer'
 
 // Проекту хватает серверной отрисовки (environment: node, без jsdom): смотрим на HTML.
 
@@ -11,9 +11,12 @@ function cls(html: string): string[] {
 }
 
 describe('PageContainer', () => {
-  it('narrow по умолчанию: 5xl/6xl, отступы p-4 lg:p-6 2xl:px-8, по центру', () => {
+  it('narrow по умолчанию: во всю ширину как wide (без 5xl/6xl), потолок только на сверхшироких, отступы p-4 lg:p-6 2xl:px-8, по центру', () => {
     const c = cls(renderToStaticMarkup(createElement(PageContainer, null, 'x')))
-    expect(c).toEqual(expect.arrayContaining(['max-w-lg', 'lg:max-w-5xl', 'xl:max-w-6xl', 'mx-auto', 'p-4', 'lg:p-6', '2xl:px-8']))
+    expect(c).toEqual(expect.arrayContaining(['max-w-lg', 'lg:max-w-none', 'min-[2000px]:max-w-[1800px]', 'mx-auto', 'p-4', 'lg:p-6', '2xl:px-8']))
+    expect(c).not.toContain('lg:max-w-5xl')
+    expect(c).not.toContain('xl:max-w-6xl')
+    expect(WIDTH_CLS.narrow).toBe(WIDTH_CLS.wide)
   })
 
   it('wide и full без потолка на десктопе, потолок только на сверхшироких, база max-w-lg для телефона', () => {
@@ -56,5 +59,17 @@ describe('PageContainer', () => {
     expect(c).toContain('space-y-6')
     expect(c).toContain('[&>[data-page-header]]:mb-5')
     expect(c).toContain('[&>[data-page-header]+*]:mt-0')
+  })
+})
+
+describe('плитки списков', () => {
+  it('до lg список остаётся карточкой со строками, плитка (рамка, скругление, тень) только с lg:', () => {
+    expect(TILE_LIST_CLS.split(' ')).toContain('lg:contents')
+    for (const c of TILE_ITEM_CLS.split(' ')) {
+      if (c.startsWith('max-lg:')) continue
+      expect(c).toMatch(/^lg:/)
+    }
+    expect(TILE_ITEM_CLS).toContain('lg:shadow-[var(--nav-card-glow)]')
+    expect(TILE_GRID_CLS).toContain('lg:items-stretch')
   })
 })

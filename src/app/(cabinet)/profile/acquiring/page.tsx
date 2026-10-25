@@ -392,7 +392,7 @@ export default function AcquiringPage() {
   // sitting against their bank account — the "Отключить" button has to stay
   // reachable for them, even though everything else here is behind the wall.
   const bccConnectedCard = bccConnection && (
-    <div className={`nav-glass rounded-2xl p-4 ${CARD_HOVER}`}>
+    <div className={`nav-glass rounded-2xl p-4 flex flex-col ${CARD_HOVER}`}>
       <div className="text-sm font-semibold mb-2" style={{ color: 'var(--nav-text-primary)' }}>{t.bccSectionTitle}</div>
       <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>{t.bccConnectedIbanLabel}: {bccConnection.iban}</div>
       <div className="text-xs mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{t.bccLastCheckedLabel}: {new Date(bccConnection.last_checked_at).toLocaleString('ru-KZ')}</div>
@@ -402,20 +402,213 @@ export default function AcquiringPage() {
           {t.bccConnectionErrorHint}
         </div>
       )}
+      <div className="h-3 flex-shrink-0" />
       <button onClick={disconnectBcc} disabled={bccDisconnecting}
-        className="w-full nav-glass rounded-xl py-2.5 text-sm font-medium mt-3 transition-colors hover:bg-[var(--nav-surface-glass)] disabled:opacity-60"
+        className="w-full nav-glass rounded-xl py-2.5 text-sm font-medium mt-auto transition-colors hover:bg-[var(--nav-surface-glass)] disabled:opacity-60"
         style={{ color: 'var(--nav-text-secondary)' }}>
         {bccDisconnecting ? t.bccDisconnectingLabel : t.bccDisconnectButton}
       </button>
     </div>
   )
 
+  const COL_CLS = 'flex flex-col gap-4 [&>:last-child]:flex-1'
+
+  // Карточка-ссылка на Kaspi Cashier API. Если соседняя колонка выше, карточка
+  // тянется по высоте, поэтому содержимое центрируем по вертикали.
+  const cashierCard = (
+    <motion.div
+      initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.1 }}
+      onClick={() => router.push('/kaspi-api')}
+      className={`nav-glass rounded-2xl p-4 cursor-pointer flex flex-col justify-center ${CARD_HOVER}`}
+    >
+      <div className="flex items-center gap-3">
+        <span
+          className="w-9 h-9 rounded-[10px] flex items-center justify-center flex-shrink-0"
+          style={{ background: 'linear-gradient(135deg, var(--nav-teal-soft), transparent)', color: 'var(--nav-teal)' }}
+        >
+          <ApiIcon />
+        </span>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>Kaspi Cashier API</div>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{t.cashierApiCardText}</p>
+        </div>
+        <span className="flex-shrink-0" style={{ color: 'var(--nav-text-muted)' }}><ChevronRightIcon /></span>
+      </div>
+    </motion.div>
+  )
+
+  // ЭСФ (электронный счёт-фактура) connection -- deliberately its own
+  // card gated on canEsf rather than folded into the canAcquiring
+  // block: it's a distinct plan flag (Task 3/src/lib/plan.ts),
+  // even though both currently resolve to "Pro only". Task 9's
+  // submit route reads this connection directly via
+  // loadEsfConnectionByUserId -- this card has no later consumer
+  // on this page itself.
+  const esfCard = isAdmin && (
+    <motion.div
+      initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.12 }}
+      className={`nav-glass rounded-2xl p-4 flex flex-col ${CARD_HOVER}`}
+    >
+      {!ap.canEsf ? (
+        <>
+          <div className="flex items-center gap-3 mb-2">
+            <span
+              className="w-9 h-9 rounded-[10px] flex items-center justify-center flex-shrink-0"
+              style={{ background: 'linear-gradient(135deg, var(--nav-accent-soft), transparent)', color: 'var(--nav-accent)' }}
+            >
+              <DocumentCheckIcon />
+            </span>
+            <div className="text-sm font-semibold flex-1" style={{ color: 'var(--nav-text-primary)' }}>{t.esfSectionTitle}</div>
+            <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0" style={{ background: 'var(--nav-accent-soft)', color: 'var(--nav-accent)' }}>
+              <LockIcon size={10} />
+              {t.proBadge}
+            </span>
+          </div>
+          <div className="text-xs mb-3 max-w-prose" style={{ color: 'var(--nav-text-muted)' }}>{t.esfProLockedHint}</div>
+          <button onClick={() => router.push('/upgrade')}
+            className="w-full rounded-xl py-2.5 text-sm font-semibold mt-auto transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0"
+            style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+            {t.goToPlansButton}
+          </button>
+        </>
+      ) : (
+        <>
+          <div className="text-sm font-semibold mb-2" style={{ color: 'var(--nav-text-primary)' }}>{t.esfSectionTitle}</div>
+          <p className="text-xs mb-3 max-w-prose" style={{ color: 'var(--nav-text-muted)' }}>{t.esfIntroText}</p>
+          {esfMessage && <p className="text-xs mb-2" style={{ color: 'var(--nav-accent)' }}>{esfMessage}</p>}
+          {esfError && <p className="text-xs mb-2" style={{ color: 'var(--nav-critical)' }}>{esfError}</p>}
+          <form onSubmit={connectEsf} className="flex flex-col flex-1">
+            <div className="grid grid-cols-1 gap-x-4 2xl:grid-cols-2">
+              <div>
+                <label className="block text-xs mb-1" style={{ color: 'var(--nav-text-muted)' }}>{t.esfLoginLabel}</label>
+                <input value={esfLogin} onChange={e => setEsfLogin(e.target.value)} placeholder={t.esfLoginPlaceholder}
+                  type="text" required
+                  className="w-full py-2 text-sm outline-none mb-3 bg-transparent"
+                  style={{ borderBottom: '1px solid var(--nav-border)', color: 'var(--nav-text-primary)' }} />
+              </div>
+              <div>
+                <label className="block text-xs mb-1" style={{ color: 'var(--nav-text-muted)' }}>{t.esfPasswordLabel}</label>
+                <input value={esfPassword} onChange={e => setEsfPassword(e.target.value)} placeholder={t.esfPasswordPlaceholder}
+                  type="password" required
+                  className="w-full py-2 text-sm outline-none mb-3 bg-transparent"
+                  style={{ borderBottom: '1px solid var(--nav-border)', color: 'var(--nav-text-primary)' }} />
+              </div>
+              <div>
+                <label className="block text-xs mb-1" style={{ color: 'var(--nav-text-muted)' }}>{t.esfVatCertNumLabel}</label>
+                <input value={esfVatNum} onChange={e => setEsfVatNum(e.target.value)} placeholder={t.esfVatCertNumPlaceholder}
+                  type="text"
+                  className="w-full py-2 text-sm outline-none mb-3 bg-transparent"
+                  style={{ borderBottom: '1px solid var(--nav-border)', color: 'var(--nav-text-primary)' }} />
+              </div>
+              <div>
+                <label className="block text-xs mb-1" style={{ color: 'var(--nav-text-muted)' }}>{t.esfVatCertSeriesLabel}</label>
+                <input value={esfVatSeries} onChange={e => setEsfVatSeries(e.target.value)} placeholder={t.esfVatCertSeriesPlaceholder}
+                  type="text"
+                  className="w-full py-2 text-sm outline-none mb-3 bg-transparent"
+                  style={{ borderBottom: '1px solid var(--nav-border)', color: 'var(--nav-text-primary)' }} />
+              </div>
+            </div>
+            <label className="block text-xs mb-1" style={{ color: 'var(--nav-text-muted)' }}>{t.esfAuthCertLabel}</label>
+            <p className="text-[11px] mb-1.5 max-w-prose" style={{ color: 'var(--nav-text-muted)' }}>{t.esfAuthCertHint}</p>
+            <label
+              htmlFor="esf-auth-cert-input"
+              className="inline-block w-fit rounded-xl px-4 py-2 text-xs font-medium border cursor-pointer transition-colors hover:bg-[var(--nav-surface-glass)] mb-3"
+              style={{ borderColor: 'var(--nav-accent)', color: 'var(--nav-accent)' }}
+            >
+              {t.esfAuthCertChooseButton}
+            </label>
+            <input id="esf-auth-cert-input" onChange={onEsfAuthCertChange} accept=".cer,.pem,.crt" type="file"
+              className="hidden" />
+            {esfAuthCertName && (
+              <p className="text-[11px] mb-3 -mt-2" style={{ color: 'var(--nav-accent)' }}>{t.esfAuthCertSelectedLabel(esfAuthCertName)}</p>
+            )}
+            <button type="submit" disabled={esfConnecting}
+              className="w-full rounded-xl py-2.5 text-sm font-semibold mt-auto transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60"
+              style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+              {esfConnecting ? t.esfConnectingLabel : t.esfConnectButton}
+            </button>
+          </form>
+        </>
+      )}
+    </motion.div>
+  )
+
+  // BCC: сообщение + карточка подключения. Клиент без подключения не видит BCC
+  // вовсе. Карточка уже живого подключения (с «Отключить») остаётся видна всем
+  // (и на lapsed-тарифе): за ней настоящий OAuth-токен к счёту в банке, и
+  // отозвать его человек должен мочь всегда.
+  const bccBlock = (
+    <>
+      {bccMessage && (ap.canAcquiring ? (isAdmin || bccConnection) : bccConnection) && (
+        <p className="text-xs px-1" style={{ color: 'var(--nav-accent)' }}>{bccMessage}</p>
+      )}
+      {bccConnection ? bccConnectedCard : (ap.canAcquiring && isAdmin) && (
+        <motion.div
+          initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.14 }}
+          className={`nav-glass rounded-2xl p-4 flex flex-col ${CARD_HOVER}`}
+        >
+          <div className="text-sm font-semibold mb-2" style={{ color: 'var(--nav-text-primary)' }}>{t.bccSectionTitle}</div>
+          <div className="flex items-center justify-between text-xs mb-3" style={{ color: 'var(--nav-text-secondary)' }}>
+            <span>{t.bccBinLabel}: {profile?.bin_iin || t.bccBinMissing}</span>
+            <button onClick={() => router.push('/profile/requisites')} className="font-medium underline" style={{ color: 'var(--nav-accent)' }}>
+              {t.bccEditBinLink}
+            </button>
+          </div>
+          <button onClick={connectBcc} disabled={bccConnecting}
+            className="w-full rounded-xl py-2.5 text-sm font-semibold mt-auto transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60"
+            style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
+            {bccConnecting ? t.bccConnectingLabel : t.bccConnectButton}
+          </button>
+        </motion.div>
+      )}
+    </>
+  )
+
+  // Загрузка выписки. Зона перетаскивания растёт на всю свободную высоту
+  // карточки, поэтому карточка сама выравнивает низ колонки.
+  const uploadCard = ap.canAcquiring && (
+    <motion.div
+      initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.18 }}
+      className={`nav-glass rounded-2xl p-4 flex flex-col ${CARD_HOVER}`}
+    >
+      <p className="text-xs leading-relaxed mb-3 max-w-prose" style={{ color: 'var(--nav-text-muted)' }}>{t.introText}</p>
+      <label
+        className="flex flex-col items-center justify-center flex-1 gap-2 rounded-xl py-6 text-center cursor-pointer transition-colors hover:bg-[var(--nav-surface-glass)]"
+        style={{ border: '1.5px dashed var(--nav-border)' }}
+      >
+        <span style={{ color: 'var(--nav-text-muted)' }}><UploadIcon /></span>
+        <span className="text-sm" style={{ color: 'var(--nav-text-primary)' }}>
+          {fileName ? t.fileChosenLabel(fileName) : t.chooseFileButton}
+        </span>
+        <input type="file" accept=".xlsx,.xls" className="hidden" onChange={onFileChange} />
+      </label>
+      {processing && <p className="text-xs text-center mt-2" style={{ color: 'var(--nav-text-muted)' }}>{t.processingLabel}</p>}
+      {error && <p className="text-xs mt-2" style={{ color: 'var(--nav-critical)' }}>{t.errorPrefix(error)}</p>}
+    </motion.div>
+  )
+
+  // Две независимые колонки (не одна общая сетка): так короткая карточка не
+  // оставляет пустоту рядом с высокой. Последняя карточка колонки тянется
+  // (COL_CLS), поэтому нижние края колонок совпадают. Админ: слева ссылка на
+  // Kaspi API, BCC и выписка, справа ЭСФ. Остальные: ОДНА колонка (ссылка на
+  // Kaspi API, под ней выписка на всю ширину): раньше маленькая карточка-ссылка
+  // растягивалась рядом с высокой выпиской в почти пустую плитку.
+  const hasRightCol = isAdmin
+
   return (
       <>
         <PageContainer>
           {header}
 
-          <div className="space-y-4 max-w-3xl">
+          <div className="space-y-4">
             {!ap.canAcquiring && (
               <ProGateBanner
                 className={`${CARD_HOVER}`}
@@ -426,200 +619,47 @@ export default function AcquiringPage() {
               />
             )}
 
-            {/* Kaspi Pay Cashier connection/wallet/statement moved out to its own
-                standalone page (2026-08-19, founder: "Kaspi API выведен отдельно
-                так же как Каспи кабинет и ИИ агент") — see /kaspi-api. This card
-                just points there now instead of duplicating that whole UI here. */}
-            <motion.div
-              initial={reduceMotion ? false : { opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.1 }}
-              onClick={() => router.push('/kaspi-api')}
-              className={`nav-glass rounded-2xl p-4 cursor-pointer ${CARD_HOVER}`}
-            >
-              <div className="flex items-center gap-3">
-                <span
-                  className="w-9 h-9 rounded-[10px] flex items-center justify-center flex-shrink-0"
-                  style={{ background: 'linear-gradient(135deg, var(--nav-teal-soft), transparent)', color: 'var(--nav-teal)' }}
-                >
-                  <ApiIcon />
-                </span>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>Kaspi Cashier API</div>
-                  <p className="text-xs mt-0.5" style={{ color: 'var(--nav-text-muted)' }}>{t.cashierApiCardText}</p>
-                </div>
-                <span className="flex-shrink-0" style={{ color: 'var(--nav-text-muted)' }}><ChevronRightIcon /></span>
+            <div className={`grid grid-cols-1 gap-4 items-stretch ${hasRightCol ? 'xl:grid-cols-2' : ''}`}>
+              <div className={COL_CLS}>
+                {cashierCard}
+                {bccBlock}
+                {uploadCard}
               </div>
-            </motion.div>
-
-            {/* ЭСФ (электронный счёт-фактура) connection -- deliberately its own
-                card gated on canEsf rather than folded into the canAcquiring
-                block above: it's a distinct plan flag (Task 3/src/lib/plan.ts),
-                even though both currently resolve to "Pro only". Task 9's
-                submit route reads this connection directly via
-                loadEsfConnectionByUserId -- this card has no later consumer
-                on this page itself. */}
-            {isAdmin && (
-            <motion.div
-              initial={reduceMotion ? false : { opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.12 }}
-              className={`nav-glass rounded-2xl p-4 ${CARD_HOVER}`}
-            >
-              {!ap.canEsf ? (
-                <>
-                  <div className="flex items-center gap-3 mb-2">
-                    <span
-                      className="w-9 h-9 rounded-[10px] flex items-center justify-center flex-shrink-0"
-                      style={{ background: 'linear-gradient(135deg, var(--nav-accent-soft), transparent)', color: 'var(--nav-accent)' }}
-                    >
-                      <DocumentCheckIcon />
-                    </span>
-                    <div className="text-sm font-semibold flex-1" style={{ color: 'var(--nav-text-primary)' }}>{t.esfSectionTitle}</div>
-                    <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0" style={{ background: 'var(--nav-accent-soft)', color: 'var(--nav-accent)' }}>
-                      <LockIcon size={10} />
-                      {t.proBadge}
-                    </span>
-                  </div>
-                  <div className="text-xs mb-3" style={{ color: 'var(--nav-text-muted)' }}>{t.esfProLockedHint}</div>
-                  <button onClick={() => router.push('/upgrade')}
-                    className="w-full rounded-xl py-2.5 text-sm font-semibold transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0"
-                    style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-                    {t.goToPlansButton}
-                  </button>
-                </>
-              ) : (
-                <>
-                  <div className="text-sm font-semibold mb-2" style={{ color: 'var(--nav-text-primary)' }}>{t.esfSectionTitle}</div>
-                  <p className="text-xs mb-3" style={{ color: 'var(--nav-text-muted)' }}>{t.esfIntroText}</p>
-                  {esfMessage && <p className="text-xs mb-2" style={{ color: 'var(--nav-accent)' }}>{esfMessage}</p>}
-                  {esfError && <p className="text-xs mb-2" style={{ color: 'var(--nav-critical)' }}>{esfError}</p>}
-                  <form onSubmit={connectEsf}>
-                    <label className="block text-xs mb-1" style={{ color: 'var(--nav-text-muted)' }}>{t.esfLoginLabel}</label>
-                    <input value={esfLogin} onChange={e => setEsfLogin(e.target.value)} placeholder={t.esfLoginPlaceholder}
-                      type="text" required
-                      className="w-full py-2 text-sm outline-none mb-3 bg-transparent"
-                      style={{ borderBottom: '1px solid var(--nav-border)', color: 'var(--nav-text-primary)' }} />
-                    <label className="block text-xs mb-1" style={{ color: 'var(--nav-text-muted)' }}>{t.esfPasswordLabel}</label>
-                    <input value={esfPassword} onChange={e => setEsfPassword(e.target.value)} placeholder={t.esfPasswordPlaceholder}
-                      type="password" required
-                      className="w-full py-2 text-sm outline-none mb-3 bg-transparent"
-                      style={{ borderBottom: '1px solid var(--nav-border)', color: 'var(--nav-text-primary)' }} />
-                    <label className="block text-xs mb-1" style={{ color: 'var(--nav-text-muted)' }}>{t.esfVatCertNumLabel}</label>
-                    <input value={esfVatNum} onChange={e => setEsfVatNum(e.target.value)} placeholder={t.esfVatCertNumPlaceholder}
-                      type="text"
-                      className="w-full py-2 text-sm outline-none mb-3 bg-transparent"
-                      style={{ borderBottom: '1px solid var(--nav-border)', color: 'var(--nav-text-primary)' }} />
-                    <label className="block text-xs mb-1" style={{ color: 'var(--nav-text-muted)' }}>{t.esfVatCertSeriesLabel}</label>
-                    <input value={esfVatSeries} onChange={e => setEsfVatSeries(e.target.value)} placeholder={t.esfVatCertSeriesPlaceholder}
-                      type="text"
-                      className="w-full py-2 text-sm outline-none mb-3 bg-transparent"
-                      style={{ borderBottom: '1px solid var(--nav-border)', color: 'var(--nav-text-primary)' }} />
-                    <label className="block text-xs mb-1" style={{ color: 'var(--nav-text-muted)' }}>{t.esfAuthCertLabel}</label>
-                    <p className="text-[11px] mb-1.5" style={{ color: 'var(--nav-text-muted)' }}>{t.esfAuthCertHint}</p>
-                    <label
-                      htmlFor="esf-auth-cert-input"
-                      className="inline-block rounded-xl px-4 py-2 text-xs font-medium border cursor-pointer transition-colors hover:bg-[var(--nav-surface-glass)] mb-3"
-                      style={{ borderColor: 'var(--nav-accent)', color: 'var(--nav-accent)' }}
-                    >
-                      {t.esfAuthCertChooseButton}
-                    </label>
-                    <input id="esf-auth-cert-input" onChange={onEsfAuthCertChange} accept=".cer,.pem,.crt" type="file"
-                      className="hidden" />
-                    {esfAuthCertName && (
-                      <p className="text-[11px] mb-3 -mt-2" style={{ color: 'var(--nav-accent)' }}>{t.esfAuthCertSelectedLabel(esfAuthCertName)}</p>
-                    )}
-                    <button type="submit" disabled={esfConnecting}
-                      className="w-full rounded-xl py-2.5 text-sm font-semibold transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60"
-                      style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-                      {esfConnecting ? t.esfConnectingLabel : t.esfConnectButton}
-                    </button>
-                  </form>
-                </>
+              {hasRightCol && (
+                <div className={COL_CLS}>
+                  {esfCard}
+                </div>
               )}
-            </motion.div>
-            )}
+            </div>
 
-            {!ap.canAcquiring ? (
-              bccConnection && (
-                <>
-                  {bccMessage && <p className="text-xs px-1" style={{ color: 'var(--nav-accent)' }}>{bccMessage}</p>}
-                  {bccConnectedCard}
-                </>
-              )
-            ) : (
+            {/* Результаты: однотипные карточки сеткой на всю ширину. */}
+            {ap.canAcquiring && (
               <>
-                {(isAdmin || bccConnection) && bccMessage && <p className="text-xs px-1" style={{ color: 'var(--nav-accent)' }}>{bccMessage}</p>}
-
-                {/* Клиент без подключения не видит BCC вовсе. Карточка уже
-                    живого подключения (с «Отключить») остаётся видна всем:
-                    за ней настоящий OAuth-токен к счёту в банке, и отозвать
-                    его человек должен мочь всегда. */}
-                {bccConnection ? bccConnectedCard : isAdmin && (
-                  <motion.div
-                    initial={reduceMotion ? false : { opacity: 0, y: 16 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.14 }}
-                    className={`nav-glass rounded-2xl p-4 ${CARD_HOVER}`}
-                  >
-                    <div className="text-sm font-semibold mb-2" style={{ color: 'var(--nav-text-primary)' }}>{t.bccSectionTitle}</div>
-                    <div className="flex items-center justify-between text-xs mb-3" style={{ color: 'var(--nav-text-secondary)' }}>
-                      <span>{t.bccBinLabel}: {profile?.bin_iin || t.bccBinMissing}</span>
-                      <button onClick={() => router.push('/profile/requisites')} className="font-medium underline" style={{ color: 'var(--nav-accent)' }}>
-                        {t.bccEditBinLink}
-                      </button>
-                    </div>
-                    <button onClick={connectBcc} disabled={bccConnecting}
-                      className="w-full rounded-xl py-2.5 text-sm font-semibold transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60"
-                      style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
-                      {bccConnecting ? t.bccConnectingLabel : t.bccConnectButton}
-                    </button>
-                  </motion.div>
-                )}
-
                 {(isAdmin || bccConnection) && bccPending.length > 0 && (
-                  <>
+                  <section className="space-y-3">
                     <div className="text-[11px] font-extrabold uppercase px-1" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.09em' }}>
                       {t.bccPendingMatchesLabel(bccPending.length)}
                     </div>
                     {confirmError && <p className="text-xs" style={{ color: 'var(--nav-critical)' }}>{t.errorPrefix(confirmError)}</p>}
-                    {bccPending.map(pending => pending.invoices && (
-                      <div key={pending.id} className={`nav-glass rounded-2xl p-4 ${CARD_HOVER}`}>
-                        <div className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{t.invoiceLabel(pending.invoices.number)}</div>
-                        <div className="text-xs mt-1" style={{ color: 'var(--nav-text-secondary)' }}>{t.clientLabel}: {pending.invoices.client_name || '—'}</div>
-                        <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>{t.amountLabel}: {Number(pending.invoices.amount).toLocaleString('ru-KZ')} ₸</div>
-                        {pending.matched_date && <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>{t.statementDateLabel}: {pending.matched_date}</div>}
-                        {pending.matched_description && <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>{t.descriptionLabel}: {pending.matched_description}</div>}
-                        <button onClick={() => confirmBccMatch(pending)} disabled={confirmingId === pending.invoice_id}
-                          className="w-full rounded-xl py-2.5 text-sm font-semibold mt-3 transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60"
-                          style={{ background: 'var(--nav-success-solid)', color: 'var(--nav-success-ink)' }}>
-                          {confirmingId === pending.invoice_id ? t.confirmingLabel : t.confirmPaymentButton}
-                        </button>
-                      </div>
-                    ))}
-                  </>
+                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3 items-stretch">
+                      {bccPending.map(pending => pending.invoices && (
+                        <div key={pending.id} className={`nav-glass rounded-2xl p-4 flex flex-col ${CARD_HOVER}`}>
+                          <div className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{t.invoiceLabel(pending.invoices.number)}</div>
+                          <div className="text-xs mt-1" style={{ color: 'var(--nav-text-secondary)' }}>{t.clientLabel}: {pending.invoices.client_name || '—'}</div>
+                          <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>{t.amountLabel}: {Number(pending.invoices.amount).toLocaleString('ru-KZ')} ₸</div>
+                          {pending.matched_date && <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>{t.statementDateLabel}: {pending.matched_date}</div>}
+                          {pending.matched_description && <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>{t.descriptionLabel}: {pending.matched_description}</div>}
+                          <div className="flex-1 min-h-3" />
+                          <button onClick={() => confirmBccMatch(pending)} disabled={confirmingId === pending.invoice_id}
+                            className="w-full rounded-xl py-2.5 text-sm font-semibold mt-0 transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60"
+                            style={{ background: 'var(--nav-success-solid)', color: 'var(--nav-success-ink)' }}>
+                            {confirmingId === pending.invoice_id ? t.confirmingLabel : t.confirmPaymentButton}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
                 )}
-
-                <motion.div
-                  initial={reduceMotion ? false : { opacity: 0, y: 16 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.18 }}
-                  className={`nav-glass rounded-2xl p-4 ${CARD_HOVER}`}
-                >
-                  <p className="text-xs leading-relaxed mb-3" style={{ color: 'var(--nav-text-muted)' }}>{t.introText}</p>
-                  <label
-                    className="flex flex-col items-center gap-2 rounded-xl py-6 text-center cursor-pointer transition-colors hover:bg-[var(--nav-surface-glass)]"
-                    style={{ border: '1.5px dashed var(--nav-border)' }}
-                  >
-                    <span style={{ color: 'var(--nav-text-muted)' }}><UploadIcon /></span>
-                    <span className="text-sm" style={{ color: 'var(--nav-text-primary)' }}>
-                      {fileName ? t.fileChosenLabel(fileName) : t.chooseFileButton}
-                    </span>
-                    <input type="file" accept=".xlsx,.xls" className="hidden" onChange={onFileChange} />
-                  </label>
-                  {processing && <p className="text-xs text-center mt-2" style={{ color: 'var(--nav-text-muted)' }}>{t.processingLabel}</p>}
-                  {error && <p className="text-xs mt-2" style={{ color: 'var(--nav-critical)' }}>{t.errorPrefix(error)}</p>}
-                </motion.div>
 
                 {openInvoices.length === 0 && (
                   <div className="text-center py-8">
@@ -628,7 +668,7 @@ export default function AcquiringPage() {
                 )}
 
                 {fileName && !processing && !error && (
-                  <>
+                  <section className="space-y-3">
                     <div className="text-xs px-1" style={{ color: 'var(--nav-text-muted)' }}>
                       {matches.length > 0 ? t.matchesFoundLabel(matches.length) : t.noMatchesFoundHint}
                       {unmatchedCount !== null && unmatchedCount > 0 && (
@@ -636,32 +676,35 @@ export default function AcquiringPage() {
                       )}
                     </div>
 
-                    {confirmError && <p className="text-xs mt-2" style={{ color: 'var(--nav-critical)' }}>{t.errorPrefix(confirmError)}</p>}
+                    {confirmError && <p className="text-xs" style={{ color: 'var(--nav-critical)' }}>{t.errorPrefix(confirmError)}</p>}
 
-                    {matches.map(match => {
-                      const rowMatchCount = matches.filter(m => m.row === match.row).length
-                      return (
-                        <div key={`${match.invoice.id}-${match.row.date}-${match.row.amount}-${match.row.description}`} className={`nav-glass rounded-2xl p-4 ${CARD_HOVER}`}>
-                          <div className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{t.invoiceLabel(match.invoice.number)}</div>
-                          <div className="text-xs mt-1" style={{ color: 'var(--nav-text-secondary)' }}>{t.clientLabel}: {match.invoice.client_name || '—'}</div>
-                          <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>{t.amountLabel}: {Number(match.invoice.amount).toLocaleString('ru-KZ')} ₸</div>
-                          {match.row.date && <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>{t.statementDateLabel}: {match.row.date}</div>}
-                          {match.row.description && <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>{t.descriptionLabel}: {match.row.description}</div>}
-                          {rowMatchCount > 1 && (
-                            <div className="flex items-center gap-1.5 text-xs mt-1" style={{ color: 'var(--nav-warning)' }}>
-                              <AlertIcon />
-                              {t.multipleMatchesHint}
-                            </div>
-                          )}
-                          <button onClick={() => confirmPayment(match)} disabled={confirmingId === match.invoice.id}
-                            className="w-full rounded-xl py-2.5 text-sm font-semibold mt-3 transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60"
-                            style={{ background: 'var(--nav-success-solid)', color: 'var(--nav-success-ink)' }}>
-                            {confirmingId === match.invoice.id ? t.confirmingLabel : t.confirmPaymentButton}
-                          </button>
-                        </div>
-                      )
-                    })}
-                  </>
+                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3 items-stretch">
+                      {matches.map(match => {
+                        const rowMatchCount = matches.filter(m => m.row === match.row).length
+                        return (
+                          <div key={`${match.invoice.id}-${match.row.date}-${match.row.amount}-${match.row.description}`} className={`nav-glass rounded-2xl p-4 flex flex-col ${CARD_HOVER}`}>
+                            <div className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{t.invoiceLabel(match.invoice.number)}</div>
+                            <div className="text-xs mt-1" style={{ color: 'var(--nav-text-secondary)' }}>{t.clientLabel}: {match.invoice.client_name || '—'}</div>
+                            <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>{t.amountLabel}: {Number(match.invoice.amount).toLocaleString('ru-KZ')} ₸</div>
+                            {match.row.date && <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>{t.statementDateLabel}: {match.row.date}</div>}
+                            {match.row.description && <div className="text-xs" style={{ color: 'var(--nav-text-muted)' }}>{t.descriptionLabel}: {match.row.description}</div>}
+                            {rowMatchCount > 1 && (
+                              <div className="flex items-center gap-1.5 text-xs mt-1" style={{ color: 'var(--nav-warning)' }}>
+                                <AlertIcon />
+                                {t.multipleMatchesHint}
+                              </div>
+                            )}
+                            <div className="flex-1 min-h-3" />
+                            <button onClick={() => confirmPayment(match)} disabled={confirmingId === match.invoice.id}
+                              className="w-full rounded-xl py-2.5 text-sm font-semibold mt-0 transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60"
+                              style={{ background: 'var(--nav-success-solid)', color: 'var(--nav-success-ink)' }}>
+                              {confirmingId === match.invoice.id ? t.confirmingLabel : t.confirmPaymentButton}
+                            </button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </section>
                 )}
               </>
             )}

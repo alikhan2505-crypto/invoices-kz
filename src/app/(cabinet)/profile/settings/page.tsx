@@ -240,9 +240,12 @@ export default function InvoiceSettings() {
 
         <PageHeader title={t.invoiceSettingsLabel} backHref="/profile" animate={false} />
 
-        <div className="space-y-4 max-w-3xl">
+        {/* Сетка на 6 колонок с xl: первый ряд -- счета и НДС (две карточки одной
+            высоты, поле заметки у счетов растёт), второй -- три одинаковые карточки
+            нумерации КП, АВР и накладной. Ниже xl одна колонка в прежнем порядке. */}
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-6 items-stretch">
         {/* Нумерация счетов */}
-        <motion.div {...fadeIn(1)} className="nav-glass rounded-2xl p-4 space-y-4">
+        <motion.div {...fadeIn(1)} className="nav-glass rounded-2xl p-4 flex flex-col gap-4 xl:col-span-3">
           <div className="text-[11px] font-extrabold uppercase" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.09em' }}>{t.invoiceNumberingSectionLabel}</div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -265,9 +268,9 @@ export default function InvoiceSettings() {
               placeholder="3" value={settings.default_due_days}
               onChange={e => setSettings({ ...settings, default_due_days: e.target.value })} />
           </div>
-          <div>
+          <div className="flex flex-col flex-1">
             <label className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{t.defaultNoteFieldLabel}</label>
-            <textarea className={`${INPUT_CLS} resize-none`}
+            <textarea className={`${INPUT_CLS} resize-none flex-1`}
               rows={3} placeholder={t.defaultNotePlaceholder}
               value={settings.default_note}
               onChange={e => setSettings({ ...settings, default_note: e.target.value })} />
@@ -275,7 +278,7 @@ export default function InvoiceSettings() {
         </motion.div>
 
         {/* Нумерация КП */}
-        <motion.div {...fadeIn(2)} className="nav-glass rounded-2xl p-4 space-y-4">
+        <motion.div {...fadeIn(2)} className="nav-glass rounded-2xl p-4 space-y-4 xl:col-span-2">
           <div className="text-[11px] font-extrabold uppercase" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.09em' }}>{t.kpNumberingSectionLabel}</div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -295,7 +298,7 @@ export default function InvoiceSettings() {
         </motion.div>
 
         {/* Нумерация АВР */}
-        <motion.div {...fadeIn(3)} className="nav-glass rounded-2xl p-4 space-y-4">
+        <motion.div {...fadeIn(3)} className="nav-glass rounded-2xl p-4 space-y-4 xl:col-span-2">
           <div className="text-[11px] font-extrabold uppercase" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.09em' }}>{t.avrNumberingSectionLabel}</div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -315,7 +318,7 @@ export default function InvoiceSettings() {
         </motion.div>
 
         {/* Нумерация Накладной */}
-        <motion.div {...fadeIn(4)} className="nav-glass rounded-2xl p-4 space-y-4">
+        <motion.div {...fadeIn(4)} className="nav-glass rounded-2xl p-4 space-y-4 xl:col-span-2">
           <div className="text-[11px] font-extrabold uppercase" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.09em' }}>{t.nakladnayaNumberingSectionLabel}</div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -335,7 +338,7 @@ export default function InvoiceSettings() {
         </motion.div>
 
         {/* НДС */}
-        <motion.div {...fadeIn(5)} className="nav-glass rounded-2xl p-4">
+        <motion.div {...fadeIn(5)} className="nav-glass rounded-2xl p-4 xl:col-span-3 xl:col-start-4 xl:row-start-1">
           <div className="text-[11px] font-extrabold uppercase mb-3" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.09em' }}>{t.vatStatusSectionLabel}</div>
           <div className="space-y-2">
             {Object.entries(vatLabels).map(([key, val]) => (
@@ -377,7 +380,7 @@ export default function InvoiceSettings() {
         </motion.div>
 
         <motion.button {...fadeIn(6)} onClick={save} disabled={saving}
-          className="w-full lg:w-fit lg:px-16 rounded-xl py-4 font-medium text-sm transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60"
+          className="w-full lg:w-fit lg:px-16 col-span-full rounded-xl py-4 font-medium text-sm transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60"
           style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
           {saving ? t.savingEllipsis : t.saveSettingsButton}
         </motion.button>

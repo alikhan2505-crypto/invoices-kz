@@ -8,7 +8,7 @@ import { useAppDialog } from '@/components/AppDialog'
 import { useLanguage } from '@/components/LanguageProvider'
 import { editLabel, deleteLabel, clearSearchLabel } from '@/lib/a11yLabels'
 import { profileClientsDict } from '@/lib/i18n/profileClients'
-import PageContainer from '@/components/PageContainer'
+import PageContainer, { TILE_LIST_CLS, TILE_GRID_CLS, TILE_ITEM_CLS } from '@/components/PageContainer'
 import PageHeader, { PageHeaderButton } from '@/components/PageHeader'
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
@@ -276,15 +276,17 @@ export default function Clients() {
           )}
 
           {loading ? (
-            <div className="nav-glass rounded-2xl overflow-hidden mb-4">
-              {[0, 1, 2].map(i => (
-                <div key={i} className="flex items-center px-4 py-3.5" style={{ borderBottom: i < 2 ? '1px solid var(--nav-border-soft)' : 'none' }}>
-                  <div className="flex-1">
-                    <Skeleton className="h-4 w-32 mb-2" />
-                    <Skeleton className="h-3 w-24" />
+            <div className={`${TILE_LIST_CLS} max-lg:mb-4`}>
+              <div className={`${TILE_GRID_CLS} lg:mb-4`}>
+                {[0, 1, 2].map(i => (
+                  <div key={i} className={`flex items-center px-4 py-3.5 ${TILE_ITEM_CLS}`}>
+                    <div className="flex-1">
+                      <Skeleton className="h-4 w-32 mb-2" />
+                      <Skeleton className="h-3 w-24" />
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center text-center py-12">
@@ -300,13 +302,14 @@ export default function Clients() {
               )}
             </div>
           ) : (
-            <div className="nav-glass rounded-2xl overflow-hidden mb-4 lg:grid lg:grid-cols-2 2xl:grid-cols-3">
+            <div className={`${TILE_LIST_CLS} max-lg:mb-4`}>
+             <div className={`${TILE_GRID_CLS} lg:mb-4`}>
               {filtered.map((client, i) => (
                 <motion.div key={client.id}
                   initial={reduceMotion ? false : { opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: reduceMotion ? 0 : Math.min(i * 0.035, 0.4), duration: reduceMotion ? 0 : 0.35, ease: EASE }}
-                  className="flex items-center px-4 py-3.5 transition-colors hover:bg-[var(--nav-surface-glass)] border-b border-b-[color:var(--nav-border-soft)] last:border-b-0 lg:last:border-b"
+                  className={`flex items-center px-4 py-3.5 transition-colors ${TILE_ITEM_CLS}`}
                 >
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-sm truncate" style={{ color: 'var(--nav-text-primary)' }}>{client.name}</div>
@@ -329,6 +332,7 @@ export default function Clients() {
                   </div>
                 </motion.div>
               ))}
+             </div>
             </div>
           )}
 

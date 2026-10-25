@@ -709,8 +709,12 @@ export default function Notifications() {
               </button>
             </div>
           ) : (
-          <div className="space-y-6 max-w-3xl">
-          <div className="space-y-6">
+          /* Две независимые колонки одинаковой высоты: в левой Telegram и то, что
+              получают клиенты, в правой события для владельца. Последняя карточка
+              каждой колонки тянется (flex-1), поэтому нижние края совпадают.
+              Ниже xl колонки «contents», порядок как прежде (клиенты после владельца). */
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-stretch">
+          <div className="contents xl:flex xl:flex-col xl:gap-6 xl:[&>:last-child]:flex-1">
 
             {/* ---------- Telegram — главный канал ---------- */}
             <motion.section {...fadeIn(1)} aria-labelledby="tg-title" className="nav-glass nav-card-accent rounded-2xl p-4 sm:p-5">
@@ -871,20 +875,33 @@ export default function Notifications() {
               </div>
             )}
 
+            {/* ---------- Что получают ваши клиенты ---------- */}
+            <motion.section {...fadeIn(3)} aria-labelledby="client-title" className="flex flex-col max-xl:order-1">
+              <h2 id="client-title" className="text-base font-bold px-1" style={{ color: 'var(--nav-text-primary)' }}>{t.clientSectionTitle}</h2>
+              <p className="text-xs px-1 mt-1 mb-4 leading-relaxed max-w-prose" style={{ color: 'var(--nav-text-muted)' }}>{t.clientSectionBody}</p>
+              <div className="nav-glass rounded-2xl overflow-hidden flex-1">
+                {clientEvents.map(def => renderEventRow(def, false, CLIENT_MANUAL.has(def.key) ? t.clientManualTag : t.clientAutoTag))}
+                <div className="px-4 py-3.5 flex items-start gap-2 text-xs leading-relaxed" style={{ color: 'var(--nav-text-secondary)' }}>
+                  <span className="mt-0.5" style={{ color: 'var(--nav-text-muted)' }}><InfoIcon /></span>
+                  {t.clientNoAutoReminders}
+                </div>
+              </div>
+            </motion.section>
+
           </div>
 
-          <div className="space-y-6">
+          <div className="contents xl:flex xl:flex-col xl:gap-6 xl:[&>:last-child]:flex-1">
             {/* ---------- Что присылать вам ---------- */}
-            <motion.section {...fadeIn(2)} aria-labelledby="owner-title">
+            <motion.section {...fadeIn(2)} aria-labelledby="owner-title" className="flex flex-col">
               <h2 id="owner-title" className="text-base font-bold px-1" style={{ color: 'var(--nav-text-primary)' }}>{t.ownerSectionTitle}</h2>
-              <p className="text-xs px-1 mt-1 mb-4 leading-relaxed" style={{ color: 'var(--nav-text-muted)' }}>
+              <p className="text-xs px-1 mt-1 mb-4 leading-relaxed max-w-prose" style={{ color: 'var(--nav-text-muted)' }}>
                 {t.ownerSectionBody}{!tgConnected ? ` ${t.tgLockedHint}` : ''}
               </p>
-              <div className="space-y-5">
+              <div className="flex flex-col gap-5 flex-1 [&>:last-child]:flex-1">
                 {ownerGroups.map(({ group, events }) => (
-                  <div key={group}>
+                  <div key={group} className="flex flex-col">
                     <SectionTitle>{t.groupTitles[group]}</SectionTitle>
-                    <div className="nav-glass rounded-2xl overflow-hidden">
+                    <div className="nav-glass rounded-2xl overflow-hidden flex-1">
                       {events.map((def, i) => renderEventRow(def, i === events.length - 1 && group !== 'account'))}
                       {group === 'account' && (
                         <div className="px-4 py-3.5">
@@ -898,19 +915,6 @@ export default function Notifications() {
                     </div>
                   </div>
                 ))}
-              </div>
-            </motion.section>
-
-            {/* ---------- Что получают ваши клиенты ---------- */}
-            <motion.section {...fadeIn(3)} aria-labelledby="client-title">
-              <h2 id="client-title" className="text-base font-bold px-1" style={{ color: 'var(--nav-text-primary)' }}>{t.clientSectionTitle}</h2>
-              <p className="text-xs px-1 mt-1 mb-4 leading-relaxed" style={{ color: 'var(--nav-text-muted)' }}>{t.clientSectionBody}</p>
-              <div className="nav-glass rounded-2xl overflow-hidden">
-                {clientEvents.map(def => renderEventRow(def, false, CLIENT_MANUAL.has(def.key) ? t.clientManualTag : t.clientAutoTag))}
-                <div className="px-4 py-3.5 flex items-start gap-2 text-xs leading-relaxed" style={{ color: 'var(--nav-text-secondary)' }}>
-                  <span className="mt-0.5" style={{ color: 'var(--nav-text-muted)' }}><InfoIcon /></span>
-                  {t.clientNoAutoReminders}
-                </div>
               </div>
             </motion.section>
           </div>

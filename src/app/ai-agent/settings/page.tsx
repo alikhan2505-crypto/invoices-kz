@@ -838,7 +838,7 @@ export default function AiAgentSettings() {
     : null
 
   const saveButton = (
-    <div className="xl:col-span-2 xl:max-w-sm">
+    <div className="xl:col-span-2 xl:max-w-sm mt-auto">
       <button onClick={save} disabled={saving || statusBusy}
         className="w-full rounded-lg px-4 py-3 text-sm font-semibold transition-transform hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0"
         style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)', boxShadow: '0 10px 24px -10px var(--nav-accent)' }}>
@@ -1094,8 +1094,8 @@ export default function AiAgentSettings() {
             )}
 
             {tab === 'prompting' && (
-              <div className="xl:grid xl:grid-cols-2 xl:gap-4 xl:items-start">
-                <div className="nav-glass nav-card-accent rounded-2xl p-5">
+              <div className="xl:grid xl:grid-cols-2 xl:gap-4 xl:items-stretch">
+                <div className="nav-glass nav-card-accent rounded-2xl p-5 flex flex-col">
                   <label className="block mb-6">
                     <span className="text-xs mb-1 block" style={{ color: 'var(--nav-text-secondary)' }}>{tf.customInstructionsLabel}</span>
                     <textarea
@@ -1120,7 +1120,7 @@ export default function AiAgentSettings() {
                   {saveButton}
                 </div>
 
-                <div className="mt-4 space-y-4 xl:mt-0">
+                <div className="mt-4 xl:mt-0 flex flex-col gap-4 [&>:last-child]:flex-1">
                 {hasKaspiShop === false && !kaspiCatalogOff && (
                   <div className="nav-glass nav-card-accent rounded-2xl p-5">
                     <div className="text-sm font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>{tf.connectShopTitle}</div>
@@ -1131,12 +1131,12 @@ export default function AiAgentSettings() {
                   </div>
                 )}
 
-                <div className="nav-glass nav-card-accent rounded-2xl p-5">
+                <div className="nav-glass nav-card-accent rounded-2xl p-5 flex flex-col">
                   <div className="text-sm font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>{tf.promptPreviewTitle}</div>
                   <p className="text-[11px] mb-3" style={{ color: 'var(--nav-text-muted)' }}>
                     {tf.promptPreviewHint}
                   </p>
-                  <div className="rounded-lg p-3 text-xs leading-relaxed whitespace-pre-wrap" style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-secondary)' }}>
+                  <div className="rounded-lg p-3 text-xs leading-relaxed whitespace-pre-wrap flex-1" style={{ background: 'var(--nav-bg)', color: 'var(--nav-text-secondary)' }}>
                     {promptPreview}
                   </div>
                 </div>
@@ -1145,8 +1145,8 @@ export default function AiAgentSettings() {
             )}
 
             {tab === 'control' && (
-              <div className="max-w-3xl">
-              <div className="nav-glass nav-card-accent rounded-2xl p-5">
+              <div className="xl:grid xl:grid-cols-2 xl:gap-4 xl:items-stretch">
+              <div className="nav-glass nav-card-accent rounded-2xl p-5 flex flex-col">
                 <div className="flex items-start justify-between gap-4 mb-1">
                   <div>
                     <span className="text-sm font-semibold block" style={{ color: 'var(--nav-text-primary)' }}>{tf.botStatusLabel}</span>
@@ -1228,7 +1228,7 @@ export default function AiAgentSettings() {
                 {saveButton}
               </div>
 
-              <div className="nav-glass nav-card-accent rounded-2xl p-5 mt-4">
+              <div className="nav-glass nav-card-accent rounded-2xl p-5 mt-4 xl:mt-0 flex flex-col">
                 <div className="text-sm font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>{tf.replyCostTitle}</div>
                 <p className="text-[11px] mb-3" style={{ color: 'var(--nav-text-muted)' }}>
                   {tf.replyCostText(REPLY_PRICE_TENGE)}
@@ -1257,7 +1257,7 @@ export default function AiAgentSettings() {
                     </div>
                   )}
 
-                  <div className="space-y-3 xl:space-y-0 xl:grid xl:grid-cols-2 xl:gap-3 xl:items-start">
+                  <div className="space-y-3 xl:space-y-0 xl:grid xl:grid-cols-2 xl:gap-3 xl:items-stretch">
                     {templates.map(t => (
                       <div key={t.id} className="nav-glass nav-card-accent rounded-2xl p-4">
                         {tplEditId === t.id ? (
@@ -1336,16 +1336,21 @@ export default function AiAgentSettings() {
                   </div>
 
                   {tplFormOpen ? (
-                    <div className="nav-glass nav-card-accent rounded-2xl p-4 mt-3 xl:max-w-3xl">
+                    <div className="nav-glass nav-card-accent rounded-2xl p-4 mt-3 xl:grid xl:grid-cols-2 xl:gap-x-6">
+                     <div className="xl:col-start-1">
                       <span className="text-xs mb-1.5 block" style={{ color: 'var(--nav-text-secondary)' }}>{tf.triggerWordsLabel}</span>
                       <TriggerChipsEditor words={tplFormWords} onChange={setTplFormWords} placeholder={tf.triggerPlaceholder} />
-                      <span className="text-xs mt-3 mb-1.5 block" style={{ color: 'var(--nav-text-secondary)' }}>{tf.replyTextLabel}</span>
+                     </div>
+                     <div className="flex flex-col xl:col-start-2 xl:row-start-1 xl:row-span-2">
+                      <span className="text-xs mt-3 xl:mt-0 mb-1.5 block" style={{ color: 'var(--nav-text-secondary)' }}>{tf.replyTextLabel}</span>
                       <textarea
-                        className={`${INPUT_CLS} min-h-[80px]`}
+                        className={`${INPUT_CLS} min-h-[80px] xl:flex-1`}
                         style={{ color: 'var(--nav-text-primary)' }}
                         maxLength={2000}
                         placeholder={tf.replyTextPlaceholder}
                         value={tplFormText} onChange={e => setTplFormText(e.target.value)} />
+                     </div>
+                     <div className="xl:col-start-1">
                       <span className="text-xs mt-3 mb-1.5 block" style={{ color: 'var(--nav-text-secondary)' }}>{tf.templateChannelLabel}</span>
                       <div className="flex gap-1.5 flex-wrap">
                         {templateChannelChoices.map(([value, label]) => (
@@ -1359,9 +1364,10 @@ export default function AiAgentSettings() {
                         ))}
                       </div>
                       <span className="text-[11px] mt-1.5 block" style={{ color: 'var(--nav-text-muted)' }}>{tf.templateChannelHint}</span>
-                      <div className="flex gap-2 mt-3">
+                     </div>
+                      <div className="flex gap-2 mt-3 xl:col-span-2 xl:justify-end">
                         <button onClick={createTemplate} disabled={tplBusy || tplFormWords.length === 0 || !tplFormText.trim()}
-                          className="flex-1 rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50"
+                          className="flex-1 xl:flex-none xl:px-10 rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50"
                           style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                           {tplBusy ? tf.savingButton : tf.addButton}
                         </button>
@@ -1374,7 +1380,7 @@ export default function AiAgentSettings() {
                     </div>
                   ) : (
                     <button onClick={() => { setTplFormOpen(true); setTplError(null) }}
-                      className="w-full xl:max-w-sm nav-glass rounded-2xl px-4 py-3 text-sm font-medium mt-3 transition-transform hover:-translate-y-0.5"
+                      className="w-full xl:w-fit xl:px-10 nav-glass rounded-2xl px-4 py-3 text-sm font-medium mt-3 transition-transform hover:-translate-y-0.5"
                       style={{ color: 'var(--nav-accent)' }}>
                       {tf.addTemplateButton}
                     </button>

@@ -105,8 +105,9 @@ export default function Referral() {
           backHref="/profile"
         />
 
-        <div className="space-y-4 xl:space-y-0 xl:grid xl:grid-cols-2 xl:gap-4 xl:items-start">
-        <div className="space-y-4">
+        {/* Две независимые стопки равной высоты: низ общий, последняя карточка короткой тянется. */}
+        <div className="space-y-4 xl:space-y-0 xl:grid xl:grid-cols-2 xl:gap-4 xl:items-stretch">
+        <div className="flex flex-col gap-4">
         <motion.div {...fadeIn(1)} className={`nav-glass nav-card-accent rounded-2xl p-6 text-center ${CARD_HOVER}`}>
           <div className="w-14 h-14 mx-auto rounded-2xl flex items-center justify-center mb-3"
             style={{ background: 'linear-gradient(135deg, var(--nav-accent-soft), transparent)', color: 'var(--nav-accent)' }}>
@@ -123,12 +124,12 @@ export default function Referral() {
           <div className="text-xs mt-2" style={{ color: 'var(--nav-text-muted)' }}>{t.referralCapNote}</div>
         </motion.div>
 
-        <motion.div {...fadeIn(2)} className="grid grid-cols-2 gap-3">
-          <div className={`nav-glass rounded-2xl p-4 text-center ${CARD_HOVER}`}>
+        <motion.div {...fadeIn(2)} className="grid grid-cols-2 gap-3 flex-1">
+          <div className={`nav-glass rounded-2xl p-4 text-center flex flex-col justify-center ${CARD_HOVER}`}>
             <div className="text-2xl font-bold" style={{ color: 'var(--nav-text-primary)' }}>{profile?.referral_count || 0}</div>
             <div className="text-xs mt-1" style={{ color: 'var(--nav-text-muted)' }}>{t.invitedFriendsLabel}</div>
           </div>
-          <div className={`nav-glass rounded-2xl p-4 text-center ${CARD_HOVER}`}>
+          <div className={`nav-glass rounded-2xl p-4 text-center flex flex-col justify-center ${CARD_HOVER}`}>
             <div className="text-2xl font-bold" style={{ color: 'var(--nav-success)' }}>
               {/* Только реально оставшиеся дни: раньше при истёкшем бонусе
                   показывали «приглашено × 7» — дни, которых у человека уже нет. */}
@@ -141,7 +142,7 @@ export default function Referral() {
         </motion.div>
 
         </div>
-        <div className="space-y-4">
+        <div className="flex flex-col gap-4">
         <motion.div {...fadeIn(3)} className="nav-glass rounded-2xl p-5">
           <div className="text-sm font-medium mb-3" style={{ color: 'var(--nav-text-primary)' }}>{t.yourReferralLinkLabel}</div>
           <div className="rounded-xl px-3 py-2.5 flex items-center justify-between mb-3" style={{ background: 'var(--nav-bg)' }}>
@@ -164,7 +165,7 @@ export default function Referral() {
           </button>
         </motion.div>
 
-        <motion.div {...fadeIn(4)} className="nav-glass rounded-2xl p-5">
+        <motion.div {...fadeIn(4)} className="nav-glass rounded-2xl p-5 flex-1">
           <div className="text-sm font-medium mb-4" style={{ color: 'var(--nav-text-primary)' }}>{t.howItWorksLabel}</div>
           <div className="space-y-3">
             {steps.map(item => (
