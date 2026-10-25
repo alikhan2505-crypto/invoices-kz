@@ -545,13 +545,13 @@ export default function Profile() {
   // Компания, Документы, Аккаунт, Помощь, Админ. С xl порядок внутри стопки тот же.
   const GROUP_ORDER_CLS: Record<number, string> = { 1: 'order-1', 2: 'order-2', 3: 'order-3', 4: 'order-4', 5: 'order-5' }
   // grow: последняя карточка стопки на десктопе тянется до низа соседней стопки
-  // (колонки равной высоты, без пустоты между блоками): обёртка и список -- flex-колонки,
-  // строки делят лишнюю высоту поровну. Без лишней высоты (телефон, высокая стопка)
-  // всё выглядит как раньше.
+  // (две стопки равной высоты, без пустоты между блоками): обёртка и список -- flex-колонки;
+  // строки НЕ растягиваем (иначе пункты меню выглядят раздутыми), лишняя высота
+  // остаётся свободной внутри карточки под последней строкой.
   const groupEl = (index: number, title: string, colorVar: string, items: (MenuItem & { allowed?: boolean })[], grow = false) => (
     <motion.div {...fadeIn(index)} className={`${GROUP_ORDER_CLS[index] ?? ''} ${grow ? 'flex flex-col flex-1' : ''}`.trim() || undefined}>
           <div className="text-[11px] font-extrabold uppercase px-1 mb-2" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.09em' }}>{title}</div>
-          <nav aria-label={title} className={`nav-glass rounded-2xl overflow-hidden py-1 ${grow ? 'flex flex-col flex-1 [&>a]:flex-auto' : ''}`}>
+          <nav aria-label={title} className={`nav-glass rounded-2xl overflow-hidden py-1 ${grow ? 'flex flex-col flex-1' : ''}`}>
             {items.map((item, i, arr) => (
               <ListRow
                 key={item.href}
@@ -682,7 +682,7 @@ export default function Profile() {
       <h1 className="sr-only">{pageTitle}</h1>
       <PageContainer variant="wide">
         {isDesktop ? (
-          <div className="flex gap-6 items-stretch">
+          <div className="flex gap-6 items-start">
             <div className="flex flex-col gap-4 w-[360px] flex-shrink-0">
               {profileCardEl}
               <ProfileBonusCard />
