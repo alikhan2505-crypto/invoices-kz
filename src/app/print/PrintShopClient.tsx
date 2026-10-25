@@ -412,7 +412,7 @@ export default function PrintShopClient() {
                 </div>
               ) : payment?.payment_link ? (
                 <>
-                  <div className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>Отсканируйте QR или откройте ссылку в приложении Kaspi.</div>
+                  <div className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>Отсканируйте QR или откройте ссылку в приложении Kaspi. Работает только у клиентов Kaspi.kz.</div>
                   {qrDataUrl && (
                     <img src={qrDataUrl} alt="Kaspi QR" width={160} height={160}
                       className="mx-auto rounded-lg" style={{ maxWidth: '100%' }} />

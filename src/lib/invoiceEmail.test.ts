@@ -81,6 +81,7 @@ describe('buildInvoiceEmailHtml', () => {
     expect(html).toContain('2 час')
     expect(html).toContain('ОПЛАТИТЬ ЧЕРЕЗ KASPI')
     expect(html).toContain('href="https://pay.kaspi.kz/pay/abc"')
+    expect(html).toContain('Кнопка для клиентов Kaspi.kz')
     expect(html).toContain('Спасибо')
     expect(html).toContain('ОТКРЫТЬ СЧЁТ ОНЛАЙН')
   })
@@ -88,6 +89,7 @@ describe('buildInvoiceEmailHtml', () => {
   it('drops a non-https payment link and an empty note', () => {
     const html = buildInvoiceEmailHtml({ ...base, kaspiPaymentLink: 'javascript:alert(1)', note: '' })
     expect(html).not.toContain('ОПЛАТИТЬ ЧЕРЕЗ KASPI')
+    expect(html).not.toContain('Кнопка для клиентов Kaspi.kz')
     expect(html).not.toContain('javascript:')
     expect(html).not.toContain('Примечание')
   })

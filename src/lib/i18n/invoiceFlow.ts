@@ -128,6 +128,7 @@ export interface InvoiceFlowContent {
   vatHintText: string
   vatHintLink: string
   kaspiCashierHintText: string
+  kaspiLinkWhoCanPay: string
   kaspiCashierHintLink: string
   noContractLabel: string
   noContractValue: string
@@ -370,6 +371,7 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     vatHintText: 'Ставка НДС задаётся в настройках профиля и применяется ко всем новым счетам.',
     vatHintLink: 'Изменить в настройках →',
     kaspiCashierHintText: 'Хотите, чтобы оплата приходила с точной суммой счёта и автоматической отметкой «Оплачено»? Подключите Kaspi Cashier API.',
+    kaspiLinkWhoCanPay: 'Ссылка открывается в приложении Kaspi и подходит только клиентам Kaspi.kz. Клиентам других банков отправляйте реквизиты счёта (они есть в PDF).',
     kaspiCashierHintLink: 'Подключить →',
     noContractLabel: 'Без договора',
     noContractValue: 'Без договора',
@@ -614,6 +616,7 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     vatHintText: 'ҚҚС мөлшерлемесі профиль баптауларында беріледі және барлық жаңа шоттарға қолданылады.',
     vatHintLink: 'Баптауларда өзгерту →',
     kaspiCashierHintText: 'Төлем шоттың нақты сомасымен келіп, «Төленді» белгісі автоматты түрде қойылғанын қалайсыз ба? Kaspi Cashier API қосыңыз.',
+    kaspiLinkWhoCanPay: 'Сілтеме Kaspi қосымшасында ашылады және тек Kaspi.kz клиенттеріне жарайды. Басқа банк клиенттеріне шоттың деректемелерін жіберіңіз (олар PDF-те бар).', // kk: awaiting native proofreading
     kaspiCashierHintLink: 'Қосу →',
     noContractLabel: 'Шартсыз',
     noContractValue: 'Шартсыз',
@@ -859,6 +862,7 @@ export const invoiceFlowDict: Record<'ru' | 'kk' | 'en', InvoiceFlowContent> = {
     vatHintText: 'The VAT rate is set in your profile settings and applies to all new invoices.',
     vatHintLink: 'Change in settings →',
     kaspiCashierHintText: 'Want payments to arrive with the invoice\'s exact amount and an automatic "Paid" mark? Connect Kaspi Cashier API.',
+    kaspiLinkWhoCanPay: "This link opens in the Kaspi app and works only for Kaspi.kz clients. For clients of other banks, send the bank details of the invoice (they are in the PDF).",
     kaspiCashierHintLink: 'Connect →',
     noContractLabel: 'No contract',
     noContractValue: 'No contract',

@@ -40,6 +40,7 @@ interface Copy {
   featuresEyebrow: string
   featuresTitle: string
   features: FeatureRow[]
+  featuresFootnote: string
   finalCtaTitle: string
   finalCtaButton: string
   footerDocsLabel: string
@@ -81,6 +82,7 @@ const COPY: Record<Lang, Copy> = {
       { label: 'Вебхук об оплате', value: 'callback_url' },
       { label: 'Проверка статуса', value: 'GET /api/kaspi/pay/status' },
     ],
+    featuresFootnote: 'Ссылка payment_link открывается в приложении Kaspi и работает только у клиентов Kaspi.kz. По данным Kaspi, оплата QR из приложений других банков не гарантируется: она зависит от вида деятельности продавца.',
     finalCtaTitle: 'Готовы принимать Kaspi Pay?',
     finalCtaButton: 'Получить доступ к API',
     footerDocsLabel: 'Документация API',
@@ -118,6 +120,8 @@ const COPY: Record<Lang, Copy> = {
       { label: 'Төлем туралы вебхук', value: 'callback_url' },
       { label: 'Мәртебені тексеру', value: 'GET /api/kaspi/pay/status' },
     ],
+    // kk: awaiting native proofreading
+    featuresFootnote: 'payment_link сілтемесі Kaspi қосымшасында ашылады және тек Kaspi.kz клиенттерінде жұмыс істейді. Kaspi деректері бойынша, QR-ды басқа банктердің қосымшаларымен төлеуге кепілдік берілмейді: бұл сатушының қызмет түріне байланысты.',
     finalCtaTitle: 'Kaspi Pay қабылдауға дайынсыз ба?',
     finalCtaButton: 'API-ға қол жеткізу',
     footerDocsLabel: 'API құжаттамасы',
@@ -155,6 +159,7 @@ const COPY: Record<Lang, Copy> = {
       { label: 'Payment webhook', value: 'callback_url' },
       { label: 'Status check', value: 'GET /api/kaspi/pay/status' },
     ],
+    featuresFootnote: "The payment_link opens in the Kaspi app and works only for Kaspi.kz clients. Per Kaspi, paying the QR from other banks' apps is not guaranteed: it depends on the seller's line of business.",
     finalCtaTitle: 'Ready to accept Kaspi Pay?',
     finalCtaButton: 'Get API access',
     footerDocsLabel: 'API documentation',
@@ -200,7 +205,7 @@ const PYTHON_LINES: CodeLine[] = [
 
 const RESPONSE_LINES: CodeLine[] = [
   [{ text: '{' }],
-  [{ text: '  "payment_link"', tone: 'accent' }, { text: ': "https://kaspi.kz/pay/...",' }],
+  [{ text: '  "payment_link"', tone: 'accent' }, { text: ': "https://pay.kaspi.kz/pay/...",' }],
   [{ text: '  "qr_token"', tone: 'accent' }, { text: ': "eyJhbGc...",' }],
   [{ text: '  "operation_id"', tone: 'accent' }, { text: ': "op_123456789"' }],
   [{ text: '}' }],
@@ -416,6 +421,7 @@ export default function CashierApiPage() {
               </div>
             ))}
           </div>
+          <p className="mt-5 max-w-prose text-[12.5px] leading-relaxed" style={{ color: C.muted }}>{t.featuresFootnote}</p>
         </section>
 
         <section className="mx-auto max-w-3xl px-5 py-16 text-center sm:px-8" style={{ borderTop: `1px solid ${C.border}` }}>

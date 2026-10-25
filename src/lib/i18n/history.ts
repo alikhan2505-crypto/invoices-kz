@@ -61,6 +61,11 @@ export interface HistoryContent {
   step2Text: string
   step3Text: string
   payViaKaspiButton: string
+  kaspiQrScanHint: string
+  kaspiButtonCaption: string
+  kaspiScanningConfirm: string
+  kaspiPhonePushButton: string
+  kaspiPhonePushHint: string
   payViaHalykButton: string
   websiteLinkLabel: string
   linkFallbackLabel: string
@@ -148,11 +153,16 @@ export const historyDict: Record<'ru' | 'kk' | 'en', HistoryContent> = {
     bikLabel: 'БИК',
     kbeLabel: 'КБе',
     howToPayHeader: '📋 Как оплатить',
-    step1Text: 'Нажмите "Открыть счёт" — скачайте PDF или оплатите через Kaspi/Halyk кнопкой ниже',
+    step1Text: 'Нажмите "Открыть счёт": скачайте PDF или оплатите онлайн кнопкой ниже (Kaspi: для клиентов Kaspi.kz)',
     step1TextNoOnline: 'Нажмите "Открыть счёт" — скачайте PDF, в нём все реквизиты для оплаты',
     step2Text: 'Оплатите через свой банк по реквизитам из PDF',
     step3Text: 'Вернитесь сюда и нажмите "Я оплатил"',
     payViaKaspiButton: '🟡 Оплатить через Kaspi',
+    kaspiQrScanHint: 'Отсканируйте QR камерой телефона или нажмите кнопку ниже: оплата откроется в приложении Kaspi.',
+    kaspiButtonCaption: 'Кнопка и QR открывают приложение Kaspi и работают только у клиентов Kaspi.kz. Клиентам других банков: оплата по реквизитам счёта.',
+    kaspiScanningConfirm: 'Подтвердите оплату в приложении Kaspi…',
+    kaspiPhonePushButton: 'Отправить запрос в Kaspi на телефон',
+    kaspiPhonePushHint: 'Номер, привязанный к Kaspi.kz',
     payViaHalykButton: '🟢 Оплатить через Halyk',
     websiteLinkLabel: '🌐 Сайт',
     linkFallbackLabel: 'Ссылка',
@@ -238,11 +248,17 @@ export const historyDict: Record<'ru' | 'kk' | 'en', HistoryContent> = {
     bikLabel: 'БСК',
     kbeLabel: 'КБЕ',
     howToPayHeader: '📋 Қалай төлеу керек',
-    step1Text: '«Шотты ашу» түймесін басыңыз — PDF жүктеңіз немесе төмендегі түйме арқылы Kaspi/Halyk-пен төлеңіз',
+    step1Text: '«Шотты ашу» түймесін басыңыз: PDF жүктеңіз немесе төмендегі түймемен онлайн төлеңіз (Kaspi: Kaspi.kz клиенттеріне)',
     step1TextNoOnline: '«Шотты ашу» түймесін басыңыз — PDF жүктеңіз, төлем деректемелерінің бәрі сонда',
     step2Text: 'PDF-тегі деректемелер бойынша өз банкіңіз арқылы төлеңіз',
     step3Text: 'Осында қайта оралып, «Мен төледім» түймесін басыңыз',
     payViaKaspiButton: '🟡 Kaspi арқылы төлеу',
+    // kk: awaiting native proofreading
+    kaspiQrScanHint: 'QR-ды телефон камерасымен сканерлеңіз немесе төмендегі түймені басыңыз: төлем Kaspi қосымшасында ашылады.',
+    kaspiButtonCaption: 'Түйме мен QR Kaspi қосымшасын ашады және тек Kaspi.kz клиенттерінде жұмыс істейді. Басқа банк клиенттері үшін: шоттың деректемелері бойынша төлеу.',
+    kaspiScanningConfirm: 'Kaspi қосымшасында төлемді растаңыз…',
+    kaspiPhonePushButton: 'Телефонға Kaspi сұранысын жіберу',
+    kaspiPhonePushHint: 'Kaspi.kz-ке тіркелген нөмір',
     payViaHalykButton: '🟢 Halyk арқылы төлеу',
     websiteLinkLabel: '🌐 Сайт',
     linkFallbackLabel: 'Сілтеме',
@@ -328,11 +344,16 @@ export const historyDict: Record<'ru' | 'kk' | 'en', HistoryContent> = {
     bikLabel: 'BIK',
     kbeLabel: 'KBe',
     howToPayHeader: '📋 How to pay',
-    step1Text: 'Tap "Open invoice" — download the PDF or pay via Kaspi/Halyk using the button below',
+    step1Text: 'Tap "Open invoice": download the PDF or pay online with the button below (Kaspi: for Kaspi.kz clients)',
     step1TextNoOnline: 'Tap "Open invoice" — download the PDF, it carries the full payment details',
     step2Text: 'Pay through your bank using the details from the PDF',
     step3Text: 'Come back here and tap "I have paid"',
     payViaKaspiButton: '🟡 Pay via Kaspi',
+    kaspiQrScanHint: "Scan the QR with your phone camera or tap the button below: the payment opens in the Kaspi app.",
+    kaspiButtonCaption: "The button and the QR open the Kaspi app and work only for Kaspi.kz clients. Clients of other banks: pay by the bank details on the invoice.",
+    kaspiScanningConfirm: 'Confirm the payment in the Kaspi app…',
+    kaspiPhonePushButton: 'Send a request to Kaspi on your phone',
+    kaspiPhonePushHint: 'The number linked to Kaspi.kz',
     payViaHalykButton: '🟢 Pay via Halyk',
     websiteLinkLabel: '🌐 Website',
     linkFallbackLabel: 'Link',

@@ -148,9 +148,12 @@ export function buildInvoiceEmailHtml(inv: InvoiceEmailInput): string {
     </a>
 
     ${kaspiLink ? `
-    <a href="${escapeHtml(kaspiLink)}" style="display:block; background:#E4171F; color:white; text-align:center; padding:14px 20px; text-decoration:none; font-size:14px; font-weight:bold; letter-spacing:0.5px; margin-bottom:16px;">
+    <a href="${escapeHtml(kaspiLink)}" style="display:block; background:#E4171F; color:white; text-align:center; padding:14px 20px; text-decoration:none; font-size:14px; font-weight:bold; letter-spacing:0.5px; margin-bottom:8px;">
       ОПЛАТИТЬ ЧЕРЕЗ KASPI →
     </a>
+    <p style="font-size:12px; color:#888; text-align:center; margin:0 0 16px;">
+      Кнопка для клиентов Kaspi.kz. Если вы платите из другого банка, откройте счёт онлайн: там есть реквизиты.
+    </p>
     ` : ''}
 
     <p style="font-size:12px; color:#aaa; text-align:center; margin:0;">

@@ -622,7 +622,7 @@ export default function PublicInvoice() {
                 />
               )}
               <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>
-                Отсканируйте QR-код камерой телефона или нажмите кнопку ниже, чтобы оплатить через приложение Kaspi.
+                {t.kaspiQrScanHint}
               </div>
             </div>
             <a
@@ -634,9 +634,10 @@ export default function PublicInvoice() {
             >
               Оплатить через Kaspi
             </a>
+            <div className="text-[11px] text-center mt-2" style={{ color: 'var(--nav-text-muted)' }}>{t.kaspiButtonCaption}</div>
             <div className="text-xs text-center mt-3 h-4" aria-live="polite" style={{ color: 'var(--nav-text-muted)' }}>
               {kaspiScanning
-                ? 'Подтвердите оплату в приложении Kaspi…'
+                ? t.kaspiScanningConfirm
                 : kaspiSecondsLeft === null
                   ? ''
                   : kaspiSecondsLeft > 0
@@ -660,6 +661,7 @@ export default function PublicInvoice() {
                 </div>
                 {kaspiPhoneOpen ? (
                   <>
+                    <div className="text-xs mb-2" style={{ color: 'var(--nav-text-muted)' }}>{t.kaspiPhonePushHint}</div>
                     <input
                       value={kaspiPhone}
                       onChange={e => setKaspiPhone(formatKzPhone(e.target.value))}
@@ -680,7 +682,7 @@ export default function PublicInvoice() {
                   <button onClick={() => setKaspiPhoneOpen(true)}
                     className="w-full rounded-lg px-3 py-2 text-xs font-medium border transition-colors"
                     style={{ borderColor: 'var(--nav-border-soft)', color: 'var(--nav-accent)', background: 'transparent' }}>
-                    Отправить запрос на телефон
+                    {t.kaspiPhonePushButton}
                   </button>
                 )}
               </>

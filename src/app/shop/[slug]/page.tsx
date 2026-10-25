@@ -372,7 +372,8 @@ export default function StorefrontPage() {
                       className="inline-block rounded-lg px-4 py-2 text-sm font-semibold" style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}>
                       {t.payViaKaspi(formatPrice(submittedTotal))}
                     </a>
-                    <div className="text-xs mt-3" style={{ color: 'var(--nav-text-muted)' }}>{t.waitingPayment}</div>
+                    <div className="text-xs mt-3" style={{ color: 'var(--nav-text-muted)' }}>{t.payHint}</div>
+                    <div className="text-xs mt-2" style={{ color: 'var(--nav-text-muted)' }}>{t.waitingPayment}</div>
                   </>
                 )}
               </div>

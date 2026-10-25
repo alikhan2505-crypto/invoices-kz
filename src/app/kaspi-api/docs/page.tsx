@@ -27,6 +27,7 @@ interface DocsCopy {
   webhookVerifyCode: string
   disclosureTitle: string
   disclosureBody: string
+  paymentWhoCanPay: string
   supportTitle: string
   quickStartTitle: string
   quickStartSteps: string[]
@@ -55,13 +56,14 @@ const signature = crypto
 const isValid = signature === req.headers['x-kaspi-pay-signature'];`,
     disclosureTitle: 'Важно знать',
     disclosureBody: 'Это не официальный Kaspi merchant API — интеграция сделана по тому же принципу, что и мобильное приложение Kaspi Pay Cashier. Мы поддерживаем совместимость и уведомим вас, если Kaspi изменит свою сторону.',
+    paymentWhoCanPay: 'Ссылка payment_link открывается в приложении Kaspi и работает только у клиентов Kaspi.kz. По данным Kaspi, оплата QR из приложений других банков не гарантируется: она зависит от вида деятельности продавца.',
     supportTitle: 'Поддержка',
     quickStartTitle: 'Как отправить первый запрос',
     quickStartSteps: [
       'В блоке «Authentication» вставьте в поле Bearer Token свой API-токен Kaspi Cashier (выдаётся один раз на странице /kaspi-api при подключении роли «Кассир»).',
       'В блоке «Request Body» замените example-значения на свои: amount — сумма в тенге, order_id — ваш уникальный ID заказа, callback_url — необязательно.',
       'Блоки Cookies, Headers и Query Parameters трогать не нужно — для этого запроса они не используются, оставьте как есть.',
-      'Нажмите зелёную кнопку Send — в панели Response справа появится ссылка/QR для оплаты клиентом.',
+      'Нажмите зелёную кнопку Send: в панели Response справа появится ссылка (для клиентов Kaspi.kz) и QR для оплаты клиентом.',
     ],
   },
   kk: {
@@ -86,13 +88,15 @@ const signature = crypto
 const isValid = signature === req.headers['x-kaspi-pay-signature'];`,
     disclosureTitle: 'Білген жөн',
     disclosureBody: 'Бұл Kaspi-дің ресми merchant API-ы емес — интеграция Kaspi Pay Cashier мобильді қосымшасы қалай жұмыс істесе, сол қағидамен жасалған. Үйлесімділікті біз қадағалаймыз және Kaspi өз тарапында бір нәрсені өзгертсе, сізге хабарлаймыз.',
+    // kk: awaiting native proofreading
+    paymentWhoCanPay: 'payment_link сілтемесі Kaspi қосымшасында ашылады және тек Kaspi.kz клиенттерінде жұмыс істейді. Kaspi деректері бойынша, QR-ды басқа банктердің қосымшаларымен төлеуге кепілдік берілмейді: бұл сатушының қызмет түріне байланысты.',
     supportTitle: 'Қолдау',
     quickStartTitle: 'Алғашқы сұранысты қалай жіберуге болады',
     quickStartSteps: [
       '«Authentication» блогындағы Bearer Token өрісіне Kaspi Cashier API-токеніңізді қойыңыз (ол /kaspi-api бетінде «Кассир» рөлін қосқанда бір рет беріледі).',
       '«Request Body» блогында мысал мәндерін өзіңіздікіне ауыстырыңыз: amount — теңгемен сома, order_id — тапсырысыңыздың бірегей идентификаторы, callback_url — міндетті емес.',
       'Cookies, Headers және Query Parameters блоктарын өзгертудің қажеті жоқ — бұл сұраныста олар қолданылмайды, сол күйінде қалдырыңыз.',
-      'Жасыл Send түймесін басыңыз — оң жақтағы Response панелінде клиент төлейтін сілтеме/QR пайда болады.',
+      'Жасыл Send түймесін басыңыз: оң жақтағы Response панелінде клиент төлейтін сілтеме (Kaspi.kz клиенттеріне) және QR пайда болады.',
     ],
   },
   en: {
@@ -117,13 +121,14 @@ const signature = crypto
 const isValid = signature === req.headers['x-kaspi-pay-signature'];`,
     disclosureTitle: 'Good to know',
     disclosureBody: 'This is not an official Kaspi merchant API — the integration works the same way the Kaspi Pay Cashier mobile app does. We maintain compatibility and will notify you if Kaspi changes their side.',
+    paymentWhoCanPay: "The payment_link opens in the Kaspi app and works only for Kaspi.kz clients. Per Kaspi, paying the QR from other banks' apps is not guaranteed: it depends on the seller's line of business.",
     supportTitle: 'Support',
     quickStartTitle: 'How to send your first request',
     quickStartSteps: [
       'In the "Authentication" block, paste your Kaspi Cashier API token into the Bearer Token field (issued once on /kaspi-api when you connect the "Cashier" role).',
       'In the "Request Body" block, replace the example values with your own: amount — the amount in tenge, order_id — your own unique order ID, callback_url — optional.',
       'Leave the Cookies, Headers, and Query Parameters blocks alone — this request doesn\'t use them.',
-      'Click the green Send button — the Response panel on the right will show the payment link/QR for the customer.',
+      'Click the green Send button: the Response panel on the right will show the payment link (for Kaspi.kz clients) and the QR for the customer.',
     ],
   },
 }
@@ -301,6 +306,7 @@ export default function KaspiApiDocsPage() {
           <section className="rounded-xl p-5" style={{ background: C.bg1, border: `1px solid ${C.border}` }}>
             <h2 className="text-[15px] font-semibold" style={{ color: C.accent }}>{d.disclosureTitle}</h2>
             <p className="mt-2 max-w-prose text-[13.5px] leading-relaxed" style={{ color: C.muted }}>{d.disclosureBody}</p>
+            <p className="mt-2 max-w-prose text-[13.5px] leading-relaxed" style={{ color: C.muted }}>{d.paymentWhoCanPay}</p>
           </section>
 
           <section>

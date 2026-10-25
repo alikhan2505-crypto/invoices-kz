@@ -33,6 +33,7 @@ export interface StorefrontContent {
   orderPaid: string
   payViaKaspi: (amount: string) => string
   waitingPayment: string
+  payHint: string
   total: string
   namePlaceholder: string
   phonePlaceholder: string
@@ -111,6 +112,7 @@ export const storefrontDict: Record<Lang, StorefrontContent> = {
     orderPaid: 'Заказ оплачен! Продавец свяжется с вами.',
     payViaKaspi: amount => `Оплатить ${amount} через Kaspi`,
     waitingPayment: 'Ждём подтверждение оплаты…',
+    payHint: 'Кнопка и QR открывают приложение Kaspi и работают только у клиентов Kaspi.kz.',
     total: 'Итого',
     namePlaceholder: 'Имя',
     phonePlaceholder: 'Телефон',
@@ -174,6 +176,8 @@ export const storefrontDict: Record<Lang, StorefrontContent> = {
     orderPaid: 'Тапсырыс төленді! Сатушы сізбен хабарласады.',
     payViaKaspi: amount => `Kaspi арқылы ${amount} төлеу`,
     waitingPayment: 'Төлемнің расталуын күтіп отырмыз…',
+    // kk: awaiting native proofreading
+    payHint: 'Түйме мен QR Kaspi қосымшасын ашады және тек Kaspi.kz клиенттерінде жұмыс істейді.',
     total: 'Жиыны',
     namePlaceholder: 'Атыңыз',
     phonePlaceholder: 'Телефон',
@@ -237,6 +241,7 @@ export const storefrontDict: Record<Lang, StorefrontContent> = {
     orderPaid: 'Order paid! The seller will contact you.',
     payViaKaspi: amount => `Pay ${amount} with Kaspi`,
     waitingPayment: 'Waiting for payment confirmation…',
+    payHint: "The button and the QR open the Kaspi app and work only for Kaspi.kz clients.",
     total: 'Total',
     namePlaceholder: 'Name',
     phonePlaceholder: 'Phone',

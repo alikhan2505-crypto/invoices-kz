@@ -322,10 +322,10 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<string> {
           <div>
             ${data.viewUrl ? `
               <div style="font-weight:bold;font-size:12px;color:#1C2056;margin-bottom:4px;">Оплата счёта онлайн</div>
-              <div style="font-size:10px;color:#6b7280;">Наведите камеру телефона (не приложение Kaspi — оно этот QR не распознаёт) — откроется страница счёта с оплатой Kaspi Pay</div>
+              <div style="font-size:10px;color:#6b7280;">Наведите камеру телефона: откроется страница счёта с оплатой онлайн.</div>
             ` : `
-              <div style="font-weight:bold;font-size:12px;color:#1C2056;margin-bottom:4px;">Оплатить через Kaspi Pay</div>
-              <div style="font-size:10px;color:#6b7280;">Отсканируйте QR-код камерой телефона</div>
+              <div style="font-weight:bold;font-size:12px;color:#1C2056;margin-bottom:4px;">Оплатить через Kaspi</div>
+              <div style="font-size:10px;color:#6b7280;">Наведите камеру телефона. Ссылка работает только у клиентов Kaspi.kz, остальным: реквизиты в этом счёте.</div>
             `}
           </div>
         </div>

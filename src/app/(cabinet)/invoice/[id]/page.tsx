@@ -894,6 +894,7 @@ export default function InvoicePage() {
               style={{ background: 'var(--nav-surface-glass)', color: 'var(--nav-text-secondary)' }}>
               {refreshingKaspi ? 'Обновляем...' : 'Обновить ссылку'}
             </button>
+            <div className="text-xs mt-3" style={{ color: 'var(--nav-text-muted)' }}>{t.kaspiLinkWhoCanPay}</div>
           </motion.div>
         )}
 

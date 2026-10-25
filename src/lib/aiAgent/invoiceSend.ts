@@ -308,7 +308,7 @@ export async function notifyInvoicePaidInConversation(
   // behind it, see the /paid route's own comment) -- the reply says so
   // plainly rather than confirming a payment nobody has actually verified.
   const text = kind === 'confirmed'
-    ? 'Вы провели оплату через Kaspi, благодарим вас! 🙏'
+    ? 'Оплата получена, благодарим вас! 🙏'
     : 'Вы нажали, что оплатили — мы проверим и вернёмся к вам.'
   const sendError = await sendIntoConversation(supabase, conversation, text)
   if (sendError) console.error('notifyInvoicePaidInConversation: send failed for invoice', invoiceId, sendError)
