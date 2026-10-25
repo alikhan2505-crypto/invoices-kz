@@ -149,7 +149,7 @@ export default function AiAgentDocsPage() {
 
         {/* Текст курса: до xl одна колонка около 720 px (на всю ширину строки были по ~145 знаков),
             с xl уроки раскладываются в две колонки карточек. */}
-        <div className="max-w-[45rem] mx-auto grid grid-cols-1 gap-x-6 xl:max-w-none xl:grid-cols-2 xl:items-start">
+        <div className="max-w-[45rem] mx-auto grid grid-cols-1 gap-x-6 xl:max-w-none xl:grid-cols-2 xl:items-stretch">
         <Lesson n={1} title="Что умеет AI-агент">
           <P>
             AI-агент — это ваш виртуальный сотрудник, который отвечает клиентам в Instagram (Direct и комментарии),

@@ -1264,7 +1264,7 @@ export default function CreateInvoicePage() {
             </div>
           )}
 
-          <div className="lg:grid lg:grid-cols-2 lg:gap-4 lg:items-start lg:mb-4">
+          <div className="lg:grid lg:grid-cols-2 lg:gap-4 lg:items-stretch lg:mb-4">
           {/* Client section */}
           <motion.div
             className="nav-glass nav-card-accent rounded-2xl p-5 mb-4 lg:mb-0"
@@ -1561,9 +1561,9 @@ export default function CreateInvoicePage() {
           </motion.div>
 
           {/* Services section + Total, grouped so Total sits directly under Services */}
-          <div>
+          <div className="lg:flex lg:flex-col">
           <motion.div
-            className="nav-glass nav-card-accent rounded-2xl p-5 mb-4"
+            className="nav-glass nav-card-accent rounded-2xl p-5 mb-4 lg:mb-0 lg:flex-1"
             initial={reduceMotion ? false : { opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.15 }}

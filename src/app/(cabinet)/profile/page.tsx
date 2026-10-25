@@ -19,7 +19,7 @@ import { useMediaQuery } from '@/lib/useMediaQuery'
 import Skeleton from '@/components/Skeleton'
 import ProfileBonusCard from '@/components/ProfileBonusCard'
 import PageContainer from '@/components/PageContainer'
-import { usePageDocumentTitle } from '@/lib/usePageDocumentTitle'
+import PageHeader from '@/components/PageHeader'
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
 // kept identical rather than inventing a second "house" ease.
@@ -260,7 +260,6 @@ export default function Profile() {
   const { lang } = useLanguage()
   const t = profileCoreDict[lang]
   const pageTitle = lang === 'en' ? 'Profile' : 'Профиль'
-  usePageDocumentTitle(pageTitle)
   const isDesktop = useMediaQuery('(min-width: 1024px)')
   const reduceMotionRaw = useReducedMotion()
   const reduceMotion = !!reduceMotionRaw
@@ -378,6 +377,7 @@ export default function Profile() {
   if (loading && !profile) return (
     <>
       <PageContainer variant="wide" className="space-y-4">
+        <PageHeader title={pageTitle} />
         <div className="nav-glass nav-card-accent rounded-2xl p-5">
           <div className="flex items-center gap-3 mb-4">
             <Skeleton className="w-12 h-12 rounded-full flex-shrink-0" />
@@ -678,9 +678,9 @@ export default function Profile() {
 
   return (
     <>
-      {/* Сознательно скрытый заголовок: на хабе нет шапки со стрелкой, а название вкладки ставит usePageDocumentTitle выше. */}
-      <h1 className="sr-only">{pageTitle}</h1>
       <PageContainer variant="wide">
+        {/* Видимый заголовок, как у остальных страниц верхнего уровня (дашборд, история, обзоры продуктов); стрелки нет: хаб это корень раздела. */}
+        <PageHeader title={pageTitle} />
         {isDesktop ? (
           <div className="flex gap-6 items-start">
             <div className="flex flex-col gap-4 w-[360px] flex-shrink-0">

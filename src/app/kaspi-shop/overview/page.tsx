@@ -155,13 +155,13 @@ export default function KaspiShopOverview() {
 
           {/* xl+: таблица заказов слева, ссылки на соседние продукты колонкой справа (380px).
               Уже xl -- как раньше, друг под другом (отступ 24px от space-y-6 родителя). */}
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_380px] xl:items-start">
-          <section className="min-w-0">
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_380px] xl:items-stretch">
+          <section className="min-w-0 xl:flex xl:flex-col">
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-[15px] font-semibold" style={{ color: 'var(--nav-text-primary)' }}>Заказы в работе</h2>
               <a href="/kaspi-shop/orders" className="text-xs font-semibold" style={{ color: 'var(--nav-accent)' }}>Все заказы →</a>
             </div>
-            <div className="nav-glass rounded-2xl overflow-x-auto">
+            <div className="nav-glass rounded-2xl overflow-x-auto xl:flex-1">
               <table className="w-full text-sm">
                 <thead>
                   <tr style={{ color: 'var(--nav-text-muted)' }}>

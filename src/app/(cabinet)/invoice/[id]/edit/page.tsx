@@ -175,7 +175,7 @@ export default function EditInvoice() {
       <PageContainer variant="wide">
       <PageHeader title={t.editInvoiceHeaderTitle} backHref={'/invoice/' + id} animate={false} />
       <div className="lg:flex lg:gap-6 lg:items-start">
-      <div className="lg:flex-1 lg:min-w-0 space-y-4 xl:space-y-0 xl:grid xl:grid-cols-2 xl:gap-4 xl:items-start">
+      <div className="lg:flex-1 lg:min-w-0 space-y-4 xl:space-y-0 xl:grid xl:grid-cols-2 xl:gap-4 xl:items-stretch">
 
         {/* Client */}
         <motion.div
@@ -350,7 +350,7 @@ export default function EditInvoice() {
 
         {/* Total */}
         <motion.div
-          className="rounded-2xl p-5"
+          className="rounded-2xl p-5 xl:flex xl:flex-col xl:justify-center"
           style={{ background: 'var(--nav-accent)' }}
           initial={reduceMotion ? false : { opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
