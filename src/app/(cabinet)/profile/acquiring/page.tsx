@@ -415,10 +415,10 @@ export default function AcquiringPage() {
         <PageContainer>
           {header}
 
-          <div className="space-y-4 xl:space-y-0 xl:grid xl:grid-cols-2 xl:gap-4 xl:items-start">
+          <div className="space-y-4 max-w-3xl">
             {!ap.canAcquiring && (
               <ProGateBanner
-                className={`${CARD_HOVER} xl:col-span-2`}
+                className={`${CARD_HOVER}`}
                 icon={<BankIcon />}
                 title={proGateText.title}
                 description={t.proLockedHint}
@@ -543,13 +543,13 @@ export default function AcquiringPage() {
             {!ap.canAcquiring ? (
               bccConnection && (
                 <>
-                  {bccMessage && <p className="text-xs px-1 xl:col-span-2" style={{ color: 'var(--nav-accent)' }}>{bccMessage}</p>}
+                  {bccMessage && <p className="text-xs px-1" style={{ color: 'var(--nav-accent)' }}>{bccMessage}</p>}
                   {bccConnectedCard}
                 </>
               )
             ) : (
               <>
-                {(isAdmin || bccConnection) && bccMessage && <p className="text-xs px-1 xl:col-span-2" style={{ color: 'var(--nav-accent)' }}>{bccMessage}</p>}
+                {(isAdmin || bccConnection) && bccMessage && <p className="text-xs px-1" style={{ color: 'var(--nav-accent)' }}>{bccMessage}</p>}
 
                 {/* Клиент без подключения не видит BCC вовсе. Карточка уже
                     живого подключения (с «Отключить») остаётся видна всем:
@@ -579,10 +579,10 @@ export default function AcquiringPage() {
 
                 {(isAdmin || bccConnection) && bccPending.length > 0 && (
                   <>
-                    <div className="text-[11px] font-extrabold uppercase px-1 xl:col-span-2" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.09em' }}>
+                    <div className="text-[11px] font-extrabold uppercase px-1" style={{ color: 'var(--nav-text-muted)', letterSpacing: '0.09em' }}>
                       {t.bccPendingMatchesLabel(bccPending.length)}
                     </div>
-                    {confirmError && <p className="text-xs xl:col-span-2" style={{ color: 'var(--nav-critical)' }}>{t.errorPrefix(confirmError)}</p>}
+                    {confirmError && <p className="text-xs" style={{ color: 'var(--nav-critical)' }}>{t.errorPrefix(confirmError)}</p>}
                     {bccPending.map(pending => pending.invoices && (
                       <div key={pending.id} className={`nav-glass rounded-2xl p-4 ${CARD_HOVER}`}>
                         <div className="text-sm font-semibold" style={{ color: 'var(--nav-text-primary)' }}>{t.invoiceLabel(pending.invoices.number)}</div>
@@ -622,21 +622,21 @@ export default function AcquiringPage() {
                 </motion.div>
 
                 {openInvoices.length === 0 && (
-                  <div className="text-center py-8 xl:col-span-2">
+                  <div className="text-center py-8">
                     <p className="text-sm" style={{ color: 'var(--nav-text-muted)' }}>{t.noOpenInvoicesHint}</p>
                   </div>
                 )}
 
                 {fileName && !processing && !error && (
                   <>
-                    <div className="text-xs px-1 xl:col-span-2" style={{ color: 'var(--nav-text-muted)' }}>
+                    <div className="text-xs px-1" style={{ color: 'var(--nav-text-muted)' }}>
                       {matches.length > 0 ? t.matchesFoundLabel(matches.length) : t.noMatchesFoundHint}
                       {unmatchedCount !== null && unmatchedCount > 0 && (
                         <span> · {t.unmatchedRowsLabel(unmatchedCount)}</span>
                       )}
                     </div>
 
-                    {confirmError && <p className="text-xs mt-2 xl:col-span-2" style={{ color: 'var(--nav-critical)' }}>{t.errorPrefix(confirmError)}</p>}
+                    {confirmError && <p className="text-xs mt-2" style={{ color: 'var(--nav-critical)' }}>{t.errorPrefix(confirmError)}</p>}
 
                     {matches.map(match => {
                       const rowMatchCount = matches.filter(m => m.row === match.row).length

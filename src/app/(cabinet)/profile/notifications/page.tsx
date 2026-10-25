@@ -709,7 +709,7 @@ export default function Notifications() {
               </button>
             </div>
           ) : (
-          <div className="space-y-6 xl:space-y-0 xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] xl:gap-6 xl:items-start">
+          <div className="space-y-6 max-w-3xl">
           <div className="space-y-6">
 
             {/* ---------- Telegram — главный канал ---------- */}

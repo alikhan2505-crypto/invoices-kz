@@ -86,7 +86,7 @@ export default function ContractPage() {
     <PageContainer>
       <PageHeader title={contract.title} backHref="/profile/contracts" />
 
-      <div className="space-y-4 xl:space-y-0 xl:grid xl:grid-cols-2 xl:gap-4 xl:items-start">
+      <div className="space-y-4 max-w-3xl">
 
         <div className="space-y-4">
         <div className="nav-glass nav-card-accent rounded-2xl p-5">

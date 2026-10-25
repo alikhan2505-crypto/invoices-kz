@@ -133,7 +133,7 @@ export default function ConnectorsPage() {
 
         <PageHeader title={t.connectorsHeaderLabel} backHref="/profile" />
 
-        <div className="space-y-4 xl:space-y-0 xl:grid xl:grid-cols-2 xl:gap-4 xl:items-start">
+        <div className="space-y-4 max-w-3xl">
         <div className="space-y-4">
         {/* Оплата */}
         <motion.div {...fadeIn(1)}>

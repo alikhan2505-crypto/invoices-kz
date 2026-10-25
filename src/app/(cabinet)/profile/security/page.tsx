@@ -110,7 +110,7 @@ export default function Security() {
             backHref="/profile"
           />
 
-          <div className="space-y-4">
+          <div className="space-y-4 max-w-3xl">
             {/* Passkeys */}
             <motion.div
               initial={reduceMotion ? false : { opacity: 0, y: 16 }}

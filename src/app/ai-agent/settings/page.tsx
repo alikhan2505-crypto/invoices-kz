@@ -1145,7 +1145,7 @@ export default function AiAgentSettings() {
             )}
 
             {tab === 'control' && (
-              <div className="xl:grid xl:grid-cols-2 xl:gap-4 xl:items-start">
+              <div className="max-w-3xl">
               <div className="nav-glass nav-card-accent rounded-2xl p-5">
                 <div className="flex items-start justify-between gap-4 mb-1">
                   <div>
@@ -1228,7 +1228,7 @@ export default function AiAgentSettings() {
                 {saveButton}
               </div>
 
-              <div className="nav-glass nav-card-accent rounded-2xl p-5 mt-4 xl:mt-0">
+              <div className="nav-glass nav-card-accent rounded-2xl p-5 mt-4">
                 <div className="text-sm font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>{tf.replyCostTitle}</div>
                 <p className="text-[11px] mb-3" style={{ color: 'var(--nav-text-muted)' }}>
                   {tf.replyCostText(REPLY_PRICE_TENGE)}
