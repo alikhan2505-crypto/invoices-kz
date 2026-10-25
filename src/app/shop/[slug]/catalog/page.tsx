@@ -5,8 +5,8 @@ import { motion, useReducedMotion } from 'framer-motion'
 import WholesaleCartBar from '@/components/kaspiShop/WholesaleCartBar'
 import { StorefrontLangSwitch, StorefrontStatus, useStorefrontT } from '@/components/shop/StorefrontChrome'
 import { formatStorefrontPrice as formatPrice } from '@/lib/i18n/storefront'
-import { ProductPhoto, CategoryTile, CategoryHeading } from '@/components/shop/StorefrontParts'
-import { STOREFRONT_WRAP, STOREFRONT_GRID, STOREFRONT_SECTION, STOREFRONT_GROUP_GRID } from '@/lib/storefrontLayout'
+import { ProductPhoto, CategoryChips } from '@/components/shop/StorefrontParts'
+import { STOREFRONT_WRAP, STOREFRONT_GRID } from '@/lib/storefrontLayout'
 
 type Variant = { id: string; size: string; color: string; stockCount: number | null }
 type Model = { id: string; name: string; price: number; imageUrl: string | null; categoryId: string | null; variants: Variant[] }
@@ -64,7 +64,7 @@ export default function WholesaleCatalogPage() {
   if (notFound) return <StorefrontStatus text={t.notFound} />
 
   const groups = groupModels(models, categories, t.otherCategory)
-  const visibleGroups = activeCategory ? groups.filter(g => g.id === activeCategory) : groups
+  const visibleModels = groups.filter(g => !activeCategory || (g.id ?? '__other') === activeCategory).flatMap(g => g.models)
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--nav-bg)' }}>
@@ -75,50 +75,34 @@ export default function WholesaleCatalogPage() {
           <StorefrontLangSwitch className="ml-auto" />
         </div>
 
-        {categories.length > 0 && (
-          <div className="flex gap-2 overflow-x-auto lg:flex-wrap lg:overflow-visible pb-2 mb-6">
-            <button onClick={() => setActiveCategory(null)}
-              className="flex-shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold"
-              style={{ background: activeCategory === null ? 'var(--nav-accent)' : 'var(--nav-surface-glass)', color: activeCategory === null ? 'var(--nav-accent-ink)' : 'var(--nav-text-secondary)' }}>
-              {t.allCategories}
-            </button>
-            {[...categories].sort((a, b) => a.sortOrder - b.sortOrder).map(c => (
-              <button key={c.id} onClick={() => setActiveCategory(c.id)}
-                className="flex-shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold"
-                style={{ background: activeCategory === c.id ? 'var(--nav-accent)' : 'var(--nav-surface-glass)', color: activeCategory === c.id ? 'var(--nav-accent-ink)' : 'var(--nav-text-secondary)' }}>
-                {c.name}
-              </button>
-            ))}
-          </div>
+        {groups.length > 1 && (
+          <CategoryChips
+            items={groups.map(g => ({ key: g.id ?? '__other', name: g.name, count: g.models.length }))}
+            active={activeCategory}
+            onChange={setActiveCategory}
+            allLabel={t.allCategories}
+          />
         )}
 
         {models.length === 0 ? (
           <div className="text-sm text-center py-16" style={{ color: 'var(--nav-text-muted)' }}>{t.noModels}</div>
         ) : (
           <div className={STOREFRONT_GRID}>
-            {visibleGroups.map(group => (
-              <div key={group.id || group.name || 'all'} className={STOREFRONT_SECTION}>
-                {group.name && <CategoryHeading name={group.name} />}
-                <div className={STOREFRONT_GROUP_GRID}>
-                  {group.name && <CategoryTile name={group.name} count={group.models.length} />}
-                  {group.models.map((m, i) => (
-                    <motion.a
-                      key={m.id}
-                      href={`/shop/${params.slug}/catalog/${m.id}`}
-                      initial={reduceMotion ? false : { opacity: 0, y: 14 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE, delay: reduceMotion ? 0 : Math.min(i * 0.04, 0.3) }}
-                      className="nav-glass rounded-2xl overflow-hidden flex flex-col transition-shadow hover:shadow-md"
-                    >
-                      <ProductPhoto src={m.imageUrl} name={m.name} />
-                      <div className="p-3 sm:p-4 flex flex-col flex-1">
-                        <div className="text-sm font-semibold mb-2 line-clamp-2" style={{ color: 'var(--nav-text-primary)' }}>{m.name}</div>
-                        <div className="text-base sm:text-lg font-bold mt-auto" style={{ color: 'var(--nav-text-primary)' }}>{formatPrice(m.price)}</div>
-                      </div>
-                    </motion.a>
-                  ))}
+            {visibleModels.map((m, i) => (
+              <motion.a
+                key={m.id}
+                href={`/shop/${params.slug}/catalog/${m.id}`}
+                initial={reduceMotion ? false : { opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE, delay: reduceMotion ? 0 : Math.min(i * 0.04, 0.3) }}
+                className="nav-glass rounded-2xl overflow-hidden flex flex-col transition-shadow hover:shadow-md"
+              >
+                <ProductPhoto src={m.imageUrl} name={m.name} />
+                <div className="p-3 sm:p-4 flex flex-col flex-1">
+                  <div className="text-sm font-semibold mb-2 line-clamp-2" style={{ color: 'var(--nav-text-primary)' }}>{m.name}</div>
+                  <div className="text-base sm:text-lg font-bold mt-auto" style={{ color: 'var(--nav-text-primary)' }}>{formatPrice(m.price)}</div>
                 </div>
-              </div>
+              </motion.a>
             ))}
           </div>
         )}

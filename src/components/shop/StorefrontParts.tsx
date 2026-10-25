@@ -26,21 +26,30 @@ export function ProductPhoto({ src, name, className = 'aspect-square', fit = 'co
   )
 }
 
-// Название раздела на десктопе: первая плитка раздела в общей сетке (см.
-// STOREFRONT_GRID). На телефоне вместо неё обычный заголовок над сеткой раздела.
-export function CategoryTile({ name, count }: { name: string; count: number }) {
+// Плашки разделов над сеткой: «Все» и по одной на раздел. На телефоне ряд
+// прокручивается в сторону, с lg переносится на новые строки.
+export function CategoryChips({ items, active, onChange, allLabel }: {
+  items: { key: string; name: string; count: number }[]
+  active: string | null
+  onChange: (key: string | null) => void
+  allLabel: string
+}) {
+  const chip = (isActive: boolean) => ({
+    background: isActive ? 'var(--nav-accent)' : 'var(--nav-surface-glass)',
+    color: isActive ? 'var(--nav-accent-ink)' : 'var(--nav-text-secondary)',
+  })
   return (
-    <div className="hidden lg:flex flex-col items-center justify-center gap-3 text-center rounded-2xl p-5 border border-[color:var(--nav-border-soft)]"
-      style={{ background: 'var(--nav-accent-soft)' }}>
-      <h2 className="text-xl font-bold break-words max-w-full" style={{ color: 'var(--nav-text-primary)' }}>{name}</h2>
-      <span className="rounded-full px-3 py-0.5 text-sm font-semibold tabular-nums"
-        style={{ background: 'var(--nav-surface-glass)', color: 'var(--nav-text-secondary)' }}>{count}</span>
+    <div className="flex gap-2 overflow-x-auto lg:flex-wrap lg:overflow-visible pb-2 mb-6">
+      <button onClick={() => onChange(null)} aria-pressed={active === null}
+        className="flex-shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold" style={chip(active === null)}>
+        {allLabel}
+      </button>
+      {items.map(c => (
+        <button key={c.key} onClick={() => onChange(c.key)} aria-pressed={active === c.key}
+          className="flex-shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold" style={chip(active === c.key)}>
+          {c.name} <span className="tabular-nums opacity-70">{c.count}</span>
+        </button>
+      ))}
     </div>
-  )
-}
-
-export function CategoryHeading({ name }: { name: string }) {
-  return (
-    <h2 className="lg:hidden text-lg font-bold mb-4 pb-2 border-b" style={{ color: 'var(--nav-text-primary)', borderColor: 'var(--nav-border)' }}>{name}</h2>
   )
 }

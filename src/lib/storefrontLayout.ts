@@ -19,13 +19,11 @@ export const STOREFRONT_BAR_INNER = 'mx-auto w-full px-4 lg:px-6 lg:max-w-3xl'
 // С lg плашка и так по центру и до пузыря не доходит.
 export const STOREFRONT_BAR_WIDGET_PAD = 'pr-[5.5rem] lg:pr-6'
 
-// Сетка всего каталога. До lg разделы идут друг под другом, у каждого своя сетка
-// (как было). С lg разделы «растворяются» (contents): все плитки лежат в одной
-// сетке, а название раздела это первая плитка раздела. Так после раздела из одной
-// карточки не остаётся пустой правой половины экрана.
-export const STOREFRONT_GRID = 'space-y-8 lg:space-y-0 lg:grid lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 lg:gap-4 lg:items-stretch'
-export const STOREFRONT_SECTION = 'lg:contents'
-export const STOREFRONT_GROUP_GRID = 'grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:contents'
+// Сетка всего каталога: одна сплошная сетка на любой ширине, без пустых хвостов
+// (раньше каждый раздел имел свою сетку, и у раздела из одной карточки половина
+// строки пустовала, на телефоне тоже). Разделы переключаются плашками-фильтрами
+// над сеткой (CategoryChips), поэтому ни заголовков, ни плиток разделов в сетке нет.
+export const STOREFRONT_GRID = 'grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 items-stretch'
 
 // Первая буква названия для заглушки фото: буква или цифра, заглавная.
 // Для пустого названия или одних символов - точка по центру.

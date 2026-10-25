@@ -7,10 +7,10 @@ import QRCode from 'qrcode'
 import { StorefrontLangSwitch, StorefrontStatus, useStorefrontT } from '@/components/shop/StorefrontChrome'
 import { formatStorefrontPrice as formatPrice, storefrontApiErrorKey, type StorefrontErrorKey } from '@/lib/i18n/storefront'
 import { WIDGET_SCRIPT_URL } from '@/lib/aiAgent/widgetSnippet'
-import { ProductPhoto, CategoryTile, CategoryHeading } from '@/components/shop/StorefrontParts'
+import { ProductPhoto, CategoryChips } from '@/components/shop/StorefrontParts'
 import {
   STOREFRONT_WRAP, STOREFRONT_BAR_OUTER, STOREFRONT_BAR_INNER, STOREFRONT_BAR_WIDGET_PAD,
-  STOREFRONT_GRID, STOREFRONT_SECTION, STOREFRONT_GROUP_GRID,
+  STOREFRONT_GRID,
 } from '@/lib/storefrontLayout'
 
 type Product = { id: string; name: string; brand: string; price: number; imageUrl: string | null; categoryId: string | null }
@@ -57,6 +57,7 @@ export default function StorefrontPage() {
   const [companyName, setCompanyName] = useState('')
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
+  const [activeCategory, setActiveCategory] = useState<string | null>(null)
   const [backgroundColor, setBackgroundColor] = useState<string | null>(null)
   const [deliveryInfo, setDeliveryInfo] = useState<string | null>(null)
   const [widgetKey, setWidgetKey] = useState<string | null>(null)
@@ -226,6 +227,9 @@ export default function StorefrontPage() {
   if (unavailable) return <StorefrontStatus text={t.unavailable} hint={t.unavailableHint} />
   if (notFound) return <StorefrontStatus text={t.notFound} />
 
+  const productGroups = groupProducts(products, categories, t.otherCategory)
+  const visibleProducts = productGroups.filter(g => !activeCategory || (g.id ?? '__other') === activeCategory).flatMap(g => g.products)
+
   if (landingEnabled) {
     return (
       <div className="min-h-screen flex items-center justify-center relative" style={{ background: backgroundColor || 'var(--nav-bg)' }}>
@@ -283,53 +287,54 @@ export default function StorefrontPage() {
           </div>
         )}
 
+        {productGroups.length > 1 && (
+          <CategoryChips
+            items={productGroups.map(g => ({ key: g.id ?? '__other', name: g.name, count: g.products.length }))}
+            active={activeCategory}
+            onChange={setActiveCategory}
+            allLabel={t.allCategories}
+          />
+        )}
+
         {products.length === 0 ? (
           <div className="text-sm text-center py-16" style={{ color: 'var(--nav-text-muted)' }}>{t.noProducts}</div>
         ) : (
           <div className={STOREFRONT_GRID}>
-            {groupProducts(products, categories, t.otherCategory).map(group => (
-              <div key={group.id || group.name || 'all'} className={STOREFRONT_SECTION}>
-                {group.name && <CategoryHeading name={group.name} />}
-                <div className={STOREFRONT_GROUP_GRID}>
-                  {group.name && <CategoryTile name={group.name} count={group.products.length} />}
-                  {group.products.map((p, i) => {
-                    const qty = cartQty(p.id)
-                    return (
-                      <motion.div
-                        key={p.id}
-                        initial={reduceMotion ? false : { opacity: 0, y: 14 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE, delay: reduceMotion ? 0 : Math.min(i * 0.04, 0.3) }}
-                        className="nav-glass rounded-2xl overflow-hidden flex flex-col transition-shadow hover:shadow-md"
-                        style={{ scrollMarginBottom: '7rem' }}
+            {visibleProducts.map((p, i) => {
+              const qty = cartQty(p.id)
+              return (
+                <motion.div
+                  key={p.id}
+                  initial={reduceMotion ? false : { opacity: 0, y: 14 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: reduceMotion ? 0 : 0.35, ease: EASE, delay: reduceMotion ? 0 : Math.min(i * 0.04, 0.3) }}
+                  className="nav-glass rounded-2xl overflow-hidden flex flex-col transition-shadow hover:shadow-md"
+                  style={{ scrollMarginBottom: '7rem' }}
+                >
+                  <ProductPhoto src={p.imageUrl} name={p.name} />
+                  <div className="p-3 sm:p-4 flex flex-col flex-1">
+                    {p.brand && <div className="text-[10px] font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--nav-text-muted)' }}>{p.brand}</div>}
+                    <div className="text-sm font-semibold mb-2 line-clamp-2" style={{ color: 'var(--nav-text-primary)' }}>{p.name}</div>
+                    <div className="text-base sm:text-lg font-bold mb-3 mt-auto" style={{ color: 'var(--nav-text-primary)' }}>{formatPrice(p.price)}</div>
+                    {qty === 0 ? (
+                      <button
+                        onClick={() => setQty(p.id, 1)}
+                        className="rounded-lg px-3 sm:px-4 py-2 text-sm font-semibold"
+                        style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}
                       >
-                        <ProductPhoto src={p.imageUrl} name={p.name} />
-                        <div className="p-3 sm:p-4 flex flex-col flex-1">
-                          {p.brand && <div className="text-[10px] font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--nav-text-muted)' }}>{p.brand}</div>}
-                          <div className="text-sm font-semibold mb-2 line-clamp-2" style={{ color: 'var(--nav-text-primary)' }}>{p.name}</div>
-                          <div className="text-base sm:text-lg font-bold mb-3 mt-auto" style={{ color: 'var(--nav-text-primary)' }}>{formatPrice(p.price)}</div>
-                          {qty === 0 ? (
-                            <button
-                              onClick={() => setQty(p.id, 1)}
-                              className="rounded-lg px-3 sm:px-4 py-2 text-sm font-semibold"
-                              style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)' }}
-                            >
-                              {t.addToCart}
-                            </button>
-                          ) : (
-                            <div className="flex items-center justify-between rounded-lg overflow-hidden" style={{ background: 'var(--nav-accent)' }}>
-                              <button onClick={() => setQty(p.id, qty - 1)} className="px-3 sm:px-4 py-2 text-sm font-bold" style={{ color: 'var(--nav-accent-ink)' }} aria-label={t.decreaseQty}>−</button>
-                              <span className="text-sm font-semibold" style={{ color: 'var(--nav-accent-ink)' }}>{qty}</span>
-                              <button onClick={() => setQty(p.id, qty + 1)} className="px-3 sm:px-4 py-2 text-sm font-bold" style={{ color: 'var(--nav-accent-ink)' }} aria-label={t.increaseQty}>+</button>
-                            </div>
-                          )}
-                        </div>
-                      </motion.div>
-                    )
-                  })}
-                </div>
-              </div>
-            ))}
+                        {t.addToCart}
+                      </button>
+                    ) : (
+                      <div className="flex items-center justify-between rounded-lg overflow-hidden" style={{ background: 'var(--nav-accent)' }}>
+                        <button onClick={() => setQty(p.id, qty - 1)} className="px-3 sm:px-4 py-2 text-sm font-bold" style={{ color: 'var(--nav-accent-ink)' }} aria-label={t.decreaseQty}>−</button>
+                        <span className="text-sm font-semibold" style={{ color: 'var(--nav-accent-ink)' }}>{qty}</span>
+                        <button onClick={() => setQty(p.id, qty + 1)} className="px-3 sm:px-4 py-2 text-sm font-bold" style={{ color: 'var(--nav-accent-ink)' }} aria-label={t.increaseQty}>+</button>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              )
+            })}
           </div>
         )}
       </div>
