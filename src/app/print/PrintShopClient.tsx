@@ -1,13 +1,15 @@
 // src/app/print/PrintShopClient.tsx
 'use client'
 import { useState, useMemo, useRef, useEffect } from 'react'
-import { Canvas } from '@react-three/fiber'
-import { OrbitControls, Bounds, useBounds } from '@react-three/drei'
+import { Canvas, useThree, useFrame } from '@react-three/fiber'
+import { OrbitControls } from '@react-three/drei'
+import * as THREE from 'three'
 import * as opentype from 'opentype.js'
 import QRCode from 'qrcode'
 import { PRINT_SHOP_FONTS, printShopFontUrl } from '@/lib/printShop/fonts'
 import { priceForSize, DEFAULT_RING_SIZE, type KeychainSize, type RingSize } from '@/lib/printShop/pricing'
 import { buildKeychainGeometries } from '@/lib/printShop/keychainGeometry'
+import { fitDistance } from '@/lib/printShop/cameraFit'
 
 const COLORS = ['белый', 'чёрный', 'серый', 'жёлтый', 'зелёный', 'красный', 'бордовый'] as const
 const COLOR_HEX: Record<string, string> = {
@@ -62,22 +64,81 @@ function KeychainMesh({ font, text, size, ringAtEnd, ringSize, baseColor, textCo
   )
 }
 
-// <Bounds observe> only detects objects being ADDED/REMOVED from the scene
-// graph -- KeychainMesh keeps the SAME <mesh> instances across re-renders
-// and just swaps their `geometry` prop in place (normal R3F reconciliation),
-// so a text/font/size/ring change never triggers observe's refit at all
-// (confirmed: it framed the FIRST name correctly, then stayed frozen on
-// every edit after that -- the "брелок в квадрат не входит" report was
-// reproduced live with a longer name after the initial fix). Calling the
-// imperative useBounds() API explicitly on every relevant dependency change
-// is the documented way to refit on data that changed without the scene
-// graph itself changing shape.
-function RefitBoundsOnChange({ deps }: { deps: unknown[] }) {
-  const bounds = useBounds()
+type OrbitLike = THREE.EventDispatcher<{ start: object }> & { target: THREE.Vector3; update: () => void }
+
+// Подгонка камеры под брелок. Заменила <Bounds> из drei (26.10.2026,
+// «Самал» упирался в правый край на широком экране). Причины обрезания:
+//  1. OrbitControls стоял без makeDefault, Bounds его не видел и ставил
+//     только позицию камеры, а target оставался в (0,0,0). Брелок начинается
+//     в x=0 и растёт вправо (кольцо слева), поэтому после первого же
+//     controls.update() камера смотрела мимо центра модели.
+//  2. Bounds считает дистанцию по самой длинной стороне box и ни наклон
+//     камеры, ни реальное соотношение сторон холста не учитывает.
+// Здесь: target ставится в центр box, дистанция считается точно для всех
+// 8 углов (см. lib/printShop/cameraFit.ts), пересчёт при смене
+// шрифта/текста/размера/кольца И при изменении размера холста (resize окна,
+// переход между брейкпоинтами). Направление взгляда сохраняется: если
+// клиент уже повернул брелок, он остаётся повёрнутым, меняется только
+// дистанция и центр. Смена параметров едет плавно, первая подгонка и
+// resize применяются мгновенно.
+function FitCamera({ content, font, text, size, ringAtEnd, ringSize }: {
+  content: React.RefObject<THREE.Group | null>
+  font: opentype.Font | null; text: string; size: KeychainSize; ringAtEnd: boolean; ringSize: RingSize
+}) {
+  const camera = useThree(s => s.camera) as THREE.PerspectiveCamera
+  const viewport = useThree(s => s.size)
+  const controls = useThree(s => s.controls) as unknown as OrbitLike | null
+  const goal = useRef<{ pos: THREE.Vector3; target: THREE.Vector3 } | null>(null)
+  const fittedSize = useRef<string | null>(null)
+
   useEffect(() => {
-    bounds.refresh().fit()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps)
+    const group = content.current
+    if (!controls || !group || viewport.width <= 0 || viewport.height <= 0) return
+    group.updateWorldMatrix(true, true)
+    const box = new THREE.Box3().setFromObject(group)
+    if (box.isEmpty()) return
+
+    const center = box.getCenter(new THREE.Vector3())
+    const dir = camera.position.clone().sub(controls.target)
+    if (dir.lengthSq() < 1e-6) dir.set(0, 52, 18)
+    dir.normalize()
+    const dist = fitDistance(box, dir, camera.fov, viewport.width / viewport.height)
+    const pos = center.clone().addScaledVector(dir, dist)
+
+    const sizeKey = `${viewport.width}x${viewport.height}`
+    if (fittedSize.current !== sizeKey) {
+      // первая подгонка или resize: без анимации
+      fittedSize.current = sizeKey
+      goal.current = null
+      camera.position.copy(pos)
+      controls.target.copy(center)
+      controls.update()
+    } else {
+      goal.current = { pos, target: center }
+    }
+  }, [content, controls, camera, viewport.width, viewport.height, font, text, size, ringAtEnd, ringSize])
+
+  // Клиент начал крутить сам: недоехавшую анимацию отменяем, не спорим с рукой.
+  useEffect(() => {
+    if (!controls) return
+    const cancel = () => { goal.current = null }
+    controls.addEventListener('start', cancel)
+    return () => controls.removeEventListener('start', cancel)
+  }, [controls])
+
+  useFrame((_, delta) => {
+    const g = goal.current
+    if (!g || !controls) return
+    const k = 1 - Math.exp(-delta * 10)
+    camera.position.lerp(g.pos, k)
+    controls.target.lerp(g.target, k)
+    if (camera.position.distanceToSquared(g.pos) < 1e-4 && controls.target.distanceToSquared(g.target) < 1e-4) {
+      camera.position.copy(g.pos)
+      controls.target.copy(g.target)
+      goal.current = null
+    }
+    controls.update()
+  })
   return null
 }
 
@@ -104,6 +165,7 @@ export default function PrintShopClient() {
   const [baseColor, setBaseColor] = useState<typeof COLORS[number]>('белый')
   const [textColor, setTextColor] = useState<typeof COLORS[number]>('чёрный')
   const [font, setFont] = useState<opentype.Font | null>(null)
+  const contentRef = useRef<THREE.Group | null>(null)
 
   const [step, setStep] = useState<Step>('configure')
   const [customerName, setCustomerName] = useState('')
@@ -200,13 +262,21 @@ export default function PrintShopClient() {
   return (
     <div className="min-h-screen" style={{ background: 'var(--nav-bg)' }}>
       <style>{fontFaceCss}</style>
-      <div className="max-w-4xl mx-auto p-4 lg:p-8 grid lg:grid-cols-2 gap-8">
+      {/* Широкий экран (решение основателя 26.10.2026): до lg всё как было
+          (max-w-4xl, одна колонка, квадратное превью). С lg контейнер
+          занимает всю ширину окна (политика «wide» из PageContainer: без
+          потолка, на экранах от 2000px центрированный потолок 1800px), две
+          колонки: превью шире, форма 380-520px, зазор 40px (lg) / 56px (xl). */}
+      <div className="max-w-4xl lg:max-w-none min-[2000px]:max-w-[1800px] mx-auto p-4 lg:p-8 grid gap-8 lg:gap-10 xl:gap-14 lg:grid-cols-[minmax(0,1.4fr)_minmax(380px,1fr)] xl:grid-cols-[minmax(0,1.4fr)_minmax(380px,520px)]">
         {/* Founder 2026-10-06: "убрать рамки у визуализации... как будто
             она на странице" -- no panel background/border/shadow at all.
             The Canvas itself has no scene.background set, so it's
             transparent by default and the page's own --nav-bg shows
-            straight through -- the keychain just sits on the page. */}
-        <div className="aspect-square">
+            straight through -- the keychain just sits on the page.
+            С lg превью липкое и высокое (65vh, не ниже 420px); холст
+            заполняет этот блок, а FitCamera подгоняет камеру под его
+            реальные пропорции. */}
+        <div className="aspect-square lg:aspect-auto lg:h-[65vh] lg:min-h-[420px] lg:sticky lg:top-6 lg:self-start min-w-0">
           <Canvas camera={{ position: [0, 52, 18], fov: 35 }}>
             {/* Three-point studio lighting (no HDRI/environment map -- this
                 is a public page, keeping it to procedural lights avoids a
@@ -231,10 +301,10 @@ export default function PrintShopClient() {
                 floating tiny in the middle. OrbitControls still lets the
                 customer drag-rotate afterward -- the two are meant to
                 compose, Bounds only sets where the camera STARTS. */}
-            <Bounds observe fit clip margin={1.5}>
+            <group ref={contentRef}>
               {font && <KeychainMesh font={font} text={text} size={size} ringAtEnd={ringAtEnd} ringSize={ringSize} baseColor={baseColor} textColor={textColor} />}
-              <RefitBoundsOnChange deps={[font, text, size, ringAtEnd, ringSize]} />
-            </Bounds>
+            </group>
+            <FitCamera content={contentRef} font={font} text={text} size={size} ringAtEnd={ringAtEnd} ringSize={ringSize} />
             {/* Founder 2026-10-06: "тень какую-то" -- ContactShadows bakes
                 its shadow onto a FIXED plane in world space that does not
                 rotate with the orbiting camera. Once the customer rotates
@@ -265,11 +335,11 @@ export default function PrintShopClient() {
                 camera distance on every parameter change, so scroll-to-zoom
                 isn't needed for this to work as a product preview;
                 disabling it removes the conflict with page scroll entirely. */}
-            <OrbitControls enablePan={false} enableZoom={false} />
+            <OrbitControls makeDefault enablePan={false} enableZoom={false} />
           </Canvas>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-4 lg:space-y-5 min-w-0">
           <div>
             <h1 className="text-xl font-bold" style={{ color: 'var(--nav-text-primary)' }}>Именной 3D-брелок</h1>
             <p className="text-sm mt-1" style={{ color: 'var(--nav-text-secondary)' }}>
