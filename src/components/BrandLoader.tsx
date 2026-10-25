@@ -1,3 +1,5 @@
+import './brand-loader.css'
+
 // Loading state: the wordmark on a navy plate, letters lighting up in a wave.
 // White INVOICES, the ".KZ" tail in the accent tint (founder, 21.09.2026).
 const HEAD = 'INVOICES'.split('')

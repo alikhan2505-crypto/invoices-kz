@@ -1,0 +1,28 @@
+/* Brand loader: navy plate, white wordmark, accent ".KZ", letters lighting up in a wave.
+   Живёт в отдельном файле (а не в globals.css), потому что CSS-чанк globals может залипнуть
+   на edge-кэше ("новый HTML, старые стили"), а загрузка видна на каждом переходе.
+
+   ГЕОМЕТРИЯ (одна на ВСЕ состояния загрузки): .brand-loader-wrap -- это блок, который сам
+   занимает ровно высоту видимой рабочей области и центрирует плашку. Ни один родитель
+   (ContentLoading, LoadingSpinner, <main min-h-screen>, Suspense-запас) НЕ задаёт свою
+   высоту/центровку под плашку, поэтому при замене одного загрузчика другим (loading.tsx ->
+   Suspense -> загрузка внутри страницы) плашка остаётся в одной и той же точке и не прыгает.
+   Раньше ContentLoading центрировал её в блоке 60vh, а страница -- в окне целиком: плашка
+   сначала висела выше центра и «падала» вниз (основатель, 25.10.2026). */
+/* Личный кабинет (вне ProductShell): над плашкой липкая верхняя панель SiteNav -- 56px на телефоне,
+   около 115px (два ряда) на десктопе; плашка центруется в остатке под ней. */
+.brand-loader-wrap { min-height: calc(100vh - 56px); min-height: calc(100dvh - 56px); display: flex; align-items: center; justify-content: center; }
+@media (min-width: 1024px) {
+  .brand-loader-wrap { min-height: calc(100vh - 24px - 115px); min-height: calc(100dvh - 24px - 115px); }
+}
+/* Кабинет продукта (ProductShell): сверху на телефоне липкая плашка 56px (h-14), на десктопе верхней панели нет. */
+.product-shell .brand-loader-wrap { min-height: calc(100vh - 56px); min-height: calc(100dvh - 56px); }
+/* Десктоп: плавающая карточка с зазором 12px сверху и снизу (top-3 + bottom-3) -- это и есть высота карточки. */
+@media (min-width: 1024px) {
+  .product-shell .brand-loader-wrap { min-height: calc(100vh - 24px); min-height: calc(100dvh - 24px); }
+}
+.brand-loader { display: inline-flex; padding: 14px 22px; border-radius: 16px; background: #1C2056; font: 800 22px/1 var(--font-geist-sans), Arial, sans-serif; letter-spacing: 0.14em; }
+.brand-loader-ch { display: inline-block; color: #fff; animation: brand-loader-wave 1.8s ease-in-out infinite; }
+.brand-loader-ch.brand-loader-tail { color: color-mix(in srgb, var(--nav-accent) 65%, white); }
+@keyframes brand-loader-wave { 0%, 60%, 100% { opacity: 0.45; transform: translateY(0); } 25% { opacity: 1; transform: translateY(-3px); } }
+@media (prefers-reduced-motion: reduce) { .brand-loader-ch { animation: none; opacity: 1; } }
