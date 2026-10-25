@@ -31,6 +31,12 @@ export interface GoLink {
   code: string
   /** Куда ведёт: путь на invoices.kz (страница обязана существовать). */
   path: string
+  /**
+   * Свой хост продукта (agent.invoices.kz, kaspi.invoices.kz, docs.invoices.kz):
+   * ссылка ведёт на его корень https://<host>/ с метками, а path тогда только
+   * внутренний адрес этого корня (через PRODUCT_HOST_ROUTES), для проверки.
+   */
+  host?: string
   utm: GoUtm
   /** Для кого/зачем ссылка — подсказка тому, кто добавляет строки. */
   note: string
@@ -38,6 +44,9 @@ export interface GoLink {
 
 const link = (code: string, path: string, source: string, medium: string, campaign: string, note: string): GoLink =>
   ({ code, path, utm: { source, medium, campaign }, note })
+
+const hostLink = (code: string, host: string, path: string, source: string, medium: string, campaign: string, note: string): GoLink =>
+  ({ code, path, host, utm: { source, medium, campaign }, note })
 
 export const GO_LINKS: readonly GoLink[] = [
   // Ссылки в чатах Telegram: пост про инструмент.
@@ -68,6 +77,15 @@ export const GO_LINKS: readonly GoLink[] = [
   link('dm-nalogi', '/tools/nalogi', 'dm', 'outreach', 'nalogi_oct', 'личные сообщения: ответ на слово НАЛОГИ'),
   link('dm-gid-komissiya', '/guides/komissiya-kaspi', 'dm', 'outreach', 'komissiya_oct', 'личные сообщения: ответ на слово КОМИССИЯ'),
   link('dm-gid-penya', '/guides/penya-za-prosrochku', 'dm', 'outreach', 'penya_oct', 'личные сообщения: ответ на слово ПЕНЯ'),
+  // Личные сообщения (25.10.2026, ещё 8 кодовых слов из роликов).
+  link('dm-schet', '/tools/schet', 'dm', 'outreach', 'schet_oct', 'личные сообщения: ответ на слово СЧЁТ'),
+  hostLink('dm-podpis', 'docs.invoices.kz', '/invoices-landing', 'dm', 'outreach', 'esign_oct', 'личные сообщения: ответ на слово ПОДПИСЬ (лендинг Счетов, блок ЭЦП, тариф Про)'),
+  link('dm-kp', '/tools/kp', 'dm', 'outreach', 'kp_oct', 'личные сообщения: ответ на слово ПРЕДЛОЖЕНИЕ'),
+  link('dm-akt', '/tools/avr', 'dm', 'outreach', 'avr_oct', 'личные сообщения: ответ на слово АКТ'),
+  link('dm-tovar', '/tools/nakladnaya', 'dm', 'outreach', 'nakladnaya_oct', 'личные сообщения: ответ на слово ТОВАР'),
+  link('dm-zarplata', '/tools/zarplata', 'dm', 'outreach', 'zarplata_oct', 'личные сообщения: ответ на слово ЗАРПЛАТА'),
+  hostLink('dm-agent', 'agent.invoices.kz', '/lp/agent', 'dm', 'outreach', 'agent_oct', 'личные сообщения: ответ на слово АГЕНТ (лендинг ИИ-агента)'),
+  hostLink('dm-bot', 'kaspi.invoices.kz', '/lp/kaspi', 'dm', 'outreach', 'kaspi_bot_oct', 'личные сообщения: ответ на слово БОТ (лендинг Kaspi Bot, тариф Про)'),
 ]
 
 export const GO_PREFIX = '/go'
@@ -77,10 +95,13 @@ export const GO_FALLBACK = '/'
 
 const CODE_RE = /^[a-z0-9-]+$/
 
-/** Адрес назначения с UTM: /tools/waybills?utm_source=…&utm_medium=…&utm_campaign=… */
+/**
+ * Адрес назначения с UTM: /tools/waybills?utm_source=…&utm_medium=…&utm_campaign=…
+ * (для ссылок со своим хостом: https://<host>/?utm_source=…).
+ */
 export function goDestination(l: GoLink): string {
   const q = new URLSearchParams({ utm_source: l.utm.source, utm_medium: l.utm.medium, utm_campaign: l.utm.campaign })
-  return `${l.path}?${q.toString()}`
+  return l.host ? `https://${l.host}/?${q.toString()}` : `${l.path}?${q.toString()}`
 }
 
 /** Код (регистр не важен) → ссылка из таблицы, иначе null. */

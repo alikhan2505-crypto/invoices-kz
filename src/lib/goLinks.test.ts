@@ -16,8 +16,11 @@ describe('GO_LINKS table', () => {
     for (const l of GO_LINKS) {
       expect(l.path.startsWith('/'), l.code).toBe(true)
       expect(l.path.includes('?'), `${l.code}: path without query`).toBe(false)
-      const page = path.join(APP, ...l.path.split('/').filter(Boolean), 'page.tsx')
-      expect(existsSync(page), `${l.code} -> ${l.path} (${page})`).toBe(true)
+      const segs = l.path.split('/').filter(Boolean)
+      const page = path.join(APP, ...segs, 'page.tsx')
+      // Лендинги продуктов: /lp/<ключ> обслуживает динамический lp/[key]/page.tsx.
+      const dynamic = segs[0] === 'lp' ? path.join(APP, 'lp', '[key]', 'page.tsx') : ''
+      expect(existsSync(page) || (dynamic !== '' && existsSync(dynamic)), `${l.code} -> ${l.path} (${page})`).toBe(true)
     }
   })
 
@@ -41,6 +44,32 @@ describe('GO_LINKS table', () => {
     expect(by('reels-marzha').utm).toMatchObject({ source: 'meta', medium: 'paid_reels' })
     expect(by('dm')).toMatchObject({ path: '/tools/waybills', utm: { source: 'dm', medium: 'outreach', campaign: 'waybills_oct' } })
     for (const c of ['kontragent', 'schet', 'kp', 'nalogi']) expect(by(c).path).toBe(`/tools/${c}`)
+  })
+})
+
+describe('кодовые слова директа 25.10.2026', () => {
+  const by = (c: string) => findGoLink(c)!
+  it('инструменты ведут на свои страницы с меткой dm / outreach / <инструмент>_oct', () => {
+    const tools: [string, string, string][] = [
+      ['dm-schet', '/tools/schet', 'schet_oct'],
+      ['dm-kp', '/tools/kp', 'kp_oct'],
+      ['dm-akt', '/tools/avr', 'avr_oct'],
+      ['dm-tovar', '/tools/nakladnaya', 'nakladnaya_oct'],
+      ['dm-zarplata', '/tools/zarplata', 'zarplata_oct'],
+    ]
+    for (const [code, p, campaign] of tools) {
+      expect(by(code), code).toMatchObject({ path: p, utm: { source: 'dm', medium: 'outreach', campaign } })
+      expect(by(code).host, code).toBeUndefined()
+      expect(resolveGo(code)).toBe(`${p}?utm_source=dm&utm_medium=outreach&utm_campaign=${campaign}`)
+    }
+  })
+  it('ПОДПИСЬ, АГЕНТ и БОТ ведут на корень своего хоста с меткой', () => {
+    expect(resolveGo('dm-podpis')).toBe('https://docs.invoices.kz/?utm_source=dm&utm_medium=outreach&utm_campaign=esign_oct')
+    expect(resolveGo('dm-agent')).toBe('https://agent.invoices.kz/?utm_source=dm&utm_medium=outreach&utm_campaign=agent_oct')
+    expect(resolveGo('dm-bot')).toBe('https://kaspi.invoices.kz/?utm_source=dm&utm_medium=outreach&utm_campaign=kaspi_bot_oct')
+  })
+  it('редирект для хостовой ссылки абсолютный', () => {
+    expect(goRedirects().find(x => x.source === '/go/dm-bot')?.destination).toBe(resolveGo('dm-bot'))
   })
 })
 

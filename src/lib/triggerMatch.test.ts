@@ -100,3 +100,62 @@ describe('matchers используют общую логику', () => {
     expect(findFlowTriggerMatch('хочу запись', flows)).toBe('f2')
   })
 })
+
+describe('triggerMatches: «=слово» -- сообщение целиком равно слову', () => {
+  it.each(['Товар', 'товар', '  ТОВАР  ', 'товар!', 'Товар.', '👍 товар', '«товар»', 'товар?!'])('«=товар» ловит «%s»', text => {
+    expect(m(text, '=товар')).toBe(true)
+  })
+
+  it.each(['товары', 'какой товар', 'товар в наличии?', 'мой товар', 'товар товар', 'очень хороший товар', ''])('«=товар» не ловит «%s»', text => {
+    expect(m(text, '=товар')).toBe(false)
+  })
+
+  it('«акт» и «бот» целиком, но не внутри слов и фраз', () => {
+    expect(m('АКТ', '=акт')).toBe(true)
+    expect(m('актуально', '=акт')).toBe(false)
+    expect(m('Нужен акт', '=акт')).toBe(false)
+    expect(m('бот', '=бот')).toBe(true)
+    expect(m('работа', '=бот')).toBe(false)
+    expect(m('это бот?', '=бот')).toBe(false)
+  })
+
+  it('пустое слово после «=» не ловит ничего', () => {
+    expect(m('любой текст', '=')).toBe(false)
+    expect(m('', '=')).toBe(false)
+    expect(m('любой текст', ' = ')).toBe(false)
+  })
+
+  it('спецсимволы регулярок в слове не ломают сравнение', () => {
+    expect(m('a.b', '=a.b')).toBe(true)
+    expect(m('axb', '=a.b')).toBe(false)
+  })
+})
+
+describe('triggerMatches: «^слово» -- с начала слова, окончание любое', () => {
+  it.each(['счёт', 'Счёт на оплату', 'выставьте счёт', 'счёта пришлите', 'нужен счёт-фактура'])('«^счёт» ловит «%s»', text => {
+    expect(m(text, '^счёт')).toBe(true)
+  })
+
+  it.each(['расчёт', 'пересчёт цен', 'нужен расчёт', '2счёт'])('«^счёт» не ловит «%s»', text => {
+    expect(m(text, '^счёт')).toBe(false)
+  })
+
+  it('пустое слово после «^» не ловит ничего', () => {
+    expect(m('любой текст', '^')).toBe(false)
+  })
+})
+
+describe('matchers: кодовые слова через = и ^', () => {
+  const templates = [
+    { id: 'tovar', trigger_words: ['=товар'], reply_text: 'Накладная' },
+    { id: 'schet', trigger_words: ['^счёт', '^счет'], reply_text: 'Счёт' },
+  ]
+  it('Instagram и AI-агент одинаково', () => {
+    for (const find of [findMatchingTemplate, findTemplateMatch]) {
+      expect(find('Товар', templates)?.id).toBe('tovar')
+      expect(find('какой товар у вас?', templates)).toBeNull()
+      expect(find('Счет', templates)?.id).toBe('schet')
+      expect(find('нужен расчёт', templates)).toBeNull()
+    }
+  })
+})
