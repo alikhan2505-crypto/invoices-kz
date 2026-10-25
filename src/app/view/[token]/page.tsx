@@ -212,7 +212,7 @@ export default function PublicInvoice() {
   useEffect(() => {
     if (!kaspiPayment?.payment_link) { setKaspiQrDataUrl(null); return }
     let cancelled = false
-    QRCode.toDataURL(kaspiPayment.payment_link, { width: 120, margin: 1 })
+    QRCode.toDataURL(kaspiPayment.payment_link, { width: 480, margin: 1 })
       .then((url) => { if (!cancelled) setKaspiQrDataUrl(url) })
       .catch(() => {}) // No QR image — the plain link still works.
     return () => { cancelled = true }
@@ -613,15 +613,16 @@ export default function PublicInvoice() {
         {kaspiPayment && kaspiPayment.status === 'pending' && kaspiPayment.payment_link && (
           <div className="nav-glass nav-card-accent rounded-2xl p-5">
             <div className="text-xs uppercase tracking-wide mb-3" style={{ color: 'var(--nav-text-muted)' }}>Оплата через Kaspi</div>
-            <div className="flex items-center gap-4 mb-4">
+            {/* QR крупный (не меньше половины колонки, 200-320 px), подпись под ним с переносом по центру. */}
+            <div className="flex flex-col items-center gap-3 mb-4">
               {kaspiQrDataUrl && (
                 <img
                   src={kaspiQrDataUrl}
                   alt="Kaspi QR"
-                  className="w-28 h-28 flex-shrink-0 rounded-lg"
+                  className="w-1/2 min-w-[200px] max-w-[320px] aspect-square rounded-lg"
                 />
               )}
-              <div className="text-xs" style={{ color: 'var(--nav-text-secondary)' }}>
+              <div className="text-sm text-center leading-snug max-w-sm" style={{ color: 'var(--nav-text-secondary)' }}>
                 {t.kaspiQrScanHint}
               </div>
             </div>
