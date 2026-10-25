@@ -38,6 +38,21 @@ export async function GET(req: NextRequest) {
   const { data: site } = await supabase.from('salon_sites').select('slug').eq('id', session.site_id).maybeSingle()
   if (!site) return NextResponse.json({ status: 'expired' })
 
+  // Код одноразовый (аудит 25.10.2026): раньше подтверждённая строка жила
+  // вечно, и любой, кто узнал code (адресная строка, логи, история браузера),
+  // мог бесконечно выпускать себе свежие куки владельца. Теперь строка
+  // удаляется атомарным delete..returning: ровно один запрос получает куку,
+  // остальные видят expired. Протухший confirmed тоже не выдаёт куку.
+  const { data: claimed } = await supabase
+    .from('planner_sessions')
+    .delete()
+    .eq('code', code)
+    .eq('status', 'confirmed')
+    .gt('expires_at', new Date().toISOString())
+    .select('id')
+    .maybeSingle()
+  if (!claimed) return NextResponse.json({ status: 'expired' })
+
   const cookie = signPlannerCookie({ ownerProfileId: session.owner_profile_id, siteId: session.site_id })
   const res = NextResponse.json({ status: 'confirmed', siteSlug: site.slug })
   res.cookies.set(PLANNER_COOKIE_NAME, cookie, {
