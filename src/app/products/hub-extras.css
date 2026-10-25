@@ -171,8 +171,8 @@
    1920): потолок 1160 -> 1440 px, шапка, плитки, полоса инструментов и футер
    лежат в одной обёртке .prd-wrap, поэтому края совпадают. Ниже 1280 px ничего
    не меняется. Тот же потолок, что LANDING_MAX_PX в src/lib/landingLayout.ts. */
-.prd-root .prd-wrap { max-width: 1440px; }
-.prd-root .prd-ghost { right: max(2vw, calc((100% - 1440px) / 2 - 20px)); }
+.prd-root .prd-wrap { max-width: 1680px; }
+.prd-root .prd-ghost { right: max(2vw, calc((100% - 1680px) / 2 - 20px)); }
 @media (min-width: 1280px) {
   .prd-root .prd-hero { max-width: 1120px; }
   .prd-root .prd-h1 { font-size: clamp(64px, 4.4vw, 80px); }

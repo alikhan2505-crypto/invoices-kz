@@ -429,6 +429,16 @@ export default function History() {
             </div>
           ) : (
             <div className="rounded-2xl overflow-hidden mb-4 border border-[color:var(--nav-border-soft)] bg-[var(--nav-surface-chrome)] lg:border-0 lg:bg-transparent lg:rounded-none lg:overflow-visible lg:grid lg:grid-cols-[repeat(auto-fill,minmax(340px,1fr))] lg:gap-3">
+              {/* Плитка «Создать новый счёт» того же размера, что карточка счёта (только десктоп;
+                  на телефоне остаётся кнопка внизу списка). */}
+              <button
+                onClick={() => router.push('/create')}
+                className="hidden lg:flex min-h-[132px] flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-4 text-sm font-semibold transition-all duration-150 hover:-translate-y-1 hover:shadow-[var(--nav-card-glow)]"
+                style={{ borderColor: 'var(--nav-accent)', background: 'var(--nav-accent-soft)', color: 'var(--nav-accent)' }}
+              >
+                <span className="text-2xl leading-none" aria-hidden="true">+</span>
+                <span>{t.createNewInvoiceButton.replace(/^\+\s*/, '')}</span>
+              </button>
               {filtered.map((inv, i) => (
                 <motion.div key={inv.id}
                   initial={reduceMotion ? false : { opacity: 0, y: 10 }}
@@ -492,7 +502,7 @@ export default function History() {
             initial={reduceMotion ? false : { opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: reduceMotion ? 0 : 0.36, ease: EASE, delay: reduceMotion ? 0 : 0.34 }}
-            className="w-full lg:max-w-sm flex items-center justify-center px-4 py-3.5 rounded-xl text-sm font-semibold transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0"
+            className="w-full lg:hidden flex items-center justify-center px-4 py-3.5 rounded-xl text-sm font-semibold transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0"
             style={{ background: 'var(--nav-accent)', color: 'var(--nav-accent-ink)', boxShadow: '0 10px 24px -10px var(--nav-accent)' }}
           >
             {t.createNewInvoiceButton}

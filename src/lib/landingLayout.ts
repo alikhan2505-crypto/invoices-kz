@@ -7,7 +7,7 @@
 //
 // Кого касается: /cashier-api (api.invoices.kz) и Счета (/invoices-landing,
 // docs.invoices.kz). Лендинги kaspi./agent./salon./cfo. (ProductLanding) и хаб
-// /products живут на своих .lp-*/.prd-* правилах в CSS с тем же потолком 1440.
-export const LANDING_MAX_PX = 1440
+// /products живут на своих .lp-*/.prd-* правилах в CSS с тем же потолком 1680 (поднят с 1440 по замечанию основателя 25.10: на 1920 поля всё ещё казались широкими).
+export const LANDING_MAX_PX = 1680
 
-export const LANDING_WRAP = 'mx-auto w-full max-w-[1440px] px-5 sm:px-8 xl:px-16'
+export const LANDING_WRAP = 'mx-auto w-full max-w-[1680px] px-5 sm:px-8 xl:px-16'
