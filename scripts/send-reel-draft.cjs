@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /*
  * Отправка Reel на одобрение в Telegram.
  *

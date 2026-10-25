@@ -63,6 +63,22 @@ function XIcon() {
     </svg>
   )
 }
+function PhoneIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="7" y="2.5" width="10" height="19" rx="2.5" />
+      <path d="M11 18.5h2" />
+    </svg>
+  )
+}
+// Round status tile instead of an emoji: icon inherits `color`, fill is a soft token.
+function StatusTile({ bg, color, children }: { bg: string; color: string; children: ReactNode }) {
+  return (
+    <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full" style={{ background: bg, color }} aria-hidden="true">
+      {children}
+    </div>
+  )
+}
 function CheckIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -1070,7 +1086,7 @@ export default function Upgrade() {
 
                 {phoneDeclined ? (
                   <div className="text-center py-6">
-                    <div className="text-4xl mb-3" aria-hidden="true">🚫</div>
+                    <StatusTile bg="var(--nav-surface-glass)" color="var(--nav-critical)"><XIcon /></StatusTile>
                     <div className="text-sm mb-4" style={{ color: 'var(--nav-text-secondary)' }}>{t.phoneRequestDeclinedNote}</div>
                     <button type="button" onClick={() => selectedPlan && openModal(selectedPlan.name, selectedPlan.amount, selectedPlan.plan, selectedPlan.period)}
                       className={`w-full min-h-[48px] rounded-xl py-3.5 text-sm font-semibold ${PRESS}`}
@@ -1080,12 +1096,12 @@ export default function Upgrade() {
                   </div>
                 ) : phoneRequested ? (
                   <div className="text-center py-6">
-                    <div className="text-4xl mb-3" aria-hidden="true">📲</div>
+                    <StatusTile bg="var(--nav-accent-soft)" color="var(--nav-accent)"><PhoneIcon /></StatusTile>
                     <div className="text-sm" style={{ color: 'var(--nav-text-secondary)' }}>{t.phoneRequestPendingNote}</div>
                   </div>
                 ) : isMobile ? (
                   <div className="text-center py-4">
-                    <div className="text-5xl mb-4" aria-hidden="true">📱</div>
+                    <StatusTile bg="var(--nav-accent-soft)" color="var(--nav-accent)"><PhoneIcon /></StatusTile>
                     <div className="font-semibold mb-2" style={{ color: 'var(--nav-text-primary)' }}>{t.redirectingKaspiLabel}</div>
                     <div className="text-sm mb-4" style={{ color: 'var(--nav-text-muted)' }}>
                       {t.appNotOpenedHint}
@@ -1181,7 +1197,7 @@ export default function Upgrade() {
 
             {step === 'success' && (
               <div className="text-center py-6" role="status">
-                <div className="text-5xl mb-4" aria-hidden="true">🎉</div>
+                <StatusTile bg="var(--nav-success-soft)" color="var(--nav-success)"><CheckIcon /></StatusTile>
                 <div className="font-bold text-xl mb-2" style={{ color: 'var(--nav-text-primary)' }}>{t.paymentSuccessTitle}</div>
                 <div className="text-sm mb-6" style={{ color: 'var(--nav-text-secondary)' }}>
                   {t.planActivatedPrefixLabel}<strong style={{ color: 'var(--nav-text-primary)' }}>{selectedPlan?.name}</strong>{t.planActivatedSuffixLabel}

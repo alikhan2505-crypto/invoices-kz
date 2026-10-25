@@ -94,7 +94,7 @@ const CHECKED_KK = formatKkDate(MRP_CHECKED)
 export const MRP_GUIDE: Guide = {
   slug: 'mrp-2026',
   updated: MRP_CHECKED,
-  relatedTools: ['nalogi', 'schet'],
+  relatedTools: ['nalogi', 'zarplata', 'schet'],
   relatedGuides: ['nalogi-ip-uproshchenka-2026', 'kak-otkryt-ip-2026', 'esf-kazakhstan-2026'],
   ru: {
     shortTitle: 'МРП 2026 в тенге',

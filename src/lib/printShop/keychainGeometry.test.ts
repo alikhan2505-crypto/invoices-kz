@@ -131,15 +131,12 @@ function topCapIntervals(geometry: THREE.BufferGeometry, y: number): [number, nu
  * WINDING RULE -- the ground truth for "what shape is this glyph", computed
  * from opentype.js's own path and nothing else.
  */
-function nonzeroIntervals(subpaths: Point[][], y: number): [number, number][] {
+function nonzeroIntervals(segments: [Point, Point][], y: number): [number, number][] {
   const crossings: { x: number; dir: number }[] = []
-  for (const sp of subpaths) {
-    for (let i = 0; i < sp.length; i++) {
-      const a = sp[i], b = sp[(i + 1) % sp.length]
-      if (a.y === b.y) continue
-      if (y < Math.min(a.y, b.y) || y >= Math.max(a.y, b.y)) continue
-      crossings.push({ x: a.x + ((y - a.y) / (b.y - a.y)) * (b.x - a.x), dir: b.y > a.y ? 1 : -1 })
-    }
+  for (const [a, b] of segments) {
+    if (a.y === b.y) continue
+    if (y < Math.min(a.y, b.y) || y >= Math.max(a.y, b.y)) continue
+    crossings.push({ x: a.x + ((y - a.y) / (b.y - a.y)) * (b.x - a.x), dir: b.y > a.y ? 1 : -1 })
   }
   crossings.sort((m, n) => m.x - n.x)
   const out: [number, number][] = []
@@ -185,11 +182,33 @@ function glyphFootprintMismatch(fontId: string, text: string, scanlines = 1500) 
   let minY = Infinity, maxY = -Infinity
   for (const sp of truth) for (const p of sp) { if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y }
   const dy = (maxY - minY) / scanlines
+
+  // Speed only, not semantics: the two interval functions still apply their
+  // exact own y-range test to every item they are handed. Scanning ALL ~3.4k
+  // top-cap triangles and ~3.7k outline segments for each of the 1500
+  // scanlines made a script face like caveat take ~5 s (right at vitest's 5 s
+  // default, so it flaked under load). Handing each scanline only the items
+  // whose y-extent can reach it (one-scanline safety margin either side)
+  // returns the identical intervals in a fraction of the time.
+  const bucketByScanline = <T,>(items: T[], extent: (item: T) => [number, number]): T[][] => {
+    const buckets: T[][] = Array.from({ length: scanlines }, () => [])
+    for (const item of items) {
+      const [lo, hi] = extent(item)
+      const from = Math.max(0, Math.floor((lo - minY) / dy) - 1)
+      const to = Math.min(scanlines - 1, Math.ceil((hi - minY) / dy) + 1)
+      for (let i = from; i <= to; i++) buckets[i].push(item)
+    }
+    return buckets
+  }
+  const truthSegments: [Point, Point][] = truth.flatMap(sp => sp.map((a, i): [Point, Point] => [a, sp[(i + 1) % sp.length]]))
+  const truthBuckets = bucketByScanline(truthSegments, ([a, b]) => [Math.min(a.y, b.y), Math.max(a.y, b.y)])
+  const triBuckets = bucketByScanline(topCapTris, vs => [Math.min(vs[0].y, vs[1].y, vs[2].y), Math.max(vs[0].y, vs[1].y, vs[2].y)])
+
   let truthArea = 0, misplacedArea = 0
   for (let i = 0; i < scanlines; i++) {
     const y = minY + (i + 0.5) * dy
-    const expected = nonzeroIntervals(truth, y)
-    const actual = topCapIntervalsFromTriangles(topCapTris, y)
+    const expected = nonzeroIntervals(truthBuckets[i], y)
+    const actual = topCapIntervalsFromTriangles(triBuckets[i], y)
     truthArea += intervalsLength(expected) * dy
     misplacedArea += symmetricDifferenceLength(expected, actual) * dy
   }
@@ -451,7 +470,7 @@ describe('buildKeychainGeometries', () => {
     }
     // Sanity that the skip-if-missing guard above did not skip everything.
     expect(built).toBeGreaterThan(60)
-  }, 60_000)
+  }, 120_000) // ~19 с в одиночку, до ~45 с под нагрузкой параллельных прогонов
 
   // --- The key-ring hole must be a real void, not just an attached contour --
 
@@ -536,5 +555,7 @@ describe('buildKeychainGeometries', () => {
         }
       }
     }
-  })
+    // 24 полных сборок геометрии (в т.ч. «Нурсултан Назарбаев» на L): честно
+    // тяжёлый тест, ~3-7 с в одиночку и больше под нагрузкой, а дефолт - 5 с.
+  }, 30_000)
 })

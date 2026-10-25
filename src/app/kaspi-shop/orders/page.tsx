@@ -384,7 +384,7 @@ function KaspiShopOrdersInner() {
             filter by status at all. Now page-local and works at every
             width; the sidebar's own duplicate submenu goes away once that
             component is replaced by SiteNav in a later pass. */}
-        <div className="flex gap-2 overflow-x-auto pb-2 mb-4">
+        <div className="flex gap-2 overflow-x-auto pb-2 mb-4 hide-scrollbar tabs-scroll-fade">
           {ORDER_STATUS_TABS.map(tab => {
             const active = status === tab.value
             return (

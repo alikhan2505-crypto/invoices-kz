@@ -159,7 +159,7 @@ export default function KaspiShopQualityPage() {
           </div>
         )}
 
-        <div className="flex gap-2 overflow-x-auto pb-2 mb-4">
+        <div className="flex gap-2 overflow-x-auto pb-2 mb-4 hide-scrollbar tabs-scroll-fade">
           {TABS.map(t => {
             const active = tab === t.value
             return (

@@ -88,6 +88,7 @@ export interface AiAgentSetupDict {
   // Про кончился
   lapsedTitle: string
   lapsedText: string
+  lapsedNoAgentsText: string
   lapsedCta: string
   lapsedDialogsLink: string
 
@@ -172,6 +173,7 @@ export const aiAgentSetupDict: Record<Lang, AiAgentSetupDict> = {
 
     lapsedTitle: 'Продлите Про, чтобы агент снова отвечал',
     lapsedText: 'Пока тариф не продлён, агент не отвечает клиентам и ничего не списывает, но их новые сообщения сохраняются — диалоги доступны для чтения. После продления агент заработает сам — настраивать заново не нужно.',
+    lapsedNoAgentsText: 'Тариф Про закончился. Продлите его, чтобы снова создавать агентов и отвечать клиентам в WhatsApp, Instagram, Telegram и на сайте.',
     lapsedCta: 'Продлить Про',
     lapsedDialogsLink: 'Открыть диалоги (только чтение)',
 
@@ -254,6 +256,7 @@ export const aiAgentSetupDict: Record<Lang, AiAgentSetupDict> = {
 
     lapsedTitle: 'Агент қайта жауап беруі үшін Про тарифін ұзартыңыз',
     lapsedText: 'Тариф ұзартылмайынша агент клиенттерге жауап бермейді және ештеңе есептен шығармайды, бірақ олардың жаңа хабарлары сақталады — диалогтарды оқуға болады. Ұзартқаннан кейін агент өзі қайта жұмыс істейді — қайта баптаудың қажеті жоқ.',
+    lapsedNoAgentsText: 'Про тарифі аяқталды. Агенттерді қайта құру және клиенттерге WhatsApp, Instagram, Telegram мен сайтта жауап беру үшін оны ұзартыңыз.',
     lapsedCta: 'Про-ны ұзарту',
     lapsedDialogsLink: 'Диалогтарды ашу (тек оқу)',
 
@@ -336,6 +339,7 @@ export const aiAgentSetupDict: Record<Lang, AiAgentSetupDict> = {
 
     lapsedTitle: 'Renew Pro so the agent replies again',
     lapsedText: 'Until the plan is renewed, the agent doesn’t reply to customers and charges nothing, but their new messages are saved — conversations stay readable. Once you renew, the agent starts working again on its own — no need to set it up again.',
+    lapsedNoAgentsText: 'Your Pro plan has expired. Renew it to create agents again and reply to customers on WhatsApp, Instagram, Telegram and your website.',
     lapsedCta: 'Renew Pro',
     lapsedDialogsLink: 'Open conversations (read-only)',
 

@@ -247,7 +247,7 @@ export const GUIDES: Guide[] = [
   {
     slug: 'nalogi-ip-uproshchenka-2026',
     updated: '2026-10-24',
-    relatedTools: ['nalogi', 'margin'],
+    relatedTools: ['nalogi', 'zarplata', 'margin'],
     relatedGuides: ['kak-otkryt-ip-2026', 'esf-kazakhstan-2026', 'komissiya-kaspi'],
     ru: {
       shortTitle: 'Налоги ИП на упрощёнке — 2026',

@@ -395,6 +395,18 @@ html {
   scrollbar-width: none;
 }
 
+/* Tab / filter-pill strip that scrolls sideways on a phone: the right edge
+   fades out so a cut-off last pill reads as "more this way". The extra end
+   padding keeps the final pill fully opaque once scrolled to the end, and the
+   rule is phone-only, where the strips actually overflow. */
+@media (max-width: 767px) {
+  .tabs-scroll-fade {
+    padding-inline-end: 1.75rem;
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 1.75rem), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 1.75rem), transparent);
+  }
+}
+
 /* Desktop hover micro-interaction for primary/secondary buttons — gated to
    real mouse-hover on a desktop-width viewport so it never sticks after a
    tap on touch devices. No `transform: scale()` here on purpose — scaling

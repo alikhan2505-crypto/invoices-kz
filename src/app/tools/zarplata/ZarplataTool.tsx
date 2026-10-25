@@ -142,7 +142,9 @@ export default function ZarplataTool({ lang }: { lang: ToolLang }) {
 
   // ----- стили (только токены --nav-*) -----
   // Видимый фокус клавиатуры вместо убранной обводки: кольцо токена --nav-accent.
-  const focusRing = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--nav-accent)]'
+  // outline-solid обязателен: рядом стоит outline-none (Tailwind 4 кладёт в него
+  // --tw-outline-style: none), и без него focus-visible:outline остаётся style none.
+  const focusRing = 'focus-visible:outline focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--nav-accent)]'
   const inputCls = `zp-native w-full rounded-xl px-3 py-2.5 text-sm outline-none ${focusRing} min-h-[44px]`
   // WebkitTextFillColor обязателен: глобальное `input, select { -webkit-text-fill-color: ... }`
   // из globals.css перебивает `color` в Chrome/Safari, и в тёмной теме введённые

@@ -917,7 +917,7 @@ export default function AiAgentSettings() {
         {/* MoonAI-style horizontal tab bar (research §1): pill tabs, active
             state on --nav-accent, layoutId slide between tabs. */}
         <motion.div
-          className="nav-glass rounded-xl p-1 mb-5 flex gap-1 overflow-x-auto"
+          className="nav-glass rounded-xl p-1 mb-5 flex gap-1 overflow-x-auto hide-scrollbar tabs-scroll-fade"
           role="tablist"
           aria-label={tf.tabsAria}
           initial={reduceMotion ? false : { opacity: 0, y: 12 }}

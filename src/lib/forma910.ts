@@ -377,7 +377,7 @@ const KK = {
 export const FORMA910_GUIDE: Guide = {
   slug: F910_SLUG,
   updated: F910_CHECKED,
-  relatedTools: ['nalogi', 'schet'],
+  relatedTools: ['nalogi', 'zarplata', 'schet'],
   relatedGuides: ['nalogi-ip-uproshchenka-2026', 'mrp-2026', 'kak-otkryt-ip-2026'],
   ru: {
     shortTitle: 'Форма 910.00: как заполнить',
