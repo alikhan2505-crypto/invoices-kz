@@ -1,7 +1,7 @@
 'use client'
 
 import dynamic from 'next/dynamic'
-import { useSyncExternalStore } from 'react'
+import { useMemo, useSyncExternalStore } from 'react'
 import '@scalar/api-reference-react/style.css'
 import { useLanguage } from '@/components/LanguageProvider'
 import { CASHIER_API_THEMED as C, CASHIER_API_FONT_MONO as FONT_MONO } from '@/lib/kaspiCashierApi/theme'
@@ -87,9 +87,18 @@ function subscribeTheme(cb: () => void) {
   return () => mo.disconnect()
 }
 
-export default function ApiDocsViewer({ lang }: { lang: 'ru' | 'en' }) {
+// extraMarkdown: дополнительные разделы (## заголовки) дописываются в info.description спецификации,
+// поэтому Scalar показывает их в левом меню под Introduction (вебхуки больше не «выпадают» из меню).
+export default function ApiDocsViewer({ lang, extraMarkdown }: { lang: 'ru' | 'en'; extraMarkdown?: string }) {
   const isDark = useSyncExternalStore(subscribeTheme, () => document.documentElement.getAttribute('data-theme') === 'dark', () => false)
-  const content = lang === 'en' ? openApiEn : openApiRu
+  const base = lang === 'en' ? openApiEn : openApiRu
+  const content = useMemo(() => {
+    if (!extraMarkdown) return base
+    const doc = base as unknown as { info?: { description?: string } } & Record<string, unknown>
+    return { ...doc, info: { ...doc.info, description: `${doc.info?.description ?? ''}
+
+${extraMarkdown}` } }
+  }, [base, extraMarkdown])
 
   return (
     <ApiReferenceReact

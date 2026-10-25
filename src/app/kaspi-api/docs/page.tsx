@@ -145,24 +145,13 @@ const WEBHOOK_BODY_EXAMPLE = `{
 // received..."), unlike WEBHOOK_BODY_EXAMPLE above (pure JSON field names,
 // already language-neutral), so it must be bilingual like every other
 // DOCS_COPY string -- see DocsCopy.webhookVerifyCode (DOCS_COPY.ru /
-// DOCS_COPY.en above), rendered below as `<Pre>{d.webhookVerifyCode}</Pre>`.
+// DOCS_COPY.en above), rendered inside the Scalar spec (webhookMarkdown in the page component).
 
 function Panel({ children }: { children: ReactNode }) {
   return (
     <div className="rounded-xl p-4" style={{ background: C.bg1, border: `1px solid ${C.border}` }}>
       {children}
     </div>
-  )
-}
-
-function Pre({ children }: { children: string }) {
-  return (
-    <pre
-      className="overflow-x-auto rounded-lg p-3 text-[12.5px] leading-relaxed"
-      style={{ background: C.bg0, border: `1px solid ${C.border}`, color: C.text, fontFamily: FONT_MONO }}
-    >
-      {children}
-    </pre>
   )
 }
 
@@ -180,6 +169,18 @@ export default function KaspiApiDocsPage() {
   // Заголовок вкладки и на время загрузки (PageHeader ещё не отрисован); строка та же, что ставит PageHeader.
   usePageDocumentTitle(DOCS_HEADING[lang])
   const viewerLang: 'ru' | 'en' = lang === 'en' ? 'en' : 'ru'
+  // Вебхуки живут внутри самой справки (пункт левого меню Scalar), а не отдельным блоком под ней.
+  const webhookMarkdown = [
+    `## ${d.webhookTitle}`,
+    d.webhookIntro,
+    `**${d.webhookPayloadLabel}**`,
+    '```json\n' + WEBHOOK_BODY_EXAMPLE + '\n```',
+    `**${d.webhookHeaderLabel}**`,
+    '```text\nX-Kaspi-Pay-Signature: <hex-encoded HMAC-SHA256>\n```',
+    `### ${d.webhookVerifyTitle}`,
+    d.webhookVerifyIntro,
+    '```js\n' + d.webhookVerifyCode + '\n```',
+  ].join('\n\n')
 
   const [loading, setLoading] = useState(true)
 
@@ -284,25 +285,10 @@ export default function KaspiApiDocsPage() {
         </div>
 
         <div>
-          <ApiDocsViewer lang={viewerLang} />
+          <ApiDocsViewer lang={viewerLang} extraMarkdown={webhookMarkdown} />
         </div>
 
         <div className="space-y-8 pt-10">
-          <section>
-            <h2 className="text-[20px] font-semibold">{d.webhookTitle}</h2>
-            <p className="mt-2 max-w-prose text-[13.5px] leading-relaxed" style={{ color: C.muted }}>{d.webhookIntro}</p>
-
-            <p className="mb-2 mt-4 text-[13px] font-semibold">{d.webhookPayloadLabel}</p>
-            <Pre>{WEBHOOK_BODY_EXAMPLE}</Pre>
-
-            <p className="mb-2 mt-4 text-[13px] font-semibold">{d.webhookHeaderLabel}</p>
-            <Pre>{'X-Kaspi-Pay-Signature: <hex-encoded HMAC-SHA256>'}</Pre>
-
-            <h3 className="mt-6 text-[15px] font-semibold">{d.webhookVerifyTitle}</h3>
-            <p className="mb-2 mt-2 max-w-prose text-[13.5px] leading-relaxed" style={{ color: C.muted }}>{d.webhookVerifyIntro}</p>
-            <Pre>{d.webhookVerifyCode}</Pre>
-          </section>
-
           <section className="rounded-xl p-5" style={{ background: C.bg1, border: `1px solid ${C.border}` }}>
             <h2 className="text-[15px] font-semibold" style={{ color: C.accent }}>{d.disclosureTitle}</h2>
             <p className="mt-2 max-w-prose text-[13.5px] leading-relaxed" style={{ color: C.muted }}>{d.disclosureBody}</p>
