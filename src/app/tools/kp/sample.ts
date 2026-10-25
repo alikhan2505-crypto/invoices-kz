@@ -1,6 +1,7 @@
 import { formatSampleMoney, type SampleCopy, type SampleDoc } from '@/lib/tools-i18n/toolSample'
 import { toolGuidePath, type ToolLang } from '@/lib/tools-i18n'
 import { kpLines, kpTotal, kpVatIncluded, type KpRow } from './calc'
+import { kpStrings, kpUnitLabel, type KpLang } from '@/lib/kpI18n'
 
 // Образец для блока «Образец» под формой /tools/kp (ToolSample). Все данные
 // ВЫМЫШЛЕННЫЕ: БИН из нулей, телефон из нулей, почта на example.com — реальных
@@ -10,6 +11,12 @@ import { kpLines, kpTotal, kpVatIncluded, type KpRow } from './calc'
 // дата, стороны, таблица позиций без колонки «Код», итоги, примечание,
 // подпись, дата составления и срок действия. НДС и итог считаются теми же
 // функциями calc.ts, что и в инструменте.
+//
+// Образец печатается на языке страницы (с 25.10.2026 КП умеет ru/kk/en): служебные
+// подписи берутся из того же словаря, что и сам документ (src/lib/kpI18n.ts),
+// а вымышленные данные (названия, адрес, позиции, примечание) есть на каждом
+// языке в SAMPLE_BY_LANG. Русские SAMPLE_ROWS / SAMPLE_SUPPLIER / SAMPLE_BUYER /
+// SAMPLE_NOTE остаются как были: на них считаются сумма и НДС.
 
 /** Строки образца в том же виде, в каком их хранит форма (цены уже с НДС). */
 export const SAMPLE_ROWS: KpRow[] = [
@@ -57,41 +64,81 @@ export const SAMPLE_BUYER = { name: 'ТОО «Образец»', bin: '000000000
 
 const tenge = (n: number) => `${formatSampleMoney(n)} ₸`
 
-/** Содержимое бланка — русское на всех языках страницы (генератор печатает русский бланк). */
-export function buildKpSampleDoc(): SampleDoc {
-  const s = SAMPLE_SUPPLIER
-  const lines = kpLines(SAMPLE_ROWS)
+/** Вымышленные данные образца на каждом языке документа (цифры и реквизиты общие). */
+export interface SampleLangData {
+  supplier: { name: string; address: string; director: string }
+  buyerName: string
+  rows: KpRow[]
+  note: string
+}
+
+export const SAMPLE_BY_LANG: Record<KpLang, SampleLangData> = {
+  ru: { supplier: SAMPLE_SUPPLIER, buyerName: SAMPLE_BUYER.name, rows: SAMPLE_ROWS, note: SAMPLE_NOTE },
+  kk: {
+    supplier: { name: 'ЖК Үлгі', address: 'Қазақстан Республикасы, Үлгі қ., Үлгілік к-сі, 1', director: 'Үлгілік Ү.Ү.' },
+    buyerName: '«Үлгі» ЖШС',
+    rows: [
+      { name: 'Логотип пен фирмалық стильді әзірлеу', qty: '1', unit: 'услуга', price: '150000' },
+      { name: 'Визиткалар, 500 дана басып шығару', qty: '2', unit: 'упак.', price: '12500' },
+    ],
+    note: 'Орындау мерзімі: 10 жұмыс күні. Төлем: 50% алдын ала төлем, қалғаны жұмыс тапсырылған соң.',
+  },
+  en: {
+    supplier: { name: 'Sole proprietor Sample', address: 'Republic of Kazakhstan, Sample City, 1 Sample St.', director: 'Sample S.S.' },
+    buyerName: 'Sample LLP',
+    rows: [
+      { name: 'Logo and brand identity design', qty: '1', unit: 'услуга', price: '150000' },
+      { name: 'Business cards, print run of 500', qty: '2', unit: 'упак.', price: '12500' },
+    ],
+    note: 'Lead time: 10 business days. Payment: 50% prepayment, the rest after delivery.',
+  },
+}
+
+const SAMPLE_CAPTIONS: Record<KpLang, { header: string; contacts: string }> = {
+  ru: { header: 'Шапка предложения', contacts: 'Контакты' },
+  kk: { header: 'Ұсыныстың тақырып бөлігі', contacts: 'Байланыс' },
+  en: { header: 'Proposal header', contacts: 'Contacts' },
+}
+
+/** Содержимое бланка на языке документа (по умолчанию русский, как печатает generateKP). */
+export function buildKpSampleDoc(lang: KpLang = 'ru'): SampleDoc {
+  const S = kpStrings(lang)
+  const d = SAMPLE_BY_LANG[lang]
+  const s = d.supplier
+  const c = SAMPLE_CAPTIONS[lang]
+  const lines = kpLines(d.rows)
+  const titleSep = lang === 'kk' ? ', ' : ' '
   return {
-    bankCaption: 'Шапка предложения',
+    bankCaption: c.header,
     bankRows: [
       [
-        { label: 'Поставщик', value: s.name },
-        { label: 'БИН', value: s.bin, center: true },
-        { label: 'Контакты', value: `Тел: ${s.phone} · ${s.email}`, center: true },
+        { label: S.supplier, value: s.name },
+        { label: S.bin.replace(/:\s*$/, ''), value: SAMPLE_SUPPLIER.bin, center: true },
+        { label: c.contacts, value: `${S.tel}${SAMPLE_SUPPLIER.phone} · ${SAMPLE_SUPPLIER.email}`, center: true },
       ],
     ],
-    title: `Коммерческое предложение № ${SAMPLE_NUMBER} от ${SAMPLE_DATE}`,
+    title: `${S.title} ${S.numberSign}${SAMPLE_NUMBER}${titleSep}${S.dateLine(SAMPLE_DATE)}`,
     parties: [
-      { label: 'Поставщик', value: `${s.name}, БИН: ${s.bin}, ${s.address}` },
-      { label: 'Покупатель', value: `${SAMPLE_BUYER.name}, БИН: ${SAMPLE_BUYER.bin}` },
+      { label: S.supplier, value: `${s.name}, ${S.bin}${SAMPLE_SUPPLIER.bin}, ${s.address}` },
+      { label: S.buyer, value: `${d.buyerName}, ${S.bin}${SAMPLE_BUYER.bin}` },
     ],
-    columns: ['№', 'Наименование', 'Кол-во', 'Ед.', 'Цена', 'Сумма'],
+    columns: [S.colNo, S.colName, S.colQty, S.colUnit, S.colPrice, S.colSum],
     rightAlignedColumns: [4, 5],
     nameColumn: 1,
     rows: lines.map((l, i) => ({
-      cells: [String(i + 1), l.name, String(l.qty), l.unit, tenge(l.price), tenge(l.qty * l.price)],
+      cells: [String(i + 1), l.name, String(l.qty), kpUnitLabel(l.unit, lang), tenge(l.price), tenge(l.qty * l.price)],
     })),
     totals: [
-      { label: 'Итого без НДС:', value: tenge(SAMPLE_NET) },
-      { label: `НДС ${SAMPLE_VAT_RATE}%:`, value: tenge(SAMPLE_VAT) },
-      { label: 'ИТОГО К ОПЛАТЕ:', value: tenge(SAMPLE_TOTAL) },
+      { label: S.subtotalNoVat, value: tenge(SAMPLE_NET) },
+      { label: S.vat16, value: tenge(SAMPLE_VAT) },
+      { label: S.totalDue, value: tenge(SAMPLE_TOTAL) },
     ],
     summaryLines: [
-      `Примечание: ${SAMPLE_NOTE}`,
-      `Дата составления: ${SAMPLE_DATE}`,
-      `Действителен до: ${SAMPLE_VALID_UNTIL}`,
+      `${S.note}: ${d.note}`,
+      `${S.dateIssued}: ${SAMPLE_DATE}`,
+      `${S.validUntil}: ${SAMPLE_VALID_UNTIL}`,
     ],
-    signatureLabel: 'Руководитель / Представитель',
+    signatureLabel: S.signer,
     signatureName: s.director,
   }
 }
@@ -127,7 +174,7 @@ export const kpSampleCopy: Record<ToolLang, SampleCopy> = {
       'Қолданылу мерзімі және шарттар: мерзімдер, жеткізу, төлеу тәртібі. Қолданылу мерзімі көрсетілмесе, КҰ-ға 30 күн қойылады.',
       'ҚҚС: ҚҚС төлеушісі «ҚҚС 16% қоса алғанда» дегенді таңдап, бағаларды салықпен бірге жазады, ҚҚС сомасы қорытындыда бөлек шығады. КҰ үшін қол мен мөр міндетті емес.',
     ],
-    caption: 'Ұсыныс бланкісі орыс тілінде шығады. Мысалдағы БСН, телефон, пошта және атаулар нақты компанияларға тиесілі емес.',
+    caption: 'Мысалдағы БСН, телефон, пошта және атаулар нақты компанияларға тиесілі емес. Ұсыныс осы бет тілінде (қазақша) жасалады.',
     scrollLabel: 'Коммерциялық ұсыныстың үлгісі, кестені көлденеңінен жылжытуға болады',
   },
   en: {
@@ -142,7 +189,7 @@ export const kpSampleCopy: Record<ToolLang, SampleCopy> = {
       'Validity and terms: timelines, delivery, payment. If you leave the validity date empty, the proposal is valid for 30 days.',
       'VAT: a VAT payer chooses “VAT 16% included” and enters prices including tax, so the VAT amount is shown separately in the total. A signature and a stamp are not required for a proposal.',
     ],
-    caption: 'The generated form is in Russian. The BIN, phone, email and names in the example are fictional and belong to no real company.',
+    caption: 'The BIN, phone, email and names in the example are fictional and belong to no real company. The proposal is generated in the language of this page.',
     scrollLabel: 'Sample commercial proposal, the table scrolls horizontally',
   },
 }

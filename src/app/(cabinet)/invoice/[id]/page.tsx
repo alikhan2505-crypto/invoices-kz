@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { generateInvoicePDF } from '@/lib/generatePDF'
 import { formatDateTime, formatDate, formatDateSafe } from '@/lib/date'
 import { generateKP } from '@/lib/generateKP'
+import KpLangPicker, { useKpDocLang } from '@/components/KpLangPicker'
 import { generateAVR } from '@/lib/generateAVR'
 import { generateNakladnaya } from '@/lib/generateNakladnaya'
 import { getActivePlan } from '@/lib/plan'
@@ -255,6 +256,9 @@ export default function InvoicePage() {
   const [updating, setUpdating] = useState(false)
   const [logs, setLogs] = useState<any[]>([])
   const [showSignModal, setShowSignModal] = useState(false)
+  // Модал подписи открыт для КП: тогда в нём ещё и выбор языка КП (ru по умолчанию).
+  const [signModalIsKp, setSignModalIsKp] = useState(false)
+  const { kpLang, setKpLang, kpLangRef } = useKpDocLang()
   const [pendingDocAction, setPendingDocAction] = useState<((withSign: boolean) => void) | null>(null)
   const [showEmailModal, setShowEmailModal] = useState(false)
   const [emailTo, setEmailTo] = useState('')
@@ -392,8 +396,9 @@ export default function InvoicePage() {
     setShowUpgradeModal(true)
   }
 
-  function askSignature(action: (withSign: boolean) => void) {
+  function askSignature(action: (withSign: boolean) => void, opts?: { kp?: boolean }) {
     setPendingDocAction(() => action)
+    setSignModalIsKp(!!opts?.kp)
     setShowSignModal(true)
   }
 
@@ -1203,10 +1208,11 @@ export default function InvoicePage() {
                   clientName: invoice.client_name || '', clientBin: invoice.client_bin || '',
                   services: invoice.services || [], total: Number(invoice.amount),
                   note: invoice.note || '', vatType: profile?.vat_type || 'no_vat',
+                  lang: kpLangRef.current,
                   profile: buildProfile(withSign),
                   bank: bank ? { bank_name: bank.bank_name, iik: bank.iik, bik: bank.bik, kbe: bank.kbe } : undefined,
                 }, win)
-              })
+              }, { kp: true })
             }}
           />
 
@@ -1441,6 +1447,7 @@ export default function InvoicePage() {
               <div className="font-semibold mb-1" style={{ color: 'var(--nav-text-primary)' }}>{t.documentFormatModalTitle}</div>
               <div className="text-sm" style={{ color: 'var(--nav-text-muted)' }}>{t.chooseDownloadVariantSubtitle}</div>
             </div>
+            {signModalIsKp && <KpLangPicker value={kpLang} onChange={setKpLang} className="mb-4" />}
             <div className="space-y-3 mb-4">
               <button onClick={() => {
                 if (!ap.canSign) {

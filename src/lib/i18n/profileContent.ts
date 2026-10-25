@@ -69,6 +69,9 @@ export interface ProfileMiscContent {
   goToPlansButton: string
   documentsInfoBannerTitle: string
   documentsInfoBannerBody: string
+  /** Выбор языка печатного КП (ru/kk/en): подпись группы и пометка у казахского варианта. */
+  kpDocLangLabel: string
+  kpDocLangReview: string
   kpTabLabel: string
   avrTabLabel: string
   nakladnayaTabLabel: string
@@ -185,6 +188,8 @@ export const profileContentDict: Record<'ru' | 'kk' | 'en', ProfileMiscContent> 
     goToPlansButton: 'Перейти к тарифам',
     documentsInfoBannerTitle: 'Архив документов',
     documentsInfoBannerBody: 'Все КП, АВР и накладные, созданные из ваших счетов. Откройте любой — его можно распечатать или скачать заново.',
+    kpDocLangLabel: 'Язык КП',
+    kpDocLangReview: '(текст проверяется)',
     kpTabLabel: 'КП',
     avrTabLabel: 'АВР',
     nakladnayaTabLabel: 'Накладные',
@@ -291,6 +296,8 @@ export const profileContentDict: Record<'ru' | 'kk' | 'en', ProfileMiscContent> 
     goToPlansButton: 'Тарифтерге өту',
     documentsInfoBannerTitle: 'Құжаттар мұрағаты',
     documentsInfoBannerBody: 'Шоттарыңыздан жасалған барлық КҰ, ОЖА және жүкқұжаттар. Кез келгенін ашып, қайта басып шығаруға немесе жүктеп алуға болады.',
+    kpDocLangLabel: 'КҰ тілі',
+    kpDocLangReview: '(мәтін тексерілуде)',
     kpTabLabel: 'КҰ',
     avrTabLabel: 'ОЖА',
     nakladnayaTabLabel: 'Жүкқұжаттар',
@@ -397,6 +404,8 @@ export const profileContentDict: Record<'ru' | 'kk' | 'en', ProfileMiscContent> 
     goToPlansButton: 'View plans',
     documentsInfoBannerTitle: 'Document archive',
     documentsInfoBannerBody: 'All quotes, acts and delivery notes created from your invoices. Open any of them to print or download it again.',
+    kpDocLangLabel: 'Proposal language',
+    kpDocLangReview: '(text is being proofread)',
     kpTabLabel: 'Quotes',
     avrTabLabel: 'Acts',
     nakladnayaTabLabel: 'Delivery notes',

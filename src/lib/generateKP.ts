@@ -8,6 +8,8 @@ interface KPService {
 }
 
 export interface KPData {
+  /** Язык печатного документа: 'ru' (по умолчанию), 'kk' или 'en'. Пользовательский ввод не переводится. */
+  lang?: KpLang
   // Бледный знак INVOICES.KZ фоном — бесплатные /tools (см. docWatermark.ts).
   showWatermark?: boolean
   number: string
@@ -45,6 +47,7 @@ import { resizeToFit } from './imageResize'
 import { docFitScript } from './docFit'
 import { watermarkCss, watermarkBodyClass } from './docWatermark'
 import { escapeHtml, escapeAttr } from './htmlEscape'
+import { kpStrings, kpUnitLabel, kpFileName, isKpLang, type KpLang } from './kpI18n'
 
 /** Картинки (подпись/печать/логотип) после resizeToFit: обычно data:image/png, но при ошибке загрузки — исходный URL из профиля. */
 export interface KPImages {
@@ -98,8 +101,10 @@ export async function generateKP(data: KPData, existingWin?: Window | null) {
 export function buildKPHtml(data: KPData, images: KPImages = {}): string {
   const p = data.profile
   const b = data.bank
+  const lang: KpLang = isKpLang(data.lang) ? data.lang : 'ru'
+  const L = kpStrings(lang)
 
-  const companyName = escapeHtml(p?.company_name || 'ИП First Project')
+  const companyName = escapeHtml(p?.company_name || L.defaultCompany)
   const binIin = escapeHtml(p?.bin_iin || '')
   const address = escapeHtml(p?.address || '')
   const phone = escapeHtml(p?.phone || '')
@@ -133,45 +138,45 @@ export function buildKPHtml(data: KPData, images: KPImages = {}): string {
   if (vatType === 'vat_16') {
     totalsHTML = `
       <div class="totals-row">
-        <label>Итого без НДС:</label>
+        <label>${L.subtotalNoVat}</label>
         <span>${formatMoney(totalWithoutVat)} ₸</span>
       </div>
       <div class="totals-row">
-        <label>НДС 16%:</label>
+        <label>${L.vat16}</label>
         <span>${formatMoney(vatAmount)} ₸</span>
       </div>
       <div class="totals-row total-final">
-        <label>ИТОГО К ОПЛАТЕ:</label>
+        <label>${L.totalDue}</label>
         <span>${formatMoney(data.total)} ₸</span>
       </div>
     `
   } else if (vatType === 'vat_0') {
     totalsHTML = `
       <div class="totals-row">
-        <label>Итого:</label>
+        <label>${L.total}</label>
         <span>${formatMoney(data.total)} ₸</span>
       </div>
       <div class="totals-row">
-        <label>НДС 0%:</label>
+        <label>${L.vat0}</label>
         <span>0,00 ₸</span>
       </div>
       <div class="totals-row total-final">
-        <label>ИТОГО К ОПЛАТЕ:</label>
+        <label>${L.totalDue}</label>
         <span>${formatMoney(data.total)} ₸</span>
       </div>
     `
   } else {
     totalsHTML = `
       <div class="totals-row">
-        <label>Итого:</label>
+        <label>${L.total}</label>
         <span>${formatMoney(data.total)} ₸</span>
       </div>
       <div class="totals-row">
-        <label>НДС:</label>
-        <span>Без НДС</span>
+        <label>${L.vatLabel}</label>
+        <span>${L.noVat}</span>
       </div>
       <div class="totals-row total-final">
-        <label>ИТОГО К ОПЛАТЕ:</label>
+        <label>${L.totalDue}</label>
         <span>${formatMoney(data.total)} ₸</span>
       </div>
     `
@@ -179,7 +184,7 @@ export function buildKPHtml(data: KPData, images: KPImages = {}): string {
 
   const html = `
     <!DOCTYPE html>
-    <html>
+    <html${L.htmlLang ? ` lang="${L.htmlLang}"` : ''}>
     <head>
       <meta charset="utf-8">
       <meta name="viewport" content="width=794, initial-scale=1.0, maximum-scale=1.0">
@@ -340,10 +345,10 @@ export function buildKPHtml(data: KPData, images: KPImages = {}): string {
       <div class="toolbar" style="position:fixed; top:0; left:0; right:0; background:white; border-bottom:1px solid #e5e7eb; padding:10px 16px; z-index:999; display:flex; align-items:center; justify-content:flex-start; gap:8px;">
         <!-- Кнопки слева: на телефоне документ не масштабируется, и правый
              край панели (где были «Печать» и «Скачать PDF») уходил за экран. -->
-        <button onclick="window.close()" style="background:#f3f4f6; color:#374151; border:none; padding:8px 14px; border-radius:8px; cursor:pointer; font-size:13px;">← Назад</button>
-        <button onclick="window.print()" style="background:#1C2056; color:white; border:none; padding:8px 14px; border-radius:8px; cursor:pointer; font-size:13px;">🖨️ Печать</button>
-        <button id="dlBtn" onclick="downloadPDF()" style="background:#2DC48D; color:white; border:none; padding:8px 14px; border-radius:8px; cursor:pointer; font-size:13px;">💾 Скачать PDF</button>
-        <span style="margin-left:auto; white-space:nowrap; font-size:12px; color:#6b7280; font-weight:600;">КП №${kpNumber}</span>
+        <button onclick="window.close()" style="background:#f3f4f6; color:#374151; border:none; padding:8px 14px; border-radius:8px; cursor:pointer; font-size:13px;">${L.back}</button>
+        <button onclick="window.print()" style="background:#1C2056; color:white; border:none; padding:8px 14px; border-radius:8px; cursor:pointer; font-size:13px;">${L.print}</button>
+        <button id="dlBtn" onclick="downloadPDF()" style="background:#2DC48D; color:white; border:none; padding:8px 14px; border-radius:8px; cursor:pointer; font-size:13px;">${L.downloadPdf}</button>
+        <span style="margin-left:auto; white-space:nowrap; font-size:12px; color:#6b7280; font-weight:600;">${L.toolbarNo}${kpNumber}</span>
       </div>
       <div style="height:55px;"></div>
 
@@ -358,15 +363,15 @@ export function buildKPHtml(data: KPData, images: KPImages = {}): string {
         <div class="header-left">
           <div class="company">${companyName}</div>
           <div class="company-details">
-            БИН: ${binIin}<br>
+            ${L.bin}${binIin}<br>
             ${address}<br>
-            ${phone ? 'Тел: ' + phone : ''}${phone && email ? ' · ' : ''}${email ? email : ''}
+            ${phone ? L.tel + phone : ''}${phone && email ? ' · ' : ''}${email ? email : ''}
           </div>
         </div>
         <div class="header-right">
-          <div class="kp-label">КОММЕРЧЕСКОЕ ПРЕДЛОЖЕНИЕ</div>
-          <div class="kp-number">№ ${kpNumber}</div>
-          <div class="kp-date">от ${kpDate}</div>
+          <div class="kp-label">${L.headerLabel}</div>
+          <div class="kp-number">${L.numberSign}${kpNumber}</div>
+          <div class="kp-date">${escapeHtml(L.dateLine(data.date))}</div>
         </div>
       </div>
       <div class="accent-bar"></div>
@@ -375,28 +380,28 @@ export function buildKPHtml(data: KPData, images: KPImages = {}): string {
 
         <!-- Title -->
         <div class="title-block">
-          <h1>Коммерческое предложение</h1>
-          <div class="subtitle">Уважаемые партнёры, предлагаем вашему вниманию следующие товары и услуги:</div>
+          <h1>${L.title}</h1>
+          <div class="subtitle">${L.subtitle}</div>
         </div>
 
         <!-- Parties -->
         <div class="parties">
           <div class="party">
-            <div class="party-label">Поставщик</div>
+            <div class="party-label">${L.supplier}</div>
             <div class="party-name">${companyName}</div>
             <div class="party-detail">
-              ${[binIin ? 'БИН: ' + binIin : '', address, phone ? 'Тел: ' + phone : '', email ? 'Email: ' + email : ''].filter(Boolean).join('<br>')}
+              ${[binIin ? L.bin + binIin : '', address, phone ? L.tel + phone : '', email ? L.email + email : ''].filter(Boolean).join('<br>')}
             </div>
           </div>
           <div class="party client">
-            <div class="party-label">Покупатель</div>
+            <div class="party-label">${L.buyer}</div>
             <div class="party-name">${escapeHtml(data.clientName)}</div>
             <div class="party-detail">
               ${[
-                data.clientBin ? 'БИН: ' + escapeHtml(data.clientBin) : '',
+                data.clientBin ? L.bin + escapeHtml(data.clientBin) : '',
                 escapeHtml(data.clientAddress || ''),
-                data.clientPhone ? 'Тел: ' + escapeHtml(data.clientPhone) : '',
-                data.clientEmail ? 'Email: ' + escapeHtml(data.clientEmail) : '',
+                data.clientPhone ? L.tel + escapeHtml(data.clientPhone) : '',
+                data.clientEmail ? L.email + escapeHtml(data.clientEmail) : '',
               ].filter(Boolean).join('<br>')}
             </div>
           </div>
@@ -405,17 +410,17 @@ export function buildKPHtml(data: KPData, images: KPImages = {}): string {
         <!-- Services. Колонка «Код» — только если у позиций есть настоящие коды
              (из справочника услуг в кабинете). Раньше без кода в ней печатался
              номер строки ещё раз — дубль «№» (правка основателя 15.10.2026). -->
-        <div class="section-title">Перечень товаров / услуг</div>
+        <div class="section-title">${L.itemsTitle}</div>
         <table class="services-table">
           <thead>
             <tr>
-              <th style="width:5%">№</th>
-              ${hasCodes ? '<th style="width:8%">Код</th>' : ''}
-              <th class="name" style="width:${hasCodes ? 40 : 48}%">Наименование</th>
-              <th style="width:10%">Кол-во</th>
-              <th style="width:8%">Ед.</th>
-              <th style="width:14%">Цена</th>
-              <th style="width:15%">Сумма</th>
+              <th style="width:5%">${L.colNo}</th>
+              ${hasCodes ? `<th style="width:8%">${L.colCode}</th>` : ''}
+              <th class="name" style="width:${hasCodes ? 40 : 48}%">${L.colName}</th>
+              <th style="width:10%">${L.colQty}</th>
+              <th style="width:8%">${L.colUnit}</th>
+              <th style="width:14%">${L.colPrice}</th>
+              <th style="width:15%">${L.colSum}</th>
             </tr>
           </thead>
           <tbody>
@@ -425,7 +430,7 @@ export function buildKPHtml(data: KPData, images: KPImages = {}): string {
                 ${hasCodes ? `<td>${escapeHtml(s.code || '')}</td>` : ''}
                 <td class="name">${escapeHtml(s.name)}</td>
                 <td>${escapeHtml(s.qty)}</td>
-                <td>${escapeHtml(s.unit || 'шт')}</td>
+                <td>${escapeHtml(kpUnitLabel(s.unit, lang))}</td>
                 <td class="right">${formatMoney(Number(s.price))} ₸</td>
                 <td class="right">${formatMoney(s.qty * s.price)} ₸</td>
               </tr>
@@ -442,29 +447,29 @@ export function buildKPHtml(data: KPData, images: KPImages = {}): string {
 
         ${data.note && data.note.trim() ? `
         <!-- Note -->
-        <div class="section-title">Примечание</div>
+        <div class="section-title">${L.note}</div>
         <div class="note-block">${escapeHtml(data.note.trim())}</div>
         ` : ''}
 
         ${b ? `
         <!-- Bank -->
-        <div class="section-title">Банковские реквизиты</div>
+        <div class="section-title">${L.bankTitle}</div>
         <div class="bank-block">
           <div class="bank-grid">
             <div class="bank-item">
-              <label>Банк</label>
+              <label>${L.bank}</label>
               <span>${escapeHtml(b.bank_name)}</span>
             </div>
             <div class="bank-item">
-              <label>ИИК</label>
+              <label>${L.iik}</label>
               <span>${escapeHtml(b.iik)}</span>
             </div>
             <div class="bank-item">
-              <label>БИК</label>
+              <label>${L.bik}</label>
               <span>${escapeHtml(b.bik)}</span>
             </div>
             <div class="bank-item">
-              <label>КБе</label>
+              <label>${L.kbe}</label>
               <span>${escapeHtml(b.kbe || '19')}</span>
             </div>
           </div>
@@ -474,7 +479,7 @@ export function buildKPHtml(data: KPData, images: KPImages = {}): string {
         <!-- Signature -->
         <div class="signature-block">
           <div class="sig-left">
-            <div class="sig-label">Руководитель / Представитель</div>
+            <div class="sig-label">${L.signer}</div>
             <div class="sig-line${signatureBase64 || stampBase64 ? ' has-img' : ''}">
               ${signatureBase64 ? `<img src="${signatureBase64}" style="position:absolute; bottom:8px; left:10px; height:45px; max-width:150px; object-fit:contain;">` : ''}
               ${stampBase64 ? `<img src="${stampBase64}" style="position:absolute; bottom:-10px; left:60px; height:90px; width:90px; object-fit:contain; opacity:0.85;">` : ''}
@@ -482,9 +487,9 @@ export function buildKPHtml(data: KPData, images: KPImages = {}): string {
             <div class="sig-name">${director ? director : ''}</div>
           </div>
           <div style="width:45%; text-align:right;">
-            <div style="font-size:10px; color:#888; margin-bottom:8px;">Дата составления</div>
+            <div style="font-size:10px; color:#888; margin-bottom:8px;">${L.dateIssued}</div>
             <div style="font-size:12px; font-weight:bold; color:#1C2056;">${kpDate}</div>
-            <div style="font-size:10px; color:#888; margin-top:12px;">Действителен до</div>
+            <div style="font-size:10px; color:#888; margin-top:12px;">${L.validUntil}</div>
             <div style="font-size:12px; font-weight:bold; color:#2DC48D;">${validDate}</div>
           </div>
         </div>
@@ -495,7 +500,7 @@ export function buildKPHtml(data: KPData, images: KPImages = {}): string {
       <div class="footer">
         <div>
           <div class="footer-brand">INVOICES.KZ</div>
-          <div class="footer-sub">Сервисы для бизнеса в Казахстане</div>
+          <div class="footer-sub">${L.footerSub}</div>
         </div>
         <div class="footer-sub">invoices.kz</div>
       </div>
@@ -503,7 +508,7 @@ export function buildKPHtml(data: KPData, images: KPImages = {}): string {
       <script>
         function downloadPDF() {
           const btn = document.getElementById('dlBtn')
-          btn.textContent = '⏳ Загрузка...'
+          btn.textContent = '${L.loading}'
           btn.disabled = true
           // Сначала снимок прокрутки (__ikzUnfit), потом прятать панель — иначе
           // страница короче и после скачивания окно не возвращается на место.
@@ -514,7 +519,7 @@ export function buildKPHtml(data: KPData, images: KPImages = {}): string {
           if (spacer) spacer.style.display = 'none'
           html2pdf().set({
             margin: 0,
-            filename: ${jsString('КП-' + data.number + '.pdf')},
+            filename: ${jsString(kpFileName(lang, data.number))},
             image: { type: 'jpeg', quality: 0.98 },
             html2canvas: { scale: 2, useCORS: true, logging: false },
             jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
@@ -522,7 +527,7 @@ export function buildKPHtml(data: KPData, images: KPImages = {}): string {
             if (window.__ikzFit) window.__ikzFit()
             if (toolbar) toolbar.style.display = 'flex'
             if (spacer) spacer.style.display = 'block'
-            btn.textContent = '💾 Скачать PDF'
+            btn.textContent = '${L.downloadPdf}'
             btn.disabled = false
           })
         }

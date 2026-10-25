@@ -14,8 +14,9 @@ import ToolSample from '@/components/tools/ToolSample'
 import KpSample, { KpSampleLink } from './KpSample'
 import { kpLines } from './calc'
 import { kpDict } from './dict'
+import { kpStrings } from '@/lib/kpI18n'
 import {
-  buildKpSampleDoc, kpGuidePath, kpSampleAnchorLabel, kpSampleCopy, SAMPLE_ANCHOR_ID, SAMPLE_BUYER, SAMPLE_DATE, SAMPLE_NET, SAMPLE_NOTE,
+  buildKpSampleDoc, kpGuidePath, kpSampleAnchorLabel, kpSampleCopy, SAMPLE_ANCHOR_ID, SAMPLE_BUYER, SAMPLE_BY_LANG, SAMPLE_DATE, SAMPLE_NET, SAMPLE_NOTE,
   SAMPLE_NUMBER, SAMPLE_ROWS, SAMPLE_SUPPLIER, SAMPLE_TOTAL, SAMPLE_VALID_UNTIL, SAMPLE_VAT, SAMPLE_VAT_RATE,
 } from './sample'
 
@@ -72,48 +73,73 @@ describe('kp sample: arithmetic', () => {
 })
 
 describe('kp sample: matches what generateKP really prints', () => {
-  it('prints the same header, parties, columns, rows, totals, note, signature and validity', () => {
-    const s = SAMPLE_SUPPLIER
-    const html = buildKPHtml({
-      number: SAMPLE_NUMBER,
-      date: SAMPLE_DATE,
-      validUntil: SAMPLE_VALID_UNTIL,
-      clientName: SAMPLE_BUYER.name,
-      clientBin: SAMPLE_BUYER.bin,
-      note: SAMPLE_NOTE,
-      services: kpLines(SAMPLE_ROWS),
-      total: SAMPLE_TOTAL,
-      vatType: 'vat_16',
-      profile: { company_name: s.name, bin_iin: s.bin, address: s.address, phone: s.phone, email: s.email, director_name: s.director },
+  for (const lang of TOOL_LANGS) {
+    it(`${lang}: prints the same header, parties, columns, rows, totals, note, signature and validity`, () => {
+      const S = kpStrings(lang)
+      const d = SAMPLE_BY_LANG[lang]
+      const s = d.supplier
+      const html = buildKPHtml({
+        lang,
+        number: SAMPLE_NUMBER,
+        date: SAMPLE_DATE,
+        validUntil: SAMPLE_VALID_UNTIL,
+        clientName: d.buyerName,
+        clientBin: SAMPLE_BUYER.bin,
+        note: d.note,
+        services: kpLines(d.rows),
+        total: SAMPLE_TOTAL,
+        vatType: 'vat_16',
+        profile: { company_name: s.name, bin_iin: SAMPLE_SUPPLIER.bin, address: s.address, phone: SAMPLE_SUPPLIER.phone, email: SAMPLE_SUPPLIER.email, director_name: s.director },
+      })
+      const doc = buildKpSampleDoc(lang)
+      expect(html).toContain(S.headerLabel)
+      expect(html).toContain(`${S.numberSign}${SAMPLE_NUMBER}`)
+      expect(html).toContain(S.dateLine(SAMPLE_DATE))
+      expect(doc.title).toContain(S.title)
+      expect(doc.title).toContain(`${S.numberSign}${SAMPLE_NUMBER}`)
+      expect(doc.title).toContain(S.dateLine(SAMPLE_DATE))
+      if (lang === 'ru') expect(doc.title).toBe(`Коммерческое предложение № ${SAMPLE_NUMBER} от ${SAMPLE_DATE}`)
+      expect(html).toContain(`${tenge(SAMPLE_NET)}`)
+      expect(html).toContain(tenge(SAMPLE_VAT))
+      expect(html).toContain(tenge(SAMPLE_TOTAL))
+      for (const t of doc.totals) expect(html).toContain(t.label)
+      for (const col of doc.columns) expect(html).toContain(col)
+      for (const row of doc.rows) for (const cell of row.cells.slice(1)) expect(html).toContain(cell)
+      for (const p of doc.parties) expect(html).toContain(p.label)
+      for (const v of [s.name, SAMPLE_SUPPLIER.bin, s.address, SAMPLE_SUPPLIER.phone, SAMPLE_SUPPLIER.email, s.director, d.buyerName, SAMPLE_BUYER.bin]) expect(html).toContain(v)
+      expect(html).toContain(S.note)
+      expect(html).toContain(d.note)
+      expect(html).toContain(doc.signatureLabel)
+      expect(html).toContain(S.dateIssued)
+      expect(html).toContain(S.validUntil)
+      expect(html).toContain(SAMPLE_VALID_UNTIL)
+      // КП из инструмента печатается без банка и без колонки «Код» - образец тоже.
+      expect(html).not.toContain(S.bankTitle)
+      expect(html).not.toContain(`>${S.colCode}<`)
+      const bankAndCode = { ru: /Банк|ИИК|БИК|Код/, kk: /Банк|ЖСК|БСК|Коды/, en: /Bank|IIK|BIK|Code/ }[lang]
+      expect(JSON.stringify(doc)).not.toMatch(bankAndCode)
     })
-    const doc = buildKpSampleDoc()
-    expect(html).toContain('КОММЕРЧЕСКОЕ ПРЕДЛОЖЕНИЕ')
-    expect(html).toContain(`№ ${SAMPLE_NUMBER}`)
-    expect(html).toContain(`от ${SAMPLE_DATE}`)
-    expect(doc.title).toBe(`Коммерческое предложение № ${SAMPLE_NUMBER} от ${SAMPLE_DATE}`)
-    expect(html).toContain(`${tenge(SAMPLE_NET)}`)
-    expect(html).toContain(tenge(SAMPLE_VAT))
-    expect(html).toContain(tenge(SAMPLE_TOTAL))
-    for (const t of doc.totals) expect(html).toContain(t.label)
-    for (const col of doc.columns) expect(html).toContain(col)
-    for (const row of doc.rows) for (const cell of row.cells.slice(1)) expect(html).toContain(cell)
-    for (const p of doc.parties) expect(html).toContain(p.label)
-    for (const v of [s.name, s.bin, s.address, s.phone, s.email, s.director, SAMPLE_BUYER.name, SAMPLE_BUYER.bin]) expect(html).toContain(v)
-    expect(html).toContain('Примечание')
-    expect(html).toContain(SAMPLE_NOTE)
-    expect(html).toContain(doc.signatureLabel)
-    expect(html).toContain('Дата составления')
-    expect(html).toContain('Действителен до')
-    expect(html).toContain(SAMPLE_VALID_UNTIL)
-    // КП из инструмента печатается без банка и без колонки «Код» — образец тоже.
-    expect(html).not.toContain('Банковские реквизиты')
-    expect(html).not.toContain('>Код<')
-    expect(JSON.stringify(doc)).not.toMatch(/Банк|ИИК|БИК|Код/)
+  }
+
+  it('keeps the Russian sample exactly as before', () => {
+    expect(SAMPLE_BY_LANG.ru.note).toBe(SAMPLE_NOTE)
+    expect(SAMPLE_BY_LANG.ru.rows).toBe(SAMPLE_ROWS)
+    expect(buildKpSampleDoc().title).toBe(buildKpSampleDoc('ru').title)
+  })
+
+  it('has the same amounts on every language (only words are translated)', () => {
+    for (const lang of TOOL_LANGS) {
+      const doc = buildKpSampleDoc(lang)
+      expect(doc.rows.map(r => r.cells.slice(4))).toEqual(buildKpSampleDoc('ru').rows.map(r => r.cells.slice(4)))
+      expect(doc.totals.map(t => t.value)).toEqual(buildKpSampleDoc('ru').totals.map(t => t.value))
+      expect(doc.rows).toHaveLength(2)
+      for (const row of doc.rows) expect(row.cells).toHaveLength(doc.columns.length)
+    }
   })
 })
 
 describe('kp sample: fictional data only', () => {
-  const everything = JSON.stringify([SAMPLE_SUPPLIER, SAMPLE_BUYER, buildKpSampleDoc(), SAMPLE_ROWS, SAMPLE_NOTE])
+  const everything = JSON.stringify([SAMPLE_SUPPLIER, SAMPLE_BUYER, SAMPLE_BY_LANG, TOOL_LANGS.map(l => buildKpSampleDoc(l)), SAMPLE_ROWS, SAMPLE_NOTE])
 
   it('uses obviously fake identifiers', () => {
     expect(SAMPLE_SUPPLIER.bin).toMatch(/^0{12}$/)
@@ -122,6 +148,10 @@ describe('kp sample: fictional data only', () => {
     expect(SAMPLE_SUPPLIER.email).toMatch(/@example\.com$/)
     expect(SAMPLE_SUPPLIER.name).toMatch(/Пример/)
     expect(SAMPLE_BUYER.name).toMatch(/Образец/)
+    expect(SAMPLE_BY_LANG.kk.supplier.name).toMatch(/Үлгі/)
+    expect(SAMPLE_BY_LANG.kk.buyerName).toMatch(/Үлгі/)
+    expect(SAMPLE_BY_LANG.en.supplier.name).toMatch(/Sample/)
+    expect(SAMPLE_BY_LANG.en.buyerName).toMatch(/Sample/)
   })
 
   it('never reuses a real bank BIK or any other real 12-digit number', () => {
@@ -165,10 +195,15 @@ describe('kp sample: copy on every language', () => {
     expect(JSON.stringify(kpSampleCopy.kk)).toMatch(/ҚҚС/)
   })
 
-  it('says the data is fictional and that the form is Russian on kk/en', () => {
+  it('says the data is fictional and that the form follows the page language on kk/en', () => {
     expect(kpSampleCopy.ru.caption).toMatch(/вымышленн/)
-    expect(kpSampleCopy.kk.caption).toMatch(/орыс тілінде/)
-    expect(kpSampleCopy.en.caption).toMatch(/in Russian/)
+    expect(kpSampleCopy.kk.caption).toMatch(/нақты компанияларға тиесілі емес/)
+    expect(kpSampleCopy.kk.caption).toMatch(/қазақша/)
+    expect(kpSampleCopy.en.caption).toMatch(/fictional/)
+    expect(kpSampleCopy.en.caption).toMatch(/language of this page/)
+    // Больше не пишем, что бланк русский: КП печатается на ru/kk/en.
+    expect(kpSampleCopy.kk.caption).not.toMatch(/орыс тілінде/)
+    expect(kpSampleCopy.en.caption).not.toMatch(/in Russian/)
   })
 
   it('states only what the tool page already says (30 days, VAT 16% label, stamp not required)', () => {
@@ -197,11 +232,13 @@ describe('ToolSample renders the kp sample into server HTML', () => {
         createElement(ToolSample, {
           idPrefix: 'kp-sample',
           copy: kpSampleCopy[lang],
-          doc: buildKpSampleDoc(),
+          doc: buildKpSampleDoc(lang),
+          docLang: lang,
           guide: { href: kpGuidePath(lang), label: kpDict[lang].guideLink },
         }),
       )
       const c = kpSampleCopy[lang]
+      const S = kpStrings(lang)
       expect(html).toContain(c.heading)
       expect(html).toContain(c.ribbon)
       expect(html).toContain(c.intro)
@@ -210,10 +247,11 @@ describe('ToolSample renders the kp sample into server HTML', () => {
       expect(html).toContain(`href="${kpGuidePath(lang)}"`)
       expect(html).toContain('overflow-x-auto')
       expect(html).toContain('role="region"')
-      expect(html).toContain('lang="ru"')
-      expect(html).toContain('ИТОГО К ОПЛАТЕ:')
+      expect(html).toContain(`lang="${lang}"`)
+      expect(html).toContain(S.totalDue)
       expect(html).toContain(tenge(SAMPLE_TOTAL))
-      expect(html).toContain(`Действителен до: ${SAMPLE_VALID_UNTIL}`)
+      expect(html).toContain(`${S.validUntil}: ${SAMPLE_VALID_UNTIL}`)
+      if (lang === 'ru') expect(html).toContain('ИТОГО К ОПЛАТЕ:')
       expect(html).not.toMatch(/\shidden[\s=>]/)
       expect(html).not.toContain('<img')
       // Цвета — только переменные темы.
@@ -239,6 +277,9 @@ describe('sample anchor link above the form', () => {
       expect(link).toContain(`<a href="#${SAMPLE_ANCHOR_ID}"`)
       expect(link).toContain(kpSampleAnchorLabel[lang])
       expect(sample).toContain(`id="${SAMPLE_ANCHOR_ID}"`)
+      // Образец напечатан на языке страницы.
+      expect(sample).toContain(`lang="${lang}"`)
+      expect(sample).toContain(kpStrings(lang).totalDue)
       // Цвета только из переменных темы, без tabindex=-1 (ссылка фокусируется).
       expect(link).not.toMatch(/#[0-9a-fA-F]{3,8}\b/)
       expect(link).not.toContain('tabindex')

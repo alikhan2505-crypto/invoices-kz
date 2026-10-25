@@ -2,8 +2,9 @@ import { quarterStartLabel, type ToolLang, type ToolSeoCopy } from '@/lib/tools-
 
 // Все тексты /tools/kp на трёх языках: и <head> (seo), и интерфейс.
 // Русский seo — дословно прежний layout.tsx, чтобы не сбить уже набранную
-// выдачу. Сам документ (generateKP) печатается только по-русски — это
-// юридическая форма, а не язык страницы (docs/tools-i18n-pattern.md).
+// выдачу. Сам документ (generateKP) с 25.10.2026 печатается на языке страницы:
+// ru, kk или en (решение основателя; остальные документы остаются русскими,
+// см. docs/tools-i18n-pattern.md).
 
 // Дата обнуления квартала словами живёт в общем tools-i18n (её же берут Счёт,
 // АВР и накладная); реэкспорт — чтобы прежний импорт из './dict' не сломался.
@@ -13,8 +14,10 @@ export interface KpDict {
   seo: ToolSeoCopy
   h1: string
   intro: string
-  /** Одна строка на kk/en: документ формируется на русском. На ru — пусто. */
-  docLangNote: string
+  /** Подпись поля «Язык документа»: КП печатается на ru, kk или en, по умолчанию - на языке страницы. */
+  docLangLabel: string
+  /** Пометка у варианта «Қазақша»: казахский текст документа ещё вычитывается основателем (KK_DOC_UNDER_REVIEW). */
+  docLangReview: string
   fromTitle: string
   companyLabel: string
   companyPlaceholder: string
@@ -95,7 +98,8 @@ export const kpDict: Record<ToolLang, KpDict> = {
     h1: 'Образец коммерческого предложения в Казахстане — заполнить и скачать бесплатно',
     intro:
       'Заполните позиции и цены — получите аккуратное КП с итоговой суммой и сроком действия и скачайте его в PDF. Без регистрации, 3 предложения в квартал.',
-    docLangNote: '',
+    docLangLabel: 'Язык документа',
+    docLangReview: '(текст проверяется)',
     fromTitle: 'От кого',
     companyLabel: 'Название ИП / ТОО *',
     companyPlaceholder: 'ИП Иванов / ТОО «Ромашка»',
@@ -192,7 +196,8 @@ export const kpDict: Record<ToolLang, KpDict> = {
     h1: 'Қазақстандағы коммерциялық ұсыныс үлгісі — толтырып, тегін жүктеңіз',
     intro:
       'Позициялар мен бағаларды толтырыңыз — жалпы сомасы мен қолданылу мерзімі көрсетілген ұқыпты коммерциялық ұсыныс (КҰ) аласыз. Тіркелусіз, тоқсанына 3 ұсыныс.',
-    docLangNote: 'Ұсыныстың өзі орыс тілінде жасалады — Қазақстанда іскерлік құжаттарға кеңінен қабылданған үлгі.',
+    docLangLabel: 'Құжат тілі',
+    docLangReview: '(мәтін тексерілуде)',
     fromTitle: 'Кімнен',
     companyLabel: 'ЖК / ЖШС атауы *',
     companyPlaceholder: 'ЖК Серіков / «Шұғыла» ЖШС',
@@ -289,7 +294,8 @@ export const kpDict: Record<ToolLang, KpDict> = {
     h1: 'Commercial proposal template for Kazakhstan — fill in and download free',
     intro:
       'Fill in items and prices to get a clean commercial proposal (quote) with a total and a validity date. No sign-up, 3 proposals per quarter.',
-    docLangNote: 'The proposal itself is generated in Russian, the standard language for business paperwork in Kazakhstan.',
+    docLangLabel: 'Document language',
+    docLangReview: '(text is being proofread)',
     fromTitle: 'From',
     companyLabel: 'Your business name *',
     companyPlaceholder: 'As registered, e.g. ИП Ivanov / ТОО «Alpha»',

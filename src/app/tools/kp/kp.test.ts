@@ -60,10 +60,15 @@ describe('kp dictionary', () => {
       .toBe('Образец коммерческого предложения в Казахстане — PDF')
   })
 
-  it('warns about the Russian document only on kk/en', () => {
-    expect(kpDict.ru.docLangNote).toBe('')
-    expect(kpDict.kk.docLangNote).not.toBe('')
-    expect(kpDict.en.docLangNote).not.toBe('')
+  it('lets the visitor pick the document language and marks the Kazakh text as under review', () => {
+    // С 25.10.2026 КП печатается на ru/kk/en: вместо строки «документ на русском» - выбор языка.
+    expect(kpDict).toBeDefined()
+    for (const lang of ['ru', 'kk', 'en'] as const) {
+      expect(kpDict[lang].docLangLabel.trim(), `${lang}.docLangLabel`).not.toBe('')
+      expect(kpDict[lang].docLangReview.trim(), `${lang}.docLangReview`).not.toBe('')
+      expect('docLangNote' in kpDict[lang]).toBe(false)
+    }
+    expect(kpDict.ru.docLangReview).toBe('(текст проверяется)')
   })
 
   it('uses Kazakh terms, not Russian abbreviations, on the kk page', () => {

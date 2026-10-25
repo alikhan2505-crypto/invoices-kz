@@ -12,7 +12,8 @@ export default function KpSample({ lang }: { lang: ToolLang }) {
       id={SAMPLE_ANCHOR_ID}
       idPrefix="kp-sample"
       copy={kpSampleCopy[lang]}
-      doc={buildKpSampleDoc()}
+      doc={buildKpSampleDoc(lang)}
+      docLang={lang}
       guide={{ href: kpGuidePath(lang), label: kpDict[lang].guideLink }}
     />
   )

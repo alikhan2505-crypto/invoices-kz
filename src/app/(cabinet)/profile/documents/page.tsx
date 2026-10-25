@@ -16,6 +16,7 @@ import { useAppDialog } from '@/components/AppDialog'
 import PageContainer, { TILE_LIST_CLS, TILE_GRID_CLS, TILE_ITEM_CLS } from '@/components/PageContainer'
 import PageHeader from '@/components/PageHeader'
 import ProGate from '@/components/ProGate'
+import KpLangPicker, { useKpDocLang } from '@/components/KpLangPicker'
 
 // Same easing curve used across the redesigned app (see src/app/dashboard/page.tsx) --
 // kept identical rather than inventing a second "house" ease.
@@ -72,6 +73,8 @@ export default function Documents() {
   const [naklList, setNaklList] = useState<any[]>([])
   const [profile, setProfile] = useState<any>(null)
   const [busyDocId, setBusyDocId] = useState<string | null>(null)
+  // Язык печатного КП (ru по умолчанию): общий выбор для кнопки «Открыть» в списке КП.
+  const { kpLang, setKpLang, kpLangRef } = useKpDocLang()
 
   useEffect(() => { load() }, [])
 
@@ -127,6 +130,7 @@ export default function Documents() {
       total: Number(doc.total),
       note: doc.note || '',
       vatType: doc.vat_type || 'no_vat',
+      lang: kpLangRef.current,
       profile: profile,
       bank: bank ? { bank_name: bank.bank_name, iik: bank.iik, bik: bank.bik, kbe: bank.kbe } : undefined,
     }, win)
@@ -257,6 +261,10 @@ export default function Documents() {
               </button>
             ))}
           </motion.div>
+
+          {tab === 'kp' && currentList.length > 0 && (
+            <KpLangPicker value={kpLang} onChange={setKpLang} className="mb-4" />
+          )}
 
           {currentList.length === 0 ? (
             <div className="flex flex-col items-center text-center py-12">

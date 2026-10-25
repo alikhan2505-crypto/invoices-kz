@@ -4,6 +4,7 @@ import Link from 'next/link'
 import BrandWordmark from '@/components/BrandWordmark'
 import { track } from '@vercel/analytics'
 import { generateKP } from '@/lib/generateKP'
+import { KK_DOC_UNDER_REVIEW, type KpLang } from '@/lib/kpI18n'
 import { useLanguage } from '@/components/LanguageProvider'
 import { formatTenge, isToolLocalized, toolGuidePath, toolLinkPath, toolsIndexPath, TOOL_CHROME, type ToolLang } from '@/lib/tools-i18n'
 import ToolLangSwitch from '@/lib/tools-i18n/ToolLangSwitch'
@@ -29,8 +30,10 @@ import { kpLines, kpRowProblem, kpTotal, kpVatIncluded, localIsoDate, ruDate, KP
 // затем живой реестр, 3 раза в квартал на каждое из двух полей.
 //
 // Один компонент на /tools/kp, /tools/kk/kp и /tools/en/kp: язык интерфейса
-// приходит пропсом из page.tsx (из адреса). Сам документ печатается по-русски
-// на любом языке страницы — см. docs/tools-i18n-pattern.md.
+// приходит пропсом из page.tsx (из адреса). КП - единственный документ, у
+// которого есть выбор языка бланка ru/kk/en (решение основателя 25.10.2026,
+// словарь в src/lib/kpI18n.ts); по умолчанию - язык страницы. Счёт, АВР и
+// накладная остаются русскими, см. docs/tools-i18n-pattern.md.
 // Гайд «Счёт, АВР, накладная и КП»: ru и kk есть, английского нет (en → русский).
 const GUIDE_SLUG = 'dokumenty-ip-kazakhstan'
 const DEFAULT_LIMIT = 3
@@ -81,6 +84,9 @@ export default function KpTool({ lang, children }: { lang: ToolLang; children?: 
   // а кнопка всё равно спросит сервер при нажатии.
   const [quota, setQuota] = useState<Quota | null>(null)
   const [generating, setGenerating] = useState(false)
+  // Язык печатного документа: по умолчанию язык страницы, в черновик не пишем -
+  // иначе русская страница наследовала бы выбор, сделанный на английской.
+  const [docLang, setDocLang] = useState<KpLang>(lang)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -187,9 +193,10 @@ export default function KpTool({ lang, children }: { lang: ToolLang; children?: 
       return
     }
     setQuota(claimed)
-    track('tool_kp_generate', { lang, vat: f.vatType })
+    track('tool_kp_generate', { lang, vat: f.vatType, doc: docLang })
     try {
       await generateKP({
+        lang: docLang,
         showWatermark: true,
         number: f.number.trim() || '1',
         date: ruDate(f.date || localIsoDate()),
@@ -252,12 +259,9 @@ export default function KpTool({ lang, children }: { lang: ToolLang; children?: 
         <h1 className="text-2xl lg:text-3xl font-bold mb-2" style={{ color: 'var(--nav-text-primary)' }}>
           {t.h1}
         </h1>
-        <p className={`text-sm ${t.docLangNote ? 'mb-2' : 'mb-6'}`} style={{ color: 'var(--nav-text-secondary)' }}>
+        <p className="text-sm mb-6" style={{ color: 'var(--nav-text-secondary)' }}>
           {t.intro}
         </p>
-        {t.docLangNote && (
-          <p className="text-[12px] mb-6" style={hintStyle}>{t.docLangNote}</p>
-        )}
 
         <div className="nav-glass rounded-2xl p-5 mb-4">
           <h2 className="text-sm font-bold mb-3" style={{ color: 'var(--nav-text-primary)' }}>{t.fromTitle}</h2>
@@ -338,16 +342,28 @@ export default function KpTool({ lang, children }: { lang: ToolLang; children?: 
               <div id="kp-valid-hint" className="text-[11px] mt-1" style={hintStyle}>{t.validHint}</div>
             </div>
           </div>
-          <div className="mb-4">
-            <label htmlFor="kp-vat" className={label} style={labelStyle}>{t.vatLabel}</label>
-            <select id="kp-vat" className={`${input} max-w-[240px]`} style={inputStyle} value={f.vatType} onChange={e => set({ vatType: e.target.value as Form['vatType'] })}>
-              <option value="no_vat">{t.vatNo}</option>
-              <option value="vat_16">{t.vat16}</option>
-              <option value="vat_0">{t.vat0}</option>
-            </select>
-            {f.vatType === 'vat_16' && (
-              <div className="text-[11px] mt-1.5" style={hintStyle}>{t.vat16Hint}</div>
-            )}
+          <div className="mb-4 grid sm:grid-cols-2 gap-3 items-start">
+            <div>
+              <label htmlFor="kp-vat" className={label} style={labelStyle}>{t.vatLabel}</label>
+              <select id="kp-vat" className={`${input} sm:max-w-[240px]`} style={inputStyle} value={f.vatType} onChange={e => set({ vatType: e.target.value as Form['vatType'] })}>
+                <option value="no_vat">{t.vatNo}</option>
+                <option value="vat_16">{t.vat16}</option>
+                <option value="vat_0">{t.vat0}</option>
+              </select>
+              {f.vatType === 'vat_16' && (
+                <div className="text-[11px] mt-1.5" style={hintStyle}>{t.vat16Hint}</div>
+              )}
+            </div>
+            {/* Язык печатного документа: по умолчанию - язык страницы, можно выбрать любой из трёх
+                (docs/tools-i18n-pattern.md: язык документа - отдельная настройка документа). */}
+            <div>
+              <label htmlFor="kp-doc-lang" className={label} style={labelStyle}>{t.docLangLabel}</label>
+              <select id="kp-doc-lang" className={`${input} sm:max-w-[240px]`} style={inputStyle} value={docLang} onChange={e => setDocLang(e.target.value as KpLang)}>
+                <option value="ru">Русский</option>
+                <option value="kk">{KK_DOC_UNDER_REVIEW ? `Қазақша ${t.docLangReview}` : 'Қазақша'}</option>
+                <option value="en">English</option>
+              </select>
+            </div>
           </div>
 
           {f.rows.map((r, i) => (
